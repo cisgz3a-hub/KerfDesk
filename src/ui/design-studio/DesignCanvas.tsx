@@ -39,7 +39,7 @@ export function DesignCanvas(): JSX.Element {
   const setView = useDesignStudioStore((state) => state.setView);
 
   useFrameOnOpen(hostRef, workspace.width, workspace.height);
-  useLayerPaint(staticRef, hostRef, workspace.width, workspace.height);
+  useLayerPaint(staticRef, overlayRef, hostRef, workspace.width, workspace.height);
   const pointer = useDesignPointer(overlayRef, newEntityId);
 
   const handleWheel = useCallback(
@@ -127,6 +127,7 @@ function useFrameOnOpen(
 // a repaint.
 function useLayerPaint(
   staticRef: React.RefObject<HTMLCanvasElement | null>,
+  overlayRef: React.RefObject<HTMLCanvasElement | null>,
   hostRef: React.RefObject<HTMLDivElement | null>,
   bedWidthMm: number,
   bedHeightMm: number,
@@ -134,9 +135,11 @@ function useLayerPaint(
   useEffect(() => {
     const host = hostRef.current;
     const staticCanvas = staticRef.current;
-    if (host === null || staticCanvas === null) return undefined;
-    const overlayCanvas = staticCanvas.nextElementSibling;
-    if (!(overlayCanvas instanceof HTMLCanvasElement)) return undefined;
+    const overlayCanvas = overlayRef.current;
+    // Both layers are addressed by their own ref. An earlier version found the
+    // overlay via staticCanvas.nextElementSibling, which silently coupled painting
+    // to DOM child order inside the host — adding any third child could break it.
+    if (host === null || staticCanvas === null || overlayCanvas === null) return undefined;
 
     const paint = (): void => {
       const session = useDesignStudioStore.getState().session;
@@ -178,13 +181,23 @@ function useLayerPaint(
     const unsubscribe = useDesignStudioStore.subscribe(scheduler.request);
     const observer = new ResizeObserver(scheduler.request);
     observer.observe(host);
-    scheduler.request();
+    // The FIRST paint runs immediately rather than on a frame: a hidden or
+    // throttled page does not run frame callbacks at all, and the canvas must not
+    // be blank while that is true.
+    scheduler.flush();
+    // Coming back into view is the other moment a frame is owed but may never have
+    // arrived, so repaint outright rather than trusting the pending request.
+    const onVisible = (): void => {
+      if (!host.ownerDocument.hidden) scheduler.flush();
+    };
+    host.ownerDocument.addEventListener('visibilitychange', onVisible);
     return () => {
       unsubscribe();
       observer.disconnect();
+      host.ownerDocument.removeEventListener('visibilitychange', onVisible);
       scheduler.cancel();
     };
-  }, [staticRef, hostRef, bedWidthMm, bedHeightMm]);
+  }, [staticRef, overlayRef, hostRef, bedWidthMm, bedHeightMm]);
 }
 
 function sizedContext(

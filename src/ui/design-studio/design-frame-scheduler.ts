@@ -14,6 +14,12 @@
 export type FrameScheduler = {
   // Schedule a run on the next frame. Repeated calls before that frame are free.
   readonly request: () => void;
+  // Run NOW, dropping any pending frame. Used for the first paint and after the
+  // page becomes visible again, because a browser pauses requestAnimationFrame
+  // entirely while a page is hidden — a canvas that owes its first paint to a
+  // frame callback stays blank until the page is composited, which is both a real
+  // user-visible stall and impossible to verify from a headless harness.
+  readonly flush: () => void;
   // Drop any pending frame and return to the idle state.
   readonly cancel: () => void;
 };
@@ -25,6 +31,11 @@ export type FrameSchedulerHost = {
 
 export function createFrameScheduler(run: () => void, host: FrameSchedulerHost): FrameScheduler {
   let handle: number | null = null;
+  const clear = (): void => {
+    if (handle === null) return;
+    host.cancelFrame(handle);
+    handle = null;
+  };
   return {
     request: () => {
       if (handle !== null) return;
@@ -33,11 +44,11 @@ export function createFrameScheduler(run: () => void, host: FrameSchedulerHost):
         run();
       });
     },
-    cancel: () => {
-      if (handle === null) return;
-      host.cancelFrame(handle);
-      handle = null;
+    flush: () => {
+      clear();
+      run();
     },
+    cancel: clear,
   };
 }
 

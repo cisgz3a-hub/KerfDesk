@@ -96,6 +96,40 @@ describe('createFrameScheduler', () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
+  // A hidden or throttled page does not run frame callbacks AT ALL, so the first
+  // paint must not be owed to one — otherwise the canvas is blank until the page is
+  // composited. Verified against a real hidden page: requestAnimationFrame fired
+  // zero times in 800 ms while document.hidden was true.
+  it('flush runs immediately without waiting for a frame', () => {
+    const run = vi.fn();
+    const host = fakeHost();
+    const scheduler = createFrameScheduler(run, host);
+    scheduler.flush();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(host.pending()).toBe(0);
+  });
+
+  it('flush drops a pending frame so the work runs once, not twice', () => {
+    const run = vi.fn();
+    const host = fakeHost();
+    const scheduler = createFrameScheduler(run, host);
+    scheduler.request();
+    scheduler.flush();
+    expect(run).toHaveBeenCalledTimes(1);
+    host.flush();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('can still schedule normally after a flush', () => {
+    const run = vi.fn();
+    const host = fakeHost();
+    const scheduler = createFrameScheduler(run, host);
+    scheduler.flush();
+    scheduler.request();
+    host.flush();
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
   it('cancel with nothing pending is inert', () => {
     const run = vi.fn();
     const host = fakeHost();
