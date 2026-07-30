@@ -59,7 +59,8 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
   for (const part of nominalParts(spec, slots)) {
     const fit = applyPanelFit(part.rings, {
       clearanceMm: spec.clearanceMm,
-      relief: spec.relief,
+      // The loose lid's thumb notch is a handhold, not a square-tab seat.
+      relief: part.panel === 'lid' ? { kind: 'none' } : spec.relief,
     });
     if (fit.kind !== 'fitted') {
       return { kind: 'error', message: `${part.name} panel: ${fit.detail}.` };
@@ -93,20 +94,24 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
     fittedPanels.map((panel) => ringsExtent(panel)),
     spec.partSpacingMm,
   );
-  return {
-    kind: 'generated',
-    panels: fittedPanels.map((panel, index) => {
-      const offsetMm = offsets[index] ?? { x: 0, y: 0 };
-      return {
-        name: panel.name,
-        panel: panel.panel,
-        ...(panel.divider === undefined ? {} : { divider: panel.divider }),
-        outline: translate(panel.outline, offsetMm),
-        cutouts: panel.cutouts.map((cutout) => translate(cutout, offsetMm)),
-        offsetMm,
-      };
-    }),
-  };
+  const panels = fittedPanels.map((panel, index): BoxPanel => {
+    const offsetMm = offsets[index] ?? { x: 0, y: 0 };
+    return {
+      name: panel.name,
+      panel: panel.panel,
+      ...(panel.divider === undefined ? {} : { divider: panel.divider }),
+      outline: translate(panel.outline, offsetMm),
+      cutouts: panel.cutouts.map((cutout) => translate(cutout, offsetMm)),
+      offsetMm,
+    };
+  });
+  if (!panels.every(panelGeometryIsFinite)) {
+    return {
+      kind: 'error',
+      message: 'Box dimensions or spacing exceed the supported numeric range.',
+    };
+  }
+  return { kind: 'generated', panels };
 }
 
 type NominalPart = {
@@ -165,4 +170,14 @@ function translate(ring: Polyline, offsetMm: Vec2): Polyline {
     closed: ring.closed,
     points: ring.points.map((point) => ({ x: point.x + offsetMm.x, y: point.y + offsetMm.y })),
   };
+}
+
+function panelGeometryIsFinite(panel: BoxPanel): boolean {
+  return (
+    Number.isFinite(panel.offsetMm.x) &&
+    Number.isFinite(panel.offsetMm.y) &&
+    [panel.outline, ...panel.cutouts].every((ring) =>
+      ring.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+    )
+  );
 }
