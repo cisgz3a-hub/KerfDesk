@@ -306,7 +306,8 @@ byte-identical for unchanged input. Design + research:
 | DS-4 | Object-snap engine (`core/design/snap/`): endpoint / midpoint / centre / quadrant / intersection / on-edge, ranked so geometry always beats the grid, each with its own on-canvas glyph and a status-bar readout | Built |
 | DS-4b | Polar/angle tracking, tangent and perpendicular snaps, alignment guides between objects | Planned |
 | DS-5 | Apply → commits designed geometry as one project undo entry; rect/circle land parametric, line/arc/path bake exact. **End-to-end slice closed** — verified from sketch through `compileJob` to emitted G-code | Built |
-| DS-6 | Modify ops: trim, extend, fillet, chamfer (`core/design/ops/`) | Planned |
+| DS-6 | Corner ops in `core/design/ops/`: fillet (tangent arc at the shared chord tolerance) and chamfer (exact, no sampling), both refusing a size that will not fit rather than clamping | Built (core) |
+| DS-6b | Trim and extend to the nearest crossing; wiring the Modify rail buttons to the corner ops | Planned |
 | DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit | Planned |
 | DS-8 | 2.5D depth per entity + three.js extrude view | Planned |
 | DS-9 | `SketchShape` arm on `ShapeSpec` — parametric round-trip through `.lf2` | Planned |
