@@ -15,6 +15,7 @@ import {
   type DesignHistory,
 } from './design-history';
 import type { DesignDraft } from './design-draft';
+import type { SnapTarget } from '../../core/design/snap';
 import type { MeasurementKey } from './design-entity-fields';
 import type { DesignToolKind } from './design-tool';
 
@@ -44,6 +45,10 @@ export type DesignSession = {
   // exactly the distance that field controls. Cleared on blur — the annotation is
   // a transient explanation, not a persistent overlay.
   readonly activeMeasurement: MeasurementKey | null;
+  // The geometric snap currently under the pointer, so the canvas can mark it and
+  // the status bar can name it. Purely a readout — the snapped point is already
+  // baked into cursorMm and any live draft.
+  readonly activeSnap: SnapTarget | null;
   readonly snapEnabled: boolean;
   readonly orthoEnabled: boolean;
   readonly showGrid: boolean;
@@ -66,6 +71,7 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     draft: null,
     marquee: null,
     activeMeasurement: null,
+    activeSnap: null,
     snapEnabled: true,
     orthoEnabled: false,
     showGrid: true,

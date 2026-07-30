@@ -169,6 +169,7 @@ function useLayerPaint(
         marquee: session.marquee,
         measuredEntity: measured.entity,
         measuredField: measured.field,
+        snap: session.activeSnap,
         widthPx,
         heightPx,
       });

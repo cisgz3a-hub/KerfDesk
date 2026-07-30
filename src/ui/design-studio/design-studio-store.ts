@@ -14,6 +14,7 @@ import {
   type Sketch,
   type SketchEntity,
 } from '../../core/design';
+import type { SnapTarget } from '../../core/design/snap';
 import type { Vec2 } from '../../core/scene';
 import { draftToEntity, type DesignDraft } from './design-draft';
 import { applyEntityField } from './design-entity-edit';
@@ -41,6 +42,7 @@ type DesignStudioState = {
   readonly setTool: (tool: DesignToolKind) => void;
   readonly setView: (view: DesignView) => void;
   readonly setCursorMm: (point: Vec2 | null) => void;
+  readonly setActiveSnap: (target: SnapTarget | null) => void;
   readonly setSelection: (ids: ReadonlyArray<string>) => void;
   readonly toggleSnap: () => void;
   readonly toggleOrtho: () => void;
@@ -83,6 +85,7 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   setTool: (tool) => set(mapSession((session) => ({ ...session, tool }))),
   setView: (view) => set(mapSession((session) => ({ ...session, view }))),
   setCursorMm: (cursorMm) => set(mapSession((session) => ({ ...session, cursorMm }))),
+  setActiveSnap: (activeSnap) => set(mapSession((session) => ({ ...session, activeSnap }))),
   setSelection: (ids) => set(mapSession((session) => ({ ...session, selectedIds: new Set(ids) }))),
 
   toggleSnap: () =>

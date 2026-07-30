@@ -303,7 +303,8 @@ byte-identical for unchanged input. Design + research:
 | DS-3 | Drawing tools: Line/Rect/Circle drag gestures with Shift/Alt modifiers, second canvas layer for the live draft + dimension label, click/marquee selection, grid snap, ortho | Built |
 | DS-3b | Floating precision inspector: per-shape editable dimensions, derived measurements (area / perimeter / circumference / chord / arc length), and a draughting-style dimension call-out drawn on the shape while a field is touched | Built |
 | DS-3c | Typed numeric entry during a draw gesture, per-tool options bar | Planned |
-| DS-4 | Object-snap engine (`core/design/snap/`): endpoint/midpoint/centre/quadrant/intersection with per-type cursor glyphs, polar tracking | Planned |
+| DS-4 | Object-snap engine (`core/design/snap/`): endpoint / midpoint / centre / quadrant / intersection / on-edge, ranked so geometry always beats the grid, each with its own on-canvas glyph and a status-bar readout | Built |
+| DS-4b | Polar/angle tracking, tangent and perpendicular snaps, alignment guides between objects | Planned |
 | DS-5 | Apply → commits designed geometry as one project undo entry; rect/circle land parametric, line/arc/path bake exact. **End-to-end slice closed** — verified from sketch through `compileJob` to emitted G-code | Built |
 | DS-6 | Modify ops: trim, extend, fillet, chamfer (`core/design/ops/`) | Planned |
 | DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit | Planned |

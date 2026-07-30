@@ -4978,3 +4978,47 @@ again.
    replacing the first, so re-applying never silently destroys earlier work.
 2. Construction guides are excluded from output every time; they exist to design
    against, not to cut.
+
+### F-DS9. Snap to existing geometry (DS-4)
+
+1. With **Snap** on, moving the pointer near existing geometry captures it on the
+   nearest meaningful reference point rather than on the grid.
+2. Six kinds are offered, each drawn with its own glyph so you can tell which one
+   caught you:
+
+   | Kind | Glyph | Where |
+   |---|---|---|
+   | node | filled square | line ends, path nodes, rectangle corners, arc ends |
+   | midpoint | hollow triangle | halfway along any edge |
+   | centre | circle with crosshair | centre of a circle, arc, or rectangle |
+   | quadrant | hollow diamond | the 0/90/180/270 rim points of a circle or arc |
+   | intersection | X | where two different shapes cross |
+   | edge | short bar | anywhere along an edge |
+
+3. The status bar names the live one, e.g. `Snap: centre`.
+4. Reach is a fixed screen distance, so it feels the same at every zoom.
+
+#### Success
+
+The point lands exactly on the reference — a corner at 103.4 mm snaps to 103.4 mm,
+not to the nearest grid line. Priority is by specificity, so a node always wins over
+the edge it sits on, and a midpoint over the same edge.
+
+#### Error — nothing in reach
+
+1. Beyond the snap radius, the grid takes over; with the grid off, the raw pointer
+   position is used. Nothing is refused and no marker is drawn.
+
+#### Empty — an empty sketch
+
+1. With no geometry there is nothing to snap to, so only the grid applies.
+
+#### Edge — snapping while drawing
+
+1. The shape being drawn is excluded from its own snap candidates, so a rectangle
+   cannot capture its own corner mid-drag.
+2. An arc offers only the quadrants it actually sweeps through — a compass point the
+   arc never reaches is not a snap target.
+3. A shape crossing itself reports no intersection; a crossing is a reference
+   between two shapes, and self-crossings fight the node snap on closed paths.
+4. Turning Snap off (Shift+S) disables both mechanisms at once.

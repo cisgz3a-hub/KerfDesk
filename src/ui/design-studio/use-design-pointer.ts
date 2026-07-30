@@ -13,7 +13,7 @@ import type { Vec2 } from '../../core/scene';
 import { isDraftTool, NO_MODIFIERS, type DraftModifiers } from './design-draft';
 import { hitTestSketch, HIT_RADIUS_PX } from './design-hit-test';
 import { useDesignStudioStore } from './design-studio-store';
-import { applyOrthoMm, snapToGridMm } from './design-snap';
+import { applyOrthoMm, snapPointMm } from './design-snap';
 import { pxToMm } from './design-view';
 
 export type DesignPointerHandlers = {
@@ -28,16 +28,8 @@ export function useDesignPointer(
   newEntityId: () => string,
 ): DesignPointerHandlers {
   const pointMm = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>): Vec2 | null => {
-      const session = useDesignStudioStore.getState().session;
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (session?.view == null || rect === undefined) return null;
-      const raw = pxToMm(session.view, {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      });
-      return snapToGridMm(raw, { enabled: session.snapEnabled, gridMm: session.gridMm });
-    },
+    (event: React.PointerEvent<HTMLCanvasElement>): Vec2 | null =>
+      resolvePointerMm(canvasRef.current, event),
     [canvasRef],
   );
 
@@ -96,10 +88,38 @@ export function useDesignPointer(
   );
 
   const onPointerLeave = useCallback(() => {
-    useDesignStudioStore.getState().setCursorMm(null);
+    const store = useDesignStudioStore.getState();
+    store.setCursorMm(null);
+    store.setActiveSnap(null);
   }, []);
 
   return { onPointerDown, onPointerMove, onPointerUp, onPointerLeave };
+}
+
+// Resolves the pointer to a millimetre point, applying object snap first and the
+// grid only as a fallback, and publishes which target captured it so the canvas can
+// mark it and the status bar can name it.
+function resolvePointerMm(
+  canvas: HTMLCanvasElement | null,
+  event: React.PointerEvent<HTMLCanvasElement>,
+): Vec2 | null {
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  const rect = canvas?.getBoundingClientRect();
+  if (session?.view == null || rect === undefined) return null;
+  const raw = pxToMm(session.view, {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  });
+  const resolved = snapPointMm({
+    sketch: session.history.present,
+    rawMm: raw,
+    pxPerMm: session.view.pxPerMm,
+    snapEnabled: session.snapEnabled,
+    gridMm: session.gridMm,
+  });
+  store.setActiveSnap(resolved.target);
+  return resolved.pointMm;
 }
 
 // Click an entity to select it (Shift adds); click empty space to start a

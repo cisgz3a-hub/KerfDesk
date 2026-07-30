@@ -9,6 +9,7 @@
 // Everything here informs. Nothing here refuses (rule 7).
 
 import { formatDisplayMillimetres } from '../format-display-millimetres';
+import { snapKindLabel } from './design-snap';
 import { DESIGN_TOOL_BY_KIND } from './design-tool';
 import { useDesignStudioStore } from './design-studio-store';
 
@@ -25,7 +26,12 @@ export function DesignStatusBar(): JSX.Element | null {
           ? 'X —  Y —'
           : `X ${formatDisplayMillimetres(session.cursorMm.x)}  Y ${formatDisplayMillimetres(session.cursorMm.y)}`}
       </span>
-      <Chip on={session.snapEnabled} label="Snap" />
+      <Chip
+        on={session.snapEnabled}
+        label={
+          session.activeSnap === null ? 'Snap' : `Snap: ${snapKindLabel(session.activeSnap.kind)}`
+        }
+      />
       <Chip on={session.orthoEnabled} label="Ortho" />
       <Chip on={session.showGrid} label={`Grid ${session.gridMm} mm`} />
       <span style={countStyle}>{entityCount === 1 ? '1 entity' : `${entityCount} entities`}</span>

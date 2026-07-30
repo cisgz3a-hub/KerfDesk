@@ -10,6 +10,7 @@
 // rest of the time.
 
 import type { SketchEntity } from '../../core/design';
+import type { SnapTarget } from '../../core/design/snap';
 import type { Vec2 } from '../../core/scene';
 import { canvasTheme } from '../theme/canvas-theme';
 import { formatDisplayMillimetres } from '../format-display-millimetres';
@@ -24,6 +25,7 @@ import {
 } from './design-draft';
 import { paintAnnotation } from './design-annotation-draw';
 import { annotationFor } from './design-measure-annotation';
+import { paintSnapMarker } from './design-snap-marker-draw';
 import { formatFieldValue, type EntityField } from './design-field-format';
 import type { DesignMarquee, DesignView } from './design-session';
 import { mmToPx } from './design-view';
@@ -36,6 +38,8 @@ export type DesignOverlayPaint = {
   // they produce the dimension call-out drawn over the shape.
   readonly measuredEntity: SketchEntity | null;
   readonly measuredField: EntityField | null;
+  // The geometric snap under the pointer, marked with a per-kind glyph.
+  readonly snap: SnapTarget | null;
   readonly widthPx: number;
   readonly heightPx: number;
 };
@@ -53,6 +57,8 @@ export function paintDesignOverlay(ctx: CanvasRenderingContext2D, paint: DesignO
   if (paint.marquee !== null) paintMarquee(ctx, paint.view, paint.marquee);
   if (paint.draft !== null) paintDraft(ctx, paint.view, paint.draft);
   paintMeasurement(ctx, paint);
+  // Drawn last so the snap glyph is never hidden behind a draft or a dimension.
+  if (paint.snap !== null) paintSnapMarker(ctx, paint.view, paint.snap);
 }
 
 // Drawn last so a dimension call-out is never hidden behind a draft.
