@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -100,5 +101,29 @@ describe('useKerfCheck', () => {
     await act(async () => useImageEditorStore.setState({ session: session('R2') }));
 
     expect(host?.textContent).toBe('none');
+  });
+
+  it('hides completed results for generated session and project replacements', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.constantFrom('session', 'project'), async (replacement) => {
+        await act(async () => {
+          useStore.setState({ project: project() });
+          useImageEditorStore.setState({ session: session('R1') });
+        });
+        await act(async () => vi.advanceTimersByTime(DEBOUNCE_MS));
+        expect(host?.textContent).not.toBe('none');
+
+        await act(async () => {
+          if (replacement === 'session') {
+            useImageEditorStore.setState({ session: session('R2') });
+          } else {
+            useStore.setState({ project: project() });
+          }
+        });
+
+        expect(host?.textContent).toBe('none');
+      }),
+      { numRuns: 12 },
+    );
   });
 });

@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import {
@@ -11,6 +12,7 @@ import { applyThicken, computeKerfCheck } from './editor-kerf-check';
 import { createSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
 import { useStore } from '../state';
+import { useToastStore } from '../state/toast-store';
 
 // 60×60 px on 60×60 mm (1 px = 1 mm).
 const BOUNDS = { minX: 0, minY: 0, maxX: 60, maxY: 60 };
@@ -132,5 +134,56 @@ describe('computeKerfCheck', () => {
     applyThicken(check);
 
     expect(useImageEditorStore.getState().session).toBe(nextSession);
+  });
+
+  it('never applies a result after any captured editor owner changes', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom('session', 'revision', 'active-layer', 'object', 'layer', 'threshold'),
+        (changedOwner) => {
+          const sourceProject = projectWithDotWidth(3);
+          const sourceSession = strokesSession();
+          const check = computeKerfCheck(sourceSession, sourceProject);
+          if (check === null) throw new Error('expected a check');
+          let currentSession = sourceSession;
+          let currentProject = sourceProject;
+
+          if (changedOwner === 'session') {
+            currentSession = createSession('R2', 'other.png', createRgbaBuffer(60, 60), BOUNDS);
+          } else if (changedOwner === 'revision') {
+            currentSession = { ...sourceSession, revision: sourceSession.revision + 1 };
+          } else if (changedOwner === 'active-layer') {
+            currentSession = { ...sourceSession, activeLayerId: 'different-layer' };
+          } else if (changedOwner === 'object') {
+            currentProject = {
+              ...sourceProject,
+              scene: {
+                ...sourceProject.scene,
+                objects: sourceProject.scene.objects.map((object) => ({ ...object })),
+              },
+            };
+          } else if (changedOwner === 'layer') {
+            currentProject = {
+              ...sourceProject,
+              scene: {
+                ...sourceProject.scene,
+                layers: sourceProject.scene.layers.map((layer) => ({ ...layer })),
+              },
+            };
+          } else {
+            currentProject = projectWithDotWidth(2);
+          }
+
+          useStore.setState({ project: currentProject });
+          useImageEditorStore.setState({ session: currentSession });
+          applyThicken(check);
+
+          expect(useImageEditorStore.getState().session).toBe(currentSession);
+          for (const toast of useToastStore.getState().toasts) {
+            useToastStore.getState().dismissToast(toast.id);
+          }
+        },
+      ),
+    );
   });
 });

@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import {
@@ -88,5 +89,79 @@ describe('kerf-check context ownership', () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it('invalidates every independently owned freshness input', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(
+          'object',
+          'layer',
+          'source-doc',
+          'revision',
+          'active-layer',
+          'dimensions',
+          'threshold',
+        ),
+        (changedInput) => {
+          const session = createSession(
+            OBJECT_ID,
+            'source.png',
+            createRgbaBuffer(SIZE_PX, SIZE_PX),
+            BOUNDS,
+          );
+          const sourceProject = project();
+          const context = kerfCheckContext(session, sourceProject);
+          if (context === null) throw new Error('expected a kerf-check context');
+          let currentSession = session;
+          let currentProject = sourceProject;
+
+          if (changedInput === 'object') {
+            currentProject = {
+              ...sourceProject,
+              scene: {
+                ...sourceProject.scene,
+                objects: sourceProject.scene.objects.map((object) => ({ ...object })),
+              },
+            };
+          } else if (changedInput === 'layer') {
+            currentProject = {
+              ...sourceProject,
+              scene: {
+                ...sourceProject.scene,
+                layers: sourceProject.scene.layers.map((layer) => ({ ...layer })),
+              },
+            };
+          } else if (changedInput === 'source-doc') {
+            currentSession = {
+              ...session,
+              doc: createRgbaBuffer(SIZE_PX, SIZE_PX),
+            };
+          } else if (changedInput === 'revision') {
+            currentSession = { ...session, revision: session.revision + 1 };
+          } else if (changedInput === 'active-layer') {
+            currentSession = { ...session, activeLayerId: 'different-layer' };
+          } else if (changedInput === 'dimensions') {
+            currentSession = {
+              ...session,
+              doc: createRgbaBuffer(SIZE_PX + 1, SIZE_PX),
+            };
+          } else {
+            currentProject = {
+              ...sourceProject,
+              scene: {
+                ...sourceProject.scene,
+                layers: sourceProject.scene.layers.map((layer) => ({
+                  ...layer,
+                  dotWidthCorrectionMm: 0.5,
+                })),
+              },
+            };
+          }
+
+          expect(isKerfCheckContextCurrent(context, currentSession, currentProject)).toBe(false);
+        },
+      ),
+    );
   });
 });
