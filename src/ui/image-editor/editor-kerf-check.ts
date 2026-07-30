@@ -12,9 +12,16 @@ import {
 } from '../../core/image-select';
 import { rasterRunSurvivesDotWidthCorrection } from '../../core/raster/raster-sweep-plan';
 import type { Project } from '../../core/scene';
+import { useStore } from '../state';
+import { useToastStore } from '../state/toast-store';
 import { BLACK, captureScoped, type EditorSession } from './editor-session';
 import { compositeSession } from './editor-session-layers';
 import { useImageEditorStore } from './image-editor-store';
+import {
+  isKerfCheckContextCurrent,
+  kerfCheckContext,
+  type KerfCheckContext,
+} from './kerf-check-context';
 
 const INK_LUMA_THRESHOLD = 128;
 const LUMA_R = 0.299;
@@ -27,6 +34,7 @@ export type KerfCheck = {
   readonly thresholdMm: number;
   readonly removedMask: SelectionMask;
   readonly correctionPx: number;
+  readonly context: KerfCheckContext;
 };
 
 /**
@@ -34,8 +42,9 @@ export type KerfCheck = {
  * dot-width correction. Line-mode kerf offset is intentionally irrelevant.
  */
 export function computeKerfCheck(session: EditorSession, project: Project): KerfCheck | null {
-  const thresholdMm = dotWidthThresholdMm(session, project);
-  if (thresholdMm === null) return null;
+  const context = kerfCheckContext(session, project);
+  if (context === null) return null;
+  const { thresholdMm } = context;
   const mmPerPx =
     (session.sourceBounds.maxX - session.sourceBounds.minX) / Math.max(1, session.base.width);
   if (!Number.isFinite(mmPerPx) || mmPerPx <= 0) return null;
@@ -47,6 +56,7 @@ export function computeKerfCheck(session: EditorSession, project: Project): Kerf
     thresholdMm,
     removedMask: removed.mask,
     correctionPx,
+    context,
   };
 }
 
@@ -81,6 +91,12 @@ export function applyThicken(check: KerfCheck): void {
   const store = useImageEditorStore.getState();
   const session = store.session;
   if (session === null || check.removedPixels === 0) return;
+  if (!isKerfCheckContextCurrent(check.context, session, useStore.getState().project)) {
+    useToastStore
+      .getState()
+      .pushToast('The image changed; the dot-width check is refreshing.', 'info');
+    return;
+  }
   const grown = expandMask(check.removedMask, check.correctionPx);
   const bounds = maskBounds(grown);
   if (bounds === null) return;
@@ -95,26 +111,6 @@ export function applyThicken(check: KerfCheck): void {
       lastDirtyRect: bounds,
     },
   });
-}
-
-function dotWidthThresholdMm(session: EditorSession, project: Project): number | null {
-  const found = project.scene.objects.find((candidate) => candidate.id === session.objectId);
-  const object = found?.kind === 'raster-image' ? found : undefined;
-  const layer =
-    object === undefined
-      ? undefined
-      : project.scene.layers.find((candidate) => candidate.color === object.color);
-  if (object === undefined || layer === undefined) return null;
-  const effective = { ...layer, ...object.operationOverride };
-  if (
-    effective.mode !== 'image' ||
-    !Number.isFinite(effective.linesPerMm) ||
-    effective.linesPerMm <= 0
-  ) {
-    return null;
-  }
-  const threshold = Math.min(Math.max(0, effective.dotWidthCorrectionMm), 1 / effective.linesPerMm);
-  return threshold > 0 ? threshold : null;
 }
 
 function inkMask(session: EditorSession): SelectionMask {

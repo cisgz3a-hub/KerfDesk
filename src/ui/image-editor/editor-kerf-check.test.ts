@@ -10,6 +10,7 @@ import {
 import { applyThicken, computeKerfCheck } from './editor-kerf-check';
 import { createSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
+import { useStore } from '../state';
 
 // 60×60 px on 60×60 mm (1 px = 1 mm).
 const BOUNDS = { minX: 0, minY: 0, maxX: 60, maxY: 60 };
@@ -107,8 +108,10 @@ describe('computeKerfCheck', () => {
 
   it('applyThicken repairs the thin strokes as one undoable entry', () => {
     const session = strokesSession();
+    const project = projectWithDotWidth(3);
     useImageEditorStore.setState({ session });
-    const check = computeKerfCheck(session, projectWithDotWidth(3));
+    useStore.setState({ project });
+    const check = computeKerfCheck(session, project);
     if (check === null) throw new Error('expected a check');
     applyThicken(check);
     const next = useImageEditorStore.getState().session;
@@ -116,5 +119,18 @@ describe('computeKerfCheck', () => {
     // Re-checking the thickened document finds no thin strokes left.
     const recheck = computeKerfCheck(next ?? session, projectWithDotWidth(3));
     expect(recheck?.removedPixels).toBe(0);
+  });
+
+  it('does not apply a stale result to a different editor session', () => {
+    const project = projectWithDotWidth(3);
+    const check = computeKerfCheck(strokesSession(), project);
+    if (check === null) throw new Error('expected a check');
+    const nextSession = createSession('R2', 'other.png', createRgbaBuffer(60, 60), BOUNDS);
+    useStore.setState({ project });
+    useImageEditorStore.setState({ session: nextSession });
+
+    applyThicken(check);
+
+    expect(useImageEditorStore.getState().session).toBe(nextSession);
   });
 });
