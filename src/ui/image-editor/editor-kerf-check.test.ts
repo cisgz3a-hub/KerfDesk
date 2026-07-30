@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import {
@@ -10,6 +11,7 @@ import {
 import { applyThicken, computeKerfCheck } from './editor-kerf-check';
 import { createSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
+import { useStore, useToastStore } from '../state';
 
 // 60×60 px on 60×60 mm (1 px = 1 mm).
 const BOUNDS = { minX: 0, minY: 0, maxX: 60, maxY: 60 };
@@ -107,8 +109,10 @@ describe('computeKerfCheck', () => {
 
   it('applyThicken repairs the thin strokes as one undoable entry', () => {
     const session = strokesSession();
+    const project = projectWithDotWidth(3);
     useImageEditorStore.setState({ session });
-    const check = computeKerfCheck(session, projectWithDotWidth(3));
+    useStore.setState({ project });
+    const check = computeKerfCheck(session, project);
     if (check === null) throw new Error('expected a check');
     applyThicken(check);
     const next = useImageEditorStore.getState().session;
@@ -116,5 +120,69 @@ describe('computeKerfCheck', () => {
     // Re-checking the thickened document finds no thin strokes left.
     const recheck = computeKerfCheck(next ?? session, projectWithDotWidth(3));
     expect(recheck?.removedPixels).toBe(0);
+  });
+
+  it('does not apply a stale result to a different editor session', () => {
+    const project = projectWithDotWidth(3);
+    const check = computeKerfCheck(strokesSession(), project);
+    if (check === null) throw new Error('expected a check');
+    const nextSession = createSession('R2', 'other.png', createRgbaBuffer(60, 60), BOUNDS);
+    useStore.setState({ project });
+    useImageEditorStore.setState({ session: nextSession });
+
+    applyThicken(check);
+
+    expect(useImageEditorStore.getState().session).toBe(nextSession);
+  });
+
+  it('never applies a result after any captured editor owner changes', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom('session', 'revision', 'active-layer', 'object', 'layer', 'threshold'),
+        (changedOwner) => {
+          const sourceProject = projectWithDotWidth(3);
+          const sourceSession = strokesSession();
+          const check = computeKerfCheck(sourceSession, sourceProject);
+          if (check === null) throw new Error('expected a check');
+          let currentSession = sourceSession;
+          let currentProject = sourceProject;
+
+          if (changedOwner === 'session') {
+            currentSession = createSession('R2', 'other.png', createRgbaBuffer(60, 60), BOUNDS);
+          } else if (changedOwner === 'revision') {
+            currentSession = { ...sourceSession, revision: sourceSession.revision + 1 };
+          } else if (changedOwner === 'active-layer') {
+            currentSession = { ...sourceSession, activeLayerId: 'different-layer' };
+          } else if (changedOwner === 'object') {
+            currentProject = {
+              ...sourceProject,
+              scene: {
+                ...sourceProject.scene,
+                objects: sourceProject.scene.objects.map((object) => ({ ...object })),
+              },
+            };
+          } else if (changedOwner === 'layer') {
+            currentProject = {
+              ...sourceProject,
+              scene: {
+                ...sourceProject.scene,
+                layers: sourceProject.scene.layers.map((layer) => ({ ...layer })),
+              },
+            };
+          } else {
+            currentProject = projectWithDotWidth(2);
+          }
+
+          useStore.setState({ project: currentProject });
+          useImageEditorStore.setState({ session: currentSession });
+          applyThicken(check);
+
+          expect(useImageEditorStore.getState().session).toBe(currentSession);
+          for (const toast of useToastStore.getState().toasts) {
+            useToastStore.getState().dismissToast(toast.id);
+          }
+        },
+      ),
+    );
   });
 });
