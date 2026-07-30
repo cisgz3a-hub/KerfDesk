@@ -109,6 +109,24 @@ describe('editorKerfThickenTarget', () => {
     ).toBeNull();
   });
 
+  it('rejects a target when the active layer does not own every lost sample', () => {
+    const session = createSession('R1', 'image.png', createRgbaBuffer(2, 1), BOUNDS);
+    const active = session.layers[0];
+    if (active === undefined) throw new Error('Expected an active layer.');
+    active.buffer.data.set([255, 255, 255, 0], 4);
+
+    expect(
+      editorKerfThickenTarget({
+        session,
+        object: image(),
+        layer: layer(),
+        group: group(),
+        device: { ...DEFAULT_DEVICE_PROFILE, origin: 'rear-left' },
+        removed: loss([255, 255]),
+      }),
+    ).toBeNull();
+  });
+
   it('keeps any visible upper-layer composition warning-only', () => {
     const base = createSession('R1', 'image.png', createRgbaBuffer(2, 1), BOUNDS);
     const session = addLayerAboveActive(base, 'upper');

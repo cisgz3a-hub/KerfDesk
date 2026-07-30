@@ -7,7 +7,7 @@ import { createSession } from './editor-session';
 
 const BOUNDS = { minX: 0, minY: 0, maxX: 2, maxY: 1 };
 
-function image(mirrorX: boolean): RasterImage {
+function image(isMirroredX: boolean): RasterImage {
   return {
     kind: 'raster-image',
     id: 'R1',
@@ -16,7 +16,7 @@ function image(mirrorX: boolean): RasterImage {
     pixelWidth: 2,
     pixelHeight: 1,
     bounds: BOUNDS,
-    transform: { ...IDENTITY_TRANSFORM, mirrorX },
+    transform: { ...IDENTITY_TRANSFORM, mirrorX: isMirroredX },
     color: '#808080',
     dither: 'threshold',
     linesPerMm: 1,

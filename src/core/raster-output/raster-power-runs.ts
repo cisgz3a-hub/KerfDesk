@@ -58,11 +58,11 @@ export function rasterSweepRunsForPixelRun(
     return [{ startXWorldMm: startX, endXWorldMm: endX, s: run.s }];
   }
 
-  const burnStartX = startX + (isReverse ? -dotWidthCorrectionMm : dotWidthCorrectionMm);
-  const burnEndX = endX + (isReverse ? dotWidthCorrectionMm : -dotWidthCorrectionMm);
-  if (!rasterRunSurvivesDotWidthCorrection(startX, endX, isReverse, dotWidthCorrectionMm)) {
+  const burnEdges = survivingBurnEdges(startX, endX, isReverse, dotWidthCorrectionMm);
+  if (burnEdges === null) {
     return [{ startXWorldMm: startX, endXWorldMm: endX, s: 0 }];
   }
+  const { burnStartX, burnEndX } = burnEdges;
   return [
     { startXWorldMm: startX, endXWorldMm: burnStartX, s: 0 },
     { startXWorldMm: burnStartX, endXWorldMm: burnEndX, s: run.s },
@@ -78,7 +78,17 @@ export function rasterRunSurvivesDotWidthCorrection(
   dotWidthCorrectionMm: number,
 ): boolean {
   if (dotWidthCorrectionMm <= 0) return true;
+  return survivingBurnEdges(startXWorldMm, endXWorldMm, isReverse, dotWidthCorrectionMm) !== null;
+}
+
+function survivingBurnEdges(
+  startXWorldMm: number,
+  endXWorldMm: number,
+  isReverse: boolean,
+  dotWidthCorrectionMm: number,
+): { readonly burnStartX: number; readonly burnEndX: number } | null {
   const burnStartX = startXWorldMm + (isReverse ? -dotWidthCorrectionMm : dotWidthCorrectionMm);
   const burnEndX = endXWorldMm + (isReverse ? dotWidthCorrectionMm : -dotWidthCorrectionMm);
-  return isReverse ? burnStartX > burnEndX : burnStartX < burnEndX;
+  const shouldSurvive = isReverse ? burnStartX > burnEndX : burnStartX < burnEndX;
+  return shouldSurvive ? { burnStartX, burnEndX } : null;
 }

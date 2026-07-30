@@ -28,6 +28,14 @@ export type KerfCheckContext = {
   readonly outputPlacementKey: string;
 };
 
+type KerfCheckCurrentInput = {
+  readonly expected: KerfCheckContext;
+  readonly session: EditorSession;
+  readonly project: Project;
+  readonly outputScope: OutputScope;
+  readonly jobPlacement: JobPlacementSettings;
+};
+
 /**
  * Resolve the edited raster's active Image-mode dot-width output topology.
  * Non-absolute placements suppress this optional advisory because the strict
@@ -85,13 +93,8 @@ export function kerfOperationLayer(context: KerfCheckContext, layerId: string): 
 }
 
 /** True only while captured editor and output-topology inputs still own the action. */
-export function isKerfCheckContextCurrent(
-  expected: KerfCheckContext,
-  session: EditorSession,
-  project: Project,
-  outputScope: OutputScope,
-  jobPlacement: JobPlacementSettings,
-): boolean {
+export function isKerfCheckContextCurrent(input: KerfCheckCurrentInput): boolean {
+  const { expected, session, project, outputScope, jobPlacement } = input;
   const current = kerfCheckContext(session, project, outputScope, jobPlacement);
   return (
     current !== null &&

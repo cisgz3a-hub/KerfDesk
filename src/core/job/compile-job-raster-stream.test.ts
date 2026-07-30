@@ -27,7 +27,7 @@ function sourceLuma(): Uint8Array {
   return luma;
 }
 
-function image(withMask: boolean): RasterImage {
+function image(hasMask: boolean): RasterImage {
   return {
     kind: 'raster-image',
     id: 'img',
@@ -40,7 +40,7 @@ function image(withMask: boolean): RasterImage {
     linesPerMm: 10,
     bounds: { minX: 0, minY: 0, maxX: 40, maxY: 30 },
     transform: IDENTITY_TRANSFORM,
-    ...(withMask ? { imageMaskId: 'mask' } : {}),
+    ...(hasMask ? { imageMaskId: 'mask' } : {}),
   };
 }
 
@@ -111,14 +111,14 @@ function materializedReference(
 describe('streamedRasterRowProvider', () => {
   // Rotated + error diffusion could not stream before ADR-243; pin it against
   // the materialized rotated pipeline (#321's sampler + full dither).
-  for (const withMask of [false, true]) {
-    it(`matches the materialized rotated pipeline (floyd-steinberg, mask=${withMask})`, () => {
+  for (const hasMask of [false, true]) {
+    it(`matches the materialized rotated pipeline (floyd-steinberg, mask=${hasMask})`, () => {
       const device = { ...DEFAULT_DEVICE_PROFILE, origin: 'rear-left' as const };
       const rotated = {
-        ...image(withMask),
+        ...image(hasMask),
         transform: { ...IDENTITY_TRANSFORM, rotationDeg: 30 },
       };
-      const mask = withMask ? maskObject() : null;
+      const mask = hasMask ? maskObject() : null;
       const bounds = { minX: 0, minY: 0, maxX: 50, maxY: 45 };
       const sampler = {
         sourceLuma: sourceLuma(),
@@ -157,11 +157,11 @@ describe('streamedRasterRowProvider', () => {
   }
   for (const algorithm of ALGORITHMS) {
     for (const origin of ORIGINS) {
-      for (const withMask of [false, true]) {
-        it(`matches the materialized pipeline (${algorithm}, ${origin}, mask=${withMask})`, () => {
+      for (const hasMask of [false, true]) {
+        it(`matches the materialized pipeline (${algorithm}, ${origin}, mask=${hasMask})`, () => {
           const device = { ...DEFAULT_DEVICE_PROFILE, origin };
-          const obj = image(withMask);
-          const mask = withMask ? maskObject() : null;
+          const obj = image(hasMask);
+          const mask = hasMask ? maskObject() : null;
           const rowAt = streamedRasterRowProvider({
             sourceLuma: sourceLuma(),
             sourceWidth: SOURCE_W,

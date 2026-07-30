@@ -270,13 +270,24 @@ describe('useKerfCheck', () => {
   });
 
   it('suppresses worker failures without publishing a stale result', async () => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    });
+    expect(host?.textContent).toBe('7');
+
     const worker = deferredWorker();
-    workerMocks.startKerfCheckWorker.mockReset().mockReturnValue(worker.handle);
+    workerMocks.startKerfCheckWorker.mockReturnValueOnce(worker.handle);
+    await act(async () => {
+      useImageEditorStore.setState({ session: session('R1') });
+    });
+    expect(host?.textContent).toBe('none');
+
     await act(async () => {
       await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
       worker.reject(new Error('worker failed'));
       await Promise.resolve();
     });
+    expect(workerMocks.startKerfCheckWorker).toHaveBeenCalledTimes(2);
     expect(host?.textContent).toBe('none');
   });
 });

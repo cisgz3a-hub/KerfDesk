@@ -121,14 +121,15 @@ function compiledRasterGroups(
   object: RasterImage,
   sourceLuma: Uint8Array,
 ): RasterGroup[] {
-  const objects = [
-    object,
-    ...(input.maskObject === null ? [] : [input.maskObject]),
-  ] as ReadonlyArray<SceneObject>;
+  const objects: SceneObject[] = [object];
+  if (input.maskObject !== null) objects.push(input.maskObject);
   const sourceLumaByObjectId = new Map([[object.id, sourceLuma]]);
   return input.layers.flatMap((layer) =>
     outputOperationLayers(layer).flatMap((operation) =>
-      compileRasterGroupsForLayer([object], operation, input.device, objects, sourceLumaByObjectId),
+      compileRasterGroupsForLayer([object], operation, input.device, {
+        sceneObjects: objects,
+        sourceLumaByObjectId,
+      }),
     ),
   );
 }

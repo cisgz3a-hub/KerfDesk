@@ -86,7 +86,9 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
         diagnostics.push(...vector.diagnostics);
       }
       groups.push(
-        ...compileRasterGroupsForLayer(orderedObjects, operationLayer, device, scene.objects),
+        ...compileRasterGroupsForLayer(orderedObjects, operationLayer, device, {
+          sceneObjects: scene.objects,
+        }),
       );
     }
   }

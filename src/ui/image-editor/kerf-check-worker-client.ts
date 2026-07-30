@@ -62,6 +62,7 @@ export function startKerfCheckWorker(
       resolve(null);
     };
     try {
+      // The copied Uint8ClampedArray owns a newly allocated, non-shared ArrayBuffer.
       worker.postMessage(workerRequest, [workerRequest.composite.data.buffer as ArrayBuffer]);
     } catch (error) {
       retire();

@@ -113,13 +113,13 @@ export function applyThicken(check: KerfCheck): void {
   if (session === null || check.removedPixels === 0 || check.removedMask === null) return;
   const app = useStore.getState();
   if (
-    !isKerfCheckContextCurrent(
-      check.context,
+    !isKerfCheckContextCurrent({
+      expected: check.context,
       session,
-      app.project,
-      currentOutputScope(app),
-      app.jobPlacement,
-    )
+      project: app.project,
+      outputScope: currentOutputScope(app),
+      jobPlacement: app.jobPlacement,
+    })
   ) {
     useToastStore
       .getState()

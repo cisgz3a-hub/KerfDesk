@@ -39,14 +39,20 @@ function kerfCheckContext(
   return resolveKerfCheckContext(editor, sourceProject, outputScope, jobPlacement);
 }
 
-function isKerfCheckContextCurrent(
-  expected: KerfCheckContext,
-  editor: EditorSession,
-  sourceProject: Project,
-  outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
-  jobPlacement: JobPlacementSettings = DEFAULT_JOB_PLACEMENT,
-): boolean {
-  return checkKerfCheckContextCurrent(expected, editor, sourceProject, outputScope, jobPlacement);
+function isKerfCheckContextCurrent(input: {
+  readonly expected: KerfCheckContext;
+  readonly editor: EditorSession;
+  readonly sourceProject: Project;
+  readonly outputScope?: OutputScope;
+  readonly jobPlacement?: JobPlacementSettings;
+}): boolean {
+  return checkKerfCheckContextCurrent({
+    expected: input.expected,
+    session: input.editor,
+    project: input.sourceProject,
+    outputScope: input.outputScope ?? DEFAULT_OUTPUT_SCOPE,
+    jobPlacement: input.jobPlacement ?? DEFAULT_JOB_PLACEMENT,
+  });
 }
 
 describe('kerf-check context ownership', () => {
@@ -56,30 +62,26 @@ describe('kerf-check context ownership', () => {
     const context = kerfCheckContext(editor, sourceProject, DEFAULT_OUTPUT_SCOPE);
     if (context === null) throw new Error('expected a kerf-check context');
 
-    expect(isKerfCheckContextCurrent(context, editor, sourceProject, DEFAULT_OUTPUT_SCOPE)).toBe(
-      true,
-    );
+    expect(isKerfCheckContextCurrent({ expected: context, editor, sourceProject })).toBe(true);
     expect(
-      isKerfCheckContextCurrent(
-        context,
-        { ...editor, revision: editor.revision + 1 },
+      isKerfCheckContextCurrent({
+        expected: context,
+        editor: { ...editor, revision: editor.revision + 1 },
         sourceProject,
-        DEFAULT_OUTPUT_SCOPE,
-      ),
+      }),
     ).toBe(false);
     expect(
-      isKerfCheckContextCurrent(
-        context,
-        { ...editor, doc: createRgbaBuffer(SIZE_PX, SIZE_PX) },
+      isKerfCheckContextCurrent({
+        expected: context,
+        editor: { ...editor, doc: createRgbaBuffer(SIZE_PX, SIZE_PX) },
         sourceProject,
-        DEFAULT_OUTPUT_SCOPE,
-      ),
+      }),
     ).toBe(false);
     expect(
-      isKerfCheckContextCurrent(
-        context,
+      isKerfCheckContextCurrent({
+        expected: context,
         editor,
-        {
+        sourceProject: {
           ...sourceProject,
           scene: {
             ...sourceProject.scene,
@@ -89,8 +91,7 @@ describe('kerf-check context ownership', () => {
             })),
           },
         },
-        DEFAULT_OUTPUT_SCOPE,
-      ),
+      }),
     ).toBe(false);
   });
 
@@ -210,9 +211,14 @@ describe('kerf-check context ownership', () => {
     const context = kerfCheckContext(editor, sourceProject);
     if (context === null) throw new Error('expected an absolute-placement context');
     expect(
-      isKerfCheckContextCurrent(context, editor, sourceProject, DEFAULT_OUTPUT_SCOPE, {
-        ...DEFAULT_JOB_PLACEMENT,
-        anchor: 'center',
+      isKerfCheckContextCurrent({
+        expected: context,
+        editor,
+        sourceProject,
+        jobPlacement: {
+          ...DEFAULT_JOB_PLACEMENT,
+          anchor: 'center',
+        },
       }),
     ).toBe(false);
   });
@@ -238,18 +244,23 @@ describe('kerf-check context ownership', () => {
     const context = kerfCheckContext(editor, sourceProject, included);
     if (context === null) throw new Error('expected selected output context');
 
-    expect(isKerfCheckContextCurrent(context, editor, sourceProject, included)).toBe(true);
     expect(
-      isKerfCheckContextCurrent(
-        context,
+      isKerfCheckContextCurrent({
+        expected: context,
         editor,
         sourceProject,
-        selectedScope([OBJECT_ID, 'kerf-context-mask'], true),
-      ),
+        outputScope: included,
+      }),
+    ).toBe(true);
+    expect(
+      isKerfCheckContextCurrent({
+        expected: context,
+        editor,
+        sourceProject,
+        outputScope: selectedScope([OBJECT_ID, 'kerf-context-mask'], true),
+      }),
     ).toBe(false);
-    expect(isKerfCheckContextCurrent(context, editor, sourceProject, DEFAULT_OUTPUT_SCOPE)).toBe(
-      false,
-    );
+    expect(isKerfCheckContextCurrent({ expected: context, editor, sourceProject })).toBe(false);
     expect(
       kerfCheckContext(editor, sourceProject, selectedScope(['kerf-context-mask'])),
     ).toBeNull();
@@ -291,9 +302,13 @@ describe('kerf-check context ownership', () => {
       },
     };
 
-    expect(isKerfCheckContextCurrent(context, editor, changedProject, DEFAULT_OUTPUT_SCOPE)).toBe(
-      false,
-    );
+    expect(
+      isKerfCheckContextCurrent({
+        expected: context,
+        editor,
+        sourceProject: changedProject,
+      }),
+    ).toBe(false);
   });
 
   it('invalidates every independently owned freshness input', () => {
@@ -382,13 +397,13 @@ describe('kerf-check context ownership', () => {
           }
 
           expect(
-            isKerfCheckContextCurrent(
-              context,
-              currentSession,
-              currentProject,
+            isKerfCheckContextCurrent({
+              expected: context,
+              editor: currentSession,
+              sourceProject: currentProject,
               outputScope,
               jobPlacement,
-            ),
+            }),
           ).toBe(false);
         },
       ),

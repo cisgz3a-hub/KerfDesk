@@ -111,6 +111,21 @@ describe('startKerfCheckWorker', () => {
     expect(slice).not.toHaveBeenCalled();
   });
 
+  it('returns null when the worker constructor throws', () => {
+    class ThrowingWorker extends FakeWorker {
+      constructor(url: URL, options: WorkerOptions) {
+        super(url, options);
+        throw new Error('worker construction failed');
+      }
+    }
+    vi.stubGlobal('Worker', ThrowingWorker);
+    const input = request();
+    const slice = vi.spyOn(input.composite.data, 'slice');
+
+    expect(startKerfCheckWorker(input)).toBeNull();
+    expect(slice).not.toHaveBeenCalled();
+  });
+
   it('retires the worker and returns null when the transferable copy cannot allocate', () => {
     const input = request();
     vi.spyOn(input.composite.data, 'slice').mockImplementation(() => {
