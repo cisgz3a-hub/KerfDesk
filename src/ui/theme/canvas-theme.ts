@@ -64,4 +64,9 @@ export const canvasTheme = {
   // they read as scaffolding rather than as cuts.
   designGeometry: '#1a1a1a',
   designConstruction: '#9aa0a6',
+  // Off-bed surround in the Design Studio. Deliberately a clear grey rather than
+  // the near-white viewportSurround: on the Studio canvas the surround and the bed
+  // are painted side by side, and #fafafa against #ffffff is a 2% difference that
+  // leaves the bed invisible — you cannot see that you have drawn off the sheet.
+  designSurround: '#dfe3e8',
 } as const;

@@ -33,6 +33,11 @@ function recordingContext(): {
     stroke: record('stroke'),
     setLineDash: record('setLineDash'),
     clearRect: record('clearRect'),
+    // The grid is clipped to the bed, so the stub needs the clipping calls.
+    save: record('save'),
+    restore: record('restore'),
+    clip: record('clip'),
+    rect: record('rect'),
   } as unknown as CanvasRenderingContext2D;
   return { ctx, calls };
 }
@@ -111,19 +116,27 @@ describe('paintDesignCanvas — grid', () => {
     expect(onCalls.length).toBeGreaterThan(offCalls.length);
   });
 
-  it('emits one stroked segment per grid line across the viewport', () => {
+  it('emits one stroked segment per grid line, clipped to the bed', () => {
     const { ctx, calls } = recordingContext();
     paintDesignCanvas(ctx, { ...basePaint, showGrid: true });
-    // 800 px / 2 px per mm = 400 mm across at a 10 mm step => 41 verticals.
-    // 600 px / 2 = 300 mm down => 31 horizontals. 72 segments total.
+    // The grid is now clipped to the BED, not drawn across the viewport: a 400x300
+    // bed at a 10 mm step has 39 interior verticals and 29 interior horizontals
+    // (the bed edges themselves are drawn by strokeRect). The origin marker adds two
+    // more moveTo pairs.
     const moves = calls.filter((call) => call.op === 'moveTo');
-    expect(moves).toHaveLength(72);
+    expect(moves).toHaveLength(39 + 29 + 2);
   });
 
   it('snaps grid lines to half-pixel centres so 1 px lines stay crisp', () => {
     const { ctx, calls } = recordingContext();
-    paintDesignCanvas(ctx, { ...basePaint, showGrid: true });
-    for (const move of calls.filter((call) => call.op === 'moveTo')) {
+    paintDesignCanvas(ctx, { ...basePaint, showGrid: true, sketch: emptySketch });
+    // Only the grid segments are half-pixel snapped; the origin marker is drawn on
+    // exact millimetre coordinates, so it is excluded by taking the clipped run.
+    const clipIndex = calls.findIndex((call) => call.op === 'clip');
+    const restoreIndex = calls.findIndex((call) => call.op === 'restore');
+    const gridMoves = calls.slice(clipIndex, restoreIndex).filter((call) => call.op === 'moveTo');
+    expect(gridMoves.length).toBeGreaterThan(60);
+    for (const move of gridMoves) {
       const [x, y] = move.args as [number, number];
       expect(Math.abs((x % 1) - 0.5)).toBeLessThan(1e-9);
       expect(Math.abs((y % 1) - 0.5)).toBeLessThan(1e-9);
@@ -148,10 +161,9 @@ describe('paintDesignCanvas — entities', () => {
   it('strokes each entity once', () => {
     const { ctx, calls } = recordingContext();
     paintDesignCanvas(ctx, { ...basePaint, sketch });
-    expect(calls.filter((call) => call.op === 'stroke')).toHaveLength(
-      // one strokeRect for the bed is a separate op; two entity strokes remain
-      2,
-    );
+    // Two entity strokes plus one for the origin marker. The bed outline uses
+    // strokeRect, which is a separate op.
+    expect(calls.filter((call) => call.op === 'stroke')).toHaveLength(3);
   });
 
   it('dashes construction geometry and resets the dash afterwards', () => {
@@ -191,6 +203,7 @@ describe('paintDesignCanvas — entities', () => {
         entities: [{ kind: 'line', id: 'dead', start: { x: 5, y: 5 }, end: { x: 5, y: 5 } }],
       },
     });
-    expect(calls.filter((call) => call.op === 'stroke')).toHaveLength(0);
+    // Only the origin marker strokes; the degenerate entity contributes nothing.
+    expect(calls.filter((call) => call.op === 'stroke')).toHaveLength(1);
   });
 });

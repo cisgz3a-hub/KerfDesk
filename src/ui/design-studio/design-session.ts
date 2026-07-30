@@ -25,6 +25,12 @@ export type DesignView = {
   readonly panYmm: number;
 };
 
+export type DesignMoveDrag = {
+  readonly lastMm: Vec2;
+  readonly beforeSketch: Sketch;
+  readonly ids: ReadonlySet<string>;
+};
+
 export type DesignMarquee = {
   readonly anchorMm: Vec2;
   readonly pointerMm: Vec2;
@@ -41,6 +47,9 @@ export type DesignSession = {
   // worth undoing, only the entity it commits to is.
   readonly draft: DesignDraft | null;
   readonly marquee: DesignMarquee | null;
+  // A live move gesture. `beforeSketch` is the state to undo back to, so the whole
+  // drag collapses into one history step on release.
+  readonly move: DesignMoveDrag | null;
   // Which inspector field is being touched right now, so the canvas can call out
   // exactly the distance that field controls. Cleared on blur — the annotation is
   // a transient explanation, not a persistent overlay.
@@ -76,6 +85,7 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     cursorMm: null,
     draft: null,
     marquee: null,
+    move: null,
     activeMeasurement: null,
     activeSnap: null,
     snapEnabled: true,

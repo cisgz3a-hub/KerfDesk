@@ -31,9 +31,14 @@ function ToolGroup(props: {
   return (
     <div style={groupStyle} role="group" aria-label={`${props.heading} tools`}>
       <span style={headingStyle}>{props.heading}</span>
-      {designToolsForRail(props.rail).map((tool) => (
-        <ToolButton key={tool.kind} tool={tool} />
-      ))}
+      {designToolsForRail(props.rail)
+        // Only tools that actually do something are rendered. Showing the finished
+        // shape of the tool set read as a rail of dead buttons, which is worse than
+        // a short rail that works.
+        .filter((tool) => tool.planned !== true)
+        .map((tool) => (
+          <ToolButton key={tool.kind} tool={tool} />
+        ))}
     </div>
   );
 }

@@ -41,6 +41,13 @@ export function commitSketch(history: DesignHistory, next: Sketch): DesignHistor
   };
 }
 
+// Replaces the present WITHOUT recording a step. Used only for the live phase of a
+// drag: the gesture pushes exactly one entry when it ends, so dragging a shape 200
+// pixels does not bury the previous action under 200 undo steps.
+export function replacePresent(history: DesignHistory, present: Sketch): DesignHistory {
+  return present === history.present ? history : { ...history, present };
+}
+
 export function canUndo(history: DesignHistory): boolean {
   return history.past.length > 0;
 }

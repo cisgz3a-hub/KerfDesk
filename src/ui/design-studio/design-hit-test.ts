@@ -9,6 +9,7 @@
 // from a pixel radius through the view) so this stays a pure geometry function.
 
 import { entityToPolylines, type Sketch, type SketchEntity } from '../../core/design';
+import { pointInPolygon } from '../../core/geometry';
 import type { Polyline, Vec2 } from '../../core/scene';
 
 // Click slop in screen pixels, converted to mm by the caller. Generous enough to
@@ -32,8 +33,20 @@ export function hitTestSketch(
 export function isEntityHit(entity: SketchEntity, pointMm: Vec2, toleranceMm: number): boolean {
   for (const polyline of entityToPolylines(entity)) {
     if (isPolylineHit(polyline, pointMm, toleranceMm)) return true;
+    // A CLOSED shape is also hit anywhere inside it, not just on its outline.
+    // Outline-only picking is LightBurn's behaviour, and it is a deliberate
+    // divergence (rule 3): the maintainer reported being unable to move shapes,
+    // because clicking the middle of a rectangle is ~40 px from any edge and so
+    // missed entirely, cleared the selection, and started a marquee instead.
+    // Interior picking is what Figma, Illustrator and Fusion all do.
+    if (isPolylineInteriorHit(polyline, pointMm)) return true;
   }
   return false;
+}
+
+function isPolylineInteriorHit(polyline: Polyline, pointMm: Vec2): boolean {
+  if (!polyline.closed || polyline.points.length < 3) return false;
+  return pointInPolygon(pointMm, polyline.points);
 }
 
 function isPolylineHit(polyline: Polyline, pointMm: Vec2, toleranceMm: number): boolean {

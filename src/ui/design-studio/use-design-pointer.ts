@@ -55,8 +55,7 @@ export function useDesignPointer(
         applyCornerAt(at, session.tool, pxPerMm);
         return;
       }
-      if (session.tool !== 'select') return;
-      beginSelect(at, event, pxPerMm);
+      if (session.tool === 'select') beginSelectOrMove(at, event, pxPerMm);
     },
     [pointMm],
   );
@@ -68,6 +67,10 @@ export function useDesignPointer(
       const session = store.session;
       if (at === null || session === null) return;
       store.setCursorMm(at);
+      if (session.move !== null) {
+        store.updateMove(at);
+        return;
+      }
       if (session.draft !== null) {
         const constrained = applyOrthoMm(session.draft.anchorMm, at, session.orthoEnabled);
         store.setDraft({ ...session.draft, pointerMm: constrained, modifiers: modifiersOf(event) });
@@ -84,6 +87,10 @@ export function useDesignPointer(
       const session = store.session;
       if (session === null) return;
       releasePointer(event.currentTarget, event.pointerId);
+      if (session.move !== null) {
+        store.endMove();
+        return;
+      }
       if (session.draft !== null) {
         store.commitDraft(newEntityId());
         return;
@@ -139,6 +146,21 @@ function applyCornerAt(at: Vec2, op: 'fillet' | 'chamfer', pxPerMm: number): voi
   const pick = pickCorner(session.history.present, at, toleranceMm);
   if (pick === null) return;
   store.applyCorner(pick, op);
+}
+
+// Resolve the selection first, then — if the press landed ON a shape rather than in
+// empty space — start a move. Without this the Studio could select but never
+// reposition, which is the most basic thing a design canvas has to do.
+function beginSelectOrMove(
+  at: Vec2,
+  event: React.PointerEvent<HTMLCanvasElement>,
+  pxPerMm: number,
+): void {
+  beginSelect(at, event, pxPerMm);
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null || session.marquee !== null) return;
+  if (session.selectedIds.size > 0) store.beginMove(at);
 }
 
 // Click an entity to select it (Shift adds); click empty space to start a

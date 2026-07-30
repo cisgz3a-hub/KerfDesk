@@ -16,12 +16,22 @@ import {
 } from '../../core/design';
 import type { SnapTarget } from '../../core/design/snap';
 import type { Vec2 } from '../../core/scene';
-import { applyCornerOp, type CornerOp } from './design-corner-apply';
+import type { CornerOp } from './design-corner-apply';
 import type { CornerPick } from './design-corner-pick';
-import { draftToEntity, type DesignDraft } from './design-draft';
-import { applyEntityField } from './design-entity-edit';
+import type { DesignDraft } from './design-draft';
 import type { MeasurementKey } from './design-entity-fields';
-import { entitiesInRectMm } from './design-hit-test';
+import {
+  applyCornerToSession,
+  beginSessionMove,
+  commitSessionDraft,
+  commitSessionMarquee,
+  duplicateSessionEntity,
+  editSessionField,
+  endSessionMove,
+  nudgeSession,
+  setSessionConstruction,
+  updateSessionMove,
+} from './design-session-mutations';
 import {
   createDesignSession,
   markSessionApplied,
@@ -63,6 +73,12 @@ type DesignStudioState = {
   readonly setChamferDistanceMm: (distanceMm: number) => void;
   // Types an exact value into one dimension of one entity.
   readonly editEntityField: (id: string, key: MeasurementKey, value: number) => void;
+  // A move gesture: begin on pointer-down over a selected shape, update per move,
+  // commit ONE history step on release.
+  readonly beginMove: (atMm: Vec2) => void;
+  readonly updateMove: (atMm: Vec2) => void;
+  readonly endMove: () => void;
+  readonly nudgeSelection: (deltaMm: Vec2) => void;
   readonly setMarquee: (marquee: DesignMarquee | null) => void;
   readonly commitMarquee: (additive: boolean) => void;
   readonly deleteSelected: () => void;
@@ -126,6 +142,11 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   editEntityField: (id, key, value) =>
     set(mapSession((session) => editSessionField(session, id, key, value))),
 
+  beginMove: (atMm) => set(mapSession((session) => beginSessionMove(session, atMm))),
+  updateMove: (atMm) => set(mapSession((session) => updateSessionMove(session, atMm))),
+  endMove: () => set(mapSession(endSessionMove)),
+  nudgeSelection: (deltaMm) => set(mapSession((session) => nudgeSession(session, deltaMm))),
+
   setMarquee: (marquee) => set(mapSession((session) => ({ ...session, marquee }))),
   commitMarquee: (additive) =>
     set(mapSession((session) => commitSessionMarquee(session, additive))),
@@ -147,104 +168,6 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   undo: () => set(mapSession(undoSession)),
   redo: () => set(mapSession(redoSession)),
 }));
-
-// The draft becomes an entity, the entity becomes one history step, and the new
-// entity becomes the selection — so the operator can immediately edit what they
-// just drew. A degenerate draft simply clears (a click is not a draw).
-function commitSessionDraft(session: DesignSession, id: string): DesignSession {
-  if (session.draft === null) return session;
-  const entity = draftToEntity(session.draft, id);
-  const cleared: DesignSession = { ...session, draft: null };
-  if (entity === null) return cleared;
-  const next = addEntity(sessionSketch(session), entity);
-  if (next === sessionSketch(session)) return cleared;
-  return { ...withSketch(cleared, next), selectedIds: new Set([entity.id]) };
-}
-
-// The copy lands offset so it is visibly a second shape rather than hiding
-// exactly on top of the original, and becomes the selection so it can be moved.
-function duplicateSessionEntity(
-  session: DesignSession,
-  id: string,
-  newId: string,
-  offsetMm: number,
-): DesignSession {
-  const sketch = sessionSketch(session);
-  const source = sketch.entities.find((candidate) => candidate.id === id);
-  if (source === undefined) return session;
-  const moved = translateEntity(source, newId, offsetMm);
-  const next = addEntity(sketch, moved);
-  if (next === sketch) return session;
-  return { ...withSketch(session, next), selectedIds: new Set([newId]) };
-}
-
-function translateEntity(entity: SketchEntity, newId: string, deltaMm: number): SketchEntity {
-  const shift = (point: { readonly x: number; readonly y: number }) => ({
-    x: point.x + deltaMm,
-    y: point.y + deltaMm,
-  });
-  switch (entity.kind) {
-    case 'rect':
-      return { ...entity, id: newId, origin: shift(entity.origin) };
-    case 'circle':
-    case 'arc':
-      return { ...entity, id: newId, center: shift(entity.center) };
-    case 'line':
-      return { ...entity, id: newId, start: shift(entity.start), end: shift(entity.end) };
-    case 'path':
-      return { ...entity, id: newId, points: entity.points.map(shift) };
-  }
-}
-
-function setSessionConstruction(
-  session: DesignSession,
-  id: string,
-  construction: boolean,
-): DesignSession {
-  const sketch = sessionSketch(session);
-  const entity = sketch.entities.find((candidate) => candidate.id === id);
-  if (entity === undefined) return session;
-  return withSketch(session, replaceEntity(sketch, { ...entity, construction }));
-}
-
-// Uses the size the tool is currently set to, so the click carries no size of its
-// own. A corner that cannot take that size leaves the sketch untouched.
-function applyCornerToSession(
-  session: DesignSession,
-  pick: CornerPick,
-  op: CornerOp,
-): DesignSession {
-  const sizeMm = op === 'fillet' ? session.filletRadiusMm : session.chamferDistanceMm;
-  const next = applyCornerOp(sessionSketch(session), pick, op, sizeMm);
-  return next === null ? session : withSketch(session, next);
-}
-
-// One typed value becomes one history step, so Ctrl+Z steps back through edits
-// the same way it steps back through drawn shapes.
-function editSessionField(
-  session: DesignSession,
-  id: string,
-  key: MeasurementKey,
-  value: number,
-): DesignSession {
-  const sketch = sessionSketch(session);
-  const entity = sketch.entities.find((candidate) => candidate.id === id);
-  if (entity === undefined) return session;
-  const edited = applyEntityField(entity, key, value);
-  if (edited === null) return session;
-  return withSketch(session, replaceEntity(sketch, edited));
-}
-
-function commitSessionMarquee(session: DesignSession, additive: boolean): DesignSession {
-  if (session.marquee === null) return session;
-  const enclosed = entitiesInRectMm(
-    sessionSketch(session),
-    session.marquee.anchorMm,
-    session.marquee.pointerMm,
-  ).map((entity) => entity.id);
-  const selectedIds = additive ? new Set([...session.selectedIds, ...enclosed]) : new Set(enclosed);
-  return { ...session, marquee: null, selectedIds };
-}
 
 // Every session mutation goes through here so a closed Studio silently ignores
 // stray actions instead of resurrecting a session.

@@ -32,7 +32,14 @@ const KIND_LABEL: Readonly<Record<SketchEntity['kind'], string>> = {
 };
 
 const DUPLICATE_OFFSET_MM = 5;
-const DEFAULT_POSITION = { x: 24, y: 96 } as const;
+// Anchored to the RIGHT edge, not the top-left. The first version defaulted to
+// {24, 96}, which put a 215x262 panel directly over the area most people draw in
+// first — and because a floating panel legitimately swallows pointer events, a drag
+// started under it silently did nothing. Reported as "cannot draw a square and a
+// circle".
+const DEFAULT_RIGHT_INSET_PX = 20;
+const DEFAULT_TOP_PX = 16;
+const PANEL_WIDTH_PX = 214;
 
 export function ShapeInspector(): JSX.Element | null {
   const session = useDesignStudioStore((state) => state.session);
@@ -41,14 +48,15 @@ export function ShapeInspector(): JSX.Element | null {
     session === null || selectedId === null
       ? null
       : findEntity(session.history.present, selectedId);
-  const [position, setPosition] = useState<{ readonly x: number; readonly y: number }>(
-    DEFAULT_POSITION,
-  );
-  const drag = useDragHandle(position, setPosition);
+  const [position, setPosition] = useState<{ readonly x: number; readonly y: number } | null>(null);
+  const hostRef = useRef<HTMLElement | null>(null);
+  const resolved = position ?? defaultPosition(hostRef.current);
+  const drag = useDragHandle(resolved, setPosition);
   if (entity === null) return null;
   return (
     <aside
-      style={{ ...boxStyle, left: position.x, top: position.y }}
+      ref={hostRef}
+      style={{ ...boxStyle, left: resolved.x, top: resolved.y }}
       aria-label={`${KIND_LABEL[entity.kind]} properties`}
     >
       <header style={headerStyle} onPointerDown={drag.onPointerDown}>
@@ -123,6 +131,16 @@ function InspectorActions(props: { readonly entity: SketchEntity }): JSX.Element
   );
 }
 
+// Right-anchored until the operator drags it somewhere they prefer, after which
+// their position sticks for the session.
+function defaultPosition(host: HTMLElement | null): { readonly x: number; readonly y: number } {
+  const parentWidth = host?.parentElement?.clientWidth ?? window.innerWidth;
+  return {
+    x: Math.max(0, parentWidth - PANEL_WIDTH_PX - DEFAULT_RIGHT_INSET_PX),
+    y: DEFAULT_TOP_PX,
+  };
+}
+
 function onlySelectedId(ids: ReadonlySet<string> | undefined): string | null {
   if (ids === undefined || ids.size !== 1) return null;
   return [...ids][0] ?? null;
@@ -167,7 +185,7 @@ function clamp(value: number, min: number, max: number): number {
 const boxStyle: React.CSSProperties = {
   position: 'absolute',
   zIndex: 3,
-  width: 214,
+  width: PANEL_WIDTH_PX,
   display: 'flex',
   flexDirection: 'column',
   borderRadius: 8,

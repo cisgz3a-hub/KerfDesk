@@ -57,13 +57,20 @@ describe('tool shortcuts', () => {
     expect(session().tool).toBe('circle');
   });
 
-  it('keeps f, o and g for Fillet, Offset and Polygon', () => {
+  it('keeps f for Fillet, which is built', () => {
     press({ key: 'f' });
     expect(session().tool).toBe('fillet');
+  });
+
+  // Offset and Polygon own 'o' and 'g' in the tool table so the letters are reserved,
+  // but neither is built yet, so neither rail button nor keypress may arm them —
+  // otherwise a stray key selects a tool with no button and nothing happens.
+  it('does not arm an unbuilt tool by keyboard', () => {
+    press({ key: 'f' });
     press({ key: 'o' });
-    expect(session().tool).toBe('offset');
+    expect(session().tool).toBe('fillet');
     press({ key: 'g' });
-    expect(session().tool).toBe('polygon');
+    expect(session().tool).toBe('fillet');
   });
 
   it('ignores an unbound key', () => {

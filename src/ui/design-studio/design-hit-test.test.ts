@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Sketch, SketchArc, SketchCircle, SketchLine } from '../../core/design';
+import type {
+  Sketch,
+  SketchArc,
+  SketchCircle,
+  SketchLine,
+  SketchRectangle,
+} from '../../core/design';
 import { distanceToSegment, entitiesInRectMm, hitTestSketch, isEntityHit } from './design-hit-test';
 
 const horizontal: SketchLine = {
@@ -36,10 +42,13 @@ describe('isEntityHit', () => {
     expect(isEntityHit(horizontal, { x: 130, y: 0 }, 1)).toBe(false);
   });
 
-  it('hits a circle on its rim, not at its centre', () => {
+  it('hits a circle on its rim AND anywhere inside it', () => {
     const circle: SketchCircle = { kind: 'circle', id: 'c', center: { x: 0, y: 0 }, radiusMm: 20 };
     expect(isEntityHit(circle, { x: 20, y: 0 }, 1)).toBe(true);
-    expect(isEntityHit(circle, { x: 0, y: 0 }, 1)).toBe(false);
+    // Interior picking, added deliberately: outline-only picking made shapes
+    // impossible to grab and move.
+    expect(isEntityHit(circle, { x: 0, y: 0 }, 1)).toBe(true);
+    expect(isEntityHit(circle, { x: 40, y: 0 }, 1)).toBe(false);
   });
 
   it('hits an arc only along the arc it sweeps', () => {
@@ -114,5 +123,56 @@ describe('entitiesInRectMm', () => {
       entities: [{ kind: 'line', id: 'd', start: { x: 1, y: 1 }, end: { x: 1, y: 1 } }],
     };
     expect(entitiesInRectMm(withDead, { x: -100, y: -100 }, { x: 100, y: 100 })).toHaveLength(0);
+  });
+});
+
+// The defect the maintainer hit: clicking the MIDDLE of a shape missed it entirely,
+// so the click cleared the selection and started a marquee, and shapes could never
+// be moved. Interior picking is a deliberate divergence from LightBurn's
+// outline-only rule (rule 3), matching Figma / Illustrator / Fusion instead.
+describe('interior hit-testing on closed shapes', () => {
+  const rect: SketchRectangle = {
+    kind: 'rect',
+    id: 'box',
+    origin: { x: 0, y: 0 },
+    widthMm: 100,
+    heightMm: 60,
+    cornerRadiusMm: 0,
+  };
+
+  it('hits the dead centre of a rectangle, far from any edge', () => {
+    expect(isEntityHit(rect, { x: 50, y: 30 }, 1)).toBe(true);
+  });
+
+  it('still misses just outside it', () => {
+    expect(isEntityHit(rect, { x: -5, y: 30 }, 1)).toBe(false);
+    expect(isEntityHit(rect, { x: 105, y: 30 }, 1)).toBe(false);
+  });
+
+  it('hits the inside of a circle as well as its rim', () => {
+    const circle: SketchCircle = {
+      kind: 'circle',
+      id: 'c',
+      center: { x: 0, y: 0 },
+      radiusMm: 20,
+    };
+    expect(isEntityHit(circle, { x: 0, y: 0 }, 1)).toBe(true);
+    expect(isEntityHit(circle, { x: 20, y: 0 }, 1)).toBe(true);
+    expect(isEntityHit(circle, { x: 30, y: 0 }, 1)).toBe(false);
+  });
+
+  it('does NOT hit the inside of an open shape, which has no inside', () => {
+    const openElbow: SketchLine = {
+      kind: 'line',
+      id: 'l',
+      start: { x: 0, y: 0 },
+      end: { x: 100, y: 0 },
+    };
+    expect(isEntityHit(openElbow, { x: 50, y: 40 }, 1)).toBe(false);
+  });
+
+  it('picks the topmost shape when two overlap, so clicking selects what you see', () => {
+    const stacked: Sketch = { entities: [rect, { ...rect, id: 'above' }] };
+    expect(hitTestSketch(stacked, { x: 50, y: 30 }, 1)?.id).toBe('above');
   });
 });

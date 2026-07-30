@@ -39,23 +39,51 @@ const SELECTED_LINE_WIDTH_PX = 2;
 const NORMAL_LINE_WIDTH_PX = 1;
 const CONSTRUCTION_DASH_PX: ReadonlyArray<number> = [6, 4];
 const MAX_GRID_DECADE_STEPS = 24;
+const ORIGIN_ARM_PX = 8;
+const ORIGIN_LINE_WIDTH_PX = 1.5;
 
 export function paintDesignCanvas(ctx: CanvasRenderingContext2D, paint: DesignCanvasPaint): void {
   paintBed(ctx, paint);
   if (paint.showGrid) paintGrid(ctx, paint);
+  paintOriginMarker(ctx, paint);
   paintEntities(ctx, paint);
 }
 
 function paintBed(ctx: CanvasRenderingContext2D, paint: DesignCanvasPaint): void {
-  const origin = mmToPx(paint.view, { x: 0, y: 0 });
-  const far = mmToPx(paint.view, { x: paint.bedWidthMm, y: paint.bedHeightMm });
-  ctx.fillStyle = canvasTheme.viewportSurround;
+  const bed = bedRectPx(paint);
+  // A clearly grey surround so the white bed reads as a sheet you are drawing ON.
+  ctx.fillStyle = canvasTheme.designSurround;
   ctx.fillRect(0, 0, paint.widthPx, paint.heightPx);
   ctx.fillStyle = canvasTheme.bedFill;
-  ctx.fillRect(origin.x, origin.y, far.x - origin.x, far.y - origin.y);
+  ctx.fillRect(bed.x, bed.y, bed.width, bed.height);
   ctx.strokeStyle = canvasTheme.bedStroke;
   ctx.lineWidth = NORMAL_LINE_WIDTH_PX;
-  ctx.strokeRect(origin.x + 0.5, origin.y + 0.5, far.x - origin.x, far.y - origin.y);
+  ctx.strokeRect(bed.x + 0.5, bed.y + 0.5, bed.width, bed.height);
+}
+
+function bedRectPx(paint: DesignCanvasPaint): {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+} {
+  const origin = mmToPx(paint.view, { x: 0, y: 0 });
+  const far = mmToPx(paint.view, { x: paint.bedWidthMm, y: paint.bedHeightMm });
+  return { x: origin.x, y: origin.y, width: far.x - origin.x, height: far.y - origin.y };
+}
+
+// The work origin, in the same red the main workspace uses. Without it there is no
+// landmark on an empty bed and no way to tell which corner X0 Y0 is.
+function paintOriginMarker(ctx: CanvasRenderingContext2D, paint: DesignCanvasPaint): void {
+  const at = mmToPx(paint.view, { x: 0, y: 0 });
+  ctx.strokeStyle = canvasTheme.origin;
+  ctx.lineWidth = ORIGIN_LINE_WIDTH_PX;
+  ctx.beginPath();
+  ctx.moveTo(at.x - ORIGIN_ARM_PX, at.y);
+  ctx.lineTo(at.x + ORIGIN_ARM_PX, at.y);
+  ctx.moveTo(at.x, at.y - ORIGIN_ARM_PX);
+  ctx.lineTo(at.x, at.y + ORIGIN_ARM_PX);
+  ctx.stroke();
 }
 
 // Chooses a step that is at least MIN_MINOR_GRID_PX on screen, walking the
@@ -74,21 +102,35 @@ export function gridStepMm(gridMm: number, pxPerMm: number): number {
   return step;
 }
 
+// Clipped to the bed, as the main workspace grid is. A grid that runs off the sheet
+// makes the whole canvas look like drawing area, which is how a part ends up at
+// X -100 without the operator noticing.
 function paintGrid(ctx: CanvasRenderingContext2D, paint: DesignCanvasPaint): void {
   const step = gridStepMm(paint.gridMm, paint.view.pxPerMm);
-  const startX = Math.floor(paint.view.panXmm / step) * step;
-  const endX = paint.view.panXmm + paint.widthPx / paint.view.pxPerMm;
-  const startY = Math.floor(paint.view.panYmm / step) * step;
-  const endY = paint.view.panYmm + paint.heightPx / paint.view.pxPerMm;
+  const bed = bedRectPx(paint);
+  if (bed.width <= 0 || bed.height <= 0) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(bed.x, bed.y, bed.width, bed.height);
+  ctx.clip();
   ctx.lineWidth = NORMAL_LINE_WIDTH_PX;
-  for (let x = startX; x <= endX; x += step) {
+  for (let x = step; x < paint.bedWidthMm; x += step) {
     ctx.strokeStyle = isMajorLine(x, step) ? canvasTheme.bedStroke : canvasTheme.grid;
-    strokeSegment(ctx, mmToPx(paint.view, { x, y: startY }), mmToPx(paint.view, { x, y: endY }));
+    strokeSegment(
+      ctx,
+      mmToPx(paint.view, { x, y: 0 }),
+      mmToPx(paint.view, { x, y: paint.bedHeightMm }),
+    );
   }
-  for (let y = startY; y <= endY; y += step) {
+  for (let y = step; y < paint.bedHeightMm; y += step) {
     ctx.strokeStyle = isMajorLine(y, step) ? canvasTheme.bedStroke : canvasTheme.grid;
-    strokeSegment(ctx, mmToPx(paint.view, { x: startX, y }), mmToPx(paint.view, { x: endX, y }));
+    strokeSegment(
+      ctx,
+      mmToPx(paint.view, { x: 0, y }),
+      mmToPx(paint.view, { x: paint.bedWidthMm, y }),
+    );
   }
+  ctx.restore();
 }
 
 function isMajorLine(valueMm: number, step: number): boolean {

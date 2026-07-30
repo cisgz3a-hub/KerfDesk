@@ -31,6 +31,12 @@ export function handleDesignStudioKey(
     event.preventDefault();
     return;
   }
+  if (handleArrowNudge(event)) return;
+  if (event.key === 'Delete' || event.key === 'Backspace') {
+    store.deleteSelected();
+    event.preventDefault();
+    return;
+  }
   handlePlainKey(event, onFit);
 }
 
@@ -59,10 +65,36 @@ function handlePlainKey(event: React.KeyboardEvent<HTMLDivElement>, onFit: () =>
     return;
   }
   const tool = designToolForShortcut(key);
-  if (tool !== null) {
+  // An unbuilt tool is not reachable by keyboard either, so a stray keypress cannot
+  // arm a tool whose rail button is deliberately absent.
+  if (tool !== null && tool.planned !== true) {
     store.setTool(tool.kind);
     event.preventDefault();
   }
+}
+
+// Arrow keys nudge the selection: one grid step, or 1 mm with Shift for fine work.
+// Every nudge is its own undo step, which is what makes keyboard positioning
+// trustworthy — you can always step back exactly one move.
+const ARROW_DELTAS: Readonly<Record<string, { readonly x: number; readonly y: number }>> = {
+  ArrowLeft: { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 },
+  ArrowUp: { x: 0, y: -1 },
+  ArrowDown: { x: 0, y: 1 },
+};
+
+const FINE_NUDGE_MM = 1;
+
+function handleArrowNudge(event: React.KeyboardEvent<HTMLDivElement>): boolean {
+  const direction = ARROW_DELTAS[event.key];
+  if (direction === undefined) return false;
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null || session.selectedIds.size === 0) return false;
+  const stepMm = event.shiftKey ? FINE_NUDGE_MM : session.gridMm;
+  store.nudgeSelection({ x: direction.x * stepMm, y: direction.y * stepMm });
+  event.preventDefault();
+  return true;
 }
 
 function handleViewToggle(
