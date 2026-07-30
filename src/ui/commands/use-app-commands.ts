@@ -381,6 +381,10 @@ function saveProject(
 
 function deleteSelection(): void {
   const state = useStore.getState();
+  if (state.selectedPathNode !== null) {
+    state.deleteSelectedPathNodes();
+    return;
+  }
   const ids = [
     ...(state.selectedObjectId !== null ? [state.selectedObjectId] : []),
     ...state.additionalSelectedIds,

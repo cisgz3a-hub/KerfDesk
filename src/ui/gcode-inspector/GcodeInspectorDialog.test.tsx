@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+import { useUiStore } from '../state/ui-store';
 import { GcodeInspectorDialog } from './GcodeInspectorDialog';
 
 (
@@ -42,9 +43,26 @@ afterEach(() => {
   container?.remove();
   container = null;
   root = null;
+  useUiStore.setState({ modalDepth: 0 });
 });
 
 describe('GcodeInspectorDialog', () => {
+  it('is an application modal that isolates global commands and owns initial focus', () => {
+    mount(
+      <GcodeInspectorDialog
+        programName="part.nc"
+        text={PROGRAM}
+        machineKind="laser"
+        onClose={() => undefined}
+      />,
+    );
+
+    const dialog = container?.querySelector('[role="dialog"]');
+    expect(dialog?.getAttribute('aria-modal')).toBe('true');
+    expect(useUiStore.getState().modalDepth).toBe(1);
+    expect(document.activeElement?.textContent).toBe('Close');
+  });
+
   it('parses the program, shows stats, and falls back gracefully without WebGL', async () => {
     mount(
       <GcodeInspectorDialog

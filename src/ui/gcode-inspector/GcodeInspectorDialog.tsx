@@ -5,6 +5,7 @@
 import { useMemo } from 'react';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import type { MachineKind } from '../../core/scene';
+import { Dialog } from '../kit/Dialog';
 import { InspectorView } from './InspectorView';
 
 export type GcodeInspectorDialogProps = {
@@ -20,46 +21,42 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
   const result = useMemo(() => buildGcodeRenderModel(props.text), [props.text]);
   const lines = useMemo(() => props.text.split(/\r\n|\n|\r/), [props.text]);
   return (
-    <div
-      role="dialog"
-      aria-label={`G-code Inspector: ${props.programName}`}
-      style={overlayStyle}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') props.onClose();
-      }}
+    <Dialog
+      ariaLabel={`G-code Inspector: ${props.programName}`}
+      size="xl"
+      panelClassName="lf-dialog--gcode-inspector"
+      onClose={props.onClose}
     >
-      <div style={panelStyle}>
-        <header style={headerStyle}>
-          <strong>{props.programName}</strong>
+      <header style={headerStyle}>
+        <strong>{props.programName}</strong>
+        <button
+          type="button"
+          className="lf-btn"
+          title="Close the Inspector (Esc)"
+          onClick={props.onClose}
+        >
+          Close
+        </button>
+      </header>
+      {result.kind === 'ok' ? (
+        <InspectorView model={result.model} lines={lines} />
+      ) : (
+        <p style={messageStyle}>{result.reason}</p>
+      )}
+      <footer style={footerStyle}>
+        {result.kind === 'ok' ? <StatsStrip model={result.model} /> : <span />}
+        {props.machineKind === 'cnc' && props.onOpen2dSimulator !== undefined ? (
           <button
             type="button"
             className="lf-btn"
-            title="Close the Inspector (Esc)"
-            onClick={props.onClose}
+            title="Open this program in the 2D simulator (F-CNC10)"
+            onClick={props.onOpen2dSimulator}
           >
-            Close
+            Open in 2D simulator
           </button>
-        </header>
-        {result.kind === 'ok' ? (
-          <InspectorView model={result.model} lines={lines} />
-        ) : (
-          <p style={messageStyle}>{result.reason}</p>
-        )}
-        <footer style={footerStyle}>
-          {result.kind === 'ok' ? <StatsStrip model={result.model} /> : <span />}
-          {props.machineKind === 'cnc' && props.onOpen2dSimulator !== undefined ? (
-            <button
-              type="button"
-              className="lf-btn"
-              title="Open this program in the 2D simulator (F-CNC10)"
-              onClick={props.onOpen2dSimulator}
-            >
-              Open in 2D simulator
-            </button>
-          ) : null}
-        </footer>
-      </div>
-    </div>
+        ) : null}
+      </footer>
+    </Dialog>
   );
 }
 
@@ -84,28 +81,6 @@ export function StatsStrip(props: { readonly model: GcodeRenderModel }): JSX.Ele
 function mm(value: number): string {
   return value >= 100 ? value.toFixed(0) : value.toFixed(1);
 }
-
-const overlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'var(--lf-backdrop)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1000,
-};
-
-const panelStyle: React.CSSProperties = {
-  width: 'min(96vw, 1400px)',
-  height: 'min(92vh, 760px)',
-  display: 'flex',
-  flexDirection: 'column',
-  background: 'var(--lf-bg-1)',
-  color: 'var(--lf-text)',
-  border: '1px solid var(--lf-border)',
-  borderRadius: 8,
-  overflow: 'hidden',
-};
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
