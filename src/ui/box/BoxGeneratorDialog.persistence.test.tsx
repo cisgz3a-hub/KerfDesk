@@ -1,7 +1,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ImmediateBoxGenerationWorker } from '../../__fixtures__/box/immediate-box-generation-worker';
 import { BoxGeneratorDialog } from './BoxGeneratorDialog';
 
 (
@@ -15,9 +16,12 @@ type RenderedDialog = {
 };
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   localStorage.clear();
   document.body.innerHTML = '';
 });
+
+beforeEach(() => vi.stubGlobal('Worker', ImmediateBoxGenerationWorker));
 
 describe('BoxGeneratorDialog draft persistence', () => {
   it.each(['Cancel', 'Escape'] as const)('persists the current draft on %s', async (action) => {
