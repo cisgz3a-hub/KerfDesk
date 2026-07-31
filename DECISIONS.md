@@ -13469,3 +13469,61 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
   `docs/audits/2026-07-30-large-file-repair-ledger.md`.
 - NOT verified: constant peak-memory behavior, document-route incremental parsing, every
   operating-system storage/OOM threshold, a hardware air-cut, or physical output.
+
+## ADR-270 - V-carve ladders complete one filled region before moving to the next (2026-07-31)
+
+**Date:** 2026-07-31
+**Status:** Accepted
+
+### Context
+
+`vcarveLadderPasses` built every inward offset for all closed contours together, then emitted the
+result one ladder step at a time. With multiple disconnected regions, that traversal revisited the
+whole design at every inset depth. A two-region regression fixture reproduced the resulting
+alternation as `RLRLRLRLRL`: the first ring of each region, then the second ring of each region,
+and so on. The controller can execute that absolute-coordinate program, but the repeated
+cross-field retracts and rapids add motion that is not needed to form the V-groove.
+
+The geometry engine may also return contours in an order different from the artwork. A carved
+region can include an outer boundary and one or more holes, while an island nested inside a hole
+is a separate filled region under the even-odd fill rule. Reordering by array position alone would
+therefore split holes from their outer boundary or attach a nested island to the wrong region.
+
+### Decision
+
+1. The offset ladder remains global and unchanged. Its contour geometry, termination reason, and
+   ladder step remain the source of truth.
+2. After the ladder is built, each output contour is annotated with its original step and assigned
+   to the innermost source filled-region root that contains it. Even containment depths identify
+   roots; odd depths identify holes that remain with their containing root.
+3. Output is region-major: filled regions follow source-contour order, and within each region the
+   original step order and offset-engine contour order are preserved. Contours that cannot be
+   assigned are retained at the end in their original ladder order.
+4. Zero- and one-region inputs keep the raw ladder order. This preserves existing single-region
+   G-code byte-for-byte.
+5. Depth law, depth-per-pass expansion, feeds, spindle behavior, Safe Z, offset-failure reporting,
+   and Start/Frame policy do not change. This ADR changes traversal only; it introduces no guard.
+6. Export provenance advances to `adr-270-vcarve-region-major-v1` so an affected file can be
+   distinguished from ring-major output.
+
+### Consequences
+
+- One disconnected carved region is completed before travel to the next, so a multi-region job no
+  longer performs a full-design revisit for every offset ring.
+- “Region” is intentionally not “glyph”: text identity is no longer present at this stage, and a
+  glyph with disconnected filled components can contain more than one carved region.
+- The contour/depth multiset is unchanged, but multi-region G-code order and travel distance can
+  change. Region order is artwork order, not a new nearest-neighbour optimization.
+- This reduces unnecessary travel but does not prove or repair a machine that loses position under
+  cutting load. Physical position retention and finished V-groove quality still require a
+  controlled hardware cut.
+
+### Verification
+
+- `vcarve-region-order.test.ts` covers disjoint source order, step order, outer-plus-hole grouping,
+  a nested island, deterministic unassigned fallback, and the single-region fast path.
+- `vcarve-ladder.test.ts` reproduces the old cross-region alternation, pins region-major traversal
+  through the real offset ladder, and compares sorted contour/depth signatures to prove that the
+  reorder loses and duplicates nothing.
+- Existing analytic V-groove and G-code snapshot tests remain the geometry/output regression
+  boundary. Automated tests do not verify physical position retention or surface finish.

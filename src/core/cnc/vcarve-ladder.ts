@@ -12,18 +12,21 @@
 // floor at δ spacing (the two-stage clearing-tool variant arrives with
 // multi-tool jobs, H.7b).
 //
-// Rings are emitted shallow → deep (outside-in), each expanded through
-// zPassDepths so no single plunge exceeds depthPerPassMm; the emitter's
-// same-XY chaining turns those into efficient stepped plunges.
+// Each disconnected filled region is completed shallow → deep (outside-in)
+// before travelling to the next region. Every contour keeps its original
+// ladder step, and each is expanded through zPassDepths so no single plunge
+// exceeds depthPerPassMm; the emitter's same-XY chaining turns those into
+// efficient stepped plunges.
 //
-// Pure and deterministic: fixed ring ordering (k ascending, input order
-// within a ring), no clock, no random.
+// Pure and deterministic: source-region order, then k ascending and offset
+// engine order within a region, no clock, no random.
 
 import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncPass, CncContourPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
 import { hasFinitePoints } from './profile-paths';
+import { vcarveRegionOrder } from './vcarve-region-order';
 
 const MIN_CLOSED_POINTS = 3;
 const MIN_RESOLUTION_MM = 0.1;
@@ -83,10 +86,10 @@ export function vcarveLadderPasses(
   // Ring k (1-based in the depth law above) is ladder step k - 1.
   const ladder = buildOffsetLadder(contours, MAX_VCARVE_RINGS, (step) => (step + 1) * delta);
   const passes: CncContourPass[] = [];
-  ladder.rings.forEach((ring, step) => {
+  for (const { step, polyline } of vcarveRegionOrder(contours, ladder.rings)) {
     const ringDepth = Math.min(((step + 1) * delta) / tanHalf, maxDepth);
-    appendRingPasses(passes, ring, ringDepth, options.depthPerPassMm);
-  });
+    appendRingPasses(passes, [polyline], ringDepth, options.depthPerPassMm);
+  }
   return { passes, offsetFailed: ladder.offsetFailed };
 }
 

@@ -23,9 +23,10 @@ export type GcodeMetadata = {
  * dynamic power for fill (ADR-036), raster gap-rapid splitting (ADR-039), and
  * standalone surfacing safe-Z-before-M3 ordering (ADR-103), ADR-234's bounded
  * 4040 Fill entry geometry, ADR-236's controlled seeks/scan-quality policy,
- * and ADR-238's generic Scan Line entry/exit runway geometry.
+ * ADR-238's generic Scan Line entry/exit runway geometry, and ADR-270's
+ * region-major V-carve traversal.
  */
-export const EMITTER_REVISION = 'adr-238-generic-scanline-runway-v1';
+export const EMITTER_REVISION = 'adr-270-vcarve-region-major-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

@@ -139,7 +139,7 @@ default-on for profile-outside/inside, no-op elsewhere. Applied at `compile-cnc-
 | Feature | Module | ADR |
 |---|---|---|
 | Depth passes | `depth-passes.ts` | ADR-098 |
-| V-carving ladder | `vcarve-ladder.ts`, `vcarve-clearance.ts` | ADR-098 H.3 |
+| V-carving ladder | `vcarve-ladder.ts`, `vcarve-region-order.ts`, `vcarve-clearance.ts` | ADR-098 H.3, ADR-270 |
 | Relief (STL → heightmap) | `compile-cnc-relief.ts` | ADR-098 H.4/H.5/H.8 |
 | Tabs (auto + manual) | `cnc-tabs.ts`, `cnc-tab-anchors.ts` | ADR-156 |
 | Helical entry | `helical-entry.ts` | ADR-152 |
