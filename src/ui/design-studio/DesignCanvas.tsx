@@ -22,6 +22,7 @@ import { paintDesignCanvas } from './design-canvas-draw';
 import { createFrameScheduler, frameSchedulerHostFor } from './design-frame-scheduler';
 import { paintDesignOverlay } from './design-overlay-draw';
 import { ShapeInspector } from './ShapeInspector';
+import { useCanvas2dSurface } from './design-surface';
 import { useDesignStudioStore } from './design-studio-store';
 import { useDesignPointer } from './use-design-pointer';
 import { fitView, zoomAt } from './design-view';
@@ -40,7 +41,8 @@ export function DesignCanvas(): JSX.Element {
 
   useFrameOnOpen(hostRef, workspace.width, workspace.height);
   useLayerPaint(staticRef, overlayRef, hostRef, workspace.width, workspace.height);
-  const pointer = useDesignPointer(overlayRef, newEntityId);
+  const surface = useCanvas2dSurface(overlayRef);
+  const pointer = useDesignPointer(surface, newEntityId);
 
   const handleWheel = useCallback(
     (event: React.WheelEvent<HTMLCanvasElement>) => {

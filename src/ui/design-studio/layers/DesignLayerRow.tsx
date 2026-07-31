@@ -81,7 +81,9 @@ const rowStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 2,
   borderRadius: 6,
-  border: '1px solid transparent',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'transparent',
   padding: 1,
 };
 

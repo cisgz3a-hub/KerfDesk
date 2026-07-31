@@ -22,7 +22,7 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
   const toggleSnap = useDesignStudioStore((state) => state.toggleSnap);
   const toggleOrtho = useDesignStudioStore((state) => state.toggleOrtho);
   const toggleGrid = useDesignStudioStore((state) => state.toggleGrid);
-  const togglePreview3d = useDesignStudioStore((state) => state.togglePreview3d);
+  const toggleSurface3d = useDesignStudioStore((state) => state.toggleSurface3d);
   const applyHandlers = useDesignApply();
   if (session === null) return null;
   return (
@@ -65,9 +65,9 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
       />
       <BarToggle
         label="3D"
-        title="Show the 3D carve preview — each layer at its depth, with its bit"
-        on={session.showPreview3d}
-        onClick={togglePreview3d}
+        title="Design in 3D — the canvas is the 3D space with the carve live under your drawing. Off = the flat 2D canvas (dimension call-outs and marquee live there)."
+        on={session.surface3d}
+        onClick={toggleSurface3d}
       />
 
       <span style={spacerStyle} />
@@ -153,7 +153,9 @@ const buttonStyle: React.CSSProperties = {
   padding: '3px 10px',
   fontSize: 12,
   borderRadius: 6,
-  border: '1px solid var(--lf-border)',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'var(--lf-border)',
   background: 'transparent',
   color: 'var(--lf-text)',
   cursor: 'pointer',

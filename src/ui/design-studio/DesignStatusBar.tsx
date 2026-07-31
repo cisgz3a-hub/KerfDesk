@@ -75,7 +75,9 @@ const readoutStyle: React.CSSProperties = {
 const chipStyle: React.CSSProperties = {
   padding: '1px 6px',
   borderRadius: 999,
-  border: '1px solid var(--lf-border)',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'var(--lf-border)',
   opacity: 0.5,
 };
 
