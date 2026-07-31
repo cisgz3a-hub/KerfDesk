@@ -629,8 +629,9 @@ Card and detail behavior:
   license closure; deterministic notices; production web build and bundle
   measurements; complete `release:check`;
   independent full-slice and final-delta audits GO with no open P0–P3 findings
-- **PR URL/commit:** authorized publication from
-  `codex/library-m5-curated-tabler` follows this exact verified local state
+- **PR URL/commit:** draft review PR
+  [#534](https://github.com/cisgz3a-hub/KerfDesk/pull/534), verified
+  implementation commit `ff67eb91bddefa54af51159b72e602490aee23da`
 - **Remaining boundary:** M6 favorites/recent/Library-native SVG import and M7
   final program regression are outside M5. No deployment, release, main merge,
   hardware operation, or physical-output qualification
@@ -676,3 +677,8 @@ drag-to-place rather than expanding scope speculatively.
   responsive-browser, static, license, full release, and production-build
   verification passed; independent full-slice and final-delta audits returned
   GO with no open P0–P3 findings.
+- 2026-07-31: Rebased the unchanged audited M4/M5 patch pair onto current main
+  `c9bf5c28d8fd6b8a1d4c542456e14e27b905215d`, reran focused responsive,
+  provenance, identity, type, and license checks, and opened separate draft
+  review PR [#534](https://github.com/cisgz3a-hub/KerfDesk/pull/534). No main
+  merge or deployment was performed.
