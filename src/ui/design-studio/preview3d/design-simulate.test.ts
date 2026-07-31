@@ -28,6 +28,26 @@ const CNC_PROJECT: Project = {
   },
 };
 
+const TWO_BIT_LAYERS = [
+  {
+    ...DEFAULT_DESIGN_LAYER,
+    id: 'flat',
+    name: 'Flat pocket',
+    cutType: 'pocket',
+    depthMm: 4,
+    toolId: 'em-6350',
+  },
+  {
+    ...DEFAULT_DESIGN_LAYER,
+    id: 'vee',
+    name: 'Vee border',
+    color: '#dc2626',
+    cutType: 'v-carve',
+    depthMm: 3,
+    toolId: 'vb-60',
+  },
+] as const;
+
 const TWO_BIT_SKETCH: Sketch = {
   entities: [
     {
@@ -49,25 +69,7 @@ const TWO_BIT_SKETCH: Sketch = {
       layerId: 'vee',
     },
   ],
-  layers: [
-    {
-      ...DEFAULT_DESIGN_LAYER,
-      id: 'flat',
-      name: 'Flat pocket',
-      cutType: 'pocket',
-      depthMm: 4,
-      toolId: 'em-6350',
-    },
-    {
-      ...DEFAULT_DESIGN_LAYER,
-      id: 'vee',
-      name: 'Vee border',
-      color: '#dc2626',
-      cutType: 'v-carve',
-      depthMm: 3,
-      toolId: 'vb-60',
-    },
-  ],
+  layers: TWO_BIT_LAYERS,
 };
 
 const ids = (sketch: Sketch): ReadonlyArray<string> =>
@@ -102,7 +104,7 @@ describe('simulateDesignCarve', () => {
   it('reports an all-construction sketch as empty', () => {
     const guides: Sketch = {
       entities: TWO_BIT_SKETCH.entities.map((entity) => ({ ...entity, construction: true })),
-      layers: TWO_BIT_SKETCH.layers,
+      layers: TWO_BIT_LAYERS,
     };
     const source = designCarveSource(CNC_PROJECT);
     const outcome = simulateDesignCarve(CNC_PROJECT, guides, ids(guides), source);
