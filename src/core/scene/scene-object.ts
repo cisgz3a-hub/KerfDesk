@@ -134,10 +134,28 @@ export type CncTabAnchor = {
   readonly pathT: number;
 };
 
+// Immutable display/audit metadata captured when a bundled Library asset is
+// inserted. It never selects an operation, changes CAM settings, or participates
+// in machine authorization. The snapshot survives even if a later app version
+// renames or removes the catalog entry.
+export type LibraryAssetProvenance = {
+  readonly schemaVersion: 1;
+  readonly assetId: string;
+  readonly title: string;
+  readonly sourceName: string;
+  readonly licenseId: string;
+  readonly creator?: string;
+  readonly sourceUrl?: string;
+  readonly licenseUrl?: string;
+  readonly sourceVersion?: string;
+  readonly assetHash?: string;
+};
+
 export type ImportedSvg = ObjectPowerScale & {
   readonly kind: 'imported-svg';
   readonly id: string;
   readonly source: string; // filename for display (e.g. 'logo.svg')
+  readonly libraryProvenance?: LibraryAssetProvenance;
   readonly bounds: Bounds; // natural bounds in mm, derived from the viewBox
   readonly transform: Transform;
   readonly paths: ReadonlyArray<ColoredPath>;

@@ -24,8 +24,13 @@ export type LibrarySourceKind = 'owned' | 'lucide' | 'cc0' | 'public-domain';
 
 export type LibraryProvenance = {
   readonly sourceKind: LibrarySourceKind;
+  readonly sourceName: string;
   readonly license: string;
+  readonly licenseId: string;
+  readonly creator?: string;
   readonly sourceUrl?: string;
+  readonly licenseUrl?: string;
+  readonly sourceVersion?: string;
   readonly downloadedAt?: string;
   readonly assetHash?: string;
   readonly notice?: string;

@@ -13,7 +13,12 @@ const entry = (patch: Partial<LibraryEntry>): LibraryEntry => ({
   machineModes: ['laser'],
   operations: ['line'],
   tags: ['base'],
-  provenance: { sourceKind: 'owned', license: 'KerfDesk first-party asset (MIT)' },
+  provenance: {
+    sourceKind: 'owned',
+    sourceName: 'CurveDesk',
+    license: 'MIT',
+    licenseId: 'MIT',
+  },
   previewSvgText: svgText,
   insert: { kind: 'svg', svgText },
   ...patch,

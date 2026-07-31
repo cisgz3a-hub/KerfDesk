@@ -88,8 +88,15 @@ export function pushUndo(prev: Project, stack: ReadonlyArray<Project>): Readonly
 // semantics (Phase C re-import).
 export function findReimportTarget(scene: Scene, object: SceneObject): ImportedSvg | null {
   if (object.kind !== 'imported-svg') return null;
+  // Catalog items are reusable artwork, not file revisions. Adding the same
+  // Library asset twice must append two independently editable objects.
+  if (object.libraryProvenance !== undefined) return null;
   for (const existing of scene.objects) {
-    if (existing.kind === 'imported-svg' && existing.source === object.source) {
+    if (
+      existing.kind === 'imported-svg' &&
+      existing.libraryProvenance === undefined &&
+      existing.source === object.source
+    ) {
       return existing;
     }
   }

@@ -26,7 +26,9 @@ function pushRequiredFieldIssues(issues: string[], entry: LibraryEntry): void {
   pushIssue(issues, entry.operations.length === 0, `${entry.id}: missing operations`);
   pushIssue(issues, entry.tags.length === 0, `${entry.id}: missing tags`);
   pushIssue(issues, entry.previewSvgText.trim() === '', `${entry.id}: missing preview SVG`);
+  pushIssue(issues, entry.provenance.sourceName.trim() === '', `${entry.id}: missing source name`);
   pushIssue(issues, entry.provenance.license.trim() === '', `${entry.id}: missing license`);
+  pushIssue(issues, entry.provenance.licenseId.trim() === '', `${entry.id}: missing license id`);
 }
 
 function missingExternalSource(entry: LibraryEntry): boolean {
