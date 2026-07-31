@@ -9,7 +9,8 @@
 
 **Branches:** `codex/box-generator-audit` (PR #529 repair boundary);
 `codex/box-generator-bg002` (PR #533 responsiveness slice);
-`codex/box-generator-bg002-repair` (post-merge repair)
+`codex/box-generator-bg002-repair` ([PR #535](https://github.com/cisgz3a-hub/KerfDesk/pull/535),
+post-merge repair)
 
 **Status:** audit and visualization contract complete. PR #529 and
 [PR #533](https://github.com/cisgz3a-hub/KerfDesk/pull/533) were squash-merged
@@ -547,3 +548,4 @@ clearance, relief choice, layer settings, exported artifact hash, and result.
 | 2026-07-31 | Post-merge regressions reproduced before repair. | The worker-dialog baseline failed three assertions: absent Worker fallback, constructor-throw fallback, and preview visibility above 20,000 points. Independent review then added and reproduced false cancellability wording for a large synchronous fallback, duplicate synchronous work under React StrictMode, and missing fallback disclosure when synchronous generation returned an error. |
 | 2026-07-31 | Post-merge repair passed focused, Box, and real-browser verification. | Focused worker/dialog bundle: 8 files / 48 tests. Full Box/golden/insertion bundle: 27 files / 170 tests, including 1,114 / 1,114 benchmark assertions and unchanged laser/CNC perceptual scores. Main and E2E typechecks, targeted ESLint/Prettier, and 2 / 2 production-Chromium worker/large-preview scenarios passed. Independent semantic review found no remaining blocker; physical fit remains unverified. |
 | 2026-07-31 | Post-merge repair passed the complete release gate. | `corepack pnpm release:check` exited 0 in 26 min 3 s: formatting, app/Electron lint, typecheck, ADR/licence checks, full unit and release-integrity suites, web and Electron-main builds, hard/soft size checks, and the public-export ratchet passed. |
+| 2026-07-31 | Post-merge repair draft review PR opened; no merge performed. | [PR #535](https://github.com/cisgz3a-hub/KerfDesk/pull/535), base `main`, head `codex/box-generator-bg002-repair`. |
