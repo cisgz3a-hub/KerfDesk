@@ -1,415 +1,195 @@
-// DesignLibraryDialog - bundled manufacturing templates and vetted artwork.
-// Entries import through the same SVG pipeline as Import SVG so inserted
-// designs remain normal editable scene objects.
+// DesignLibraryDialog - accessible browsing and inspected insertion for the
+// bundled manufacturing templates and vetted artwork. Insertion stays on the
+// normal SVG scene path and never applies operation or machine settings.
 
 import { useMemo, useState } from 'react';
+import { Dialog, IconButton } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { DESIGN_LIBRARY, LIBRARY_CATEGORIES } from './design-library';
+import { CollectionRail, LibraryToolbar, type UpdateLibraryFilter } from './DesignLibraryControls';
+import { DesignLibraryDetails } from './DesignLibraryDetails';
+import { DesignLibraryGrid } from './DesignLibraryGrid';
+import { DESIGN_LIBRARY } from './design-library';
 import { filterDesignLibrary, type LibraryFilters } from './design-library-filter';
-import type {
-  LibraryEntry,
-  LibraryEntryKind,
-  LibraryMachineMode,
-  LibraryOperation,
-  LibrarySourceKind,
-} from './design-library-types';
+import type { LibraryEntry } from './design-library-types';
+import { EMPTY_LIBRARY_FILTERS } from './design-library-view-model';
 import { librarySvgObjectFor } from './library-entry-insert';
+import './design-library.css';
+import './design-library-card.css';
+import './design-library-detail.css';
 
-const OPERATIONS: ReadonlyArray<LibraryOperation> = [
-  'line',
-  'fill',
-  'image',
-  'profile',
-  'pocket',
-  'drill',
-  'v-carve',
-  'calibration',
-];
-
-const SOURCE_KINDS: ReadonlyArray<LibrarySourceKind> = ['owned', 'lucide', 'cc0', 'public-domain'];
-
-type UpdateFilter = <K extends keyof LibraryFilters>(key: K, value: LibraryFilters[K]) => void;
+const INITIAL_LIBRARY_ENTRY_ID =
+  filterDesignLibrary(DESIGN_LIBRARY, EMPTY_LIBRARY_FILTERS)[0]?.id ?? '';
 
 export function DesignLibraryDialog(): JSX.Element | null {
-  const open = useUiStore((s) => s.libraryDialogOpen);
-  const setOpen = useUiStore((s) => s.setLibraryDialogOpen);
-  const importSvgObject = useStore((s) => s.importSvgObject);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const [filters, setFilters] = useState<LibraryFilters>({
-    category: 'all',
-    machine: 'all',
-    kind: 'all',
-    operation: 'all',
-    sourceKind: 'all',
-    search: '',
-  });
-  const visibleEntries = useMemo(() => filterDesignLibrary(DESIGN_LIBRARY, filters), [filters]);
-  if (!open) return null;
+  const open = useUiStore((state) => state.libraryDialogOpen);
+  return open ? <OpenDesignLibraryDialog /> : null;
+}
 
-  const updateFilter = <K extends keyof LibraryFilters>(key: K, value: LibraryFilters[K]): void => {
-    setFilters((current) => ({ ...current, [key]: value }));
-  };
-
-  const insertEntry = (item: LibraryEntry, batchOffsetIdx = 0): boolean => {
-    const object = librarySvgObjectFor(item, crypto.randomUUID());
-    if (object === null) {
-      pushToast(`Could not insert ${item.title}.`, 'error');
-      return false;
-    }
-    const outcome = importSvgObject(object, batchOffsetIdx);
-    return outcome.kind === 'added';
-  };
-
-  const insertOne = (item: LibraryEntry): void => {
-    if (!insertEntry(item)) return;
-    pushToast(`${item.title} added to the canvas.`, 'success');
-    setOpen(false);
-  };
-
-  const insertVisible = (): void => {
-    let inserted = 0;
-    visibleEntries.forEach((entry, idx) => {
-      if (insertEntry(entry, idx)) inserted += 1;
-    });
-    if (inserted === 0) {
-      pushToast('No visible library entries could be imported.', 'error');
-      return;
-    }
-    pushToast(`Imported ${inserted} visible library entries.`, 'success');
-  };
-
+function OpenDesignLibraryDialog(): JSX.Element {
+  const setOpen = useUiStore((state) => state.setLibraryDialogOpen);
+  const close = (): void => setOpen(false);
+  const browser = useDesignLibraryBrowser(close);
   return (
-    <div role="dialog" aria-label="Design library" style={backdropStyle}>
-      <div style={panelStyle}>
-        <div style={headerStyle}>
-          <h3 style={titleStyle}>Design library</h3>
-          <button type="button" onClick={() => setOpen(false)} title="Close the design library.">
-            Close
-          </button>
-        </div>
-
-        <div style={browserStyle}>
-          <CategoryRail filters={filters} updateFilter={updateFilter} />
-          <div style={contentStyle}>
-            <FilterBar filters={filters} updateFilter={updateFilter} />
-            <ResultBar visibleCount={visibleEntries.length} insertVisible={insertVisible} />
-            <EntryGrid entries={visibleEntries} insertOne={insertOne} />
-          </div>
-        </div>
-
-        <p style={footStyle}>
-          Owned templates and vetted artwork import as editable vectors. External artwork includes
-          source and license provenance.
-        </p>
+    <Dialog title="Design Library" size="xl" panelClassName="lf-library-dialog" onClose={close}>
+      <div className="lf-library-dialog__close">
+        <IconButton icon="close" label="Close Design Library" onClick={close} size="sm" />
       </div>
-    </div>
+      <p className="lf-library-dialog__intro">
+        Explore editable vectors, inspect exact licensing, then add one design to your canvas.
+      </p>
+      <div className="lf-library-shell">
+        <LibraryToolbar
+          entries={DESIGN_LIBRARY}
+          filters={browser.filters}
+          filtersOpen={browser.filtersOpen}
+          updateFilter={browser.updateFilter}
+          setFiltersOpen={browser.setFiltersOpen}
+          clearFilters={browser.clearFilters}
+        />
+        <LibraryWorkspace browser={browser} />
+      </div>
+    </Dialog>
   );
 }
 
-function CategoryRail(props: {
-  readonly filters: LibraryFilters;
-  readonly updateFilter: UpdateFilter;
-}): JSX.Element {
-  return (
-    <div style={categoryRailStyle}>
-      <button
-        type="button"
-        title="Show every library category."
-        onClick={() => props.updateFilter('category', 'all')}
-        aria-pressed={props.filters.category === 'all'}
-        style={props.filters.category === 'all' ? activeCategoryStyle : categoryButtonStyle}
-      >
-        All
-      </button>
-      {LIBRARY_CATEGORIES.map((category) => (
-        <button
-          key={category}
-          type="button"
-          title={`Show ${category} library entries.`}
-          onClick={() => props.updateFilter('category', category)}
-          aria-pressed={props.filters.category === category}
-          style={props.filters.category === category ? activeCategoryStyle : categoryButtonStyle}
-        >
-          {category}
-        </button>
-      ))}
-    </div>
-  );
-}
+type LibraryBrowser = ReturnType<typeof useDesignLibraryBrowser>;
 
-function FilterBar(props: {
-  readonly filters: LibraryFilters;
-  readonly updateFilter: UpdateFilter;
-}): JSX.Element {
+function LibraryWorkspace(props: { readonly browser: LibraryBrowser }): JSX.Element {
+  const browser = props.browser;
   return (
-    <div style={filterBarStyle}>
-      <input
-        aria-label="Search design library"
-        type="search"
-        title="Search the design library by name, category, tag, or source."
-        value={props.filters.search ?? ''}
-        onInput={(event) => props.updateFilter('search', event.currentTarget.value)}
-        placeholder="Search"
-        style={searchStyle}
+    <div className="lf-library-workspace">
+      <CollectionRail
+        entries={DESIGN_LIBRARY}
+        filters={browser.filters}
+        updateFilter={browser.updateFilter}
       />
-      <select
-        aria-label="Machine filter"
-        title="Filter designs by machine type."
-        value={props.filters.machine ?? 'all'}
-        onChange={(event) =>
-          props.updateFilter('machine', event.currentTarget.value as LibraryMachineMode | 'all')
-        }
-      >
-        <option value="all">All machines</option>
-        <option value="laser">Laser</option>
-        <option value="cnc">CNC</option>
-      </select>
-      <select
-        aria-label="Type filter"
-        title="Filter designs by template or artwork type."
-        value={props.filters.kind ?? 'all'}
-        onChange={(event) =>
-          props.updateFilter('kind', event.currentTarget.value as LibraryEntryKind | 'all')
-        }
-      >
-        <option value="all">All types</option>
-        <option value="owned-template">Templates</option>
-        <option value="bundled-artwork">Artwork</option>
-      </select>
-      <OperationSelect filters={props.filters} updateFilter={props.updateFilter} />
-      <SourceSelect filters={props.filters} updateFilter={props.updateFilter} />
+      <section className="lf-library-results" aria-label="Design Library results">
+        <div className="lf-library-results__summary">
+          <span role="status" aria-live="polite" aria-atomic="true">
+            {resultCountLabel(browser.visibleEntries.length, DESIGN_LIBRARY.length)}
+          </span>
+          <span>Choose a card to inspect it</span>
+        </div>
+        <DesignLibraryGrid
+          entries={browser.visibleEntries}
+          selectedId={browser.selectedEntry?.id}
+          addingId={browser.addingId}
+          onSelect={browser.selectEntry}
+          onAdd={browser.insertOne}
+          clearFilters={browser.clearFilters}
+        />
+      </section>
+      <DesignLibraryDetails
+        entry={browser.selectedEntry}
+        errorMessage={browser.errorMessage}
+        addingId={browser.addingId}
+        onAdd={browser.insertOne}
+        onReturnToResults={returnToNarrowCard}
+      />
     </div>
   );
 }
 
-function OperationSelect(props: {
-  readonly filters: LibraryFilters;
-  readonly updateFilter: UpdateFilter;
-}): JSX.Element {
-  return (
-    <select
-      aria-label="Operation filter"
-      title="Filter designs by machining or laser operation."
-      value={props.filters.operation ?? 'all'}
-      onChange={(event) =>
-        props.updateFilter('operation', event.currentTarget.value as LibraryOperation | 'all')
+function useDesignLibraryBrowser(onClose: () => void) {
+  const importSvgObject = useStore((state) => state.importSvgObject);
+  const pushToast = useToastStore((state) => state.pushToast);
+  const [filters, setFilters] = useState<LibraryFilters>(EMPTY_LIBRARY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState(INITIAL_LIBRARY_ENTRY_ID);
+  const [errorMessage, setErrorMessage] = useState<string>();
+  const [addingId, setAddingId] = useState<string>();
+  const visibleEntries = useMemo(() => filterDesignLibrary(DESIGN_LIBRARY, filters), [filters]);
+  const selectedEntry =
+    visibleEntries.find((entry) => entry.id === selectedId) ?? visibleEntries[0];
+
+  const reportInsertError = (entry: LibraryEntry): void => {
+    const message = `${entry.title} could not be added. The Library is still open so you can try another design.`;
+    setErrorMessage(message);
+    pushToast(`Could not add ${entry.title}.`, 'error');
+  };
+  const applyFilters = (nextFilters: LibraryFilters): void => {
+    const nextEntries = filterDesignLibrary(DESIGN_LIBRARY, nextFilters);
+    setFilters(nextFilters);
+    setSelectedId((current) =>
+      nextEntries.some((entry) => entry.id === current) ? current : (nextEntries[0]?.id ?? ''),
+    );
+    setErrorMessage(undefined);
+  };
+  const insertEntry = async (entry: LibraryEntry): Promise<void> => {
+    let added = false;
+    setAddingId(entry.id);
+    setErrorMessage(undefined);
+    try {
+      const object = await librarySvgObjectFor(entry, crypto.randomUUID());
+      if (object === null) {
+        reportInsertError(entry);
+        return;
       }
-    >
-      <option value="all">All operations</option>
-      {OPERATIONS.map((operation) => (
-        <option key={operation} value={operation}>
-          {operation}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function SourceSelect(props: {
-  readonly filters: LibraryFilters;
-  readonly updateFilter: UpdateFilter;
-}): JSX.Element {
-  return (
-    <select
-      aria-label="Source filter"
-      title="Filter designs by provenance source."
-      value={props.filters.sourceKind ?? 'all'}
-      onChange={(event) =>
-        props.updateFilter('sourceKind', event.currentTarget.value as LibrarySourceKind | 'all')
+      const outcome = importSvgObject(object);
+      if (outcome.kind !== 'added') {
+        reportInsertError(entry);
+        return;
       }
-    >
-      <option value="all">All sources</option>
-      {SOURCE_KINDS.map((sourceKind) => (
-        <option key={sourceKind} value={sourceKind}>
-          {sourceKind}
-        </option>
-      ))}
-    </select>
-  );
+      added = true;
+    } catch {
+      reportInsertError(entry);
+    } finally {
+      setAddingId(undefined);
+    }
+    if (added) {
+      pushToast(`${entry.title} added to the canvas.`, 'success');
+      onClose();
+    }
+  };
+  const insertOne = (entry: LibraryEntry): void => {
+    if (addingId !== undefined) return;
+    void insertEntry(entry);
+  };
+  const updateFilter: UpdateLibraryFilter = (key, value): void => {
+    applyFilters({ ...filters, [key]: value });
+  };
+  const clearFilters = (): void => {
+    applyFilters(EMPTY_LIBRARY_FILTERS);
+  };
+
+  return {
+    filters,
+    filtersOpen,
+    visibleEntries,
+    selectedEntry,
+    errorMessage,
+    addingId,
+    updateFilter,
+    setFiltersOpen,
+    clearFilters,
+    insertOne,
+    selectEntry: (entry: LibraryEntry): void => {
+      setSelectedId(entry.id);
+      setErrorMessage(undefined);
+      revealNarrowDetails();
+    },
+  };
 }
 
-function ResultBar(props: {
-  readonly visibleCount: number;
-  readonly insertVisible: () => void;
-}): JSX.Element {
-  return (
-    <div style={resultBarStyle}>
-      <span>{props.visibleCount} entries</span>
-      <button
-        type="button"
-        aria-label="Import visible library entries"
-        title="Import every library entry currently shown by the filters."
-        onClick={props.insertVisible}
-        disabled={props.visibleCount === 0}
-      >
-        Import visible
-      </button>
-    </div>
-  );
+function revealNarrowDetails(): void {
+  if (typeof window.matchMedia !== 'function') return;
+  if (!window.matchMedia('(max-width: 920px)').matches) return;
+  window.requestAnimationFrame(() => {
+    const detail = document.getElementById('library-detail-panel');
+    detail?.focus({ preventScroll: true });
+    detail?.scrollIntoView({ block: 'start' });
+  });
 }
 
-function EntryGrid(props: {
-  readonly entries: ReadonlyArray<LibraryEntry>;
-  readonly insertOne: (item: LibraryEntry) => void;
-}): JSX.Element {
-  return (
-    <div style={gridStyle}>
-      {props.entries.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          data-library-card
-          onClick={() => props.insertOne(item)}
-          aria-label={`Insert ${item.title}`}
-          title={`Insert "${item.title}" onto the canvas.`}
-          style={cellStyle}
-        >
-          <img
-            src={`data:image/svg+xml;utf8,${encodeURIComponent(item.previewSvgText)}`}
-            alt={item.title}
-            width={42}
-            height={42}
-            style={iconStyle}
-          />
-          <span style={nameStyle}>{item.title}</span>
-          <span style={metaStyle}>{item.subcategory}</span>
-          <EntryBadges item={item} />
-        </button>
-      ))}
-    </div>
-  );
+function returnToNarrowCard(entry: LibraryEntry): void {
+  const card = document.getElementById(`library-card-${entry.id}`);
+  card?.focus({ preventScroll: true });
+  card?.scrollIntoView({ block: 'center' });
 }
 
-function EntryBadges(props: { readonly item: LibraryEntry }): JSX.Element {
-  const item = props.item;
-  return (
-    <span style={badgeRowStyle}>
-      <span style={badgeStyle}>{item.kind === 'owned-template' ? 'Template' : 'Art'}</span>
-      <span style={badgeStyle}>{item.machineModes.join('+')}</span>
-      <span style={badgeStyle}>{item.provenance.sourceKind}</span>
-    </span>
-  );
+function resultCountLabel(visible: number, total: number): string {
+  if (visible === total) return `${total} designs`;
+  return `${visible} of ${total} designs`;
 }
-
-const backdropStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'var(--lf-backdrop)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 40,
-};
-const panelStyle: React.CSSProperties = {
-  background: 'var(--lf-bg-1)',
-  color: 'var(--lf-text)',
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  padding: 12,
-  width: 860,
-  maxWidth: 'calc(100vw - 48px)',
-  maxHeight: 'calc(100vh - 96px)',
-  overflowY: 'auto',
-};
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  marginBottom: 8,
-};
-const titleStyle: React.CSSProperties = { fontSize: 14, margin: 0 };
-const browserStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '150px 1fr',
-  gap: 10,
-  minHeight: 420,
-};
-const categoryRailStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 5,
-};
-const categoryButtonStyle: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '5px 7px',
-};
-const activeCategoryStyle: React.CSSProperties = {
-  ...categoryButtonStyle,
-  background: 'var(--lf-accent)',
-  color: 'var(--lf-bg)',
-};
-const contentStyle: React.CSSProperties = {
-  minWidth: 0,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
-};
-const filterBarStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(120px, 1fr) repeat(4, minmax(104px, max-content))',
-  gap: 6,
-  alignItems: 'center',
-};
-const searchStyle: React.CSSProperties = {
-  minWidth: 0,
-};
-const resultBarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 8,
-  fontSize: 12,
-  color: 'var(--lf-text-muted)',
-};
-const gridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))',
-  gap: 8,
-};
-const cellStyle: React.CSSProperties = {
-  minHeight: 126,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'flex-start',
-  gap: 4,
-  padding: 8,
-};
-const iconStyle: React.CSSProperties = {
-  width: 42,
-  height: 42,
-  objectFit: 'contain',
-  filter: 'invert(0.8)',
-};
-const nameStyle: React.CSSProperties = {
-  fontSize: 11,
-  lineHeight: 1.15,
-  textAlign: 'center',
-};
-const metaStyle: React.CSSProperties = {
-  fontSize: 10,
-  lineHeight: 1.1,
-  color: 'var(--lf-text-muted)',
-  textAlign: 'center',
-};
-const badgeRowStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  justifyContent: 'center',
-  gap: 3,
-};
-const badgeStyle: React.CSSProperties = {
-  fontSize: 9,
-  lineHeight: 1,
-  padding: '2px 3px',
-  border: '1px solid var(--lf-border)',
-  borderRadius: 3,
-};
-const footStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  margin: '10px 0 0 0',
-};

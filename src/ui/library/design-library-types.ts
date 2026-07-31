@@ -20,7 +20,7 @@ export type LibraryOperation =
   | 'v-carve'
   | 'calibration';
 
-export type LibrarySourceKind = 'owned' | 'lucide' | 'cc0' | 'public-domain';
+export type LibrarySourceKind = 'owned' | 'tabler' | 'lucide' | 'cc0' | 'public-domain';
 
 export type LibraryProvenance = {
   readonly sourceKind: LibrarySourceKind;
@@ -38,7 +38,7 @@ export type LibraryProvenance = {
 
 export type LibrarySvgInsert = {
   readonly kind: 'svg';
-  readonly svgText: string;
+  readonly loadSvgText: () => Promise<string>;
 };
 
 export type LibraryGeneratedInsert = {
@@ -47,6 +47,16 @@ export type LibraryGeneratedInsert = {
 };
 
 export type LibraryInsert = LibrarySvgInsert | LibraryGeneratedInsert;
+
+export type LibraryPreviewSource =
+  | {
+      readonly kind: 'inline-svg';
+      readonly svgText: string;
+    }
+  | {
+      readonly kind: 'asset-url';
+      readonly url: string;
+    };
 
 export type LibraryEntry = {
   readonly id: string;
@@ -58,6 +68,6 @@ export type LibraryEntry = {
   readonly operations: ReadonlyArray<LibraryOperation>;
   readonly tags: ReadonlyArray<string>;
   readonly provenance: LibraryProvenance;
-  readonly previewSvgText: string;
+  readonly preview: LibraryPreviewSource;
   readonly insert: LibraryInsert;
 };

@@ -50,8 +50,8 @@ function ownedEntry(args: {
     operations: args.operations,
     tags: args.tags,
     provenance: OWNED_PROVENANCE,
-    previewSvgText: args.svgText,
-    insert: { kind: 'svg', svgText: args.svgText },
+    preview: { kind: 'inline-svg', svgText: args.svgText },
+    insert: { kind: 'svg', loadSvgText: async () => args.svgText },
   };
 }
 

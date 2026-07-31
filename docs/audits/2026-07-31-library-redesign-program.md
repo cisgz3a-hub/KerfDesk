@@ -1,8 +1,10 @@
 # CurveDesk Library redesign program
 
 Date started: 2026-07-31
-Worktree: `C:\Users\Asus\LaserForge-2.0\.codex-worktrees\library-redesign`
-Branch: `codex/library-redesign-program`
+Worktree:
+`C:\Users\Asus\LaserForge-2.0\.codex-worktrees\library-m5-curated-tabler`
+Branch: `codex/library-m5-curated-tabler`, based on the repaired M3 head
+`f91478eb18f5a5c10b48e8eec74c65494efdecf6` plus the audited M4 browser commit
 Baseline: `e3ace9928163fcd696d074c9f0a54024f8215948` (`origin/main`, fetched 2026-07-31)
 Status: active implementation program; verified milestones may be committed,
 pushed, and opened as review PRs after coordinator handoff; never merge main,
@@ -51,8 +53,8 @@ machine semantics.
 | M1 | Current UX, data/import, provenance/license, performance, web/Electron, workflow audit | Confirmed | Source/test audit plus isolated desktop/narrow browser baseline |
 | M2 | Comparable-product research, permissive-source decision, IA and visual-system plan | Confirmed | Primary-source citations, license matrix, accepted asset/source boundaries |
 | M3 | Correct Library insertion identity and persisted provenance | Confirmed | Independent re-audit GO; 56 focused tests, 210 project IO tests, type/lint/export/file-size/integrity/build gates |
-| M4 | Accessible responsive browser, premium cards/details, search/filter and empty/error UX | Planned | Focused component tests plus desktop/narrow keyboard and visual audit |
-| M5 | Curated Tabler/owned starter collections and lazy catalog delivery | Planned | Pinned MIT source, per-asset manifest, notices, catalog validation, bundle/performance budget |
+| M4 | Accessible responsive browser, premium cards/details, search/filter and empty/error UX | Confirmed | Full suite and release gates; three independent audit sectors GO; desktop, 651 px, 390 px, and 320 px browser audits |
+| M5 | Curated Tabler/owned starter collections and lazy catalog delivery | Confirmed | Pinned MIT source, per-asset manifest, notices, catalog validation, bundle/performance budget |
 | M6 | Library-native SVG import entry, favorites/recent state, final accessibility/platform audit | Planned | Verified current SVG handler, focused tests, browser smoke, web/Electron behavior audit |
 | M7 | Final regression and behavior audit | Planned | Relevant CI gates plus separate browser smoke; limitations recorded |
 
@@ -403,12 +405,236 @@ Card and detail behavior:
 - **Tests/checks:** original M3: 56 focused, 210 project IO, 14
   release-integrity, independent delta audit GO; integration repair: 16
   focused, 223 widened, 8,212 full-suite tests, complete `release:check`,
-  export ratchet at 208; fresh exact-head independent audit pending publication
-- **PR URL/commit:** [draft PR #530](https://github.com/cisgz3a-hub/KerfDesk/pull/530);
-  repaired head pending publication
+  export ratchet at 208; fresh exact-head independent audit GO; GitHub CI and
+  Chrome UX smoke passed
+- **PR URL/commit:** ready-for-review PR
+  [#530](https://github.com/cisgz3a-hub/KerfDesk/pull/530), commit
+  `f91478eb18f5a5c10b48e8eec74c65494efdecf6`
 - **Remaining boundary:** software behavior only; M4 UX is not included;
   physical output is unverified; no deployment, release, hardware operation, or
   main merge
+- **Source ledger path:**
+  `docs/audits/2026-07-31-library-redesign-program.md`
+
+## M4 — accessible responsive premium browser
+
+### Implemented contract
+
+- Replaced the fixed bespoke modal and cramped card strip with the shared
+  `Dialog` contract and a responsive Library workspace: collection rail, design
+  grid, and inspected-design panel on wide screens; two-column cards and a
+  stacked inspector on narrow screens.
+- The dialog now exposes `aria-modal`, a labelled title, initial focus, a focus
+  trap, Escape dismissal, opener-focus restoration, and the existing modal-depth
+  shortcut isolation. The result pane is a named region rather than a second
+  application `main` landmark.
+- Search covers title, category, subcategory, tags, creator, source, display
+  license, and license ID. Facets are derived from populated catalog values, the
+  result count is announced politely, and zero results provide a clear recovery
+  action. Filtering commits a visible selection instead of reviving stale hidden
+  selections when filters are broadened.
+- Cards use stable 4:3 preview stages, human labels, separate inspect and
+  quick-add actions, selected state, and source disambiguation only where titles
+  collide. The two distinct `Flower` assets are distinguishable visually and by
+  screen-reader action names.
+- Preview delivery uses cached data URLs, native lazy loading, asynchronous
+  decoding, `content-visibility`, and explicit loading, ready, and error states.
+  Detail preview state is keyed to asset identity so one broken preview cannot
+  poison the next selection.
+- The inspector exposes exact source, creator, human-readable and
+  machine-readable license, version, source/license URLs, asset hash, and notice.
+  Web URLs remain normal HTTPS links. Electron presents the exact URLs as text
+  because the existing renderer window policy denies external targets; no
+  desktop trust boundary was widened.
+- Suggested uses are explicitly advisory. Both add actions retain the M3
+  production SVG parser/insertion path, close only after an `added` outcome, and
+  apply no power, speed, material, tool, depth, calibration, CNC, operation,
+  Frame, Start, controller, or output override.
+- No assets, packages, lockfiles, dependencies, license terms, or notices were
+  added or changed. The accepted pinned Tabler artwork family remains an M5
+  boundary.
+
+### Verification and independent audit
+
+- Focused Library, catalog, provenance, and insertion-identity tests:
+  **31/31 passed**. The repository raw-control hover-help contract passed
+  **1/1** after the full suite identified eight missing Library tooltips.
+- A broader Library/provenance/insertion/Electron-policy bundle passed
+  **49/49** in the platform audit. TypeScript, full ESLint, Electron ESLint,
+  Prettier, diff check, ADR-number gate, raw and soft file-size gates, and the
+  public-export no-growth ratchet all passed.
+- The complete Vitest suite passed with the compact fail-fast reporter; fail-fast
+  would have stopped at the first failure and did not. One earlier
+  default-reporter rerun ended nonzero after the Library hover contract passed,
+  but its failure identity was lost in truncated warning output and it did not
+  reproduce in the subsequent complete run. This remains a P3 general
+  test-harness/load observation, not a reproducible M4 failure.
+- Release-integrity tests passed **14/14**. License check passed for 33 production
+  packages across seven allowed license groups. Web and Electron-main production
+  builds passed.
+- The final primary renderer is 720.18 kB / 211.18 kB gzip versus the M3
+  713.12 kB / 209.20 kB gzip: a bounded M4 increase of 7.06 kB / 1.98 kB gzip.
+  Library preview payloads remain cached and lazy; manifest/asset code splitting
+  is intentionally assigned to M5.
+- Real Chrome audits passed at desktop, 651 px, 390 px, and 320 px. At 1280 px
+  the Library renders a three-column card grid with no page overflow. At 390 px
+  the body, dialog, 367 px grid, cards, and inspector have no horizontal
+  overflow; the grid renders two 166 px columns. Card-to-detail and Back-to-card
+  focus/scroll behavior, empty-state recovery, filter selection stability,
+  duplicate-title labels, Escape dismissal, and opener-focus restoration all
+  passed. No console error or Vite overlay remained.
+- Three independent audit sectors returned **GO with no open P0–P3 findings**:
+  behavior/edge cases, accessibility/visual integration, and platform/scope.
+  The final source delta is confined to 12 files under `src/ui/library`; this
+  ledger is the only audit document changed.
+- No controller, Frame, Start, output, laser-safety, Electron-main, project IO,
+  or scene-state file changed. No packaged desktop installation, real hardware,
+  physical placement, cut quality, engraving quality, or burn safety was
+  qualified.
+
+### Coordinator master-ledger record
+
+- **Workstream:** CurveDesk Library — M4
+- **Finding/fix title:** Premium, provenance-aware, accessible responsive Library
+  browser
+- **Severity:** former P1/P2 integration findings closed; no open M4 severity
+- **Status:** fixed/verified
+- **Exact evidence/reproduction:** the old fixed modal exposed tiny forced-style
+  previews, a one-card narrow strip, dead facets, bulk `Import visible`, no
+  `aria-modal`, and no inspected provenance. The M4 dialog now uses the shared
+  modal contract; populated collection/facet controls; cached lazy previews;
+  separate inspect/add actions; exact provenance; duplicate-title
+  disambiguation; committed filter fallback; item-local preview/add errors; and
+  responsive wide/narrow layouts in `src/ui/library`
+- **Tests/checks:** 31 focused tests; one hover-help contract; 49-test
+  platform-policy bundle; complete Vitest suite; typecheck; full and Electron
+  lint; Prettier; diff; ADR; 14 release-integrity tests; license check; web and
+  Electron-main builds; raw/soft size gates; export ratchet; desktop, 651 px,
+  390 px, and 320 px Chrome audits; three-sector independent audit GO
+- **PR URL/commit:** none for M4; local milestone commit replayed onto repaired
+  M3 head `f91478eb18f5a5c10b48e8eec74c65494efdecf6` before M5 work
+- **Remaining boundary:** M5 curated pinned-MIT starter assets and lazy catalog
+  delivery; M6 Library-native SVG import, favorites/recent, and final platform
+  audit; M7 whole-program regression. Packaged Electron and physical output
+  remain unverified. No deployment, release, hardware operation, or main merge
+- **Source ledger path:**
+  `docs/audits/2026-07-31-library-redesign-program.md`
+
+## M5 — curated pinned-MIT starter collections
+
+### Implemented contract
+
+- Replaced the mixed Lucide/OpenClipart customer-artwork starter set with 46
+  intentionally selected, non-brand Tabler 3.43.0 outline assets in six useful
+  collections: Pets & Wildlife, Garden & Outdoors, Kitchen & Café, Home &
+  Workshop, Celebration & Marks, and Hobbies & Outdoors. Together with the 21
+  CurveDesk-owned manufacturing templates, the Library contains 67 entries.
+- Pinned `@tabler/icons` exactly to `3.43.0`. The authoritative upstream
+  `v3.43.0` MIT license names copyright 2020–2026 Paweł Kuna; the annotated
+  tag resolves to commit `e40738b64486f857128ae58335354681e4e9dc9b`, and the
+  npm lock records integrity
+  `sha512-qXwS17Op9jqr3Asvu31fejyw8+OnRDKH7oR8nQXyUgW1pI44ET8OKG9kssy+XIvvAIyej6gZdGmviNUn1VMfPw==`.
+- Added one typed canonical manifest with title, collection, search tags, and
+  exact installed-file SHA-256 for every curated item. UI provenance derives
+  immutable source/license URLs from the pinned upstream commit. No external
+  SVG was copied into the repository, package code is never executed, and no
+  unverified aggregator, brand, or unknown-license asset was used.
+- Preserved distribution obligations in `THIRD_PARTY_NOTICES.md`,
+  `RESEARCH_LOG.md`, and the generated customer
+  `public/third-party-notices.txt`. Existing Lucide/OpenClipart dependencies,
+  notices, and historical provenance remain available for their other accepted
+  roles even though those assets no longer appear in the customer starter
+  catalog.
+- Preview URLs use explicit `?no-inline` package imports and native image lazy
+  loading. Exact SVG text uses per-item dynamic `?raw` imports only when the
+  user adds an item. Every loaded asset still passes through the production
+  SVG sanitizer/parser and the M3 identity/provenance insertion path. The web
+  PWA still precaches emitted chunks under the repository's whole-app offline
+  contract; lazy delivery here means the geometry module is not imported,
+  parsed, or executed in the renderer until insertion.
+- Add actions expose a single in-progress state, prevent duplicate concurrent
+  adds, and isolate lazy-load, parse, or import failures to the chosen item.
+  Failure produces no scene mutation, leaves the Library open, announces the
+  error, and re-enables the actions.
+- A live M5 browser report found square SVG image tracks expanding beyond the
+  4:3 preview media frame, cropping visible artwork. The image is now centered
+  in an explicit 18 px inset containment box with `object-fit: contain`; the
+  card and detail frames preserve the complete asset and have no horizontal
+  overflow.
+- No controller, Frame, Start, output, laser-safety, project authorization, or
+  machine-setting semantics changed.
+
+### Verification and independent audit
+
+- Focused catalog, UI, insertion, project-provenance, and identity tests:
+  **49/49 passed**. Coverage includes all 67 catalog records, all 46 exact
+  installed-file hashes, production-parser acceptance for every SVG entry, a
+  real lazy Tabler insertion with exact saved provenance, ordinary-import ↔
+  Library collision behavior, non-blocking malformed/future project metadata,
+  and rejected lazy-load recovery.
+- Focused real-Chrome responsive regression: **1/1 passed** at 1180 × 800 and
+  390 × 844. It asserts the 4:3 media ratio, centered `contain` behavior, image
+  bounds inside card/detail frames, and no media or page horizontal overflow.
+  Independent live browser inspection also confirmed complete artwork at both
+  widths with no console/Vite failure observed.
+- TypeScript, e2e TypeScript, full ESLint, Prettier, and `git diff --check`
+  passed.
+- The isolated M5 license check passed for **34 production packages across
+  seven allowed license groups**. After the clean rebase, current-main
+  dependency growth made the exact-head inventory **50 production packages
+  across eight allowed groups**; that check also passed. The generated notice
+  contains the exact `@tabler/icons@3.43.0` MIT text and Paweł Kuna copyright.
+- Production web build passed. It emits 46 preview SVGs totaling **27,548
+  bytes** and 46 insertion-only geometry chunks totaling **29,066 bytes**. The
+  primary renderer is **514.36 kB / 155.65 kB gzip**, down from the M4
+  **720.18 kB / 211.18 kB gzip** baseline by approximately **205.82 kB /
+  55.53 kB gzip**.
+- The first complete-gate run exposed a test-only timing assumption: one lazy
+  import assertion ran after an arbitrary zero-millisecond tick rather than the
+  observable insertion result. The repair now waits, within a bounded React
+  `act`, for dialog closure on success and the accessible alert on rejection;
+  all exact scene, provenance, dialog, alert, and re-enabled-action assertions
+  remain in place. Its focused rerun passed **14/14**.
+- An exact-tree complete `pnpm release:check` passed after an earlier restricted
+  Windows host ended the Vitest process with `0x40010004` and no assertion
+  failure. The successful unrestricted run passed typecheck, full and Electron
+  ESLint, Prettier, ADR-number and license checks, the complete Vitest suite,
+  14 release-integrity tests, deterministic notices, web and Electron-main
+  builds, raw/soft file-size policies, and the public-export ratchet.
+- Independent full-slice audit and final timing-delta re-audit both returned
+  **GO with no open P0–P3 findings**. The delta audit confirmed the final change
+  is test-only, bounded, cannot hide a hang or false outcome, and preserves all
+  production-behavior assertions.
+- Packaged Electron interaction, real hardware, placement, and physical output
+  are not qualified by this browser/software evidence.
+
+### Coordinator master-ledger record
+
+- **Workstream:** CurveDesk Library — M5
+- **Finding/fix title:** Replace the mixed clip-art catalog with a
+  provenance-complete, lazy, visually contained Tabler/CurveDesk starter
+  collection
+- **Severity:** former P1 licensing/performance and live P1 visual-containment
+  findings closed; no open M5 severity
+- **Status:** fixed/verified
+- **Exact evidence/reproduction:** the former starter mixed Lucide UI glyphs
+  and OpenClipart with eager renderer bytes; the first M5 live build also let
+  square image tracks exceed 4:3 preview height and visibly crop artwork. The
+  current 67-entry catalog uses 46 pinned non-brand Tabler assets plus 21 owned
+  templates, canonical SHA-256 provenance, separate lazy previews and
+  insertion chunks, and bounded card/detail media at desktop and narrow widths
+- **Tests/checks:** 49 focused tests; 1 focused Chrome desktop/narrow
+  regression; live browser audit; typecheck and e2e typecheck; full ESLint;
+  Prettier; diff check; isolated 34-package and exact-rebased-head 50-package
+  license closure; deterministic notices; production web build and bundle
+  measurements; complete `release:check`;
+  independent full-slice and final-delta audits GO with no open P0–P3 findings
+- **PR URL/commit:** draft review PR
+  [#534](https://github.com/cisgz3a-hub/KerfDesk/pull/534), verified
+  implementation commit `ff67eb91bddefa54af51159b72e602490aee23da`
+- **Remaining boundary:** M6 favorites/recent/Library-native SVG import and M7
+  final program regression are outside M5. No deployment, release, main merge,
+  hardware operation, or physical-output qualification
 - **Source ledger path:**
   `docs/audits/2026-07-31-library-redesign-program.md`
 
@@ -436,3 +662,23 @@ drag-to-place rather than expanding scope speculatively.
   optional Library provenance is now normalized as non-blocking display/audit
   metadata, and mixed ordinary-import/Library identity collisions have explicit
   insertion and re-import regression coverage.
+- 2026-07-31: Published the repaired M3 slice to
+  [#530](https://github.com/cisgz3a-hub/KerfDesk/pull/530) at
+  `f91478eb18f5a5c10b48e8eec74c65494efdecf6`; exact-head independent audit,
+  CI, Chrome UX smoke, and CodeRabbit passed. The PR was marked ready for
+  integration review and remains unmerged by this program.
+- 2026-07-31: Completed M4 premium responsive browsing, accessible shared-modal
+  behavior, searchable provenance, populated facets, resilient lazy previews,
+  narrow-screen navigation, exact platform presentation, full-suite and release
+  gates, and a three-sector independent audit. No open P0–P3 M4 findings remain.
+- 2026-07-31: Completed the M5 pinned Tabler 3.43.0 starter catalog, canonical
+  per-item provenance, lazy preview/insertion delivery, exact notices, resilient
+  add states, and the live card/detail preview-containment repair. Focused,
+  responsive-browser, static, license, full release, and production-build
+  verification passed; independent full-slice and final-delta audits returned
+  GO with no open P0–P3 findings.
+- 2026-07-31: Rebased the unchanged audited M4/M5 patch pair onto current main
+  `c9bf5c28d8fd6b8a1d4c542456e14e27b905215d`, reran focused responsive,
+  provenance, identity, type, and license checks, and opened separate draft
+  review PR [#534](https://github.com/cisgz3a-hub/KerfDesk/pull/534). No main
+  merge or deployment was performed.

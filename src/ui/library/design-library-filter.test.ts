@@ -19,8 +19,8 @@ const entry = (patch: Partial<LibraryEntry>): LibraryEntry => ({
     license: 'MIT',
     licenseId: 'MIT',
   },
-  previewSvgText: svgText,
-  insert: { kind: 'svg', svgText },
+  preview: { kind: 'inline-svg', svgText },
+  insert: { kind: 'svg', loadSvgText: async () => svgText },
   ...patch,
 });
 
@@ -60,17 +60,88 @@ describe('filterDesignLibrary', () => {
     ]);
   });
 
-  it('composes machine, kind, operation, and source filters', () => {
+  it.each([
+    ['title', 'title needle', entry({ id: 'title', title: 'Title Needle' })],
+    ['category', 'signs & plaques', entry({ id: 'category', category: 'Signs & Plaques' })],
+    ['subcategory', 'detail needle', entry({ id: 'subcategory', subcategory: 'Detail Needle' })],
+    ['tag', 'tag-needle', entry({ id: 'tag', tags: ['tag-needle'] })],
+    [
+      'creator',
+      'creator needle',
+      entry({
+        id: 'creator',
+        provenance: {
+          sourceKind: 'lucide',
+          sourceName: 'Lucide',
+          creator: 'Creator Needle',
+          license: 'ISC',
+          licenseId: 'ISC',
+        },
+      }),
+    ],
+    [
+      'source',
+      'source needle',
+      entry({
+        id: 'source',
+        provenance: {
+          sourceKind: 'cc0',
+          sourceName: 'Source Needle',
+          license: 'CC0',
+          licenseId: 'CC0-1.0',
+        },
+      }),
+    ],
+    [
+      'license',
+      'friendly permit',
+      entry({
+        id: 'license',
+        provenance: {
+          sourceKind: 'owned',
+          sourceName: 'CurveDesk',
+          license: 'Friendly Permit',
+          licenseId: 'FRIENDLY-1.0',
+        },
+      }),
+    ],
+  ])('searches %s metadata case-insensitively', (_field, query, matchingEntry) => {
+    const distractor = entry({ id: 'distractor' });
+    expect(
+      filterDesignLibrary([distractor, matchingEntry], {
+        search: `  ${query.toUpperCase()}  `,
+      }).map((item) => item.id),
+    ).toEqual([matchingEntry.id]);
+  });
+
+  it('composes category, machine, kind, operation, and source filters', () => {
     expect(
       filterDesignLibrary(entries, {
+        category: 'CNC Templates',
         machine: 'cnc',
         kind: 'owned-template',
         operation: 'pocket',
+        sourceKind: 'owned',
       }).map((item) => item.id),
     ).toEqual(['cnc-pocket-test']);
   });
 
-  it('sorts by category then title', () => {
+  it('treats undefined and all as unfiltered without mutating the input', () => {
+    const originalIds = entries.map((item) => item.id);
+    expect(filterDesignLibrary(entries, {}).length).toBe(entries.length);
+    expect(
+      filterDesignLibrary(entries, {
+        category: 'all',
+        machine: 'all',
+        kind: 'all',
+        operation: 'all',
+        sourceKind: 'all',
+      }).length,
+    ).toBe(entries.length);
+    expect(entries.map((item) => item.id)).toEqual(originalIds);
+  });
+
+  it('sorts copies by category then title', () => {
     expect(filterDesignLibrary(entries, {}).map((item) => item.id)).toEqual([
       'cnc-pocket-test',
       'flower-art',

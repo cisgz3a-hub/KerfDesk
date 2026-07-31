@@ -841,6 +841,38 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
   scale — kept as the documented IMPORT path instead), The Noun Project
   (not license-compatible).
 
+### @tabler/icons — adopted for the curated Design Library (2026-07-31)
+
+- **Version:** exactly `3.43.0`; npm integrity
+  `sha512-qXwS17Op9jqr3Asvu31fejyw8+OnRDKH7oR8nQXyUgW1pI44ET8OKG9kssy+XIvvAIyej6gZdGmviNUn1VMfPw==`.
+- **License:** MIT. Verified against the upstream `v3.43.0` `LICENSE`
+  (copyright 2020–2026 Paweł Kuna) and the installed npm package.
+- **Source:** https://github.com/tabler/tabler-icons/tree/v3.43.0
+  (annotated tag commit `e40738b64486f857128ae58335354681e4e9dc9b`).
+- **Decision affected:** ADR-017 dependency policy and the M2/M5 source
+  decision in `docs/audits/2026-07-31-library-redesign-program.md`.
+- **Role:** data-only source for 46 intentionally selected, non-brand outline
+  SVGs in six practical Library collections. Preview URLs are emitted as
+  separate offline assets and browser-lazy-loaded. Exact SVG text is
+  code-split and imported into the renderer only when an item is added; package
+  code never runs. The web PWA may fetch those emitted chunks during its
+  whole-app offline precache, but it does not parse or execute them in the
+  renderer before insertion. Every file retains an immutable upstream URL and
+  SHA-256 in the canonical catalog manifest, then passes through CurveDesk's
+  normal sanitized SVG importer.
+- **Maintenance/fit:** the exact upstream release was tagged 2026-05-06; the
+  package has no dependencies. The final M5 gate records emitted asset sizes,
+  renderer impact, and parse/insert timings before merge.
+- **Evaluated:** 2026-07-31, Codex session.
+- **Confidence:** high for source identity, licence, and exact file integrity;
+  visual and insertion quality remains subject to the M5 browser/audit gate.
+- **Re-verify by:** 2027-01-31 or before changing the pinned version.
+- **Alternatives considered:** keeping Lucide as customer artwork (mixed UI and
+  customer-asset roles, less coherent provenance); Iconoir (MIT but redundant);
+  Google Material Icons (Apache-2.0 but a second visual family); additional
+  Openclipart/CC0 ingestion (inconsistent and per-item provenance-heavy);
+  proprietary/generic SVG aggregators (rejected).
+
 ### electron-updater — adopted for Windows desktop auto-update (2026-07-04, ADR-024)
 
 - **Version:** ^6.8.9 (resolved 6.8.9 at adoption, 2026-07-04). VERIFY no

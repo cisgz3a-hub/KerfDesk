@@ -50,6 +50,7 @@
     "deploy:web:preview": "pnpm guard:repo && pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
   },
   "dependencies": {
+    "@tabler/icons": "3.43.0",
     "clipper2-ts": "2.0.1-17",
     "dompurify": "^3.4.12",
     "electron-updater": "^6.8.9",
