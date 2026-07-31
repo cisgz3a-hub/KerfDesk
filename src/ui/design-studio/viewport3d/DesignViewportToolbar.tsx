@@ -99,11 +99,15 @@ const barStyle: React.CSSProperties = {
   maxWidth: 'calc(100% - 16px)',
 };
 
+// Non-shorthand border so the active variant's borderColor never conflicts
+// (React warns when a shorthand and its longhand mix across rerenders).
 const buttonStyle: React.CSSProperties = {
   fontSize: 11,
   padding: '3px 9px',
   borderRadius: 5,
-  border: '1px solid transparent',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'transparent',
   background: 'transparent',
   color: 'var(--lf-text)',
   cursor: 'pointer',
