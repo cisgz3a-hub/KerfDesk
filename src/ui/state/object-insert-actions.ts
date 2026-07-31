@@ -13,7 +13,9 @@ import {
   type ShapeObject,
   type TextObject,
 } from '../../core/scene';
+import type { Sketch } from '../../core/design';
 import { applyInsertBoxPanels, type InsertablePart } from './box-insert-mutation';
+import { applyCarveSettingsToOperations, applyDesignSketch } from './design-apply-mutation';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
@@ -49,6 +51,7 @@ export function objectInsertActions(
   | 'upsertTextObject'
   | 'drawShape'
   | 'insertBoxPanels'
+  | 'applyDesignSketch'
   | 'addRegistrationBox'
   | 'addRegistrationCircle'
   | 'removeRegistrationBox'
@@ -59,6 +62,7 @@ export function objectInsertActions(
     upsertTextObject: upsertTextObjectAction(set),
     drawShape: drawShapeAction(set),
     insertBoxPanels: insertBoxPanelsAction(set),
+    applyDesignSketch: applyDesignSketchAction(set),
     addRegistrationBox: (widthMm: number, heightMm: number) => {
       set((s) => {
         // Replace-in-place: keep an existing box's position and lock state so
@@ -167,6 +171,26 @@ function insertBoxPanelsAction(set: Setter): AppState['insertBoxPanels'] {
             state.layerDefaults,
             state.cncLiveCaps,
           );
+    });
+  };
+}
+
+function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
+  return (sketch: Sketch, ids: ReadonlyArray<string>) => {
+    set((state) => {
+      const next = applyDesignSketch(state, sketch, ids);
+      // A sketch that contributes nothing leaves the project exactly as it was.
+      if (next === null) return state;
+      // Defaults first, then the design layers' carve settings — the reverse
+      // order would let the defaults pass clobber the depth/bit the operator
+      // just saw in the Studio's 3D preview (ADR-272 Amendment 1 clause 2).
+      const withDefaults = applyLayerDefaultsToFreshLayers(
+        state.project.scene.layers,
+        next,
+        state.layerDefaults,
+        state.cncLiveCaps,
+      );
+      return applyCarveSettingsToOperations(withDefaults, next.carveOperations);
     });
   };
 }

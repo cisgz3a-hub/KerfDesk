@@ -13658,3 +13658,216 @@ power, or produces acceptable material results.
 - NOT verified: no machine was connected or moved; no air cut, material coupon, encoder trace,
   backlash measurement, load measurement, thermal calibration, burn quality, cut quality, or
   physical position retention was tested.
+## ADR-272 - Design Studio: a full-window on-canvas design surface for laser and CNC (2026-07-30)
+
+### Context
+
+The canvas is a **placement** surface, not a design surface. Artwork is
+imported, dragged, scaled, and assigned operations. Phase G (ADR-051) added
+rectangle / ellipse / polygon / star / pen, and ADR-159/164 added bounded node
+editing, but a person still cannot draw a part to size from nothing: there is no
+line tool, no arc tool, no trim, no extend, no fillet, no chamfer, no dimension
+you can type, and no geometric snapping of any kind. `snapping.ts:168` snaps
+axis-aligned bounding-box min/mid/max plus a grid - endpoint, midpoint, centre,
+quadrant, intersection, tangent and perpendicular snapping do not exist anywhere
+in the tree, and nothing snap-related lives in `core/`.
+
+The maintainer asked for an in-detail design tool where shapes and pictures are
+designed by hand directly on canvas, with an "AutoCAD-like" precision layer that
+is "not totally 3D, but still 3D enough for CNC", optionally in a separate
+window like Image Studio. Research and the governing brief are in
+`docs/audits/2026-07-30-design-studio-brief.md` and
+`docs/audits/2026-07-30-design-studio-research-and-plan.md` (215 fetched
+sources).
+
+Three findings from that research constrain this decision, and each was verified
+mechanically rather than assumed.
+
+**1. A geometric constraint solver cannot be bought.** Every browser-capable 2D
+constraint solver is license-blocked: `@salusoft89/planegcs` publishes
+`LGPL-2.0-or-later` on npm while its repository LICENSE file is verbatim
+LGPL-2.1; FreeCAD's planegcs carries `SPDX-License-Identifier: LGPL-2.1-or-later`
+in `GCS.cpp`; SolveSpace and libslvs are GPL-3.0-or-later; JSketcher uses a
+custom Autodrop3d licence requiring irrevocable copyright assignment of
+modifications; CADmium is Elastic License 2.0. `kiwi.js` is genuinely BSD-3, but
+Cassowary is a *linear* solver and tangency, distance, angle, radius and
+concentricity are nonlinear. An npm search across three query variants returned
+exactly one published 2D geometric constraint solver, and it is LGPL.
+`scripts/check-licenses.mjs:22` does not list any GPL-family identifier, so such
+a dependency fails `release:check` mechanically, not by judgement.
+
+**2. Two barrels are full, which forces the module boundary.**
+`node scripts/check-index-exports.mjs` reports `src/core/scene/index.ts` at 208
+exports against a baseline of exactly 208 in `scripts/index-export-baseline.json`
+- ratcheted, may only shrink - and `src/core/geometry/index.ts` at exactly 20,
+the ADR-015 hard cap. A twenty-first geometry export fails CI.
+
+**3. The workspace tool-dispatch chain is out of room.**
+`src/ui/workspace/use-workspace-drag.ts` measures 398 of the 400 counted-line
+cap; `beginToolDrag` is at cyclomatic complexity 11 of 12; `computeMouseDownDrag`
+is already at 12; `useDragMove` and the `useUiStore` factory arrow are each 78 of
+the 80 function-line cap. A design tool with a dozen new tools cannot be grafted
+onto that chain.
+
+### Decision
+
+Build the **Design Studio**: a lazy-loaded, full-window overlay with its own pure
+core module, following ADR-242 (Image Studio) as its structural template.
+
+1. **New pure module `src/core/design/`** with its own barrel and two
+   sub-barrels, `snap/` and `ops/`. Fresh barrels get the full 20-export budget,
+   so the frozen `core/scene` barrel and the saturated `core/geometry` barrel are
+   sidestepped rather than fought. No geometry op is duplicated: existing
+   `vector-path-tools` / `vector-path-booleans` helpers are imported, per
+   ADR-131 and ADR-255 clause 4 ("no third parser").
+
+2. **New lazy overlay `src/ui/design-studio/`**, mounted as an always-present
+   `DesignStudioHost` that returns `null` without a session, so cold start pays
+   nothing. Shell is `position:fixed; inset:0; zIndex:1010`, `role="dialog"`,
+   `aria-modal="true"` - the exact Image Studio values, deliberately above
+   `--lf-z-dialog` (1000) and below toasts (1100).
+
+3. **Session isolation.** A standalone zustand store holds the sketch, tools,
+   view, selection and history. Nothing enters the project store except at
+   Apply, which writes once and produces exactly one project undo entry. Undo
+   inside the Studio is session-local. Closing **stashes and never prompts**
+   (rule 7; ADR-242 clause 5).
+
+4. **The pipeline is not touched.** The Studio materializes into ordinary
+   `ShapeObject` geometry, so compile, preview, emit and serialize are unchanged
+   and G-code stays byte-identical for unchanged input. This is the property that
+   made ADR-051 and ADR-242 land cleanly, and it is retained deliberately.
+
+5. **No general constraint solver.** Precision is delivered by an object-snap
+   engine, ortho/polar tracking, typed numeric entry, and **dimension-driven
+   editing** - a dimension owns its geometry and re-solves that geometry locally
+   when its value changes. Fusion's and Onshape's unified infer-from-selection
+   Dimension tool and their driving-vs-driven distinction are adopted; FreeCAD's
+   numeric degrees-of-freedom readout is adopted in preference to Fusion's and
+   Onshape's documented absence of one. A general nonlinear solver is explicitly
+   **not** in scope and would need its own ADR and its own in-house
+   implementation.
+
+6. **2.5D, not 3D.** A design entity carries an optional depth. Closed profiles
+   extrude to solids in a three.js view via `THREE.Shape` + `ExtrudeGeometry`
+   (verified present in the installed `three@0.180.0`, along with `Path`,
+   `LatheGeometry`, `ShapeGeometry`). **No new runtime dependency.** No B-rep
+   kernel, no mesh CSG, no sculpting. ADR-102 section 2 is satisfied by keeping
+   the Studio's 3D view under `src/ui/viewer3d/`, the ADR-255-designated shared
+   scene home; mesh building stays a pure core function returning plain typed
+   arrays.
+
+7. **Layout copies LightBurn** (CLAUDE.md rule 3): two vertical left rails, a
+   Creation rail above a Modifiers rail; flyout submenus; a context-sensitive
+   options bar that swaps with the active tool; on-canvas parametric handles in
+   distinct colours with the same values typeable in the inspector; destructive
+   ops previewing their damage before the click. Construction geometry is
+   modelled as ordinary objects on a non-output layer, exactly as LightBurn's T1
+   tool layer, because `Layer.output` already exists.
+
+8. **Smoothness is architectural, not incidental.** Tools are state machines
+   (Idle to Pointing to Dragging), following tldraw's published model, so no
+   boolean soup and no complexity cliff. The canvas is two layers on two
+   cadences: committed geometry redraws on change, the interaction overlay
+   redraws on pointer move, both coalesced to one rAF. Snap targets are indexed
+   into a bucketed spatial grid and rebuilt only when geometry changes, never
+   scanned per pointer move. Entity materialization, bounds and hit geometry are
+   memoized per revision.
+
+9. **Rule 7 holds absolutely.** The Studio adds no guard. Operations that cannot
+   produce geometry return `Result<T, DesignOpError>` and surface a message;
+   nothing blocks, gates, caps, delays, disables or confirms before Frame, Start,
+   preview, save, import, export or emission. History eviction informs
+   ("N older steps trimmed") exactly as Image Studio's does.
+
+10. **Staged DS-0..DS-9**, each an individually reviewed, CI-green, shippable
+    diff. The end-to-end slice - open, draw a dimensioned profile by hand, apply,
+    cut - closes at **DS-5**; everything after it is breadth on a working
+    surface. Parametric round-trip through `.lf2` lands at DS-9 by adding a
+    `SketchShape` arm to the already-exported `ShapeSpec` union, which adds no
+    barrel symbol and needs no new `SceneObject` variant.
+
+### Consequences
+
+The Studio is additive: the existing workspace, its tool strip, and every
+existing flow keep working unchanged. Cold start is unaffected because the chunk
+is lazy. Because the Studio commits ordinary geometry, a design made in it is
+indistinguishable downstream from imported artwork - which is the point, and also
+the limitation until DS-9.
+
+Costs accepted. Until DS-9 a sketch is not parametric across save/reload; it
+materializes to polylines like every pen drawing does today. Without a general
+solver, a sketch cannot be made fully-constrained in the CAD sense, and
+dimension-driven editing resolves locally rather than globally - a change that
+would require simultaneous re-solution of a coupled system is not expressible.
+Arc entities materialize to polylines for compilation, because nothing in
+`core/` produces an `elliptical-arc` segment today and compile reads `polylines`,
+not `curves`; native G2/G3 emission already exists on the CNC side
+(`cnc-grbl-strategy.ts:351`) and remains available to a later stage.
+
+Deliberately deferred, each needing its own decision: a general nonlinear
+constraint solver; a typed command line (adjacent to "command palette", which
+`PROJECT.md` lists as out of scope); mesh CSG; STEP/B-rep import; curve-preserving
+booleans, which are blocked upstream by `transformCurveSubpathUniform` supporting
+uniform scale and translate only; and an oriented bounding box for selection
+maths, which today is AABB everywhere.
+
+Not verified at the time of writing: nothing has been rendered, no perceptual
+check exists, no hardware has cut anything designed in the Studio, and the
+Inkscape / Affinity / Illustrator arm of the research fan-out had not returned.
+The verification gap that green tests cannot close applies in full - jsdom cannot
+see WebGL, and per ADR-255's verification note no green suite is ever claimed as
+visual proof.
+
+### Amendment 1 (2026-08-01) - DS-8 becomes the layered carve: design layers with per-layer settings and bits, a live 3D target-surface pane, and a per-bit simulate pass
+
+The maintainer asked for the carved-picture-frame workflow: design in LAYERS,
+each layer with its own settings and its own bit, bit changes mid-job, and a 3D
+view of the layered result while designing. This amendment re-scopes DS-8
+accordingly and resolves the brief's open decision 4.
+
+1. **Depth lives on the DESIGN LAYER - not the entity, and not
+   `ObjectOperationOverride`.** A `DesignLayer` in `core/design` carries
+   `{ id, name, color, cutType, depthMm, toolId?, vClearToolId? }` -
+   deliberately a subset of `CncLayerSettings`, because a scene `Layer` already
+   IS the process operation (`layer.ts:63`, `machine.ts:105`) and per-layer
+   depth/bit is the shipped multi-tool model (H.7). The clause-6 sentence "a
+   design entity carries an optional depth" is superseded: an entity carries an
+   optional `layerId`. `ObjectOperationOverride` stays laser-only and untouched.
+
+2. **Apply materializes one scene operation PER design layer** (name and colour
+   carried over) and patches that fresh layer's `cnc` block with the design
+   layer's cutType / depthMm / toolId / vClearToolId AFTER
+   `applyLayerDefaultsToFreshLayers` stamps project defaults - order matters,
+   the defaults pass would otherwise clobber the carve settings. Multi-bit
+   sectioning (`cnc-tool-sections.ts`), labelled M0 tool-change holds, and the
+   per-bit Z-zero Continue gate are the existing pipeline and gain no new code.
+
+3. **The 3D pane imports scene BUILDERS, never `three`.** The pane lives in
+   `src/ui/design-studio/preview3d/` but contains no three.js import: it
+   consumes `createReliefThreeScene` / `SceneHandle` from
+   `src/ui/relief-viewer/` exactly as `Cnc3DPane` does from `src/ui/workspace/`.
+   ADR-102 section 2's import boundary is satisfied as written; the clause-6
+   sentence nominating `src/ui/viewer3d/` as the Studio's scene home is
+   superseded by this route (that folder remains the Inspector's).
+
+4. **Two fidelity tiers, each labelled as what it is.** The INSTANT tier renders
+   the target surface: pure `core/design-carve` rasterizes the layers into a
+   `Heightmap` - pocket floors flat at depth; v-carve depth = boundary distance
+   divided by tan(tipAngle/2), clamped to layer depth, the same law as
+   `vcarve-ladder.ts` so preview and toolpath cannot disagree about shape;
+   profile kerf slots at tool diameter on the offset side; drill discs; depths
+   at or past stock thickness clamp to a through cut - and `steppedSurfaceMesh`
+   (ADR-261 provenance) renders it with true vertical walls. The SIMULATE tier
+   compiles the designed layers through the real `compileCncJob` one tool bucket
+   at a time and stamps each bucket's removal grid with THAT bucket's kernel
+   (`kernelForTool`), min-combining the grids - honest per-bit cutter shapes,
+   which the single-kernel CNC pane cannot show today.
+
+5. **Rule 7 and ADR-261 section 3 hold.** The pane and everything it computes
+   are display-only: nothing gates Apply, Frame, or Start.
+
+6. **No `.lf2` change in v1.** Studio state stays transient; layers exist in the
+   session and materialize as ordinary scene layers at Apply. DS-9 remains the
+   parametric round-trip stage and will serialize the layer table with the
+   sketch when it lands.

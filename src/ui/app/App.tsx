@@ -14,6 +14,7 @@ import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
+import { DesignStudioHost } from '../design-studio';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
 import { Cnc3DPane, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
@@ -75,6 +76,7 @@ export function App(): JSX.Element {
       <ConfirmSaveDialog />
       <JobReviewDialog />
       <ImageEditorHost />
+      <DesignStudioHost />
     </div>
   );
 }

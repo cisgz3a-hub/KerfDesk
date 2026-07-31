@@ -75,7 +75,7 @@
 - **Laptop workspace**: at 1100 px wide or below, the machine rail starts collapsed while Cuts/Layers remains visible, preserving editing space without hiding the layer workflow.
 - **CNC Canvas Focus**: at 1439 px wide or below, CNC starts with the 3D result collapsed to a named 44 px restore strip unless the operator has already chosen otherwise. Expanding or collapsing 3D is one click, persists across reloads, and overrides later responsive defaults.
 - **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering either responsive range again reapplies only its collapsed default.
-- **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button. Preview lives in the top toolbar and the Window menu, not here.
+- **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button and a "Design" button that opens the Design Studio (ADR-272, flows F-DS1..F-DS4). Preview lives in the top toolbar and the Window menu, not here.
 - **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores both panels. Panel visibility does not affect the Live Motion bar.
 
 #### Disabled controls
@@ -4704,3 +4704,390 @@ validation must be supervised without cutting load.
 1. Opening a program emitted by any built-in strategy shows zero
    unsupported-word notes and zero junk lines (ADR-255 acceptance gate —
    own-output-clean).
+
+## Phase N flows (Design Studio — ADR-272)
+
+The Design Studio is a full-window overlay for drawing a part to size by hand.
+Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
+router flows). Stages DS-2 and DS-3 are what these flows describe today; flows
+for the modify operations, dimensions, and the 2.5D view land with DS-6..DS-8.
+
+Nothing in this surface refuses anything (rule 7). Closing never prompts, an
+unfinished tool explains itself in the status bar rather than being disabled, and
+history eviction is an advisory.
+
+### F-DS1. Open the Design Studio
+
+1. Click **Design** at the bottom of the left tool rail (below **Lib**).
+2. The overlay chunk loads lazily on first open; a "Opening Design Studio…"
+   card shows while it does.
+3. The Studio opens full-window over the app: title row, Create rail above
+   Modify rail on the left, canvas centre, status bar at the bottom.
+4. The canvas frames the configured bed on first open with a light bed, a
+   1/2/5-decade grid, and the bed outline.
+5. Every app-level keyboard shortcut is suppressed while the Studio is open, so
+   Ctrl+Z inside the Studio undoes a drawing step and never the project.
+
+#### Success
+
+The Studio is open, Select is armed, snapping and the grid are on, and the
+status bar reads `X —  Y —` until the pointer enters the canvas.
+
+#### Error — the overlay chunk fails to load
+
+1. The loading card stays visible. Nothing is written to the project.
+2. Closing the app or reloading returns to a working canvas; the project is
+   untouched because the Studio never wrote to it.
+
+#### Empty — nothing drawn yet
+
+1. The canvas shows the bed and grid with no geometry.
+2. The status bar reads `0 entities`.
+
+#### Edge — reopening after closing
+
+1. Closing stashes the session. Reopening restores the same sketch, the same
+   tool, and the same view — no prompt on either transition.
+
+### F-DS2. Navigate the canvas
+
+1. Move the pointer: the status bar X/Y readout tracks it in millimetres, in
+   tabular figures so the digits do not jitter.
+2. Wheel: zooms about the pointer, so the millimetre under the cursor stays
+   under the cursor.
+3. **Fit** in the title row (or Shift+F) re-frames the bed.
+
+#### Success
+
+Zoom stays inside 0.05–200 px/mm. The grid coarsens as the view zooms out and
+never becomes a grey wash.
+
+#### Error — a degenerate viewport
+
+1. A zero-size canvas produces no view rather than NaN coordinates; the readout
+   stays `X —  Y —`.
+
+#### Empty — pointer outside the canvas
+
+1. Leaving the canvas clears the readout to `X —  Y —`.
+
+#### Edge — a hidden or background window
+
+1. Painting is coalesced into one animation frame, which the browser does not
+   run while the page is not compositing. The canvas paints on the first frame
+   after the window becomes visible again; no work is lost and no state drifts.
+
+### F-DS3. Choose a tool
+
+1. Click a tool in the Create or Modify rail, or press its letter (V select,
+   N nodes, L line, P polyline, R rectangle, C circle, A arc, G polygon,
+   D dimension, T trim, E extend, F fillet, H chamfer, O offset, M mirror,
+   Y array, B boolean).
+2. View toggles take the Shift variant so the plain letters stay with the
+   tools: Shift+F fit, Shift+S snap, Shift+O ortho, Shift+G grid.
+3. The status bar shows the armed tool's own hint — discoverability lives on the
+   tool, as it does in LightBurn.
+
+#### Success
+
+The chosen tool is pressed in its rail and its hint is on the status bar.
+
+#### Error — a tool whose behaviour is not built yet
+
+1. The tool still arms and is never disabled. Its rail button is drawn quieter
+   and the status bar says "<Tool> — not built yet" ahead of the hint.
+2. Nothing is blocked and nothing is refused.
+
+#### Empty — no selection for a selection-only tool
+
+1. The tool arms and the hint says what to pick. It does not refuse.
+
+#### Edge — typing in a field inside the Studio
+
+1. Tool letters are ignored while focus is in an input, textarea, or
+   contenteditable, so typing a dimension never switches tools.
+
+### F-DS4. Undo, redo, and close
+
+1. Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) step the Studio's own history, up to 200
+   steps.
+2. Esc is a ladder, not a close: it clears the selection, then returns to
+   Select, then closes.
+3. **Close** in the title row closes immediately and keeps the drawing.
+
+#### Success
+
+Undo and redo round-trip the sketch exactly. Selection ids that undo removed are
+dropped so the inspector never reads a vanished shape.
+
+#### Error — undo with nothing to undo
+
+1. The Undo button is inert and drawn at reduced opacity. Pressing Ctrl+Z does
+   nothing. This is a no-op control, not a policy gate.
+
+#### Empty — closing an untouched session
+
+1. Closing asks nothing and writes nothing to the project.
+
+#### Edge — more than 200 steps
+
+1. The oldest steps are evicted and the status bar reports "N older steps
+   trimmed". The drawing is unaffected; this informs and never blocks.
+
+### F-DS5. Draw a shape (DS-3)
+
+1. Arm Rectangle (R), Circle (C), or Line (L) in the Create rail.
+2. Press on the canvas and drag. The live shape and its dimension label follow
+   the pointer on the interaction layer; the committed drawing underneath is not
+   redrawn.
+3. Hold **Shift** to constrain — a square, or a 45-degree-locked line that keeps
+   the length the pointer implies. Hold **Alt** to draw from the centre; for a
+   circle, Alt reinterprets the drag as the diameter.
+4. With Snap on, both ends land on the grid. With Ortho on, the moving point
+   locks to the axis it has travelled further along.
+5. Release to commit. The shape becomes one entity, one undo step, and the new
+   selection.
+
+#### Success
+
+The entity count rises by one, the status bar shows the new count, and the shape
+is selected so it can be acted on immediately.
+
+#### Error — a degenerate gesture
+
+1. A press-and-release that never moved commits nothing and consumes no undo
+   step. A click is not a draw. Nothing is reported as a failure.
+
+#### Empty — no drag yet
+
+1. Between pressing and moving, the draft exists but the entity count is
+   unchanged; the drawing only gains geometry on release.
+
+#### Edge — Esc mid-drag
+
+1. Esc discards the draft outright and the following pointer-up does NOT commit
+   it. (The main workspace draw tool has the opposite behaviour today - see the
+   defects noted in the research document.)
+
+### F-DS6. Select geometry (DS-3)
+
+1. Arm Select (V). Click a shape to select it; Shift+click adds or removes.
+2. Click empty space and drag to marquee-select.
+
+#### Success
+
+Clicked geometry highlights in the accent colour at double width. The topmost
+entity under the pointer wins, because entity order is z-order.
+
+#### Error — clicking near but not on geometry
+
+1. Hit tolerance is a fixed pixel radius converted to millimetres through the
+   current zoom, so the same slop applies at every zoom level. Outside it, the
+   click starts a marquee instead.
+
+#### Empty — marquee that catches nothing
+
+1. The selection clears. A marquee never creates an undo step.
+
+#### Edge — marquee that only overlaps
+
+1. Selection is enclose-not-touch: a shape crossing the marquee edge is not
+   selected, matching the main workspace.
+
+### F-DS7. Read and type exact dimensions (DS-3b)
+
+1. Select a single shape. A floating **properties box** appears, titled with the
+   shape kind, grouped Position / Size / Shape / Measured. Drag its header to move
+   it; it cannot be dragged off-screen.
+2. Editable dimensions depend on the shape: a rectangle shows X, Y, Width, Height
+   and Corner radius; a circle shows Centre X/Y, Radius **and** Diameter; a line
+   shows both endpoints **and** Length and Angle; an arc shows Centre, Radius,
+   Start angle, Sweep and Arc length.
+3. Measured values are shown read-only alongside: area, perimeter, circumference,
+   chord, node count.
+4. Hover or focus any row and the exact distance it controls is called out **on the
+   shape** - a dimension line with arrowheads at both ends, witness lines out to
+   the geometry, and the value in a chip. Radius shows centre-to-rim; Angle and
+   Sweep show a swept arc with both legs; an endpoint field marks that point.
+   Leaving the row removes the call-out.
+5. Type a value and press Enter, or click away, to commit. Millimetres accept two
+   decimals; a comma decimal separator and a trailing unit are both accepted.
+
+#### Success
+
+The geometry is rebuilt from the typed number, not nudged toward it. Resizing grows
+from the origin so X and Y stay put; typing a length keeps the start point and the
+direction; typing an angle rotates about the start and preserves length; diameter is
+radius doubled. Each committed value is one undo step.
+
+#### Error - a value that cannot apply
+
+1. A non-numeric entry, a blank field, or a value below the dimension's floor is
+   ignored and the field returns to the geometry's value. Nothing is reported as a
+   failure and the shape is not changed.
+2. A dimension that does not belong to the selected shape is simply absent from the
+   box rather than shown disabled.
+
+#### Empty - nothing selected, or several things selected
+
+1. With no selection, or with more than one shape selected, the box is not shown.
+   Per-shape dimensions are unambiguous only for a single shape.
+
+#### Edge - the shape changes underneath the box
+
+1. Undo, redo, or a drag updates every field live, because the inputs mirror the
+   geometry whenever they are not being typed into.
+2. Deleting the shape closes the box. Escape while typing abandons that edit and
+   restores the shown value without stepping the Escape ladder.
+3. A freehand path exposes X and Y (which translate it) plus read-only extents,
+   node count and run length; it has no parametric dimension to call out, so no
+   arrow is drawn.
+
+### F-DS8. Apply the drawing to the project (DS-5)
+
+1. With output geometry drawn, **Apply** in the title row adds it to the project as
+   cuttable artwork. **Apply & Close** does the same and then closes.
+2. Every entity becomes one scene object. A rectangle and a circle stay
+   **parametric** — they arrive as ordinary drawn shapes the main canvas can still
+   edit through Shape properties. A line, arc, or path arrives as exact baked
+   geometry, deliberately never re-fitted.
+3. All of it shares one auto-created `Design` cut operation, and everything
+   inserted is selected so it can be moved or re-assigned immediately.
+4. The whole apply is **one** project undo step, however many drawing steps went
+   into it. The Studio keeps its own separate history.
+5. The Studio stays open after Apply, so you can check the canvas and keep drawing.
+
+#### Success
+
+Objects appear on the main canvas at the millimetre positions drawn, on a `Design`
+layer, and the project is marked dirty. Apply goes inert until the drawing changes
+again.
+
+#### Error — nothing to apply
+
+1. An empty sketch, or one containing only construction guides, applies nothing and
+   leaves the project untouched. Apply is inert rather than refusing.
+
+#### Empty — first Apply of a session
+
+1. A fresh session has nothing to apply until something is drawn.
+
+#### Edge — applying twice
+
+1. A second Apply inserts a second copy on its own `Design 2` operation rather than
+   replacing the first, so re-applying never silently destroys earlier work.
+2. Construction guides are excluded from output every time; they exist to design
+   against, not to cut.
+
+### F-DS9. Snap to existing geometry (DS-4)
+
+1. With **Snap** on, moving the pointer near existing geometry captures it on the
+   nearest meaningful reference point rather than on the grid.
+2. Six kinds are offered, each drawn with its own glyph so you can tell which one
+   caught you:
+
+   | Kind | Glyph | Where |
+   |---|---|---|
+   | node | filled square | line ends, path nodes, rectangle corners, arc ends |
+   | midpoint | hollow triangle | halfway along any edge |
+   | centre | circle with crosshair | centre of a circle, arc, or rectangle |
+   | quadrant | hollow diamond | the 0/90/180/270 rim points of a circle or arc |
+   | intersection | X | where two different shapes cross |
+   | edge | short bar | anywhere along an edge |
+
+3. The status bar names the live one, e.g. `Snap: centre`.
+4. Reach is a fixed screen distance, so it feels the same at every zoom.
+
+#### Success
+
+The point lands exactly on the reference — a corner at 103.4 mm snaps to 103.4 mm,
+not to the nearest grid line. Priority is by specificity, so a node always wins over
+the edge it sits on, and a midpoint over the same edge.
+
+#### Error — nothing in reach
+
+1. Beyond the snap radius, the grid takes over; with the grid off, the raw pointer
+   position is used. Nothing is refused and no marker is drawn.
+
+#### Empty — an empty sketch
+
+1. With no geometry there is nothing to snap to, so only the grid applies.
+
+#### Edge — snapping while drawing
+
+1. The shape being drawn is excluded from its own snap candidates, so a rectangle
+   cannot capture its own corner mid-drag.
+2. An arc offers only the quadrants it actually sweeps through — a compass point the
+   arc never reaches is not a snap target.
+3. A shape crossing itself reports no intersection; a crossing is a reference
+   between two shapes, and self-crossings fight the node snap on closed paths.
+4. Turning Snap off (Shift+S) disables both mechanisms at once.
+
+### F-DS10. Design in carve layers (DS-8, ADR-272 Amendment 1)
+
+1. The right panel lists the sketch's carve layers. A fresh sketch has one
+   ("Layer 1"); **+ New** adds another, named and colored by position, and the
+   new layer becomes active immediately.
+2. New shapes land on the ACTIVE layer; the 2D canvas strokes each shape in its
+   layer's color so the drawing, the panel, and the 3D view tell one story.
+3. Click a row to make it active. The row reads back the layer's cut type,
+   depth, bit, and shape count.
+4. The active layer's settings edit below the list: name, cut type
+   (profile outside/inside/on-path, pocket, engrave, v-carve, drill), depth
+   (with a **Through** helper that sets the stock thickness), the bit, and —
+   for v-carve — an optional clearing bit for flat floors.
+5. Select shapes and press **Assign** to move them onto the active layer.
+6. Layer edits ride the sketch history: Ctrl+Z walks them like drawing steps.
+
+#### Error — removing the last layer
+
+1. The remove button is inert with one layer (its title says why); a sketch
+   always keeps a layer. Removing any other layer re-homes its shapes to the
+   first layer.
+
+#### Empty — no selection
+
+1. **Assign** is inert until shapes are selected; its title explains.
+
+#### Edge — undo removes the active layer
+
+1. The active layer falls back to the first remaining layer; nothing dangles.
+
+### F-DS11. Watch the 3D carve preview (DS-8)
+
+1. The **Carve preview** pane renders the stock with every layer carved at its
+   depth: pockets flat-floor, v-carves groove by boundary distance with the
+   layer's v-bit angle, profiles slot at bit diameter on the offset side,
+   drills bore at circle centres, and depths at the stock thickness read as
+   through cuts. It updates as you draw ("design surface" tier).
+2. **Simulate** compiles the layers into real toolpaths and carves the result
+   with each tool section's own bit shape — the **Bits** tier. Design/Bits
+   chips switch views; if the drawing changes after a run, the Bits chip says
+   "(stale)" until Simulate runs again.
+3. Drag rotates, right-drag orbits, the wheel zooms. The **3D** toggle in the
+   top bar and the pane's own header collapse it; the left edge drags to
+   resize the panel.
+
+#### Error — no WebGL / not a CNC machine
+
+1. Without WebGL the pane says so and everything else keeps working.
+2. On a laser machine profile, Simulate reports it needs a CNC machine; the
+   design-surface tier still previews. Nothing is refused (rule 7).
+
+#### Empty — nothing drawn
+
+1. The pane shows the untouched stock slab.
+
+### F-DS12. Apply layers → a multi-bit job (DS-8)
+
+1. **Apply** commits each contributing layer as ONE scene operation carrying
+   the layer's name, color, cut type, depth, and bit; feeds, passes, and tabs
+   take the operator's defaults. One project undo entry removes the whole
+   apply, as before.
+2. The job pipeline is unchanged: layers with different bits become contiguous
+   per-bit tool sections (profile sections last), and each boundary emits the
+   labelled M0 tool-change hold — jog, swap the bit, re-zero Z, Continue.
+
+#### Edge — same bit on every layer
+
+1. One tool section, no tool-change pause: exactly the pre-layer behavior.

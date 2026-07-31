@@ -3,6 +3,7 @@
 
 import { create } from 'zustand';
 import type { InsertablePart } from './box-insert-mutation';
+import type { Sketch } from '../../core/design';
 import type { DeviceProfile } from '../../core/devices';
 import {
   createProject,
@@ -268,6 +269,9 @@ export type AppState = ObjectPropertiesActions &
     // Phase K (ADR-106): insert a generated box panel sheet — one polyline
     // shape per panel, one undo step, every panel selected.
     readonly insertBoxPanels: (panels: ReadonlyArray<InsertablePart>) => void;
+    // Design Studio Apply (ADR-272 DS-5): ids come from the caller because pure
+    // core may not generate identity.
+    readonly applyDesignSketch: (sketch: Sketch, ids: ReadonlyArray<string>) => void;
     // ADR-057: add (or replace) the registration jig box on the reserved
     // registration layer. Width/height in mm; a new box centers on the bed, a
     // replace keeps the existing box's position and lock state.

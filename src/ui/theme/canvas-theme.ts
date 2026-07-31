@@ -57,4 +57,16 @@ export const canvasTheme = {
   noticeText: '#5f4200',
   // Trace-source backing tint (draw-raster, ADR-026)
   traceSourceTint: '#3b82c4',
+  // Design Studio sketch geometry (design-canvas-draw, ADR-272). Sketch
+  // entities have no layer yet — they only acquire one at Apply — so they need
+  // their own default ink. Near-black on the light bed, matching the
+  // WYSIWYG-against-white rationale above; construction guides are muted so
+  // they read as scaffolding rather than as cuts.
+  designGeometry: '#1a1a1a',
+  designConstruction: '#9aa0a6',
+  // Off-bed surround in the Design Studio. Deliberately a clear grey rather than
+  // the near-white viewportSurround: on the Studio canvas the surround and the bed
+  // are painted side by side, and #fafafa against #ffffff is a 2% difference that
+  // leaves the bed invisible — you cannot see that you have drawn off the sheet.
+  designSurround: '#dfe3e8',
 } as const;
