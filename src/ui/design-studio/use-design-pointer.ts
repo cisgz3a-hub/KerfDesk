@@ -29,8 +29,7 @@ export function useDesignPointer(
   newEntityId: () => string,
 ): DesignPointerHandlers {
   const pointMm = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>): Vec2 | null =>
-      resolvePointerMm(surface, event),
+    (event: React.PointerEvent<HTMLCanvasElement>): Vec2 | null => resolvePointerMm(surface, event),
     [surface],
   );
 

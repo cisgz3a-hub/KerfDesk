@@ -8,15 +8,20 @@
 // worldUnits:false keeps a constant CSS-pixel width at any zoom.
 
 import type * as ThreeNamespace from 'three';
+import type { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import type { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import type { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { canvasTheme } from '../../theme/canvas-theme';
 import type { ViewportOverlay } from './viewport-overlay';
 
 type ThreeModule = typeof ThreeNamespace;
 
+// Type-only: erased at build, so the lines addons still load in the lazy
+// chunk via loadViewportLinesAddons (ADR-102 §3).
 type LinesAddons = {
-  readonly LineSegments2: typeof import('three/examples/jsm/lines/LineSegments2.js').LineSegments2;
-  readonly LineSegmentsGeometry: typeof import('three/examples/jsm/lines/LineSegmentsGeometry.js').LineSegmentsGeometry;
-  readonly LineMaterial: typeof import('three/examples/jsm/lines/LineMaterial.js').LineMaterial;
+  readonly LineSegments2: typeof LineSegments2;
+  readonly LineSegmentsGeometry: typeof LineSegmentsGeometry;
+  readonly LineMaterial: typeof LineMaterial;
 };
 
 const SKETCH_LINE_WIDTH_PX = 2;

@@ -5114,30 +5114,46 @@ the edge it sits on, and a midpoint over the same edge.
 
 1. The active layer falls back to the first remaining layer; nothing dangles.
 
-### F-DS11. Watch the 3D carve preview (DS-8)
+### F-DS11. Design in the 3D space (DS-8b, ADR-272 Amendment 2)
 
-1. The **Carve preview** pane renders the stock with every layer carved at its
-   depth: pockets flat-floor, v-carves groove by boundary distance with the
-   layer's v-bit angle, profiles slot at bit diameter on the offset side,
-   drills bore at circle centres, and depths at the stock thickness read as
-   through cuts. It updates as you draw ("design surface" tier).
-2. **Simulate** compiles the layers into real toolpaths and carves the result
-   with each tool section's own bit shape — the **Bits** tier. Design/Bits
-   chips switch views; if the drawing changes after a run, the Bits chip says
-   "(stale)" until Simulate runs again.
-3. Drag rotates, right-drag orbits, the wheel zooms. The **3D** toggle in the
-   top bar and the pane's own header collapse it; the left edge drags to
-   resize the panel.
+1. The Studio's canvas IS the 3D design space: the stock sits on a grid, the
+   sketch draws on its top face in each layer's colour, and the carve renders
+   live underneath — pockets flat-floor, v-carves groove by boundary distance
+   with the layer's v-bit angle, profiles slot at bit diameter on the offset
+   side, drills bore at circle centres, and depths at the stock thickness
+   read as through cuts.
+2. The left button always belongs to the armed tool — draw, select, and move
+   exactly as in 2D, from any camera angle (the pointer lands on the stock
+   plane). Middle drag pans, Shift+middle or right drag orbits, the wheel
+   zooms at the cursor. Object snapping and hit radii keep their on-screen
+   size at any zoom or tilt.
+3. The Studio opens looking straight down (the precision view). The viewport
+   toolbar's **Top** and **Iso** buttons snap the camera back; **Design** /
+   **Bits** chips switch the carve tiers, and **Simulate** compiles the layers
+   into real toolpaths carved with each tool section's own bit shape. If the
+   drawing changes after a run, the Bits chip says "(stale)" until Simulate
+   runs again.
+4. The top bar's **3D** toggle switches to the flat 2D canvas — the fallback
+   surface, and where dimension call-outs and marquee selection still live in
+   this stage.
 
 #### Error — no WebGL / not a CNC machine
 
-1. Without WebGL the pane says so and everything else keeps working.
+1. Without WebGL the viewport says so and points at the 2D toggle; drawing
+   and Apply work the same there.
 2. On a laser machine profile, Simulate reports it needs a CNC machine; the
    design-surface tier still previews. Nothing is refused (rule 7).
 
 #### Empty — nothing drawn
 
-1. The pane shows the untouched stock slab.
+1. The viewport shows the untouched stock slab on the grid.
+
+#### Edge — drawing while orbited off Top
+
+1. A drag still draws: the pointer maps through the camera onto the stock
+   plane, so a rectangle drawn from an isometric angle lands exactly where
+   its corners touched the stock. A ray that misses the plane (aimed at the
+   sky) simply does nothing.
 
 ### F-DS12. Apply layers → a multi-bit job (DS-8)
 

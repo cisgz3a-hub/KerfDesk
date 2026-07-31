@@ -19,6 +19,7 @@ import { DesignStatusBar } from './DesignStatusBar';
 import { DesignToolRails } from './DesignToolRails';
 import { DesignTopBar } from './DesignTopBar';
 import { DesignSidePanel } from './preview3d/DesignSidePanel';
+import { DesignViewport3D } from './viewport3d/DesignViewport3D';
 import { handleDesignStudioKey } from './design-shortcuts';
 import { useDesignStudioStore } from './design-studio-store';
 import { fitView } from './design-view';
@@ -63,7 +64,7 @@ export function DesignStudioOverlay(): JSX.Element | null {
       <div style={bodyStyle}>
         <DesignToolRails />
         <div style={mainColumnStyle}>
-          <DesignCanvas />
+          {session.surface3d ? <DesignViewport3D /> : <DesignCanvas />}
         </div>
         <DesignSidePanel />
       </div>

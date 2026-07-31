@@ -6,10 +6,10 @@
 // GPU (the discipline every shipped viewer here follows).
 //
 // Input mapping is the Fusion synthesis recorded in the research doc: the
-// LEFT button never touches the camera (mouseButtons.LEFT = -1 falls through
-// OrbitControls' dispatch to NONE, verified in the installed r180 source),
-// MIDDLE pans with the built-in Shift-orbit modifier, RIGHT orbits, and the
-// wheel zooms at the cursor.
+// LEFT button never touches the camera (mouseButtons.LEFT = null falls
+// through OrbitControls' dispatch to state NONE, verified in the installed
+// r180 source), MIDDLE pans with the built-in Shift-orbit modifier, RIGHT
+// orbits, and the wheel zooms at the cursor.
 
 import type { WebGLRenderer } from 'three';
 import type * as ThreeNamespace from 'three';
@@ -73,12 +73,7 @@ export async function createDesignViewportScene(
 
   const scene = new three.Scene();
   scene.background = new three.Color(viewer3dTheme.color.background);
-  const camera = new three.PerspectiveCamera(
-    CAMERA_FOV_DEG,
-    1,
-    CAMERA_NEAR_MM,
-    CAMERA_FAR_MM,
-  );
+  const camera = new three.PerspectiveCamera(CAMERA_FOV_DEG, 1, CAMERA_NEAR_MM, CAMERA_FAR_MM);
   camera.up.set(0, 0, 1);
 
   const lighting = applySceneLighting(three, renderer, scene, frame);
@@ -95,42 +90,59 @@ export async function createDesignViewportScene(
   const render = (): void => renderer.render(scene, camera);
   controls.addEventListener('change', render);
 
+  const handle = buildViewportHandle({
+    three,
+    addons,
+    canvas,
+    frame,
+    renderer,
+    scene,
+    camera,
+    controls,
+    render,
+    teardown: () => {
+      controls.removeEventListener('change', render);
+      controls.dispose();
+      stage.dispose();
+      lighting.dispose();
+      renderer.dispose();
+    },
+  });
+  handle.setPreset('top');
+  handle.resize(canvas.clientWidth, canvas.clientHeight);
+  return { kind: 'ok', handle };
+}
+
+type HandleDeps = {
+  readonly three: typeof ThreeNamespace;
+  readonly addons: Awaited<ReturnType<typeof loadViewportLinesAddons>>;
+  readonly canvas: HTMLCanvasElement;
+  readonly frame: ViewportFrame;
+  readonly renderer: WebGLRenderer;
+  readonly scene: ThreeNamespace.Scene;
+  readonly camera: ThreeNamespace.PerspectiveCamera;
+  readonly controls: { target: ThreeNamespace.Vector3; update: () => void };
+  readonly render: () => void;
+  readonly teardown: () => void;
+};
+
+function buildViewportHandle(deps: HandleDeps): DesignViewportHandle {
+  const { three, canvas, frame, camera, controls, render } = deps;
   let content: { object: ThreeNamespace.Object3D; dispose: () => void } | null = null;
   let overlay: OverlayDrawableHandle | null = null;
   const plane = new three.Plane(new three.Vector3(0, 0, 1), 0);
   const raycaster = new three.Raycaster();
   const scratch = new three.Vector3();
 
-  const setPreset = (preset: CameraPreset): void => {
-    const placement = cameraPlacement(preset, {
-      minX: -frame.widthMm / 2,
-      maxX: frame.widthMm / 2,
-      minY: -frame.heightMm / 2,
-      maxY: frame.heightMm / 2,
-      minZ: -frame.thicknessMm,
-      maxZ: 0,
-    });
-    camera.position.set(placement.position.x, placement.position.y, placement.position.z);
-    camera.up.set(placement.up.x, placement.up.y, placement.up.z);
-    controls.target.set(placement.target.x, placement.target.y, placement.target.z);
-    controls.update();
-    render();
-  };
-  setPreset('top');
-
-  const handle: DesignViewportHandle = {
+  return {
     dispose: () => {
-      controls.removeEventListener('change', render);
-      controls.dispose();
       overlay?.dispose();
       content?.dispose();
-      stage.dispose();
-      lighting.dispose();
-      renderer.dispose();
+      deps.teardown();
     },
     resize: (width, height) => {
       if (width <= 0 || height <= 0) return;
-      renderer.setSize(width, height, false);
+      deps.renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       render();
@@ -140,24 +152,38 @@ export async function createDesignViewportScene(
       // never blanks mid-edit (relief-scene-handle's rule).
       const next = await buildViewerContent(three, input);
       if (content !== null) {
-        scene.remove(content.object);
+        deps.scene.remove(content.object);
         content.dispose();
       }
       content = next;
-      scene.add(next.object);
+      deps.scene.add(next.object);
       render();
     },
     updateOverlay: (input) => {
-      const next = buildOverlayDrawable(three, addons, input);
+      const next = buildOverlayDrawable(three, deps.addons, input);
       if (overlay !== null) {
-        scene.remove(overlay.object);
+        deps.scene.remove(overlay.object);
         overlay.dispose();
       }
       overlay = next;
-      scene.add(next.object);
+      deps.scene.add(next.object);
       render();
     },
-    setPreset,
+    setPreset: (preset) => {
+      const placement = cameraPlacement(preset, {
+        minX: -frame.widthMm / 2,
+        maxX: frame.widthMm / 2,
+        minY: -frame.heightMm / 2,
+        maxY: frame.heightMm / 2,
+        minZ: -frame.thicknessMm,
+        maxZ: 0,
+      });
+      camera.position.set(placement.position.x, placement.position.y, placement.position.z);
+      camera.up.set(placement.up.x, placement.up.y, placement.up.z);
+      controls.target.set(placement.target.x, placement.target.y, placement.target.z);
+      controls.update();
+      render();
+    },
     pointerToSceneMm: (offsetX, offsetY) => {
       const ndc = pointerNdc(offsetX, offsetY, canvas.clientWidth, canvas.clientHeight);
       raycaster.setFromCamera(new three.Vector2(ndc.x, ndc.y), camera);
@@ -171,16 +197,16 @@ export async function createDesignViewportScene(
       const height = canvas.clientHeight;
       if (width <= 0 || height <= 0) return 1;
       const a = controls.target.clone().project(camera);
-      const b = controls.target.clone().add(new three.Vector3(1, 0, 0)).project(camera);
+      const b = controls.target
+        .clone()
+        .add(new three.Vector3(1, 0, 0))
+        .project(camera);
       const dxPx = ((b.x - a.x) * width) / 2;
       const dyPx = ((b.y - a.y) * height) / 2;
       const px = Math.hypot(dxPx, dyPx);
       return px > 0.01 ? px : 1;
     },
   };
-
-  handle.resize(canvas.clientWidth, canvas.clientHeight);
-  return { kind: 'ok', handle };
 }
 
 // Re-exported so the component can map its stored frame without repeating the

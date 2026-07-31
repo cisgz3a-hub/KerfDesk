@@ -7,7 +7,9 @@ import { buildViewportOverlay, OVERLAY_LIFT_MM } from './viewport-overlay';
 
 const FRAME = { originMm: { x: 100, y: 50 }, widthMm: 200, heightMm: 100 };
 
-const LAYERS = [{ ...DEFAULT_DESIGN_LAYER, id: 'vee', color: '#dc2626', cutType: 'v-carve' }] as const;
+const LAYERS = [
+  { ...DEFAULT_DESIGN_LAYER, id: 'vee', color: '#dc2626', cutType: 'v-carve' },
+] as const;
 
 const sketch: Sketch = {
   entities: [
@@ -20,7 +22,13 @@ const sketch: Sketch = {
       cornerRadiusMm: 0,
       layerId: 'vee',
     },
-    { id: 'guide', kind: 'line', start: { x: 100, y: 50 }, end: { x: 300, y: 50 }, construction: true },
+    {
+      id: 'guide',
+      kind: 'line',
+      start: { x: 100, y: 50 },
+      end: { x: 300, y: 50 },
+      construction: true,
+    },
   ],
   layers: LAYERS,
 };

@@ -105,7 +105,7 @@ type DesignStudioState = {
   readonly removeLayer: (layerId: string) => void;
   readonly moveLayer: (layerId: string, direction: 'up' | 'down') => void;
   readonly assignSelectionToLayer: (layerId: string) => void;
-  readonly togglePreview3d: () => void;
+  readonly toggleSurface3d: () => void;
 };
 
 export const useDesignStudioStore = create<DesignStudioState>((set) => ({
@@ -196,8 +196,8 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
     set(mapSession((session) => moveSessionLayer(session, layerId, direction))),
   assignSelectionToLayer: (layerId) =>
     set(mapSession((session) => assignSelectionToSessionLayer(session, layerId))),
-  togglePreview3d: () =>
-    set(mapSession((session) => ({ ...session, showPreview3d: !session.showPreview3d }))),
+  toggleSurface3d: () =>
+    set(mapSession((session) => ({ ...session, surface3d: !session.surface3d }))),
 }));
 
 // Every session mutation goes through here so a closed Studio silently ignores

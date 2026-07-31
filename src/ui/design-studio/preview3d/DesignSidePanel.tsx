@@ -1,19 +1,22 @@
-// DesignSidePanel — the Studio's right rail (ADR-272 Amendment 1): carve
-// layers on top, the live 3D preview below, one drag handle on the left edge.
-// The research plan's window layout put exactly this column here; the floating
-// shape inspector stays independent of it.
+// DesignSidePanel — the Studio's right rail (ADR-272 Amendment 2): the carve
+// layers card, resizable from its left edge. The 3D view no longer lives
+// here — the CANVAS is the 3D space now; this rail is where the layer plan
+// reads and edits. Machine facts (tools, active bit, stock) come from the
+// cheap source derivation, never the heightmap — the viewport owns that.
 
+import { useMemo } from 'react';
+import { useStore } from '../../state';
 import { DesignLayersCard } from '../layers/DesignLayersCard';
-import { DesignCarvePreview } from './DesignCarvePreview';
-import { useDesignCarveContent } from './use-design-carve-content';
+import { designCarveSource } from './design-carve-source';
 import { useDesignPaneWidth } from './use-design-pane-width';
 
 export function DesignSidePanel(): JSX.Element {
-  const carve = useDesignCarveContent();
+  const project = useStore((state) => state.project);
+  const source = useMemo(() => designCarveSource(project), [project]);
   const resize = useDesignPaneWidth();
 
   return (
-    <aside aria-label="Carve layers and preview" style={{ ...panelStyle, width: resize.widthPx }}>
+    <aside aria-label="Carve layers panel" style={{ ...panelStyle, width: resize.widthPx }}>
       <div
         role="separator"
         aria-orientation="vertical"
@@ -25,14 +28,11 @@ export function DesignSidePanel(): JSX.Element {
         style={handleStyle}
       />
       <div style={contentStyle}>
-        {carve === null ? null : (
-          <DesignLayersCard
-            tools={carve.source.tools}
-            activeTool={carve.source.activeTool}
-            stockThicknessMm={carve.source.stock.thicknessMm}
-          />
-        )}
-        <DesignCarvePreview content={carve?.content ?? null} source={carve?.source ?? null} />
+        <DesignLayersCard
+          tools={source.tools}
+          activeTool={source.activeTool}
+          stockThicknessMm={source.stock.thicknessMm}
+        />
       </div>
     </aside>
   );
@@ -63,4 +63,5 @@ const contentStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   minHeight: 0,
+  overflowY: 'auto',
 };
