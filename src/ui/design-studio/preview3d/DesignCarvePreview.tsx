@@ -1,20 +1,41 @@
-// DesignCarvePreview — the Studio's live 3D carve view (ADR-271 Amendment 1,
-// instant tier). The canvas stays mounted while collapsed (display:none) so
-// the WebGL scene and the operator's orbit survive the toggle; the scene
-// renders on demand, so a hidden pane costs nothing.
+// DesignCarvePreview — the Studio's live 3D carve view (ADR-271 Amendment 1).
+// Two labelled tiers: the instant DESIGN surface (target depths, recomputed as
+// you draw) and the click-to-run BITS simulation (real toolpaths, each tool
+// section stamped with its own bit's kernel). The canvas stays mounted while
+// collapsed (display:none) so the WebGL scene and the orbit survive a toggle.
 //
 // Display-only (ADR-261 §3): this view informs, it never gates anything.
 
+import { useMemo, useState } from 'react';
+import { steppedSurfaceMesh } from '../../../core/heightfield';
 import type { ViewerContentInput } from '../../cnc-viewer3d/viewer3d-content';
 import { useDesignStudioStore } from '../design-studio-store';
+import type { DesignCarveSource } from './design-carve-source';
 import { useDesignPreviewScene } from './use-design-preview-scene';
+import { useDesignSimulate } from './use-design-simulate';
 
 export function DesignCarvePreview(props: {
   readonly content: ViewerContentInput | null;
+  readonly source: DesignCarveSource | null;
 }): JSX.Element | null {
   const show = useDesignStudioStore((state) => state.session?.showPreview3d ?? true);
   const togglePreview3d = useDesignStudioStore((state) => state.togglePreview3d);
-  const scene = useDesignPreviewScene(props.content);
+  const [mode, setMode] = useState<'design' | 'bits'>('design');
+  const sim = useDesignSimulate(props.source);
+
+  const simContent = useMemo<ViewerContentInput | null>(() => {
+    if (sim.simulate.kind !== 'ok' || props.source === null) return null;
+    return {
+      mesh: steppedSurfaceMesh(sim.simulate.grid),
+      stockThicknessMm: props.source.stock.thicknessMm,
+      ...(props.source.materialKey === undefined ? {} : { materialKey: props.source.materialKey }),
+    };
+  }, [sim.simulate, props.source]);
+
+  const showingBits = mode === 'bits' && simContent !== null;
+  const scene = useDesignPreviewScene(showingBits ? simContent : props.content);
+  const failureReason =
+    sim.simulate.kind === 'failed' || sim.simulate.kind === 'empty' ? sim.simulate.reason : null;
 
   return (
     <section aria-label="Carve preview" style={{ ...sectionStyle, ...(show ? null : collapsedStyle) }}>
@@ -28,9 +49,32 @@ export function DesignCarvePreview(props: {
         >
           {show ? '▾' : '▸'} Carve preview
         </button>
-        <span style={tierStyle} title="What you are looking at: the target surface each layer asks for, at its depth, with its bit">
-          design surface
-        </span>
+        {simContent === null ? null : (
+          <span role="group" aria-label="Preview tier" style={chipsStyle}>
+            <TierChip label="Design" active={!showingBits} onClick={() => setMode('design')} title="The target surface each layer asks for — instant, updates as you draw" />
+            <TierChip
+              label={sim.isStale ? 'Bits (stale)' : 'Bits'}
+              active={showingBits}
+              onClick={() => setMode('bits')}
+              title={
+                sim.isStale
+                  ? 'Simulated with each layer’s real bit — the drawing changed since this ran, press Simulate again'
+                  : 'Simulated from real toolpaths, each tool section stamped with its own bit'
+              }
+            />
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            sim.run();
+            setMode('bits');
+          }}
+          title="Compile the layers into real toolpaths and carve them with each layer's bit shape"
+          style={simulateStyle}
+        >
+          Simulate
+        </button>
       </header>
       <div style={{ ...bodyStyle, ...(show ? null : hiddenStyle) }}>
         <canvas
@@ -46,7 +90,27 @@ export function DesignCarvePreview(props: {
           </p>
         )}
       </div>
+      {failureReason === null || !show ? null : <p style={reasonStyle}>{failureReason}</p>}
     </section>
+  );
+}
+
+function TierChip(props: {
+  readonly label: string;
+  readonly active: boolean;
+  readonly title: string;
+  readonly onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      title={props.title}
+      aria-pressed={props.active}
+      style={{ ...chipStyle, ...(props.active ? chipActiveStyle : null) }}
+    >
+      {props.label}
+    </button>
   );
 }
 
@@ -76,13 +140,33 @@ const toggleStyle: React.CSSProperties = {
   padding: 0,
 };
 
-const tierStyle: React.CSSProperties = {
-  marginLeft: 'auto',
+const chipsStyle: React.CSSProperties = { display: 'flex', gap: 2, marginLeft: 4 };
+
+const chipStyle: React.CSSProperties = {
   fontSize: 10,
-  color: 'var(--lf-text-dim)',
-  border: '1px solid var(--lf-border)',
-  borderRadius: 999,
   padding: '1px 8px',
+  borderRadius: 999,
+  border: '1px solid var(--lf-border)',
+  background: 'transparent',
+  color: 'var(--lf-text-dim)',
+  cursor: 'pointer',
+};
+
+const chipActiveStyle: React.CSSProperties = {
+  borderColor: 'var(--lf-accent)',
+  color: 'var(--lf-text)',
+  background: 'var(--lf-bg-input)',
+};
+
+const simulateStyle: React.CSSProperties = {
+  marginLeft: 'auto',
+  fontSize: 11,
+  padding: '2px 9px',
+  borderRadius: 4,
+  border: '1px solid var(--lf-border)',
+  background: 'transparent',
+  color: 'var(--lf-text)',
+  cursor: 'pointer',
 };
 
 const bodyStyle: React.CSSProperties = {
@@ -114,4 +198,10 @@ const stateStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-text-dim)',
   pointerEvents: 'none',
+};
+
+const reasonStyle: React.CSSProperties = {
+  margin: '0 8px 8px',
+  fontSize: 10,
+  color: 'var(--lf-text-dim)',
 };

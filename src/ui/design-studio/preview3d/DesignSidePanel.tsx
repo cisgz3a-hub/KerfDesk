@@ -32,7 +32,7 @@ export function DesignSidePanel(): JSX.Element {
             stockThicknessMm={carve.source.stock.thicknessMm}
           />
         )}
-        <DesignCarvePreview content={carve?.content ?? null} />
+        <DesignCarvePreview content={carve?.content ?? null} source={carve?.source ?? null} />
       </div>
     </aside>
   );

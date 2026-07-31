@@ -12,3 +12,4 @@ export {
   type DesignCarveInput,
 } from './carve-input';
 export { designCarveHeightmap } from './carve-heightmap';
+export { mergeRemovalDepthsInto } from './grid-merge';
