@@ -5022,3 +5022,72 @@ the edge it sits on, and a midpoint over the same edge.
 3. A shape crossing itself reports no intersection; a crossing is a reference
    between two shapes, and self-crossings fight the node snap on closed paths.
 4. Turning Snap off (Shift+S) disables both mechanisms at once.
+
+### F-DS10. Design in carve layers (DS-8, ADR-271 Amendment 1)
+
+1. The right panel lists the sketch's carve layers. A fresh sketch has one
+   ("Layer 1"); **+ New** adds another, named and colored by position, and the
+   new layer becomes active immediately.
+2. New shapes land on the ACTIVE layer; the 2D canvas strokes each shape in its
+   layer's color so the drawing, the panel, and the 3D view tell one story.
+3. Click a row to make it active. The row reads back the layer's cut type,
+   depth, bit, and shape count.
+4. The active layer's settings edit below the list: name, cut type
+   (profile outside/inside/on-path, pocket, engrave, v-carve, drill), depth
+   (with a **Through** helper that sets the stock thickness), the bit, and —
+   for v-carve — an optional clearing bit for flat floors.
+5. Select shapes and press **Assign** to move them onto the active layer.
+6. Layer edits ride the sketch history: Ctrl+Z walks them like drawing steps.
+
+#### Error — removing the last layer
+
+1. The remove button is inert with one layer (its title says why); a sketch
+   always keeps a layer. Removing any other layer re-homes its shapes to the
+   first layer.
+
+#### Empty — no selection
+
+1. **Assign** is inert until shapes are selected; its title explains.
+
+#### Edge — undo removes the active layer
+
+1. The active layer falls back to the first remaining layer; nothing dangles.
+
+### F-DS11. Watch the 3D carve preview (DS-8)
+
+1. The **Carve preview** pane renders the stock with every layer carved at its
+   depth: pockets flat-floor, v-carves groove by boundary distance with the
+   layer's v-bit angle, profiles slot at bit diameter on the offset side,
+   drills bore at circle centres, and depths at the stock thickness read as
+   through cuts. It updates as you draw ("design surface" tier).
+2. **Simulate** compiles the layers into real toolpaths and carves the result
+   with each tool section's own bit shape — the **Bits** tier. Design/Bits
+   chips switch views; if the drawing changes after a run, the Bits chip says
+   "(stale)" until Simulate runs again.
+3. Drag rotates, right-drag orbits, the wheel zooms. The **3D** toggle in the
+   top bar and the pane's own header collapse it; the left edge drags to
+   resize the panel.
+
+#### Error — no WebGL / not a CNC machine
+
+1. Without WebGL the pane says so and everything else keeps working.
+2. On a laser machine profile, Simulate reports it needs a CNC machine; the
+   design-surface tier still previews. Nothing is refused (rule 7).
+
+#### Empty — nothing drawn
+
+1. The pane shows the untouched stock slab.
+
+### F-DS12. Apply layers → a multi-bit job (DS-8)
+
+1. **Apply** commits each contributing layer as ONE scene operation carrying
+   the layer's name, color, cut type, depth, and bit; feeds, passes, and tabs
+   take the operator's defaults. One project undo entry removes the whole
+   apply, as before.
+2. The job pipeline is unchanged: layers with different bits become contiguous
+   per-bit tool sections (profile sections last), and each boundary emits the
+   labelled M0 tool-change hold — jog, swap the bit, re-zero Z, Continue.
+
+#### Edge — same bit on every layer
+
+1. One tool section, no tool-change pause: exactly the pre-layer behavior.
