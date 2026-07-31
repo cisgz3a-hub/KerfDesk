@@ -32,6 +32,8 @@ function diagnosticWarning(diagnostic: CompileDiagnostic): string {
       return kerfOffsetFailedWarning(diagnostic.layerName);
     case 'fill-collapsed-at-precision':
       return FILL_COLLAPSED_AT_PRECISION_WARNING(diagnostic.layerName);
+    case 'raster-source-luma-mismatch':
+      return `Image "${diagnostic.source}" on layer "${diagnostic.layerName}" is missing from the job because its pixel buffer has ${diagnostic.actualPixels} samples, but its declared dimensions require ${diagnostic.expectedPixels}. Reopen or re-import the image before running.`;
     default:
       return assertNever(diagnostic, 'JobDiagnostic');
   }

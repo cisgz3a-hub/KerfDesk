@@ -171,13 +171,41 @@ describe('compileJob raster image groups', () => {
     ).toThrow(/lumaBase64/);
   });
 
-  it('rejects an override whose dimensions do not match the raster', () => {
+  it('skips an override whose dimensions do not match the raster without throwing', () => {
     const object = rasterObject();
-    expect(() =>
+    expect(
       compileRasterGroupsForLayer([object], imageLayer(), dev, {
         sourceLumaByObjectId: new Map([[object.id, Uint8Array.of(0)]]),
       }),
-    ).toThrow('compileRasterGroup: source luma dimensions do not match the raster');
+    ).toEqual({
+      groups: [],
+      diagnostics: [
+        {
+          kind: 'raster-source-luma-mismatch',
+          layerName: 'Operation',
+          source: 'photo.png',
+          expectedPixels: 4,
+          actualPixels: 1,
+        },
+      ],
+    });
+  });
+
+  it('keeps valid sibling raster groups when one override has mismatched dimensions', () => {
+    const invalid = rasterObject();
+    const valid = { ...rasterObject('AP//AA=='), id: 'R2', source: 'valid.png' };
+
+    const compiled = compileRasterGroupsForLayer([invalid, valid], imageLayer(), dev, {
+      sourceLumaByObjectId: new Map([[invalid.id, Uint8Array.of(0)]]),
+    });
+
+    expect(compiled.groups.map((group) => group.sourceObjectId)).toEqual(['R2']);
+    expect(compiled.diagnostics).toEqual([
+      expect.objectContaining({
+        kind: 'raster-source-luma-mismatch',
+        source: 'photo.png',
+      }),
+    ]);
   });
 
   it('decodes saved luma without relying on a host atob global', () => {

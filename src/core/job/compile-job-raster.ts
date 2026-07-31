@@ -11,7 +11,7 @@ import {
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import { sceneObjectUsesOperation, type Layer, type RasterImage, type SceneObject } from '../scene';
-import type { RasterGroup } from './job';
+import type { JobDiagnostic, RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
 import { layerWithObjectOverride } from './compile-job-object-policy';
@@ -34,6 +34,11 @@ type CompileRasterGroupOptions = {
   readonly sourceLumaOverride: Uint8Array | undefined;
 };
 
+type RasterCompilation = {
+  readonly groups: ReadonlyArray<RasterGroup>;
+  readonly diagnostics: ReadonlyArray<JobDiagnostic>;
+};
+
 /**
  * Compile raster groups for one materialized operation and object set.
  * Optional luma overrides let worker-owned transient rasters avoid JSON/base64
@@ -44,22 +49,32 @@ export function compileRasterGroupsForLayer(
   layer: Layer,
   device: DeviceProfile,
   options: CompileRasterGroupsOptions = {},
-): RasterGroup[] {
+): RasterCompilation {
   const sceneObjects = options.sceneObjects ?? objects;
   const groups: RasterGroup[] = [];
+  const diagnostics: JobDiagnostic[] = [];
   for (const obj of objects) {
     if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, layer)) continue;
     if (obj.role === 'trace-source') continue;
     const effectiveLayer = layerWithObjectOverride(layer, obj);
     if (effectiveLayer.mode !== 'image') continue;
-    groups.push(
-      compileRasterGroup(obj, effectiveLayer, device, {
-        objects: sceneObjects,
-        sourceLumaOverride: options.sourceLumaByObjectId?.get(obj.id),
-      }),
-    );
+    const sourceLumaOverride = options.sourceLumaByObjectId?.get(obj.id);
+    const group = compileRasterGroup(obj, effectiveLayer, device, {
+      objects: sceneObjects,
+      sourceLumaOverride,
+    });
+    if (group !== null) groups.push(group);
+    else {
+      diagnostics.push({
+        kind: 'raster-source-luma-mismatch',
+        layerName: effectiveLayer.name,
+        source: obj.source,
+        expectedPixels: obj.pixelWidth * obj.pixelHeight,
+        actualPixels: sourceLumaOverride?.length ?? 0,
+      });
+    }
   }
-  return groups;
+  return { groups, diagnostics };
 }
 
 function compileRasterGroup(
@@ -67,10 +82,11 @@ function compileRasterGroup(
   layer: Layer,
   device: DeviceProfile,
   options: CompileRasterGroupOptions,
-): RasterGroup {
+): RasterGroup | null {
   const bidirectionalScanOffsetMm = validatedScanOffsetMm(device, layer.bidirectionalScanOffsetMm);
   const scanDirection = resolveImageScanDirection(device, layer);
   const sourceLuma = sourceLumaForRaster(obj, options.sourceLumaOverride);
+  if (sourceLuma === null) return null;
   const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
   const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
   const powerPercent = effectiveObjectPowerPercent(layer, obj);
@@ -147,12 +163,9 @@ function compileRasterGroup(
 function sourceLumaForRaster(
   obj: RasterImage,
   sourceLumaOverride: Uint8Array | undefined,
-): Uint8Array {
+): Uint8Array | null {
   const sourceLuma = sourceLumaOverride ?? decodeRasterLuma(obj);
-  if (sourceLuma.length !== obj.pixelWidth * obj.pixelHeight) {
-    throw new Error('compileRasterGroup: source luma dimensions do not match the raster');
-  }
-  return sourceLuma;
+  return sourceLuma.length === obj.pixelWidth * obj.pixelHeight ? sourceLuma : null;
 }
 
 type MaterializedRasterInput = {

@@ -85,11 +85,11 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
         groups.push(...vector.groups);
         diagnostics.push(...vector.diagnostics);
       }
-      groups.push(
-        ...compileRasterGroupsForLayer(orderedObjects, operationLayer, device, {
-          sceneObjects: scene.objects,
-        }),
-      );
+      const raster = compileRasterGroupsForLayer(orderedObjects, operationLayer, device, {
+        sceneObjects: scene.objects,
+      });
+      groups.push(...raster.groups);
+      diagnostics.push(...raster.diagnostics);
     }
   }
   return diagnostics.length === 0 ? { groups } : { groups, diagnostics };
