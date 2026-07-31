@@ -97,7 +97,11 @@ describe('compileCncJob pocket strategies', () => {
     expect(rough.passes.length).toBeGreaterThan(rest.passes.length);
     expect(rest.passes.length).toBeGreaterThan(0);
     const gcode = cncGrblStrategy.emit(job, dev);
-    expect(gcode.indexOf('tool 6.350 mm')).toBeLessThan(gcode.indexOf('tool 1.588 mm'));
+    const roughToolComment = '; cnc tool: end-mill; diameter-mm: 6.350';
+    const restToolComment = '; cnc tool: end-mill; diameter-mm: 1.588';
+    expect(gcode).toContain(roughToolComment);
+    expect(gcode).toContain(restToolComment);
+    expect(gcode.indexOf(roughToolComment)).toBeLessThan(gcode.indexOf(restToolComment));
     expect(gcode.match(/^M0$/gm)).toHaveLength(1);
   });
 });
