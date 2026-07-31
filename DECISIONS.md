@@ -13872,6 +13872,40 @@ accordingly and resolves the brief's open decision 4.
    parametric round-trip stage and will serialize the layer table with the
    sketch when it lands.
 
+### Amendment 2 (2026-08-01) - The canvas becomes a 3D design space (DS-8b)
+
+The maintainer reviewed the DS-8 result and rejected the docked 3D preview
+pane: "I wanted an AutoCAD/Blender look where your canvas is the design space
+in 3D." Research and verified platform facts:
+`docs/audits/2026-08-01-design-viewport3d-research.md`.
+
+1. **The Studio's centre surface is a three.js viewport** — the stock on a
+   grid in 3D, the sketch drawn as lines floated on the stock top, the carved
+   solid updating live beneath it (the Amendment 1 target-surface pipeline,
+   unchanged). Drawing, selection, and snapping run through the SAME mm-space
+   machinery as the 2D canvas: the pointer maps to the z=0 stock plane by
+   raycast, and hit radii scale by a projected pixels-per-mm at the camera
+   target. Picking never raycasts three.js lines (Line2.raycast is unreliable
+   per the committed r180 research); it reuses design-hit-test in mm space.
+2. **Input mapping (the Fusion synthesis):** left button belongs to the armed
+   tool, middle pans, Shift+middle and right orbit, wheel zooms to cursor,
+   Top/Iso presets, and the Studio opens looking straight down (Fusion's
+   auto-look-at-sketch). Stock OrbitControls provides all of it with
+   `mouseButtons = { LEFT: -1, MIDDLE: PAN, RIGHT: ROTATE }` and
+   `zoomToCursor` (verified against the installed three@0.180 source).
+3. **ADR-102 section 2 is amended**: three.js may additionally be imported
+   beneath `src/ui/design-studio/viewport3d/` — the same single-folder grant
+   ADR-255 and ADR-261 each made. Everything else stands: UI-only, lazy
+   chunks, jsdom fallback, pure typed-array seams (overlay geometry building
+   is a pure module).
+4. **The 2D canvas survives as the fallback surface** behind a top-bar 2D/3D
+   toggle (`session.surface3d`, default 3D). Dimension call-out annotations
+   and marquee selection remain 2D-only in this stage and the toggle says so;
+   parity is a later stage, not an implied promise.
+5. The right rail keeps only the carve-layers card. The Amendment 1 preview
+   pane is deleted; its Design/Bits tier chips and Simulate move into the
+   viewport toolbar (the simulate pipeline is reused unchanged). Rule 7 and
+   ADR-261 section 3 continue to hold: the viewport informs, never gates.
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01
