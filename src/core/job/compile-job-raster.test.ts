@@ -171,24 +171,32 @@ describe('compileJob raster image groups', () => {
     ).toThrow(/lumaBase64/);
   });
 
-  it('skips an override whose dimensions do not match the raster without throwing', () => {
+  it.each([
+    ['zero-length', 0, 'mismatch'],
+    ['undersized', 3, 'mismatch'],
+    ['matched', 4, 'compiled'],
+    ['oversized', 5, 'mismatch'],
+  ] as const)('handles a %s source-luma override', (_label, actualPixels, expected) => {
     const object = rasterObject();
-    expect(
-      compileRasterGroupsForLayer([object], imageLayer(), dev, {
-        sourceLumaByObjectId: new Map([[object.id, Uint8Array.of(0)]]),
-      }),
-    ).toEqual({
-      groups: [],
-      diagnostics: [
-        {
-          kind: 'raster-source-luma-mismatch',
-          layerName: 'Operation',
-          source: 'photo.png',
-          expectedPixels: 4,
-          actualPixels: 1,
-        },
-      ],
+    const compiled = compileRasterGroupsForLayer([object], imageLayer(), dev, {
+      sourceLumaByObjectId: new Map([[object.id, new Uint8Array(actualPixels)]]),
     });
+
+    if (expected === 'compiled') {
+      expect(compiled.groups.map((group) => group.sourceObjectId)).toEqual([object.id]);
+      expect(compiled.diagnostics).toEqual([]);
+      return;
+    }
+    expect(compiled.groups).toEqual([]);
+    expect(compiled.diagnostics).toEqual([
+      {
+        kind: 'raster-source-luma-mismatch',
+        layerName: 'Operation',
+        source: 'photo.png',
+        expectedPixels: 4,
+        actualPixels,
+      },
+    ]);
   });
 
   it('keeps valid sibling raster groups when one override has mismatched dimensions', () => {
