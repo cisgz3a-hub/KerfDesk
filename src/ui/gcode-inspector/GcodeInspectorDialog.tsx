@@ -8,6 +8,7 @@ import { Dialog } from '../kit/Dialog';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import { InspectionPressureNotice } from './InspectionPressureNotice';
 import { InspectorView } from './InspectorView';
+import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
 import { useGcodeInspection } from './use-gcode-inspection';
 
 export type GcodeInspectorDialogProps = {
@@ -45,6 +46,7 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
       {state.kind === 'ready' ? (
         state.result.parsed.kind === 'ok' ? (
           <>
+            {state.mainThreadFallback ? <MainThreadInspectionNotice /> : null}
             <InspectionPressureNotice result={state.result} />
             <InspectorView model={state.result.parsed.model} lines={state.result.lines} />
           </>
@@ -75,9 +77,12 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
 }
 
 function inspectionProgressLabel(
-  phase: 'queued' | 'reading' | 'parsing',
+  phase: 'queued' | 'reading' | 'parsing' | 'fallback',
   queuePosition: number,
 ): string {
+  if (phase === 'fallback') {
+    return 'Background preview worker unavailable — parsing on the main UI thread may make the app unresponsive.';
+  }
   if (phase === 'queued' && queuePosition > 0) {
     return `Preview queued — ${queuePosition} request(s) ahead. Close to cancel.`;
   }

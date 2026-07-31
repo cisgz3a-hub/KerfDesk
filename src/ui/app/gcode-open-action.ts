@@ -13,7 +13,7 @@ import {
 } from '../import/import-worker-client';
 import { resolveImportBlob, type BlobSourceFile } from '../import/import-file-blob';
 import type { ToastVariant } from '../state/toast-store';
-import { importSourceSizeAdvisory } from './import-size-advisory';
+import { importSourceSizeAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { annotateGcode2dPreviewPressure } from './gcode-2d-preview-pressure';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
@@ -122,9 +122,8 @@ export async function open2dSimulatorFromSource(
         : parseGcodeOffThread(new Blob([source.text]), options);
     const result =
       offThread ??
-      (source.kind === 'text'
-        ? parseGcodeProgram(source.text)
-        : Promise.reject(new Error('G-code import worker unavailable')));
+      (pushToast(mainThreadImportFallbackAdvisory(name), 'warning'),
+      parseGcodeProgram(source.kind === 'text' ? source.text : await source.blob.text()));
     open2dSimulatorFromResult(name, await result, openPreview, pushToast);
   } catch (error) {
     pushToast(

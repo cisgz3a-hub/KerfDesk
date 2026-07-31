@@ -84,8 +84,8 @@ function request<R>(
   expectedKind: ResultKind,
   options: DocumentImportRequestOptions,
 ): Promise<R> | null {
-  if (ensureWorker() === null) return null;
   if (options.signal?.aborted === true) return Promise.reject(abortError());
+  if (ensureWorker() === null) return null;
   nextRequestId += 1;
   const id = nextRequestId;
   return new Promise<R>((resolve, reject) => {

@@ -5,7 +5,7 @@ import { importByteSize, resolveImportBlob, type BlobSourceFile } from '../impor
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
-import { largeImportAdvisory } from './import-size-advisory';
+import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import {
   describeImportError,
   describeImportResult,
@@ -25,7 +25,7 @@ export async function importSvgFiles(
       const size = importByteSize(file, blob);
       const advisory = size === null ? null : largeImportAdvisory(file.name, size);
       if (advisory !== null) pushToast(advisory, 'warning');
-      const result = await parseFile(file, blob, controls.options);
+      const result = await parseFile(file, blob, controls.options, pushToast);
       if (result.object !== null) {
         const outcome = importObject(result.object, successIndex);
         successIndex += 1;
@@ -54,11 +54,15 @@ async function parseFile(
   file: BlobSourceFile,
   blob: Blob | null,
   options: Parameters<typeof parseSvgOffThread>[3],
+  pushToast: (message: string, variant?: ToastVariant) => void,
 ): Promise<ParseSvgResult> {
   const id = crypto.randomUUID();
   if (blob !== null) {
     const pending = parseSvgOffThread(blob, id, file.name, options);
-    if (pending === null) throw new Error('SVG import worker unavailable');
+    if (pending === null) {
+      pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
+      return parseSvg({ svgText: await file.text(), id, source: file.name });
+    }
     return pending;
   }
   return parseSvg({ svgText: await file.text(), id, source: file.name });

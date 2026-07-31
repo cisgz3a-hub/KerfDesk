@@ -10,6 +10,8 @@ afterEach(() => {
 });
 
 describe('LightBurn project open migration', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('loads read-only source into an lf2 target and reports migration evidence', async () => {
     const setProject = vi.fn(() => ({ kind: 'loaded' as const }));
     const markLoaded = vi.fn();
@@ -67,5 +69,37 @@ describe('LightBurn project open migration', () => {
       savedName: 'converted.lf2',
       lastSaveTarget: null,
     });
+  });
+
+  it('imports a Blob-backed project through the disclosed fallback when Worker construction fails', async () => {
+    vi.stubGlobal('Worker', function WorkerUnavailable(): never {
+      throw new Error('workers blocked');
+    });
+    const blob = { size: RECT_PROJECT.length } as unknown as Blob;
+    const readFile = vi.fn(async () => RECT_PROJECT);
+    const setProject = vi.fn(() => ({ kind: 'loaded' as const }));
+    const pushToast = vi.fn();
+    const platform: PlatformAdapter = {
+      id: 'mock',
+      pickFilesForOpen: async () => [
+        {
+          name: 'fallback.lbrn2',
+          size: blob.size,
+          text: readFile,
+          blob: async () => blob,
+        },
+      ],
+      pickFileForSave: async () => null,
+      serial: { isSupported: () => false, requestPort: async () => null },
+    };
+
+    await handleOpenProject({ platform, setProject, markLoaded: vi.fn(), pushToast });
+
+    expect(readFile).toHaveBeenCalledOnce();
+    expect(setProject).toHaveBeenCalledOnce();
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/fallback\.lbrn2.*main thread.*unresponsive/i),
+      'warning',
+    );
   });
 });

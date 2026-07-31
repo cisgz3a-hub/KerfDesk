@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SceneObject } from '../../core/scene';
 import { importDxfFiles, isDxfFile } from './dxf-import-action';
 
@@ -57,20 +57,29 @@ describe('isDxfFile', () => {
 });
 
 describe('importDxfFiles', () => {
-  it('does not fall back to reading a Blob on the UI thread when workers are unavailable', async () => {
-    const text = vi.fn(async () => dxfLine());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('imports through the disclosed main-thread fallback when worker construction fails', async () => {
+    vi.stubGlobal('Worker', function WorkerUnavailable(): never {
+      throw new Error('workers blocked');
+    });
+    const blob = { size: dxfLine().length } as unknown as Blob;
+    const readFile = vi.fn(async () => dxfLine());
+    const importObject = vi.fn(() => ({ kind: 'added' as const }));
     const pushToast = vi.fn();
 
-    await importDxfFiles(
-      [{ name: 'worker-required.dxf', text, blob: async () => new Blob([dxfLine()]) }],
-      { importObject: vi.fn(), pushToast },
-    );
+    await importDxfFiles([{ name: 'fallback.dxf', text: readFile, blob: async () => blob }], {
+      importObject,
+      pushToast,
+    });
 
-    expect(text).not.toHaveBeenCalled();
+    expect(readFile).toHaveBeenCalledOnce();
+    expect(importObject).toHaveBeenCalledOnce();
     expect(pushToast).toHaveBeenCalledWith(
-      'worker-required.dxf: DXF import worker unavailable',
-      'error',
+      expect.stringMatching(/fallback\.dxf.*main thread.*unresponsive/i),
+      'warning',
     );
+    expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('Imported 1 path'), 'success');
   });
 
   it('imports parsed geometry and toasts the path count', async () => {

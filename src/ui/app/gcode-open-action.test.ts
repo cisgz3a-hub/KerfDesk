@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mockPlatform } from '../../__fixtures__/file-actions';
 import {
   handleOpenGcodeInspector,
@@ -78,14 +78,49 @@ describe('handleOpenGcodeInspector', () => {
 });
 
 describe('open2dSimulatorFromSource', () => {
-  it('does not fall back to reading and parsing a Blob on the UI thread', async () => {
-    const read = vi.fn(async () => 'G21\nG1 X10');
-    const source = { text: read } as unknown as Blob;
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('opens through the disclosed main-thread fallback when worker construction fails', async () => {
+    vi.stubGlobal('Worker', function WorkerUnavailable(): never {
+      throw new Error('workers blocked');
+    });
+    const read = vi.fn(async () => 'G21 G90\nG1 X10');
+    const source = { size: 17, text: read } as unknown as Blob;
+    const openPreview = vi.fn();
     const pushToast = vi.fn();
 
-    await open2dSimulatorFromSource('part.nc', { kind: 'blob', blob: source }, vi.fn(), pushToast);
+    await open2dSimulatorFromSource(
+      'part.nc',
+      { kind: 'blob', blob: source },
+      openPreview,
+      pushToast,
+    );
+
+    expect(read).toHaveBeenCalledOnce();
+    expect(openPreview).toHaveBeenCalledOnce();
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/part\.nc.*main thread.*unresponsive/i),
+      'warning',
+    );
+  });
+
+  it('does not enter fallback when the request was already cancelled', async () => {
+    vi.stubGlobal('Worker', undefined);
+    const read = vi.fn(async () => 'G21 G90\nG1 X10');
+    const source = { size: 17, text: read } as unknown as Blob;
+    const controller = new AbortController();
+    controller.abort();
+    const pushToast = vi.fn();
+
+    await open2dSimulatorFromSource(
+      'cancelled.nc',
+      { kind: 'blob', blob: source },
+      vi.fn(),
+      pushToast,
+      { signal: controller.signal },
+    );
 
     expect(read).not.toHaveBeenCalled();
-    expect(pushToast).toHaveBeenCalledWith('part.nc: G-code import worker unavailable', 'error');
+    expect(pushToast).toHaveBeenCalledWith('cancelled.nc: 2D preview cancelled.', 'warning');
   });
 });

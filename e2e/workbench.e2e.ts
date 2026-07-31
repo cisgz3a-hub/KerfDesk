@@ -51,6 +51,8 @@ baseTest(
 baseTest(
   'synthetic SVG import supports layer editing, Preview, Save, and machine switching',
   async ({ page }) => {
+    const workerUrls: string[] = [];
+    page.on('worker', (worker) => workerUrls.push(worker.url()));
     await page.setViewportSize({ width: 1024, height: 768 });
     await installFileSystemMocks(page);
     // SVG import must not cold-load the unrelated native-project parser graph.
@@ -66,6 +68,7 @@ baseTest(
     await page.getByRole('button', { name: 'Import SVG...' }).click();
     await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
     await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
+    expect(workerUrls.some((url) => url.includes('document-import-worker'))).toBe(true);
 
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Select all artwork using fixture' }).click();

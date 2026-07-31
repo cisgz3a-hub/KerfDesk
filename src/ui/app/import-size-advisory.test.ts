@@ -79,8 +79,20 @@ describe('oversize imports proceed', () => {
     );
   });
 
-  it('routes an oversized STL to its worker without reading an ArrayBuffer on the UI thread', async () => {
-    const arrayBuffer = vi.fn(async () => new ArrayBuffer(0));
+  it('advises before using the disclosed main-thread STL fallback when Worker is unavailable', async () => {
+    const ascii = [
+      'solid part',
+      'facet normal 0 0 1',
+      'outer loop',
+      'vertex 0 0 0',
+      'vertex 10 0 0',
+      'vertex 0 10 1',
+      'endloop',
+      'endfacet',
+      'endsolid part',
+    ].join('\n');
+    const bytes = new TextEncoder().encode(ascii);
+    const arrayBuffer = vi.fn(async () => bytes.buffer as ArrayBuffer);
     const file = {
       name: 'oversize.stl',
       size: IMPORT_SOURCE_ADVISORY_BYTES.stl + 1,
@@ -94,9 +106,12 @@ describe('oversize imports proceed', () => {
       pushToast,
     });
 
-    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(arrayBuffer).toHaveBeenCalledOnce();
     expect(pushToast).toHaveBeenCalledWith(expect.stringMatching(SLOW_IMPORT), 'warning');
-    expect(pushToast).toHaveBeenCalledWith('oversize.stl: STL import worker unavailable', 'error');
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/oversize\.stl.*main thread.*unresponsive/i),
+      'warning',
+    );
   });
 });
 

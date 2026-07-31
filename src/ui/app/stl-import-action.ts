@@ -14,13 +14,15 @@ import {
   type ReliefObject,
   type SceneObject,
 } from '../../core/scene';
+import { parseStl } from '../../io/stl';
 import { parseStlOffThread } from '../import/import-worker-client';
 import {
   type PreparedStlImportResult,
   type StlImportPreparationOptions,
+  prepareParsedStlImport,
 } from '../import/stl-import-preparation';
 import type { ToastVariant } from '../state/toast-store';
-import { importSourceSizeAdvisory } from './import-size-advisory';
+import { importSourceSizeAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
 export const DEFAULT_RELIEF_WIDTH_MM = 100;
@@ -59,11 +61,12 @@ export async function importStlFiles(
     if (sizeAdvisory !== null) ctx.pushToast(sizeAdvisory, 'warning');
     const controls = createImportWorkerControls(file.name, ctx.pushToast);
     try {
-      // Parsing and the aspect-ratio heightmap probe stay in the import worker;
-      // a Blob is never materialized and converted on the UI thread.
+      // Parsing and the aspect-ratio heightmap probe normally stay in the import
+      // worker. Constructor-time Worker unavailability retains the legacy valid
+      // path with a responsiveness warning; worker errors/cancellation do not retry.
       const pending = parseStlOffThread(file, STL_PREPARATION_OPTIONS, controls.options);
-      if (pending === null) throw new Error('STL import worker unavailable');
-      const prepared = await pending;
+      const prepared =
+        pending === null ? await prepareStlOnMainThread(file, ctx.pushToast) : await pending;
       const relief = reliefFromPreparedStl(prepared, file.name);
       if (typeof relief === 'string') {
         ctx.pushToast(`${file.name}: ${relief}`, 'error');
@@ -89,6 +92,14 @@ export async function importStlFiles(
       controls.dispose();
     }
   }
+}
+
+async function prepareStlOnMainThread(
+  file: File,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): Promise<PreparedStlImportResult> {
+  pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
+  return prepareParsedStlImport(parseStl(await file.arrayBuffer()), STL_PREPARATION_OPTIONS);
 }
 
 // Rule 7 / ADR-228: the RELIEF_EMBED_TRIANGLE_LIMIT refusal ("decimate the mesh

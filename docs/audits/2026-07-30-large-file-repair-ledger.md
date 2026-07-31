@@ -703,3 +703,67 @@ cold-optimizer correction.
   output-scaled, and not memory-bounded.
 - **Publication boundary:** update draft PR #527 only. No merge to `main`, deployment, hardware,
   controller, settings, Frame, or Start action is part of this correction.
+
+## Corrective audit 3 - constructor-time worker-unavailable fallback
+
+**Status:** fixed and independently verified locally; publication and fresh CI pending.
+
+### Finding
+
+- PR #527 returned a worker-unavailable error whenever `Worker` was absent or its constructor
+  threw. That refused otherwise-valid DXF, G-code 2D/Inspector, STL, SVG, native project,
+  LightBurn project/CLB, and native material-library input.
+- This was a new import/preview guard under repository rule 7. Worker availability determines
+  responsiveness, not whether those existing parsers can produce a valid result.
+
+### Repair
+
+- Normal production requests retain the existing worker-backed clients and FIFO/cancellation
+  behavior.
+- A client returns `null` only when no request has begun because `Worker` is absent or construction
+  throws. Callers then run their existing valid text/ArrayBuffer parser and warn that processing is
+  continuing on the main thread and may make the app unresponsive.
+- Pre-aborted requests reject before worker construction is considered. Once a request exists,
+  `postMessage` failure, worker error, active/queued cancellation, or reset rejects that promise and
+  never retries through the fallback.
+- The G-code Inspector displays the main-UI-thread disclosure during a Blob read and after parsing;
+  it no longer says that a worker is preparing a request after construction has already failed.
+- No size threshold, truncation, compile refusal, silent fallback after partial work, or validation
+  weakening was added.
+
+### Test-first verification
+
+- Red: the stable pre-repair focused run recorded 10 failed and 42 passed tests. Every Blob-backed
+  format refused before reading its established fallback input; the pre-cancelled G-code request
+  was incorrectly reported as worker unavailable.
+- Green: the stable focused suite passed 13 files and 84 tests across all format actions, the three
+  worker clients, advisory behavior, and Inspector UI. It includes constructor throws and a
+  pre-aborted request that proves no fallback read occurs.
+- Green real Chrome: 5/5 production cases passed - large Inspector worker parsing, active
+  cancellation, FIFO, the real import worker used by G-code 2D preparation, and the SVG document
+  worker used by the assembled workbench.
+- Green static checks before the publication gate: renderer and Electron lint, renderer and E2E
+  typecheck, Prettier, hard file-size, report-only soft-size, public-export ratchet, and
+  `git diff --check`.
+
+### Independent audit
+
+- A separate read-only reviewer inspected the frozen tree and reported no actionable findings.
+- The reviewer confirmed that the three clients test pre-abort before construction and return
+  `null` only before request creation; post-message failures and worker errors reject already
+  created promises. Every production caller selects fallback only from that constructor-time
+  `null`.
+- The audit first caught an exact-optional TypeScript defect in the newly isolated native-project
+  fallback test while the tree was still changing. The final rerun confirmed it fixed.
+
+### Remaining boundary
+
+- The constructor-failure path intentionally parses on the UI thread and can stall on large input;
+  the warning is an honest availability fallback, not a responsiveness or memory-bounded claim.
+- Real-browser tests prove normal workers run but do not force the browser's `Worker` constructor
+  to fail; constructor failure is simulated in focused tests.
+- DXF/G-code/STL incremental parsing still has format-specific output-scaled retention, and
+  document workers still call whole-Blob `text()`. No unlimited, constant-memory, or greater-than
+  200 MiB claim is made.
+- The exact rebased tree must pass the full release gate and fresh GitHub checks before review.
+  Draft PR #527 only; no merge, deployment, hardware, controller, settings, Frame, or Start action.

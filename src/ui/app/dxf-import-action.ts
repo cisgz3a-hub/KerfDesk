@@ -10,7 +10,7 @@ import { importByteSize, resolveImportBlob } from '../import/import-file-blob';
 import { parseDxfOffThread, type ImportWorkerRequestOptions } from '../import/import-worker-client';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
-import { largeImportAdvisory } from './import-size-advisory';
+import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { describeReimportOutcome } from './import-toasts';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
@@ -73,7 +73,9 @@ export async function importDxfFiles(
 // Parse in the import worker when a Blob is reachable — the worker reads the
 // file itself, so a 100 MB DXF never becomes a main-thread string (measured:
 // ~11.4 s of blocked UI at that size). Text-only adapters and mocks keep their
-// compatibility path; a reachable Blob is never read and parsed on the UI thread.
+// compatibility path. If Worker construction itself is unavailable, the same
+// valid parser remains available on the UI thread with an explicit responsiveness
+// warning; a started, failed, or cancelled worker request never enters that fallback.
 async function parseDxfFile(
   file: TextFileHandle,
   blob: Blob | null,
@@ -85,7 +87,8 @@ async function parseDxfFile(
     const offThread = parseDxfInWorker(blob, id, file.name, controls.options);
     if (offThread !== null) return await offThread;
     if (blob !== null) {
-      return { kind: 'error', reason: 'DXF import worker unavailable' };
+      pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
+      return parseDxf({ dxfText: await file.text(), id, source: file.name });
     }
     return parseDxf({ dxfText: await file.text(), id, source: file.name });
   } finally {

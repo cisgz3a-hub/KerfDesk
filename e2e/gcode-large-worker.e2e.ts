@@ -102,6 +102,47 @@ test('real production worker runs queued Inspector requests in FIFO order', asyn
   expect(workerUrls.some((url) => url.includes('gcode-inspector-worker'))).toBe(true);
 });
 
+test('real production import worker parses G-code for the 2D preview path', async ({ page }) => {
+  const workerUrls: string[] = [];
+  page.on('worker', (worker) => workerUrls.push(worker.url()));
+  await page.goto('/');
+
+  const result = await page.evaluate(async () => {
+    interface ParsedGcode {
+      readonly kind: 'ok' | 'error';
+      readonly toolpath?: { readonly steps: readonly unknown[] };
+    }
+    interface ClientApi {
+      parseGcodeOffThread: (blob: Blob) => Promise<ParsedGcode> | null;
+      resetImportWorkerForTests: () => void;
+    }
+    const modulePath = '/src/ui/import/import-worker-client.ts';
+    const loaded: unknown = await import(/* @vite-ignore */ modulePath);
+    const client = loaded as Partial<ClientApi>;
+    if (
+      typeof client.parseGcodeOffThread !== 'function' ||
+      typeof client.resetImportWorkerForTests !== 'function'
+    ) {
+      throw new Error('production import worker client is unavailable');
+    }
+    try {
+      const pending = client.parseGcodeOffThread(new Blob(['G21 G90\nG0 X0 Y0\nG1 X10 Y0\n']));
+      if (pending === null) throw new Error('production import worker could not be constructed');
+      return await pending;
+    } finally {
+      client.resetImportWorkerForTests();
+    }
+  });
+
+  expect(result.kind).toBe('ok');
+  expect(result.toolpath?.steps.length).toBeGreaterThan(0);
+  expect(
+    workerUrls.some(
+      (url) => url.includes('/import-worker') && !url.includes('document-import-worker'),
+    ),
+  ).toBe(true);
+});
+
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {
   await page.getByText(family, { exact: true }).click();
   await page.getByRole('menuitem').filter({ hasText: command }).click();

@@ -62,4 +62,29 @@ describe('importSvgFiles', () => {
 
     expect(text).not.toHaveBeenCalled();
   });
+
+  it('imports through the disclosed main-thread fallback when worker construction fails', async () => {
+    vi.stubGlobal('Worker', function WorkerUnavailable(): never {
+      throw new Error('workers blocked');
+    });
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect x="5" y="5" width="30" height="20" fill="none" stroke="#f00"/></svg>';
+    const blob = { size: svg.length } as unknown as Blob;
+    const readFile = vi.fn(async () => svg);
+    const importObject = vi.fn(() => ({ kind: 'added' as const }));
+    const pushToast = vi.fn();
+
+    await importSvgFiles(
+      [{ name: 'fallback.svg', text: readFile, blob: async () => blob }],
+      importObject,
+      pushToast,
+    );
+
+    expect(readFile).toHaveBeenCalledOnce();
+    expect(importObject).toHaveBeenCalledOnce();
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/fallback\.svg.*main thread.*unresponsive/i),
+      'warning',
+    );
+  });
 });

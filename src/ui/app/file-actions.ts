@@ -12,8 +12,9 @@ import type {
   ReadinessSettingsCapability,
 } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
-import { deserializeProject, prepareProjectForPersistence } from '../../io/project';
-import { importLightBurnProject } from '../../io/lightburn';
+import type { importLightBurnProject } from '../../io/lightburn';
+import { prepareProjectForPersistence } from '../../io/project';
+import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -34,12 +35,8 @@ import { controllerReadinessAdvisories } from './controller-readiness-advisories
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { importSourceSizeAdvisory } from './import-size-advisory';
 import { prepareGcodeSave } from './prepare-gcode-save';
+import { parseOpenedProjectFile, type OpenProjectFile } from './project-open-parser';
 import { importSvgFiles } from './svg-import-action';
-import {
-  parseLightBurnProjectOffThread,
-  parseProjectOffThread,
-} from '../import/document-import-worker-client';
-import { resolveImportBlob } from '../import/import-file-blob';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
 export async function handleImportDxf(
@@ -310,13 +307,6 @@ export type OpenProjectCtx = {
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
-type OpenProjectFile = {
-  readonly name: string;
-  readonly size?: number;
-  readonly text: () => Promise<string>;
-  readonly blob?: () => Promise<Blob>;
-};
-
 export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   let files: ReadonlyArray<OpenProjectFile>;
   try {
@@ -338,7 +328,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   const controls = createImportWorkerControls(file.name, ctx.pushToast);
   let result: ReturnType<typeof deserializeProject>;
   try {
-    const parsed = await parseOpenedProjectFile(file, controls.options);
+    const parsed = await parseOpenedProjectFile(file, controls.options, ctx.pushToast);
     if (parsed.kind === 'lightburn') {
       openLightBurnMigration(ctx, file.name, parsed.result);
       return;
@@ -377,34 +367,6 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   ctx.pushToast(`Could not open ${file.name}: ${describeResult(result)}`, 'error');
 }
 
-async function parseOpenedProjectFile(
-  file: OpenProjectFile,
-  options: Parameters<typeof parseProjectOffThread>[1],
-): Promise<
-  | { readonly kind: 'native'; readonly result: ReturnType<typeof deserializeProject> }
-  | { readonly kind: 'lightburn'; readonly result: ReturnType<typeof importLightBurnProject> }
-> {
-  const blob = await resolveImportBlob(file);
-  if (/\.lbrn2?$/i.test(file.name)) {
-    const result =
-      blob === null
-        ? importLightBurnProject(await file.text(), file.name)
-        : await requireWorkerResult(
-            parseLightBurnProjectOffThread(blob, file.name, options),
-            'LightBurn project import worker unavailable',
-          );
-    return { kind: 'lightburn', result };
-  }
-  const result =
-    blob === null
-      ? deserializeProject(await file.text())
-      : await requireWorkerResult(
-          parseProjectOffThread(blob, options),
-          'project import worker unavailable',
-        );
-  return { kind: 'native', result };
-}
-
 function openLightBurnMigration(
   ctx: OpenProjectCtx,
   fileName: string,
@@ -424,11 +386,6 @@ function openLightBurnMigration(
     unsupported + warnings === 0 ? 'success' : 'warning',
   );
   reportMachineCapabilityRepair(loadResult, ctx.pushToast);
-}
-
-async function requireWorkerResult<T>(pending: Promise<T> | null, message: string): Promise<T> {
-  if (pending === null) throw new Error(message);
-  return pending;
 }
 
 function reportMachineCapabilityRepair(

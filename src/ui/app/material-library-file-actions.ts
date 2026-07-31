@@ -8,7 +8,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
 import { importLightBurnClb } from '../../io/lightburn';
-import { importSourceSizeAdvisory } from './import-size-advisory';
+import { importSourceSizeAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import {
   parseLightBurnClbOffThread,
   parseMaterialLibraryOffThread,
@@ -49,13 +49,7 @@ export async function handleOpenMaterialLibrary(ctx: OpenMaterialLibraryCtx): Pr
   let result: DeserializeMaterialLibraryResult;
   try {
     const blob = await resolveImportBlob(file);
-    result =
-      blob === null
-        ? deserializeMaterialLibrary(await file.text())
-        : await requireWorkerResult(
-            parseMaterialLibraryOffThread(blob, controls.options),
-            'material library import worker unavailable',
-          );
+    result = await parseMaterialLibraryFile(file, blob, controls.options, ctx.pushToast);
   } catch (err) {
     ctx.pushToast(
       isImportCancellation(err)
@@ -99,13 +93,7 @@ export async function handleImportClbMaterialLibrary(ctx: OpenMaterialLibraryCtx
   let result: ReturnType<typeof importLightBurnClb>;
   try {
     const blob = await resolveImportBlob(file);
-    result =
-      blob === null
-        ? importLightBurnClb(await file.text(), file.name)
-        : await requireWorkerResult(
-            parseLightBurnClbOffThread(blob, file.name, controls.options),
-            'CLB import worker unavailable',
-          );
+    result = await parseClbFile(file, blob, controls.options, ctx.pushToast);
   } catch (err) {
     ctx.pushToast(
       isImportCancellation(err)
@@ -167,7 +155,28 @@ function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-async function requireWorkerResult<T>(pending: Promise<T> | null, message: string): Promise<T> {
-  if (pending === null) throw new Error(message);
-  return pending;
+async function parseMaterialLibraryFile(
+  file: { readonly name: string; readonly text: () => Promise<string> },
+  blob: Blob | null,
+  options: Parameters<typeof parseMaterialLibraryOffThread>[1],
+  pushToast: PushToast,
+): Promise<DeserializeMaterialLibraryResult> {
+  if (blob === null) return deserializeMaterialLibrary(await file.text());
+  const pending = parseMaterialLibraryOffThread(blob, options);
+  if (pending !== null) return pending;
+  pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
+  return deserializeMaterialLibrary(await file.text());
+}
+
+async function parseClbFile(
+  file: { readonly name: string; readonly text: () => Promise<string> },
+  blob: Blob | null,
+  options: Parameters<typeof parseLightBurnClbOffThread>[2],
+  pushToast: PushToast,
+): Promise<ReturnType<typeof importLightBurnClb>> {
+  if (blob === null) return importLightBurnClb(await file.text(), file.name);
+  const pending = parseLightBurnClbOffThread(blob, file.name, options);
+  if (pending !== null) return pending;
+  pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
+  return importLightBurnClb(await file.text(), file.name);
 }

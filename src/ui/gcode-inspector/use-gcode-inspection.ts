@@ -8,12 +8,16 @@ export type InspectionState =
   | { readonly kind: 'idle' }
   | {
       readonly kind: 'loading';
-      readonly phase: 'queued' | 'reading' | 'parsing';
+      readonly phase: 'queued' | 'reading' | 'parsing' | 'fallback';
       readonly queuePosition: number;
       readonly bytesRead?: number;
       readonly totalBytes?: number;
     }
-  | { readonly kind: 'ready'; readonly result: GcodeInspectorWorkerResult }
+  | {
+      readonly kind: 'ready';
+      readonly result: GcodeInspectorWorkerResult;
+      readonly mainThreadFallback: boolean;
+    }
   | { readonly kind: 'error'; readonly reason: string };
 
 export function useGcodeInspection(source: GcodeInspectionSource | null): InspectionState {
@@ -32,14 +36,14 @@ export function useGcodeInspection(source: GcodeInspectionSource | null): Inspec
         if (isCurrent) setState({ kind: 'loading', ...progress });
       },
     });
-    const pending =
-      offThread ??
-      (source.kind === 'text'
-        ? Promise.resolve(inspectGcodeText(source.text))
-        : Promise.reject(new Error('G-code Inspector worker unavailable')));
+    const mainThreadFallback = offThread === null;
+    if (mainThreadFallback) {
+      setState({ kind: 'loading', phase: 'fallback', queuePosition: 0 });
+    }
+    const pending = offThread ?? inspectGcodeOnMainThread(source, controller.signal);
     void pending.then(
       (result) => {
-        if (isCurrent) setState({ kind: 'ready', result });
+        if (isCurrent) setState({ kind: 'ready', result, mainThreadFallback });
       },
       (error: unknown) => {
         if (!isCurrent) return;
@@ -55,4 +59,21 @@ export function useGcodeInspection(source: GcodeInspectionSource | null): Inspec
     };
   }, [source]);
   return state;
+}
+
+async function inspectGcodeOnMainThread(
+  source: GcodeInspectionSource,
+  signal: AbortSignal,
+): Promise<GcodeInspectorWorkerResult> {
+  throwIfAborted(signal);
+  const text = source.kind === 'text' ? source.text : await source.blob.text();
+  throwIfAborted(signal);
+  return inspectGcodeText(text);
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (!signal.aborted) return;
+  const error = new Error('G-code Inspector request cancelled');
+  error.name = 'AbortError';
+  throw error;
 }

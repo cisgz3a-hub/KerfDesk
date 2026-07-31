@@ -12,6 +12,7 @@ import { InspectorView } from './InspectorView';
 import { useCurrentGcode, type CurrentGcode } from './use-current-gcode';
 import { useGcodeInspection, type InspectionState } from './use-gcode-inspection';
 import { InspectionPressureNotice } from './InspectionPressureNotice';
+import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
 
 export function CanvasGcodeView(props: { readonly active: boolean }): JSX.Element {
   const { state, stale, refresh } = useCurrentGcode(props.active);
@@ -56,6 +57,7 @@ function Body(props: {
     return <p style={messageStyle}>Switch to G-code to compile this design.</p>;
   }
   if (props.inspection.kind === 'loading') {
+    if (props.inspection.phase === 'fallback') return <MainThreadInspectionNotice />;
     const queued =
       props.inspection.phase === 'queued' && props.inspection.queuePosition > 0
         ? ` (${props.inspection.queuePosition} ahead)`
@@ -70,6 +72,7 @@ function Body(props: {
   }
   return (
     <>
+      {props.inspection.mainThreadFallback ? <MainThreadInspectionNotice /> : null}
       <InspectionPressureNotice result={props.inspection.result} />
       <InspectorView
         model={props.inspection.result.parsed.model}
