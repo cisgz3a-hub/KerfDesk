@@ -29,6 +29,7 @@ import {
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
 import { normalizeLayer } from './normalize-layer';
+import { normalizeLibraryAssetProvenance } from './project-library-provenance-normalizer';
 import { validateProjectShape } from './project-shape-validator';
 
 export type DeserializeResult =
@@ -408,7 +409,16 @@ function normalizeAirAssistCommand(value: unknown): Project['device']['airAssist
 
 function normalizeSceneObject(obj: unknown): unknown {
   if (!isObject(obj)) return obj;
-  if (obj['kind'] !== 'text') return obj;
-  if (typeof obj['letterSpacing'] === 'number') return obj;
-  return { ...obj, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };
+  const { libraryProvenance: rawLibraryProvenance, ...withoutLibraryProvenance } = obj;
+  const libraryProvenance =
+    obj['kind'] === 'imported-svg'
+      ? normalizeLibraryAssetProvenance(rawLibraryProvenance)
+      : undefined;
+  const normalized =
+    libraryProvenance === undefined
+      ? withoutLibraryProvenance
+      : { ...withoutLibraryProvenance, libraryProvenance };
+  if (obj['kind'] !== 'text') return normalized;
+  if (typeof obj['letterSpacing'] === 'number') return normalized;
+  return { ...normalized, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };
 }

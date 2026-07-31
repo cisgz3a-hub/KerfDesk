@@ -338,13 +338,18 @@ Card and detail behavior:
 - Added a versioned, immutable `libraryProvenance` snapshot to imported SVG
   scene objects. It captures catalog ID, title, source, exact license ID, and
   optional creator, URLs, source version, and asset hash.
-- Project loading validates the snapshot. Unsupported schema versions,
-  malformed types, and blank/whitespace required identity fields fail closed.
+- Project loading recognizes the supported snapshot shape without making
+  provenance load-bearing. Missing, unsupported, malformed, or untrusted
+  provenance is discarded as unavailable display/audit metadata while the
+  project geometry continues to load.
 - Library insertion attaches that snapshot after the production SVG parser and
   before the normal scene import action.
 - Library-origin objects are reusable artwork rather than file revisions:
   adding the same asset repeatedly appends independent objects. Existing
   same-source file imports still use the established replace-in-place contract.
+- Mixed ordinary-import/Library source-name collisions preserve both identities:
+  either insertion order appends the second object, and a later ordinary-file
+  revision replaces only the ordinary object.
 - Insertion remains geometry-only. It sets no object power scale or operation
   override and creates only ordinary line layers without CNC, material, or
   calibration metadata.
@@ -374,6 +379,11 @@ Card and detail behavior:
 - Independent M3 audit initially returned NO-GO for one P1 export-ratchet
   violation and two P2 validation/evidence gaps. All three were repaired. The
   delta re-audit returned **GO with no open P0–P2 findings**.
+- Integration repair verification: **16/16** focused provenance/identity tests,
+  **223/223** widened project/Library tests, and **8,212/8,212** tests in
+  `pnpm release:check` passed. The complete gate also passed typecheck, ESLint,
+  Prettier, ADR/license/integrity checks, deterministic notices, production web
+  and Electron builds, file-size/line limits, and the public-export ratchet.
 - No controller, Frame, Start, output, or laser-safety files changed. No
   physical-output behavior was qualified.
 
@@ -386,12 +396,16 @@ Card and detail behavior:
 - **Status:** fixed/verified
 - **Exact evidence/reproduction:** repeated `Library: Flower` imports previously
   replaced one another through source-name matching; Library-tagged scene
-  objects now bypass filename re-import targeting, persist exact provenance,
-  reject malformed/blank snapshots, and retain ordinary line-only insertion
-- **Tests/checks:** 56 focused tests; 210 project IO tests; 14 release-integrity
-  tests; typecheck; touched ESLint; Prettier; diff; file-size; export ratchet at
-  208; license check; web build; independent delta audit GO
-- **PR URL/commit:** none
+  objects now bypass filename re-import targeting, persist recognized exact
+  provenance, discard malformed/blank/future snapshots without blocking
+  geometry load, isolate mixed ordinary/Library source collisions, and retain
+  ordinary line-only insertion
+- **Tests/checks:** original M3: 56 focused, 210 project IO, 14
+  release-integrity, independent delta audit GO; integration repair: 16
+  focused, 223 widened, 8,212 full-suite tests, complete `release:check`,
+  export ratchet at 208; fresh exact-head independent audit pending publication
+- **PR URL/commit:** [draft PR #530](https://github.com/cisgz3a-hub/KerfDesk/pull/530);
+  repaired head pending publication
 - **Remaining boundary:** software behavior only; M4 UX is not included;
   physical output is unverified; no deployment, release, hardware operation, or
   main merge
@@ -418,3 +432,7 @@ drag-to-place rather than expanding scope speculatively.
 - 2026-07-31: Completed M3 duplicate-safe Library insertion, validated persisted
   provenance, exact per-entry license metadata, operation-neutral coverage, and
   an independent audit/delta re-audit. No open P0–P2 M3 findings remain.
+- 2026-07-31: Repaired the M3 integration contract before publication:
+  optional Library provenance is now normalized as non-blocking display/audit
+  metadata, and mixed ordinary-import/Library identity collisions have explicit
+  insertion and re-import regression coverage.
