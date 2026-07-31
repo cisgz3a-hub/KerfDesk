@@ -2653,21 +2653,35 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC11. Manage the bit library — Phase H.7
 
 #### Success
-1. Material & Bit → Manage bits lists every bit (starters + custom).
-   The add form takes name, kind (end mill / ball nose / v-bit /
-   engraving), diameter, and included angle (v/engraving only). Diameter and angle
-   start blank and return to blank after each successful Add so a prior
-   cutter's geometry cannot be reused accidentally.
-2. An added bit is selectable immediately (machine bit list and every
+1. Material & Bit → Manage bits lists every bit (starters + custom),
+   grouped by cutter family. The manual add form takes name, kind (end
+   mill / ball nose / v-bit / engraving), diameter, and included angle
+   (v/engraving only). Diameter and angle start blank and return to blank
+   after each successful Add so a prior cutter's geometry cannot be reused
+   accidentally.
+2. Add from bit catalog searches researched cutter families and common
+   metric/imperial sizes. A selectable template needs both a cutting envelope
+   represented by the current flat, full-radius ball, or point-V kernels and
+   sufficiently evidenced dimensions, capability, and operation semantics.
+   Modeled templates can be copied into the saved custom-bit library unless
+   already built in or saved. Other entries remain visible with their source
+   and the reason they are reference-only; they have no Add action.
+3. An added bit is selectable immediately (machine bit list and every
    per-layer Bit select) and persists app-level in localStorage — it
    merges into the tool list of every future CNC session, across
    projects.
-3. Deleting a custom bit removes it from the library and the open
-   machine (undoable). If the bit is still assigned to an active V-carve
-   clearing, non-adaptive pocket roughing, or bound relief-finishing stage,
-   deletion is refused and the warning names the role and layer that must be
-   changed first. Starters have no Delete button.
-4. Every list row shows the canonical stored diameter and, for an angled
+4. Catalog family, shank diameter, flute count, and stable catalog identity
+   survive both app-library persistence and `.lf2` project round-trips. A
+   catalog flute count becomes the default for material-feed calculations;
+   the operator can still override it in the Feeds calculator.
+5. Deleting a custom bit removes it from the saved library and, when
+   present, from the open machine. The open-project machine edit is
+   undoable; project Undo does not restore the app-level library entry.
+   If the bit is still assigned to an active V-carve clearing, non-adaptive
+   pocket roughing, or bound relief-finishing stage, deletion is refused and
+   the warning names the role and layer that must be changed first. Starters
+   have no Delete button.
+6. Every list row shows the canonical stored diameter and, for an angled
    cutter, the stored included angle independently of the operator-entered
    name.
 
@@ -2680,12 +2694,37 @@ and lifts the command's CNC-only gate.)*
 #### Empty
 1. No custom bits: the list shows only starters; nothing is deletable.
 
+#### Edge — old and custom tools without a family
+1. Tools saved before family metadata existed remain usable. Their existing
+   geometry kind supplies a display group; an unknown future family is shown
+   under Custom / other and never changes CAM geometry.
+
+#### Edge — adding the same catalog bit twice
+1. Stable catalog identity makes the second Add a no-op, so the library and
+   open machine cannot accumulate duplicate copies of the same catalog entry.
+
+#### Edge — catalog bit already present in an imported project
+1. Add adopts the existing project ID and replaces its catalog metadata from
+   the trusted catalog instead of appending another copy. If that bit is active
+   and its trusted flute count changes, inherited automatic material recipes
+   recalculate; layers pinned to another bit and manual/legacy values preserve
+   operator intent.
+
 #### Edge — layers referencing a deleted bit
-1. A deleted primary layer toolId may remain as a stale binding; compile falls
-   back to the machine's active bit (layerCncTool), so output never references a
-   missing bit. Dormant hidden secondary-tool bindings are cleared as part of
-   deletion rather than becoming unreachable stale state.
-2. If deletion changes an output operation's effective cutter while its manual
+1. Deleting the active bit selects a surviving bit. If no bit survives, the
+   shared default tool list and default active bit are restored.
+2. Inherited automatic material recipes recalculate for the new active bit.
+   An automatic material-recipe layer pinned to the deleted bit loses that pin
+   and recalculates against the fallback. Automatic layers pinned to another
+   surviving bit and manual/legacy numeric settings retain their intent.
+3. A manual/legacy primary `toolId` may remain stale; `layerCncTool` resolves
+   it to the active bit during compile, so output does not reference a missing
+   primary bit.
+4. Deletion is refused while an active V-clear, relief-finish, or
+   pocket-roughing stage uses the bit. Dormant hidden secondary-tool bindings
+   are cleared as part of deletion rather than becoming unreachable stale
+   state.
+5. If deletion changes an output operation's effective cutter while its manual
    feed, plunge, spindle RPM, and depth-per-pass values remain exact, the same
    retained-values warning used by the bit selectors is shown. A successfully
    recalculated material recipe remains silent.
@@ -2715,8 +2754,10 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. Material & Bit → Machine profiles: Save snapshots the whole CNC
    setup (stock, bit list, active bit, safe Z, spindle, park, tiling)
-   under a name; Apply replaces the current setup (undoable); Delete
-   removes the profile.
+   under a name. Apply restores the profile's machine settings and
+   active-bit intent while merging its tool list with the current project;
+   bits added after the profile was saved remain available. The open-project
+   edit is undoable. Delete removes the app-level profile.
 2. Profiles are app-level (localStorage), usable across projects.
 
 #### Error — non-CNC project
@@ -2732,6 +2773,13 @@ and lifts the command's CNC-only gate.)*
 2. If Apply changes an output operation's effective cutter while keeping manual
    numeric settings, it shows the retained-values warning. Material-recipe
    values that successfully recalculate for the applied profile remain silent.
+
+#### Edge — duplicate catalog identities in an imported or legacy profile
+1. Incoming profile aliases are matched to an existing current-project tool
+   when possible; otherwise the first incoming copy is retained. The profile's
+   requested active ID is mapped to that retained ID.
+2. Existing project tool IDs are never removed merely because they share a
+   catalog identity. Current layer references remain unchanged and resolvable.
 
 ### F-CNC14. Run a multi-bit job (M0 tool change) — Phase H.7
 

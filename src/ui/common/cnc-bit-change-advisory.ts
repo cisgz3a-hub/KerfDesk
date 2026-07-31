@@ -3,6 +3,7 @@ import {
   layerCncTool,
   sceneObjectUsesOperation,
   type CncLayerSettings,
+  type CncMachineConfig,
   type CncTool,
   type Project,
   type Scene,
@@ -13,17 +14,24 @@ export const CNC_RETAINED_FEEDS_WARNING =
 
 /**
  * True when at least one operation follows the machine's Active bit while its
- * numeric cutting values remain manual/unscoped. Material recipes are excluded:
- * a successful machine update recalculates those values for the new cutter.
+ * numeric cutting values remain manual/unscoped. A stale explicit id also
+ * follows Active because layerCncTool falls back when that id is absent from
+ * the machine. Material recipes are excluded: a successful machine update
+ * recalculates those values for the new cutter.
  */
-export function hasActiveBitDependentRetainedFeeds(scene: Scene): boolean {
+export function hasActiveBitDependentRetainedFeeds(
+  scene: Scene,
+  machine: CncMachineConfig,
+): boolean {
   return scene.layers.some((layer) => {
     if (!layer.output || !scene.objects.some((object) => sceneObjectUsesOperation(object, layer))) {
       return false;
     }
     const settings = layer.cnc;
     if (settings === undefined) return true;
-    return settings.toolId === undefined && settings.feedSource?.kind !== 'material-recipe';
+    const followsActive =
+      settings.toolId === undefined || !machine.tools.some((tool) => tool.id === settings.toolId);
+    return followsActive && settings.feedSource?.kind !== 'material-recipe';
   });
 }
 
@@ -57,7 +65,8 @@ function sameCncTool(left: CncTool, right: CncTool): boolean {
     left.id === right.id &&
     left.kind === right.kind &&
     left.diameterMm === right.diameterMm &&
-    left.tipAngleDeg === right.tipAngleDeg
+    left.tipAngleDeg === right.tipAngleDeg &&
+    left.fluteCount === right.fluteCount
   );
 }
 

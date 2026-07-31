@@ -45,6 +45,9 @@ describe('DEFAULT_CNC_TOOLS', () => {
       kind: 'v-bit',
       diameterMm: 6.35,
       tipAngleDeg: 90,
+      family: 'v-groove',
+      shankDiameterMm: 3.175,
+      catalogId: 'v90-hobby-0125',
     });
     expect(DEFAULT_CNC_TOOLS).toContainEqual({
       id: 'vb-90-12700-hobby',
@@ -52,6 +55,9 @@ describe('DEFAULT_CNC_TOOLS', () => {
       kind: 'v-bit',
       diameterMm: 12.7,
       tipAngleDeg: 90,
+      family: 'v-groove',
+      shankDiameterMm: 6.35,
+      catalogId: 'v90-hobby-025',
     });
   });
 });

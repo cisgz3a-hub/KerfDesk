@@ -38,6 +38,12 @@ export function resolveRestPocketOperation(
   if (roughTool === undefined) {
     return { kind: 'error', reason: 'The selected pocket roughing bit is missing.' };
   }
+  if (roughTool.kind !== 'end-mill') {
+    return {
+      kind: 'error',
+      reason: `Pocket roughing requires a flat end mill; "${roughTool.name}" is ${roughTool.kind}.`,
+    };
+  }
   const finishTool = layerCncTool(config, settings);
   const rest = planRestPocketToolpaths(
     contours,

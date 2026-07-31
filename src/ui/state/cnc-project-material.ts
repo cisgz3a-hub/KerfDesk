@@ -64,7 +64,7 @@ export function materialFeedsPatch(input: {
     materialKey: input.materialKey,
     spindleRpm: input.spindleRpm,
     machineSpindleMaxRpm: input.machineSpindleMaxRpm,
-    fluteCount: input.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
+    fluteCount: input.fluteCount ?? input.tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
     ...(input.liveCaps === null || input.liveCaps === undefined
       ? {}
       : { liveCaps: input.liveCaps }),

@@ -7,6 +7,7 @@
 
 import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import type { CncLayerSettings, CncMachineConfig, CncTool, CncToolKind } from '../../core/scene';
+import { normalizeCncMachineConfig } from '../../io/project/deserialize-project';
 
 export const CNC_LIBRARY_STORAGE_KEY = 'laserforge.cnc-library.v1';
 
@@ -117,27 +118,63 @@ function arrayOf<T>(raw: unknown, parse: (item: unknown) => T | null): ReadonlyA
 }
 
 const TOOL_KINDS: ReadonlyArray<CncToolKind> = ['end-mill', 'ball-nose', 'v-bit', 'engraving'];
+const MAX_TOOL_METADATA_LENGTH = 120;
+const MAX_TOOL_FLUTES = 16;
 
 function parseTool(raw: unknown): CncTool | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const record = raw as Record<string, unknown>;
+  const core = parseToolCore(record);
+  if (core === null) return null;
+  return { ...core, ...parseToolMetadata(record) };
+}
+
+function parseToolCore(record: Record<string, unknown>): CncTool | null {
   const kind = TOOL_KINDS.find((candidate) => candidate === record['kind']);
-  if (
-    typeof record['id'] !== 'string' ||
-    typeof record['name'] !== 'string' ||
-    kind === undefined ||
-    !isPositive(record['diameterMm'])
-  ) {
-    return null;
-  }
-  const tipAngleDeg = record['tipAngleDeg'];
+  if (typeof record['id'] !== 'string') return null;
+  if (typeof record['name'] !== 'string') return null;
+  if (kind === undefined) return null;
+  if (!isPositive(record['diameterMm'])) return null;
   return {
     id: record['id'],
     name: record['name'],
     kind,
     diameterMm: record['diameterMm'],
-    ...(isValidCncTipAngleDeg(tipAngleDeg) ? { tipAngleDeg } : {}),
   };
+}
+
+function parseToolMetadata(record: Record<string, unknown>): Partial<CncTool> {
+  const metadata: {
+    tipAngleDeg?: number;
+    family?: string;
+    shankDiameterMm?: number;
+    fluteCount?: number;
+    catalogId?: string;
+  } = {};
+  const family = boundedString(record['family']);
+  const catalogId = boundedString(record['catalogId']);
+  if (isValidCncTipAngleDeg(record['tipAngleDeg'])) {
+    metadata.tipAngleDeg = record['tipAngleDeg'];
+  }
+  if (family !== null) metadata.family = family;
+  if (isPositive(record['shankDiameterMm'])) {
+    metadata.shankDiameterMm = record['shankDiameterMm'];
+  }
+  if (validFluteCount(record['fluteCount'])) metadata.fluteCount = record['fluteCount'];
+  if (catalogId !== null) metadata.catalogId = catalogId;
+  return metadata;
+}
+
+function validFluteCount(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_TOOL_FLUTES
+  );
+}
+
+function boundedString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_TOOL_METADATA_LENGTH
+    ? value
+    : null;
 }
 
 function parseFeedPreset(raw: unknown): CncFeedPreset | null {
@@ -164,35 +201,17 @@ function parseFeedPreset(raw: unknown): CncFeedPreset | null {
   };
 }
 
-// Machine profiles reuse the .lf2 machine normalization contract loosely.
-// Tool geometry still crosses the same parseTool boundary as the custom-bit
-// library; apply replaces the machine directly and must not revive invalid
-// nested tool data.
 function parseMachineProfile(raw: unknown): CncMachineProfile | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const record = raw as Record<string, unknown>;
-  const machine = record['machine'];
   if (typeof record['id'] !== 'string' || typeof record['name'] !== 'string') return null;
-  if (typeof machine !== 'object' || machine === null) return null;
-  const machineRecord = machine as Record<string, unknown>;
-  if (machineRecord['kind'] !== 'cnc') return null;
-  const toolSelection = parseMachineToolSelection(machineRecord);
-  if (toolSelection === null) return null;
+  const machine = normalizeCncMachineConfig(record['machine']);
+  if (machine === null) return null;
   return {
     id: record['id'],
     name: record['name'],
-    machine: { ...(machine as CncMachineConfig), ...toolSelection },
+    machine,
   };
-}
-
-function parseMachineToolSelection(
-  machine: Record<string, unknown>,
-): Pick<CncMachineConfig, 'tools' | 'toolId'> | null {
-  if (!Array.isArray(machine['tools']) || typeof machine['toolId'] !== 'string') return null;
-  const tools = arrayOf(machine['tools'], parseTool);
-  const requestedToolId = machine['toolId'];
-  const toolId = tools.some((tool) => tool.id === requestedToolId) ? requestedToolId : tools[0]?.id;
-  return toolId === undefined ? null : { tools, toolId };
 }
 
 function isPositive(value: unknown): value is number {

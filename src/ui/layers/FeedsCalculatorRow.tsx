@@ -25,6 +25,7 @@ export function FeedsCalculatorRow(props: {
   // constants meant the panel previewed - and on Apply committed - a different
   // material's numbers under this layer's name.
   const recipe = props.settings.feedSource;
+  const tool = machine?.kind === 'cnc' ? layerCncTool(machine, props.settings) : null;
   const [material, setMaterial] = useState<ChiploadMaterial>(
     // materialKey is a plain string on the wire, so a foreign or stale .lf2 can
     // carry a key the chipload chart no longer has.
@@ -32,12 +33,9 @@ export function FeedsCalculatorRow(props: {
       ? recipe.materialKey
       : 'plywood-mdf',
   );
-  const [flutes, setFlutes] = useState(
-    recipe?.kind === 'material-recipe' ? recipe.fluteCount : DEFAULT_ASSUMED_FLUTE_COUNT,
-  );
-  if (machine?.kind !== 'cnc') return null;
+  const [flutes, setFlutes] = useFluteSelection(tool, props.settings);
+  if (machine?.kind !== 'cnc' || tool === null) return null;
 
-  const tool = layerCncTool(machine, props.settings);
   const rpm = props.settings.spindleRpm;
   const result = materialFeedResult(
     materialFeedsPatch({
@@ -106,6 +104,30 @@ function AngledToolFeedNotice(props: { readonly tool: CncTool }): JSX.Element | 
       {advisory}
     </p>
   );
+}
+
+function useFluteSelection(
+  tool: CncTool | null,
+  settings: CncLayerSettings,
+): readonly [number, (flutes: number) => void] {
+  const contextKey = fluteContextKey(tool, settings);
+  const fallback = initialFluteCount(tool, settings);
+  const [selection, setSelection] = useState(() => ({ contextKey, flutes: fallback }));
+  const flutes = selection.contextKey === contextKey ? selection.flutes : fallback;
+  return [flutes, (next) => setSelection({ contextKey, flutes: next })];
+}
+
+function initialFluteCount(tool: CncTool | null, settings: CncLayerSettings): number {
+  const recipe = settings.feedSource;
+  if (recipe?.kind === 'material-recipe') return recipe.fluteCount;
+  return tool?.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT;
+}
+
+function fluteContextKey(tool: CncTool | null, settings: CncLayerSettings): string {
+  const source = settings.feedSource;
+  return source?.kind === 'material-recipe'
+    ? `${tool?.id ?? 'none'}:${source.materialKey}:${source.fluteCount}`
+    : `${tool?.id ?? 'none'}:manual`;
 }
 
 function MaterialSelect(props: {

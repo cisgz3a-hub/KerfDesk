@@ -19,6 +19,7 @@ import {
 } from './cnc-library-persistence';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { cncMachineWithCustomTools } from './machine-actions';
 
 beforeEach(() => {
   resetStore();
@@ -112,6 +113,31 @@ describe('custom bits (F-CNC11)', () => {
     expect(machine.tools.some((tool) => tool.name === 'Custom V')).toBe(true);
   });
 
+  it('preserves a project tool instead of merging a second ID for the same catalog entry', () => {
+    const imported = {
+      id: 'project-catalog-id',
+      name: 'Project copy',
+      kind: 'end-mill' as const,
+      diameterMm: 3.175,
+      catalogId: 'o-upcut-0125',
+    };
+    const saved = {
+      ...imported,
+      id: 'saved-library-id',
+      name: 'Saved copy',
+      family: 'o-flute-upcut',
+      fluteCount: 1,
+    };
+    const merged = cncMachineWithCustomTools(
+      { ...DEFAULT_CNC_MACHINE_CONFIG, tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, imported] },
+      [saved],
+    );
+
+    expect(merged.tools.filter((tool) => tool.catalogId === imported.catalogId)).toEqual([
+      imported,
+    ]);
+  });
+
   it('deleting a custom bit removes it from the library and the machine', () => {
     useStore.getState().setMachineKind('cnc');
     useStore.getState().addCustomCncTool({ name: 'Temp', kind: 'end-mill', diameterMm: 4 });
@@ -177,6 +203,41 @@ describe('custom bits (F-CNC11)', () => {
       expect(machine.tools.some((tool) => tool.id === id)).toBe(false);
     },
   );
+  it('does not add the same catalog entry twice', () => {
+    useStore.getState().setMachineKind('cnc');
+    const catalogTool = {
+      name: '3.175 mm single O-flute',
+      kind: 'end-mill' as const,
+      diameterMm: 3.175,
+      family: 'o-flute-upcut',
+      fluteCount: 1,
+      catalogId: 'o-upcut-0125',
+    };
+
+    useStore.getState().addCustomCncTool(catalogTool);
+    useStore.getState().addCustomCncTool(catalogTool);
+
+    const state = useStore.getState();
+    expect(state.cncLibrary.customTools).toHaveLength(1);
+    const machine = state.project.machine;
+    if (machine?.kind !== 'cnc') throw new Error('cnc machine missing');
+    expect(machine.tools.filter((tool) => tool.catalogId === catalogTool.catalogId)).toHaveLength(
+      1,
+    );
+  });
+
+  it('does not copy a built-in catalog bit into the deletable custom library', () => {
+    useStore.getState().addCustomCncTool({
+      name: '90° point V-bit',
+      kind: 'v-bit',
+      diameterMm: 6.35,
+      tipAngleDeg: 90,
+      family: 'v-groove',
+      catalogId: 'v90-hobby-0125',
+    });
+
+    expect(useStore.getState().cncLibrary.customTools).toHaveLength(0);
+  });
 });
 
 describe('feed presets (F-CNC12)', () => {
@@ -258,7 +319,15 @@ describe('persistence codec', () => {
 
   it('round-trips the library through storage', () => {
     const storage = memoryStorage();
-    useStore.getState().addCustomCncTool({ name: 'RT', kind: 'ball-nose', diameterMm: 3 });
+    useStore.getState().addCustomCncTool({
+      name: 'RT',
+      kind: 'ball-nose',
+      diameterMm: 3,
+      family: 'ball-nose',
+      shankDiameterMm: 6,
+      fluteCount: 2,
+      catalogId: 'ball-m300',
+    });
     useStore.getState().saveCncFeedPreset('RT preset', DEFAULT_CNC_LAYER_SETTINGS);
     const library = useStore.getState().cncLibrary;
 
@@ -280,6 +349,12 @@ describe('persistence codec', () => {
       }),
     );
     expect(parsed?.customTools).toHaveLength(1);
+    expect(parsed?.customTools[0]).toEqual({
+      id: 'x',
+      name: 'ok',
+      kind: 'end-mill',
+      diameterMm: 2,
+    });
     expect(parsed?.feedPresets).toHaveLength(0);
     expect(parsed?.machineProfiles).toHaveLength(0);
   });
@@ -321,7 +396,7 @@ describe('persistence codec', () => {
           name: 'Preserved profile',
           machine: {
             ...DEFAULT_CNC_MACHINE_CONFIG,
-            stock: { thicknessMm: 12 },
+            stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: 12 },
             tools: [{ id: 'v', name: 'Profile V-bit', kind: 'v-bit', diameterMm: 3 }],
             toolId: 'v',
           },
@@ -344,5 +419,29 @@ describe('persistence codec', () => {
     );
 
     expect(parsed?.machineProfiles[0]?.machine.toolId).toBe(DEFAULT_CNC_TOOLS[0]?.id);
+  });
+
+  it('drops malformed optional tool metadata field-safely', () => {
+    const parsed = parseCncLibrary(
+      JSON.stringify({
+        customTools: [
+          {
+            id: 'x',
+            name: 'still valid',
+            kind: 'end-mill',
+            diameterMm: 2,
+            family: 'x'.repeat(121),
+            shankDiameterMm: -6,
+            fluteCount: 17,
+            catalogId: '',
+          },
+        ],
+        feedPresets: [],
+        machineProfiles: [],
+      }),
+    );
+    expect(parsed?.customTools).toEqual([
+      { id: 'x', name: 'still valid', kind: 'end-mill', diameterMm: 2 },
+    ]);
   });
 });

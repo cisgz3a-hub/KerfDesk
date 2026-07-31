@@ -20,6 +20,11 @@ export function findCncRestPocketIssues(
     if (settings.cutType !== 'pocket' || settings.pocketRoughToolId === undefined) continue;
     const polylines = collectLayerPolylines(scene.objects, layer, device);
     if (polylines.length === 0) continue;
+    // Missing/non-flat roughers are compile-integrity failures reported by
+    // findInvalidCncToolGeometry. Keep this advisory pass for dimensional and
+    // strategy failures so one bad binding does not produce duplicate issues.
+    const roughTool = config.tools.find((tool) => tool.id === settings.pocketRoughToolId);
+    if (roughTool === undefined || roughTool.kind !== 'end-mill') continue;
     const operation = resolveRestPocketOperation(polylines, settings, config);
     if (operation.kind === 'error') issues.push({ layerId: layer.id, reason: operation.reason });
   }

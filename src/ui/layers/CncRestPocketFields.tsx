@@ -1,4 +1,6 @@
-import { activeCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
+import { activeCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
+import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
+import { CncToolOptions } from '../machine/CncToolOptions';
 import { useStore } from '../state';
 import { Row } from './CncLayerPrimitives';
 import { useCncTools } from './CncLayerToolFields';
@@ -19,6 +21,12 @@ export function RestPocketToolSelect(props: {
       currentTool !== undefined &&
       tool.diameterMm > currentTool.diameterMm,
   );
+  const currentRougher = tools.find((tool) => tool.id === props.settings.pocketRoughToolId);
+  const unavailableRougherId =
+    props.settings.pocketRoughToolId !== undefined &&
+    !roughers.some((tool) => tool.id === props.settings.pocketRoughToolId)
+      ? props.settings.pocketRoughToolId
+      : null;
   return (
     <Row label="Rough first">
       <select
@@ -29,14 +37,21 @@ export function RestPocketToolSelect(props: {
         style={selectStyle}
       >
         <option value="">Single bit</option>
-        {roughers.map((tool) => (
-          <option key={tool.id} value={tool.id}>
-            {tool.name}
+        {unavailableRougherId === null ? null : (
+          <option value={unavailableRougherId} disabled>
+            {unavailableRougherLabel(unavailableRougherId, currentRougher)}
           </option>
-        ))}
+        )}
+        <CncToolOptions tools={roughers} />
       </select>
     </Row>
   );
+}
+
+function unavailableRougherLabel(toolId: string, tool: CncTool | undefined): string {
+  return tool === undefined
+    ? `Current missing roughing bit — ${toolId}`
+    : `Current unsupported roughing bit (choose a larger flat end mill) — ${cncToolGeometryLabel(tool)} — ${tool.name}`;
 }
 
 function commitRoughingTool(

@@ -4,9 +4,9 @@ import {
   hasActiveBitDependentRetainedFeeds,
   hasRetainedFeedsAfterEffectiveToolChange,
 } from '../common/cnc-bit-change-advisory';
-import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { CncToolOptions } from './CncToolOptions';
 
 export function CncActiveBitSelect(props: {
   readonly machine: CncMachineConfig;
@@ -40,11 +40,7 @@ export function CncActiveBitSelect(props: {
       title="The bit in the spindle. Profile offsets and pocket clearing use its diameter."
       style={props.style}
     >
-      {props.machine.tools.map((candidate) => (
-        <option key={candidate.id} value={candidate.id}>
-          {cncToolGeometryLabel(candidate)} — {candidate.name}
-        </option>
-      ))}
+      <CncToolOptions tools={props.machine.tools} />
     </select>
   );
 }

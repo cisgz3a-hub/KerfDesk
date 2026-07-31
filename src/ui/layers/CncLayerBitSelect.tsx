@@ -6,7 +6,7 @@ import {
   type Layer,
 } from '../../core/scene';
 import { CNC_RETAINED_FEEDS_WARNING } from '../common/cnc-bit-change-advisory';
-import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
+import { CncToolOptions } from '../machine/CncToolOptions';
 import { useStore } from '../state';
 import { withoutCncFeedProvenance } from '../state/cnc-feed-provenance';
 import { materialFeedsPatch } from '../state/cnc-project-material';
@@ -30,6 +30,7 @@ export function LayerBitSelect(props: {
   const profile = useStore((state) => state.project.device);
   const liveCaps = useStore((state) => state.cncLiveCaps);
   const pushToast = useToastStore((state) => state.pushToast);
+  const unavailableToolId = unavailableLayerToolId(tools, props.settings.toolId);
 
   // Material-derived values follow the new cutter. Manual/starter values stay
   // exact and receive the explicit review advisory below.
@@ -46,7 +47,7 @@ export function LayerBitSelect(props: {
       profile,
       machineSpindleMaxRpm: machine.params.spindleMaxRpm,
       liveCaps,
-      fluteCount: source.fluteCount,
+      fluteCount: tool.fluteCount ?? source.fluteCount,
     });
   };
 
@@ -61,7 +62,11 @@ export function LayerBitSelect(props: {
       base = { ...props.settings, toolId };
     }
     const activeToolId = machine?.kind === 'cnc' ? activeCncTool(machine).id : '';
-    const currentEffectiveToolId = props.settings.toolId ?? activeToolId;
+    const currentEffectiveToolId = effectiveLayerToolId(
+      props.settings.toolId,
+      unavailableToolId,
+      activeToolId,
+    );
     const nextEffectiveToolId = toolId ?? activeToolId;
     if (currentEffectiveToolId === nextEffectiveToolId) {
       // The binding changed between "follow Active bit" and an explicit id,
@@ -84,12 +89,31 @@ export function LayerBitSelect(props: {
         style={selectStyle}
       >
         <option value="">Machine bit (active)</option>
-        {tools.map((tool) => (
-          <option key={tool.id} value={tool.id}>
-            {cncToolGeometryLabel(tool)} — {tool.name}
+        {unavailableToolId === null ? null : (
+          <option value={unavailableToolId} disabled>
+            Current unavailable bit — missing {unavailableToolId}
           </option>
-        ))}
+        )}
+        <CncToolOptions tools={tools} />
       </select>
     </Row>
   );
+}
+
+function unavailableLayerToolId(
+  tools: ReadonlyArray<CncTool>,
+  configuredToolId: string | undefined,
+): string | null {
+  if (configuredToolId === undefined) return null;
+  return tools.some((tool) => tool.id === configuredToolId) ? null : configuredToolId;
+}
+
+function effectiveLayerToolId(
+  configuredToolId: string | undefined,
+  unavailableToolId: string | null,
+  activeToolId: string,
+): string {
+  return configuredToolId === undefined || unavailableToolId !== null
+    ? activeToolId
+    : configuredToolId;
 }

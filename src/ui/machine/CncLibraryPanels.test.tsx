@@ -91,6 +91,43 @@ async function render(component: React.ReactNode): Promise<{ host: HTMLDivElemen
   return { host, root };
 }
 
+async function applySameIdSingleFluteProfile(settings: CncLayerSettings): Promise<void> {
+  useStore.setState({ project: createProject() });
+  useStore.getState().setMachineKind('cnc');
+  const current = useStore.getState().project.machine;
+  if (current?.kind !== 'cnc') throw new Error('CNC machine missing');
+  const profileMachine = {
+    ...current,
+    tools: current.tools.map((tool) =>
+      tool.id === current.toolId ? { ...tool, fluteCount: 1 } : tool,
+    ),
+  };
+  useStore.setState((state) => ({
+    cncLibrary: {
+      ...state.cncLibrary,
+      machineProfiles: [{ id: 'single-flute', name: 'Single flute', machine: profileMachine }],
+    },
+  }));
+  installUsedLayer(settings);
+
+  const { host, root } = await render(<CncMachineProfilesRow />);
+  try {
+    const select = host.querySelector('[aria-label="Saved machine profile"]');
+    if (!(select instanceof HTMLSelectElement)) throw new Error('Profile select missing');
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    await act(async () => {
+      setter?.call(select, 'single-flute');
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const apply = host.querySelector('[aria-label="Apply machine profile"]');
+    if (!(apply instanceof HTMLButtonElement)) throw new Error('Apply button missing');
+    await act(async () => apply.click());
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+}
+
 describe('CncToolManager', () => {
   it('shows canonical stored geometry even when the custom name contains another size', async () => {
     useStore.setState({ project: createProject() });
@@ -106,9 +143,9 @@ describe('CncToolManager', () => {
 
     const { host, root } = await render(<CncToolManager machine={machine} />);
     try {
-      const customRow = [...host.querySelectorAll('li')].find((row) =>
-        row.textContent?.includes('90 degree 3mm V-bit'),
-      );
+      const customRow = host
+        .querySelector('[aria-label="Delete bit 90 degree 3mm V-bit"]')
+        ?.closest('li');
       expect(customRow).toBeDefined();
       expect(customRow?.textContent).toContain('3.175 mm');
       expect(customRow?.textContent).toContain('90° V-bit');
@@ -131,9 +168,7 @@ describe('CncToolManager', () => {
 
     const { host, root } = await render(<CncToolManager machine={machine} />);
     try {
-      const row = [...host.querySelectorAll('li')].find((item) =>
-        item.textContent?.includes(longName),
-      );
+      const row = host.querySelector(`[aria-label="Delete bit ${longName}"]`)?.closest('li');
       const label = row?.querySelector('span');
       expect(label?.textContent).toBe(`3.175 mm, 90° V-bit — ${longName}`);
       expect(label?.getAttribute('title')).toBe(label?.textContent);
@@ -296,5 +331,41 @@ describe('CncMachineProfilesRow', () => {
       await act(async () => root.unmount());
       host.remove();
     }
+  });
+
+  it('warns when a same-ID flute-count profile change retains manual values', async () => {
+    await applySameIdSingleFluteProfile({
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      feedMmPerMin: 777,
+    });
+
+    const machine = useStore.getState().project.machine;
+    if (machine?.kind !== 'cnc') throw new Error('CNC machine missing');
+    expect(machine.tools.find((tool) => tool.id === machine.toolId)?.fluteCount).toBe(1);
+    expect(useStore.getState().project.scene.layers[0]?.cnc?.feedMmPerMin).toBe(777);
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ variant: 'warning' });
+  });
+
+  it('stays silent when a same-ID flute-count profile change recalculates automatic values', async () => {
+    await applySameIdSingleFluteProfile({
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      materialKey: 'plywood-mdf',
+      feedMmPerMin: 777,
+      feedSource: {
+        kind: 'material-recipe',
+        materialKey: 'plywood-mdf',
+        fluteCount: 2,
+      },
+    });
+
+    const machine = useStore.getState().project.machine;
+    if (machine?.kind !== 'cnc') throw new Error('CNC machine missing');
+    expect(machine.tools.find((tool) => tool.id === machine.toolId)?.fluteCount).toBe(1);
+    expect(useStore.getState().project.scene.layers[0]?.cnc?.feedSource).toEqual({
+      kind: 'material-recipe',
+      materialKey: 'plywood-mdf',
+      fluteCount: 1,
+    });
+    expect(useToastStore.getState().toasts).toEqual([]);
   });
 });

@@ -207,7 +207,7 @@ export function vcarveClearanceGroupForLayer(
 ): CncGroup | null {
   if (settings.cutType !== 'v-carve' || settings.vClearToolId === undefined) return null;
   const clearTool = config.tools.find((tool) => tool.id === settings.vClearToolId);
-  if (clearTool === undefined) return null;
+  if (clearTool === undefined || clearTool.kind !== 'end-mill') return null;
   const vBit = layerCncTool(config, settings);
   const toolpaths = vcarveClearanceToolpaths(polylines, {
     vBit,

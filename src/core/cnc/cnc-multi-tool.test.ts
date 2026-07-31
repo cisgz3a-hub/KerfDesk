@@ -197,6 +197,31 @@ describe('compileCncJob multi-tool', () => {
     const cnc = job.groups.filter((group) => group.kind === 'cnc');
     expect(cnc.every((group) => group.cutType !== 'pocket')).toBe(true);
   });
+
+  it.each([
+    ['missing', 'missing-clear'],
+    ['ball-nose', 'bn-3175'],
+    ['engraving', 'eng-15'],
+  ] as const)('does not compile a V-carve clearance group with a %s cutter', (_, clearToolId) => {
+    const scene = sceneOf(
+      [squareObject('A', '#111111', 10, 60)],
+      [
+        layerWith('#111111', {
+          cutType: 'v-carve',
+          toolId: 'vb-60',
+          vClearToolId: clearToolId,
+          depthMm: 3,
+        }),
+      ],
+    );
+
+    const cnc = compileCncJob(scene, DEVICE, MACHINE).groups.filter(
+      (group) => group.kind === 'cnc',
+    );
+    expect(cnc).toHaveLength(1);
+    expect(cnc[0]).toMatchObject({ cutType: 'v-carve', toolId: 'vb-60' });
+    expect(cnc.some((group) => group.toolId === clearToolId)).toBe(false);
+  });
 });
 
 describe('cncGrblStrategy tool changes', () => {

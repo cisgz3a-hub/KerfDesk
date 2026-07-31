@@ -14034,3 +14034,103 @@ this decision.
   selected valid CNC operation.
 - Automated checks cannot verify spindle load, lost steps, coupler slip, electrical noise,
   workholding, or physical coordinate retention; those require a controlled loaded scrap cut.
+
+## ADR-275 - CNC cutter families are catalog metadata, not invented CAM geometry (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The CNC bit library began as a short starter list. Operators need a much broader set of common
+router and milling cutters, including the small-shank 60° and 90° V-bits sold for hobby routers.
+Simply appending every commercial cutter under an existing `kind` would be unsafe and misleading:
+
+- CAM and removal simulation currently understand a flat cylinder, a full-radius ball nose, and a
+  point-tip cone; the legacy `engraving` kind is also simulated as a flat cylinder;
+- cutter names such as upcut, compression, O-flute, dovetail, surfacing, and roundover describe
+  flute direction, operation constraints, or geometry that is not equivalent to those three
+  envelopes;
+- the existing starter list is serialized into every CNC project, so turning it into a large
+  global catalog would bloat every `.lf2`; and
+- automatic material feeds previously assumed two flutes, which is wrong for single O-flute tools.
+
+Primary manufacturer catalogs were used to establish the taxonomy and representative dimensions,
+including LMT Onsrud, Whiteside, Inventables, Amana Tool, Carbide 3D, and Harvey Tool. They are
+catalog evidence, not authorization to copy manufacturer feeds or to claim physical qualification.
+
+### Decision
+
+1. **`CncTool.kind` remains load-bearing geometry.** It is not expanded with marketing or product
+   families. CAM, offsets, removal simulation, and 3D profiles continue to branch only on the
+   existing geometry kind.
+2. **Family is descriptive metadata.** `family`, `shankDiameterMm`, `fluteCount`, and stable
+   `catalogId` fields may accompany a tool. Project deserialization and app-library restoration
+   rebuild these fields through bounded validation; unknown fields remain stripped.
+3. **The starter list stays small and append-only.** The two manufacturer-listed hobby 90° V-bit
+   cutting/shank dimensions are appended with stable IDs and identified as nominal point-cone
+   models. The broader catalog lives outside the default project payload and copies only the
+   operator-selected entry into the app-level custom library.
+4. **The catalog has an explicit model-fit boundary.** Center-cutting flat tools, untapered
+   full-radius ball tools, and nominal V-groove tools may be addable when their stored gross
+   envelope matches a current kernel. Product angle/tip tolerances remain a physical qualification
+   boundary. A cutter also needs sufficiently evidenced selectable dimensions, capability, and
+   operation semantics. Entries that fail either boundary remain searchable reference-only entries
+   with a reason and primary source.
+5. **Catalog breadth means families plus representative sizes, not every manufacturer SKU.** The
+   catalog covers common metric and imperial dimensions without presenting a manufacturer part
+   number, cutting length, coating, material, or flute geometry that the app has not verified.
+6. **Angles use the included cone angle.** A manufacturer side, chamfer, or dovetail angle must
+   never be copied into `tipAngleDeg` without converting and verifying that it describes a
+   point-tip cone. Cutting diameter and shank diameter remain separate values.
+7. **Flute metadata participates only in trusted automatic calculation.** A catalog flute count is
+   used when a material recipe is first calculated and when trusted tool identity changes through
+   active-bit selection, profile application, catalog adoption, or deletion fallback. Only layers
+   carrying automatic provenance are eligible for that rewrite: an explicit count on a layer pinned
+   to another tool and manual/legacy numeric settings retain operator intent.
+8. **Selection feedback shows the modeled cutting envelope.** A transient preview may reuse the
+   same tool profile and mesh builder as simulation, but must be labeled “Modeled cutting
+   envelope.” It must not depict unmodeled flutes, bearings, pilots, coatings, or shanks as though
+   they were physically exact, and Three.js remains lazy-loaded inside the CNC 3D UI boundary.
+9. **This feature adds no Start guard and changes no machine command.** Reference-only entries
+   cannot become selectable through the catalog. Existing input validation, Frame-first Start
+   authorization, controller behavior, and physical emergency controls are unchanged.
+
+### Consequences
+
+- Operators can browse many more cutter families without every project carrying the whole catalog.
+- Upcut, downcut, compression, O-flute, and straight tools may share the flat kernel while remaining
+  distinguishable in the UI; that distinction does not claim flute-resolved simulation.
+- Dovetail, T-slot, keyhole, edge-forming, finite-tip engraving, tapered-ball, surfacing, drilling,
+  drag-engraving, and other unsupported families remain visible without being misrepresented as an
+  ordinary end mill.
+- Old projects without family metadata retain their exact tool IDs and geometry. UI grouping falls
+  back from `kind`, and unknown future families display as custom rather than changing CAM behavior.
+- A catalog Add is rejected when the local saved library already owns that identity. When an
+  imported project already carries it, Add adopts that project ID and refreshes its trusted catalog
+  metadata rather than appending another alias.
+- Profile application canonicalizes only incoming catalog aliases. Every existing project tool ID
+  survives, while the profile's requested active ID maps to the retained current or incoming copy.
+- Deleting a custom tool is refused while an active V-clear, relief-finish, or pocket-roughing
+  stage uses it; dormant hidden references are cleared. Deleting the sole active custom tool also
+  restores the shared default tool list and a valid active ID.
+- Software tests can verify catalog integrity, persistence, grouping, selection, and modeled mesh
+  construction. They cannot verify runout, cutter balance, flute clearance, feeds, chip evacuation,
+  material finish, machine rigidity, or the result of a physical cut.
+
+### Verification
+
+- Catalog integrity tests cover exact modeled/reference counts, unique IDs, HTTPS source fields,
+  evidence-scope labels, family/model separation, and the two hobby-router 90° V-bit cutting/shank
+  dimensions.
+- Project and local-library tests cover valid metadata round-trips, malformed optional fields,
+  deeply normalized machine-profile payloads, and duplicate catalog identity.
+- Layer and automatic-seeding tests cover single O-flute material-feed provenance, active catalog
+  adoption, profile transitions, sole-tool deletion fallback, active auxiliary-reference refusal,
+  dormant-reference cleanup, incoming profile-alias normalization, exact-snapshot ordering,
+  existing project-ID preservation, and pinned/manual intent.
+- Grouped-selector and catalog-panel tests cover legacy fallback grouping, reference-only entries,
+  and add-once behavior.
+- The research/model-fit record is `docs/audits/2026-08-01-cnc-bit-catalog-research.md`.
+- NOT verified: manufacturer SKU completeness, manufacturer feed recommendations, real spindle or
+  collet compatibility, an air cut, a material cut, surface finish, or perceptual 3D fidelity.

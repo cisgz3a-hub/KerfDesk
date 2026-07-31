@@ -13,11 +13,30 @@ import { useStore } from '../state';
 import { blockingCncSecondaryToolReferences } from '../state/cnc-tool-references';
 import { useToastStore } from '../state/toast-store';
 import { AddCncBitForm } from './AddCncBitForm';
+import { CncBitCatalogPanel } from './CncBitCatalogPanel';
+import {
+  addFormStyle,
+  deleteButtonStyle,
+  detailsStyle,
+  kindSelectStyle,
+  listItemStyle,
+  listStyle,
+  nameInputStyle,
+  summaryStyle,
+  toolGroupHeadingStyle,
+  toolGroupListStyle,
+  toolGroupStyle,
+  toolNameStyle,
+} from './CncLibraryPanels.styles';
+import { groupCncTools } from './CncToolOptions';
 
 export function CncToolManager(props: { readonly machine: CncMachineConfig }): JSX.Element {
-  const deleteCustomCncTool = useStore((s) => s.deleteCustomCncTool);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const customToolIds = useStore((s) => new Set(s.cncLibrary.customTools.map((t) => t.id)));
+  const deleteCustomCncTool = useStore((state) => state.deleteCustomCncTool);
+  const pushToast = useToastStore((state) => state.pushToast);
+  const customToolIds = useStore(
+    (state) => new Set(state.cncLibrary.customTools.map((tool) => tool.id)),
+  );
+  const groups = groupCncTools(props.machine.tools);
   const deleteTool = (toolId: string): void => {
     const before = useStore.getState().project;
     const blockingReference = blockingCncSecondaryToolReferences(before.scene, toolId)[0];
@@ -36,30 +55,51 @@ export function CncToolManager(props: { readonly machine: CncMachineConfig }): J
         Manage bits ({props.machine.tools.length})
       </summary>
       <ul style={listStyle} aria-label="Bit list">
-        {props.machine.tools.map((tool) => {
-          const label = `${cncToolGeometryLabel(tool)} — ${tool.name}`;
-          return (
-            <li key={tool.id} style={listItemStyle}>
-              <span style={toolNameStyle} title={label} aria-label={label}>
-                {label}
-              </span>
-              {customToolIds.has(tool.id) ? (
-                <button
-                  type="button"
-                  onClick={() => deleteTool(tool.id)}
-                  aria-label={`Delete bit ${tool.name}`}
-                  title="Remove this custom bit. Primary assignments fall back to Active; visible clearing, finishing, or roughing assignments must be changed first."
-                  style={deleteButtonStyle}
-                >
-                  Delete
-                </button>
-              ) : null}
-            </li>
-          );
-        })}
+        {groups.map((group) => (
+          <li key={group.key} style={toolGroupStyle}>
+            <h4 style={toolGroupHeadingStyle}>{group.label}</h4>
+            <ul style={toolGroupListStyle} aria-label={group.label}>
+              {group.tools.map((tool) => (
+                <CncToolManagerRow
+                  key={tool.id}
+                  tool={tool}
+                  custom={customToolIds.has(tool.id)}
+                  onDelete={() => deleteTool(tool.id)}
+                />
+              ))}
+            </ul>
+          </li>
+        ))}
       </ul>
+      <CncBitCatalogPanel />
       <AddCncBitForm />
     </details>
+  );
+}
+
+function CncToolManagerRow(props: {
+  readonly tool: CncMachineConfig['tools'][number];
+  readonly custom: boolean;
+  readonly onDelete: () => void;
+}): JSX.Element {
+  const label = `${cncToolGeometryLabel(props.tool)} — ${props.tool.name}`;
+  return (
+    <li style={listItemStyle}>
+      <span style={toolNameStyle} title={label} aria-label={label}>
+        {label}
+      </span>
+      {props.custom ? (
+        <button
+          type="button"
+          onClick={props.onDelete}
+          aria-label={`Delete bit ${props.tool.name}`}
+          title="Remove this custom bit. Primary assignments fall back to Active; visible clearing, finishing, or roughing assignments must be changed first."
+          style={deleteButtonStyle}
+        >
+          Delete
+        </button>
+      ) : null}
+    </li>
   );
 }
 
@@ -71,10 +111,10 @@ function secondaryToolDeleteWarning(reference: {
 }
 
 export function CncMachineProfilesRow(): JSX.Element {
-  const profiles = useStore((s) => s.cncLibrary.machineProfiles);
-  const applyCncMachineProfile = useStore((s) => s.applyCncMachineProfile);
-  const deleteCncMachineProfile = useStore((s) => s.deleteCncMachineProfile);
-  const pushToast = useToastStore((s) => s.pushToast);
+  const profiles = useStore((state) => state.cncLibrary.machineProfiles);
+  const applyCncMachineProfile = useStore((state) => state.applyCncMachineProfile);
+  const deleteCncMachineProfile = useStore((state) => state.deleteCncMachineProfile);
+  const pushToast = useToastStore((state) => state.pushToast);
   const [selectedId, setSelectedId] = useState('');
   const applyProfile = (): void => {
     const before = useStore.getState().project;
@@ -94,7 +134,7 @@ export function CncMachineProfilesRow(): JSX.Element {
       <div style={addFormStyle}>
         <select
           value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
+          onChange={(event) => setSelectedId(event.target.value)}
           aria-label="Saved machine profile"
           title="Pick a saved CNC machine profile."
           style={kindSelectStyle}
@@ -134,7 +174,7 @@ export function CncMachineProfilesRow(): JSX.Element {
 }
 
 function SaveMachineProfileControls(): JSX.Element {
-  const saveCncMachineProfile = useStore((s) => s.saveCncMachineProfile);
+  const saveCncMachineProfile = useStore((state) => state.saveCncMachineProfile);
   const [saveName, setSaveName] = useState('');
   const saveProfile = (): void => {
     if (saveName.trim() === '') return;
@@ -163,50 +203,3 @@ function SaveMachineProfileControls(): JSX.Element {
     </div>
   );
 }
-
-const detailsStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 4,
-  padding: '4px 6px',
-  marginTop: 4,
-};
-const summaryStyle: React.CSSProperties = {
-  fontSize: 12,
-  cursor: 'pointer',
-  userSelect: 'none',
-  color: 'var(--lf-text-muted)',
-};
-const listStyle: React.CSSProperties = {
-  listStyle: 'none',
-  margin: '6px 0',
-  padding: 0,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 2,
-  maxHeight: 160,
-  overflowY: 'auto',
-};
-const listItemStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: 6,
-  fontSize: 12,
-};
-const toolNameStyle: React.CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  whiteSpace: 'normal',
-  overflowWrap: 'anywhere',
-  lineHeight: 1.3,
-};
-const deleteButtonStyle: React.CSSProperties = { flexShrink: 0 };
-const addFormStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 4,
-  marginTop: 6,
-  flexWrap: 'wrap',
-};
-const nameInputStyle: React.CSSProperties = { flex: 1, minWidth: 90, padding: '2px 6px' };
-const kindSelectStyle: React.CSSProperties = { fontSize: 12, padding: '2px 4px' };
