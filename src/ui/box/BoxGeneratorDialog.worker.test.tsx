@@ -1,15 +1,33 @@
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateBox, type BoxPanel } from '../../core/box';
+import { generateBox, type BoxPanel, type BoxSpec } from '../../core/box';
 import { BoxGeneratorDialog } from './BoxGeneratorDialog';
-import { BOX_CANVAS_PREVIEW_POINT_BUDGET } from './box-preview-responsiveness';
+import { BOX_LARGE_DESIGN_POINT_ADVISORY_THRESHOLD } from './box-preview-responsiveness';
 import type {
   BoxGenerationWorkerRequest,
   BoxGenerationWorkerResponse,
 } from './box-generation-worker-protocol';
-import { runBoxGenerationRequest } from './box-generation-worker-runtime';
+import * as boxGenerationRuntime from './box-generation-worker-runtime';
+
+const DEFAULT_SPEC: BoxSpec = {
+  widthMm: 60,
+  depthMm: 40,
+  heightMm: 30,
+  dimensionMode: 'inner',
+  thicknessMm: 3,
+  targetFingerWidthMm: 9,
+  style: 'closed',
+  clearanceMm: 0,
+  relief: { kind: 'none' },
+  partSpacingMm: 8,
+  dividersXCount: 0,
+  dividersYCount: 0,
+};
+
+const SYNCHRONOUS_FALLBACK_WARNING =
+  'Background generation was unavailable, so this preview was generated synchronously. Complex designs may temporarily make the app unresponsive.';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -40,6 +58,11 @@ class FakeWorker {
   }
 }
 
+class FakePath2D {
+  readonly moveTo = vi.fn();
+  readonly lineTo = vi.fn();
+}
+
 type RenderedDialog = {
   readonly host: HTMLDivElement;
   readonly root: Root;
@@ -50,6 +73,7 @@ type RenderedDialog = {
 beforeEach(() => {
   FakeWorker.instances = [];
   vi.stubGlobal('Worker', FakeWorker);
+  vi.stubGlobal('Path2D', FakePath2D);
 });
 
 afterEach(() => {
@@ -126,7 +150,9 @@ describe('BoxGeneratorDialog background generation', () => {
       await click(button(rendered.host, 'Cancel preview generation'));
       expect(first.isTerminated).toBe(true);
       expect(rendered.host.textContent).toContain('Preview generation cancelled');
+      expect(rendered.host.textContent).not.toContain(SYNCHRONOUS_FALLBACK_WARNING);
       expect(generateButton(rendered.host).disabled).toBe(true);
+      expect(FakeWorker.instances).toHaveLength(1);
 
       await click(button(rendered.host, 'Retry preview generation'));
       expect(FakeWorker.instances).toHaveLength(2);
@@ -200,40 +226,125 @@ describe('BoxGeneratorDialog background generation', () => {
       await act(async () => currentWorker().onmessageerror?.());
       expect(rendered.host.textContent).toContain('response could not be read');
       expect(rendered.host.textContent).toContain('Retry preview generation');
+      expect(rendered.host.textContent).not.toContain(SYNCHRONOUS_FALLBACK_WARNING);
       expect(generateButton(rendered.host).disabled).toBe(true);
     } finally {
       await unmount(rendered);
     }
   });
 
-  it('reports unavailable Worker support without running geometry inline', async () => {
+  it('falls back synchronously when Worker support is unavailable and discloses responsiveness risk', async () => {
     vi.unstubAllGlobals();
     const rendered = await renderDialog();
     try {
-      expect(rendered.host.textContent).toContain('Background box generation is unavailable');
+      expect(rendered.host.textContent).toContain(SYNCHRONOUS_FALLBACK_WARNING);
+      expect(rendered.host.textContent).not.toContain('Retry preview generation');
+      expect(generateButton(rendered.host).disabled).toBe(false);
+      await click(generateButton(rendered.host));
+      const direct = generateBox(DEFAULT_SPEC);
+      expect(direct.kind).toBe('generated');
+      expect(rendered.onGenerate).toHaveBeenCalledWith(
+        direct.kind === 'generated' ? direct.panels : [],
+      );
+    } finally {
+      await unmount(rendered);
+    }
+  });
+
+  it('falls back synchronously when the module worker cannot be constructed', async () => {
+    function BrokenWorker(): never {
+      throw new Error('worker chunk missing');
+    }
+    vi.stubGlobal('Worker', BrokenWorker);
+    const rendered = await renderDialog();
+    try {
+      expect(rendered.host.textContent).toContain(SYNCHRONOUS_FALLBACK_WARNING);
+      expect(generateButton(rendered.host).disabled).toBe(false);
+    } finally {
+      await unmount(rendered);
+    }
+  });
+
+  it('runs a construction fallback only once during StrictMode effect replay', async () => {
+    vi.unstubAllGlobals();
+    const runtimeSpy = vi.spyOn(boxGenerationRuntime, 'runBoxGenerationRequest');
+    const rendered = await renderDialog(true);
+    try {
+      expect(rendered.host.textContent).toContain(SYNCHRONOUS_FALLBACK_WARNING);
+      expect(runtimeSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      runtimeSpy.mockRestore();
+      await unmount(rendered);
+    }
+  });
+
+  it('discloses responsiveness risk when a synchronous fallback returns an error', async () => {
+    vi.unstubAllGlobals();
+    const runtimeSpy = vi
+      .spyOn(boxGenerationRuntime, 'runBoxGenerationRequest')
+      .mockReturnValueOnce({
+        kind: 'result',
+        id: 1,
+        result: { kind: 'error', message: 'fallback geometry failed' },
+        metrics: null,
+      });
+    const rendered = await renderDialog();
+    try {
+      expect(rendered.host.textContent).toContain('fallback geometry failed');
+      expect(rendered.host.textContent).toContain(
+        'Background generation was unavailable, so this attempt ran synchronously.',
+      );
+      expect(rendered.host.textContent).toContain(
+        'Retrying complex designs may temporarily make the app unresponsive.',
+      );
+      expect(generateButton(rendered.host).disabled).toBe(true);
+    } finally {
+      runtimeSpy.mockRestore();
+      await unmount(rendered);
+    }
+  });
+
+  it('does not replay synchronously after a constructed worker fails to start its request', async () => {
+    class ThrowingPostWorker extends FakeWorker {
+      override postMessage(): void {
+        throw new Error('clone failed');
+      }
+    }
+    vi.stubGlobal('Worker', ThrowingPostWorker);
+    const rendered = await renderDialog();
+    try {
+      expect(FakeWorker.instances).toHaveLength(1);
+      expect(rendered.host.textContent).toContain('clone failed');
       expect(rendered.host.textContent).toContain('Retry preview generation');
+      expect(rendered.host.textContent).not.toContain(SYNCHRONOUS_FALLBACK_WARNING);
       expect(generateButton(rendered.host).disabled).toBe(true);
     } finally {
       await unmount(rendered);
     }
   });
 
-  it('suppresses an oversized canvas preview without blocking complete geometry insertion', async () => {
+  it('keeps flat and assembled previews visible above the advisory point threshold', async () => {
     const rendered = await renderDialog();
     try {
+      await setInput(rendered.host, 'Finger width', '3');
+      await setInput(rendered.host, 'Width', '5000');
       const worker = currentWorker();
       const response = responseFor(worker);
       if (response.kind !== 'result' || response.metrics === null) {
         throw new Error('generated response missing');
       }
-      await respond(worker, {
-        ...response,
-        metrics: {
-          ...response.metrics,
-          pointCount: BOX_CANVAS_PREVIEW_POINT_BUDGET + 1,
-        },
-      });
-      expect(rendered.host.textContent).toContain('Preview hidden for responsiveness');
+      expect(response.metrics.pointCount).toBeGreaterThan(
+        BOX_LARGE_DESIGN_POINT_ADVISORY_THRESHOLD,
+      );
+      await respond(worker, response);
+      expect(rendered.host.textContent).not.toContain('Preview hidden for responsiveness');
+      expect(
+        rendered.host.querySelector('canvas[aria-label="Generated panel sheet preview"]'),
+      ).not.toBeNull();
+      await click(button(rendered.host, 'Assembled'));
+      expect(
+        rendered.host.querySelector('canvas[aria-label="Assembled box preview"]'),
+      ).not.toBeNull();
       expect(generateButton(rendered.host).disabled).toBe(false);
       await click(generateButton(rendered.host));
       const result = response.result;
@@ -247,20 +358,17 @@ describe('BoxGeneratorDialog background generation', () => {
   });
 });
 
-async function renderDialog(): Promise<RenderedDialog> {
+async function renderDialog(strictMode = false): Promise<RenderedDialog> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   const onGenerate = vi.fn<(panels: ReadonlyArray<BoxPanel>) => void>();
   const onCancel = vi.fn();
+  const dialog = (
+    <BoxGeneratorDialog machine={{ kind: 'laser' }} onCancel={onCancel} onGenerate={onGenerate} />
+  );
   await act(async () => {
-    root.render(
-      <BoxGeneratorDialog
-        machine={{ kind: 'laser' }}
-        onCancel={onCancel}
-        onGenerate={onGenerate}
-      />,
-    );
+    root.render(strictMode ? <StrictMode>{dialog}</StrictMode> : dialog);
   });
   return { host, root, onGenerate, onCancel };
 }
@@ -268,7 +376,7 @@ async function renderDialog(): Promise<RenderedDialog> {
 function responseFor(worker: FakeWorker): BoxGenerationWorkerResponse {
   const request = worker.posted[0];
   if (request === undefined) throw new Error('request missing');
-  return runBoxGenerationRequest(request);
+  return boxGenerationRuntime.runBoxGenerationRequest(request);
 }
 
 async function respond(worker: FakeWorker, response = responseFor(worker)): Promise<void> {

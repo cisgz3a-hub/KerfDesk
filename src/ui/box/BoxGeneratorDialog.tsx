@@ -1,6 +1,7 @@
 // BoxGeneratorDialog — the Phase K parametric finger-joint box form.
-// Draft parsing and validation stay synchronous; geometry runs in a dedicated,
-// cancellable worker so expensive valid values never execute during render.
+// Draft parsing and validation stay synchronous; geometry normally runs in a
+// dedicated, cancellable worker. Worker-construction failure uses the same
+// generator synchronously and is disclosed as a responsiveness fallback.
 
 import { useCallback, useRef, useState, type CSSProperties } from 'react';
 import { deriveBoxDims, type BoxPanel, type BoxSpec, type BoxSpecValidation } from '../../core/box';
@@ -15,7 +16,6 @@ import {
 import { BoxGenerationStatus } from './BoxGenerationStatus';
 import { BoxGeneratorFields } from './BoxGeneratorFields';
 import { BoxGeneratorPreview, type BoxPreviewView } from './BoxGeneratorPreview';
-import { boxPreviewShouldBeSuppressed } from './box-preview-responsiveness';
 import {
   useBoxGeneration,
   type BoxGenerationSnapshot,
@@ -36,8 +36,6 @@ export function BoxGeneratorDialog(props: {
   const persistAndClose = useBoxDraftClose(form.draft, props.onCancel);
   if (generation.currentSnapshot !== null) lastReady.current = generation.currentSnapshot;
   const displayedSnapshot = generation.currentSnapshot ?? lastReady.current;
-  const isPreviewSuppressed =
-    displayedSnapshot !== null && boxPreviewShouldBeSuppressed(displayedSnapshot.metrics);
 
   const cancelGeneration = generation.cancel;
   const handleCancel = useCallback(() => {
@@ -77,7 +75,6 @@ export function BoxGeneratorDialog(props: {
           generation.currentSnapshot,
           generation.state,
         )}
-        isPreviewSuppressed={isPreviewSuppressed}
         onCancel={cancelGeneration}
         onRetry={generation.retry}
       />

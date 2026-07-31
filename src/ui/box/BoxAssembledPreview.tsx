@@ -71,11 +71,21 @@ function drawAssembly(
     .filter((plate): plate is Plate => plate !== null)
     // Painter sort: far (small x+y+z) first for the (1,1,1)-ish iso view.
     .sort((a, b) => a.depth - b.depth);
-  const all = plates.flatMap((plate) => plate.rings.flat());
-  const minX = Math.min(...all.map((p) => p.sx));
-  const maxX = Math.max(...all.map((p) => p.sx));
-  const minY = Math.min(...all.map((p) => p.sy));
-  const maxY = Math.max(...all.map((p) => p.sy));
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const plate of plates) {
+    for (const ring of plate.rings) {
+      for (const point of ring) {
+        minX = Math.min(minX, point.sx);
+        maxX = Math.max(maxX, point.sx);
+        minY = Math.min(minY, point.sy);
+        maxY = Math.max(maxY, point.sy);
+      }
+    }
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return;
   const scale = Math.min(
     (PREVIEW_WIDTH_PX - 2 * PREVIEW_MARGIN_PX) / Math.max(maxX - minX, 1),
     (PREVIEW_HEIGHT_PX - 2 * PREVIEW_MARGIN_PX) / Math.max(maxY - minY, 1),

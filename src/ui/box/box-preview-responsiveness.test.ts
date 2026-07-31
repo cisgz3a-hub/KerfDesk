@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { BoxSpec } from '../../core/box';
 import { estimateBoxWork } from '../../core/box/box-work-estimate';
 import {
-  BOX_CANVAS_PREVIEW_POINT_BUDGET,
+  BOX_LARGE_DESIGN_POINT_ADVISORY_THRESHOLD,
   boxEstimateIsLarge,
-  boxPreviewShouldBeSuppressed,
 } from './box-preview-responsiveness';
 
 const RELIEF_HEAVY_SPEC: BoxSpec = {
@@ -26,23 +25,26 @@ describe('box preview responsiveness', () => {
 
     expect(estimate.nominalPointUpper).toBe(4_030);
     expect(estimate.reliefBooleanInputVertexUpper).toBe(100_750);
-    expect(estimate.nominalPointUpper).toBeLessThan(BOX_CANVAS_PREVIEW_POINT_BUDGET);
+    expect(estimate.nominalPointUpper).toBeLessThan(BOX_LARGE_DESIGN_POINT_ADVISORY_THRESHOLD);
     expect(boxEstimateIsLarge(estimate)).toBe(true);
   });
 
-  it('keeps the exact output preview threshold strict', () => {
+  it('uses 20,000 points only as an estimate advisory threshold', () => {
+    const estimate = estimateBoxWork({ ...RELIEF_HEAVY_SPEC, relief: { kind: 'none' } });
     expect(
-      boxPreviewShouldBeSuppressed({
-        panelCount: 6,
-        ringCount: 6,
-        pointCount: BOX_CANVAS_PREVIEW_POINT_BUDGET,
+      boxEstimateIsLarge({
+        ...estimate,
+        nominalPointUpper: BOX_LARGE_DESIGN_POINT_ADVISORY_THRESHOLD,
+        reliefBooleanInputVertexUpper: BOX_LARGE_DESIGN_POINT_ADVISORY_THRESHOLD,
+        saturatedFields: [],
       }),
     ).toBe(false);
     expect(
-      boxPreviewShouldBeSuppressed({
-        panelCount: 6,
-        ringCount: 6,
-        pointCount: BOX_CANVAS_PREVIEW_POINT_BUDGET + 1,
+      boxEstimateIsLarge({
+        ...estimate,
+        nominalPointUpper: BOX_LARGE_DESIGN_POINT_ADVISORY_THRESHOLD + 1,
+        reliefBooleanInputVertexUpper: BOX_LARGE_DESIGN_POINT_ADVISORY_THRESHOLD,
+        saturatedFields: [],
       }),
     ).toBe(true);
   });

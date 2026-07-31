@@ -6,8 +6,10 @@ import {
   type BoxGenerationTask,
 } from './box-generation-worker-client';
 import type { BoxGenerationMetrics } from './box-generation-worker-protocol';
+import { runBoxGenerationRequest } from './box-generation-worker-runtime';
 
 type BoxWorkEstimate = ReturnType<typeof estimateBoxWork>;
+export type BoxGenerationMode = 'worker' | 'synchronous-fallback';
 
 export type BoxGenerationSnapshot = {
   readonly requestId: number;
@@ -16,6 +18,7 @@ export type BoxGenerationSnapshot = {
   readonly panels: ReadonlyArray<BoxPanel>;
   readonly estimate: BoxWorkEstimate;
   readonly metrics: BoxGenerationMetrics;
+  readonly generationMode: BoxGenerationMode;
 };
 
 export type BoxGenerationFailure =
@@ -42,6 +45,7 @@ export type BoxGenerationState =
       readonly specKey: string;
       readonly estimate: BoxWorkEstimate;
       readonly failure: BoxGenerationFailure;
+      readonly generationMode: BoxGenerationMode;
     }
   | {
       readonly kind: 'cancelled';
@@ -55,6 +59,14 @@ type ActiveRequest = {
   readonly task: BoxGenerationTask;
 };
 
+type SynchronousFallbackState = Extract<BoxGenerationState, { readonly kind: 'ready' | 'failed' }>;
+
+type SynchronousFallbackCache = {
+  readonly specKey: string;
+  readonly retryToken: number;
+  readonly state: SynchronousFallbackState;
+};
+
 export function useBoxGeneration(spec: BoxSpec | null): {
   readonly state: BoxGenerationState;
   readonly currentSnapshot: BoxGenerationSnapshot | null;
@@ -65,6 +77,7 @@ export function useBoxGeneration(spec: BoxSpec | null): {
   const [retryToken, setRetryToken] = useState(0);
   const nextRequestId = useRef(0);
   const active = useRef<ActiveRequest | null>(null);
+  const synchronousFallbackCache = useRef<SynchronousFallbackCache | null>(null);
   const specRef = useRef(spec);
   specRef.current = spec;
   const specKey = spec === null ? null : JSON.stringify(spec);
@@ -81,16 +94,13 @@ export function useBoxGeneration(spec: BoxSpec | null): {
     setState({ kind: 'pending', requestId, specKey, estimate });
     const task = startBoxGeneration(requestId, requestedSpec);
     if (task === null) {
-      setState({
-        kind: 'failed',
-        requestId,
-        specKey,
-        estimate,
-        failure: {
-          kind: 'worker',
-          message: 'Background box generation is unavailable. Reload the app or retry.',
-        },
-      });
+      const cached = synchronousFallbackCache.current;
+      const fallbackState =
+        cached?.specKey === specKey && cached.retryToken === retryToken
+          ? identifySynchronousFallback(cached.state, requestId, requestedSpec, estimate)
+          : createSynchronousFallbackState(requestId, specKey, requestedSpec, estimate);
+      synchronousFallbackCache.current = { specKey, retryToken, state: fallbackState };
+      setState(fallbackState);
       return;
     }
     active.current = { id: requestId, task };
@@ -131,7 +141,15 @@ function settleRequest(
       if (result.kind === 'generated' && metrics !== null) {
         setState({
           kind: 'ready',
-          snapshot: { requestId, specKey, spec, panels: result.panels, estimate, metrics },
+          snapshot: {
+            requestId,
+            specKey,
+            spec,
+            panels: result.panels,
+            estimate,
+            metrics,
+            generationMode: 'worker',
+          },
         });
         return;
       }
@@ -141,6 +159,7 @@ function settleRequest(
         specKey,
         estimate,
         failure: failureFromResult(result, metrics),
+        generationMode: 'worker',
       });
     })
     .catch((error: unknown) => {
@@ -155,8 +174,79 @@ function settleRequest(
           kind: 'worker',
           message: error instanceof Error ? error.message : String(error),
         },
+        generationMode: 'worker',
       });
     });
+}
+
+function createSynchronousFallbackState(
+  requestId: number,
+  specKey: string,
+  spec: BoxSpec,
+  estimate: BoxWorkEstimate,
+): SynchronousFallbackState {
+  try {
+    const response = runBoxGenerationRequest({ kind: 'generate', id: requestId, spec });
+    if (response.kind === 'result' && response.result.kind === 'generated' && response.metrics) {
+      return {
+        kind: 'ready',
+        snapshot: {
+          requestId,
+          specKey,
+          spec,
+          panels: response.result.panels,
+          estimate,
+          metrics: response.metrics,
+          generationMode: 'synchronous-fallback',
+        },
+      };
+    }
+    if (response.kind === 'result') {
+      return {
+        kind: 'failed',
+        requestId,
+        specKey,
+        estimate,
+        failure: failureFromResult(response.result, response.metrics),
+        generationMode: 'synchronous-fallback',
+      };
+    }
+    return {
+      kind: 'failed',
+      requestId,
+      specKey,
+      estimate,
+      failure: { kind: 'worker', message: response.message },
+      generationMode: 'synchronous-fallback',
+    };
+  } catch (error: unknown) {
+    return {
+      kind: 'failed',
+      requestId,
+      specKey,
+      estimate,
+      failure: {
+        kind: 'generation',
+        message: error instanceof Error ? error.message : String(error),
+      },
+      generationMode: 'synchronous-fallback',
+    };
+  }
+}
+
+function identifySynchronousFallback(
+  state: SynchronousFallbackState,
+  requestId: number,
+  spec: BoxSpec,
+  estimate: BoxWorkEstimate,
+): SynchronousFallbackState {
+  if (state.kind === 'ready') {
+    return {
+      kind: 'ready',
+      snapshot: { ...state.snapshot, requestId, spec, estimate },
+    };
+  }
+  return { ...state, requestId, estimate };
 }
 
 function failureFromResult(
