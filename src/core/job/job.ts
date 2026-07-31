@@ -14,9 +14,11 @@ import {
   assertNever,
   type CncCoolantMode,
   type CncCutType,
+  type CncToolKind,
   type LayerFillStyle,
   type Vec2,
 } from '../scene';
+import type { CncFeedSource } from '../scene/cnc-feed-source';
 import type { Vec3 } from '../geometry/vec3';
 import type { IslandFillMotionPolicy } from './island-fill-motion';
 import type { FillRunwayPolicy } from './fill-runway-policy';
@@ -208,6 +210,14 @@ export type CncGroup = {
   readonly toolId?: string;
   readonly toolName?: string;
   readonly toolDiameterMm: number;
+  // Incident provenance copied from the exact compiled settings. Optional so
+  // legacy archives and hand-built Job fixtures remain readable.
+  readonly toolKind?: CncToolKind;
+  readonly toolTipAngleDeg?: number;
+  readonly requestedDepthMm?: number;
+  readonly depthPerPassMm?: number;
+  readonly vResolutionMm?: number;
+  readonly feedSource?: CncFeedSource;
   readonly feedMmPerMin: number; // already capped to device.maxFeed
   readonly plungeMmPerMin: number;
   readonly spindleRpm: number; // S value; capped to machine spindleMaxRpm

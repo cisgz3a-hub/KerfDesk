@@ -327,6 +327,30 @@ describe('runCncPreflight', () => {
     expect(result.issues.some((issue) => issue.message.includes('V-carve requires'))).toBe(false);
   });
 
+  it('flags an angleless legacy v-bit as invalid V-carve geometry', () => {
+    const angleless = {
+      ...config,
+      toolId: 'angleless',
+      tools: [{ id: 'angleless', name: 'Angleless V-bit', kind: 'v-bit' as const, diameterMm: 3 }],
+    };
+    const result = runCncPreflight(
+      {
+        ...projectWithCnc({ cutType: 'v-carve' }),
+        scene: {
+          ...projectWithCnc({ cutType: 'v-carve' }).scene,
+          objects: [squareObject('v-carve-square', '#ff0000', 20)],
+        },
+      },
+      angleless,
+      GOOD_GCODE,
+    );
+    expect(result.issues).toContainEqual({
+      code: 'cnc-tool-geometry-invalid',
+      message:
+        'Layer L1: V-carve requires an explicit included angle from 1 to 179 degrees for "Angleless V-bit". Edit or replace this bit before generating toolpaths.',
+    });
+  });
+
   it('does not impose a universal stock-depth cap on emitted Z', () => {
     const overdeep = GOOD_GCODE.replace('G1 Z-1.000 F300', 'G1 Z-99.000 F300');
     const result = runCncPreflight(projectWithCnc({ depthMm: 1 }), config, overdeep);

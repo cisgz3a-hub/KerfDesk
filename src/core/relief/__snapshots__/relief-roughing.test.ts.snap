@@ -9,7 +9,15 @@ G17
 G0 Z3.810
 M3 S12000
 G4 P3.000
-; cnc layer L1 relief-rough tool 3.175 mm feed 1000 plunge 300 spindle 12000 rpm passes 8
+; cnc layer-id: L1
+; cnc operation: relief-rough; passes: 8
+; cnc tool-id: em-3175
+; cnc tool-name: 3.175 mm (1/8") end mill
+; cnc tool: end-mill; diameter-mm: 3.175
+; cnc depth: per-pass-mm: 1.500
+; cnc motion: feed-mm-min: 1000; plunge-mm-min: 300
+; cnc spindle-rpm: 12000
+; cnc feed-source: manual
 G0 X0.000 Y399.802
 G1 Z-1.500 F300
 G1 X0.198 Y400.000 F1000

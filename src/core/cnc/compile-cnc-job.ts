@@ -53,6 +53,7 @@ import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
 import { collectLayerContours } from './collect-cnc-contours';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
+import { cncGroupProvenance } from './cnc-group-provenance';
 
 export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
   const clearingGroups: CncGroup[] = [];
@@ -182,6 +183,7 @@ function cncGroupForPasses(
     toolId: tool.id,
     toolName: tool.name,
     toolDiameterMm: tool.diameterMm,
+    ...cncGroupProvenance(settings, tool),
     feedMmPerMin: capFeed(cutFeed, device.maxFeed),
     plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
@@ -223,6 +225,7 @@ export function vcarveClearanceGroupForLayer(
     toolId: clearTool.id,
     toolName: clearTool.name,
     toolDiameterMm: clearTool.diameterMm,
+    ...cncGroupProvenance(settings, clearTool, { includeVResolution: false }),
     feedMmPerMin: capFeed(settings.feedMmPerMin, device.maxFeed),
     plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),

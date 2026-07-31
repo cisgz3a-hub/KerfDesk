@@ -2,7 +2,11 @@
 // filter tiled exports exactly like the single-file path (audit finding #29).
 
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_CNC_MACHINE_CONFIG, DEFAULT_CNC_TILING } from '../../core/scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  DEFAULT_CNC_TILING,
+} from '../../core/scene';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { capturingPlatform, tiledCncProject } from './save-tiled-gcode-testing';
 
@@ -34,6 +38,60 @@ describe('handleSaveTiledGcode', () => {
     expect(maxX(all)).toBeGreaterThan(20);
     // O2 lives at 60..80 — scoped out, so no tile may reach its territory.
     expect(maxX(all)).toBeLessThan(50);
+  });
+
+  it('does not rescan an unselected invalid V-carve during per-tile preflight', async () => {
+    const base = tiledCncProject();
+    const machine = base.machine;
+    if (machine?.kind !== 'cnc') throw new Error('expected CNC project');
+    const invalidToolId = 'angleless-v-bit';
+    const project = {
+      ...base,
+      machine: {
+        ...machine,
+        tools: [
+          ...machine.tools,
+          {
+            id: invalidToolId,
+            name: 'Legacy angleless V-bit',
+            kind: 'v-bit' as const,
+            diameterMm: 3,
+          },
+        ],
+      },
+      scene: {
+        ...base.scene,
+        layers: base.scene.layers.map((layer) =>
+          layer.id === 'L2'
+            ? {
+                ...layer,
+                cnc: {
+                  ...(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS),
+                  cutType: 'v-carve' as const,
+                  toolId: invalidToolId,
+                },
+              }
+            : layer,
+        ),
+      },
+    };
+    const written: string[] = [];
+
+    const handled = await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project,
+      savedName: 'job',
+      outputScope: {
+        cutSelectedGraphics: true,
+        useSelectionOrigin: false,
+        selectedObjectIds: ['O1'],
+      },
+      pushToast: () => undefined,
+    });
+
+    expect(handled).toBe(true);
+    expect(written.length).toBeGreaterThan(0);
+    expect(maxX(written.join('\n'))).toBeLessThan(50);
   });
 
   // Rule 7 / ADR-228: a pre-emit policy finding stopped refusing the tiled
@@ -109,6 +167,8 @@ describe('handleSaveTiledGcode', () => {
     for (const file of written) {
       expect(file).toContain('; commit:');
       expect(file).toContain('; emitter:');
+      expect(file).toContain(`; profile-name: ${tiledCncProject().device.name}`);
+      expect(file).toContain(`; profile-id: ${tiledCncProject().device.profileId}`);
       expect(file).toContain('GRBL $30=12000');
       expect(file).toMatch(/; tile: row \d+, column \d+/);
     }

@@ -33,9 +33,12 @@ export function registrationGroupForTile(
       { x: center.x - tile.rect.minX, y: center.y - tile.rect.minY, z: 0 },
     ],
   }));
+  const { vResolutionMm: _vResolutionMm, ...templateWithoutVResolution } = template;
   return {
-    ...template,
+    ...templateWithoutVResolution,
     cutType: 'drill',
+    requestedDepthMm: REGISTRATION_HOLE_DEPTH_MM,
+    depthPerPassMm: REGISTRATION_HOLE_DEPTH_MM,
     feedMmPerMin: Math.min(template.feedMmPerMin, template.plungeMmPerMin),
     passes,
   };

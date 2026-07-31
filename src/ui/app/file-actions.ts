@@ -11,7 +11,14 @@ import type {
   PreflightIssue,
   ReadinessSettingsCapability,
 } from '../../core/preflight';
-import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
+import {
+  DEFAULT_OUTPUT_SCOPE,
+  machineKindOf,
+  validateOutputScope,
+  type OutputScope,
+  type Project,
+  type SceneObject,
+} from '../../core/scene';
 import type { importLightBurnProject } from '../../io/lightburn';
 import { prepareProjectForPersistence } from '../../io/project';
 import type { deserializeProject } from '../../io/project';
@@ -207,8 +214,9 @@ function pushPostSaveAdvisories(
   for (const advisory of preflightAdvisories) {
     ctx.pushToast(advisory.message, 'warning');
   }
+  const warningProject = outputScopedWarningProject(ctx);
   for (const warning of detectMachineJobWarnings(
-    ctx.project,
+    warningProject,
     ctx.controllerSettings,
     ctx.activeWcs ?? null,
   )) {
@@ -220,6 +228,12 @@ function pushPostSaveAdvisories(
       'info',
     );
   }
+}
+
+function outputScopedWarningProject(ctx: SaveGcodeCtx): Project {
+  const scoped = validateOutputScope(ctx.project.scene, ctx.outputScope ?? DEFAULT_OUTPUT_SCOPE);
+  if (!scoped.ok || scoped.scene === ctx.project.scene) return ctx.project;
+  return { ...ctx.project, scene: scoped.scene };
 }
 
 export type SaveProjectCtx = {

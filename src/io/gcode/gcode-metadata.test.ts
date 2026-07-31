@@ -11,7 +11,7 @@ const META: GcodeMetadata = {
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('adr-270-vcarve-region-major-v1');
+    expect(EMITTER_REVISION).toBe('adr-273-cnc-incident-provenance-v1');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
@@ -43,12 +43,27 @@ describe('gcodeMetadataHeader', () => {
   // ADR-103 defect fix: router exports carried the laser-worded banner. The
   // CNC header names the RPM mapping and router mode instead.
   it('records router-mode assumptions for CNC exports', () => {
-    const header = gcodeMetadataHeader(META, { kind: 'cnc', spindleMaxRpm: 24000 });
+    const header = gcodeMetadataHeader(
+      META,
+      { kind: 'cnc', spindleMaxRpm: 24000 },
+      {
+        name: 'Shop 4040\nG0 X399',
+        profileId: 'shop-4040\r\nM3 S99999',
+        profileSource: 'custom',
+        catalogVersion: '2026-08-01',
+      },
+    );
     expect(header).toContain(
       '; assumes: GRBL $30=24000 (S maps 1:1 to spindle RPM), $32=0 (router mode)',
     );
     expect(header).toContain('; safety: retract to safe Z before travels');
     expect(header).not.toContain('laser mode');
+    expect(header).toContain('; profile-name: Shop 4040 G0 X399');
+    expect(header).toContain('; profile-id: shop-4040  M3 S99999');
+    expect(header).toContain('; profile-source: custom');
+    expect(header).toContain('; profile-catalog: 2026-08-01');
+    expect(header.split('\n')).not.toContain('G0 X399');
+    expect(header.split('\n')).not.toContain('M3 S99999');
   });
 
   it('keeps newline and control characters inside comment lines', () => {

@@ -41,9 +41,13 @@ export function emitStandaloneCncGcode(
   const gcode =
     metadata === undefined
       ? normalizedBody
-      : gcodeMetadataHeader(metadata, {
-          kind: 'cnc',
-          spindleMaxRpm: machine.params.spindleMaxRpm,
-        }) + normalizedBody;
+      : gcodeMetadataHeader(
+          metadata,
+          {
+            kind: 'cnc',
+            spindleMaxRpm: machine.params.spindleMaxRpm,
+          },
+          project.device,
+        ) + normalizedBody;
   return { gcode, preflight };
 }

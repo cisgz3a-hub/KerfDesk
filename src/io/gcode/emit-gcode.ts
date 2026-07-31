@@ -136,7 +136,11 @@ export function emitPreparedGcodeWithCncPassSpans(
   // preflight input makes that guarantee explicit.
   const preflight = runEmitPreflight(prepared.project, body, options, rotaryStage);
   const gcode = options.metadata
-    ? gcodeMetadataHeader(options.metadata, headerAssumptionsFor(prepared.project)) + body
+    ? gcodeMetadataHeader(
+        options.metadata,
+        headerAssumptionsFor(prepared.project),
+        prepared.project.device,
+      ) + body
     : body;
   const spans = cncEmission !== null && options.metadata === undefined ? cncEmission.spans : null;
   return { gcode, preflight, spans };

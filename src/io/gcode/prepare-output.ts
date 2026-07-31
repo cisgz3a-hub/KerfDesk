@@ -4,7 +4,7 @@
 // from RAW compileJob (no optimize, no job-origin) while Save/Start emitted from
 // the OPTIMIZED job, so the operator could approve one path order in the preview
 // and burn another (roadmap P1-C). prepareOutput runs the identical pipeline for
-// every consumer: pre-emit budget guard -> compile -> optional job-origin ->
+// every consumer: pre-emit integrity/advisory checks -> compile -> optional job-origin ->
 // optimize. Pure: no clock, no random, no I/O.
 
 import {
@@ -90,8 +90,9 @@ export function prepareOutput(
   // the operator saw a REFUSED .rd export (emit-rd) and a refused tiled CNC
   // export for a finding that merely warns on Start. Split against the one
   // canonical set both the Start and Save paths key off so the three cannot
-  // drift apart. The blocking bucket is empty for every code pre-emit can emit
-  // today; it stays so a later integrity check here still refuses correctly.
+  // drift apart. An invalid V-carve tool angle is the current pre-compile
+  // integrity refusal: there is no honest depth program to materialize without
+  // that geometry. Other pre-emit findings remain advisory.
   const preEmit = runPreEmitPreflight(outputProject);
   const blocking = preEmit.issues.filter((issue) =>
     COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code),

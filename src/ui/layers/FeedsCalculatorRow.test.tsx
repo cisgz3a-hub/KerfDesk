@@ -130,6 +130,40 @@ describe('FeedsCalculatorRow', () => {
     }
   });
 
+  it('keeps Apply enabled for a V-bit while disclosing the unchanged rough-guide model', async () => {
+    install4040Cnc();
+    const onCommitSettings = vi.fn();
+    const { host, root } = await render(onCommitSettings, {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      toolId: 'vb-90',
+    });
+    try {
+      const applyButton = host.querySelector('button');
+      expect(applyButton).toBeInstanceOf(HTMLButtonElement);
+      expect((applyButton as HTMLButtonElement).disabled).toBe(false);
+      expect(host.textContent).toContain('machine-aware feed 300');
+      expect(host.textContent).toContain(
+        'V-bit rough guide: the material recipe uses the stored 12.7 mm diameter band.',
+      );
+      expect(host.textContent).toContain(
+        'It does not model the 90° included angle or the cutting width at each depth.',
+      );
+      expect(host.textContent).toContain("Start with the cutter manufacturer's data");
+
+      await apply(host);
+      expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({
+        feedMmPerMin: 300,
+        plungeMmPerMin: 120,
+        spindleRpm: 12_000,
+        depthPerPassMm: 0.75,
+        feedSource: { kind: 'material-recipe', materialKey: 'plywood-mdf', fluteCount: 2 },
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('uses the compile-authoritative CNC machine spindle ceiling', async () => {
     install4040Cnc();
     const project = useStore.getState().project;

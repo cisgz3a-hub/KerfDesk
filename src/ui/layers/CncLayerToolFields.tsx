@@ -3,24 +3,13 @@
 // VClearToolSelect arms the two-stage v-carve's flat-floor clearing bit.
 // Split from CncLayerFields.tsx, which sits near the file-size cap.
 
-import {
-  DEFAULT_CNC_TOOLS,
-  activeCncTool,
-  sceneObjectUsesOperation,
-  type CncLayerSettings,
-  type CncTool,
-  type Layer,
-} from '../../core/scene';
+import { sceneObjectUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
-import { materialFeedsPatch } from '../state/cnc-project-material';
-import { withoutCncFeedProvenance } from '../state/cnc-feed-provenance';
+import { useCncTools } from './CncLayerBitSelect';
 
-export function useCncTools(): ReadonlyArray<CncTool> {
-  return useStore((s) =>
-    s.project.machine?.kind === 'cnc' ? s.project.machine.tools : DEFAULT_CNC_TOOLS,
-  );
-}
+export { LayerBitSelect } from './CncLayerBitSelect';
+export { useCncTools };
 
 // Relief roughing (H.5) reads depth-per-pass + stepover from the layer but
 // takes total depth from the relief object — CncLayerFields keys its
@@ -30,68 +19,6 @@ export function useLayerHasReliefObjects(layer: Layer): boolean {
     s.project.scene.objects.some(
       (object) => object.kind === 'relief' && sceneObjectUsesOperation(object, layer),
     ),
-  );
-}
-
-export function LayerBitSelect(props: {
-  readonly layer: Layer;
-  readonly settings: CncLayerSettings;
-  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-  readonly onCommitSettings: (settings: CncLayerSettings) => void;
-}): JSX.Element {
-  const tools = useCncTools();
-  const machine = useStore((s) => s.project.machine);
-  const profile = useStore((s) => s.project.device);
-  const liveCaps = useStore((s) => s.cncLiveCaps);
-  // A material-driven layer must recompute its feeds for the NEW bit's
-  // diameter — otherwise the material hint claims feeds that were computed
-  // for the old bit.
-  const feedsForBit = (toolId: string | undefined): Partial<CncLayerSettings> | null => {
-    const source = props.settings.feedSource;
-    if (machine?.kind !== 'cnc' || source?.kind !== 'material-recipe') return null;
-    const tool = toolId === undefined ? activeCncTool(machine) : tools.find((t) => t.id === toolId);
-    if (tool === undefined) return null;
-    return materialFeedsPatch({
-      materialKey: source.materialKey,
-      tool,
-      spindleRpm: props.settings.spindleRpm,
-      profile,
-      machineSpindleMaxRpm: machine.params.spindleMaxRpm,
-      liveCaps,
-      fluteCount: source.fluteCount,
-    });
-  };
-  return (
-    <Row label="Bit">
-      <select
-        value={props.settings.toolId ?? ''}
-        onChange={(e) => {
-          const toolId = e.target.value === '' ? undefined : e.target.value;
-          const feeds = feedsForBit(toolId);
-          let base: CncLayerSettings;
-          if (e.target.value === '') {
-            // Clearing the override removes the key (exact optional field).
-            const { toolId: _removed, ...rest } = props.settings;
-            base = rest;
-          } else {
-            base = { ...props.settings, toolId: e.target.value };
-          }
-          props.onCommitSettings(
-            feeds === null ? withoutCncFeedProvenance(base) : { ...base, ...feeds },
-          );
-        }}
-        aria-label={`Bit for ${props.layer.color}`}
-        title="Which bit cuts this layer. Layers with different bits become a multi-bit job with M0 tool-change pauses."
-        style={selectStyle}
-      >
-        <option value="">Machine bit (active)</option>
-        {tools.map((tool) => (
-          <option key={tool.id} value={tool.id}>
-            {tool.name}
-          </option>
-        ))}
-      </select>
-    </Row>
   );
 }
 

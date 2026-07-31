@@ -4,7 +4,7 @@
 // Machine-touching actions (apply profile) go through the project with
 // undo, exactly like updateCncMachine.
 
-import type { CncLayerSettings, CncMachineConfig, CncTool } from '../../core/scene';
+import type { CncLayerSettings, CncMachineConfig, CncTool, Scene } from '../../core/scene';
 import {
   EMPTY_CNC_LIBRARY,
   feedPresetFromSettings,
@@ -16,6 +16,10 @@ import {
   refreshAutomaticCncFeeds,
   refreshAutomaticCncFeedsAfterToolRemoval,
 } from './cnc-auto-seeding';
+import {
+  blockingCncSecondaryToolReferences,
+  sceneWithoutDormantCncSecondaryToolReferences,
+} from './cnc-tool-references';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 
@@ -70,47 +74,64 @@ function customToolActions(
           dirty: true,
         };
       }),
-    deleteCustomCncTool: (toolId) =>
-      set((s) => {
-        const library: CncLibrary = {
-          ...s.cncLibrary,
-          customTools: s.cncLibrary.customTools.filter((tool) => tool.id !== toolId),
-        };
-        const machine = s.project.machine;
-        if (machine?.kind !== 'cnc' || !machine.tools.some((tool) => tool.id === toolId)) {
-          return { cncLibrary: library };
-        }
-        const tools = machine.tools.filter((tool) => tool.id !== toolId);
-        const nextMachine: CncMachineConfig = {
-          ...machine,
-          tools,
-          toolId:
-            machine.toolId === toolId && tools[0] !== undefined ? tools[0].id : machine.toolId,
-        };
-        const scene = refreshAutomaticCncFeedsAfterToolRemoval(
-          s.project.scene,
-          {
-            device: s.project.device,
-            machine: nextMachine,
-            liveCaps: s.cncLiveCaps,
-          },
-          toolId,
-        );
-        // Manual/legacy layer settings remain exact. Only material recipes
-        // carrying automatic provenance drop a deleted override and recalculate
-        // against the surviving active bit.
-        return {
-          cncLibrary: library,
-          project: {
-            ...s.project,
-            scene,
-            machine: nextMachine,
-          },
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+    deleteCustomCncTool: (toolId) => set((s) => stateAfterCustomToolDeletion(s, toolId)),
+  };
+}
+
+function stateAfterCustomToolDeletion(
+  state: AppState,
+  toolId: string,
+): AppState | Partial<AppState> {
+  // Active clearing/finishing/roughing stages have no safe implicit fallback.
+  // Keep this refusal below the UI so command callers cannot bypass it.
+  if (blockingCncSecondaryToolReferences(state.project.scene, toolId).length > 0) return state;
+  const preparedScene = sceneWithoutDormantCncSecondaryToolReferences(state.project.scene, toolId);
+  const library: CncLibrary = {
+    ...state.cncLibrary,
+    customTools: state.cncLibrary.customTools.filter((tool) => tool.id !== toolId),
+  };
+  const machine = state.project.machine;
+  if (machine?.kind !== 'cnc' || !machine.tools.some((tool) => tool.id === toolId)) {
+    return libraryDeletionWithoutMachineUpdate(state, library, preparedScene);
+  }
+  const tools = machine.tools.filter((tool) => tool.id !== toolId);
+  const nextMachine: CncMachineConfig = {
+    ...machine,
+    tools,
+    toolId: machine.toolId === toolId && tools[0] !== undefined ? tools[0].id : machine.toolId,
+  };
+  const scene = refreshAutomaticCncFeedsAfterToolRemoval(
+    preparedScene,
+    {
+      device: state.project.device,
+      machine: nextMachine,
+      liveCaps: state.cncLiveCaps,
+    },
+    toolId,
+  );
+  // Manual/legacy primary settings remain exact. Material recipes carrying
+  // automatic provenance recalculate against the surviving Active bit.
+  return {
+    cncLibrary: library,
+    project: { ...state.project, scene, machine: nextMachine },
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+function libraryDeletionWithoutMachineUpdate(
+  state: AppState,
+  library: CncLibrary,
+  scene: Scene,
+): Partial<AppState> {
+  if (scene === state.project.scene) return { cncLibrary: library };
+  return {
+    cncLibrary: library,
+    project: { ...state.project, scene },
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
   };
 }
 

@@ -30,6 +30,7 @@ import {
 } from '../scene';
 import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
+import { cncGroupProvenance } from './cnc-group-provenance';
 import { parkFields } from './motion-polish';
 
 const MIN_FEED_MM_PER_MIN = 1;
@@ -78,6 +79,10 @@ function reliefGroup(
     toolId: tool.id,
     toolName: tool.name,
     toolDiameterMm: tool.diameterMm,
+    ...cncGroupProvenance(settings, tool, {
+      includeRequestedDepth: false,
+      includeVResolution: false,
+    }),
     feedMmPerMin: cap(settings.feedMmPerMin, device.maxFeed),
     plungeMmPerMin: cap(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: Math.min(Math.max(0, settings.spindleRpm), config.params.spindleMaxRpm),

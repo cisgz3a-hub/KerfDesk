@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
 import { CHIPLOAD_MATERIALS } from '../../core/cnc';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  activeCncTool,
+  layerCncTool,
+  type Layer,
+  type MachineConfig,
+} from '../../core/scene';
+import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
 import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { useStore } from '../state';
 
@@ -10,11 +18,14 @@ export function CncProjectMaterialPicker(props: {
 }): JSX.Element {
   const applyCncStockMaterial = useStore((state) => state.applyCncStockMaterial);
   const layerCount = useStore((state) => state.project.scene.layers.length);
+  const layers = useStore((state) => state.project.scene.layers);
+  const machine = useStore((state) => state.project.machine);
   const activeKey = props.activeMaterialKey ?? CUSTOM;
   const [pendingKey, setPendingKey] = useState(activeKey);
   useEffect(() => setPendingKey(activeKey), [activeKey]);
 
   const preset = selectedPreset(pendingKey);
+  const angledToolAdvisories = projectAngledToolAdvisories(machine, layers);
   const buttonLabel = preset === null ? 'Use manual feeds' : `Apply ${preset.label} preset`;
   const isCustomActive = pendingKey === CUSTOM && activeKey === CUSTOM;
   return (
@@ -32,7 +43,7 @@ export function CncProjectMaterialPicker(props: {
           <CncMaterialOptions />
         </select>
       </div>
-      <p style={hintStyle}>{materialApplyHint(preset, layerCount)}</p>
+      <p style={hintStyle}>{materialApplyHint(preset, layerCount, angledToolAdvisories)}</p>
       <button
         type="button"
         disabled={isCustomActive}
@@ -46,16 +57,41 @@ export function CncProjectMaterialPicker(props: {
   );
 }
 
-function materialApplyHint(preset: ReturnType<typeof selectedPreset>, layerCount: number): string {
+function materialApplyHint(
+  preset: ReturnType<typeof selectedPreset>,
+  layerCount: number,
+  angledToolAdvisories: ReadonlyArray<string>,
+): string {
   if (preset === null) {
     return 'Manual mode clears the project preset but keeps every layer’s current numeric values.';
   }
   const familyLabel = preset.family === 'plywood-mdf' ? 'plywood / MDF' : preset.family;
+  let hint: string;
   if (layerCount === 0) {
-    return `${preset.label} uses the ${familyLabel} starting model. Apply saves it for new layers. Test on scrap before the final cut.`;
+    hint = `${preset.label} uses the ${familyLabel} starting model. Apply saves it for new layers. Test on scrap before the final cut.`;
+  } else {
+    const layerLabel = layerCount === 1 ? 'layer' : 'layers';
+    hint = `${preset.label} uses the ${familyLabel} starting model. Apply recalculates feed, plunge, and depth/pass for ${layerCount} ${layerLabel} from each bit, spindle, and machine limits. Test on scrap.`;
   }
-  const layerLabel = layerCount === 1 ? 'layer' : 'layers';
-  return `${preset.label} uses the ${familyLabel} starting model. Apply recalculates feed, plunge, and depth/pass for ${layerCount} ${layerLabel} from each bit, spindle, and machine limits. Test on scrap.`;
+  return angledToolAdvisories.length === 0 ? hint : `${hint} ${angledToolAdvisories.join(' ')}`;
+}
+
+function projectAngledToolAdvisories(
+  machine: MachineConfig | undefined,
+  layers: ReadonlyArray<Layer>,
+): ReadonlyArray<string> {
+  if (machine?.kind !== 'cnc') return [];
+  const tools =
+    layers.length === 0
+      ? [activeCncTool(machine)]
+      : layers.map((layer) => layerCncTool(machine, layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS));
+  return [
+    ...new Set(
+      tools
+        .map(cncAngledToolFeedAdvisory)
+        .filter((advisory): advisory is string => advisory !== null),
+    ),
+  ];
 }
 
 function selectedPreset(value: string) {

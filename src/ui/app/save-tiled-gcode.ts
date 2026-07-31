@@ -57,7 +57,10 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
     jobAwareAlert(tiledSaveWorkBudgetMessage(tiled.grid));
     return true;
   }
-  const emitted = emitTileFiles(ctx.project, machine, tiled.tiles, ctx.savedName);
+  // Per-tile preflight must inspect the same selected artifact that produced
+  // prepared.job; rescanning the original scene can overblock on unselected
+  // operations that are absent from every tile.
+  const emitted = emitTileFiles(prepared.project, machine, tiled.tiles, ctx.savedName);
   if (emitted === null) return true;
   const files = emitted.files;
   // Rule 7 / ADR-228: a disagreeing $30/$32 is the same hazard whether the job

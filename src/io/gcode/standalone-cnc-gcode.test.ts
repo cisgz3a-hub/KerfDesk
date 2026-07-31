@@ -36,6 +36,8 @@ describe('emitStandaloneCncGcode', () => {
     expect(result.preflight).toEqual({ ok: true, issues: [] });
     expect(result.gcode).toContain('; KerfDesk\n; version: 1.2.3');
     expect(result.gcode).toContain('; emitter: surfacing-test');
+    expect(result.gcode).toContain(`; profile-name: ${cncProject().device.name}`);
+    expect(result.gcode).toContain(`; profile-id: ${cncProject().device.profileId}`);
     expect(result.gcode).toContain('; assumes: GRBL $30=12000');
     expect(result.gcode.indexOf('G0 Z3.810')).toBeLessThan(result.gcode.indexOf('M3 S12000'));
     expect(result.gcode.endsWith('\n')).toBe(true);

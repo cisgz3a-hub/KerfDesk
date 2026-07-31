@@ -121,6 +121,35 @@ describe('resolveCncAutoLayerSettings', () => {
 });
 
 describe('resolveCncMaterialFeedPatch', () => {
+  it('keeps the current 4040 material result explicit for a custom 3 mm 90-degree V-bit', () => {
+    expect(
+      resolveCncMaterialFeedPatch({
+        profile: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+        tool: {
+          id: 'custom-v-3mm-90',
+          name: 'Custom 3 mm 90 degree V-bit',
+          kind: 'v-bit',
+          diameterMm: 3,
+          tipAngleDeg: 90,
+        },
+        materialKey: 'plywood-mdf',
+        spindleRpm: 12_000,
+        machineSpindleMaxRpm: 12_000,
+        fluteCount: 2,
+      }),
+    ).toMatchObject({
+      feedMmPerMin: 300,
+      plungeMmPerMin: 120,
+      spindleRpm: 12_000,
+      depthPerPassMm: 0.75,
+      feedSource: {
+        kind: 'material-recipe',
+        materialKey: 'plywood-mdf',
+        fluteCount: 2,
+      },
+    });
+  });
+
   it('applies live XY and Z caps after material calculation', () => {
     expect(
       resolveCncMaterialFeedPatch({

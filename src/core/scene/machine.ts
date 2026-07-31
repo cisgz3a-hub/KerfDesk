@@ -16,9 +16,22 @@ export type CncTool = {
   readonly name: string;
   readonly kind: CncToolKind;
   readonly diameterMm: number;
-  // v-bit / engraving tools only: included tip angle.
+  // v-bit / engraving tools only: included angle.
   readonly tipAngleDeg?: number;
 };
+
+export const MIN_CNC_TIP_ANGLE_DEG = 1;
+export const MAX_CNC_TIP_ANGLE_DEG = 179;
+
+/** The one included-angle contract shared by entry, persistence and geometry. */
+export function isValidCncTipAngleDeg(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= MIN_CNC_TIP_ANGLE_DEG &&
+    value <= MAX_CNC_TIP_ANGLE_DEG
+  );
+}
 
 // Stock (workpiece) parameters. Z0 is the stock TOP surface; cut depths are
 // measured down from it. The XY footprint (Phase H.2) locates the workpiece
@@ -153,8 +166,9 @@ export type CncLayerSettings = {
   // key). Absent = feeds were entered manually ("Custom"). Display/round-trip
   // only — does not affect compiled output.
   readonly materialKey?: string;
-  // Display/round-trip provenance only. It never changes emitted output;
-  // numeric settings above remain the source of truth for compilation.
+  // Display/round-trip provenance only. It never changes emitted motion;
+  // numeric settings above remain the source of truth for compilation, while
+  // export comments may record this source for incident diagnosis.
   readonly feedSource?: CncFeedSource;
   readonly tabsEnabled: boolean; // profile cuts only
   readonly tabHeightMm: number; // material left under a tab

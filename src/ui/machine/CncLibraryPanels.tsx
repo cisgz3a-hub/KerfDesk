@@ -3,137 +3,86 @@
 // Material & Bit card. App-level data — see cnc-library-persistence.
 
 import { useState } from 'react';
-import type { CncMachineConfig, CncToolKind } from '../../core/scene';
+import type { CncMachineConfig } from '../../core/scene';
+import {
+  CNC_RETAINED_FEEDS_WARNING,
+  hasRetainedFeedsAfterEffectiveToolChange,
+} from '../common/cnc-bit-change-advisory';
+import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
 import { useStore } from '../state';
-
-const TOOL_KIND_OPTIONS: ReadonlyArray<{ readonly value: CncToolKind; readonly label: string }> = [
-  { value: 'end-mill', label: 'End mill' },
-  { value: 'ball-nose', label: 'Ball nose' },
-  { value: 'v-bit', label: 'V-bit' },
-  { value: 'engraving', label: 'Engraving' },
-];
-
-const MAX_TOOL_DIAMETER_MM = 50;
-const MAX_TIP_ANGLE_DEG = 179;
+import { blockingCncSecondaryToolReferences } from '../state/cnc-tool-references';
+import { useToastStore } from '../state/toast-store';
+import { AddCncBitForm } from './AddCncBitForm';
 
 export function CncToolManager(props: { readonly machine: CncMachineConfig }): JSX.Element {
   const deleteCustomCncTool = useStore((s) => s.deleteCustomCncTool);
+  const pushToast = useToastStore((s) => s.pushToast);
   const customToolIds = useStore((s) => new Set(s.cncLibrary.customTools.map((t) => t.id)));
+  const deleteTool = (toolId: string): void => {
+    const before = useStore.getState().project;
+    const blockingReference = blockingCncSecondaryToolReferences(before.scene, toolId)[0];
+    if (blockingReference !== undefined) {
+      pushToast(secondaryToolDeleteWarning(blockingReference), 'warning');
+      return;
+    }
+    deleteCustomCncTool(toolId);
+    if (hasRetainedFeedsAfterEffectiveToolChange(before, useStore.getState().project)) {
+      pushToast(CNC_RETAINED_FEEDS_WARNING, 'warning');
+    }
+  };
   return (
     <details style={detailsStyle}>
       <summary style={summaryStyle} title="Add or remove custom bits (saved across projects).">
         Manage bits ({props.machine.tools.length})
       </summary>
       <ul style={listStyle} aria-label="Bit list">
-        {props.machine.tools.map((tool) => (
-          <li key={tool.id} style={listItemStyle}>
-            <span style={toolNameStyle}>
-              {/* Default names already carry the mm size; only append it for
-                  custom bits whose name doesn't. */}
-              {tool.name}
-              {tool.name.includes('mm') ? '' : ` — ${tool.diameterMm} mm`}
-            </span>
-            {customToolIds.has(tool.id) ? (
-              <button
-                type="button"
-                onClick={() => deleteCustomCncTool(tool.id)}
-                aria-label={`Delete bit ${tool.name}`}
-                title="Remove this custom bit from the machine and the saved library. Layers using it fall back to the active bit."
-              >
-                Delete
-              </button>
-            ) : null}
-          </li>
-        ))}
+        {props.machine.tools.map((tool) => {
+          const label = `${cncToolGeometryLabel(tool)} — ${tool.name}`;
+          return (
+            <li key={tool.id} style={listItemStyle}>
+              <span style={toolNameStyle} title={label} aria-label={label}>
+                {label}
+              </span>
+              {customToolIds.has(tool.id) ? (
+                <button
+                  type="button"
+                  onClick={() => deleteTool(tool.id)}
+                  aria-label={`Delete bit ${tool.name}`}
+                  title="Remove this custom bit. Primary assignments fall back to Active; visible clearing, finishing, or roughing assignments must be changed first."
+                  style={deleteButtonStyle}
+                >
+                  Delete
+                </button>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
-      <AddBitForm />
+      <AddCncBitForm />
     </details>
   );
 }
 
-function AddBitForm(): JSX.Element {
-  const addCustomCncTool = useStore((s) => s.addCustomCncTool);
-  const [name, setName] = useState('');
-  const [kind, setKind] = useState<CncToolKind>('end-mill');
-  const [diameter, setDiameter] = useState('3.175');
-  const [tipAngle, setTipAngle] = useState('60');
-  const needsAngle = kind === 'v-bit' || kind === 'engraving';
-
-  const onAdd = (): void => {
-    const diameterMm = Number.parseFloat(diameter);
-    const tipAngleDeg = Number.parseFloat(tipAngle);
-    if (name.trim() === '' || !(diameterMm > 0) || diameterMm > MAX_TOOL_DIAMETER_MM) return;
-    addCustomCncTool({
-      name: name.trim(),
-      kind,
-      diameterMm,
-      ...(needsAngle && tipAngleDeg > 0 && tipAngleDeg <= MAX_TIP_ANGLE_DEG ? { tipAngleDeg } : {}),
-    });
-    setName('');
-  };
-
-  return (
-    <div style={addFormStyle}>
-      <input
-        type="text"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Bit name"
-        aria-label="New bit name"
-        title="Display name for the custom bit."
-        style={nameInputStyle}
-      />
-      <select
-        value={kind}
-        onChange={(e) => setKind(e.target.value as CncToolKind)}
-        aria-label="New bit kind"
-        title="Bit geometry: end mill, ball nose, v-bit, or engraving."
-        style={kindSelectStyle}
-      >
-        {TOOL_KIND_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <input
-        type="number"
-        value={diameter}
-        onChange={(e) => setDiameter(e.target.value)}
-        min={0.1}
-        max={MAX_TOOL_DIAMETER_MM}
-        step={0.1}
-        aria-label="New bit diameter (mm)"
-        title="Cutting diameter in millimeters."
-        style={numberInputStyle}
-      />
-      {needsAngle ? (
-        <input
-          type="number"
-          value={tipAngle}
-          onChange={(e) => setTipAngle(e.target.value)}
-          min={1}
-          max={MAX_TIP_ANGLE_DEG}
-          step={1}
-          aria-label="New bit tip angle (deg)"
-          title="Included tip angle for v/engraving bits."
-          style={numberInputStyle}
-        />
-      ) : null}
-      <button type="button" onClick={onAdd} aria-label="Add bit" title="Add the custom bit.">
-        Add
-      </button>
-    </div>
-  );
+function secondaryToolDeleteWarning(reference: {
+  readonly layerColor: string;
+  readonly role: string;
+}): string {
+  return `Cannot delete this bit: ${reference.role} on layer ${reference.layerColor} still uses it. Change that layer's secondary bit setting first.`;
 }
 
 export function CncMachineProfilesRow(): JSX.Element {
   const profiles = useStore((s) => s.cncLibrary.machineProfiles);
-  const saveCncMachineProfile = useStore((s) => s.saveCncMachineProfile);
   const applyCncMachineProfile = useStore((s) => s.applyCncMachineProfile);
   const deleteCncMachineProfile = useStore((s) => s.deleteCncMachineProfile);
+  const pushToast = useToastStore((s) => s.pushToast);
   const [selectedId, setSelectedId] = useState('');
-  const [saveName, setSaveName] = useState('');
+  const applyProfile = (): void => {
+    const before = useStore.getState().project;
+    applyCncMachineProfile(selectedId);
+    if (hasRetainedFeedsAfterEffectiveToolChange(before, useStore.getState().project)) {
+      pushToast(CNC_RETAINED_FEEDS_WARNING, 'warning');
+    }
+  };
   return (
     <details style={detailsStyle}>
       <summary
@@ -160,7 +109,7 @@ export function CncMachineProfilesRow(): JSX.Element {
         <button
           type="button"
           disabled={selectedId === ''}
-          onClick={() => applyCncMachineProfile(selectedId)}
+          onClick={applyProfile}
           aria-label="Apply machine profile"
           title="Replace the current CNC setup with the saved profile (undoable)."
         >
@@ -179,30 +128,39 @@ export function CncMachineProfilesRow(): JSX.Element {
           Delete
         </button>
       </div>
-      <div style={addFormStyle}>
-        <input
-          type="text"
-          value={saveName}
-          onChange={(e) => setSaveName(e.target.value)}
-          placeholder="Profile name"
-          aria-label="New machine profile name"
-          title="Name for snapshotting the current CNC setup as a profile."
-          style={nameInputStyle}
-        />
-        <button
-          type="button"
-          onClick={() => {
-            if (saveName.trim() === '') return;
-            saveCncMachineProfile(saveName.trim());
-            setSaveName('');
-          }}
-          aria-label="Save machine profile"
-          title="Snapshot the current stock/bit/spindle setup under this name."
-        >
-          Save
-        </button>
-      </div>
+      <SaveMachineProfileControls />
     </details>
+  );
+}
+
+function SaveMachineProfileControls(): JSX.Element {
+  const saveCncMachineProfile = useStore((s) => s.saveCncMachineProfile);
+  const [saveName, setSaveName] = useState('');
+  const saveProfile = (): void => {
+    if (saveName.trim() === '') return;
+    saveCncMachineProfile(saveName.trim());
+    setSaveName('');
+  };
+  return (
+    <div style={addFormStyle}>
+      <input
+        type="text"
+        value={saveName}
+        onChange={(event) => setSaveName(event.target.value)}
+        placeholder="Profile name"
+        aria-label="New machine profile name"
+        title="Name for snapshotting the current CNC setup as a profile."
+        style={nameInputStyle}
+      />
+      <button
+        type="button"
+        onClick={saveProfile}
+        aria-label="Save machine profile"
+        title="Snapshot the current stock/bit/spindle setup under this name."
+      >
+        Save
+      </button>
+    </div>
   );
 }
 
@@ -230,16 +188,19 @@ const listStyle: React.CSSProperties = {
 };
 const listItemStyle: React.CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 6,
   fontSize: 12,
 };
 const toolNameStyle: React.CSSProperties = {
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
+  flex: 1,
+  minWidth: 0,
+  whiteSpace: 'normal',
+  overflowWrap: 'anywhere',
+  lineHeight: 1.3,
 };
+const deleteButtonStyle: React.CSSProperties = { flexShrink: 0 };
 const addFormStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -249,4 +210,3 @@ const addFormStyle: React.CSSProperties = {
 };
 const nameInputStyle: React.CSSProperties = { flex: 1, minWidth: 90, padding: '2px 6px' };
 const kindSelectStyle: React.CSSProperties = { fontSize: 12, padding: '2px 4px' };
-const numberInputStyle: React.CSSProperties = { width: 64, padding: '2px 6px' };

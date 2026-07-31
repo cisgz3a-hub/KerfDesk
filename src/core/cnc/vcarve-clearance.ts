@@ -14,9 +14,9 @@ import { insetContoursChecked } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
 import { pocketRingToolpaths, type PocketToolpaths } from './pocket-paths';
+import { vcarveIncludedAngleDeg } from './vcarve-angle';
 
 const MIN_CLOSED_POINTS = 3;
-const FALLBACK_TIP_ANGLE_DEG = 60;
 
 export type VCarveClearanceOptions = {
   readonly vBit: CncTool;
@@ -40,16 +40,14 @@ export function vcarveClearancePocket(
   polylines: ReadonlyArray<Polyline>,
   options: VCarveClearanceOptions,
 ): PocketToolpaths {
+  const tipAngleDeg = vcarveIncludedAngleDeg(options.vBit);
+  if (tipAngleDeg === null) return NO_CLEARANCE;
   if (!(options.maxDepthMm > 0)) return NO_CLEARANCE;
   const contours = polylines.filter(
     (polyline) =>
       polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
   );
   if (contours.length === 0) return NO_CLEARANCE;
-  const tipAngleDeg =
-    options.vBit.tipAngleDeg !== undefined && options.vBit.tipAngleDeg > 0
-      ? options.vBit.tipAngleDeg
-      : FALLBACK_TIP_ANGLE_DEG;
   const clampInsetMm = options.maxDepthMm * Math.tan((tipAngleDeg * Math.PI) / 360);
   // The flat-floor region: everything deeper than the clamp inset. Narrow
   // shapes offset away entirely — clipper returns nothing and there is no

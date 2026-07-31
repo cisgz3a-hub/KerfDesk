@@ -5,6 +5,7 @@
 // cnc-grbl-coolant.ts.
 
 import type { CncGroup } from '../job';
+import { sanitizeGcodeCommentValue } from '../gcode-comments';
 import type { CncCoolantMode, Vec2 } from '../scene';
 import { appendCoolantStart, appendCoolantStop } from './cnc-grbl-coolant';
 import { appendRetract, fmt, type Head } from './cnc-grbl-emit-head';
@@ -70,7 +71,8 @@ function appendToolChange(lines: string[], head: Head, group: CncGroup, state: E
   lines.push(`G0 X${fmt(park.x)} Y${fmt(park.y)}`);
   head.x = fmt(park.x);
   head.y = fmt(park.y);
-  lines.push(`${TOOL_CHANGE_LOAD_PREFIX}${group.toolName ?? 'next tool'}`);
+  const toolName = sanitizeGcodeCommentValue(group.toolName ?? 'next tool', 40) || 'next tool';
+  lines.push(`${TOOL_CHANGE_LOAD_PREFIX}${toolName}`);
   lines.push('; re-zero Z on the stock top, then cycle-start to resume');
   lines.push('M0');
   // The operator physically moves the head during the pause: jogging XY over the

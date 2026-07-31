@@ -1,9 +1,11 @@
 // The single canonical set of preflight codes that may refuse an action.
 //
 // Rule 7 / ADR-228: a preflight finding may warn, but only a *factual* inability
-// to produce the program may refuse. These five are rule-7 category (b) compile
+// to produce the program may refuse. These six are rule-7 category (b) compile
 // integrity — the program cannot be materialized at all:
 //   - non-finite-coordinate / empty-output: nothing emittable was produced.
+//   - cnc-tool-geometry-invalid: V-carve depth cannot be calculated without
+//     the selected V-bit's explicit included angle.
 //   - no-output-layer: there is no layer to emit from.
 //   - relief-needs-cnc: a relief object cannot compile on a laser machine.
 //   - program-materialization-failed: the engine factually failed to build the
@@ -24,6 +26,7 @@ import type { PreflightCode } from './preflight';
 export const COMPILE_INTEGRITY_PREFLIGHT_CODES: ReadonlySet<PreflightCode> = new Set<PreflightCode>(
   [
     'non-finite-coordinate',
+    'cnc-tool-geometry-invalid',
     'empty-output',
     'relief-needs-cnc',
     'no-output-layer',
