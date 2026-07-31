@@ -42,12 +42,15 @@ describe('applyDesignSketch', () => {
     ]);
   });
 
+  // A sketch without explicit layers lives on the default carve layer, so the
+  // whole apply still shares ONE operation — now named after that layer
+  // (ADR-271 Amendment 1 clause 2).
   it('shares one auto-created line operation across the whole apply', () => {
     const result = applyDesignSketch(emptySlice(), plaque, ids);
     if (result === null) throw new Error('expected insertion');
     expect(result.project.scene.layers).toHaveLength(1);
     const [operation] = result.project.scene.layers;
-    expect(operation?.name).toBe('Design');
+    expect(operation?.name).toBe('Layer 1');
     expect(operation?.mode).toBe('line');
     expect(
       result.project.scene.objects.map((object) =>
@@ -84,9 +87,10 @@ describe('applyDesignSketch', () => {
     );
     if (second === null) throw new Error('expected insertion');
     expect(second.project.scene.objects).toHaveLength(6);
+    // uniqueOperationName suffixes the second apply's duplicate layer name.
     expect(second.project.scene.layers.map((operation) => operation.name)).toEqual([
-      'Design',
-      'Design 2',
+      'Layer 1',
+      'Layer 1 2',
     ]);
   });
 
