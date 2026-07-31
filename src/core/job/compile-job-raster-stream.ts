@@ -14,6 +14,7 @@ import { applyImageMaskToLuma } from '../raster';
 import { createImageMaskPixelTest } from '../raster/image-mask';
 import { ditherIndependentRow, isErrorDiffusionMode } from '../raster/dither';
 import { createErrorDiffusionRowDitherer } from '../raster/dither-rows';
+import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import type { Layer, RasterImage, SceneObject } from '../scene';
 import type { RasterMachineBounds } from './raster-bounds';
 import { isRotatedRaster, rotatedRasterRow } from './raster-rotated-sample';
@@ -127,14 +128,4 @@ function nearestSourceCoordinate(
   targetExtent: number,
 ): number {
   return Math.min(sourceExtent - 1, Math.floor(((target + 0.5) * sourceExtent) / targetExtent));
-}
-
-export function originFlipsRasterX(device: DeviceProfile): boolean {
-  return device.origin === 'front-right' || device.origin === 'rear-right';
-}
-
-export function originFlipsRasterY(device: DeviceProfile): boolean {
-  return (
-    device.origin === 'front-left' || device.origin === 'front-right' || device.origin === 'center'
-  );
 }

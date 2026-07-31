@@ -3,6 +3,10 @@
 // previous sweep stops at its burn edge and the next entry runway is bounded
 // by the gap, so neither forward nor reverse motion can double back.
 
+import { rasterPixelRuns, rasterSweepRunsForPixelRun, type RasterSweepRun } from '../raster-output';
+
+export { rasterRunSurvivesDotWidthCorrection, type RasterSweepRun } from '../raster-output';
+
 const RASTER_GAP_RAPID_THRESHOLD_MM = 5;
 
 export type RasterActiveSpan = {
@@ -18,25 +22,6 @@ export type RasterRowSweepPlan = {
   readonly runs: ReadonlyArray<RasterSweepRun>;
 };
 
-export type RasterSweepRun = {
-  readonly startXWorldMm: number;
-  readonly endXWorldMm: number;
-  readonly s: number;
-};
-
-/** True when dot-width correction leaves a positive-width burn segment. */
-export function rasterRunSurvivesDotWidthCorrection(
-  startXWorldMm: number,
-  endXWorldMm: number,
-  reverse: boolean,
-  dotWidthCorrectionMm: number,
-): boolean {
-  if (dotWidthCorrectionMm <= 0) return true;
-  const burnStartX = startXWorldMm + (reverse ? -dotWidthCorrectionMm : dotWidthCorrectionMm);
-  const burnEndX = endXWorldMm + (reverse ? dotWidthCorrectionMm : -dotWidthCorrectionMm);
-  return reverse ? burnStartX > burnEndX : burnStartX < burnEndX;
-}
-
 type RasterActiveSpanInput = {
   readonly row: Uint16Array;
   readonly pixelWidthMm: number;
@@ -48,12 +33,6 @@ type RasterRowSweepPlanInput = RasterActiveSpanInput & {
   readonly dotWidthCorrectionMm?: number;
   /** Raster bounds.minX. Defaults to zero for span-only consumers. */
   readonly minXWorldMm?: number;
-};
-
-type RasterPixelRun = {
-  readonly firstX: number;
-  readonly lastX: number;
-  readonly s: number;
 };
 
 type BoundedSplitRunwayInput = {
@@ -127,59 +106,14 @@ function planRasterSweepRuns(
   const pixelRuns = rasterPixelRuns(row, span);
   const orderedRuns = reverse ? [...pixelRuns].reverse() : pixelRuns;
   return orderedRuns.flatMap((run) =>
-    rasterSweepRunsForPixelRun(run, pixelWidthMm, reverse, dotWidthCorrectionMm, minXWorldMm),
+    rasterSweepRunsForPixelRun({
+      run,
+      pixelWidthMm,
+      isReverse: reverse,
+      dotWidthCorrectionMm,
+      minXWorldMm,
+    }),
   );
-}
-
-function rasterPixelRuns(row: Uint16Array, span: RasterActiveSpan): RasterPixelRun[] {
-  const runs: RasterPixelRun[] = [];
-  let firstX = span.firstX;
-  let s = row[firstX] ?? 0;
-  for (let x = span.firstX + 1; x <= span.lastX; x += 1) {
-    const nextS = row[x] ?? 0;
-    if (nextS === s) continue;
-    runs.push({ firstX, lastX: x - 1, s });
-    firstX = x;
-    s = nextS;
-  }
-  runs.push({ firstX, lastX: span.lastX, s });
-  return runs;
-}
-
-function rasterSweepRunsForPixelRun(
-  run: RasterPixelRun,
-  pixelWidthMm: number,
-  reverse: boolean,
-  dotWidthCorrectionMm: number,
-  minXWorldMm: number,
-): RasterSweepRun[] {
-  // Keep the emitter's historical operation order: add minX to the pixel
-  // edge before applying DWC. Reassociating these floating-point additions
-  // can move a half-thousandth endpoint onto the other side of toFixed(3).
-  const leftX = minXWorldMm + run.firstX * pixelWidthMm;
-  const rightX = minXWorldMm + (run.lastX + 1) * pixelWidthMm;
-  const startX = reverse ? rightX : leftX;
-  const endX = reverse ? leftX : rightX;
-  if (run.s <= 0 || dotWidthCorrectionMm <= 0) {
-    return [{ startXWorldMm: startX, endXWorldMm: endX, s: run.s }];
-  }
-
-  const burnStartX = startX + (reverse ? -dotWidthCorrectionMm : dotWidthCorrectionMm);
-  const burnEndX = endX + (reverse ? dotWidthCorrectionMm : -dotWidthCorrectionMm);
-  const correctedRunExists = rasterRunSurvivesDotWidthCorrection(
-    startX,
-    endX,
-    reverse,
-    dotWidthCorrectionMm,
-  );
-  if (!correctedRunExists) {
-    return [{ startXWorldMm: startX, endXWorldMm: endX, s: 0 }];
-  }
-  return [
-    { startXWorldMm: startX, endXWorldMm: burnStartX, s: 0 },
-    { startXWorldMm: burnStartX, endXWorldMm: burnEndX, s: run.s },
-    { startXWorldMm: burnEndX, endXWorldMm: endX, s: 0 },
-  ];
 }
 
 export function rasterControllerCoordinateMm(value: number): number {

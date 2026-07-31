@@ -12,9 +12,10 @@ import type { AppState } from './store';
 export type EditedImageFields = {
   readonly dataUrl: string;
   readonly lumaBase64: string;
-  /** Present only when the edit cropped/resized (mm follows the same DPI). */
+  /** Apply always records the baked bitmap dimensions. */
   readonly pixelWidth?: number;
   readonly pixelHeight?: number;
+  /** Present only when canvas/crop edits changed the physical image extent. */
   readonly bounds?: Bounds;
 };
 

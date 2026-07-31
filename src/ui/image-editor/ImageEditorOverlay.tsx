@@ -4,18 +4,18 @@
 // the working pixels into the scene object as one project undo entry.
 
 import { useEffect, useRef, useState } from 'react';
+import type { RgbaBuffer } from '../../core/image-edit';
 import { formatDuration } from '../../core/job';
 import type { RasterImage } from '../../core/scene';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { applyThicken } from './editor-kerf-check';
 import { useInkTimeReadout } from './use-ink-time-readout';
-import { useKerfCheck } from './use-kerf-check';
 import { AdjustDialogPanel } from './AdjustDialog';
 import type { EditorSession } from './editor-session';
 import { EditorAdjustMenus } from './EditorAdjustMenus';
 import { HistoryPanel } from './HistoryPanel';
+import { KerfStatus } from './KerfStatus';
 import { LayersPanel } from './LayersPanel';
 import { EditorCanvas } from './EditorCanvas';
 import { EditorOptionsBar } from './EditorOptionsBar';
@@ -24,6 +24,7 @@ import { ResizeDialogPanel } from './ResizeDialog';
 import { TextDialog } from './TextDialog';
 import { handleEditorKeyDown, handleEditorKeyUp } from './editor-shortcuts';
 import { useImageEditorStore } from './image-editor-store';
+import { useCompositeDoc } from './use-composite-doc';
 import { useQuickMaskStore } from './quick-mask-store';
 
 export function ImageEditorOverlay(): JSX.Element | null {
@@ -38,6 +39,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
   const openImageDialog = useUiStore((s) => s.openImageDialog);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const isQuickMask = useQuickMaskStore((s) => s.rubylith !== null);
+  const composite = useCompositeDoc(session, session?.revision ?? -1);
   useRegisterModal();
 
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -82,11 +84,16 @@ export function ImageEditorOverlay(): JSX.Element | null {
         <EditorToolStrip />
         <div style={mainColumnStyle}>
           <EditorOptionsBar />
-          <EditorCanvas />
+          <EditorCanvas composite={composite} />
           <AdjustDialogPanel />
           <ResizeDialogPanel />
           <TextDialog />
-          <StatusFooter session={session} isQuickMask={isQuickMask} trimmed={trimmed} />
+          <StatusFooter
+            session={session}
+            composite={composite}
+            isQuickMask={isQuickMask}
+            trimmed={trimmed}
+          />
         </div>
         {isHistoryOpen ? (
           <div style={dockStyle}>
@@ -120,10 +127,11 @@ const dockStyle: React.CSSProperties = {
 
 function StatusFooter(props: {
   readonly session: EditorSession;
+  readonly composite: RgbaBuffer | undefined;
   readonly isQuickMask: boolean;
   readonly trimmed: number;
 }): JSX.Element {
-  const { session, isQuickMask, trimmed } = props;
+  const { session, composite, isQuickMask, trimmed } = props;
   return (
     <footer style={statusStyle}>
       <span>
@@ -135,7 +143,7 @@ function StatusFooter(props: {
         {trimmed > 0 ? ` · ${trimmed} older history steps trimmed` : ''}
         <InkTimeStatus />
       </span>
-      <KerfStatus />
+      <KerfStatus composite={composite} />
       <span>Esc closes — session is kept · Apply commits one undo step</span>
     </footer>
   );
@@ -153,31 +161,6 @@ function InkTimeStatus(): JSX.Element | null {
   return (
     <span title="Ink coverage of the visible image, and a rough engrave time from the assigned Image-mode layer">
       {` · ink ${readout.inkPercent}%${time}`}
-    </span>
-  );
-}
-
-// Kerf thin-stroke advisory (V2 plan E2) — a warning with its fix in place,
-// never a block (rule 7).
-function KerfStatus(): JSX.Element | null {
-  const check = useKerfCheck();
-  if (check === null || check.removedPixels === 0) return null;
-  return (
-    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-      <span
-        title={`These active-layer Image-mode raster pixels are in horizontal runs that the current ${check.thresholdMm} mm dot-width correction would remove`}
-      >
-        ⚠ {check.removedPixels} px on active layer removed by {check.thresholdMm} mm dot correction
-      </span>
-      <button
-        type="button"
-        className="lf-btn"
-        style={{ padding: '0 8px', fontSize: 11 }}
-        onClick={() => applyThicken(check)}
-        title="Thicken affected runs on the active layer enough to survive dot-width correction (one undo step)"
-      >
-        Thicken
-      </button>
     </span>
   );
 }

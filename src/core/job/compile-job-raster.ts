@@ -9,14 +9,11 @@ import {
   resampleLumaNearest,
 } from '../raster';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
+import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import { sceneObjectUsesOperation, type Layer, type RasterImage, type SceneObject } from '../scene';
 import type { RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
-import {
-  originFlipsRasterX,
-  originFlipsRasterY,
-  streamedRasterRowProvider,
-} from './compile-job-raster-stream';
+import { streamedRasterRowProvider } from './compile-job-raster-stream';
 import { layerWithObjectOverride } from './compile-job-object-policy';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
 import { rasterBoundsInMachineCoords, type RasterMachineBounds } from './raster-bounds';
@@ -27,19 +24,40 @@ import { validatedScanOffsetMm } from './scan-offset';
 
 const WHITE_LUMA_BYTE = 255;
 
+type CompileRasterGroupsOptions = {
+  readonly sceneObjects?: ReadonlyArray<SceneObject>;
+  readonly sourceLumaByObjectId?: ReadonlyMap<string, Uint8Array>;
+};
+
+type CompileRasterGroupOptions = {
+  readonly objects: ReadonlyArray<SceneObject>;
+  readonly sourceLumaOverride: Uint8Array | undefined;
+};
+
+/**
+ * Compile raster groups for one materialized operation and object set.
+ * Optional luma overrides let worker-owned transient rasters avoid JSON/base64
+ * serialization without changing persisted RasterImage data.
+ */
 export function compileRasterGroupsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
-  sceneObjects: ReadonlyArray<SceneObject> = objects,
+  options: CompileRasterGroupsOptions = {},
 ): RasterGroup[] {
+  const sceneObjects = options.sceneObjects ?? objects;
   const groups: RasterGroup[] = [];
   for (const obj of objects) {
     if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, layer)) continue;
     if (obj.role === 'trace-source') continue;
     const effectiveLayer = layerWithObjectOverride(layer, obj);
     if (effectiveLayer.mode !== 'image') continue;
-    groups.push(compileRasterGroup(obj, effectiveLayer, device, sceneObjects));
+    groups.push(
+      compileRasterGroup(obj, effectiveLayer, device, {
+        objects: sceneObjects,
+        sourceLumaOverride: options.sourceLumaByObjectId?.get(obj.id),
+      }),
+    );
   }
   return groups;
 }
@@ -48,11 +66,11 @@ function compileRasterGroup(
   obj: RasterImage,
   layer: Layer,
   device: DeviceProfile,
-  objects: ReadonlyArray<SceneObject>,
+  options: CompileRasterGroupOptions,
 ): RasterGroup {
   const bidirectionalScanOffsetMm = validatedScanOffsetMm(device, layer.bidirectionalScanOffsetMm);
   const scanDirection = resolveImageScanDirection(device, layer);
-  const sourceLuma = decodeRasterLuma(obj);
+  const sourceLuma = sourceLumaForRaster(obj, options.sourceLumaOverride);
   const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
   const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
   const powerPercent = effectiveObjectPowerPercent(layer, obj);
@@ -67,7 +85,7 @@ function compileRasterGroup(
     ? obj.pixelHeight
     : pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
   const lineIntervalMm = (bounds.maxY - bounds.minY) / pixelHeight;
-  const maskObject = imageMaskObjectFor(obj, objects);
+  const maskObject = imageMaskObjectFor(obj, options.objects);
   // Streaming works for every dither algorithm and for masked images
   // (ADR-243), so the only decision left is size: small rasters keep the
   // one-shot materialized dither, large ones hold O(width) state instead.
@@ -124,6 +142,17 @@ function compileRasterGroup(
     scanDirection,
     ...(bidirectionalScanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm }),
   };
+}
+
+function sourceLumaForRaster(
+  obj: RasterImage,
+  sourceLumaOverride: Uint8Array | undefined,
+): Uint8Array {
+  const sourceLuma = sourceLumaOverride ?? decodeRasterLuma(obj);
+  if (sourceLuma.length !== obj.pixelWidth * obj.pixelHeight) {
+    throw new Error('compileRasterGroup: source luma dimensions do not match the raster');
+  }
+  return sourceLuma;
 }
 
 type MaterializedRasterInput = {

@@ -123,9 +123,9 @@ function runApply(set: Setter, get: () => ImageEditorState): Promise<string | nu
       const bounds = appliedBounds(session);
       useStore.getState().applyEditedImage(objectId, {
         ...fields,
-        ...(bounds === null
-          ? {}
-          : { pixelWidth: session.doc.width, pixelHeight: session.doc.height, bounds }),
+        pixelWidth: session.doc.width,
+        pixelHeight: session.doc.height,
+        ...(bounds === null ? {} : { bounds }),
       });
       reconcileAppliedSession(set, objectId, revision);
       useToastStore.getState().pushToast('Image edits applied.', 'success');

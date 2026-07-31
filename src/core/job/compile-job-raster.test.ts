@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import { createLayer, IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../scene';
 import { compileJob } from './compile-job';
+import { compileRasterGroupsForLayer } from './compile-job-raster';
 import type { Job, RasterGroup } from './job';
 
 const dev = DEFAULT_DEVICE_PROFILE;
@@ -168,6 +169,15 @@ describe('compileJob raster image groups', () => {
     expect(() =>
       compileJob({ objects: [rasterObject('AP//AA===')], layers: [imageLayer()] }, dev),
     ).toThrow(/lumaBase64/);
+  });
+
+  it('rejects an override whose dimensions do not match the raster', () => {
+    const object = rasterObject();
+    expect(() =>
+      compileRasterGroupsForLayer([object], imageLayer(), dev, {
+        sourceLumaByObjectId: new Map([[object.id, Uint8Array.of(0)]]),
+      }),
+    ).toThrow('compileRasterGroup: source luma dimensions do not match the raster');
   });
 
   it('decodes saved luma without relying on a host atob global', () => {
