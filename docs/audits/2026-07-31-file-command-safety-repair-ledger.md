@@ -1,21 +1,23 @@
 # CurveDesk menu-command safety repair ledger — 2026-07-31
 
-Status: bundle #1 is published as draft PR #528; bundle #2 has passed focused
-verification and independent pre-publication review.
+Status: bundle #1 is under integration correction on draft PR #528 after the
+active-job File refusal was held; bundle #2 merged through PR #531 at
+`da56b579`.
 
 This is dated evidence for the sequential repair branches. It does not supersede
 the living product, workflow, safety, or machine-control authorities.
 
 ## Authority and scope
 
-- Bundle #1 base: exact `origin/main` commit
-  `e3ace9928163fcd696d074c9f0a54024f8215948`; branch
-  `codex/file-safety-lightburn`; draft PR #528.
+- Bundle #1 correction base: exact `origin/main` commit
+  `da56b5793ba9efb86e10fb42323ebc0201e6f059`; branch
+  `codex/file-safety-lightburn`; amended draft PR #528.
 - Bundle #2 base: exact `origin/main` commit
   `e3d5cc11ed1b3a0a8f0fd37251306de3aa1bca81`; branch
   `codex/inspector-delete-consistency`.
 - Ranked repair order:
-  1. active-job gating for every File command and File keyboard chord;
+  1. keep File commands available during an active job while preserving Abort
+     reachability through presentation and layout;
   2. unsaved-state preservation after `.lbrn` / `.lbrn2` conversion;
   3. G-code Inspector modal isolation;
   4. node-mode Delete consistency across keyboard, menu, and workspace context
@@ -23,38 +25,46 @@ the living product, workflow, safety, or machine-control authorities.
 - Excluded: Start/Frame policy, controller or firmware behavior, settings,
   hardware, native-picker qualification, and physical output.
 
-## Repair 1 — active-job File-action gating
+## Repair 1 correction — active-job File actions remain available
 
 ### Failing reproductions
 
-The original implementation failed three independent boundaries:
+The held draft introduced three policy violations:
 
-- `confirmDiscardAsync` returned `true` for a clean project before checking the
-  active job, so clean-project New/Open could proceed.
-- All ten registered File commands remained enabled while a job was active.
-- `Ctrl+N` replaced a clean project during an active job.
+- all ten registered File commands were disabled while a job was active;
+- all six File keyboard chords were intercepted with a refusal toast; and
+- `confirmDiscardAsync` refused both clean and dirty New/Open flows during an
+  active job.
 
-The red run reported the expected failures in `confirm-discard.test.ts`,
-`command-registry.test.ts`, and `use-shortcuts-streaming-gate.test.tsx`.
+The correction's failing-first run reported 11 expected failures across
+`confirm-discard.test.ts`, `shortcuts-file-active-job.test.ts`,
+`use-shortcuts-streaming-gate.test.tsx`, and `command-registry.test.ts`.
+LightBurn migration and topmost Abort-layout checks passed in that same red
+run.
 
 ### Narrow repair
 
-- `confirmDiscardAsync` now checks `isActiveJob` before the clean-project fast
-  path.
-- One `fileCommand` constructor disables all ten File commands with the same
-  actionable reason. Menu, toolbar, and workspace context actions consume these
-  registered command objects and cannot invoke disabled actions.
-- All six File chords (`New`, `Open`, `Save`, `Save As`, `Import SVG`, and Save
-  G-code) read current laser-store state at key-dispatch time, show the warning,
-  and open no picker or project-changing path while a job is active.
-- Existing idle Save / Don't Save / Cancel, picker-cancel, error, and shortcut
-  behavior remains unchanged.
+- Removed the `fileCommand` active-job disabling constructor and its shared
+  refusal copy.
+- Removed the active-job intercept from all six File chords (`New`, `Open`,
+  `Save`, `Save As`, `Import SVG`, and Save G-code).
+- Removed the active-job refusal from `confirmDiscardAsync`; dirty projects
+  retain the normal Save / Don't Save / Cancel flow and clean projects retain
+  the fast path.
+- Added a rendered layout regression proving the persistent Live Motion bar
+  retains maximum stacking order and an enabled `ABORT JOB` action while File
+  dialogs are presented.
+- Existing picker-cancel, save, error, and idle behavior remains unchanged.
 
 ### Green evidence
 
-- Focused red-to-green bundle: 4 files, 77 tests passed.
-- Combined File surface bundle: 18 files, 140 tests passed.
-- Dedicated keyboard gate: all six File chords passed.
+- Focused red-to-green bundle: 6 files, 70 tests passed.
+- All ten registered File commands passed enabled-state and invocation checks
+  with `jobActive: true`.
+- All six File chords reached their normal confirmation or picker path with a
+  live streamer and produced no active-job refusal.
+- Clean and dirty `Ctrl+N` integration paths passed with a live streamer.
+- Abort stayed enabled in the maximum-stacking-order live-motion surface.
 
 ## Repair 2 — LightBurn conversion remains unsaved
 
@@ -79,24 +89,25 @@ without the unsaved-changes flow.
 - Tests verify both the exact `markLoaded` call and real store state:
   `dirty: true`, the converted `.lf2` name, and `lastSaveTarget: null`.
 
-## Independent review — bundle #1
+## Independent review — bundle #1 correction
 
-An independent read-only reviewer inspected the complete diff against
-`origin/main` and returned **PASS — no blocking findings**.
+The original bundle #1 review is superseded because it accepted the
+active-job File refusal that was subsequently held as a policy violation. A
+fresh independent read-only review inspected the complete corrected diff
+against exact base `da56b579` and returned **PRE-PUBLISH PASS — no blocking
+findings**.
 
-The reviewer confirmed:
+The reviewer independently passed the 6-file / 70-test focused bundle,
+TypeScript, changed-file ESLint, changed-file Prettier, and
+`git diff --check`. The reviewer confirmed all ten File commands and all six
+File chords remain available during a live streamer; clean and dirty
+confirmation paths retain normal behavior; the maximum-stacking-order Live
+Motion bar keeps Abort enabled above dialog backdrops; LightBurn conversion
+remains dirty and clears the prior save target; and no Start/Frame, controller,
+firmware, settings, or hardware production path changed.
 
-- all ten File commands, including both G-code Inspector commands, share the
-  active-job gate;
-- menu, toolbar, and context surfaces honor the registered disabled state;
-- shortcut gating reads live job state rather than a render snapshot;
-- clean and dirty New/Open paths fail closed while a job remains active;
-- Abort reachability and the existing `Ctrl/Cmd+.` path are unchanged;
-- LightBurn conversion is explicitly dirty and clears the prior save target;
-- no Start, Frame, controller, firmware, settings, or hardware policy changed.
-
-Independent verification passed 13 files / 171 tests, TypeScript, ESLint on all
-changed files, and Prettier.
+A post-publication identity and PR-state audit remains required after the
+amended commit is pushed.
 
 ## Repair 3 — G-code Inspector modal isolation
 
