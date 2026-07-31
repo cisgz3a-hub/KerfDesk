@@ -15,7 +15,7 @@ import { CORNER_PICK_RADIUS_PX, pickCorner } from './design-corner-pick';
 import { hitTestSketch, HIT_RADIUS_PX } from './design-hit-test';
 import { useDesignStudioStore } from './design-studio-store';
 import { applyOrthoMm, snapPointMm } from './design-snap';
-import { pxToMm } from './design-view';
+import type { DesignSurface } from './design-surface';
 
 export type DesignPointerHandlers = {
   readonly onPointerDown: (event: React.PointerEvent<HTMLCanvasElement>) => void;
@@ -25,13 +25,13 @@ export type DesignPointerHandlers = {
 };
 
 export function useDesignPointer(
-  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  surface: DesignSurface,
   newEntityId: () => string,
 ): DesignPointerHandlers {
   const pointMm = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>): Vec2 | null =>
-      resolvePointerMm(canvasRef.current, event),
-    [canvasRef],
+      resolvePointerMm(surface, event),
+    [surface],
   );
 
   const onPointerDown = useCallback(
@@ -50,14 +50,14 @@ export function useDesignPointer(
         });
         return;
       }
-      const pxPerMm = session.view === null ? 1 : session.view.pxPerMm;
+      const pxPerMm = surface.pxPerMm();
       if (session.tool === 'fillet' || session.tool === 'chamfer') {
         applyCornerAt(at, session.tool, pxPerMm);
         return;
       }
       if (session.tool === 'select') beginSelectOrMove(at, event, pxPerMm);
     },
-    [pointMm],
+    [pointMm, surface],
   );
 
   const onPointerMove = useCallback(
@@ -111,23 +111,21 @@ export function useDesignPointer(
 
 // Resolves the pointer to a millimetre point, applying object snap first and the
 // grid only as a fallback, and publishes which target captured it so the canvas can
-// mark it and the status bar can name it.
+// mark it and the status bar can name it. The surface owns the raw mapping —
+// pan/zoom transform on the flat canvas, plane raycast in the 3D viewport —
+// and everything after the mapping is shared.
 function resolvePointerMm(
-  canvas: HTMLCanvasElement | null,
+  surface: DesignSurface,
   event: React.PointerEvent<HTMLCanvasElement>,
 ): Vec2 | null {
   const store = useDesignStudioStore.getState();
   const session = store.session;
-  const rect = canvas?.getBoundingClientRect();
-  if (session?.view == null || rect === undefined) return null;
-  const raw = pxToMm(session.view, {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top,
-  });
+  const raw = surface.toMm(event);
+  if (session === null || raw === null) return null;
   const resolved = snapPointMm({
     sketch: session.history.present,
     rawMm: raw,
-    pxPerMm: session.view.pxPerMm,
+    pxPerMm: surface.pxPerMm(),
     snapEnabled: session.snapEnabled,
     gridMm: session.gridMm,
   });
