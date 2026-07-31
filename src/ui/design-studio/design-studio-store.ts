@@ -20,6 +20,15 @@ import type { CornerOp } from './design-corner-apply';
 import type { CornerPick } from './design-corner-pick';
 import type { DesignDraft } from './design-draft';
 import type { MeasurementKey } from './design-entity-fields';
+import type { DesignLayerPatch } from '../../core/design/layers';
+import {
+  addSessionLayer,
+  assignSelectionToSessionLayer,
+  moveSessionLayer,
+  patchSessionLayer,
+  removeSessionLayer,
+  setSessionActiveLayer,
+} from './design-layer-session';
 import {
   applyCornerToSession,
   beginSessionMove,
@@ -88,6 +97,15 @@ type DesignStudioState = {
   readonly markApplied: () => void;
   readonly undo: () => void;
   readonly redo: () => void;
+  // Carve layers (ADR-271 Amendment 1). Ids come from the caller — pure core
+  // may not generate identity.
+  readonly setActiveLayer: (layerId: string) => void;
+  readonly addLayer: (id: string) => void;
+  readonly patchLayer: (layerId: string, patch: DesignLayerPatch) => void;
+  readonly removeLayer: (layerId: string) => void;
+  readonly moveLayer: (layerId: string, direction: 'up' | 'down') => void;
+  readonly assignSelectionToLayer: (layerId: string) => void;
+  readonly togglePreview3d: () => void;
 };
 
 export const useDesignStudioStore = create<DesignStudioState>((set) => ({
@@ -167,6 +185,18 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
 
   undo: () => set(mapSession(undoSession)),
   redo: () => set(mapSession(redoSession)),
+
+  setActiveLayer: (layerId) => set(mapSession((session) => setSessionActiveLayer(session, layerId))),
+  addLayer: (id) => set(mapSession((session) => addSessionLayer(session, id))),
+  patchLayer: (layerId, patch) =>
+    set(mapSession((session) => patchSessionLayer(session, layerId, patch))),
+  removeLayer: (layerId) => set(mapSession((session) => removeSessionLayer(session, layerId))),
+  moveLayer: (layerId, direction) =>
+    set(mapSession((session) => moveSessionLayer(session, layerId, direction))),
+  assignSelectionToLayer: (layerId) =>
+    set(mapSession((session) => assignSelectionToSessionLayer(session, layerId))),
+  togglePreview3d: () =>
+    set(mapSession((session) => ({ ...session, showPreview3d: !session.showPreview3d }))),
 }));
 
 // Every session mutation goes through here so a closed Studio silently ignores

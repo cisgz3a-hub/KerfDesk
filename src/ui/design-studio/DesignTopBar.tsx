@@ -22,6 +22,7 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
   const toggleSnap = useDesignStudioStore((state) => state.toggleSnap);
   const toggleOrtho = useDesignStudioStore((state) => state.toggleOrtho);
   const toggleGrid = useDesignStudioStore((state) => state.toggleGrid);
+  const togglePreview3d = useDesignStudioStore((state) => state.togglePreview3d);
   const applyHandlers = useDesignApply();
   if (session === null) return null;
   return (
@@ -61,6 +62,12 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
         title="Show the grid (Shift+G)"
         on={session.showGrid}
         onClick={toggleGrid}
+      />
+      <BarToggle
+        label="3D"
+        title="Show the 3D carve preview — each layer at its depth, with its bit"
+        on={session.showPreview3d}
+        onClick={togglePreview3d}
       />
 
       <span style={spacerStyle} />

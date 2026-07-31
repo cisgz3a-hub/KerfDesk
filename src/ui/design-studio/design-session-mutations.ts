@@ -18,10 +18,12 @@ import { sessionSketch, withSketch, type DesignSession } from './design-session'
 
 // The draft becomes an entity, the entity becomes one history step, and the new
 // entity becomes the selection — so the operator can immediately edit what they
-// just drew. A degenerate draft simply clears (a click is not a draw).
+// just drew. A degenerate draft simply clears (a click is not a draw). The new
+// entity lands on the active carve layer (ADR-271 Amendment 1).
 export function commitSessionDraft(session: DesignSession, id: string): DesignSession {
   if (session.draft === null) return session;
-  const entity = draftToEntity(session.draft, id);
+  const drafted = draftToEntity(session.draft, id);
+  const entity = drafted === null ? null : { ...drafted, layerId: session.activeLayerId };
   const cleared: DesignSession = { ...session, draft: null };
   if (entity === null) return cleared;
   const next = addEntity(sessionSketch(session), entity);

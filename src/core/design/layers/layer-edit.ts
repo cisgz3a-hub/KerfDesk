@@ -7,7 +7,19 @@
 // materializes on the first layer edit.
 
 import type { Sketch, SketchEntity } from '../sketch-entity';
-import { DEFAULT_DESIGN_LAYER, type DesignLayer } from './design-layer';
+import { DEFAULT_DESIGN_LAYER, type DesignCutType, type DesignLayer } from './design-layer';
+
+// Field-wise layer patch. `null` on a bit field CLEARS it (back to the
+// machine's active bit / single-stage v-carve); `undefined` leaves it alone —
+// the distinction exactOptionalPropertyTypes exists to keep honest.
+export type DesignLayerPatch = {
+  readonly name?: string;
+  readonly color?: string;
+  readonly cutType?: DesignCutType;
+  readonly depthMm?: number;
+  readonly toolId?: string | null;
+  readonly vClearToolId?: string | null;
+};
 
 /** The sketch's layer list; never empty (absent = the default layer). */
 export function sketchLayers(sketch: Sketch): ReadonlyArray<DesignLayer> {
@@ -33,22 +45,31 @@ export function addDesignLayer(sketch: Sketch, layer: DesignLayer): Sketch {
  * Patches one layer's editable settings. Non-finite or non-positive depths are
  * ignored field-wise; an unknown id returns the sketch unchanged.
  */
-export function patchDesignLayer(
-  sketch: Sketch,
-  layerId: string,
-  patch: Partial<Omit<DesignLayer, 'id'>>,
-): Sketch {
+export function patchDesignLayer(sketch: Sketch, layerId: string, patch: DesignLayerPatch): Sketch {
   const layers = sketchLayers(sketch);
   const index = layers.findIndex((layer) => layer.id === layerId);
   const current = layers[index];
   if (current === undefined) return sketch;
-  const next = { ...current, ...patch };
-  const depthMm =
-    patch.depthMm !== undefined && Number.isFinite(patch.depthMm) && patch.depthMm > 0
-      ? patch.depthMm
-      : current.depthMm;
-  const updated = layers.map((layer, at) => (at === index ? { ...next, depthMm } : layer));
+  const next = patchedLayer(current, patch);
+  const updated = layers.map((layer, at) => (at === index ? next : layer));
   return { ...sketch, layers: updated };
+}
+
+function patchedLayer(current: DesignLayer, patch: DesignLayerPatch): DesignLayer {
+  const depthOk =
+    patch.depthMm !== undefined && Number.isFinite(patch.depthMm) && patch.depthMm > 0;
+  const toolId = patch.toolId === undefined ? current.toolId : (patch.toolId ?? undefined);
+  const vClearToolId =
+    patch.vClearToolId === undefined ? current.vClearToolId : (patch.vClearToolId ?? undefined);
+  return {
+    id: current.id,
+    name: patch.name ?? current.name,
+    color: patch.color ?? current.color,
+    cutType: patch.cutType ?? current.cutType,
+    depthMm: depthOk ? patch.depthMm : current.depthMm,
+    ...(toolId === undefined ? {} : { toolId }),
+    ...(vClearToolId === undefined ? {} : { vClearToolId }),
+  };
 }
 
 /**

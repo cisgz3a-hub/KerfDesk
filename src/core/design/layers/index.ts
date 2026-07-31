@@ -19,4 +19,5 @@ export {
   patchDesignLayer,
   removeDesignLayer,
   sketchLayers,
+  type DesignLayerPatch,
 } from './layer-edit';

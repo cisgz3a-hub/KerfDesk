@@ -18,6 +18,7 @@ import { DesignOptionsBar } from './DesignOptionsBar';
 import { DesignStatusBar } from './DesignStatusBar';
 import { DesignToolRails } from './DesignToolRails';
 import { DesignTopBar } from './DesignTopBar';
+import { DesignSidePanel } from './preview3d/DesignSidePanel';
 import { handleDesignStudioKey } from './design-shortcuts';
 import { useDesignStudioStore } from './design-studio-store';
 import { fitView } from './design-view';
@@ -64,6 +65,7 @@ export function DesignStudioOverlay(): JSX.Element | null {
         <div style={mainColumnStyle}>
           <DesignCanvas />
         </div>
+        <DesignSidePanel />
       </div>
       <DesignStatusBar />
     </div>

@@ -16,6 +16,7 @@
 // into a grey wash.
 
 import { entityToPolylines, type Sketch } from '../../core/design';
+import { entityDesignLayer, sketchLayers } from '../../core/design/layers';
 import type { Polyline, Vec2 } from '../../core/scene';
 import { canvasTheme } from '../theme/canvas-theme';
 import { mmToPx } from './design-view';
@@ -137,7 +138,11 @@ function isMajorLine(valueMm: number, step: number): boolean {
   return Math.round(valueMm / step) % MAJOR_EVERY === 0;
 }
 
+// Strokes take the carve layer's colour (scene DATA, like the main canvas's
+// operation colours) so the 2D drawing and the layers panel tell one story;
+// selection and construction styling still win over the layer tint.
 function paintEntities(ctx: CanvasRenderingContext2D, paint: DesignCanvasPaint): void {
+  const layers = sketchLayers(paint.sketch);
   for (const entity of paint.sketch.entities) {
     const isSelected = paint.selectedIds.has(entity.id);
     const isGuide = entity.construction === true;
@@ -145,7 +150,7 @@ function paintEntities(ctx: CanvasRenderingContext2D, paint: DesignCanvasPaint):
       ? canvasTheme.selection
       : isGuide
         ? canvasTheme.designConstruction
-        : canvasTheme.designGeometry;
+        : entityDesignLayer(entity, layers).color;
     ctx.lineWidth = isSelected ? SELECTED_LINE_WIDTH_PX : NORMAL_LINE_WIDTH_PX;
     ctx.setLineDash(isGuide ? [...CONSTRUCTION_DASH_PX] : []);
     for (const polyline of entityToPolylines(entity)) strokePolyline(ctx, paint.view, polyline);

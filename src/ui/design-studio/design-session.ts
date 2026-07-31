@@ -4,6 +4,7 @@
 // project undo. The one crossing point is Apply.
 
 import { EMPTY_SKETCH, type Sketch } from '../../core/design';
+import { DEFAULT_DESIGN_LAYER_ID } from '../../core/design/layers';
 import type { Vec2 } from '../../core/scene';
 import {
   canRedo,
@@ -66,6 +67,11 @@ export type DesignSession = {
   // close, like every other tool setting.
   readonly filletRadiusMm: number;
   readonly chamferDistanceMm: number;
+  // The carve layer new entities land on (ADR-271 Amendment 1). Session state,
+  // not history: switching layers is not an edit worth undoing.
+  readonly activeLayerId: string;
+  // Whether the 3D carve preview pane is expanded. Survives close via the stash.
+  readonly showPreview3d: boolean;
   // True once the sketch has changed since the last Apply. Apply gates on THIS,
   // not on undo depth, because a view-only step must not look like a change and
   // a change that was undone-then-redone must still apply.
@@ -94,6 +100,8 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     gridMm: DEFAULT_DESIGN_GRID_MM,
     filletRadiusMm: DEFAULT_FILLET_RADIUS_MM,
     chamferDistanceMm: DEFAULT_CHAMFER_DISTANCE_MM,
+    activeLayerId: DEFAULT_DESIGN_LAYER_ID,
+    showPreview3d: true,
     dirtySinceApply: false,
   };
 }
