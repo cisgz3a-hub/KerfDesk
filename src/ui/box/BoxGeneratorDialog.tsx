@@ -1,86 +1,50 @@
-// BoxGeneratorDialog — the Phase K parametric finger-joint box form
-// (ADR-106, F-K1..F-K5): string drafts with calibration-dialog persistence,
-// live validation via the pure core, machine-aware defaults, and a preview
-// that keeps the last valid sheet while the draft is invalid. Generation is
-// disabled unless the core says the spec is valid.
+// BoxGeneratorDialog — the Phase K parametric finger-joint box form.
+// Draft parsing and validation stay synchronous; geometry runs in a dedicated,
+// cancellable worker so expensive valid values never execute during render.
 
-import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
-import {
-  deriveBoxDims,
-  generateBox,
-  validateBoxSpec,
-  type BoxPanel,
-  type BoxSpec,
-  type GenerateBoxResult,
-} from '../../core/box';
+import { useCallback, useRef, useState, type CSSProperties } from 'react';
+import { deriveBoxDims, type BoxPanel, type BoxSpec, type BoxSpecValidation } from '../../core/box';
+import { persistCalibrationDraft } from '../calibration/calibration-draft-storage';
 import { Button, Dialog, DialogActions } from '../kit';
 import {
-  persistCalibrationDraft,
-  restoreCalibrationDraft,
-} from '../calibration/calibration-draft-storage';
-import {
   BOX_DRAFT_KEY,
-  BOX_DRAFT_PERSISTED_FIELDS,
   BOX_FIELD_LABELS,
-  boxDraftWithMaterialThickness,
-  defaultBoxDraft,
-  parseBoxDraft,
-  type BoxAutoFitField,
-  type BoxDraft,
   type BoxDraftParse,
   type BoxMachineContext,
-  SLIDE_LID_MIN_CLEARANCE_DRAFT,
 } from './box-draft';
+import { BoxGenerationStatus } from './BoxGenerationStatus';
 import { BoxGeneratorFields } from './BoxGeneratorFields';
-import { BoxAssembledPreview } from './BoxAssembledPreview';
-import { BoxPreview } from './BoxPreview';
+import { BoxGeneratorPreview, type BoxPreviewView } from './BoxGeneratorPreview';
+import { boxPreviewShouldBeSuppressed } from './box-preview-responsiveness';
+import {
+  useBoxGeneration,
+  type BoxGenerationSnapshot,
+  type BoxGenerationState,
+} from './use-box-generation';
 import { useBoxDraftClose } from './use-box-draft-close';
+import { useBoxGeneratorForm } from './use-box-generator-form';
 
 export function BoxGeneratorDialog(props: {
   readonly machine: BoxMachineContext;
   readonly onCancel: () => void;
   readonly onGenerate: (panels: ReadonlyArray<BoxPanel>) => void;
 }): JSX.Element {
-  const [draft, setDraft] = useState(() =>
-    restoreCalibrationDraft(
-      BOX_DRAFT_KEY,
-      defaultBoxDraft(props.machine),
-      BOX_DRAFT_PERSISTED_FIELDS,
-    ),
-  );
-  const [lockedAutoFitFields, setLockedAutoFitFields] = useState<ReadonlySet<BoxAutoFitField>>(
-    () => new Set(),
-  );
-  const handleCancel = useBoxDraftClose(draft, props.onCancel);
-  // Keeps the last valid sheet visible while the draft is invalid (F-K1).
-  // Render-time ref write is an idempotent cache, safe under StrictMode.
-  const lastValidPanels = useRef<ReadonlyArray<BoxPanel> | null>(null);
-  const lastValidSpec = useRef<BoxSpec | null>(null);
-  const [view, setView] = useState<'flat' | 'assembled'>('flat');
-  const setField =
-    (field: keyof BoxDraft) =>
-    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
-      const { value } = event.target;
-      setDraft((current) => {
-        if (field === 'thickness') {
-          return boxDraftWithMaterialThickness(current, value, lockedAutoFitFields);
-        }
-        // A slide lid cannot slide at zero clearance; lift the draft to the
-        // style's working default when the user has not set one (F-K7).
-        if (field === 'style' && value === 'slide-lid' && Number(current.clearance) === 0) {
-          return { ...current, style: value, clearance: SLIDE_LID_MIN_CLEARANCE_DRAFT };
-        }
-        return { ...current, [field]: value };
-      });
-      if (isAutoFitField(field)) {
-        setLockedAutoFitFields((current) => new Set([...current, field]));
-      }
-    };
-  const parsed = parseBoxDraft(draft, props.machine);
-  const generation = parsed.kind === 'spec' ? generateBox(parsed.spec) : null;
-  const panels = generation !== null && generation.kind === 'generated' ? generation.panels : null;
-  if (panels !== null) lastValidPanels.current = panels;
-  if (panels !== null && parsed.kind === 'spec') lastValidSpec.current = parsed.spec;
+  const form = useBoxGeneratorForm(props.machine);
+  const [view, setView] = useState<BoxPreviewView>('flat');
+  const lastReady = useRef<BoxGenerationSnapshot | null>(null);
+  const generation = useBoxGeneration(form.validSpec);
+  const persistAndClose = useBoxDraftClose(form.draft, props.onCancel);
+  if (generation.currentSnapshot !== null) lastReady.current = generation.currentSnapshot;
+  const displayedSnapshot = generation.currentSnapshot ?? lastReady.current;
+  const isPreviewSuppressed =
+    displayedSnapshot !== null && boxPreviewShouldBeSuppressed(displayedSnapshot.metrics);
+
+  const cancelGeneration = generation.cancel;
+  const handleCancel = useCallback(() => {
+    cancelGeneration();
+    persistAndClose();
+  }, [cancelGeneration, persistAndClose]);
+
   return (
     <Dialog
       onClose={handleCancel}
@@ -88,51 +52,46 @@ export function BoxGeneratorDialog(props: {
       as="form"
       onSubmit={(event) => {
         event.preventDefault();
-        if (panels === null) return;
-        persistCalibrationDraft(BOX_DRAFT_KEY, draft);
-        props.onGenerate(panels);
+        if (generation.currentSnapshot === null) return;
+        persistCalibrationDraft(BOX_DRAFT_KEY, form.draft);
+        props.onGenerate(generation.currentSnapshot.panels);
       }}
       size="md"
     >
-      <BoxGeneratorFields draft={draft} machine={props.machine} setField={setField} />
-      <p style={summaryStyle}>{summaryLine(parsed)}</p>
-      <ViewToggle view={view} onSelect={setView} />
-      {view === 'flat' ? (
-        <BoxPreview panels={panels ?? lastValidPanels.current} />
-      ) : (
-        <BoxAssembledPreview
-          panels={panels ?? lastValidPanels.current}
-          spec={parsed.kind === 'spec' && panels !== null ? parsed.spec : lastValidSpec.current}
-        />
-      )}
-      <IssueList issues={issueLines(parsed, generation)} warnings={warningLines(parsed)} />
+      <BoxGeneratorFields draft={form.draft} machine={props.machine} setField={form.setField} />
+      <p style={summaryStyle}>
+        {summaryLine(displayedSnapshot, generation.currentSnapshot, form.validSpec)}
+      </p>
+      <BoxGeneratorPreview
+        view={view}
+        onSelectView={setView}
+        snapshot={displayedSnapshot}
+        isPending={generation.state.kind === 'pending'}
+      />
+      <BoxGenerationStatus
+        state={generation.state}
+        staleMessage={stalePreviewMessage(
+          form.parsed,
+          form.validation,
+          displayedSnapshot,
+          generation.currentSnapshot,
+          generation.state,
+        )}
+        isPreviewSuppressed={isPreviewSuppressed}
+        onCancel={cancelGeneration}
+        onRetry={generation.retry}
+      />
+      <IssueList
+        issues={issueLines(form.parsed, form.validation, generation.state)}
+        warnings={warningLines(form.validation)}
+      />
       <DialogActions>
         <Button onClick={handleCancel}>Cancel</Button>
-        <Button type="submit" variant="primary" disabled={panels === null}>
+        <Button type="submit" variant="primary" disabled={generation.currentSnapshot === null}>
           Generate
         </Button>
       </DialogActions>
     </Dialog>
-  );
-}
-
-function isAutoFitField(field: keyof BoxDraft): field is BoxAutoFitField {
-  return field === 'fingerWidth' || field === 'partSpacing';
-}
-
-function ViewToggle(props: {
-  readonly view: 'flat' | 'assembled';
-  readonly onSelect: (view: 'flat' | 'assembled') => void;
-}): JSX.Element {
-  return (
-    <div style={viewToggleStyle} role="group" aria-label="Preview view">
-      <Button onClick={() => props.onSelect('flat')} aria-pressed={props.view === 'flat'}>
-        Flat
-      </Button>
-      <Button onClick={() => props.onSelect('assembled')} aria-pressed={props.view === 'assembled'}>
-        Assembled
-      </Button>
-    </div>
   );
 }
 
@@ -157,33 +116,70 @@ function IssueList(props: {
   );
 }
 
-function issueLines(parsed: BoxDraftParse, generation: GenerateBoxResult | null): string[] {
+function issueLines(
+  parsed: BoxDraftParse,
+  validation: BoxSpecValidation | null,
+  generation: BoxGenerationState,
+): string[] {
   if (parsed.kind === 'incomplete') {
     return parsed.emptyFields.map((field) => `${BOX_FIELD_LABELS[field]}: Enter a value.`);
   }
-  if (generation === null) return [];
-  if (generation.kind === 'invalid') {
-    return generation.issues.map((issue) => `${BOX_FIELD_LABELS[issue.field]}: ${issue.message}`);
+  if (validation?.kind === 'invalid') {
+    return validation.issues.map((issue) => `${BOX_FIELD_LABELS[issue.field]}: ${issue.message}`);
   }
-  if (generation.kind === 'error') return [generation.message];
-  return [];
+  if (generation.kind !== 'failed') return [];
+  if (generation.failure.kind === 'invalid') {
+    return generation.failure.issues.map(
+      (issue) => `${BOX_FIELD_LABELS[issue.field]}: ${issue.message}`,
+    );
+  }
+  return [generation.failure.message];
 }
 
-// Warnings (e.g. finger under twice the relief tool) surface even when the
-// spec is valid, so they come from validation, not the generation result.
-function warningLines(parsed: BoxDraftParse): string[] {
-  if (parsed.kind !== 'spec') return [];
-  const validation = validateBoxSpec(parsed.spec);
+function warningLines(validation: BoxSpecValidation | null): string[] {
+  if (validation === null) return [];
   return validation.warnings.map(
     (warning) => `${BOX_FIELD_LABELS[warning.field]}: ${warning.message}`,
   );
 }
 
-function summaryLine(parsed: BoxDraftParse): string {
-  if (parsed.kind !== 'spec') return 'Enter all dimensions to preview the sheet.';
-  const dims = deriveBoxDims(parsed.spec);
+function stalePreviewMessage(
+  parsed: BoxDraftParse,
+  validation: BoxSpecValidation | null,
+  displayed: BoxGenerationSnapshot | null,
+  current: BoxGenerationSnapshot | null,
+  generation: BoxGenerationState,
+): string | null {
+  if (displayed === null || current !== null) return null;
+  if (parsed.kind === 'incomplete') {
+    return 'Showing last generated preview; current values are incomplete.';
+  }
+  if (validation?.kind === 'invalid') {
+    return 'Showing last generated preview; current values are invalid.';
+  }
+  if (generation.kind === 'pending') {
+    return 'Showing last generated preview while current values generate.';
+  }
+  if (generation.kind === 'failed') {
+    return 'Showing last generated preview; current values could not be generated.';
+  }
+  if (generation.kind === 'cancelled') {
+    return 'Showing last generated preview; current generation was cancelled.';
+  }
+  return 'Showing last generated preview; current values are not generated yet.';
+}
+
+function summaryLine(
+  displayed: BoxGenerationSnapshot | null,
+  current: BoxGenerationSnapshot | null,
+  validSpec: BoxSpec | null,
+): string {
+  const spec = displayed?.spec ?? validSpec;
+  if (spec === null) return 'Enter valid dimensions to preview the sheet.';
+  const label = displayed === null ? 'Requested' : current === null ? 'Last generated' : 'Current';
+  const dims = deriveBoxDims(spec);
   return (
-    `Outer ${fmt(dims.outerWidthMm)} × ${fmt(dims.outerDepthMm)} × ${fmt(dims.outerHeightMm)} mm · ` +
+    `${label} · Outer ${fmt(dims.outerWidthMm)} × ${fmt(dims.outerDepthMm)} × ${fmt(dims.outerHeightMm)} mm · ` +
     `Inner ${fmt(dims.innerWidthMm)} × ${fmt(dims.innerDepthMm)} × ${fmt(dims.innerHeightMm)} mm`
   );
 }
@@ -191,8 +187,6 @@ function summaryLine(parsed: BoxDraftParse): string {
 function fmt(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
-
-const viewToggleStyle: CSSProperties = { display: 'flex', gap: 4, margin: '0 0 6px' };
 
 const summaryStyle: CSSProperties = {
   fontSize: 12,

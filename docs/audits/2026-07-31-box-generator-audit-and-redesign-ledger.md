@@ -4,9 +4,13 @@
 
 **Baseline:** `origin/main` at `e3ace9928163fcd696d074c9f0a54024f8215948`
 
-**Audit branch:** `codex/box-generator-audit`
+**Branches:** `codex/box-generator-audit` (PR #529 repair boundary);
+`codex/box-generator-bg002` (stacked responsiveness slice)
 
-**Status:** audit and visualization contract complete; three narrow repairs implemented and locally verified; review PR #529 open
+**Status:** audit and visualization contract complete; PR #529 was
+squash-merged by the maintainer with both checks green; BG-002 is implemented,
+independently audited, and release-gate green on its separate branch; this task
+performed no merge
 
 **Scope:** Box Generator math, fabrication semantics, preview, insertion, persistence, and
 downstream project/output handoff only
@@ -54,8 +58,9 @@ The highest-risk source-confirmed issues and their current disposition are:
 
 1. **repaired:** finite inputs could overflow derived/layout dimensions and let
    non-finite panel coordinates escape;
-2. generation work is unbudgeted and synchronous, so extreme but otherwise
-   valid dimensions or divider counts can freeze the dialog;
+2. **repaired on `codex/box-generator-bg002`:** generation now runs in a
+   cancellable, latest-request-only worker with advisory work estimation and a
+   DOM-only oversized-preview fallback;
 3. fresh CNC Box operations now inherit the global **On path** cut default,
    while the Box contract relies on **Outside** compensation to preserve the
    drawn dimensions;
@@ -78,6 +83,8 @@ string draft
   -> parseBoxDraft
   -> validateBoxSpec
   -> deriveBoxDims / shared edge claims
+  -> O(1) advisory work estimate
+  -> dedicated one-shot generation worker
   -> nominal closed rings
   -> clearance offset
   -> optional CNC corner relief
@@ -156,13 +163,13 @@ No boxes.py code was copied.
 | ID | Priority | Status | Finding and evidence | Required disposition |
 |---|---:|---|---|---|
 | BG-001 | P1 | **Repaired; adversarial review green** | Current main accepted direct derived/spacing overflow. The first repair review then found two low-cell-count survivors: cumulative horizontal layout and finite-offset-plus-local-point translation could still overflow. Both returned `generated` with non-finite coordinates. | Direct derived/spacing overflow now fails validation. A centralized post-layout guard rejects any non-finite offset or outline/cutout point before `kind: generated` can escape. Both survivor tests and a non-vacuous valid-spec property failed first; 3 focused files / 25 tests pass, and an independent style/mode/divider/fit matrix found no remaining generated non-finite result. |
-| BG-002 | P1 | Confirmed; design required | `cellCount` and divider arrays scale with user numbers, and `generateBox` runs synchronously during React render. A large finite dimension with a small finger target or a large feasible divider count can allocate/loop until the UI stalls. No compute budget, cancellation, worker, or degraded preview exists. | Do not add a blocking numeric cap under the no-new-guards rule. Move generation out of render, make work cancellable/yielding, add an informational complexity estimate, and let the preview fall back without disabling Generate. |
+| BG-002 | P1 | **Repaired and independently verified on stacked branch** | The regression first failed because render completed geometry without creating a worker. Valid specs now enter a one-shot module worker; every request has a monotonic ID/spec key, stale work is terminated, late results are ignored, and Cancel/Escape/unmount terminate before close. A saturating O(1) estimate is advisory only. Worker-reported output counts suppress unsafe canvases while complete geometry remains eligible for Generate. | No numeric generation cap, timeout, synchronous heavy fallback, output-math change, visualization work, or CNC policy change was added. Three independent reviews found and cleared an advisory relief-work undercount plus one export-boundary issue. The current focused bundle, full Box bundle, real-Chromium cancellation smoke, and complete release gate pass; evidence is recorded below. |
 | BG-003 | P1 | Decision-blocked | `defaultBoxDraft(CNC).relief === 'off'` and tests explicitly call dogbones opt-in. Commit `6013a5c5` records a maintainer request for this behavior. `WORKFLOW.md` F-K3 and ADR-106 still say generated CNC panels carry reliefs and describe a prefilled relief tool. | Maintainer chooses the product contract. Recommended: keep the intentional opt-in code and amend the living workflow/ADR wording to say square CNC corners require relief before claiming seatability. Do not silently change output. |
 | BG-004 | P2 | Confirmed | F-K3 says switching machine mode while the dialog is open updates only untouched defaults. The dialog initializes state once, tracks touches only for finger width/spacing, and has no effect for later `machine` prop changes. A shared persisted draft can also override a new CNC machine's stock-derived values. | Specify per-field touched state and a machine-context transition contract before changing persistence/default behavior. Tool diameter remains live machine truth. |
 | BG-005 | P2 | **Repaired; focused tests green** | F-K5 says Cancel persists the current draft. The dialog persisted only inside submit; the Cancel button and Escape called `onCancel` directly. | Both close paths now use one persist-then-close hook. Cancel and Escape tests failed first, then 3 focused files / 23 tests passed. |
 | BG-006 | P2 | Confirmed; visualization contract | ADR-119/F-K9 say “extruded plates.” `BoxAssembledPreview` maps only one face ring per part at local depth `T`; it builds no side faces. Average-depth painter sorting cannot provide reliable hidden-surface ordering for intersecting plates. | Correct the fallback's truth claim and implement real extrusion only after the pure preview contract is accepted. |
 | BG-007 | P2 | Confirmed | The assembled fallback always samples `w = T`. For frames whose origin is on a minimum box face, that draws the inner face, while maximum-side panels draw the outer face. The displayed envelope is therefore inset by `T` on bottom/front/left even before considering the missing sidewalls. | Pin face selection in preview-model tests. A real slab uses both `w = 0` and `w = T`; a static single-face fallback must choose the documented outward face by panel normal. |
-| BG-008 | P2 | Confirmed | Invalid form values retain the last valid preview without a visible or announced stale-state marker. `summaryLine` independently calls `deriveBoxDims` for a parsed numeric spec, so an invalid extreme draft can show `NaN`/`Infinity` dimensions alongside cached geometry. | After BG-001, show “Showing last valid preview; current values are invalid” in visible text and an `aria-live` region. Render the summary from a valid preview model only. |
+| BG-008 | P2 | **Stale-state portion repaired with BG-002** | Invalid, incomplete, pending, cancelled, and failed input now retain one atomic last-ready snapshot with visible polite stale text. Summary dimensions come only from current or last-ready valid specs; stale geometry can never enable Generate. | Field-linked validation accessibility remains BG-017. The richer selected-panel/3D correspondence stays deferred until the preview-model contract. |
 | BG-009 | P2 | Coverage gap | ADR-119 promised Flat/Assembled toggle and jsdom-safe component tests. No `BoxPreview`/`BoxAssembledPreview` component test or toggle test exists. There is also no Box-specific project round-trip plus laser/CNC G-code golden covering outline + cutout preservation. | Add contract tests before visual replacement and one ordinary downstream golden in a later isolated PR. Do not churn global G-code snapshots for the audit-only slice. |
 | BG-010 | P2 | Confirmed limitation | Layout is a fixed three-column grid, not nesting, and spacing is measured before downstream kerf/tool compensation. `0` is accepted. Close panels can therefore have overlapping output envelopes even though the flat generator preview shows distinct nominal rings. | Label spacing as nominal edge gap. Add an optional downstream compensation envelope indicator once exact layer/tool context is supplied; keep bed fit and nesting advisory. |
 | BG-011 | P3 | Confirmed limitation | After insertion, the project retains baked rings and panel names but no `BoxSpec`, part key, or generator revision. Reopening a project preserves cut geometry but cannot reopen the box parametrically or prove which settings produced it. | Treat editable parametric provenance as a separate product proposal with migration/versioning; it is not required for output preservation. |
@@ -184,6 +191,7 @@ No boxes.py code was copied.
 | Benchmark | 54 specs across structural, assembly, fit, relief, layout, divider, slide-lid, fit-coupon, and determinism categories; 1,114 / 1,114 passed in this audit baseline. | It is a software benchmark, not a manufacturing sample. |
 | Perceptual | Canonical laser and CNC sheet masks passed their analytic thresholds. | A raster mask is not a real cut and the assembled preview was not visually qualified. |
 | Integration | One-object-per-panel insertion, selection, one undo step, and ring order are tested. Generic project and compiler tests cover these object types. | No Box-specific project/G-code golden proves the whole handoff in one fixture. |
+| Responsiveness | Worker/direct-core parity covers the seeded corpus plus divider and slide-lid cases; fake-worker lifecycle tests cover supersede/cancel/error/retry, and Chromium stays editable during an expensive cancellable request. | No hardware, physical fit, or arbitrary-result transfer/memory guarantee follows from worker isolation. |
 
 Required new automated contracts:
 
@@ -385,7 +393,12 @@ Acceptance budgets:
   deterministically;
 - repeated open/close testing must show no monotonic resource or listener growth.
 
-Preview complexity is computed from the completed model: use 3D only at
+The BG-002 pre-visualization fallback uses exact worker-reported counts and
+hides the existing point-spreading Canvas2D/isometric renderers above 20,000
+points. It keeps complete geometry and Generate available. This threshold is a
+display policy only; it never changes validation, worker dispatch, or output.
+
+Future preview complexity is computed from the completed model: use 3D only at
 `partCount <= 200`, `ringVertexCount <= 50,000`, and predicted
 `triangleCount <= 200,000`. Above any threshold, use Canvas2D/SVG static
 preview; above 100,000 ring vertices, use the DOM-only part list/dimensions/fit
@@ -398,8 +411,8 @@ and permit one reconstruction attempt for that loss cycle after
 mode, and theme. A failed attempt stays static until the dialog is reopened:
 [WebGL context-loss event](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/webglcontextlost_event).
 
-This does not solve BG-002: generation runs before any preview exists. Worker
-cancellation and exact work estimation are a pre-visualization program stage.
+The stacked BG-002 slice now supplies that pre-visualization worker,
+cancellation, stale-result, estimate, and DOM-only fallback prerequisite.
 
 ## 8. Dependency decision
 
@@ -447,12 +460,12 @@ Each stage is independently reviewable. No stage merges `main`.
    real joint panels retain relief.
 3. **Draft cancellation repair — implemented:** BG-005 was reproduced for
    Cancel and Escape; both now use one persist-and-close handler.
-4. **Generation responsiveness PR:** resolve BG-002 before visualization.
-   Add a pure work estimate (predicted parts, rings, vertices, and edge/divider
-   cells), run generation in a dedicated worker with monotonically increasing
-   request IDs, terminate/supersede stale work, show a pending state after
-   50 ms, and make dialog Cancel terminate the worker. The estimate informs UI
-   and preview mode only; it does not impose an arbitrary output cap.
+4. **Generation responsiveness PR — implemented on stacked branch:** BG-002
+   has a pure saturating estimate, dedicated one-shot worker, monotonically
+   increasing request IDs/spec keys, terminate-to-cancel supersession,
+   50 ms pending announcement, retryable failures, atomic stale snapshots, and
+   an output-count-driven DOM fallback. The estimate is advisory and never an
+   output cap.
 5. **Contract PR:** resolve BG-003 and BG-013, supersede ADR-119's no-camera
    premise, define `BoxPreviewModel`, stale behavior, compensation language,
    accessibility, and performance budgets. No Three implementation.
@@ -507,3 +520,10 @@ clearance, relief choice, layer settings, exported artifact hash, and result.
 | 2026-07-31 | Repaired Box bundle verified. | 21 files / 134 tests; benchmark 1,114 / 1,114; laser IoU 1.0000; CNC IoU 0.9693. |
 | 2026-07-31 | Final repository and release-gate components passed. | 1,359 test files / 8,190 tests passed (14 files / 22 tests skipped); typecheck, format, both linters, ADR/licence/integrity/size/export checks, web build, and Electron-main build passed. Three chunk 704.87 KB minified; the unrelated 1,006.57 KB UI-workbench build warning remains. |
 | 2026-07-31 | Review PR opened; no merge performed. | [PR #529](https://github.com/cisgz3a-hub/KerfDesk/pull/529), base `main`, head `codex/box-generator-audit`. |
+| 2026-07-31 | PR #529 squash-merged by the maintainer while BG-002 work was in progress. | GitHub records merge commit `e3d5cc11ed1b3a0a8f0fd37251306de3aa1bca81`; both prerequisite checks were green. This BG-002 task did not perform the merge. |
+| 2026-07-31 | BG-002 replayed as one isolated commit on current `origin/main`. | Base `f99e0c5f82801eafd62ebdef35a56e52ff20fa51`; only the BG-002 slice was rebased after the prerequisite merge. No merge to `main` was performed. |
+| 2026-07-31 | BG-002 isolated without changing PR #529. | New stacked worktree/branch `codex/box-generator-bg002` at PR #529 head; PR #529 remained clean and both named checks were green. |
+| 2026-07-31 | BG-002 regression reproduced test-first. | The initial dialog test expected a pending worker request and failed: zero workers were created because `generateBox` still ran during render. |
+| 2026-07-31 | Worker/cancellation repair and estimator audited. | The current independent bundle passed 8 files / 43 tests across lifecycle, 50 ms status, stale results, preview fallback, estimator property/metamorphic checks, and direct-core/worker parity. A first nominal bound failed on an open-top Z-axis case, and later review caught relief-heavy Boolean input missing from the large-work classifier. The repaired O(1) estimate now uses source-derived style coefficients plus a saturating advisory `25 × nominal` relief-input term; representative closed/open/divider/slide builders and a 40,680-spec external grid passed. |
+| 2026-07-31 | Real-browser responsiveness smoke passed and repeated. | Production Vite worker in headless Chrome kept a second field edit under 1.5 s during a 300,000 mm expensive request, cancelled it, recovered to ordinary values, and closed cleanly. Independent review repeated the smoke three more times, and a final post-rebase run on current `main` also passed. |
+| 2026-07-31 | BG-002 final verification passed. | Full Box/insertion bundle passed 162 tests; main and E2E typechecks, Box export boundary at 20, and raw file-size policy passed. `corepack pnpm release:check` passed first on the prerequisite head in 22 min 21 s and again on final current `main` in 18 min 4 s: formatting, both linters, ADR/licence checks, full unit and release-integrity suites, web and Electron-main builds, hard/soft size checks, and the public-export ratchet all passed. |
