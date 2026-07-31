@@ -24,7 +24,11 @@ export function DesignLayerSettings(props: {
   const { layer, tools } = props;
   return (
     <div style={settingsStyle}>
-      <NameField key={`name-${layer.id}`} name={layer.name} onCommit={(name) => props.onPatch({ name })} />
+      <NameField
+        key={`name-${layer.id}`}
+        name={layer.name}
+        onCommit={(name) => props.onPatch({ name })}
+      />
       <label style={fieldStyle}>
         <span style={labelStyle}>Cut</span>
         <select
@@ -46,55 +50,55 @@ export function DesignLayerSettings(props: {
         stockThicknessMm={props.stockThicknessMm}
         onCommit={(depthMm) => props.onPatch({ depthMm })}
       />
-      <label style={fieldStyle}>
-        <span style={labelStyle}>Bit</span>
-        <select
-          value={layer.toolId ?? ACTIVE_BIT_VALUE}
-          title="The bit this layer cuts with. Layers with different bits become a multi-bit job with tool-change pauses."
-          onChange={(event) =>
-            props.onPatch(
-              event.target.value === ACTIVE_BIT_VALUE
-                ? { toolId: null }
-                : { toolId: event.target.value },
-            )
-          }
-          style={inputStyle}
-        >
-          <option value={ACTIVE_BIT_VALUE}>Machine bit (active)</option>
-          {tools.map((tool) => (
-            <option key={tool.id} value={tool.id}>
-              {tool.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <BitSelectField
+        label="Bit"
+        title="The bit this layer cuts with. Layers with different bits become a multi-bit job with tool-change pauses."
+        value={layer.toolId}
+        emptyLabel="Machine bit (active)"
+        tools={tools}
+        onSelect={(toolId) => props.onPatch({ toolId })}
+      />
       {layer.cutType === 'v-carve' ? (
-        <label style={fieldStyle}>
-          <span style={labelStyle}>Clear</span>
-          <select
-            value={layer.vClearToolId ?? ACTIVE_BIT_VALUE}
-            title="Two-stage v-carve: flat floors beyond the v-bit's reach are pocket-cleared with this bit first"
-            onChange={(event) =>
-              props.onPatch(
-                event.target.value === ACTIVE_BIT_VALUE
-                  ? { vClearToolId: null }
-                  : { vClearToolId: event.target.value },
-              )
-            }
-            style={inputStyle}
-          >
-            <option value={ACTIVE_BIT_VALUE}>Single stage (v-bit only)</option>
-            {tools
-              .filter((tool) => tool.kind !== 'v-bit')
-              .map((tool) => (
-                <option key={tool.id} value={tool.id}>
-                  {tool.name}
-                </option>
-              ))}
-          </select>
-        </label>
+        <BitSelectField
+          label="Clear"
+          title="Two-stage v-carve: flat floors beyond the v-bit's reach are pocket-cleared with this bit first"
+          value={layer.vClearToolId}
+          emptyLabel="Single stage (v-bit only)"
+          tools={tools.filter((tool) => tool.kind !== 'v-bit')}
+          onSelect={(vClearToolId) => props.onPatch({ vClearToolId })}
+        />
       ) : null}
     </div>
+  );
+}
+
+function BitSelectField(props: {
+  readonly label: string;
+  readonly title: string;
+  readonly value: string | undefined;
+  readonly emptyLabel: string;
+  readonly tools: ReadonlyArray<CncTool>;
+  readonly onSelect: (toolId: string | null) => void;
+}): JSX.Element {
+  return (
+    <label style={fieldStyle}>
+      <span style={labelStyle}>{props.label}</span>
+      <select
+        value={props.value ?? ACTIVE_BIT_VALUE}
+        title={props.title}
+        onChange={(event) =>
+          props.onSelect(event.target.value === ACTIVE_BIT_VALUE ? null : event.target.value)
+        }
+        style={inputStyle}
+      >
+        <option value={ACTIVE_BIT_VALUE}>{props.emptyLabel}</option>
+        {props.tools.map((tool) => (
+          <option key={tool.id} value={tool.id}>
+            {tool.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

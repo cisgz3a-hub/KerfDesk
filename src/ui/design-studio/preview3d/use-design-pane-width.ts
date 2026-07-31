@@ -72,7 +72,11 @@ export function useDesignPaneWidth(): DesignPaneResize {
 
   const onHandleKeyDown = useCallback((event: React.KeyboardEvent) => {
     const delta =
-      event.key === 'ArrowLeft' ? KEYBOARD_STEP_PX : event.key === 'ArrowRight' ? -KEYBOARD_STEP_PX : 0;
+      event.key === 'ArrowLeft'
+        ? KEYBOARD_STEP_PX
+        : event.key === 'ArrowRight'
+          ? -KEYBOARD_STEP_PX
+          : 0;
     if (delta === 0) return;
     event.preventDefault();
     setWidthPx((current) => {

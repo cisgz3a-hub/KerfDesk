@@ -9,11 +9,7 @@
 // applyLayerDefaultsToFreshLayers — the defaults pass would clobber them here.
 
 import { designEntityToSceneObject, type Sketch } from '../../core/design';
-import {
-  entityDesignLayer,
-  sketchLayers,
-  type DesignLayer,
-} from '../../core/design/layers';
+import { entityDesignLayer, sketchLayers, type DesignLayer } from '../../core/design/layers';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   addLayer,

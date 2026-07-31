@@ -8,10 +8,7 @@ import type { Polyline } from '../scene';
 import type { CarveGrid } from './carve-input';
 
 /** 1 = inside under the even-odd rule, 0 = outside. Row-major, like Heightmap. */
-export function rasterizeEvenOdd(
-  contours: ReadonlyArray<Polyline>,
-  grid: CarveGrid,
-): Uint8Array {
+export function rasterizeEvenOdd(contours: ReadonlyArray<Polyline>, grid: CarveGrid): Uint8Array {
   const mask = new Uint8Array(grid.widthCells * grid.heightCells);
   const closed = contours.filter((polyline) => polyline.closed && polyline.points.length >= 3);
   if (closed.length === 0) return mask;

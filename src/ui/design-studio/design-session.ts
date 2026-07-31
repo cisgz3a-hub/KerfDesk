@@ -4,7 +4,7 @@
 // project undo. The one crossing point is Apply.
 
 import { EMPTY_SKETCH, type Sketch } from '../../core/design';
-import { DEFAULT_DESIGN_LAYER_ID } from '../../core/design/layers';
+import { DEFAULT_DESIGN_LAYER_ID, sketchLayers } from '../../core/design/layers';
 import type { Vec2 } from '../../core/scene';
 import {
   canRedo,
@@ -114,12 +114,23 @@ export function sessionSketch(session: DesignSession): Sketch {
 // can never disagree.
 export function withSketch(session: DesignSession, next: Sketch): DesignSession {
   if (next === sessionSketch(session)) return session;
-  return {
+  return withValidActiveLayer({
     ...session,
     history: commitSketch(session.history, next),
     selectedIds: retainedSelection(session.selectedIds, next),
     dirtySinceApply: true,
-  };
+  });
+}
+
+// A sketch transition (edit, undo, redo, wholesale replace) can remove the
+// layer the session was drawing on; falling back to the first layer keeps the
+// panel, the assign action, and freshly drawn entities pointing at a layer
+// that exists.
+function withValidActiveLayer(session: DesignSession): DesignSession {
+  const layers = sketchLayers(sessionSketch(session));
+  if (layers.some((layer) => layer.id === session.activeLayerId)) return session;
+  const fallback = layers[0]?.id ?? DEFAULT_DESIGN_LAYER_ID;
+  return { ...session, activeLayerId: fallback };
 }
 
 // Called after a successful Apply. History is deliberately NOT cleared: undo
@@ -132,23 +143,23 @@ export function markSessionApplied(session: DesignSession): DesignSession {
 export function undoSession(session: DesignSession): DesignSession {
   if (!canUndo(session.history)) return session;
   const history = undoSketch(session.history);
-  return {
+  return withValidActiveLayer({
     ...session,
     history,
     selectedIds: retainedSelection(session.selectedIds, history.present),
     dirtySinceApply: true,
-  };
+  });
 }
 
 export function redoSession(session: DesignSession): DesignSession {
   if (!canRedo(session.history)) return session;
   const history = redoSketch(session.history);
-  return {
+  return withValidActiveLayer({
     ...session,
     history,
     selectedIds: retainedSelection(session.selectedIds, history.present),
     dirtySinceApply: true,
-  };
+  });
 }
 
 // Selection is by id, and undo can remove an entity out from under it. Dropping

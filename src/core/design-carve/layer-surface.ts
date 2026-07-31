@@ -13,7 +13,12 @@ import { entityToPolylines } from '../design';
 import type { DesignLayer } from '../design/layers';
 import type { CncTool, Polyline } from '../scene';
 import type { SketchEntity } from '../design';
-import { carveLayerTool, vBitHalfAngleRad, type CarveGrid, type DesignCarveInput } from './carve-input';
+import {
+  carveLayerTool,
+  vBitHalfAngleRad,
+  type CarveGrid,
+  type DesignCarveInput,
+} from './carve-input';
 import { stampAlongPolylines, stampDisc } from './disc-stamp';
 import { insideDistanceMm } from './distance-transform';
 import { rasterizeEvenOdd } from './grid-mask';

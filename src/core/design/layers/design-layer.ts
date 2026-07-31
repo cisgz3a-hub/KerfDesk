@@ -45,7 +45,7 @@ export const DESIGN_CUT_TYPES: ReadonlyArray<DesignCutType> = [
 // designed without touching layer settings cuts like a drawn part does today.
 export const DEFAULT_DESIGN_LAYER_ID = 'design-layer-1';
 
-// eslint-disable-next-line no-restricted-syntax -- scene DATA: layer colors become operation colors at Apply, not chrome (ADR-047).
+// Scene DATA: layer colors become operation colors at Apply, not chrome (ADR-047).
 const DESIGN_LAYER_COLORS = [
   '#000000',
   '#2563eb',

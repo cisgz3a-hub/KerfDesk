@@ -45,32 +45,14 @@ export function DesignLayersCard(props: {
 
   return (
     <section aria-label="Carve layers" style={cardStyle}>
-      <header style={headerStyle}>
-        <h3 style={titleStyle}>Carve layers</h3>
-        <button
-          type="button"
-          title={
-            selectionCount > 0
-              ? `Move the ${selectionCount} selected shape${selectionCount === 1 ? '' : 's'} onto the active layer`
-              : 'Select shapes on the canvas first, then assign them to the active layer'
-          }
-          disabled={selectionCount === 0 || active === undefined}
-          onClick={() => {
-            if (active !== undefined) assignSelectionToLayer(active.id);
-          }}
-          style={actionButtonStyle}
-        >
-          Assign
-        </button>
-        <button
-          type="button"
-          title="Add a carve layer — draw the next shapes on it with its own cut, depth, and bit"
-          onClick={() => addLayer(crypto.randomUUID())}
-          style={actionButtonStyle}
-        >
-          + New
-        </button>
-      </header>
+      <LayersCardHeader
+        selectionCount={selectionCount}
+        canAssign={selectionCount > 0 && active !== undefined}
+        onAssign={() => {
+          if (active !== undefined) assignSelectionToLayer(active.id);
+        }}
+        onNew={() => addLayer(crypto.randomUUID())}
+      />
       <div style={listStyle}>
         {layers.map((layer, index) => (
           <DesignLayerRow
@@ -78,7 +60,10 @@ export function DesignLayersCard(props: {
             layer={layer}
             isActive={layer.id === active?.id}
             entityCount={countByLayer.get(layer.id) ?? 0}
-            tool={carveLayerTool({ tools: props.tools, activeTool: props.activeTool }, layer.toolId)}
+            tool={carveLayerTool(
+              { tools: props.tools, activeTool: props.activeTool },
+              layer.toolId,
+            )}
             canRemove={layers.length > 1}
             canMoveUp={index > 0}
             canMoveDown={index < layers.length - 1}
@@ -97,6 +82,41 @@ export function DesignLayersCard(props: {
         />
       )}
     </section>
+  );
+}
+
+function LayersCardHeader(props: {
+  readonly selectionCount: number;
+  readonly canAssign: boolean;
+  readonly onAssign: () => void;
+  readonly onNew: () => void;
+}): JSX.Element {
+  const { selectionCount } = props;
+  return (
+    <header style={headerStyle}>
+      <h3 style={titleStyle}>Carve layers</h3>
+      <button
+        type="button"
+        title={
+          selectionCount > 0
+            ? `Move the ${selectionCount} selected shape${selectionCount === 1 ? '' : 's'} onto the active layer`
+            : 'Select shapes on the canvas first, then assign them to the active layer'
+        }
+        disabled={!props.canAssign}
+        onClick={props.onAssign}
+        style={actionButtonStyle}
+      >
+        Assign
+      </button>
+      <button
+        type="button"
+        title="Add a carve layer — draw the next shapes on it with its own cut, depth, and bit"
+        onClick={props.onNew}
+        style={actionButtonStyle}
+      >
+        + New
+      </button>
+    </header>
   );
 }
 

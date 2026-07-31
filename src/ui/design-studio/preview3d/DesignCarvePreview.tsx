@@ -38,44 +38,22 @@ export function DesignCarvePreview(props: {
     sim.simulate.kind === 'failed' || sim.simulate.kind === 'empty' ? sim.simulate.reason : null;
 
   return (
-    <section aria-label="Carve preview" style={{ ...sectionStyle, ...(show ? null : collapsedStyle) }}>
-      <header style={headerStyle}>
-        <button
-          type="button"
-          onClick={togglePreview3d}
-          title={show ? 'Hide the 3D carve preview' : 'Show the 3D carve preview'}
-          aria-expanded={show}
-          style={toggleStyle}
-        >
-          {show ? '▾' : '▸'} Carve preview
-        </button>
-        {simContent === null ? null : (
-          <span role="group" aria-label="Preview tier" style={chipsStyle}>
-            <TierChip label="Design" active={!showingBits} onClick={() => setMode('design')} title="The target surface each layer asks for — instant, updates as you draw" />
-            <TierChip
-              label={sim.isStale ? 'Bits (stale)' : 'Bits'}
-              active={showingBits}
-              onClick={() => setMode('bits')}
-              title={
-                sim.isStale
-                  ? 'Simulated with each layer’s real bit — the drawing changed since this ran, press Simulate again'
-                  : 'Simulated from real toolpaths, each tool section stamped with its own bit'
-              }
-            />
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            sim.run();
-            setMode('bits');
-          }}
-          title="Compile the layers into real toolpaths and carve them with each layer's bit shape"
-          style={simulateStyle}
-        >
-          Simulate
-        </button>
-      </header>
+    <section
+      aria-label="Carve preview"
+      style={{ ...sectionStyle, ...(show ? null : collapsedStyle) }}
+    >
+      <PreviewHeader
+        show={show}
+        onToggle={togglePreview3d}
+        hasSimulation={simContent !== null}
+        showingBits={showingBits}
+        isStale={sim.isStale}
+        onMode={setMode}
+        onSimulate={() => {
+          sim.run();
+          setMode('bits');
+        }}
+      />
       <div style={{ ...bodyStyle, ...(show ? null : hiddenStyle) }}>
         <canvas
           ref={scene.canvasRef}
@@ -92,6 +70,58 @@ export function DesignCarvePreview(props: {
       </div>
       {failureReason === null || !show ? null : <p style={reasonStyle}>{failureReason}</p>}
     </section>
+  );
+}
+
+function PreviewHeader(props: {
+  readonly show: boolean;
+  readonly onToggle: () => void;
+  readonly hasSimulation: boolean;
+  readonly showingBits: boolean;
+  readonly isStale: boolean;
+  readonly onMode: (mode: 'design' | 'bits') => void;
+  readonly onSimulate: () => void;
+}): JSX.Element {
+  return (
+    <header style={headerStyle}>
+      <button
+        type="button"
+        onClick={props.onToggle}
+        title={props.show ? 'Hide the 3D carve preview' : 'Show the 3D carve preview'}
+        aria-expanded={props.show}
+        style={toggleStyle}
+      >
+        {props.show ? '▾' : '▸'} Carve preview
+      </button>
+      {props.hasSimulation ? (
+        <span role="group" aria-label="Preview tier" style={chipsStyle}>
+          <TierChip
+            label="Design"
+            active={!props.showingBits}
+            onClick={() => props.onMode('design')}
+            title="The target surface each layer asks for — instant, updates as you draw"
+          />
+          <TierChip
+            label={props.isStale ? 'Bits (stale)' : 'Bits'}
+            active={props.showingBits}
+            onClick={() => props.onMode('bits')}
+            title={
+              props.isStale
+                ? 'Simulated with each layer’s real bit — the drawing changed since this ran, press Simulate again'
+                : 'Simulated from real toolpaths, each tool section stamped with its own bit'
+            }
+          />
+        </span>
+      ) : null}
+      <button
+        type="button"
+        onClick={props.onSimulate}
+        title="Compile the layers into real toolpaths and carve them with each layer's bit shape"
+        style={simulateStyle}
+      >
+        Simulate
+      </button>
+    </header>
   );
 }
 

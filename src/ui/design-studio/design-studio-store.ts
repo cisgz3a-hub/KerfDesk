@@ -186,7 +186,8 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   undo: () => set(mapSession(undoSession)),
   redo: () => set(mapSession(redoSession)),
 
-  setActiveLayer: (layerId) => set(mapSession((session) => setSessionActiveLayer(session, layerId))),
+  setActiveLayer: (layerId) =>
+    set(mapSession((session) => setSessionActiveLayer(session, layerId))),
   addLayer: (id) => set(mapSession((session) => addSessionLayer(session, id))),
   patchLayer: (layerId, patch) =>
     set(mapSession((session) => patchSessionLayer(session, layerId, patch))),

@@ -28,7 +28,10 @@ export function sketchLayers(sketch: Sketch): ReadonlyArray<DesignLayer> {
 }
 
 /** The layer this entity belongs to; an unknown or absent id means the first layer. */
-export function entityDesignLayer(entity: SketchEntity, layers: ReadonlyArray<DesignLayer>): DesignLayer {
+export function entityDesignLayer(
+  entity: SketchEntity,
+  layers: ReadonlyArray<DesignLayer>,
+): DesignLayer {
   const first = layers[0] ?? DEFAULT_DESIGN_LAYER;
   if (entity.layerId === undefined) return first;
   return layers.find((layer) => layer.id === entity.layerId) ?? first;
@@ -58,9 +61,8 @@ export function patchDesignLayer(sketch: Sketch, layerId: string, patch: DesignL
 function patchedLayer(current: DesignLayer, patch: DesignLayerPatch): DesignLayer {
   const depthOk =
     patch.depthMm !== undefined && Number.isFinite(patch.depthMm) && patch.depthMm > 0;
-  const toolId = patch.toolId === undefined ? current.toolId : (patch.toolId ?? undefined);
-  const vClearToolId =
-    patch.vClearToolId === undefined ? current.vClearToolId : (patch.vClearToolId ?? undefined);
+  const toolId = patchedToolId(current.toolId, patch.toolId);
+  const vClearToolId = patchedToolId(current.vClearToolId, patch.vClearToolId);
   return {
     id: current.id,
     name: patch.name ?? current.name,
@@ -70,6 +72,15 @@ function patchedLayer(current: DesignLayer, patch: DesignLayerPatch): DesignLaye
     ...(toolId === undefined ? {} : { toolId }),
     ...(vClearToolId === undefined ? {} : { vClearToolId }),
   };
+}
+
+// undefined = leave alone, null = clear, string = set.
+function patchedToolId(
+  current: string | undefined,
+  patch: string | null | undefined,
+): string | undefined {
+  if (patch === undefined) return current;
+  return patch ?? undefined;
 }
 
 /**

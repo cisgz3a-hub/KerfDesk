@@ -1,10 +1,17 @@
 // use-design-preview-scene — owns the carve preview's three.js lifecycle.
 //
-// A distilled useCnc3dScene: the scene is created ONCE and updated in place;
-// teardown lives in a zero-dependency effect so it runs at unmount only
-// (sharing an effect with updates is what used to snap the operator's orbit);
-// the StrictMode double-mount is handled by the cancelled flag AND by
-// disposing the orphaned first handle, or a live WebGL context leaks.
+// A distilled useCnc3dScene with one extra rule the Studio needs: content can
+// change WHILE the first scene create is still awaiting its lazy three chunk
+// (open the Studio, draw immediately). Starting a second renderer on the same
+// canvas — and then disposing the "orphan" — kills the survivor's GL context,
+// which is exactly the wedge live verification caught. So creation is
+// serialized: at most one create ever runs, later content parks in pendingRef
+// and is applied the moment the handle exists.
+//
+// The other shipped rules still hold: create once / update in place, teardown
+// in a zero-dependency effect so it runs at unmount only, StrictMode handled
+// by resetting the unmounted flag in setup and disposing a handle that
+// resolves after a real unmount.
 //
 // This module imports the scene BUILDER from relief-viewer, never `three` —
 // the ADR-102 §2 route ADR-271 Amendment 1 clause 3 records.
@@ -26,11 +33,17 @@ export type DesignPreviewScene = {
 export function useDesignPreviewScene(content: ViewerContentInput | null): DesignPreviewScene {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handleRef = useRef<ReliefSceneHandle | null>(null);
+  const creatingRef = useRef(false);
+  const pendingRef = useRef<ViewerContentInput | null>(null);
+  const unmountedRef = useRef(false);
   const [state, setState] = useState<DesignPreviewSceneState>('loading');
 
-  // Zero deps: unmount only. See the module header.
+  // Zero deps: teardown at unmount only. The setup RESETS the flag because
+  // StrictMode runs setup → cleanup → setup on the same refs.
   useEffect(() => {
+    unmountedRef.current = false;
     return () => {
+      unmountedRef.current = true;
       handleRef.current?.dispose();
       handleRef.current = null;
     };
@@ -39,22 +52,30 @@ export function useDesignPreviewScene(content: ViewerContentInput | null): Desig
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null || content === null) return;
-    let cancelled = false;
 
     const existing = handleRef.current;
     if (existing !== null) {
       void existing.updateContent(content).catch(() => {
-        if (!cancelled) setState('failed');
+        if (!unmountedRef.current) setState('failed');
       });
-      return () => {
-        cancelled = true;
-      };
+      return;
     }
 
+    // A create is already in flight: park the newest content for it. Never
+    // start a second renderer on this canvas.
+    if (creatingRef.current) {
+      pendingRef.current = content;
+      return;
+    }
+
+    creatingRef.current = true;
     setState('loading');
     void createReliefThreeScene(canvas, content.mesh, content.stockThicknessMm)
       .then((outcome) => {
-        if (cancelled) {
+        creatingRef.current = false;
+        if (unmountedRef.current) {
+          // Resolved after a real unmount — free the orphan or it leaks a
+          // live WebGL context.
           if (outcome.kind === 'ok') outcome.handle.dispose();
           return;
         }
@@ -65,18 +86,17 @@ export function useDesignPreviewScene(content: ViewerContentInput | null): Desig
         handleRef.current = outcome.handle;
         // Fit to the laid-out size, not mount-time attrs — the pane resizes.
         outcome.handle.resize(canvas.clientWidth, canvas.clientHeight);
-        // The builder took only the mesh; hand it the full content so material
-        // shading arrives with the first paint rather than the first edit.
-        void outcome.handle.updateContent(content).catch(() => setState('failed'));
+        const latest = pendingRef.current ?? content;
+        pendingRef.current = null;
+        void outcome.handle.updateContent(latest).catch(() => {
+          if (!unmountedRef.current) setState('failed');
+        });
         setState('ready');
       })
       .catch(() => {
-        if (!cancelled) setState('failed');
+        creatingRef.current = false;
+        if (!unmountedRef.current) setState('failed');
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [content]);
 
   // Renders on demand, so keeping the buffer in step with the resizable pane

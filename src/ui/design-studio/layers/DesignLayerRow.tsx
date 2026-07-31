@@ -35,7 +35,9 @@ export function DesignLayerRow(props: {
           {layer.name}
           <span style={metaStyle}>
             {summary}
-            {props.entityCount > 0 ? ` · ${props.entityCount} shape${props.entityCount === 1 ? '' : 's'}` : ''}
+            {props.entityCount > 0
+              ? ` · ${props.entityCount} shape${props.entityCount === 1 ? '' : 's'}`
+              : ''}
           </span>
         </span>
       </button>

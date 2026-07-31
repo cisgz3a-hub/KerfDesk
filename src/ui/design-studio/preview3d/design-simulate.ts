@@ -41,7 +41,8 @@ export function simulateDesignCarve(
   if (project.machine === undefined || project.machine.kind !== 'cnc') {
     return {
       kind: 'failed',
-      reason: 'Bit simulation needs a CNC machine profile — the design preview above still applies.',
+      reason:
+        'Bit simulation needs a CNC machine profile — the design preview above still applies.',
     };
   }
   const scratch: Project = {
@@ -50,7 +51,8 @@ export function simulateDesignCarve(
     machine: project.machine,
   };
   const applied = applyDesignSketch({ project: scratch, undoStack: [] }, sketch, ids);
-  if (applied === null) return { kind: 'empty', reason: 'Nothing to simulate — the sketch has no output geometry.' };
+  if (applied === null)
+    return { kind: 'empty', reason: 'Nothing to simulate — the sketch has no output geometry.' };
   const staged = applyCarveSettingsToOperations(applied, applied.carveOperations);
 
   const prepared = prepareOutput(staged.project, {});

@@ -43,7 +43,6 @@ export function useDesignSimulate(source: DesignCarveSource | null): DesignSimul
     setSimulate({ kind: outcome.kind, reason: outcome.reason, forSketch: current });
   }, [source]);
 
-  const isStale =
-    simulate.kind !== 'idle' && sketch !== null && simulate.forSketch !== sketch;
+  const isStale = simulate.kind !== 'idle' && sketch !== null && simulate.forSketch !== sketch;
   return { simulate, isStale, run };
 }

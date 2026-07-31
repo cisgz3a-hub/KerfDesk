@@ -29,8 +29,17 @@ export function insideDistanceMm(mask: Uint8Array, grid: CarveGrid): Float32Arra
   return distance;
 }
 
-// Neighbor reads treat out-of-grid as distance 0, hence the `straight`/
-// `diagonal` literals at the edges.
+// A neighbor's distance plus the step weight; out-of-grid neighbors count as
+// outside (distance 0), so a region cropped by the stock edge stays shallow.
+function throughNeighbor(
+  distance: Float32Array,
+  index: number,
+  inGrid: boolean,
+  weight: number,
+): number {
+  return inGrid ? (distance[index] ?? 0) + weight : weight;
+}
+
 function forwardPass(
   distance: Float32Array,
   width: number,
@@ -41,15 +50,15 @@ function forwardPass(
   for (let cy = 0; cy < height; cy += 1) {
     for (let cx = 0; cx < width; cx += 1) {
       const index = cy * width + cx;
-      let best = distance[index] ?? OUTSIDE_DISTANCE_MM;
+      const best = distance[index] ?? OUTSIDE_DISTANCE_MM;
       if (best === OUTSIDE_DISTANCE_MM) continue;
-      const west = cx > 0 ? (distance[index - 1] ?? 0) + straight : straight;
-      const north = cy > 0 ? (distance[index - width] ?? 0) + straight : straight;
-      const northWest = cx > 0 && cy > 0 ? (distance[index - width - 1] ?? 0) + diagonal : diagonal;
-      const northEast =
-        cx < width - 1 && cy > 0 ? (distance[index - width + 1] ?? 0) + diagonal : diagonal;
-      best = Math.min(best, west, north, northWest, northEast);
-      distance[index] = best;
+      distance[index] = Math.min(
+        best,
+        throughNeighbor(distance, index - 1, cx > 0, straight),
+        throughNeighbor(distance, index - width, cy > 0, straight),
+        throughNeighbor(distance, index - width - 1, cx > 0 && cy > 0, diagonal),
+        throughNeighbor(distance, index - width + 1, cx < width - 1 && cy > 0, diagonal),
+      );
     }
   }
 }
@@ -64,16 +73,15 @@ function backwardPass(
   for (let cy = height - 1; cy >= 0; cy -= 1) {
     for (let cx = width - 1; cx >= 0; cx -= 1) {
       const index = cy * width + cx;
-      let best = distance[index] ?? OUTSIDE_DISTANCE_MM;
+      const best = distance[index] ?? OUTSIDE_DISTANCE_MM;
       if (best === OUTSIDE_DISTANCE_MM) continue;
-      const east = cx < width - 1 ? (distance[index + 1] ?? 0) + straight : straight;
-      const south = cy < height - 1 ? (distance[index + width] ?? 0) + straight : straight;
-      const southEast =
-        cx < width - 1 && cy < height - 1 ? (distance[index + width + 1] ?? 0) + diagonal : diagonal;
-      const southWest =
-        cx > 0 && cy < height - 1 ? (distance[index + width - 1] ?? 0) + diagonal : diagonal;
-      best = Math.min(best, east, south, southEast, southWest);
-      distance[index] = best;
+      distance[index] = Math.min(
+        best,
+        throughNeighbor(distance, index + 1, cx < width - 1, straight),
+        throughNeighbor(distance, index + width, cy < height - 1, straight),
+        throughNeighbor(distance, index + width + 1, cx < width - 1 && cy < height - 1, diagonal),
+        throughNeighbor(distance, index + width - 1, cx > 0 && cy < height - 1, diagonal),
+      );
     }
   }
 }
