@@ -35,6 +35,28 @@ test('Box Generator stays editable and cancellable during expensive generation',
   await expect(dialog).toHaveCount(0);
 });
 
+test('Box Generator keeps flat and assembled previews available above 20,000 points', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+  await runMenuCommand(page, 'Tools', 'Box Generator...');
+  const dialog = page.getByRole('dialog', { name: 'Box Generator' });
+  const generate = dialog.getByRole('button', { name: 'Generate', exact: true });
+
+  await dialog.getByRole('spinbutton', { name: 'Finger width', exact: true }).fill('3');
+  await dialog.getByRole('spinbutton', { name: 'Width', exact: true }).fill('5000');
+  await expect(generate).toBeEnabled();
+  await expect(dialog).not.toContainText('Preview hidden for responsiveness');
+  await expect(dialog.getByRole('img', { name: 'Generated panel sheet preview' })).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Assembled', exact: true }).click();
+  await expect(dialog.getByRole('img', { name: 'Assembled box preview' })).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {
   await page.getByText(family, { exact: true }).click();
   await page.getByRole('menuitem').filter({ hasText: command }).click();

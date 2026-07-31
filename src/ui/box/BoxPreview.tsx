@@ -55,9 +55,14 @@ function drawSheet(ctx: CanvasRenderingContext2D, panels: ReadonlyArray<BoxPanel
   ctx.fillStyle = SHEET_BACKGROUND;
   ctx.fillRect(0, 0, PREVIEW_WIDTH_PX, PREVIEW_HEIGHT_PX);
   if (panels === null || panels.length === 0) return;
-  const points = panels.flatMap((panel) => panel.outline.points);
-  const maxX = Math.max(...points.map((p) => p.x));
-  const maxY = Math.max(...points.map((p) => p.y));
+  let maxX = 0;
+  let maxY = 0;
+  for (const panel of panels) {
+    for (const point of panel.outline.points) {
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+  }
   const scale = Math.min(
     (PREVIEW_WIDTH_PX - 2 * PREVIEW_MARGIN_PX) / Math.max(maxX, 1),
     (PREVIEW_HEIGHT_PX - 2 * PREVIEW_MARGIN_PX) / Math.max(maxY, 1),
@@ -81,10 +86,19 @@ function drawSheet(ctx: CanvasRenderingContext2D, panels: ReadonlyArray<BoxPanel
 }
 
 function drawLabel(ctx: CanvasRenderingContext2D, panel: BoxPanel, scale: number): void {
-  const xs = panel.outline.points.map((p) => p.x);
-  const ys = panel.outline.points.map((p) => p.y);
-  const centerX = ((Math.min(...xs) + Math.max(...xs)) / 2) * scale;
-  const centerY = ((Math.min(...ys) + Math.max(...ys)) / 2) * scale;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const point of panel.outline.points) {
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minY = Math.min(minY, point.y);
+    maxY = Math.max(maxY, point.y);
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return;
+  const centerX = ((minX + maxX) / 2) * scale;
+  const centerY = ((minY + maxY) / 2) * scale;
   ctx.fillStyle = LABEL_FILL;
   ctx.font = LABEL_FONT;
   ctx.textAlign = 'center';
