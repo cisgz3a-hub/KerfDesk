@@ -263,6 +263,20 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     diameterMm: 3.175,
     tipAngleDeg: 15,
   },
+  {
+    id: 'vb-90-6350-hobby',
+    name: '90° V-bit — 6.35 mm (1/4") cut, 3.175 mm (1/8") shank',
+    kind: 'v-bit',
+    diameterMm: 6.35,
+    tipAngleDeg: 90,
+  },
+  {
+    id: 'vb-90-12700-hobby',
+    name: '90° V-bit — 12.7 mm (1/2") cut, 6.35 mm (1/4") shank',
+    kind: 'v-bit',
+    diameterMm: 12.7,
+    tipAngleDeg: 90,
+  },
 ];
 
 // Footprint defaults sized to the 4040 target machine's 400 × 400 mm bed
