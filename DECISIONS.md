@@ -13818,3 +13818,56 @@ Inkscape / Affinity / Illustrator arm of the research fan-out had not returned.
 The verification gap that green tests cannot close applies in full - jsdom cannot
 see WebGL, and per ADR-255's verification note no green suite is ever claimed as
 visual proof.
+
+### Amendment 1 (2026-08-01) - DS-8 becomes the layered carve: design layers with per-layer settings and bits, a live 3D target-surface pane, and a per-bit simulate pass
+
+The maintainer asked for the carved-picture-frame workflow: design in LAYERS,
+each layer with its own settings and its own bit, bit changes mid-job, and a 3D
+view of the layered result while designing. This amendment re-scopes DS-8
+accordingly and resolves the brief's open decision 4.
+
+1. **Depth lives on the DESIGN LAYER - not the entity, and not
+   `ObjectOperationOverride`.** A `DesignLayer` in `core/design` carries
+   `{ id, name, color, cutType, depthMm, toolId?, vClearToolId? }` -
+   deliberately a subset of `CncLayerSettings`, because a scene `Layer` already
+   IS the process operation (`layer.ts:63`, `machine.ts:105`) and per-layer
+   depth/bit is the shipped multi-tool model (H.7). The clause-6 sentence "a
+   design entity carries an optional depth" is superseded: an entity carries an
+   optional `layerId`. `ObjectOperationOverride` stays laser-only and untouched.
+
+2. **Apply materializes one scene operation PER design layer** (name and colour
+   carried over) and patches that fresh layer's `cnc` block with the design
+   layer's cutType / depthMm / toolId / vClearToolId AFTER
+   `applyLayerDefaultsToFreshLayers` stamps project defaults - order matters,
+   the defaults pass would otherwise clobber the carve settings. Multi-bit
+   sectioning (`cnc-tool-sections.ts`), labelled M0 tool-change holds, and the
+   per-bit Z-zero Continue gate are the existing pipeline and gain no new code.
+
+3. **The 3D pane imports scene BUILDERS, never `three`.** The pane lives in
+   `src/ui/design-studio/preview3d/` but contains no three.js import: it
+   consumes `createReliefThreeScene` / `SceneHandle` from
+   `src/ui/relief-viewer/` exactly as `Cnc3DPane` does from `src/ui/workspace/`.
+   ADR-102 section 2's import boundary is satisfied as written; the clause-6
+   sentence nominating `src/ui/viewer3d/` as the Studio's scene home is
+   superseded by this route (that folder remains the Inspector's).
+
+4. **Two fidelity tiers, each labelled as what it is.** The INSTANT tier renders
+   the target surface: pure `core/design-carve` rasterizes the layers into a
+   `Heightmap` - pocket floors flat at depth; v-carve depth = boundary distance
+   divided by tan(tipAngle/2), clamped to layer depth, the same law as
+   `vcarve-ladder.ts` so preview and toolpath cannot disagree about shape;
+   profile kerf slots at tool diameter on the offset side; drill discs; depths
+   at or past stock thickness clamp to a through cut - and `steppedSurfaceMesh`
+   (ADR-261 provenance) renders it with true vertical walls. The SIMULATE tier
+   compiles the designed layers through the real `compileCncJob` one tool bucket
+   at a time and stamps each bucket's removal grid with THAT bucket's kernel
+   (`kernelForTool`), min-combining the grids - honest per-bit cutter shapes,
+   which the single-kernel CNC pane cannot show today.
+
+5. **Rule 7 and ADR-261 section 3 hold.** The pane and everything it computes
+   are display-only: nothing gates Apply, Frame, or Start.
+
+6. **No `.lf2` change in v1.** Studio state stays transient; layers exist in the
+   session and materialize as ordinary scene layers at Apply. DS-9 remains the
+   parametric round-trip stage and will serialize the layer table with the
+   sketch when it lands.
