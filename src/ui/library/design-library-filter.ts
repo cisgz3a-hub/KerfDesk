@@ -55,5 +55,18 @@ export function filterDesignLibrary(
 }
 
 function haystack(entry: LibraryEntry): string {
-  return [entry.title, entry.category, entry.subcategory, ...entry.tags].join(' ').toLowerCase();
+  const provenance = entry.provenance;
+  return [
+    entry.title,
+    entry.category,
+    entry.subcategory,
+    ...entry.tags,
+    provenance.creator,
+    provenance.sourceName,
+    provenance.license,
+    provenance.licenseId,
+  ]
+    .filter((value): value is string => value !== undefined)
+    .join(' ')
+    .toLowerCase();
 }
