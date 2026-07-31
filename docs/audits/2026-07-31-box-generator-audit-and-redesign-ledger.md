@@ -9,8 +9,9 @@
 
 **Status:** audit and visualization contract complete; PR #529 was
 squash-merged by the maintainer with both checks green; BG-002 is implemented,
-independently audited, and release-gate green on its separate branch; this task
-performed no merge
+independently audited, and release-gate green on its separate branch; draft
+[PR #533](https://github.com/cisgz3a-hub/KerfDesk/pull/533) is open and this
+task performed no merge
 
 **Scope:** Box Generator math, fabrication semantics, preview, insertion, persistence, and
 downstream project/output handoff only
@@ -521,9 +522,10 @@ clearance, relief choice, layer settings, exported artifact hash, and result.
 | 2026-07-31 | Final repository and release-gate components passed. | 1,359 test files / 8,190 tests passed (14 files / 22 tests skipped); typecheck, format, both linters, ADR/licence/integrity/size/export checks, web build, and Electron-main build passed. Three chunk 704.87 KB minified; the unrelated 1,006.57 KB UI-workbench build warning remains. |
 | 2026-07-31 | Review PR opened; no merge performed. | [PR #529](https://github.com/cisgz3a-hub/KerfDesk/pull/529), base `main`, head `codex/box-generator-audit`. |
 | 2026-07-31 | PR #529 squash-merged by the maintainer while BG-002 work was in progress. | GitHub records merge commit `e3d5cc11ed1b3a0a8f0fd37251306de3aa1bca81`; both prerequisite checks were green. This BG-002 task did not perform the merge. |
-| 2026-07-31 | BG-002 replayed as one isolated commit on current `origin/main`. | Base `f99e0c5f82801eafd62ebdef35a56e52ff20fa51`; only the BG-002 slice was rebased after the prerequisite merge. No merge to `main` was performed. |
+| 2026-07-31 | BG-002 replayed as an isolated slice on current `origin/main`. | Base `f99e0c5f82801eafd62ebdef35a56e52ff20fa51`; only the BG-002 slice was rebased after the prerequisite merge. No merge to `main` was performed. |
 | 2026-07-31 | BG-002 isolated without changing PR #529. | New stacked worktree/branch `codex/box-generator-bg002` at PR #529 head; PR #529 remained clean and both named checks were green. |
 | 2026-07-31 | BG-002 regression reproduced test-first. | The initial dialog test expected a pending worker request and failed: zero workers were created because `generateBox` still ran during render. |
 | 2026-07-31 | Worker/cancellation repair and estimator audited. | The current independent bundle passed 8 files / 43 tests across lifecycle, 50 ms status, stale results, preview fallback, estimator property/metamorphic checks, and direct-core/worker parity. A first nominal bound failed on an open-top Z-axis case, and later review caught relief-heavy Boolean input missing from the large-work classifier. The repaired O(1) estimate now uses source-derived style coefficients plus a saturating advisory `25 × nominal` relief-input term; representative closed/open/divider/slide builders and a 40,680-spec external grid passed. |
 | 2026-07-31 | Real-browser responsiveness smoke passed and repeated. | Production Vite worker in headless Chrome kept a second field edit under 1.5 s during a 300,000 mm expensive request, cancelled it, recovered to ordinary values, and closed cleanly. Independent review repeated the smoke three more times, and a final post-rebase run on current `main` also passed. |
 | 2026-07-31 | BG-002 final verification passed. | Full Box/insertion bundle passed 162 tests; main and E2E typechecks, Box export boundary at 20, and raw file-size policy passed. `corepack pnpm release:check` passed first on the prerequisite head in 22 min 21 s and again on final current `main` in 18 min 4 s: formatting, both linters, ADR/licence checks, full unit and release-integrity suites, web and Electron-main builds, hard/soft size checks, and the public-export ratchet all passed. |
+| 2026-07-31 | BG-002 draft review PR opened; no merge performed. | [PR #533](https://github.com/cisgz3a-hub/KerfDesk/pull/533), base `main`, head `codex/box-generator-bg002`. |
