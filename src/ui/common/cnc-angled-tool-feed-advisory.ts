@@ -1,4 +1,5 @@
-import { isValidCncTipAngleDeg, type CncTool } from '../../core/scene';
+import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
+import type { CncTool } from '../../core/scene';
 
 // The generic material recipe is deliberately still available for angled bits
 // (WORKFLOW F-CNC24). This copy makes its exact model boundary visible without

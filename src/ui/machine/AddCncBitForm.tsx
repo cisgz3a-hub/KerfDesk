@@ -3,8 +3,8 @@ import {
   MAX_CNC_TIP_ANGLE_DEG,
   MIN_CNC_TIP_ANGLE_DEG,
   isValidCncTipAngleDeg,
-  type CncToolKind,
-} from '../../core/scene';
+} from '../../core/cnc-tip-angle';
+import type { CncToolKind } from '../../core/scene';
 import { useStore } from '../state';
 
 const TOOL_KIND_OPTIONS: ReadonlyArray<{ readonly value: CncToolKind; readonly label: string }> = [

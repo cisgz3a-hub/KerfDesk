@@ -1,4 +1,5 @@
-import { isValidCncTipAngleDeg, type CncTool, type CncToolKind } from '../../core/scene';
+import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
+import type { CncTool, CncToolKind } from '../../core/scene';
 
 const TOOL_KIND_LABELS: Readonly<Record<CncToolKind, string>> = {
   'end-mill': 'End mill',

@@ -1,12 +1,11 @@
 import { collectLayerPolylines } from '../cnc/collect-cnc-contours';
 import { vcarveResolutionMm } from '../cnc/vcarve-ladder';
 import { zPassDepths } from '../cnc/depth-passes';
+import { MIN_CNC_TIP_ANGLE_DEG, isValidCncTipAngleDeg } from '../cnc-tip-angle';
 import type { DeviceProfile } from '../devices';
 import { insetContoursChecked } from '../geometry/offset-ladder';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
-  MIN_CNC_TIP_ANGLE_DEG,
-  isValidCncTipAngleDeg,
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,

@@ -4,7 +4,7 @@
 // angles where the kind requires them, and a resolvable default toolId.
 
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CNC_MACHINE_CONFIG, DEFAULT_CNC_TOOLS, isValidCncTipAngleDeg } from './machine';
+import { DEFAULT_CNC_MACHINE_CONFIG, DEFAULT_CNC_TOOLS } from './machine';
 
 // v-bit and engraving tools cut a cone; their included angle is load-
 // bearing (v-carve depth uses tan(θ/2)), so it must be present and finite.
@@ -31,16 +31,6 @@ describe('DEFAULT_CNC_TOOLS', () => {
         expect(tool.tipAngleDeg ?? 0).toBeGreaterThan(0);
       }
     }
-  });
-
-  it.each([
-    [1, true],
-    [179, true],
-    [0.999, false],
-    [179.001, false],
-    [Number.NaN, false],
-  ])('validates the shared included-angle boundary %s', (angle, expected) => {
-    expect(isValidCncTipAngleDeg(angle)).toBe(expected);
   });
 
   it("resolves the config's default toolId to a real tool", () => {

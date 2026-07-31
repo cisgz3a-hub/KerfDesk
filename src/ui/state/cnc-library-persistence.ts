@@ -5,13 +5,8 @@
 // Stored in localStorage with the same safe-parse / clear-on-corrupt
 // posture as the material library slot.
 
-import {
-  isValidCncTipAngleDeg,
-  type CncLayerSettings,
-  type CncMachineConfig,
-  type CncTool,
-  type CncToolKind,
-} from '../../core/scene';
+import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
+import type { CncLayerSettings, CncMachineConfig, CncTool, CncToolKind } from '../../core/scene';
 
 export const CNC_LIBRARY_STORAGE_KEY = 'laserforge.cnc-library.v1';
 

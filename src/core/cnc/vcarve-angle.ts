@@ -1,4 +1,5 @@
-import { isValidCncTipAngleDeg, type CncTool } from '../scene';
+import { isValidCncTipAngleDeg } from '../cnc-tip-angle';
+import type { CncTool } from '../scene';
 
 // Wrong-kind V-carve selections have historically remained advisory-only and
 // used this fallback. Actual V-bits must carry valid geometry instead.

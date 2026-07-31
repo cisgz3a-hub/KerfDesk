@@ -3,6 +3,7 @@
 
 import { normalizeCameraAlignment, normalizeCameraCalibration } from '../../core/camera';
 import { isChiploadMaterialKey } from '../../core/cnc';
+import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import {
   DEFAULT_DEVICE_PROFILE,
   isKnownControllerKind,
@@ -22,7 +23,6 @@ import {
   type CncTiling,
   DEFAULT_CNC_TOOLS,
   isCncCoolantMode,
-  isValidCncTipAngleDeg,
   type Project,
 } from '../../core/scene';
 import { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION } from '../../core/scene/project';

@@ -20,19 +20,6 @@ export type CncTool = {
   readonly tipAngleDeg?: number;
 };
 
-export const MIN_CNC_TIP_ANGLE_DEG = 1;
-export const MAX_CNC_TIP_ANGLE_DEG = 179;
-
-/** The one included-angle contract shared by entry, persistence and geometry. */
-export function isValidCncTipAngleDeg(value: unknown): value is number {
-  return (
-    typeof value === 'number' &&
-    Number.isFinite(value) &&
-    value >= MIN_CNC_TIP_ANGLE_DEG &&
-    value <= MAX_CNC_TIP_ANGLE_DEG
-  );
-}
-
 // Stock (workpiece) parameters. Z0 is the stock TOP surface; cut depths are
 // measured down from it. The XY footprint (Phase H.2) locates the workpiece
 // on the bed: originOffset is the stock's min-XY corner in machine
