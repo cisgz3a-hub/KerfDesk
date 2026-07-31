@@ -1,4 +1,4 @@
-// use-design-carve-content — the sketch, as viewer content (ADR-271
+// use-design-carve-content — the sketch, as viewer content (ADR-272
 // Amendment 1 clause 4, instant tier). Pure math on a deferred sketch: typing
 // and dragging stay snappy because the heightmap recomputes behind
 // useDeferredValue, the same trick Cnc3DPane uses (PRF-01 also applies here —

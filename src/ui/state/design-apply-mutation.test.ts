@@ -44,7 +44,7 @@ describe('applyDesignSketch', () => {
 
   // A sketch without explicit layers lives on the default carve layer, so the
   // whole apply still shares ONE operation — now named after that layer
-  // (ADR-271 Amendment 1 clause 2).
+  // (ADR-272 Amendment 1 clause 2).
   it('shares one auto-created line operation across the whole apply', () => {
     const result = applyDesignSketch(emptySlice(), plaque, ids);
     if (result === null) throw new Error('expected insertion');

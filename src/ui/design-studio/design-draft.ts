@@ -1,5 +1,5 @@
 // design-draft — the in-progress gesture, and how it becomes an entity
-// (ADR-271, DS-3).
+// (ADR-272, DS-3).
 //
 // Lives in ui/ rather than core/design on purpose: a draft is interaction state,
 // not a domain concept, and it carries the modifier keys that only a pointer has.

@@ -1,4 +1,4 @@
-// design-snap — where the pointer actually lands (ADR-271, DS-3/DS-4).
+// design-snap — where the pointer actually lands (ADR-272, DS-3/DS-4).
 //
 // Two mechanisms, deliberately ranked: a geometric snap to real geometry ALWAYS
 // beats the grid. Dragging a real endpoint off to the nearest grid line is the

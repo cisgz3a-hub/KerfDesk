@@ -1,4 +1,4 @@
-// design-fields-rect — the dimensions a rectangle exposes (ADR-271, DS-3b).
+// design-fields-rect — the dimensions a rectangle exposes (ADR-272, DS-3b).
 
 import type { SketchEntity } from '../../core/design';
 import { derivedField, mmField, TAU, type EntityField } from './design-field-types';

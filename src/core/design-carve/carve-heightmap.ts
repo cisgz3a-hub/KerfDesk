@@ -1,5 +1,5 @@
 // carve-heightmap — composes every design layer's target surface into ONE
-// heightmap (ADR-271 Amendment 1 clause 4). Deeper always wins (min-combine),
+// heightmap (ADR-272 Amendment 1 clause 4). Deeper always wins (min-combine),
 // so layer order never changes the previewed solid — exactly like material:
 // once wood is gone, a shallower later cut cannot put it back.
 

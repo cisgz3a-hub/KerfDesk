@@ -1,4 +1,4 @@
-// DesignLayerRow — one carve layer in the Studio's layers list (ADR-271
+// DesignLayerRow — one carve layer in the Studio's layers list (ADR-272
 // Amendment 1). Click arms the layer for new geometry; the row reads back the
 // layer's kind, depth and bit so the whole plan is scannable without opening
 // each layer's settings.

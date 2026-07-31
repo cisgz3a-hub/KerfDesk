@@ -1,4 +1,4 @@
-// design-field-types — the vocabulary of a dimension (ADR-271, DS-3b).
+// design-field-types — the vocabulary of a dimension (ADR-272, DS-3b).
 //
 // Types only, so the field builders, the editor, the annotation geometry, and the
 // formatter can all share one definition without importing each other.

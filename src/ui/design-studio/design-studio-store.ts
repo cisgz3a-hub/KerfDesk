@@ -1,4 +1,4 @@
-// Design Studio ephemeral session store (ADR-271, Phase N).
+// Design Studio ephemeral session store (ADR-272, Phase N).
 //
 // Standalone on purpose, exactly like the Image Studio store: the sketch, the
 // active tool, the view, the selection, and the Studio's own undo history must
@@ -97,7 +97,7 @@ type DesignStudioState = {
   readonly markApplied: () => void;
   readonly undo: () => void;
   readonly redo: () => void;
-  // Carve layers (ADR-271 Amendment 1). Ids come from the caller — pure core
+  // Carve layers (ADR-272 Amendment 1). Ids come from the caller — pure core
   // may not generate identity.
   readonly setActiveLayer: (layerId: string) => void;
   readonly addLayer: (id: string) => void;

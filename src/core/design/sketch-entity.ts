@@ -1,5 +1,5 @@
 // sketch-entity — the discriminated union the Design Studio draws, edits, and
-// materializes (ADR-271, Phase N DS-1). Deliberately separate from ShapeSpec:
+// materializes (ADR-272, Phase N DS-1). Deliberately separate from ShapeSpec:
 // a ShapeSpec is one finished object's parametric block, while a Sketch is a
 // working set of independent entities that only becomes objects at Apply.
 //
@@ -20,7 +20,7 @@ export type SketchEntityBase = {
   // LightBurn models the same idea as a non-output "tool" layer (T1), and our
   // Layer.output flag is where an applied construction entity would land.
   readonly construction?: boolean;
-  // The carve layer this entity belongs to (ADR-271 Amendment 1). Absent or
+  // The carve layer this entity belongs to (ADR-272 Amendment 1). Absent or
   // unknown means the sketch's first layer, so pre-layer sketches keep working.
   readonly layerId?: string;
 };
@@ -68,7 +68,7 @@ export type SketchEntityKind = SketchEntity['kind'];
 
 export type Sketch = {
   readonly entities: ReadonlyArray<SketchEntity>;
-  // Carve layers (ADR-271 Amendment 1). Absent or empty behaves as exactly the
+  // Carve layers (ADR-272 Amendment 1). Absent or empty behaves as exactly the
   // default layer; the field materializes on the first layer edit so sketches
   // built before layers existed stay valid.
   readonly layers?: ReadonlyArray<DesignLayer>;
@@ -92,7 +92,7 @@ function isPositive(value: number): boolean {
 
 // Returns a usable entity, or null when the entity is degenerate. Null is the
 // pure-core "nothing to draw" answer; it is never an error condition and never
-// blocks anything (ADR-271 clause 9).
+// blocks anything (ADR-272 clause 9).
 export function sanitizeEntity(entity: SketchEntity): SketchEntity | null {
   switch (entity.kind) {
     case 'line':

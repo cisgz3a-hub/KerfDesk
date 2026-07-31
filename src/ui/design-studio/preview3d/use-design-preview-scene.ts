@@ -14,7 +14,7 @@
 // resolves after a real unmount.
 //
 // This module imports the scene BUILDER from relief-viewer, never `three` —
-// the ADR-102 §2 route ADR-271 Amendment 1 clause 3 records.
+// the ADR-102 §2 route ADR-272 Amendment 1 clause 3 records.
 
 import { useEffect, useRef, useState } from 'react';
 import type { ViewerContentInput } from '../../cnc-viewer3d/viewer3d-content';

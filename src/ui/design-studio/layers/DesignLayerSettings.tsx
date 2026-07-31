@@ -1,4 +1,4 @@
-// DesignLayerSettings — the active layer's carve settings (ADR-271
+// DesignLayerSettings — the active layer's carve settings (ADR-272
 // Amendment 1): kind, depth, bit, and the v-carve clearing bit. Numeric entry
 // commits on blur or Enter, the numeric-field convention the main inspector
 // uses, so half-typed values never thrash the 3D preview.

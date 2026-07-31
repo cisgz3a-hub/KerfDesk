@@ -1,4 +1,4 @@
-// design-fields-path — the dimensions a freehand path exposes (ADR-271, DS-3b).
+// design-fields-path — the dimensions a freehand path exposes (ADR-272, DS-3b).
 //
 // A path has no parametric handles, so it reports its extents and its measured run
 // length rather than pretending its size is typeable. X and Y ARE editable, because

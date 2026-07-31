@@ -1,4 +1,4 @@
-// The simulate tier's gate (ADR-271 Amendment 1 clause 4): real toolpaths,
+// The simulate tier's gate (ADR-272 Amendment 1 clause 4): real toolpaths,
 // and each tool section stamped with ITS OWN bit — a v-groove where the v-bit
 // ran, a flat floor where the end mill ran, in one combined grid. Assertions
 // read depth VALUES, not absolute positions, so they hold under every origin

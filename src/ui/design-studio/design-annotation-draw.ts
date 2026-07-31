@@ -1,5 +1,5 @@
 // design-annotation-draw — paints a dimension call-out on the overlay layer
-// (ADR-271, DS-3b).
+// (ADR-272, DS-3b).
 //
 // Proper draughting conventions, because a dimension that looks like a stray line
 // teaches nothing: witness (extension) lines run from the geometry out past the

@@ -1,4 +1,4 @@
-// DesignLayersCard — the Studio's carve layers panel (ADR-271 Amendment 1):
+// DesignLayersCard — the Studio's carve layers panel (ADR-272 Amendment 1):
 // the layer list, the active layer's settings, and the two actions that give
 // layers meaning — New layer and Assign selection. Layer edits ride the sketch
 // history, so Ctrl+Z walks them like any drawing step.

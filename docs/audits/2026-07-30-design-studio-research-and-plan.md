@@ -319,7 +319,7 @@ Each stage is an individually reviewable, CI-green, shippable diff (CLAUDE.md ru
 
 | Stage | Delivers | Gate |
 |---|---|---|
-| **DS-0** | Governance: ADR-271, PROJECT.md phase + scope amendments, WORKFLOW.md `F-DS` flows | `check:adr-numbers` green |
+| **DS-0** | Governance: ADR-272, PROJECT.md phase + scope amendments, WORKFLOW.md `F-DS` flows | `check:adr-numbers` green |
 | **DS-1** | `src/core/design/` sketch model + entity geometry + bounds, fully unit-tested. No UI. | tests green |
 | **DS-2** | Overlay shell: Host + lazy overlay + standalone store + session-local undo + Esc ladder + modal registration. Opens, closes, stashes. Empty canvas. | renders; chunk measured |
 | **DS-3** | Canvas + view transform + two-layer render + rAF coalescing + Select/Line/Rectangle/Circle tools. Typed numeric entry. | **perceptual: rendered and compared** |
@@ -344,7 +344,7 @@ works.
 3. **Separate window** — recommendation: **full-window overlay**, Image Studio parity.
    A real OS window cannot share the store and breaks the PWA target.
 4. **Where depth lives** — recommendation: **per design entity**, materialized to a
-   per-object override at Apply. Requires extending `ObjectOperationOverride`; ADR-271
+   per-object override at Apply. Requires extending `ObjectOperationOverride`; ADR-272
    records it.
 
 ### 4.2 Pre-existing defects found during recon (not introduced by this work)

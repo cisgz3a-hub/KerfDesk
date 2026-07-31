@@ -1,4 +1,4 @@
-// design-layer — the carve layer a sketch entity belongs to (ADR-271
+// design-layer — the carve layer a sketch entity belongs to (ADR-272
 // Amendment 1, DS-8). A DesignLayer is deliberately a SUBSET of
 // CncLayerSettings: at Apply each design layer becomes one scene operation and
 // these fields patch its `cnc` block, so the vocabulary must stay a projection

@@ -13658,7 +13658,7 @@ power, or produces acceptable material results.
 - NOT verified: no machine was connected or moved; no air cut, material coupon, encoder trace,
   backlash measurement, load measurement, thermal calibration, burn quality, cut quality, or
   physical position retention was tested.
-## ADR-271 - Design Studio: a full-window on-canvas design surface for laser and CNC (2026-07-30)
+## ADR-272 - Design Studio: a full-window on-canvas design surface for laser and CNC (2026-07-30)
 
 ### Context
 

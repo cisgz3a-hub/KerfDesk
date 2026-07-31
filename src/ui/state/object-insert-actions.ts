@@ -183,7 +183,7 @@ function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
       if (next === null) return state;
       // Defaults first, then the design layers' carve settings — the reverse
       // order would let the defaults pass clobber the depth/bit the operator
-      // just saw in the Studio's 3D preview (ADR-271 Amendment 1 clause 2).
+      // just saw in the Studio's 3D preview (ADR-272 Amendment 1 clause 2).
       const withDefaults = applyLayerDefaultsToFreshLayers(
         state.project.scene.layers,
         next,

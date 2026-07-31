@@ -1,4 +1,4 @@
-// snap-kinds — the vocabulary of object snapping (ADR-271, Phase N DS-4).
+// snap-kinds — the vocabulary of object snapping (ADR-272, Phase N DS-4).
 //
 // LightBurn names five snap point types and gives each its own cursor glyph:
 // Node, Midpoint, Center, Intersection and Line (verified in its documentation,

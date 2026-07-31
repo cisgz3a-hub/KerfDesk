@@ -1,4 +1,4 @@
-// The DS-8 acceptance gate (ADR-271 Amendment 1): a LAYERED design — two
+// The DS-8 acceptance gate (ADR-272 Amendment 1): a LAYERED design — two
 // carve layers, two different bits — must reach a multi-bit CNC program
 // through the UNCHANGED pipeline: per-bit tool sections, the profile section
 // last, and a labelled M0 tool-change pause between them. This is "change

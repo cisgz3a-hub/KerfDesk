@@ -154,7 +154,7 @@ it, not before the whole build.
 - **Plan as a document**, reviewed before code — a design + self-audit doc in
   `docs/audits/`, matching the G-code Inspector and Image Studio precedents.
 - **ADR before architecture.** New unions, new stores, new dependencies, and the
-  depth model each need a `DECISIONS.md` entry. Next free number is **ADR-271**
+  depth model each need a `DECISIONS.md` entry. Next free number is **ADR-272**
   (`node scripts/check-adr-numbers.mjs` prints it — always re-run, numbers race).
 - **Staged, individually reviewable diffs** (CLAUDE.md rule 1). Every stage is
   independently shippable and CI-green: `pnpm test`, `pnpm lint`,

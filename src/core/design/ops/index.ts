@@ -1,4 +1,4 @@
-// core/design/ops — the Modify-rail operations (ADR-271, Phase N DS-6).
+// core/design/ops — the Modify-rail operations (ADR-272, Phase N DS-6).
 //
 // Its own sub-barrel, like core/design/snap: the parent barrel stays well under the
 // ADR-015 cap and trim / extend / offset / boolean can land here later without

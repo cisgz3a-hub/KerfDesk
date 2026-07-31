@@ -1,5 +1,5 @@
 // layer-surface — writes one design layer's target surface into the depth
-// grid (ADR-271 Amendment 1 clause 4). Each cut type reuses the law its
+// grid (ADR-272 Amendment 1 clause 4). Each cut type reuses the law its
 // toolpath compiler applies, so the instant preview and the eventual G-code
 // cannot disagree about shape:
 //   pocket   flat floor at -depthMm over the even-odd region

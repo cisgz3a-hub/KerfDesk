@@ -1,4 +1,4 @@
-// use-design-apply — the Apply handler (ADR-271, Phase N DS-5, flow F-DS8).
+// use-design-apply — the Apply handler (ADR-272, Phase N DS-5, flow F-DS8).
 //
 // Keeps the orchestration out of the button: mint one id per entity (pure core
 // may not generate identity), hand the sketch to the project store as a single

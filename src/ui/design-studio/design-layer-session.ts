@@ -1,5 +1,5 @@
 // design-layer-session — the pure session transitions behind the layers panel
-// (ADR-271 Amendment 1). Layer edits are SKETCH edits — they ride the same
+// (ADR-272 Amendment 1). Layer edits are SKETCH edits — they ride the same
 // history as geometry, so undo walks layer changes too — while the active
 // layer is session state only. Total functions throughout: an edit that cannot
 // apply returns the session unchanged (rule 7).

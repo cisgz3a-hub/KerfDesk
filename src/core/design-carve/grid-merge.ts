@@ -1,5 +1,5 @@
 // grid-merge — folds one removal grid's depths into another. The simulate
-// tier stamps each tool section with ITS OWN bit's kernel (ADR-271
+// tier stamps each tool section with ITS OWN bit's kernel (ADR-272
 // Amendment 1 clause 4), producing one grid per bit over the same spec;
 // material that any bit removed stays removed, so deeper (more negative)
 // always wins, mirroring carve-heightmap's min-combine.

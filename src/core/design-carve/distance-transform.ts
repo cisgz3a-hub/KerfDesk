@@ -1,6 +1,6 @@
 // distance-transform — two-pass chamfer distance inside a mask, in
 // millimetres. Feeds the v-carve preview law z = -dist / tan(tipAngle / 2)
-// (ADR-271 Amendment 1 clause 4): the distance to the region boundary IS the
+// (ADR-272 Amendment 1 clause 4): the distance to the region boundary IS the
 // groove depth, which is why the transform lives next to the carve and not in
 // a generic geometry module.
 //

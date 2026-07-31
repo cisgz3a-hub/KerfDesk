@@ -1,5 +1,5 @@
 // design-apply-mutation — commit a Design Studio sketch into the scene
-// (ADR-271, Phase N DS-5; layered by Amendment 1, DS-8).
+// (ADR-272, Phase N DS-5; layered by Amendment 1, DS-8).
 //
 // The ONE place the Studio writes to the project. Every designed entity
 // becomes a scene object; entities GROUP BY CARVE LAYER, each design layer

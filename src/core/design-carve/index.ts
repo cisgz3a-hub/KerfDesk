@@ -1,4 +1,4 @@
-// core/design-carve — the instant carve preview surface (ADR-271 Amendment 1
+// core/design-carve — the instant carve preview surface (ADR-272 Amendment 1
 // clause 4): design layers in, one target-surface Heightmap out. Pure typed
 // arrays only; steppedSurfaceMesh (core/heightfield) renders the result at the
 // UI boundary. Its own module because core/sim sits at the export cap and this

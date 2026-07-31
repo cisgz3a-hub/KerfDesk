@@ -272,7 +272,7 @@ amended). Zero new runtime dependencies. Acceptance gates: total line
 accountability; own-output-clean (every built-in strategy's output parses
 with zero unsupported-word notes).
 
-### Phase N — v0.13 "Design Studio" [Approved 2026-07-30 — ADR-271; build starting at DS-0]
+### Phase N — v0.13 "Design Studio" [Approved 2026-07-30 — ADR-272; build starting at DS-0]
 
 An on-canvas design surface: draw a part to size by hand, from nothing, and cut
 it. Today the canvas places artwork; Phase G gave it rectangle/ellipse/polygon/
@@ -287,7 +287,7 @@ uses `THREE.Shape` + `ExtrudeGeometry` from the already-pinned `three@0.180.0`,
 and open-path offset / simplification / hole-aware booleans are reachable
 through capabilities already shipped in `clipper2-ts`. **No general constraint
 solver** — every browser-capable 2D geometric solver is GPL-family or otherwise
-license-blocked (ADR-271 Context), so precision comes from object snaps,
+license-blocked (ADR-272 Context), so precision comes from object snaps,
 ortho/polar tracking, typed numeric entry, and dimension-driven editing. The
 pipeline is untouched: the Studio materializes into ordinary `ShapeObject`
 geometry, so compile/preview/emit/serialize are unchanged and G-code stays
@@ -297,7 +297,7 @@ byte-identical for unchanged input. Design + research:
 
 | Stage | Delivers | Status |
 |---|---|---|
-| DS-0 | Governance: ADR-271, this entry, `F-DS` flows in WORKFLOW.md | Done |
+| DS-0 | Governance: ADR-272, this entry, `F-DS` flows in WORKFLOW.md | Done |
 | DS-1 | Pure `src/core/design/` sketch model, entity geometry, bounds | Built |
 | DS-2 | Overlay shell: host + lazy chunk + session store + local undo + Esc ladder + two-rail palette + status bar + canvas with bed/grid/geometry paint, rAF coalescing, cursor-anchored zoom | Built |
 | DS-3 | Drawing tools: Line/Rect/Circle drag gestures with Shift/Alt modifiers, second canvas layer for the live draft + dimension label, click/marquee selection, grid snap, ortho | Built |
@@ -309,7 +309,7 @@ byte-identical for unchanged input. Design + research:
 | DS-6 | Corner ops in `core/design/ops/`: fillet (tangent arc at the shared chord tolerance) and chamfer (exact, no sampling), both refusing a size that will not fit rather than clamping | Built (core) |
 | DS-6b | Fillet and chamfer wired to the Modify rail with a context-sensitive options bar (trim/extend still planned) | Built |
 | DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit | Planned |
-| DS-8 | Layered carve (ADR-271 Amendment 1): design layers with per-layer cut type / depth / bit, layers panel with assign-selection, live three.js target-surface pane, per-bit simulate pass, Apply → one operation per layer feeding the existing multi-bit tool-change job | In progress |
+| DS-8 | Layered carve (ADR-272 Amendment 1): design layers with per-layer cut type / depth / bit, layers panel with assign-selection, live three.js target-surface pane, per-bit simulate pass, Apply → one operation per layer feeding the existing multi-bit tool-change job | In progress |
 | DS-9 | `SketchShape` arm on `ShapeSpec` — parametric round-trip through `.lf2` | Planned |
 
 ### Anything past Phase F

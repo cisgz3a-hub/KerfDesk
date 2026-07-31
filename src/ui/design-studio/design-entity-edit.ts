@@ -1,5 +1,5 @@
 // design-entity-edit — typing an exact number back into the geometry
-// (ADR-271, DS-3b). The write half of design-entity-fields.
+// (ADR-272, DS-3b). The write half of design-entity-fields.
 //
 // This is what makes the Studio precise rather than approximate: every dimension
 // the inspector shows can be typed, and the entity is REBUILT from the number

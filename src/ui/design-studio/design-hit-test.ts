@@ -1,4 +1,4 @@
-// design-hit-test — which entity is under the pointer (ADR-271, DS-3).
+// design-hit-test — which entity is under the pointer (ADR-272, DS-3).
 //
 // Tests against MATERIALIZED geometry, so what you can click is exactly what is
 // drawn: an arc is pickable along the arc it sweeps, not across the chord or

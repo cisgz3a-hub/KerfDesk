@@ -1,4 +1,4 @@
-// DesignTopBar — the Studio's title row (ADR-271, DS-2).
+// DesignTopBar — the Studio's title row (ADR-272, DS-2).
 //
 // Controls that act on the whole session live here; controls that act on the
 // armed tool live in the options bar below it, and controls that act on the

@@ -1,5 +1,5 @@
 // design-session-mutations — the pure session transitions behind the store actions
-// (ADR-271). Split out of design-studio-store.ts when that file crossed the 250-line
+// (ADR-272). Split out of design-studio-store.ts when that file crossed the 250-line
 // soft cap: the store is zustand wiring, and these are the sketch-and-selection
 // transitions it wires up. Every function here is total — it returns the session
 // unchanged rather than throwing when an operation cannot apply (rule 7).
@@ -19,7 +19,7 @@ import { sessionSketch, withSketch, type DesignSession } from './design-session'
 // The draft becomes an entity, the entity becomes one history step, and the new
 // entity becomes the selection — so the operator can immediately edit what they
 // just drew. A degenerate draft simply clears (a click is not a draw). The new
-// entity lands on the active carve layer (ADR-271 Amendment 1).
+// entity lands on the active carve layer (ADR-272 Amendment 1).
 export function commitSessionDraft(session: DesignSession, id: string): DesignSession {
   if (session.draft === null) return session;
   const drafted = draftToEntity(session.draft, id);

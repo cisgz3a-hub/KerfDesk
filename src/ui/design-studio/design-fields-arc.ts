@@ -1,4 +1,4 @@
-// design-fields-arc — the dimensions an arc exposes (ADR-271, DS-3b).
+// design-fields-arc — the dimensions an arc exposes (ADR-272, DS-3b).
 
 import type { SketchEntity } from '../../core/design';
 import {

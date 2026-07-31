@@ -1,4 +1,4 @@
-// use-design-simulate — click-to-run bit simulation state (ADR-271
+// use-design-simulate — click-to-run bit simulation state (ADR-272
 // Amendment 1 clause 4). The result remembers WHICH sketch it simulated, so
 // the pane can mark it stale the moment the drawing moves on — an honest
 // label instead of a silently outdated surface.

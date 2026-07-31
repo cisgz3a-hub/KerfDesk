@@ -1,4 +1,4 @@
-// DesignStatusBar — the Studio's bottom readout (ADR-271, DS-2).
+// DesignStatusBar — the Studio's bottom readout (ADR-272, DS-2).
 //
 // Carries the three things a precision canvas must always show: where the
 // pointer is, what the armed tool expects you to do next, and how big the

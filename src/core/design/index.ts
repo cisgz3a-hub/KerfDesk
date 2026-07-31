@@ -1,4 +1,4 @@
-// core/design — the pure sketch model behind the Design Studio (ADR-271,
+// core/design — the pure sketch model behind the Design Studio (ADR-272,
 // Phase N). Cross-module consumers (ui/design-studio) import from here, never
 // from the leaf files; intra-module code imports leaves directly.
 //

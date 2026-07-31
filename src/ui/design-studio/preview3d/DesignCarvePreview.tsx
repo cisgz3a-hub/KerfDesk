@@ -1,4 +1,4 @@
-// DesignCarvePreview — the Studio's live 3D carve view (ADR-271 Amendment 1).
+// DesignCarvePreview — the Studio's live 3D carve view (ADR-272 Amendment 1).
 // Two labelled tiers: the instant DESIGN surface (target depths, recomputed as
 // you draw) and the click-to-run BITS simulation (real toolpaths, each tool
 // section stamped with its own bit's kernel). The canvas stays mounted while

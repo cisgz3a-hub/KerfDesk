@@ -1,5 +1,5 @@
 // resolve-snap — pick the one snap target the cursor should land on
-// (ADR-271, Phase N DS-4).
+// (ADR-272, Phase N DS-4).
 //
 // Priority beats proximity: an endpoint within range always wins over the
 // point-on-line that lies on top of it, because "the corner" is what the operator

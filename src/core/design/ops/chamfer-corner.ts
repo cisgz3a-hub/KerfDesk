@@ -1,4 +1,4 @@
-// chamfer-corner — flatten a path corner (ADR-271, DS-6).
+// chamfer-corner — flatten a path corner (ADR-272, DS-6).
 //
 // The exact operation: one vertex is replaced by the two setback points, so the
 // result is straight-line geometry with no sampling and no tolerance. Nothing is

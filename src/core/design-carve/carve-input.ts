@@ -1,4 +1,4 @@
-// carve-input — the vocabulary of the instant carve preview (ADR-271
+// carve-input — the vocabulary of the instant carve preview (ADR-272
 // Amendment 1 clause 4). Pure data in, one Heightmap out; the UI decides grid
 // resolution and which frame the origin lives in (the math is frame-agnostic,
 // the caller must simply be consistent, per the ADR-261 one-frame rule).

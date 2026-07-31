@@ -1,5 +1,5 @@
 // design-carve-source — what the carve preview knows about the machine
-// (ADR-271 Amendment 1). On a CNC project this is the real stock footprint in
+// (ADR-272 Amendment 1). On a CNC project this is the real stock footprint in
 // SCENE frame (the ADR-261 one-frame rule: the same toSceneCoords mapping the
 // CNC result pane uses), the real tool table, and the active bit. On a laser
 // project the Studio still previews: the whole bed as stock at the default

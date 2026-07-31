@@ -13,7 +13,7 @@ export {
 } from './rematerialize-shape';
 export { polylineToPolylines } from './polyline';
 export type { PolylineSpec } from './polyline';
-// Published for core/design (ADR-271): the Design Studio derives sketch extents
+// Published for core/design (ADR-272): the Design Studio derives sketch extents
 // from materialized geometry and must not grow a second bounds implementation.
 export { boundsOfPolylines } from './polyline-bounds';
 export { createPolyline, CURRENT_POLYLINE_FAIRING_VERSION } from './create-polyline';

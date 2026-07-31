@@ -1,4 +1,4 @@
-// DesignSidePanel — the Studio's right rail (ADR-271 Amendment 1): carve
+// DesignSidePanel — the Studio's right rail (ADR-272 Amendment 1): carve
 // layers on top, the live 3D preview below, one drag handle on the left edge.
 // The research plan's window layout put exactly this column here; the floating
 // shape inspector stays independent of it.

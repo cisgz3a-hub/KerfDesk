@@ -1,4 +1,4 @@
-// layer-edit — pure carve-layer operations on a Sketch (ADR-271 Amendment 1,
+// layer-edit — pure carve-layer operations on a Sketch (ADR-272 Amendment 1,
 // DS-8). Every function is pure and total, like sketch-edit: nothing mutates,
 // nothing throws, and an edit that cannot apply returns the sketch unchanged.
 //

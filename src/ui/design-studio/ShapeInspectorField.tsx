@@ -1,5 +1,5 @@
 // ShapeInspectorField — one dimension row in the floating inspector
-// (ADR-271, DS-3b).
+// (ADR-272, DS-3b).
 //
 // The row is where "precise" is actually delivered:
 //  - the value is typed, not nudged, and commits on Enter or on blur (the repo's

@@ -1,4 +1,4 @@
-// design-simulate — the honest tier of the carve preview (ADR-271
+// design-simulate — the honest tier of the carve preview (ADR-272
 // Amendment 1 clause 4): compile the designed layers through the REAL
 // pipeline, then stamp each tool section's removal grid with THAT section's
 // bit kernel and min-combine — per-bit cutter shapes the single-kernel CNC

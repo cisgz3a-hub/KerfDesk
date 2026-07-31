@@ -1,4 +1,4 @@
-// DesignCanvas — the Design Studio drawing surface (ADR-271, DS-2/DS-3).
+// DesignCanvas — the Design Studio drawing surface (ADR-272, DS-2/DS-3).
 //
 // Smoothness is structural, not incidental. Four things do the work:
 //  1. TWO stacked canvases on two cadences. The static layer (bed, grid,

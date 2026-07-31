@@ -57,7 +57,7 @@ export const canvasTheme = {
   noticeText: '#5f4200',
   // Trace-source backing tint (draw-raster, ADR-026)
   traceSourceTint: '#3b82c4',
-  // Design Studio sketch geometry (design-canvas-draw, ADR-271). Sketch
+  // Design Studio sketch geometry (design-canvas-draw, ADR-272). Sketch
   // entities have no layer yet — they only acquire one at Apply — so they need
   // their own default ink. Near-black on the light bed, matching the
   // WYSIWYG-against-white rationale above; construction guides are muted so

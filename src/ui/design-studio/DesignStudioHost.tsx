@@ -1,4 +1,4 @@
-// Mount point for the Design Studio (ADR-271). App renders this always; the
+// Mount point for the Design Studio (ADR-272). App renders this always; the
 // heavy overlay chunk loads lazily only once a session opens, so a user who
 // never opens the Studio pays nothing at cold start (the ADR-102 lazy-import
 // precedent, and the same shape as ImageEditorHost).
