@@ -150,6 +150,32 @@ describe('SelectedObjectProperties target switching', () => {
       await cleanup(root, host);
     }
   });
+
+  it('does not retarget an image edit when the primary changes within one selection', async () => {
+    vi.useFakeTimers();
+    useStore.getState().importRasterImage(raster('I1'));
+    useStore.getState().importRasterImage(raster('I2'));
+    useStore.setState({ selectedObjectId: 'I1', additionalSelectedIds: new Set(['I2']) });
+    const { host, root } = await render();
+    try {
+      const brightness = host.querySelector('input[aria-label="Brightness for I1.png"]');
+      if (!(brightness instanceof HTMLInputElement)) throw new Error('brightness input missing');
+
+      await change(brightness, '45');
+      await act(async () => {
+        useStore.setState({ selectedObjectId: 'I2', additionalSelectedIds: new Set(['I1']) });
+      });
+      await act(async () => vi.advanceTimersByTime(300));
+
+      const brightnessValues = useStore
+        .getState()
+        .project.scene.objects.filter((object) => object.kind === 'raster-image')
+        .map((object) => object.brightness);
+      expect(brightnessValues).toEqual([undefined, undefined]);
+    } finally {
+      await cleanup(root, host);
+    }
+  });
 });
 
 function rectangle(id: string) {
