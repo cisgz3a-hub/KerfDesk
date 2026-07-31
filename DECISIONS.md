@@ -13527,3 +13527,134 @@ therefore split holes from their outer boundary or attach a nested island to the
   reorder loses and duplicates nothing.
 - Existing analytic V-groove and G-code snapshot tests remain the geometry/output regression
   boundary. Automated tests do not verify physical position retention or surface finish.
+
+## ADR-271 - ExecutablePlan becomes the versioned motion truth through a byte-neutral sidecar first (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The current production chain shares `prepareOutput`, but downstream consumers still use different
+representations: prepared `Job` geometry, preview `Toolpath`, emitted text, controller-oriented
+motion manifests, Inspector render models, timing plans, Frame paths, and recovery spans. Those
+representations have legitimate local purposes, but no versioned artifact currently states the
+complete ordered commanded motion, controller events, intent, terminal state, and exact output
+compatibility in one place.
+
+That makes a reliability-oriented math engine unsafe to introduce in one jump. Replacing the
+emitter, routing, ETA, preview, Frame, and recovery together would remove the independent baseline
+needed to detect semantic or lexical drift. It would also invite optimization estimates to become
+an accidental second Start policy gate.
+
+The reported field symptom—an air run retains coordinates while material cutting loses position
+and doubles letters—makes the evidence boundary especially important. Software can prove what was
+commanded and how the host handled it. Source inspection and simulation cannot determine whether a
+particular machine tracks under load, has backlash, misses steps, supplies stable spindle/laser
+power, or produces acceptable material results.
+
+### Decision
+
+1. **Adopt `ExecutablePlan` as the versioned target motion truth.** Its governing mathematical
+   contract is `docs/architecture/10-executable-plan-mathematical-contract.md`; v1's machine-
+   readable contract is `docs/schemas/executable-plan-v1.schema.json`.
+2. **Land a byte-neutral sidecar before moving any production consumer.** The v1 opt-in path runs
+   today's production preparation and emitter once, builds a typed plan from that exact program,
+   verifies it, and serializes the plan. Existing `emitGcode` behavior and callers remain
+   unchanged in this slice.
+3. **Retain a lossless v1 compatibility carrier.** `compatibility.exactProgram` is deliberately the
+   exact emitted string. The v1 serializer returns it unchanged. This duplicates lexical content in
+   a persisted JSON sidecar, but provides a hard equality boundary while native dialect serializers
+   are not yet plan-first. A later schema may remove it only after every supported dialect has
+   byte-pinned plan serialization.
+4. **Use differential semantic evidence.** Plan construction aligns the existing controller motion
+   manifest with the existing Inspector render model. The parity verifier then compares ordered
+   endpoints with the independent clean-room simulator parser, checks raw-line accounting, checks
+   exact serialization, and rebuilds for determinism. A parser disagreement produces sidecar
+   evidence; it does not mutate the current G-code.
+5. **Make the adversarial corpus executable and non-physical.** The corpus covers laser-off feed
+   runways, powered motion, same-block modal transitions, relative/inch normalization, full-circle
+   and helical CNC arcs, plunge/retract, coolant, Marlin fan power, negative/tiny coordinates,
+   Unicode and mixed line endings, tool/pause events, invalid arcs, and terminal parking. It is a
+   semantic benchmark corpus, not a burn or cutting qualification.
+6. **Migrate consumers incrementally after v1 parity is stable.** Preview, calculated bounds, ETA,
+   Frame geometry, recovery, and finally native dialect emission move to the plan in separate,
+   reviewable slices. Each consumer removes its competing motion construction only after old/new
+   corpus comparison. Physical Frame remains the source of truth for ordinary Start authorization.
+7. **Version dynamics by axis and controller.** A future schema records per-axis speed,
+   acceleration, optional jerk, command resolution, feedback kind, and controller planner
+   semantics. Old profiles retain current feeds and fixed runway behavior when acceleration or jerk
+   is unknown. Unknown values are never invented and cannot justify higher feed or shorter runway.
+8. **Calculate runway and derating only from known conservative dynamics.** The math contract's
+   projected-axis and energy bounds determine reachable feed and deceleration distance. Shortfall
+   and derating are plan annotations and Job Review advisories. Optimization margin does not become
+   a second ordinary Start gate.
+9. **Replace nearest-neighbour only with precedence-preserving deterministic routing.** Small task
+   sets use an exact precedence-aware solver over legal orientations; larger sets use a
+   deterministic ready-set heuristic with stable tie-breaks. Terminal parking is a required final
+   node. The exact/large threshold is versioned and corpus-justified.
+10. **Do not ship thermal or CNC-load confidence without field calibration.** Such models require a
+    versioned machine/controller/material/tool dataset with repeated observed outcomes and an
+    explicit validity domain. Outside that domain the result is unavailable. Host inference is not
+    described as encoder feedback or closed-loop correction.
+11. **Qualify in layers.** Pure tests and simulators establish schema, geometry, semantics,
+    determinism, and protocol properties. De-energized runs establish only gross motion behavior.
+    Instrumented material coupons establish calibration, tracking, backlash, power/load response,
+    and material results for the tested setup. This ADR authorizes no hardware motion.
+12. **Preserve frame-first policy.** Ordinary Start remains authorized by a clean completed Frame
+    for the exact reviewed job under ADR-228/230/232/237. The engine may refuse an unsupported or
+    internally inconsistent execution because it cannot execute correctly. Advisory runway,
+    derating, thermal, load, ETA, or optimization margins never create another ordinary Start gate.
+
+### Delivery phases
+
+| Phase | Deliverable | Completion evidence |
+|---|---|---|
+| 1 (this decision's first slice) | v1 schema, mathematical contract, sidecar builder/serializer, parity verifier, adversarial corpus | exact current laser/CNC output equality plus focused and release gates |
+| 2 | preview, bounds, ETA, Frame, and recovery consume the same plan | old/new semantic corpus parity; exact Frame identity and recovery-epoch tests |
+| 3 | native plan-first dialect serializers | byte-pinned equality for GRBL, GRBL-CNC, Marlin, and Smoothieware; compatibility carrier removable only in a new version |
+| 4 | versioned per-axis/controller dynamics, conservative legacy fallback, runway, derating | analytic/property tests and controller simulators; advisory-only UI proof |
+| 5 | precedence-aware exact-small/deterministic-large routing plus terminal park | optimality oracle for small cases; permutation/precedence/determinism properties for large cases |
+| 6 | calibrated thermal/CNC-load models | accepted field dataset, uncertainty/validity-domain review, and out-of-domain `unavailable` tests |
+| 7 | physical qualification coupons | operator-approved de-energized and instrumented material protocols with recorded plan/profile identity |
+
+### Consequences
+
+- The first slice adds a second representation only as an opt-in sidecar; it intentionally does not
+  claim that production consumers have already converged on one motion truth.
+- Exact compatibility is directly testable rather than inferred from unchanged snapshots.
+- v1 sidecars can be large because they retain the exact program. That cost is accepted only for the
+  compatibility bridge and must be revisited before persistent sidecars become a default artifact.
+- A plan can expose parser disagreement without blocking or rewriting the legacy job. Promoting the
+  plan to production authority requires the staged consumer migrations above.
+- Versioned dynamics and routing decisions become reproducible. Unknown legacy physics remains
+  explicit rather than being hidden in optimistic defaults.
+- A mathematically consistent command remains only a command. Open-loop motion can still lose
+  physical position under load, and software verification cannot certify a material result.
+
+### Rejected alternatives
+
+- **Rewrite all consumers and the emitter in one PR:** rejected because there would be no stable
+  differential baseline and the physical/policy review surface would be too broad.
+- **Canonicalize or pretty-print current G-code:** rejected because even semantically harmless text
+  changes would break the zero-byte migration guarantee and recovery/provenance comparisons.
+- **Treat the Inspector alone as execution truth:** rejected because its forgiving, display-oriented
+  policy deliberately retains partial programs and cannot independently verify itself.
+- **Assume generic acceleration, jerk, thermal, or spindle-load constants:** rejected because a
+  plausible formula with invented inputs is less reliable than an explicit unknown.
+- **Block Start on optimization margins:** rejected by the frame-first governing decisions; those
+  margins remain review information unless execution is unsupported or internally inconsistent.
+
+### Verification
+
+- `build-executable-plan.test.ts` runs the executable adversarial corpus and pins intent, command
+  modes, normalization, terminal state, line-ending identity, UTF-8 length, deterministic rebuild,
+  exact serialization, empty-output behavior, and invalid-arc failure.
+- `executable-plan-parity.test.ts` requires byte identity, line accounting, independent ordered
+  endpoint agreement, and deterministic rebuild; negative tests mutate lexical and semantic state.
+- `executable-plan-emission.test.ts` compares the existing and opt-in plan paths through real laser
+  and CNC production composition and requires identical G-code and preflight results.
+- Existing G-code snapshots remain unchanged. Full release verification is required before merge.
+- NOT verified: no machine was connected or moved; no air cut, material coupon, encoder trace,
+  backlash measurement, load measurement, thermal calibration, burn quality, cut quality, or
+  physical position retention was tested.

@@ -40,6 +40,7 @@ than inventing a rationale. That is a finding, not a gap in the writing.
 | 7 | [07-frame-permit-model.md](07-frame-permit-model.md) | Frame-first Start authorization — the only guard |
 | 8 | [08-invariants-and-verification.md](08-invariants-and-verification.md) | What is proven, how, and what is *not* |
 | 9 | [09-weakness-register.md](09-weakness-register.md) | Known-weak / unproven + the Phase 2 comparison grid |
+| 10 | [10-executable-plan-mathematical-contract.md](10-executable-plan-mathematical-contract.md) | Versioned motion truth, parity laws, dynamics/routing stages, and qualification boundary |
 
 ---
 
