@@ -56,6 +56,14 @@ export function importSourceSizeAdvisory(
   return slowImportMessage(file.name, file.size);
 }
 
+/** Disclosure used only when a background Worker cannot be constructed before work begins. */
+export function mainThreadImportFallbackAdvisory(name: string): string {
+  return (
+    `${name}: background worker could not start, so processing is continuing on the main thread. ` +
+    'The app may be unresponsive until it finishes.'
+  );
+}
+
 function slowImportMessage(name: string, sizeBytes: number): string {
   const mb = Math.round(sizeBytes / BYTES_PER_MB);
   return `${name} is ${mb} MB — importing it may take a while and the app may be busy until it finishes.`;

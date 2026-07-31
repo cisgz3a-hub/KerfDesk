@@ -1,4 +1,5 @@
 import type { Project, RasterImage } from '../../core/scene';
+import type { GcodeInspectionSource } from '../gcode-inspector';
 import type { SelectedImageMaskPair } from './image-mask-command-state';
 
 export type CommandShellCallbacks = {
@@ -6,8 +7,8 @@ export type CommandShellCallbacks = {
   readonly requestMultiFileTrace: () => void;
   readonly requestConvertToBitmap: () => void;
   readonly requestAdjustImage: () => void;
-  /** Open the ADR-255 G-code Inspector with an already-read program. */
-  readonly requestGcodeInspector: (programName: string, text: string) => void;
+  /** Open the ADR-255 G-code Inspector without forcing a file read on the UI thread. */
+  readonly requestGcodeInspector: (programName: string, source: GcodeInspectionSource) => void;
   readonly requestBoxGenerator: () => void;
   readonly requestBoxFitTest: () => void;
   readonly requestMaterialTest: () => void;

@@ -113,6 +113,11 @@ export type ProgramStats = {
 
 export type GcodeRenderModel = {
   readonly segmentCount: number;
+  /** Present when the complete render exceeds the UI pressure advisory threshold. */
+  readonly renderPressure: {
+    readonly threshold: number;
+    readonly observed: number;
+  } | null;
   /** Six floats per segment: x0 y0 z0 x1 y1 z1, work coordinates, mm. */
   readonly positions: Float32Array;
   /** SEG_KIND value per segment. */
@@ -142,6 +147,8 @@ export type BuildRenderModelOptions = {
   /** Optional segment cap for bounded synchronous consumers. The parser
    * checks after each source line, so one expanded line may cross the cap. */
   readonly maxSegments?: number;
+  /** Advisory threshold only. Every parsed segment remains in the render model. */
+  readonly renderPressureThreshold?: number;
   /** Work-coordinate position before the first program line. */
   readonly initialPositionMm?: { readonly x: number; readonly y: number; readonly z: number };
 };

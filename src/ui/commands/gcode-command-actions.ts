@@ -14,6 +14,7 @@ import type { useStore } from '../state';
 import type { useLaserStore } from '../state/laser-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import type { useToastStore } from '../state/toast-store';
+import type { GcodeInspectionSource } from '../gcode-inspector';
 
 type AppState = ReturnType<typeof useStore.getState>;
 type LaserState = ReturnType<typeof useLaserStore.getState>;
@@ -25,7 +26,7 @@ export type GcodeActionDeps = {
   readonly app: AppState;
   readonly laser: LaserState;
   readonly pushToast: PushToast;
-  readonly openInspector: (programName: string, text: string) => void;
+  readonly openInspector: (programName: string, source: GcodeInspectionSource) => void;
 };
 
 export function saveGcodeAction(deps: GcodeActionDeps): () => void {
@@ -42,7 +43,10 @@ export function saveGcodeAction(deps: GcodeActionDeps): () => void {
  * this is the workbench.
  */
 export function inspectCurrentGcodeAction(deps: GcodeActionDeps): () => void {
-  return () => void handleInspectCurrentGcode(saveGcodeContext(deps), deps.openInspector);
+  return () =>
+    void handleInspectCurrentGcode(saveGcodeContext(deps), (programName, text) =>
+      deps.openInspector(programName, { kind: 'text', text }),
+    );
 }
 
 export function openGcodeInspectorAction(deps: GcodeActionDeps): () => void {

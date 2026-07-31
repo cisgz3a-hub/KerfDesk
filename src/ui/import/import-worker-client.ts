@@ -1,123 +1,232 @@
-// Main-thread client for the import worker (Phase 3 of the large-file plan).
-//
-// Unlike the ADR-244 preparation client there is no single-flight cache and no
-// supersede: each import is an independent one-shot request the operator asked
-// for, so concurrent imports simply queue on the one worker and every result is
-// still wanted. What IS shared with that client is the contract that matters for
-// the test suite — `null` when Worker is unavailable (vitest/jsdom), so every
-// caller keeps a working synchronous path.
-
 import type { ParseDxfResult } from '../../io/dxf';
 import type { ParseGcodeProgramResult } from '../../io/gcode';
-import type { ParseStlResult } from '../../io/stl';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
+import type {
+  PreparedStlImportResult,
+  StlImportPreparationOptions,
+} from './stl-import-preparation';
+import { type PackedDxfResult, unpackDxfResult } from './packed-dxf-result';
+import { type PackedGcodeResult, unpackGcodeResult } from './packed-gcode-result';
+
+export type ImportWorkerProgress = {
+  readonly phase: 'queued' | 'reading' | 'parsing' | 'preparing';
+  readonly queuePosition: number;
+  readonly bytesRead?: number;
+  readonly totalBytes?: number;
+};
+
+export type ImportWorkerRequestOptions = {
+  readonly signal?: AbortSignal;
+  readonly onProgress?: (progress: ImportWorkerProgress) => void;
+};
 
 type Pending = {
+  readonly request: ImportWorkerRequest;
+  readonly expectedKind: Exclude<ImportWorkerResponse['kind'], 'progress' | 'error'>;
   readonly resolve: (response: ImportWorkerResponse) => void;
-  readonly reject: (err: Error) => void;
+  readonly reject: (error: Error) => void;
+  readonly options: ImportWorkerRequestOptions;
+  readonly handleAbort: () => void;
 };
 
 let workerInstance: Worker | null = null;
 let nextRequestId = 0;
+let activeRequestId: number | null = null;
 const pendingByRequestId = new Map<number, Pending>();
+const requestQueue: number[] = [];
 
-/** Parse a DXF off the main thread, or null when workers are unavailable. */
 export function parseDxfOffThread(
   blob: Blob,
   objectId: string,
   source: string,
+  options: ImportWorkerRequestOptions = {},
 ): Promise<ParseDxfResult> | null {
-  return request({ kind: 'dxf', blob, objectId, source }, 'dxf');
+  const packed = request<'dxf', PackedDxfResult>(
+    { kind: 'dxf', blob, objectId, source },
+    'dxf',
+    options,
+  );
+  return packed === null ? null : packed.then(unpackDxfResult);
 }
 
-/** Parse a G-code program off the main thread, or null when unavailable. */
-export function parseGcodeOffThread(blob: Blob): Promise<ParseGcodeProgramResult> | null {
-  return request({ kind: 'gcode', blob }, 'gcode');
+export function parseGcodeOffThread(
+  blob: Blob,
+  options: ImportWorkerRequestOptions = {},
+): Promise<ParseGcodeProgramResult> | null {
+  const packed = request<'gcode', PackedGcodeResult>({ kind: 'gcode', blob }, 'gcode', options);
+  return packed === null ? null : packed.then(unpackGcodeResult);
 }
 
-/** Parse an STL off the main thread, or null when unavailable. */
-export function parseStlOffThread(blob: Blob): Promise<ParseStlResult> | null {
-  return request({ kind: 'stl', blob }, 'stl');
+export function parseStlOffThread(
+  blob: Blob,
+  preparation: StlImportPreparationOptions,
+  options: ImportWorkerRequestOptions = {},
+): Promise<PreparedStlImportResult> | null {
+  return request({ kind: 'stl', blob, options: preparation }, 'stl', options);
 }
 
 export function resetImportWorkerForTests(): void {
   rejectAllPendingAndRetireWorker('import worker reset');
 }
 
-// A plain Omit over a union collapses the discriminant into the shared keys, so
-// the per-kind fields (objectId/source) would be rejected. Distribute instead.
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type RequestBody = DistributiveOmit<ImportWorkerRequest, 'id'>;
+type ResultKind = Pending['expectedKind'];
 
-// The `kind` argument is what ties the untyped response back to the caller's
-// result type; a mismatched kind means the worker answered the wrong request and
-// is treated as an error rather than mis-cast.
-function request<K extends ImportWorkerResponse['kind'], R>(
+function request<K extends ResultKind, R>(
   body: RequestBody,
-  kind: K,
+  expectedKind: K,
+  options: ImportWorkerRequestOptions,
 ): Promise<R> | null {
-  const worker = ensureWorker();
-  if (worker === null) return null;
+  if (options.signal?.aborted === true) return Promise.reject(abortError());
+  if (ensureWorker() === null) return null;
+  nextRequestId += 1;
+  const id = nextRequestId;
   return new Promise<R>((resolve, reject) => {
-    nextRequestId += 1;
-    const id = nextRequestId;
+    const handleAbort = (): void => cancelRequest(id);
     pendingByRequestId.set(id, {
-      resolve: (response) => {
-        if (response.kind === 'error') {
-          reject(new Error(response.message));
-          return;
-        }
-        if (response.kind !== kind) {
-          reject(new Error(`import worker answered '${response.kind}' for a '${kind}' request`));
-          return;
-        }
-        resolve(response.result as R);
-      },
+      request: { id, ...body } as ImportWorkerRequest,
+      expectedKind,
+      resolve: (response) => resolveResult(response, expectedKind, resolve, reject),
       reject,
+      options,
+      handleAbort,
     });
-    try {
-      worker.postMessage({ id, ...body } as ImportWorkerRequest);
-    } catch (err) {
-      pendingByRequestId.delete(id);
-      retireWorker();
-      reject(err instanceof Error ? err : new Error(String(err)));
-    }
+    options.signal?.addEventListener('abort', handleAbort, { once: true });
+    requestQueue.push(id);
+    reportQueuePositions();
+    startNextRequest();
   });
+}
+
+function resolveResult<R>(
+  response: ImportWorkerResponse,
+  expectedKind: ResultKind,
+  resolve: (result: R) => void,
+  reject: (error: Error) => void,
+): void {
+  if (response.kind === 'error') reject(new Error(response.message));
+  else if (response.kind === 'progress') reject(new Error('progress is not a final response'));
+  else if (response.kind !== expectedKind) {
+    reject(new Error(`import worker answered '${response.kind}' for a '${expectedKind}' request`));
+  } else resolve(response.result as R);
+}
+
+function startNextRequest(): void {
+  if (activeRequestId !== null) return;
+  const id = requestQueue.shift();
+  if (id === undefined) return;
+  const pending = pendingByRequestId.get(id);
+  if (pending === undefined) {
+    startNextRequest();
+    return;
+  }
+  const worker = ensureWorker();
+  if (worker === null) {
+    pending.reject(new Error('import worker unavailable'));
+    finishRequest(id);
+    return;
+  }
+  activeRequestId = id;
+  try {
+    worker.postMessage(pending.request);
+  } catch (error) {
+    pending.reject(error instanceof Error ? error : new Error(String(error)));
+    retireWorker();
+    finishRequest(id);
+  }
+  reportQueuePositions();
+}
+
+function handleWorkerMessage(event: MessageEvent<ImportWorkerResponse>): void {
+  const pending = pendingByRequestId.get(event.data.id);
+  if (pending === undefined) return;
+  if (event.data.kind === 'progress') {
+    pending.options.onProgress?.({
+      phase: event.data.phase,
+      queuePosition: 0,
+      ...(event.data.bytesRead === undefined ? {} : { bytesRead: event.data.bytesRead }),
+      ...(event.data.totalBytes === undefined ? {} : { totalBytes: event.data.totalBytes }),
+    });
+    return;
+  }
+  pending.resolve(event.data);
+  finishRequest(event.data.id);
+}
+
+function finishRequest(id: number): void {
+  const pending = pendingByRequestId.get(id);
+  pending?.options.signal?.removeEventListener('abort', pending.handleAbort);
+  pendingByRequestId.delete(id);
+  if (activeRequestId === id) activeRequestId = null;
+  reportQueuePositions();
+  startNextRequest();
+}
+
+function cancelRequest(id: number): void {
+  const pending = pendingByRequestId.get(id);
+  if (pending === undefined) return;
+  pending.reject(abortError());
+  if (activeRequestId === id) {
+    retireWorker();
+    activeRequestId = null;
+  } else {
+    const index = requestQueue.indexOf(id);
+    if (index >= 0) requestQueue.splice(index, 1);
+  }
+  finishRequest(id);
+}
+
+function reportQueuePositions(): void {
+  for (const [index, id] of requestQueue.entries()) {
+    pendingByRequestId.get(id)?.options.onProgress?.({
+      phase: 'queued',
+      queuePosition: index + 1,
+    });
+  }
 }
 
 function ensureWorker(): Worker | null {
   if (workerInstance !== null) return workerInstance;
   if (typeof Worker === 'undefined') return null;
   try {
-    workerInstance = new Worker(new URL('./import-worker.ts', import.meta.url), {
+    const worker = new Worker(new URL('./import-worker.ts', import.meta.url), {
       type: 'module',
     });
-    workerInstance.onmessage = handleWorkerMessage;
-    workerInstance.onerror = (): void => {
-      rejectAllPendingAndRetireWorker('import worker errored');
+    workerInstance = worker;
+    worker.onmessage = (event) => {
+      if (workerInstance === worker) handleWorkerMessage(event);
     };
-    return workerInstance;
+    worker.onerror = () => {
+      if (workerInstance === worker) {
+        rejectAllPendingAndRetireWorker('import worker errored');
+      }
+    };
+    return worker;
   } catch {
     return null;
   }
 }
 
-function handleWorkerMessage(e: MessageEvent<ImportWorkerResponse>): void {
-  const pending = pendingByRequestId.get(e.data.id);
-  if (pending === undefined) return;
-  pendingByRequestId.delete(e.data.id);
-  pending.resolve(e.data);
-}
-
 function rejectAllPendingAndRetireWorker(message: string): void {
-  const pendings = Array.from(pendingByRequestId.values());
+  const pending = Array.from(pendingByRequestId.values());
   pendingByRequestId.clear();
+  requestQueue.splice(0);
+  activeRequestId = null;
   retireWorker();
-  for (const pending of pendings) pending.reject(new Error(message));
+  for (const request of pending) {
+    request.options.signal?.removeEventListener('abort', request.handleAbort);
+    request.reject(new Error(message));
+  }
 }
 
 function retireWorker(): void {
-  if (workerInstance === null) return;
-  workerInstance.terminate();
+  workerInstance?.terminate();
   workerInstance = null;
+}
+
+function abortError(): Error {
+  const error = new Error('import request cancelled');
+  error.name = 'AbortError';
+  return error;
 }

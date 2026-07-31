@@ -50,12 +50,12 @@ export function InspectorSourcePane(props: {
   // manual scroll: only correct when it has actually left the window.
   useEffect(() => {
     const element = scrollRef.current;
-    if (element === null || activeLine === null) return;
+    if (element === null || activeLine === null || activeLine >= props.lines.length) return;
     const top = activeLine * ROW_HEIGHT_PX;
     const bottom = top + ROW_HEIGHT_PX;
     if (top >= element.scrollTop && bottom <= element.scrollTop + element.clientHeight) return;
     element.scrollTop = Math.max(0, top - element.clientHeight / 2);
-  }, [activeLine]);
+  }, [activeLine, props.lines.length]);
 
   const shown = useMemo(
     () => visibleRange(scrollTop, viewportPx, props.lines.length),

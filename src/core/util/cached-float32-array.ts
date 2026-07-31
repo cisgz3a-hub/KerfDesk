@@ -18,16 +18,19 @@
 // one — the cache cannot go wrong, it can only miss.
 
 type Entry = {
-  readonly values: ReadonlyArray<number>;
+  readonly values: ReadonlyArray<number> | Float32Array;
   readonly array: Float32Array;
 };
 
 const entriesByOwner = new WeakMap<object, Entry>();
 
-export function cachedFloat32Array(owner: object, values: ReadonlyArray<number>): Float32Array {
+export function cachedFloat32Array(
+  owner: object,
+  values: ReadonlyArray<number> | Float32Array,
+): Float32Array {
   const cached = entriesByOwner.get(owner);
   if (cached !== undefined && cached.values === values) return cached.array;
-  const array = Float32Array.from(values);
+  const array = values instanceof Float32Array ? values : Float32Array.from(values);
   entriesByOwner.set(owner, { values, array });
   return array;
 }

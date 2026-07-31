@@ -374,7 +374,7 @@ export type ReliefObject = ObjectPowerScale & {
   readonly kind: 'relief';
   readonly id: string;
   readonly source: string; // filename for display
-  readonly meshPositions: ReadonlyArray<number>;
+  readonly meshPositions: ReadonlyArray<number> | Float32Array;
   readonly targetWidthMm: number;
   readonly reliefDepthMm: number;
   readonly emptyCells: 'floor' | 'top';

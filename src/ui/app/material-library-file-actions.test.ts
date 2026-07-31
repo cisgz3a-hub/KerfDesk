@@ -107,6 +107,7 @@ function reject(message: string): Promise<never> {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('material library file actions', () => {
@@ -149,6 +150,74 @@ describe('material library file actions', () => {
     expect(toast.messages).toEqual([
       { message: 'Loaded material library: Shop Library', variant: 'success' },
     ]);
+  });
+
+  it('opens a Blob-backed native library through the disclosed fallback when Worker construction fails', async () => {
+    vi.stubGlobal('Worker', function WorkerUnavailable(): never {
+      throw new Error('workers blocked');
+    });
+    const doc = library();
+    const libraryText = serializeMaterialLibrary(doc);
+    const blob = { size: libraryText.length } as unknown as Blob;
+    const readFile = vi.fn(async () => libraryText);
+    const setMaterialLibrary = vi.fn();
+    const toast = toasts();
+
+    await handleOpenMaterialLibrary({
+      platform: mockPlatform({
+        open: async () => [
+          {
+            name: 'fallback.lfml.json',
+            size: blob.size,
+            text: readFile,
+            blob: async () => blob,
+          },
+        ],
+      }),
+      setMaterialLibrary,
+      pushToast: toast.pushToast,
+    });
+
+    expect(readFile).toHaveBeenCalledOnce();
+    expect(setMaterialLibrary).toHaveBeenCalledWith(doc);
+    expect(toast.messages).toContainEqual({
+      message: expect.stringMatching(/fallback\.lfml\.json.*main thread.*unresponsive/i),
+      variant: 'warning',
+    });
+  });
+
+  it('imports a Blob-backed CLB through the disclosed fallback when Worker construction fails', async () => {
+    vi.stubGlobal('Worker', function WorkerUnavailable(): never {
+      throw new Error('workers blocked');
+    });
+    const xml =
+      '<Library><Material Name="Birch"><Entry Thickness="3" Desc="Cut"><CutSetting Speed="8" MaxPower="75" /></Entry></Material></Library>';
+    const blob = { size: xml.length } as unknown as Blob;
+    const readFile = vi.fn(async () => xml);
+    const setMaterialLibrary = vi.fn();
+    const pushToast = vi.fn();
+
+    await handleImportClbMaterialLibrary({
+      platform: mockPlatform({
+        open: async () => [
+          {
+            name: 'fallback.clb',
+            size: blob.size,
+            text: readFile,
+            blob: async () => blob,
+          },
+        ],
+      }),
+      setMaterialLibrary,
+      pushToast,
+    });
+
+    expect(readFile).toHaveBeenCalledOnce();
+    expect(setMaterialLibrary).toHaveBeenCalledOnce();
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/fallback\.clb.*main thread.*unresponsive/i),
+      'warning',
+    );
   });
 
   it('keeps cancelled open and save pickers silent', async () => {

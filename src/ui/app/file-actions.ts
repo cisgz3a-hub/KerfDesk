@@ -12,9 +12,9 @@ import type {
   ReadinessSettingsCapability,
 } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
-import { deserializeProject, prepareProjectForPersistence } from '../../io/project';
-import { importLightBurnProject } from '../../io/lightburn';
-import { parseSvg } from '../../io/svg';
+import type { importLightBurnProject } from '../../io/lightburn';
+import { prepareProjectForPersistence } from '../../io/project';
+import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -29,17 +29,15 @@ import {
   type JobPlacementSettings,
   type MachinePlacementSnapshot,
 } from '../job-placement';
-import {
-  describeImportError,
-  describeImportResult,
-  describeReimportOutcome,
-} from './import-toasts';
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
-import { importSourceSizeAdvisory, largeImportAdvisory } from './import-size-advisory';
+import { importSourceSizeAdvisory } from './import-size-advisory';
 import { prepareGcodeSave } from './prepare-gcode-save';
+import { parseOpenedProjectFile, type OpenProjectFile } from './project-open-parser';
+import { importSvgFiles } from './svg-import-action';
+import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -50,6 +48,7 @@ export async function handleImportDxf(
     readonly name: string;
     readonly size?: number;
     readonly text: () => Promise<string>;
+    readonly blob?: () => Promise<Blob>;
   }>;
   try {
     files = await platform.pickFilesForOpen({ accept: ['.dxf'], multiple: true });
@@ -69,6 +68,7 @@ export async function handleImportSvg(
     readonly name: string;
     readonly size?: number;
     readonly text: () => Promise<string>;
+    readonly blob?: () => Promise<Blob>;
   }>;
   try {
     files = await platform.pickFilesForOpen({ accept: ['.svg'], multiple: true });
@@ -76,42 +76,7 @@ export async function handleImportSvg(
     pushToast(`Could not import SVG: ${errMsg(err)}`, 'error');
     return;
   }
-  let successIdx = 0;
-  for (const file of files) {
-    try {
-      // F-A4 large-import advisory (rule 7: informs, never refuses). Raised
-      // BEFORE the read when the adapter supplies a size, so the operator learns
-      // the cost up front; adapters without size fall back to the post-read length.
-      const advisory = file.size === undefined ? null : largeImportAdvisory(file.name, file.size);
-      if (advisory !== null) pushToast(advisory, 'warning');
-      const text = await file.text();
-      if (file.size === undefined) {
-        const postReadAdvisory = largeImportAdvisory(file.name, text.length);
-        if (postReadAdvisory !== null) pushToast(postReadAdvisory, 'warning');
-      }
-      const id = crypto.randomUUID();
-      const result = parseSvg({ svgText: text, id, source: file.name });
-      if (result.object !== null) {
-        const outcome = importSvgObject(result.object, successIdx);
-        successIdx += 1;
-        if (outcome.kind === 'replaced') {
-          // Phase C re-import: store recognised the source filename and
-          // swapped the existing object in place, keeping layer settings
-          // and transform. Toast the diff so the user sees what changed.
-          const t = describeReimportOutcome(outcome);
-          pushToast(t.message, t.variant);
-          continue; // skip the generic "imported" toast
-        }
-      }
-      for (const t of describeImportResult(file.name, result)) {
-        pushToast(t.message, t.variant);
-      }
-    } catch (err) {
-      const t = describeImportError(file.name, err);
-      pushToast(t.message, t.variant);
-      console.error(`Failed to import ${file.name}:`, err);
-    }
-  }
+  await importSvgFiles(files, importSvgObject, pushToast);
 }
 
 export type SaveGcodeCtx = {
@@ -343,11 +308,7 @@ export type OpenProjectCtx = {
 };
 
 export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
-  let files: ReadonlyArray<{
-    readonly name: string;
-    readonly size?: number;
-    readonly text: () => Promise<string>;
-  }>;
+  let files: ReadonlyArray<OpenProjectFile>;
   try {
     files = await ctx.platform.pickFilesForOpen({
       accept: ['.lf2', '.lbrn', '.lbrn2'],
@@ -364,18 +325,26 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     /\.lbrn2?$/i.test(file.name) ? 'lightburn-project' : 'native-project',
   );
   if (sizeAdvisory !== null) ctx.pushToast(sizeAdvisory, 'warning');
-  let text: string;
+  const controls = createImportWorkerControls(file.name, ctx.pushToast);
+  let result: ReturnType<typeof deserializeProject>;
   try {
-    text = await file.text();
+    const parsed = await parseOpenedProjectFile(file, controls.options, ctx.pushToast);
+    if (parsed.kind === 'lightburn') {
+      openLightBurnMigration(ctx, file.name, parsed.result);
+      return;
+    }
+    result = parsed.result;
   } catch (err) {
-    ctx.pushToast(`Could not open ${file.name}: ${errMsg(err)}`, 'error');
+    ctx.pushToast(
+      isImportCancellation(err)
+        ? `${file.name}: open cancelled.`
+        : `Could not open ${file.name}: ${errMsg(err)}`,
+      isImportCancellation(err) ? 'warning' : 'error',
+    );
     return;
+  } finally {
+    controls.dispose();
   }
-  if (/\.lbrn2?$/i.test(file.name)) {
-    openLightBurnMigration(ctx, file.name, text);
-    return;
-  }
-  const result = deserializeProject(text);
   if (result.kind === 'ok') {
     const loadResult = ctx.setProject(result.project);
     markCapabilityAwareLoad(ctx, file.name, loadResult);
@@ -398,8 +367,11 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   ctx.pushToast(`Could not open ${file.name}: ${describeResult(result)}`, 'error');
 }
 
-function openLightBurnMigration(ctx: OpenProjectCtx, fileName: string, text: string): void {
-  const result = importLightBurnProject(text, fileName);
+function openLightBurnMigration(
+  ctx: OpenProjectCtx,
+  fileName: string,
+  result: ReturnType<typeof importLightBurnProject>,
+): void {
   if (!result.ok) {
     ctx.pushToast(`Could not import ${fileName}: ${result.reason}`, 'error');
     return;

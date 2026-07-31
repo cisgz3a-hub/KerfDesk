@@ -45,4 +45,11 @@ describe('cachedFloat32Array', () => {
     expect(second).not.toBe(first);
     expect([...second]).toEqual([7, 8, 9]);
   });
+
+  it('reuses a typed relief mesh without allocating a second buffer', () => {
+    const owner = {};
+    const values = Float32Array.from([1, 2, 3]);
+
+    expect(cachedFloat32Array(owner, values)).toBe(values);
+  });
 });

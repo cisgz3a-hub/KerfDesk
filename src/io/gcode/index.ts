@@ -15,4 +15,5 @@ export type {
 } from './prepare-output-snapshot';
 export { prepareOutputSnapshot } from './prepare-output-snapshot';
 export type { GcodeProgramSummary, ParseGcodeProgramResult } from './parse-gcode-program';
-export { GCODE_PREVIEW_CUT_COLOR, parseGcodeProgram } from './parse-gcode-program';
+export { createGcodeProgramLineParser } from './gcode-program-line-parser';
+export { parseGcodeProgram } from './parse-gcode-program';

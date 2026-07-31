@@ -177,12 +177,20 @@ export const OPENCLIPART_ASSETS = [
   },
 ];
 
-const LAZY_VAL_FALLBACK = {
-  name: 'lazy-val',
-  version: '1.0.5',
-  license: 'MIT',
-  file: 'scripts/license-texts/lazy-val-1.0.5-MIT.txt',
-};
+const REVIEWED_LICENSE_FALLBACKS = [
+  {
+    name: 'lazy-val',
+    version: '1.0.5',
+    license: 'MIT',
+    file: 'scripts/license-texts/lazy-val-1.0.5-MIT.txt',
+  },
+  {
+    name: 'saxes',
+    version: '6.0.0',
+    license: 'ISC',
+    file: 'scripts/license-texts/saxes-6.0.0-ISC.txt',
+  },
+];
 
 export function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -202,20 +210,20 @@ function packageLicenseFiles(depDir) {
 export function readPackageLicense({ depDir, license, name, rootDir = REPO_ROOT, version }) {
   const files = packageLicenseFiles(depDir);
   if (files.length === 0) {
-    const fallbackMatches =
-      name === LAZY_VAL_FALLBACK.name &&
-      version === LAZY_VAL_FALLBACK.version &&
-      license === LAZY_VAL_FALLBACK.license;
-    if (!fallbackMatches) {
+    const fallback = REVIEWED_LICENSE_FALLBACKS.find(
+      (candidate) =>
+        name === candidate.name && version === candidate.version && license === candidate.license,
+    );
+    if (!fallback) {
       throw new Error(`no LICENSE file found for production package ${name}@${version}`);
     }
-    const fallback = path.join(rootDir, LAZY_VAL_FALLBACK.file);
-    if (!fs.existsSync(fallback)) {
-      throw new Error(`reviewed lazy-val fallback is missing: ${LAZY_VAL_FALLBACK.file}`);
+    const fallbackPath = path.join(rootDir, fallback.file);
+    if (!fs.existsSync(fallbackPath)) {
+      throw new Error(`reviewed ${name} fallback is missing: ${fallback.file}`);
     }
     return {
-      sourceFiles: [`reviewed fallback: ${LAZY_VAL_FALLBACK.file}`],
-      text: fs.readFileSync(fallback, 'utf8').trim(),
+      sourceFiles: [`reviewed fallback: ${fallback.file}`],
+      text: fs.readFileSync(fallbackPath, 'utf8').trim(),
     };
   }
 

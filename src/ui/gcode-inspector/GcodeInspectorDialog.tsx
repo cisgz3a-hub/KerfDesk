@@ -2,15 +2,18 @@
 // WORKFLOW.md F-M1). Used for opened FILES; the same view also renders
 // inline as a main-canvas mode (CanvasGcodeView).
 
-import { useMemo } from 'react';
-import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
+import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { MachineKind } from '../../core/scene';
 import { Dialog } from '../kit/Dialog';
+import type { GcodeInspectionSource } from './gcode-inspection-source';
+import { InspectionPressureNotice } from './InspectionPressureNotice';
 import { InspectorView } from './InspectorView';
+import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
+import { useGcodeInspection } from './use-gcode-inspection';
 
 export type GcodeInspectorDialogProps = {
   readonly programName: string;
-  readonly text: string;
+  readonly source: GcodeInspectionSource;
   readonly machineKind: MachineKind;
   /** CNC-only handoff to the existing F-CNC10 2D simulator (flow retained). */
   readonly onOpen2dSimulator?: () => void;
@@ -18,8 +21,7 @@ export type GcodeInspectorDialogProps = {
 };
 
 export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Element {
-  const result = useMemo(() => buildGcodeRenderModel(props.text), [props.text]);
-  const lines = useMemo(() => props.text.split(/\r\n|\n|\r/), [props.text]);
+  const state = useGcodeInspection(props.source);
   return (
     <Dialog
       ariaLabel={`G-code Inspector: ${props.programName}`}
@@ -38,13 +40,27 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
           Close
         </button>
       </header>
-      {result.kind === 'ok' ? (
-        <InspectorView model={result.model} lines={lines} />
-      ) : (
-        <p style={messageStyle}>{result.reason}</p>
-      )}
+      {state.kind === 'loading' ? (
+        <p style={messageStyle}>{inspectionProgressLabel(state.phase, state.queuePosition)}</p>
+      ) : null}
+      {state.kind === 'ready' ? (
+        state.result.parsed.kind === 'ok' ? (
+          <>
+            {state.mainThreadFallback ? <MainThreadInspectionNotice /> : null}
+            <InspectionPressureNotice result={state.result} />
+            <InspectorView model={state.result.parsed.model} lines={state.result.lines} />
+          </>
+        ) : (
+          <p style={messageStyle}>{state.result.parsed.reason}</p>
+        )
+      ) : null}
+      {state.kind === 'error' ? <p style={messageStyle}>{state.reason}</p> : null}
       <footer style={footerStyle}>
-        {result.kind === 'ok' ? <StatsStrip model={result.model} /> : <span />}
+        {state.kind === 'ready' && state.result.parsed.kind === 'ok' ? (
+          <StatsStrip model={state.result.parsed.model} />
+        ) : (
+          <span />
+        )}
         {props.machineKind === 'cnc' && props.onOpen2dSimulator !== undefined ? (
           <button
             type="button"
@@ -60,6 +76,21 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
   );
 }
 
+function inspectionProgressLabel(
+  phase: 'queued' | 'reading' | 'parsing' | 'fallback',
+  queuePosition: number,
+): string {
+  if (phase === 'fallback') {
+    return 'Background preview worker unavailable — parsing on the main UI thread may make the app unresponsive.';
+  }
+  if (phase === 'queued' && queuePosition > 0) {
+    return `Preview queued — ${queuePosition} request(s) ahead. Close to cancel.`;
+  }
+  if (phase === 'reading') return 'Reading G-code in worker… Close to cancel.';
+  if (phase === 'parsing') return 'Building preview in worker… Close to cancel.';
+  return 'Preparing preview in worker… Close to cancel.';
+}
+
 export function StatsStrip(props: { readonly model: GcodeRenderModel }): JSX.Element {
   const { stats, segmentCount, events, unsupportedWords, skippedMotions } = props.model;
   const bounds = stats.motionBounds;
@@ -72,8 +103,9 @@ export function StatsStrip(props: { readonly model: GcodeRenderModel }): JSX.Ele
   const findings = unsupportedWords.length + skippedMotions.length;
   return (
     <span style={statsStyle}>
-      {segmentCount} segments · {size} · cut {mm(stats.cutMm)} mm · travel {mm(stats.travelMm)} mm ·{' '}
-      {events.length} events{findings > 0 ? ` · ${findings} findings` : ''}
+      {segmentCount} shown segments · {size} · cut {mm(stats.cutMm)} mm · travel{' '}
+      {mm(stats.travelMm)} mm · {events.length} events
+      {findings > 0 ? ` · ${findings} findings` : ''}
     </span>
   );
 }

@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useUiStore } from '../state/ui-store';
 import { GcodeInspectorDialog } from './GcodeInspectorDialog';
 
@@ -44,6 +44,7 @@ afterEach(() => {
   container = null;
   root = null;
   useUiStore.setState({ modalDepth: 0 });
+  vi.unstubAllGlobals();
 });
 
 describe('GcodeInspectorDialog', () => {
@@ -51,7 +52,7 @@ describe('GcodeInspectorDialog', () => {
     mount(
       <GcodeInspectorDialog
         programName="part.nc"
-        text={PROGRAM}
+        source={{ kind: 'text', text: PROGRAM }}
         machineKind="laser"
         onClose={() => undefined}
       />,
@@ -67,7 +68,7 @@ describe('GcodeInspectorDialog', () => {
     mount(
       <GcodeInspectorDialog
         programName="part.nc"
-        text={PROGRAM}
+        source={{ kind: 'text', text: PROGRAM }}
         machineKind="laser"
         onClose={() => undefined}
       />,
@@ -75,27 +76,48 @@ describe('GcodeInspectorDialog', () => {
     await settleUntil(() => (container?.textContent ?? '').includes('3D view unavailable'));
     const text = container?.textContent ?? '';
     expect(text).toContain('part.nc');
-    expect(text).toContain('2 segments');
+    expect(text).toContain('2 shown segments');
     expect(text).not.toContain('Open in 2D simulator');
   }, 15_000);
 
-  it('shows the parse error for non-G-code input', () => {
+  it('shows the parse error for non-G-code input', async () => {
     mount(
       <GcodeInspectorDialog
         programName="prose.txt"
-        text={'hello world\nthis is prose'}
+        source={{ kind: 'text', text: 'hello world\nthis is prose' }}
         machineKind="laser"
         onClose={() => undefined}
       />,
     );
-    expect(container?.textContent ?? '').toContain('does not look like G-code');
+    await settleUntil(() => (container?.textContent ?? '').includes('does not look like G-code'));
+  });
+
+  it('parses a Blob through the disclosed main-thread fallback when Worker construction fails', async () => {
+    vi.stubGlobal('Worker', function WorkerUnavailable(): never {
+      throw new Error('workers blocked');
+    });
+    const readBlob = vi.fn(async () => PROGRAM);
+    const blob = { size: PROGRAM.length, text: readBlob } as unknown as Blob;
+    mount(
+      <GcodeInspectorDialog
+        programName="fallback.nc"
+        source={{ kind: 'blob', blob }}
+        machineKind="laser"
+        onClose={() => undefined}
+      />,
+    );
+
+    await settleUntil(() => (container?.textContent ?? '').includes('2 shown segments'));
+    expect(readBlob).toHaveBeenCalledOnce();
+    expect(container?.textContent ?? '').toMatch(/may be unresponsive/i);
+    expect(container?.textContent ?? '').toContain('2 shown segments');
   });
 
   it('offers the 2D simulator handoff only in CNC mode', () => {
     mount(
       <GcodeInspectorDialog
         programName="part.nc"
-        text={PROGRAM}
+        source={{ kind: 'text', text: PROGRAM }}
         machineKind="cnc"
         onOpen2dSimulator={() => undefined}
         onClose={() => undefined}

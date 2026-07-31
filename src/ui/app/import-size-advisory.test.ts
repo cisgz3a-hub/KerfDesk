@@ -2,9 +2,10 @@
 // which pinned the refusals this suite now pins the ABSENCE of.
 //
 // Rule 7 / ADR-228 names `import` as a guard surface, so an oversize file must
-// be imported and merely advised about. Each case therefore asserts the two
-// halves that matter: the import PROCEEDS (the bytes are actually read), and the
-// operator is TOLD, as a warning rather than an error.
+// be imported and merely advised about. Each case therefore asserts that the
+// production route is attempted and the operator is told with a warning rather
+// than an import-limit error. Worker-backed Blob routes must not reread the
+// entire source on the UI thread.
 
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CNC_MACHINE_CONFIG, createProject } from '../../core/scene';
@@ -78,8 +79,20 @@ describe('oversize imports proceed', () => {
     );
   });
 
-  it('reads an oversized STL rather than refusing its ArrayBuffer', async () => {
-    const arrayBuffer = vi.fn(async () => new ArrayBuffer(0));
+  it('advises before using the disclosed main-thread STL fallback when Worker is unavailable', async () => {
+    const ascii = [
+      'solid part',
+      'facet normal 0 0 1',
+      'outer loop',
+      'vertex 0 0 0',
+      'vertex 10 0 0',
+      'vertex 0 10 1',
+      'endloop',
+      'endfacet',
+      'endsolid part',
+    ].join('\n');
+    const bytes = new TextEncoder().encode(ascii);
+    const arrayBuffer = vi.fn(async () => bytes.buffer as ArrayBuffer);
     const file = {
       name: 'oversize.stl',
       size: IMPORT_SOURCE_ADVISORY_BYTES.stl + 1,
@@ -93,8 +106,12 @@ describe('oversize imports proceed', () => {
       pushToast,
     });
 
-    expect(arrayBuffer).toHaveBeenCalled();
+    expect(arrayBuffer).toHaveBeenCalledOnce();
     expect(pushToast).toHaveBeenCalledWith(expect.stringMatching(SLOW_IMPORT), 'warning');
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/oversize\.stl.*main thread.*unresponsive/i),
+      'warning',
+    );
   });
 });
 
