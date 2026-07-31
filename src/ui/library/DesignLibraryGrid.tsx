@@ -4,6 +4,7 @@ import { LibraryPreview } from './LibraryPreview';
 export function DesignLibraryGrid(props: {
   readonly entries: ReadonlyArray<LibraryEntry>;
   readonly selectedId: string | undefined;
+  readonly addingId: string | undefined;
   readonly onSelect: (entry: LibraryEntry) => void;
   readonly onAdd: (entry: LibraryEntry) => void;
   readonly clearFilters: () => void;
@@ -20,6 +21,8 @@ export function DesignLibraryGrid(props: {
           entry={entry}
           disambiguateSource={(titleCounts.get(entry.title) ?? 0) > 1}
           selected={entry.id === props.selectedId}
+          adding={entry.id === props.addingId}
+          addDisabled={props.addingId !== undefined}
           onSelect={() => props.onSelect(entry)}
           onAdd={() => props.onAdd(entry)}
         />
@@ -32,6 +35,8 @@ function LibraryCard(props: {
   readonly entry: LibraryEntry;
   readonly disambiguateSource: boolean;
   readonly selected: boolean;
+  readonly adding: boolean;
+  readonly addDisabled: boolean;
   readonly onSelect: () => void;
   readonly onAdd: () => void;
 }): JSX.Element {
@@ -69,12 +74,17 @@ function LibraryCard(props: {
       <button
         type="button"
         className="lf-library-card__add"
-        aria-label={`Add ${entry.title}${sourceSuffix} to canvas`}
-        title={`Add ${entry.title} to the canvas.`}
+        aria-label={
+          props.adding
+            ? `Adding ${entry.title}${sourceSuffix} to canvas`
+            : `Add ${entry.title}${sourceSuffix} to canvas`
+        }
+        title={props.adding ? `Adding ${entry.title}.` : `Add ${entry.title} to the canvas.`}
+        disabled={props.addDisabled}
         onClick={props.onAdd}
       >
-        <span aria-hidden="true">+</span>
-        Add
+        {props.adding ? null : <span aria-hidden="true">+</span>}
+        {props.adding ? 'Adding...' : 'Add'}
       </button>
     </article>
   );

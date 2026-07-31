@@ -1,11 +1,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { useUiStore } from '../state/ui-store';
+import { DESIGN_LIBRARY } from './design-library';
 import { DesignLibraryDialog } from './DesignLibraryDialog';
 
 (
@@ -45,7 +46,24 @@ async function setSearch(h: HTMLDivElement, value: string): Promise<void> {
 
 async function click(element: Element | null): Promise<void> {
   if (!(element instanceof HTMLButtonElement)) throw new Error('Library button missing');
-  await act(async () => element.click());
+  await act(async () => {
+    element.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+async function waitForObservation(
+  predicate: () => boolean,
+  description: string,
+  timeoutMs = 10_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw new Error(`Timed out waiting for ${description}`);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+  }
 }
 
 beforeEach(() => {
@@ -154,13 +172,43 @@ describe('DesignLibraryDialog', () => {
     ).toBe('laser-kerf-comb');
   });
 
-  it('searches creator and license provenance and exposes exact detail', async () => {
+  it('lazily loads and inserts a pinned Tabler asset with exact provenance', async () => {
     const h = await renderDialog();
-    await setSearch(h, 'Cole Bemis');
+    await setSearch(h, 'moon & stars');
+    const image = h.querySelector('.lf-library-card img');
+    expect(image?.getAttribute('src')).not.toMatch(/^data:/);
+
+    await click(h.querySelector('button[aria-label="Add Moon & Stars to canvas"]'));
+    await waitForObservation(
+      () => useUiStore.getState().libraryDialogOpen === false,
+      'the lazy Library insertion to finish',
+    );
+    const inserted = useStore.getState().project.scene.objects.at(-1);
+    expect(inserted?.kind).toBe('imported-svg');
+    if (inserted?.kind === 'imported-svg') {
+      expect(inserted.libraryProvenance).toMatchObject({
+        schemaVersion: 1,
+        assetId: 'tabler-moon-stars',
+        sourceName: 'Tabler Icons',
+        licenseId: 'MIT',
+        sourceVersion: '@tabler/icons@3.43.0 / v3.43.0 / e40738b64486f857128ae58335354681e4e9dc9b',
+        assetHash: 'sha256:15b86404807ec8c05b18dcaf70fc2e143bb8281785906ee5857ed1f1ebbe22c7',
+      });
+    }
+    expect(useUiStore.getState().libraryDialogOpen).toBe(false);
+  });
+
+  it('searches pinned creator and license provenance and exposes exact detail', async () => {
+    const h = await renderDialog();
+    await setSearch(h, 'Paweł Kuna');
     expect(h.querySelectorAll('[data-library-card]').length).toBeGreaterThan(0);
-    expect(h.textContent).toContain('Lucide contributors; Feather icon by Cole Bemis');
-    expect(h.textContent).toContain('ISC and MIT (Feather-derived) (ISC AND MIT)');
-    expect(h.querySelector('a[href="https://github.com/lucide-icons/lucide"]')).not.toBeNull();
+    expect(h.textContent).toContain('Paweł Kuna and Tabler Icons contributors');
+    expect(h.textContent).toContain('MIT');
+    expect(
+      h.querySelector(
+        'a[href^="https://github.com/tabler/tabler-icons/blob/e40738b64486f857128ae58335354681e4e9dc9b/icons/outline/"]',
+      ),
+    ).not.toBeNull();
   });
 
   it('keeps a filter fallback selected when results broaden again', async () => {
@@ -177,25 +225,22 @@ describe('DesignLibraryDialog', () => {
     ).toBe('Kerf Comb');
   });
 
-  it('disambiguates duplicate titles by source for sighted and screen-reader users', async () => {
+  it('uses unique titles and curated collection labels for sighted and screen-reader users', async () => {
     const h = await renderDialog();
-    await setSearch(h, 'flower');
-    expect(
-      h.querySelector('button[aria-label="View details for Flower from Openclipart"]'),
-    ).not.toBeNull();
-    expect(
-      h.querySelector('button[aria-label="View details for Flower from Lucide"]'),
-    ).not.toBeNull();
-    expect(h.textContent).toContain('Nature · Openclipart');
-    expect(h.textContent).toContain('Nature · Lucide');
+    await setSearch(h, 'garden flower');
+    expect(h.querySelector('button[aria-label="View details for Garden Flower"]')).not.toBeNull();
+    expect(h.textContent).toContain('Garden & Outdoors');
+    expect(h.textContent).not.toContain('Openclipart');
+    expect(h.textContent).not.toContain('Lucide');
   });
 
   it('keeps exact provenance URLs readable when desktop security blocks external windows', async () => {
     const h = await renderDialog('electron');
-    await setSearch(h, 'Cole Bemis');
-    expect(h.textContent).toContain('https://github.com/lucide-icons/lucide');
-    expect(h.textContent).toContain('https://lucide.dev/license');
-    expect(h.querySelector('a[href="https://github.com/lucide-icons/lucide"]')).toBeNull();
+    await setSearch(h, 'Paweł Kuna');
+    expect(h.textContent).toContain(
+      'https://github.com/tabler/tabler-icons/blob/e40738b64486f857128ae58335354681e4e9dc9b/',
+    );
+    expect(h.querySelector('a[href*="github.com/tabler/tabler-icons"]')).toBeNull();
   });
 
   it('keeps a zero-result query visible and recovers through Clear filters', async () => {
@@ -236,6 +281,33 @@ describe('DesignLibraryDialog', () => {
     expect(useUiStore.getState().libraryDialogOpen).toBe(true);
     expect(h.querySelector('[role="alert"]')?.textContent).toContain('could not be added');
     expect(h.querySelectorAll('[data-library-card]')).toHaveLength(1);
+  });
+
+  it('isolates a rejected lazy geometry load and re-enables add actions', async () => {
+    const entry = DESIGN_LIBRARY.find((candidate) => candidate.id === 'tabler-acorn');
+    if (entry?.insert.kind !== 'svg') throw new Error('expected Acorn SVG entry');
+    const loadSpy = vi
+      .spyOn(entry.insert, 'loadSvgText')
+      .mockRejectedValueOnce(new Error('simulated lazy asset failure'));
+    try {
+      const h = await renderDialog();
+      await setSearch(h, 'acorn');
+      const before = useStore.getState().project.scene.objects.length;
+      await click(h.querySelector('button[aria-label="Add Acorn to canvas"]'));
+      await waitForObservation(
+        () =>
+          h.querySelector('[role="alert"]')?.textContent?.includes('could not be added') === true,
+        'the lazy Library failure notice',
+      );
+
+      expect(useStore.getState().project.scene.objects.length).toBe(before);
+      expect(useUiStore.getState().libraryDialogOpen).toBe(true);
+      expect(h.querySelector('[role="alert"]')?.textContent).toContain('could not be added');
+      const addButton = h.querySelector('button[aria-label="Add Acorn to canvas"]');
+      expect(addButton instanceof HTMLButtonElement ? addButton.disabled : true).toBe(false);
+    } finally {
+      loadSpy.mockRestore();
+    }
   });
 
   it('shows an accessible fallback when a preview cannot load', async () => {

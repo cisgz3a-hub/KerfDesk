@@ -19,8 +19,8 @@ const entry = (patch: Partial<LibraryEntry>): LibraryEntry => ({
     license: 'MIT',
     licenseId: 'MIT',
   },
-  previewSvgText: svgText,
-  insert: { kind: 'svg', svgText },
+  preview: { kind: 'inline-svg', svgText },
+  insert: { kind: 'svg', loadSvgText: async () => svgText },
   ...patch,
 });
 

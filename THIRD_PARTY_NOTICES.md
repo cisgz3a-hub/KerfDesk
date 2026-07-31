@@ -29,6 +29,7 @@ macOS; JS license banners also remain in shipped assets.
 | imagetracerjs | Unlicense (public domain) | András Jankovics — https://github.com/jankovicsandras/imagetracerjs |
 | clipper2-ts | BSL-1.0 (Boost Software License 1.0) | Port of Angus Johnson's Clipper2 — https://github.com/ErikSom/Clipper2-ts |
 | lucide-static | ISC | © Lucide Contributors — https://github.com/lucide-icons/lucide |
+| @tabler/icons 3.43.0 | MIT | © 2020-2026 Paweł Kuna and Tabler Icons contributors — https://github.com/tabler/tabler-icons/tree/v3.43.0 |
 
 The MIT / ISC permission notices ("Permission is hereby granted, free of charge, …
 THE SOFTWARE IS PROVIDED "AS IS"…"), the Apache-2.0 / MPL-2.0 texts (DOMPurify),

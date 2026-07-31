@@ -4,9 +4,10 @@ import type { LibraryEntry } from './design-library-types';
 const previewUrlCache = new Map<string, string>();
 
 function previewUrlFor(entry: LibraryEntry): string {
+  if (entry.preview.kind === 'asset-url') return entry.preview.url;
   const cached = previewUrlCache.get(entry.id);
   if (cached !== undefined) return cached;
-  const url = `data:image/svg+xml;utf8,${encodeURIComponent(entry.previewSvgText)}`;
+  const url = `data:image/svg+xml;utf8,${encodeURIComponent(entry.preview.svgText)}`;
   previewUrlCache.set(entry.id, url);
   return url;
 }

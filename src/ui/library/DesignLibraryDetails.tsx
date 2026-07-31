@@ -17,6 +17,7 @@ const OPERATION_LABELS: Readonly<Record<LibraryOperation, string>> = {
 export function DesignLibraryDetails(props: {
   readonly entry: LibraryEntry | undefined;
   readonly errorMessage: string | undefined;
+  readonly addingId: string | undefined;
   readonly onAdd: (entry: LibraryEntry) => void;
   readonly onReturnToResults: (entry: LibraryEntry) => void;
 }): JSX.Element {
@@ -75,8 +76,13 @@ export function DesignLibraryDetails(props: {
         <ProvenanceSection entry={entry} linksEnabled={platform?.id !== 'electron'} />
       </div>
       <div className="lf-library-detail__actions">
-        <Button variant="primary" onClick={() => props.onAdd(entry)}>
-          Add to canvas
+        <Button
+          variant="primary"
+          disabled={props.addingId !== undefined}
+          aria-busy={props.addingId === entry.id ? 'true' : undefined}
+          onClick={() => props.onAdd(entry)}
+        >
+          {props.addingId === entry.id ? 'Adding to canvas...' : 'Add to canvas'}
         </Button>
       </div>
     </aside>

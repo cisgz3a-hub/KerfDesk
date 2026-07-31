@@ -75,6 +75,7 @@ function LibraryWorkspace(props: { readonly browser: LibraryBrowser }): JSX.Elem
         <DesignLibraryGrid
           entries={browser.visibleEntries}
           selectedId={browser.selectedEntry?.id}
+          addingId={browser.addingId}
           onSelect={browser.selectEntry}
           onAdd={browser.insertOne}
           clearFilters={browser.clearFilters}
@@ -83,6 +84,7 @@ function LibraryWorkspace(props: { readonly browser: LibraryBrowser }): JSX.Elem
       <DesignLibraryDetails
         entry={browser.selectedEntry}
         errorMessage={browser.errorMessage}
+        addingId={browser.addingId}
         onAdd={browser.insertOne}
         onReturnToResults={returnToNarrowCard}
       />
@@ -97,6 +99,7 @@ function useDesignLibraryBrowser(onClose: () => void) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(INITIAL_LIBRARY_ENTRY_ID);
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [addingId, setAddingId] = useState<string>();
   const visibleEntries = useMemo(() => filterDesignLibrary(DESIGN_LIBRARY, filters), [filters]);
   const selectedEntry =
     visibleEntries.find((entry) => entry.id === selectedId) ?? visibleEntries[0];
@@ -114,20 +117,35 @@ function useDesignLibraryBrowser(onClose: () => void) {
     );
     setErrorMessage(undefined);
   };
-  const insertOne = (entry: LibraryEntry): void => {
-    const object = librarySvgObjectFor(entry, crypto.randomUUID());
-    if (object === null) {
-      reportInsertError(entry);
-      return;
-    }
-    const outcome = importSvgObject(object);
-    if (outcome.kind !== 'added') {
-      reportInsertError(entry);
-      return;
-    }
+  const insertEntry = async (entry: LibraryEntry): Promise<void> => {
+    let added = false;
+    setAddingId(entry.id);
     setErrorMessage(undefined);
-    pushToast(`${entry.title} added to the canvas.`, 'success');
-    onClose();
+    try {
+      const object = await librarySvgObjectFor(entry, crypto.randomUUID());
+      if (object === null) {
+        reportInsertError(entry);
+        return;
+      }
+      const outcome = importSvgObject(object);
+      if (outcome.kind !== 'added') {
+        reportInsertError(entry);
+        return;
+      }
+      added = true;
+    } catch {
+      reportInsertError(entry);
+    } finally {
+      setAddingId(undefined);
+    }
+    if (added) {
+      pushToast(`${entry.title} added to the canvas.`, 'success');
+      onClose();
+    }
+  };
+  const insertOne = (entry: LibraryEntry): void => {
+    if (addingId !== undefined) return;
+    void insertEntry(entry);
   };
   const updateFilter: UpdateLibraryFilter = (key, value): void => {
     applyFilters({ ...filters, [key]: value });
@@ -142,6 +160,7 @@ function useDesignLibraryBrowser(onClose: () => void) {
     visibleEntries,
     selectedEntry,
     errorMessage,
+    addingId,
     updateFilter,
     setFiltersOpen,
     clearFilters,

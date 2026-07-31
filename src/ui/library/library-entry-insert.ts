@@ -3,10 +3,14 @@ import { parseSvg } from '../../io/svg';
 import type { LibraryEntry } from './design-library-types';
 import { libraryAssetProvenanceFor } from './library-entry-provenance';
 
-export function librarySvgObjectFor(entry: LibraryEntry, id: string): ImportedSvg | null {
+export async function librarySvgObjectFor(
+  entry: LibraryEntry,
+  id: string,
+): Promise<ImportedSvg | null> {
   if (entry.insert.kind !== 'svg') return null;
+  const svgText = await entry.insert.loadSvgText();
   const result = parseSvg({
-    svgText: entry.insert.svgText,
+    svgText,
     id,
     source: `Library: ${entry.title}`,
   });

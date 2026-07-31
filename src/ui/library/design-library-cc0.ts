@@ -37,8 +37,8 @@ function cc0Entry(args: {
       assetHash: args.assetHash,
       notice: 'Openclipart states submitted clipart is released to the public domain under CC0.',
     },
-    previewSvgText: args.svgText,
-    insert: { kind: 'svg', svgText: args.svgText },
+    preview: { kind: 'inline-svg', svgText: args.svgText },
+    insert: { kind: 'svg', loadSvgText: async () => args.svgText },
   };
 }
 
