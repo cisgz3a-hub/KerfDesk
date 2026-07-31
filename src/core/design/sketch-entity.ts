@@ -12,6 +12,7 @@
 // (no Math.random, no clock) — the UI owns identity.
 
 import type { Vec2 } from '../scene';
+import type { DesignLayer } from './layers/design-layer';
 
 export type SketchEntityBase = {
   readonly id: string;
@@ -19,6 +20,9 @@ export type SketchEntityBase = {
   // LightBurn models the same idea as a non-output "tool" layer (T1), and our
   // Layer.output flag is where an applied construction entity would land.
   readonly construction?: boolean;
+  // The carve layer this entity belongs to (ADR-271 Amendment 1). Absent or
+  // unknown means the sketch's first layer, so pre-layer sketches keep working.
+  readonly layerId?: string;
 };
 
 export type SketchLine = SketchEntityBase & {
@@ -64,6 +68,10 @@ export type SketchEntityKind = SketchEntity['kind'];
 
 export type Sketch = {
   readonly entities: ReadonlyArray<SketchEntity>;
+  // Carve layers (ADR-271 Amendment 1). Absent or empty behaves as exactly the
+  // default layer; the field materializes on the first layer edit so sketches
+  // built before layers existed stay valid.
+  readonly layers?: ReadonlyArray<DesignLayer>;
 };
 
 export const EMPTY_SKETCH: Sketch = { entities: [] };
