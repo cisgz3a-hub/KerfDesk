@@ -1,4 +1,4 @@
-// design-fields-circle — the dimensions a circle exposes (ADR-268, DS-3b).
+// design-fields-circle — the dimensions a circle exposes (ADR-271, DS-3b).
 //
 // Radius AND diameter are both shown and both editable, because a hole is
 // specified by diameter and a fillet by radius; making the operator halve a number

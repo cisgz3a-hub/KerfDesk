@@ -1,5 +1,5 @@
 // sketch-edit — returns a new sketch with one structural change applied
-// (ADR-268, Phase N DS-1). Every function is pure and total: nothing mutates,
+// (ADR-271, Phase N DS-1). Every function is pure and total: nothing mutates,
 // nothing throws, and an edit that cannot apply returns the sketch unchanged so
 // the caller never has to branch on failure.
 //

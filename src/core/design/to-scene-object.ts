@@ -1,5 +1,5 @@
 // to-scene-object — turn one finished sketch entity into a scene object
-// (ADR-268, Phase N DS-5). This is the Studio's single crossing point into the
+// (ADR-271, Phase N DS-5). This is the Studio's single crossing point into the
 // project: everything downstream (compile, preview, emit, save) then treats a
 // designed part exactly like imported artwork, which is why the pipeline needed
 // no changes at all.

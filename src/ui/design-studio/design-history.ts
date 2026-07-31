@@ -1,4 +1,4 @@
-// design-history — session-local undo for the Design Studio (ADR-268, DS-2).
+// design-history — session-local undo for the Design Studio (ADR-271, DS-2).
 //
 // Deliberately NOT the project undo stack. Drawing produces many small steps
 // and the operator should be able to undo a stray click without disturbing the

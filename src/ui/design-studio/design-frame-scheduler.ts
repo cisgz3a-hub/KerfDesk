@@ -1,5 +1,5 @@
 // design-frame-scheduler — coalesces many repaint requests into one animation
-// frame (ADR-268, DS-3).
+// frame (ADR-271, DS-3).
 //
 // Extracted from the canvas hook because inlining it caused a real, invisible
 // bug: the cleanup cancelled the pending frame but left the handle set, so under

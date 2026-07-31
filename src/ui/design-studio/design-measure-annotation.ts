@@ -1,5 +1,5 @@
 // design-measure-annotation — what a dimension field is pointing AT
-// (ADR-268, DS-3b).
+// (ADR-271, DS-3b).
 //
 // Focusing "Width" in the inspector must show, on the shape, the exact distance
 // that number controls: a dimension line spanning it, arrowheads at both ends,

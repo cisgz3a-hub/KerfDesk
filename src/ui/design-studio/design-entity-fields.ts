@@ -1,5 +1,5 @@
 // design-entity-fields — dispatch from an entity to the dimensions it exposes
-// (ADR-268, DS-3b).
+// (ADR-271, DS-3b).
 //
 // The inspector never switches on entity kind: it renders whatever list comes back
 // from here, so adding a shape means adding one arm plus one builder file and no UI

@@ -1,4 +1,4 @@
-// design-shortcuts — the Studio's own keymap (ADR-268, DS-2).
+// design-shortcuts — the Studio's own keymap (ADR-271, DS-2).
 //
 // Bound to the overlay root div, never to window. App-level shortcuts are
 // already suppressed wholesale by useRegisterModal, so the Studio is free to

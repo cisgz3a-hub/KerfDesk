@@ -1,5 +1,5 @@
 // snap-intersections — where two pieces of geometry actually cross
-// (ADR-268, Phase N DS-4).
+// (ADR-271, Phase N DS-4).
 //
 // The most expensive snap and the one worth bounding: candidate pairs are limited
 // to segments whose bounding boxes reach the query point, so cost scales with the

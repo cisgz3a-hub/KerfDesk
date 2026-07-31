@@ -1,4 +1,4 @@
-// Lucide icons for the Design Studio tool rails (ADR-268, DS-2) — the same
+// Lucide icons for the Design Studio tool rails (ADR-271, DS-2) — the same
 // pinned lucide-static assets the main toolbar and Image Studio use, keyed by
 // design tool. Kept local rather than added to src/ui/kit/icons.tsx so the
 // shared kit does not grow a rail's worth of glyphs (the Image Studio

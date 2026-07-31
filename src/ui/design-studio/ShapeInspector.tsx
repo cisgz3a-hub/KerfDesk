@@ -1,5 +1,5 @@
 // ShapeInspector — the floating precision box for the selected shape
-// (ADR-268, DS-3b).
+// (ADR-271, DS-3b).
 //
 // Appears when exactly one shape is selected, anchored beside it so the numbers
 // sit next to the thing they describe, and draggable by its header because the

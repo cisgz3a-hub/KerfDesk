@@ -1,4 +1,4 @@
-// design-field-format — how a dimension reads, in one place (ADR-268, DS-3b).
+// design-field-format — how a dimension reads, in one place (ADR-271, DS-3b).
 //
 // The inspector input and the on-canvas call-out must show the SAME number: if a
 // field says 49.99 and the arrow says 50, the operator cannot trust either. One

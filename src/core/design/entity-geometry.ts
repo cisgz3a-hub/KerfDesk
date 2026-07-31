@@ -1,5 +1,5 @@
 // entity-geometry — materializes a sketch entity into the Polyline form the
-// rest of the pipeline already understands (ADR-268, Phase N DS-1).
+// rest of the pipeline already understands (ADR-271, Phase N DS-1).
 //
 // Arc sampling and rounded-rectangle walking are NOT reimplemented here: both
 // come from the existing core modules so the Design Studio cannot drift from

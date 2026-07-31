@@ -1,4 +1,4 @@
-// Design Studio ephemeral session store (ADR-268, Phase N).
+// Design Studio ephemeral session store (ADR-271, Phase N).
 //
 // Standalone on purpose, exactly like the Image Studio store: the sketch, the
 // active tool, the view, the selection, and the Studio's own undo history must

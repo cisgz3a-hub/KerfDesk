@@ -1,4 +1,4 @@
-// The DS-5 acceptance gate (ADR-268): a part designed in the Studio must reach
+// The DS-5 acceptance gate (ADR-271): a part designed in the Studio must reach
 // real G-code through the UNCHANGED pipeline. This is the test that earns the
 // phrase "end to end" — everything else only proves the Studio holds geometry.
 //

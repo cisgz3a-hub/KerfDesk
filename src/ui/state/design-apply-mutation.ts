@@ -1,5 +1,5 @@
 // design-apply-mutation — commit a Design Studio sketch into the scene
-// (ADR-268, Phase N DS-5, flow F-DS8).
+// (ADR-271, Phase N DS-5, flow F-DS8).
 //
 // The ONE place the Studio writes to the project. Mirrors applyInsertBoxPanels:
 // every designed entity becomes a scene object, they all share one auto-created

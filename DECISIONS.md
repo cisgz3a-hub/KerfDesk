@@ -13818,4 +13818,3 @@ Inkscape / Affinity / Illustrator arm of the research fan-out had not returned.
 The verification gap that green tests cannot close applies in full - jsdom cannot
 see WebGL, and per ADR-255's verification note no green suite is ever claimed as
 visual proof.
->>>>>>> a13df816 (feat(design-studio): ADR-268 Phase N DS-0..DS-3b — sketch core, Studio shell, drag tools, precision inspector)

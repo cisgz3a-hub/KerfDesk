@@ -1,4 +1,4 @@
-// design-fields-line — the dimensions a line exposes (ADR-268, DS-3b).
+// design-fields-line — the dimensions a line exposes (ADR-271, DS-3b).
 //
 // Both endpoints AND length/angle are editable: Cartesian for placing a line
 // against known coordinates, polar for "50 mm at 30 degrees". They describe the

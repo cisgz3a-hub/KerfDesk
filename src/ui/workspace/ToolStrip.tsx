@@ -62,7 +62,7 @@ export function ToolStrip(): JSX.Element {
       <button
         type="button"
         aria-label="Open Design Studio"
-        title="Draw a part to size by hand — precision tools, snapping, and dimensions in a full window (ADR-268)."
+        title="Draw a part to size by hand — precision tools, snapping, and dimensions in a full window (ADR-271)."
         onClick={() => useDesignStudioStore.getState().openStudio()}
         style={studioButtonStyle}
       >

@@ -1,5 +1,5 @@
 // entity-snap-points — the named reference points a single entity offers
-// (ADR-268, Phase N DS-4): endpoints, midpoints, centres and quadrants.
+// (ADR-271, Phase N DS-4): endpoints, midpoints, centres and quadrants.
 //
 // These are the points an operator reaches for by name — "the corner", "the centre
 // of the hole", "halfway along that edge" — so they are derived from the entity's

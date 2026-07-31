@@ -1,5 +1,5 @@
 // DesignOptionsBar — the context-sensitive strip under the title row
-// (ADR-268, DS-6b).
+// (ADR-271, DS-6b).
 //
 // LightBurn's convention, and the reason its toolbars stay readable: controls that
 // belong to the ARMED TOOL live here and swap with it, rather than crowding one

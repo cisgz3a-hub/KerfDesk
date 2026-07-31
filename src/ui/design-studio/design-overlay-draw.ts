@@ -1,4 +1,4 @@
-// design-overlay-draw — the interaction layer (ADR-268, DS-3).
+// design-overlay-draw — the interaction layer (ADR-271, DS-3).
 //
 // This is the SECOND canvas, stacked above the static one, and the whole reason
 // the Studio feels smooth: it carries everything that changes per pointer move —

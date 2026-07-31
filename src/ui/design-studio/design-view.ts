@@ -1,5 +1,5 @@
 // design-view — millimetre/pixel conversion for the Design Studio canvas
-// (ADR-268, DS-2). Pure and separately testable: every coordinate the canvas
+// (ADR-271, DS-2). Pure and separately testable: every coordinate the canvas
 // draws and every pointer position it reads goes through exactly these two
 // functions, so the drawing and the hit-testing can never disagree about where
 // a millimetre is.

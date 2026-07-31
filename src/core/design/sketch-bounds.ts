@@ -1,4 +1,4 @@
-// sketch-bounds — extents of sketch geometry (ADR-268, Phase N DS-1).
+// sketch-bounds — extents of sketch geometry (ADR-271, Phase N DS-1).
 //
 // Bounds are derived from MATERIALIZED geometry, not from the parametric block,
 // so what the operator measures is exactly what gets cut. An arc's box is the

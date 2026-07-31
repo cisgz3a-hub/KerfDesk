@@ -1,4 +1,4 @@
-// DesignStudioOverlay — the full-window Design Studio shell (ADR-268, DS-2).
+// DesignStudioOverlay — the full-window Design Studio shell (ADR-271, DS-2).
 //
 // Same shape and the same z-index as Image Studio: fixed inset 0 at 1010,
 // deliberately above --lf-z-dialog (1000) and below toasts (1100), with

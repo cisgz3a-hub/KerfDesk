@@ -1,5 +1,5 @@
 // design-session-mutations — the pure session transitions behind the store actions
-// (ADR-268). Split out of design-studio-store.ts when that file crossed the 250-line
+// (ADR-271). Split out of design-studio-store.ts when that file crossed the 250-line
 // soft cap: the store is zustand wiring, and these are the sketch-and-selection
 // transitions it wires up. Every function here is total — it returns the session
 // unchanged rather than throwing when an operation cannot apply (rule 7).

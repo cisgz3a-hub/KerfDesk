@@ -1,4 +1,4 @@
-// core/design/snap — the object-snap engine (ADR-268, Phase N DS-4).
+// core/design/snap — the object-snap engine (ADR-271, Phase N DS-4).
 //
 // Its own sub-barrel rather than more exports on core/design, following the
 // core/shapes/primitives precedent: the parent barrel stays well under the

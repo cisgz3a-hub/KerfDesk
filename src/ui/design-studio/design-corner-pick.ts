@@ -1,4 +1,4 @@
-// design-corner-pick — which corner did the operator click (ADR-268, DS-6b).
+// design-corner-pick — which corner did the operator click (ADR-271, DS-6b).
 //
 // The corner operations act on ONE corner, so the click has to name it. Two shapes
 // answer, and they answer differently:

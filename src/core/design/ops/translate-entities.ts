@@ -1,4 +1,4 @@
-// translate-entities — move geometry (ADR-268, DS-6c).
+// translate-entities — move geometry (ADR-271, DS-6c).
 //
 // Every entity kind carries its position differently — a rect has an origin, a
 // circle and an arc a centre, a line two endpoints, a path a point list — so moving

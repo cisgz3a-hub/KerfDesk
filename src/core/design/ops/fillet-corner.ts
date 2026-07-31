@@ -1,4 +1,4 @@
-// fillet-corner — round a path corner (ADR-268, DS-6).
+// fillet-corner — round a path corner (ADR-271, DS-6).
 //
 // The vertex is replaced by a tangent arc, sampled through the SAME
 // ARC_CHORD_TOLERANCE_MM the importer and the .nc parser use, so a filleted corner

@@ -1,5 +1,5 @@
 // design-snap-marker-draw — the glyph that says WHICH snap captured the pointer
-// (ADR-268, DS-4).
+// (ADR-271, DS-4).
 //
 // A distinct glyph per snap type, following LightBurn, which shows a different
 // cursor for each of its five snap kinds. One marker that means "snapped" is not

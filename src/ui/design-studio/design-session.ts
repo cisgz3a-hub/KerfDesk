@@ -1,5 +1,5 @@
 // design-session — the Design Studio's session shape and its pure transitions
-// (ADR-268, DS-2). Everything here is ephemeral: it lives only while the
+// (ADR-271, DS-2). Everything here is ephemeral: it lives only while the
 // overlay is open, is stashed on close, and never reaches the project store or
 // project undo. The one crossing point is Apply.
 

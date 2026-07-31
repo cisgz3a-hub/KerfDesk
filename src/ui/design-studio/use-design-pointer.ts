@@ -1,4 +1,4 @@
-// use-design-pointer — the canvas gesture state machine (ADR-268, DS-3).
+// use-design-pointer — the canvas gesture state machine (ADR-271, DS-3).
 //
 // Tools are STATES, not flags (tldraw's published model): the armed tool decides
 // what a pointer event means, so there is no growing pile of booleans and no

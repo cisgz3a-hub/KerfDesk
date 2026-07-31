@@ -1,5 +1,5 @@
 // snap-segments — the flat segment list every geometric snap works from
-// (ADR-268, Phase N DS-4).
+// (ADR-271, Phase N DS-4).
 //
 // Both the point-on-line snap and the intersection snap need "every straight run
 // in the sketch", so it is derived once here rather than twice. Segments come from

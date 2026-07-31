@@ -1,4 +1,4 @@
-// design-corner-apply — turn a corner pick into a sketch edit (ADR-268, DS-6b).
+// design-corner-apply — turn a corner pick into a sketch edit (ADR-271, DS-6b).
 //
 // The bridge between "the operator clicked here with the fillet tool" and the pure
 // corner operations. Two shapes are handled differently on purpose:

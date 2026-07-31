@@ -1,7 +1,7 @@
 // design-canvas-draw — immediate-mode painting for the Design Studio canvas
-// (ADR-268, DS-2).
+// (ADR-271, DS-2).
 //
-// Two cadences, deliberately (ADR-268 clause 8): this module paints the STATIC
+// Two cadences, deliberately (ADR-271 clause 8): this module paints the STATIC
 // layer — bed, grid, committed geometry — which only needs repainting when the
 // sketch, the view, or the selection changes. The interaction overlay (cursor,
 // rubber band, snap markers) lives on its own canvas above this one and repaints

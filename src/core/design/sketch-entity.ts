@@ -1,5 +1,5 @@
 // sketch-entity — the discriminated union the Design Studio draws, edits, and
-// materializes (ADR-268, Phase N DS-1). Deliberately separate from ShapeSpec:
+// materializes (ADR-271, Phase N DS-1). Deliberately separate from ShapeSpec:
 // a ShapeSpec is one finished object's parametric block, while a Sketch is a
 // working set of independent entities that only becomes objects at Apply.
 //
@@ -84,7 +84,7 @@ function isPositive(value: number): boolean {
 
 // Returns a usable entity, or null when the entity is degenerate. Null is the
 // pure-core "nothing to draw" answer; it is never an error condition and never
-// blocks anything (ADR-268 clause 9).
+// blocks anything (ADR-271 clause 9).
 export function sanitizeEntity(entity: SketchEntity): SketchEntity | null {
   switch (entity.kind) {
     case 'line':

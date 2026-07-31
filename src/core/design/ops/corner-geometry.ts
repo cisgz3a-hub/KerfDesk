@@ -1,4 +1,4 @@
-// corner-geometry — the maths both corner operations share (ADR-268, DS-6).
+// corner-geometry — the maths both corner operations share (ADR-271, DS-6).
 //
 // A corner is three consecutive points A-B-C. Fillet and chamfer both cut the same
 // distance back along BA and BC and then differ only in what replaces the removed

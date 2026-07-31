@@ -1,4 +1,4 @@
-// DesignToolRails — the Design Studio's left palette (ADR-268, DS-2).
+// DesignToolRails — the Design Studio's left palette (ADR-271, DS-2).
 //
 // LightBurn's layout, deliberately: a Creation rail for making geometry above a
 // Modifiers rail for combining and altering it, separated by a labelled rule so

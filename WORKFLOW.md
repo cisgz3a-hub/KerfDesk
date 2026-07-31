@@ -75,7 +75,7 @@
 - **Laptop workspace**: at 1100 px wide or below, the machine rail starts collapsed while Cuts/Layers remains visible, preserving editing space without hiding the layer workflow.
 - **CNC Canvas Focus**: at 1439 px wide or below, CNC starts with the 3D result collapsed to a named 44 px restore strip unless the operator has already chosen otherwise. Expanding or collapsing 3D is one click, persists across reloads, and overrides later responsive defaults.
 - **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering either responsive range again reapplies only its collapsed default.
-- **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button and a "Design" button that opens the Design Studio (ADR-268, flows F-DS1..F-DS4). Preview lives in the top toolbar and the Window menu, not here.
+- **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button and a "Design" button that opens the Design Studio (ADR-271, flows F-DS1..F-DS4). Preview lives in the top toolbar and the Window menu, not here.
 - **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores both panels. Panel visibility does not affect the Live Motion bar.
 
 #### Disabled controls
@@ -4705,7 +4705,7 @@ validation must be supervised without cutting load.
    unsupported-word notes and zero junk lines (ADR-255 acceptance gate —
    own-output-clean).
 
-## Phase N flows (Design Studio — ADR-268)
+## Phase N flows (Design Studio — ADR-271)
 
 The Design Studio is a full-window overlay for drawing a part to size by hand.
 Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
