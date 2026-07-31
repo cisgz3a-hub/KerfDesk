@@ -261,9 +261,15 @@ Identical to F-A3 except:
 ### F-A7. Artwork Operations panel
 
 #### Layout
-- The top selection inspector is the canonical settings surface. Clicking one artwork shows that
-  artwork's named operation and its laser or CNC fields. The inspector never duplicates the same
-  detailed settings in a second card below it.
+- The top **Artwork settings** inspector is the canonical detailed settings surface and remains
+  present whenever editable artwork exists. A canvas selection takes priority and shows that
+  artwork's shape, image, and named laser/CNC operation fields. Clearing the canvas selection keeps
+  the last inspected artwork available without reselecting it; with several unselected artworks, a
+  single **Artwork** selector chooses which one the inspector edits. The selector is UI-only and
+  does not change selected-only output, canvas handles, grouping, or machine order.
+- The inspector renders only one detailed settings context at a time. A real multi-selection keeps
+  the existing combined/common-operation workflow; unselected artworks are switched through the
+  **Artwork** selector rather than expanding one settings card per shape.
 - A compact ordered operation list follows the inspector. Each row shows automatic colour, name,
   process summary, visibility, output, and order controls. Operation row order decides the processes
   inside an artwork; artwork run priority is the top-level machine sequence.

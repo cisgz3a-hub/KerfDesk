@@ -15,12 +15,14 @@ import { useCutSettingsLauncher } from './use-cut-settings-launcher';
 
 export function SelectedOperationInspector(props: {
   readonly objects: ReadonlyArray<SceneObject>;
+  readonly selectionActive: boolean;
 }): JSX.Element | null {
   const layers = useStore((state) => state.project.scene.layers);
   const machineKind = useStore((state) => state.project.machine?.kind ?? 'laser');
-  const assignOperation = useStore((state) => state.useOperationForSelection);
+  const assignOperation = useStore((state) => state.useOperationForObjects);
   const [requestedId, setRequestedId] = useState<string | null>(null);
   const context = selectionOperationContext(props.objects, layers);
+  const objectIds = props.objects.map((object) => object.id);
   if (context.candidates.length === 0) return null;
   const active =
     context.candidates.find((operation) => operation.id === requestedId) ??
@@ -43,7 +45,7 @@ export function SelectedOperationInspector(props: {
         <button
           type="button"
           title="Assign one shared operation and its settings to every selected artwork"
-          onClick={() => assignOperation(active.id)}
+          onClick={() => assignOperation(objectIds, active.id)}
           style={primaryButtonStyle}
         >
           Use one operation for selection
@@ -58,6 +60,7 @@ export function SelectedOperationInspector(props: {
       candidates={context.candidates}
       objects={props.objects}
       machineKind={machineKind}
+      selectionActive={props.selectionActive}
       onSelect={setRequestedId}
     />
   );
@@ -68,10 +71,11 @@ function SelectedOperationEditor(props: {
   readonly candidates: ReadonlyArray<Layer>;
   readonly objects: ReadonlyArray<SceneObject>;
   readonly machineKind: 'laser' | 'cnc';
+  readonly selectionActive: boolean;
   readonly onSelect: (id: string) => void;
 }): JSX.Element {
-  const makeUnique = useStore((state) => state.makeSelectedOperationUnique);
-  const addOperation = useStore((state) => state.addOperationForSelection);
+  const makeUnique = useStore((state) => state.makeOperationUniqueForObjects);
+  const addOperation = useStore((state) => state.addOperationForObjects);
   const renameOperation = useStore((state) => state.renameOperation);
   const allObjects = useStore((state) => state.project.scene.objects);
   const layers = useStore((state) => state.project.scene.layers);
@@ -79,8 +83,12 @@ function SelectedOperationEditor(props: {
   const selectedUsingActive = props.objects.filter((object) =>
     operationIdsForObject(object, layers).includes(props.active.id),
   ).length;
+  const objectIds = props.objects.map((object) => object.id);
   return (
-    <section aria-label="Selected artwork operation" style={inspectorStyle}>
+    <section
+      aria-label={props.selectionActive ? 'Selected artwork operation' : 'Artwork operation'}
+      style={inspectorStyle}
+    >
       <div style={titleRowStyle}>
         <span style={{ ...swatchStyle, background: props.active.color }} />
         <input
@@ -107,7 +115,7 @@ function SelectedOperationEditor(props: {
           <button
             type="button"
             title="Give only the selected artwork a copy of these operation settings"
-            onClick={() => makeUnique(props.active.id)}
+            onClick={() => makeUnique(objectIds, props.active.id)}
           >
             Make unique
           </button>
@@ -115,7 +123,7 @@ function SelectedOperationEditor(props: {
         <button
           type="button"
           title="Add another process operation to the selected artwork"
-          onClick={addOperation}
+          onClick={() => addOperation(objectIds)}
         >
           Add operation
         </button>
@@ -124,7 +132,10 @@ function SelectedOperationEditor(props: {
       {props.machineKind === 'cnc' ? (
         <CncLayerFields layer={props.active} />
       ) : (
-        <LaserOperationFields operation={props.active} />
+        <LaserOperationFields
+          operation={props.active}
+          ariaContext={props.selectionActive ? 'selected objects' : 'inspected artwork'}
+        />
       )}
       <CompatibilityNote
         objects={props.objects}
@@ -135,14 +146,17 @@ function SelectedOperationEditor(props: {
   );
 }
 
-function LaserOperationFields(props: { readonly operation: Layer }): JSX.Element {
+function LaserOperationFields(props: {
+  readonly operation: Layer;
+  readonly ariaContext: string;
+}): JSX.Element {
   const setLayerParam = useStore((state) => state.setLayerParam);
   const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
     useCutSettingsLauncher();
   const target = {
     settings: captureLayerOperationSettings(props.operation),
     selectedObjectCount: 0,
-    ariaContext: 'selected objects',
+    ariaContext: props.ariaContext,
     commit: (patch: Partial<ReturnType<typeof captureLayerOperationSettings>>) =>
       setLayerParam(props.operation.id, patch),
   };
@@ -152,7 +166,7 @@ function LaserOperationFields(props: { readonly operation: Layer }): JSX.Element
         <span>Process</span>
         <select
           value={props.operation.mode}
-          aria-label="Mode for selected objects"
+          aria-label={`Mode for ${props.ariaContext}`}
           title="Choose how the laser processes the selected artwork"
           onChange={(event) =>
             setLayerParam(props.operation.id, { mode: event.target.value as LayerMode })
@@ -226,8 +240,8 @@ function OperationSelect(props: {
     <label style={fieldRowStyle}>
       <span>Operation</span>
       <select
-        aria-label="Operation for selected artwork"
-        title="Choose which operation to inspect for the selected artwork"
+        aria-label="Operation to inspect"
+        title="Choose which operation settings to inspect"
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}
       >

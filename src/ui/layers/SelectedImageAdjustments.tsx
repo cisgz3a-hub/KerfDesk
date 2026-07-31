@@ -5,22 +5,16 @@ import { useDebouncedCommit } from './use-debounced-commit';
 
 type AdjustmentField = 'brightness' | 'contrast' | 'gamma';
 
-export function SelectedImageAdjustments(): JSX.Element | null {
-  const selectedObjectId = useStore((s) => s.selectedObjectId);
-  const objects = useStore((s) => s.project.scene.objects);
-  const image =
-    selectedObjectId === null
-      ? undefined
-      : objects.find(
-          (obj): obj is RasterImage => obj.id === selectedObjectId && obj.kind === 'raster-image',
-        );
-  if (image === undefined) return null;
+export function SelectedImageAdjustments(props: {
+  readonly image: RasterImage | null;
+}): JSX.Element | null {
+  if (props.image === null) return null;
   return (
     <section aria-label="Selected image adjustments" style={sectionStyle}>
       <h3 style={headingStyle}>Image Adjust</h3>
-      <EditImageButton image={image} />
+      <EditImageButton image={props.image} />
       <AdjustmentInput
-        image={image}
+        image={props.image}
         field="brightness"
         label="Brightness"
         min={-100}
@@ -29,7 +23,7 @@ export function SelectedImageAdjustments(): JSX.Element | null {
         fallback={0}
       />
       <AdjustmentInput
-        image={image}
+        image={props.image}
         field="contrast"
         label="Contrast"
         min={-100}
@@ -38,7 +32,7 @@ export function SelectedImageAdjustments(): JSX.Element | null {
         fallback={0}
       />
       <AdjustmentInput
-        image={image}
+        image={props.image}
         field="gamma"
         label="Gamma"
         min={0.1}
