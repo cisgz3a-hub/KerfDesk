@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CNC_MACHINE_CONFIG, DEFAULT_CNC_TOOLS } from './machine';
 
-// v-bit and engraving tools cut a cone; their included tip angle is load-
+// v-bit and engraving tools cut a cone; their included angle is load-
 // bearing (v-carve depth uses tan(θ/2)), so it must be present and finite.
 const ANGLE_REQUIRED_KINDS = new Set(['v-bit', 'engraving']);
 
@@ -23,7 +23,7 @@ describe('DEFAULT_CNC_TOOLS', () => {
     }
   });
 
-  it('has a finite tip angle for every angle-driven tool kind', () => {
+  it('has a finite included angle for every angle-driven tool kind', () => {
     for (const tool of DEFAULT_CNC_TOOLS) {
       if (ANGLE_REQUIRED_KINDS.has(tool.kind)) {
         expect(tool.tipAngleDeg).toBeDefined();

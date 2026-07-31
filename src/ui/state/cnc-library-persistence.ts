@@ -5,6 +5,7 @@
 // Stored in localStorage with the same safe-parse / clear-on-corrupt
 // posture as the material library slot.
 
+import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import type { CncLayerSettings, CncMachineConfig, CncTool, CncToolKind } from '../../core/scene';
 
 export const CNC_LIBRARY_STORAGE_KEY = 'laserforge.cnc-library.v1';
@@ -135,7 +136,7 @@ function parseTool(raw: unknown): CncTool | null {
     name: record['name'],
     kind,
     diameterMm: record['diameterMm'],
-    ...(isPositive(tipAngleDeg) ? { tipAngleDeg } : {}),
+    ...(isValidCncTipAngleDeg(tipAngleDeg) ? { tipAngleDeg } : {}),
   };
 }
 
@@ -163,9 +164,10 @@ function parseFeedPreset(raw: unknown): CncFeedPreset | null {
   };
 }
 
-// Machine profiles reuse the .lf2 machine normalization contract loosely:
-// structural sanity here, field-level clamping on apply (the config flows
-// through updateCncMachine-style replacement).
+// Machine profiles reuse the .lf2 machine normalization contract loosely.
+// Tool geometry still crosses the same parseTool boundary as the custom-bit
+// library; apply replaces the machine directly and must not revive invalid
+// nested tool data.
 function parseMachineProfile(raw: unknown): CncMachineProfile | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const record = raw as Record<string, unknown>;
@@ -174,15 +176,23 @@ function parseMachineProfile(raw: unknown): CncMachineProfile | null {
   if (typeof machine !== 'object' || machine === null) return null;
   const machineRecord = machine as Record<string, unknown>;
   if (machineRecord['kind'] !== 'cnc') return null;
-  if (!Array.isArray(machineRecord['tools']) || typeof machineRecord['toolId'] !== 'string') {
-    return null;
-  }
-  // Structure vetted above; deep field clamping happens on apply.
+  const toolSelection = parseMachineToolSelection(machineRecord);
+  if (toolSelection === null) return null;
   return {
     id: record['id'],
     name: record['name'],
-    machine: machine as CncMachineConfig,
+    machine: { ...(machine as CncMachineConfig), ...toolSelection },
   };
+}
+
+function parseMachineToolSelection(
+  machine: Record<string, unknown>,
+): Pick<CncMachineConfig, 'tools' | 'toolId'> | null {
+  if (!Array.isArray(machine['tools']) || typeof machine['toolId'] !== 'string') return null;
+  const tools = arrayOf(machine['tools'], parseTool);
+  const requestedToolId = machine['toolId'];
+  const toolId = tools.some((tool) => tool.id === requestedToolId) ? requestedToolId : tools[0]?.id;
+  return toolId === undefined ? null : { tools, toolId };
 }
 
 function isPositive(value: unknown): value is number {

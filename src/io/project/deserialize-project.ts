@@ -3,6 +3,7 @@
 
 import { normalizeCameraAlignment, normalizeCameraCalibration } from '../../core/camera';
 import { isChiploadMaterialKey } from '../../core/cnc';
+import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import {
   DEFAULT_DEVICE_PROFILE,
   isKnownControllerKind,
@@ -211,7 +212,6 @@ function normalizeStockOriginOffset(
 // the field, and an unknown kind degrades to end-mill (same junk-to-default
 // contract as coolantModeOrOff).
 const CNC_TOOL_KINDS = ['end-mill', 'ball-nose', 'v-bit', 'engraving'] as const;
-const MAX_TIP_ANGLE_DEG = 180;
 
 function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {
   if (!Array.isArray(raw)) return DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
@@ -229,8 +229,7 @@ function normalizeCncTool(tool: unknown): Record<string, unknown> | null {
   if (typeof tool['id'] !== 'string' || typeof tool['name'] !== 'string') return null;
   if (!isFiniteNumber(diameterMm) || diameterMm <= 0) return null;
   const tipAngleDeg = tool['tipAngleDeg'];
-  const tipAngleValid =
-    isFiniteNumber(tipAngleDeg) && tipAngleDeg > 0 && tipAngleDeg < MAX_TIP_ANGLE_DEG;
+  const tipAngleValid = isValidCncTipAngleDeg(tipAngleDeg);
   return {
     id: tool['id'],
     name: tool['name'],

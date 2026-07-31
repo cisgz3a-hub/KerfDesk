@@ -111,7 +111,12 @@ function refreshMaterialRecipeLayer(
     fluteCount: source.fluteCount,
     ...(context.liveCaps === null ? {} : { liveCaps: context.liveCaps }),
   });
-  return patch === null ? layer : layerWithAutomaticPatch(layer, settings, patch);
+  if (patch !== null) return layerWithAutomaticPatch(layer, settings, patch);
+  // The recipe no longer resolves for this cutter/material/profile. Keep the
+  // operator-visible numbers exact, but withdraw automatic rewrite authority
+  // so the UI can identify them honestly as retained manual values.
+  const { feedSource: _source, ...withoutSource } = settings;
+  return { ...layer, cnc: withoutSource };
 }
 
 function layerWithAutomaticPatch(

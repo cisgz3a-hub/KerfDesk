@@ -12,7 +12,8 @@ import {
   findCncMachineStarterById,
 } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
-import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
+import { layerCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
+import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
 import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
@@ -80,27 +81,31 @@ export function CncMaterialRow(props: {
           <CncMaterialOptions />
         </select>
       </Row>
-      <p style={hintStyle}>{materialHint(settings, tool.name, starterDisplay)}</p>
+      <p style={hintStyle}>{materialHint(settings, tool, starterDisplay)}</p>
     </>
   );
 }
 
 function materialHint(
   settings: CncLayerSettings,
-  toolName: string,
+  tool: CncTool,
   starterDisplay: StarterDisplay | null,
 ): string {
-  if (starterDisplay !== null) return starterDisplay.hint;
-  if (settings.feedSource?.kind === 'material-recipe') {
-    return `Automatic starting values calculated for ${toolName} with ${settings.feedSource.fluteCount} flutes and the active machine limits. Editing a value switches to Manual.`;
-  }
-  if (settings.materialKey !== undefined) {
+  let hint: string;
+  if (starterDisplay !== null) {
+    hint = starterDisplay.hint;
+  } else if (settings.feedSource?.kind === 'material-recipe') {
+    hint = `Automatic starting values calculated for ${tool.name} with ${settings.feedSource.fluteCount} flutes and the active machine limits. Editing a value switches to Manual.`;
+  } else if (settings.materialKey !== undefined) {
     const label =
       CHIPLOAD_MATERIALS.find((material) => material.value === settings.materialKey)?.label ??
       settings.materialKey;
-    return `Saved ${label} tag is legacy/unscoped. Its feeds are manual; choose Manual, then reselect the material to recalculate.`;
+    hint = `Saved ${label} tag is legacy/unscoped. Its feeds are manual; choose Manual, then reselect the material to recalculate.`;
+  } else {
+    hint = 'Manual values are active. Verify them for this bit, stock, and machine before cutting.';
   }
-  return 'Manual values are active. Verify them for this bit, stock, and machine before cutting.';
+  const advisory = cncAngledToolFeedAdvisory(tool);
+  return advisory === null ? hint : `${hint} ${advisory}`;
 }
 
 function machineStarterDisplay(

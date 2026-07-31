@@ -28,6 +28,7 @@
 // cnc-grbl-coolant.ts.
 
 import type { DeviceProfile } from '../devices';
+import { sanitizeGcodeCommentValue } from '../gcode-comments';
 import {
   circularArcGeometry,
   isCircularArcFullCircle,
@@ -45,6 +46,7 @@ import type {
 import { assertNever } from '../scene';
 import { appendCoolantStart } from './cnc-grbl-coolant';
 import { appendRetract, fmt, fmtFeed, type Head } from './cnc-grbl-emit-head';
+import { appendCncGroupComments } from './cnc-grbl-group-comments';
 import { prepareHelicalMotion, type PreparedHelicalMotion } from './cnc-grbl-helical';
 import { collectIndexedCncGroups } from './cnc-grbl-job-groups';
 import {
@@ -116,7 +118,8 @@ function emitCncProgram(
   // offset (error:33) and Z becomes the circular axis.
   lines.push('G17');
   if (isMultiTool && firstGroup.toolName !== undefined) {
-    lines.push(`; tool: ${firstGroup.toolName} (load before starting)`);
+    const toolName = sanitizeGcodeCommentValue(firstGroup.toolName, 40) || 'unnamed tool';
+    lines.push(`; tool: ${toolName} (load before starting)`);
   }
   // Lift to safe height BEFORE the spindle spins up: after Z touch-off the
   // bit is resting on the stock top, and starting the spindle there burns
@@ -177,11 +180,7 @@ function appendGroup(
 ): void {
   const feed = fmtFeed(group.feedMmPerMin);
   const plunge = fmtFeed(group.plungeMmPerMin);
-  lines.push(
-    `; cnc layer ${group.layerId} ${group.cutType} tool ${fmt(group.toolDiameterMm)} mm ` +
-      `feed ${feed} plunge ${plunge} spindle ${Math.round(group.spindleRpm)} rpm ` +
-      `passes ${group.passes.length}`,
-  );
+  appendCncGroupComments(lines, group);
   for (const [passIndex, pass] of group.passes.entries()) {
     const firstRawLine = lines.length + 1;
     appendPass(lines, head, pass, group.safeZMm, feed, plunge, group.retractBetweenPasses ?? false);

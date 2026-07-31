@@ -261,7 +261,7 @@ describe('runCncPassRecoveryFlow', () => {
     expect(warning).toContain('START LATER THAN THE COMPUTED SAFE PASS?');
     const recoveryGcode = startJob.mock.calls[0]?.[0] ?? '';
     expect(recoveryGcode).not.toBe(originalGcode);
-    expect(recoveryGcode).toContain('passes 2');
+    expect(recoveryGcode).toContain('; cnc operation: profile-on-path; passes: 2');
     expect(recoveryGcode).toMatchSnapshot();
   });
 

@@ -7,8 +7,9 @@
 import { useState } from 'react';
 import { chiploadFor, isChiploadMaterialKey, type ChiploadMaterial } from '../../core/cnc';
 import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
-import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
+import { layerCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
 import { CncMaterialOptions } from '../common/CncMaterialOptions';
+import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
 
@@ -82,6 +83,7 @@ export function FeedsCalculatorRow(props: {
         chiploadMm={chiploadFor(material, tool.diameterMm)}
         result={result}
       />
+      <AngledToolFeedNotice tool={tool} />
       <button
         type="button"
         disabled={!canApply}
@@ -94,6 +96,15 @@ export function FeedsCalculatorRow(props: {
         Apply to layer
       </button>
     </details>
+  );
+}
+
+function AngledToolFeedNotice(props: { readonly tool: CncTool }): JSX.Element | null {
+  const advisory = cncAngledToolFeedAdvisory(props.tool);
+  return advisory === null ? null : (
+    <p role="note" style={advisoryStyle}>
+      {advisory}
+    </p>
   );
 }
 
@@ -194,5 +205,10 @@ const resultStyle: React.CSSProperties = {
 const errorStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-danger)',
+  margin: '4px 0 6px 0',
+};
+const advisoryStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-warning-fg)',
   margin: '4px 0 6px 0',
 };

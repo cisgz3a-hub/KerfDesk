@@ -120,6 +120,41 @@ describe('CncMaterialRow', () => {
     }
   });
 
+  it('keeps V-bit material auto-fill available while disclosing its diameter-only model', async () => {
+    install4040Cnc();
+    const onCommitSettings = vi.fn();
+    const settings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      toolId: 'vb-90',
+    };
+    const { host, root } = await render(settings, vi.fn(), onCommitSettings);
+    try {
+      const select = host.querySelector('select');
+      expect(select).toBeInstanceOf(HTMLSelectElement);
+      expect((select as HTMLSelectElement).disabled).toBe(false);
+      expect(host.textContent).toContain(
+        'V-bit rough guide: the material recipe uses the stored 12.7 mm diameter band.',
+      );
+      expect(host.textContent).toContain(
+        'It does not model the 90° included angle or the cutting width at each depth.',
+      );
+      expect(host.textContent).toContain("Start with the cutter manufacturer's data");
+
+      await act(async () => selectMaterial(host, 'plywood-mdf'));
+      const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
+      expect(next).toMatchObject({
+        feedMmPerMin: 300,
+        plungeMmPerMin: 120,
+        spindleRpm: 12_000,
+        depthPerPassMm: 0.75,
+        feedSource: { kind: 'material-recipe', materialKey: 'plywood-mdf', fluteCount: 2 },
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('clears the material key on Custom via a whole-settings commit', async () => {
     installCnc();
     const onCommit = vi.fn();

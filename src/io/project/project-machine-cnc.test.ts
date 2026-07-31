@@ -72,6 +72,16 @@ describe('.lf2 machine tools validation (audit 2026-07-17-0550 P2-1)', () => {
     expect(tool?.tipAngleDeg).toBeUndefined();
   });
 
+  it.each([0.5, 179.5])('drops an out-of-contract %s degree angle', (tipAngleDeg) => {
+    const tool = firstTool(
+      loadWithToolsJson(
+        `[{"id":"vb","name":"V-bit","kind":"v-bit","diameterMm":6.35,"tipAngleDeg":${tipAngleDeg}}]`,
+      ),
+    );
+    expect(tool?.id).toBe('vb');
+    expect(tool?.tipAngleDeg).toBeUndefined();
+  });
+
   it('keeps a valid tipAngleDeg', () => {
     const tool = firstTool(
       loadWithToolsJson(

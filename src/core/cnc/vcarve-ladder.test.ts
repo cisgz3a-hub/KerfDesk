@@ -193,6 +193,42 @@ describe('vcarvePasses', () => {
     expect(vcarvePasses([square(0, 10)], { ...options, maxDepthMm: 0 })).toEqual([]);
   });
 
+  it.each([undefined, 0.5, 179.5, Number.NaN])(
+    'does not invent a 60-degree cone for invalid angle %s',
+    (tipAngleDeg) => {
+      const { tipAngleDeg: _validAngle, ...baseTool } = VBIT_90;
+      const tool: CncTool = {
+        ...baseTool,
+        ...(tipAngleDeg === undefined ? {} : { tipAngleDeg }),
+      };
+      expect(
+        vcarvePasses([square(0, 10)], {
+          tool,
+          maxDepthMm: 2,
+          depthPerPassMm: 1,
+          resolutionMm: 0.5,
+        }),
+      ).toEqual([]);
+    },
+  );
+
+  it('preserves the advisory-only legacy output for a non-V-bit selection', () => {
+    const wrongKind: CncTool = {
+      id: 'end-mill',
+      name: '3 mm end mill',
+      kind: 'end-mill',
+      diameterMm: 3,
+    };
+    expect(
+      vcarvePasses([square(0, 10)], {
+        tool: wrongKind,
+        maxDepthMm: 2,
+        depthPerPassMm: 1,
+        resolutionMm: 0.5,
+      }).length,
+    ).toBeGreaterThan(0);
+  });
+
   it('property: depths always in [−maxDepth, 0) and byte-deterministic (100 seeds)', () => {
     const size = fc.integer({ min: 4, max: 40 });
     const maxDepth = fc.integer({ min: 1, max: 8 });

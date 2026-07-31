@@ -16,7 +16,7 @@ export type CncTool = {
   readonly name: string;
   readonly kind: CncToolKind;
   readonly diameterMm: number;
-  // v-bit / engraving tools only: included tip angle.
+  // v-bit / engraving tools only: included angle.
   readonly tipAngleDeg?: number;
 };
 
@@ -153,8 +153,9 @@ export type CncLayerSettings = {
   // key). Absent = feeds were entered manually ("Custom"). Display/round-trip
   // only — does not affect compiled output.
   readonly materialKey?: string;
-  // Display/round-trip provenance only. It never changes emitted output;
-  // numeric settings above remain the source of truth for compilation.
+  // Display/round-trip provenance only. It never changes emitted motion;
+  // numeric settings above remain the source of truth for compilation, while
+  // export comments may record this source for incident diagnosis.
   readonly feedSource?: CncFeedSource;
   readonly tabsEnabled: boolean; // profile cuts only
   readonly tabHeightMm: number; // material left under a tab

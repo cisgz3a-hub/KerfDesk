@@ -310,7 +310,7 @@ function finalizeStartPreparation({
   const largeJobWarning = largeJobPreparationWarning(prepared.project.scene);
   const largeRasterWarning = largeRasterPreparationWarning(prepared.project);
   const warnings = collectStartWarnings(
-    project,
+    prepared.project,
     controllerSettings,
     [
       ...(largeJobWarning === null ? [] : [largeJobWarning]),

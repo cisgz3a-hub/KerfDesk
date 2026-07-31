@@ -27,6 +27,7 @@ import {
 import type { CncMachineConfig, Layer, Project } from '../scene';
 import { DEFAULT_CNC_LAYER_SETTINGS, layerCncTool, type CncLayerSettings } from '../scene';
 import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-preflight';
+import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
 import { findNoGoZoneCollisions } from './no-go-zones';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
@@ -54,6 +55,7 @@ export function runCncPreflight(
     });
   }
   appendCncMachineIssues(config, issues);
+  issues.push(...findInvalidCncToolGeometry(project.scene, config, project.device));
   for (const layer of outputLayers) {
     appendCncLayerIssues(layer, project.device.maxFeed, config, issues);
   }
@@ -148,7 +150,7 @@ function appendCncLayerIssues(
       message: `Layer ${layer.id}: spindle RPM must be greater than 0.`,
     });
   }
-  // H.3: v-carve depth math is driven by the bit's tip angle — a flat end
+  // H.3: v-carve depth math is driven by the bit's included angle — a flat end
   // mill would gouge full-width trenches at the commanded depths. H.7: the
   // layer's own bit (falling back to the machine bit) is what matters.
   const layerTool = layerCncTool(config, settings);

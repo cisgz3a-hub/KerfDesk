@@ -61,10 +61,14 @@ export function emitTileFiles(
       return null;
     }
     for (const issue of preflight.issues) advisories.add(issue.message);
-    const header = gcodeMetadataHeader(buildGcodeMetadata(), {
-      kind: 'cnc',
-      spindleMaxRpm: machine.params.spindleMaxRpm,
-    });
+    const header = gcodeMetadataHeader(
+      buildGcodeMetadata(),
+      {
+        kind: 'cnc',
+        spindleMaxRpm: machine.params.spindleMaxRpm,
+      },
+      project.device,
+    );
     emitted.push({
       name: tileFileName(baseName(savedName), tile),
       gcode: `${header}; tile: row ${tile.row + 1}, column ${tile.col + 1}\n${body}`,

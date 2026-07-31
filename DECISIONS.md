@@ -13871,3 +13871,132 @@ accordingly and resolves the brief's open decision 4.
    session and materialize as ordinary scene layers at Apply. DS-9 remains the
    parametric round-trip stage and will serialize the layer table with the
    sketch when it lands.
+
+## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The supplied failed 4040 V-carve export identified only layer, operation, tool diameter, effective
+feed, plunge, spindle RPM, and pass count. It did not record the custom bit's stable id, bit kind,
+included angle, requested depth, depth per pass, V-carve resolution, feed-source provenance, or
+machine-profile identity. That prevents a saved file from proving which of several plausible setup
+inputs produced its motion after the project or custom library changes.
+
+The same export placed all group data in one 129-byte comment. CurveDesk's GRBL streamer strips
+full-line semicolon comments before transmission, so that line cannot explain coordinate loss in an
+in-app run. Other senders have their own parser and buffer behavior, however, and short independent
+fields are easier to inspect. Layer, tool, build, and profile labels also originate in persisted or
+imported data; interpolating an embedded newline directly into G-code could turn the remainder into
+a sendable command rather than a comment.
+
+### Decision
+
+1. `CncGroup` may carry the compiled tool kind and angle, requested depth, depth per pass, V-carve
+   resolution, and feed-source identity. The fields are optional for old execution archives and
+   hand-built jobs. Compilers populate only values that truthfully describe the group; relief does
+   not claim a layer requested depth, and tile-registration groups record their fixed peck depth.
+2. The CNC emitter writes provenance as short, single-purpose full-line semicolon comments. Dynamic
+   values have line breaks and control characters flattened, are UTF-8 truncated without splitting
+   code points, and are bounded so each `; cnc` provenance line stays at most 96 bytes.
+3. Export headers record the machine profile name and, when present, profile id, source, and catalog
+   version for ordinary, tiled, and standalone CNC files. The canonical custom-profile hash remains
+   in the execution archive; the plain-text export does not invent a hash it does not already own.
+4. Provenance is diagnostic only. Numeric compiled fields remain the motion source of truth;
+   `feedSource` may change comments but cannot change emitted motion. The in-app streamer continues
+   to strip comments before sending, and no Start, Frame, controller, or machine-policy gate changes.
+5. Tool labels in both the initial-load and mid-job tool-change comments use the same one-line
+   sanitizer. Emitter revision advances to `adr-273-cnc-incident-provenance-v1`.
+
+### Consequences
+
+- A saved CNC file can now distinguish a 3 mm 90-degree custom V-bit from a diameter-only tool and
+  can reconstruct the relevant requested/effective setup without the live project.
+- Newline-bearing imported labels remain inert comments instead of creating controller commands.
+- Motion commands and their order are unchanged. Raw comment-line counts and pass-span line numbers
+  advance together when the exact artifact is emitted, so recovery continues to use matching spans.
+- Provenance can narrow a coordinate-loss investigation but cannot prove physical position
+  retention. Stepper load, workholding, couplers, electrical noise, and controller state still need
+  controlled hardware qualification.
+
+### Verification
+
+- Compiler coverage pins the 3 mm 90-degree V-bit, requested depth, depth-per-pass, V-resolution,
+  and feed-source fields on the compiled group.
+- Emitter coverage compares sendable lines before and after provenance enrichment, rejects malicious
+  newline labels as commands, exercises initial and mid-job tool comments, and caps CNC comment size.
+- Ordinary, tiled, and standalone export tests pin profile identity; metadata tests pin control-byte
+  sanitization and the new emitter revision.
+- Automated tests and an air cut do not verify cutting-load position retention or finished geometry.
+
+## ADR-274 - V-bit geometry is explicit before a contributing V-carve can compile (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The custom-bit form previously began with populated diameter and angle values. An operator could
+name a physically different cutter, add it without replacing every field, and leave a plausible
+but false geometry record. Older or hand-edited projects can also contain a V-bit with no usable
+included angle. The V-carve ladder and its optional clearing stage silently substituted a
+60-degree cone for that missing or degenerate value, so generated depth geometry could disagree
+with the cutter in the spindle while the file still looked structurally valid.
+
+An included angle is not a tunable warning threshold: it is a required operand in
+`z(d) = -d / tan(angle / 2)`. Inventing it changes the requested toolpath. Conversely, a layer with
+no closed contour that survives the first configured V-carve inset or can produce a requested
+two-stage clearing pocket does not generate a V-carve pass and must not block an otherwise valid
+selected output. Selecting a non-V-bit for V-carve already has an established
+`cnc-settings-invalid` advisory contract; changing that separate path into a refusal is outside
+this decision.
+
+### Decision
+
+1. New custom bits start with blank diameter and included-angle fields. Diameter must be finite
+   and within 0.1 through 50 mm. V-bit and engraving-bit included angle must be finite and within
+   1 through 179 degrees. The saved library and the bit list display the exact stored values.
+2. Entry, library persistence, project deserialization, feed guidance, and V-carve geometry share
+   one 1-through-179-degree included-angle contract. Invalid persisted angles are not presented as
+   trusted cutter geometry.
+3. Prepared CNC output reports `cnc-tool-geometry-invalid` as a compile-integrity refusal only when
+   an output-enabled V-carve operation uses an actual V-bit with an invalid included angle and has
+   at least one closed, finite contour whose first configured V-carve inset produces a path or whose
+   requested two-stage clearing operation could produce a pocket for an allowed angle. The same
+   exact-artifact check therefore
+   applies before Save, Frame, and Start; output-disabled, unused, and selection-filtered operations
+   do not block another artifact.
+4. The V-carve ladder and two-stage clearing calculation no longer invent a 60-degree angle for an
+   actual V-bit. Direct core calls return no ladder or clearing paths for that invalid input, so a
+   caller that bypasses prepared-output preflight cannot emit a partial carve.
+5. A non-V-bit assigned to V-carve retains its historical 60-degree fallback and advisory-only
+   behavior. This preserves current output/policy for the pre-existing wrong-kind condition while
+   keeping the new refusal strictly about missing mathematical geometry on a real V-bit.
+
+### Consequences
+
+- A newly created 3 mm, 90-degree V-bit is stored and displayed as exactly 3 mm and 90 degrees;
+  the form no longer supplies a hidden 3.175 mm or 60-degree starting value.
+- A contributing V-carve cannot be generated from an invented included angle. The refusal names
+  the affected layer and bit and tells the operator to edit or replace it.
+- This is a compile-integrity boundary, not a feed, spindle, material, calculated-bounds, or
+  machine-motion heuristic. It does not claim that a valid angle, an air cut, or valid G-code proves
+  that the 4040 will retain position under cutting load.
+- Existing wrong-kind guidance remains an advisory and is not silently converted into a wider
+  Start policy gate by this change.
+
+### Verification
+
+- Form and persistence tests cover blank entry, exact 3 mm / 90-degree storage, and rejection of
+  out-of-range or non-finite angles. Shared-contract tests accept the exact 1- and 179-degree
+  boundaries and reject values immediately outside them.
+- V-carve ladder and clearance tests prove invalid actual V-bit angles produce no partial geometry
+  and that the legacy non-V-bit advisory path still produces its prior output.
+- Preflight and prepared-output tests cover contributing geometry, a too-narrow single-stage
+  contour, a narrow contour with a possible two-stage clearing pocket, invalid depth-per-pass
+  fallback behavior, output-disabled and unused layers, and an unselected invalid V-carve beside a
+  selected valid CNC operation.
+- Automated checks cannot verify spindle load, lost steps, coupler slip, electrical noise,
+  workholding, or physical coordinate retention; those require a controlled loaded scrap cut.

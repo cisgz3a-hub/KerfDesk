@@ -2,12 +2,7 @@
 // project machine is CNC. The Easel-style job setup: what stock is on the
 // bed, which bit is in the spindle, and the machine's Z/spindle parameters.
 
-import {
-  activeCncTool,
-  isCncCoolantMode,
-  type CncCoolantMode,
-  type CncMachineConfig,
-} from '../../core/scene';
+import { isCncCoolantMode, type CncCoolantMode, type CncMachineConfig } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
 import { ProbeControls } from '../laser/ProbeControls';
@@ -18,6 +13,7 @@ import { CncMachineCatalogRow } from './CncMachineCatalogRow';
 import { CncProjectMaterialPicker } from './CncProjectMaterialPicker';
 import { CncTilingPanel } from './CncTilingPanel';
 import { SurfacingPanel } from './SurfacingPanel';
+import { CncActiveBitSelect } from './CncActiveBitSelect';
 
 export function CncSetupPanel(): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);
@@ -27,27 +23,13 @@ export function CncSetupPanel(): JSX.Element | null {
 
 function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Element {
   const { machine } = props;
-  const updateCncMachine = useStore((s) => s.updateCncMachine);
-  const tool = activeCncTool(machine);
   return (
     <section aria-label="Material and bit setup" style={cardStyle}>
       <h3 style={headingStyle}>Material &amp; Bit</h3>
       <CncDetectedSettingsRow machine={machine} />
       <CncProjectMaterialPicker activeMaterialKey={machine.stock.materialKey} />
       <Row label="Bit">
-        <select
-          value={tool.id}
-          onChange={(e) => updateCncMachine({ toolId: e.target.value })}
-          aria-label="Active bit"
-          title="The bit in the spindle. Profile offsets and pocket clearing use its diameter."
-          style={selectStyle}
-        >
-          {machine.tools.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.name} ({candidate.diameterMm} mm)
-            </option>
-          ))}
-        </select>
+        <CncActiveBitSelect machine={machine} style={selectStyle} />
       </Row>
       <CncStockFields machine={machine} />
       <CncMachineParamsFields machine={machine} />

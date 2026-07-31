@@ -84,6 +84,8 @@ describe('emitGcode', () => {
     // Header present and first; the motion body is unchanged after it.
     expect(withMeta.gcode.startsWith('; KerfDesk')).toBe(true);
     expect(withMeta.gcode).toContain('; commit: deadbee');
+    expect(withMeta.gcode).toContain(`; profile-name: ${project.device.name}`);
+    expect(withMeta.gcode).toContain(`; profile-id: ${project.device.profileId}`);
     expect(withMeta.gcode.endsWith(withoutMeta.gcode)).toBe(true);
     // No metadata => no header => deterministic body only.
     expect(withoutMeta.gcode.startsWith('G21')).toBe(true);

@@ -476,10 +476,10 @@ G-code**, a factual no-file outcome stops before the picker: placement cannot be
 resolved; selection, variable, registration, or output-snapshot preparation
 produces no program; the post-prepare emitter refuses the requested output (for
 example, rotary raster while its Labs permission is off); or emitted preflight
-contains one of the five codes in `COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
+contains one of the six codes in `COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
 other preflight finding is an advisory reported after a successful save.
 
-For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232): the same five
+For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232): the same six
 compile-integrity codes cover unproducible or unstreamable output. Calculated
 bed bounds, configured no-go zones, and live output-setting findings are carried
 into Job Review as warnings before the Frame trace; they do not refuse Frame.
@@ -526,8 +526,13 @@ grouped by what each validates:
     operator-selected; stock thickness does not impose a universal depth cap.
 20. **No single pass cuts deeper than the configured maximum.**
 21. **No rapid (G0) travel before a safe-Z retract is established** (plunged-travel guard).
+22. **An actual selected V-bit on a contributing V-carve layer has an explicit
+    finite included angle from 1 through 179 degrees.** The compiler does not
+    invent an angle for a legacy or hand-edited V-bit because that would change
+    every calculated cut depth. Selecting a non-V-bit remains the established
+    advisory-only wrong-kind path.
 
-For **Save G-code**, the five-code set controls the emitted-preflight partition;
+For **Save G-code**, the six-code set controls the emitted-preflight partition;
 it is not an exhaustive list of reasons no file can exist. Factual
 placement/preparation failures and a post-prepare emission refusal return
 distinct non-writable outcomes before that partition. Calculated
@@ -2386,6 +2391,12 @@ F-CNC19 tiling.
 3. The file emits through `cncGrblStrategy`: G21/G90/G94 preamble, M3 +
    spin-up dwell, safe-Z discipline, per-layer comment headers, M5 + park
    postamble.
+4. Each CNC operation's short comment block records the selected tool id/name,
+   stored kind/diameter/angle, requested depth and depth/pass, V-carve
+   resolution where relevant, effective feed/plunge/RPM, and automatic feed
+   source. Dynamic labels are flattened into one inert comment line. Export
+   metadata also records the selected machine-profile identity for ordinary,
+   tiled, and standalone CNC files.
 
 #### Error — preflight violation
 1. The modal lists each issue with its code and message; no file is written
@@ -2507,8 +2518,13 @@ F-CNC19 tiling.
 
 #### Error — active bit is not a v-bit
 1. The layer panel and pre-Frame Job Review show "V-carve requires a v-bit."
-   It is an ordinary Frame/Start warning, not a Start gate. Save G-code keeps
-   its export preflight until a v-bit is selected.
+   It is an ordinary Save/Frame/Start warning, not a gate. Output remains
+   available for compatibility and can use the legacy 60-degree wrong-kind
+   fallback, so the operator is told to select the actual V-bit.
+2. A selected V-bit with a missing, non-finite, or out-of-range included angle
+   cannot produce the requested V-carve depth math. Save and Start stop before
+   compilation and tell the operator to edit or replace the bit; no silent
+   60-degree fallback is permitted.
 
 #### Empty
 1. Open paths and layers with no closed shapes compile to no passes; the
@@ -2639,24 +2655,40 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. Material & Bit → Manage bits lists every bit (starters + custom).
    The add form takes name, kind (end mill / ball nose / v-bit /
-   engraving), diameter, and tip angle (v/engraving only).
+   engraving), diameter, and included angle (v/engraving only). Diameter and angle
+   start blank and return to blank after each successful Add so a prior
+   cutter's geometry cannot be reused accidentally.
 2. An added bit is selectable immediately (machine bit list and every
    per-layer Bit select) and persists app-level in localStorage — it
    merges into the tool list of every future CNC session, across
    projects.
 3. Deleting a custom bit removes it from the library and the open
-   machine (undoable). Starters have no Delete button.
+   machine (undoable). If the bit is still assigned to an active V-carve
+   clearing, non-adaptive pocket roughing, or bound relief-finishing stage,
+   deletion is refused and the warning names the role and layer that must be
+   changed first. Starters have no Delete button.
+4. Every list row shows the canonical stored diameter and, for an angled
+   cutter, the stored included angle independently of the operator-entered
+   name.
 
 #### Error — invalid fields
-1. Empty names and non-positive/oversized diameters are ignored — the
+1. Empty names and diameters outside 0.1 through 50 mm are ignored — the
    Add button does nothing until the fields are sane.
+2. V-bit and engraving-bit angles must be finite values from 1 through 179
+   degrees. An invalid Add shows an inline reason and stores no tool.
 
 #### Empty
 1. No custom bits: the list shows only starters; nothing is deletable.
 
 #### Edge — layers referencing a deleted bit
-1. Layers keep the stale toolId; compile falls back to the machine's
-   active bit (layerCncTool), so output never references a missing bit.
+1. A deleted primary layer toolId may remain as a stale binding; compile falls
+   back to the machine's active bit (layerCncTool), so output never references a
+   missing bit. Dormant hidden secondary-tool bindings are cleared as part of
+   deletion rather than becoming unreachable stale state.
+2. If deletion changes an output operation's effective cutter while its manual
+   feed, plunge, spindle RPM, and depth-per-pass values remain exact, the same
+   retained-values warning used by the bit selectors is shown. A successfully
+   recalculated material recipe remains silent.
 
 ### F-CNC12. Save and apply feeds/speeds presets — Phase H.7
 
@@ -2697,6 +2729,9 @@ and lifts the command's CNC-only gate.)*
 #### Edge — profile with bits the library no longer has
 1. The snapshot carries its own tool list, so applying restores those
    bits for the project even if the library changed since.
+2. If Apply changes an output operation's effective cutter while keeping manual
+   numeric settings, it shows the retained-values warning. Material-recipe
+   values that successfully recalculate for the applied profile remain silent.
 
 ### F-CNC14. Run a multi-bit job (M0 tool change) — Phase H.7
 
@@ -2711,8 +2746,9 @@ and lifts the command's CNC-only gate.)*
 3. Geometry offsets use each layer's OWN bit diameter.
 
 #### Error — v-carve layer with a flat bit
-1. Preflight blocks with the layer's bit named (not just the machine
-   bit).
+1. Job Review warns with the layer's bit named (not just the machine bit), but
+   wrong-kind output remains available through the legacy fallback. An actual
+   V-bit with invalid included angle is the separate compile-integrity refusal.
 
 #### Empty
 1. All layers on one bit → no M0 blocks; output is byte-identical to a
@@ -2720,6 +2756,10 @@ and lifts the command's CNC-only gate.)*
 
 #### Edge — unknown per-layer bit id
 1. Falls back to the machine's active bit at compile time.
+2. Changing a layer Bit keeps existing manual or machine-starter feed, plunge,
+   spindle RPM, and depth-per-pass values. A warning names that retention and
+   asks the operator to verify the numbers for the newly selected cutter.
+   Material-recipe settings are recalculated for the new cutter instead.
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
@@ -3039,7 +3079,7 @@ and lifts the command's CNC-only gate.)*
    PROVISIONAL industry-typical mid-range chiploads per diameter band.
 4. A recognized machine starter and the active CNC machine/controller ceilings
    can only lower the displayed automatic result. For the Neotronics 4040,
-   Plywood/MDF with the 3.175 mm two-flute starter resolves to 600 mm/min feed,
+   Plywood/MDF with the 3.175 mm two-flute starter resolves to 300 mm/min feed,
    120 mm/min plunge, 12000 RPM, and 0.75 mm/pass rather than the generic result.
 
 #### Error — none (inputs are bounded)
@@ -3053,6 +3093,11 @@ and lifts the command's CNC-only gate.)*
 1. The calculator uses the bit's DIAMETER regardless of kind; for
    v-carving the chipload model is a rough guide only — the flow says
    so rather than pretending precision.
+2. For a V-bit or engraving bit, the calculator shows the exact stored
+   diameter and included angle and states that the diameter band is used while
+   included angle and depth-dependent cutting engagement are not modeled. Material,
+   flute, and Apply controls remain enabled and the numeric result is unchanged;
+   the operator is directed to the cutter maker's data and a scrap test.
 
 ### F-CNC25. Surface the spoilboard — Phase H.11 (ADR-103 G8)
 
@@ -3244,6 +3289,10 @@ and lifts the command's CNC-only gate.)*
 2. The choice and automatic-source provenance are remembered on the layer and
    round-trip in the .lf2 file; they are display-only and do not change compiled
    output beyond the persisted numeric settings themselves.
+3. When the layer uses a V-bit or engraving bit, the row names the cutter's
+   stored diameter and included angle and discloses that the automatic model
+   uses the diameter band but not depth-dependent cutting engagement. The
+   material select remains enabled and applies the same bounded numeric patch.
 
 #### Error — none (bounded)
 1. Material is a select; the engine floors tiny results (feed / per-pass)
@@ -3323,6 +3372,10 @@ and lifts the command's CNC-only gate.)*
 #### Edge — which layers count
 1. The feed check considers only layers set to output; a hidden/off layer
    with an aggressive feed does not raise the advisory.
+2. An output layer carrying material-recipe provenance and using a V-bit or
+   engraving bit adds a Job Review warning with the exact feed, plunge, RPM,
+   and depth/pass values plus the diameter-band model limitation. Manual and
+   machine-starter values do not claim that material-recipe calculation.
 
 ### F-CNC35. Set the project material once (Easel-style) — ADR-112
 
@@ -3336,6 +3389,9 @@ and lifts the command's CNC-only gate.)*
 2. New layers inherit it: add a layer or import an SVG after choosing the
    material and the fresh layers come in with those feeds (not the generic
    1000 / 1.5 default). Set material first, then import — the Easel order.
+3. Before Apply, each distinct angled cutter used by the project is disclosed
+   with its stored geometry and the same rough-guide model boundary. Apply
+   remains available and recalculates the same values as the per-layer path.
 
 #### Error — none (bounded select)
 1. Unknown saved keys are dropped during project normalization. Known species
@@ -3356,8 +3412,8 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. With the Neotronics 4040 profile active, a fresh CNC operation starts with
-   the revisioned 3.175 mm two-flute engineering starter: 600 mm/min feed,
-   120 mm/min plunge, 12000 RPM, and 0.75 mm/pass. The layer card and Job Review
+   the revisioned 3.175 mm two-flute engineering starter: 300 mm/min feed,
+   250 mm/min plunge, 12000 RPM, and 0.75 mm/pass. The layer card and Job Review
    identify the starter and revision; the numbers remain fully editable.
 2. A selected project material outranks the machine starter. An operator-saved
    per-color or all-color layer default outranks both and is copied exactly.
@@ -3378,6 +3434,11 @@ and lifts the command's CNC-only gate.)*
    numeric settings are never rewritten. Explicit machine/profile changes may
    refresh only values carrying trusted automatic provenance; an unknown, newer,
    or no-longer-matching starter keeps its numbers and becomes Manual.
+2. Changing the machine Active bit recalculates material-recipe layers that
+   follow it. If any following layer instead keeps manual or withdrawn-starter
+   feed, plunge, RPM, and depth/pass numbers, a warning tells the operator to
+   verify those retained values for the new bit. Selecting the same bit is a
+   no-op and emits no warning.
 
 ### F-CNC38. Keep origin and work-Z evidence axis-honest — Phase H.11
 
