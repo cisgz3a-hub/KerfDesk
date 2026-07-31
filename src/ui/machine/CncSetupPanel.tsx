@@ -7,13 +7,13 @@ import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
 import { ProbeControls } from '../laser/ProbeControls';
 import { ProbePlateRemovalNotice } from '../laser/ProbePlateRemovalNotice';
+import { CncActiveBitSelect } from './CncActiveBitSelect';
 import { CncDetectedSettingsRow } from './CncDetectedSettingsRow';
 import { CncMachineProfilesRow, CncToolManager } from './CncLibraryPanels';
 import { CncMachineCatalogRow } from './CncMachineCatalogRow';
 import { CncProjectMaterialPicker } from './CncProjectMaterialPicker';
 import { CncTilingPanel } from './CncTilingPanel';
 import { SurfacingPanel } from './SurfacingPanel';
-import { CncActiveBitSelect } from './CncActiveBitSelect';
 
 export function CncSetupPanel(): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);

@@ -2525,6 +2525,16 @@ F-CNC19 tiling.
    cannot produce the requested V-carve depth math. Save and Start stop before
    compilation and tell the operator to edit or replace the bit; no silent
    60-degree fallback is permitted.
+3. The optional flat-floor clearing bit must be a flat end mill. An older
+   project that assigned a ball-nose or engraving cutter keeps that selection
+   visible as a disabled diagnostic choice instead of silently changing it. If
+   the selected geometry would emit a clearing pocket, prepared output refuses
+   it and names the incompatible cutter; the direct compiler also omits the
+   clearing group. A contour with no flat floor adds no refusal because that
+   clearing stage contributes no motion.
+4. A missing configured clearing bit follows the same compile-integrity rule:
+   it remains visible as an unavailable choice, prepared output refuses it only
+   when a flat-floor stage can contribute, and direct compile omits that stage.
 
 #### Empty
 1. Open paths and layers with no closed shapes compile to no passes; the
@@ -2659,21 +2669,32 @@ and lifts the command's CNC-only gate.)*
    (v/engraving only). Diameter and angle start blank and return to blank
    after each successful Add so a prior cutter's geometry cannot be reused
    accidentally.
-2. Add from bit catalog searches researched cutter families and common
-   metric/imperial sizes. A selectable template needs both a cutting envelope
-   represented by the current flat, full-radius ball, or point-V kernels and
-   sufficiently evidenced dimensions, capability, and operation semantics.
-   Modeled templates can be copied into the saved custom-bit library unless
-   already built in or saved. Other entries remain visible with their source
-   and the reason they are reference-only; they have no Add action.
+2. Add from bit catalog searches 88 modeled envelopes and 72 reference-only
+   family entries (160 entries total). A generic flat or full-radius-ball
+   template is an operator-matched nominal diameter envelope whose gross
+   geometry fits the current kernel; Add does not claim that its family source
+   verifies the generated size, shank, center-cut/plunge capability, entry
+   strategy, or automatic feed. Apart from explicitly single/double O-flute
+   family identity, it also does not establish flute count. Exact-product
+   point-V and O-flute ball-nose evidence is labeled separately; the two Amana
+   ball-nose products retain their exact product diameter and shank but no
+   numeric flute count because the product source does not state one. Modeled
+   envelopes can be copied into the saved custom-bit library unless already
+   built in or saved. Unsupported
+   entries remain visible with their source and the reason they are
+   reference-only; they have no Add action.
 3. An added bit is selectable immediately (machine bit list and every
    per-layer Bit select) and persists app-level in localStorage — it
-   merges into the tool list of every future CNC session, across
-   projects.
-4. Catalog family, shank diameter, flute count, and stable catalog identity
-   survive both app-library persistence and `.lf2` project round-trips. A
-   catalog flute count becomes the default for material-feed calculations;
-   the operator can still override it in the Feeds calculator.
+   merges into the tool list whenever a CNC project is opened, across
+   projects. Existing project copies win an ID or catalog-identity match, so
+   opening a project never replaces its saved ID or metadata with a library
+   alias.
+4. Catalog family, optional evidenced shank/flute metadata, and stable catalog
+   identity survive both app-library persistence and `.lf2` project
+   round-trips. Generic non-O-flute envelopes carry no trusted flute count and
+   make no automatic-feed claim. An explicit single/double O-flute family
+   count becomes the default for material-feed calculations; the operator can
+   still override it in the Feeds calculator.
 5. Deleting a custom bit removes it from the saved library and, when
    present, from the open machine. The open-project machine edit is
    undoable; project Undo does not restore the app-level library entry.
@@ -2684,6 +2705,21 @@ and lifts the command's CNC-only gate.)*
 6. Every list row shows the canonical stored diameter and, for an angled
    cutter, the stored included angle independently of the operator-entered
    name.
+7. Choosing an Active bit briefly shows a dismissible **Modeled cutting
+   envelope** preview. For an end mill, full-radius ball, or valid point V-bit,
+   it uses the same profile as removal simulation, reports a catalog shank
+   diameter as metadata only when known, and states that flutes, coating,
+   cutting length, and the shank transition are not modeled. A legacy engraving
+   tool does not store enough tip geometry for a truthful 3D cutting envelope,
+   so it receives a readable no-shape fallback rather than the simulator's flat
+   approximation. A V-bit without a valid included angle likewise receives a
+   readable fallback instead of an invented cone.
+   If WebGL or scene initialization is unavailable, the bit name and geometry
+   notice remain readable. A later render exception or WebGL context loss
+   disposes the acquired scene and transitions to the same fallback. Selection
+   still succeeds and no machine command is sent. The visible timer starts only
+   after the 3D scene or fallback is ready, pauses while hovered or focused, and
+   reduced-motion users receive a static frame.
 
 #### Error — invalid fields
 1. Empty names and diameters outside 0.1 through 50 mm are ignored — the
@@ -2709,6 +2745,13 @@ and lifts the command's CNC-only gate.)*
    and its trusted flute count changes, inherited automatic material recipes
    recalculate; layers pinned to another bit and manual/legacy values preserve
    operator intent.
+
+#### Edge — project saved before the two catalog-backed starter V-bits
+1. Opening a nonempty older CNC tool list appends the 6.35 mm-cut / 3.175 mm-shank
+   and 12.7 mm-cut / 6.35 mm-shank 90-degree V-bit starters when neither their
+   stable ID nor catalog identity is already present. Existing tool order,
+   objects, metadata, project-owned custom tools, layer references, and Active
+   bit remain unchanged.
 
 #### Edge — layers referencing a deleted bit
 1. Deleting the active bit selects a surviving bit. If no bit survives, the
@@ -2771,8 +2814,10 @@ and lifts the command's CNC-only gate.)*
 1. The snapshot carries its own tool list, so applying restores those
    bits for the project even if the library changed since.
 2. If Apply changes an output operation's effective cutter while keeping manual
-   numeric settings, it shows the retained-values warning. Material-recipe
-   values that successfully recalculate for the applied profile remain silent.
+   numeric settings, it shows the retained-values warning. Effective cutter
+   identity includes flute count even when ID and gross geometry are unchanged.
+   Material-recipe values that successfully recalculate for the applied profile
+   remain silent.
 
 #### Edge — duplicate catalog identities in an imported or legacy profile
 1. Incoming profile aliases are matched to an existing current-project tool
@@ -2890,7 +2935,10 @@ and lifts the command's CNC-only gate.)*
    pass); finishing consumes it down to the true surface.
 
 #### Error — unknown finishing bit id
-1. The finishing group is skipped (roughing-only), never a crash.
+1. The missing ID stays visible as a disabled diagnostic choice. Prepared
+   output refuses the unavailable active finishing stage; direct compile still
+   skips it and remains roughing-only rather than crashing. A binding on a
+   layer with no relief object is dormant and does not block.
 
 #### Empty
 1. "Roughing only" (the default) emits no finishing group.

@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createLayer,
   createProject,
@@ -13,6 +13,13 @@ import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { CncActiveBitSelect } from './CncActiveBitSelect';
+
+vi.mock('../cnc-viewer3d/bit-preview-three-scene', () => ({
+  createBitPreviewThreeScene: vi.fn(async () => ({
+    kind: 'no-webgl',
+    reason: 'WebGL intentionally unavailable in this selector test.',
+  })),
+}));
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -50,6 +57,20 @@ function installCnc(
   const machine = useStore.getState().project.machine;
   if (machine?.kind !== 'cnc') throw new Error('CNC machine missing');
   return machine;
+}
+
+function addOneFluteTool(): { readonly machine: CncMachineConfig; readonly toolId: string } {
+  useStore.getState().addCustomCncTool({
+    name: 'One-flute Active bit',
+    kind: 'end-mill',
+    diameterMm: 6.35,
+    fluteCount: 1,
+  });
+  const toolId = useStore.getState().cncLibrary.customTools[0]?.id;
+  if (toolId === undefined) throw new Error('custom bit missing');
+  const machine = useStore.getState().project.machine;
+  if (machine?.kind !== 'cnc') throw new Error('CNC machine missing');
+  return { machine, toolId };
 }
 
 async function render(machine: CncMachineConfig): Promise<{ host: HTMLDivElement; root: Root }> {
@@ -128,6 +149,36 @@ describe('CncActiveBitSelect retained-feed advisory', () => {
     }
   });
 
+  it('warns when a missing explicit primary id falls back to Active with manual values', async () => {
+    const manual = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      toolId: 'deleted-primary',
+      feedMmPerMin: 777,
+      plungeMmPerMin: 123,
+      spindleRpm: 10_000,
+      depthPerPassMm: 0.4,
+    };
+    const machine = installCnc(manual);
+    const { host, root } = await render(machine);
+    try {
+      await act(async () => selectBit(host, 'em-6350'));
+      expect(settings()).toMatchObject({
+        toolId: 'deleted-primary',
+        feedMmPerMin: 777,
+        plungeMmPerMin: 123,
+        spindleRpm: 10_000,
+        depthPerPassMm: 0.4,
+      });
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'warning',
+        message: expect.stringMatching(/kept.*verify/i),
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('warns when an Active bit change preserves a no-longer-matching starter', async () => {
     const starter = {
       ...DEFAULT_CNC_LAYER_SETTINGS,
@@ -176,6 +227,43 @@ describe('CncActiveBitSelect retained-feed advisory', () => {
       await act(async () => selectBit(host, 'em-6350'));
       expect(settings()?.feedMmPerMin).not.toBe(111);
       expect(settings()?.feedSource).toEqual(recipe.feedSource);
+      expect(useToastStore.getState().toasts).toEqual([]);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('recalculates a recipe whose missing primary id falls back to Active without warning', async () => {
+    const recipe = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      toolId: 'deleted-primary',
+      materialKey: 'plywood-mdf',
+      feedMmPerMin: 111,
+      feedSource: {
+        kind: 'material-recipe' as const,
+        materialKey: 'plywood-mdf',
+        fluteCount: 2,
+      },
+    };
+    installCnc(recipe);
+    const { machine, toolId } = addOneFluteTool();
+    const before = settings();
+    expect(before?.feedSource).toEqual(recipe.feedSource);
+    const { host, root } = await render(machine);
+    try {
+      await act(async () => selectBit(host, toolId));
+      expect(settings()?.toolId).toBe('deleted-primary');
+      expect([
+        settings()?.feedMmPerMin,
+        settings()?.plungeMmPerMin,
+        settings()?.depthPerPassMm,
+      ]).not.toEqual([before?.feedMmPerMin, before?.plungeMmPerMin, before?.depthPerPassMm]);
+      expect(settings()?.feedSource).toEqual({
+        kind: 'material-recipe',
+        materialKey: 'plywood-mdf',
+        fluteCount: 1,
+      });
       expect(useToastStore.getState().toasts).toEqual([]);
     } finally {
       await act(async () => root.unmount());
