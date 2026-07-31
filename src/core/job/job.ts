@@ -248,7 +248,14 @@ export type JobDiagnostic =
   // Hatch geometry existed, but every sweep rounded to a stationary point at
   // emitted G-code precision. Keep this advisory so microscopic fill loss is
   // visible without turning it into a Start, Frame, or export refusal.
-  | { readonly kind: 'fill-collapsed-at-precision'; readonly layerName: string };
+  | { readonly kind: 'fill-collapsed-at-precision'; readonly layerName: string }
+  | {
+      readonly kind: 'raster-source-luma-mismatch';
+      readonly layerName: string;
+      readonly source: string;
+      readonly expectedPixels: number;
+      readonly actualPixels: number;
+    };
 
 export type Job = {
   readonly groups: ReadonlyArray<Group>;

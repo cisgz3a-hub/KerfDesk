@@ -125,11 +125,12 @@ function compiledRasterGroups(
   if (input.maskObject !== null) objects.push(input.maskObject);
   const sourceLumaByObjectId = new Map([[object.id, sourceLuma]]);
   return input.layers.flatMap((layer) =>
-    outputOperationLayers(layer).flatMap((operation) =>
-      compileRasterGroupsForLayer([object], operation, input.device, {
-        sceneObjects: objects,
-        sourceLumaByObjectId,
-      }),
+    outputOperationLayers(layer).flatMap(
+      (operation) =>
+        compileRasterGroupsForLayer([object], operation, input.device, {
+          sceneObjects: objects,
+          sourceLumaByObjectId,
+        }).groups,
     ),
   );
 }

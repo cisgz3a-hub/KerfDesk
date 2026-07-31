@@ -33,4 +33,24 @@ describe('compileDiagnosticWarnings', () => {
   it('adds no warning when compilation has no diagnostic', () => {
     expect(compileDiagnosticWarnings({ groups: [] })).toEqual([]);
   });
+
+  it('names a skipped raster whose luma dimensions do not match', () => {
+    const [warning] = compileDiagnosticWarnings({
+      groups: [],
+      diagnostics: [
+        {
+          kind: 'raster-source-luma-mismatch',
+          layerName: 'Photo Engrave',
+          source: 'portrait.png',
+          expectedPixels: 16,
+          actualPixels: 15,
+        },
+      ],
+    });
+
+    expect(warning).toContain('Image "portrait.png" on layer "Photo Engrave"');
+    expect(warning).toContain('15 samples');
+    expect(warning).toContain('require 16');
+    expect(warning).toContain('missing from the job');
+  });
 });
