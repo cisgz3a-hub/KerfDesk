@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createLayer,
   createProject,
@@ -96,6 +96,43 @@ describe('SelectedReliefProperties', () => {
     } finally {
       await act(async () => root.unmount());
       host.remove();
+    }
+  });
+
+  it('does not retarget a pending width edit when the selected relief changes', async () => {
+    vi.useFakeTimers();
+    installProject('cnc');
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: {
+        ...project,
+        scene: {
+          ...project.scene,
+          objects: [relief(), { ...relief(), id: 'R2', source: 'second.stl' }],
+        },
+      },
+    });
+    useStore.getState().selectObject('R1');
+    const { host, root } = await render();
+    try {
+      const width = host.querySelector('input[aria-label="Relief width (mm)"]');
+      if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
+      await act(async () => {
+        width.value = '125';
+        Simulate.change(width);
+      });
+      await act(async () => useStore.getState().selectObject('R2'));
+      await act(async () => vi.advanceTimersByTime(300));
+
+      const widths = useStore
+        .getState()
+        .project.scene.objects.filter((object) => object.kind === 'relief')
+        .map((object) => object.targetWidthMm);
+      expect(widths).toEqual([100, 100]);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      vi.useRealTimers();
     }
   });
 

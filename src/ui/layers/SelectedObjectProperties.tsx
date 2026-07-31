@@ -49,6 +49,7 @@ export function SelectedObjectProperties(): JSX.Element | null {
   if (context === null) return null;
   return (
     <ArtworkPropertiesInspector
+      key={JSON.stringify(context.objects.map((object) => object.id))}
       artwork={artwork}
       layers={layers}
       context={context}
