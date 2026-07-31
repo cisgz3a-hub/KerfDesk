@@ -11,14 +11,18 @@ import {
   type ExecutablePlanV1,
 } from './executable-plan-types';
 
-export function assembleExecutablePlan(
-  gcode: string,
-  model: GcodeRenderModel,
-  options: BuildExecutablePlanOptions,
-  inputMotions: ReadonlyArray<ExecutablePlanMotion>,
-  sendableLineCount: number,
-): ExecutablePlanV1 {
-  const motions = classifyPlanParks(inputMotions, model.events);
+type AssembleExecutablePlanInput = {
+  readonly gcode: string;
+  readonly model: GcodeRenderModel;
+  readonly options: BuildExecutablePlanOptions;
+  readonly motions: ReadonlyArray<ExecutablePlanMotion>;
+  readonly sendableLineCount: number;
+};
+
+/** Assembles the validated semantic components into an immutable v1 plan. */
+export function assembleExecutablePlan(input: AssembleExecutablePlanInput): ExecutablePlanV1 {
+  const { gcode, model, options, sendableLineCount } = input;
+  const motions = classifyPlanParks(input.motions, model.events);
   return {
     schema: EXECUTABLE_PLAN_SCHEMA,
     schemaVersion: EXECUTABLE_PLAN_SCHEMA_VERSION,
@@ -56,7 +60,7 @@ function classifyPlanParks(
   motions: ReadonlyArray<ExecutablePlanMotion>,
   events: ReadonlyArray<ProgramEvent>,
 ): ReadonlyArray<ExecutablePlanMotion> {
-  const lastProcess = motions.findLastIndex((motion) => motion.intent === 'process');
+  const lastProcess = lastMotionIndex(motions, (motion) => motion.intent === 'process');
   if (lastProcess < 0) return motions;
   const parkIndexes = new Set<number>();
   motions.forEach((motion, index) => {
@@ -66,7 +70,8 @@ function classifyPlanParks(
     (motion, index) => index > lastProcess && motion.intent === 'park',
   );
   if (!hasTerminalPark) {
-    const finalTravel = motions.findLastIndex(
+    const finalTravel = lastMotionIndex(
+      motions,
       (motion, index) => index > lastProcess && motion.intent === 'travel',
     );
     if (finalTravel >= 0) parkIndexes.add(finalTravel);
@@ -75,6 +80,17 @@ function classifyPlanParks(
   return motions.map((motion, index) =>
     parkIndexes.has(index) && motion.intent === 'travel' ? { ...motion, intent: 'park' } : motion,
   );
+}
+
+function lastMotionIndex(
+  motions: ReadonlyArray<ExecutablePlanMotion>,
+  matches: (motion: ExecutablePlanMotion, index: number) => boolean,
+): number {
+  for (let index = motions.length - 1; index >= 0; index -= 1) {
+    const motion = motions[index];
+    if (motion !== undefined && matches(motion, index)) return index;
+  }
+  return -1;
 }
 
 function pauseParkIndexes(

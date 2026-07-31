@@ -40,7 +40,16 @@
       "properties": {
         "units": { "const": "mm" },
         "distanceMode": { "const": "absolute" },
-        "initialPositionMm": { "$ref": "#/$defs/point" },
+        "initialPositionMm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "z"],
+          "properties": {
+            "x": { "const": 0 },
+            "y": { "const": 0 },
+            "z": { "const": 0 }
+          }
+        },
         "initialPositionBasis": { "const": "assumed-work-origin-v1" }
       }
     },

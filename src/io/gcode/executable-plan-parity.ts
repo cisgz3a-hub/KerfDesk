@@ -7,8 +7,10 @@ import {
 import type { ToolpathStep } from '../../core/job';
 import { parseGcodeProgram } from './parse-gcode-program';
 
+/** Maximum coordinate disagreement accepted between independent plan parsers. */
 export const EXECUTABLE_PLAN_PARITY_TOLERANCE_MM = 1e-6;
 
+/** One independently evaluated plan-versus-program invariant. */
 export type ExecutablePlanParityCheck = {
   readonly name:
     | 'byte-exact-serialization'
@@ -19,6 +21,7 @@ export type ExecutablePlanParityCheck = {
   readonly detail: string;
 };
 
+/** Aggregate semantic and byte-compatibility result for an ExecutablePlan. */
 export type ExecutablePlanParityResult = {
   readonly ok: boolean;
   readonly toleranceMm: number;
@@ -30,6 +33,7 @@ type EndpointPair = {
   readonly end: ExecutablePlanPoint;
 };
 
+/** Verifies bytes, line accounting, geometry, and deterministic reconstruction. */
 export function verifyExecutablePlanParity(
   plan: ExecutablePlanV1,
   currentGcode: string,

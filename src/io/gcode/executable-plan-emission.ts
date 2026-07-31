@@ -13,6 +13,7 @@ import {
 } from './executable-plan-parity';
 import { prepareOutput, type PreparedOutput } from './prepare-output';
 
+/** Semantic sidecar status attached to an otherwise unchanged emission result. */
 export type ExecutablePlanSidecar =
   | {
       readonly kind: 'ok';
@@ -26,6 +27,7 @@ export type ExecutablePlanSidecar =
       readonly issues: ReadonlyArray<ExecutablePlanBuildIssue | string>;
     };
 
+/** Legacy emission result plus the opt-in ExecutablePlan sidecar. */
 export type EmitGcodeWithExecutablePlanResult = EmitGcodeResult & {
   readonly sidecar: ExecutablePlanSidecar;
 };
@@ -42,6 +44,7 @@ export function emitGcodeWithExecutablePlan(
   return emitPreparedGcodeWithExecutablePlan(prepared, options);
 }
 
+/** Emits an already-prepared job and attaches a parity-verified semantic sidecar. */
 export function emitPreparedGcodeWithExecutablePlan(
   prepared: PreparedOutput,
   options: EmitGcodeOptions = {},

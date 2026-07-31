@@ -5,6 +5,7 @@ import {
   type GcodeRenderModel,
   type ProgramEvent,
 } from '../gcode-view';
+// Deep import: core/job's legacy barrel is CI-ratcheted at 85 exports and may only shrink.
 import { buildMotionManifest, type MotionBlock } from '../job/motion-manifest';
 import { assembleExecutablePlan } from './assemble-executable-plan';
 import {
@@ -29,6 +30,23 @@ type RenderLineMotion = {
   readonly segmentCount: number;
 };
 
+type AlignmentContext = {
+  readonly renderLines: ReadonlyMap<number, RenderLineMotion>;
+  readonly model: GcodeRenderModel;
+  readonly options: BuildExecutablePlanOptions;
+  readonly armedByLine: ReadonlyMap<number, boolean>;
+  readonly issues: ExecutablePlanBuildIssue[];
+};
+
+type MotionIntentInput = {
+  readonly block: MotionBlock;
+  readonly rendered: RenderLineMotion;
+  readonly firstRenderKind: number | undefined;
+  readonly machineKind: BuildExecutablePlanOptions['machineKind'];
+  readonly spindleState: 'armed' | 'off';
+};
+
+/** Builds a deterministic v1 semantic sidecar from one exact G-code program. */
 export function buildExecutablePlan(
   gcode: string,
   options: BuildExecutablePlanOptions,
@@ -66,9 +84,14 @@ function buildAlignedPlan(
   if (collected.issues.length > 0) return semanticError(collected.issues);
   const issues: ExecutablePlanBuildIssue[] = [];
   const armedByLine = spindleArmedAtMotionLines(model.events, manifest.blocks);
-  const motions = manifest.blocks.map((block, index) =>
-    alignMotion(block, index, collected.lines, model, options, armedByLine, issues),
-  );
+  const context: AlignmentContext = {
+    renderLines: collected.lines,
+    model,
+    options,
+    armedByLine,
+    issues,
+  };
+  const motions = manifest.blocks.map((block, index) => alignMotion(block, index, context));
   const manifestLines = new Set(manifest.blocks.map((block) => block.rawLineIndex));
   for (const line of collected.lines.keys()) {
     if (!manifestLines.has(line)) {
@@ -87,7 +110,13 @@ function buildAlignedPlan(
   );
   return {
     kind: 'ok',
-    plan: assembleExecutablePlan(gcode, model, options, alignedMotions, manifest.sendableLineCount),
+    plan: assembleExecutablePlan({
+      gcode,
+      model,
+      options,
+      motions: alignedMotions,
+      sendableLineCount: manifest.sendableLineCount,
+    }),
   };
 }
 
@@ -126,15 +155,11 @@ function collectRenderLines(model: GcodeRenderModel): {
 function alignMotion(
   block: MotionBlock,
   index: number,
-  renderLines: ReadonlyMap<number, RenderLineMotion>,
-  model: GcodeRenderModel,
-  options: BuildExecutablePlanOptions,
-  armedByLine: ReadonlyMap<number, boolean>,
-  issues: ExecutablePlanBuildIssue[],
+  context: AlignmentContext,
 ): ExecutablePlanMotion | null {
-  const rendered = renderLines.get(block.rawLineIndex);
+  const rendered = context.renderLines.get(block.rawLineIndex);
   if (rendered === undefined) {
-    issues.push({
+    context.issues.push({
       code: 'motion-line-mismatch',
       message: `Controller motion on raw line ${block.rawLineIndex} has no render motion.`,
       rawLineIndex: block.rawLineIndex,
@@ -143,15 +168,15 @@ function alignMotion(
   }
   const manifestStart = block.points[0];
   const manifestEnd = block.points.at(-1);
-  const renderStart = renderPoint(model, rendered.firstSegment, false);
-  const renderEnd = renderPoint(model, rendered.lastSegment, true);
+  const renderStart = renderSegmentStart(context.model, rendered.firstSegment);
+  const renderEnd = renderSegmentEnd(context.model, rendered.lastSegment);
   if (
     manifestStart === undefined ||
     manifestEnd === undefined ||
     !sameEndpoint(manifestStart, renderStart) ||
     !sameEndpoint(manifestEnd, renderEnd)
   ) {
-    issues.push({
+    context.issues.push({
       code: 'endpoint-mismatch',
       message: `Independent parsers disagree on endpoints for raw line ${block.rawLineIndex}.`,
       rawLineIndex: block.rawLineIndex,
@@ -164,13 +189,13 @@ function alignMotion(
     sendableLineIndex: block.sendableLineIndex,
     programLineNumber: block.programLineNumber,
     mode: motionMode(rendered.mode),
-    intent: motionIntent(
+    intent: motionIntent({
       block,
       rendered,
-      model.segKind[rendered.firstSegment],
-      options,
-      armedByLine.get(block.rawLineIndex) === true,
-    ),
+      firstRenderKind: context.model.segKind[rendered.firstSegment],
+      machineKind: context.options.machineKind,
+      spindleState: context.armedByLine.get(block.rawLineIndex) === true ? 'armed' : 'off',
+    }),
     pointsMm: block.points.map(copyPoint),
     lengthMm: block.lengthMm,
     routeStartMm: block.routeStartMm,
@@ -181,8 +206,15 @@ function alignMotion(
   };
 }
 
-function renderPoint(model: GcodeRenderModel, segment: number, end: boolean): ExecutablePlanPoint {
-  const offset = segment * 6 + (end ? 3 : 0);
+function renderSegmentStart(model: GcodeRenderModel, segment: number): ExecutablePlanPoint {
+  return renderPointAtOffset(model, segment * 6);
+}
+
+function renderSegmentEnd(model: GcodeRenderModel, segment: number): ExecutablePlanPoint {
+  return renderPointAtOffset(model, segment * 6 + 3);
+}
+
+function renderPointAtOffset(model: GcodeRenderModel, offset: number): ExecutablePlanPoint {
   return {
     x: model.positions[offset] ?? 0,
     y: model.positions[offset + 1] ?? 0,
@@ -209,20 +241,16 @@ function motionMode(mode: number): ExecutablePlanMotionMode {
   return 'counterclockwise-arc';
 }
 
-function motionIntent(
-  block: MotionBlock,
-  rendered: RenderLineMotion,
-  firstRenderKind: number | undefined,
-  options: BuildExecutablePlanOptions,
-  spindleArmed: boolean,
-): ExecutablePlanMotionIntent {
-  if (block.kind !== 'plunge') return block.kind;
-  if (rendered.mode === SEG_MOTION.cw || rendered.mode === SEG_MOTION.ccw) {
+function motionIntent(input: MotionIntentInput): ExecutablePlanMotionIntent {
+  if (input.block.kind !== 'plunge') return input.block.kind;
+  if (input.rendered.mode === SEG_MOTION.cw || input.rendered.mode === SEG_MOTION.ccw) {
     const energized =
-      options.machineKind === 'cnc' ? spindleArmed : spindleArmed && rendered.power > 0;
+      input.machineKind === 'cnc'
+        ? input.spindleState === 'armed'
+        : input.spindleState === 'armed' && input.rendered.power > 0;
     return energized ? 'process' : 'travel';
   }
-  return firstRenderKind === SEG_KIND.retract ? 'retract' : 'plunge';
+  return input.firstRenderKind === SEG_KIND.retract ? 'retract' : 'plunge';
 }
 
 function spindleArmedAtMotionLines(

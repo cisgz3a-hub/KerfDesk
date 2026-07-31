@@ -2,23 +2,30 @@ import type { ProgramEvent, UnsupportedWordCount } from '../gcode-view';
 import type { OutputStrategy } from '../output';
 import type { MachineKind } from '../scene';
 
+/** Stable schema identifier for the first ExecutablePlan contract. */
 export const EXECUTABLE_PLAN_SCHEMA = 'curvedesk.executable-plan' as const;
+/** Current ExecutablePlan schema version. */
 export const EXECUTABLE_PLAN_SCHEMA_VERSION = 1 as const;
 
+/** Controller dialect that emitted the exact compatibility program. */
 export type ExecutablePlanController = OutputStrategy['id'];
+/** Normalized motion command represented by one plan motion. */
 export type ExecutablePlanMotionMode =
   | 'rapid'
   | 'linear'
   | 'clockwise-arc'
   | 'counterclockwise-arc';
+/** Safety-relevant semantic role assigned to one motion. */
 export type ExecutablePlanMotionIntent = 'travel' | 'process' | 'plunge' | 'retract' | 'park';
 
+/** Absolute millimetre coordinate in plan space. */
 export type ExecutablePlanPoint = {
   readonly x: number;
   readonly y: number;
   readonly z: number;
 };
 
+/** Ordered normalized motion with source-line provenance. */
 export type ExecutablePlanMotion = {
   readonly id: string;
   /** Zero-based index in compatibility.exactProgram. */
@@ -37,6 +44,7 @@ export type ExecutablePlanMotion = {
   readonly sourceSegmentCount: number;
 };
 
+/** Axis-aligned three-dimensional bounds in millimetres. */
 export type ExecutablePlanBounds = {
   readonly minX: number;
   readonly maxX: number;
@@ -46,6 +54,7 @@ export type ExecutablePlanBounds = {
   readonly maxZ: number;
 };
 
+/** Route distance totals partitioned by semantic motion intent. */
 export type ExecutablePlanTotals = {
   readonly routeMm: number;
   readonly travelMm: number;
@@ -55,6 +64,7 @@ export type ExecutablePlanTotals = {
   readonly parkMm: number;
 };
 
+/** Machine-command state implied at the end of the program. */
 export type ExecutablePlanTerminalState = {
   readonly positionMm: ExecutablePlanPoint | null;
   readonly spindleMode: 'off' | 'constant' | 'dynamic';
@@ -62,6 +72,7 @@ export type ExecutablePlanTerminalState = {
   readonly programEnded: boolean;
 };
 
+/** Immutable semantic sidecar for one exact legacy G-code program. */
 export type ExecutablePlanV1 = {
   readonly schema: typeof EXECUTABLE_PLAN_SCHEMA;
   readonly schemaVersion: typeof EXECUTABLE_PLAN_SCHEMA_VERSION;
@@ -103,12 +114,14 @@ export type ExecutablePlanV1 = {
   };
 };
 
+/** Inputs required to interpret controller and machine semantics. */
 export type BuildExecutablePlanOptions = {
   readonly machineKind: MachineKind;
   readonly controller: ExecutablePlanController;
   readonly profileControllerKind?: string;
 };
 
+/** Fail-closed disagreement found while aligning independent parsers. */
 export type ExecutablePlanBuildIssue = {
   readonly code:
     | 'render-parse-error'
@@ -120,6 +133,7 @@ export type ExecutablePlanBuildIssue = {
   readonly rawLineIndex?: number;
 };
 
+/** Explicit result of sidecar construction; construction never throws for program content. */
 export type BuildExecutablePlanResult =
   | { readonly kind: 'ok'; readonly plan: ExecutablePlanV1 }
   | { readonly kind: 'unavailable'; readonly reason: 'no-program' }
