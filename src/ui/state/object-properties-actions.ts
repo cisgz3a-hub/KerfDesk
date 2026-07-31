@@ -10,20 +10,22 @@ type ObjectPropertiesState = StateSlice & {
   readonly additionalSelectedIds: ReadonlySet<string>;
 };
 
-type ObjectPropertiesMutation =
-  | {
-      readonly project: Project;
-      readonly undoStack: ReadonlyArray<Project>;
-      readonly redoStack: ReadonlyArray<Project>;
-      readonly dirty: true;
-    }
-  | Record<string, never>;
+type ObjectPropertiesChange = {
+  readonly project: Project;
+  readonly undoStack: ReadonlyArray<Project>;
+  readonly redoStack: ReadonlyArray<Project>;
+  readonly dirty: true;
+};
+
+type ObjectPropertiesMutation = ObjectPropertiesChange | Record<string, never>;
 
 type ObjectPropertiesSet = (fn: (state: ObjectPropertiesState) => ObjectPropertiesMutation) => void;
 
 export type ObjectPropertiesActions = {
   readonly setSelectedObjectsPowerScale: (powerScale: number) => void;
+  readonly setObjectsPowerScale: (objectIds: ReadonlyArray<string>, powerScale: number) => void;
   readonly setSelectedShapeSpec: (spec: ParametricShapeSpec) => void;
+  readonly setShapeSpec: (objectId: string, spec: ParametricShapeSpec) => void;
   readonly setSelectedObjectsOperationOverride: (patch: ObjectOperationOverride) => void;
   readonly clearSelectedObjectsOperationOverride: () => void;
 };
@@ -31,49 +33,16 @@ export type ObjectPropertiesActions = {
 export function objectPropertiesActions(set: ObjectPropertiesSet): ObjectPropertiesActions {
   return {
     setSelectedObjectsPowerScale: (powerScale) =>
-      set((state) => {
-        const ids = selectedObjectIds(state);
-        if (ids.size === 0) return {};
-        const clamped = clampPowerScale(powerScale);
-        let changed = false;
-        const objects = state.project.scene.objects.map((object) => {
-          if (!ids.has(object.id)) return object;
-          if ((object.powerScale ?? MAX_POWER_SCALE_PERCENT) === clamped) return object;
-          changed = true;
-          return { ...object, powerScale: clamped };
-        });
-        if (!changed) return {};
-        return {
-          project: { ...state.project, scene: { ...state.project.scene, objects } },
-          undoStack: pushUndo(state.project, state.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+      set((state) => setObjectsPowerScale(state, selectedObjectIds(state), powerScale)),
+    setObjectsPowerScale: (objectIds, powerScale) =>
+      set((state) => setObjectsPowerScale(state, new Set(objectIds), powerScale)),
     setSelectedShapeSpec: (spec) =>
-      set((state) => {
-        if (state.selectedObjectId === null || state.additionalSelectedIds.size > 0) return {};
-        const selected = state.project.scene.objects.find(
-          (object) => object.id === state.selectedObjectId,
-        );
-        if (!isEditableParametricShape(selected)) return {};
-        const replacement = rematerializeParametricShape(selected, spec);
-        if (replacement === null || shapeSpecEqual(replacement, selected)) return {};
-        return {
-          project: {
-            ...state.project,
-            scene: {
-              ...state.project.scene,
-              objects: state.project.scene.objects.map((object) =>
-                object.id === selected.id ? replacement : object,
-              ),
-            },
-          },
-          undoStack: pushUndo(state.project, state.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+      set((state) =>
+        state.selectedObjectId === null || state.additionalSelectedIds.size > 0
+          ? {}
+          : setShapeSpec(state, state.selectedObjectId, spec),
+      ),
+    setShapeSpec: (objectId, spec) => set((state) => setShapeSpec(state, objectId, spec)),
     setSelectedObjectsOperationOverride: (patch) =>
       setSelectedObjectsOperationOverrideMatching(set, patch),
     clearSelectedObjectsOperationOverride: () =>
@@ -95,6 +64,52 @@ export function objectPropertiesActions(set: ObjectPropertiesSet): ObjectPropert
           dirty: true,
         };
       }),
+  };
+}
+
+function setObjectsPowerScale(
+  state: ObjectPropertiesState,
+  ids: ReadonlySet<string>,
+  powerScale: number,
+): ObjectPropertiesMutation {
+  if (ids.size === 0) return {};
+  const clamped = clampPowerScale(powerScale);
+  let changed = false;
+  const objects = state.project.scene.objects.map((object) => {
+    if (!ids.has(object.id)) return object;
+    if ((object.powerScale ?? MAX_POWER_SCALE_PERCENT) === clamped) return object;
+    changed = true;
+    return { ...object, powerScale: clamped };
+  });
+  return changed ? mutation(state, objects) : {};
+}
+
+function setShapeSpec(
+  state: ObjectPropertiesState,
+  objectId: string,
+  spec: ParametricShapeSpec,
+): ObjectPropertiesMutation {
+  const object = state.project.scene.objects.find((candidate) => candidate.id === objectId);
+  if (!isEditableParametricShape(object) || object.locked === true) return {};
+  const replacement = rematerializeParametricShape(object, spec);
+  if (replacement === null || shapeSpecEqual(replacement, object)) return {};
+  return mutation(
+    state,
+    state.project.scene.objects.map((candidate) =>
+      candidate.id === object.id ? replacement : candidate,
+    ),
+  );
+}
+
+function mutation(
+  state: ObjectPropertiesState,
+  objects: ReadonlyArray<SceneObject>,
+): ObjectPropertiesChange {
+  return {
+    project: { ...state.project, scene: { ...state.project.scene, objects } },
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
   };
 }
 

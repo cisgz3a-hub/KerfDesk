@@ -31,25 +31,31 @@ type OperationSet = (
 
 export type OperationActions = {
   readonly useOperationForSelection: (operationId: string) => void;
+  readonly useOperationForObjects: (objectIds: ReadonlyArray<string>, operationId: string) => void;
   readonly makeSelectedOperationUnique: (operationId: string) => void;
+  readonly makeOperationUniqueForObjects: (
+    objectIds: ReadonlyArray<string>,
+    operationId: string,
+  ) => void;
   readonly addOperationForSelection: () => void;
+  readonly addOperationForObjects: (objectIds: ReadonlyArray<string>) => void;
   readonly renameOperation: (operationId: string, name: string) => void;
 };
 
 export function operationActions(set: OperationSet): OperationActions {
   return {
-    useOperationForSelection: (operationId) => set((state) => rebindSelection(state, operationId)),
+    useOperationForSelection: (operationId) =>
+      set((state) => rebindObjects(state, selectedIdSet(state), operationId)),
+    useOperationForObjects: (objectIds, operationId) =>
+      set((state) => rebindObjects(state, new Set(objectIds), operationId)),
     makeSelectedOperationUnique: (operationId) =>
-      set((state) => cloneOperationForSelection(state, operationId, false)),
+      set((state) => cloneOperationForObjects(state, selectedIdSet(state), operationId, false)),
+    makeOperationUniqueForObjects: (objectIds, operationId) =>
+      set((state) => cloneOperationForObjects(state, new Set(objectIds), operationId, false)),
     addOperationForSelection: () =>
-      set((state) => {
-        const selected = selectedObjects(state);
-        const primary = selected[0];
-        if (primary === undefined) return {};
-        const source = primaryOperationForObject(primary, state.project.scene.layers);
-        if (source === null) return {};
-        return cloneOperationForSelection(state, source.id, true);
-      }),
+      set((state) => addOperationForObjects(state, selectedIdSet(state))),
+    addOperationForObjects: (objectIds) =>
+      set((state) => addOperationForObjects(state, new Set(objectIds))),
     renameOperation: (operationId, name) =>
       set((state) => {
         const trimmed = name.trim();
@@ -68,16 +74,16 @@ export function operationActions(set: OperationSet): OperationActions {
   };
 }
 
-function rebindSelection(
+function rebindObjects(
   state: OperationActionState,
+  objectIds: ReadonlySet<string>,
   operationId: string,
 ): OperationMutation | Record<string, never> {
   if (!state.project.scene.layers.some((operation) => operation.id === operationId)) return {};
-  const selectedIds = selectedIdSet(state);
-  if (selectedIds.size === 0) return {};
+  if (objectIds.size === 0) return {};
   let changed = false;
   const objects = state.project.scene.objects.map((object) => {
-    if (!selectedIds.has(object.id)) return object;
+    if (!objectIds.has(object.id)) return object;
     const next = bindSceneObjectToOperations(clearOperationOverride(object), [operationId]);
     if (sameOperationIds(object.operationIds, next.operationIds)) return object;
     changed = true;
@@ -88,14 +94,24 @@ function rebindSelection(
   return mutation(state, { ...state.project, scene });
 }
 
-function cloneOperationForSelection(
+function addOperationForObjects(
   state: OperationActionState,
+  objectIds: ReadonlySet<string>,
+): OperationMutation | Record<string, never> {
+  const primary = objectsWithIds(state, objectIds)[0];
+  if (primary === undefined) return {};
+  const source = primaryOperationForObject(primary, state.project.scene.layers);
+  return source === null ? {} : cloneOperationForObjects(state, objectIds, source.id, true);
+}
+
+function cloneOperationForObjects(
+  state: OperationActionState,
+  objectIds: ReadonlySet<string>,
   operationId: string,
   additive: boolean,
 ): OperationMutation | Record<string, never> {
   const source = state.project.scene.layers.find((layer) => layer.id === operationId);
-  const selected = selectedObjects(state);
-  const first = selected[0];
+  const first = objectsWithIds(state, objectIds)[0];
   if (source === undefined || first === undefined) return {};
   const seed = createArtworkOperation(state.project.scene, first, {
     name: additive ? `${source.name} 2` : artworkOperationName(first),
@@ -107,9 +123,8 @@ function cloneOperationForSelection(
     color: nextOperationColor(state.project.scene.layers),
     subLayers: [],
   };
-  const selectedIds = selectedIdSet(state);
   const objects = state.project.scene.objects.map((object) => {
-    if (!selectedIds.has(object.id)) return object;
+    if (!objectIds.has(object.id)) return object;
     const clean = clearOperationOverride(object);
     return additive
       ? appendSceneObjectOperationBinding(clean, operation.id, state.project.scene.layers)
@@ -124,9 +139,11 @@ function cloneOperationForSelection(
   return mutation(state, { ...state.project, scene });
 }
 
-function selectedObjects(state: OperationActionState): ReadonlyArray<SceneObject> {
-  const ids = selectedIdSet(state);
-  return state.project.scene.objects.filter((object) => ids.has(object.id));
+function objectsWithIds(
+  state: OperationActionState,
+  objectIds: ReadonlySet<string>,
+): ReadonlyArray<SceneObject> {
+  return state.project.scene.objects.filter((object) => objectIds.has(object.id));
 }
 
 function selectedIdSet(state: OperationActionState): ReadonlySet<string> {
