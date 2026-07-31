@@ -1,5 +1,19 @@
 export type { EmitGcodeResult, EmitGcodeOptions } from './emit-gcode';
 export { emitGcode, emitPreparedGcode } from './emit-gcode';
+export type {
+  EmitGcodeWithExecutablePlanResult,
+  ExecutablePlanSidecar,
+} from './executable-plan-emission';
+export {
+  emitGcodeWithExecutablePlan,
+  emitPreparedGcodeWithExecutablePlan,
+} from './executable-plan-emission';
+export {
+  EXECUTABLE_PLAN_PARITY_TOLERANCE_MM,
+  verifyExecutablePlanParity,
+  type ExecutablePlanParityCheck,
+  type ExecutablePlanParityResult,
+} from './executable-plan-parity';
 export type { EmitGcodeSnapshotOptions } from './emit-gcode-snapshot';
 export { emitGcodeSnapshot } from './emit-gcode-snapshot';
 export type { GcodeMetadata } from './gcode-metadata';
