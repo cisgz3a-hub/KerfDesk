@@ -25,7 +25,7 @@ describe('CommandShell node-mode Delete', () => {
 
     const { host, root } = await renderShell(mockPlatform());
     try {
-      await clickMenuCommand(host, 'Edit', 'Delete');
+      await clickMenuCommand(host, 'Edit', 'Delete Delete');
       expectOnlyNodeDeleted();
     } finally {
       await act(async () => root.unmount());
@@ -43,7 +43,7 @@ describe('CommandShell node-mode Delete', () => {
           .getState()
           .openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
       });
-      await clickButton(host, 'Delete');
+      await clickButton(workspaceQuickActions(host), 'Delete');
       expectOnlyNodeDeleted();
     } finally {
       await act(async () => root.unmount());
@@ -57,7 +57,7 @@ describe('CommandShell node-mode Delete', () => {
 
     const { host, root } = await renderShell(mockPlatform());
     try {
-      await clickMenuCommand(host, 'Edit', 'Delete');
+      await clickMenuCommand(host, 'Edit', 'Delete Delete');
       const state = useStore.getState();
       expect(state.project.scene.objects).toHaveLength(0);
       expect(state.undoStack).toHaveLength(1);
@@ -146,11 +146,15 @@ async function renderShell(platform: PlatformAdapter): Promise<{
   return { host, root };
 }
 
-async function clickButton(host: HTMLElement, text: string): Promise<void> {
-  const button = [...host.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent?.trim() === text,
+async function clickButton(container: HTMLElement, accessibleName: string): Promise<void> {
+  const matches = [...container.querySelectorAll('button[role="menuitem"]')].filter(
+    (candidate) => exactAccessibleName(candidate) === accessibleName,
   );
-  if (!(button instanceof HTMLButtonElement)) throw new Error(`${text} button missing`);
+  expect(matches, `exact "${accessibleName}" menu item`).toHaveLength(1);
+  const button = matches[0];
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`${accessibleName} button missing`);
+  }
   expect(button.disabled).toBe(false);
   await act(async () => {
     button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -160,22 +164,55 @@ async function clickButton(host: HTMLElement, text: string): Promise<void> {
 async function clickMenuCommand(
   host: HTMLElement,
   family: string,
-  commandText: string,
+  commandAccessibleName: string,
 ): Promise<void> {
-  const summary = [...host.querySelectorAll('summary')].find(
-    (candidate) => candidate.textContent === family,
+  const menuBar = host.querySelector<HTMLElement>(
+    '[role="menubar"][aria-label="Application menu"]',
   );
+  if (menuBar === null) throw new Error('application menu missing');
+  const summaries = [...menuBar.querySelectorAll('summary[role="menuitem"]')].filter(
+    (candidate) => exactAccessibleName(candidate) === family,
+  );
+  expect(summaries, `exact "${family}" menu`).toHaveLength(1);
+  const summary = summaries[0];
   if (!(summary instanceof HTMLElement)) throw new Error(`${family} menu missing`);
   await act(async () => {
     summary.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   });
 
-  const button = [...host.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent?.includes(commandText) === true,
+  const familyMenu = summary
+    .closest('details')
+    ?.querySelector<HTMLElement>(':scope > [role="menu"]');
+  if (familyMenu === null || familyMenu === undefined) {
+    throw new Error(`${family} command container missing`);
+  }
+  await clickButton(familyMenu, commandAccessibleName);
+}
+
+function workspaceQuickActions(host: HTMLElement): HTMLElement {
+  const matches = [...host.querySelectorAll<HTMLElement>('[role="menu"][aria-label]')].filter(
+    (candidate) => exactAccessibleName(candidate) === 'Workspace quick actions',
   );
-  if (!(button instanceof HTMLButtonElement)) throw new Error(`${commandText} command missing`);
-  expect(button.disabled).toBe(false);
-  await act(async () => {
-    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
+  expect(matches, 'exact workspace quick-actions menu').toHaveLength(1);
+  const menu = matches[0];
+  if (menu === undefined) throw new Error('workspace quick-actions menu missing');
+  return menu;
+}
+
+function exactAccessibleName(element: Element): string {
+  const ariaLabel = element.getAttribute('aria-label');
+  if (ariaLabel !== null) return normalizeAccessibleName(ariaLabel);
+  return normalizeAccessibleName(
+    [...element.childNodes]
+      .filter((node) => !(node instanceof Element) || node.getAttribute('aria-hidden') !== 'true')
+      .map((node) =>
+        node instanceof Element ? exactAccessibleName(node) : (node.textContent ?? ''),
+      )
+      .filter((text) => text.length > 0)
+      .join(' '),
+  );
+}
+
+function normalizeAccessibleName(name: string): string {
+  return name.replace(/\s+/g, ' ').trim();
 }
