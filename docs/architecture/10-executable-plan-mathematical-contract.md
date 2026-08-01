@@ -5,8 +5,13 @@
 **Machine-readable schema:**
 [`../schemas/executable-plan-v1.schema.json`](../schemas/executable-plan-v1.schema.json).
 
-**Status:** v1 sidecar is implemented; the dynamics, routing, consumer migration, calibrated
-models, and physical coupons below are staged requirements, not shipped claims.
+**Status:** v1 sidecar is implemented. The route-capable started-job motion overlay now receives
+that sidecar and draws from its ordered motions only after exact preview-route parity with the
+runtime manifest; a runtime start-basis difference, file-only or marker-only plan, resume plan, or
+sidecar error retains the legacy overlay. This is the first rollback-preserving integration slice,
+not completion of preview migration. Bounds, timing, Frame, recovery, native output, dynamics,
+routing, calibrated models, and physical coupons below remain staged requirements, not shipped
+claims.
 
 ## 1. Purpose and evidence boundary
 
@@ -387,6 +392,13 @@ After v1 parity is stable, one pull request at a time moves these consumers to t
 
 Each migration must compare old and new behavior on the adversarial corpus and retain a rollback
 path until parity is demonstrated. No consumer may silently construct a competing motion order.
+
+The first integration slice applies that rule to the started-job 2D motion overlay. It associates
+the parity-verified plan process-locally with the runtime-seeded manifest, without changing the
+serialized recovery artifact, and compares every preview-relevant line, intent, point, length, and
+cumulative route value exactly. Matching overlays read `plan.motions`; non-matching runtime start
+bases retain the old overlay without changing bytes, preflight, Frame, or Start authorization.
+Marker-only and resumed overlays remain explicitly staged with recovery.
 
 ### The Inspector is explicitly out of scope for v1
 
