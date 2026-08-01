@@ -829,3 +829,93 @@ cold-optimizer correction.
   generated text is already resident in UI memory before inspection.
 - No greater-than-200 MiB, unlimited-import, persistence, autosave, recovery, PNG, lifecycle, STL,
   DXF, hardware, controller, settings, Frame, Start, or deployment claim is part of this repair.
+## Corrective audit 5 - incremental production SVG source
+
+**Status:** implementation reverified on current main; fresh independent audit, publication, and
+GitHub checks pending.
+
+### Finding
+
+- The shared document import worker called `Blob.text()` before every format parser. SVG therefore
+  retained a whole decoded source string while `linkedom` built a second, output-scaled XML DOM,
+  despite already running outside the UI thread.
+- Current-main refresh confirmed that the earlier STL persistence, transfer, cancellation/FIFO, and
+  real-worker coverage findings were already repaired. This slice addresses SVG only and does not
+  duplicate those completed changes.
+
+### Repair
+
+- Qualified SVG requests now read `Blob.stream()` through a streaming UTF-8 `TextDecoder` and the
+  existing `saxes` XML validator. SAX events construct the worker `linkedom` document incrementally;
+  the established worker sanitizer and geometry parser then consume that document unchanged.
+- The worker reports `reading` while consuming/building the source DOM and `parsing` before the
+  existing sanitizer/geometry pass. Existing FIFO and worker-termination cancellation semantics are
+  unchanged.
+- A stream error after any input has been consumed is surfaced and never retried through
+  `Blob.text()`. Environments without `Blob.stream()` retain the established text parser, and
+  constructor-time Worker failure retains the existing disclosed main-thread fallback.
+- Native project, LightBurn project/CLB, material-library, PNG, persistence, autosave, and recovery
+  paths are outside this one-fix boundary.
+
+### Test-first verification
+
+- Red: the production-source regression failed because `document-import-source` did not exist and
+  the worker had only the unconditional whole-Blob text route.
+- Green final focused compatibility suite: 14 files / 141 tests. The direct stream suite passes
+  13/13. Coverage compares the streamed result with the existing
+  worker result across `<use>`/xlink, transforms, entities, CDATA/DOCTYPE, sanitizer removals,
+  multibyte chunk boundaries, literal LF/CR/TAB and XML 1.1 NEL/line-separator attribute values,
+  malformed XML, no-stream fallback, non-SVG routing, and partial-stream failure after one consumed
+  chunk without text retry.
+- Green real Chrome: a measured 24 MiB SVG composed of bounded 4 KiB inert XML comments plus one
+  rectangle imported through `document-import-worker` in 7.7 seconds, produced one object/layer,
+  and advanced the reset UI heartbeat before the scene-commit mutation.
+- Renderer and E2E typecheck, focused ESLint, focused Prettier, production web and Electron-main
+  builds, release-integrity 14/14, file-size and public-export gates, and `git diff --check` passed
+  on the rebased implementation tree.
+- The composite exact-tree `pnpm release:check` did not finish green. Typecheck, renderer/Electron
+  lint, formatting, ADR numbering, and license checks passed; the repo-wide unit run then reported
+  two unrelated timing-budget failures under load and the outer command reached 30 minutes before
+  later stages. Both failures passed immediately in isolation: output preparation 4/4 with its
+  large case at 1.019 seconds, and canvas-motion budgets 2/2 with the 50k plan at 32.66 ms. The
+  later gate stages were then run separately and passed as listed above. This is not recorded as a
+  fully green composite release gate; exact-head GitHub CI remains required.
+
+### Audit and corrections
+
+- The first independent exact-diff audit found that `saxes` XML normalization changed literal
+  LF/CR/TAB inside attribute values, while the established `linkedom` parser retained them. That
+  could change a valid reference match and therefore imported geometry.
+- The repaired builder keeps a bounded raw opening-tag scanner beside the validating SAX parser and
+  applies the established `linkedom` attribute values only for the rare tag containing literal
+  attribute whitespace. LF, CR, TAB, XML 1.1 NEL, and XML 1.1 line-separator reproductions now match
+  the old worker result.
+- A second independent pass found the XML 1.1 NEL and line-separator normalization hole after the
+  first three cases were repaired. Both cases failed before the detector was extended and pass
+  afterward; a final independent confirmation is still required on the frozen corrected diff.
+- The functional re-audit then found the new parser file over the 250 counted-line soft policy.
+  `RawOpenTagScanner` was moved unchanged into a cohesive sibling module: the two new production
+  files are 121 and 191 raw physical lines and neither appears in the soft-limit report.
+- The split-diff audit also found an unnecessary `parseSvgInWorker` barrel re-export that raised
+  `src/io/svg/index.ts` from 10 to 11 symbols. Production exports only the new document parser now;
+  the established text helper remains directly importable where its existing tests need it.
+- The same audit found that the original partial-failure fixture errored from `start()` before a
+  read was proven and that production source imports crossed the SVG module boundary. The fixture
+  now errors from the second `pull()` after one chunk, and the production code imports through
+  `src/io/svg/index.ts`.
+- A fresh independent exact-diff audit is required after the final gate before publication.
+
+- **Confirmed:** the normal production SVG worker no longer materializes or retains a whole source
+  string before DOM construction.
+- **Confirmed:** the same `saxes` validation, sanitizer, root checks, geometry conversion, progress,
+  FIFO, cancellation, and error response surfaces remain in the production request path.
+- **No new refusal:** missing stream support uses the valid legacy text path; a genuinely failed
+  active stream reports its error instead of silently duplicating work or substituting partial data.
+- **Honest memory boundary:** the input working set is the browser stream chunk, decoder state, and
+  current SAX token, but the XML DOM and imported scene graph still scale with document content. A
+  single enormous attribute, comment, or text token can itself be large.
+- **Evidence boundary:** the 24 MiB bounded-token fixture proves that production route only. It does
+  not establish a greater-than-200 MiB contract, unlimited imports, constant total memory, storage
+  pressure behavior, or equivalent behavior for native project, LightBurn, or material imports.
+- No hardware, controller, firmware, setting, Frame, Start, deployment, or merge action is part of
+  this repair.
