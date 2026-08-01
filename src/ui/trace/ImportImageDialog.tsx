@@ -34,7 +34,8 @@ import {
   type TraceFillStyle,
   type TraceOutput,
 } from './dialog-parts';
-import { dataUrlToFile } from './image-loader';
+import { readRasterSourceFile } from '../import/paged-raster-source';
+import { rasterDisplayDataUrl } from '../workspace/draw-raster';
 import type { PreparedTrace } from './prepared-trace';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { TraceSettingsControls } from './TraceSettingsControls';
@@ -215,7 +216,7 @@ function useTraceSourceFile(
   const [file, setFile] = useState<File | null>(null);
   useEffect(() => {
     let cancelled = false;
-    dataUrlToFile(seed.dataUrl as string, seed.source)
+    readRasterSourceFile(seed, seed.source)
       .then((f) => {
         if (!cancelled) setFile(f);
       })
@@ -225,7 +226,10 @@ function useTraceSourceFile(
     return (): void => {
       cancelled = true;
     };
-  }, [seed.dataUrl, seed.source, pushToast]);
+    // Depends on the whole seed: a page-backed raster's bytes are reached
+    // through imageAsset, not dataUrl. Scene objects are immutable, so the
+    // identity only changes when the image itself does.
+  }, [seed, pushToast]);
   return file;
 }
 
@@ -239,7 +243,7 @@ function TracePreviewPanel(props: {
     <>
       <TracePreview
         state={props.preview}
-        sourceDataUrl={props.seed.dataUrl as string}
+        sourceDataUrl={rasterDisplayDataUrl(props.seed)}
         imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
         boundary={selection.boundary}
         onBoundaryChange={selection.setBoundary}

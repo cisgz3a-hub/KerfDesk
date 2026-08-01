@@ -17,7 +17,13 @@ import {
   type RasterImage,
   type SceneObject,
 } from '../../core/scene';
+import { IndexedDbPagedAssetRepository } from '../import/paged-asset-indexeddb';
 import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
+
+// One shared reader for every preview hydration. Each repository instance
+// caches its own IDBDatabase and never closes it, so letting hydration default
+// to a fresh instance leaked an open connection on every preview cache miss.
+const previewAssetRepository = new IndexedDbPagedAssetRepository();
 import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
 import { drawBitmapAtTransform, rasterDisplayDataUrl } from './draw-raster';
 import type { ViewTransform } from './view-transform';
@@ -141,7 +147,7 @@ function schedulePreviewCanvasBuild(
   let cancelled = false;
   const controller = new AbortController();
   const cancel = scheduleBuild(() => {
-    void hydratePagedRasterImage(obj, undefined, controller.signal)
+    void hydratePagedRasterImage(obj, previewAssetRepository, controller.signal)
       .then((hydrated) => {
         if (cancelled) return;
         const canvas = buildPreviewCanvas(hydrated, layer, device, maskObject);
