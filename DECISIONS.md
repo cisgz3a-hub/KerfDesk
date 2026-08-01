@@ -14534,9 +14534,9 @@ sources and barcode/QR generation remain deferred.
 3. The first transient workflow retains the original grid `ArraySpec`, captures one clock for the
    whole batch, and renders every slot before calculating final placements. It uses the maximum
    actual rendered envelope with the retained rows, columns, and spacing, then derives row-major
-   `ArrayPlacement` values. A longer later value must not overlap because layout measured only the
-   first record. Circular imposition remains deferred until its variable-width collision policy is
-   specified; the sequence planner itself is layout-independent.
+   `ArrayPlacement` values. This prevents a longer later value from overlapping merely because the
+   old layout measured only the first record. Circular imposition remains deferred until its
+   variable-width collision policy is specified; the sequence planner itself is layout-independent.
 4. The prepared output owns an exact slot manifest and post-success variable state bound to its
    artifact identity. Preview, Save Project, Frame, compile failure, cancellation, stale preparation,
    and retry consume zero records. `manual` advancement changes on neither output trigger;
