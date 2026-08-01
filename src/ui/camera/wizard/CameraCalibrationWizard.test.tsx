@@ -6,8 +6,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CalibrationSession, RgbaImage } from '../../../core/camera';
+import type { CameraCaptureBinding } from '../../../core/camera/capture-binding';
+import { createProject } from '../../../core/scene';
 import type { PlatformAdapter } from '../../../platform/types';
 import { PlatformProvider } from '../../app/platform-context';
+import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { cameraCaptureBindingForFrame, type ActiveCameraSource } from '../frame-source';
 import { CameraCalibrationWizard } from './CameraCalibrationWizard';
@@ -34,11 +38,43 @@ const CAMERA_B: ActiveCameraSource = {
   cameraUrl: 'http://192.168.10.11/capture.jpg',
   frameUrl: 'http://127.0.0.1/frame.jpg?url=camera-b',
 };
+const FRAME_WIDTH = 320;
+const FRAME_HEIGHT = 240;
+const FOCAL_LENGTH_PX = 200;
+const REPROJECTION_RMS_PX = 0.25;
+const POSE_SPREAD_RAD = 0.2;
+const RGBA_CHANNELS = 4;
+const SOLVED_SESSION: CalibrationSession = {
+  kind: 'solved',
+  captures: [],
+  result: {
+    kind: 'ok',
+    intrinsics: {
+      fx: FOCAL_LENGTH_PX,
+      fy: FOCAL_LENGTH_PX,
+      cx: FRAME_WIDTH / 2,
+      cy: FRAME_HEIGHT / 2,
+    },
+    distortion: [0, 0, 0, 0],
+    imageWidth: FRAME_WIDTH,
+    imageHeight: FRAME_HEIGHT,
+    views: [],
+    perViewRmsPx: [],
+    rmsPx: REPROJECTION_RMS_PX,
+    iterations: 1,
+    converged: true,
+    exit: 'tolerance',
+    coverage: [],
+  },
+  trust: { kind: 'trusted' },
+  diversity: { kind: 'ok', maxSpreadRad: POSE_SPREAD_RAD },
+};
 
 let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  useStore.setState({ project: createProject() });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -47,6 +83,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  useStore.getState().newProject();
   useCameraStore.setState({ sourceState: { kind: 'idle' } });
   useCameraWizardStore.getState().closeWizard();
 });
@@ -97,14 +134,14 @@ describe('CameraCalibrationWizard', () => {
     expect(buttonByText('Back to capture')).not.toBeNull();
   });
 
-  it('discards an in-progress calibration when the live camera source changes', () => {
-    const captureBinding = cameraCaptureBindingForFrame(CAMERA_A, 320, 240);
+  it('discards a collecting capture set when the live camera source changes', () => {
+    const captureBinding = cameraCaptureBindingForFrame(CAMERA_A, FRAME_WIDTH, FRAME_HEIGHT);
     useCameraWizardStore.getState().openWizard();
     useCameraWizardStore.setState({
-      step: 'review',
+      step: 'capture',
       captureBinding,
-      frameWidth: 320,
-      frameHeight: 240,
+      frameWidth: FRAME_WIDTH,
+      frameHeight: FRAME_HEIGHT,
     });
     useCameraStore.setState({ sourceState: { kind: 'live', source: CAMERA_B } });
 
@@ -116,4 +153,48 @@ describe('CameraCalibrationWizard', () => {
     expect(state.lastRejection).toBe('source-changed');
     expect(container.textContent).toContain('camera source changed');
   });
+
+  it('keeps solved review actionable after a live source change and applies its binding', () => {
+    const captureBinding = cameraCaptureBindingForFrame(CAMERA_A, FRAME_WIDTH, FRAME_HEIGHT);
+    useCameraWizardStore.getState().openWizard();
+    useCameraWizardStore.setState(solvedReviewState(captureBinding));
+    useCameraStore.setState({ sourceState: { kind: 'live', source: CAMERA_A } });
+    renderWizard();
+
+    act(() => useCameraStore.setState({ sourceState: { kind: 'live', source: CAMERA_B } }));
+
+    const state = useCameraWizardStore.getState();
+    expect(state.step).toBe('review');
+    expect(state.session.kind).toBe('solved');
+    expect(state.captureBinding).toEqual(captureBinding);
+    expect(container.textContent).toContain('applying still saves the recorded source identity');
+    const apply = buttonByText('Apply calibration');
+    expect(apply?.disabled).toBe(false);
+
+    act(() => apply?.click());
+
+    expect(useStore.getState().project.device.cameraCalibration?.capture).toEqual(captureBinding);
+  });
 });
+
+function solvedReviewState(captureBinding: CameraCaptureBinding) {
+  return {
+    step: 'review' as const,
+    solving: false,
+    captureBinding,
+    frameWidth: FRAME_WIDTH,
+    frameHeight: FRAME_HEIGHT,
+    lastFrame: blankFrame(),
+    rectifiedFrame: null,
+    abMode: 'rectified' as const,
+    session: SOLVED_SESSION,
+  };
+}
+
+function blankFrame(): RgbaImage {
+  return {
+    width: FRAME_WIDTH,
+    height: FRAME_HEIGHT,
+    data: new Uint8ClampedArray(FRAME_WIDTH * FRAME_HEIGHT * RGBA_CHANNELS),
+  };
+}

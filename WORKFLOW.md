@@ -4347,9 +4347,9 @@ and lifts the command's CNC-only gate.)*
   rejected with a hint (not silently dropped); a camera-resolution change
   mid-session refuses to mix pixel bases and offers Reset; changing the board
   description discards captures taken against the old board. Changing the
-  active camera source discards the in-progress capture set, and Apply always
-  persists the binding recorded by the accepted frames rather than whichever
-  camera happens to be active later.
+  active camera source while collecting discards the in-progress capture set.
+  A completed Review remains bound to its accepted frames; Apply persists that
+  recorded binding rather than whichever camera happens to be active later.
 
 ### F-CAM3. Workspace camera overlay (ADR-107 v1 wiring)
 
