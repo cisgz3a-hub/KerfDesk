@@ -14523,12 +14523,13 @@ sources and barcode/QR generation remain deferred.
 
 1. Adopt a bounded, offline variable-data imposition workflow for one selected design unit. The
    first delivery is transient: it does not change the persisted project schema.
-2. A pure sequence planner accepts the current `ProjectVariableData` and a caller-supplied slot
-   count. It records ordered slot indices and variable contexts, not bounds-derived translations.
+2. A pure sequence planner accepts the current `ProjectVariableData` and a caller-supplied ordered
+   slot-seed list. It records ordered slot indices and variable contexts, not the seed values or
+   bounds-derived translations.
    Slot zero records the current record index and serial value; every later slot applies the existing
    `advanceVariableSequence(..., 'next')` semantics, including record wrap, serial wrap, and
-   `advanceBy` as the per-slot stride. The plan records the exact `nextVariables` state after the
-   requested slot count. Existing array validation and the one-through-500 copy rule remain with the
+   `advanceBy` as the per-slot stride. The plan records the exact `nextVariables` state after all
+   supplied seeds. Existing array validation and the one-through-500 copy rule remain with the
    layout request; the sequence planner adds no second cap, clamp, or rewrite.
 3. The first transient workflow retains the original grid `ArraySpec`, captures one clock for the
    whole batch, and renders every slot before calculating final placements. It uses the maximum

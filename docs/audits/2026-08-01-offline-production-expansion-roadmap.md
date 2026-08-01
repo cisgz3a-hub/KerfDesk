@@ -180,8 +180,8 @@ type VariableBatchPlan = {
 
 Rules:
 
-1. the planner accepts a caller-supplied slot count and emits ordered slot indices, not final
-   bounds-derived translations;
+1. the planner accepts a caller-supplied ordered slot-seed list and emits ordered slot indices, not
+   seed values or final bounds-derived translations;
 2. it adds no second count normalization, cap, clamp, or rewrite; the retained grid layout request
    and existing array generator remain responsible for producing one through 500 slots;
 3. slot zero uses the current project record and serial exactly;
@@ -189,7 +189,7 @@ Rules:
 5. existing `advanceBy` is therefore the per-slot stride and is never silently rewritten to the
    batch size;
 6. existing range wrap and safe-integer behavior remain the authority;
-7. `nextVariables` is the state after exactly `slotCount` advancements; and
+7. `nextVariables` is the state after exactly `slotSeeds.length` advancements; and
 8. neither input is mutated.
 
 This slice does not decide whether imposition later persists in `.lf2`. It provides the stable
