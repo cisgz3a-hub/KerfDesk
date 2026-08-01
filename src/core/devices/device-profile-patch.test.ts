@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { CameraAlignment, CameraCalibration } from '../camera';
+import type { CameraCaptureBinding } from '../camera/capture-binding';
 import { resolveEffectiveScanDirection } from '../job/scan-direction-policy';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from './device-profile';
 import { deviceProfileWithInteractivePatch } from './device-profile-patch';
@@ -13,12 +14,31 @@ const CAMERA_FRAME_HEIGHT_PX = 480;
 const CAMERA_RMS_PX = 0.4;
 const INITIAL_CALIBRATION_EPOCH = 1;
 const REPLACEMENT_CALIBRATION_EPOCH = 2;
+const MAX_GENERATED_CAPTURE_DIMENSION_PX = 4096;
+const MAX_GENERATED_SOURCE_ID_LENGTH = 40;
 
 const CAMERA_CALIBRATION: CameraCalibration = calibrationAt(INITIAL_CALIBRATION_EPOCH);
 
 const RECTIFIED_ALIGNMENT: CameraAlignment = alignmentWithBasis('rectified');
 
-function calibrationAt(calibratedAt: number): CameraCalibration {
+const cameraCaptureBindingArbitrary: fc.Arbitrary<CameraCaptureBinding> = fc.record({
+  version: fc.constant(1 as const),
+  sourceKind: fc.constantFrom<CameraCaptureBinding['sourceKind']>(
+    'usb',
+    'machine-jpeg',
+    'machine-rtsp',
+  ),
+  sourceId: fc.string({ minLength: 1, maxLength: MAX_GENERATED_SOURCE_ID_LENGTH }),
+  width: fc.integer({ min: 1, max: MAX_GENERATED_CAPTURE_DIMENSION_PX }),
+  height: fc.integer({ min: 1, max: MAX_GENERATED_CAPTURE_DIMENSION_PX }),
+  resizeMode: fc.constantFrom<CameraCaptureBinding['resizeMode']>(
+    'none',
+    'crop-and-scale',
+    'unknown',
+  ),
+});
+
+function calibrationAt(calibratedAt: number, capture?: CameraCaptureBinding): CameraCalibration {
   return {
     intrinsics: {
       fx: CAMERA_FOCAL_LENGTH_PX,
@@ -31,6 +51,7 @@ function calibrationAt(calibratedAt: number): CameraCalibration {
     imageHeight: CAMERA_FRAME_HEIGHT_PX,
     rmsPx: CAMERA_RMS_PX,
     calibratedAt,
+    ...(capture === undefined ? {} : { capture }),
   };
 }
 
@@ -176,19 +197,20 @@ describe('deviceProfileWithInteractivePatch', () => {
           basis: fc.constantFrom<CameraAlignment['basis']>('raw', 'rectified'),
           hasAlignment: fc.boolean(),
           suppliesReplacement: fc.boolean(),
+          capture: cameraCaptureBindingArbitrary,
         }),
-        ({ currentEpoch, nextEpoch, basis, hasAlignment, suppliesReplacement }) => {
+        ({ currentEpoch, nextEpoch, basis, hasAlignment, suppliesReplacement, capture }) => {
           const inheritedAlignment = hasAlignment ? alignmentWithBasis(basis) : undefined;
           const replacementAlignment = suppliesReplacement
             ? { ...alignmentWithBasis(basis), alignedAt: nextEpoch }
             : undefined;
           const profile = {
             ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
-            cameraCalibration: calibrationAt(currentEpoch),
+            cameraCalibration: calibrationAt(currentEpoch, capture),
             ...(inheritedAlignment === undefined ? {} : { cameraAlignment: inheritedAlignment }),
           };
           const patched = deviceProfileWithInteractivePatch(profile, {
-            cameraCalibration: calibrationAt(nextEpoch),
+            cameraCalibration: calibrationAt(nextEpoch, capture),
             ...(replacementAlignment === undefined
               ? {}
               : { cameraAlignment: replacementAlignment }),

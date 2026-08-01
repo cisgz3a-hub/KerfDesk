@@ -1,5 +1,5 @@
 import type { DeviceProfile } from './device-profile';
-import { profileWithoutStaleRectifiedAlignment } from './camera-alignment-profile-patch';
+import { profileWithoutStaleRectifiedAlignment } from './profile-without-stale-rectified-alignment';
 import { isScanOffsetTableForProfile } from './scan-offset-profile';
 
 // Interactive profile edits must never leave the optional controlled seek
