@@ -61,14 +61,14 @@ export function OffsetPathsRow(): JSX.Element | null {
 
 const sectionStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '100px 1fr',
+  gridTemplateColumns: '92px 1fr',
   alignItems: 'center',
   gap: 8,
   borderTop: '1px solid var(--lf-border)',
   marginTop: 8,
   paddingTop: 8,
 };
-const labelStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-muted)' };
+const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
 // Wrap so the Outward/Inward buttons drop to the next line instead of clipping
 // off the right edge when the panel is narrow.
 const controlStyle: React.CSSProperties = {
@@ -77,5 +77,13 @@ const controlStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 6,
 };
-const inputStyle: React.CSSProperties = { width: 64, boxSizing: 'border-box' };
-const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
+const inputStyle: React.CSSProperties = {
+  width: 64,
+  boxSizing: 'border-box',
+  padding: '4px 6px',
+  border: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-input)',
+  color: 'var(--lf-text)',
+  borderRadius: 4,
+};
+const unitStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };

@@ -220,7 +220,11 @@ function ShapeNumberField(props: {
     format: (value) => formatShapeValue(value * scale, props.integer),
   });
   return (
-    <Field label={props.label} {...(props.unit === undefined ? {} : { unit: props.unit })}>
+    <Field
+      label={props.label}
+      labelWidth="md"
+      {...(props.unit === undefined ? {} : { unit: props.unit })}
+    >
       <input
         type="number"
         min={props.min * scale}
@@ -267,4 +271,13 @@ export function isParametricShapeObject(object: ShapeObject): object is ShapeObj
   return object.spec.kind !== 'polyline';
 }
 
-const inputStyle: React.CSSProperties = { width: 84, minWidth: 0, boxSizing: 'border-box' };
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
+  padding: '4px 6px',
+  border: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-input)',
+  color: 'var(--lf-text)',
+  borderRadius: 4,
+};
