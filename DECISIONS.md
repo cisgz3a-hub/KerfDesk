@@ -8010,10 +8010,6 @@ multi-sender machines still require a sole gateway or machine interlock.
 
 **Status:** Accepted | **Date:** 2026-07-14
 
-**2026-08-01 maintainer amendment:** The in-card Advanced section remains
-labeled and narrow-panel safe but is now always visible. The Basic/Advanced
-visibility distinction and persisted disclosure state are removed.
-
 ### Context
 
 The guided setup reducer was safe and draft-only, but every project traversed the same seven-step
@@ -8233,8 +8229,8 @@ the current Home proof before constructing a probe envelope.
 The CNC "3D result" pane (`Cnc3DPane`) exposes a drag handle on its left edge — the seam with the
 flexible canvas. Dragging it, or focusing it and pressing ArrowLeft/ArrowRight, sets the pane width,
 clamped to [200, 560] px. The chosen width persists in localStorage
-(`laserforge.cnc-3d-pane-width.v1`), guarded for non-browser contexts, so it survives reloads like the
-CNC Basic/Advanced disclosure (ADR-111). The three.js scene handle gains a `resize(w, h)` method, and
+(`laserforge.cnc-3d-pane-width.v1`), guarded for non-browser contexts, so it survives reloads. The
+three.js scene handle gains a `resize(w, h)` method, and
 a ResizeObserver re-fits the renderer and camera on every width change so the render-on-demand scene
 stays crisp instead of scaling a stale buffer.
 
@@ -13967,8 +13963,8 @@ otherwise fixed).
 1. **The durable slice is written to `localStorage`, not to the project.** The
    sketch, the armed layer, the surface toggle, and the apply record persist
    under one versioned key. `.lf2` is untouched: this is browser-local working
-   state, the same class as the CNC Basic/Advanced disclosure (ADR-111) and the
-   3D pane width (ADR-191), and it needs no schema migration. Parametric design
+   state, the same class as the 3D pane width (ADR-191), and it needs no schema
+   migration. Parametric design
    data reaching the PROJECT file remains DS-9's job, unchanged by this.
 2. **History is deliberately NOT persisted.** An undo stack that outlives the
    tab walks back into a project state that no longer exists. A reload costs the
