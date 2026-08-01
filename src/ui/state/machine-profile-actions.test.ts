@@ -107,7 +107,7 @@ describe('machine profile store actions', () => {
 
     updated.undo();
 
-    expect(useStore.getState().project.device.cameraCalibration).toBe(CAMERA_CALIBRATION);
-    expect(useStore.getState().project.device.cameraAlignment).toBe(RECTIFIED_ALIGNMENT);
+    expect(useStore.getState().project.device.cameraCalibration).toEqual(CAMERA_CALIBRATION);
+    expect(useStore.getState().project.device.cameraAlignment).toEqual(RECTIFIED_ALIGNMENT);
   });
 });

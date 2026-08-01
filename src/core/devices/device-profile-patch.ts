@@ -1,4 +1,5 @@
 import type { DeviceProfile } from './device-profile';
+import { profileWithoutStaleRectifiedAlignment } from './camera-alignment-profile-patch';
 import { isScanOffsetTableForProfile } from './scan-offset-profile';
 
 // Interactive profile edits must never leave the optional controlled seek
@@ -29,22 +30,6 @@ export function deviceProfileWithInteractivePatch(
   }
   if (controlledFeed <= scanSafe.maxFeed) return scanSafe;
   return { ...scanSafe, controlledLaserOffTravelFeedMmPerMin: scanSafe.maxFeed };
-}
-
-function profileWithoutStaleRectifiedAlignment(
-  current: DeviceProfile,
-  patch: Partial<DeviceProfile>,
-  next: DeviceProfile,
-): DeviceProfile {
-  if (
-    next.cameraCalibration === current.cameraCalibration ||
-    Object.hasOwn(patch, 'cameraAlignment') ||
-    current.cameraAlignment?.basis !== 'rectified'
-  ) {
-    return next;
-  }
-  const { cameraAlignment: _staleAlignment, ...withoutAlignment } = next;
-  return withoutAlignment;
 }
 
 function positiveFinite(value: number): boolean {
