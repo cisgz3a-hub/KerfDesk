@@ -47,6 +47,22 @@ export type SketchCircle = SketchEntityBase & {
   readonly radiusMm: number;
 };
 
+// Axis-aligned, because it exists to hold what a single-axis stretch produces
+// (ADR-272 Amendment 4) and an axis-aligned stretch of an axis-aligned ellipse
+// is another axis-aligned ellipse. A rotated ellipse would need a third
+// parameter no gesture currently produces, so it is deliberately absent.
+//
+// A circle is NOT re-expressed as an equal-axis ellipse: a circle drawn as a
+// circle keeps its radius, its diameter field, and its exact G-code arcs. This
+// arm is what a circle BECOMES when the operator stretches one axis, so the
+// alternative is silently deforming a circle the model cannot hold.
+export type SketchEllipse = SketchEntityBase & {
+  readonly kind: 'ellipse';
+  readonly center: Vec2;
+  readonly radiusXMm: number;
+  readonly radiusYMm: number;
+};
+
 export type SketchRectangle = SketchEntityBase & {
   readonly kind: 'rect';
   // Minimum-x / minimum-y corner in sketch millimetres.
@@ -62,7 +78,13 @@ export type SketchPath = SketchEntityBase & {
   readonly closed: boolean;
 };
 
-export type SketchEntity = SketchLine | SketchArc | SketchCircle | SketchRectangle | SketchPath;
+export type SketchEntity =
+  | SketchLine
+  | SketchArc
+  | SketchCircle
+  | SketchEllipse
+  | SketchRectangle
+  | SketchPath;
 
 export type SketchEntityKind = SketchEntity['kind'];
 
@@ -81,6 +103,24 @@ export const EMPTY_SKETCH: Sketch = { entities: [] };
 export const MIN_ENTITY_SIZE_MM = 0.01;
 
 export const FULL_TURN_DEG = 360;
+
+/**
+ * The identity an entity keeps when a modify op changes what KIND it is — a
+ * stretched circle becoming an ellipse, a stretched arc becoming a path. Built
+ * field by field rather than by spreading the source, so the result carries no
+ * leftover geometry from the shape it used to be; that residue would otherwise
+ * reach the session's persisted payload.
+ *
+ * The optional fields are omitted rather than set to undefined, which is what
+ * `exactOptionalPropertyTypes` requires.
+ */
+export function entityBase(entity: SketchEntity): SketchEntityBase {
+  return {
+    id: entity.id,
+    ...(entity.construction === undefined ? {} : { construction: entity.construction }),
+    ...(entity.layerId === undefined ? {} : { layerId: entity.layerId }),
+  };
+}
 
 export function isFiniteVec2(point: Vec2): boolean {
   return Number.isFinite(point.x) && Number.isFinite(point.y);
@@ -101,6 +141,8 @@ export function sanitizeEntity(entity: SketchEntity): SketchEntity | null {
       return sanitizeArc(entity);
     case 'circle':
       return sanitizeCircle(entity);
+    case 'ellipse':
+      return sanitizeEllipse(entity);
     case 'rect':
       return sanitizeRectangle(entity);
     case 'path':
@@ -126,6 +168,15 @@ function sanitizeArc(entity: SketchArc): SketchArc | null {
 
 function sanitizeCircle(entity: SketchCircle): SketchCircle | null {
   if (!isFiniteVec2(entity.center) || !isPositive(entity.radiusMm)) return null;
+  return entity;
+}
+
+// Both radii must stand on their own: an ellipse with one axis collapsed is a
+// line segment the ellipse sampler cannot express, so it is degenerate rather
+// than silently drawn as a sliver.
+function sanitizeEllipse(entity: SketchEllipse): SketchEllipse | null {
+  if (!isFiniteVec2(entity.center)) return null;
+  if (!isPositive(entity.radiusXMm) || !isPositive(entity.radiusYMm)) return null;
   return entity;
 }
 

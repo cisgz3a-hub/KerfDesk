@@ -14,6 +14,8 @@ import {
   type Viewer3dSceneHandle,
 } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
+import type { GcodeInspectionSource } from './gcode-inspection-source';
+import type { GcodeSourceLineIndex } from './gcode-source-line-index';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
 import { InspectorViewControls } from './InspectorViewControls';
@@ -40,11 +42,19 @@ const INSPECTOR_LIMITS: MotionLimits = {
  */
 export type InspectorVariant = 'full' | 'preview';
 
-export function InspectorView(props: {
-  readonly model: GcodeRenderModel;
-  readonly lines: ReadonlyArray<string>;
-  readonly variant?: InspectorVariant;
-}): JSX.Element {
+type InspectorViewProps =
+  | {
+      readonly model: GcodeRenderModel;
+      readonly source: GcodeInspectionSource;
+      readonly sourceIndex: GcodeSourceLineIndex;
+      readonly variant?: 'full';
+    }
+  | {
+      readonly model: GcodeRenderModel;
+      readonly variant: 'preview';
+    };
+
+export function InspectorView(props: InspectorViewProps): JSX.Element {
   const full = (props.variant ?? 'full') === 'full';
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [travelVisible, setTravelVisible] = useState(true);
@@ -90,9 +100,10 @@ export function InspectorView(props: {
         />
         <InspectorTimeline playback={playback} totalRouteMm={time.motionSeconds} />
       </div>
-      {full && sourceVisible ? (
+      {props.variant !== 'preview' && sourceVisible ? (
         <InspectorSourcePane
-          lines={props.lines}
+          source={props.source}
+          sourceIndex={props.sourceIndex}
           categories={model.lineCategories}
           activeLine={activeLine}
           selectedLine={selectedLine}

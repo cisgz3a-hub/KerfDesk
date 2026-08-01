@@ -100,8 +100,9 @@ function applyProfile(
   stampAlongPolylines(depth, grid, centerlines, tool.diameterMm / 2, cut);
 }
 
-// Drill reads circle CENTRES: the hole is the bit's own diameter, so only the
-// centre matters and non-circle entities on a drill layer contribute nothing.
+// Drill reads round entities' CENTRES: the hole is the bit's own diameter, so
+// the drawn size is already ignored and an ellipse marks a drill point exactly
+// as well as a circle. Entities with no centre contribute nothing.
 function applyDrill(
   depth: Float32Array,
   grid: CarveGrid,
@@ -110,7 +111,7 @@ function applyDrill(
   cut: number,
 ): void {
   for (const entity of entities) {
-    if (entity.kind !== 'circle') continue;
+    if (entity.kind !== 'circle' && entity.kind !== 'ellipse') continue;
     stampDisc(depth, grid, entity.center, tool.diameterMm / 2, cut);
   }
 }

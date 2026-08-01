@@ -28,6 +28,7 @@ import {
   cncPassXyPoints,
   type CncGroup,
   type CutGroup,
+  type Group,
   type Job,
 } from './job';
 import { estimateWithPlanner, type PlannerEndMotionOptions } from './planner';
@@ -83,26 +84,46 @@ function timingScale(value: number | undefined): number {
 // retracts (approximated at the machine's max feed) per pass.
 function jobWithCncAsCutGroups(job: Job): Job {
   let changed = false;
-  const groups = job.groups.map((group) => {
-    if (group.kind !== 'cnc') return group;
+  const groups: Group[] = [];
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc') {
+      groups.push(group);
+      continue;
+    }
     changed = true;
-    return cncAsCutGroup(group);
-  });
+    groups.push(...cncAsCutGroups(group));
+  }
   return changed ? { groups } : job;
 }
 
-function cncAsCutGroup(group: CncGroup): CutGroup {
+function cncAsCutGroups(group: CncGroup): ReadonlyArray<CutGroup> {
+  const hasPlungeFedPath = group.passes.some(
+    (pass) => pass.kind === 'path3d' && pass.lateralFeed === 'plunge',
+  );
+  if (!hasPlungeFedPath) return [cncAsCutGroup(group, group.passes, group.feedMmPerMin)];
+  return group.passes.map((pass) =>
+    cncAsCutGroup(
+      group,
+      [pass],
+      pass.kind === 'path3d' && pass.lateralFeed === 'plunge'
+        ? group.plungeMmPerMin
+        : group.feedMmPerMin,
+    ),
+  );
+}
+
+function cncAsCutGroup(group: CncGroup, passes: CncGroup['passes'], speed: number): CutGroup {
   return {
     kind: 'cut',
     layerId: group.layerId,
     color: group.color,
     power: 100,
-    speed: group.feedMmPerMin,
+    speed,
     passes: 1,
     airAssist: false,
     // path3d passes project to XY here; their Z travel is approximated by the
     // plunge term below (exact 3D length arrives with the H.2 simulator).
-    segments: group.passes.map((pass) => ({
+    segments: passes.map((pass) => ({
       polyline: cncPassXyPoints(pass),
       closed: pass.closed,
     })),

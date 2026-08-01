@@ -139,7 +139,8 @@ function cutStepForPass(
       // The rendered polyline is the XY projection; the arc length is 3D so
       // the scrubber's timing stays honest. Truncation inside this step
       // slightly overshoots the XY head on steep segments — acceptable for a
-      // preview (documented in toolpath-slice.ts consumers).
+      // preview (documented in toolpath-slice.ts consumers). zs carries the
+      // full Z profile so the simulator can stamp vertex-exact depths.
       return {
         kind: 'cut',
         color: group.color,
@@ -149,6 +150,7 @@ function cutStepForPass(
           from: pass.points[0]?.z ?? 0,
           to: pass.points[pass.points.length - 1]?.z ?? 0,
         },
+        zs: pass.points.map((point) => point.z),
         groupId: group.layerId,
         passIndex,
       };

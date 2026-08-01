@@ -102,7 +102,11 @@
 2. On `dragenter`, viewport shows a dashed-blue overlay with text "Drop to import" centered.
 3. On `drop`:
    1. Overlay disappears.
-   2. SVG is sanitized-and-parsed via DOMPurify (`USE_PROFILES: { svg: true, svgFilters: true }` plus a custom hook that strips `<script>`, `<foreignObject>`, external `xlink:href`, and non-image data URIs). DOMPurify returns a clean DOM; we do not re-parse the source string after sanitization.
+   2. A normal file-backed SVG is UTF-8-decoded incrementally in the import Worker, validated while
+      it is read, built into a detached DOM, and sanitized before geometry extraction. The sanitizer
+      strips `<script>`, `<foreignObject>`, event handlers, external references, and non-image data
+      URIs. If the Worker cannot start, the warning-disclosed main-thread fallback uses DOMPurify
+      (`USE_PROFILES: { svg: true, svgFilters: true }`) plus its reference-removal hook.
    3. Geometry walked out of the sanitized DOM into internal Scene objects.
    4. Object is placed centered on the bed by default, at its natural mm size from the SVG `viewBox`.
    5. Object is auto-selected (selection handles visible).
@@ -130,10 +134,11 @@
 1. SVG is structurally invalid (malformed XML, missing root, etc.).
 2. Toast (error): `Could not parse <filename>: <one-line reason>`. No state change.
 
-#### Error — SVG file too large
-1. Threshold: 25 MB raw file size.
-2. Modal: `<filename> is larger than 25 MB (actual: 31 MB). Importing it may slow the app. Import anyway?` with buttons `Cancel` / `Import anyway`.
-3. If user proceeds and the parse takes > 5 s, viewport shows a non-blocking spinner with "Parsing large SVG…"
+#### Edge — SVG file larger than the advisory threshold
+1. Above 25 MB raw size, import proceeds and a non-blocking warning says the filename, rounded size,
+   and that the app may be busy until it finishes.
+2. Worker toasts report queued, reading, and parsing phases. Pressing Esc cancels the queued or
+   active import; no size threshold refuses or delays it.
 
 #### Error — SVG contains malicious content
 1. `<script>` tags stripped silently; count surfaced in toast: `Imported · sanitized 2 script tags`.
@@ -888,8 +893,8 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    spatial session/origin drift. Advisory settings and build-info observations may refresh.
 6. Clean completion issues a one-run exact `FramedRunPermit`. The controls read **Ready to start —
    framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
-   one-use. Any relevant edit, camera or rotary change, Jog, Home, origin/probe/reset/disconnect, or
-   controller drift expires it.
+   one-use. Any project, output-scope, placement, registration, or rotary-raster edit, Jog, Home,
+   origin/probe/reset/disconnect, or controller drift expires it. Camera-only UI state does not.
 7. User clicks **Start framed job**. Start atomically claims the permit and sends its cached G-code
    without recompiling, reopening Job Review, or rerunning policy gates. Only live transport and
    exact-handoff checks remain; a deterministic empty/comment-only or RX-oversized program was
@@ -1542,6 +1547,59 @@ enumeration of ADR-186/ADR-205):
   stroke-text operations default to Engrave even when a V-bit is mounted.
 - F-D4. Adjust character spacing / line height
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
+
+### F-D6. Impose offline variable data across one sheet [Planned — ADR-279]
+
+*Not implemented yet. This section records the accepted target workflow for staged delivery under
+ADR-279.*
+
+**Success:**
+
+1. Select one design unit whose text may contain the shipped bounded offline fields.
+2. Open **Variable-data imposition** and choose a grid layout. Slot 1 uses the current CSV record and
+   serial value; each later slot advances by the existing `Advance by` value. Grid order is
+   row-major. Circular imposition remains deferred until its variable-width collision behavior is
+   specified.
+3. CurveDesk materializes every slot against one captured clock before showing the result. Layout
+   uses the maximum rendered envelope across the batch, so a longer later value cannot silently
+   overlap its neighbour.
+4. Preview, Save Project, and Frame do not consume records; Save Project also does not persist the
+   transient imposition. Successful Save G-code export, including tiled G-code and experimental
+   file-only `.rd`, applies the exact post-batch state once only for `after-successful-export`; a
+   completed stream applies it once only for `after-successful-stream`; `manual` changes on neither
+   trigger. Failed, cancelled, stale, mismatched-policy, or retried preparation consumes nothing.
+5. For machine output, complete Frame for the exact current job as usual. Frame remains the only
+   guard. This flow adds no block, refusal, gate, cap, clamp, delay, hide, disable, rewrite, or
+   confirmation to preview, project save, import/export, Apply, output, Frame, or Start beyond the
+   existing factual compile-integrity, transport, and handoff preconditions. Imposition concerns
+   appear in the editor or Job Review.
+
+**Error:**
+
+- A missing field, malformed embedded CSV value, or materialization failure identifies the affected
+  slot and leaves the project and variable cursor unchanged.
+- A prepared artifact whose source project or variable state changed is stale and cannot apply its
+  saved post-batch cursor. Re-prepare from the current state.
+
+**Empty:**
+
+- With no selected design unit, explain that one design must be selected; do not create an empty
+  batch.
+- A design with no CSV tokens can still batch serial and date/time fields without an embedded CSV.
+  A CSV field with no embedded dataset or addressed row reports the affected slot and leaves the
+  variable cursor unchanged.
+
+**Edge:**
+
+- The batch sequences ordered slot indices independently of final geometry. The original grid rows,
+  columns, and spacing remain available until every slot has been measured; only then are final
+  placements calculated. The existing grid layout currently returns one through 500 placements;
+  imposition adds no second size rule.
+- Date/time values use one captured clock for the whole batch.
+- Phase one is transient and offline. It does not add live databases, barcode/QR generation,
+  camera-detected placement, persisted imposition schema, or a new machine policy gate.
+- Record wrap, serial wrap, and `Advance by` semantics reuse the existing variable-sequence rules;
+  the batch plan records the exact next state rather than recalculating it after output.
 
 ## Phase E flows
 
@@ -2515,6 +2573,11 @@ F-CNC19 tiling.
 3. The preview's removal shading shows the V-groove deepening toward shape
    centers; the emitted G-code passes both motion and depth invariants.
 4. V-carve groups run BEFORE profile cuts (they never free the part).
+5. Advanced → Entry offers an optional maximum contour-ramp angle. With an
+   exact manufacturer-qualified angle, each ring descends from stock top over
+   as many complete laps as both that angle and depth-per-pass require, at the
+   plunge feed, then makes one level cleanup lap at cutting feed. 0 leaves the
+   legacy stepped-plunge program unchanged.
 
 #### Error — active bit is not a v-bit
 1. The layer panel and pre-Frame Job Review show "V-carve requires a v-bit."
@@ -2544,7 +2607,11 @@ F-CNC19 tiling.
 1. Regions too narrow for even one ring at δ produce no rings there —
    the groove simply ends (no gouge, no error).
 2. depthMm larger than the shape supports: the ladder stops where offsets
-   vanish; depth per pass still caps every plunge.
+   vanish. Depth per pass caps each legacy plunge or, for a ramped V-carve,
+   the descent per complete ring lap.
+3. A configured ramp that is invalid or has no usable closed contour at
+   emitted precision retains the complete legacy stepped-plunge V-carve group
+   and raises a Job Review advisory. G-code provenance names the fallback.
 
 ### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
 
@@ -2950,8 +3017,9 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
 
 #### Success
-1. The layer card's "Entry" row offers a ramp angle for profile/pocket/engrave
-   cuts. Climb / Conventional / Default direction appears only for
+1. The layer card's "Entry" row offers a ramp angle for
+   profile/pocket/engrave/V-carve cuts. Climb / Conventional / Default
+   direction appears only for
    outside/inside profiles and pockets, where direction affects winding.
 2. Direction enforcement re-orients closed toolpaths (M3 spindle: climb
    keeps material RIGHT of travel — outside profiles run CW,
@@ -2959,15 +3027,25 @@ and lifts the command's CNC-only gate.)*
    the longest segment so witness marks land on a flat span.
 3. A ramp angle > 0 turns plunges into descents ALONG the toolpath at
    that angle; closed loops re-cut the ramped span level afterwards.
+   V-carve uses its dedicated full-contour strategy: every ring starts at
+   stock top, descends over one or more complete laps, and then cuts one level
+   cleanup lap. It does not use the ordinary short-path vertical fallback.
 4. Offset pockets can instead enable **Helical entry**. Each ring retracts,
    relocates, and descends through a native tangent helix that ends at the
    contour start. Raster pockets, islands, disconnected pockets, and a minimum
    diameter that cannot fit are blocked before output.
    Depth ladders ramp each step from the previous level.
 
-#### Error — none (both options are clamped)
-1. Ramp angle clamps to [0.5°, 45°]; direction only applies where a
-   material side exists (engraves/open paths are left alone).
+#### Advisory — invalid or unrepresentable V-carve entry
+1. Ordinary profile/pocket/engrave ramp angles retain their [0.5°, 45°]
+   behavior. A V-carve uses the separate `vCarveRampEntryDeg` opt-in, so a
+   generic ramp retained from an older cut type cannot activate it. Its stored
+   maximum is never raised: it must be finite, greater than 0, and less than
+   90°. An entry that cannot be represented at emitted precision uses the
+   complete legacy stepped entry and names that fallback in Job Review and
+   G-code provenance; it does not refuse output.
+2. Direction only applies where a material side exists (engraves/open paths
+   are left alone).
 
 #### Empty
 1. Defaults (no direction, 0 ramp) keep output byte-identical to
@@ -2999,6 +3077,17 @@ and lifts the command's CNC-only gate.)*
 1. Grid size is resolved before tile records, G-code, or file dialogs are
    created. A grid above 500 planned cells reports a factual non-writable
    outcome and writes nothing; increase tile size or reduce overlap.
+
+#### Advisory — tiled V-carve entry semantics
+1. Every tiled V-carve ramp warns that the entered angle is requested
+   provenance, not a re-verified emitted maximum, because per-tile derivation
+   can create new segment endpoints. Export remains available.
+2. If clipping makes a plunge-fed V-carve ramp piece begin below stock top,
+   that tile starts with a direct plunge at the configured plunge feed. Tiled
+   export remains available, but CurveDesk raises a separate warning toast and
+   writes an inert G-code provenance comment. Keep the contour inside one tile
+   when the exact cutter cannot plunge or requires a guaranteed maximum ramp
+   angle.
 
 #### Edge — requested overlap leaves no positive tile step
 1. Planning uses one disclosed effective overlap that leaves a positive
@@ -4271,6 +4360,15 @@ and lifts the command's CNC-only gate.)*
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
   and the rest of the app is unaffected.
+- **Error / USB source ended.** If the browser reports the exact active camera track ended, the
+  source leaves `live`, releases its remaining tracks, refreshes the device list, and tells the
+  operator to reconnect the camera and press **Start USB camera**. An old track callback cannot
+  replace a newer source. Camera access is never restarted automatically.
+- **Edge / temporary USB mute.** `mute` is shown as an informational temporary-unavailability
+  note while the source remains live; `unmute` clears it. Camera actions are not newly gated.
+- **Edge / device list changed.** While Camera Mode is open, browser `devicechange` refreshes the
+  picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
+  is shown as a retryable open failure rather than mislabeled as denial.
 - **Empty / no camera.** With no camera detected, Camera Mode shows an empty state ("No camera
   found — connect a USB camera") and the camera picker is disabled.
 - **Edge / degenerate corners.** If the four chosen points are collinear or coincident (no
@@ -4288,7 +4386,8 @@ and lifts the command's CNC-only gate.)*
   review step shows the reprojection error plus an Original / Corrected A/B of
   the last capture. If the corrected view's straight edges LOOK straight, the
   operator applies; the calibration persists on the device profile (undoable)
-  and survives reload.
+  and survives reload, bound to the source identity and pixel geometry of the
+  accepted capture set.
 - **Error / solve rejected.** A failed solve (too few views, degenerate
   geometry) shows the typed reason with "Back to capture"; nothing persists.
   A suspect solve (implausible coefficients, high RMS, uneven coverage, too-
@@ -4300,7 +4399,10 @@ and lifts the command's CNC-only gate.)*
 - **Edge / mid-session changes.** Captures with no full board in view are
   rejected with a hint (not silently dropped); a camera-resolution change
   mid-session refuses to mix pixel bases and offers Reset; changing the board
-  description discards captures taken against the old board.
+  description discards captures taken against the old board. Changing the
+  active camera source while collecting discards the in-progress capture set.
+  A completed Review remains bound to its accepted frames; Apply persists that
+  recorded binding rather than whichever camera happens to be active later.
 
 ### F-CAM3. Workspace camera overlay (ADR-107 v1 wiring)
 
@@ -4369,6 +4471,21 @@ and lifts the command's CNC-only gate.)*
   are pointed to the bridge command; the desktop app starts it automatically.
   Hosted web builds cannot call the loopback network-camera bridge and support
   USB cameras only (ADR-141).
+- **Error / RTSP preview interrupted.** Each probe creates an unguessable bridge-owned stream
+  session shared by every view of that exact source. The renderer polls its status because
+  Chromium does not reliably emit `<img>` error after an established MJPEG socket dies.
+  An authoritative failed status (including unexpected FFmpeg end or ten seconds without output)
+  and an image error make that exact source leave `live` immediately. Because an unavailable
+  status can also be a transient status-channel fault, one unavailable reading is tolerated; a
+  second consecutive unavailable reading makes the source leave `live`, and a `live` or `starting`
+  reading resets the count. This is count-based rather than a fixed grace period: two immediate
+  failures are separated by the one-second poll interval, while two browser requests that each hit
+  the three-second status timeout can take about seven seconds. The RTSP section then shows
+  **Reconnect**. Pressing it probes again and creates a fresh session. No background FFmpeg respawn
+  or automatic camera reconnection runs after failure.
+- **Edge / older bridge.** A bridge that returns a usable RTSP preview but no liveness session does
+  not block the preview. The RTSP section labels it unmonitored and explains that a frozen image
+  may not be detected; no session is fabricated and no automatic reconnect or probe runs.
 - **Empty / no camera found.** Discovery completes with no candidate camera;
   the panel stays usable for USB cameras and manual RTSP entry.
 - **Edge / slow or single-threaded camera.** Frame fetches for the same camera

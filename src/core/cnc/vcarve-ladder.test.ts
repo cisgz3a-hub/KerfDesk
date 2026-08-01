@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
-import { vcarvePasses, vcarveResolutionMm } from './vcarve-ladder';
+import { vcarveLadderPasses, vcarvePasses, vcarveResolutionMm } from './vcarve-ladder';
 
 const VBIT_90: CncTool = {
   id: 'v90',
@@ -101,6 +101,44 @@ describe('vcarvePasses', () => {
     // tan(π/4) carries float error (0.999…), so match with tolerance.
     expect(depths.some((z) => Math.abs(z + 1.5) < 1e-9)).toBe(true);
     expect(depths.some((z) => Math.abs(z + 2) < 1e-9)).toBe(true);
+  });
+
+  it('replaces configured stepped plunges with emission-accurate ramps and cleanup laps', () => {
+    const passes = vcarvePasses([square(0, 20)], {
+      tool: VBIT_90,
+      maxDepthMm: 1,
+      depthPerPassMm: 0.25,
+      resolutionMm: 0.5,
+      rampAngleDeg: 3,
+    });
+    expect(passes.length).toBeGreaterThan(0);
+    expect(passes.length % 2).toBe(0);
+    for (let index = 0; index < passes.length; index += 2) {
+      const ramp = passes[index];
+      const cleanup = passes[index + 1];
+      expect(ramp).toMatchObject({ kind: 'path3d', lateralFeed: 'plunge' });
+      expect(cleanup).toMatchObject({ kind: 'contour', closed: true });
+      if (ramp?.kind !== 'path3d' || cleanup?.kind !== 'contour') continue;
+      expect(ramp.points[0]?.z).toBe(0);
+      expect(ramp.points.at(-1)?.z).toBeCloseTo(cleanup.zMm, 9);
+    }
+  });
+
+  it('uses the complete legacy ladder and reports an advisory when ramp planning fails', () => {
+    const options = {
+      tool: VBIT_90,
+      maxDepthMm: 1,
+      depthPerPassMm: 0.25,
+      resolutionMm: 0.5,
+    };
+    const legacy = vcarveLadderPasses([square(0, 20)], options);
+    const fallback = vcarveLadderPasses([square(0, 20)], {
+      ...options,
+      rampAngleDeg: Number.NaN,
+    });
+    expect(fallback.passes).toEqual(legacy.passes);
+    expect(fallback.passes.length).toBeGreaterThan(0);
+    expect(fallback.entryIssue).toContain('positive and finite');
   });
 
   it('keeps every ring inside the source region (holes respected)', () => {

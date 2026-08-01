@@ -74,6 +74,7 @@ describe('GcodeInspectorDialog', () => {
       />,
     );
     await settleUntil(() => (container?.textContent ?? '').includes('3D view unavailable'));
+    await settleUntil(() => (container?.textContent ?? '').includes('G21 G90'));
     const text = container?.textContent ?? '';
     expect(text).toContain('part.nc');
     expect(text).toContain('2 shown segments');
@@ -108,9 +109,11 @@ describe('GcodeInspectorDialog', () => {
     );
 
     await settleUntil(() => (container?.textContent ?? '').includes('2 shown segments'));
+    await settleUntil(() => (container?.textContent ?? '').includes('G21 G90'));
     expect(readBlob).toHaveBeenCalledOnce();
     expect(container?.textContent ?? '').toMatch(/may be unresponsive/i);
     expect(container?.textContent ?? '').toContain('2 shown segments');
+    expect(container?.textContent ?? '').not.toContain('Source unavailable');
   });
 
   it('offers the 2D simulator handoff only in CNC mode', () => {

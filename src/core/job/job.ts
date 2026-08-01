@@ -136,6 +136,11 @@ export type CncPath3dPass = {
   // Machine-coord XY plus Z (0 = stock top, negative into the stock).
   readonly points: ReadonlyArray<Vec3>;
   readonly closed: boolean;
+  // Most in-cut XYZ moves use the group's cutting feed. Entry-only paths may
+  // explicitly use the group's plunge feed for their lateral descent; this is
+  // opt-in so relief, tabs, imported paths, and existing ramps retain their
+  // established feed semantics.
+  readonly lateralFeed?: 'plunge';
 };
 
 export type CncArcPass = {
@@ -217,6 +222,11 @@ export type CncGroup = {
   readonly requestedDepthMm?: number;
   readonly depthPerPassMm?: number;
   readonly vResolutionMm?: number;
+  readonly rampEntryDeg?: number;
+  // Set only on tiled derivatives of a ramped job. Clipping can change the
+  // entry geometry, so rampEntryDeg remains requested provenance rather than
+  // a final emitted-angle guarantee for that detached tile.
+  readonly rampEntryTiled?: true;
   readonly feedSource?: CncFeedSource;
   readonly feedMmPerMin: number; // already capped to device.maxFeed
   readonly plungeMmPerMin: number;

@@ -1,26 +1,21 @@
-import { buildGcodeRenderModel } from '../../core/gcode-view';
 import { createGcodeRenderModelBuilder } from '../../core/gcode-view/gcode-render-model-builder';
-import { iterateLines } from '../../core/util';
-import { readBlobLines, type BlobReadProgress } from '../import/blob-line-reader';
+import type { BlobReadProgress } from '../import/blob-line-reader';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
+import { indexGcodeBlobLines, indexGcodeTextLines } from './gcode-source-line-index';
 import {
   INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   type GcodeInspectorWorkerResult,
 } from './gcode-inspector-worker-protocol';
 
 export function inspectGcodeText(text: string): GcodeInspectorWorkerResult {
-  const lines: string[] = [];
-  let sourceLineCount = 0;
-  for (const line of iterateLines(text)) {
-    lines.push(line);
-    sourceLineCount += 1;
-  }
+  const builder = createGcodeRenderModelBuilder({
+    renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
+  });
+  const sourceIndex = indexGcodeTextLines(text, (line) => builder.pushLine(line));
   return {
-    parsed: buildGcodeRenderModel(text, {
-      renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
-    }),
-    lines,
-    sourceLineCount,
+    parsed: builder.finish(),
+    sourceIndex,
+    sourceLineCount: sourceIndex.starts.length,
   };
 }
 
@@ -32,13 +27,14 @@ export async function inspectGcodeSource(
   const builder = createGcodeRenderModelBuilder({
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   });
-  const lines: string[] = [];
-  let sourceLineCount = 0;
-  const pushLine = (line: string): void => {
-    builder.pushLine(line);
-    lines.push(line);
-    sourceLineCount += 1;
+  const sourceIndex = await indexGcodeBlobLines(
+    source.blob,
+    (line) => builder.pushLine(line),
+    onProgress,
+  );
+  return {
+    parsed: builder.finish(),
+    sourceIndex,
+    sourceLineCount: sourceIndex.starts.length,
   };
-  await readBlobLines(source.blob, pushLine, onProgress);
-  return { parsed: builder.finish(), lines, sourceLineCount };
 }

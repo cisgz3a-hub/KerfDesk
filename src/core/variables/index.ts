@@ -11,3 +11,8 @@ export {
   resolveVariableSequence,
   type VariableSequenceDirection,
 } from './sequence';
+export {
+  planVariableBatchSequence,
+  type VariableBatchPlan,
+  type VariableBatchSlot,
+} from './batch-sequence';

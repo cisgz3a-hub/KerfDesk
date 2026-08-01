@@ -345,6 +345,26 @@ describe('cncGrblStrategy', () => {
       expect(gcode).toContain('G1 X30.000 Y10.000 Z-1.500 F1000\nG1 X30.000 Y30.000 Z-2.500');
     });
 
+    it('uses plunge feed for lateral XYZ entry paths that request it', () => {
+      const entry = group({
+        passes: [
+          {
+            kind: 'path3d',
+            points: [
+              { x: 10, y: 10, z: 0 },
+              { x: 20, y: 10, z: -0.5 },
+              { x: 20, y: 20, z: -1 },
+            ],
+            closed: false,
+            lateralFeed: 'plunge',
+          },
+        ],
+      });
+      const gcode = cncGrblStrategy.emit({ groups: [entry] }, dev);
+      expect(gcode).toContain('G1 X20.000 Y10.000 Z-0.500 F300');
+      expect(gcode).not.toContain('G1 X20.000 Y10.000 Z-0.500 F1000');
+    });
+
     it('in-cut Z changes ride G1, never G0 — the motion invariant holds', () => {
       const gcode = cncGrblStrategy.emit({ groups: [ramp] }, dev);
       expect(findPlungedTravelIssues(gcode, { safeZMm: 3.81 })).toEqual([]);

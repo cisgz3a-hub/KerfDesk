@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { parseDocumentImportText } from './document-import-parse';
+import { parseDocumentImportSource } from './document-import-source';
 import type {
   DocumentImportWorkerRequest,
   DocumentImportWorkerResponse,
@@ -13,9 +13,9 @@ self.onmessage = (event: MessageEvent<DocumentImportWorkerRequest>): void => {
 async function parseRequest(request: DocumentImportWorkerRequest): Promise<void> {
   try {
     postProgress(request.id, 'reading');
-    const text = await request.blob.text();
-    postProgress(request.id, 'parsing');
-    const response = await parseDocumentImportText(request, text);
+    const response = await parseDocumentImportSource(request, () =>
+      postProgress(request.id, 'parsing'),
+    );
     self.postMessage(response);
   } catch (error) {
     const response: DocumentImportWorkerResponse = {

@@ -1,4 +1,3 @@
-import { useCameraStore } from '../state/camera-store';
 import type { FramedRunPermit } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
@@ -13,7 +12,6 @@ export function framedRunReadinessIssue(
   permit: FramedRunPermit | null,
   app: ReturnType<typeof useStore.getState> = useStore.getState(),
   laser: ReturnType<typeof useLaserStore.getState> = useLaserStore.getState(),
-  camera: ReturnType<typeof useCameraStore.getState> = useCameraStore.getState(),
   options: { readonly ignoreControllerStatusState?: boolean } = {},
 ): string | null {
   if (permit === null) return FRAME_JOB_FIRST_MESSAGE;
@@ -25,14 +23,8 @@ export function framedRunReadinessIssue(
     return 'The artwork, output selection, placement, or registration changed after Frame. Frame the updated job again.';
   }
   const environmentProject = transientProject ? permit.candidate.project : app.project;
-  if (
-    !startExternalEnvironmentMatches(
-      permit.candidate.externalEnvironment,
-      environmentProject,
-      camera,
-    )
-  ) {
-    return 'The camera or rotary setup changed after Frame. Frame the current setup again.';
+  if (!startExternalEnvironmentMatches(permit.candidate.externalEnvironment, environmentProject)) {
+    return 'The rotary setup changed after Frame. Frame the current setup again.';
   }
   if (
     !controllerStartPreparationStillCurrent(permit.controller, laser, {

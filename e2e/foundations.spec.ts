@@ -50,7 +50,7 @@ test('connects an RTSP camera through the loopback bridge and captures readable 
   await page.getByRole('textbox', { name: 'RTSP camera URL' }).fill('rtsp://192.168.10.1:8554/');
   await page.getByRole('button', { name: 'Connect', exact: true }).click();
 
-  await expect(page.getByRole('button', { name: 'Connected', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   await expect(page.getByAltText('Machine camera stream')).toHaveAttribute(
     'src',
     'http://127.0.0.1:51731/stream.mjpg?camera=e2e',
@@ -111,7 +111,15 @@ async function installRtspBridgeRoutes(
           codec: 'h264',
           ffmpegAvailable: true,
           previewUrl: 'http://127.0.0.1:51731/stream.mjpg?camera=e2e',
+          streamSessionId: 'e2e-session',
         }),
+      });
+      return;
+    }
+    if (requestUrl.pathname === '/stream-status') {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ kind: 'live' }),
       });
       return;
     }

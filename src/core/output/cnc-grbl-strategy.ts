@@ -365,9 +365,9 @@ function appendArcPass(
 }
 
 // path3d: same retract/rapid/plunge discipline as a contour pass, then
-// per-vertex XYZ feed moves. Plunge targets the FIRST vertex's Z; every
-// in-cut Z change after that rides a G1 at the cutting feed (never a rapid),
-// so findPlungedTravelIssues holds by construction.
+// per-vertex XYZ feed moves. Plunge targets the FIRST vertex's Z. Ordinary
+// in-cut XYZ changes use cutting feed; an entry-only pass can opt into the
+// group's plunge feed for every lateral descent (never a rapid).
 function appendPath3dPass(
   lines: string[],
   head: Head,
@@ -397,14 +397,15 @@ function appendPath3dPass(
     lines.push(`G1 Z${startZ} F${plunge}`);
     head.z = startZ;
   }
-  appendPath3dCutMoves(lines, head, pass, feed, plunge);
+  const lateralFeed = pass.lateralFeed === 'plunge' ? plunge : feed;
+  appendPath3dCutMoves(lines, head, pass, lateralFeed, plunge);
 }
 
 function appendPath3dCutMoves(
   lines: string[],
   head: Head,
   pass: CncPath3dPass,
-  feed: number,
+  lateralFeed: number,
   plunge: number,
 ): void {
   let modalFeed: number | null = null;
@@ -415,10 +416,9 @@ function appendPath3dCutMoves(
     const y = fmt(point.y);
     const z = fmt(point.z);
     if (x === head.x && y === head.y && z === head.z) continue; // zero-length at emit precision
-    // Pure-vertical segments (a ramp longer than its path ends with a
-    // same-XY descent) ride the plunge feed, never the XY cutting feed; the
-    // cutting feed is re-issued on the next lateral move.
-    const wantFeed = x === head.x && y === head.y ? plunge : feed;
+    // Pure-vertical segments ride the plunge feed, never the XY cutting feed;
+    // the selected lateral feed is re-issued on the next lateral move.
+    const wantFeed = x === head.x && y === head.y ? plunge : lateralFeed;
     const feedWord = modalFeed === wantFeed ? '' : ` F${wantFeed}`;
     modalFeed = wantFeed;
     lines.push(`G1 X${x} Y${y} Z${z}${feedWord}`);

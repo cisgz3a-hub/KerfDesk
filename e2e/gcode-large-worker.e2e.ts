@@ -16,6 +16,7 @@ test('opens a large G-code file through the real production worker', async ({ pa
   await expect(dialog.getByRole('status')).toContainText('all 260,100 segments are shown', {
     timeout: 60_000,
   });
+  await expect(dialog.getByLabel('Program source')).toContainText('G1 X1');
 
   expect(workerUrls.some((url) => url.includes('gcode-inspector-worker'))).toBe(true);
   expect(await stopHeartbeat(page)).toBeGreaterThan(5);
@@ -54,6 +55,7 @@ test('real production worker runs queued Inspector requests in FIFO order', asyn
     }
     interface Inspection {
       readonly sourceLineCount: number;
+      readonly sourceIndex: { readonly starts: Float64Array };
     }
     interface ClientApi {
       inspectGcodeOffThread: (
@@ -87,6 +89,8 @@ test('real production worker runs queued Inspector requests in FIFO order', asyn
       const [firstResult, secondResult] = await Promise.all([first, second]);
       return {
         firstSourceLineCount: firstResult.sourceLineCount,
+        firstSourceIndexLength: firstResult.sourceIndex.starts.length,
+        firstHasClonedLines: 'lines' in firstResult,
         secondSourceLineCount: secondResult.sourceLineCount,
         secondProgress,
       };
@@ -96,6 +100,8 @@ test('real production worker runs queued Inspector requests in FIFO order', asyn
   }, LARGE_PROGRAM);
 
   expect(result.firstSourceLineCount).toBeGreaterThan(260_000);
+  expect(result.firstSourceIndexLength).toBe(result.firstSourceLineCount);
+  expect(result.firstHasClonedLines).toBe(false);
   expect(result.secondSourceLineCount).toBe(3);
   expect(result.secondProgress[0]).toEqual({ phase: 'queued', queuePosition: 1 });
   expect(result.secondProgress.some((progress) => progress.phase === 'parsing')).toBe(true);

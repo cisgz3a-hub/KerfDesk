@@ -317,7 +317,7 @@ describe('runFrameNow framed-run authorization', () => {
     });
   });
 
-  it('expires a permit permanently on the first project or environment drift', async () => {
+  it('expires on project drift but preserves a permit through camera-only drift', async () => {
     const frame = vi.fn(
       async (_bounds: JobBounds, _feed: number, candidate?: FramedRunCandidate) => {
         if (candidate === undefined) throw new Error('Frame candidate was not supplied');
@@ -344,7 +344,7 @@ describe('runFrameNow framed-run authorization', () => {
     expect(useLaserStore.getState().framedRun).not.toBeNull();
     useCameraStore.getState().setSurfaceHeightMm(12);
     useCameraStore.getState().setSurfaceHeightMm(0);
-    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().framedRun).not.toBeNull();
   });
 
   it('expires permanently when rotary feature identity changes away and back', async () => {

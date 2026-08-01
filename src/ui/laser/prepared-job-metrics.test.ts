@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type RotarySetup } from '../../core/devices';
+import type { ExecutablePlanV1 } from '../../core/execution-plan';
 import { estimateJobDuration, machineSpaceJob, type CutGroup, type Job } from '../../core/job';
 import { createProject } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
@@ -34,6 +35,28 @@ function yLineJob(): Job {
     ],
   };
   return { groups: [group] };
+}
+
+function subPrecisionYLineJob(): Job {
+  const job = yLineJob();
+  const group = job.groups[0];
+  if (group?.kind !== 'cut') throw new Error('Expected the cut fixture.');
+  return {
+    groups: [
+      {
+        ...group,
+        segments: [
+          {
+            closed: false,
+            polyline: [
+              { x: 0, y: 0 },
+              { x: 0, y: 50.0004 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
 }
 
 function deviceWith(rotary: RotarySetup | undefined) {
@@ -78,5 +101,24 @@ describe('buildPreparedJobMetrics rotary duration (ADR-127)', () => {
     const metrics = buildPreparedJobMetrics(preparedWith(job));
 
     expect(metrics.duration.totalSeconds).toBeCloseTo(expected.totalSeconds, 6);
+  });
+});
+
+describe('buildPreparedJobMetrics calculated bounds', () => {
+  it('uses verified plan values while leaving Frame-specific bounds on the established path', () => {
+    const job = subPrecisionYLineJob();
+    const plan = {
+      bounds: {
+        processMm: { minX: 0, minY: 0, minZ: 0, maxX: 0, maxY: 50, maxZ: 0 },
+        allMotionMm: { minX: 0, minY: 0, minZ: 0, maxX: 0, maxY: 50, maxZ: 0 },
+      },
+    } as ExecutablePlanV1;
+
+    const metrics = buildPreparedJobMetrics(preparedWith(job), undefined, plan);
+
+    expect(metrics.jobBounds?.maxY).toBe(50);
+    expect(metrics.motionBounds?.maxY).toBe(50);
+    expect(metrics.frameJobBounds?.maxY).toBe(50.0004);
+    expect(metrics.frameMotionBounds?.maxY).toBe(50.0004);
   });
 });

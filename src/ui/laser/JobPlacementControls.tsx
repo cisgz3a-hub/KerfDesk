@@ -2,7 +2,6 @@ import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobStartMode } from '../
 import { controlHelp } from '../help/help-topics';
 import { type JobPlacementSettings } from '../job-placement';
 import { useStore } from '../state';
-import { useCameraStore } from '../state/camera-store';
 import { sectionCaptionStyle } from './JobControls.styles';
 
 const START_FROM_LABELS: Readonly<Record<JobStartMode, string>> = {
@@ -30,7 +29,6 @@ const SELECTION_ORIGIN_HELP_ID = 'control:laser.output-scope.selection-origin';
 export function JobPlacementControls(props: { readonly streaming: boolean }): JSX.Element {
   const placement = useStore((s) => s.jobPlacement);
   const setJobPlacement = useStore((s) => s.setJobPlacement);
-  const cameraPlacementActive = useCameraStore((s) => s.placementActive);
   // Placement and output scope are compile settings, not controller commands.
   // Keep them editable while disconnected so Current Position can be changed
   // to Absolute for offline export; only an active machine operation locks them.
@@ -45,12 +43,8 @@ export function JobPlacementControls(props: { readonly streaming: boolean }): JS
           className="lf-select"
           style={startFromSelectStyle}
           value={placement.startFrom}
-          disabled={busy || cameraPlacementActive}
-          title={
-            cameraPlacementActive
-              ? 'Camera placement is aligned to the physical bed, so Absolute Coordinates is required. Exit camera placement in the Camera panel to use another origin mode.'
-              : 'Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin. Every ordinary Start requires the exact completed Frame.'
-          }
+          disabled={busy}
+          title="Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin. Every ordinary Start requires the exact completed Frame."
           onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
         >
           {Object.entries(START_FROM_LABELS).map(([value, label]) => (
@@ -64,11 +58,6 @@ export function JobPlacementControls(props: { readonly streaming: boolean }): JS
         <AnchorPicker placement={placement} disabled={busy || placement.startFrom === 'absolute'} />
         <span style={fieldNameStyle}>Job origin</span>
       </div>
-      {cameraPlacementActive ? (
-        <div role="status" style={cameraPlacementNoteStyle}>
-          Camera placement locks Absolute Coordinates so the job cannot shift away from the image.
-        </div>
-      ) : null}
       <OutputScopeControls placement={placement} disabled={busy} />
     </div>
   );
@@ -175,10 +164,6 @@ const scopeLabelStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 4,
-};
-const cameraPlacementNoteStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-warning-fg)',
 };
 const anchorGridStyle: React.CSSProperties = {
   display: 'grid',

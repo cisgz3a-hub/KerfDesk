@@ -1,5 +1,6 @@
 import type { BuildRenderModelResult } from '../../core/gcode-view';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
+import type { GcodeSourceLineIndex } from './gcode-source-line-index';
 
 export const INSPECTOR_RENDER_PRESSURE_THRESHOLD = 250_000;
 
@@ -10,7 +11,7 @@ export type GcodeInspectorWorkerRequest = {
 
 export type GcodeInspectorWorkerResult = {
   readonly parsed: BuildRenderModelResult;
-  readonly lines: ReadonlyArray<string>;
+  readonly sourceIndex: GcodeSourceLineIndex;
   readonly sourceLineCount: number;
 };
 

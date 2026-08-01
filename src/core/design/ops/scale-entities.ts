@@ -1,10 +1,11 @@
 // scale-entities — resize geometry about a fixed anchor (ADR-272, DS-8d).
 //
-// Uniform on purpose. A SketchCircle carries a single radius, so it cannot
-// represent a non-uniform scale; stretching one axis would silently turn a
-// designed circle into something the model cannot hold. One factor keeps every
-// entity kind exact, which is what a resize handle must be in a precision tool.
-// Per-axis stretching waits for an ellipse arm on the entity union.
+// Uniform, and exact for every entity kind: one factor scales a circle to a
+// circle and an arc to an arc, so a corner grip never changes what a shape IS.
+//
+// Per-axis stretching is a different operation with different exactness rules
+// and lives in stretch-entities (ADR-272 Amendment 4). Keeping them apart is
+// deliberate: a corner grip must never quietly bake an arc.
 
 import type { Vec2 } from '../../scene';
 import type { Sketch, SketchEntity } from '../sketch-entity';
@@ -29,6 +30,13 @@ export function scaleEntity(entity: SketchEntity, anchorMm: Vec2, factor: number
       };
     case 'circle':
       return { ...entity, center: about(entity.center), radiusMm: entity.radiusMm * factor };
+    case 'ellipse':
+      return {
+        ...entity,
+        center: about(entity.center),
+        radiusXMm: entity.radiusXMm * factor,
+        radiusYMm: entity.radiusYMm * factor,
+      };
     case 'arc':
       // Sweep and start angle are unchanged: scaling about a point preserves
       // direction, so only the radius and the centre move.

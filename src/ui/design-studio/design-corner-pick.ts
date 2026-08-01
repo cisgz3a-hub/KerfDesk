@@ -56,9 +56,11 @@ function entityCorners(entity: SketchEntity): ReadonlyArray<CornerPick> {
       return pathCorners(entity);
     case 'rect':
       return rectCorners(entity);
-    // A line has no corner of its own, and a circle or arc has no vertex to round.
+    // A line has no corner of its own, and a circle, ellipse or arc has no
+    // vertex to round.
     case 'line':
     case 'circle':
+    case 'ellipse':
     case 'arc':
       return [];
   }

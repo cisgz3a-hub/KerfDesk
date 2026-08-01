@@ -165,6 +165,7 @@ export function MotionPolishRows(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
+  const isVCarve = props.settings.cutType === 'v-carve';
   const showCutDirection =
     props.settings.cutType === 'profile-outside' ||
     props.settings.cutType === 'profile-inside' ||
@@ -195,25 +196,40 @@ export function MotionPolishRows(props: {
       ) : null}
       <ClearableNumberField
         min={0}
-        max={45}
+        max={isVCarve ? Number.MAX_VALUE : 45}
         step={0.5}
-        value={props.settings.rampEntryDeg ?? 0}
-        onCommit={(deg) => {
-          if (deg <= 0) {
-            const { rampEntryDeg: _removed, ...rest } = props.settings;
-            props.onCommitSettings(rest);
-          } else {
-            const { helixEntry: _removed, ...rest } = props.settings;
-            props.onCommitSettings({ ...rest, rampEntryDeg: deg });
-          }
-        }}
+        value={(isVCarve ? props.settings.vCarveRampEntryDeg : props.settings.rampEntryDeg) ?? 0}
+        onCommit={(deg) => commitRampEntry(props.settings, deg, props.onCommitSettings)}
         ariaLabel={`Ramp entry angle for ${props.layer.color}`}
-        title="Descend into cuts along the path at this angle instead of plunging straight down. 0 = plunge (default)."
+        title={
+          isVCarve
+            ? "Maximum multi-lap contour-ramp angle. Use only the exact cutter manufacturer's approved angle; 0 keeps legacy stepped plunges."
+            : 'Descend into cuts along the path at this angle instead of plunging straight down. 0 = plunge (default).'
+        }
         style={rampInputStyle}
       />
       <span style={rampUnitStyle}>° ramp</span>
     </Row>
   );
+}
+
+function commitRampEntry(
+  settings: CncLayerSettings,
+  deg: number,
+  commit: (settings: CncLayerSettings) => void,
+): void {
+  if (settings.cutType === 'v-carve') {
+    const { vCarveRampEntryDeg: _removed, ...rest } = settings;
+    commit(deg <= 0 ? rest : { ...rest, vCarveRampEntryDeg: deg });
+    return;
+  }
+  const { rampEntryDeg: _removed, ...withoutRamp } = settings;
+  if (deg <= 0) {
+    commit(withoutRamp);
+    return;
+  }
+  const { helixEntry: _helixRemoved, ...withoutHelix } = withoutRamp;
+  commit({ ...withoutHelix, rampEntryDeg: deg });
 }
 
 export function HelicalEntryRows(props: {

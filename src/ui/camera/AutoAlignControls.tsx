@@ -4,7 +4,6 @@
 // remains available on the machine-camera preview for display-only setups.
 
 import { useEffect } from 'react';
-import { useStore } from '../state';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { useCameraAlignWizardStore } from './align-wizard/camera-align-wizard-store';
 import { CameraAlignWizard } from './align-wizard/CameraAlignWizard';
@@ -14,7 +13,6 @@ export function AutoAlignControls(): JSX.Element {
   const openWizard = useCameraAlignWizardStore((s) => s.openWizard);
   const closeWizard = useCameraAlignWizardStore((s) => s.closeWizard);
   const featureEnabled = useExperimentalLaserFeatures((state) => state.features.cameraAlignmentV2);
-  const homingEnabled = useStore((state) => state.project.device.homing.enabled);
   const available = featureEnabled;
 
   useEffect(() => {
@@ -28,7 +26,7 @@ export function AutoAlignControls(): JSX.Element {
         className="lf-btn"
         disabled={!available}
         onClick={openWizard}
-        title={alignmentButtonTitle(featureEnabled, homingEnabled)}
+        title={alignmentButtonTitle(featureEnabled)}
       >
         Align to bed…
       </button>
@@ -37,11 +35,8 @@ export function AutoAlignControls(): JSX.Element {
   );
 }
 
-function alignmentButtonTitle(featureEnabled: boolean, homingEnabled: boolean): string {
+function alignmentButtonTitle(featureEnabled: boolean): string {
   if (!featureEnabled) return 'Enable Camera alignment v2 in Tools > Labs first.';
-  if (!homingEnabled) {
-    return 'Align the camera to the bed. Confirm bed coordinates inside the wizard before burning markers.';
-  }
   return 'Align the camera to the bed: burn the marker target (or reuse a burned one), then detect it.';
 }
 

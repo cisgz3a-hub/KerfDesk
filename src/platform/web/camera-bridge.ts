@@ -3,10 +3,12 @@ import type {
   CameraBridgeHealth,
   CameraBridgeProbeRequest,
   CameraBridgeProbeResult,
+  CameraBridgeStreamStatus,
   MachineCameraDiscovery,
 } from '../types';
 
 const DEFAULT_BRIDGE_ORIGIN = 'http://127.0.0.1:51731';
+const STREAM_STATUS_TIMEOUT_MS = 3_000;
 
 const BRIDGE_NOT_RUNNING_REASON =
   'The network-camera bridge is available only in LaserForge Desktop or local development. For local development, run pnpm camera:bridge in a separate terminal; hosted web builds support USB cameras only.';
@@ -16,10 +18,35 @@ export function createHttpCameraBridge(bridgeOrigin = DEFAULT_BRIDGE_ORIGIN): Ca
   return {
     isSupported: () => true,
     probeRtspCamera: (req) => probeRtspCamera(origin, req),
+    rtspStreamStatus: (streamSessionId) => fetchStreamStatus(origin, streamSessionId),
     discoverMachineCamera: () => discoverMachineCamera(origin),
     proxiedFrameUrl: (cameraUrl) => `${origin}/frame.jpg?url=${encodeURIComponent(cameraUrl)}`,
     health: () => fetchHealth(origin),
   };
+}
+
+async function fetchStreamStatus(
+  origin: string,
+  streamSessionId: string,
+): Promise<CameraBridgeStreamStatus> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), STREAM_STATUS_TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      `${origin}/stream-status?session=${encodeURIComponent(streamSessionId)}`,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+        signal: controller.signal,
+      },
+    );
+    return normalizeStreamStatus(await response.json());
+  } catch {
+    return { kind: 'unavailable', reason: BRIDGE_NOT_RUNNING_REASON };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function probeRtspCamera(
@@ -98,20 +125,16 @@ function normalizeHealth(value: unknown): CameraBridgeHealth {
 function normalizeProbeResult(value: unknown): CameraBridgeProbeResult {
   if (!isRecord(value)) return invalidBridgeResponse();
   if (value['kind'] === 'ok') {
-    if (
-      typeof value['url'] !== 'string' ||
-      typeof value['ffmpegAvailable'] !== 'boolean' ||
-      !isOptionalString(value['codec']) ||
-      !isOptionalString(value['previewUrl'])
-    ) {
-      return invalidBridgeResponse();
-    }
+    if (!isValidProbeSuccess(value)) return invalidBridgeResponse();
     return {
       kind: 'ok',
       url: value['url'],
       ...(value['codec'] !== undefined ? { codec: value['codec'] } : {}),
       ffmpegAvailable: value['ffmpegAvailable'],
       ...(value['previewUrl'] !== undefined ? { previewUrl: value['previewUrl'] } : {}),
+      ...(value['streamSessionId'] !== undefined
+        ? { streamSessionId: value['streamSessionId'] }
+        : {}),
     };
   }
   if (
@@ -121,6 +144,45 @@ function normalizeProbeResult(value: unknown): CameraBridgeProbeResult {
     return { kind: value['kind'], reason: value['reason'] };
   }
   return invalidBridgeResponse();
+}
+
+type ValidProbeSuccess = Record<string, unknown> & {
+  readonly url: string;
+  readonly ffmpegAvailable: boolean;
+  readonly codec?: string;
+  readonly previewUrl?: string;
+  readonly streamSessionId?: string;
+};
+
+function isValidProbeSuccess(value: Record<string, unknown>): value is ValidProbeSuccess {
+  return (
+    typeof value['url'] === 'string' &&
+    typeof value['ffmpegAvailable'] === 'boolean' &&
+    isOptionalString(value['codec']) &&
+    isOptionalString(value['previewUrl']) &&
+    isOptionalString(value['streamSessionId'])
+  );
+}
+
+function normalizeStreamStatus(value: unknown): CameraBridgeStreamStatus {
+  if (!isRecord(value)) return invalidStreamStatus();
+  if (value['kind'] === 'starting' || value['kind'] === 'live') {
+    return { kind: value['kind'] };
+  }
+  if (
+    (value['kind'] === 'failed' || value['kind'] === 'unavailable') &&
+    typeof value['reason'] === 'string'
+  ) {
+    return { kind: value['kind'], reason: value['reason'] };
+  }
+  return invalidStreamStatus();
+}
+
+function invalidStreamStatus(): CameraBridgeStreamStatus {
+  return {
+    kind: 'unavailable',
+    reason: 'The local camera bridge returned an invalid RTSP stream status.',
+  };
 }
 
 function invalidBridgeResponse(): CameraBridgeProbeResult {

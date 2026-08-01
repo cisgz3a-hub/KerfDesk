@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react';
 import { toCameraCalibration, type TrustReason } from '../../../core/camera';
+import { cameraBindingCompatibility } from '../../../core/camera/camera-capture-binding';
 import { assertNever } from '../../../core/scene';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
@@ -55,21 +56,31 @@ function SolvedView(): JSX.Element {
   const setAbMode = useCameraWizardStore((s) => s.setAbMode);
   const lastFrame = useCameraWizardStore((s) => s.lastFrame);
   const rectifiedFrame = useCameraWizardStore((s) => s.rectifiedFrame);
+  const captureBinding = useCameraWizardStore((s) => s.captureBinding);
   const setStep = useCameraWizardStore((s) => s.setStep);
   const closeWizard = useCameraWizardStore((s) => s.closeWizard);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
   const sourceState = useCameraStore((s) => s.sourceState);
   if (session.kind !== 'solved') return <></>;
   const { result, diversity } = session;
+  const currentCapture =
+    captureBinding !== null && sourceState.kind === 'live'
+      ? cameraCaptureBindingForFrame(
+          sourceState.source,
+          captureBinding.width,
+          captureBinding.height,
+        )
+      : null;
+  const sourceDiffersFromCapture =
+    captureBinding !== null &&
+    (currentCapture === null ||
+      cameraBindingCompatibility(captureBinding, currentCapture) !== 'match');
 
   const apply = (): void => {
-    if (sourceState.kind !== 'live' || lastFrame === null) return;
-    const capture = cameraCaptureBindingForFrame(
-      sourceState.source,
-      lastFrame.width,
-      lastFrame.height,
-    );
-    updateDeviceProfile({ cameraCalibration: toCameraCalibration(result, Date.now(), capture) });
+    if (captureBinding === null) return;
+    updateDeviceProfile({
+      cameraCalibration: toCameraCalibration(result, Date.now(), captureBinding),
+    });
     closeWizard();
   };
 
@@ -104,11 +115,17 @@ function SolvedView(): JSX.Element {
         Flip between Original and Corrected: straight edges in the scene should LOOK straight in the
         corrected view. Apply only if they do.
       </p>
+      {sourceDiffersFromCapture ? (
+        <p style={warnStyle}>
+          This calibration belongs to the camera source recorded with these captures. The current
+          camera is different or unavailable; applying still saves the recorded source identity.
+        </p>
+      ) : null}
       <div style={rowStyle}>
         <Button variant="ghost" onClick={() => setStep('capture')}>
           Capture more poses
         </Button>
-        <Button variant="primary" onClick={apply} disabled={sourceState.kind !== 'live'}>
+        <Button variant="primary" onClick={apply}>
           Apply calibration
         </Button>
       </div>

@@ -1,5 +1,5 @@
 import { sanitizeGcodeCommentValue } from '../gcode-comments';
-import type { CncGroup } from '../job';
+import type { CncGroup, CncPath3dPass } from '../job';
 import { fmt, fmtFeed } from './cnc-grbl-emit-head';
 
 const LABEL_BYTES = 48;
@@ -18,12 +18,32 @@ export function appendCncGroupComments(lines: string[], group: CncGroup): void {
     const resolution = group.vResolutionMm === 0 ? 'auto' : fmt(group.vResolutionMm);
     lines.push(`; cnc v-resolution-mm: ${resolution}`);
   }
+  appendEntryComments(lines, group);
   lines.push(
     `; cnc motion: feed-mm-min: ${fmtFeed(group.feedMmPerMin)}; ` +
       `plunge-mm-min: ${fmtFeed(group.plungeMmPerMin)}`,
   );
   lines.push(`; cnc spindle-rpm: ${Math.max(0, Math.round(group.spindleRpm))}`);
   appendFeedSourceComments(lines, group);
+}
+
+function appendEntryComments(lines: string[], group: CncGroup): void {
+  if (group.rampEntryDeg === undefined) return;
+  const entryPaths = group.passes.filter(
+    (pass): pass is CncPath3dPass => pass.kind === 'path3d' && pass.lateralFeed === 'plunge',
+  );
+  const strategy =
+    group.cutType === 'v-carve' && entryPaths.length === 0
+      ? 'stepped-plunge-fallback'
+      : 'contour-ramp';
+  const angleLabel = group.rampEntryTiled ? 'requested-max-angle-deg' : 'max-angle-deg';
+  lines.push(`; cnc entry: ${strategy}; ${angleLabel}: ${fmt(group.rampEntryDeg)}`);
+  if (group.rampEntryTiled) {
+    lines.push('; cnc entry-advisory: tiled output does not retain the max-angle guarantee');
+  }
+  if (entryPaths.some((pass) => (pass.points[0]?.z ?? 0) < 0)) {
+    lines.push('; cnc entry-advisory: tiled ramp starts below stock top');
+  }
 }
 
 function toolGeometryComment(group: CncGroup): string {

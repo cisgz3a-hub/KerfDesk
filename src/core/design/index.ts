@@ -13,6 +13,7 @@ export type {
   Sketch,
   SketchArc,
   SketchCircle,
+  SketchEllipse,
   SketchEntity,
   SketchLine,
   SketchPath,

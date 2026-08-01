@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 255. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 279. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -104,7 +104,9 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height. (Glyph weld is **not** implemented — it depends on the geometry kernel, anticipated post-Phase-F; do not describe it as shipped.)
 - Imported `.ttf` / `.otf` user fonts are embedded in the project under fixed count and byte budgets; KerfDesk does not enumerate or depend on host system fonts (ADR-164).
 - Four bundled outline fonts cover sans, monospace, handwritten, and calligraphic text. Four reviewed OFL native-stroke fonts add technical, display, calligraphic, and casual-hand centerline writing for CNC engraving. Text can be assigned independently to CNC machining layers; outline text supports variable-depth V-carving, while open stroke text defaults to Engrave/on-path.
-- Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields; live databases, barcode/QR generation, and automatic imposition remain deferred (ADR-164).
+- Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields;
+  bounded offline sheet imposition is adopted for staged implementation (ADR-279). Live databases
+  and barcode/QR generation remain deferred (ADR-164).
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
 
@@ -148,7 +150,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults | Built |
 | H.7 | Tool + feeds/speeds libraries (material-library pattern), multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |
 | H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover | Built |
-| H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity (helical entry deferred; arc/line profile leads shipped — ADR-250) | Built |
+| H.9 | Motion polish: ramp entry (including emission-accurate V-carve contour ramps — ADR-278), climb/conventional, entry-point rotation, parking parity (helical entry deferred; arc/line profile leads shipped — ADR-250) | Built; hardware CLAIMED |
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
 | H.11 | Market-parity build-out (ADR-103): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator, machine-aware G-code banner | Built (G1–G8) |
 | H.12 | Easel-parity pack (ADR-105): persistent live 3D pane, pocket raster fill (offset/raster-X/raster-Y), bundled local design library | Built |
@@ -408,8 +410,11 @@ phase; tracked here so they don't get lost.
 - **Canvas:** Canvas2D.
 - **Desktop shell:** Electron LTS. `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
 - **Platform adapter:** `platform/web/` implements the `PlatformAdapter` interface for the browser; the main-process desktop (Electron) code lives in the top-level `electron/` folder, and `src/platform/electron/` holds the renderer-side Electron detection (`isElectronRenderer`, imported by `ui/app/main.tsx`) plus the release-workflow gate.
-- **SVG parse:** native `DOMParser` (browser and jsdom in Node tests).
-- **SVG sanitize:** **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible). Pinned per ADR-017.
+- **SVG parse:** normal file-backed imports use `saxes` plus a detached `linkedom` DOM in the import
+  Worker; the disclosed main-thread fallback uses native `DOMParser` (browser and jsdom in tests).
+- **SVG sanitize:** the file-backed Worker allowlists SVG elements and removes event handlers,
+  external references, and non-image data URIs before geometry extraction. The main-thread fallback
+  uses **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible), pinned per ADR-017.
 - **Text (Phase D):** `opentype.js` (MIT) for outlines. Seventeen bundled permissive fonts — thirteen outline plus four native CNC stroke faces (Roboto / Special Elite Apache-2.0; Poppins / Tinos Regular + Bold / Inconsolata / Courier Prime / Pacifico / Dancing Script / Anton / UnifrakturMaguntia / Stardos Stencil / Saira Stencil One / Relief SingleLine / three reviewed EMS stroke faces OFL-1.1). Stencil faces bridge their counters so cut-out lettering leaves no loose centres (ADR-267).
 - **Vectorize (Phase E):** in-house contour/centerline/edge trace engine (ADR-123); `imagetracerjs` (Unlicense — MIT-compatible) kept only as a multi-colour fallback.
 - **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property), and Playwright for a dedicated real-browser smoke workflow (ADR-158).
@@ -542,7 +547,11 @@ an assumption that every folder must have an `index.ts`.
 
 ## Security posture
 
-- **Imported SVG is untrusted.** Parsed via native `DOMParser`, sanitized via **DOMPurify** with `USE_PROFILES: { svg: true, svgFilters: true }` and a custom hook removing external `xlink:href` and non-image data URIs.
+- **Imported SVG is untrusted.** Normal file-backed imports validate with `saxes`, construct a
+  detached `linkedom` Worker DOM, then allowlist SVG elements and remove event handlers, external
+  references, and non-image data URIs before geometry extraction. The disclosed main-thread
+  fallback uses native `DOMParser` plus **DOMPurify** with `USE_PROFILES: { svg: true, svgFilters:
+  true }` and the existing reference-removal hook.
 - **Imported raster images (Phase E)** decoded inside a sandbox. Memory-bounded.
 - **Bundled fonts (Phase D)** stay in managed code: TTF outlines use `opentype.js`; pinned SVG centerline glyph data uses the pure TypeScript stroke parser. They are never passed to native font APIs.
 - **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No preload and no IPC handlers (`ipcMain` surface). The notify-only Preview checker is one exact GET-only `app://app/api/desktop-preview-update` route, so the renderer retains `connect-src 'self'`; main performs the pinned GitHub metadata request and returns only `{ kind, version }`. `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
@@ -605,8 +614,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   and advanced fill-pattern systems, node/graph-based operation editors, and plugin
   operation pipelines remain out of scope.
 - Macros, scripting, command palette, plugins, extensions.
-- ~~Variable text (CSV / counter / date).~~ **Bounded offline fields shipped**;
-  live databases, barcode/QR generation, and automatic imposition remain deferred (ADR-164).
+- ~~Variable text (CSV / counter / date).~~ **Bounded offline fields shipped**; bounded offline sheet
+  imposition is adopted for staged implementation (ADR-279). Live databases and barcode/QR
+  generation remain deferred (ADR-164).
 - Host system-font enumeration. Explicitly imported user fonts are embedded in
   the project under fixed budgets and no longer depend on the host after save (ADR-164).
 

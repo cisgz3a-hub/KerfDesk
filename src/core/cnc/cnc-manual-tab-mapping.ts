@@ -1,8 +1,14 @@
 import type { Polyline, Vec2 } from '../scene';
 import { projectPointToPolyline } from './cnc-tab-anchors';
 
+// The scene-object families that produce CNC contours (collect-cnc-contours).
+export type CncContourSourceKind = 'imported-svg' | 'text' | 'traced-image' | 'shape';
+
 export type CollectedCncContour = {
   readonly polyline: Polyline;
+  // Which family produced this contour. Absent on legacy fixtures and direct
+  // cncGroupForLayer callers, which keep the pre-provenance behavior.
+  readonly sourceKind?: CncContourSourceKind;
   readonly manualTabPoints?: ReadonlyArray<Vec2>;
 };
 

@@ -31,6 +31,33 @@ export type EmitGcodeWithExecutablePlanResult = EmitGcodeResult & {
   readonly sidecar: ExecutablePlanSidecar;
 };
 
+/** Builds the parity-verified sidecar for one already-emitted exact program. */
+export function buildExecutablePlanSidecar(gcode: string, project: Project): ExecutablePlanSidecar {
+  if (gcode.length === 0) return { kind: 'unavailable', reason: 'no-gcode' };
+  const machineKind = machineKindOf(project.machine);
+  const controller = machineKind === 'cnc' ? 'grbl-cnc' : selectOutputStrategy(project.device).id;
+  const built = buildExecutablePlan(gcode, {
+    machineKind,
+    controller,
+    ...(project.device.controllerKind === undefined
+      ? {}
+      : { profileControllerKind: project.device.controllerKind }),
+  });
+  if (built.kind !== 'ok') {
+    const issues = built.kind === 'error' ? built.issues : ['No emitted program was available.'];
+    return { kind: 'error', reason: 'plan-build-failed', issues };
+  }
+  const parity = verifyExecutablePlanParity(built.plan, gcode);
+  if (!parity.ok) {
+    return {
+      kind: 'error',
+      reason: 'semantic-parity-failed',
+      issues: parity.checks.filter((check) => !check.ok).map((check) => check.detail),
+    };
+  }
+  return { kind: 'ok', plan: built.plan, parity };
+}
+
 /** Opt-in compatibility seam. Existing emitGcode callers are untouched. */
 export function emitGcodeWithExecutablePlan(
   project: Project,
@@ -52,36 +79,8 @@ export function emitPreparedGcodeWithExecutablePlan(
   if (!prepared.ok || emission.gcode.length === 0) {
     return { ...emission, sidecar: { kind: 'unavailable', reason: 'no-gcode' } };
   }
-  const machineKind = machineKindOf(prepared.project.machine);
-  const controller =
-    machineKind === 'cnc' ? 'grbl-cnc' : selectOutputStrategy(prepared.project.device).id;
-  const built = buildExecutablePlan(emission.gcode, {
-    machineKind,
-    controller,
-    ...(prepared.project.device.controllerKind === undefined
-      ? {}
-      : { profileControllerKind: prepared.project.device.controllerKind }),
-  });
-  if (built.kind !== 'ok') {
-    const issues = built.kind === 'error' ? built.issues : ['No emitted program was available.'];
-    return {
-      ...emission,
-      sidecar: { kind: 'error', reason: 'plan-build-failed', issues },
-    };
-  }
-  const parity = verifyExecutablePlanParity(built.plan, emission.gcode);
-  if (!parity.ok) {
-    return {
-      ...emission,
-      sidecar: {
-        kind: 'error',
-        reason: 'semantic-parity-failed',
-        issues: parity.checks.filter((check) => !check.ok).map((check) => check.detail),
-      },
-    };
-  }
   // The emitted program is returned untouched. Sourcing it from the plan would be
   // a no-op only while byteParity runs first, making byte neutrality depend on
   // check ordering instead of on never rewriting the emitter's output.
-  return { ...emission, sidecar: { kind: 'ok', plan: built.plan, parity } };
+  return { ...emission, sidecar: buildExecutablePlanSidecar(emission.gcode, prepared.project) };
 }

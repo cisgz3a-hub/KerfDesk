@@ -194,15 +194,6 @@ describe('interrupted laser job intent separation', () => {
       () => useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true }),
     ],
     [
-      'camera placement trust',
-      () =>
-        useCameraStore.setState({
-          placementActive: true,
-          confirmedPositionEpoch: CONTROLLER_EPOCH,
-          surfaceHeightMm: 2,
-        }),
-    ],
-    [
       'resolved rotary-raster policy',
       () => useExperimentalLaserFeatures.getState().setFeature('rotaryRaster', true),
     ],
@@ -222,7 +213,7 @@ describe('interrupted laser job intent separation', () => {
     expect(repository.getSnapshot().activeRun).toBeNull();
   });
 
-  it('rechecks external inputs inside startJob after its asynchronous arming boundary', async () => {
+  it('does not treat camera-only changes at the asynchronous arming boundary as drift', async () => {
     const repository = recoveryHarness();
     const discard = vi.spyOn(repository, 'discardStagedRun');
     const firstProgramWrites: string[] = [];
@@ -240,12 +231,11 @@ describe('interrupted laser job intent separation', () => {
     await runStartJobFlow(repository);
 
     expect(boundaryStart).toHaveBeenCalledOnce();
-    expect(firstProgramWrites).toEqual([]);
-    expect(useLaserStore.getState().streamer).toBeNull();
-    expect(useLaserStore.getState().activeRunId).toBeNull();
-    expect(discard).toHaveBeenCalledOnce();
-    expect(repository.getSnapshot().activeRun).toBeNull();
-    expect(jobAwareAlert).toHaveBeenCalledWith(expect.stringContaining('camera setup'));
+    expect(firstProgramWrites).toHaveLength(1);
+    expect(useLaserStore.getState().activeRunId).not.toBeNull();
+    expect(discard).not.toHaveBeenCalled();
+    expect(repository.getSnapshot().activeRun).not.toBeNull();
+    expect(jobAwareAlert).not.toHaveBeenCalled();
   });
 
   it('preserves an older recovery capsule when a new ordinary Start is rejected', async () => {

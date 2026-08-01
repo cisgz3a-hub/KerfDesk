@@ -154,6 +154,59 @@ describe('handleSaveTiledGcode', () => {
     expect(maxX(written.join('\n'))).toBeGreaterThan(55);
   });
 
+  it('writes tiles and warns when a split V-carve ramp starts below stock top', async () => {
+    const base = tiledCncProject();
+    const machine = base.machine;
+    if (machine?.kind !== 'cnc') throw new Error('expected CNC project');
+    const written: string[] = [];
+    const toasts: string[] = [];
+    const project = {
+      ...base,
+      machine: {
+        ...machine,
+        tiling: {
+          tileWidthMm: 70,
+          tileHeightMm: 380,
+          overlapMm: 0,
+          registrationHoles: false,
+        },
+      },
+      scene: {
+        ...base.scene,
+        layers: base.scene.layers.map((layer) =>
+          layer.id === 'L2'
+            ? {
+                ...layer,
+                cnc: {
+                  ...(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS),
+                  cutType: 'v-carve' as const,
+                  toolId: 'vb-60',
+                  vCarveRampEntryDeg: 3,
+                },
+              }
+            : layer,
+        ),
+      },
+    };
+
+    const handled = await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project,
+      savedName: 'job',
+      pushToast: (message) => toasts.push(message),
+    });
+
+    expect(handled).toBe(true);
+    expect(written.length).toBeGreaterThan(0);
+    expect(toasts).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('not a re-verified emitted maximum'),
+        expect.stringContaining('direct plunge'),
+      ]),
+    );
+    expect(written.join('\n')).toContain('requested-max-angle-deg: 3.000');
+  });
+
   it('prepends provenance, machine assumptions, and tile identity to every file', async () => {
     const written: string[] = [];
     await handleSaveTiledGcode({

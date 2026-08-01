@@ -112,6 +112,10 @@ export type CncLayerSettings = {
   // Motion polish (H.9), both opt-in — absent keeps pre-H.9 output:
   // descend into cuts along the path at this angle instead of plunging.
   readonly rampEntryDeg?: number;
+  // V-carve-specific opt-in. Kept separate so a generic ramp value preserved
+  // across a historical cut-type change cannot silently activate new V-bit
+  // motion after a project upgrade.
+  readonly vCarveRampEntryDeg?: number;
   // Pocket-only native G2/G3 descent. Diameter values describe the tool-center
   // circle; the pocket toolpath is already inset by the cutter radius.
   readonly helixEntry?: CncHelixEntrySettings;

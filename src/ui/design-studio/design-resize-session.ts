@@ -5,11 +5,13 @@
 //
 // Every update scales from `beforeSketch`, never from the last frame, so the
 // factor never compounds and dragging back to where you started restores the
-// original geometry precisely.
+// original geometry precisely. That also means an edge grip's one-off
+// conversions (a circle to an ellipse, an arc to a path) happen once from the
+// original shape rather than accumulating a bake per pointer move.
 
-import { scaleEntities } from '../../core/design/ops';
+import { stretchEntities } from '../../core/design/ops';
 import type { Vec2 } from '../../core/scene';
-import { resizeFactor, type ResizeHandle } from './design-handles';
+import { resizeFactors, type ResizeHandle } from './design-handles';
 import { commitSketch, replacePresent } from './design-history';
 import { sessionSketch, type DesignSession } from './design-session';
 
@@ -24,8 +26,8 @@ export function beginSessionResize(session: DesignSession, handle: ResizeHandle)
 export function updateSessionResize(session: DesignSession, atMm: Vec2): DesignSession {
   const resize = session.resize;
   if (resize === null) return session;
-  const factor = resizeFactor(resize.handle, atMm);
-  const scaled = scaleEntities(resize.beforeSketch, resize.ids, resize.handle.anchorMm, factor);
+  const factors = resizeFactors(resize.handle, atMm);
+  const scaled = stretchEntities(resize.beforeSketch, resize.ids, resize.handle.anchorMm, factors);
   if (scaled === sessionSketch(session)) return session;
   return {
     ...session,

@@ -227,8 +227,8 @@ function uiLibrarySlice(
 }
 
 // The dialog open/close trio slice (text, trace-image, convert-to-bitmap).
-// Grouped like uiToggleSlice so the store factory stays under the
-// function-size cap; each action only needs `set`.
+// Grouped separately so the store factory stays under the function-size cap;
+// each action only needs `set`.
 function uiDialogSlice(
   set: UiStateSetter,
 ): Pick<

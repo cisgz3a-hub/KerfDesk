@@ -52,11 +52,14 @@ test.describe('workspace shell acceptance', () => {
     await page.keyboard.press('Enter');
     await expect(consoleDetails).toHaveAttribute('open', '');
 
-    // Maintainer constraint (ADR-225 amendment): Start job and Frame must
+    // Maintainer constraint (ADR-225 amendment): the start and Frame actions must
     // render above the fold at laptop height without scrolling the rail —
     // placement sits below the job cluster precisely to protect this.
-    await expectInsideViewport(page, page.getByRole('button', { name: 'Frame', exact: true }));
-    await expectInsideViewport(page, page.getByRole('button', { name: 'Start job', exact: true }));
+    await expectInsideViewport(page, page.getByRole('button', { name: 'Frame job', exact: true }));
+    await expectInsideViewport(
+      page,
+      page.getByRole('button', { name: 'Set up & Frame', exact: true }),
+    );
     await expectInsideViewport(page, page.getByRole('contentinfo', { name: 'Status bar' }));
     await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
   });

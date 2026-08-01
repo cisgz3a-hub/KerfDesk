@@ -18,10 +18,14 @@ import {
   toBoardObservation,
   toGrayImage,
 } from '../../../core/camera';
+import {
+  cameraBindingCompatibility,
+  type CameraCaptureBinding,
+} from '../../../core/camera/camera-capture-binding';
 
 export type WizardStep = 'setup' | 'capture' | 'review';
 
-export type CaptureRejection = 'not-found' | 'resolution-changed';
+export type CaptureRejection = 'not-found' | 'resolution-changed' | 'source-changed';
 
 export type CameraWizardStore = {
   readonly open: boolean;
@@ -36,6 +40,9 @@ export type CameraWizardStore = {
   // Frame size every capture must share; set by the first capture.
   readonly frameWidth: number;
   readonly frameHeight: number;
+  // Source identity and pixel geometry of the first accepted capture. Every
+  // later capture and the persisted calibration must use this exact binding.
+  readonly captureBinding: CameraCaptureBinding | null;
   // The most recent full-res capture and its rectified counterpart (review A/B).
   readonly lastFrame: RgbaImage | null;
   readonly rectifiedFrame: RgbaImage | null;
@@ -53,7 +60,8 @@ export type CameraWizardStore = {
   readonly setAbMode: (mode: 'raw' | 'rectified') => void;
   // Full-resolution capture: re-detects on the supplied frame and appends a
   // BoardObservation, or records why the frame was rejected.
-  readonly addCaptureFrame: (frame: RgbaImage) => void;
+  readonly addCaptureFrame: (frame: RgbaImage, capture: CameraCaptureBinding) => void;
+  readonly invalidateCaptureSource: (capture: CameraCaptureBinding) => void;
   readonly beginSolve: () => void;
   // The actual solve; the component defers this one tick so "Solving…" paints.
   readonly completeSolve: () => void;
@@ -68,6 +76,19 @@ const DEFAULT_SPACING_MM = 10;
 // iteration cap while micro-improving; hundreds of iterations cost seconds.
 const SOLVE_MAX_ITERATIONS = 600;
 
+function clearedCaptureState(lastRejection: CaptureRejection | null) {
+  return {
+    session: emptySession(),
+    frameWidth: 0,
+    frameHeight: 0,
+    captureBinding: null,
+    lastFrame: null,
+    rectifiedFrame: null,
+    solving: false,
+    lastRejection,
+  };
+}
+
 const INITIAL = {
   open: false,
   minimized: false,
@@ -75,14 +96,8 @@ const INITIAL = {
   spec: DEFAULT_SPEC,
   spacingMm: DEFAULT_SPACING_MM,
   autoCapture: true,
-  session: emptySession(),
-  frameWidth: 0,
-  frameHeight: 0,
-  lastFrame: null,
-  rectifiedFrame: null,
+  ...clearedCaptureState(null),
   abMode: 'rectified' as const,
-  solving: false,
-  lastRejection: null,
 };
 
 export const useCameraWizardStore = create<CameraWizardStore>((set, get) => ({
@@ -91,14 +106,29 @@ export const useCameraWizardStore = create<CameraWizardStore>((set, get) => ({
   openWizard: () => set({ ...INITIAL, open: true }),
   closeWizard: () => set({ open: false, minimized: false }),
   toggleMinimized: () => set((s) => ({ minimized: !s.minimized })),
-  setSpec: (spec) => set({ spec, session: emptySession(), lastRejection: null }),
+  setSpec: (spec) => set({ spec, ...clearedCaptureState(null) }),
   setSpacingMm: (mm) => set({ spacingMm: mm }),
   setAutoCapture: (on) => set({ autoCapture: on }),
   setStep: (step) => set({ step }),
   setAbMode: (mode) => set({ abMode: mode }),
 
-  addCaptureFrame: (frame) => {
+  addCaptureFrame: (frame, capture) => {
     const state = get();
+    if (capture.width !== frame.width || capture.height !== frame.height) {
+      set({ lastRejection: 'resolution-changed' });
+      return;
+    }
+    if (state.captureBinding !== null) {
+      const compatibility = cameraBindingCompatibility(state.captureBinding, capture);
+      if (compatibility === 'source-mismatch') {
+        set({ ...clearedCaptureState('source-changed'), step: 'capture' });
+        return;
+      }
+      if (compatibility === 'geometry-mismatch') {
+        set({ lastRejection: 'resolution-changed' });
+        return;
+      }
+    }
     if (
       state.frameWidth !== 0 &&
       (frame.width !== state.frameWidth || frame.height !== state.frameHeight)
@@ -120,9 +150,16 @@ export const useCameraWizardStore = create<CameraWizardStore>((set, get) => ({
       ),
       frameWidth: frame.width,
       frameHeight: frame.height,
+      captureBinding: state.captureBinding ?? capture,
       lastFrame: frame,
       lastRejection: null,
     });
+  },
+
+  invalidateCaptureSource: (capture) => {
+    const saved = get().captureBinding;
+    if (saved === null || cameraBindingCompatibility(saved, capture) === 'match') return;
+    set({ ...clearedCaptureState('source-changed'), step: 'capture' });
   },
 
   beginSolve: () => set({ solving: true, step: 'review' }),
@@ -147,15 +184,5 @@ export const useCameraWizardStore = create<CameraWizardStore>((set, get) => ({
     set({ session, rectifiedFrame, solving: false });
   },
 
-  resetSession: () =>
-    set({
-      session: emptySession(),
-      frameWidth: 0,
-      frameHeight: 0,
-      lastFrame: null,
-      rectifiedFrame: null,
-      solving: false,
-      lastRejection: null,
-      step: 'capture',
-    }),
+  resetSession: () => set({ ...clearedCaptureState(null), step: 'capture' }),
 }));

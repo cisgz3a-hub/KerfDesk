@@ -16,10 +16,13 @@
 // each cut segment at half-cell spacing plus exact endpoints, so no cell the
 // tool touched is skipped.
 //
-// Approximation (documented): a cut step carries one Z span across its whole
-// polyline; Z interpolates linearly by arc length within the step. Contour
-// passes are exact (flat Z); path3d steps are exact at vertices and linear
-// between — adequate for a preview grid at 0.2 mm cells.
+// Depth model: a contour step carries one flat Z (exact). A path3d step
+// carries per-vertex Zs and stamps vertex-exact, interpolating linearly
+// inside each segment — the same law a G1 XYZ move obeys — so non-monotone
+// profiles (a valley whose endpoints sit at the surface) are represented
+// faithfully. A cut step without usable per-vertex Zs (laser steps, sliced
+// partials whose polyline lost the zs correspondence) falls back to one Z
+// span interpolated linearly by arc length across the whole step.
 
 import type { Toolpath, ToolpathStep } from '../job';
 import type { CncTool } from '../scene';
@@ -114,6 +117,11 @@ function stampCutStep(
   step: Extract<ToolpathStep, { kind: 'cut' }>,
   budgetMm: number,
 ): void {
+  const zs = vertexZs(step);
+  if (zs !== null) {
+    stampCutStepVertexZ(grid, kernel, step, zs, budgetMm);
+    return;
+  }
   const zFrom = step.z?.from ?? 0;
   const zTo = step.z?.to ?? 0;
   if (zFrom >= 0 && zTo >= 0) return; // laser steps carry no depth
@@ -135,6 +143,68 @@ function stampCutStep(
     if (done) return;
     walked += segLen;
   }
+}
+
+// A per-vertex profile is usable only while one Z accompanies each vertex —
+// a sliced/truncated polyline loses that correspondence and falls back to
+// the endpoint span. An all-surface profile removes nothing.
+function vertexZs(step: Extract<ToolpathStep, { kind: 'cut' }>): ReadonlyArray<number> | null {
+  const zs = step.zs;
+  if (zs === undefined || zs.length !== step.polyline.length) return null;
+  let deepest = 0;
+  for (const z of zs) deepest = Math.min(deepest, z);
+  return deepest < 0 ? zs : null;
+}
+
+function stampCutStepVertexZ(
+  grid: RemovalGrid,
+  kernel: ToolKernel,
+  step: Extract<ToolpathStep, { kind: 'cut' }>,
+  zs: ReadonlyArray<number>,
+  budgetMm: number,
+): void {
+  let walked = 0;
+  for (let i = 1; i < step.polyline.length; i += 1) {
+    const a = step.polyline[i - 1];
+    const b = step.polyline[i];
+    const zA = zs[i - 1];
+    const zB = zs[i];
+    if (a === undefined || b === undefined || zA === undefined || zB === undefined) continue;
+    const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+    const done = stampSegmentVertexZ(grid, kernel, a, b, { segLen, walked, budgetMm, zA, zB });
+    if (done) return;
+    walked += segLen;
+  }
+}
+
+type VertexZSegmentParams = {
+  readonly segLen: number;
+  readonly walked: number;
+  readonly budgetMm: number;
+  readonly zA: number;
+  readonly zB: number;
+};
+
+// G1 XYZ interpolates Z linearly along the segment, so each sample lerps the
+// segment's own endpoint Zs — vertex-exact where the whole-step span lerp
+// cannot represent a non-monotone profile. Returns true when the scrub
+// budget ran out inside this segment.
+function stampSegmentVertexZ(
+  grid: RemovalGrid,
+  kernel: ToolKernel,
+  a: { readonly x: number; readonly y: number },
+  b: { readonly x: number; readonly y: number },
+  p: VertexZSegmentParams,
+): boolean {
+  const sampleSpacing = grid.mmPerCell / 2;
+  const samples = Math.max(1, Math.ceil(p.segLen / sampleSpacing));
+  for (let s = 0; s <= samples; s += 1) {
+    const t = s / samples;
+    if (p.walked + p.segLen * t > p.budgetMm) return true;
+    const z = p.zA + (p.zB - p.zA) * t;
+    if (z < 0) stampTip(grid, kernel, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, z);
+  }
+  return false;
 }
 
 type SegmentStampParams = {

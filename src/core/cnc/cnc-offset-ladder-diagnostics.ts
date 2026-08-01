@@ -150,6 +150,9 @@ function vcarveLadderFailed(
     maxDepthMm: settings.depthMm,
     depthPerPassMm: settings.depthPerPassMm,
     resolutionMm: settings.vResolutionMm,
+    ...(settings.vCarveRampEntryDeg === undefined
+      ? {}
+      : { rampAngleDeg: settings.vCarveRampEntryDeg }),
   });
   if (ladder.offsetFailed) return true;
   const clearTool = toolById(config, settings.vClearToolId);

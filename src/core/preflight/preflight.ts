@@ -65,6 +65,7 @@ export type PreflightCode =
   | 'print-and-cut-registration-invalid'
   | 'cnc-settings-invalid'
   | 'cnc-helix-entry-invalid'
+  | 'cnc-vcarve-entry-fallback'
   | 'cnc-rest-machining-invalid'
   | 'cnc-adaptive-clearing-invalid'
   | 'cnc-inlay-invalid'

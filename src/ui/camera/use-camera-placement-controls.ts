@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
@@ -25,36 +25,30 @@ export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   const exit = useCameraStore((s) => s.deactivatePlacement);
   const confirmedEpoch = useCameraStore((s) => s.confirmedPositionEpoch);
   const confirmEpoch = useCameraStore((s) => s.confirmPositionEpoch);
-  const setJobPlacement = useStore((s) => s.setJobPlacement);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const homingState = useLaserStore((s) => s.homingState);
   const positionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
   const overlayUsable = still !== null || sourceState.kind === 'live';
 
-  const activateAbsolute = useCallback((): void => {
-    activate();
-    setJobPlacement({ startFrom: 'absolute' });
-  }, [activate, setJobPlacement]);
-
   useEffect(() => {
     if (!overlayGeometryReady || !visible || !overlayUsable || active) return;
-    activateAbsolute();
-  }, [activateAbsolute, active, overlayGeometryReady, overlayUsable, visible]);
+    activate();
+  }, [activate, active, overlayGeometryReady, overlayUsable, visible]);
 
   const toggleOverlay = (): void => {
     setVisible(!visible);
-    if (!visible && overlayGeometryReady) activateAbsolute();
+    if (!visible && overlayGeometryReady) activate();
   };
   const updateStill = async (): Promise<void> => {
     if (sourceState.kind !== 'live') return;
     const frame = await captureSourceFrame(sourceState.source);
     if (frame === null) return;
     setStill(frame, cameraCaptureBindingForFrame(sourceState.source, frame.width, frame.height));
-    if (overlayGeometryReady) activateAbsolute();
+    if (overlayGeometryReady) activate();
   };
   const useLive = (): void => {
     setStill(null);
-    if (overlayGeometryReady) activateAbsolute();
+    if (overlayGeometryReady) activate();
   };
   const positionTrusted = homingEnabled
     ? homingState === 'confirmed'

@@ -4933,8 +4933,10 @@ each a few dozen lines — and hand-rolls to ~150–250 LOC of pure TypeScript.
    bundle size, not licence (OpenCV.js is Apache-2.0, which is permitted). RANSAC (v3) injects
    its RNG per the pure-core no-random rule.
 2. **Capture via a new `CameraAdapter` on `PlatformAdapter`** (`getUserMedia` / enumerate /
-   stream), mirroring the existing `SerialAdapter` contract (`isSupported` / request,
-   AbortError → null). Electron is Chromium, so one web code path serves web and desktop.
+   stream), mirroring the existing `SerialAdapter` contract (`isSupported` / request).
+   `NotAllowedError` maps to permission denial/null; device-access failures such as
+   `AbortError` propagate as retryable errors. Electron is Chromium, so one web code path
+   serves web and desktop.
 3. **v1 live overlay via CSS `matrix3d`** (the GPU performs the perspective divide; Canvas2D is
    affine-only and physically cannot warp). `matrix3d` covers the homography only — distortion
    correction (v2) cannot ride it and its live-undistort tech (WebGL shader / CPU remap /
@@ -8233,8 +8235,8 @@ the current Home proof before constructing a probe envelope.
 The CNC "3D result" pane (`Cnc3DPane`) exposes a drag handle on its left edge — the seam with the
 flexible canvas. Dragging it, or focusing it and pressing ArrowLeft/ArrowRight, sets the pane width,
 clamped to [200, 560] px. The chosen width persists in localStorage
-(`laserforge.cnc-3d-pane-width.v1`), guarded for non-browser contexts, so it survives reloads like the
-CNC Basic/Advanced disclosure (ADR-111). The three.js scene handle gains a `resize(w, h)` method, and
+(`laserforge.cnc-3d-pane-width.v1`), guarded for non-browser contexts, so it survives reloads. The
+three.js scene handle gains a `resize(w, h)` method, and
 a ResizeObserver re-fits the renderer and camera on every width change so the render-on-demand scene
 stays crisp instead of scaling a stale buffer.
 
@@ -13438,10 +13440,15 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
    readers, but their required results still scale with the parsed output. DXF uses two passes and
    retains blocks/output; STL retains the mesh and derived relief data; persistence materializes
    JSON. None has a proven constant peak-memory ceiling.
-7. **Document routes move off the UI thread without a streaming claim.** Native `.lf2`, SVG,
-   LightBurn `.lbrn`/`.lbrn2`, native `.lfml.json`, and LightBurn `.clb` run in a dedicated worker
-   with queue/progress/cancel semantics, but still perform whole-Blob text decoding plus JSON or
-   XML/DOM construction there.
+7. **Document routes move off the UI thread.** Native `.lf2`, LightBurn `.lbrn`/`.lbrn2`, native
+   `.lfml.json`, and LightBurn `.clb` run in a dedicated worker with queue/progress/cancel semantics
+   but still perform whole-Blob text decoding plus JSON or XML/DOM construction there. File-backed
+   SVG is the narrow exception: it consumes `Blob.stream()` through one streaming UTF-8 decoder,
+   validates incrementally with `saxes`, and builds the detached `linkedom` worker DOM from SAX
+   events before the established worker sanitizer and geometry walk. A missing `Blob.stream()`
+   keeps the whole-text worker path; constructor-time Worker failure keeps the disclosed main-thread
+   fallback. The SVG DOM, scene result, browser stream chunk, decoder state, and an individual XML
+   token remain content-scaled, so this is not a constant-memory or unlimited-import claim.
 
 ### Consequences
 
@@ -13456,8 +13463,9 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
   JSON persistence cost.
 - Queueing prevents concurrent reads on a shared worker client. Cancellation is immediate at the
   worker boundary; incremental parsers also observe their abort signal between chunks.
-- Worker placement alone does not authorize a streaming or memory-bounded claim for the document
-  routes, result reconstruction, or persistence path.
+- Worker placement alone does not authorize a memory-bounded claim for document reconstruction or
+  persistence. SVG input decoding is incremental, while its DOM and scene result remain complete;
+  the other document routes still materialize their whole decoded source.
 - No controller, firmware, settings, machine command, Frame/Start behavior, or physical-output
   semantics change.
 
@@ -13476,8 +13484,11 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
   `git diff --check`, and production web builds passed during the sequential implementation.
 - The implementation-and-audit record is
   `docs/audits/2026-07-30-large-file-repair-ledger.md`.
-- NOT verified: constant peak-memory behavior, document-route incremental parsing, every
-  operating-system storage/OOM threshold, a hardware air-cut, or physical output.
+- The SVG amendment adds direct malformed-input, chunk-boundary, legacy-attribute, sanitizer,
+  fallback, and stream-failure parity coverage plus a real-browser 24 MiB bounded-token import.
+- NOT verified: constant peak-memory behavior, SVGs larger than the 24 MiB browser fixture, other
+  document-route incremental parsing, every operating-system storage/OOM threshold, a hardware
+  air-cut, or physical output.
 
 ## ADR-270 - V-carve ladders complete one filled region before moving to the next (2026-07-31)
 
@@ -13955,6 +13966,69 @@ in 3D." Research and verified platform facts:
    pane is deleted; its Design/Bits tier chips and Simulate move into the
    viewport toolbar (the simulate pipeline is reused unchanged). Rule 7 and
    ADR-261 section 3 continue to hold: the viewport informs, never gates.
+
+### Amendment 3 (2026-08-01) - The drawing survives a page reload (DS-8f)
+
+Everything about a Studio session was ephemeral, which meant a refresh, a
+crash, or a closed tab discarded the drawing outright — and with it the record
+of what the last Apply created, so the next Apply after a reload duplicated the
+part instead of updating it (the defect ADR-272 Amendment 1's re-apply work
+otherwise fixed).
+
+1. **The durable slice is written to `localStorage`, not to the project.** The
+   sketch, the armed layer, the surface toggle, and the apply record persist
+   under one versioned key. `.lf2` is untouched: this is browser-local working
+   state, the same class as the 3D pane width (ADR-191), and it needs no schema
+   migration. Parametric design
+   data reaching the PROJECT file remains DS-9's job, unchanged by this.
+2. **History is deliberately NOT persisted.** An undo stack that outlives the
+   tab walks back into a project state that no longer exists. A reload costs the
+   undo depth and nothing else.
+3. **Storage is best-effort in both directions.** A quota error, private-mode
+   throw, or corrupt payload costs the restore and never the session; an
+   oversized sketch is skipped rather than truncated. Nothing here may block
+   drawing (rule 7), and every read treats the payload as untrusted input.
+4. **Precedence on open:** the in-memory stash first (this page's drawing), then
+   the saved drawing, then blank.
+
+### Amendment 4 (2026-08-01) - Edge grips stretch one axis, and the model gains an ellipse (DS-8g)
+
+The selection carried four corner grips, all of them uniform scales, because a
+per-axis stretch had nowhere to put its result: `SketchCircle` holds a single
+radius, so widening a circle would have deformed it into something the model
+could not represent. The layered carve the Studio exists for is built from
+nested rectangles, and "make this one 20 mm wider without making it taller" had
+no gesture at all — only two typed numbers in the inspector.
+
+1. **Four edge grips join the four corner grips.** A corner grip scales
+   uniformly, exactly as before; an edge grip stretches its own axis and reports
+   a factor of exactly `1` on the other, so the held dimension is untouched by
+   rounding as well as by intent. An edge grip is omitted only when its own axis
+   has no extent, where the factor is a division by zero rather than a resize.
+2. **`SketchEllipse` joins the entity union**, axis-aligned, with independent
+   radii. It exists to hold what a stretched circle becomes. A circle is NOT
+   re-expressed as an equal-axis ellipse: a circle drawn as a circle keeps its
+   radius, its diameter field, and its exact arcs.
+3. **Per-axis exactness is stated per kind, not assumed.** Rectangles with
+   square corners, lines, paths, circles-to-ellipses, and ellipses are exact. A
+   rounded rectangle's corner radius follows the SMALLER factor — a true stretch
+   makes the corners elliptical, which `RectangleSpec` cannot hold, and the
+   smaller factor keeps the fillet inside the shorter side while agreeing with
+   the uniform case when the factors are equal. An arc is BAKED to a path at the
+   sampled tolerance, because a stretched arc is an elliptical arc, which
+   neither this model nor `G2`/`G3` can express; the sampled polyline is the
+   honest form rather than an arc of a radius the operator never asked for.
+4. **`stretchEntities` is a separate operation from `scaleEntities`**, and
+   delegates to it whenever the two factors are equal. The two have different
+   exactness rules, and one function hiding that difference is how a precision
+   tool starts lying — in particular, a corner grip must never quietly bake an
+   arc.
+5. **The scene needed no change.** An ellipse materializes through the existing
+   `EllipseSpec` carrier that a circle already used, so the applied part stays
+   re-editable on the main canvas and `.lf2` gains no new shape.
+6. There is deliberately **no ellipse drawing tool**. The arm exists to make the
+   stretch honest; a tool for it is separable work.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01
@@ -14243,6 +14317,270 @@ claim physical qualification.
 - The research/model-fit record is `docs/audits/2026-08-01-cnc-bit-catalog-research.md`.
 - NOT verified: manufacturer SKU completeness, manufacturer feed recommendations, real spindle or
   collet compatibility, an air cut, a material cut, surface finish, or perceptual 3D fidelity.
+
+## ADR-276 - Profile cuts finish one part before travelling to the next (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+`orderInnerFirst` ordered a profile layer's toolpaths by containment depth alone: every inner
+contour in the scene, then every outer. The inner-before-outer property is load-bearing — cutting
+a hole after the outer that frees its part machines a workpiece that can move — but the global
+partition also meant the cutter visited every letter counter across a multi-part job before
+returning to the first part's outer. Field case (2026-08-01): a two-line "Drive / Safe"
+profile-on-path job cut one counter in the top word, dived to two counters in the bottom word,
+then travelled back to the top-left letter — three cross-field rapids before any letter was
+complete. ADR-270 already fixed the same class of defect for V-carve ladders by grouping on the
+source filled region.
+
+### Decision
+
+- `orderInnerFirst` (`src/core/cnc/profile-ordering.ts`) groups toolpaths into parts: each
+  top-level contour owns every contour nested inside it. Parts run in the order their top-level
+  contours appear in the input — the same source-order rule as ADR-270 — and inside a part the
+  order stays innermost-first, ties by input order, outer last.
+- A nested contour's owner is the first top-level contour containing its probe point; anything no
+  top-level contour contains owns itself, so lone open engravings keep their input position.
+- The duplicate `orderInnerFirst` copy in `compile-cnc-helpers.ts` is deleted; the roughing path
+  (`compile-cnc-job.ts`) and the finishing path (`finish-allowance.ts`) now share the one
+  `profile-ordering.ts` implementation, so both walk parts identically.
+
+### Consequences
+
+- A letter (or any part) is machined completely — counters, then its outer, at every depth —
+  before the cutter travels on. The safety ordering inside each part is unchanged; freeing part A
+  never affects part B's uncut counters, which sit inside B.
+- Single-part layers order exactly as before. Multi-part profile layers reorder, so multi-part
+  G-code snapshots change once; single-part snapshots stay byte-identical.
+- Travel distance is not globally minimized (parts follow scene order, matching ADR-270), only
+  degrouped cross-field hops are eliminated.
+
+### Verification
+
+- `profile-ordering.test.ts` pins part completion, part order by input, innermost-first within a
+  part, open-detail grouping, lone-contour position, and single/empty passthrough.
+- `compile-cnc-part-order.test.ts` pins the compiled pass sequence end-to-end for a two-letter
+  profile-on-path layer (counter ladder, outer ladder, next letter).
+- NOT verified: a physical cut. No hardware is available; the evidence is the compiled pass
+  sequence and the existing motion invariants.
+
+## ADR-277 - Line-art double-line pairing is provenance-scoped (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+> **Numbering note.** ADR-276 (profile part-major ordering) is claimed by the sibling PR from the
+> same session; this ADR takes the next number. ADR-262's CI uniqueness gate arbitrates races.
+
+### Context
+
+ADR-218 dedupes the two edges a boundary trace makes of one drawn stroke: a nested closed pair
+whose bounding boxes hug within one bit diameter on every side is treated as one drawn line, and
+only the selected edge (`lineArtContours`, default 'inner') is machined. The heuristic is purely
+geometric — and a letter glyph with a counter is geometrically the same picture. Field case
+(2026-08-01, "Drive / Safe" profile-on-path, 3.175 mm bit): a text "D" whose counter sits ~2.1 mm
+inside its outer on all four sides was classified as a traced ring, and the layer's 'outer'
+selection silently dropped the counter — the job cut a D with no hole. The "e" and "a" counters
+on the same layer survived only because their glyph bounding boxes extend far below the counter.
+O, o, 0, and Q glyphs lose their counters the same way; under the default 'inner' a D-like glyph
+loses its *outer* instead, which is worse. `lineArtContours` is a layer setting, so one traced
+object sharing a layer with text is enough to expose every glyph on that layer.
+
+### Decision
+
+- `collectLayerContours` stamps each collected contour with its source object family
+  (`sourceKind: 'imported-svg' | 'text' | 'traced-image' | 'shape'`).
+- `selectLineArtContours` takes an optional pairable set; rings outside it neither pair nor act
+  as pair parents. `lineArtPairableSet` (same module) excludes `text` and `shape` contours —
+  glyph counters and drawn-shape holes are real geometry, never duplicate traced edges.
+  `traced-image` and `imported-svg` contours keep the ADR-218 behavior unchanged.
+- No provenance (legacy fixtures, direct `cncGroupForLayer` callers) or nothing excluded means
+  no restriction — pure-trace scenes and existing tests stay byte-identical.
+
+### Consequences
+
+- Text and drawn shapes on profile/engrave layers always machine every contour, regardless of the
+  layer's `lineArtContours` setting and bit size.
+- An imported SVG of *outlined text* (text converted to paths upstream) still pairs — provenance
+  cannot see through an export. The 'both' setting remains the escape hatch there; accepted
+  residual, documented in the UI field's help.
+- The job111 double-cut protection (ADR-218's reason to exist) is untouched for traces.
+
+### Verification
+
+- `compile-cnc-line-art-provenance.test.ts` (new): a tight text glyph pair keeps both contours
+  under 'inner' and 'outer'; the same geometry as a traced image still selects one edge.
+- `line-art-contours.test.ts`: rings outside the pairable set never pair; pairable and
+  unpairable pairs coexist independently; the existing ADR-218 suite is unchanged and green.
+- NOT verified: a physical cut. No hardware is available; evidence is the compiled contour set.
+
+## ADR-278 - V-carve entry uses an opt-in emission-accurate contour ramp (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+CurveDesk's V-carve ladder reached each ring depth through discrete same-XY plunges. That motion is
+mathematically valid, but it concentrates load at entry and is a poor fit for a cutting-load
+position-loss investigation. Vectric documents that along-path ramping avoids vertical entry and
+reduces cutter wear, heat, and spindle/Z-axis load; its spiral profile mode descends over the whole
+perimeter and uses cutter pass depth to select the number of laps. LMT Onsrud likewise explains
+that a straight plunge can recut trapped chips and generate heat, while simultaneous XY/Z ramp-in
+motion reduces that entry dwell.
+
+Those sources establish a useful strategy, not a universal numeric setting. Vectric says a ramp
+angle is commonly supplied by the cutter manufacturer. Autodesk constrains both ramp angle and
+stepdown per revolution and warns that an entry must fit without gouging; its FeatureCAM guidance
+requires more XY travel for a non-center-cutting tool. Amana documents at least one 90-degree
+V-groove cutter as non-end-cutting and unable to plunge. A nominal diameter and included angle
+therefore do not establish center-cutting geometry, flute clearance, ramp angle, or material feed.
+
+### Decision
+
+1. V-carve exposes a dedicated optional `vCarveRampEntryDeg` setting. Absence (shown as 0 in the UI)
+   preserves the exact legacy stepped-plunge program; CurveDesk does not invent or auto-enable an
+   angle for an unknown cutter. It is deliberately separate from generic `rampEntryDeg`, which old
+   projects may retain after changing cut type and which V-carve previously ignored.
+2. For an enabled V-carve, every inward-offset ring starts at stock top at the deterministic
+   midpoint of its longest segment and descends continuously around that exact ring. Planning uses
+   the emitter's 0.001 mm coordinate grid. Job-origin placement can put a grid point on a binary
+   floating-point rounding tie, so each XY component is conservatively allowed to lose one emitted
+   quantum before segment length `L_i` is calculated. Its maximum descent capacity is then
+   `floor(L_i * tan(a) / 0.001)` Z quanta. One lap may use no more than both the sum of those
+   capacities and `floor(depthPerPass / 0.001)`; the lap count is the emitted target depth in quanta
+   divided by that conservative per-lap capacity, rounded up. Integer Z quanta are distributed by
+   cumulative segment capacity, so ordinary final G-code formatting and job-origin translation
+   cannot steepen a segment above the configured maximum. A separate full-depth cleanup lap
+   restores the requested V-carve geometry after the descending laps.
+3. All descending XYZ segments use the group's plunge feed. The level cleanup lap uses the normal
+   cutting feed. GRBL receives ordinary absolute `G1 X Y Z F` moves; this change adds no controller
+   dialect, live load feedback, adaptive feed, spindle, acceleration, or firmware behavior.
+4. The entered angle is a true maximum: it must be finite, greater than 0, and less than 90 degrees,
+   and it is never raised to a software minimum. Planning also requires a non-degenerate closed
+   contour at emitted precision and a safely representable JavaScript motion count. If a configured
+   entry cannot be represented, CurveDesk preserves the complete legacy stepped-plunge ladder and
+   reports a nonblocking Job Review advisory. It does not omit the layer, impose a predictive
+   segment budget, or create a new refusal.
+5. Every tiled ramp warns that per-tile derivation can create arbitrary segment endpoints, so tiled
+   files retain the entered angle only as `requested-max-angle-deg` provenance and explicitly do not
+   assert the ordinary final-emission maximum-angle guarantee. Tiling may also split a valid contour
+   ramp into a piece whose first point is already below stock top; that tile necessarily begins with
+   a direct plunge at the configured plunge feed. Export remains available under the frame-first
+   policy, while a separate warning toast and inert G-code provenance comment disclose that loss of
+   the low-load entry guarantee.
+6. The configured angle and any legacy fallback or tiled-entry caveat are written into CNC
+   provenance comments. The emitter revision advances to `adr-278-vcarve-contour-ramp-v1`.
+
+### Consequences
+
+- A qualified cutter can enter each V-carve ring without a same-XY downward cutting move, while
+  depth-per-pass and maximum-angle constraints both remain effective.
+- Small contours may require many laps. CurveDesk does not impose a predictive output-size cap;
+  only emission-precision or numeric representability failures retain legacy entry with disclosure.
+- Existing projects and new layers remain unchanged until an operator enters an exact
+  manufacturer-approved angle. The tool's SKU/datasheet, material, machine rigidity, and chip
+  evacuation still determine whether a real cut is appropriate.
+- Lower entry load is a risk reduction, not a coordinate-recovery mechanism. An open-loop machine
+  can still miss steps under cutting load, while controller status continues to reflect commanded
+  step accounting rather than independent physical-axis feedback.
+
+### Verification
+
+- Planner tests pin exact final depth, full-depth cleanup, deterministic entry point,
+  segment-by-segment angle and depth-per-pass bounds after 0.001 mm G-code rounding and a
+  half-quantum job-origin translation (including a 0.1-degree persisted maximum), absence of a
+  same-XY descent on a 0.171 mm-perimeter fixture, and numeric-domain fallback without substituting
+  an arbitrary maximum angle.
+- Compiler/emitter tests prove V-carve produces paired plunge-fed XYZ ramps and cut-fed cleanup
+  laps, emits no direct negative-Z plunge for the ramped fixture, and preserves the legacy path when
+  the setting is absent.
+- Preflight and tiling tests prove an invalid or numerically unrepresentable entry preserves the
+  legacy layer with an advisory, while every tiled entry remains exportable with requested-only
+  angle provenance and a boundary-clipped entry separately discloses its initial plunge.
+- Source record: `docs/audits/2026-08-01-cnc-vcarve-ramp-entry-acceptance.md`.
+- NOT verified: exact-cutter ramp capability, loaded-cut position retention, chip evacuation,
+  workholding, tool temperature, surface finish, or finished V-groove dimensions.
+
+## ADR-279 - Offline variable-data imposition plans every slot before output (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+CurveDesk already stores bounded offline CSV rows, serial values, date/time fields, and cut-setting
+fields in a project. Compilation currently resolves every variable-text object from one shared
+record and serial context, while an ordinary array repeats the resulting design. A production sheet
+therefore cannot yet assign the next record and serial value to each copy.
+
+LightBurn's official Variable Text reference documents automatic arrays and offsets plus explicit
+current, start, end, and advance-by controls. That is comparison evidence for the operator workflow,
+not authority to copy an internal format or to relax CurveDesk's offline, deterministic, and
+frame-first contracts. ADR-164 deliberately deferred automatic imposition until those contracts
+could be specified. ADR-279 narrowly amends ADR-164 to adopt bounded offline imposition; live data
+sources and barcode/QR generation remain deferred.
+
+### Decision
+
+1. Adopt a bounded, offline variable-data imposition workflow for one selected design unit. The
+   first delivery is transient: it does not change the persisted project schema.
+2. A pure sequence planner accepts the current `ProjectVariableData` and a caller-supplied ordered
+   slot-seed list. It records ordered slot indices and variable contexts, not the seed values or
+   bounds-derived translations.
+   Slot zero records the current record index and serial value; every later slot applies the existing
+   `advanceVariableSequence(..., 'next')` semantics, including record wrap, serial wrap, and
+   `advanceBy` as the per-slot stride. The plan records the exact `nextVariables` state after all
+   supplied seeds. Existing array validation and the one-through-500 copy rule remain with the
+   layout request; the sequence planner adds no second cap, clamp, or rewrite.
+3. The first transient workflow retains the original grid `ArraySpec`, captures one clock for the
+   whole batch, and renders every slot before calculating final placements. It uses the maximum
+   actual rendered envelope with the retained rows, columns, and spacing, then derives row-major
+   `ArrayPlacement` values. This prevents a longer later value from overlapping merely because the
+   old layout measured only the first record. Circular imposition remains deferred until its
+   variable-width collision policy is specified; the sequence planner itself is layout-independent.
+4. The prepared output owns an exact slot manifest and post-success variable state bound to its
+   artifact identity. Preview, Save Project, Frame, compile failure, cancellation, stale preparation,
+   and retry consume zero records. `manual` advancement changes on neither output trigger;
+   `after-successful-export` applies the saved state once only after successful Save G-code export,
+   including tiled G-code and the experimental file-only `.rd` path; and
+   `after-successful-stream` applies it once only after a fully completed stream. Recovery must not
+   double-advance a policy-matched artifact.
+5. Frame remains the only guard. This program adds no block, refusal, gate, cap, clamp, delay, hide,
+   disable, rewrite, or confirmation to preview, project save, import/export, Apply, output, Frame,
+   or Start beyond the existing factual compile-integrity, transport, and handoff preconditions.
+   Placement and setup concerns are editor or Job Review information. This ADR does not couple
+   imposition to camera or stock-simulation evidence.
+6. Live databases, barcode/QR generation, camera-assisted filling, and persisted editable
+   imposition remain out of scope. Persisting the layout requires a later decision only if the
+   transient workflow proves insufficient.
+
+### Consequences
+
+- Operators can prepare a whole offline production sheet while preserving the existing meaning of
+  current record, serial range, and advance-by.
+- Planning and cursor movement are independently testable before UI, persistence, output, or machine
+  code changes. Existing single-record output remains byte-identical until a batch is explicitly
+  requested.
+- The full feature needs policy-matched artifact advancement and recovery tests before release. A
+  visual grid alone is incomplete because it could silently skip or double-consume production
+  records.
+- The existing grid array generator currently yields one through 500 placements. That inherited
+  behavior does not establish acceptable interactive performance; async materialization and a
+  measured 500-placement pressure fixture are still required. Imposition adds no second size rule.
+
+### Verification
+
+- The first slice adds pure planner tests for slot order/count, wrap, stride, determinism, input
+  immutability, geometry independence, no planner cap/rewrite, and the exact post-batch state.
+- Later slices require renderer fixtures with unequal string widths, artifact identity and stale-state
+  tests, all three advancement policies across single-file/tiled `.gcode` export, file-only `.rd`
+  export, and stream triggers, success and failure tests, recovery tests, and a real-browser
+  success/error/empty/edge workflow.
+- NOT verified by this decision: production throughput, a complete imposed-sheet UI, persisted
+  imposition, physical placement, camera accuracy, controller tracking, or output on hardware.
 
 ## ADR-280 - One design language for the operations rail (2026-08-01)
 

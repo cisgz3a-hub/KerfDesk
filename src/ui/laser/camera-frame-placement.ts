@@ -19,8 +19,8 @@ export function resolveCameraSafeFramePlacement(
 ): ResolvedJobPlacement {
   // Frame is the physical placement authority. Camera alignment, Home state,
   // and manual position confirmation may inform the review, but they do not
-  // veto a tool-off trace the operator can directly watch. The resulting exact
-  // artifact captures camera state; changing it after Frame invalidates Start.
+  // veto a tool-off trace the operator can directly watch. The exact artifact
+  // captures compiled placement and origin, not later camera-only UI state.
   void project;
   return resolveJobPlacement(jobPlacement, machine);
 }

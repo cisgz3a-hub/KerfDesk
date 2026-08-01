@@ -7,6 +7,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LINE_CATEGORY } from '../../core/gcode-view';
+import type { GcodeInspectionSource } from './gcode-inspection-source';
+import type { GcodeSourceLineIndex } from './gcode-source-line-index';
+import { useGcodeSourceLines } from './use-gcode-source-lines';
 import { explainLine } from './word-glossary';
 
 const ROW_HEIGHT_PX = 18;
@@ -26,7 +29,8 @@ const CATEGORY_BADGE: Readonly<Record<number, string>> = {
 };
 
 export function InspectorSourcePane(props: {
-  readonly lines: ReadonlyArray<string>;
+  readonly source: GcodeInspectionSource;
+  readonly sourceIndex: GcodeSourceLineIndex;
   readonly categories: Uint8Array;
   /** Line the playhead is executing; drives highlight and auto-scroll. */
   readonly activeLine: number | null;
@@ -50,17 +54,33 @@ export function InspectorSourcePane(props: {
   // manual scroll: only correct when it has actually left the window.
   useEffect(() => {
     const element = scrollRef.current;
-    if (element === null || activeLine === null || activeLine >= props.lines.length) return;
+    if (element === null || activeLine === null || activeLine >= props.sourceIndex.starts.length)
+      return;
     const top = activeLine * ROW_HEIGHT_PX;
     const bottom = top + ROW_HEIGHT_PX;
     if (top >= element.scrollTop && bottom <= element.scrollTop + element.clientHeight) return;
     element.scrollTop = Math.max(0, top - element.clientHeight / 2);
-  }, [activeLine, props.lines.length]);
+  }, [activeLine, props.sourceIndex.starts.length]);
 
   const shown = useMemo(
-    () => visibleRange(scrollTop, viewportPx, props.lines.length),
-    [scrollTop, viewportPx, props.lines.length],
+    () => visibleRange(scrollTop, viewportPx, props.sourceIndex.starts.length),
+    [scrollTop, viewportPx, props.sourceIndex.starts.length],
   );
+  const visible = useGcodeSourceLines(props.source, props.sourceIndex, shown.first, shown.last);
+  const selectedInWindow =
+    props.selectedLine !== null &&
+    props.selectedLine >= shown.first &&
+    props.selectedLine < shown.last;
+  const selected = useGcodeSourceLines(
+    props.source,
+    props.sourceIndex,
+    selectedInWindow || props.selectedLine === null ? 0 : props.selectedLine,
+    selectedInWindow || props.selectedLine === null ? 0 : props.selectedLine + 1,
+  );
+  const selectedText = selectedInWindow
+    ? (visible.lines[props.selectedLine - shown.first] ?? null)
+    : (selected.lines[0] ?? null);
+  const sourceError = visible.error ?? selected.error;
 
   return (
     <div style={paneStyle} aria-label="Program source">
@@ -69,9 +89,12 @@ export function InspectorSourcePane(props: {
         style={scrollStyle}
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
-        <div style={{ height: props.lines.length * ROW_HEIGHT_PX, position: 'relative' }}>
-          {props.lines.slice(shown.first, shown.last).map((text, offset) => {
+        <div
+          style={{ height: props.sourceIndex.starts.length * ROW_HEIGHT_PX, position: 'relative' }}
+        >
+          {Array.from({ length: shown.last - shown.first }, (_, offset) => {
             const line = shown.first + offset;
+            const text = visible.lines[offset] ?? '';
             return (
               <SourceRow
                 key={line}
@@ -86,7 +109,8 @@ export function InspectorSourcePane(props: {
           })}
         </div>
       </div>
-      <WordDetail line={props.selectedLine} text={lineText(props.lines, props.selectedLine)} />
+      <SourceError error={sourceError} />
+      <WordDetail line={props.selectedLine} text={selectedText} />
     </div>
   );
 }
@@ -117,6 +141,15 @@ function SourceRow(props: {
   );
 }
 
+function SourceError(props: { readonly error: string | null }): JSX.Element | null {
+  if (props.error === null) return null;
+  return (
+    <p role="alert" style={sourceErrorStyle}>
+      Source unavailable: {props.error}
+    </p>
+  );
+}
+
 function rowBackground(isActive: boolean, isSelected: boolean): string {
   if (isActive) return 'var(--lf-accent-wash)';
   return isSelected ? 'var(--lf-bg-2)' : 'transparent';
@@ -133,7 +166,9 @@ function WordDetail(props: {
   return (
     <div style={detailStyle}>
       <div style={detailHeadStyle}>Line {props.line + 1}</div>
-      {words.length === 0 ? (
+      {props.text === null ? (
+        <p style={detailNoWordsStyle}>Loading source line...</p>
+      ) : words.length === 0 ? (
         <p style={detailNoWordsStyle}>No G-code words on this line.</p>
       ) : (
         <dl style={detailListStyle}>
@@ -159,11 +194,6 @@ export function visibleRange(
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT_PX) - OVERSCAN_ROWS);
   const rows = Math.ceil(viewportPx / ROW_HEIGHT_PX) + OVERSCAN_ROWS * 2;
   return { first, last: Math.min(lineCount, first + rows) };
-}
-
-function lineText(lines: ReadonlyArray<string>, line: number | null): string | null {
-  if (line === null) return null;
-  return lines[line] ?? null;
 }
 
 const paneStyle: React.CSSProperties = {
@@ -252,6 +282,14 @@ const detailEmptyStyle: React.CSSProperties = {
   margin: 0,
   padding: '6px 8px',
   color: 'var(--lf-text-muted)',
+  fontSize: 'var(--lf-text-xs)',
+  borderTop: '1px solid var(--lf-border)',
+};
+
+const sourceErrorStyle: React.CSSProperties = {
+  margin: 0,
+  padding: '6px 8px',
+  color: 'var(--lf-danger)',
   fontSize: 'var(--lf-text-xs)',
   borderTop: '1px solid var(--lf-border)',
 };

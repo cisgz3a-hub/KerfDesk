@@ -7,22 +7,12 @@ import { useEffect } from 'react';
 import { useCameraAlignWizardStore } from './camera-align-wizard-store';
 import { burnAlignMarkers } from './burn-markers-step';
 import { useLaserStore } from '../../state/laser-store';
-import { useStore } from '../../state';
-import { useCameraStore } from '../../state/camera-store';
 
 export function SetupStep(props: { readonly note: string | null }): JSX.Element {
   const powerPercent = useCameraAlignWizardStore((s) => s.powerPercent);
   const speedMmPerMin = useCameraAlignWizardStore((s) => s.speedMmPerMin);
   const setStep = useCameraAlignWizardStore((s) => s.setStep);
   const connected = useLaserStore((s) => s.connection.kind === 'connected');
-  const homingState = useLaserStore((s) => s.homingState);
-  const trustedPositionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
-  const homingEnabled = useStore((s) => s.project.device.homing.enabled);
-  const confirmedPositionEpoch = useCameraStore((s) => s.confirmedPositionEpoch);
-  const confirmPositionEpoch = useCameraStore((s) => s.confirmPositionEpoch);
-  const positionReady = homingEnabled
-    ? homingState === 'confirmed'
-    : confirmedPositionEpoch === trustedPositionEpoch;
 
   const burn = async (): Promise<void> => {
     setStep({ kind: 'burning' });
@@ -51,7 +41,7 @@ export function SetupStep(props: { readonly note: string | null }): JSX.Element 
         <button
           type="button"
           className="lf-btn lf-btn--primary"
-          disabled={!connected || !positionReady}
+          disabled={!connected}
           onClick={() => void burn()}
           title="Burn a temporary marker job without changing the project (normal preflight + confirmation)."
         >
@@ -69,37 +59,7 @@ export function SetupStep(props: { readonly note: string | null }): JSX.Element 
       {!connected ? (
         <p style={noteStyle}>Connect the machine to burn — or skip to detection.</p>
       ) : null}
-      {connected && !positionReady ? (
-        <MarkerBurnPositionCheck
-          homingEnabled={homingEnabled}
-          onConfirm={() => confirmPositionEpoch(trustedPositionEpoch)}
-        />
-      ) : null}
       {props.note !== null ? <p style={errStyle}>{props.note}</p> : null}
-    </div>
-  );
-}
-
-function MarkerBurnPositionCheck(props: {
-  readonly homingEnabled: boolean;
-  readonly onConfirm: () => void;
-}): JSX.Element {
-  if (props.homingEnabled) {
-    return <p style={errStyle}>Home the machine before burning the absolute bed marker pattern.</p>;
-  }
-  return (
-    <div style={rowStyle}>
-      <p style={errStyle}>
-        Confirm that controller coordinates match the physical bed before burning markers.
-      </p>
-      <button
-        type="button"
-        className="lf-btn"
-        onClick={props.onConfirm}
-        title="Confirm the controller coordinate frame matches the machine bed for this session. Reconnect, reset, alarm, sleep, or homing invalidates it."
-      >
-        Confirm bed coordinates
-      </button>
     </div>
   );
 }

@@ -8,12 +8,13 @@
 // layers; this module deliberately adds none of its own.
 
 import { sampleArcPoints } from '../geometry';
-import { rectangleToPolylines } from '../shapes/primitives';
+import { ellipseToPolylines, rectangleToPolylines } from '../shapes/primitives';
 import type { Polyline, Vec2 } from '../scene';
 import {
   sanitizeEntity,
   type SketchArc,
   type SketchCircle,
+  type SketchEllipse,
   type SketchEntity,
   type SketchPath,
   type SketchRectangle,
@@ -36,6 +37,8 @@ export function entityToPolylines(entity: SketchEntity): ReadonlyArray<Polyline>
       return [arcPolyline(clean)];
     case 'circle':
       return [circlePolyline(clean)];
+    case 'ellipse':
+      return [ellipsePolyline(clean)];
     case 'rect':
       return rectanglePolylines(clean);
     case 'path':
@@ -56,6 +59,26 @@ function arcPolyline(entity: SketchArc): Polyline {
 function circlePolyline(entity: SketchCircle): Polyline {
   const sampled = sampleArcPoints(entity.center, entity.radiusMm, 0, FULL_TURN_RAD);
   return { points: withoutClosingDuplicate(sampled), closed: true };
+}
+
+// ellipseToPolylines inscribes the outline in the local box [0,w] x [0,h] and
+// repeats the first point for renderers that never close a path; the sketch
+// places it by its centre and carries closure in the flag, so both are undone
+// here rather than re-deriving the sampler's adaptive segment count.
+function ellipsePolyline(entity: SketchEllipse): Polyline {
+  const local = ellipseToPolylines({
+    widthMm: entity.radiusXMm * 2,
+    heightMm: entity.radiusYMm * 2,
+  })[0];
+  if (local === undefined) return { points: [], closed: true };
+  const offset: Vec2 = {
+    x: entity.center.x - entity.radiusXMm,
+    y: entity.center.y - entity.radiusYMm,
+  };
+  return {
+    points: withoutClosingDuplicate(local.points).map((point) => translate(point, offset)),
+    closed: true,
+  };
 }
 
 function rectanglePolylines(entity: SketchRectangle): ReadonlyArray<Polyline> {

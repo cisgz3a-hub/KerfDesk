@@ -9,6 +9,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { buildPreviewToolpath } from './draw-preview';
+import { previewRouteSource } from './executable-plan-preview-route';
 import { previewIssueFor } from './preview-status';
 
 describe('preview preparation failures', () => {
@@ -35,6 +36,7 @@ describe('preview preparation failures', () => {
     const toolpath = buildPreviewToolpath(hugeRasterProject());
 
     expect(previewIssueFor(toolpath)).toBeNull();
+    expect(previewRouteSource(toolpath)).toBe('legacy-toolpath');
   });
 });
 

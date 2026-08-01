@@ -15,6 +15,7 @@ import type { SketchEntity } from '../../core/design';
 import type { Vec2 } from '../../core/scene';
 import type { ArcEntity } from './design-fields-arc';
 import type { CircleEntity } from './design-fields-circle';
+import type { EllipseEntity } from './design-fields-ellipse';
 import type { LineEntity } from './design-fields-line';
 import type { RectEntity } from './design-fields-rect';
 import { DEG_TO_RAD, RAD_TO_DEG, type MeasurementKey } from './design-field-types';
@@ -125,6 +126,25 @@ const CIRCLE_ANNOTATIONS: AnnotationTable<CircleEntity> = {
   }),
 };
 
+// Both call-outs run through the centre, so the width and height readings sit
+// on the axes they measure rather than floating beside the outline.
+const ELLIPSE_ANNOTATIONS: AnnotationTable<EllipseEntity> = {
+  width: (entity) => ({
+    kind: 'linear',
+    fromMm: { x: entity.center.x - entity.radiusXMm, y: entity.center.y },
+    toMm: { x: entity.center.x + entity.radiusXMm, y: entity.center.y },
+    offsetMm: { x: 0, y: 0 },
+  }),
+  height: (entity) => ({
+    kind: 'linear',
+    fromMm: { x: entity.center.x, y: entity.center.y - entity.radiusYMm },
+    toMm: { x: entity.center.x, y: entity.center.y + entity.radiusYMm },
+    offsetMm: { x: 0, y: 0 },
+  }),
+  centerX: (entity) => ({ kind: 'point', atMm: entity.center }),
+  centerY: (entity) => ({ kind: 'point', atMm: entity.center }),
+};
+
 const LINE_ANNOTATIONS: AnnotationTable<LineEntity> = {
   // Offset perpendicular to the line itself, so it reads as that line's length.
   length: (entity) => ({
@@ -191,6 +211,8 @@ export function annotationFor(
       return pickAnnotation(RECT_ANNOTATIONS, key, entity);
     case 'circle':
       return pickAnnotation(CIRCLE_ANNOTATIONS, key, entity);
+    case 'ellipse':
+      return pickAnnotation(ELLIPSE_ANNOTATIONS, key, entity);
     case 'line':
       return pickAnnotation(LINE_ANNOTATIONS, key, entity);
     case 'arc':

@@ -61,6 +61,7 @@ export function translateEntity(
     case 'rect':
       return { ...entity, id: newId, origin: shift(entity.origin) };
     case 'circle':
+    case 'ellipse':
     case 'arc':
       return { ...entity, id: newId, center: shift(entity.center) };
     case 'line':

@@ -45,10 +45,12 @@ import {
   setSessionConstruction,
   updateSessionMove,
 } from './design-session-mutations';
+import { readPersistedSession } from './design-session-storage';
 import {
   createDesignSession,
   markSessionApplied,
   redoSession,
+  restoreDesignSession,
   sessionSketch,
   undoSession,
   withSketch,
@@ -122,10 +124,7 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   session: null,
   stash: null,
 
-  openStudio: () =>
-    set((state) =>
-      state.session !== null ? state : { session: state.stash ?? createDesignSession() },
-    ),
+  openStudio: () => set(openedSession),
 
   // No confirmation, no "discard changes?" — the session survives in the stash
   // and the operator gets it back untouched on reopen.
@@ -215,6 +214,16 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   toggleSurface3d: () =>
     set(mapSession((session) => ({ ...session, surface3d: !session.surface3d }))),
 }));
+
+// Reopening prefers the stash (this page's drawing, untouched), then the
+// drawing the last page left behind (ADR-272 Amendment 3), and only then
+// starts blank.
+function openedSession(state: DesignStudioState): Partial<DesignStudioState> {
+  if (state.session !== null) return state;
+  if (state.stash !== null) return { session: state.stash };
+  const saved = readPersistedSession();
+  return { session: saved === null ? createDesignSession() : restoreDesignSession(saved) };
+}
 
 // Every session mutation goes through here so a closed Studio silently ignores
 // stray actions instead of resurrecting a session.

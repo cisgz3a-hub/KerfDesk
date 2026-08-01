@@ -253,6 +253,21 @@ describe('runCncPreflight', () => {
     );
   });
 
+  it('reports when an unplannable V-carve ramp uses the legacy stepped entry', () => {
+    const base = projectWithCnc({ cutType: 'v-carve', vCarveRampEntryDeg: Number.NaN });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 20)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'cnc-vcarve-entry-fallback',
+        message: expect.stringContaining('legacy stepped-plunge entry'),
+      }),
+    );
+  });
+
   it('flags a layer whose shapes are too narrow for the bit instead of dropping it silently', () => {
     // Default bit is 3.175 mm: a 2 mm pocket offsets away entirely and used
     // to vanish from the job with no message while other layers still cut.

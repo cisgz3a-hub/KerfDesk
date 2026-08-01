@@ -1,7 +1,7 @@
 // OverlayControls â€” the Camera panel's workspace-overlay row (ADR-107,
 // LightBurn "Camera Control" parity): show/hide on canvas, a fade slider, and
 // the still-vs-live source choice. Camera placement stays latched after hiding
-// the image so relative origins cannot silently shift camera-positioned work.
+// the image so its status remains visible until the operator exits it.
 
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
@@ -161,7 +161,7 @@ function ExitPlacementButton(props: { readonly onExit: () => void }): JSX.Elemen
       type="button"
       className="lf-btn"
       onClick={props.onExit}
-      title="Leave camera placement mode. Absolute Coordinates remains selected, but the camera-specific Start and Frame gate is removed."
+      title="Leave camera placement mode. Start-from remains under operator control, and the completed Frame verifies exact motion."
     >
       Exit camera placement
     </button>
@@ -172,7 +172,8 @@ function CameraPlacementStatus(props: { readonly placement: PlacementControls })
   const { placement } = props;
   return (
     <div role="status" style={placementStatusStyle(placement.positionTrusted)}>
-      <strong>Camera placement active.</strong> Absolute Coordinates is locked.{' '}
+      <strong>Camera placement active.</strong> Start-from remains under operator control; verify
+      the exact placement with Frame.{' '}
       {positionTrustCopy(placement.homingEnabled, placement.positionTrusted)}
       {!placement.homingEnabled && !placement.positionTrusted ? (
         <button
@@ -192,7 +193,7 @@ function positionTrustCopy(homingEnabled: boolean, trusted: boolean): string {
   if (homingEnabled) {
     return trusted
       ? 'Machine position is trusted from Home.'
-      : 'Home the machine before Frame or Start.';
+      : 'Home is not confirmed; watch Frame to verify the exact placement.';
   }
   return trusted
     ? 'Controller-to-bed position is confirmed for this session.'

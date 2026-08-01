@@ -1,12 +1,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createProject } from '../../core/scene';
 import {
   DEFAULT_EXPERIMENTAL_LASER_FEATURES,
   useExperimentalLaserFeatures,
 } from '../state/experimental-laser-features';
-import { useStore } from '../state/store';
 import { useCameraAlignWizardStore } from './align-wizard/camera-align-wizard-store';
 import { AutoAlignControls } from './AutoAlignControls';
 
@@ -18,13 +16,6 @@ let host: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  const project = createProject();
-  useStore.setState({
-    project: {
-      ...project,
-      device: { ...project.device, homing: { enabled: true, direction: 'front-left' } },
-    },
-  });
   useExperimentalLaserFeatures.setState({ features: DEFAULT_EXPERIMENTAL_LASER_FEATURES });
   useCameraAlignWizardStore.getState().closeWizard();
   host = document.createElement('div');
@@ -38,7 +29,7 @@ afterEach(() => {
 });
 
 describe('AutoAlignControls', () => {
-  it('requires the Labs opt-in but allows no-homing profiles to use epoch confirmation', () => {
+  it('requires the Labs opt-in and then exposes the marker alignment flow', () => {
     act(() => root.render(<AutoAlignControls />));
     const button = alignButton(host);
     expect(button.disabled).toBe(true);
@@ -48,20 +39,7 @@ describe('AutoAlignControls', () => {
     expect(button.disabled).toBe(false);
     act(() => button.click());
     expect(host.textContent).toContain('Align camera to bed');
-
-    act(() => {
-      useStore.setState((state) => ({
-        project: {
-          ...state.project,
-          device: {
-            ...state.project.device,
-            homing: { ...state.project.device.homing, enabled: false },
-          },
-        },
-      }));
-    });
-    expect(button.disabled).toBe(false);
-    expect(button.title).toContain('Confirm bed coordinates');
+    expect(button.title).toContain('burn the marker target');
     expect(useCameraAlignWizardStore.getState().open).toBe(true);
   });
 });

@@ -6,11 +6,6 @@ import {
   IDENTITY_TRANSFORM,
   type Project,
 } from '../../core/scene';
-import {
-  CAMERA_ABSOLUTE_COORDINATES_MESSAGE,
-  CAMERA_HOME_REQUIRED_MESSAGE,
-  CAMERA_POSITION_CONFIRMATION_REQUIRED_MESSAGE,
-} from '../camera/camera-placement-safety';
 import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
 
@@ -88,9 +83,6 @@ describe('Start camera-placement integration', () => {
     );
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.warnings).not.toContain(CAMERA_ABSOLUTE_COORDINATES_MESSAGE);
-    }
   });
 
   it('starts without a completed Home on a homing-capable machine once framed', () => {
@@ -103,9 +95,6 @@ describe('Start camera-placement integration', () => {
     });
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.warnings).not.toContain(CAMERA_HOME_REQUIRED_MESSAGE);
-    }
   });
 
   it('starts without an epoch-bound confirmation on a no-homing machine once framed', () => {
@@ -120,8 +109,5 @@ describe('Start camera-placement integration', () => {
     });
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.warnings).not.toContain(CAMERA_POSITION_CONFIRMATION_REQUIRED_MESSAGE);
-    }
   });
 });

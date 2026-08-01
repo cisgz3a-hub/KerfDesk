@@ -17,6 +17,7 @@ import {
   rebuildCanvasPlanForGcode,
   reportedWorkPositionMm,
 } from './canvas-motion-plan';
+import { canvasExecutablePlan } from './canvas-preview-motion';
 
 const JOB: Job = {
   groups: [
@@ -207,9 +208,14 @@ describe('CanvasMotionPlan', () => {
       statusQuery: 'none',
     });
     expect(grbl.capability).toBe('realtime');
+    expect(canvasExecutablePlan(grbl)?.compatibility.exactProgram).toBe(gcode);
+    expect(canvasExecutablePlan(grbl)?.controller.emitter).toBe('grbl');
+    expect(JSON.stringify(grbl)).not.toContain('curvedesk.executable-plan');
     expect(grbl.framePerimeter[0]).toEqual({ x: 10, y: 20 });
     expect(marlin.capability).toBe('settle-only');
+    expect(canvasExecutablePlan(marlin)?.controller.emitter).toBe('marlin');
     expect(ruida.capability).toBe('file-only');
+    expect(canvasExecutablePlan(ruida)).toBeUndefined();
     expect(ruida.framePerimeter).toEqual([]);
     expect(ruida.jobStart).toEqual({ x: 10, y: 20 });
   });
@@ -231,6 +237,19 @@ describe('CanvasMotionPlan', () => {
     expect(markers.framePerimeter).toEqual(full.framePerimeter);
     expect(markers.coordinateFrame).toEqual(full.coordinateFrame);
     expect(markers.manifest.blocks).toEqual([]);
+    expect(canvasExecutablePlan(markers)).toBeUndefined();
+  });
+
+  it('keeps the legacy canvas plan when ExecutablePlan v1 cannot represent the program', () => {
+    const plan = buildCanvasMotionPlan({
+      gcode: 'G21\nG90\nG81 X10 Y20 Z-3 R1',
+      prepared: prepared(),
+      machine,
+      statusQuery: 'realtime-report',
+    });
+
+    expect(plan.manifest.blocks.length).toBeGreaterThan(0);
+    expect(canvasExecutablePlan(plan)).toBeUndefined();
   });
 
   it('renders an origin-anchored start artwork-relative when the bed position is unverified', () => {
@@ -298,6 +317,7 @@ describe('CanvasMotionPlan', () => {
 
     const resumed = rebuildCanvasPlanForGcode(plan, 'G21\nG90\nG1 Z-2.000 F300');
     expect(resumed.cncPassSpans).toBeUndefined();
+    expect(canvasExecutablePlan(resumed)).toBeUndefined();
   });
 
   it('keeps CNC pass spans when a current-position start adds park lines', () => {

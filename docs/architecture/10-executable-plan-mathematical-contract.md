@@ -5,8 +5,16 @@
 **Machine-readable schema:**
 [`../schemas/executable-plan-v1.schema.json`](../schemas/executable-plan-v1.schema.json).
 
-**Status:** v1 sidecar is implemented; the dynamics, routing, consumer migration, calibrated
-models, and physical coupons below are staged requirements, not shipped claims.
+**Status:** v1 sidecar is implemented. The route-capable started-job motion overlay and the
+non-live 2D preview now draw from its ordered motions only after exact parity with their legacy
+route at emitted coordinate precision. Runtime start-basis differences, file-only or marker-only
+plans, resume plans, controlled laser-off feed differences, CNC boundary-retract differences, and
+streamed rasters retain the relevant legacy route. Sidecar errors do the same. The large-job Worker
+carries only a verified derived preview route across its structured-clone boundary; it does not
+duplicate the full v1 compatibility carrier. These are rollback-preserving integration slices, not
+completion of preview migration. Bounds, timing, Frame, recovery, native output, dynamics,
+routing, calibrated models, and physical coupons below remain staged requirements, not shipped
+claims.
 
 ## 1. Purpose and evidence boundary
 
@@ -387,6 +395,41 @@ After v1 parity is stable, one pull request at a time moves these consumers to t
 
 Each migration must compare old and new behavior on the adversarial corpus and retain a rollback
 path until parity is demonstrated. No consumer may silently construct a competing motion order.
+
+The first integration slice applies that rule to the started-job 2D motion overlay. It associates
+the parity-verified plan process-locally with the runtime-seeded manifest, without changing the
+serialized recovery artifact, and compares every preview-relevant line, intent, point, length, and
+cumulative route value exactly. Matching overlays read `plan.motions`; non-matching runtime start
+bases retain the old overlay without changing bytes, preflight, Frame, or Start authorization.
+Marker-only and resumed overlays remain explicitly staged with recovery.
+
+The second integration slice applies the same rule to the non-live 2D preview. Ordinary in-process
+previews keep the plan association in a `WeakMap`, preserving the public `Toolpath` object shape;
+ADR-244's large-job Worker explicitly serializes only the verified plan-derived route. The drawing
+consumer selects that route, while timeline, 3D, CNC-removal metadata, and other rich legacy
+`Toolpath` consumers remain unchanged for their own later slices. Current-position jobs fall back
+regardless of their numeric XY because v1 does not carry that live start basis. Any ordered segment
+kind, coordinate, cumulative segment-distance allocation, total route-length mismatch, or cut step
+without two drawable points or whose declared scrubber length disagrees with its polyline geometry
+also falls back. ADR-243 streamed rasters also
+fall back because v1's exact-program carrier would defeat their bounded-memory row-provider path;
+a streaming plan representation is required before that case can migrate. CNC currently falls back
+because the emitted plan includes the preamble safe-Z rise and postamble retract that
+`toolpath-cnc.ts` deliberately omits at the job boundaries. That source-confirmed difference is not
+hidden by a projection rule; reconciling it requires its own reviewed compatibility decision.
+
+The third integration slice applies the rule to the Start-time calculated bounds held in
+`PreparedJobMetrics.jobBounds` and `PreparedJobMetrics.motionBounds`. The first value reads the
+plan's process-only XY bounds; the second reads its all-motion XY bounds. Both values change
+authority together only when both agree with the existing prepared-Job calculations at the three
+decimal places emitted for millimetre coordinates. A missing sidecar or either disagreement keeps
+both legacy values. Current-position jobs always retain the legacy runtime start basis, even at
+numeric `(0, 0)`, and rotary jobs retain design-surface bounds because the emitted plan is already
+scaled into machine space. Realtime and settle-only Start preparation reuse the exact plan object
+already associated with the canvas; file-only preparation constructs the same verified sidecar.
+This slice deliberately leaves duration, park calculation, Frame-specific bounds, Frame motion,
+recovery, and emitted bytes unchanged. In particular, a plan all-motion envelope widened by its
+initial approach or terminal park falls back instead of inventing an undocumented projection rule.
 
 ### The Inspector is explicitly out of scope for v1
 

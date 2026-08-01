@@ -5,11 +5,12 @@
 // Camera Mode off entirely. The Electron renderer is Chromium and exposes the
 // same API, so this one implementation serves both web and desktop.
 //
-// Permission contract mirrors webSerial: a user "deny" (NotAllowedError) or a
-// cancelled prompt (AbortError) resolves to null; any other failure (camera in
-// use, hardware error) propagates so the UI can surface it.
+// Permission refusal (NotAllowedError) resolves to null. Device-access
+// failures such as AbortError/NotReadableError propagate so the UI can offer
+// recovery without mislabeling them as permission denial.
 
 import type { CameraAdapter, CameraDevice, CameraStream, NetworkCamera } from '../types';
+import { cameraStreamFromMediaStream } from './web-camera-stream';
 
 const NETWORK_CAMERA_PORT = 8080;
 const NETWORK_CAMERA_PATH = '/media/getCapturePhoto';
@@ -44,7 +45,7 @@ async function listCameras(): Promise<ReadonlyArray<CameraDevice>> {
 async function openStream(deviceId?: string): Promise<CameraStream | null> {
   if (!isSupported()) return null;
   try {
-    return makeCameraStream(await requestStream(deviceId), deviceId);
+    return cameraStreamFromMediaStream(await requestStream(deviceId), deviceId);
   } catch (err) {
     if (isPermissionDenied(err)) return null;
     // A stale or pre-permission-blank deviceId over-constrains getUserMedia
@@ -52,7 +53,7 @@ async function openStream(deviceId?: string): Promise<CameraStream | null> {
     // the first stream (before any grant) always has a blank deviceId.
     if (isOverconstrained(err) && deviceId !== undefined && deviceId !== '') {
       try {
-        return makeCameraStream(await requestStream(undefined), undefined);
+        return cameraStreamFromMediaStream(await requestStream(undefined), undefined);
       } catch (retryErr) {
         if (isPermissionDenied(retryErr)) return null;
         throw retryErr;
@@ -79,35 +80,18 @@ function requestStream(deviceId?: string): Promise<MediaStream> {
 }
 
 function isPermissionDenied(err: unknown): boolean {
-  return (
-    err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')
-  );
+  return err instanceof DOMException && err.name === 'NotAllowedError';
 }
 
 function isOverconstrained(err: unknown): boolean {
   return err instanceof DOMException && err.name === 'OverconstrainedError';
 }
 
-function makeCameraStream(
-  stream: MediaStream,
-  requestedDeviceId: string | undefined,
-): CameraStream {
-  const settings = stream.getVideoTracks()[0]?.getSettings();
-  return {
-    stream,
-    sourceId: settings?.deviceId || requestedDeviceId || 'default-camera',
-    resizeMode: normalizeResizeMode(
-      (settings as (MediaTrackSettings & { readonly resizeMode?: string }) | undefined)?.resizeMode,
-    ),
-    stop: () => {
-      for (const track of stream.getTracks()) track.stop();
-    },
-  };
-}
-
-function normalizeResizeMode(value: string | undefined): CameraStream['resizeMode'] {
-  if (value === 'none' || value === 'crop-and-scale') return value;
-  return 'unknown';
+function onDeviceChange(handler: () => void): () => void {
+  if (!isSupported()) return () => undefined;
+  const listener = (): void => handler();
+  navigator.mediaDevices.addEventListener('devicechange', listener);
+  return () => navigator.mediaDevices.removeEventListener('devicechange', listener);
 }
 
 /** Build the Falcon JPEG frame URL for a candidate host. */
@@ -163,5 +147,6 @@ export const webCamera: CameraAdapter = {
   isSupported,
   listCameras,
   openStream,
+  onDeviceChange,
   discoverNetworkCamera,
 };

@@ -19,6 +19,7 @@ import { sanitizeEntity, type SketchEntity } from '../../core/design';
 import type { Vec2 } from '../../core/scene';
 import type { ArcEntity } from './design-fields-arc';
 import type { CircleEntity } from './design-fields-circle';
+import type { EllipseEntity } from './design-fields-ellipse';
 import type { LineEntity } from './design-fields-line';
 import type { PathEntity } from './design-fields-path';
 import type { RectEntity } from './design-fields-rect';
@@ -40,6 +41,15 @@ const CIRCLE_EDITS: EditTable<CircleEntity> = {
   centerY: (entity, value) => ({ ...entity, center: { ...entity.center, y: value } }),
   radius: (entity, value) => ({ ...entity, radiusMm: value }),
   diameter: (entity, value) => ({ ...entity, radiusMm: value / 2 }),
+};
+
+// Width and height are diameters, so each is halved back into its radius; the
+// centre stays put, which is what "make this hole 12 mm wide" means.
+const ELLIPSE_EDITS: EditTable<EllipseEntity> = {
+  centerX: (entity, value) => ({ ...entity, center: { ...entity.center, x: value } }),
+  centerY: (entity, value) => ({ ...entity, center: { ...entity.center, y: value } }),
+  width: (entity, value) => ({ ...entity, radiusXMm: value / 2 }),
+  height: (entity, value) => ({ ...entity, radiusYMm: value / 2 }),
 };
 
 const LINE_EDITS: EditTable<LineEntity> = {
@@ -89,6 +99,8 @@ function runEdit(entity: SketchEntity, key: MeasurementKey, value: number): Sket
       return pickEdit(RECT_EDITS, key, entity, value);
     case 'circle':
       return pickEdit(CIRCLE_EDITS, key, entity, value);
+    case 'ellipse':
+      return pickEdit(ELLIPSE_EDITS, key, entity, value);
     case 'line':
       return pickEdit(LINE_EDITS, key, entity, value);
     case 'arc':

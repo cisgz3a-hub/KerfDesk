@@ -1,7 +1,25 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { CameraAlignment, CameraCalibration } from '../../core/camera';
 import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+
+const CAMERA_CALIBRATION: CameraCalibration = {
+  intrinsics: { fx: 800, fy: 800, cx: 320, cy: 240 },
+  distortion: [0, 0, 0, 0],
+  imageWidth: 640,
+  imageHeight: 480,
+  rmsPx: 0.4,
+  calibratedAt: 1,
+};
+
+const RECTIFIED_ALIGNMENT: CameraAlignment = {
+  homography: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  frameWidth: 640,
+  frameHeight: 480,
+  basis: 'rectified',
+  alignedAt: 1,
+};
 
 describe('machine profile store actions', () => {
   beforeEach(() => resetStore());
@@ -62,5 +80,34 @@ describe('machine profile store actions', () => {
       maxFeed: 500,
       controlledLaserOffTravelFeedMmPerMin: 500,
     });
+  });
+
+  it('invalidates rectified alignment with calibration in one undoable profile update', () => {
+    const before = useStore.getState();
+    useStore.setState({
+      project: {
+        ...before.project,
+        device: {
+          ...before.project.device,
+          cameraCalibration: CAMERA_CALIBRATION,
+          cameraAlignment: RECTIFIED_ALIGNMENT,
+        },
+      },
+      undoStack: [],
+    });
+
+    useStore.getState().updateDeviceProfile({
+      cameraCalibration: { ...CAMERA_CALIBRATION, calibratedAt: 2 },
+    });
+
+    const updated = useStore.getState();
+    expect(updated.project.device.cameraCalibration?.calibratedAt).toBe(2);
+    expect(updated.project.device.cameraAlignment).toBeUndefined();
+    expect(updated.undoStack).toHaveLength(1);
+
+    updated.undo();
+
+    expect(useStore.getState().project.device.cameraCalibration).toEqual(CAMERA_CALIBRATION);
+    expect(useStore.getState().project.device.cameraAlignment).toEqual(RECTIFIED_ALIGNMENT);
   });
 });

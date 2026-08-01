@@ -18,6 +18,7 @@ import {
   findCncRestPocketIssues,
   findDroppedCncLayers,
 } from '../cnc';
+import { findCncVCarveEntryIssues } from '../cnc/vcarve-entry-diagnostics';
 import { machineBoundsForDevice } from '../devices';
 import {
   findNonFiniteCoords,
@@ -75,6 +76,14 @@ export function runCncPreflight(
     issues.push({
       code: 'cnc-helix-entry-invalid',
       message: `Layer ${issue.layerId}: ${issue.reason} Adjust Helical entry or disable it.`,
+    });
+  }
+  for (const issue of findCncVCarveEntryIssues(project.scene, project.device, config)) {
+    issues.push({
+      code: 'cnc-vcarve-entry-fallback',
+      message:
+        `Layer ${issue.layerId}: ${issue.reason} CurveDesk used the legacy stepped-plunge ` +
+        'entry. Adjust Ramp entry or disable it.',
     });
   }
   for (const issue of findCncRestPocketIssues(project.scene, project.device, config)) {
