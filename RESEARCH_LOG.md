@@ -1354,3 +1354,31 @@ PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worke
   tiled boundary split likewise remains exportable but warns that the clipped
   tile begins with a direct plunge. See ADR-278 and
   `docs/audits/2026-08-01-cnc-vcarve-ramp-entry-acceptance.md`.
+
+---
+
+## Offline production workflow references - 2026-08-01
+
+- **Subject:** LightBurn Variable Text and User Bundles; xTool Creative Space
+  Batch Fill; Autodesk Fusion manufacturing simulation and mesh export.
+- **Version / date:** current official documentation accessed 2026-08-01.
+- **License:** n/a; workflow comparison sources only, with no code or assets copied.
+- **Source URLs:**
+  - https://docs.lightburnsoftware.com/latest/Reference/VariableText/
+  - https://docs.lightburnsoftware.com/latest/Reference/UserBundles/
+  - https://support.xtool.com/article/771
+  - https://help.autodesk.com/cloudhelp/ENU/Fusion-CAM/files/GUID76F8D8EF-2725-4203-944B-B9345936DDDB.htm
+  - https://help.autodesk.com/cloudhelp/ENU/Fusion-Mesh/files/MESH-EXPORT-TOOLS.htm
+- **Decision affected:** ADR-279 and
+  `docs/audits/2026-08-01-offline-production-expansion-roadmap.md`.
+- **Evaluated:** 2026-08-01, Codex review session.
+- **Confidence:** high for the documented comparison workflows; these sources do not prove
+  CurveDesk implementation, camera accuracy, physical placement, or stock fidelity.
+- **Re-verify by:** 2027-02-01.
+- **Alternatives considered:** no dependency or external format was adopted. These primary vendor
+  pages were preferred to secondary feature summaries; each remains comparison evidence rather than
+  implementation authority.
+- **Notes:** LightBurn documents variable controls/arrays and selective user-bundle contents; xTool
+  documents sample-based batch-fill limitations; Autodesk distinguishes motion animation from stock
+  verification and documents STL among mesh-export formats. CurveDesk keeps its offline,
+  deterministic, frame-first, and hardware-qualification boundaries.

@@ -1,7 +1,7 @@
 # CurveDesk offline production expansion roadmap
 
 **Date:** 2026-08-01
-**Verified baseline:** `main` at `28a5c3a15eab2a6ec699f3544d322264545ed967`
+**Verified baseline:** `main` at `000db901997d837a8612d5d2fe71af2562a539aa`
 **Status:** implementation plan; offline variable-data imposition adopted by ADR-279; the
 other three initiatives remain planned until their own governing decisions land
 **Product name:** CurveDesk. Existing `laserforge-*` storage markers and `.lf*` compatibility
@@ -44,13 +44,13 @@ controller tracking, cutter geometry, stock flatness, or the shape left by a rea
 
 | Area | Capability today | Confirmed gap | Evidence |
 | --- | --- | --- | --- |
-| Variable data | Embedded CSV, serial, date/time and cut-setting fields; bounded ranges; manual and policy-matched successful-output advancement | Every object in one prepared output receives one global record/serial context, so ordinary array copies repeat the same record | `src/core/scene/variable-template.ts:18-49`, `src/io/gcode/prepare-output-snapshot.ts:28-38,98-165`, `src/ui/state/variable-data-actions.ts:82-128` — **SOURCE-CONFIRMED** |
+| Variable data | Embedded CSV, serial, date/time and cut-setting fields; bounded ranges; manual and policy-matched ordinary single-file `.gcode` export/stream advancement; tiled G-code and file-only `.rd` do not currently advance | Every object in one prepared output receives one global record/serial context, so ordinary array copies repeat the same record | `src/core/scene/variable-template.ts:18-49`, `src/io/gcode/prepare-output-snapshot.ts:28-38,98-165`, `src/ui/state/variable-data-actions.ts:82-128`, `src/ui/app/file-actions.ts:117-133,153-161,192-202` — **SOURCE-CONFIRMED** |
 | Layout | Grid and board fill are deterministic row-major layouts; circular arrays use deterministic angular order; existing arrays are bounded to 500 placed units | No imposition pipeline connects array slots to distinct variable contexts or an exact batch manifest | `src/core/scene/array-layout.ts:3-79`, `src/core/scene/tile-into-region.ts:31-72`, `src/ui/state/board-tile-actions.ts:32-72` — **SOURCE-CONFIRMED** |
 | Portable data | Machine profiles and material libraries have deterministic, validated document codecs; multiple material libraries persist locally | No selective whole-workshop bundle exists; CNC library persistence has no strict document marker/schema and drops malformed members permissively | `src/io/machine-profile/machine-profile-io.ts:24-109`, `src/io/material-library/material-library-io.ts:19-123`, `src/ui/state/material-library-collection.ts:18-40,162-188`, `src/ui/state/cnc-library-persistence.ts:1-12,65-107` — **SOURCE-CONFIRMED** |
 | Camera | USB/machine-JPEG/machine-RTSP sources, lens calibration, source binding, registered top-down warp, height compensation, overlay, trace and snapshots | No sample-blank selection, similar-workpiece detection, arbitrary target proposal editor, or same-design copy workflow | `src/ui/camera/frame-source.ts:18-35,86-119`, `src/core/camera/calibrate.ts:22-68,111-181`, `src/core/camera/camera-capture-binding.ts:39-49`, `src/core/camera/warp-to-bed.ts:24-45`, `src/core/camera/surface-height-compensation.ts:29-60`, `src/ui/camera/WorkspaceCameraOverlay.tsx:31-70`, `src/ui/camera/trace-from-camera.ts:42-95`, `src/ui/camera/snapshot.ts:16-31` — **SOURCE-CONFIRMED** |
 | Board placement | Manual head-position board capture supports rectangle/circle; one selected design can fill a regular region | It is not camera segmentation and cannot place rigid copies at irregular physical targets | `src/core/scene/board-capture.ts:1-12,23-30`, `src/ui/state/board-tile-actions.ts:1-84` — **SOURCE-CONFIRMED** |
 | CNC stock | Stock footprint/thickness, flat/ball/cone cutter kernels, deterministic removal grids, 2D depth shading and 3D stock preview already exist | Current render mesh is an open surface, not a closed remaining-stock solid | `src/core/scene/machine.ts:15-32`, `src/core/sim/removal-grid.ts:1-36`, `src/core/sim/tool-kernels.ts:1-11,58-74`, `src/core/heightfield/stepped-surface-mesh.ts:62-66,126-205` — **SOURCE-CONFIRMED** |
-| STL | Binary and ASCII STL import become a deterministic relief heightmap | No STL emitter or commanded-stock export UI exists; the Inspector renders centerlines without stock setup | `src/io/stl/index.ts:1-4`, `src/ui/gcode-inspector/use-viewer3d-scene.ts:31-45`, `WORKFLOW.md:2518-2549` — **SOURCE-CONFIRMED** |
+| STL | Binary and ASCII STL import become a deterministic relief heightmap | No STL emitter or commanded-stock export UI exists; the Inspector renders centerlines without stock setup | `src/io/stl/index.ts:1-4`, `src/ui/gcode-inspector/use-viewer3d-scene.ts:31-45`, `WORKFLOW.md:4901-4964` — **SOURCE-CONFIRMED** |
 
 Targeted stock-simulation/parser coverage passed 31/31 during this audit stream:
 `pnpm exec vitest run src/core/sim/stamp-toolpath.test.ts
@@ -168,7 +168,6 @@ The first implementation slice is pure and schema-free:
 ```ts
 type VariableBatchSlot = {
   readonly slotIndex: number;
-  readonly placement: ArrayPlacement;
   readonly recordIndex: number;
   readonly serialValue: number;
 };
@@ -181,16 +180,16 @@ type VariableBatchPlan = {
 
 Rules:
 
-1. the planner accepts the ordered `ReadonlyArray<ArrayPlacement>` already produced by the existing
-   array layout and preserves every placement;
-2. it adds no validation, count normalization, cap, clamp, or rewrite; the existing array generator
-   currently supplies one through 500 placements;
+1. the planner accepts a caller-supplied slot count and emits ordered slot indices, not final
+   bounds-derived translations;
+2. it adds no second count normalization, cap, clamp, or rewrite; the retained grid layout request
+   and existing array generator remain responsible for producing one through 500 slots;
 3. slot zero uses the current project record and serial exactly;
 4. every later slot is one application of existing `advanceVariableSequence(..., 'next')`;
 5. existing `advanceBy` is therefore the per-slot stride and is never silently rewritten to the
    batch size;
 6. existing range wrap and safe-integer behavior remain the authority;
-7. `nextVariables` is the state after exactly `placements.length` advancements; and
+7. `nextVariables` is the state after exactly `slotCount` advancements; and
 8. neither input is mutated.
 
 This slice does not decide whether imposition later persists in `.lf2`. It provides the stable
@@ -201,10 +200,12 @@ sequence contract both transient and persisted designs would need.
 1. Freeze one valid clock value for the whole batch so date/time fields do not change mid-sheet.
 2. Materialize the selected design unit once per planned slot with that slot's record/serial
    context.
-3. Measure every real rendered unit before placement. Cell width/height use the maximum rendered
-   envelope across the requested range, not the current row's placeholder or current text bounds.
-4. Place units in the supplied deterministic order and center each real unit within the maximum
-   cell envelope. Existing grid order is row-major; circular order is angular.
+3. Retain the original grid `ArraySpec`; measure every real rendered unit before placement.
+   Cell width/height use the maximum rendered envelope across the requested range, not the current
+   row's placeholder or current text bounds.
+4. Derive final `ArrayPlacement` values only after measurement, using the retained rows, columns, and
+   spacing. Place units in row-major order and center each real unit within the maximum cell envelope.
+   Circular imposition remains deferred until its variable-width collision policy is specified.
 5. Preserve layers, operations, groups, artwork order and non-variable companion geometry; mint
    all new IDs outside pure core.
 6. Build a transient project first. Editable/persisted imposition is a later schema decision after
@@ -218,7 +219,8 @@ sequence contract both transient and persisted designs would need.
   aborted stream and incomplete recovery consume zero records.
 - `manual` advancement changes on neither output trigger.
 - `after-successful-export` applies the exact `nextVariables` stored with the prepared artifact once
-  only after successful Save G-code/export.
+  only after successful Save G-code export, including tiled G-code and the experimental file-only
+  `.rd` path.
 - `after-successful-stream` applies that state once only after a fully completed stream.
 - A successful trigger that does not match the configured policy consumes zero records.
 - A recovered/retried artifact carries a consumption identity so the same completed artifact cannot
@@ -511,15 +513,15 @@ source no longer says the initiative being built is deferred, and no runtime beh
 
 ### Step 2 — build the pure variable batch planner
 
-Add only `batch-sequence.ts`, its tests and one barrel export. Good result: exact placement passthrough,
-order, wrap, stride, serial-only behavior, safe-integer inheritance, determinism, non-mutation and no
-planner cap/rewrite pass.
+Add only `batch-sequence.ts`, its tests and one barrel export. Good result: slot order/count,
+geometry independence, wrap, stride, serial-only behavior, safe-integer inheritance, determinism,
+non-mutation and no planner cap/rewrite pass.
 
 ### Step 3 — build transient exact materialization and preview
 
-Render each slot with one clock, compute the maximum envelope, preserve the supplied placement order,
-and preview the slot manifest. Good result: long/short fixture rows cannot overlap and no `.lf2`
-schema changes.
+Render each slot with one clock, compute the maximum envelope, then derive placements from the
+retained grid specification and preview the slot manifest. Good result: long/short fixture rows
+cannot overlap and no `.lf2` schema changes.
 
 ### Step 4 — harden portable data and manual camera placement
 
@@ -560,7 +562,7 @@ Each row is one coherent review unit. No row adds or widens a guard or non-factu
 | VAR-1 | Pure batch sequence planner | Focused sequence/planner tests, typecheck, lint, full release |
 | VAR-2 | Async slot materialization + max envelope | Renderer fixtures, 500-slot pressure benchmark |
 | VAR-3 | Imposition dialog + exact preview/manifest | Component + real-browser success/error/empty/edge |
-| VAR-4 | Artifact-bound export/stream advancement and recovery | Identity, stale, failure, retry, resume tests |
+| VAR-4 | Artifact-bound `.gcode`/`.rd` export and stream advancement/recovery | Identity, stale, failure, retry, resume, exact-once tiled/`.rd` tests |
 | VAR-5 | Optional persisted editable imposition, only if still justified | Project schema migration + reopen E2E |
 | BND-1 | Strict CNC-library codec with compatibility adapter | Current payload round-trip and corrupt fixtures |
 | BND-2 | Bundle envelope + component selection/import | Deterministic bytes, collisions, exclusions, web/Electron |

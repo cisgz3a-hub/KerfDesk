@@ -14523,22 +14523,26 @@ sources and barcode/QR generation remain deferred.
 
 1. Adopt a bounded, offline variable-data imposition workflow for one selected design unit. The
    first delivery is transient: it does not change the persisted project schema.
-2. A pure planner accepts the current `ProjectVariableData` and the ordered `ArrayPlacement` list
-   already produced by the existing array layout. It neither validates, caps, clamps, nor rewrites
-   that list. Slot zero records the current record index and serial value; every later slot applies
-   the existing `advanceVariableSequence(..., 'next')` semantics, including record wrap, serial
-   wrap, and `advanceBy` as the per-slot stride. The plan records the exact `nextVariables` state
-   after all received placements.
-3. Later materialization captures one clock for the whole batch, renders every slot before layout,
-   and uses the maximum actual rendered envelope. Placement preserves the existing ordered layout:
-   grid arrays are row-major and circular arrays use deterministic angular order. A longer later
-   value must not overlap because layout measured only the first record.
+2. A pure sequence planner accepts the current `ProjectVariableData` and a caller-supplied slot
+   count. It records ordered slot indices and variable contexts, not bounds-derived translations.
+   Slot zero records the current record index and serial value; every later slot applies the existing
+   `advanceVariableSequence(..., 'next')` semantics, including record wrap, serial wrap, and
+   `advanceBy` as the per-slot stride. The plan records the exact `nextVariables` state after the
+   requested slot count. Existing array validation and the one-through-500 copy rule remain with the
+   layout request; the sequence planner adds no second cap, clamp, or rewrite.
+3. The first transient workflow retains the original grid `ArraySpec`, captures one clock for the
+   whole batch, and renders every slot before calculating final placements. It uses the maximum
+   actual rendered envelope with the retained rows, columns, and spacing, then derives row-major
+   `ArrayPlacement` values. A longer later value must not overlap because layout measured only the
+   first record. Circular imposition remains deferred until its variable-width collision policy is
+   specified; the sequence planner itself is layout-independent.
 4. The prepared output owns an exact slot manifest and post-success variable state bound to its
    artifact identity. Preview, Save Project, Frame, compile failure, cancellation, stale preparation,
    and retry consume zero records. `manual` advancement changes on neither output trigger;
-   `after-successful-export` applies the saved state once only after successful Save G-code/export;
-   and `after-successful-stream` applies it once only after a fully completed stream. Recovery must
-   not double-advance a policy-matched artifact.
+   `after-successful-export` applies the saved state once only after successful Save G-code export,
+   including tiled G-code and the experimental file-only `.rd` path; and
+   `after-successful-stream` applies it once only after a fully completed stream. Recovery must not
+   double-advance a policy-matched artifact.
 5. Frame remains the only guard. This program adds no block, refusal, gate, cap, clamp, delay, hide,
    disable, rewrite, or confirmation to preview, project save, import/export, Apply, output, Frame,
    or Start beyond the existing factual compile-integrity, transport, and handoff preconditions.
@@ -14558,16 +14562,17 @@ sources and barcode/QR generation remain deferred.
 - The full feature needs policy-matched artifact advancement and recovery tests before release. A
   visual grid alone is incomplete because it could silently skip or double-consume production
   records.
-- The existing array generator currently yields one through 500 placements. That inherited behavior
-  does not establish acceptable interactive performance; async materialization and a measured
-  500-placement pressure fixture are still required. Imposition adds no second size rule.
+- The existing grid array generator currently yields one through 500 placements. That inherited
+  behavior does not establish acceptable interactive performance; async materialization and a
+  measured 500-placement pressure fixture are still required. Imposition adds no second size rule.
 
 ### Verification
 
-- The first slice adds pure planner tests for placement-order preservation, wrap, stride,
-  determinism, input immutability, no planner cap/rewrite, and the exact post-batch state.
+- The first slice adds pure planner tests for slot order/count, wrap, stride, determinism, input
+  immutability, geometry independence, no planner cap/rewrite, and the exact post-batch state.
 - Later slices require renderer fixtures with unequal string widths, artifact identity and stale-state
-  tests, all three advancement policies across export and stream triggers, success and failure tests,
-  recovery tests, and a real-browser success/error/empty/edge workflow.
+  tests, all three advancement policies across single-file/tiled `.gcode` export, file-only `.rd`
+  export, and stream triggers, success and failure tests, recovery tests, and a real-browser
+  success/error/empty/edge workflow.
 - NOT verified by this decision: production throughput, a complete imposed-sheet UI, persisted
   imposition, physical placement, camera accuracy, controller tracking, or output on hardware.
