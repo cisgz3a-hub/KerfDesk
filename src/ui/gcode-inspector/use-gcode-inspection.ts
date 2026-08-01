@@ -16,6 +16,7 @@ export type InspectionState =
   | {
       readonly kind: 'ready';
       readonly result: GcodeInspectorWorkerResult;
+      readonly source: GcodeInspectionSource;
       readonly mainThreadFallback: boolean;
     }
   | { readonly kind: 'error'; readonly reason: string };
@@ -40,10 +41,13 @@ export function useGcodeInspection(source: GcodeInspectionSource | null): Inspec
     if (mainThreadFallback) {
       setState({ kind: 'loading', phase: 'fallback', queuePosition: 0 });
     }
-    const pending = offThread ?? inspectGcodeOnMainThread(source, controller.signal);
+    const pending =
+      offThread === null
+        ? inspectGcodeOnMainThread(source, controller.signal)
+        : offThread.then((result) => ({ result, source }));
     void pending.then(
-      (result) => {
-        if (isCurrent) setState({ kind: 'ready', result, mainThreadFallback });
+      (completion) => {
+        if (isCurrent) setState({ kind: 'ready', ...completion, mainThreadFallback });
       },
       (error: unknown) => {
         if (!isCurrent) return;
@@ -64,11 +68,17 @@ export function useGcodeInspection(source: GcodeInspectionSource | null): Inspec
 async function inspectGcodeOnMainThread(
   source: GcodeInspectionSource,
   signal: AbortSignal,
-): Promise<GcodeInspectorWorkerResult> {
+): Promise<{
+  readonly result: GcodeInspectorWorkerResult;
+  readonly source: GcodeInspectionSource;
+}> {
   throwIfAborted(signal);
   const text = source.kind === 'text' ? source.text : await source.blob.text();
   throwIfAborted(signal);
-  return inspectGcodeText(text);
+  return {
+    result: inspectGcodeText(text),
+    source: source.kind === 'text' ? source : { kind: 'text', text },
+  };
 }
 
 function throwIfAborted(signal: AbortSignal): void {

@@ -74,11 +74,7 @@ function Body(props: {
     <>
       {props.inspection.mainThreadFallback ? <MainThreadInspectionNotice /> : null}
       <InspectionPressureNotice result={props.inspection.result} />
-      <InspectorView
-        model={props.inspection.result.parsed.model}
-        lines={props.inspection.result.lines}
-        variant="preview"
-      />
+      <InspectorView model={props.inspection.result.parsed.model} variant="preview" />
     </>
   );
 }
