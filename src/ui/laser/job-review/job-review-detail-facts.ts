@@ -124,7 +124,10 @@ function cncTabsPart(settings: CncLayerSettings): string {
 }
 
 function cncEntryPart(settings: CncLayerSettings): ReadonlyArray<string> {
-  if (settings.rampEntryDeg !== undefined) return [`ramp entry ${settings.rampEntryDeg}°`];
+  const rampEntryDeg =
+    settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg;
+  if (rampEntryDeg !== undefined) return [`ramp entry ${rampEntryDeg}°`];
+  if (settings.cutType === 'v-carve') return [];
   if (settings.helixEntry !== undefined) return ['helix entry'];
   return [];
 }

@@ -41,7 +41,60 @@ export function tileJobs(job: Job, tiling: CncTiling): TiledJobsResult {
     }
     if (groups.length > 0) out.push({ tile, job: { groups } });
   }
-  return out.length === 0 ? { kind: 'empty' } : { kind: 'ready', grid: plan.grid, tiles: out };
+  return tiledJobsResult(plan.grid, out);
+}
+
+function tiledJobsResult(
+  grid: Extract<TiledJobsResult, { readonly kind: 'ready' }>['grid'],
+  tiles: ReadonlyArray<TiledJob>,
+): TiledJobsResult {
+  if (tiles.length === 0) return { kind: 'empty' };
+  const advisories = tiledRampAdvisories(tiles);
+  return {
+    kind: 'ready',
+    grid,
+    tiles,
+    ...(advisories.length === 0 ? {} : { advisories }),
+  };
+}
+
+function tiledRampAdvisories(tiles: ReadonlyArray<TiledJob>): ReadonlyArray<string> {
+  const advisories: string[] = [];
+  if (hasTiledEntryRamp(tiles)) {
+    advisories.push(
+      'Tiled V-carve output is derived as per-tile geometry. Its entered ramp angle remains ' +
+        'requested provenance, not a re-verified emitted maximum. Inspect each tile or keep the ' +
+        'contour wholly within one tile when the cutter requires a guaranteed maximum angle.',
+    );
+  }
+  if (hasClippedEntryRamp(tiles)) {
+    advisories.push(
+      'A tiled V-carve contour ramp crosses a tile boundary. At least one clipped tile starts ' +
+        'below stock top, so its emitted path begins with a direct plunge at the configured ' +
+        'plunge feed. Inspect each tile or place the contour wholly within one tile if the ' +
+        'exact cutter cannot plunge.',
+    );
+  }
+  return advisories;
+}
+
+function hasTiledEntryRamp(tiles: ReadonlyArray<TiledJob>): boolean {
+  return tiles.some(({ job }) =>
+    job.groups.some((group) => group.kind === 'cnc' && group.rampEntryTiled === true),
+  );
+}
+
+function hasClippedEntryRamp(tiles: ReadonlyArray<TiledJob>): boolean {
+  return tiles.some(({ job }) =>
+    job.groups.some(
+      (group) =>
+        group.kind === 'cnc' &&
+        group.passes.some(
+          (pass) =>
+            pass.kind === 'path3d' && pass.lateralFeed === 'plunge' && (pass.points[0]?.z ?? 0) < 0,
+        ),
+    ),
+  );
 }
 
 /** Add a one-based row and column suffix to a tiled CNC output filename. */
@@ -85,7 +138,12 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
       }
     } else if (pass.kind === 'path3d') {
       for (const piece of clipPointsToRect([...pass.points], tile.rect, pass.closed)) {
-        passes.push({ kind: 'path3d', closed: false, points: piece });
+        passes.push({
+          kind: 'path3d',
+          closed: false,
+          points: piece,
+          ...(pass.lateralFeed === undefined ? {} : { lateralFeed: pass.lateralFeed }),
+        });
       }
     } else if (pass.kind === 'helical-contour') {
       for (const piece of clipPointsToRect(helicalXyzPoints(pass), tile.rect, false)) {
@@ -104,7 +162,19 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
     }
   }
   if (passes.length === 0) return null;
-  return { ...group, passes: passes.map((pass) => translatePass(pass, tile)) };
+  const tiledRamp = hasEntryRamp(group);
+  return {
+    ...group,
+    ...(tiledRamp ? { rampEntryTiled: true as const } : {}),
+    passes: passes.map((pass) => translatePass(pass, tile)),
+  };
+}
+
+function hasEntryRamp(group: CncGroup): boolean {
+  return (
+    group.rampEntryDeg !== undefined &&
+    group.passes.some((pass) => pass.kind === 'path3d' && pass.lateralFeed === 'plunge')
+  );
 }
 
 function helicalXyzPoints(pass: Extract<CncPass, { readonly kind: 'helical-contour' }>): Xyz[] {

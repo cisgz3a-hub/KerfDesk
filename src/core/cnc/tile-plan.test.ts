@@ -140,6 +140,93 @@ describe('tileJobs clipping', () => {
     expect(pass.points.at(-1)?.z).toBeCloseTo(-2, 9);
   });
 
+  it('preserves a clipped contour ramp and advises that the new tile starts with a plunge', () => {
+    const result = tileJobs(
+      {
+        groups: [
+          {
+            ...groupOf([
+              {
+                kind: 'path3d',
+                closed: false,
+                points: [
+                  { x: 0, y: 40, z: 0 },
+                  { x: 200, y: 40, z: -4 },
+                ],
+                lateralFeed: 'plunge',
+              },
+            ]),
+            cutType: 'v-carve',
+            rampEntryDeg: 3,
+          },
+        ],
+      },
+      TILING,
+    );
+    expect(result).toMatchObject({ kind: 'ready' });
+    if (result.kind !== 'ready') throw new Error('expected ready tiles');
+    expect(result.advisories).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('not a re-verified emitted maximum'),
+        expect.stringContaining('begins with a direct plunge'),
+      ]),
+    );
+    const clipped = result.tiles
+      .flatMap(({ job }) => job.groups)
+      .flatMap((group) => (group.kind === 'cnc' ? group.passes : []))
+      .find(
+        (pass) =>
+          pass.kind === 'path3d' && pass.lateralFeed === 'plunge' && (pass.points[0]?.z ?? 0) < 0,
+      );
+    expect(clipped).toBeDefined();
+    expect(
+      result.tiles
+        .flatMap(({ job }) => job.groups)
+        .filter((group) => group.kind === 'cnc')
+        .every((group) => group.rampEntryTiled === true),
+    ).toBe(true);
+  });
+
+  it('preserves plunge-feed semantics when the whole ramp fits one tile', () => {
+    const result = tileJobs(
+      {
+        groups: [
+          {
+            ...groupOf([
+              {
+                kind: 'path3d',
+                closed: false,
+                points: [
+                  { x: 0, y: 40, z: 0 },
+                  { x: 50, y: 40, z: -1 },
+                ],
+                lateralFeed: 'plunge',
+              },
+            ]),
+            cutType: 'v-carve',
+            rampEntryDeg: 3,
+          },
+        ],
+      },
+      TILING,
+    );
+    if (result.kind !== 'ready') throw new Error('expected ready tiles');
+    expect(result.advisories).toEqual([
+      expect.stringContaining('not a re-verified emitted maximum'),
+    ]);
+    const group = result.tiles[0]?.job.groups[0];
+    if (group?.kind !== 'cnc') throw new Error('group missing');
+    const pass = group.passes[0];
+    expect(pass?.kind === 'path3d' ? pass.lateralFeed : undefined).toBe('plunge');
+  });
+
+  it('does not add a ramp advisory to an ordinary tiled contour', () => {
+    const result = tileJobs(lineJob(0, 50, 40), TILING);
+    expect(result).toMatchObject({ kind: 'ready' });
+    if (result.kind !== 'ready') return;
+    expect(result.advisories).toBeUndefined();
+  });
+
   it('clips arc passes as sampled contour pieces per tile', () => {
     const arc: CncGroup['passes'] = [
       {

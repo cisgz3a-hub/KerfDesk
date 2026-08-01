@@ -166,6 +166,7 @@ describe('compileCncJob multi-tool', () => {
           toolId: 'vb-60',
           vClearToolId: 'em-3175',
           depthMm: 3,
+          vCarveRampEntryDeg: 3,
         }),
       ],
     );
@@ -175,8 +176,12 @@ describe('compileCncJob multi-tool', () => {
     const [clearance, vcarve] = cnc;
     expect(clearance?.cutType).toBe('pocket');
     expect(clearance?.toolId).toBe('em-3175');
+    expect(clearance).not.toHaveProperty('rampEntryDeg');
     expect(vcarve?.cutType).toBe('v-carve');
     expect(vcarve?.toolId).toBe('vb-60');
+    expect(vcarve).toMatchObject({ rampEntryDeg: 3 });
+    const gcode = cncGrblStrategy.emit(job, DEVICE);
+    expect(gcode.match(/; cnc entry: contour-ramp/g)).toHaveLength(1);
   });
 
   it('a shape too narrow for a flat floor produces no clearance stage', () => {

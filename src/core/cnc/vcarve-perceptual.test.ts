@@ -177,6 +177,41 @@ describe('v-carve — perceptual (analytic pyramid field)', () => {
     expect(gcode).toMatchSnapshot();
   });
 
+  it('emits opt-in V-carve descent as plunge-fed XYZ ramps plus cut-feed cleanup laps', () => {
+    const device = DEFAULT_DEVICE_PROFILE;
+    const scene = vcarveScene();
+    const layer = scene.layers[0];
+    if (layer?.cnc === undefined) throw new Error('expected V-carve layer');
+    const rampedScene: Scene = {
+      ...scene,
+      layers: [{ ...layer, cnc: { ...layer.cnc, vCarveRampEntryDeg: 3 } }],
+    };
+    const job = compileCncJob(rampedScene, device, vbitConfig());
+    const group = job.groups[0];
+    if (group?.kind !== 'cnc') throw new Error('expected CNC group');
+    expect(group.passes.some((pass) => pass.kind === 'path3d')).toBe(true);
+
+    const lines = cncGrblStrategy.emit(job, device).split('\n');
+    expect(lines.some((line) => /^G1 Z-/.test(line))).toBe(false);
+    expect(lines.some((line) => /^G1 X.* Y.* Z-.* F300$/.test(line))).toBe(true);
+    expect(lines.some((line) => /^G1 X.* Y.* F1000$/.test(line))).toBe(true);
+  });
+
+  it('does not reinterpret a persisted generic ramp as V-carve opt-in', () => {
+    const device = DEFAULT_DEVICE_PROFILE;
+    const scene = vcarveScene();
+    const layer = scene.layers[0];
+    if (layer?.cnc === undefined) throw new Error('expected V-carve layer');
+    const staleGenericScene: Scene = {
+      ...scene,
+      layers: [{ ...layer, cnc: { ...layer.cnc, rampEntryDeg: 3 } }],
+    };
+    const baseline = compileCncJob(scene, device, vbitConfig());
+    const staleGeneric = compileCncJob(staleGenericScene, device, vbitConfig());
+    expect(staleGeneric).toEqual(baseline);
+    expect(cncGrblStrategy.emit(staleGeneric, device)).toBe(cncGrblStrategy.emit(baseline, device));
+  });
+
   it('carries region-major traversal through compile and final G-code emission', () => {
     const device = DEFAULT_DEVICE_PROFILE;
     const job = compileCncJob(multiRegionVcarveScene(), device, vbitConfig());
