@@ -41,6 +41,23 @@ describe('entityDesignLayer', () => {
   });
 });
 
+describe('createDesignLayer', () => {
+  // Identical defaults made a new layer carve exactly like the previous one, so
+  // assigning a shape to it changed nothing the operator could see.
+  it('steps each new layer one millimetre deeper than the last', () => {
+    expect(createDesignLayer('a', 0).depthMm).toBe(1);
+    expect(createDesignLayer('b', 1).depthMm).toBe(2);
+    expect(createDesignLayer('c', 2).depthMm).toBe(3);
+  });
+
+  it('gives each new layer its own colour and name', () => {
+    const first = createDesignLayer('a', 0);
+    const second = createDesignLayer('b', 1);
+    expect(second.name).toBe('Layer 2');
+    expect(second.color).not.toBe(first.color);
+  });
+});
+
 describe('addDesignLayer', () => {
   it('appends and refuses duplicate ids without throwing', () => {
     const sketch: Sketch = { entities: [] };

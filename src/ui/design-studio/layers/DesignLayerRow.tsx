@@ -10,6 +10,10 @@ import { DESIGN_CUT_TYPE_LABELS } from './design-cut-type-labels';
 export function DesignLayerRow(props: {
   readonly layer: DesignLayer;
   readonly isActive: boolean;
+  // True when the canvas selection includes a shape on this layer — the panel's
+  // answer to "which layer is this shape on?", and what makes Assign visibly
+  // move the selection from one row to another.
+  readonly hasSelection: boolean;
   readonly entityCount: number;
   readonly tool: CncTool;
   readonly canRemove: boolean;
@@ -32,7 +36,14 @@ export function DesignLayerRow(props: {
       >
         <span aria-hidden="true" style={{ ...chipStyle, background: layer.color }} />
         <span style={nameStyle}>
-          {layer.name}
+          <span style={titleRowStyle}>
+            {layer.name}
+            {props.hasSelection ? (
+              <span style={selectionBadgeStyle} title="The selected shape is on this layer">
+                selected
+              </span>
+            ) : null}
+          </span>
           <span style={metaStyle}>
             {summary}
             {props.entityCount > 0
@@ -121,6 +132,25 @@ const nameStyle: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
   lineHeight: 1.25,
+};
+
+const titleRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+  minWidth: 0,
+};
+
+const selectionBadgeStyle: React.CSSProperties = {
+  fontSize: 9,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: 0.4,
+  padding: '0 5px',
+  borderRadius: 999,
+  color: 'var(--lf-bg-1)',
+  background: 'var(--lf-accent)',
+  flexShrink: 0,
 };
 
 const metaStyle: React.CSSProperties = {
