@@ -4289,7 +4289,8 @@ and lifts the command's CNC-only gate.)*
   review step shows the reprojection error plus an Original / Corrected A/B of
   the last capture. If the corrected view's straight edges LOOK straight, the
   operator applies; the calibration persists on the device profile (undoable)
-  and survives reload.
+  and survives reload, bound to the source identity and pixel geometry of the
+  accepted capture set.
 - **Error / solve rejected.** A failed solve (too few views, degenerate
   geometry) shows the typed reason with "Back to capture"; nothing persists.
   A suspect solve (implausible coefficients, high RMS, uneven coverage, too-
@@ -4301,7 +4302,10 @@ and lifts the command's CNC-only gate.)*
 - **Edge / mid-session changes.** Captures with no full board in view are
   rejected with a hint (not silently dropped); a camera-resolution change
   mid-session refuses to mix pixel bases and offers Reset; changing the board
-  description discards captures taken against the old board.
+  description discards captures taken against the old board. Changing the
+  active camera source discards the in-progress capture set, and Apply always
+  persists the binding recorded by the accepted frames rather than whichever
+  camera happens to be active later.
 
 ### F-CAM3. Workspace camera overlay (ADR-107 v1 wiring)
 

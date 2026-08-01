@@ -8,6 +8,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter } from '../../../platform/types';
 import { PlatformProvider } from '../../app/platform-context';
+import { useCameraStore } from '../../state/camera-store';
+import { cameraCaptureBindingForFrame, type ActiveCameraSource } from '../frame-source';
 import { CameraCalibrationWizard } from './CameraCalibrationWizard';
 import { useCameraWizardStore } from './camera-wizard-store';
 
@@ -22,6 +24,16 @@ const mockPlatform: PlatformAdapter = {
   pickFileForSave: vi.fn(async () => null),
   serial: { isSupported: () => false, requestPort: vi.fn(async () => null) },
 };
+const CAMERA_A: ActiveCameraSource = {
+  kind: 'machine-jpeg',
+  cameraUrl: 'http://192.168.10.10/capture.jpg',
+  frameUrl: 'http://127.0.0.1/frame.jpg?url=camera-a',
+};
+const CAMERA_B: ActiveCameraSource = {
+  kind: 'machine-jpeg',
+  cameraUrl: 'http://192.168.10.11/capture.jpg',
+  frameUrl: 'http://127.0.0.1/frame.jpg?url=camera-b',
+};
 
 let container: HTMLDivElement;
 let root: Root;
@@ -35,6 +47,8 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  useCameraStore.setState({ sourceState: { kind: 'idle' } });
+  useCameraWizardStore.getState().closeWizard();
 });
 
 function renderWizard(): void {
@@ -81,5 +95,25 @@ describe('CameraCalibrationWizard', () => {
     renderWizard();
     expect(container.textContent).toContain('Calibration failed (too-few-views)');
     expect(buttonByText('Back to capture')).not.toBeNull();
+  });
+
+  it('discards an in-progress calibration when the live camera source changes', () => {
+    const captureBinding = cameraCaptureBindingForFrame(CAMERA_A, 320, 240);
+    useCameraWizardStore.getState().openWizard();
+    useCameraWizardStore.setState({
+      step: 'review',
+      captureBinding,
+      frameWidth: 320,
+      frameHeight: 240,
+    });
+    useCameraStore.setState({ sourceState: { kind: 'live', source: CAMERA_B } });
+
+    renderWizard();
+
+    const state = useCameraWizardStore.getState();
+    expect(state.step).toBe('capture');
+    expect(state.captureBinding).toBeNull();
+    expect(state.lastRejection).toBe('source-changed');
+    expect(container.textContent).toContain('camera source changed');
   });
 });

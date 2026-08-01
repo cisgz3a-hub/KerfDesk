@@ -16,7 +16,11 @@ import {
   liveDetectScale,
   type LiveCaptureElement,
 } from '../frame-capture';
-import { sourcePollIntervalMs } from '../frame-source';
+import {
+  cameraCaptureBindingForFrame,
+  sourcePollIntervalMs,
+  type ActiveCameraSource,
+} from '../frame-source';
 import { useCameraWizardStore } from './camera-wizard-store';
 import { isNovelPose } from './capture-novelty';
 import { DetectionOverlay } from './DetectionOverlay';
@@ -49,7 +53,12 @@ export function CaptureStep(): JSX.Element {
     sourceState.kind === 'live',
     sourceState.kind === 'live' ? sourcePollIntervalMs(sourceState.source) : 0,
   );
-  useAutoCapture(element, live, autoCapture);
+  useAutoCapture(
+    element,
+    live,
+    autoCapture,
+    sourceState.kind === 'live' ? sourceState.source : null,
+  );
 
   const captures = session.captures.length;
   const detectionLocked = live.corners !== null;
@@ -87,8 +96,15 @@ export function CaptureStep(): JSX.Element {
         {lastRejection === 'resolution-changed'
           ? ' — the camera resolution changed; reset and recapture.'
           : ''}
+        {lastRejection === 'source-changed'
+          ? ' — the camera source changed; previous captures were discarded.'
+          : ''}
       </p>
-      <CaptureControls element={element} detectionLocked={detectionLocked} />
+      <CaptureControls
+        element={element}
+        detectionLocked={detectionLocked}
+        source={sourceState.source}
+      />
     </div>
   );
 }
@@ -96,6 +112,7 @@ export function CaptureStep(): JSX.Element {
 function CaptureControls(props: {
   readonly element: LiveCaptureElement | null;
   readonly detectionLocked: boolean;
+  readonly source: ActiveCameraSource;
 }): JSX.Element {
   const autoCapture = useCameraWizardStore((s) => s.autoCapture);
   const setAutoCapture = useCameraWizardStore((s) => s.setAutoCapture);
@@ -116,7 +133,12 @@ function CaptureControls(props: {
         disabled={!props.detectionLocked || props.element === null}
         onClick={() => {
           const frame = props.element === null ? null : captureElementFrame(props.element, 1);
-          if (frame !== null) addCaptureFrame(frame);
+          if (frame !== null) {
+            addCaptureFrame(
+              frame,
+              cameraCaptureBindingForFrame(props.source, frame.width, frame.height),
+            );
+          }
         }}
         title="Capture the current board pose now."
       >
@@ -149,17 +171,20 @@ function useAutoCapture(
   element: LiveCaptureElement | null,
   live: ReturnType<typeof useLiveDetection>,
   enabled: boolean,
+  source: ActiveCameraSource | null,
 ): void {
   const session = useCameraWizardStore((s) => s.session);
   const addCaptureFrame = useCameraWizardStore((s) => s.addCaptureFrame);
   useEffect(() => {
-    if (!enabled || element === null || live.corners === null) return;
+    if (!enabled || element === null || live.corners === null || source === null) return;
     if (live.stableTicks < AUTO_CAPTURE_STABLE_TICKS) return;
     const priors = session.captures.map((c) => c.imagePoints);
     if (!isNovelPose(live.corners, priors, live.frameWidth, live.frameHeight)) return;
     const frame = captureElementFrame(element, 1);
-    if (frame !== null) addCaptureFrame(frame);
-  }, [enabled, element, live, session, addCaptureFrame]);
+    if (frame !== null) {
+      addCaptureFrame(frame, cameraCaptureBindingForFrame(source, frame.width, frame.height));
+    }
+  }, [enabled, element, live, session, source, addCaptureFrame]);
 }
 
 const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };

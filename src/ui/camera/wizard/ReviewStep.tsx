@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react';
 import { toCameraCalibration, type TrustReason } from '../../../core/camera';
+import { cameraBindingCompatibility } from '../../../core/camera/camera-capture-binding';
 import { assertNever } from '../../../core/scene';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
@@ -55,21 +56,31 @@ function SolvedView(): JSX.Element {
   const setAbMode = useCameraWizardStore((s) => s.setAbMode);
   const lastFrame = useCameraWizardStore((s) => s.lastFrame);
   const rectifiedFrame = useCameraWizardStore((s) => s.rectifiedFrame);
+  const captureBinding = useCameraWizardStore((s) => s.captureBinding);
   const setStep = useCameraWizardStore((s) => s.setStep);
   const closeWizard = useCameraWizardStore((s) => s.closeWizard);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
   const sourceState = useCameraStore((s) => s.sourceState);
   if (session.kind !== 'solved') return <></>;
   const { result, diversity } = session;
+  const currentCapture =
+    captureBinding !== null && sourceState.kind === 'live'
+      ? cameraCaptureBindingForFrame(
+          sourceState.source,
+          captureBinding.width,
+          captureBinding.height,
+        )
+      : null;
+  const sourceMatchesCapture =
+    captureBinding !== null &&
+    currentCapture !== null &&
+    cameraBindingCompatibility(captureBinding, currentCapture) === 'match';
 
   const apply = (): void => {
-    if (sourceState.kind !== 'live' || lastFrame === null) return;
-    const capture = cameraCaptureBindingForFrame(
-      sourceState.source,
-      lastFrame.width,
-      lastFrame.height,
-    );
-    updateDeviceProfile({ cameraCalibration: toCameraCalibration(result, Date.now(), capture) });
+    if (!sourceMatchesCapture || captureBinding === null) return;
+    updateDeviceProfile({
+      cameraCalibration: toCameraCalibration(result, Date.now(), captureBinding),
+    });
     closeWizard();
   };
 
@@ -108,7 +119,7 @@ function SolvedView(): JSX.Element {
         <Button variant="ghost" onClick={() => setStep('capture')}>
           Capture more poses
         </Button>
-        <Button variant="primary" onClick={apply} disabled={sourceState.kind !== 'live'}>
+        <Button variant="primary" onClick={apply} disabled={!sourceMatchesCapture}>
           Apply calibration
         </Button>
       </div>
