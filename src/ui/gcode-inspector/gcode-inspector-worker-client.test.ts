@@ -42,7 +42,11 @@ class StubWorker {
 
 const result = {
   parsed: { kind: 'error' as const, reason: 'fixture' },
-  lines: [],
+  sourceIndex: {
+    unit: 'utf16-code-unit' as const,
+    starts: new Float64Array([0]),
+    sourceLength: 0,
+  },
   sourceLineCount: 0,
 };
 

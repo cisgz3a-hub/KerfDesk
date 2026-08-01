@@ -20,4 +20,5 @@ export {
 } from './corner-geometry';
 export { filletPathCorner, type FilletResult } from './fillet-corner';
 export { scaleEntities, scaleEntity } from './scale-entities';
+export { stretchEntities, stretchEntity, type StretchFactors } from './stretch-entities';
 export { translateEntities, translateEntity } from './translate-entities';

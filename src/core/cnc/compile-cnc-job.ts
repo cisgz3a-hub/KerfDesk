@@ -30,9 +30,9 @@ import {
   capSpindle,
   contourPassFromPolyline,
   isProfileCutType,
-  orderInnerFirst,
   resolveRetractBetweenPasses,
 } from './compile-cnc-helpers';
+import { orderInnerFirst } from './profile-ordering';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { pocketToolpathsForSettings, resolveRestPocketOperation } from './cnc-rest-operation';

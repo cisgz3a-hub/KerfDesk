@@ -13971,6 +13971,44 @@ otherwise fixed).
 4. **Precedence on open:** the in-memory stash first (this page's drawing), then
    the saved drawing, then blank.
 
+### Amendment 4 (2026-08-01) - Edge grips stretch one axis, and the model gains an ellipse (DS-8g)
+
+The selection carried four corner grips, all of them uniform scales, because a
+per-axis stretch had nowhere to put its result: `SketchCircle` holds a single
+radius, so widening a circle would have deformed it into something the model
+could not represent. The layered carve the Studio exists for is built from
+nested rectangles, and "make this one 20 mm wider without making it taller" had
+no gesture at all — only two typed numbers in the inspector.
+
+1. **Four edge grips join the four corner grips.** A corner grip scales
+   uniformly, exactly as before; an edge grip stretches its own axis and reports
+   a factor of exactly `1` on the other, so the held dimension is untouched by
+   rounding as well as by intent. An edge grip is omitted only when its own axis
+   has no extent, where the factor is a division by zero rather than a resize.
+2. **`SketchEllipse` joins the entity union**, axis-aligned, with independent
+   radii. It exists to hold what a stretched circle becomes. A circle is NOT
+   re-expressed as an equal-axis ellipse: a circle drawn as a circle keeps its
+   radius, its diameter field, and its exact arcs.
+3. **Per-axis exactness is stated per kind, not assumed.** Rectangles with
+   square corners, lines, paths, circles-to-ellipses, and ellipses are exact. A
+   rounded rectangle's corner radius follows the SMALLER factor — a true stretch
+   makes the corners elliptical, which `RectangleSpec` cannot hold, and the
+   smaller factor keeps the fillet inside the shorter side while agreeing with
+   the uniform case when the factors are equal. An arc is BAKED to a path at the
+   sampled tolerance, because a stretched arc is an elliptical arc, which
+   neither this model nor `G2`/`G3` can express; the sampled polyline is the
+   honest form rather than an arc of a radius the operator never asked for.
+4. **`stretchEntities` is a separate operation from `scaleEntities`**, and
+   delegates to it whenever the two factors are equal. The two have different
+   exactness rules, and one function hiding that difference is how a precision
+   tool starts lying — in particular, a corner grip must never quietly bake an
+   arc.
+5. **The scene needed no change.** An ellipse materializes through the existing
+   `EllipseSpec` carrier that a circle already used, so the applied part stays
+   re-editable on the main canvas and `.lf2` gains no new shape.
+6. There is deliberately **no ellipse drawing tool**. The arm exists to make the
+   stretch honest; a tool for it is separable work.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01
@@ -14260,7 +14298,55 @@ claim physical qualification.
 - NOT verified: manufacturer SKU completeness, manufacturer feed recommendations, real spindle or
   collet compatibility, an air cut, a material cut, surface finish, or perceptual 3D fidelity.
 
-## ADR-276 - V-carve entry uses an opt-in emission-accurate contour ramp (2026-08-01)
+## ADR-276 - Profile cuts finish one part before travelling to the next (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+`orderInnerFirst` ordered a profile layer's toolpaths by containment depth alone: every inner
+contour in the scene, then every outer. The inner-before-outer property is load-bearing — cutting
+a hole after the outer that frees its part machines a workpiece that can move — but the global
+partition also meant the cutter visited every letter counter across a multi-part job before
+returning to the first part's outer. Field case (2026-08-01): a two-line "Drive / Safe"
+profile-on-path job cut one counter in the top word, dived to two counters in the bottom word,
+then travelled back to the top-left letter — three cross-field rapids before any letter was
+complete. ADR-270 already fixed the same class of defect for V-carve ladders by grouping on the
+source filled region.
+
+### Decision
+
+- `orderInnerFirst` (`src/core/cnc/profile-ordering.ts`) groups toolpaths into parts: each
+  top-level contour owns every contour nested inside it. Parts run in the order their top-level
+  contours appear in the input — the same source-order rule as ADR-270 — and inside a part the
+  order stays innermost-first, ties by input order, outer last.
+- A nested contour's owner is the first top-level contour containing its probe point; anything no
+  top-level contour contains owns itself, so lone open engravings keep their input position.
+- The duplicate `orderInnerFirst` copy in `compile-cnc-helpers.ts` is deleted; the roughing path
+  (`compile-cnc-job.ts`) and the finishing path (`finish-allowance.ts`) now share the one
+  `profile-ordering.ts` implementation, so both walk parts identically.
+
+### Consequences
+
+- A letter (or any part) is machined completely — counters, then its outer, at every depth —
+  before the cutter travels on. The safety ordering inside each part is unchanged; freeing part A
+  never affects part B's uncut counters, which sit inside B.
+- Single-part layers order exactly as before. Multi-part profile layers reorder, so multi-part
+  G-code snapshots change once; single-part snapshots stay byte-identical.
+- Travel distance is not globally minimized (parts follow scene order, matching ADR-270), only
+  degrouped cross-field hops are eliminated.
+
+### Verification
+
+- `profile-ordering.test.ts` pins part completion, part order by input, innermost-first within a
+  part, open-detail grouping, lone-contour position, and single/empty passthrough.
+- `compile-cnc-part-order.test.ts` pins the compiled pass sequence end-to-end for a two-letter
+  profile-on-path layer (counter ladder, outer ladder, next letter).
+- NOT verified: a physical cut. No hardware is available; the evidence is the compiled pass
+  sequence and the existing motion invariants.
+
+## ADR-278 - V-carve entry uses an opt-in emission-accurate contour ramp (2026-08-01)
 
 **Date:** 2026-08-01
 **Status:** Accepted
@@ -14316,7 +14402,7 @@ therefore do not establish center-cutting geometry, flute clearance, ramp angle,
    policy, while a separate warning toast and inert G-code provenance comment disclose that loss of
    the low-load entry guarantee.
 6. The configured angle and any legacy fallback or tiled-entry caveat are written into CNC
-   provenance comments. The emitter revision advances to `adr-276-vcarve-contour-ramp-v1`.
+   provenance comments. The emitter revision advances to `adr-278-vcarve-contour-ramp-v1`.
 
 ### Consequences
 

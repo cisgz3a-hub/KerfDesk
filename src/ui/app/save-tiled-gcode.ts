@@ -5,8 +5,7 @@
 // preflight is deliberately skipped — an oversized job is the point of
 // tiling — and each tile's G-code preflights individually instead.
 
-import { tileJobs } from '../../core/cnc';
-import type { TiledJobsResult } from '../../core/cnc/tile-plan';
+import { tileJobs, type TiledJobsResult } from '../../core/cnc/tile-jobs';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';

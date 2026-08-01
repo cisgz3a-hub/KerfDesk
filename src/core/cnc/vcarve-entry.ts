@@ -1,8 +1,5 @@
 import type { CncContourPass, CncPass, CncPath3dPass } from '../job';
-import {
-  formatGcodeCoordinateMm,
-  GCODE_COORDINATE_DECIMAL_PLACES,
-} from '../gcode/coordinate-format';
+import { formatGcodeCoordinateMm, GCODE_COORDINATE_DECIMAL_PLACES } from '../gcode';
 import type { Polyline, Vec2 } from '../scene';
 
 const COORD_EPSILON_MM = 1e-9;

@@ -26,6 +26,7 @@ const GROUPS: ReadonlyArray<{ readonly group: FieldGroup; readonly heading: stri
 const KIND_LABEL: Readonly<Record<SketchEntity['kind'], string>> = {
   rect: 'Rectangle',
   circle: 'Circle',
+  ellipse: 'Ellipse',
   line: 'Line',
   arc: 'Arc',
   path: 'Path',

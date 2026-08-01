@@ -1352,5 +1352,5 @@ PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worke
   represented at emitted precision, the full legacy stepped ladder remains
   available and Job Review warns that fallback occurred. A
   tiled boundary split likewise remains exportable but warns that the clipped
-  tile begins with a direct plunge. See ADR-276 and
+  tile begins with a direct plunge. See ADR-278 and
   `docs/audits/2026-08-01-cnc-vcarve-ramp-entry-acceptance.md`.

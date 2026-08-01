@@ -24,6 +24,8 @@ export function entitySnapPoints(entity: SketchEntity): ReadonlyArray<SnapTarget
       ];
     case 'circle':
       return [target('center', entity.center, entity.id), ...circleQuadrants(entity)];
+    case 'ellipse':
+      return [target('center', entity.center, entity.id), ...ellipseQuadrants(entity)];
     case 'arc':
       return arcPoints(entity);
     case 'rect':
@@ -39,6 +41,22 @@ function circleQuadrants(
   return QUADRANT_ANGLES_DEG.map((deg) =>
     target('quadrant', polar(entity.center, entity.radiusMm, deg), entity.id),
   );
+}
+
+// An ellipse's quadrants are the ends of its two axes — the four extreme points
+// of its outline, which is what "the top of that hole" means on an ellipse just
+// as it does on a circle.
+function ellipseQuadrants(
+  entity: Extract<SketchEntity, { readonly kind: 'ellipse' }>,
+): ReadonlyArray<SnapTarget> {
+  const { center, radiusXMm, radiusYMm } = entity;
+  const points: ReadonlyArray<Vec2> = [
+    { x: center.x + radiusXMm, y: center.y },
+    { x: center.x, y: center.y + radiusYMm },
+    { x: center.x - radiusXMm, y: center.y },
+    { x: center.x, y: center.y - radiusYMm },
+  ];
+  return points.map((point) => target('quadrant', point, entity.id));
 }
 
 // An arc offers its centre, its two ends, and only the quadrants it actually

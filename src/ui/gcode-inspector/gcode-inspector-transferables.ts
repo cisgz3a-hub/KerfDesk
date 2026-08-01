@@ -3,9 +3,10 @@ import type { GcodeInspectorWorkerResult } from './gcode-inspector-worker-protoc
 export function gcodeInspectorTransferables(
   result: GcodeInspectorWorkerResult,
 ): ReadonlyArray<ArrayBuffer> {
-  if (result.parsed.kind !== 'ok') return [];
+  if (result.parsed.kind !== 'ok') return arrayBufferOf(result.sourceIndex.starts.buffer);
   const model = result.parsed.model;
   return uniqueArrayBuffers([
+    result.sourceIndex.starts.buffer,
     model.positions.buffer,
     model.segKind.buffer,
     model.segMotion.buffer,
@@ -15,6 +16,10 @@ export function gcodeInspectorTransferables(
     model.segRouteEndMm.buffer,
     model.lineCategories.buffer,
   ]);
+}
+
+function arrayBufferOf(buffer: ArrayBufferLike): ReadonlyArray<ArrayBuffer> {
+  return buffer instanceof ArrayBuffer ? [buffer] : [];
 }
 
 function uniqueArrayBuffers(buffers: ReadonlyArray<ArrayBufferLike>): ReadonlyArray<ArrayBuffer> {

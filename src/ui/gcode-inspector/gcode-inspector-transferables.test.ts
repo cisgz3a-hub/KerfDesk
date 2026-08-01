@@ -9,13 +9,15 @@ describe('gcodeInspectorTransferables', () => {
     if (result.parsed.kind !== 'ok') return;
 
     const transfers = gcodeInspectorTransferables(result);
-    expect(transfers).toHaveLength(8);
+    expect(transfers).toHaveLength(9);
     expect(new Set(transfers).size).toBe(transfers.length);
+    expect(transfers).toContain(result.sourceIndex.starts.buffer);
     expect(transfers).toContain(result.parsed.model.positions.buffer);
     expect(transfers).toContain(result.parsed.model.lineCategories.buffer);
   });
 
-  it('returns no transfers for a parse error', () => {
-    expect(gcodeInspectorTransferables(inspectGcodeText('not gcode'))).toEqual([]);
+  it('still transfers the source index for a parse error', () => {
+    const result = inspectGcodeText('not gcode');
+    expect(gcodeInspectorTransferables(result)).toEqual([result.sourceIndex.starts.buffer]);
   });
 });

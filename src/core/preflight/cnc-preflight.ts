@@ -18,7 +18,7 @@ import {
   findCncRestPocketIssues,
   findDroppedCncLayers,
 } from '../cnc';
-import { findCncVCarveEntryIssues } from '../cnc/cnc-vcarve-entry-issues';
+import { findCncVCarveEntryIssues } from '../cnc/vcarve-entry-diagnostics';
 import { machineBoundsForDevice } from '../devices';
 import {
   findNonFiniteCoords,

@@ -1,9 +1,13 @@
-import type { MotionBlock, MotionPoint } from '../../core/job/motion-manifest';
+import type { ExecutablePlanPoint } from '../../core/execution-plan';
 import {
   mapControllerPointToScene,
   type CanvasMotionPlan,
   type LiveCanvasRun,
 } from '../state/canvas-motion-plan';
+import {
+  canvasPreviewMotionSequence,
+  type CanvasPreviewMotion,
+} from '../state/canvas-preview-motion';
 import type { ViewTransform } from './view-transform';
 
 type CachedRoutePaths = {
@@ -63,7 +67,7 @@ function routePaths(
   }
   const target = Math.max(
     cached.confirmedRouteMm,
-    Math.min(confirmedRouteMm, plan.manifest.totalRouteMm),
+    Math.min(confirmedRouteMm, canvasPreviewMotionSequence(plan).totalRouteMm),
   );
   appendConfirmedRange(plan, cached, cached.confirmedRouteMm, target);
   cached.confirmedRouteMm = target;
@@ -83,7 +87,9 @@ function plannedPath(plan: CanvasMotionPlan, PathCtor: typeof Path2D): Path2D {
   const cached = plannedPathCache.get(plan);
   if (cached !== undefined && cached.pathConstructor === PathCtor) return cached.path;
   const path = new PathCtor();
-  for (const block of plan.manifest.blocks) appendFullBlock(path, block, plan);
+  for (const motion of canvasPreviewMotionSequence(plan).motions) {
+    appendFullMotion(path, motion, plan);
+  }
   plannedPathCache.set(plan, { pathConstructor: PathCtor, path });
   return path;
 }
@@ -107,7 +113,10 @@ function drawRasterizedRoute(
   }
   const cached = routeRaster(plan, ctx.canvas, view, plannedColor, PathCtor);
   if (cached === null) return false;
-  const target = Math.max(0, Math.min(run.route.confirmedRouteMm, plan.manifest.totalRouteMm));
+  const target = Math.max(
+    0,
+    Math.min(run.route.confirmedRouteMm, canvasPreviewMotionSequence(plan).totalRouteMm),
+  );
   if (target < cached.confirmedRouteMm) {
     resetRouteRaster(cached, plan, view, plannedColor, PathCtor);
   }
@@ -174,9 +183,9 @@ function appendConfirmedRasterRange(
   strokeScenePath(cached.context, travel, view, completedColor, 1.5, [6, 4]);
 }
 
-function appendFullBlock(path: Path2D, block: MotionBlock, plan: CanvasMotionPlan): void {
-  if (block.kind === 'plunge' || block.points.length < 2) return;
-  block.points.forEach((point, index) => {
+function appendFullMotion(path: Path2D, motion: CanvasPreviewMotion, plan: CanvasMotionPlan): void {
+  if (isVertical(motion) || motion.pointsMm.length < 2) return;
+  motion.pointsMm.forEach((point, index) => {
     const scene = mapControllerPointToScene(point, plan);
     if (index === 0) path.moveTo(scene.x, scene.y);
     else path.lineTo(scene.x, scene.y);
@@ -190,28 +199,28 @@ function appendConfirmedRange(
   toRouteMm: number,
 ): void {
   if (toRouteMm <= fromRouteMm) return;
-  const blocks = plan.manifest.blocks;
-  const first = firstBlockEndingAfter(blocks, fromRouteMm);
-  for (let blockIndex = first; blockIndex < blocks.length; blockIndex += 1) {
-    const block = blocks[blockIndex];
-    if (block === undefined || block.routeStartMm >= toRouteMm) break;
-    const path = block.kind === 'process' ? paths.process : paths.travel;
-    appendBlockRange(path, block, plan, fromRouteMm, toRouteMm);
+  const motions = canvasPreviewMotionSequence(plan).motions;
+  const first = firstMotionEndingAfter(motions, fromRouteMm);
+  for (let motionIndex = first; motionIndex < motions.length; motionIndex += 1) {
+    const motion = motions[motionIndex];
+    if (motion === undefined || motion.routeStartMm >= toRouteMm) break;
+    const path = motion.intent === 'process' ? paths.process : paths.travel;
+    appendMotionRange(path, motion, plan, fromRouteMm, toRouteMm);
   }
 }
 
-function appendBlockRange(
+function appendMotionRange(
   path: Path2D,
-  block: MotionBlock,
+  motion: CanvasPreviewMotion,
   plan: CanvasMotionPlan,
   fromRouteMm: number,
   toRouteMm: number,
 ): void {
-  if (block.kind === 'plunge') return;
-  let segmentStartMm = block.routeStartMm;
-  for (let index = 1; index < block.points.length; index += 1) {
-    const from = block.points[index - 1];
-    const to = block.points[index];
+  if (isVertical(motion)) return;
+  let segmentStartMm = motion.routeStartMm;
+  for (let index = 1; index < motion.pointsMm.length; index += 1) {
+    const from = motion.pointsMm[index - 1];
+    const to = motion.pointsMm[index];
     if (from === undefined || to === undefined) continue;
     const length = distance(from, to);
     const segmentEndMm = segmentStartMm + length;
@@ -230,13 +239,16 @@ function appendBlockRange(
   }
 }
 
-function firstBlockEndingAfter(blocks: ReadonlyArray<MotionBlock>, routeMm: number): number {
+function firstMotionEndingAfter(
+  motions: ReadonlyArray<CanvasPreviewMotion>,
+  routeMm: number,
+): number {
   let low = 0;
-  let high = blocks.length;
+  let high = motions.length;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    const block = blocks[middle];
-    if (block !== undefined && block.routeEndMm > routeMm) high = middle;
+    const motion = motions[middle];
+    if (motion !== undefined && motion.routeEndMm > routeMm) high = middle;
     else low = middle + 1;
   }
   return low;
@@ -267,13 +279,13 @@ function drawRouteFallback(
   plannedColor: string,
   completedColor: string,
 ): void {
-  for (const block of plan.manifest.blocks) {
-    drawBlock(ctx, block, block.points, plannedColor, false, view, plan);
-    if (block.routeStartMm >= run.route.confirmedRouteMm) continue;
-    drawBlock(
+  for (const motion of canvasPreviewMotionSequence(plan).motions) {
+    drawMotion(ctx, motion, motion.pointsMm, plannedColor, false, view, plan);
+    if (motion.routeStartMm >= run.route.confirmedRouteMm) continue;
+    drawMotion(
       ctx,
-      block,
-      confirmedBlockPoints(block, run.route.confirmedRouteMm),
+      motion,
+      confirmedMotionPoints(motion, run.route.confirmedRouteMm),
       completedColor,
       true,
       view,
@@ -282,20 +294,20 @@ function drawRouteFallback(
   }
 }
 
-function drawBlock(
+function drawMotion(
   ctx: CanvasRenderingContext2D,
-  block: MotionBlock,
-  points: ReadonlyArray<MotionPoint>,
+  motion: CanvasPreviewMotion,
+  points: ReadonlyArray<ExecutablePlanPoint>,
   color: string,
   completed: boolean,
   view: ViewTransform,
   plan: CanvasMotionPlan,
 ): void {
-  if (block.kind === 'plunge' || points.length < 2) return;
+  if (isVertical(motion) || points.length < 2) return;
   ctx.save();
   ctx.strokeStyle = color;
-  ctx.lineWidth = completed ? (block.kind === 'process' ? 2.4 : 1.5) : 1.2;
-  ctx.setLineDash(completed && block.kind !== 'process' ? [6, 4] : []);
+  ctx.lineWidth = completed ? (motion.intent === 'process' ? 2.4 : 1.5) : 1.2;
+  ctx.setLineDash(completed && motion.intent !== 'process' ? [6, 4] : []);
   ctx.beginPath();
   points.forEach((point, index) => {
     const scene = mapControllerPointToScene(point, plan);
@@ -310,17 +322,17 @@ function drawBlock(
   ctx.restore();
 }
 
-function confirmedBlockPoints(
-  block: MotionBlock,
+function confirmedMotionPoints(
+  motion: CanvasPreviewMotion,
   confirmedRouteMm: number,
-): ReadonlyArray<MotionPoint> {
-  if (confirmedRouteMm >= block.routeEndMm) return block.points;
-  const targetMm = confirmedRouteMm - block.routeStartMm;
-  const points: MotionPoint[] = [];
+): ReadonlyArray<ExecutablePlanPoint> {
+  if (confirmedRouteMm >= motion.routeEndMm) return motion.pointsMm;
+  const targetMm = confirmedRouteMm - motion.routeStartMm;
+  const points: ExecutablePlanPoint[] = [];
   let walked = 0;
-  for (let index = 1; index < block.points.length; index += 1) {
-    const from = block.points[index - 1];
-    const to = block.points[index];
+  for (let index = 1; index < motion.pointsMm.length; index += 1) {
+    const from = motion.pointsMm[index - 1];
+    const to = motion.pointsMm[index];
     if (from === undefined || to === undefined) continue;
     if (points.length === 0) points.push(from);
     const length = distance(from, to);
@@ -336,11 +348,19 @@ function confirmedBlockPoints(
   return points;
 }
 
-function distance(a: MotionPoint, b: MotionPoint): number {
+function isVertical(motion: CanvasPreviewMotion): boolean {
+  return motion.intent === 'plunge' || motion.intent === 'retract';
+}
+
+function distance(a: ExecutablePlanPoint, b: ExecutablePlanPoint): number {
   return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
 }
 
-function interpolate(a: MotionPoint, b: MotionPoint, t: number): MotionPoint {
+function interpolate(
+  a: ExecutablePlanPoint,
+  b: ExecutablePlanPoint,
+  t: number,
+): ExecutablePlanPoint {
   return {
     x: a.x + (b.x - a.x) * t,
     y: a.y + (b.y - a.y) * t,

@@ -7,10 +7,12 @@
 // Two carriers, chosen per entity by ONE rule: use a parametric ShapeSpec only
 // where it represents the entity EXACTLY, and a baked vector object otherwise.
 //
-//  - rect   -> kind:'shape' spec 'rect'    — exact, and stays re-editable on the
-//              main canvas (corner-radius handle, Shape properties).
-//  - circle -> kind:'shape' spec 'ellipse' — exact (a circle is an ellipse with
-//              equal axes), likewise re-editable.
+//  - rect    -> kind:'shape' spec 'rect'    — exact, and stays re-editable on the
+//               main canvas (corner-radius handle, Shape properties).
+//  - circle  -> kind:'shape' spec 'ellipse' — exact (a circle is an ellipse with
+//               equal axes), likewise re-editable.
+//  - ellipse -> kind:'shape' spec 'ellipse' — exact, the same carrier with
+//               independent axes.
 //  - line / arc / path -> kind:'imported-svg' carrying exact polylines.
 //
 // Why not createPolyline for the third group: it FAIRS its input above a minimum
@@ -27,6 +29,7 @@ import {
   type Polyline,
   type SceneObject,
   type ShapeObject,
+  type Vec2,
 } from '../scene';
 import { createEllipse, createRectangle } from '../shapes/primitives';
 import { entityToPolylines } from './entity-geometry';
@@ -53,7 +56,21 @@ export function designEntityToSceneObject(
     case 'rect':
       return rectangleObject(entity, id, color);
     case 'circle':
-      return circleObject(entity, id, color);
+      return ellipseObject({
+        id,
+        color,
+        center: entity.center,
+        radiusXMm: entity.radiusMm,
+        radiusYMm: entity.radiusMm,
+      });
+    case 'ellipse':
+      return ellipseObject({
+        id,
+        color,
+        center: entity.center,
+        radiusXMm: entity.radiusXMm,
+        radiusYMm: entity.radiusYMm,
+      });
     case 'line':
     case 'arc':
     case 'path':
@@ -81,23 +98,26 @@ function rectangleObject(
   });
 }
 
-// An ellipse is also top-left placed, so a circle's transform is its centre less
-// the radius on both axes.
-function circleObject(
-  entity: Extract<SketchEntity, { readonly kind: 'circle' }>,
-  id: string,
-  color: string,
-): ShapeObject | null {
-  if (!(entity.radiusMm > 0)) return null;
-  const diameterMm = entity.radiusMm * 2;
+// An EllipseSpec is top-left placed and sized by diameters, so the transform is
+// the centre less each radius. Circles and ellipses share this carrier: a circle
+// is the equal-axis case, and routing both through one function keeps them from
+// drifting apart.
+function ellipseObject(args: {
+  readonly id: string;
+  readonly color: string;
+  readonly center: Vec2;
+  readonly radiusXMm: number;
+  readonly radiusYMm: number;
+}): ShapeObject | null {
+  if (!(args.radiusXMm > 0) || !(args.radiusYMm > 0)) return null;
   return createEllipse({
-    id,
-    color,
-    spec: { widthMm: diameterMm, heightMm: diameterMm },
+    id: args.id,
+    color: args.color,
+    spec: { widthMm: args.radiusXMm * 2, heightMm: args.radiusYMm * 2 },
     transform: {
       ...IDENTITY_TRANSFORM,
-      x: entity.center.x - entity.radiusMm,
-      y: entity.center.y - entity.radiusMm,
+      x: args.center.x - args.radiusXMm,
+      y: args.center.y - args.radiusYMm,
     },
   });
 }

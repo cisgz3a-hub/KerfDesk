@@ -3,7 +3,7 @@
 - **Date:** 2026-08-01
 - **Scope:** software/CAM/G-code only; no controller connection, machine motion,
   firmware/settings change, or physical cutter qualification
-- **Decision:** ADR-276
+- **Decision:** ADR-278
 
 ## Outcome
 

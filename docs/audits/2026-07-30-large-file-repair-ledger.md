@@ -767,3 +767,65 @@ cold-optimizer correction.
   200 MiB claim is made.
 - The exact rebased tree must pass the full release gate and fresh GitHub checks before review.
   Draft PR #527 only; no merge, deployment, hardware, controller, settings, Frame, or Start action.
+
+## Corrective audit 4 - indexed lazy G-code Inspector source
+
+**Status:** fixed and locally verified; publication and fresh GitHub checks pending.
+
+### Finding
+
+- The G-code Inspector worker retained every decoded source line in a nested `string[]` after
+  parsing and structured-cloned that full graph back to the UI. The source pane virtualized DOM
+  rows, but the worker result still duplicated source-line strings in UI memory.
+
+### Repair
+
+- Text and Blob parsing now build a packed `Float64Array` of source-line starts while feeding the
+  existing render-model builder. Blob offsets are UTF-8 bytes; generated-text offsets are UTF-16
+  code units, matching the source type that the UI already owns.
+- The worker transfers the packed offset buffer with the existing render-model buffers. It no
+  longer returns a source-line string array.
+- The full Inspector keeps its original immutable Blob or string and decodes only the visible
+  window plus an off-screen selected line. Source/index mismatch or read failure is shown instead
+  of substituting incorrect text.
+- The preview-only canvas does not hydrate source lines. Parsing, render-pressure disclosure,
+  cancellation, FIFO behavior, and worker-unavailable fallback semantics are unchanged.
+- No source truncation, size refusal, validation weakening, or new import/preview guard was added.
+
+### Test-first verification
+
+- Red: the new 20,005-line protocol regression failed because `sourceIndex` was absent and the
+  result still exposed `lines`.
+- Green focused suite: 12 Inspector files / 58 tests. Direct and streamed parsing retain identical
+  render results; line windows cover LF, CR, CRLF across chunks, Unicode UTF-8 boundaries, final
+  empty lines, mismatch errors, parse-error transfers, and full-dialog source rendering.
+- Green static checks: renderer and E2E typecheck, focused ESLint, hard file-size policy, and
+  `git diff --check`.
+- Green real Chrome: 4/4 production cases passed, covering a 260,100-segment Inspector with a
+  populated lazy source window, active cancellation, FIFO with a transferred source index and no
+  cloned `lines` property, and the separate G-code 2D import worker.
+
+### Independent audit corrections
+
+- The first frozen-diff review caught a worker-constructor-unavailable Blob mismatch: fallback
+  parsing produced a UTF-16 text index, but the source pane still received the original Blob and
+  correctly rejected the incompatible pair. A failing dialog regression reproduced the missing
+  source text. Ready inspection state now retains the exact source representation used to build
+  its index, so fallback source hydration uses the already-read text and preserves the disclosed
+  main-thread behavior.
+- The same review reproduced an embedded UTF-8 BOM fidelity edge case. `Blob.text()` treated a BOM
+  at every nonzero slice boundary as a file marker and removed it, even though the worker's
+  full-stream decode preserves a later-line U+FEFF. Nonzero lazy windows now decode with
+  BOM-preserving `TextDecoder` semantics; file-leading BOM handling remains unchanged.
+- Direct coverage now splits actual multibyte code points across chunks, preserves an embedded BOM
+  on a non-first Blob line, and requires fallback source text without a source-unavailable alert.
+
+### Remaining boundary
+
+- This removes the Inspector's duplicate source-line string graph; it does not make the full
+  render model constant-memory. Render typed arrays, findings, events, and the original source
+  still scale with the program.
+- Blob parsing remains incremental by chunk and visible source hydration is range-bounded, while
+  generated text is already resident in UI memory before inspection.
+- No greater-than-200 MiB, unlimited-import, persistence, autosave, recovery, PNG, lifecycle, STL,
+  DXF, hardware, controller, settings, Frame, Start, or deployment claim is part of this repair.

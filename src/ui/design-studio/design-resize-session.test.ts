@@ -12,11 +12,15 @@ function selectedSession() {
   return { ...base, selectedIds: new Set(['c']) };
 }
 
-function swGrip(session: ReturnType<typeof selectedSession>) {
+function gripOf(session: ReturnType<typeof selectedSession>, id: string) {
   const handles = resizeHandles(selectionBounds(sessionSketch(session), session.selectedIds));
-  const grip = handles.find((handle) => handle.corner === 'sw');
-  if (grip === undefined) throw new Error('expected a south-west grip');
+  const grip = handles.find((handle) => handle.id === id);
+  if (grip === undefined) throw new Error(`expected a ${id} grip`);
   return grip;
+}
+
+function swGrip(session: ReturnType<typeof selectedSession>) {
+  return gripOf(session, 'sw');
 }
 
 describe('the resize gesture', () => {
@@ -69,6 +73,42 @@ describe('the resize gesture', () => {
     expect(done.history.past.length).toBe(depthBefore + 1);
     expect(done.resize).toBeNull();
     expect(done.dirtySinceApply).toBe(true);
+  });
+
+  // The maintainer's ask: make this wider WITHOUT making it taller.
+  it('an edge grip stretches one axis and leaves the other alone', () => {
+    const session = selectedSession();
+    const grip = gripOf(session, 'e');
+    // Bounds are 40..60; the east grip is at x=60 anchored at x=40, so dragging
+    // to x=80 doubles the width.
+    const resizing = updateSessionResize(beginSessionResize(session, grip), { x: 80, y: 50 });
+    const stretched = sessionSketch(resizing).entities[0];
+    if (stretched?.kind !== 'ellipse') throw new Error('expected an ellipse');
+    expect(stretched.radiusXMm).toBeCloseTo(20, 6);
+    // The height is untouched, exactly — not merely close.
+    expect(stretched.radiusYMm).toBe(10);
+    expect(stretched.center.y).toBe(50);
+    // The held edge stayed put.
+    expect(stretched.center.x - stretched.radiusXMm).toBeCloseTo(40, 6);
+  });
+
+  it('keeps the entity id and layer when a circle becomes an ellipse', () => {
+    const base = withSketch(createDesignSession(), {
+      entities: [{ ...circle, layerId: 'layer-2', construction: true }],
+    });
+    const session = { ...base, selectedIds: new Set(['c']) };
+    const resizing = updateSessionResize(beginSessionResize(session, gripOf(session, 'e')), {
+      x: 80,
+      y: 50,
+    });
+    const stretched = sessionSketch(resizing).entities[0];
+    if (stretched?.kind !== 'ellipse') throw new Error('expected an ellipse');
+    expect(stretched.id).toBe('c');
+    expect(stretched.layerId).toBe('layer-2');
+    expect(stretched.construction).toBe(true);
+    // The circle's own radius must not ride along as dead weight — this value
+    // reaches the persisted session payload.
+    expect('radiusMm' in stretched).toBe(false);
   });
 
   it('is inert without a selection or without a live gesture', () => {
