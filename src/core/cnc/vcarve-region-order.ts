@@ -30,13 +30,29 @@ export function vcarveRegionOrder(
   sourceContours: ReadonlyArray<Polyline>,
   rings: ReadonlyArray<ReadonlyArray<Polyline>>,
 ): ReadonlyArray<OrderedVCarvePolyline> {
+  return vcarveRegionBuckets(sourceContours, rings).flat();
+}
+
+/**
+ * The same region assignment, kept per bucket: one bucket per filled source
+ * region in source order, then one trailing bucket for contours matching no
+ * region. Bucket layout depends only on `sourceContours`, so two ring sets
+ * bucketed against the same sources zip by index — the ladder zips its δ
+ * rings with the thin-detail rings (ADR-279) so a region finishes BOTH before
+ * the cutter travels on, keeping ADR-270's promise. An empty ring set returns
+ * no buckets.
+ */
+export function vcarveRegionBuckets(
+  sourceContours: ReadonlyArray<Polyline>,
+  rings: ReadonlyArray<ReadonlyArray<Polyline>>,
+): ReadonlyArray<ReadonlyArray<OrderedVCarvePolyline>> {
   const ladderOrder = flattenLadder(rings);
-  if (ladderOrder.length === 0) return ladderOrder;
+  if (ladderOrder.length === 0) return [];
 
   const regions = sourceRegions(sourceContours);
   // This is the common single-shape path, and preserving raw ladder order here
   // keeps existing single-region G-code byte-identical.
-  if (regions.length <= 1) return ladderOrder;
+  if (regions.length <= 1) return [ladderOrder];
 
   const byRegion: OrderedVCarvePolyline[][] = regions.map(() => []);
   const unassigned: OrderedVCarvePolyline[] = [];
@@ -45,7 +61,7 @@ export function vcarveRegionOrder(
     const bucket = regionIndex < 0 ? unassigned : byRegion[regionIndex];
     bucket?.push(entry);
   }
-  return [...byRegion.flat(), ...unassigned];
+  return [...byRegion, unassigned];
 }
 
 function flattenLadder(rings: ReadonlyArray<ReadonlyArray<Polyline>>): OrderedVCarvePolyline[] {
