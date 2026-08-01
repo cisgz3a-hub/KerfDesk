@@ -38,16 +38,6 @@ export function offsetClosedPolylinesWithRoundJoins(
   return contoursOrEmpty(offsetClosedPolylines(polylines, offsetMm, JoinType.Round));
 }
 
-// Round-join twin of offsetClosedPolylinesForKerfChecked: the v-carve detail
-// stage grows a ring by the bit-cone radius (a disc, hence round joins) and
-// must not read an engine failure as "everything is covered".
-export function offsetClosedPolylinesWithRoundJoinsChecked(
-  polylines: ReadonlyArray<Polyline>,
-  offsetMm: number,
-): Result<ReadonlyArray<Polyline>, VectorOpError> {
-  return offsetClosedPolylines(polylines, offsetMm, JoinType.Round);
-}
-
 // Preserves the pre-existing contract for callers that have no failure path:
 // a failed offset reads as "no usable contours".
 function contoursOrEmpty(
