@@ -28,7 +28,9 @@ export type ActiveCameraSource =
       readonly kind: 'machine-rtsp';
       readonly frameUrl: string;
       readonly previewUrl: string;
-      readonly streamSessionId: string;
+      readonly liveness:
+        | { readonly kind: 'monitored'; readonly streamSessionId: string }
+        | { readonly kind: 'unmonitored'; readonly advisory: string };
       readonly sourceId: string;
     };
 

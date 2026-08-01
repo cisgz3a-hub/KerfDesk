@@ -69,8 +69,8 @@ const BRIDGE_MISSING =
 const FFMPEG_MISSING =
   'FFmpeg is not installed on this computer — RTSP cameras need it for preview and capture. Install it, then reconnect.';
 const NO_PREVIEW_URL = 'The camera bridge did not return a preview URL for this RTSP camera.';
-const NO_STREAM_STATUS =
-  'The camera bridge did not return a liveness session for this RTSP preview. Update KerfDesk Desktop, then reconnect.';
+const UNMONITORED_RTSP_ADVISORY =
+  'This camera bridge does not report RTSP preview liveness. The preview remains available, but a frozen image may not be detected. Update the desktop app or restart the local bridge to enable monitoring.';
 function cameraErrorMessage(err: unknown): string {
   if (err instanceof DOMException) {
     return err.message === '' ? err.name : `${err.name}: ${err.message}`;
@@ -228,17 +228,14 @@ function makeStartRtspSource(
       });
       return;
     }
-    if (probe.streamSessionId === undefined) {
-      set({
-        sourceState: { kind: 'error', sourceKind: 'machine-rtsp', message: NO_STREAM_STATUS },
-      });
-      return;
-    }
     const source: Extract<ActiveCameraSource, { readonly kind: 'machine-rtsp' }> = {
       kind: 'machine-rtsp',
       previewUrl: probe.previewUrl,
       frameUrl: bridge.proxiedFrameUrl(url),
-      streamSessionId: probe.streamSessionId,
+      liveness:
+        probe.streamSessionId === undefined
+          ? { kind: 'unmonitored', advisory: UNMONITORED_RTSP_ADVISORY }
+          : { kind: 'monitored', streamSessionId: probe.streamSessionId },
       sourceId: publicCameraSourceId(url),
     };
     set({
@@ -247,6 +244,8 @@ function makeStartRtspSource(
         source,
       },
     });
-    void monitorRtspSource(get, bridge, source, epoch);
+    if (source.liveness.kind === 'monitored') {
+      void monitorRtspSource(get, bridge, source, source.liveness.streamSessionId, epoch);
+    }
   };
 }

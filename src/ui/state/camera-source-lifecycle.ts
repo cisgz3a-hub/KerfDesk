@@ -88,10 +88,11 @@ export async function monitorRtspSource(
   get: CameraSourceGet,
   bridge: CameraBridgeAdapter,
   source: Extract<ActiveCameraSource, { readonly kind: 'machine-rtsp' }>,
+  streamSessionId: string,
   epoch: number,
 ): Promise<void> {
   while (isCurrentSourceAtEpoch(get, source, epoch)) {
-    const status = await readRtspStatus(bridge, source.streamSessionId);
+    const status = await readRtspStatus(bridge, streamSessionId);
     if (!isCurrentSourceAtEpoch(get, source, epoch)) return;
     if (status.kind === 'failed' || status.kind === 'unavailable') {
       get().reportSourceFailure(source);

@@ -33,6 +33,8 @@ export function RtspSourceControls(): JSX.Element {
   const rtspSource = control.kind === 'live' ? control.source : null;
   const rtspStarting = control.kind === 'starting';
   const rtspError = control.kind === 'error' ? control.message : null;
+  const rtspAdvisory =
+    rtspSource?.liveness.kind === 'unmonitored' ? rtspSource.liveness.advisory : null;
   const connect = (): void => {
     saveRtspCameraUrl(url);
     void startRtspSource(bridge, url);
@@ -77,6 +79,11 @@ export function RtspSourceControls(): JSX.Element {
       {rtspError === null ? null : (
         <p role="status" style={errorStyle}>
           {rtspError}
+        </p>
+      )}
+      {rtspAdvisory === null ? null : (
+        <p role="status" style={noteStyle}>
+          {rtspAdvisory}
         </p>
       )}
       {rtspSource !== null ? (

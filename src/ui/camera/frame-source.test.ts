@@ -27,7 +27,7 @@ const RTSP_SOURCE: ActiveCameraSource = {
   kind: 'machine-rtsp',
   frameUrl: 'http://127.0.0.1:51731/frame.jpg?url=rtsp',
   previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=rtsp',
-  streamSessionId: 'session-a',
+  liveness: { kind: 'monitored', streamSessionId: 'session-a' },
   sourceId: 'rtsp://192.168.10.1/live',
 };
 

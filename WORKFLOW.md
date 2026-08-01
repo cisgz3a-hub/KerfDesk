@@ -4421,6 +4421,9 @@ and lifts the command's CNC-only gate.)*
   closing makes that exact source leave `live`; the RTSP section shows **Reconnect**. Pressing it
   probes again and creates a fresh session. No background FFmpeg respawn or automatic camera
   reconnection runs after failure.
+- **Edge / older bridge.** A bridge that returns a usable RTSP preview but no liveness session does
+  not block the preview. The RTSP section labels it unmonitored and explains that a frozen image
+  may not be detected; no session is fabricated and no automatic reconnect or probe runs.
 - **Empty / no camera found.** Discovery completes with no candidate camera;
   the panel stays usable for USB cameras and manual RTSP entry.
 - **Edge / slow or single-threaded camera.** Frame fetches for the same camera

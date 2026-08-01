@@ -48,13 +48,14 @@ function controlledCamera(initialStatus: CameraStreamStatus = 'live'): Controlle
 function rtspBridge(
   probe = vi.fn(),
   rtspStreamStatus: CameraBridgeAdapter['rtspStreamStatus'] = async () => ({ kind: 'live' }),
+  hasStreamSession = true,
 ): CameraBridgeAdapter {
   probe.mockImplementation(async () => ({
     kind: 'ok',
     url: 'rtsp://192.168.10.1:8554/',
     ffmpegAvailable: true,
     previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
-    streamSessionId: `session-${probe.mock.calls.length}`,
+    ...(hasStreamSession ? { streamSessionId: `session-${probe.mock.calls.length}` } : {}),
   }));
   return {
     isSupported: () => true,
@@ -150,6 +151,43 @@ describe('USB camera lifecycle', () => {
 });
 
 describe('RTSP camera lifecycle', () => {
+  it('keeps a usable legacy preview live as explicitly unmonitored without polling', async () => {
+    const probe = vi.fn();
+    const status = vi.fn(async () => ({ kind: 'live' as const }));
+    const bridge = rtspBridge(probe, status, false);
+
+    await useCameraStore.getState().startRtspSource(bridge, 'rtsp://192.168.10.1:8554/');
+
+    const current = useCameraStore.getState().sourceState;
+    expect(current.kind).toBe('live');
+    if (current.kind !== 'live' || current.source.kind !== 'machine-rtsp') return;
+    expect(current.source.liveness).toMatchObject({
+      kind: 'unmonitored',
+      advisory: expect.stringContaining('does not report RTSP preview liveness'),
+    });
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(status).not.toHaveBeenCalled();
+  });
+
+  it('keeps a modern preview bound to its monitored session without probing again', async () => {
+    const probe = vi.fn();
+    const status = vi.fn(async () => ({ kind: 'live' as const }));
+    const bridge = rtspBridge(probe, status);
+
+    await useCameraStore.getState().startRtspSource(bridge, 'rtsp://192.168.10.1:8554/');
+
+    const current = useCameraStore.getState().sourceState;
+    expect(current.kind).toBe('live');
+    if (current.kind !== 'live' || current.source.kind !== 'machine-rtsp') return;
+    expect(current.source.liveness).toEqual({
+      kind: 'monitored',
+      streamSessionId: 'session-1',
+    });
+    await vi.waitFor(() => expect(status).toHaveBeenCalledWith('session-1'));
+    expect(probe).toHaveBeenCalledTimes(1);
+    useCameraStore.getState().stopSource();
+  });
+
   it('uses authoritative bridge failure to leave live without probing or reconnecting again', async () => {
     const probe = vi.fn();
     const status = vi.fn(async () => ({
@@ -212,7 +250,10 @@ describe('RTSP camera lifecycle', () => {
     expect(replacement.kind).toBe('live');
     expect(probe).toHaveBeenCalledTimes(2);
     if (replacement.kind === 'live' && replacement.source.kind === 'machine-rtsp') {
-      expect(replacement.source.streamSessionId).toBe('session-2');
+      expect(replacement.source.liveness).toEqual({
+        kind: 'monitored',
+        streamSessionId: 'session-2',
+      });
     }
 
     useCameraStore.getState().reportSourceFailure(first.source);

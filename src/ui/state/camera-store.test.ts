@@ -316,7 +316,7 @@ describe('camera-store', () => {
         frameUrl: `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(
           'rtsp://192.168.10.1:8554/',
         )}`,
-        streamSessionId: 'session-a',
+        liveness: { kind: 'monitored', streamSessionId: 'session-a' },
         sourceId: 'rtsp://192.168.10.1:8554/',
       },
     });
