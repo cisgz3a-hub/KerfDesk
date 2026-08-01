@@ -80,12 +80,11 @@ export function vcarveThinDetailRings(
     MAX_THIN_DETAIL_RINGS,
     (step) => (step + 1) * THIN_DETAIL_RESOLUTION_MM,
   );
-  const roots = sliverRoots(uncovered.value);
   return {
     rings: fine.rings,
     offsetFailed: fine.offsetFailed,
-    residualThin: hasUnrescuedSliver(roots, fine.rings),
-    sliverRoots: roots,
+    residualThin: hasResidualThin(uncovered.value, fine.rings[0] ?? []),
+    sliverRoots: sliverRoots(uncovered.value),
   };
 }
 
@@ -105,16 +104,21 @@ function uncoveredByFirstRing(
   return differenceClosedPolylinesChecked(sourceContours, covered.value);
 }
 
-// A visible sliver root (area floor applied) that no fine ring landed inside
-// is artwork below the fine pitch: it stays uncut.
-function hasUnrescuedSliver(
-  roots: ReadonlyArray<Polyline>,
-  rings: ReadonlyArray<ReadonlyArray<Polyline>>,
+// Exact residual: sliver material the fine rings' bit cones do not touch —
+// the same opening law the detail stage itself applies, one level down. This
+// catches a sub-pitch tail attached to an otherwise-rescued sliver, which a
+// per-root "did any ring land here" test misses.
+function hasResidualThin(
+  slivers: ReadonlyArray<Polyline>,
+  fineFirstRing: ReadonlyArray<Polyline>,
 ): boolean {
-  const ringLoops = rings.flat();
-  return roots
-    .filter((root) => Math.abs(signedAreaMm2(root.points)) >= MIN_RESIDUAL_AREA_MM2)
-    .some((root) => !hasRingInside(ringLoops, root));
+  const residual = uncoveredByFirstRing(slivers, fineFirstRing, THIN_DETAIL_RESOLUTION_MM);
+  // An engine failure leaves the question unanswerable; stay silent rather
+  // than warn on speculation — this is advisory input either way (rule 7).
+  if (residual.kind === 'error') return false;
+  return sliverRoots(residual.value).some(
+    (root) => Math.abs(signedAreaMm2(root.points)) >= MIN_RESIDUAL_AREA_MM2,
+  );
 }
 
 // Every even-odd filled root of the uncovered slivers, engine order, no area
@@ -131,9 +135,3 @@ function sliverRoots(slivers: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> 
   });
 }
 
-function hasRingInside(ringLoops: ReadonlyArray<Polyline>, root: Polyline): boolean {
-  return ringLoops.some((ring) => {
-    const probe = ring.points[0];
-    return probe !== undefined && pointInPolygon(probe, root.points);
-  });
-}
