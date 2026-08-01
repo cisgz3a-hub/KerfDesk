@@ -1,6 +1,5 @@
 import {
   buildExecutablePlan,
-  serializeExecutablePlan,
   type ExecutablePlanBuildIssue,
   type ExecutablePlanV1,
 } from '../../core/execution-plan';
@@ -81,9 +80,8 @@ export function emitPreparedGcodeWithExecutablePlan(
       },
     };
   }
-  return {
-    ...emission,
-    gcode: serializeExecutablePlan(built.plan),
-    sidecar: { kind: 'ok', plan: built.plan, parity },
-  };
+  // The emitted program is returned untouched. Sourcing it from the plan would be
+  // a no-op only while byteParity runs first, making byte neutrality depend on
+  // check ordering instead of on never rewriting the emitter's output.
+  return { ...emission, sidecar: { kind: 'ok', plan: built.plan, parity } };
 }
