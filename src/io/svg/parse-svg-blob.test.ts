@@ -5,6 +5,9 @@ import { parseSvgInWorker, parseSvgWorkerDocument } from './parse-svg-worker';
 
 const LEGACY_C1_REPLACEMENT = '\u2026';
 const XML_C1_CODE_POINT = '\u0085';
+// XML 1.0 NameStartChar allows #x10000-#xEFFFF, so a legal element name can begin
+// with a character that is two UTF-16 code units wide.
+const ASTRAL_NAME = '\u{20000}';
 
 type ReferenceCase = {
   readonly label: string;
@@ -70,6 +73,24 @@ describe('readSvgDocumentFromBlob', () => {
     expect(streamedElement).not.toBeNull();
     expect(streamedElement?.getAttribute(attribute)).toBe(
       establishedElement?.getAttribute(attribute),
+    );
+  });
+
+  it('imports a document whose element name starts with an astral code point', async () => {
+    // The literal tab is what makes the tag take the raw-replay path, so a scanner
+    // that hands out the wrong tag here shows up as a changed attribute value.
+    const svgText = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><${ASTRAL_NAME}/><path d="M0 0\tL9 9" stroke="red"/></svg>`;
+    const established = new WorkerDomParser().parseFromString(
+      svgText,
+      'image/svg+xml',
+    ) as unknown as Document;
+
+    const streamed = await readSvgDocumentFromBlob(oneByteChunkBlob(svgText));
+
+    expect(streamed.documentElement.getAttribute('viewBox')).toBe('0 0 10 10');
+    expect(streamed.querySelector('path')?.getAttribute('stroke')).toBe('red');
+    expect(streamed.querySelector('path')?.getAttribute('d')).toBe(
+      established.querySelector('path')?.getAttribute('d'),
     );
   });
 });

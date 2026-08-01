@@ -79,17 +79,20 @@ class SvgDocumentBuilder {
   }
 }
 
-function applyAttributes(element: Element, tag: SaxesTagPlain, rawOpenTag: string): void {
+function applyAttributes(element: Element, tag: SaxesTagPlain, rawOpenTag: string | null): void {
   // The established linkedom worker preserves some raw whitespace and character-reference
   // spellings that saxes normalizes. Keep those rare tags on linkedom so an ID/reference pair
   // cannot silently gain or lose geometry when the source moves to incremental parsing.
-  if (!needsLegacyAttributeParsing(rawOpenTag)) {
+  // Rule 7: when the raw scan is missing or does not name this element the source stays
+  // importable on the saxes values — a lost raw spelling never refuses a valid file.
+  const replayable = replayableRawOpenTag(rawOpenTag, tag.name);
+  if (replayable === null) {
     for (const [name, value] of Object.entries(tag.attributes)) element.setAttribute(name, value);
     return;
   }
 
-  const body = rawOpenTag.slice(0, -1);
-  const standalone = body.trimEnd().endsWith('/') ? rawOpenTag : `${body}/>`;
+  const body = replayable.slice(0, -1);
+  const standalone = body.trimEnd().endsWith('/') ? replayable : `${body}/>`;
   const document = new WorkerDomParser().parseFromString(
     standalone,
     'image/svg+xml',
@@ -97,6 +100,16 @@ function applyAttributes(element: Element, tag: SaxesTagPlain, rawOpenTag: strin
   for (const attribute of [...document.documentElement.attributes]) {
     element.setAttribute(attribute.name, attribute.value);
   }
+}
+
+// XML 1.0 §2.3 S: the characters that may follow an element name inside a tag.
+const NAME_BOUNDARY_CHARACTERS = [' ', '\t', '\r', '\n', '/', '>'];
+
+function replayableRawOpenTag(rawOpenTag: string | null, name: string): string | null {
+  if (rawOpenTag === null || !rawOpenTag.startsWith(`<${name}`)) return null;
+  const boundary = rawOpenTag.charAt(name.length + 1);
+  if (!NAME_BOUNDARY_CHARACTERS.includes(boundary)) return null;
+  return needsLegacyAttributeParsing(rawOpenTag) ? rawOpenTag : null;
 }
 
 function needsLegacyAttributeParsing(rawOpenTag: string): boolean {
