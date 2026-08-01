@@ -45,6 +45,9 @@ jobs:
       - name: Type-check browser tests
         run: pnpm typecheck:e2e
 
+      - name: Verify browser test discovery
+        run: pnpm check:e2e-discovery
+
       - name: Run browser smoke
         run: pnpm test:e2e
 

@@ -7,7 +7,7 @@ const workspaceRoot = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: '**/*.e2e.ts',
+  testMatch: ['**/*.e2e.ts', '**/*.spec.ts'],
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,
