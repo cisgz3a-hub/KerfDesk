@@ -24,6 +24,15 @@ export type PreviewRouteParityResult =
       readonly reason: 'route-length';
       readonly legacy: string;
       readonly plan: string;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: 'cut-step-allocation';
+      readonly route: 'legacy' | 'plan';
+      readonly stepIndex: number;
+      readonly issue: 'insufficient-points' | 'length-mismatch';
+      readonly declared: string;
+      readonly geometry: string;
     };
 
 type PreviewRouteSegment = {
@@ -46,6 +55,24 @@ export function comparePreviewRoutesAtEmitPrecision(
   left: Toolpath,
   right: Toolpath,
 ): PreviewRouteParityResult {
+  const invalidLegacyCut = cutStepAllocationIssue(left);
+  if (invalidLegacyCut !== null) {
+    return {
+      ok: false,
+      reason: 'cut-step-allocation',
+      route: 'legacy',
+      ...invalidLegacyCut,
+    };
+  }
+  const invalidPlanCut = cutStepAllocationIssue(right);
+  if (invalidPlanCut !== null) {
+    return {
+      ok: false,
+      reason: 'cut-step-allocation',
+      route: 'plan',
+      ...invalidPlanCut,
+    };
+  }
   const leftSegments = routeSegments(left);
   const rightSegments = routeSegments(right);
   if (leftSegments.length !== rightSegments.length) {
@@ -82,6 +109,44 @@ export function comparePreviewRoutesAtEmitPrecision(
     };
   }
   return { ok: true };
+}
+
+function cutStepAllocationIssue(toolpath: Toolpath): {
+  readonly stepIndex: number;
+  readonly issue: 'insufficient-points' | 'length-mismatch';
+  readonly declared: string;
+  readonly geometry: string;
+} | null {
+  for (let stepIndex = 0; stepIndex < toolpath.steps.length; stepIndex += 1) {
+    const step = toolpath.steps[stepIndex];
+    if (step === undefined || step.kind !== 'cut') continue;
+    const declared = formatGcodeCoordinateMm(step.length);
+    const geometry = formatGcodeCoordinateMm(polylineLength(step.polyline));
+    // A point-only cut has no drawable segment, yet sliceToolpath and the
+    // endpoint renderer can still use its point as the route head. Flattening
+    // it away would therefore hide a real preview difference.
+    if (step.polyline.length < 2) {
+      return { stepIndex, issue: 'insufficient-points', declared, geometry };
+    }
+    // sliceToolpath uses the declared length to select the active step, but
+    // geometric distance to truncate a cut polyline. If those disagree, no
+    // grouping-independent segment comparison can prove scrubber parity.
+    if (declared !== geometry) {
+      return { stepIndex, issue: 'length-mismatch', declared, geometry };
+    }
+  }
+  return null;
+}
+
+function polylineLength(polyline: ReadonlyArray<Vec2>): number {
+  let length = 0;
+  for (let index = 1; index < polyline.length; index += 1) {
+    const from = polyline[index - 1];
+    const to = polyline[index];
+    if (from === undefined || to === undefined) continue;
+    length += Math.hypot(to.x - from.x, to.y - from.y);
+  }
+  return length;
 }
 
 function routeSegments(toolpath: Toolpath): ReadonlyArray<PreviewRouteSegment> {

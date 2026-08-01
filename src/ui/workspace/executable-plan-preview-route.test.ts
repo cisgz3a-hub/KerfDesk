@@ -111,7 +111,7 @@ describe('ExecutablePlan non-live preview route', () => {
     expect(previewRouteForDrawing(preview)).toBe(preview);
   });
 
-  it('rejects equal geometry and total length when cumulative scrubber allocation differs', () => {
+  it('rejects cut steps whose declared scrubber lengths reallocate identical geometry', () => {
     const legacy: Toolpath = {
       steps: [
         cutStep(9, [
@@ -142,8 +142,62 @@ describe('ExecutablePlan non-live preview route', () => {
     expect(sliceToolpath(legacy, 5).head).not.toEqual(sliceToolpath(plan, 5).head);
     expect(comparePreviewRoutesAtEmitPrecision(legacy, plan)).toMatchObject({
       ok: false,
-      reason: 'segment-mismatch',
-      index: 1,
+      reason: 'cut-step-allocation',
+      route: 'legacy',
+      stepIndex: 0,
+      issue: 'length-mismatch',
+      declared: '9.000',
+      geometry: '1.000',
+    });
+  });
+
+  it('rejects equal cut geometry when declared step length changes slice semantics', () => {
+    const polyline = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const legacy: Toolpath = {
+      steps: [cutStep(2, polyline)],
+      totalLength: 10,
+    };
+    const plan: Toolpath = {
+      steps: [cutStep(10, polyline)],
+      totalLength: 10,
+    };
+
+    expect(sliceToolpath(legacy, 5).head).toEqual({ x: 10, y: 0 });
+    expect(sliceToolpath(plan, 5).head).toEqual({ x: 5, y: 0 });
+    expect(comparePreviewRoutesAtEmitPrecision(legacy, plan)).toMatchObject({
+      ok: false,
+      reason: 'cut-step-allocation',
+      route: 'legacy',
+      stepIndex: 0,
+      issue: 'length-mismatch',
+      declared: '2.000',
+      geometry: '10.000',
+    });
+  });
+
+  it('rejects a point-only cut that would change the zero-position head', () => {
+    const route = cutStep(10, [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ]);
+    const legacy: Toolpath = {
+      steps: [cutStep(0, [{ x: 50, y: 50 }]), route],
+      totalLength: 10,
+    };
+    const plan: Toolpath = { steps: [route], totalLength: 10 };
+
+    expect(sliceToolpath(legacy, 0).head).toEqual({ x: 50, y: 50 });
+    expect(sliceToolpath(plan, 0).head).toEqual({ x: 0, y: 0 });
+    expect(comparePreviewRoutesAtEmitPrecision(legacy, plan)).toMatchObject({
+      ok: false,
+      reason: 'cut-step-allocation',
+      route: 'legacy',
+      stepIndex: 0,
+      issue: 'insufficient-points',
     });
   });
 
