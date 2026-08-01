@@ -5,24 +5,18 @@
 // three.js scene. UI-only; the compile path is the same one Preview uses.
 
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
-import { toSceneCoords } from '../../core/devices';
-import { activeCncTool, type OutputScope, type Project } from '../../core/scene';
-import { isChiploadMaterialKey } from '../../core/cnc';
-import { computeRemovalGrid, DEFAULT_CELL_MM, kernelForTool, toolProfile } from '../../core/sim';
-import { toolpathMoves3d } from '../../core/toolpath3d';
+import type { OutputScope, Project } from '../../core/scene';
 import { liveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
 import { useOutputScope, useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { Cnc3DFullPage } from './Cnc3DFullPage';
 import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
-import { buildPreviewToolpath } from './draw-preview';
+import { computeDesignSceneSource } from './design-scene-source';
 import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
 import { useCncCanvasFocus } from './use-cnc-canvas-focus';
 import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { useCncPaneWidth } from './use-cnc-pane-width';
 
-// Coarser than the Preview grid — the pane recomputes on every edit.
-const PANE_TARGET_CELLS_PER_AXIS = 500;
 const CANVAS_WIDTH_PX = 244;
 const CANVAS_HEIGHT_PX = 240;
 
@@ -72,60 +66,19 @@ function stockThicknessMm(project: Project): number {
   return project.machine?.kind === 'cnc' ? project.machine.stock.thicknessMm : 0;
 }
 
-// Design-time scene source: the removal grid AND the 3D moves that carved it,
-// both derived from one buildPreviewToolpath call. They are returned together
-// because computing the toolpath twice — once to stamp, once to draw — would
-// double the most expensive step in the pane.
+// Design-time scene source (design-scene-source.ts): removal grid, 3D moves,
+// and bit silhouette from ONE prepared output, with each tool section stamped
+// by its own bit's kernel (H.7). Memoized against the deferred project so
+// typing stays snappy and hover stays value-stable (PRF-01).
 function useDesignSceneSource(
   project: Project,
   outputScope: OutputScope,
   collapsed: boolean,
 ): DesignSceneSource | null {
-  return useMemo(() => {
-    const machine = project.machine;
-    if (collapsed || machine === undefined || machine.kind !== 'cnc') return null;
-    const toolpath = buildPreviewToolpath(project, { outputScope });
-    if (toolpath === null || toolpath.totalLength <= 0) return null;
-    const stock = machine.stock;
-    const a = toSceneCoords(stock.originOffset, project.device);
-    const b = toSceneCoords(
-      { x: stock.originOffset.x + stock.widthMm, y: stock.originOffset.y + stock.heightMm },
-      project.device,
-    );
-    const widthMm = Math.abs(b.x - a.x);
-    const heightMm = Math.abs(b.y - a.y);
-    const mmPerCell = Math.max(
-      DEFAULT_CELL_MM,
-      Math.max(widthMm, heightMm) / PANE_TARGET_CELLS_PER_AXIS,
-    );
-    const kernel = kernelForTool(activeCncTool(machine), mmPerCell);
-    const result = computeRemovalGrid(
-      toolpath,
-      {
-        originX: Math.min(a.x, b.x),
-        originY: Math.min(a.y, b.y),
-        widthMm,
-        heightMm,
-        mmPerCell,
-      },
-      kernel,
-    );
-    if (result.kind !== 'ok') return null;
-    // buildPreviewToolpath already mapped the prepared job into scene frame,
-    // which is the frame the grid above was stamped in — so the moves and the
-    // surface share one frame, as ADR-261 §2 requires.
-    const materialKey = stock.materialKey;
-    return {
-      grid: result.grid,
-      // materialKey is a plain string on the model, so an unrecognised key from
-      // an older project file falls back to the default palette.
-      ...(isChiploadMaterialKey(materialKey) ? { materialKey } : {}),
-      moves: toolpathMoves3d(toolpath),
-      // Same tool record that produced the kernel above, so the drawn bit and
-      // the simulated one cannot disagree.
-      toolProfile: toolProfile(activeCncTool(machine)),
-    };
-  }, [project, outputScope, collapsed]);
+  return useMemo(
+    () => (collapsed ? null : computeDesignSceneSource(project, outputScope)),
+    [project, outputScope, collapsed],
+  );
 }
 
 function PaneScene(props: {
