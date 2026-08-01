@@ -23,8 +23,12 @@ export type SnapQuery = {
   readonly toleranceMm: number;
   // Which kinds are live. Defaults to all of them.
   readonly kinds?: ReadonlySet<SnapKind>;
-  // The entity currently being drawn or dragged, so it cannot snap to itself.
+  // The entity currently being drawn, so it cannot snap to itself.
   readonly excludeEntityId?: string;
+  // Every entity currently being dragged. A drag moves a whole SELECTION and
+  // each shape in it follows the cursor, so leaving them snappable makes the
+  // pointer chase geometry that is chasing the pointer.
+  readonly excludeEntityIds?: ReadonlySet<string>;
 };
 
 export type SnapResult = {
@@ -56,10 +60,12 @@ function candidateTargets(
   query: SnapQuery,
   kinds: ReadonlySet<SnapKind>,
 ): ReadonlyArray<SnapTarget> {
+  const isExcluded = (id: string): boolean =>
+    id === query.excludeEntityId || query.excludeEntityIds?.has(id) === true;
   const named = query.sketch.entities
-    .filter((entity) => entity.id !== query.excludeEntityId)
+    .filter((entity) => !isExcluded(entity.id))
     .flatMap((entity) => entitySnapPoints(entity));
-  const segments = sketchSegments(query.sketch, query.excludeEntityId);
+  const segments = sketchSegments(query.sketch, isExcluded);
   const onLine = kinds.has('on-line')
     ? segments.map(
         (segment): SnapTarget => ({

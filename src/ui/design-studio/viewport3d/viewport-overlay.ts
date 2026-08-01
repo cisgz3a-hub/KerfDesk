@@ -12,6 +12,7 @@ import type { Polyline, Vec2 } from '../../../core/scene';
 import { localFromScene } from '../../cnc-viewer3d/viewer3d-picking';
 import { canvasTheme } from '../../theme/canvas-theme';
 import { draftToEntity, type DesignDraft } from '../design-draft';
+import { resizeHandles, selectionBounds } from '../design-handles';
 
 // Floats the sketch just above the stock top so lines never z-fight the
 // carved surface. Small enough to read as "on" the material.
@@ -37,6 +38,13 @@ export type ViewportOverlay = {
   readonly buckets: ReadonlyArray<OverlayBucket>;
   // Snap marker position in the local frame, or null when nothing is captured.
   readonly snapLocal: { readonly x: number; readonly y: number; readonly z: number } | null;
+  // Resize grips on the selection's corners, in the local frame. Drawn at a
+  // constant screen size by the renderer, so no millimetre size is given here.
+  readonly handlesLocal: ReadonlyArray<{
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+  }>;
 };
 
 export type ViewportOverlayInput = {
@@ -85,7 +93,15 @@ export function buildViewportOverlay(input: ViewportOverlayInput): ViewportOverl
           input.frame.originMm,
           input.frame,
         );
-  return { buckets, snapLocal };
+  const handlesLocal = resizeHandles(selectionBounds(input.sketch, input.selectedIds)).map(
+    (handle) =>
+      localFromScene(
+        { x: handle.atMm.x, y: handle.atMm.y, z: OVERLAY_LIFT_MM },
+        input.frame.originMm,
+        input.frame,
+      ),
+  );
+  return { buckets, snapLocal, handlesLocal };
 }
 
 function draftEntityPolylines(entity: SketchEntity): ReadonlyArray<Polyline> {

@@ -19,6 +19,8 @@ import type { Vec2 } from '../../core/scene';
 import type { CornerOp } from './design-corner-apply';
 import type { CornerPick } from './design-corner-pick';
 import type { DesignDraft } from './design-draft';
+import type { ResizeHandle } from './design-handles';
+import { beginSessionResize, endSessionResize, updateSessionResize } from './design-resize-session';
 import type { MeasurementKey } from './design-entity-fields';
 import type { DesignLayerPatch } from '../../core/design/layers';
 import {
@@ -87,6 +89,12 @@ type DesignStudioState = {
   readonly beginMove: (atMm: Vec2) => void;
   readonly updateMove: (atMm: Vec2) => void;
   readonly endMove: () => void;
+  // A resize gesture on one of the selection's corner grips: begin on
+  // pointer-down over the grip, update per move, commit ONE history step on
+  // release.
+  readonly beginResize: (handle: ResizeHandle) => void;
+  readonly updateResize: (atMm: Vec2) => void;
+  readonly endResize: () => void;
   readonly nudgeSelection: (deltaMm: Vec2) => void;
   readonly setMarquee: (marquee: DesignMarquee | null) => void;
   readonly commitMarquee: (additive: boolean) => void;
@@ -163,6 +171,9 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   beginMove: (atMm) => set(mapSession((session) => beginSessionMove(session, atMm))),
   updateMove: (atMm) => set(mapSession((session) => updateSessionMove(session, atMm))),
   endMove: () => set(mapSession(endSessionMove)),
+  beginResize: (handle) => set(mapSession((session) => beginSessionResize(session, handle))),
+  updateResize: (atMm) => set(mapSession((session) => updateSessionResize(session, atMm))),
+  endResize: () => set(mapSession(endSessionResize)),
   nudgeSelection: (deltaMm) => set(mapSession((session) => nudgeSession(session, deltaMm))),
 
   setMarquee: (marquee) => set(mapSession((session) => ({ ...session, marquee }))),

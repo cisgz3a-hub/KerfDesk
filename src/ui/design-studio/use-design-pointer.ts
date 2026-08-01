@@ -12,6 +12,12 @@ import { useCallback } from 'react';
 import type { Vec2 } from '../../core/scene';
 import { isDraftTool, NO_MODIFIERS, type DraftModifiers } from './design-draft';
 import { CORNER_PICK_RADIUS_PX, pickCorner } from './design-corner-pick';
+import {
+  handleAtPoint,
+  resizeHandles,
+  selectionBounds,
+  RESIZE_HANDLE_GRAB_PX,
+} from './design-handles';
 import { hitTestSketch, HIT_RADIUS_PX } from './design-hit-test';
 import { useDesignStudioStore } from './design-studio-store';
 import { applyOrthoMm, snapPointMm } from './design-snap';
@@ -54,6 +60,9 @@ export function useDesignPointer(
         applyCornerAt(at, session.tool, pxPerMm);
         return;
       }
+      // A grip beats everything under it: the grips sit ON the selection's
+      // corners, so hit-testing shapes first would always start a move instead.
+      if (session.tool === 'select' && beginResizeAt(at, pxPerMm)) return;
       if (session.tool === 'select') beginSelectOrMove(at, event, pxPerMm);
     },
     [pointMm, surface],
@@ -66,16 +75,7 @@ export function useDesignPointer(
       const session = store.session;
       if (at === null || session === null) return;
       store.setCursorMm(at);
-      if (session.move !== null) {
-        store.updateMove(at);
-        return;
-      }
-      if (session.draft !== null) {
-        const constrained = applyOrthoMm(session.draft.anchorMm, at, session.orthoEnabled);
-        store.setDraft({ ...session.draft, pointerMm: constrained, modifiers: modifiersOf(event) });
-        return;
-      }
-      if (session.marquee !== null) store.setMarquee({ ...session.marquee, pointerMm: at });
+      advanceGesture(at, event);
     },
     [pointMm],
   );
@@ -86,15 +86,7 @@ export function useDesignPointer(
       const session = store.session;
       if (session === null) return;
       releasePointer(event.currentTarget, event.pointerId);
-      if (session.move !== null) {
-        store.endMove();
-        return;
-      }
-      if (session.draft !== null) {
-        store.commitDraft(newEntityId());
-        return;
-      }
-      if (session.marquee !== null) store.commitMarquee(event.shiftKey);
+      finishGesture(event, newEntityId);
     },
     [newEntityId],
   );
@@ -127,9 +119,61 @@ function resolvePointerMm(
     pxPerMm: surface.pxPerMm(),
     snapEnabled: session.snapEnabled,
     gridMm: session.gridMm,
+    // While dragging, the moving shapes must not be snap targets: they follow
+    // the cursor, so snapping to them makes the pointer chase geometry that is
+    // chasing the pointer — worst on a circle, whose centre and quadrants are
+    // all live targets travelling with it.
+    ...(session.move === null ? {} : { excludeEntityIds: session.move.ids }),
   });
   store.setActiveSnap(resolved.target);
   return resolved.pointMm;
+}
+
+// One live gesture at a time, most specific first: a resize outranks a move,
+// which outranks the draft, which outranks the marquee.
+function advanceGesture(at: Vec2, event: React.PointerEvent<HTMLCanvasElement>): void {
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null) return;
+  if (session.resize !== null) return store.updateResize(at);
+  if (session.move !== null) return store.updateMove(at);
+  if (session.draft !== null) {
+    const constrained = applyOrthoMm(session.draft.anchorMm, at, session.orthoEnabled);
+    return store.setDraft({
+      ...session.draft,
+      pointerMm: constrained,
+      modifiers: modifiersOf(event),
+    });
+  }
+  if (session.marquee !== null) store.setMarquee({ ...session.marquee, pointerMm: at });
+}
+
+function finishGesture(
+  event: React.PointerEvent<HTMLCanvasElement>,
+  newEntityId: () => string,
+): void {
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null) return;
+  if (session.resize !== null) return store.endResize();
+  if (session.move !== null) return store.endMove();
+  if (session.draft !== null) return store.commitDraft(newEntityId());
+  if (session.marquee !== null) store.commitMarquee(event.shiftKey);
+}
+
+// Starts a resize when the press landed on one of the selection's corner
+// grips. Reach is a screen distance so a grip is equally grabbable at any zoom
+// or camera tilt.
+function beginResizeAt(at: Vec2, pxPerMm: number): boolean {
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null || session.selectedIds.size === 0) return false;
+  const handles = resizeHandles(selectionBounds(session.history.present, session.selectedIds));
+  const toleranceMm = RESIZE_HANDLE_GRAB_PX / (pxPerMm > 0 ? pxPerMm : 1);
+  const handle = handleAtPoint(handles, at, toleranceMm);
+  if (handle === null) return false;
+  store.beginResize(handle);
+  return true;
 }
 
 // The corner tools are click-to-apply rather than drag: pick the nearest corner and

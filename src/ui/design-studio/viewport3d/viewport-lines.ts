@@ -28,6 +28,7 @@ const SKETCH_LINE_WIDTH_PX = 2;
 const DASH_SIZE_MM = 4;
 const GAP_SIZE_MM = 2.5;
 const SNAP_MARKER_MM = 2.2;
+const GRIP_SIZE_MM = 3.2;
 
 export async function loadViewportLinesAddons(): Promise<LinesAddons> {
   const [{ LineSegments2 }, { LineSegmentsGeometry }, { LineMaterial }] = await Promise.all([
@@ -80,10 +81,42 @@ export function buildOverlayDrawable(
     disposers.push(marker.dispose);
   }
 
+  for (const at of overlay.handlesLocal) {
+    const grip = buildResizeGrip(three, at);
+    group.add(grip.object);
+    disposers.push(grip.dispose);
+  }
+
   return {
     object: group,
     dispose: () => {
       for (const dispose of disposers) dispose();
+    },
+  };
+}
+
+// A resize grip: a small always-on-top square sitting on the stock at a
+// selection corner. Sized in millimetres rather than screen pixels for now —
+// a screen-constant sprite needs a per-frame scale the render-on-demand scene
+// deliberately does not run.
+function buildResizeGrip(
+  three: ThreeModule,
+  at: { readonly x: number; readonly y: number; readonly z: number },
+): OverlayDrawableHandle {
+  const geometry = new three.PlaneGeometry(GRIP_SIZE_MM, GRIP_SIZE_MM);
+  const material = new three.MeshBasicMaterial({
+    color: new three.Color(canvasTheme.selection).getHex(),
+    depthTest: false,
+    side: three.DoubleSide,
+  });
+  const mesh = new three.Mesh(geometry, material);
+  mesh.position.set(at.x, at.y, at.z);
+  mesh.renderOrder = 4;
+  return {
+    object: mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
     },
   };
 }
