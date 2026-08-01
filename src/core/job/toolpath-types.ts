@@ -29,6 +29,14 @@ export type ToolpathStep =
       readonly polyline: ReadonlyArray<Vec2>;
       readonly length: number;
       readonly z?: ZSpan;
+      // Per-vertex Z for XYZ-interpolated (path3d) steps — one entry per
+      // polyline vertex. ZSpan's endpoint lerp cannot represent a
+      // non-monotone profile (a valley's 0 → 0 span reads as "no depth"),
+      // so the simulator stamps from these when present; z stays as the
+      // endpoint summary for the scrubber's head-Z readout. A consumer that
+      // truncates the polyline without truncating zs (toolpath slicing)
+      // drops the correspondence, and the simulator falls back to the span.
+      readonly zs?: ReadonlyArray<number>;
       readonly groupId?: string;
       // The bit cutting this step (H.7 multi-tool), so the simulator can stamp
       // each section with its own cutter. NOT derivable from groupId: a
