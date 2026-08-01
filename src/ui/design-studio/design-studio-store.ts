@@ -19,6 +19,7 @@ import type { Vec2 } from '../../core/scene';
 import type { CornerOp } from './design-corner-apply';
 import type { CornerPick } from './design-corner-pick';
 import type { DesignDraft } from './design-draft';
+import type { DesignApplyRecord } from '../state/design-apply-record';
 import type { ResizeHandle } from './design-handles';
 import { beginSessionResize, endSessionResize, updateSessionResize } from './design-resize-session';
 import type { MeasurementKey } from './design-entity-fields';
@@ -102,7 +103,7 @@ type DesignStudioState = {
   readonly duplicateEntity: (id: string, newId: string, offsetMm: number) => void;
   readonly setConstruction: (id: string, construction: boolean) => void;
   // Clears the dirty flag after the sketch has been written to the project.
-  readonly markApplied: () => void;
+  readonly markApplied: (applied: DesignApplyRecord | null) => void;
   readonly undo: () => void;
   readonly redo: () => void;
   // Carve layers (ADR-272 Amendment 1). Ids come from the caller — pure core
@@ -192,7 +193,7 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   setConstruction: (id, construction) =>
     set(mapSession((session) => setSessionConstruction(session, id, construction))),
 
-  markApplied: () => set(mapSession(markSessionApplied)),
+  markApplied: (applied) => set(mapSession((session) => markSessionApplied(session, applied))),
 
   undo: () => set(mapSession(undoSession)),
   redo: () => set(mapSession(redoSession)),
