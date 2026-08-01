@@ -9,6 +9,7 @@
 import type { SketchEntity } from '../../core/design';
 import { arcFields } from './design-fields-arc';
 import { circleFields } from './design-fields-circle';
+import { ellipseFields } from './design-fields-ellipse';
 import { lineFields } from './design-fields-line';
 import { pathFields } from './design-fields-path';
 import { rectFields } from './design-fields-rect';
@@ -22,6 +23,8 @@ export function entityFields(entity: SketchEntity): ReadonlyArray<EntityField> {
       return rectFields(entity);
     case 'circle':
       return circleFields(entity);
+    case 'ellipse':
+      return ellipseFields(entity);
     case 'line':
       return lineFields(entity);
     case 'arc':
