@@ -336,7 +336,7 @@ const toggleRowStyle: React.CSSProperties = {
 const airAssistStyle: React.CSSProperties = { fontSize: 12 };
 const fieldRowStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '100px 1fr',
+  gridTemplateColumns: '92px 1fr',
   gap: 8,
   alignItems: 'center',
 };

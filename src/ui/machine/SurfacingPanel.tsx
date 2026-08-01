@@ -18,7 +18,6 @@ import { controllerReadinessAdvisories } from '../app/controller-readiness-advis
 import { usePlatform } from '../app/platform-context';
 import { partitionSavePreflight } from '../app/save-preflight-policy';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
-import { RailSection } from '../kit';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
@@ -62,10 +61,13 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
   };
 
   return (
-    <RailSection
-      label="Surface spoilboard"
-      hint="Generate a serpentine facing program to flatten the spoilboard or stock top."
-    >
+    <details style={boxStyle}>
+      <summary
+        style={summaryStyle}
+        title="Generate a serpentine facing program to flatten the spoilboard or stock top."
+      >
+        Surface spoilboard
+      </summary>
       <div style={rowStyle}>
         <Num label="Width" value={widthMm} onCommit={setWidthMm} title="Area width to face (X)." />
         <Num
@@ -96,7 +98,7 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
       >
         Save surfacing G-code…
       </button>
-    </RailSection>
+    </details>
   );
 }
 
@@ -214,7 +216,14 @@ function Num(props: {
   );
 }
 
-const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, margin: '2px 0' };
+const boxStyle: React.CSSProperties = {
+  border: '1px solid var(--lf-border)',
+  borderRadius: 4,
+  padding: '4px 6px',
+  marginTop: 4,
+};
+const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12 };
+const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, margin: '6px 0' };
 const fieldStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',

@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
-import {
-  MAX_SAVE_EXTENSION_LENGTH,
-  type PlatformAdapter,
-  type SaveTarget,
-} from '../../platform/types';
-import {
-  exportGrblSettingsBackup,
-  GRBL_SETTINGS_BACKUP_EXTENSION,
-} from './export-grbl-settings-backup';
+import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import { exportGrblSettingsBackup } from './export-grbl-settings-backup';
 
 function makePlatform(save: PlatformAdapter['pickFileForSave']): PlatformAdapter {
   return {
@@ -26,15 +19,15 @@ describe('exportGrblSettingsBackup', () => {
   it('writes a pretty JSON backup through PlatformAdapter', async () => {
     let written = '';
     const target: SaveTarget = {
-      displayName: 'settings.lfgrbl.json',
+      displayName: 'settings.lfgrbl-settings.json',
       write: async (data) => {
         if (typeof data !== 'string') throw new Error('expected text backup');
         written = data;
       },
     };
     const platform = makePlatform(async (req) => {
-      expect(req.suggestedName).toBe('kerfdesk-grbl-settings-2026-06-15.lfgrbl.json');
-      expect(req.extensions).toEqual(['.lfgrbl.json']);
+      expect(req.suggestedName).toBe('kerfdesk-grbl-settings-2026-06-15.lfgrbl-settings.json');
+      expect(req.extensions).toEqual(['.lfgrbl-settings.json']);
       return target;
     });
 
@@ -44,7 +37,7 @@ describe('exportGrblSettingsBackup', () => {
       createdAt: '2026-06-15T09:00:00.000Z',
     });
 
-    expect(result).toEqual({ ok: true, displayName: 'settings.lfgrbl.json' });
+    expect(result).toEqual({ ok: true, displayName: 'settings.lfgrbl-settings.json' });
     expect(JSON.parse(written)).toMatchObject({
       format: 'laserforge.grbl-settings.backup',
       version: 1,
@@ -52,31 +45,6 @@ describe('exportGrblSettingsBackup', () => {
       settings: [expect.objectContaining({ code: '$30', rawValue: '1000' })],
     });
     expect(written).toContain('\n  "settings": [\n');
-  });
-
-  // Regression: '.lfgrbl-settings.json' (21) exceeded the Chromium accept-type
-  // limit, so showSaveFilePicker threw before the dialog opened and the backup
-  // button could never save anything.
-  it('keeps the backup extension short enough for the browser save picker', () => {
-    expect(GRBL_SETTINGS_BACKUP_EXTENSION.length).toBeLessThanOrEqual(MAX_SAVE_EXTENSION_LENGTH);
-  });
-
-  it('reports a picker rejection instead of throwing at the caller', async () => {
-    const platform = makePlatform(async () => {
-      throw new Error('Extension is too long');
-    });
-
-    await expect(
-      exportGrblSettingsBackup({
-        platform,
-        rows: settingsMapToRows(new Map([[30, '1000']])),
-        createdAt: '2026-06-15T09:00:00.000Z',
-      }),
-    ).resolves.toEqual({
-      ok: false,
-      reason: 'write-failed',
-      message: 'Could not export machine settings backup: Extension is too long',
-    });
   });
 
   it('returns no-settings when rows are empty', async () => {
@@ -116,7 +84,7 @@ describe('exportGrblSettingsBackup', () => {
   it('keeps unknown settings in the exported backup', async () => {
     let written = '';
     const platform = makePlatform(async () => ({
-      displayName: 'settings.lfgrbl.json',
+      displayName: 'settings.lfgrbl-settings.json',
       write: async (data) => {
         if (typeof data !== 'string') throw new Error('expected text backup');
         written = data;

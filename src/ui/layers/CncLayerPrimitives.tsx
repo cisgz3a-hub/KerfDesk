@@ -57,8 +57,6 @@ export function NumberField(props: {
   );
 }
 
-// Layout only — paint (borders, padding, font size) comes from the
-// .lf-pane-form scope in tokens.css so every rail control matches.
 export const rowStyle: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
@@ -67,15 +65,13 @@ export const rowStyle: React.CSSProperties = {
   minHeight: 28,
 };
 export const labelStyle: React.CSSProperties = {
-  flex: '0 0 100px',
+  flex: '0 0 96px',
   fontSize: 12,
   color: 'var(--lf-text-muted)',
 };
-// 120px basis: 100px label + 8px gap + 120px value fits the 300px rail even
-// with its scrollbar, so rows keep label-left instead of wrapping to stacked.
 export const valueStyle: React.CSSProperties = {
   display: 'flex',
-  flex: '1 1 120px',
+  flex: '1 1 140px',
   flexWrap: 'wrap',
   alignItems: 'center',
   gap: 4,
@@ -84,11 +80,12 @@ export const valueStyle: React.CSSProperties = {
 export const selectStyle: React.CSSProperties = {
   flex: 1,
   minWidth: 0,
+  fontSize: 12,
+  padding: '2px 4px',
 };
-// 84px: leaves room for the longest unit (mm/min) beside the input in the
-// 300px rail, so units never wrap under their field.
 export const inputStyle: React.CSSProperties = {
-  width: 84,
+  width: 80,
   boxSizing: 'border-box',
+  padding: '2px 6px',
 };
 export const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };

@@ -8012,10 +8012,6 @@ multi-sender machines still require a sole gateway or machine interlock.
 
 **Status:** Accepted | **Date:** 2026-07-14
 
-**2026-08-01 maintainer amendment:** The in-card Advanced section remains
-labeled and narrow-panel safe but is now always visible. The Basic/Advanced
-visibility distinction and persisted disclosure state are removed.
-
 ### Context
 
 The guided setup reducer was safe and draft-only, but every project traversed the same seven-step
@@ -14856,36 +14852,3 @@ claimed ADR-279 for offline imposition while this decision was off main.
   radius-pitch law (95.95 % under the diameter law — the diagonal seams), clamp honoured.
 - NOT verified: physical cutting; ring-count growth on very large clamped floors is bounded
   by the budgets and reported when hit, not eliminated.
-
-## ADR-281 - One design language for the operations rail (2026-08-01)
-
-**Context.** The Artwork/Operations rail grew feature-by-feature: eight hand-rolled
-`<details>/<summary>` stylings (some boxed, some bare), five different label-column widths
-(90/92/96/108/120 px), numeric inputs at 64/80/100 %-width, native unstyled buttons beside
-`.lf-btn` chrome, selects whose text ran under the dropdown arrow, and an 11-row Material & Bit
-wall mixing stock, spindle, and park settings. The maintainer called the pane unprofessional and
-hard to navigate; every complaint traced to a missing shared grammar, not to any one component.
-
-**Decision.**
-1. `tokens.css` gains a rail form grammar: a `.lf-pane-form` scope that paints every native
-   button/input/select inside the pane with the chrome look (buttons without a class get the
-   quiet-button treatment; selects ellipsize; checkboxes take the accent), plus `.lf-section`
-   (one disclosure chrome: hairline separator, rotating chevron, right-aligned muted badge),
-   `.lf-subhead` (uppercase group label over a hairline), `.lf-hint` (annotation text), and
-   `.lf-btn--sm`. Component code keeps layout-only inline styles; paint lives in the stylesheet.
-2. A `RailSection` kit component (label / badge / hint / open) replaces every hand-rolled
-   disclosure in the pane: probe, Manage bits, bit catalog, machine catalog, machine profiles,
-   tiling, spoilboard, feeds calculator.
-3. The field grammar standardizes on a 100 px label column and an 84 px numeric input
-   (48 px floor in pairs) across the setup card, layer cards, selected-artwork panel, and the
-   offset/dogbone rows. Related X/Y values share one row (`Stock size (mm)` W·H,
-   `Stock origin (mm)` X·Y, `Park position (mm)` X·Y) with per-input aria-labels unchanged.
-4. Material & Bit reads as labeled groups - STOCK / SPINDLE / MOTION - using the same
-   `.lf-subhead` the layer card's Advanced group already used.
-
-**Consequences.** The pane reads as one system; new rail features compose `RailSection` + the
-row grammar instead of restyling from scratch. The laser rail's `CollapsibleRailSection` and the
-machine rail are NOT yet migrated - follow-up work, same primitives. Screen-reader contracts are
-unchanged (every aria-label kept; the narrow-rail select shrink contract in
-`CncSetupPanel.layout.test.tsx` still holds). Perceptual verification: before/after screenshots
-at the 300 px rail width; no G-code, state, or behavior changes.
