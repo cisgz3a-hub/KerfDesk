@@ -5,6 +5,7 @@
 
 import { EMPTY_SKETCH, type Sketch } from '../../core/design';
 import type { DesignApplyRecord } from '../state/design-apply-record';
+import type { PersistedDesignSession } from './design-session-storage';
 import type { ResizeHandle } from './design-handles';
 import { DEFAULT_DESIGN_LAYER_ID, sketchLayers } from '../../core/design/layers';
 import type { Vec2 } from '../../core/scene';
@@ -128,6 +129,22 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
 
 export function sessionSketch(session: DesignSession): Sketch {
   return session.history.present;
+}
+
+/**
+ * A session restored from the last page's drawing. History starts fresh — an
+ * undo stack that outlived the tab would walk back into a project state that
+ * no longer exists — while the sketch, the armed layer, the surface, and the
+ * apply record carry over so a reload costs nothing but the undo depth.
+ */
+export function restoreDesignSession(saved: PersistedDesignSession): DesignSession {
+  const base = createDesignSession(saved.sketch);
+  return withValidActiveLayer({
+    ...base,
+    activeLayerId: saved.activeLayerId,
+    surface3d: saved.surface3d,
+    applied: saved.applied,
+  });
 }
 
 // The single place a sketch change enters the session, so "dirty" and history

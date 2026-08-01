@@ -13946,6 +13946,31 @@ in 3D." Research and verified platform facts:
    pane is deleted; its Design/Bits tier chips and Simulate move into the
    viewport toolbar (the simulate pipeline is reused unchanged). Rule 7 and
    ADR-261 section 3 continue to hold: the viewport informs, never gates.
+
+### Amendment 3 (2026-08-01) - The drawing survives a page reload (DS-8f)
+
+Everything about a Studio session was ephemeral, which meant a refresh, a
+crash, or a closed tab discarded the drawing outright — and with it the record
+of what the last Apply created, so the next Apply after a reload duplicated the
+part instead of updating it (the defect ADR-272 Amendment 1's re-apply work
+otherwise fixed).
+
+1. **The durable slice is written to `localStorage`, not to the project.** The
+   sketch, the armed layer, the surface toggle, and the apply record persist
+   under one versioned key. `.lf2` is untouched: this is browser-local working
+   state, the same class as the CNC Basic/Advanced disclosure (ADR-111) and the
+   3D pane width (ADR-191), and it needs no schema migration. Parametric design
+   data reaching the PROJECT file remains DS-9's job, unchanged by this.
+2. **History is deliberately NOT persisted.** An undo stack that outlives the
+   tab walks back into a project state that no longer exists. A reload costs the
+   undo depth and nothing else.
+3. **Storage is best-effort in both directions.** A quota error, private-mode
+   throw, or corrupt payload costs the restore and never the session; an
+   oversized sketch is skipped rather than truncated. Nothing here may block
+   drawing (rule 7), and every read treats the payload as untrusted input.
+4. **Precedence on open:** the in-memory stash first (this page's drawing), then
+   the saved drawing, then blank.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01

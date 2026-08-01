@@ -5,6 +5,7 @@
 
 import { lazy, Suspense } from 'react';
 import { useDesignStudioStore } from './design-studio-store';
+import { useDesignSessionPersistence } from './use-design-session-persistence';
 
 const LazyOverlay = lazy(() =>
   import('./DesignStudioOverlay').then((m) => ({ default: m.DesignStudioOverlay })),
@@ -12,6 +13,9 @@ const LazyOverlay = lazy(() =>
 
 export function DesignStudioHost(): JSX.Element | null {
   const hasSession = useDesignStudioStore((state) => state.session !== null);
+  // Mounted on the host rather than the overlay: the drawing must keep being
+  // saved while the Studio is closed and living in the stash.
+  useDesignSessionPersistence();
   if (!hasSession) return null;
   return (
     <Suspense fallback={<LoadingCard />}>
