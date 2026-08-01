@@ -38,6 +38,16 @@ const cameraCaptureBindingArbitrary: fc.Arbitrary<CameraCaptureBinding> = fc.rec
   ),
 });
 
+type CaptureBindingField = Exclude<keyof CameraCaptureBinding, 'version'>;
+
+const captureBindingFieldArbitrary = fc.constantFrom<CaptureBindingField>(
+  'sourceKind',
+  'sourceId',
+  'width',
+  'height',
+  'resizeMode',
+);
+
 function calibrationAt(calibratedAt: number, capture?: CameraCaptureBinding): CameraCalibration {
   return {
     intrinsics: {
@@ -63,6 +73,24 @@ function alignmentWithBasis(basis: CameraAlignment['basis']): CameraAlignment {
     basis,
     alignedAt: INITIAL_CALIBRATION_EPOCH,
   };
+}
+
+function captureWithChangedField(
+  capture: CameraCaptureBinding,
+  field: CaptureBindingField,
+): CameraCaptureBinding {
+  switch (field) {
+    case 'sourceKind':
+      return { ...capture, sourceKind: capture.sourceKind === 'usb' ? 'machine-jpeg' : 'usb' };
+    case 'sourceId':
+      return { ...capture, sourceId: `${capture.sourceId}-replacement` };
+    case 'width':
+      return { ...capture, width: capture.width + 1 };
+    case 'height':
+      return { ...capture, height: capture.height + 1 };
+    case 'resizeMode':
+      return { ...capture, resizeMode: capture.resizeMode === 'none' ? 'unknown' : 'none' };
+  }
 }
 
 describe('deviceProfileWithInteractivePatch', () => {
@@ -252,6 +280,31 @@ describe('deviceProfileWithInteractivePatch', () => {
         },
       ),
       { numRuns: 100 },
+    );
+  });
+
+  it('clears inherited rectified alignment for generated capture-binding changes', () => {
+    fc.assert(
+      fc.property(
+        cameraCaptureBindingArbitrary,
+        captureBindingFieldArbitrary,
+        (currentCapture, changedField) => {
+          const profile = {
+            ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+            cameraCalibration: calibrationAt(INITIAL_CALIBRATION_EPOCH, currentCapture),
+            cameraAlignment: RECTIFIED_ALIGNMENT,
+          };
+          const patched = deviceProfileWithInteractivePatch(profile, {
+            cameraCalibration: calibrationAt(
+              INITIAL_CALIBRATION_EPOCH,
+              captureWithChangedField(currentCapture, changedField),
+            ),
+          });
+
+          expect(patched.cameraAlignment).toBeUndefined();
+        },
+      ),
+      { numRuns: 200 },
     );
   });
 });
