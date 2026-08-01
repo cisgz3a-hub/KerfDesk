@@ -61,7 +61,14 @@ export function computeRemovalGrid(
   if (result.kind === 'error') return result;
   const { grid } = result;
   const kernels = kernelsByToolKey(options.toolsByToolKey, grid.mmPerCell);
-  const limit = options.uptoLengthMm ?? Number.POSITIVE_INFINITY;
+  const requestedLimit = options.uptoLengthMm;
+  // Treat the scrubber's 100% position as the finished cut before subtracting
+  // accumulated step lengths. Otherwise floating-point cancellation can make
+  // the final segment one ulp short and omit its last fixed-lattice sample.
+  const limit =
+    requestedLimit === undefined || requestedLimit >= toolpath.totalLength
+      ? Number.POSITIVE_INFINITY
+      : requestedLimit;
   let traversed = 0;
   for (const step of toolpath.steps) {
     if (traversed >= limit) break;
@@ -163,23 +170,32 @@ function stampCutStepVertexZ(
   zs: ReadonlyArray<number>,
   budgetMm: number,
 ): void {
-  let walked = 0;
+  let walkedMotionMm = 0;
   for (let i = 1; i < step.polyline.length; i += 1) {
     const a = step.polyline[i - 1];
     const b = step.polyline[i];
     const zA = zs[i - 1];
     const zB = zs[i];
     if (a === undefined || b === undefined || zA === undefined || zB === undefined) continue;
-    const segLen = Math.hypot(b.x - a.x, b.y - a.y);
-    const done = stampSegmentVertexZ(grid, kernel, a, b, { segLen, walked, budgetMm, zA, zB });
+    const xyLengthMm = Math.hypot(b.x - a.x, b.y - a.y);
+    const motionLengthMm = Math.hypot(b.x - a.x, b.y - a.y, zB - zA);
+    const done = stampSegmentVertexZ(grid, kernel, a, b, {
+      xyLengthMm,
+      motionLengthMm,
+      walkedMotionMm,
+      budgetMm,
+      zA,
+      zB,
+    });
     if (done) return;
-    walked += segLen;
+    walkedMotionMm += motionLengthMm;
   }
 }
 
 type VertexZSegmentParams = {
-  readonly segLen: number;
-  readonly walked: number;
+  readonly xyLengthMm: number;
+  readonly motionLengthMm: number;
+  readonly walkedMotionMm: number;
   readonly budgetMm: number;
   readonly zA: number;
   readonly zB: number;
@@ -196,11 +212,32 @@ function stampSegmentVertexZ(
   b: { readonly x: number; readonly y: number },
   p: VertexZSegmentParams,
 ): boolean {
+  const remainingMotionMm = p.budgetMm - p.walkedMotionMm;
+  if (remainingMotionMm < 0) return true;
+  const tLimit = p.motionLengthMm > 0 ? Math.min(1, remainingMotionMm / p.motionLengthMm) : 1;
+
+  // A vertical move stays over one grid cell. Stamping its reached endpoint is
+  // exact and monotone: a descending frontier can only deepen the cell, while
+  // an ascending frontier cannot undo the already-stamped start depth.
+  if (p.xyLengthMm === 0) {
+    if (p.zA < 0) stampTip(grid, kernel, a.x, a.y, p.zA);
+    const reachedZ = p.zA + (p.zB - p.zA) * tLimit;
+    if (reachedZ < 0) stampTip(grid, kernel, a.x, a.y, reachedZ);
+    return tLimit < 1;
+  }
+
+  // Use one lattice for the full 3D segment and reveal only a prefix as the
+  // scrub budget advances. Re-spacing samples over [0, tLimit] would move old
+  // samples between frames, allowing previously removed cells to reappear.
+  // Make the 3D lattice a multiple of the established XY lattice: this bounds
+  // lag on steep moves while retaining every sample in the completed grid.
   const sampleSpacing = grid.mmPerCell / 2;
-  const samples = Math.max(1, Math.ceil(p.segLen / sampleSpacing));
+  const xySamples = Math.max(1, Math.ceil(p.xyLengthMm / sampleSpacing));
+  const motionSamples = Math.max(1, Math.ceil(p.motionLengthMm / sampleSpacing));
+  const samples = xySamples * Math.ceil(motionSamples / xySamples);
   for (let s = 0; s <= samples; s += 1) {
     const t = s / samples;
-    if (p.walked + p.segLen * t > p.budgetMm) return true;
+    if (t > tLimit) return true;
     const z = p.zA + (p.zB - p.zA) * t;
     if (z < 0) stampTip(grid, kernel, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, z);
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildToolpath } from '../job';
-import type { CncPass, Job } from '../job';
+import type { CncPass, Job, Toolpath } from '../job';
 import { gridCellIndex, gridCellOfPoint, type RemovalGrid } from './removal-grid';
 import { computeRemovalGrid } from './stamp-toolpath';
 import { kernelForTool } from './tool-kernels';
@@ -15,6 +15,7 @@ import { kernelForTool } from './tool-kernels';
 const FLAT_TOOL = { id: 't', name: 't', kind: 'end-mill', diameterMm: 2 } as const;
 const SAFE_Z_MM = 3.81;
 const GRID = { originX: 0, originY: 0, widthMm: 30, heightMm: 30, mmPerCell: 0.5 };
+const FINE_GRID = { originX: 0, originY: 0, widthMm: 15, heightMm: 15, mmPerCell: 0.1 };
 
 function jobOf(passes: ReadonlyArray<CncPass>): Job {
   return {
@@ -46,6 +47,15 @@ function depthAt(grid: RemovalGrid, x: number, y: number): number {
   const index = gridCellIndex(grid, cx, cy);
   if (index === null) throw new Error(`(${x}, ${y}) is outside the grid`);
   return grid.depth[index] ?? 0;
+}
+
+function lengthBeforeFirstCut(toolpath: Toolpath): number {
+  let length = 0;
+  for (const step of toolpath.steps) {
+    if (step.kind === 'cut') return length;
+    length += step.length;
+  }
+  throw new Error('Expected a cut step.');
 }
 
 describe('computeRemovalGrid — path3d per-vertex Z', () => {
@@ -100,5 +110,123 @@ describe('computeRemovalGrid — path3d per-vertex Z', () => {
     expect(depthAt(grid, 20, 15)).toBeLessThanOrEqual(-0.95);
     // …and the surface-level seam corner stays uncut.
     expect(depthAt(grid, 10, 10)).toBeGreaterThanOrEqual(-0.15);
+  });
+
+  it('uses 3D motion length when the scrubber stops on a steep XYZ segment', () => {
+    const steep: CncPass = {
+      kind: 'path3d',
+      points: [
+        { x: 5, y: 15, z: 0 },
+        { x: 6, y: 15, z: -10 },
+      ],
+      closed: false,
+    };
+    const toolpath = buildToolpath(jobOf([steep]), { startPoint: { x: 5, y: 15 } });
+    const cutBudgetMm = 1;
+    const grid = expectGrid(
+      computeRemovalGrid(toolpath, GRID, kernelForTool(FLAT_TOOL, GRID.mmPerCell), {
+        uptoLengthMm: lengthBeforeFirstCut(toolpath) + cutBudgetMm,
+      }),
+    );
+
+    const expectedZ = -10 * (cutBudgetMm / Math.hypot(1, 10));
+    const sampledZ = depthAt(grid, 5, 15);
+    expect(sampledZ).toBeGreaterThanOrEqual(expectedZ - 1e-6);
+    expect(sampledZ - expectedZ).toBeLessThanOrEqual(GRID.mmPerCell / 2);
+    expect(Math.min(...grid.depth)).toBeGreaterThan(-1.1);
+  });
+
+  it('stamps only the reached depth when a path3d segment is purely vertical', () => {
+    const vertical: CncPass = {
+      kind: 'path3d',
+      points: [
+        { x: 15, y: 15, z: 0 },
+        { x: 15, y: 15, z: -5 },
+      ],
+      closed: false,
+    };
+    const toolpath = buildToolpath(jobOf([vertical]), { startPoint: { x: 15, y: 15 } });
+    const cutBudgetMm = 0.1;
+    const grid = expectGrid(
+      computeRemovalGrid(toolpath, GRID, kernelForTool(FLAT_TOOL, GRID.mmPerCell), {
+        uptoLengthMm: lengthBeforeFirstCut(toolpath) + cutBudgetMm,
+      }),
+    );
+
+    expect(depthAt(grid, 15, 15)).toBeCloseTo(-cutBudgetMm, 6);
+    expect(Math.min(...grid.depth)).toBeCloseTo(-cutBudgetMm, 6);
+  });
+
+  it('never restores removed cells as path3d scrub progress advances', () => {
+    const constantDepth: CncPass = {
+      kind: 'path3d',
+      points: [
+        { x: 3, y: 3, z: -5 },
+        { x: 4, y: 3.5, z: -5 },
+      ],
+      closed: false,
+    };
+    const toolpath = buildToolpath(jobOf([constantDepth]), { startPoint: { x: 3, y: 3 } });
+    const beforeCutMm = lengthBeforeFirstCut(toolpath);
+    const cutLengthMm = Math.hypot(1, 0.5);
+    const kernel = kernelForTool(FLAT_TOOL, FINE_GRID.mmPerCell);
+    const earlier = expectGrid(
+      computeRemovalGrid(toolpath, FINE_GRID, kernel, {
+        uptoLengthMm: beforeCutMm + cutLengthMm * 0.6,
+      }),
+    );
+    const later = expectGrid(
+      computeRemovalGrid(toolpath, FINE_GRID, kernel, {
+        uptoLengthMm: beforeCutMm + cutLengthMm * 0.7,
+      }),
+    );
+
+    for (let i = 0; i < earlier.depth.length; i += 1) {
+      expect(later.depth[i], `cell ${i} became shallower`).toBeLessThanOrEqual(
+        earlier.depth[i] ?? 0,
+      );
+    }
+  });
+
+  it('retains the established XY samples in a completed steep segment', () => {
+    const steep: CncPass = {
+      kind: 'path3d',
+      points: [
+        { x: 3, y: 3, z: -5 },
+        { x: 4, y: 5, z: -1 },
+      ],
+      closed: false,
+    };
+    const toolpath = buildToolpath(jobOf([steep]), { startPoint: { x: 3, y: 3 } });
+    const grid = expectGrid(
+      computeRemovalGrid(toolpath, FINE_GRID, kernelForTool(FLAT_TOOL, FINE_GRID.mmPerCell)),
+    );
+
+    const retainedCell = 31 * grid.widthCells + 42;
+    expect(grid.depth[retainedCell]).toBeCloseTo(-3.4, 6);
+  });
+
+  it('makes exact-total and over-total scrub budgets identical to the finished grid', () => {
+    const multiSegment: CncPass = {
+      kind: 'path3d',
+      points: [
+        { x: 3, y: 3, z: -5 },
+        { x: 3.1, y: 3.1, z: -5 },
+        { x: 3.2, y: 3.3, z: -5 },
+      ],
+      closed: false,
+    };
+    const toolpath = buildToolpath(jobOf([multiSegment]), { startPoint: { x: 3, y: 3 } });
+    const kernel = kernelForTool(FLAT_TOOL, FINE_GRID.mmPerCell);
+    const finished = expectGrid(computeRemovalGrid(toolpath, FINE_GRID, kernel));
+    const exactTotal = expectGrid(
+      computeRemovalGrid(toolpath, FINE_GRID, kernel, { uptoLengthMm: toolpath.totalLength }),
+    );
+    const overTotal = expectGrid(
+      computeRemovalGrid(toolpath, FINE_GRID, kernel, { uptoLengthMm: toolpath.totalLength + 1 }),
+    );
+
+    expect(exactTotal.depth).toEqual(finished.depth);
+    expect(overTotal.depth).toEqual(finished.depth);
   });
 });
