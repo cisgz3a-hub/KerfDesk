@@ -70,6 +70,7 @@ function reliefGroup(
   tool: CncTool,
   cutType: 'relief-rough' | 'relief-finish',
   passes: ReadonlyArray<CncPass>,
+  layerPrimaryTool: CncTool = tool,
 ): CncGroup {
   return {
     kind: 'cnc',
@@ -81,7 +82,9 @@ function reliefGroup(
     toolDiameterMm: tool.diameterMm,
     ...cncGroupProvenance(settings, tool, {
       includeRequestedDepth: false,
+      includeDepthPerPass: cutType !== 'relief-finish',
       includeVResolution: false,
+      layerPrimaryTool,
     }),
     feedMmPerMin: cap(settings.feedMmPerMin, device.maxFeed),
     plungeMmPerMin: cap(settings.plungeMmPerMin, device.maxFeed),
@@ -143,7 +146,16 @@ function reliefFinishingGroup(
     }
   }
   if (passes.length === 0) return null;
-  return reliefGroup(layer, settings, device, config, finishTool, 'relief-finish', passes);
+  return reliefGroup(
+    layer,
+    settings,
+    device,
+    config,
+    finishTool,
+    'relief-finish',
+    passes,
+    layerCncTool(config, settings),
+  );
 }
 
 function reliefObjectsForLayer(

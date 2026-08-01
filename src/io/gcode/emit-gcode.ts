@@ -4,6 +4,7 @@
 // based on `preflight.ok`.
 
 import {
+  findCncSecondaryToolFeedIssues,
   runCncPreflight,
   runPreflight,
   type PreflightOptions,
@@ -134,7 +135,10 @@ export function emitPreparedGcodeWithCncPassSpans(
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
-  const preflight = runEmitPreflight(prepared.project, body, options, rotaryStage);
+  const preflight = appendSecondaryToolFeedIssues(
+    runEmitPreflight(prepared.project, body, options, rotaryStage),
+    job,
+  );
   const gcode = options.metadata
     ? gcodeMetadataHeader(
         options.metadata,
@@ -144,6 +148,11 @@ export function emitPreparedGcodeWithCncPassSpans(
     : body;
   const spans = cncEmission !== null && options.metadata === undefined ? cncEmission.spans : null;
   return { gcode, preflight, spans };
+}
+
+function appendSecondaryToolFeedIssues(preflight: PreflightResult, job: Job): PreflightResult {
+  const issues = findCncSecondaryToolFeedIssues(job);
+  return issues.length === 0 ? preflight : { ok: false, issues: [...preflight.issues, ...issues] };
 }
 
 type MaterializedProgram<T> =
