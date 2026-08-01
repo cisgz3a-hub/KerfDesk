@@ -20,6 +20,15 @@ const RTSP_SOURCE_ENDED =
 const MACHINE_JPEG_SOURCE_ENDED =
   'Machine camera preview stopped. Check the camera and bridge, then reconnect it.';
 export const RTSP_STATUS_POLL_INTERVAL_MS = 1_000;
+// The bridge reports 'unavailable' for status-channel faults and some absent
+// session states. A lone reading therefore does not prove that the video
+// stream died, while 'failed' is authoritative and remains immediate. Two
+// consecutive readings preserve one transient hiccup without leaving a stale
+// preview live through an invented grace period. This is a count threshold,
+// not a fixed wall-clock window: immediate failures resolve after one 1 s poll
+// interval, while two browser requests that each hit the 3 s fetch timeout can
+// take about 7 s in total.
+export const CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE = 2;
 
 export function handleUsbStatus(
   set: CameraSourceSet,
@@ -91,10 +100,19 @@ export async function monitorRtspSource(
   streamSessionId: string,
   epoch: number,
 ): Promise<void> {
+  let consecutiveUnavailableReadings = 0;
   while (isCurrentSourceAtEpoch(get, source, epoch)) {
     const status = await readRtspStatus(bridge, streamSessionId);
     if (!isCurrentSourceAtEpoch(get, source, epoch)) return;
-    if (status.kind === 'failed' || status.kind === 'unavailable') {
+    if (status.kind === 'failed') {
+      get().reportSourceFailure(source);
+      return;
+    }
+    // Any non-unavailable reading clears the run: the status channel is back,
+    // so whatever hiccuped before it is not a continuing outage.
+    consecutiveUnavailableReadings =
+      status.kind === 'unavailable' ? consecutiveUnavailableReadings + 1 : 0;
+    if (consecutiveUnavailableReadings >= CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE) {
       get().reportSourceFailure(source);
       return;
     }
