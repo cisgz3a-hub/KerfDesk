@@ -37,9 +37,14 @@ import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
 import { hasFinitePoints } from './profile-paths';
 import { vcarveIncludedAngleDeg } from './vcarve-angle';
+import { orderDetailBySliver } from './vcarve-detail-order';
 import { planVCarveRampEntry } from './vcarve-entry';
 import { vcarveRegionBuckets, type OrderedVCarvePolyline } from './vcarve-region-order';
-import { THIN_DETAIL_RESOLUTION_MM, vcarveThinDetailRings } from './vcarve-thin-detail';
+import {
+  THIN_DETAIL_RESOLUTION_MM,
+  vcarveThinDetailRings,
+  type ThinDetailRings,
+} from './vcarve-thin-detail';
 
 const MIN_CLOSED_POINTS = 3;
 const MIN_RESOLUTION_MM = 0.1;
@@ -116,7 +121,7 @@ export function vcarveLadderPasses(
   const detail = ladder.offsetFailed
     ? NO_DETAIL
     : vcarveThinDetailRings(contours, ladder.rings[0] ?? [], delta);
-  const rings = zipRegionRings(contours, ladder.rings, detail.rings, {
+  const rings = zipRegionRings(contours, ladder.rings, detail, {
     deltaMm: delta,
     tanHalf,
     maxDepthMm: maxDepth,
@@ -135,7 +140,12 @@ const NO_LADDER: VCarveLadder = {
   entryIssue: null,
   thinResidual: false,
 };
-const NO_DETAIL = { rings: [], offsetFailed: false, residualThin: false } as const;
+const NO_DETAIL = {
+  rings: [],
+  offsetFailed: false,
+  residualThin: false,
+  sliverRoots: [],
+} as const;
 
 // Ring spacing: explicit setting wins; 0 = auto at toolDiameter/8 with a
 // 0.1 mm floor so tiny engraving bits don't explode the ring count.
@@ -158,16 +168,20 @@ type RingDepthClamp = {
 function zipRegionRings(
   contours: ReadonlyArray<Polyline>,
   coarseRings: ReadonlyArray<ReadonlyArray<Polyline>>,
-  detailRings: ReadonlyArray<ReadonlyArray<Polyline>>,
+  detail: ThinDetailRings,
   clamp: RingDepthClamp,
 ): ReadonlyArray<VCarveRing> {
   const coarse = vcarveRegionBuckets(contours, coarseRings);
-  const detail = vcarveRegionBuckets(contours, detailRings);
+  const fine = vcarveRegionBuckets(contours, detail.rings);
   const rings: VCarveRing[] = [];
-  for (let bucket = 0; bucket < Math.max(coarse.length, detail.length); bucket += 1) {
+  for (let bucket = 0; bucket < Math.max(coarse.length, fine.length); bucket += 1) {
     rings.push(
       ...ringsForBucket(coarse[bucket] ?? [], clamp.deltaMm, clamp),
-      ...ringsForBucket(detail[bucket] ?? [], THIN_DETAIL_RESOLUTION_MM, clamp),
+      ...ringsForBucket(
+        orderDetailBySliver(fine[bucket] ?? [], detail.sliverRoots),
+        THIN_DETAIL_RESOLUTION_MM,
+        clamp,
+      ),
     );
   }
   return rings;

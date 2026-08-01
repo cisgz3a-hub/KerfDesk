@@ -388,6 +388,49 @@ describe('vcarvePasses — thin detail (ADR-279)', () => {
     expect(contourRegionOrder(passes)).toMatch(/^L+R+$/);
   });
 
+  it('finishes one sliver before travelling to the next within a region', () => {
+    // One source region: a thick square with TWO thin fingers off its right
+    // edge. Both fingers vanish from the δ ladder as separate slivers. Detail
+    // passes must complete finger A (all its fine steps) before travelling to
+    // finger B — not hop between fingers step by step.
+    const glyph: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 6, y: 0 },
+        { x: 6, y: 0.5 },
+        { x: 12, y: 0.5 },
+        { x: 12, y: 1 },
+        { x: 6, y: 1 },
+        { x: 6, y: 5 },
+        { x: 12, y: 5 },
+        { x: 12, y: 5.5 },
+        { x: 6, y: 5.5 },
+        { x: 6, y: 6 },
+        { x: 0, y: 6 },
+      ],
+    };
+    const passes = vcarvePasses([glyph], {
+      tool: VBIT_90,
+      maxDepthMm: 2,
+      depthPerPassMm: 2,
+      resolutionMm: 0.5,
+    });
+    const fingerOrder = passes
+      .flatMap((pass) => {
+        if (pass.kind !== 'contour') return [];
+        // Coverage of the square's δ ladder ends at its right edge (x = 6),
+        // so finger detail rings live entirely at x > 6.
+        const inFinger = pass.polyline.every((point) => point.x >= 6.01);
+        if (!inFinger) return [];
+        const maxY = Math.max(...pass.polyline.map((point) => point.y));
+        return [maxY <= 1.2 ? 'A' : 'B'];
+      })
+      .join('');
+    expect(fingerOrder.length).toBeGreaterThan(4);
+    expect(fingerOrder).toMatch(/^(A+B+|B+A+)$/);
+  });
+
   it('property: detail passes never cut deeper than the band half-width (100 seeds)', () => {
     // A 90° bit's groove over a band of width w is w/2 deep at the centerline;
     // cutting deeper than the artwork asks for would gouge the workpiece.
