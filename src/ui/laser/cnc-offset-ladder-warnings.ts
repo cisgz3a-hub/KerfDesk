@@ -9,39 +9,20 @@
 // Advisory only. It informs and never refuses Frame, Start or a save (rule 7);
 // the operator decides whether to run it after checking the preview.
 
-// Deep imports: core/cnc's barrel is a ratcheted over-cap legacy barrel
+// Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json pins it at 67) and may only shrink, so
-// neither the diagnostic nor the detail-pitch constant can be added to it.
-import {
-  findCncOffsetLadderDiagnostics,
-  type CncOffsetLadderDiagnostic,
-} from '../../core/cnc/cnc-offset-ladder-diagnostics';
-import { THIN_DETAIL_RESOLUTION_MM } from '../../core/cnc/vcarve-thin-detail';
-import { assertNever, type Project } from '../../core/scene';
-
-// The narrowest groove the fine detail stage can carve (ADR-279).
-const MIN_CARVEABLE_DETAIL_MM = 2 * THIN_DETAIL_RESOLUTION_MM;
+// the diagnostic cannot be added to it.
+import { findCncOffsetLadderDiagnostics } from '../../core/cnc/cnc-offset-ladder-diagnostics';
+import type { Project } from '../../core/scene';
 
 export function detectCncOffsetLadderWarnings(project: Project): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
   return findCncOffsetLadderDiagnostics(project.scene, project.device, machine).map((diagnostic) =>
-    ladderWarningFor(project, diagnostic),
+    diagnostic.kind === 'pass-limit'
+      ? restPocketPassLimitWarning(layerNameFor(project, diagnostic.layerId))
+      : offsetLadderWarning(layerNameFor(project, diagnostic.layerId)),
   );
-}
-
-function ladderWarningFor(project: Project, diagnostic: CncOffsetLadderDiagnostic): string {
-  const layerName = layerNameFor(project, diagnostic.layerId);
-  switch (diagnostic.kind) {
-    case 'pass-limit':
-      return restPocketPassLimitWarning(layerName);
-    case 'geometry-failed':
-      return offsetLadderWarning(layerName);
-    case 'thin-detail-dropped':
-      return thinDetailDroppedWarning(layerName);
-    default:
-      return assertNever(diagnostic.kind, 'CncOffsetLadderDiagnostic kind');
-  }
 }
 
 function layerNameFor(project: Project, layerId: string): string {
@@ -65,14 +46,5 @@ function restPocketPassLimitWarning(layerName: string): string {
     'interior remained, so the finishing-bit pass is incomplete and can leave stock standing. ' +
     'The generated passes still cut. Check the preview before running, and use a larger bit or ' +
     'larger stepover, or simplify/split the pocket.'
-  );
-}
-
-function thinDetailDroppedWarning(layerName: string): string {
-  return (
-    `V-carve on layer "${layerName}": some artwork details are narrower than ` +
-    `${MIN_CARVEABLE_DETAIL_MM} mm — finer than the smallest groove the detail pass can carve — ` +
-    'and stay uncut. Everything else still cuts. To carve those details, thicken them or use a ' +
-    'font or artwork with slightly wider strokes.'
   );
 }

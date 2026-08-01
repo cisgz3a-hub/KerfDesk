@@ -51,7 +51,7 @@ export function findCncOffsetLadderFailures(
 
 export type CncOffsetLadderDiagnostic = {
   readonly layerId: string;
-  readonly kind: 'geometry-failed' | 'pass-limit' | 'thin-detail-dropped';
+  readonly kind: 'geometry-failed' | 'pass-limit';
 };
 
 // Keeps the end reason available to the advisory UI. Existing callers that
@@ -73,37 +73,28 @@ export function findCncOffsetLadderDiagnostics(
       diagnostics.push({ layerId: layer.id, kind: restCompletion });
       continue;
     }
-    const vectorKinds =
-      polylines.length > 0 ? vectorLadderDiagnosticKinds(polylines, settings, config) : [];
+    const vectorFailed = polylines.length > 0 && vectorLadderFailed(polylines, settings, config);
     // A layer can carry both relief objects and vector shapes; either ladder
     // failing makes the layer's output incomplete.
-    if (
-      vectorKinds.includes('geometry-failed') ||
-      reliefOffsetLadderFailed(scene.objects, layer, settings, config)
-    ) {
+    if (vectorFailed || reliefOffsetLadderFailed(scene.objects, layer, settings, config)) {
       diagnostics.push({ layerId: layer.id, kind: 'geometry-failed' });
-    }
-    if (vectorKinds.includes('thin-detail-dropped')) {
-      diagnostics.push({ layerId: layer.id, kind: 'thin-detail-dropped' });
     }
   }
   return diagnostics;
 }
 
-function vectorLadderDiagnosticKinds(
+function vectorLadderFailed(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   config: CncMachineConfig,
-): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
+): boolean {
   const tool = layerCncTool(config, settings);
-  if (settings.cutType === 'pocket') {
-    return pocketLadderFailed(polylines, settings, config, tool) ? ['geometry-failed'] : [];
-  }
-  if (settings.cutType === 'v-carve') return vcarveLadderKinds(polylines, settings, config, tool);
+  if (settings.cutType === 'pocket') return pocketLadderFailed(polylines, settings, config, tool);
+  if (settings.cutType === 'v-carve') return vcarveLadderFailed(polylines, settings, config, tool);
   // Profile, engrave, drill and inlay reach the emitter without walking an
   // offset ladder. Deliberately not an exhaustive match — a diagnostic should
   // report nothing for a cut type it does not know, not fail to compile.
-  return [];
+  return false;
 }
 
 function pocketLadderFailed(
@@ -148,12 +139,12 @@ function pocketStrategyFailed(
   return pocketRingToolpaths(polylines, toolDiameterMm, settings.stepoverPercent).offsetFailed;
 }
 
-function vcarveLadderKinds(
+function vcarveLadderFailed(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   config: CncMachineConfig,
   tool: CncTool,
-): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
+): boolean {
   const ladder = vcarveLadderPasses(polylines, {
     tool,
     maxDepthMm: settings.depthMm,
@@ -163,22 +154,7 @@ function vcarveLadderKinds(
       ? {}
       : { rampAngleDeg: settings.vCarveRampEntryDeg }),
   });
-  const kinds: Array<CncOffsetLadderDiagnostic['kind']> = [];
-  if (ladder.offsetFailed || vcarveClearanceFailed(polylines, settings, config, tool)) {
-    kinds.push('geometry-failed');
-  }
-  // Artwork finer than even the detail pitch (ADR-279) stays uncut — worth a
-  // Job Review note on lettering jobs, and never a refusal (rule 7).
-  if (ladder.thinResidual) kinds.push('thin-detail-dropped');
-  return kinds;
-}
-
-function vcarveClearanceFailed(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  config: CncMachineConfig,
-  tool: CncTool,
-): boolean {
+  if (ladder.offsetFailed) return true;
   const clearTool = toolById(config, settings.vClearToolId);
   if (clearTool === null) return false;
   return vcarveClearancePocket(polylines, {
