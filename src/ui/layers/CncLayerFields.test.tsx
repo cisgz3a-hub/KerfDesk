@@ -55,8 +55,6 @@ function installProject(layer: Layer, withRelief: boolean): void {
   };
   useStore.setState({ project });
   useStore.getState().setMachineKind('cnc');
-  // Stepover lives in the advanced field group (ADR-111); reveal it.
-  useUiStore.getState().setShowCncAdvanced(true);
 }
 
 async function render(layer: Layer): Promise<{
@@ -117,7 +115,7 @@ describe('CncLayerFields relief contract', () => {
   });
 });
 
-describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
+describe('CncLayerFields always-visible Advanced section', () => {
   function profileLayer(): Layer {
     return {
       ...createLayer({ id: '#00aa00', color: '#00aa00' }),
@@ -125,10 +123,9 @@ describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
     };
   }
 
-  it('Basic always shows the core cut params + material + cut depth', async () => {
+  it('shows the core cut params + material + cut depth', async () => {
     const layer = profileLayer();
     installProject(layer, false);
-    useUiStore.getState().setShowCncAdvanced(false);
     const { host, root } = await render(layer);
     try {
       for (const field of ['Cut depth', 'Depth per pass', 'Feed', 'Plunge', 'Spindle']) {
@@ -143,19 +140,17 @@ describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
     }
   });
 
-  it('Advanced still gates a genuinely-advanced field (Stepover on a pocket layer)', async () => {
+  it('keeps Stepover visible in Advanced for a pocket layer', async () => {
     const layer: Layer = {
       ...createLayer({ id: '#00aa00', color: '#00aa00' }),
       cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket' },
     };
     installProject(layer, false);
-    useUiStore.getState().setShowCncAdvanced(false);
     const { host, root } = await render(layer);
     try {
-      // Core cut params are visible without the toggle...
       expect(host.querySelector(`input[aria-label="Feed for ${layer.color}"]`)).not.toBeNull();
-      // ...but Stepover (pocket ring spacing) is still Advanced-only.
-      expect(stepoverInput(host, layer.color)).toBeNull();
+      expect(stepoverInput(host, layer.color)).not.toBeNull();
+      expect(host.querySelector('section[aria-label="Advanced cut settings"]')).not.toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();

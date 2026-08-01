@@ -3,9 +3,9 @@
 // stepover / pocket fill, and the cut-type-specific tails (relief rows,
 // v-carve options, H.9 motion polish — CutTypeSections). The core per-cut
 // numbers (depth-per-pass / feed / plunge / spindle) live in CncCoreCutFields,
-// which the parent now renders in the always-visible Basic group. Extracted
+// which the parent renders in the always-visible core group. Extracted
 // from CncLayerFields to keep that file under the size cap and so the
-// Basic/Advanced toggle gates this group with one conditional (ADR-111).
+// specialist controls remain grouped under one always-visible heading.
 
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
@@ -25,8 +25,7 @@ import { AdaptivePocketFields } from './AdaptivePocketFields';
 import { CncInlayFields } from './CncInlayFields';
 import { CncTabPositionControls } from './CncTabPositionControls';
 
-// The whole advanced field set, gated by one conditional in the parent
-// (ADR-111 Basic/Advanced). Tabs is NOT here — it moved to the Basic group.
+// The whole advanced field set. Tabs is NOT here — it moved to the core group.
 export function CncLayerAdvancedGroup(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -67,10 +66,9 @@ export function CncLayerAdvancedGroup(props: {
   );
 }
 
-// The core per-cut parameters, promoted to the always-visible Basic group:
-// the numbers every CNC cut needs. Previously gated behind Advanced (ADR-111);
-// surfaced per maintainer request so depth-per-pass / feed / plunge / spindle
-// are always in reach without opening Advanced.
+// The core per-cut parameters lead the card: the numbers every CNC cut needs.
+// Depth-per-pass / feed / plunge / spindle remain separate from the labeled
+// Advanced helper and specialist section that follows.
 export function CncCoreCutFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -129,9 +127,9 @@ export function CncCoreCutFields(props: {
   );
 }
 
-// The feeds HELPERS (preset picker + chip-load calculator) stay in Advanced —
-// they assist dialing in the core numbers above rather than being cut params
-// themselves, so beginners are not confronted with them by default.
+// The feeds HELPERS (preset picker + chip-load calculator) stay grouped under
+// Advanced because they assist with the core numbers rather than being cut
+// parameters themselves. The section itself remains visible at all times.
 function FeedHelperRows(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -304,8 +302,8 @@ function VCarveFields(props: {
   );
 }
 
-// Holding tabs — a Basic field (rendered by the parent for profile cuts) so
-// beginners keep parts attached without opening Advanced.
+// Holding tabs stay with the core profile controls so part retention remains
+// prominent before the Advanced helper and specialist section.
 export function TabFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;

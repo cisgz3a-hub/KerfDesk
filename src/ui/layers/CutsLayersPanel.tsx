@@ -16,7 +16,6 @@ import { CncSetupPanel } from '../machine/CncSetupPanel';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { type CutsLayersView, useUiStore } from '../state/ui-store';
-import { CncAdvancedToggle } from './CncAdvancedToggle';
 import { ArtworkRunOrderPanel } from './ArtworkRunOrderPanel';
 import { LayerRow } from './LayerRow';
 import { DogboneRow } from './DogboneRow';
@@ -140,7 +139,6 @@ function LayersView(props: {
       <OffsetPathsRow />
       <DogboneRow />
       <SelectedReliefProperties />
-      <CncAdvancedToggle />
       <LayerList layers={props.layers} />
     </>
   );
