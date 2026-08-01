@@ -104,4 +104,22 @@ describe('compileCncJob pocket strategies', () => {
     expect(gcode.indexOf(roughToolComment)).toBeLessThan(gcode.indexOf(restToolComment));
     expect(gcode.match(/^M0$/gm)).toHaveLength(1);
   });
+
+  it('defensively omits rest machining assigned to a non-flat rougher', () => {
+    const job = compileCncJob(
+      sceneWith(
+        {
+          cutType: 'pocket',
+          toolId: 'em-1588',
+          pocketRoughToolId: 'bn-6350',
+          depthMm: 2,
+          depthPerPassMm: 2,
+        },
+        30,
+      ),
+      dev,
+      config,
+    );
+    expect(job.groups).toEqual([]);
+  });
 });

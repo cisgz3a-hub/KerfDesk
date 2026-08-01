@@ -56,6 +56,39 @@ describe('resolveCncAutoLayerSettings', () => {
     });
   });
 
+  it('uses the active catalog tool flute count for a fresh material-driven layer', () => {
+    const tool = {
+      id: 'o-flute',
+      name: '3.175 mm single O-flute',
+      kind: 'end-mill' as const,
+      diameterMm: 3.175,
+      family: 'o-flute-upcut',
+      fluteCount: 1,
+    };
+    const machine = {
+      ...DEFAULT_CNC_MACHINE_CONFIG,
+      tools: [tool],
+      toolId: tool.id,
+      stock: {
+        ...DEFAULT_CNC_MACHINE_CONFIG.stock,
+        materialKey: 'plywood-mdf',
+      },
+    };
+
+    expect(
+      resolveCncAutoLayerSettings({
+        profile: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+        machine,
+      }),
+    ).toMatchObject({
+      feedSource: {
+        kind: 'material-recipe',
+        materialKey: 'plywood-mdf',
+        fluteCount: 1,
+      },
+    });
+  });
+
   it('lowers future starter values to the slower live XY rate and live Z rate', () => {
     expect(
       resolveCncAutoLayerSettings({

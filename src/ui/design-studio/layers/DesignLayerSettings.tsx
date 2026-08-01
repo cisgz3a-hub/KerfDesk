@@ -11,6 +11,8 @@ import {
   type DesignLayer,
   type DesignLayerPatch,
 } from '../../../core/design/layers';
+import { cncToolGeometryLabel } from '../../common/cnc-tool-geometry-label';
+import { CncToolOptions } from '../../machine/CncToolOptions';
 import { DESIGN_CUT_TYPE_LABELS } from './design-cut-type-labels';
 
 const ACTIVE_BIT_VALUE = '';
@@ -22,6 +24,9 @@ export function DesignLayerSettings(props: {
   readonly onPatch: (patch: DesignLayerPatch) => void;
 }): JSX.Element {
   const { layer, tools } = props;
+  const flatTools = tools.filter((tool) => tool.kind === 'end-mill');
+  const currentTool = tools.find((tool) => tool.id === layer.toolId);
+  const currentClearTool = tools.find((tool) => tool.id === layer.vClearToolId);
   return (
     <div style={settingsStyle}>
       <NameField
@@ -56,6 +61,8 @@ export function DesignLayerSettings(props: {
         value={layer.toolId}
         emptyLabel="Machine bit (active)"
         tools={tools}
+        currentTool={currentTool}
+        unavailablePrefix="Current unavailable bit"
         onSelect={(toolId) => props.onPatch({ toolId })}
       />
       {layer.cutType === 'v-carve' ? (
@@ -64,7 +71,11 @@ export function DesignLayerSettings(props: {
           title="Two-stage v-carve: flat floors beyond the v-bit's reach are pocket-cleared with this bit first"
           value={layer.vClearToolId}
           emptyLabel="Single stage (v-bit only)"
-          tools={tools.filter((tool) => tool.kind !== 'v-bit')}
+          // Clearing is a constant-Z pocket pass. Only the flat end-mill
+          // kernel can truthfully leave the floor this control promises.
+          tools={flatTools}
+          currentTool={currentClearTool}
+          unavailablePrefix="Current unsupported clearing bit (choose a flat end mill)"
           onSelect={(vClearToolId) => props.onPatch({ vClearToolId })}
         />
       ) : null}
@@ -78,8 +89,14 @@ function BitSelectField(props: {
   readonly value: string | undefined;
   readonly emptyLabel: string;
   readonly tools: ReadonlyArray<CncTool>;
+  readonly currentTool: CncTool | undefined;
+  readonly unavailablePrefix: string;
   readonly onSelect: (toolId: string | null) => void;
 }): JSX.Element {
+  const unavailableValue =
+    props.value !== undefined && !props.tools.some((tool) => tool.id === props.value)
+      ? props.value
+      : null;
   return (
     <label style={fieldStyle}>
       <span style={labelStyle}>{props.label}</span>
@@ -92,14 +109,29 @@ function BitSelectField(props: {
         style={inputStyle}
       >
         <option value={ACTIVE_BIT_VALUE}>{props.emptyLabel}</option>
-        {props.tools.map((tool) => (
-          <option key={tool.id} value={tool.id}>
-            {tool.name}
+        {unavailableValue === null ? null : (
+          <option value={unavailableValue} disabled>
+            {unavailableCurrentToolLabel(
+              unavailableValue,
+              props.currentTool,
+              props.unavailablePrefix,
+            )}
           </option>
-        ))}
+        )}
+        <CncToolOptions tools={props.tools} />
       </select>
     </label>
   );
+}
+
+function unavailableCurrentToolLabel(
+  toolId: string,
+  tool: CncTool | undefined,
+  prefix: string,
+): string {
+  return tool === undefined
+    ? `${prefix} — missing ${toolId}`
+    : `${prefix} — ${cncToolGeometryLabel(tool)} — ${tool.name}`;
 }
 
 function NameField(props: {

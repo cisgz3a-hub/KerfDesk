@@ -59,7 +59,7 @@ export function CncMaterialRow(props: {
       profile,
       machineSpindleMaxRpm: machine.params.spindleMaxRpm,
       liveCaps,
-      fluteCount: DEFAULT_ASSUMED_FLUTE_COUNT,
+      fluteCount: tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
     });
     if (patch !== null) onCommitSettings({ ...settings, ...patch });
   };

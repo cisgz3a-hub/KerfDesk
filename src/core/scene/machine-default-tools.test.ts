@@ -37,4 +37,27 @@ describe('DEFAULT_CNC_TOOLS', () => {
     const found = DEFAULT_CNC_TOOLS.some((tool) => tool.id === DEFAULT_CNC_MACHINE_CONFIG.toolId);
     expect(found).toBe(true);
   });
+
+  it('includes both common hobby-router 90-degree V-bit sizes', () => {
+    expect(DEFAULT_CNC_TOOLS).toContainEqual({
+      id: 'vb-90-6350-hobby',
+      name: '90° V-bit — 6.35 mm (1/4") cut, 3.175 mm (1/8") shank',
+      kind: 'v-bit',
+      diameterMm: 6.35,
+      tipAngleDeg: 90,
+      family: 'v-groove',
+      shankDiameterMm: 3.175,
+      catalogId: 'v90-hobby-0125',
+    });
+    expect(DEFAULT_CNC_TOOLS).toContainEqual({
+      id: 'vb-90-12700-hobby',
+      name: '90° V-bit — 12.7 mm (1/2") cut, 6.35 mm (1/4") shank',
+      kind: 'v-bit',
+      diameterMm: 12.7,
+      tipAngleDeg: 90,
+      family: 'v-groove',
+      shankDiameterMm: 6.35,
+      catalogId: 'v90-hobby-025',
+    });
+  });
 });

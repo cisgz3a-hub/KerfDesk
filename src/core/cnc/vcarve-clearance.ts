@@ -25,6 +25,15 @@ export type VCarveClearanceOptions = {
   readonly stepoverPercent: number;
 };
 
+type VCarveFloorOptions = Pick<VCarveClearanceOptions, 'vBit' | 'maxDepthMm'>;
+
+export function vcarveHasFlatFloor(
+  polylines: ReadonlyArray<Polyline>,
+  options: VCarveFloorOptions,
+): boolean {
+  return vcarveClearanceFloor(polylines, options).contours.length > 0;
+}
+
 export function vcarveClearanceToolpaths(
   polylines: ReadonlyArray<Polyline>,
   options: VCarveClearanceOptions,
@@ -40,19 +49,7 @@ export function vcarveClearancePocket(
   polylines: ReadonlyArray<Polyline>,
   options: VCarveClearanceOptions,
 ): PocketToolpaths {
-  const tipAngleDeg = vcarveIncludedAngleDeg(options.vBit);
-  if (tipAngleDeg === null) return NO_CLEARANCE;
-  if (!(options.maxDepthMm > 0)) return NO_CLEARANCE;
-  const contours = polylines.filter(
-    (polyline) =>
-      polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
-  );
-  if (contours.length === 0) return NO_CLEARANCE;
-  const clampInsetMm = options.maxDepthMm * Math.tan((tipAngleDeg * Math.PI) / 360);
-  // The flat-floor region: everything deeper than the clamp inset. Narrow
-  // shapes offset away entirely — clipper returns nothing and there is no
-  // clearance stage.
-  const floorRegions = insetContoursChecked(contours, clampInsetMm);
+  const floorRegions = vcarveClearanceFloor(polylines, options);
   if (floorRegions.contours.length === 0) {
     return { toolpaths: [], offsetFailed: floorRegions.offsetFailed };
   }
@@ -63,4 +60,23 @@ export function vcarveClearancePocket(
   );
 }
 
-const NO_CLEARANCE: PocketToolpaths = { toolpaths: [], offsetFailed: false };
+function vcarveClearanceFloor(
+  polylines: ReadonlyArray<Polyline>,
+  options: VCarveFloorOptions,
+): { readonly contours: ReadonlyArray<Polyline>; readonly offsetFailed: boolean } {
+  const tipAngleDeg = vcarveIncludedAngleDeg(options.vBit);
+  if (tipAngleDeg === null) return NO_FLOOR;
+  if (!(options.maxDepthMm > 0)) return NO_FLOOR;
+  const contours = polylines.filter(
+    (polyline) =>
+      polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
+  );
+  if (contours.length === 0) return NO_FLOOR;
+  const clampInsetMm = options.maxDepthMm * Math.tan((tipAngleDeg * Math.PI) / 360);
+  // The flat-floor region: everything deeper than the clamp inset. Narrow
+  // shapes offset away entirely — clipper returns nothing and there is no
+  // clearance stage.
+  return insetContoursChecked(contours, clampInsetMm);
+}
+
+const NO_FLOOR = { contours: [], offsetFailed: false } as const;

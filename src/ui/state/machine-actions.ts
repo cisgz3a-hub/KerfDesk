@@ -47,6 +47,11 @@ type MachineState = {
 type MachineSet = (fn: (state: MachineState) => Partial<MachineState>) => void;
 type MachineGet = () => MachineState;
 
+const PROJECT_BACKFILL_CNC_TOOL_IDS: ReadonlySet<string> = new Set([
+  'vb-90-6350-hobby',
+  'vb-90-12700-hobby',
+]);
+
 export type MachineKindSelectionResult =
   | { readonly kind: 'selected'; readonly machineKind: MachineKind }
   | { readonly kind: 'unchanged'; readonly machineKind: MachineKind }
@@ -87,10 +92,31 @@ export function cncMachineWithCustomTools(
   customTools: ReadonlyArray<CncTool>,
 ): CncMachineConfig {
   const missing = customTools.filter(
-    (tool) => !machine.tools.some((existing) => existing.id === tool.id),
+    (tool) =>
+      !machine.tools.some(
+        (existing) =>
+          existing.id === tool.id ||
+          (tool.catalogId !== undefined && existing.catalogId === tool.catalogId),
+      ),
   );
   if (missing.length === 0) return machine;
   return { ...machine, tools: [...machine.tools, ...missing] };
+}
+
+// Reconcile only the append-only starters introduced after older projects
+// were saved, then the reusable app library. Existing project ID/catalog
+// matches win both passes, preserving project metadata and references.
+export function cncMachineWithReusableTools(
+  machine: CncMachineConfig,
+  customTools: ReadonlyArray<CncTool>,
+): CncMachineConfig {
+  const backfilledStarters = DEFAULT_CNC_MACHINE_CONFIG.tools.filter((tool) =>
+    PROJECT_BACKFILL_CNC_TOOL_IDS.has(tool.id),
+  );
+  return cncMachineWithCustomTools(
+    cncMachineWithCustomTools(machine, backfilledStarters),
+    customTools,
+  );
 }
 
 export function machineActions(set: MachineSet, get: MachineGet): MachineActions {
@@ -131,6 +157,7 @@ export function machineActions(set: MachineSet, get: MachineGet): MachineActions
               device: { ...state.project.device, cncSubProfile: { ...machine.params } },
               machine,
               liveCaps: state.cncLiveCaps,
+              activeToolChanged: patch.toolId !== undefined && patch.toolId !== current.toolId,
             }),
           },
           undoStack: pushUndo(state.project, state.undoStack),
@@ -178,7 +205,7 @@ function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<
   const machine =
     kind === 'laser'
       ? LASER_MACHINE_CONFIG
-      : cncMachineWithCustomTools(cncBase, state.cncLibrary.customTools);
+      : cncMachineWithReusableTools(cncBase, state.cncLibrary.customTools);
   const device =
     current?.kind === 'cnc'
       ? { ...state.project.device, cncSubProfile: { ...current.params } }

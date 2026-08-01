@@ -5,7 +5,9 @@
 // integrity — the program cannot be materialized at all:
 //   - non-finite-coordinate / empty-output: nothing emittable was produced.
 //   - cnc-tool-geometry-invalid: V-carve depth cannot be calculated without
-//     the selected V-bit's explicit included angle.
+//     the selected V-bit's explicit included angle; configured contributing
+//     secondary stages must resolve to supported tools; and flat-floor/rest
+//     clearing cannot use a non-flat cutter.
 //   - no-output-layer: there is no layer to emit from.
 //   - relief-needs-cnc: a relief object cannot compile on a laser machine.
 //   - program-materialization-failed: the engine factually failed to build the

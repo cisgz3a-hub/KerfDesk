@@ -19,7 +19,9 @@ import { normalizeScanOffsetCalibrationStatus } from '../../core/devices/scan-of
 import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
+  type CncMachineConfig,
   type CncCoolantMode,
+  type CncTool,
   type CncTiling,
   DEFAULT_CNC_TOOLS,
   isCncCoolantMode,
@@ -123,7 +125,11 @@ function normalizeProject(raw: Record<string, unknown>): Project {
 function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefined {
   if (!isObject(raw)) return undefined;
   if (raw['kind'] === 'laser') return { kind: 'laser' };
-  if (raw['kind'] !== 'cnc') return undefined;
+  return normalizeCncMachineConfig(raw) ?? undefined;
+}
+
+export function normalizeCncMachineConfig(raw: unknown): CncMachineConfig | null {
+  if (!isObject(raw) || raw['kind'] !== 'cnc') return null;
   const d = DEFAULT_CNC_MACHINE_CONFIG;
   const stock = isObject(raw['stock']) ? raw['stock'] : {};
   const params = isObject(raw['params']) ? raw['params'] : {};
@@ -131,7 +137,7 @@ function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefine
   const toolId =
     typeof raw['toolId'] === 'string' && tools.some((tool) => tool['id'] === raw['toolId'])
       ? raw['toolId']
-      : d.toolId;
+      : (tools[0]?.id ?? d.toolId);
   return {
     kind: 'cnc',
     stock: {
@@ -212,10 +218,12 @@ function normalizeStockOriginOffset(
 // the field, and an unknown kind degrades to end-mill (same junk-to-default
 // contract as coolantModeOrOff).
 const CNC_TOOL_KINDS = ['end-mill', 'ball-nose', 'v-bit', 'engraving'] as const;
+const MAX_TOOL_METADATA_LENGTH = 120;
+const MAX_TOOL_FLUTES = 16;
 
-function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {
+function normalizeCncTools(raw: unknown): Array<CncTool> {
   if (!Array.isArray(raw)) return DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
-  const tools: Array<Record<string, unknown>> = [];
+  const tools: Array<CncTool> = [];
   for (const tool of raw) {
     const normalized = normalizeCncTool(tool);
     if (normalized !== null) tools.push(normalized);
@@ -223,20 +231,52 @@ function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {
   return tools.length > 0 ? tools : DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
 }
 
-function normalizeCncTool(tool: unknown): Record<string, unknown> | null {
+function normalizeCncTool(tool: unknown): CncTool | null {
   if (!isObject(tool)) return null;
+  const core = normalizeCncToolCore(tool);
+  if (core === null) return null;
+  return { ...core, ...normalizeCncToolMetadata(tool) };
+}
+
+function normalizeCncToolCore(tool: Record<string, unknown>): CncTool | null {
+  if (typeof tool['id'] !== 'string') return null;
+  if (typeof tool['name'] !== 'string') return null;
   const diameterMm = tool['diameterMm'];
-  if (typeof tool['id'] !== 'string' || typeof tool['name'] !== 'string') return null;
   if (!isFiniteNumber(diameterMm) || diameterMm <= 0) return null;
-  const tipAngleDeg = tool['tipAngleDeg'];
-  const tipAngleValid = isValidCncTipAngleDeg(tipAngleDeg);
   return {
     id: tool['id'],
     name: tool['name'],
     kind: isCncToolKindValue(tool['kind']) ? tool['kind'] : 'end-mill',
     diameterMm,
-    ...(tipAngleValid ? { tipAngleDeg } : {}),
   };
+}
+
+function normalizeCncToolMetadata(tool: Record<string, unknown>): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {};
+  const family = boundedToolString(tool['family']);
+  const catalogId = boundedToolString(tool['catalogId']);
+  if (isValidCncTipAngleDeg(tool['tipAngleDeg'])) {
+    metadata['tipAngleDeg'] = tool['tipAngleDeg'];
+  }
+  if (family !== null) metadata['family'] = family;
+  if (isFiniteNumber(tool['shankDiameterMm']) && tool['shankDiameterMm'] > 0) {
+    metadata['shankDiameterMm'] = tool['shankDiameterMm'];
+  }
+  if (validFluteCount(tool['fluteCount'])) metadata['fluteCount'] = tool['fluteCount'];
+  if (catalogId !== null) metadata['catalogId'] = catalogId;
+  return metadata;
+}
+
+function validFluteCount(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_TOOL_FLUTES
+  );
+}
+
+function boundedToolString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_TOOL_METADATA_LENGTH
+    ? value
+    : null;
 }
 
 function isCncToolKindValue(value: unknown): value is (typeof CNC_TOOL_KINDS)[number] {

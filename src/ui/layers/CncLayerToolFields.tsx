@@ -3,8 +3,15 @@
 // VClearToolSelect arms the two-stage v-carve's flat-floor clearing bit.
 // Split from CncLayerFields.tsx, which sits near the file-size cap.
 
-import { sceneObjectUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
+import {
+  sceneObjectUsesOperation,
+  type CncLayerSettings,
+  type CncTool,
+  type Layer,
+} from '../../core/scene';
+import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
+import { CncToolOptions } from '../machine/CncToolOptions';
 import { useStore } from '../state';
 import { useCncTools } from './CncLayerBitSelect';
 
@@ -29,7 +36,16 @@ export function VClearToolSelect(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const tools = useCncTools();
-  const flatTools = tools.filter((tool) => tool.kind !== 'v-bit');
+  // Floor clearing emits ordinary constant-Z pocket passes. Only the flat
+  // end-mill kernel can truthfully leave that floor; ball/core-box tools and
+  // legacy engraving geometry must not be offered here.
+  const flatTools = tools.filter((tool) => tool.kind === 'end-mill');
+  const currentClearTool = tools.find((tool) => tool.id === props.settings.vClearToolId);
+  const unavailableClearToolId =
+    props.settings.vClearToolId !== undefined &&
+    !flatTools.some((tool) => tool.id === props.settings.vClearToolId)
+      ? props.settings.vClearToolId
+      : null;
   return (
     <Row label="Clear floors">
       <select
@@ -47,14 +63,22 @@ export function VClearToolSelect(props: {
         style={selectStyle}
       >
         <option value="">Single stage (v-bit only)</option>
-        {flatTools.map((tool) => (
-          <option key={tool.id} value={tool.id}>
-            {tool.name}
+        {unavailableClearToolId === null ? null : (
+          <option value={unavailableClearToolId} disabled>
+            {unavailableClearToolLabel(unavailableClearToolId, currentClearTool)}
           </option>
-        ))}
+        )}
+        <CncToolOptions tools={flatTools} />
       </select>
     </Row>
   );
+}
+
+function unavailableClearToolLabel(toolId: string, tool: CncTool | undefined): string {
+  const prefix = 'Current unsupported clearing bit (choose a flat end mill)';
+  return tool === undefined
+    ? `${prefix} — missing ${toolId}`
+    : `${prefix} — ${cncToolGeometryLabel(tool)} — ${tool.name}`;
 }
 
 // The relief block for layers carrying relief objects: the honest-card
@@ -91,6 +115,11 @@ function ReliefFinishRow(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const tools = useCncTools();
+  const unavailableFinishToolId =
+    props.settings.reliefFinishToolId !== undefined &&
+    !tools.some((tool) => tool.id === props.settings.reliefFinishToolId)
+      ? props.settings.reliefFinishToolId
+      : null;
   return (
     <Row label="Finish with">
       <select
@@ -108,11 +137,12 @@ function ReliefFinishRow(props: {
         style={selectStyle}
       >
         <option value="">Roughing only</option>
-        {tools.map((tool) => (
-          <option key={tool.id} value={tool.id}>
-            {tool.name}
+        {unavailableFinishToolId === null ? null : (
+          <option value={unavailableFinishToolId} disabled>
+            Current missing finishing bit — {unavailableFinishToolId}
           </option>
-        ))}
+        )}
+        <CncToolOptions tools={tools} />
       </select>
       <ClearableNumberField
         min={0.005}

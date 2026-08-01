@@ -107,6 +107,56 @@ describe('FeedsCalculatorRow', () => {
     }
   });
 
+  it('starts from the active catalog bit flute count when no recipe exists', async () => {
+    install4040Cnc();
+    const onCommitSettings = vi.fn();
+    const { host, root } = await render(onCommitSettings);
+    try {
+      await act(async () => {
+        useStore.getState().addCustomCncTool({
+          name: '3.175 mm single O-flute',
+          kind: 'end-mill',
+          diameterMm: 3.175,
+          family: 'o-flute-upcut',
+          fluteCount: 1,
+          catalogId: 'o-upcut-0125',
+        });
+        const toolId = useStore.getState().cncLibrary.customTools[0]?.id;
+        if (toolId === undefined) throw new Error('Catalog tool missing');
+        useStore.getState().updateCncMachine({ toolId });
+      });
+      const fluteSelect = host.querySelector('select[aria-label="Bit flute count"]');
+      expect(fluteSelect).toHaveProperty('value', '1');
+      await apply(host);
+      expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({
+        feedSource: { kind: 'material-recipe', fluteCount: 1 },
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('preserves an explicit flute override across unrelated machine rerenders', async () => {
+    install4040Cnc();
+    const { host, root } = await render(vi.fn());
+    try {
+      const fluteSelect = host.querySelector('select[aria-label="Bit flute count"]');
+      if (!(fluteSelect instanceof HTMLSelectElement)) throw new Error('Flute select missing');
+      await act(async () => {
+        fluteSelect.value = '3';
+        fluteSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      expect(fluteSelect.value).toBe('3');
+
+      await act(async () => useStore.getState().updateCncMachine({ stock: { thicknessMm: 12 } }));
+      expect(fluteSelect.value).toBe('3');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('includes connected controller caps in the applied recipe', async () => {
     install4040Cnc();
     useStore.getState().setCncLiveCaps({
