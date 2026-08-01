@@ -65,6 +65,19 @@ describe('buildMotionManifest', () => {
     expect(manifest.firstProcessPoint).toEqual({ x: 5, y: 0, z: 0 });
   });
 
+  // The shape cnc-grbl-helical.ts emits for a helical entry: XY returns to the
+  // start while Z descends. It cuts material the whole way, so it is not the
+  // vertical plunge that endpoint displacement made it look like.
+  it('classifies a closed helical entry as process, not a plunge', () => {
+    const manifest = buildMotionManifest(
+      'G21\nG90\nM3 S12000\nG0 X15 Y10 Z0\nG3 X15 Y10 Z-1 I-5 J0 F300',
+      { machineKind: 'cnc' },
+    );
+    const helix = manifest.blocks.at(-1);
+    expect(helix?.kind).toBe('process');
+    expect(helix?.points.at(-1)).toEqual({ x: 15, y: 10, z: -1 });
+  });
+
   it('still calls a pure-Z move a plunge when no XY route is swept', () => {
     const manifest = buildMotionManifest('G21\nG90\nM3 S12000\nG0 X1 Y1 Z2\nG1 Z-1 F100', {
       machineKind: 'cnc',

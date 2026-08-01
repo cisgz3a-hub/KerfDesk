@@ -182,6 +182,33 @@ export const EXECUTABLE_PLAN_CORPUS: ReadonlyArray<ExecutablePlanCorpusCase> = [
     },
   },
   {
+    // G80 cancels a cycle without being one, so it emits no canned-cycle event and
+    // must still build. Pins that the refusal keys on the cycle word, not the mode.
+    name: 'a bare G80 cycle cancel is not a canned-cycle refusal',
+    machineKind: 'cnc',
+    controller: 'grbl-cnc',
+    gcode: [
+      'G21',
+      'G90',
+      'M3 S12000',
+      'G0 X1.000 Y1.000 Z5.000',
+      'G80',
+      'G1 Z-1.000 F100',
+      'G1 X5.000 Y1.000 F300',
+      'M5',
+      'G0 X0.000 Y0.000 Z5.000',
+      'M2',
+      '',
+    ].join('\n'),
+    expected: {
+      intents: ['travel', 'plunge', 'process', 'park'],
+      modes: ['rapid', 'linear', 'linear', 'rapid'],
+      finalPosition: { x: 0, y: 0, z: 5 },
+      lineEnding: 'lf',
+      programEnded: true,
+    },
+  },
+  {
     // Float32 storage has a ~1.2e-4 mm ULP out here, so a fixed absolute endpoint
     // budget would reject a single-ULP difference on a large-format bed.
     name: 'large-format coordinates survive the Float32 storage round trip',
