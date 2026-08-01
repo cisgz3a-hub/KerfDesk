@@ -33,7 +33,7 @@ export async function exportExecutionArtifact(args: {
   try {
     const target = await args.platform.pickFileForSave({
       suggestedName: suggestedArtifactName(archived.value.createdAtIso, args.runId),
-      extensions: ['.lfexecution.json'],
+      extensions: [EXECUTION_ARTIFACT_EXTENSION],
     });
     if (target === null) {
       return { ok: false, reason: 'cancelled', message: 'Execution export cancelled.' };
@@ -52,10 +52,15 @@ export async function exportExecutionArtifact(args: {
   }
 }
 
+/** Must stay within MAX_SAVE_EXTENSION_LENGTH: Chromium refuses to open the
+ * save picker at all for a longer extension, which made the earlier
+ * '.lfexecution.json' export unreachable in every browser. */
+export const EXECUTION_ARTIFACT_EXTENSION = '.lfexec.json';
+
 function suggestedArtifactName(createdAtIso: string, runId: RunId): string {
   const date = /^\d{4}-\d{2}-\d{2}/.exec(createdAtIso)?.[0] ?? 'undated';
   const safeRunId = runId.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'run';
-  return `kerfdesk-execution-${date}-${safeRunId}.lfexecution.json`;
+  return `kerfdesk-execution-${date}-${safeRunId}${EXECUTION_ARTIFACT_EXTENSION}`;
 }
 
 function errorMessage(error: unknown): string {

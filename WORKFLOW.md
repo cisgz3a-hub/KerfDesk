@@ -1139,7 +1139,7 @@ The Live Motion bar shows `completed / total` lines and a percentage beside the 
 #### Success — export backup
 1. After at least one setting row has been read, **Export backup** is enabled.
 2. User chooses a save target.
-3. App writes `.lfgrbl-settings.json` containing every visible row, including unknown settings.
+3. App writes `.lfgrbl.json` containing every visible row, including unknown settings.
 4. Exporting a backup sends no command to the controller.
 
 #### Error — disconnected

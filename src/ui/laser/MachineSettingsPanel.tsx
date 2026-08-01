@@ -46,13 +46,15 @@ export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX
   };
 
   const handleExport = (): void => {
-    void exportGrblSettingsBackup({ platform, rows }).then((result) => {
-      if (result.ok) {
-        pushToast(`Exported machine settings backup to ${result.displayName}`, 'success');
-        return;
-      }
-      if (result.reason !== 'cancelled') pushToast(result.message, 'error');
-    });
+    void exportGrblSettingsBackup({ platform, rows })
+      .then((result) => {
+        if (result.ok) {
+          pushToast(`Exported machine settings backup to ${result.displayName}`, 'success');
+          return;
+        }
+        if (result.reason !== 'cancelled') pushToast(result.message, 'error');
+      })
+      .catch((err: unknown) => pushToast(errMsg(err), 'error'));
   };
 
   return (

@@ -232,7 +232,7 @@ describe('MachineSettingsPanel', () => {
   it('exports visible settings through PlatformAdapter', async () => {
     let written = '';
     const target: SaveTarget = {
-      displayName: 'settings.lfgrbl-settings.json',
+      displayName: 'settings.lfgrbl.json',
       write: async (data) => {
         if (typeof data !== 'string') throw new Error('expected text backup');
         written = data;

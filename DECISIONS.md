@@ -5786,7 +5786,7 @@ from the live editor/controller state.
   conservative 64 MiB allocation-free estimate. A larger executable job continues
   without recovery/archive capture and shows the existing forensic-record warning
   instead of allocating an unbounded archive copy before Start.
-  The read-only Execution archive can export a retained exact artifact as `.lfexecution.json`; its versioned
+  The read-only Execution archive can export a retained exact artifact as `.lfexec.json`; its versioned
   tagged-binary envelope preserves typed arrays, hashes every encoded field, and
   never recompiles or overlays live editor/controller state.
 - Fresh Start stages the artifact before the first write, but does not replace an
