@@ -14788,3 +14788,67 @@ ring as no cut at all.
   guarantee this blend is measured against.
 - NOT verified: physical cutting; ramp-configured layers intentionally retain the pre-blend
   seam (documented above); the 3D viewer still shades path3d by endpoint span.
+
+## ADR-280 Amendment 3 - coverage floor and honest pass limits after the #584 revert (2026-08-02)
+
+**Date:** 2026-08-02
+**Status:** Accepted
+
+### Context
+
+PR #584 reverted the #581 re-land with a fail-closed blocker: a valid 1 degree V-bit at
+0.05 mm detail depth drives the Amendment 1 pitch law to 0.00087 mm rings — below clipper's
+0.001 mm grid — so the 8192-ring budget exhausted silently ~7.1 mm in, leaving an ~85.7 mm
+core unvisited with neither offsetFailed nor thinResidual raised. It also noted the 2 mm probe
+tolerated 14.24 % uncut in-shape cells and therefore could not distinguish full floor coverage
+from interior stripes. All four findings verified and answered here; this Amendment lands with
+the junction blend (Amendment 2). The decision also renumbered from ADR-279 to ADR-280: #578
+claimed ADR-279 for offline imposition while this decision was off main.
+
+### Findings and corrections
+
+1. **Coverage floor.** Ring pitch now floors at MIN_COVERAGE_PITCH_MM = 0.002 (two clipper
+   quanta, so successive insets stay distinct after rounding). A clamp footprint finer than
+   the floor cannot achieve full coverage on the emission grid at any ring count — that state
+   sets the new `passLimited` flag instead of silently capping.
+2. **Honest budgets.** `buildOffsetLadder` now reports `capped` when maxSteps exhausts with
+   the last step still producing contours — previously indistinguishable from a finished
+   region (the audit's silent-truncation trap, made UI-reachable by the pitch law). The
+   v-carve ladder folds coarse-capped, fine-capped, and floor-degraded into
+   `VCarveLadder.passLimited`, surfaced through the existing `pass-limit` Job Review advisory
+   (message generalized beyond rest machining; informs, never refuses — rule 7).
+3. **Pitch bound corrected to one footprint RADIUS.** The tightened probe exposed a second
+   coverage gap in Amendment 1's own law: ring-to-ring spacing grows to pitch·√2 across
+   mitered corners (up to 2× at the miter-limit bevel), so diameter-spaced rings leave seams
+   along diagonals (measured: 4 % interior stripes). Pitch is now
+   min(Detail, maxDepth·tan(θ/2)), one footprint radius, flooring as above.
+4. **Probe strengthened.** The #575 probe now separates the sub-footprint edge band (analytic
+   depth below clampDepth·tan(θ/2) + one cell — legitimately below any ring's reach) from the
+   interior, and requires ≥ 99 % interior coverage outright, which stripes fail. The clamp
+   bound (nothing deeper than requested) is unchanged. A 1 degree regression test pins
+   `passLimited` with all depths inside the clamp, and the advisory suite pins the layer-named
+   pass-limit warning for the same configuration.
+
+### Consequences
+
+- Depth-clamped floors get 2× the rings of the Amendment 1 law — the price of seam-free
+  coverage across mitered corners; unclamped carves are unchanged (their footprint radius
+  already exceeds the configured Detail).
+- Degenerate-but-valid configurations (ultra-narrow bits at shallow depths) now carve what
+  the grid can express and TELL the operator planning was pass-limited, rather than
+  pretending completeness.
+- The pass-limit advisory text now covers rest machining, v-carve budgets, and the coverage
+  floor with one layer-named message that names remedies.
+
+### Verification
+
+- `vcarve-ladder.test.ts`: the exact #584 configuration (1 degree bit, 0.05 mm depth) —
+  `passLimited` true, passes present, every depth within the clamp.
+- `offset-ladder.test.ts`: budget exhaustion with interior remaining reports `capped` without
+  `offsetFailed`.
+- `cnc-offset-ladder-warnings.test.ts`: the same configuration produces the layer-named
+  pass-limit advisory as a plain string (no refusal channel).
+- `vcarve-thin-perceptual.test.ts`: interior coverage ≥ 99 % on the #575 probe under the
+  radius-pitch law (95.95 % under the diameter law — the diagonal seams), clamp honoured.
+- NOT verified: physical cutting; ring-count growth on very large clamped floors is bounded
+  by the budgets and reported when hit, not eliminated.

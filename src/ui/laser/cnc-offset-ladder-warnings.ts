@@ -34,7 +34,7 @@ function ladderWarningFor(project: Project, diagnostic: CncOffsetLadderDiagnosti
   const layerName = layerNameFor(project, diagnostic.layerId);
   switch (diagnostic.kind) {
     case 'pass-limit':
-      return restPocketPassLimitWarning(layerName);
+      return passLimitWarning(layerName);
     case 'geometry-failed':
       return offsetLadderWarning(layerName);
     case 'thin-detail-dropped':
@@ -59,12 +59,16 @@ function offsetLadderWarning(layerName: string): string {
   );
 }
 
-function restPocketPassLimitWarning(layerName: string): string {
+// Covers every ladder that runs out of PLAN rather than interior: the
+// rest-machining ring budget, the v-carve ring budget, and a depth-clamp
+// footprint finer than the 0.001 mm emission grid (#584's 1° bit at 0.05 mm).
+function passLimitWarning(layerName: string): string {
   return (
-    `Rest machining on layer "${layerName}" reached its 4096-ring planning limit while usable ` +
-    'interior remained, so the finishing-bit pass is incomplete and can leave stock standing. ' +
-    'The generated passes still cut. Check the preview before running, and use a larger bit or ' +
-    'larger stepover, or simplify/split the pocket.'
+    `Toolpath planning on layer "${layerName}" hit its ring limits while usable interior ` +
+    'remained (the ring budget, or a ring pitch finer than the 0.001 mm G-code grid), so the ' +
+    'layer clears less material than the shape asks for. The generated passes still cut. ' +
+    'Check the preview before running; a wider-angle bit, more depth, a larger bit or a larger ' +
+    'detail/stepover reduces the ring count.'
   );
 }
 

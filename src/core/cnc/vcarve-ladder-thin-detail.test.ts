@@ -1,0 +1,212 @@
+import { describe, expect, it } from 'vitest';
+import fc from 'fast-check';
+import type { CncTool, Polyline } from '../scene';
+import { vcarveLadderPasses, vcarvePasses } from './vcarve-ladder';
+
+// ADR-280: strokes narrower than 2·δ used to vanish from the carve entirely —
+// the first coarse inset already consumed them, so a thin script stroke
+// contributed no rings while the rest of the glyph cut. The thin-detail stage
+// must carve them with a fine-pitch ladder instead of dropping them. Split
+// from vcarve-ladder.test.ts at the 400-line cap; the δ-ladder invariants
+// stay there.
+
+const VBIT_90: CncTool = {
+  id: 'v90',
+  name: '90° v-bit',
+  kind: 'v-bit',
+  diameterMm: 6,
+  tipAngleDeg: 90,
+};
+
+function square(at: number, size: number): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: at, y: at },
+      { x: at + size, y: at },
+      { x: at + size, y: at + size },
+      { x: at, y: at + size },
+    ],
+  };
+}
+
+function band(widthMm: number, lengthMm: number, atX = 0): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: atX, y: 0 },
+      { x: atX + lengthMm, y: 0 },
+      { x: atX + lengthMm, y: widthMm },
+      { x: atX, y: widthMm },
+    ],
+  };
+}
+
+// δ rings stay constant-Z contours; detail rings are path3d since the
+// junction blend (ADR-280 Amendment 2) — helpers read both.
+function passXy(
+  pass: ReturnType<typeof vcarvePasses>[number],
+): ReadonlyArray<{ readonly x: number; readonly y: number }> {
+  if (pass.kind === 'contour') return pass.polyline;
+  if (pass.kind === 'path3d') return pass.points;
+  return [];
+}
+
+function passDepths(passes: ReturnType<typeof vcarvePasses>): number[] {
+  return passes.map((pass) => {
+    if (pass.kind === 'contour') return pass.zMm;
+    if (pass.kind === 'path3d') return Math.min(...pass.points.map((point) => point.z));
+    return Number.NaN;
+  });
+}
+
+function regionOrder(passes: ReturnType<typeof vcarvePasses>): string {
+  return passes
+    .map((pass) => {
+      const xy = passXy(pass);
+      if (xy.length === 0) return '?';
+      return Math.max(...xy.map((point) => point.x)) < 10 ? 'L' : 'R';
+    })
+    .join('');
+}
+
+describe('vcarvePasses — thin detail (ADR-280)', () => {
+  it('carves a stroke narrower than 2·δ instead of dropping it (the script-font bug)', () => {
+    // 0.5 mm × 10 mm band, δ = 0.5: the first coarse inset exceeds the
+    // 0.25 mm half-width, so the ring ladder alone yields nothing.
+    const passes = vcarvePasses([band(0.5, 10)], {
+      tool: VBIT_90,
+      maxDepthMm: 2,
+      depthPerPassMm: 2,
+      resolutionMm: 0.5,
+    });
+    expect(passes.length).toBeGreaterThan(0);
+    const depths = passDepths(passes);
+    // Depth law: detail rings walk toward the band's centerline; the deepest
+    // must approach half-width/tan(45°) = 0.25 without ever exceeding it.
+    expect(Math.min(...depths)).toBeLessThanOrEqual(-0.15);
+    expect(Math.min(...depths)).toBeGreaterThanOrEqual(-0.25 - 1e-9);
+    for (const pass of passes) {
+      for (const p of passXy(pass)) {
+        expect(p.x).toBeGreaterThanOrEqual(-1e-6);
+        expect(p.x).toBeLessThanOrEqual(10 + 1e-6);
+        expect(p.y).toBeGreaterThanOrEqual(-1e-6);
+        expect(p.y).toBeLessThanOrEqual(0.5 + 1e-6);
+      }
+    }
+  });
+
+  it('detail passes respect the maxDepth clamp', () => {
+    const passes = vcarvePasses([band(0.5, 10)], {
+      tool: VBIT_90,
+      maxDepthMm: 0.1,
+      depthPerPassMm: 0.1,
+      resolutionMm: 0.5,
+    });
+    expect(passes.length).toBeGreaterThan(0);
+    for (const z of passDepths(passes)) {
+      expect(z).toBeGreaterThanOrEqual(-0.1 - 1e-9);
+      expect(z).toBeLessThan(0);
+    }
+  });
+
+  it('still finishes each region — ladder and detail — before travelling on', () => {
+    // Thick left square gets coarse rings; thin right band gets only detail
+    // rings; the region-major promise must hold across both kinds (ADR-270).
+    const passes = vcarvePasses([square(0, 6), band(0.5, 10, 20)], {
+      tool: VBIT_90,
+      maxDepthMm: 3,
+      depthPerPassMm: 3,
+      resolutionMm: 0.5,
+    });
+    expect(regionOrder(passes)).toMatch(/^L+R+$/);
+  });
+
+  it('finishes one sliver before travelling to the next within a region', () => {
+    // One source region: a thick square with TWO thin fingers off its right
+    // edge. Both fingers vanish from the δ ladder as separate slivers. Detail
+    // passes must complete finger A (all its fine steps) before travelling to
+    // finger B — not hop between fingers step by step.
+    const glyph: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 6, y: 0 },
+        { x: 6, y: 0.5 },
+        { x: 12, y: 0.5 },
+        { x: 12, y: 1 },
+        { x: 6, y: 1 },
+        { x: 6, y: 5 },
+        { x: 12, y: 5 },
+        { x: 12, y: 5.5 },
+        { x: 6, y: 5.5 },
+        { x: 6, y: 6 },
+        { x: 0, y: 6 },
+      ],
+    };
+    const passes = vcarvePasses([glyph], {
+      tool: VBIT_90,
+      maxDepthMm: 2,
+      depthPerPassMm: 2,
+      resolutionMm: 0.5,
+    });
+    const fingerOrder = passes
+      .flatMap((pass) => {
+        const xy = passXy(pass);
+        if (xy.length === 0) return [];
+        // Coverage of the square's δ ladder ends at its right edge (x = 6),
+        // so finger detail rings live entirely at x > 6.
+        const inFinger = xy.every((point) => point.x >= 6.01);
+        if (!inFinger) return [];
+        const maxY = Math.max(...xy.map((point) => point.y));
+        return [maxY <= 1.2 ? 'A' : 'B'];
+      })
+      .join('');
+    expect(fingerOrder.length).toBeGreaterThan(4);
+    expect(fingerOrder).toMatch(/^(A+B+|B+A+)$/);
+  });
+
+  it('flags pass-limited planning for a 1° bit at 0.05 mm depth (#584)', () => {
+    // The clamp footprint wants 0.05·tan(0.5°) ≈ 0.00044 mm rings — below
+    // the 0.001 mm emission grid. The pitch floors at 0.002 mm, the clamp is
+    // honoured, and planning reports pass-limited instead of silently capping.
+    const narrow: CncTool = {
+      id: 'v1',
+      name: '1° engraver',
+      kind: 'v-bit',
+      diameterMm: 6,
+      tipAngleDeg: 1,
+    };
+    const ladder = vcarveLadderPasses([square(0, 2)], {
+      tool: narrow,
+      maxDepthMm: 0.05,
+      depthPerPassMm: 0.05,
+      resolutionMm: 0.5,
+    });
+    expect(ladder.passLimited).toBe(true);
+    expect(ladder.passes.length).toBeGreaterThan(0);
+    for (const z of passDepths(ladder.passes)) {
+      expect(z).toBeGreaterThanOrEqual(-0.05 - 1e-9);
+      expect(z).toBeLessThan(0);
+    }
+  });
+
+  it('property: detail passes never cut deeper than the band half-width (100 seeds)', () => {
+    // A 90° bit's groove over a band of width w is w/2 deep at the centerline;
+    // cutting deeper than the artwork asks for would gouge the workpiece.
+    const width = fc.double({ min: 0.15, max: 0.95, noNaN: true });
+    fc.assert(
+      fc.property(width, (w) => {
+        const options = { tool: VBIT_90, maxDepthMm: 5, depthPerPassMm: 5, resolutionMm: 1 };
+        const a = vcarvePasses([band(w, 8)], options);
+        const b = vcarvePasses([band(w, 8)], options);
+        expect(a).toEqual(b);
+        for (const z of passDepths(a)) {
+          expect(z).toBeGreaterThanOrEqual(-(w / 2) - 1e-9);
+          expect(z).toBeLessThan(0);
+        }
+      }),
+      { numRuns: 100 },
+    );
+  });
+});

@@ -86,6 +86,9 @@ export function findCncOffsetLadderDiagnostics(
     if (vectorKinds.includes('thin-detail-dropped')) {
       diagnostics.push({ layerId: layer.id, kind: 'thin-detail-dropped' });
     }
+    if (vectorKinds.includes('pass-limit')) {
+      diagnostics.push({ layerId: layer.id, kind: 'pass-limit' });
+    }
   }
   return diagnostics;
 }
@@ -170,6 +173,9 @@ function vcarveLadderKinds(
   // Artwork finer than even the detail pitch (ADR-280) stays uncut — worth a
   // Job Review note on lettering jobs, and never a refusal (rule 7).
   if (ladder.thinResidual) kinds.push('thin-detail-dropped');
+  // Ring budget or coverage-floor pitch exhausted at valid settings (#584):
+  // interior remains unvisited; advisory only, same rule.
+  if (ladder.passLimited) kinds.push('pass-limit');
   return kinds;
 }
 

@@ -265,8 +265,15 @@ describe('v-carve thin artwork — perceptual (ADR-280)', () => {
         kernelForTool(VBIT_90, cell),
       ),
     );
-    let insideCells = 0;
-    let cutInside = 0;
+    // #584's critique of the first probe: an in-shape percentage cannot
+    // separate "full floor coverage" from "interior stripes remain", because
+    // the near-edge band (analytic depth below one clamp footprint radius,
+    // clampDepth·tan(45°) = 0.05 mm, plus a cell of discretization) is
+    // legitimately below the ring pitch's reach. Count that band separately
+    // and require the INTERIOR to be covered outright.
+    const edgeBandMm = clampDepth + cell;
+    let interiorCells = 0;
+    let interiorCut = 0;
     let deepestCut = 0;
     for (let cy = 0; cy < grid.heightCells; cy += 1) {
       for (let cx = 0; cx < grid.widthCells; cx += 1) {
@@ -274,14 +281,17 @@ describe('v-carve thin artwork — perceptual (ADR-280)', () => {
         const y = grid.originY + (cy + 0.5) * grid.mmPerCell;
         if (x < minX || x > maxX || y < minY || y > maxY) continue;
         const cellDepth = grid.depth[cy * grid.widthCells + cx] ?? 0;
-        insideCells += 1;
-        if (cellDepth < 0) cutInside += 1;
         deepestCut = Math.min(deepestCut, cellDepth);
+        const edgeDist = Math.min(x - minX, maxX - x, y - minY, maxY - y);
+        if (edgeDist < edgeBandMm) continue;
+        interiorCells += 1;
+        if (cellDepth < 0) interiorCut += 1;
       }
     }
-    expect(insideCells).toBeGreaterThan(0);
-    // #575 measured 10.67 % here; overlapping footprints must cover the floor.
-    expect(cutInside / insideCells).toBeGreaterThanOrEqual(0.85);
+    expect(interiorCells).toBeGreaterThan(0);
+    // #575 measured ~11 % total coverage here; the interior must now be cut
+    // essentially everywhere — stripes would fail this outright.
+    expect(interiorCut / interiorCells).toBeGreaterThanOrEqual(0.99);
     // The clamp is still honoured — nothing cuts deeper than requested.
     expect(deepestCut).toBeGreaterThanOrEqual(-clampDepth - 1e-9);
     // Removal-grid computation over a contended CI worker pool can exceed the

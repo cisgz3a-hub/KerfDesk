@@ -54,6 +54,9 @@ import {
 
 const MIN_CLOSED_POINTS = 3;
 const MIN_RESOLUTION_MM = 0.1;
+// Two clipper quanta (OFFSET_PRECISION_DECIMALS = 3 → 0.001 mm grid): the
+// finest ring pitch whose successive insets stay distinct after rounding.
+const MIN_COVERAGE_PITCH_MM = 0.002;
 const AUTO_RESOLUTION_TOOL_FRACTION = 8;
 // Backstop against degenerate inputs (huge region + microscopic δ).
 const MAX_VCARVE_RINGS = 8192;
@@ -81,6 +84,12 @@ export type VCarveLadder = {
   // carve (< 2 × THIN_DETAIL_RESOLUTION_MM wide): that material stays uncut.
   // Also Job Review material, never a refusal (rule 7).
   readonly thinResidual: boolean;
+  // True when planning could not visit all interior at valid settings: a
+  // ladder hit its ring budget, or the depth-clamp footprint demands a pitch
+  // finer than the coverage floor (a 1° bit at 0.05 mm depth needs
+  // 0.00087 mm rings — below the 0.001 mm emission grid, #584). Reported as
+  // the pass-limit advisory, never a refusal (rule 7).
+  readonly passLimited: boolean;
 };
 
 type VCarveRing = {
@@ -135,9 +144,23 @@ export function vcarveLadderPasses(
   // max depth). The configured Detail is a MAXIMUM spacing; the clamp physics
   // may demand finer. Same law at the fine pitch. Ring counts stay bounded by
   // MAX_VCARVE_RINGS / MAX_THIN_DETAIL_RINGS as before.
-  const footprintPitchMm = 2 * maxDepth * tanHalf;
-  const delta = Math.min(requestedDeltaMm, footprintPitchMm);
-  const finePitchMm = Math.min(THIN_DETAIL_RESOLUTION_MM, footprintPitchMm);
+  // One clamp-footprint RADIUS, not diameter: ring-to-ring spacing grows to
+  // pitch·√2 across mitered corners (up to 2× at the miter-limit bevel), so
+  // rings spaced a full diameter apart leave uncut seams along diagonals —
+  // the probe measured 4 % interior stripes at 2·r spacing. r spacing keeps
+  // adjacent footprints overlapping in every offset direction.
+  const footprintPitchMm = maxDepth * tanHalf;
+  // Coverage floor (#584): successive insets must stay distinct on clipper's
+  // 1 µm grid, so the pitch never drops below two quanta. A footprint finer
+  // than the floor (a 1° bit at 0.05 mm depth: 0.00087 mm) cannot achieve
+  // full floor coverage on the emission grid at any ring count — planning is
+  // pass-limited and Job Review says so instead of silently capping.
+  const delta = Math.max(Math.min(requestedDeltaMm, footprintPitchMm), MIN_COVERAGE_PITCH_MM);
+  const finePitchMm = Math.max(
+    Math.min(THIN_DETAIL_RESOLUTION_MM, footprintPitchMm),
+    MIN_COVERAGE_PITCH_MM,
+  );
+  const pitchDegraded = footprintPitchMm < MIN_COVERAGE_PITCH_MM;
 
   // Ring k (1-based in the depth law above) is ladder step k - 1.
   const ladder = buildOffsetLadder(contours, MAX_VCARVE_RINGS, (step) => (step + 1) * delta);
@@ -161,6 +184,7 @@ export function vcarveLadderPasses(
     ...entry,
     offsetFailed: ladder.offsetFailed || detail.offsetFailed,
     thinResidual: detail.residualThin,
+    passLimited: pitchDegraded || ladder.capped || detail.capped,
   };
 }
 
@@ -169,11 +193,13 @@ const NO_LADDER: VCarveLadder = {
   offsetFailed: false,
   entryIssue: null,
   thinResidual: false,
+  passLimited: false,
 };
 const NO_DETAIL = {
   rings: [],
   offsetFailed: false,
   residualThin: false,
+  capped: false,
   sliverRoots: [],
 } as const;
 

@@ -194,8 +194,47 @@ describe('detectCncOffsetLadderWarnings', () => {
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain(LAYER_NAME);
-    expect(warnings[0]).toContain('4096-ring planning limit');
+    expect(warnings[0]).toContain('ring limits');
     expect(warnings[0]).toContain('still cut');
+  });
+
+  it('notes a v-carve whose clamp footprint is finer than the coverage floor (#584)', () => {
+    // A valid 1° V-bit at 0.05 mm depth wants 0.00087 mm rings — below the
+    // 0.001 mm emission grid. Planning is pass-limited and must SAY so
+    // instead of silently capping; still advisory only (rule 7).
+    restOperation.mockReturnValue({ kind: 'not-requested' });
+    offsetChecked.mockReset();
+    offsetChecked.mockReturnValue({ kind: 'ok', value: [] });
+    const narrow: CncTool = {
+      id: 'v1',
+      name: '1° engraver',
+      kind: 'v-bit',
+      diameterMm: 6,
+      tipAngleDeg: 1,
+    };
+    const base = pocketProject();
+    const project: Project = {
+      ...base,
+      machine: { ...DEFAULT_CNC_MACHINE_CONFIG, tools: [narrow], toolId: narrow.id },
+      scene: {
+        ...base.scene,
+        layers: base.scene.layers.map((layer) => ({
+          ...layer,
+          cnc: {
+            ...DEFAULT_CNC_LAYER_SETTINGS,
+            cutType: 'v-carve' as const,
+            depthMm: 0.05,
+            depthPerPassMm: 0.05,
+          },
+        })),
+      },
+    };
+
+    const warnings = detectCncOffsetLadderWarnings(project);
+
+    expect(warnings.some((warning) => warning.includes('ring limits'))).toBe(true);
+    expect(warnings.some((warning) => warning.includes(LAYER_NAME))).toBe(true);
+    for (const warning of warnings) expect(typeof warning).toBe('string');
   });
 
   it('notes v-carve artwork finer than the detail pitch — advisory, layer-named (ADR-280)', () => {

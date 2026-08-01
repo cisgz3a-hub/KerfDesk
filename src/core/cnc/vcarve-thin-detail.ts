@@ -53,6 +53,9 @@ export type ThinDetailRings = {
   // True when a visible sliver was too thin even for the fine pitch — that
   // material stays uncut and Job Review should say so (advisory only).
   readonly residualThin: boolean;
+  // True when the fine ladder hit its ring budget with interior remaining —
+  // reported as a pass-limit advisory, never a refusal (rule 7, #584).
+  readonly capped: boolean;
   // Filled roots of the uncovered slivers, in engine order — the grouping key
   // for sliver-major emission (vcarve-detail-order.ts).
   readonly sliverRoots: ReadonlyArray<Polyline>;
@@ -73,10 +76,10 @@ export function vcarveThinDetailRings(
 ): ThinDetailRings {
   const uncovered = uncoveredByFirstRing(sourceContours, firstRing, coarseInsetMm);
   if (uncovered.kind === 'error') {
-    return { rings: [], offsetFailed: true, residualThin: false, sliverRoots: [] };
+    return { rings: [], offsetFailed: true, residualThin: false, capped: false, sliverRoots: [] };
   }
   if (uncovered.value.length === 0) {
-    return { rings: [], offsetFailed: false, residualThin: false, sliverRoots: [] };
+    return { rings: [], offsetFailed: false, residualThin: false, capped: false, sliverRoots: [] };
   }
   const fine = buildOffsetLadder(
     uncovered.value,
@@ -87,6 +90,7 @@ export function vcarveThinDetailRings(
     rings: fine.rings,
     offsetFailed: fine.offsetFailed,
     residualThin: hasResidualThin(uncovered.value, fine.rings[0] ?? [], finePitchMm),
+    capped: fine.capped,
     sliverRoots: sliverRoots(uncovered.value),
   };
 }
