@@ -19,4 +19,5 @@ export {
   type CornerSetback,
 } from './corner-geometry';
 export { filletPathCorner, type FilletResult } from './fillet-corner';
+export { scaleEntities, scaleEntity } from './scale-entities';
 export { translateEntities, translateEntity } from './translate-entities';

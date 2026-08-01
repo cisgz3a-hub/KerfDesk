@@ -4,6 +4,7 @@
 // project undo. The one crossing point is Apply.
 
 import { EMPTY_SKETCH, type Sketch } from '../../core/design';
+import type { ResizeHandle } from './design-handles';
 import { DEFAULT_DESIGN_LAYER_ID, sketchLayers } from '../../core/design/layers';
 import type { Vec2 } from '../../core/scene';
 import {
@@ -37,6 +38,15 @@ export type DesignMarquee = {
   readonly pointerMm: Vec2;
 };
 
+// A live resize. `beforeSketch` is the state to undo back to, so the whole
+// gesture collapses into one history step on release — the same shape the move
+// gesture uses.
+export type DesignResizeDrag = {
+  readonly handle: ResizeHandle;
+  readonly beforeSketch: Sketch;
+  readonly ids: ReadonlySet<string>;
+};
+
 export type DesignSession = {
   readonly history: DesignHistory;
   readonly tool: DesignToolKind;
@@ -51,6 +61,8 @@ export type DesignSession = {
   // A live move gesture. `beforeSketch` is the state to undo back to, so the whole
   // drag collapses into one history step on release.
   readonly move: DesignMoveDrag | null;
+  // A live resize gesture, started on one of the selection's corner grips.
+  readonly resize: DesignResizeDrag | null;
   // Which inspector field is being touched right now, so the canvas can call out
   // exactly the distance that field controls. Cleared on blur — the annotation is
   // a transient explanation, not a persistent overlay.
@@ -93,6 +105,7 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     draft: null,
     marquee: null,
     move: null,
+    resize: null,
     activeMeasurement: null,
     activeSnap: null,
     snapEnabled: true,
