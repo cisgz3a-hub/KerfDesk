@@ -27,8 +27,10 @@ import {
   type Vec2,
 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
+import { buildExecutablePlanSidecar } from '../../io/gcode/executable-plan-emission';
 import type { MachineStartSnapshot } from '../laser/start-job-readiness';
 import { cncPassRouteSpans, type CncPassRouteSpan } from './canvas-pass-progress';
+import { registerCanvasExecutablePlan } from './canvas-preview-motion';
 import type { LiveJobTiming } from './live-job-timing';
 
 export type CanvasPlanCapability = 'realtime' | 'settle-only' | 'file-only' | 'unavailable';
@@ -120,7 +122,12 @@ export function buildCanvasMotionPlan(
     machineKind,
     ...(initial === null ? {} : { initialPosition: initial }),
   });
-  return assembleCanvasPlan(args, manifest, manifest.firstProcessPoint, initial, args.gcode);
+  const plan = assembleCanvasPlan(args, manifest, manifest.firstProcessPoint, initial, args.gcode);
+  if (plan.capability === 'realtime' || plan.capability === 'settle-only') {
+    const sidecar = buildExecutablePlanSidecar(args.gcode, args.prepared.project);
+    if (sidecar.kind === 'ok') registerCanvasExecutablePlan(plan, sidecar.plan);
+  }
+  return plan;
 }
 
 export function buildCanvasMarkerPlan(args: CanvasPlanBuildContext): CanvasMotionPlan {
