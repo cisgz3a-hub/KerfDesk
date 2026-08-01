@@ -53,6 +53,9 @@ export type ThinDetailRings = {
   // True when a visible sliver was too thin even for the fine pitch — that
   // material stays uncut and Job Review should say so (advisory only).
   readonly residualThin: boolean;
+  // Filled roots of the uncovered slivers, in engine order — the grouping key
+  // for sliver-major emission (vcarve-detail-order.ts).
+  readonly sliverRoots: ReadonlyArray<Polyline>;
 };
 
 /**
@@ -66,19 +69,23 @@ export function vcarveThinDetailRings(
   coarseInsetMm: number,
 ): ThinDetailRings {
   const uncovered = uncoveredByFirstRing(sourceContours, firstRing, coarseInsetMm);
-  if (uncovered.kind === 'error') return { rings: [], offsetFailed: true, residualThin: false };
+  if (uncovered.kind === 'error') {
+    return { rings: [], offsetFailed: true, residualThin: false, sliverRoots: [] };
+  }
   if (uncovered.value.length === 0) {
-    return { rings: [], offsetFailed: false, residualThin: false };
+    return { rings: [], offsetFailed: false, residualThin: false, sliverRoots: [] };
   }
   const fine = buildOffsetLadder(
     uncovered.value,
     MAX_THIN_DETAIL_RINGS,
     (step) => (step + 1) * THIN_DETAIL_RESOLUTION_MM,
   );
+  const roots = sliverRoots(uncovered.value);
   return {
     rings: fine.rings,
     offsetFailed: fine.offsetFailed,
-    residualThin: hasUnrescuedSliver(uncovered.value, fine.rings),
+    residualThin: hasUnrescuedSliver(roots, fine.rings),
+    sliverRoots: roots,
   };
 }
 
@@ -98,19 +105,22 @@ function uncoveredByFirstRing(
   return differenceClosedPolylinesChecked(sourceContours, covered.value);
 }
 
-// A sliver root (even-odd filled loop) that no fine ring landed inside is
-// artwork below the fine pitch: it stays uncut.
+// A visible sliver root (area floor applied) that no fine ring landed inside
+// is artwork below the fine pitch: it stays uncut.
 function hasUnrescuedSliver(
-  slivers: ReadonlyArray<Polyline>,
+  roots: ReadonlyArray<Polyline>,
   rings: ReadonlyArray<ReadonlyArray<Polyline>>,
 ): boolean {
   const ringLoops = rings.flat();
-  return sliverRoots(slivers).some((root) => !hasRingInside(ringLoops, root));
+  return roots
+    .filter((root) => Math.abs(signedAreaMm2(root.points)) >= MIN_RESIDUAL_AREA_MM2)
+    .some((root) => !hasRingInside(ringLoops, root));
 }
 
+// Every even-odd filled root of the uncovered slivers, engine order, no area
+// floor — tiny corner wedges still own their rings for ordering purposes.
 function sliverRoots(slivers: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> {
   return slivers.filter((candidate, index) => {
-    if (Math.abs(signedAreaMm2(candidate.points)) < MIN_RESIDUAL_AREA_MM2) return false;
     const probe = candidate.points[0];
     if (probe === undefined) return false;
     const containmentDepth = slivers.reduce((count, other, otherIndex) => {
