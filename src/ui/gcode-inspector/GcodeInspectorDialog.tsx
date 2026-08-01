@@ -48,7 +48,11 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
           <>
             {state.mainThreadFallback ? <MainThreadInspectionNotice /> : null}
             <InspectionPressureNotice result={state.result} />
-            <InspectorView model={state.result.parsed.model} lines={state.result.lines} />
+            <InspectorView
+              model={state.result.parsed.model}
+              source={state.source}
+              sourceIndex={state.result.sourceIndex}
+            />
           </>
         ) : (
           <p style={messageStyle}>{state.result.parsed.reason}</p>
