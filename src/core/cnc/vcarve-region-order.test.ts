@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Polyline } from '../scene';
-import { vcarveRegionBuckets, vcarveRegionOrder } from './vcarve-region-order';
+import { vcarveRegionOrder } from './vcarve-region-order';
 
 function square(minX: number, minY: number, size: number): Polyline {
   return {
@@ -118,49 +118,5 @@ describe('vcarveRegionOrder', () => {
       { step: 1, polyline: secondOuter },
       { step: 1, polyline: secondHole },
     ]);
-  });
-});
-
-// ADR-279: the ladder zips δ-ring buckets with thin-detail buckets by index,
-// so bucket layout must depend only on the source contours.
-describe('vcarveRegionBuckets', () => {
-  it('returns no buckets for an empty ring set', () => {
-    expect(vcarveRegionBuckets([square(0, 0, 8)], [])).toEqual([]);
-  });
-
-  it('single region: one bucket in raw ladder order', () => {
-    const ring0 = square(1, 1, 6);
-    const ring1 = square(2, 2, 4);
-    expect(vcarveRegionBuckets([square(0, 0, 8)], [[ring0], [ring1]])).toEqual([
-      [
-        { step: 0, polyline: ring0 },
-        { step: 1, polyline: ring1 },
-      ],
-    ]);
-  });
-
-  it('two ring sets bucketed against the same sources align by region index', () => {
-    const left = square(0, 0, 8);
-    const right = square(20, 0, 8);
-    const leftRing = square(1, 1, 6);
-    const rightRing = square(21, 1, 6);
-    const rightDetail = square(22, 2, 4);
-
-    const coarse = vcarveRegionBuckets([left, right], [[rightRing, leftRing]]);
-    const detail = vcarveRegionBuckets([left, right], [[rightDetail]]);
-
-    // Buckets: [left, right, unassigned] in both calls.
-    expect(coarse).toEqual([
-      [{ step: 0, polyline: leftRing }],
-      [{ step: 0, polyline: rightRing }],
-      [],
-    ]);
-    expect(detail).toEqual([[], [{ step: 0, polyline: rightDetail }], []]);
-  });
-
-  it('flattening the buckets reproduces vcarveRegionOrder exactly', () => {
-    const source = [square(0, 0, 8), square(20, 0, 8)];
-    const rings = [[square(21, 1, 6), square(1, 1, 6)], [square(2, 2, 4)]];
-    expect(vcarveRegionBuckets(source, rings).flat()).toEqual(vcarveRegionOrder(source, rings));
   });
 });
