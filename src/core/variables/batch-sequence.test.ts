@@ -1,52 +1,49 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_PROJECT_VARIABLE_DATA,
-  type ArrayPlacement,
-  type ProjectVariableData,
-} from '../scene';
+import { DEFAULT_PROJECT_VARIABLE_DATA, type ProjectVariableData } from '../scene';
 import { planVariableBatchSequence } from './batch-sequence';
 
 describe('planVariableBatchSequence', () => {
-  it('binds each ordered placement to the current sequence value before advancing', () => {
-    const placements = [placement(0), placement(10), placement(20)];
+  it('binds each ordered slot to the current sequence value before advancing', () => {
     const variables = productionData();
 
-    const plan = planVariableBatchSequence(variables, placements);
+    const plan = planVariableBatchSequence(variables, ['first', 'second', 'third']);
 
     expect(plan.slots).toEqual([
-      { slotIndex: 0, placement: placements[0], recordIndex: 2, serialValue: 11 },
-      { slotIndex: 1, placement: placements[1], recordIndex: 1, serialValue: 13 },
-      { slotIndex: 2, placement: placements[2], recordIndex: 3, serialValue: 11 },
+      { slotIndex: 0, recordIndex: 2, serialValue: 11 },
+      { slotIndex: 1, recordIndex: 1, serialValue: 13 },
+      { slotIndex: 2, recordIndex: 3, serialValue: 11 },
     ]);
     expect(plan.nextVariables).toMatchObject({ recordIndex: 2, serialValue: 13 });
   });
 
-  it('preserves circular placement details and input identity without mutation', () => {
-    const pivot = Object.freeze({ x: 42, y: 24 });
-    const placements = Object.freeze([
-      Object.freeze({ dx: 3, dy: 4, rotationDeg: 90, pivot }),
-      Object.freeze({ dx: -3, dy: -4, rotationDeg: 270, pivot }),
-    ] satisfies ReadonlyArray<ArrayPlacement>);
+  it('is deterministic and does not retain or inspect seed geometry', () => {
+    const staleGeometry = Object.freeze([
+      Object.freeze({ dx: 3, dy: 4, rotationDeg: 90 }),
+      Object.freeze({ dx: -3, dy: -4, rotationDeg: 270 }),
+    ]);
+    const replacementGeometry = Object.freeze([
+      Object.freeze({ dx: 300, dy: 400 }),
+      Object.freeze({ dx: -300, dy: -400 }),
+    ]);
     const variables = Object.freeze(productionData());
 
-    const first = planVariableBatchSequence(variables, placements);
-    const second = planVariableBatchSequence(variables, placements);
+    const first = planVariableBatchSequence(variables, staleGeometry);
+    const second = planVariableBatchSequence(variables, replacementGeometry);
 
     expect(first).toEqual(second);
-    expect(first.slots[0]?.placement).toBe(placements[0]);
-    expect(first.slots[1]?.placement).toBe(placements[1]);
+    expect(first.slots.every((slot) => !('placement' in slot))).toBe(true);
+    expect(staleGeometry[0]?.dx).toBe(3);
     expect(variables).toEqual(productionData());
   });
 
-  it('adds no placement cap or rewrite', () => {
-    const placements = Array.from({ length: 501 }, (_, index) => placement(index));
+  it('adds no second slot cap or rewrite', () => {
+    const slotSeeds = Array.from({ length: 501 }, (_, index) => index);
 
-    const plan = planVariableBatchSequence(DEFAULT_PROJECT_VARIABLE_DATA, placements);
+    const plan = planVariableBatchSequence(DEFAULT_PROJECT_VARIABLE_DATA, slotSeeds);
 
     expect(plan.slots).toHaveLength(501);
     expect(plan.slots[500]).toEqual({
       slotIndex: 500,
-      placement: placements[500],
       recordIndex: 0,
       serialValue: 501,
     });
@@ -60,7 +57,7 @@ describe('planVariableBatchSequence', () => {
       serialValue: Number.MAX_SAFE_INTEGER,
     };
 
-    const plan = planVariableBatchSequence(variables, [placement(0), placement(1)]);
+    const plan = planVariableBatchSequence(variables, [undefined, undefined]);
 
     expect(
       plan.slots.map(({ recordIndex, serialValue }) => ({ recordIndex, serialValue })),
@@ -74,7 +71,7 @@ describe('planVariableBatchSequence', () => {
     });
   });
 
-  it('returns an unchanged cursor for an empty supplied placement list', () => {
+  it('returns an unchanged cursor for an empty supplied slot list', () => {
     const variables = productionData();
 
     const plan = planVariableBatchSequence(variables, []);
@@ -102,8 +99,4 @@ function productionData(): ProjectVariableData {
       advanceBy: 2,
     },
   };
-}
-
-function placement(dx: number): ArrayPlacement {
-  return { dx, dy: dx / 2, rotationDeg: dx };
 }

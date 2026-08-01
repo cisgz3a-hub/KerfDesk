@@ -1,9 +1,8 @@
-import type { ArrayPlacement, ProjectVariableData } from '../scene';
+import type { ProjectVariableData } from '../scene';
 import { advanceVariableSequence } from './sequence';
 
 export type VariableBatchSlot = {
   readonly slotIndex: number;
-  readonly placement: ArrayPlacement;
   readonly recordIndex: number;
   readonly serialValue: number;
 };
@@ -13,23 +12,26 @@ export type VariableBatchPlan = {
   readonly nextVariables: ProjectVariableData;
 };
 
+/**
+ * Plans variable contexts for an already-ordered, already-bounded slot list.
+ * Seed values intentionally contribute only order and cardinality; they are
+ * neither inspected nor retained, so final placement geometry can be derived
+ * after every variable value has been rendered and measured.
+ */
 export function planVariableBatchSequence(
   variables: ProjectVariableData,
-  placements: ReadonlyArray<ArrayPlacement>,
+  slotSeeds: ReadonlyArray<unknown>,
 ): VariableBatchPlan {
   const slots: VariableBatchSlot[] = [];
   let nextVariables = variables;
-  let slotIndex = 0;
 
-  for (const placement of placements) {
+  for (let slotIndex = 0; slotIndex < slotSeeds.length; slotIndex += 1) {
     slots.push({
       slotIndex,
-      placement,
       recordIndex: nextVariables.recordIndex,
       serialValue: nextVariables.serialValue,
     });
     nextVariables = advanceVariableSequence(nextVariables, 'next');
-    slotIndex += 1;
   }
 
   return { slots, nextVariables };
