@@ -1026,3 +1026,75 @@ remains pending.
 - Native material-library JSON remains whole-text. Save, autosave, recovery, PNG/lifecycle, Trace,
   Image Editor, hardware, controller, firmware, settings, Frame, Start, deployment, and merge are
   outside this one-fix repair.
+
+## Corrective audit 9 - incremental production native material-library JSON source
+
+**Status:** fixed, exact-tree release-verified, and independently audit-approved on the stacked
+native-JSON branch; dependent draft publication remains pending.
+
+### Finding
+
+- The production document worker still called `Blob.text()` and then `JSON.parse` for native
+  `.lfml.json` material libraries. The route avoided a UI-thread parse stall when the worker was
+  available, but retained a complete decoded source string beside the parsed raw graph and
+  normalized library.
+- This is a distinct consumer of the streamed JSON reader introduced by Corrective audit 8. It is
+  intentionally developed as a stacked one-fix change so that the shared parser is not duplicated
+  and the material-library diff remains separately reviewable.
+
+### Repair
+
+- Stream-capable native material-library requests now use the same incremental UTF-8 JSON reader
+  inside the production document worker, then enter the exact existing material schema checks and
+  canonicalization through a value-level extraction of `deserializeMaterialLibrary`.
+- The existing text deserializer still owns `JSON.parse` for string callers and delegates the
+  parsed value to that same validation path. A new one-symbol stream submodule barrel exposes the
+  worker-only value entry without growing the legacy over-soft-limit material-library barrel.
+- Malformed JSON keeps the established `invalid` result shape. A failed active stream propagates
+  without retrying through `Blob.text()`. Environments without `Blob.stream()` and constructor-time
+  Worker failure retain the established valid whole-text compatibility fallbacks and their existing
+  responsiveness disclosure.
+- Reading, FIFO queueing, cancellation, worker termination, and parsing progress keep the shared
+  document-worker semantics; no size refusal, content cap, truncation, or new guard is added.
+
+### Test-first verification
+
+- Red: the new production-source regression failed 1/1 because the material route invoked a
+  throwing `Blob.text()` spy instead of the supplied stream.
+- Green direct compatibility suite: 6 files / 84 tests, covering streamed JSON parity, project and
+  SVG coexistence, native material schema/canonicalization, malformed syntax, no-stream fallback,
+  and partial-stream failure without text retry. The broader material/import sweep passed 22 files /
+  141 tests, including production file actions, worker client, size advisory, collection,
+  persistence, management, and Saved Libraries dialog behavior.
+- Focused TypeScript, E2E TypeScript, ESLint, Prettier, and index-export ratchet checks pass after the
+  material-specific source handler was extracted to keep the shared dispatcher below the hard
+  complexity limit.
+- Green real Chrome default fixture: a measured 24 MiB whitespace-heavy but valid `.lfml.json`
+  imported through `document-import-worker`, advanced the reset UI heartbeat, and loaded the
+  expected empty material library in 3.8 seconds for the test and 5.6 seconds total.
+- Green one-off real Chrome scale run: the same production test passed with
+  `CURVEDESK_MATERIAL_LIBRARY_TEST_MIB=200`, measured at least 200 MiB, advanced the UI heartbeat,
+  and loaded the expected library in 6.0 seconds for the test and 7.2 seconds total.
+- Green exact-tree `pnpm release:check`: full unit corpus, TypeScript, application and Electron
+  ESLint, formatting, ADR numbering, 50-package license closure, 14/14 release-integrity tests, web
+  and Electron-main builds, raw/soft file-size policy, and index-export ratchet all passed.
+- Fresh independent exact-diff audit of staged patch `5fa0f85c` found no actionable issue. The
+  reviewer independently reran 6 files / 84 focused tests, TypeScript and E2E TypeScript, targeted
+  staged-path lint/format, the export ratchet, and the real Chrome 24 MiB fixture; the primary
+  verification separately covered the broader 22/141 sweep, full release gate, and 200 MiB fixture.
+
+### Remaining boundary
+
+- This removes the normal worker path's complete decoded input string. The original `Blob`, parsed
+  raw graph, normalized/canonical library, worker transfer result, material collection, persistence,
+  and UI state still scale with material content; normalization can transiently retain raw and
+  canonical graphs together.
+- Any single JSON string or number token can itself be large. Browser stream chunk size is not a
+  CurveDesk memory contract. This is incremental input parsing, not constant total memory.
+- The 200 MiB fixture is whitespace-heavy and contains an empty `entries` array. It proves that this
+  valid native `.lfml.json` input route can import that measured fixture in the tested Chrome
+  environment; it does not prove that a dense 200 MiB preset library, another format/device, or
+  storage/quota pressure has the same peak memory or completion behavior.
+- The separate LightBurn project/CLB incremental XML repair remains draft PR #593. Save, autosave,
+  recovery, PNG/lifecycle, Trace, Image Editor, hardware, controller, firmware, settings, Frame,
+  Start, deployment, and merge are outside this one-fix repair.
