@@ -16,11 +16,20 @@ import type { ToolpathStep } from './toolpath-types';
 const XY_EPS = 5e-4;
 
 // Head Z persists ACROSS CNC groups (the emitter tracks one modal Z for the
-// whole job), so buildToolpath threads one state through every group.
-export type CncSimState = { zMm: number | null };
+// whole job), so buildToolpath threads one state through every group. toolId
+// is the bit currently in the spindle: a retract belongs to the bit that was
+// just cutting, not to the group whose pass comes next (between those two the
+// emitter parks and pauses for the change).
+export type CncSimState = { zMm: number | null; toolId: string | undefined };
 
 export function createCncSimState(): CncSimState {
-  return { zMm: null };
+  return { zMm: null, toolId: undefined };
+}
+
+// exactOptionalPropertyTypes: an absent bit must omit the key, not set it to
+// undefined. Absent means the machine's active bit.
+function toolIdField(toolId: string | undefined): { readonly toolId?: string } {
+  return toolId === undefined ? {} : { toolId };
 }
 
 export function appendCncGroupSteps(
@@ -67,11 +76,20 @@ function appendPassSteps(
   }
   if (state.zMm !== entryZ) {
     const fromZ = state.zMm ?? safeZ;
-    steps.push({ kind: 'plunge', at: first, fromZ, toZ: entryZ, length: Math.abs(fromZ - entryZ) });
+    steps.push({
+      kind: 'plunge',
+      at: first,
+      fromZ,
+      toZ: entryZ,
+      length: Math.abs(fromZ - entryZ),
+      ...toolIdField(group.toolId),
+    });
     state.zMm = entryZ;
   }
-  steps.push(cutStepForPass(pass, xy, group, passIndex));
+  const cut = cutStepForPass(pass, xy, group, passIndex);
+  steps.push({ ...cut, ...toolIdField(group.toolId) });
   state.zMm = passExitZMm(pass);
+  state.toolId = group.toolId;
   return xy[xy.length - 1] ?? first;
 }
 
@@ -95,6 +113,7 @@ function appendRetract(
     fromZ: state.zMm,
     toZ: safeZ,
     length: Math.abs(state.zMm - safeZ),
+    ...toolIdField(state.toolId),
   });
   state.zMm = safeZ;
 }
@@ -104,7 +123,7 @@ function cutStepForPass(
   xy: ReadonlyArray<Vec2>,
   group: CncGroup,
   passIndex: number,
-): ToolpathStep {
+): Extract<ToolpathStep, { kind: 'cut' }> {
   switch (pass.kind) {
     case 'contour':
       return {
