@@ -330,6 +330,30 @@ describe('RTSP transient status hiccups', () => {
     });
   });
 
+  it('bounds delayed unavailable readings by two reads and one poll interval', async () => {
+    const status = vi.fn(
+      () =>
+        new Promise<CameraBridgeStreamStatus>((resolve) => {
+          setTimeout(() => resolve(unavailableStatus()), 3_000);
+        }),
+    );
+    const bridge = rtspBridge(vi.fn(), status);
+
+    await useCameraStore.getState().startRtspSource(bridge, RTSP_URL);
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(useCameraStore.getState().sourceState.kind).toBe('live');
+
+    await vi.advanceTimersByTimeAsync(RTSP_STATUS_POLL_INTERVAL_MS + 3_000);
+
+    expect(status).toHaveBeenCalledTimes(CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE);
+    expect(useCameraStore.getState().sourceState).toMatchObject({
+      kind: 'error',
+      sourceKind: 'machine-rtsp',
+    });
+  });
+
   it('restarts the run count after any reading that reaches the bridge', async () => {
     const readings: readonly CameraBridgeStreamStatus[] = [
       ...Array<CameraBridgeStreamStatus>(CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE - 1).fill(

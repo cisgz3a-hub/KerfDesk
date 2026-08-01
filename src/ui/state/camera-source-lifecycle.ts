@@ -20,16 +20,15 @@ const RTSP_SOURCE_ENDED =
 const MACHINE_JPEG_SOURCE_ENDED =
   'Machine camera preview stopped. Check the camera and bridge, then reconnect it.';
 export const RTSP_STATUS_POLL_INTERVAL_MS = 1_000;
-// The bridge reports 'unavailable' for every status-channel fault — its 3 s
-// fetch timeout, any fetch rejection, and any unparseable body all collapse
-// into it (src/platform/web/camera-bridge.ts). None of those observe the video
-// stream, so a single one is a status-channel hiccup, not a dead preview. Only
-// 'failed' is the bridge's authoritative word that the stream itself ended.
-// Five consecutive readings at the 1 s poll interval is a ~4 s window of an
-// unreachable status channel — long past any single slow or dropped request,
-// while still ending a genuinely dead preview well inside an operator's
-// glance at the canvas.
-export const CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE = 5;
+// The bridge reports 'unavailable' for status-channel faults and some absent
+// session states. A lone reading therefore does not prove that the video
+// stream died, while 'failed' is authoritative and remains immediate. Two
+// consecutive readings preserve one transient hiccup without leaving a stale
+// preview live through an invented grace period. This is a count threshold,
+// not a fixed wall-clock window: immediate failures resolve after one 1 s poll
+// interval, while two browser requests that each hit the 3 s fetch timeout can
+// take about 7 s in total.
+export const CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE = 2;
 
 export function handleUsbStatus(
   set: CameraSourceSet,
@@ -109,8 +108,8 @@ export async function monitorRtspSource(
       get().reportSourceFailure(source);
       return;
     }
-    // Any reading that reached the bridge clears the run: the status channel
-    // is back, so whatever hiccuped before it is not an outage.
+    // Any non-unavailable reading clears the run: the status channel is back,
+    // so whatever hiccuped before it is not a continuing outage.
     consecutiveUnavailableReadings =
       status.kind === 'unavailable' ? consecutiveUnavailableReadings + 1 : 0;
     if (consecutiveUnavailableReadings >= CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE) {

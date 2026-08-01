@@ -4474,10 +4474,15 @@ and lifts the command's CNC-only gate.)*
 - **Error / RTSP preview interrupted.** Each probe creates an unguessable bridge-owned stream
   session shared by every view of that exact source. The renderer polls its status because
   Chromium does not reliably emit `<img>` error after an established MJPEG socket dies.
-  Unexpected FFmpeg end, ten seconds without output, bridge loss, or the last preview connection
-  closing makes that exact source leave `live`; the RTSP section shows **Reconnect**. Pressing it
-  probes again and creates a fresh session. No background FFmpeg respawn or automatic camera
-  reconnection runs after failure.
+  An authoritative failed status (including unexpected FFmpeg end or ten seconds without output)
+  and an image error make that exact source leave `live` immediately. Because an unavailable
+  status can also be a transient status-channel fault, one unavailable reading is tolerated; a
+  second consecutive unavailable reading makes the source leave `live`, and a `live` or `starting`
+  reading resets the count. This is count-based rather than a fixed grace period: two immediate
+  failures are separated by the one-second poll interval, while two browser requests that each hit
+  the three-second status timeout can take about seven seconds. The RTSP section then shows
+  **Reconnect**. Pressing it probes again and creates a fresh session. No background FFmpeg respawn
+  or automatic camera reconnection runs after failure.
 - **Edge / older bridge.** A bridge that returns a usable RTSP preview but no liveness session does
   not block the preview. The RTSP section labels it unmonitored and explains that a frozen image
   may not be detected; no session is fabricated and no automatic reconnect or probe runs.
