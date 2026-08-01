@@ -24,6 +24,7 @@ import { useUiStore } from '../state/ui-store';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
 import { CncCoreCutFields, CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
 import { CncLineArtContoursField } from './CncLineArtContoursField';
+import { CncThinDetailNote } from './CncThinDetailNote';
 import { CncRetractPassesField } from './CncRetractPassesField';
 import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
 import { CncMaterialRow } from './CncMaterialRow';
@@ -76,6 +77,7 @@ export function CncLayerFields(props: {
         </select>
       </Row>
       <CncLineArtContoursField layer={layer} settings={settings} onCommit={commit} />
+      <CncThinDetailNote layer={layer} settings={settings} />
       <LayerBitSelect
         layer={layer}
         settings={settings}
