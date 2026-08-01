@@ -26,7 +26,7 @@ function square(at: number, size: number): Polyline {
 }
 
 // δ rings stay constant-Z contours; detail rings are path3d since the
-// junction blend (ADR-279 Amendment 2) — helpers read both.
+// junction blend (ADR-280 Amendment 2) — helpers read both.
 function passXy(
   pass: ReturnType<typeof vcarvePasses>[number],
 ): ReadonlyArray<{ readonly x: number; readonly y: number }> {
@@ -67,7 +67,7 @@ describe('vcarvePasses', () => {
       resolutionMm: 0.5,
     });
     const depths = contourDepths(passes);
-    // Rings 1 and 2 of the δ ladder (corner-detail passes from ADR-279 may
+    // Rings 1 and 2 of the δ ladder (corner-detail passes from ADR-280 may
     // sit shallower — they follow the same law at the fine pitch).
     expect(depths.some((z) => Math.abs(z + 0.5) < 1e-9)).toBe(true);
     expect(depths.some((z) => Math.abs(z + 1.0) < 1e-9)).toBe(true);
@@ -329,11 +329,11 @@ describe('vcarveResolutionMm', () => {
   });
 });
 
-// ADR-279: strokes narrower than 2·δ used to vanish from the carve entirely —
+// ADR-280: strokes narrower than 2·δ used to vanish from the carve entirely —
 // the first coarse inset already consumed them, so a thin script stroke
 // contributed no rings while the rest of the glyph cut. The thin-detail stage
 // must carve them with a fine-pitch ladder instead of dropping them.
-describe('vcarvePasses — thin detail (ADR-279)', () => {
+describe('vcarvePasses — thin detail (ADR-280)', () => {
   function band(widthMm: number, lengthMm: number, atX = 0): Polyline {
     return {
       closed: true,

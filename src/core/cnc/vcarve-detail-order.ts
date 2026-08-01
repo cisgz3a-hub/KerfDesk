@@ -1,5 +1,5 @@
 // orderDetailBySliver — sliver-major ordering for thin-detail rings
-// (ADR-279 follow-up).
+// (ADR-280 follow-up).
 //
 // Detail rings arrive step-major from the fine ladder: every sliver's ring 1,
 // then every sliver's ring 2. Emitting that order hops the cutter between

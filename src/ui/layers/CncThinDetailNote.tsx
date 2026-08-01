@@ -1,6 +1,6 @@
 // CncThinDetailNote — per-layer advisory under the V-carve cut type: fires
 // when this layer's artwork holds detail finer than the 0.1 mm floor the
-// ADR-279 detail stage can carve, so the operator learns at design time
+// ADR-280 detail stage can carve, so the operator learns at design time
 // rather than at Job Review. Text only — informs, never gates (rule 7).
 //
 // The check compiles the layer's v-carve ladder, so it runs 300 ms after the
@@ -18,7 +18,7 @@ import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scen
 import { useStore } from '../state';
 
 const NOTE_DEBOUNCE_MS = 300;
-// The narrowest groove the fine detail stage can carve (ADR-279).
+// The narrowest groove the fine detail stage can carve (ADR-280).
 const MIN_CARVEABLE_DETAIL_MM = 2 * THIN_DETAIL_RESOLUTION_MM;
 
 export function CncThinDetailNote(props: {

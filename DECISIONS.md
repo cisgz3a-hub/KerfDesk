@@ -14578,7 +14578,7 @@ sources and barcode/QR generation remain deferred.
 - NOT verified by this decision: production throughput, a complete imposed-sheet UI, persisted
   imposition, physical placement, camera accuracy, controller tracking, or output on hardware.
 
-## ADR-279 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
+## ADR-280 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
 
 **Date:** 2026-08-01
 **Status:** Accepted
@@ -14676,7 +14676,7 @@ drop was a fidelity bug against the whole reference field, not a design choice.
 - NOT verified: a physical cut (no hardware available), and the junction under-cut blend is
   bounded analytically but has not been rendered on hardware.
 
-## ADR-279 Amendment - coverage law corrected after the #575 revert (2026-08-01)
+## ADR-280 Amendment - coverage law corrected after the #575 revert (2026-08-01)
 
 **Date:** 2026-08-01
 **Status:** Accepted
@@ -14730,7 +14730,7 @@ panel note) folded in.
 - NOT verified: physical cutting; the junction under-cut blend remains as documented in the
   base decision.
 
-## ADR-279 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
+## ADR-280 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
 
 **Date:** 2026-08-02
 **Status:** Accepted

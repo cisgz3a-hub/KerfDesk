@@ -1,4 +1,4 @@
-// vcarveThinDetailRings — the fine-detail stage of v-carving (ADR-279).
+// vcarveThinDetailRings — the fine-detail stage of v-carving (ADR-280).
 //
 // The δ-pitched ring ladder cannot see any sub-region narrower than 2δ: its
 // first inset already consumes the region there, so a thin script stroke

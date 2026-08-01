@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`v-carve thin artwork — perceptual (ADR-279) > emits deterministic G-code for the thin-stroke job (snapshot) 1`] = `
+exports[`v-carve thin artwork — perceptual (ADR-280) > emits deterministic G-code for the thin-stroke job (snapshot) 1`] = `
 "G21
 G90
 G54

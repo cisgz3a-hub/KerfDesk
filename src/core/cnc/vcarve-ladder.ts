@@ -15,7 +15,7 @@
 // Because rings vanish wherever the region is narrower than 2δ, artwork
 // finer than the ring pitch — thin script strokes, serif tips — would
 // otherwise silently drop out of the carve. A second, fine-pitched ladder
-// over exactly that uncovered material (vcarve-thin-detail.ts, ADR-279)
+// over exactly that uncovered material (vcarve-thin-detail.ts, ADR-280)
 // carves those slivers to their shallow centerline groove instead.
 //
 // Each disconnected filled region is completed shallow → deep (outside-in),
@@ -85,7 +85,7 @@ export type VCarveLadder = {
 
 type VCarveRing = {
   // δ ladder rings keep their pitch depth; detail rings carry the junction
-  // blend on the stepped path (per-vertex depths, ADR-279 Amendment 2).
+  // blend on the stepped path (per-vertex depths, ADR-280 Amendment 2).
   readonly kind: 'ring' | 'detail';
   readonly polyline: Polyline;
   readonly depthMm: number;
@@ -188,7 +188,7 @@ export function vcarveResolutionMm(settingMm: number, toolDiameterMm: number): n
 
 // The δ rings and detail rings count steps in different pitches; this maps
 // both through the shared depth law, region-zipped so a region finishes its
-// rings, then its detail, before the cutter travels on (ADR-270, ADR-279).
+// rings, then its detail, before the cutter travels on (ADR-270, ADR-280).
 type RingDepthClamp = {
   readonly deltaMm: number;
   readonly finePitchMm: number;
@@ -269,7 +269,7 @@ function legacyPassesForRings(
   );
 }
 
-// The junction blend (ADR-279 Amendment 2): a detail ring's vertices carry
+// The junction blend (ADR-280 Amendment 2): a detail ring's vertices carry
 // the true-boundary groove depth, split through depthPerPassMm on the
 // deepest vertex so plunge-load limits still hold. Shallower levels clamp
 // each vertex to the level floor; the final level is the exact profile.
