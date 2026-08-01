@@ -176,3 +176,57 @@ describe('interior hit-testing on closed shapes', () => {
     expect(hitTestSketch(stacked, { x: 50, y: 30 }, 1)?.id).toBe('above');
   });
 });
+
+// The maintainer's second report: "if I have a square and I put a square inside,
+// I cannot choose the middle square — the bigger square covers the smaller."
+// Pure z-order plus interior picking means a LATER, LARGER shape swallows every
+// shape inside it — and a layered carve is nested rectangles by nature, so this
+// made assigning an inner shape to a layer impossible.
+describe('nested shapes stay selectable', () => {
+  const outer: SketchRectangle = {
+    kind: 'rect',
+    id: 'outer',
+    origin: { x: 0, y: 0 },
+    widthMm: 200,
+    heightMm: 160,
+    cornerRadiusMm: 0,
+  };
+  // Drawn LAST, so pure z-order would hand it every click inside it.
+  const enclosing: SketchRectangle = {
+    kind: 'rect',
+    id: 'enclosing',
+    origin: { x: -40, y: -40 },
+    widthMm: 300,
+    heightMm: 260,
+    cornerRadiusMm: 0,
+  };
+  const inner: SketchRectangle = {
+    kind: 'rect',
+    id: 'inner',
+    origin: { x: 80, y: 60 },
+    widthMm: 40,
+    heightMm: 40,
+    cornerRadiusMm: 0,
+  };
+  const nested: Sketch = { entities: [outer, inner, enclosing] };
+
+  it('picks the innermost shape under the pointer, not the biggest one on top', () => {
+    expect(hitTestSketch(nested, { x: 100, y: 80 }, 1)?.id).toBe('inner');
+  });
+
+  it('picks the enclosing shape where only it covers the point', () => {
+    expect(hitTestSketch(nested, { x: -20, y: -20 }, 1)?.id).toBe('enclosing');
+  });
+
+  // An edge you can see beats an interior you cannot: the outer rect's outline
+  // must win over the enclosing rect's interior even though the enclosing rect
+  // is on top.
+  it('an outline hit beats a larger shape whose interior covers the same point', () => {
+    expect(hitTestSketch(nested, { x: 0, y: 80 }, 1)?.id).toBe('outer');
+  });
+
+  it('still prefers the topmost when two identical shapes are stacked', () => {
+    const twins: Sketch = { entities: [inner, { ...inner, id: 'twin' }] };
+    expect(hitTestSketch(twins, { x: 100, y: 80 }, 1)?.id).toBe('twin');
+  });
+});

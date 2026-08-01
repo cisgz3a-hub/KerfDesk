@@ -74,18 +74,25 @@ export function designLayerColor(index: number): string {
   return color ?? DESIGN_LAYER_COLORS[0];
 }
 
+// Each new layer starts one step deeper than the last. Layers exist to cut at
+// DIFFERENT depths, and identical defaults made a fresh layer carve exactly
+// like the one before it — assigning a shape to it changed nothing visible,
+// which read as "layers are not working" (maintainer, 2026-08-01).
+export const DESIGN_LAYER_DEPTH_STEP_MM = 1;
+
 /**
- * A fresh layer for the given ordinal, named and colored by position.
+ * A fresh layer for the given ordinal, named, colored, and stepped by position.
  *
  * @param id Caller-minted id (the UI owns identity).
- * @param ordinal Zero-based position used for the name and palette color.
+ * @param ordinal Zero-based position used for the name, palette color, and depth.
  */
 export function createDesignLayer(id: string, ordinal: number): DesignLayer {
+  const safe = Number.isInteger(ordinal) && ordinal >= 0 ? ordinal : 0;
   return {
     id,
     name: `Layer ${ordinal + 1}`,
     color: designLayerColor(ordinal),
     cutType: DEFAULT_DESIGN_LAYER.cutType,
-    depthMm: DEFAULT_DESIGN_LAYER.depthMm,
+    depthMm: DEFAULT_DESIGN_LAYER.depthMm + safe * DESIGN_LAYER_DEPTH_STEP_MM,
   };
 }

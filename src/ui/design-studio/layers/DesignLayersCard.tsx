@@ -4,7 +4,8 @@
 // history, so Ctrl+Z walks them like any drawing step.
 
 import { useMemo } from 'react';
-import { entityDesignLayer, sketchLayers } from '../../../core/design/layers';
+import type { Sketch } from '../../../core/design';
+import { entityDesignLayer, sketchLayers, type DesignLayer } from '../../../core/design/layers';
 import type { CncTool } from '../../../core/scene';
 import { carveLayerTool } from '../../../core/design-carve';
 import { useDesignStudioStore } from '../design-studio-store';
@@ -20,7 +21,11 @@ export function DesignLayersCard(props: {
     state.session === null ? null : state.session.history.present,
   );
   const activeLayerId = useDesignStudioStore((state) => state.session?.activeLayerId ?? null);
-  const selectionCount = useDesignStudioStore((state) => state.session?.selectedIds.size ?? 0);
+  // The Set itself, not just its size: the panel marks which rows hold the
+  // selection so Assign has a visible before and after. The store replaces the
+  // Set only when the selection changes, so this stays reference-stable.
+  const selectedIds = useDesignStudioStore((state) => state.session?.selectedIds ?? null);
+  const selectionCount = selectedIds?.size ?? 0;
   const setActiveLayer = useDesignStudioStore((state) => state.setActiveLayer);
   const addLayer = useDesignStudioStore((state) => state.addLayer);
   const patchLayer = useDesignStudioStore((state) => state.patchLayer);
@@ -29,16 +34,11 @@ export function DesignLayersCard(props: {
   const assignSelectionToLayer = useDesignStudioStore((state) => state.assignSelectionToLayer);
 
   const layers = useMemo(() => (sketch === null ? [] : sketchLayers(sketch)), [sketch]);
-  const countByLayer = useMemo(() => {
-    const counts = new Map<string, number>();
-    if (sketch === null) return counts;
-    for (const entity of sketch.entities) {
-      if (entity.construction === true) continue;
-      const id = entityDesignLayer(entity, layers).id;
-      counts.set(id, (counts.get(id) ?? 0) + 1);
-    }
-    return counts;
-  }, [sketch, layers]);
+  const tally = useMemo(
+    () => tallyLayers(sketch, layers, selectedIds),
+    [sketch, layers, selectedIds],
+  );
+  const { countByLayer, layersWithSelection } = tally;
 
   if (sketch === null) return null;
   const active = layers.find((layer) => layer.id === activeLayerId) ?? layers[0];
@@ -59,6 +59,7 @@ export function DesignLayersCard(props: {
             key={layer.id}
             layer={layer}
             isActive={layer.id === active?.id}
+            hasSelection={layersWithSelection.has(layer.id)}
             entityCount={countByLayer.get(layer.id) ?? 0}
             tool={carveLayerTool(
               { tools: props.tools, activeTool: props.activeTool },
@@ -83,6 +84,29 @@ export function DesignLayersCard(props: {
       )}
     </section>
   );
+}
+
+// One pass over the entities for both readouts: how many shapes each layer
+// holds, and which layers hold the current selection — the answer to "what
+// layer is this shape on?", which the panel could not previously show.
+function tallyLayers(
+  sketch: Sketch | null,
+  layers: ReadonlyArray<DesignLayer>,
+  selectedIds: ReadonlySet<string> | null,
+): {
+  readonly countByLayer: ReadonlyMap<string, number>;
+  readonly layersWithSelection: ReadonlySet<string>;
+} {
+  const countByLayer = new Map<string, number>();
+  const layersWithSelection = new Set<string>();
+  if (sketch === null) return { countByLayer, layersWithSelection };
+  for (const entity of sketch.entities) {
+    if (entity.construction === true) continue;
+    const id = entityDesignLayer(entity, layers).id;
+    countByLayer.set(id, (countByLayer.get(id) ?? 0) + 1);
+    if (selectedIds?.has(entity.id) === true) layersWithSelection.add(id);
+  }
+  return { countByLayer, layersWithSelection };
 }
 
 function LayersCardHeader(props: {

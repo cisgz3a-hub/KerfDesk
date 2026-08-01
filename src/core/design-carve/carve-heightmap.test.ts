@@ -134,6 +134,27 @@ describe('designCarveHeightmap', () => {
     expect(depthAtMm(map, 10, 10)).toBeCloseTo(-5, 5);
   });
 
+  // The maintainer asked whether one pocket layer pockets everything. It does
+  // not: a pocket clears the whole interior of ITS OWN layer's shape, and a
+  // shape on a DIFFERENT layer neither extends it nor punches an island in it.
+  // Islands come from putting both contours on the same layer (the frame case
+  // covered by the first test in this file).
+  it('confines a pocket to its own layer and leaves other layers alone', () => {
+    const pocket = layer({ id: 'P', cutType: 'pocket', depthMm: 4, toolId: 'em' });
+    const other = layer({ id: 'O', name: 'Layer 2', cutType: 'profile-on-path', depthMm: 1 });
+    const map = designCarveHeightmap(
+      input({
+        entities: [rect('p', 'P', 2, 2, 6), rect('o', 'O', 14, 14, 4)],
+        layers: [pocket, other],
+      }),
+    );
+    expect(depthAtMm(map, 5, 5)).toBeCloseTo(-4, 5); // inside the pocket layer
+    // Well clear of both shapes (3 mm from each, past the 1.5 mm bit radius).
+    expect(depthAtMm(map, 11, 11)).toBe(0);
+    // The other layer's shape is cut by ITS setting, not the pocket's depth.
+    expect(depthAtMm(map, 14, 16)).toBeCloseTo(-1, 5);
+  });
+
   it('is deterministic for identical input', () => {
     const carve = layer({ id: 'L', cutType: 'v-carve', depthMm: 2, toolId: 'vb' });
     const sketch: Sketch = { entities: [rect('r', 'L', 5, 5, 10)], layers: [carve] };
