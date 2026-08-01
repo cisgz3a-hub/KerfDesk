@@ -154,7 +154,7 @@ function ArtworkTargetChooser(props: {
             aria-label="Artwork to inspect"
             title="Choose which artwork settings to edit without selecting it on the canvas"
             onChange={(event) => props.onChange(event.target.value)}
-            style={inputStyle}
+            style={chooserSelectStyle}
           >
             {options.map((option) => (
               <option key={option.id} value={option.id}>
@@ -276,20 +276,17 @@ const targetHintStyle: React.CSSProperties = {
 };
 const rowStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '92px 1fr',
+  gridTemplateColumns: '100px 1fr',
   alignItems: 'center',
   gap: 8,
   marginBottom: 6,
 };
-const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
+const labelStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-muted)' };
 const controlStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
-const inputStyle: React.CSSProperties = {
+const inputStyle: React.CSSProperties = { width: 84, boxSizing: 'border-box' };
+const chooserSelectStyle: React.CSSProperties = {
   width: '100%',
+  minWidth: 0,
   boxSizing: 'border-box',
-  padding: '4px 6px',
-  border: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-input)',
-  color: 'var(--lf-text)',
-  borderRadius: 4,
 };
-const unitStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
+const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };

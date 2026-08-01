@@ -10,6 +10,7 @@ import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
 import { layerCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
 import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
+import { RailSection } from '../kit';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
 
@@ -50,13 +51,10 @@ export function FeedsCalculatorRow(props: {
   );
   const canApply = result !== null;
   return (
-    <details style={boxStyle}>
-      <summary
-        style={summaryStyle}
-        title="Compute starting feeds from chipload: RPM × flutes × mm-per-tooth for the layer's bit."
-      >
-        Feeds calculator
-      </summary>
+    <RailSection
+      label="Feeds calculator"
+      hint="Compute starting feeds from chipload: RPM × flutes × mm-per-tooth for the layer's bit."
+    >
       <div style={rowStyle}>
         <MaterialSelect value={material} onPick={setMaterial} />
         <label style={fieldStyle}>
@@ -93,7 +91,7 @@ export function FeedsCalculatorRow(props: {
       >
         Apply to layer
       </button>
-    </details>
+    </RailSection>
   );
 }
 
@@ -204,14 +202,7 @@ function materialFeedResult(patch: Partial<CncLayerSettings> | null): MaterialFe
   };
 }
 
-const boxStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 4,
-  padding: '4px 6px',
-  marginTop: 4,
-};
-const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12 };
-const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, margin: '6px 0' };
+const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, margin: '2px 0' };
 const fieldStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',

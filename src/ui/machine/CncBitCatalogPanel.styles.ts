@@ -1,17 +1,5 @@
 import type { CSSProperties } from 'react';
 
-export const detailsStyle: CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 4,
-  padding: '4px 6px',
-  marginTop: 4,
-};
-export const summaryStyle: CSSProperties = {
-  fontSize: 12,
-  cursor: 'pointer',
-  userSelect: 'none',
-  color: 'var(--lf-text-muted)',
-};
 export const noticeStyle: CSSProperties = {
   fontSize: 11,
   lineHeight: 1.35,

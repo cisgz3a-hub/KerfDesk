@@ -12,17 +12,16 @@ import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
 import { useStore } from '../state';
 import { blockingCncSecondaryToolReferences } from '../state/cnc-tool-references';
 import { useToastStore } from '../state/toast-store';
+import { RailSection } from '../kit';
 import { AddCncBitForm } from './AddCncBitForm';
 import { CncBitCatalogPanel } from './CncBitCatalogPanel';
 import {
   addFormStyle,
   deleteButtonStyle,
-  detailsStyle,
   kindSelectStyle,
   listItemStyle,
   listStyle,
   nameInputStyle,
-  summaryStyle,
   toolGroupHeadingStyle,
   toolGroupListStyle,
   toolGroupStyle,
@@ -50,10 +49,11 @@ export function CncToolManager(props: { readonly machine: CncMachineConfig }): J
     }
   };
   return (
-    <details style={detailsStyle}>
-      <summary style={summaryStyle} title="Add or remove custom bits (saved across projects).">
-        Manage bits ({props.machine.tools.length})
-      </summary>
+    <RailSection
+      label="Manage bits"
+      badge={String(props.machine.tools.length)}
+      hint="Add or remove custom bits (saved across projects)."
+    >
       <ul style={listStyle} aria-label="Bit list">
         {groups.map((group) => (
           <li key={group.key} style={toolGroupStyle}>
@@ -73,7 +73,7 @@ export function CncToolManager(props: { readonly machine: CncMachineConfig }): J
       </ul>
       <CncBitCatalogPanel />
       <AddCncBitForm />
-    </details>
+    </RailSection>
   );
 }
 
@@ -124,13 +124,11 @@ export function CncMachineProfilesRow(): JSX.Element {
     }
   };
   return (
-    <details style={detailsStyle}>
-      <summary
-        style={summaryStyle}
-        title="Save the current stock/bit/spindle setup under a name and re-apply it on any project."
-      >
-        Machine profiles ({profiles.length})
-      </summary>
+    <RailSection
+      label="Machine profiles"
+      badge={String(profiles.length)}
+      hint="Save the current stock/bit/spindle setup under a name and re-apply it on any project."
+    >
       <div style={addFormStyle}>
         <select
           value={selectedId}
@@ -169,7 +167,7 @@ export function CncMachineProfilesRow(): JSX.Element {
         </button>
       </div>
       <SaveMachineProfileControls />
-    </details>
+    </RailSection>
   );
 }
 
