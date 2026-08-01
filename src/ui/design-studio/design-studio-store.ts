@@ -26,6 +26,7 @@ import type { MeasurementKey } from './design-entity-fields';
 import type { DesignLayerPatch } from '../../core/design/layers';
 import {
   addSessionLayer,
+  armLayerOfSelection,
   assignSelectionToSessionLayer,
   moveSessionLayer,
   patchSessionLayer,
@@ -135,7 +136,10 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   setView: (view) => set(mapSession((session) => ({ ...session, view }))),
   setCursorMm: (cursorMm) => set(mapSession((session) => ({ ...session, cursorMm }))),
   setActiveSnap: (activeSnap) => set(mapSession((session) => ({ ...session, activeSnap }))),
-  setSelection: (ids) => set(mapSession((session) => ({ ...session, selectedIds: new Set(ids) }))),
+  // Selecting arms the selection's layer, so the layers panel shows the cut,
+  // depth, and bit of the shape just clicked.
+  setSelection: (ids) =>
+    set(mapSession((session) => armLayerOfSelection({ ...session, selectedIds: new Set(ids) }))),
 
   toggleSnap: () =>
     set(mapSession((session) => ({ ...session, snapEnabled: !session.snapEnabled }))),
@@ -179,7 +183,7 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
 
   setMarquee: (marquee) => set(mapSession((session) => ({ ...session, marquee }))),
   commitMarquee: (additive) =>
-    set(mapSession((session) => commitSessionMarquee(session, additive))),
+    set(mapSession((session) => armLayerOfSelection(commitSessionMarquee(session, additive)))),
 
   deleteSelected: () =>
     set(

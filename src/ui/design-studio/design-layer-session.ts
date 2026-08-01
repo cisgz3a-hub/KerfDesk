@@ -8,6 +8,7 @@ import {
   addDesignLayer,
   assignEntitiesToLayer,
   createDesignLayer,
+  entityDesignLayer,
   moveDesignLayer,
   patchDesignLayer,
   removeDesignLayer,
@@ -15,6 +16,31 @@ import {
   type DesignLayerPatch,
 } from '../../core/design/layers';
 import { sessionSketch, withSketch, type DesignSession } from './design-session';
+
+/**
+ * Arms the layer the current selection sits on, so the settings panel edits
+ * the layer the operator is actually looking at — clicking a shape shows its
+ * cut, depth, and bit without hunting for the right row. Selecting also sets
+ * where the NEXT shape lands, which is how Illustrator and Figma behave: there
+ * is one "layer I am working in", not two.
+ *
+ * A selection spanning several layers names no single layer, so the active one
+ * is left alone rather than guessing.
+ */
+export function armLayerOfSelection(session: DesignSession): DesignSession {
+  if (session.selectedIds.size === 0) return session;
+  const sketch = sessionSketch(session);
+  const layers = sketchLayers(sketch);
+  let layerId: string | null = null;
+  for (const entity of sketch.entities) {
+    if (!session.selectedIds.has(entity.id)) continue;
+    const id = entityDesignLayer(entity, layers).id;
+    if (layerId === null) layerId = id;
+    else if (layerId !== id) return session;
+  }
+  if (layerId === null || layerId === session.activeLayerId) return session;
+  return { ...session, activeLayerId: layerId };
+}
 
 export function setSessionActiveLayer(session: DesignSession, layerId: string): DesignSession {
   const layers = sketchLayers(sessionSketch(session));
