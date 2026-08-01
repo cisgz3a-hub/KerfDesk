@@ -102,7 +102,11 @@
 2. On `dragenter`, viewport shows a dashed-blue overlay with text "Drop to import" centered.
 3. On `drop`:
    1. Overlay disappears.
-   2. SVG is sanitized-and-parsed via DOMPurify (`USE_PROFILES: { svg: true, svgFilters: true }` plus a custom hook that strips `<script>`, `<foreignObject>`, external `xlink:href`, and non-image data URIs). DOMPurify returns a clean DOM; we do not re-parse the source string after sanitization.
+   2. A normal file-backed SVG is UTF-8-decoded incrementally in the import Worker, validated while
+      it is read, built into a detached DOM, and sanitized before geometry extraction. The sanitizer
+      strips `<script>`, `<foreignObject>`, event handlers, external references, and non-image data
+      URIs. If the Worker cannot start, the warning-disclosed main-thread fallback uses DOMPurify
+      (`USE_PROFILES: { svg: true, svgFilters: true }`) plus its reference-removal hook.
    3. Geometry walked out of the sanitized DOM into internal Scene objects.
    4. Object is placed centered on the bed by default, at its natural mm size from the SVG `viewBox`.
    5. Object is auto-selected (selection handles visible).
@@ -130,10 +134,11 @@
 1. SVG is structurally invalid (malformed XML, missing root, etc.).
 2. Toast (error): `Could not parse <filename>: <one-line reason>`. No state change.
 
-#### Error — SVG file too large
-1. Threshold: 25 MB raw file size.
-2. Modal: `<filename> is larger than 25 MB (actual: 31 MB). Importing it may slow the app. Import anyway?` with buttons `Cancel` / `Import anyway`.
-3. If user proceeds and the parse takes > 5 s, viewport shows a non-blocking spinner with "Parsing large SVG…"
+#### Edge — SVG file larger than the advisory threshold
+1. Above 25 MB raw size, import proceeds and a non-blocking warning says the filename, rounded size,
+   and that the app may be busy until it finishes.
+2. Worker toasts report queued, reading, and parsing phases. Pressing Esc cancels the queued or
+   active import; no size threshold refuses or delays it.
 
 #### Error — SVG contains malicious content
 1. `<script>` tags stripped silently; count surfaced in toast: `Imported · sanitized 2 script tags`.

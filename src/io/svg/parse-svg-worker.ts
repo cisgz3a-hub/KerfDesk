@@ -44,6 +44,13 @@ export function parseSvgInWorker(args: {
     args.svgText,
     'image/svg+xml',
   ) as unknown as Document;
+  return parseSvgWorkerDocument(document, args);
+}
+
+export function parseSvgWorkerDocument(
+  document: Document,
+  args: { readonly id: string; readonly source: string },
+): ParseSvgResult {
   const stripped = sanitizeWorkerSvgDocument(document);
   return parseSvgDocument(document, args, stripped);
 }
