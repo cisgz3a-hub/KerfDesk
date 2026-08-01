@@ -8,15 +8,15 @@ export function RailSection(props: {
   readonly label: string;
   /** Right-aligned muted status: a count ("20") or a state ("Off"). */
   readonly badge?: string;
-  /** Tooltip explaining what the section does. */
-  readonly hint?: string;
+  /** Tooltip explaining what the section does — required by the hover-help contract. */
+  readonly hint: string;
   /** Force the open state on render; omit for ordinary uncontrolled toggling. */
   readonly open?: boolean;
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
     <details className="lf-section" {...(props.open === undefined ? {} : { open: props.open })}>
-      <summary {...(props.hint === undefined ? {} : { title: props.hint })}>
+      <summary title={props.hint}>
         <span>{props.label}</span>
         {props.badge === undefined ? null : <span className="lf-section-badge">{props.badge}</span>}
       </summary>
