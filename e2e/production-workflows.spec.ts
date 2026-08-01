@@ -40,11 +40,14 @@ test('calibrates machine timing and exposes cut and travel estimates in Preview'
   kerfdesk,
 }) => {
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
-  await page.getByText('Device Profile', { exact: true }).click();
-  await page.getByText('Advanced: estimator tuning', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Go to step 5: Options & calibration', exact: true })
+    .click();
+  await page.getByText('Planner and time estimate', { exact: true }).click();
   await fillAndCommit(page, 'Estimated cut time scale', '1.18');
   await fillAndCommit(page, 'Estimated travel time scale', '1.07');
-  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Go to step 6: Review & save', exact: true }).click();
+  await page.getByRole('button', { name: 'Save machine setup', exact: true }).click();
 
   await page.getByRole('button', { name: 'Preview' }).click();
   const panel = page.getByRole('group', { name: 'Preview route controls and statistics' });
@@ -200,9 +203,9 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await targetTwo.getByRole('spinbutton', { name: 'Design X' }).fill('100');
   await targetTwo.getByRole('spinbutton', { name: 'Design Y' }).fill('0');
   const captureButtons = page.getByRole('button', { name: 'Capture head' });
-  await kerfdesk.emitSerialLine('<Idle|MPos:20.000,30.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await kerfdesk.emitSerialLine('<Idle|MPos:20.000,270.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await captureButtons.nth(0).click();
-  await kerfdesk.emitSerialLine('<Idle|MPos:120.000,30.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await kerfdesk.emitSerialLine('<Idle|MPos:120.000,270.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await captureButtons.nth(1).click();
   await page.getByRole('button', { name: 'Apply registration' }).click();
 
@@ -449,33 +452,48 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await connectAndHome(page, kerfdesk);
 
   await kerfdesk.setAutoAcknowledge(false);
-  await page.getByRole('button', { name: 'Frame', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Cancel frame' })).toBeVisible();
-  for (let line = 1; line <= 5; line += 1) {
-    await expect
-      .poll(async () => frameWriteCount(await kerfdesk.events()))
-      .toBeGreaterThanOrEqual(line);
-    await kerfdesk.acknowledgeSerial(1);
-  }
+  const frameBaselineLines = serialWriteLineCount(await kerfdesk.events());
+  const frameBaselineCharacters = serialWrites(await kerfdesk.events()).length;
+  await page.getByRole('button', { name: 'Frame job', exact: true }).click();
+  await expect
+    .poll(async () => serialWriteLineCount(await kerfdesk.events()))
+    .toBeGreaterThan(frameBaselineLines);
+  await kerfdesk.acknowledgeSerial(1);
+  await expect(page.getByRole('button', { name: 'ABORT MOTION', exact: true })).toBeVisible();
+  await drainHeldFrameWrites(page, kerfdesk, frameBaselineLines + 1, frameBaselineCharacters);
+  expect(absoluteXyJogWrites(await kerfdesk.events(), frameBaselineCharacters).slice(0, 5)).toEqual(
+    [
+      '$J=G90 G21 X10.000 Y270.000 F6000\n',
+      '$J=G90 G21 X30.000 Y270.000 F6000\n',
+      '$J=G90 G21 X30.000 Y290.000 F6000\n',
+      '$J=G90 G21 X10.000 Y290.000 F6000\n',
+      '$J=G90 G21 X10.000 Y270.000 F6000\n',
+    ],
+  );
   await kerfdesk.setAutoAcknowledge(true);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-  await expect(page.getByRole('button', { name: 'Frame', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Start framed job', exact: true })).toBeEnabled();
+  await dismissNotifications(page);
 
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
-  await page.getByRole('button', { name: 'Start job' }).click();
+  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
   await confirmJobReview(page);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await page.getByRole('button', { name: 'Pause' }).click();
+  await expect.poll(async () => serialWriteBytes(await kerfdesk.events())).toContain(0x84);
+  await kerfdesk.emitSerialLine(
+    '<Door:0|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
+  );
   await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
-  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('!');
   await page.getByRole('button', { name: 'Resume' }).click();
+  await kerfdesk.emitSerialLine('<Run|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:1500,0>');
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('~');
 
-  await page.getByRole('button', { name: 'Stop' }).click();
+  await page.getByRole('button', { name: 'ABORT JOB', exact: true }).click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('\u0018');
-  await expect(page.getByRole('button', { name: 'Start job' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up & Frame', exact: true })).toBeVisible();
 
   await kerfdesk.emitSerialLine('ALARM:3');
   await expect(page.getByRole('alert')).toContainText('Alarm 3');
@@ -487,7 +505,7 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
     .toBeGreaterThan(settleWritesBeforeRecovery);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('alert')).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Start job' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Set up & Frame', exact: true })).toBeEnabled();
 });
 
 test('shows controller-reported canvas progress without treating acknowledgements as motion', async ({
@@ -497,22 +515,26 @@ test('shows controller-reported canvas progress without treating acknowledgement
   const probe = page.getByTestId('canvas-motion-probe');
   await expect(probe).toHaveAttribute('aria-label', /Frame start ready; Job start ready/);
   await connectAndHome(page, kerfdesk);
+  await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
   const writesBefore = serialWrites(await kerfdesk.events()).length;
-  await page.getByRole('button', { name: 'Start job' }).click();
+  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
   await confirmJobReview(page);
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
   const beforeAck = Number(await probe.getAttribute('data-confirmed-route-mm'));
 
-  await kerfdesk.acknowledgeSerial(4);
+  const programWrites = serialWrites(await kerfdesk.events()).slice(writesBefore);
+  const firstMove = /G0 X(-?\d+(?:\.\d+)?) Y(-?\d+(?:\.\d+)?)/.exec(programWrites);
+  expect(firstMove).not.toBeNull();
+  const acceptedThroughFirstMove =
+    [...programWrites.slice(0, firstMove?.index ?? 0)].filter((character) => character === '\n')
+      .length + 1;
+  await kerfdesk.acknowledgeSerial(acceptedThroughFirstMove);
   await expect
     .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
     .toBe(beforeAck);
 
-  const programWrites = serialWrites(await kerfdesk.events()).slice(writesBefore);
-  const firstMove = /G0 X(-?\d+(?:\.\d+)?) Y(-?\d+(?:\.\d+)?)/.exec(programWrites);
-  expect(firstMove).not.toBeNull();
   const targetX = Number(firstMove?.[1] ?? 0);
   const targetY = Number(firstMove?.[2] ?? 0);
   await kerfdesk.emitSerialLine(
@@ -525,12 +547,14 @@ test('shows controller-reported canvas progress without treating acknowledgement
   await page.getByRole('button', { name: 'Pause' }).click();
   const atPause = Number(await probe.getAttribute('data-confirmed-route-mm'));
   await kerfdesk.emitSerialLine(
-    `<Hold:0|MPos:${targetX.toFixed(3)},${targetY.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:0,0>`,
+    `<Door:0|MPos:${targetX.toFixed(3)},${targetY.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>`,
   );
   await expect(probe).toHaveAttribute('data-lifecycle', 'paused');
   expect(Number(await probe.getAttribute('data-confirmed-route-mm'))).toBe(atPause);
 
-  await page.getByRole('button', { name: 'Resume' }).click();
+  const resume = page.getByRole('button', { name: 'Resume' });
+  await expect(resume).toBeVisible();
+  await resume.click();
   await kerfdesk.emitSerialLine(
     `<Run|MPos:${targetX.toFixed(3)},${targetY.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:1500,0>`,
   );
@@ -538,7 +562,7 @@ test('shows controller-reported canvas progress without treating acknowledgement
     .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
     .toBeGreaterThan(atPause);
 
-  await page.getByRole('button', { name: 'Stop' }).click();
+  await page.getByRole('button', { name: 'ABORT JOB', exact: true }).click();
   await expect(probe).toHaveAttribute('data-lifecycle', 'stopped');
   expect(Number(await probe.getAttribute('data-confirmed-route-mm'))).toBeGreaterThanOrEqual(
     atPause,
@@ -550,10 +574,11 @@ test('keeps the finished route and confirms it only after the stream settles Idl
   kerfdesk,
 }) => {
   await connectAndHome(page, kerfdesk);
+  await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
-  await page.getByRole('button', { name: 'Start job' }).click();
+  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
   await confirmJobReview(page);
   const probe = page.getByTestId('canvas-motion-probe');
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
@@ -570,25 +595,35 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   kerfdesk,
 }) => {
   await connectAndHome(page, kerfdesk);
+  await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
+  const baselineLines = serialWriteLineCount(await kerfdesk.events());
 
-  await page.getByRole('button', { name: 'Start job' }).click();
+  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
   await confirmJobReview(page);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
-  await expect.poll(async () => serialWriteLineCount(await kerfdesk.events())).toBeGreaterThan(0);
+  await expect
+    .poll(async () => serialWriteLineCount(await kerfdesk.events()))
+    .toBeGreaterThan(baselineLines);
   await kerfdesk.acknowledgeSerial(1);
   await kerfdesk.disconnectSerial();
 
-  await expect(page.getByText(/Interrupted laser job/)).toBeVisible();
-  await expect(page.locator('p').filter({ hasText: 'Recorded cause:' })).toContainText(
+  const recovery = page.locator('details[aria-label="Interrupted job recovery"]');
+  await expect(recovery.getByText('Interrupted job saved', { exact: true })).toBeVisible();
+  await recovery.getByText('Interrupted job saved', { exact: true }).click();
+  await expect(recovery.locator('p').filter({ hasText: 'Recorded cause:' })).toContainText(
     /connection|disconnect|USB/i,
   );
-  await expect(page.getByRole('button', { name: 'Review safe recovery' })).toBeVisible();
-  await expect(page.getByTitle('Discard the interrupted-job record.')).toBeVisible();
+  await expect(
+    recovery.getByRole('button', { name: 'Review recovery', exact: true }),
+  ).toBeVisible();
+  await expect(
+    recovery.getByTitle('Permanently discard only this isolated recovery capsule.'),
+  ).toBeVisible();
 });
 
-test('shares jog speed across buttons, keyboard movement, and return to work zero', async ({
+test('uses jog speed for XY buttons and return to work zero without hijacking canvas arrows', async ({
   page,
   kerfdesk,
 }) => {
@@ -601,17 +636,18 @@ test('shares jog speed across buttons, keyboard movement, and return to work zer
     .toContain('$J=G91 G21 X10.000 Y10.000 F1000');
   await kerfdesk.emitSerialLine('<Idle|MPos:10.000,10.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
 
+  const jogWritesBeforeArrow = jogWriteCount(await kerfdesk.events());
+  const selectionY = page.getByRole('spinbutton', { name: 'Selection Y position' });
+  const selectionYBeforeArrow = Number(await selectionY.inputValue());
   await page.keyboard.press('ArrowUp');
-  await expect
-    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), '$J=G91 G21 Y10.000 F1000\n'))
-    .toBe(1);
-  await kerfdesk.emitSerialLine('<Idle|MPos:10.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(selectionY).toHaveValue(String(selectionYBeforeArrow - 1));
 
   await page.getByRole('button', { name: 'Set origin here' }).click();
   await expect
-    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), 'G92 X0 Y0\n'))
+    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), 'G54 G92 X0 Y0\n'))
     .toBe(1);
-  await kerfdesk.emitSerialLine('<Idle|MPos:50.000,40.000,0.000|WCO:10.000,20.000,0.000|FS:0,0>');
+  expect(jogWriteCount(await kerfdesk.events())).toBe(jogWritesBeforeArrow);
+  await kerfdesk.emitSerialLine('<Idle|MPos:50.000,30.000,0.000|WCO:10.000,10.000,0.000|FS:0,0>');
 
   const goToWorkZero = page.getByRole('button', { name: 'Go to work zero' });
   await expect(goToWorkZero).toBeEnabled();
@@ -626,6 +662,15 @@ test('shares jog speed across buttons, keyboard movement, and return to work zer
 
 async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
+}
+
+async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+  const writesBeforeFrame = serialWrites(await kerfdesk.events()).length;
+  await page.getByRole('button', { name: 'Frame job', exact: true }).click();
+  await expect
+    .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeFrame))
+    .toContain('$J=G90 G21');
+  await expect(page.getByRole('button', { name: 'Start framed job', exact: true })).toBeEnabled();
 }
 
 // ADR-224: every Start now opens the Job Review dialog; its single Start
@@ -678,11 +723,37 @@ function serialWrites(events: readonly Readonly<Record<string, unknown>>[]): str
     .join('');
 }
 
+function serialWriteBytes(events: readonly Readonly<Record<string, unknown>>[]): number[] {
+  return events.flatMap((event) => {
+    if (event['kind'] !== 'serial-write') return [];
+    const bytes = event['bytes'];
+    if (!Array.isArray(bytes)) return [];
+    return bytes.filter((value): value is number => typeof value === 'number');
+  });
+}
+
 function serialWriteLineCount(events: readonly Readonly<Record<string, unknown>>[]): number {
   return events
     .filter((event) => event['kind'] === 'serial-write')
     .map((event) => String(event['text']))
     .reduce((count, text) => count + [...text].filter((character) => character === '\n').length, 0);
+}
+
+function jogWriteCount(events: readonly Readonly<Record<string, unknown>>[]): number {
+  return events.filter(
+    (event) => event['kind'] === 'serial-write' && String(event['text']).startsWith('$J='),
+  ).length;
+}
+
+function absoluteXyJogWrites(
+  events: readonly Readonly<Record<string, unknown>>[],
+  baselineCharacters: number,
+): string[] {
+  return (
+    serialWrites(events)
+      .slice(baselineCharacters)
+      .match(/\$J=G90 G21 X-?\d+(?:\.\d+)? Y-?\d+(?:\.\d+)? F\d+\n/g) ?? []
+  );
 }
 
 async function drainHeldSerialWrites(
@@ -708,10 +779,29 @@ async function drainHeldSerialWrites(
   throw new Error('Held serial writes did not drain.');
 }
 
-function frameWriteCount(events: readonly Readonly<Record<string, unknown>>[]): number {
-  return events.filter(
-    (event) => event['kind'] === 'serial-write' && String(event['text']).startsWith('$J=G90 G21'),
-  ).length;
+async function drainHeldFrameWrites(
+  page: Page,
+  kerfdesk: KerfDeskFixture,
+  baselineLines: number,
+  baselineCharacters: number,
+): Promise<void> {
+  let acknowledged = 0;
+  let stablePasses = 0;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const events = await kerfdesk.events();
+    const written = serialWriteLineCount(events) - baselineLines;
+    const pending = written - acknowledged;
+    if (pending > 0) {
+      await kerfdesk.acknowledgeSerial(pending);
+      acknowledged += pending;
+      stablePasses = 0;
+    } else if (serialWrites(events).slice(baselineCharacters).includes('G4 P0.01\n')) {
+      stablePasses += 1;
+      if (stablePasses >= 3) return;
+    }
+    await page.waitForTimeout(25);
+  }
+  throw new Error('Held Frame writes did not reach the controller-settle command.');
 }
 
 function exactSerialWriteCount(
