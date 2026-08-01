@@ -274,6 +274,34 @@ describe('excluding the entity being drawn', () => {
     });
     expect(result?.target.entityId).toBe('r');
   });
+
+  // A drag moves a whole SELECTION, and every shape in it chases the cursor.
+  // Excluding one id was not enough: the rest of the selection kept capturing
+  // the pointer, which is what made dragging lurch.
+  it('excludes every entity named in excludeEntityIds', () => {
+    const line: SketchLine = { kind: 'line', id: 'l', start: { x: 0, y: 0 }, end: { x: 10, y: 0 } };
+    const sketch: Sketch = { entities: [rect, line] };
+    expect(
+      resolveSnap({
+        sketch,
+        pointMm: { x: 0.5, y: 0.5 },
+        toleranceMm: 4,
+        excludeEntityIds: new Set(['r', 'l']),
+      }),
+    ).toBeNull();
+  });
+
+  it('still snaps to a shape outside the excluded set', () => {
+    const line: SketchLine = { kind: 'line', id: 'l', start: { x: 0, y: 0 }, end: { x: 10, y: 0 } };
+    const sketch: Sketch = { entities: [rect, line] };
+    const result = resolveSnap({
+      sketch,
+      pointMm: { x: 100.5, y: 0.5 },
+      toleranceMm: 4,
+      excludeEntityIds: new Set(['l']),
+    });
+    expect(result?.target.entityId).toBe('r');
+  });
 });
 
 describe('disabled kinds', () => {

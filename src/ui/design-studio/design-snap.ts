@@ -37,6 +37,7 @@ export function snapPointMm(args: {
   readonly gridMm: number;
   readonly kinds?: ReadonlySet<SnapKind>;
   readonly excludeEntityId?: string;
+  readonly excludeEntityIds?: ReadonlySet<string>;
 }): ResolvedSnap {
   if (!args.snapEnabled) return { pointMm: args.rawMm, target: null };
   const toleranceMm = SNAP_RADIUS_PX / (args.pxPerMm > 0 ? args.pxPerMm : 1);
@@ -46,6 +47,7 @@ export function snapPointMm(args: {
     toleranceMm,
     ...(args.kinds === undefined ? {} : { kinds: args.kinds }),
     ...(args.excludeEntityId === undefined ? {} : { excludeEntityId: args.excludeEntityId }),
+    ...(args.excludeEntityIds === undefined ? {} : { excludeEntityIds: args.excludeEntityIds }),
   });
   if (geometric !== null) return { pointMm: geometric.target.atMm, target: geometric.target };
   return {

@@ -127,6 +127,11 @@ function resolvePointerMm(
     pxPerMm: surface.pxPerMm(),
     snapEnabled: session.snapEnabled,
     gridMm: session.gridMm,
+    // While dragging, the moving shapes must not be snap targets: they follow
+    // the cursor, so snapping to them makes the pointer chase geometry that is
+    // chasing the pointer — worst on a circle, whose centre and quadrants are
+    // all live targets travelling with it.
+    ...(session.move === null ? {} : { excludeEntityIds: session.move.ids }),
   });
   store.setActiveSnap(resolved.target);
   return resolved.pointMm;

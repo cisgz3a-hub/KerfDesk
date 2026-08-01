@@ -37,10 +37,10 @@ export function entitySegments(entity: SketchEntity): ReadonlyArray<SnapSegment>
 
 export function sketchSegments(
   sketch: Sketch,
-  excludeEntityId?: string,
+  isExcluded?: (entityId: string) => boolean,
 ): ReadonlyArray<SnapSegment> {
   return sketch.entities
-    .filter((entity) => entity.id !== excludeEntityId)
+    .filter((entity) => isExcluded?.(entity.id) !== true)
     .flatMap((entity) => entitySegments(entity));
 }
 
