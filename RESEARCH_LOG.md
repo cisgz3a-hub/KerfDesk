@@ -33,7 +33,7 @@ Each entry here corresponds to a `package.json` dependency. New rows are added w
 
 ### DOMPurify
 
-- **Version:** ≥ 3.3.2 (pinned floor; latest at adoption: 3.4.6 — verified via `cure53/DOMPurify` `package.json` on 2026-05-27)
+- **Version:** ^3.4.11 (resolved 3.4.11; the security floor remains 3.3.2)
 - **License:** MPL-2.0 OR Apache-2.0 (verified MIT-compatible per ADR-017)
 - **Source:** https://github.com/cure53/DOMPurify
 - **Decision affected:** ADR-017 (library policy); used in `src/io/svg/` for sanitization
@@ -89,18 +89,18 @@ not separately evaluated against ADR-017's per-library criteria — the stack
 choice itself was the ADR. Listed here for completeness so the bundle / CVE
 audit can find them.
 
-Versions below reflect the current `package.json` (last refreshed 2026-05-28
-after the F-2 security bump). When you bump anything in this table, also
+Versions below reflect the current `package.json` (last refreshed 2026-07-22).
+When you bump anything in this table, also
 append a row to the "Re-verification log" further down so the diff stays
 auditable.
 
 | Package | Version (pinned ^) | License | Role |
 |---|---|---|---|
 | `typescript` | ^5.5.0 | Apache-2.0 | Type-checker |
-| `vite` | ^6.4.2 | MIT | Web build + dev server |
+| `vite` | ^6.4.3 | MIT | Web build + dev server |
 | `@vitejs/plugin-react` | ^4.3.0 | MIT | JSX transform for Vite |
-| `vitest` | ^3.2.4 | MIT | Test runner |
-| `@vitest/coverage-v8` | ^3.2.4 | MIT | Coverage |
+| `vitest` | ^3.2.6 | MIT | Test runner |
+| `@vitest/coverage-v8` | ^3.2.6 | MIT | Coverage |
 | `jsdom` | ^25.0.0 | MIT | DOM env for Vitest |
 | `fast-check` | ^3.22.0 | BSD-2-Clause | Property tests |
 | `eslint` | ^9.10.0 | MIT | Linter |
@@ -114,15 +114,17 @@ auditable.
 | `eslint-import-resolver-typescript` | ^3.6.3 | ISC | TS path resolution for boundaries |
 | `prettier` | ^3.3.0 | MIT | Formatter |
 | `globals` | ^15.9.0 | MIT | Predefined env globals |
-| `license-checker` | ^25.0.1 | BSD-3-Clause | CI license audit |
 | `@types/node`, `@types/react`, `@types/react-dom`, `@types/opentype.js` | various | MIT (DefinitelyTyped) | Type declarations |
 | `electron` | ^42.3.0 | MIT | Windows desktop shell (bumped F-2; CVE-2026-34769/34780 patched) |
-| `electron-builder` | ^26.11.1 | MIT | Desktop installer pipeline |
-| `wrangler` | ^4.95.0 | MIT / Apache-2.0 | Cloudflare Pages deploy CLI |
+| `electron-builder` | ^26.15.3 | MIT | Desktop installer pipeline |
+| `@playwright/test` | ^1.61.1 | Apache-2.0 | Isolated browser smoke |
+| `vite-plugin-pwa` | ^1.3.0 | MIT | PWA/service-worker build integration |
+| `workbox-window` | ^7.4.1 | MIT | Service-worker registration helper |
+| `wrangler` | ^4.100.0 | MIT / Apache-2.0 | Cloudflare Pages deploy CLI |
 
-All licenses verified MIT-compatible by `pnpm license-check` (production-only)
-+ manual review of dev-dep tree. The CI workflow re-runs the check on every
-push.
+Production licenses are checked by `pnpm license-check`; development tools are
+reviewed when adopted or upgraded. `pnpm release:check` runs the production
+license check in CI.
 
 ---
 
@@ -168,6 +170,25 @@ These have been chosen in advance but are not yet in `package.json`. Re-verify a
 - **Alternatives that would replace imagetracerjs entirely (parked, not adopted):**
   - **vtracer** (MIT, Rust-based, has WASM build) — visioncortex group; known higher quality than imagetracerjs. Strong candidate for a future evaluation. Would need a bundle-impact + integration-shape review before adoption per ADR-017.
   - **potrace** (GPL-2) — gold standard but license-incompatible per ADR-017. Algorithm (Selinger 2003 paper) could be re-implemented from scratch if the preprocessing-upgrade path stops being enough.
+
+### clipper2-ts — adopted geometry kernel
+
+- **Version:** 2.0.1-17
+- **License:** BSL-1.0 (Boost Software License 1.0)
+- **Source:** https://github.com/ErikSom/Clipper2-ts
+- **Role:** deterministic polygon offsetting and clipping in core geometry,
+  including kerf, pockets, and later CNC geometry flows.
+- **Decision affected:** ADR-098 and ADR-209.
+
+### workbox-window — adopted PWA registration helper
+
+- **Version:** ^7.4.1
+- **License:** MIT
+- **Source:** https://github.com/GoogleChrome/workbox
+- **Role:** browser-side registration and lifecycle handling for the service
+  worker produced by `vite-plugin-pwa`; it is a build dependency that contributes
+  code to the shipped web application.
+- **Decision affected:** ADR-060.
 
 ---
 
@@ -741,7 +762,9 @@ compiler.
 - Be concrete. "Used by many projects" is not a useful claim; "4,281 npm dependents as of 2026-05-26" is.
 - Be honest about confidence. "high" means you'd defend this in a code review; "low" means you'd want a second opinion.
 - Verify licenses against the actual `LICENSE` file in the upstream repo, not against npm metadata or reputation.
-- A library is not added to `package.json` until its row exists here. CI enforces this with a custom lint rule cross-checking `package.json` against this file.
+- A library should be documented here when it is adopted. `package.json` and the
+  production license check are the enforced dependency sources; this log provides
+  the human rationale and is reviewed for drift during dependency changes.
 
 ### Playwright - adopted for isolated browser smoke (2026-07-13, ADR-158)
 

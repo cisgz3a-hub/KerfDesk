@@ -23,6 +23,8 @@ also preserved as `@license` banners inside the shipped `dist/web/assets/*.js`.
 | imagetracerjs | Unlicense (public domain) | András Jankovics — https://github.com/jankovicsandras/imagetracerjs |
 | clipper2-ts | BSL-1.0 (Boost Software License 1.0) | Port of Angus Johnson's Clipper2 — https://github.com/ErikSom/Clipper2-ts |
 | lucide-static | ISC | © Lucide Contributors — https://github.com/lucide-icons/lucide |
+| electron-updater | MIT | electron-builder contributors — https://github.com/electron-userland/electron-builder |
+| workbox-window | MIT | © Google LLC — https://github.com/GoogleChrome/workbox |
 
 The MIT / ISC permission notices ("Permission is hereby granted, free of charge, …
 THE SOFTWARE IS PROVIDED "AS IS"…"), the Apache-2.0 / MPL-2.0 texts (DOMPurify),

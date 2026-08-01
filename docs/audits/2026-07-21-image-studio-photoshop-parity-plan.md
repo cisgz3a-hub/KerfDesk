@@ -1,5 +1,9 @@
 # Image Studio → Photoshop parity plan (2026-07-21)
 
+Status: implemented through PP-F. This file preserves the execution plan and its
+research rationale; use `PROJECT.md`, `WORKFLOW.md`, and `DECISIONS.md` for current
+product status.
+
 Maintainer verdict on the IE-1 v1 editor: "not very good." Goal restated: copy the best
 Photoshop into KerfDesk, researched properly. Evidence: [`photoshop-ux-anatomy-research`](./2026-07-21-photoshop-ux-anatomy-research.md)
 (live-verified against Photopea) and [`minipaint-source-study`](./2026-07-21-minipaint-source-study.md)

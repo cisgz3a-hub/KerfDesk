@@ -1,8 +1,19 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.0 — Phase L "Image Studio" adopted: in-app Photoshop-grade raster editing of `RasterImage` sources, staged IE-1..IE-4, build started 2026-07-21 (ADR-242; research + roadmap in `docs/audits/2026-07-21-image-editor-research-and-roadmap.md`). Carried from v3.9: revisioned machine-aware CNC starters (ADR-233), bounded 4040 fill entries (ADR-234), profile-scoped 4040 scan quality hardening (ADR-235), and the actual completed Frame as the spatial source of truth with calculated bounds/settings kept advisory (ADR-232). Exact-artifact pre-Frame Job Review and a completion-issued Start permit remain governed by ADR-230, with the public-spec 4040 hybrid profile in ADR-231 and the read-only Super console in ADR-229. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 242. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Current status (2026-07-22):** Phase L Image Studio is active. The base editor,
+> PP-A through PP-F Photoshop-parity stack, adjustments/filters, resize/transform,
+> Quick Mask, History, and the ADR-245 layer model are merged. The maintainer-selected
+> V2 retouch/advisory/Apply-and-Trace arc is planned in
+> `docs/audits/2026-07-22-image-studio-v2-plan.md` and has not been implemented by that
+> plan. Recent governing decisions also cover the six-step Machine Setup (ADR-240),
+> advisory-only large-job budgets (ADR-241/243), background preparation (ADR-244), and
+> profile-scoped 4040 scan hardening (ADR-236). The ADR tail is **245**. Software,
+> browser/perceptual, and real-hardware qualification remain separate claims; see
+> `docs/hardware/verification-status.md`.
 >
-> **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
+> **Read also:** `docs/README.md` for documentation routing, `WORKFLOW.md` for user
+> flows, `DECISIONS.md` for architecture rationale, and `AGENTS.md` / `CLAUDE.md`
+> for repository and engineering rules.
 
 ---
 
@@ -97,16 +108,21 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 
 Import a raster (JPG/PNG), trace to vectors with the in-house contour/centerline/edge engine (ADR-123 — binary presets route to `contour-trace.ts`; Centerline is a shipped preset). `imagetracerjs` (Unlicense — MIT-compatible; `potrace-wasm` rejected on GPL grounds) remains only as a UI-unreachable multi-colour fallback. Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013 and ADR-123.
 
-**Trace pipeline hardening (2026-05-29).** Fixed transparent-PNG decode (composite onto white — it was producing all-black traces); added a perceptual-fidelity test harness that renders trace output and diffs it against analytic ground-truth masks via IoU (ADR-025, `src/__fixtures__/perceptual/`); and made a committed trace keep its source bitmap as a coexisting `RasterImage` for LightBurn-style overlay (ADR-026, new `src/ui/state/import-actions.ts`). **Known open gap — the next frontier:** imagetracerjs is outline-only, so a single pen stroke becomes two parallel contours; closing this outline-vs-centerline gap (a centerline/skeleton trace mode + metric) is the core remaining "faulty vs LightBurn" issue and is *not* caught by the IoU harness. Also open: `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input (the `Line Art` preset sidesteps it), and the ADR-026 follow-ups (re-trace-from-source, source dimming/opacity, grouping the trace+source pair). See ADR-025 'Scope'/'Consequences' and ADR-026 'Consequences'.
+**Trace pipeline status.** Transparent-PNG decode, the ADR-025 perceptual harness,
+source retention/re-trace, the clean-room contour engine, measured Centerline, and Edge
+Detection have shipped (ADR-025/026/058/059/100/123). Fresh laser traces default to
+editable vectors while raster scan remains an explicit output choice (ADR-238). Fidelity is
+still a perceptual and physical-output claim: structural tests alone do not prove that a
+particular source traces or burns correctly.
 
-### Phase F — v0.6 "Raster engrave" [In progress]
+### Phase F — v0.6 "Raster engrave" [Built; hardware qualification remains feature-specific]
 
 Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005. See ADR-019 (Fill) + ADR-020 (Image).
 
 - **F.1 — Fill** [Shipped]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Snake fill alternates row direction.
 - **F.2 — Image** [F.2.a-e shipped; F.2.f hardware burn pending]. True raster engrave: new `RasterImage` SceneObject variant (PNG data URL + base64 luma); `dither.ts` runs threshold/Floyd-Steinberg/grayscale; `emit-raster.ts` emits M4-mode per-pixel S-modulation G1 sweeps with overscan. Job.groups is now a CutGroup-or-RasterGroup discriminated union; grbl-strategy dispatches per kind. Toolbar `Engrave Image…` opens a file picker; Layer dropdown enables `Image` mode and surfaces Dither + lines/mm fields. ADR-020. Hardware verification checklist in WORKFLOW.md F-F2; not yet burned on Falcon.
-- **F.3 — Set work origin** [Code shipped; hardware verification pending]. Operator jogs the laser head to a workpiece corner and presses *Set origin here* to declare that physical point as work-coord (0, 0). New `OriginRow` in `JobControls.tsx` (Set / Reset buttons), origin readout in `StatusDisplay.tsx`, GRBL command constants (`G92 X0 Y0` / `G92.1`), WCO parsing + caching across status frames in `laser-store`. Pipeline change is zero: GRBL applies the WCS offset to absolute-G90 G-code at run time. ADR-021; WORKFLOW.md F-F3. G92 only — persistent G10 L20 P1 deferred. Bed-bounds preflight remains machine-relative; operator framing after Set Origin is the documented safety check (future ADR-022).
-- **F.4 — Convert to Bitmap** [A1–A4 shipped (Fill All / Outlines / Use Cut Settings + DPI control); A5 placement/brightness polish pending]. Vector→raster: rasterize selected vector objects into a `RasterImage` engrave source, matching LightBurn (Outlines / Fill All / Use Cut Settings render types, DPI control, 50% gray pixels, **source vector deleted**). New pure-core `src/core/raster/rasterize-vector.ts`; additive (no `SceneObject`/schema change). ADR-029; WORKFLOW.md F-F4. Staged: **A1** ✓ pure-core Fill-All luma rasterizer; **A2** ✓ Toolbar `Convert to Bitmap` button → PNG encode + `RasterImage` in-place swap (Fill All only — the render-type picker + DPI control arrive with A3/A4); A3 = Outlines; A4 = Use Cut Settings; A5 = placement/brightness polish. A2 fill+encode fidelity verified in-browser side-effect-free (real PNG round-trips to 200×200 at 254 DPI; ink 50% gray, even-odd hole preserved); live in-app render/placement and a LightBurn side-by-side not yet done.
+- **F.3 — Set work origin** [Code shipped; hardware verification remains profile-specific]. The ordinary control sends `G92 X0 Y0` and Reset sends `G92.1`; advanced controls can store/clear the G54 origin with `G10 L20 P1` / `G10 L2 P1`. WCO parsing, transaction acknowledgement, and origin-state invalidation live in `laser-store`. ADR-021 records the original G92 decision; ADR-022 and `WORKFLOW.md` F-F3 describe current placement and verification behavior.
+- **F.4 — Convert to Bitmap** [A1–A5 shipped]. Selected vector artwork is rasterized into a `RasterImage` engrave source using Fill All, Outlines, or Use Cut Settings, with DPI and Default Brightness controls. The operation supports multi-selection, worker execution, transform baking, budget/error handling, and one in-place project change. See ADR-029 and `WORKFLOW.md` F-F4. Visual equivalence for a particular design still requires rendered comparison.
 
 - **F.5 - Material calibration workflow** [Shipped; hardware calibration pending]. Minimal LightBurn-style Material Test and Interval Test generators, native `.lfml.json` libraries, multi-library UI, bounded LightBurn `.clb` import, and refreshable native preset-to-layer bindings are in scope. Manufacturer profile packs, `.clb` export, and LightBurn `LinkPath` synchronization remain deferred. ADR-044, ADR-045, ADR-093, ADR-164.
 - **F.6 - Experimental laser safety surface** [Shipped; hardware features remain CLAIMED]. Tools → Labs stores fail-closed, local feature gates for rotary, rotary raster, low-power Fire, print-and-cut, and camera alignment v2. Low-power Fire additionally requires controller capability and an opted-in profile, is hard-capped at 5%, and is hold-to-run with redundant release paths (ADR-161, ADR-162).
@@ -223,7 +239,7 @@ and the seeded benchmark — new categories must score 100% without
 regressing v1. Deferred with names in ADR-116: lip/hinged/living-hinge
 lids, polygon prisms, dovetails, CNC dado 2.5D, T-slot hardware joints.
 
-### Phase L — v0.11 "Image Studio" [In progress — IE-1 under construction]
+### Phase L — v0.11 "Image Studio" [In progress — base/parity editor shipped; V2 planned]
 
 Full in-app raster editing of `RasterImage` engrave/trace sources — the pixel-repair loop
 LightBurn lacks (it has no painting, selections, levels, or background removal; verified
@@ -238,10 +254,10 @@ Abort stays reachable while a job streams (non-negotiable #9). The edit→re-tra
 
 | Stage | Delivers | Status |
 |---|---|---|
-| IE-1 | Line work & selections: editor overlay + session store, brush/pencil/eraser/line tools, marquee/lasso/wand selections with delete/fill/paint-clipped/move, crop, editor-local undo/History, Apply→re-trace, engrave-preview view | In progress |
-| IE-2 | Adjust & filters: levels/curves/histogram, Enhance (unsharp) parity, blur/median/despeckle, selection-scoped adjustments, Image/Canvas Size with bilinear resample, arbitrary rotate, Halftone/Newsprint/Sketch image modes, live trace overlay | Planned |
-| IE-3 | Retouch & content: clone stamp, dodge/burn, classical background removal, raster text stamp, gradient fill, non-PatchMatch spot-heal | Planned |
-| IE-4 | Layers/blend modes/masks, `.lf2` session persistence, acceleration — each requires its own ADR | Deferred |
+| IE-1 | Editor overlay, session store, brush/pencil/eraser/line tools, marquee/lasso/wand selections, crop/free transform, Quick Mask, History, and Apply | Shipped |
+| IE-2 | Levels/curves/histogram, threshold/invert/posterize, blur/unsharp/high-pass/median, halftone/line-screen, and Image/Canvas Size | Shipped |
+| IE-3 | Retouch/content tools selected for the V2 arc: gradient, clone/heal, text layer, laser advisories, and Apply & Trace | Planned; see the 2026-07-22 V2 plan |
+| IE-4 | ADR-245 layers, visibility/opacity, normal/multiply blend, reorder/merge, and composite Apply | Core and UI shipped; cross-layer history, project-session persistence, and acceleration remain deferred |
 
 ### Anything past Phase F
 
@@ -306,14 +322,22 @@ phase; tracked here so they don't get lost.
 14. **G-code snapshot-tested** (ADR-010).
 15. **File-size limits enforced** (ADR-015): files ≤ 400 lines hard, ≤ 250 soft; components ≤ 250 hard; functions ≤ 80 hard.
 16. **Co-located tests** (ADR-015): tests live beside their source (`Foo.ts` has a `Foo.test.ts`). Not every source file has a sibling and CI does not enforce a strict sibling rule (see CLAUDE.md); PR review rejects untested source changes.
-17. **Single responsibility per file** (CLAUDE.md). One-sentence description without "and."
+17. **Single responsibility per file** (CLAUDE.md). Split by cohesion and change risk,
+    not by an arbitrary wording test.
 18. **Discriminated unions for state** (ADR-010, ADR-014).
 19. **`SceneObject` extensible from day one** (ADR-014).
 20. **Third-party libraries pass evaluation policy** (ADR-017): license, maintenance, fit, size, CVE status.
 
 ### Maintainer authority
 
-21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-228, ADR-230, ADR-232). A clean completed Frame for the exact current job is the sole ordinary Start authorization on laser and CNC; Start only claims that one-use permit plus unavoidable live transport/handoff facts, and Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories.
+21. **Ordinary Start is frame-first; integrity boundaries remain enforced** (ADR-228,
+    ADR-230, ADR-232, ADR-237). A clean completed Frame for the exact current job is
+    the sole ordinary operator-policy authorization on laser and CNC. Calculated bed,
+    no-go, settings, and similar advisory findings belong in Start-time Job Review.
+    Transport readiness, required placement inputs, compile integrity, exact-handoff/
+    recovery consistency, security validation, unsupported capabilities, and explicit
+    destructive intent may still refuse an operation that cannot be executed correctly.
+    Frame-first must not be used to weaken physical interlocks or trust boundaries.
 
 ---
 
@@ -325,7 +349,9 @@ phase; tracked here so they don't get lost.
 - Web cold-start < 2 s, desktop cold-start < 3 s.
 - 60 fps pan/zoom on a 5,000-segment scene.
 - A fix that changes G-code output produces a visible snapshot diff in CI.
-- **No file in the repo exceeds 400 lines.** Enforced by ESLint.
+- Checked production source stays within the 400 counted-line ESLint limit and the
+  600-physical-line repository backstop; tests, fixtures, documents, and explicit
+  policy scopes are described in `CLAUDE.md` and the check scripts.
 - **Every third-party dependency has an entry in `RESEARCH_LOG.md`** with license, version, maintenance status at adoption.
 
 ---
@@ -347,7 +373,7 @@ phase; tracked here so they don't get lost.
 - **Lint/format:**
   - ESLint with `eslint-plugin-boundaries` (module isolation).
   - `eslint max-lines`, `max-lines-per-function`, `complexity` (file-size enforcement).
-  - `license-checker` in CI (license-compliance enforcement).
+  - `scripts/check-licenses.mjs` using `pnpm licenses list --prod` in CI.
   - Prettier.
 - **CI:** GitHub Actions on `ubuntu-latest`. The release/deploy gate runs lint, typecheck, license-check, unit, property, snapshot, web build, and Electron main-process compile. Playwright runs in a separate pull-request/manual browser-smoke workflow so browser provisioning cannot time out a production deploy (ADR-158). The Windows desktop `.exe` (`build:desktop`, electron-builder) and hardware verification remain release-manual (S02-001/003).
 - **Repo:** Single Git repo, MIT license, public (ADR-120 supersedes ADR-018's private posture).
@@ -547,8 +573,11 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 | `PROJECT.md` | Scope, non-negotiables, phase plan. (This file.) |
 | `WORKFLOW.md` | Detailed user flows for the current phase. |
 | `DECISIONS.md` | Architecturally significant decisions with rationale. |
-| `CLAUDE.md` | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. |
+| `AGENTS.md` | Tool-neutral repository operating contract and machine-control policy. |
+| `CLAUDE.md` | Engineering standards, enforcement map, and verification guidance. |
+| `docs/README.md` | Documentation routing and current-vs-historical ownership. |
 | `RESEARCH_LOG.md` | External claims and library adoptions, with source, version, license, date. |
+| `docs/hardware/verification-status.md` | Living hardware/perceptual qualification register. |
 | `LICENSE` | MIT (ADR-120). |
 
 External authorities:
@@ -559,7 +588,11 @@ External authorities:
 
 ---
 
-## Vertical slice — Phase A acceptance
+## Historical vertical slice — Phase A acceptance baseline
+
+This section records the original Phase A merge bar. It is retained for provenance;
+the active release gate is `pnpm release:check`, current scope is described above,
+and current physical qualification lives in `docs/hardware/verification-status.md`.
 
 Phase A merges only when **all** of these are true. Phase B starts only after Phase A is green.
 
@@ -575,9 +608,10 @@ Phase A merges only when **all** of these are true. Phase B starts only after Ph
    - **SVG sanitizer (via DOMPurify):** strips `<script>`, external `xlink:href`, foreign objects, non-image data URIs on a corpus of crafted-malicious SVGs.
    - **Module boundary:** ESLint passes; no `core` file imports from `platform`, `ui`, or `io`.
    - **File-size discipline:** ESLint passes; no file > 400 lines; no component > 250 lines; no function > 80 lines.
-   - **License compliance:** `license-checker` finds zero GPL-family transitive dependencies.
+   - **License compliance:** `scripts/check-licenses.mjs` finds no disallowed production licenses.
    - **SceneObject extensibility:** a stub `TextObject` variant added to the union compiles through `JobCompiler` without modifying existing tests.
-5. No file in the repo over 400 lines. No untested source file. CI green.
+5. Checked production source satisfies the file-size policies; behavior changes carry
+   focused tests; CI is green.
 6. `RESEARCH_LOG.md` contains an entry for every adopted runtime dependency (license, version, justification, evaluation date).
 
 Anything outside this list is Phase B or later.

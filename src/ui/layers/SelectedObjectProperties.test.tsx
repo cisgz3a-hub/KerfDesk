@@ -26,10 +26,102 @@ async function render(): Promise<{ readonly host: HTMLDivElement; readonly root:
 }
 
 describe('SelectedObjectProperties', () => {
-  it('does not render when nothing is selected', async () => {
+  it('does not render when the canvas has no artwork', async () => {
     const { host, root } = await render();
     try {
       expect(host.querySelector('[aria-label="Selected object properties"]')).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('keeps one artwork editable after it is deselected on the canvas', async () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'rect-1',
+        color: '#ff0000',
+        spec: { widthMm: 40, heightMm: 20, cornerRadiusMm: 0 },
+      }),
+    );
+    useStore.getState().selectObject(null);
+    const { host, root } = await render();
+    try {
+      expect(host.querySelector('[aria-label="Artwork properties"]')).not.toBeNull();
+      expect(host.textContent).toContain('Nothing selected on canvas');
+      const radius = host.querySelector('input[aria-label="Rectangle corner radius"]');
+      if (!(radius instanceof HTMLInputElement)) throw new Error('corner radius input missing');
+      await act(async () => {
+        radius.value = '4';
+        Simulate.change(radius);
+      });
+      await act(async () => Simulate.blur(radius));
+
+      const powerScale = host.querySelector(
+        'input[aria-label="Power scale for inspected artwork"]',
+      );
+      if (!(powerScale instanceof HTMLInputElement)) throw new Error('power scale input missing');
+      await act(async () => {
+        powerScale.value = '80';
+        Simulate.change(powerScale);
+      });
+      await act(async () => Simulate.blur(powerScale));
+
+      expect(useStore.getState().selectedObjectId).toBeNull();
+      expect(useStore.getState().project.scene.objects[0]).toMatchObject({
+        powerScale: 80,
+        spec: { kind: 'rect', cornerRadiusMm: 4 },
+      });
+      expect(host.querySelector('[aria-label="Artwork operation"]')).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('uses one artwork chooser when several unselected artworks are on the canvas', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
+    useStore.getState().selectObject(null);
+    const { host, root } = await render();
+    try {
+      const chooser = host.querySelector('select[aria-label="Artwork to inspect"]');
+      if (!(chooser instanceof HTMLSelectElement)) throw new Error('artwork chooser missing');
+      expect(chooser.options).toHaveLength(2);
+      await act(async () => {
+        chooser.value = 'O2';
+        Simulate.change(chooser);
+      });
+      const mode = host.querySelector('select[aria-label="Mode for inspected artwork"]');
+      if (!(mode instanceof HTMLSelectElement)) throw new Error('operation mode missing');
+      await act(async () => {
+        mode.value = 'fill';
+        Simulate.change(mode);
+      });
+
+      const state = useStore.getState();
+      expect(state.selectedObjectId).toBeNull();
+      expect(state.additionalSelectedIds.size).toBe(0);
+      expect(state.project.scene.layers.find((layer) => layer.name === 'O1')?.mode).toBe('line');
+      expect(state.project.scene.layers.find((layer) => layer.name === 'O2')?.mode).toBe('fill');
+      expect(host.querySelectorAll('[aria-label="Artwork operation"]')).toHaveLength(1);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('remembers the last selected artwork when the canvas selection is cleared', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
+    useStore.getState().selectObject('O2');
+    const { host, root } = await render();
+    try {
+      await act(async () => useStore.getState().selectObject(null));
+      const chooser = host.querySelector('select[aria-label="Artwork to inspect"]');
+      if (!(chooser instanceof HTMLSelectElement)) throw new Error('artwork chooser missing');
+      expect(chooser.value).toBe('O2');
+      expect(useStore.getState().selectedObjectId).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();

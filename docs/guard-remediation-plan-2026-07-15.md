@@ -1,5 +1,11 @@
 # Guard remediation implementation plan
 
+> **Historical and superseded.** This plan records the pre-ADR-228 remediation
+> model. Its fail-closed policy recommendations are not current instructions.
+> Use `AGENTS.md`, PROJECT non-negotiable 21, ADR-228/230/232/237, and
+> `docs/audits/2026-07-18-guard-inventory-frame-first.md` for current ordinary
+> Start behavior. The original plan is preserved below for provenance.
+
 **Branch:** `codex/guard-safety-main`  
 **Baseline:** `origin/main` at `e3c2b4b7a4e00cd1a576922f8d5046dda5217ffb`  
 **Created:** 2026-07-15

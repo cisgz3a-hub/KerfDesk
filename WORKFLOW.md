@@ -1,8 +1,16 @@
 # WORKFLOW.md — KerfDesk user flows
 
-> Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
+> Current user flows aim to cover **success**, **error**, **empty**, and **edge/recovery**
+> states. This file is the workflow specification; accepted later ADRs and passages
+> explicitly marked historical or superseded take precedence until the affected flow
+> is corrected. UI changes must update the relevant flow in the same change.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC45 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation.
+> Detailed flows exist for the baseline app/controller paths, Phase F laser production,
+> CNC/router (`F-CNC*` + `F-CNC-PROBE`), multi-controller behavior, Phase K box
+> generation, Phase L Image Studio, Camera Mode, and the Windows desktop app. Phase C
+> contains the current Machine Setup flow but retains older placeholder bullets; Phase D/E
+> remain compact indexes rather than full four-state specifications. Use `docs/README.md`
+> as the section map.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -22,9 +30,8 @@
 > opens when the operator presses **Start** on a review-pending permit; its confirm button is
 > **Start job**, and confirming claims the permit and streams. Warnings, the G54 normalization
 > disclosure, and the acknowledgement/attestation prompts all surface in that Start-time review.
-> Passages below that describe a pre-Frame Job Review or an **Accept & Frame** confirm predate
-> ADR-237 — read "Job Review before Frame" as "Job Review at Start". Transient camera-marker
-> Frames remain reviewed before dispatch and stream without reopening the dialog.
+> Transient camera-marker Frames remain reviewed before dispatch and stream without
+> reopening the dialog.
 
 ---
 
@@ -261,9 +268,15 @@ Identical to F-A3 except:
 ### F-A7. Artwork Operations panel
 
 #### Layout
-- The top selection inspector is the canonical settings surface. Clicking one artwork shows that
-  artwork's named operation and its laser or CNC fields. The inspector never duplicates the same
-  detailed settings in a second card below it.
+- The top **Artwork settings** inspector is the canonical detailed settings surface and remains
+  present whenever editable artwork exists. A canvas selection takes priority and shows that
+  artwork's shape, image, and named laser/CNC operation fields. Clearing the canvas selection keeps
+  the last inspected artwork available without reselecting it; with several unselected artworks, a
+  single **Artwork** selector chooses which one the inspector edits. The selector is UI-only and
+  does not change selected-only output, canvas handles, grouping, or machine order.
+- The inspector renders only one detailed settings context at a time. A real multi-selection keeps
+  the existing combined/common-operation workflow; unselected artworks are switched through the
+  **Artwork** selector rather than expanding one settings card per shape.
 - A compact ordered operation list follows the inspector. Each row shows automatic colour, name,
   process summary, visibility, output, and order controls. Operation row order decides the processes
   inside an artwork; artwork run priority is the top-level machine sequence.
@@ -1753,9 +1766,8 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     2–3. The cache should still update — WCO is reported on a
     separate bit from MPos/WPos.
 
-When this checklist passes on the Falcon, promote Phase F.3's
-"Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
-Shipped" and update the hardware verification inventory.
+When this checklist passes on the Falcon, record the machine, firmware, procedure,
+measurements, and evidence in `docs/hardware/verification-status.md`.
 
 #### No-homing positioning guide (ADR-193)
 
@@ -2407,7 +2419,7 @@ F-CNC19 tiling.
 4. V-carve groups run BEFORE profile cuts (they never free the part).
 
 #### Error — active bit is not a v-bit
-1. The layer panel and pre-Frame Job Review show "V-carve requires a v-bit."
+1. The layer panel and Start-time Job Review show "V-carve requires a v-bit."
    It is an ordinary Frame/Start warning, not a Start gate. Save G-code keeps
    its export preflight until a v-bit is selected.
 
@@ -3393,19 +3405,19 @@ F-CNC19 tiling.
 
 ### F-CNC42. Attest exclusive controller access before CNC Frame - Phase H.11
 
-#### Success - one pre-Frame Job Review acknowledgement
-1. After compile/readiness succeeds, Job Review names physical
+#### Success - one Start-time Job Review acknowledgement
+1. After a matching Frame completes and the operator presses Start, Job Review names physical
    workholding/clearance and every common competing command path: pendant/MPG,
    WebUI/network, another sender app, PLC motion or spindle commands, controller
    macros, and SD/file jobs.
 2. The operator confirms KerfDesk is the sole command owner while emergency-
    stop, safety-door, and feed-hold circuits remain enabled.
 3. The resulting evidence is bound to the exact program fingerprint plus the
-   current trusted-position and work-Z-reference epochs before Frame.
+   current trusted-position and work-Z-reference epochs before streaming.
 
 #### Error - missing, incomplete, or stale evidence
-1. A missing acknowledgement keeps Job Review incomplete; there is no separate
-   post-Frame ordinary Start confirmation.
+1. A missing acknowledgement keeps the Start-time Job Review incomplete; no job
+   bytes are streamed.
 2. A reconnect, controller banner/reset, alarm/sleep, homing, origin/probe
    change, tool change, or other setup-trust invalidation expires the exact
    candidate/permit and requires a new Job Review plus completed Frame.
@@ -4201,7 +4213,7 @@ runs this on real Windows:
       the desktop app the Download/Install affordances are hidden.
 
 Until every box is checked on real hardware, the desktop installer stays
-**CLAIMED** in the hardware verification inventory.
+**Claimed** in `docs/hardware/verification-status.md`.
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 

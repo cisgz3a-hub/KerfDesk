@@ -65,4 +65,7 @@
 1. Confirm the intended output layers and material settings.
 2. Use Preview to inspect cut order, travel, curves, arrays, variables, nesting, and registration.
 3. Frame on the connected machine with the laser off.
-4. Start only after bounds, position, controller readiness, raster, curve-segment, and safety checks pass.
+4. Run Frame with output disabled for the exact job. Press Start only after the
+   completed Frame opens the permit, then read every Start-time Job Review warning
+   and confirm only when the physical setup is correct. Transport, compile, required
+   placement inputs, and exact-handoff integrity must still be valid.

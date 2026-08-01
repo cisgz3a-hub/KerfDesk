@@ -65,7 +65,15 @@ export default tseslint.config(
       'coverage/**',
       'node_modules/**',
       'references/**',
+      // Agent worktree roots — each holds a full working copy of this repo.
+      // `eslint .` must not descend into them: the `src/**` overrides below
+      // (which switch off consistent-type-definitions and array-type) are
+      // anchored to the real tree, so a copy under any other prefix gets
+      // linted by the bare presets and fails on rules the checked-in tree
+      // never sees. Left unignored, `.codex-worktrees/` alone contributed
+      // ~177k errors across 25.5k files and blocked `pnpm release:check`.
       '.claude/**',
+      '.codex-worktrees/**',
       'references/**',
       'eslint.config.mjs',
       'eslint.electron.config.mjs',

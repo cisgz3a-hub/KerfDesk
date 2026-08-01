@@ -1,23 +1,22 @@
 import type { ShapeObject } from '../../core/scene';
 import type { ParametricShapeSpec } from '../../core/shapes';
 import { Field } from '../kit';
-import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 export function SelectedShapeGeometryFields(props: {
   readonly object: ShapeObject;
+  readonly setSpec: (spec: ParametricShapeSpec) => void;
 }): JSX.Element | null {
-  const setSpec = useStore((state) => state.setSelectedShapeSpec);
   const spec = props.object.spec;
   switch (spec.kind) {
     case 'rect':
-      return <RectangleFields spec={spec} setSpec={setSpec} />;
+      return <RectangleFields spec={spec} setSpec={props.setSpec} />;
     case 'ellipse':
-      return <EllipseFields spec={spec} setSpec={setSpec} />;
+      return <EllipseFields spec={spec} setSpec={props.setSpec} />;
     case 'polygon':
-      return <PolygonFields spec={spec} setSpec={setSpec} />;
+      return <PolygonFields spec={spec} setSpec={props.setSpec} />;
     case 'star':
-      return <StarFields spec={spec} setSpec={setSpec} />;
+      return <StarFields spec={spec} setSpec={props.setSpec} />;
     case 'polyline':
       return null;
   }

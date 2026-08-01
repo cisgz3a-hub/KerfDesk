@@ -3,7 +3,9 @@
 Date: 2026-07-21
 Repository: `C:\Users\Asus\LaserForge-2.0`
 Research branch: `claude/photoshop-feature-research-e52de4`
-Status: research + plan only. No implementation in this document's PR. Governing artifacts proposed here (ADR-242, PROJECT.md Phase L, WORKFLOW.md F-L flows) require maintainer ratification before any code.
+Status: historical research and planning input. ADR-242 was accepted and the
+Image Studio foundation and parity phases were subsequently implemented; use
+`PROJECT.md`, `WORKFLOW.md`, and `DECISIONS.md` for current status.
 
 ## Executive verdict
 
@@ -247,4 +249,7 @@ Green structural tests will not prove a paintbrush feels right or a wand selects
 3. **Ship the engrave NN→bilinear resample fix now as its own snapshot-acknowledged PR** (recommended) or defer until IE-2.
 4. **Halftone/Newsprint dithers**: land early inside IE-2 (recommended — engrave parity win independent of the editor) or hold for the editor.
 
-**Recommended action:** ratify ADR-242 + the PROJECT.md Phase L block from this document, then green-light the Phase IE-1 PR stack starting with PR 0 (governance docs) and PR 1 (`core/image-edit` buffer/tiles/history with property tests).
+**Historical recommendation (completed):** ADR-242 and the PROJECT.md Phase L
+block were ratified, and the Image Studio foundation and parity work subsequently
+landed. Remaining work is tracked in the current Phase L table and the 2026-07-22
+v2 plan.

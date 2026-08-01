@@ -2,11 +2,13 @@
 
 > Architecturally significant decisions only. A future maintainer should understand the *why* without needing to ask.
 >
-> **Current Start policy — frame-first (ADR-228, ADR-230, ADR-232).** A completed Frame for the exact
-> current job is the sole Start guard on laser and CNC; the Job Review dialog is the single
-> warning surface. Older gate ADRs below that mandated Start blocks are stamped
-> "Superseded by ADR-228" in their Status lines — their evidence models often remain in use,
-> but their *refusals* do not. Per-gate disposition:
+> **Current ordinary Start policy — frame-first (ADR-228, ADR-230, ADR-232).** A completed Frame for
+> the exact current job is the sole product-policy authorization for ordinary laser and CNC Start;
+> the Job Review dialog is the single warning surface. This does not remove transport readiness,
+> compilation validity, placement inputs, handoff/recovery confirmation, security/trust checks,
+> unsupported-capability boundaries, or explicit destructive-action confirmation. Older gate ADRs
+> below that mandated additional ordinary Start blocks are superseded; their evidence models often
+> remain useful, but those product-policy refusals do not. Per-gate disposition:
 > `docs/audits/2026-07-18-guard-inventory-frame-first.md`.
 
 ## Decision index
@@ -204,6 +206,12 @@
 | ADR-237 | 2026-07-21 | Accepted | Job Review runs at Start; plain Frame is dialog-free |
 | ADR-238 | 2026-07-21 | Accepted | Laser trace output defaults to editable vectors; raster scan remains selectable |
 | ADR-239 | 2026-07-21 | Accepted, hardware verification pending | Tangential feed-matched contour entries for the 4040-safe profile |
+| ADR-240 | 2026-07-21 | Accepted | Capability-first six-step Machine Setup wizard with a searchable catalog |
+| ADR-241 | 2026-07-21 | Accepted | Curve/fill segment budget advises in Job Review instead of refusing output |
+| ADR-242 | 2026-07-21 | Accepted | Image Studio for in-app raster editing |
+| ADR-243 | 2026-07-21 | Accepted | Stream rasters of any size row-by-row; make raster budgets advisory |
+| ADR-244 | 2026-07-21 | Accepted | Prepare large-job preview and estimates off the main thread |
+| ADR-245 | 2026-07-21 | Accepted | Image Studio active-layer document with composite bake |
 
 ---
 
@@ -322,7 +330,8 @@ Phase A: Windows `.exe` opens and runs on Windows 10 and 11.
 - Repo public from first commit.
 - Permitted dependency licenses: MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD.
 - Rejected: GPL family (GPL-2, GPL-3, AGPL, LGPL), proprietary, source-available (BSL, Elastic).
-- Enforcement: `license-checker` runs in CI; GPL transitive deps fail the build.
+- Enforcement at adoption was planned around `license-checker`; the current CI
+  implementation is `pnpm license-check` / `scripts/check-licenses.mjs`.
 
 ### Verification
 `LICENSE` in repo root. CI dependency audit fails on GPL.
@@ -566,16 +575,19 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 
 - **No policy (treat every dep as a one-off decision):** rejected — exactly the kind of unrigorous adoption that bloats projects.
 - **Stricter policy (no new deps without a full RFC):** rejected — too heavyweight for solo development.
-- **Centralized "dependency review" step in CI:** considered. The `license-checker` plus `RESEARCH_LOG.md` discipline plus this policy provides the same protection at lower process cost.
+- **Centralized "dependency review" step in CI:** considered. The production
+  license check plus `RESEARCH_LOG.md` discipline provides the same protection
+  at lower process cost.
 
 ### Consequences
 - Easier: justifiable adoption decisions; clean license audit; CVE tracking; bounded bundle size.
 - Harder: no quick "throw a library at it" shortcuts. Every new dep is a small ADR-shaped artifact in `RESEARCH_LOG.md`.
 
 ### Verification
-- Phase A CI includes `license-checker` step.
+- CI includes `pnpm license-check` through `pnpm release:check`.
 - `RESEARCH_LOG.md` has an entry for DOMPurify before the first PR that imports it lands.
-- Future PR that adds a runtime dependency without a `RESEARCH_LOG.md` entry is rejected by CI lint (custom rule).
+- Future PRs that add a runtime dependency must update `RESEARCH_LOG.md`; this is
+  a review requirement, while CI separately enforces the production license set.
 
 ---
 
@@ -802,7 +814,7 @@ add a `forceMMode` field on DeviceProfile then.
 that.** A 50×50 mm photo at 5 lines/mm is ~250 lines × ~30 chars =
 7.5 KB — fits in memory. A 200×200 mm photo at 10 lines/mm balloons
 to ~6 MB — must stream. The 100 KB threshold matches the heuristic
-the AUDIT.md A6 mitigation already uses for bundle splits (the order
+the original audit's A6 mitigation used for bundle splits (the order
 where allocation becomes user-visible). Implementation: emit-raster
 returns either a `string` or an `AsyncIterable<string>`; the file/
 serial writer adapts.
@@ -4251,7 +4263,7 @@ The maintainer chose **full auto-update** (over notify-only) for the desktop app
 - Green tests never prove the installer runs (CLAUDE.md): a workflow-shape test +
   an auto-update-config unit test guard structure, but install / serial / update
   behavior is verified manually on Windows 10 and 11 (WORKFLOW.md desktop flow,
-  AUDIT.md CLAIMED row) before the launch is called done.
+  `docs/hardware/verification-status.md`) before the launch is called done.
 
 ### References
 ADR-007 (Windows-only desktop), ADR-011 (platform adapter), ADR-018 (private
@@ -4314,7 +4326,7 @@ motion polish (ramps, climb/conventional, leads, parking), and tiling.
    are planned for Phase H.
 3. **Hardware verification targets the 4040 machine.** Every output-affecting
    sub-phase ends with an air-cut checklist executed by the maintainer;
-   AUDIT.md rows stay CLAIMED until that evidence exists.
+   ledger entries stay Claimed until that evidence exists.
 4. The laser non-negotiables extend to CNC with analogs: bounds check, origin
    honesty, no partial output, deterministic G-code (snapshot + fuzz), units
    honest, pure core — plus the CNC-specific **no XY rapid below safe Z**
@@ -4327,7 +4339,8 @@ Home → clamp scrap / set work XY zero → set Z zero ~30 mm above the
 spoilboard (air gap) → feed override 50% → run the job end-to-end → verify:
 retract before every travel, pass ordering (pockets/engraves before profiles,
 inner before outer), spindle spin-up dwell before first plunge, correct park.
-Log the result in AUDIT.md; only then may a row flip CLAIMED → VERIFIED.
+Log the result in `docs/hardware/verification-status.md`; only then may an entry
+move from Claimed to Hardware-verified.
 
 ### Alternatives considered
 
@@ -4575,8 +4588,8 @@ buffers, and lighting is weeks of risk for zero product differentiation.
 
 ### Verification
 
-- RESEARCH_LOG.md dependency row (version, license re-verified) — CI
-  cross-checks package.json against it.
+- RESEARCH_LOG.md dependency row with version and license re-verified; reviewers
+  cross-check it against `package.json`.
 - Pure mesh-builder unit tests against analytic heightmaps; component
   fallback test in jsdom; full gate.
 - Visual check of the rendered relief in the isolated preview browser.
@@ -4667,7 +4680,7 @@ defect), which will carry the snapshot acknowledgment line.
 
 Per feature: unit + property tests, WORKFLOW.md flows (success / error /
 empty / edge) before UI, full gate per commit, isolated-preview
-perceptual pass where renderable, AUDIT.md CLAIMED rows with named
+perceptual pass where renderable, hardware-ledger entries with named
 pending hardware checks.
 
 ## ADR-104 — Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03)
@@ -4851,7 +4864,7 @@ design is built around:
    for a canonical spec; IoU vs analytic expectation + opt-in PNG
    artifact for human eyeballing.
 4. **Hardware:** physical fit is NOT software-verifiable — the feature
-   lands CLAIMED per AUDIT.md convention with a named pending check:
+   lands Claimed in `docs/hardware/verification-status.md` with a named pending check:
    cut a 60×40×30 mm, T=3 box on the Falcon (laser) / 4040 (router)
    and assemble it.
 
@@ -5725,7 +5738,7 @@ jsdom hook tests pin acquire/release/re-acquire and the one-shot warning
 (denied + missing API); policy tests pin `screen-wake-lock` granted for
 trusted check+request and denied for untrusted origins and subframes.
 NOT verified: the packaged Electron runtime grant, and a real hours-long
-burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
+burn with display sleep armed — Claimed in the hardware ledger until the maintainer
 runs one.
 
 ## ADR-118 — Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07)
@@ -8653,7 +8666,7 @@ beam/spindle behavior, clearances, and calibration remain the operator's hardwar
 
 ## ADR-206 - Require explicit maintainer permission for every new guard
 
-**Status:** Superseded in mechanism by ADR-228 — the permission process is replaced by a standing denial: no guard will ever be created again. | **Date:** 2026-07-15
+**Status:** Superseded by ADR-228 for ordinary Start policy. Use the current-policy note at the top of this file for the governing scope. | **Date:** 2026-07-15
 
 ### Context
 
@@ -9801,6 +9814,11 @@ operator clicks whenever they choose.
 **Status:** Accepted (maintainer directive, verbatim: "FRAME IS SOURCE OF TRUTH... when a frame
 completes. start can start with no blocks or guards or checks at all. no alarm. frame is good
 start is open... no guard will ever be created again.")
+
+**Current interpretation:** "guard" here means an additional ordinary
+product-policy Start gate. It does not waive transport readiness, compilation
+validity, required placement inputs, recovery handoff, security/trust,
+unsupported-capability boundaries, or explicit destructive-action confirmation.
 
 ### Decision
 
