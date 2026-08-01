@@ -8,6 +8,21 @@ export function contourPassFromPolyline(polyline: Polyline, zMm: number): CncPas
   return { kind: 'contour', zMm, polyline: ensureRingClosure(polyline), closed: polyline.closed };
 }
 
+// Clear every ring at one depth before stepping down so pockets remove the
+// floor level by level.
+export function depthMajorPasses(
+  toolpaths: ReadonlyArray<Polyline>,
+  depths: ReadonlyArray<number>,
+): CncPass[] {
+  const passes: CncPass[] = [];
+  for (const zMm of depths) {
+    for (const toolpath of toolpaths) {
+      passes.push(contourPassFromPolyline(toolpath, zMm));
+    }
+  }
+  return passes;
+}
+
 export function isProfileCutType(cutType: CncCutType): boolean {
   return (
     cutType === 'profile-outside' || cutType === 'profile-inside' || cutType === 'profile-on-path'

@@ -203,6 +203,44 @@ describe('invalid CNC tool geometry preflight', () => {
     ).toEqual({ ok: true, issues: [] });
   });
 
+  it('does not widen the historical clear-tool refusal scope for over-cone jobs', () => {
+    const overConeVBit: CncTool = {
+      id: 'v90-6',
+      name: '6 mm 90 degree V-bit',
+      kind: 'v-bit',
+      diameterMm: 6,
+      tipAngleDeg: 90,
+    };
+    const wrongKindClearTool: CncTool = {
+      id: 'wrong-clear',
+      name: '3 mm ball nose',
+      kind: 'ball-nose',
+      diameterMm: 3,
+    };
+    const machine: CncMachineConfig = {
+      ...DEFAULT_CNC_MACHINE_CONFIG,
+      toolId: overConeVBit.id,
+      tools: [overConeVBit, wrongKindClearTool],
+    };
+    const object = rectangle('over-cone-square', VCARVE_COLOR, 18);
+
+    for (const vClearToolId of ['missing-clear', wrongKindClearTool.id]) {
+      const result = preflight(
+        [
+          vcarveLayer('over-cone-v-carve', {
+            toolId: overConeVBit.id,
+            vClearToolId,
+            depthMm: 10,
+            depthPerPassMm: 1,
+          }),
+        ],
+        [object],
+        machine,
+      );
+      expect(result.issues.some((issue) => issue.code === 'cnc-tool-geometry-invalid')).toBe(false);
+    }
+  });
+
   it.each([
     ['missing', 'missing-rougher'],
     ['ball-nose', 'bn-6350'],

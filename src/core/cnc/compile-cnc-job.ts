@@ -29,6 +29,7 @@ import {
   capFeed,
   capSpindle,
   contourPassFromPolyline,
+  depthMajorPasses,
   isProfileCutType,
   resolveRetractBetweenPasses,
 } from './compile-cnc-helpers';
@@ -51,6 +52,7 @@ import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish
 import { applyProfileLeadPasses } from './profile-lead-passes';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
+import { vcarveEffectiveDepthMm } from './vcarve-depth';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
 import { collectLayerContours } from './collect-cnc-contours';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
@@ -210,13 +212,15 @@ export function vcarveClearanceGroupForLayer(
   const clearTool = config.tools.find((tool) => tool.id === settings.vClearToolId);
   if (clearTool === undefined || clearTool.kind !== 'end-mill') return null;
   const vBit = layerCncTool(config, settings);
+  const effectiveDepthMm = vcarveEffectiveDepthMm(vBit, settings.depthMm);
+  if (effectiveDepthMm === null) return null;
   const toolpaths = vcarveClearanceToolpaths(polylines, {
     vBit,
     clearTool,
-    maxDepthMm: settings.depthMm,
+    maxDepthMm: effectiveDepthMm,
     stepoverPercent: settings.stepoverPercent,
   });
-  const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
+  const depths = zPassDepths(effectiveDepthMm, settings.depthPerPassMm);
   if (toolpaths.length === 0 || depths.length === 0) return null;
   return {
     kind: 'cnc',
@@ -454,19 +458,4 @@ function appendTabbedPasses(
     return;
   }
   passes.push({ kind: 'path3d', points, closed: false });
-}
-
-// Clear every ring at one depth before stepping down — pockets remove the
-// floor level by level.
-function depthMajorPasses(
-  toolpaths: ReadonlyArray<Polyline>,
-  depths: ReadonlyArray<number>,
-): CncPass[] {
-  const passes: CncPass[] = [];
-  for (const zMm of depths) {
-    for (const toolpath of toolpaths) {
-      passes.push(contourPassFromPolyline(toolpath, zMm));
-    }
-  }
-  return passes;
 }

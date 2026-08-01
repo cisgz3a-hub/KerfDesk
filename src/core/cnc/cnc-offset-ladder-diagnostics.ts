@@ -37,6 +37,7 @@ import { resolveRestPocketOperation } from './cnc-rest-operation';
 import { reliefOffsetLadderFailed } from './compile-cnc-relief';
 import { pocketRasterToolpaths, pocketRingToolpaths } from './pocket-paths';
 import { vcarveClearancePocket } from './vcarve-clearance';
+import { vcarveEffectiveDepthMm } from './vcarve-depth';
 import { vcarveLadderPasses } from './vcarve-ladder';
 
 export function findCncOffsetLadderFailures(
@@ -157,10 +158,12 @@ function vcarveLadderFailed(
   if (ladder.offsetFailed) return true;
   const clearTool = toolById(config, settings.vClearToolId);
   if (clearTool === null) return false;
+  const effectiveDepthMm = vcarveEffectiveDepthMm(tool, settings.depthMm);
+  if (effectiveDepthMm === null) return false;
   return vcarveClearancePocket(polylines, {
     vBit: tool,
     clearTool,
-    maxDepthMm: settings.depthMm,
+    maxDepthMm: effectiveDepthMm,
     stepoverPercent: settings.stepoverPercent,
   }).offsetFailed;
 }
