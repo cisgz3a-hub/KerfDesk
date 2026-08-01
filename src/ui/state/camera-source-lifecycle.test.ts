@@ -1,11 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   CameraAdapter,
   CameraBridgeAdapter,
+  CameraBridgeStreamStatus,
   CameraStream,
   CameraStreamStatus,
 } from '../../platform/types';
+import {
+  CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE,
+  RTSP_STATUS_POLL_INTERVAL_MS,
+} from './camera-source-lifecycle';
 import { useCameraStore } from './camera-store';
+
+const RTSP_URL = 'rtsp://192.168.10.1:8554/';
+
+function unavailableStatus(): CameraBridgeStreamStatus {
+  return { kind: 'unavailable', reason: 'The local camera bridge status request failed.' };
+}
 
 type ControlledCamera = {
   readonly adapter: CameraAdapter;
@@ -258,5 +269,105 @@ describe('RTSP camera lifecycle', () => {
 
     useCameraStore.getState().reportSourceFailure(first.source);
     expect(useCameraStore.getState().sourceState).toBe(replacement);
+  });
+});
+
+// The bridge collapses every status-channel fault into 'unavailable' — its
+// 3 s fetch timeout, any fetch rejection, and any unparseable body all land
+// there (src/platform/web/camera-bridge.ts). None of those say the video
+// stream died, so a lone one must not end a preview that is still playing.
+describe('RTSP transient status hiccups', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('keeps the preview live through a single unavailable status reading', async () => {
+    const status = vi.fn(async () => ({ kind: 'live' }) as CameraBridgeStreamStatus);
+    status.mockResolvedValueOnce({
+      kind: 'unavailable',
+      reason: 'The local camera bridge status request failed.',
+    });
+    const bridge = rtspBridge(vi.fn(), status);
+
+    await useCameraStore.getState().startRtspSource(bridge, RTSP_URL);
+    const livePreview = useCameraStore.getState().sourceState;
+    expect(livePreview.kind).toBe('live');
+
+    await vi.advanceTimersByTimeAsync(RTSP_STATUS_POLL_INTERVAL_MS * 2);
+
+    expect(useCameraStore.getState().sourceState).toBe(livePreview);
+    expect(status.mock.calls.length).toBeGreaterThan(1);
+    useCameraStore.getState().stopSource();
+  });
+
+  it('keeps the preview live while unavailable readings stay under the run threshold', async () => {
+    const status = vi.fn(async () => unavailableStatus());
+    const bridge = rtspBridge(vi.fn(), status);
+
+    await useCameraStore.getState().startRtspSource(bridge, RTSP_URL);
+    // One reading fires immediately, then one per poll interval.
+    await vi.advanceTimersByTimeAsync(
+      RTSP_STATUS_POLL_INTERVAL_MS * (CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE - 2),
+    );
+
+    expect(status).toHaveBeenCalledTimes(CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE - 1);
+    expect(useCameraStore.getState().sourceState.kind).toBe('live');
+    useCameraStore.getState().stopSource();
+  });
+
+  it('leaves live once the unavailable run reaches the threshold', async () => {
+    const status = vi.fn(async () => unavailableStatus());
+    const bridge = rtspBridge(vi.fn(), status);
+
+    await useCameraStore.getState().startRtspSource(bridge, RTSP_URL);
+    await vi.advanceTimersByTimeAsync(
+      RTSP_STATUS_POLL_INTERVAL_MS * (CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE - 1),
+    );
+
+    expect(status).toHaveBeenCalledTimes(CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE);
+    expect(useCameraStore.getState().sourceState).toMatchObject({
+      kind: 'error',
+      sourceKind: 'machine-rtsp',
+    });
+  });
+
+  it('restarts the run count after any reading that reaches the bridge', async () => {
+    const readings: readonly CameraBridgeStreamStatus[] = [
+      ...Array<CameraBridgeStreamStatus>(CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE - 1).fill(
+        unavailableStatus(),
+      ),
+      { kind: 'live' },
+      ...Array<CameraBridgeStreamStatus>(CONSECUTIVE_UNAVAILABLE_READINGS_BEFORE_FAILURE - 1).fill(
+        unavailableStatus(),
+      ),
+    ];
+    const status = vi.fn(async () => readings[status.mock.calls.length - 1] ?? unavailableStatus());
+    const bridge = rtspBridge(vi.fn(), status);
+
+    await useCameraStore.getState().startRtspSource(bridge, RTSP_URL);
+    await vi.advanceTimersByTimeAsync(RTSP_STATUS_POLL_INTERVAL_MS * (readings.length - 1));
+
+    expect(status).toHaveBeenCalledTimes(readings.length);
+    expect(useCameraStore.getState().sourceState.kind).toBe('live');
+    useCameraStore.getState().stopSource();
+  });
+
+  it('still leaves live on the very first authoritative failed reading', async () => {
+    const status = vi.fn(
+      async () =>
+        ({
+          kind: 'failed',
+          reason: 'FFmpeg camera preview ended unexpectedly.',
+        }) as CameraBridgeStreamStatus,
+    );
+    const bridge = rtspBridge(vi.fn(), status);
+
+    await useCameraStore.getState().startRtspSource(bridge, RTSP_URL);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(useCameraStore.getState().sourceState).toMatchObject({
+      kind: 'error',
+      sourceKind: 'machine-rtsp',
+    });
   });
 });
