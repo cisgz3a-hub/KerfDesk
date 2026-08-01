@@ -1,5 +1,4 @@
 import { createStore } from 'zustand/vanilla';
-import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
@@ -24,7 +23,6 @@ export function ensureFramedRunInvalidationSubscriptions(): void {
   if (invalidationLifecycle.getState().owner !== owner) return;
   const expireIfOwned = (): void => expireCurrentPermitIfNeeded(owner);
   useStore.subscribe(expireIfOwned);
-  useCameraStore.subscribe(expireIfOwned);
   useExperimentalLaserFeatures.subscribe(expireIfOwned);
   usePrintCutSessionStore.subscribe(expireIfOwned);
   useLaserStore.subscribe(expireIfOwned);
@@ -38,7 +36,7 @@ function expireCurrentPermitIfNeeded(owner: symbol): void {
   const expectedStartRun = isStampedStartRun(laser, laser.statusReport);
   if (
     !transientMachineActivity(laser, expectedStartRun) &&
-    framedRunReadinessIssue(permit, undefined, laser, undefined, {
+    framedRunReadinessIssue(permit, undefined, laser, {
       ignoreControllerStatusState: expectedStartRun,
     }) === null
   ) {

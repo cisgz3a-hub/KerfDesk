@@ -888,8 +888,8 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    spatial session/origin drift. Advisory settings and build-info observations may refresh.
 6. Clean completion issues a one-run exact `FramedRunPermit`. The controls read **Ready to start —
    framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
-   one-use. Any relevant edit, camera or rotary change, Jog, Home, origin/probe/reset/disconnect, or
-   controller drift expires it.
+   one-use. Any project, output-scope, placement, registration, or rotary-raster edit, Jog, Home,
+   origin/probe/reset/disconnect, or controller drift expires it. Camera-only UI state does not.
 7. User clicks **Start framed job**. Start atomically claims the permit and sends its cached G-code
    without recompiling, reopening Job Review, or rerunning policy gates. Only live transport and
    exact-handoff checks remain; a deterministic empty/comment-only or RX-oversized program was

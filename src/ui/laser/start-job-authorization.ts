@@ -1,5 +1,4 @@
 import type { JobCheckpoint } from '../../core/recovery';
-import { useCameraStore } from '../state/camera-store';
 import type { FramedRunControllerSnapshot } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import type { LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
@@ -62,10 +61,7 @@ export function currentLaserForAuthorizedStartNow(
   if (currentReplayExecutionSignature() !== args.expectedExecutionSignature) {
     return { ok: false, refusal: { kind: 'execution-inputs-changed' } };
   }
-  const camera = useCameraStore.getState();
-  if (
-    !startExternalEnvironmentMatches(args.externalEnvironment, useStore.getState().project, camera)
-  ) {
+  if (!startExternalEnvironmentMatches(args.externalEnvironment, useStore.getState().project)) {
     return { ok: false, refusal: { kind: 'execution-inputs-changed' } };
   }
   const current = useLaserStore.getState();
