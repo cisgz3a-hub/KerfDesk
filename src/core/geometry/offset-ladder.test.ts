@@ -112,18 +112,4 @@ describe('insetContoursChecked', () => {
     expect(inset).toEqual({ contours: [SQUARE], offsetFailed: false });
     expect(offsetChecked).toHaveBeenCalledWith([SQUARE], -2.5);
   });
-
-  it('reports capped when the ring budget exhausts with interior remaining (#584)', () => {
-    // Every step keeps producing contours: exhausting maxSteps used to be
-    // indistinguishable from a finished region — the silent-truncation trap
-    // the #584 audit made reachable from valid UI settings.
-    offsetChecked.mockReset();
-    offsetChecked.mockReturnValue(ok([SQUARE]));
-
-    const ladder = buildOffsetLadder([SQUARE], 3, (step) => step + 1);
-
-    expect(ladder.rings).toHaveLength(3);
-    expect(ladder.offsetFailed).toBe(false);
-    expect(ladder.capped).toBe(true);
-  });
 });

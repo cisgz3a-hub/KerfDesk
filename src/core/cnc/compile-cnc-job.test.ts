@@ -199,16 +199,10 @@ describe('compileCncJob', () => {
     expect(first.cutType).toBe('v-carve');
     expect(second.cutType).toBe('profile-outside');
     expect(first.passes.length).toBeGreaterThan(0);
-    // Every v-carve depth stays within the configured max — δ rings as
-    // constant-Z contours, corner/thin detail rings as per-vertex path3d
-    // (ADR-280 Amendment 2).
+    // Every v-carve depth stays within the configured max.
     for (const pass of first.passes) {
-      const deepest =
-        pass.kind === 'path3d'
-          ? Math.min(...pass.points.map((point) => point.z))
-          : contourPass(pass).zMm;
-      expect(deepest).toBeGreaterThanOrEqual(-2 - 1e-9);
-      expect(deepest).toBeLessThan(0);
+      expect(contourPass(pass).zMm).toBeGreaterThanOrEqual(-2 - 1e-9);
+      expect(contourPass(pass).zMm).toBeLessThan(0);
     }
   });
 

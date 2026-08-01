@@ -10,7 +10,7 @@ import { kernelForTool } from './tool-kernels';
 // a path3d pass's per-vertex Z to its endpoint span and interpolated by arc
 // length — a non-monotone profile (down-then-up) whose endpoints sit at the
 // surface stamped NOTHING. That blocked honest verification of any
-// variable-depth pass (the ADR-280 junction blend needs exactly that).
+// variable-depth pass (the ADR-279 junction blend needs exactly that).
 
 const FLAT_TOOL = { id: 't', name: 't', kind: 'end-mill', diameterMm: 2 } as const;
 const SAFE_Z_MM = 3.81;
