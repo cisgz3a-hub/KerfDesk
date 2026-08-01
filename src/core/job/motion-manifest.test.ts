@@ -42,6 +42,36 @@ describe('buildMotionManifest', () => {
     expect(arc?.points.at(-1)).toEqual({ x: 0, y: 10, z: -2 });
   });
 
+  // A closed arc has equal endpoints but a non-zero route, so endpoint displacement
+  // alone read it as a vertical plunge and lost the material entry (ADR-271 sect. 5).
+  it('classifies a flat full-circle CNC arc as process, not a plunge', () => {
+    const manifest = buildMotionManifest('G21\nG90\nM3 S12000\nG0 X5 Y0\nG2 X5 Y0 I-5 J0 F300', {
+      machineKind: 'cnc',
+    });
+    const arc = manifest.blocks.at(-1);
+    expect(arc?.kind).toBe('process');
+    // Route length is the sampled chord sum, so it sits just under the true
+    // circumference. Timing consumers inherit that bias; it is not an error.
+    const circumferenceMm = 2 * Math.PI * 5;
+    expect(arc?.lengthMm).toBeLessThan(circumferenceMm);
+    expect(arc?.lengthMm).toBeGreaterThan(circumferenceMm * 0.99);
+  });
+
+  it('marks a flat full-circle laser cut as the material entry', () => {
+    const manifest = buildMotionManifest('G21\nG90\nM4 S500\nG0 X5 Y0\nG2 X5 Y0 I-5 J0 F300', {
+      machineKind: 'laser',
+    });
+    expect(manifest.blocks.at(-1)?.kind).toBe('process');
+    expect(manifest.firstProcessPoint).toEqual({ x: 5, y: 0, z: 0 });
+  });
+
+  it('still calls a pure-Z move a plunge when no XY route is swept', () => {
+    const manifest = buildMotionManifest('G21\nG90\nM3 S12000\nG0 X1 Y1 Z2\nG1 Z-1 F100', {
+      machineKind: 'cnc',
+    });
+    expect(manifest.blocks.at(-1)?.kind).toBe('plunge');
+  });
+
   it('uses the first powered CNC plunge as the material-entry marker', () => {
     const manifest = buildMotionManifest('G21\nG90\nG0 X12 Y8 Z3\nM3 S12000\nG1 Z-1 F100\nG1 X20', {
       machineKind: 'cnc',
