@@ -1,4 +1,5 @@
-import type { CameraCalibration, CameraCaptureBinding } from '../camera';
+import type { CameraCalibration } from '../camera';
+import type { CameraCaptureBinding } from '../camera/capture-binding';
 import type { DeviceProfile } from './device-profile';
 
 /** Remove only an inherited rectified alignment whose lens model truly changed. */
