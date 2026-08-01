@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import { createLayer, IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../scene';
 import { compileJob } from './compile-job';
+import { compileRasterGroupsForLayer } from './compile-job-raster';
 import type { Job, RasterGroup } from './job';
 
 const dev = DEFAULT_DEVICE_PROFILE;
@@ -168,6 +169,51 @@ describe('compileJob raster image groups', () => {
     expect(() =>
       compileJob({ objects: [rasterObject('AP//AA===')], layers: [imageLayer()] }, dev),
     ).toThrow(/lumaBase64/);
+  });
+
+  it.each([
+    ['zero-length', 0, 'mismatch'],
+    ['undersized', 3, 'mismatch'],
+    ['matched', 4, 'compiled'],
+    ['oversized', 5, 'mismatch'],
+  ] as const)('handles a %s source-luma override', (_label, actualPixels, expected) => {
+    const object = rasterObject();
+    const compiled = compileRasterGroupsForLayer([object], imageLayer(), dev, {
+      sourceLumaByObjectId: new Map([[object.id, new Uint8Array(actualPixels)]]),
+    });
+
+    if (expected === 'compiled') {
+      expect(compiled.groups.map((group) => group.sourceObjectId)).toEqual([object.id]);
+      expect(compiled.diagnostics).toEqual([]);
+      return;
+    }
+    expect(compiled.groups).toEqual([]);
+    expect(compiled.diagnostics).toEqual([
+      {
+        kind: 'raster-source-luma-mismatch',
+        layerName: 'Operation',
+        source: 'photo.png',
+        expectedPixels: 4,
+        actualPixels,
+      },
+    ]);
+  });
+
+  it('keeps valid sibling raster groups when one override has mismatched dimensions', () => {
+    const invalid = rasterObject();
+    const valid = { ...rasterObject('AP//AA=='), id: 'R2', source: 'valid.png' };
+
+    const compiled = compileRasterGroupsForLayer([invalid, valid], imageLayer(), dev, {
+      sourceLumaByObjectId: new Map([[invalid.id, Uint8Array.of(0)]]),
+    });
+
+    expect(compiled.groups.map((group) => group.sourceObjectId)).toEqual(['R2']);
+    expect(compiled.diagnostics).toEqual([
+      expect.objectContaining({
+        kind: 'raster-source-luma-mismatch',
+        source: 'photo.png',
+      }),
+    ]);
   });
 
   it('decodes saved luma without relying on a host atob global', () => {

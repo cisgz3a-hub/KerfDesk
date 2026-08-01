@@ -14,7 +14,8 @@ export function validateDesignLibraryCatalog(entries: ReadonlyArray<LibraryEntry
       missingPublicDomainProvenance(entry),
       `${entry.id}: missing public-domain provenance`,
     );
-    pushIssue(issues, missingSvgText(entry), `${entry.id}: missing SVG insert text`);
+    pushIssue(issues, missingPreview(entry), `${entry.id}: missing preview source`);
+    pushIssue(issues, missingSvgLoader(entry), `${entry.id}: missing SVG loader`);
   }
   return issues;
 }
@@ -25,8 +26,9 @@ function pushRequiredFieldIssues(issues: string[], entry: LibraryEntry): void {
   pushIssue(issues, entry.machineModes.length === 0, `${entry.id}: missing machine modes`);
   pushIssue(issues, entry.operations.length === 0, `${entry.id}: missing operations`);
   pushIssue(issues, entry.tags.length === 0, `${entry.id}: missing tags`);
-  pushIssue(issues, entry.previewSvgText.trim() === '', `${entry.id}: missing preview SVG`);
+  pushIssue(issues, entry.provenance.sourceName.trim() === '', `${entry.id}: missing source name`);
   pushIssue(issues, entry.provenance.license.trim() === '', `${entry.id}: missing license`);
+  pushIssue(issues, entry.provenance.licenseId.trim() === '', `${entry.id}: missing license id`);
 }
 
 function missingExternalSource(entry: LibraryEntry): boolean {
@@ -42,8 +44,14 @@ function missingPublicDomainProvenance(entry: LibraryEntry): boolean {
   );
 }
 
-function missingSvgText(entry: LibraryEntry): boolean {
-  return entry.insert.kind === 'svg' && entry.insert.svgText.trim() === '';
+function missingPreview(entry: LibraryEntry): boolean {
+  return entry.preview.kind === 'inline-svg'
+    ? entry.preview.svgText.trim() === ''
+    : entry.preview.url.trim() === '';
+}
+
+function missingSvgLoader(entry: LibraryEntry): boolean {
+  return entry.insert.kind === 'svg' && typeof entry.insert.loadSvgText !== 'function';
 }
 
 function pushIssue(issues: string[], failed: boolean, issue: string): void {

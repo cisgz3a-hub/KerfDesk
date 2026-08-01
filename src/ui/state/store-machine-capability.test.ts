@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DEFAULT_CNC_MACHINE_CONFIG, createProject } from '../../core/scene';
+import { DEFAULT_CNC_MACHINE_CONFIG, createProject, type CncTool } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -47,5 +47,36 @@ describe('project lifecycle machine capability', () => {
     expect(useStore.getState().project.machine?.kind).toBe('laser');
     expect(useStore.getState().cachedCncMachine?.params.safeZMm).toBe(21);
     expect(useStore.getState().dirty).toBe(true);
+  });
+
+  it('enriches an opened matching CNC project from the app library without marking it repaired', () => {
+    const savedTool: CncTool = {
+      id: 'saved-tool',
+      name: 'Saved 4 mm cutter',
+      kind: 'end-mill',
+      diameterMm: 4,
+      catalogId: 'saved-flat-4',
+    };
+    const legacyTools = DEFAULT_CNC_MACHINE_CONFIG.tools.filter(
+      (tool) => !tool.id.startsWith('vb-90-') || !tool.id.endsWith('-hobby'),
+    );
+    useStore.setState((state) => ({
+      cncLibrary: { ...state.cncLibrary, customTools: [savedTool] },
+    }));
+
+    const result = useStore.getState().setProject({
+      ...createProject(),
+      machine: { ...DEFAULT_CNC_MACHINE_CONFIG, toolId: 'em-6350', tools: legacyTools },
+    });
+    const machine = useStore.getState().project.machine;
+    if (machine?.kind !== 'cnc') throw new Error('expected CNC machine');
+
+    expect(result).toEqual({ kind: 'loaded' });
+    expect(machine.toolId).toBe('em-6350');
+    expect(machine.tools.slice(0, legacyTools.length)).toEqual(legacyTools);
+    expect(machine.tools.map((tool) => tool.id)).toEqual(
+      expect.arrayContaining(['vb-90-6350-hobby', 'vb-90-12700-hobby', savedTool.id]),
+    );
+    expect(useStore.getState().dirty).toBe(false);
   });
 });

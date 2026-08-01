@@ -1,70 +1,68 @@
-# Contributing to KerfDesk
+# Contributing to KerfDesk (LaserForge 2.0)
 
-KerfDesk (repository name: LaserForge 2.0) is MIT-licensed. By contributing, you
-agree that your contribution is distributed under the project's MIT license.
+KerfDesk is MIT-licensed (ADR-120); by submitting a contribution you agree it is licensed under the project's MIT license. The project is shipped through Phase K (laser MVP plus text/trace/raster, drawing tools, CNC/router, multi-controller, camera, and box generator) and under active development. CI gates (`.github/workflows/ci.yml`, a single `pnpm release:check` step) are live: typecheck, lint, prettier, dependency-license and vulnerability checks, Vitest, web/Electron builds, and file-size discipline. A separate Playwright browser smoke runs in `.github/workflows/e2e.yml` and is observability-only on main. Deploys auto-fire to Cloudflare Pages on green CI (`.github/workflows/deploy.yml`).
 
-The project is under active development through Phase L, including the Image
-Studio work adopted by ADR-242 and ADR-245. Code completion, simulator coverage,
-and real-hardware qualification are tracked separately; never infer hardware
-acceptance from a merged implementation or green CI run.
+## Non-negotiable: Frame is the only guard — never add a new one
 
-## Before making a change
+**No new guard may ever be added to this codebase. Hard rule, no exceptions**
+(maintainer, 2026-07-17; `CLAUDE.md` collaboration rule 7, `PROJECT.md`
+non-negotiable #21, `DECISIONS.md` ADR-228 clarified by ADR-232). A *guard* is any
+behavior that blocks, refuses, gates, caps, clamps, delays, hides, disables,
+rewrites, or adds a confirmation before an otherwise-available action, input,
+output, machine command, job start, preview, save, import, export, or G-code
+emission. The single Start guard is the frame-first gate (a completed Frame for the
+exact current job opens Start on laser and CNC); the Job Review dialog is the only
+warning surface, and it informs — it never refuses. Do not add a guard, re-add a
+deleted one, expand a refusal surface, or promote a warning into a block — not for
+"safety," not for "defense in depth," not with a test or an ADR. **A PR that adds a
+guard will be rejected on sight.** The only refusals permitted to exist are the
+three factual categories defined in `CLAUDE.md` rule 7 — transport preconditions,
+compile integrity, and handoff consistency; relabeling a policy judgment as one of
+them is itself a violation. Widening any of those three — or adding a new refusal
+inside them — requires the maintainer's explicit prior permission in chat, which
+must be presumed denied. Nothing in this paragraph authorizes a guard: adding a
+guard, or any refusal outside those three factual categories, is never permitted,
+and no ADR, test, or grant of permission can authorize it (ADR-228 standing denial).
 
-1. Read [`AGENTS.md`](AGENTS.md) for the repository operating contract and the
-   frame-first machine-control policy.
-2. Use [`docs/README.md`](docs/README.md) to find the relevant product, workflow,
-   architecture, safety, or historical document.
-3. Confirm the behavior against current source and tests. Dated audit reports are
-   evidence snapshots, not current truth.
-4. Read [`SECURITY.md`](SECURITY.md) before investigating or reporting a
-   security-sensitive issue.
+## Non-negotiable: we only build with verified research
 
-## Documentation and decision gates
+**When you don't know something, go find out — do not guess.** Read the source, run the
+command, fetch the upstream document (vendor docs, advisory record, spec, changelog,
+firmware manual). Uncertainty is a trigger to investigate, never a licence to speculate,
+and external research is expected rather than a last resort.
 
-- Product scope changes require a `PROJECT.md` update.
-- Architecturally significant, machine-policy, persistence-schema, dependency,
-  or trust-boundary changes require an ADR in `DECISIONS.md`.
-- New runtime dependencies require a current `RESEARCH_LOG.md` evaluation before
-  code imports them.
-- Routine bug fixes, tests, documentation corrections, and behavior-neutral
-  refactors do not require an ADR.
-- G-code snapshot changes require this PR-body line:
-  `Snapshot change acknowledged: <reason>`.
+Do not open a PR whose description or code rests on "I think it works like this,"
+"probably," "this should be fine," or a design whose feasibility was never checked. Every
+factual claim — an API signature, a version or semver range, a CVE's affected-vs-patched
+range, a controller `$` setting, a G-code behavior, a LightBurn behavior — must be backed
+by something you actually read or ran in the course of the work, and cited so a reviewer
+can check it. "I read it somewhere" is not a source. A confident wrong answer costs far
+more than the verification would have; here it can mean a ruined workpiece or an unsafe
+machine move. See `CLAUDE.md` — "We only build with verified research".
 
-## Machine-control changes
+## Before you open a PR
 
-A completed Frame for the exact reviewed job is the sole ordinary operator-policy
-gate for Start. Advisory policy findings belong in the Start-time Job Review.
-Transport, compile, placement-input, handoff/recovery integrity, security,
-capability, and destructive-intent boundaries remain valid refusals when the
-operation cannot be executed correctly. See `AGENTS.md` and ADR-228/230/232/237.
+1. Read [`CLAUDE.md`](./CLAUDE.md) — file-size limits, naming, anti-patterns, checklists. The file-size, module-boundary, and type-strictness rules are enforced by ESLint and CI; naming, anti-patterns, and the checklists are enforced at maintainer review.
+2. Read [`PROJECT.md`](./PROJECT.md) — the current phase and scope. Anything outside the current phase needs a `PROJECT.md` revision and a `DECISIONS.md` entry before code lands.
+3. Read [`WORKFLOW.md`](./WORKFLOW.md) — if your change touches UI, the success / error / empty / edge states for the affected flow must already be documented (or you must update this file first).
+4. Read [`DECISIONS.md`](./DECISIONS.md) — architectural changes (module boundaries, state shape, build setup) require a new ADR.
+5. Read [`SECURITY.md`](./SECURITY.md) before reporting or testing a security-sensitive issue.
 
-Do not add or widen an ordinary machine-motion refusal without current evidence,
-focused tests, an ADR, and explicit maintainer approval. Do not weaken security,
-untrusted-input validation, experimental capability gates, low-power Fire
-controls, recovery integrity, or physical interlocks under the frame-first rule.
+## Process gates
 
-## Verification
+- **Scope changes:** require a `PROJECT.md` revision.
+- **Architectural changes:** require a new ADR in `DECISIONS.md` (format: match ADR-017's structure — Context, Decision, Alternatives considered, Consequences, Verification).
+- **New runtime dependencies:** require a `RESEARCH_LOG.md` entry (license, version, source, alternatives, evaluation date) before the PR that imports the library can merge. ADR-017 governs this policy.
+- **G-code output changes:** require an explicit `Snapshot change acknowledged: <reason>` line in the PR description.
 
-Use the smallest adequate bundle, then run broader gates in proportion to risk.
+## What lands without an ADR
 
-| Change | Minimum expected evidence |
-|---|---|
-| Documentation only | Prettier check, relative-link check, and verification of changed commands/claims |
-| Bug fix | Failing reproduction where practical, focused tests, typecheck, and lint |
-| UI workflow | Focused tests plus the relevant isolated Playwright or live-browser check |
-| G-code/output | Focused property/snapshot tests and explicit snapshot acknowledgement |
-| Release candidate | `pnpm release:check`; hardware/perceptual evidence remains separate |
+- Bug fixes with a failing test that demonstrates the bug, then passes after the fix.
+- Refactors that change nothing user-visible and nothing in the public module API.
+- Documentation polish.
 
-`pnpm release:check` gates CI and production Pages deployment. Playwright browser
-smoke runs in a separate PR/main workflow and is currently observability-only; it
-does not block Pages deployment.
+If you're unsure whether your change needs an ADR, open an issue first.
 
-## Pull requests
+## PR title
 
-- Keep one coherent intent per PR and preserve unrelated working-tree changes.
-- Explain the root cause and user impact, not only the code diff.
-- State what was verified and what was not, especially for machine, controller,
-  browser, visual, and burn-quality behavior.
-- Use Conventional Commit titles: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`,
-  `chore:`, or `ci:`.
+Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`, `ci:`.

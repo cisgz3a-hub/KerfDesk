@@ -1,8 +1,48 @@
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-import { appVersion, buildTimeIso, gitShortSha } from './src/platform/web/build-info';
+import {
+  appVersion,
+  buildTimeIso,
+  gitShortSha,
+  resolveBuildAppVersion,
+} from './src/platform/web/build-info';
+
+const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url));
+const DESKTOP_RELEASE_VERSION_ENV = 'KERFDESK_DESKTOP_VERSION';
+const BUILD_APP_VERSION = resolveBuildAppVersion(
+  appVersion(),
+  process.env[DESKTOP_RELEASE_VERSION_ENV],
+);
+
+/**
+ * Directories Vite's dev and test transforms may read from.
+ *
+ * A git worktree is checked out under `<repo>/.claude/worktrees/<name>` and
+ * carries its own lockfile, so Vite's workspace-root detection stops at the
+ * worktree — while pnpm's real package store stays in the parent repo's
+ * `node_modules`, which the worktree only symlinks into. Every `?raw` asset
+ * import from a dependency then fails to load with "Denied ID", which takes
+ * out every suite that renders a lucide icon.
+ *
+ * Allow the project plus any ancestor that actually holds a `node_modules`. On
+ * an ordinary clone that resolves to the project root alone, so a normal
+ * checkout keeps exactly the default access.
+ */
+function fileSystemAllowList(): ReadonlyArray<string> {
+  const roots = [PROJECT_ROOT];
+  let dir = dirname(PROJECT_ROOT);
+  for (;;) {
+    if (existsSync(join(dir, 'node_modules')) && !roots.includes(dir)) roots.push(dir);
+    const parent = dirname(dir);
+    if (parent === dir) return roots;
+    dir = parent;
+  }
+}
 
 // Vite config for the web build (ADR-003, ADR-009).
 // The Electron build reuses this config via electron-builder's renderer entry
@@ -25,17 +65,44 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['favicon.svg'],
+      includeAssets: [
+        'favicon.svg',
+        'favicon-32x32.png',
+        'apple-touch-icon.png',
+        'app-icon-192x192.png',
+        'app-icon-512x512.png',
+        'app-icon-maskable-512x512.png',
+      ],
       manifest: {
         name: 'KerfDesk',
         short_name: 'KerfDesk',
         description:
           'GRBL CAM for laser cutters, engravers, and CNC routers — design, trace, and burn, fully offline.',
-        theme_color: '#2563eb',
+        theme_color: '#111827',
         background_color: '#f8fafc',
         display: 'standalone',
         start_url: '.',
-        icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        icons: [
+          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          {
+            src: 'app-icon-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'app-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'app-icon-maskable-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,png,json,ttf,woff,woff2}'],
@@ -51,7 +118,7 @@ export default defineConfig({
   define: {
     __BUILD_TIME__: JSON.stringify(buildTimeIso()),
     __GIT_SHA__: JSON.stringify(gitShortSha()),
-    __APP_VERSION__: JSON.stringify(appVersion()),
+    __APP_VERSION__: JSON.stringify(BUILD_APP_VERSION),
   },
   build: {
     outDir: 'dist/web',
@@ -95,6 +162,10 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
+    // The document worker loads these dependencies only after the first SVG
+    // request. Pre-bundle them so a cold dev server does not discover them
+    // mid-test and reload the page while an import is in flight.
+    include: ['linkedom/worker', 'saxes'],
     esbuildOptions: {
       // Keep dev dependency pre-bundling aligned with the production build.
       // Without this, Vite's optimizer can fall back to its lower default
@@ -110,6 +181,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    fs: { allow: [...fileSystemAllowList()] },
   },
   preview: {
     port: 4173,

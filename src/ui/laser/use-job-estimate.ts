@@ -215,6 +215,14 @@ function followUpWithWorkerEstimate(
     (prepared) => {
       if (!args.isFollowUpStale()) args.settleAt(prepared.estimate);
     },
-    () => undefined,
+    (error: unknown) => {
+      if (args.isFollowUpStale()) return;
+      args.settleAt({
+        kind: 'preparation-failed',
+        message: `Background estimate failed: ${
+          error instanceof Error ? error.message : String(error)
+        }. Edit the job to retry.`,
+      });
+    },
   );
 }

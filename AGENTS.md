@@ -1,87 +1,143 @@
-# Repository agent guide
+# Operating rules for agents working in this repo
 
-This is the tool-neutral operating contract for anyone using an AI coding agent in
-this repository. Tool-specific entry points, including `CLAUDE.md`, defer to this
-file.
+> Read `CLAUDE.md` (operating manual), `PROJECT.md` (scope), `DECISIONS.md` (ADRs),
+> and `WORKFLOW.md` (flows) at the start of every session. The rule below overrides
+> any default behavior and is enforced at maintainer review — it is the rule agents
+> most often violate in this repo.
 
-## Start with the right tree
+## FRAME IS THE ONLY GUARD — no new guard may ever be added. Hard rule, no exceptions.
 
-1. Confirm the repository root, branch, and working-tree state before reading or
-   editing. `C:\Users\Asus\LaserForge` is a worktree hub, not the Git repository;
-   the canonical checkout is `C:\Users\Asus\LaserForge-2.0`.
-2. Preserve unrelated or uncommitted work. Do not copy rules from sibling
-   worktrees without verifying them against current `origin/main`.
-3. Read [`docs/README.md`](docs/README.md) and only the product, workflow, ADR, or
-   safety sections relevant to the task. `DECISIONS.md` and `WORKFLOW.md` are
-   large reference logs; do not load them end to end by default.
+(Maintainer, 2026-07-17. Canonical sources: `CLAUDE.md` collaboration rule 7,
+`PROJECT.md` non-negotiable #21, `DECISIONS.md` ADR-228 clarified by ADR-232.
+This section restates them in full so it is self-contained — do not rely on the
+reader having opened those files.)
 
-## Authority and document roles
+A **guard** is any behavior that blocks, refuses, gates, caps, clamps, delays,
+hides, disables, rewrites, or adds a confirmation before an otherwise-available
+action, input, output, machine command, job start, preview, save, import, export,
+or G-code emission.
 
-- `PROJECT.md` defines current product scope and non-negotiable behavior.
-- `WORKFLOW.md` defines operator flows. A later governing ADR wins over a passage
-  explicitly marked historical or superseded.
-- `DECISIONS.md` records architectural decisions and their rationale.
-- `CLAUDE.md` records engineering standards and the commands that enforce them.
-- `SECURITY.md` and `docs/safety.md` govern trust boundaries and physical safety.
-- `docs/audits/` contains dated evidence, plans, and handoffs. It is not current
-  product truth unless a living document or accepted ADR adopts a finding.
+The **one** Start guard that exists is the frame-first gate: a completed Frame for
+the exact current job (bounds signature + origin identity) opens Start on both
+laser and CNC. The **Job Review dialog is the single warning surface** the operator
+confirms. Frame is the source of truth: calculated bed bounds, configured no-go
+zones, and controller-setting policy may **warn** in Job Review, but must **never**
+refuse Frame or Start. The actual clean Frame completion decides whether a permit
+exists.
 
-If two current authorities genuinely conflict, stop and ask the maintainer. Do
-not resolve a product or safety-policy conflict by guessing.
+**Never add a new guard, re-add a deleted one, expand any refusal surface, or
+promote a warning into a block** — not for "safety," not for "defense in depth,"
+not with a test or an ADR, not ever. Anything you believe the operator should know
+goes into the Job Review warnings list, which informs and never refuses. **If you
+find yourself reasoning toward an exception, you are wrong** — put the concern in
+Job Review as a warning and stop.
 
-## Machine-control policy
+The only non-guard refusals permitted to exist are:
 
-### Ordinary Start authorization is frame-first
+- **(a) transport preconditions** — the serial channel factually cannot accept a
+  stream (disconnected, no status yet, controller Alarm/not-Idle, a job/jog/frame/
+  operation already running, MPG owning control, a line larger than the RX buffer)
+  — each of which must offer its fix in place where one exists;
+- **(b) compile integrity** — the program factually cannot be produced or contains
+  unstreamable bytes (compile failure, NaN coordinates, empty output); and
+- **(c) handoff consistency** — the exact reviewed program/setup must be the one
+  streamed (evidence epochs, attestation binding, resume fingerprints).
 
-For an ordinary laser or CNC job, a clean completed Frame for the exact reviewed
-job is the sole operator-policy gate to Start (ADR-228, ADR-230, ADR-232, and
-ADR-237). Calculated bounds, configured no-go zones, controller settings, and
-other advisory findings belong in the Start-time Job Review and do not create an
-additional ordinary Start policy gate.
+Re-labeling a policy judgment as one of those three factual categories is itself a
+violation of this rule. Narrowing, correcting, or removing a refusal is normal
+work; **widening any of those three permitted refusals — or adding a new refusal
+inside them — requires the maintainer's explicit prior permission in chat, which
+must be presumed denied. Nothing in this paragraph authorizes a guard: adding a
+guard, or any refusal outside those three factual categories, is never permitted,
+and no ADR, test, or grant of permission can authorize it (ADR-228 standing
+denial).**
 
-The following remain valid refusal boundaries because the requested operation
-cannot be executed correctly or through the available capability:
+---
 
-- transport readiness, controller ownership, and mutually exclusive operations;
-- compile integrity and required placement inputs;
-- exact-artifact, evidence-epoch, resume, and recovery consistency;
-- security and untrusted-input validation;
-- unsupported controller, platform, machine, or experimental capabilities; and
-- destructive actions that need explicit user intent.
+# We only build with verified research — never guess, never hallucinate
 
-Do not interpret frame-first as permission to weaken input validation, browser or
-Electron trust boundaries, low-power Fire hold-to-run behavior, capability/Labs
-gates, recovery integrity, hardware interlocks, or the operator's physical
-emergency controls. A new or wider ordinary machine-motion refusal requires
-current evidence, focused tests, an ADR, and explicit maintainer approval. Prefer
-an actionable warning when the operator can reasonably override the finding.
+**When you don't know something, go do the research.** Read the source in the current
+tree, run the command, fetch the upstream document — vendor docs, the advisory record,
+the spec, the changelog, the firmware manual. Then answer. Uncertainty is a trigger to
+investigate, never a licence to guess. External research is expected, not a last resort.
 
-## Working mode
+**Banned moves.** If you catch yourself writing one, stop mid-sentence and go research:
 
-- For an audit or diagnosis request, stay read-only and report evidence unless
-  the user also asks for a fix.
-- For an implementation request, make the smallest coherent change that meets
-  the goal. Keep refactors separate when they are not required for the change.
-- Verify claims against the current tree. Historical audits, PR text, and nearby
-  worktrees are leads, not proof.
-- Never operate real machine hardware or mutate the maintainer's live scene
-  without explicit permission. Use unit tests, simulators, isolated browser
-  state, throwaway projects, and de-energized qualification procedures.
-- Automated tests prove software behavior, not burn quality, physical placement,
-  or perceptual fidelity. State the hardware or visual qualification that remains.
-- Treat LightBurn as the default workflow reference where the product contract
-  says it applies. An intentional divergence must be documented rather than
-  silently treated as parity.
+- "Maybe I should…" / "I think it works like this" / "It probably…" / "This should be fine"
+- Proposing a design whose feasibility you have not checked
+- Stating an API, flag, version or semver range, CVE affected/patched range, config key,
+  default, or firmware behavior from memory
+- Recommending a fix you have not confirmed actually fixes the thing
 
-## Verification and handoff
+**Before stating a fact or recommending a fix, hold one of these from THIS session:** the
+source read in the tree (cite `file:line`), the command run with its real output and exit
+code, the upstream primary source fetched and read, or a reproduction you ran yourself.
+"I read it somewhere," "that's how it usually works," and "the docs probably say" are not
+sources. Cite what you used so the maintainer can check it.
 
-Use the smallest verification bundle proportional to the change. Documentation
-work normally needs formatting, link, and command/claim checks; source changes
-normally need focused tests plus the relevant CI gates. `pnpm release:check` is
-the complete release gate. Playwright browser smoke is a separate workflow and
-does not currently gate deployment.
+Highest-risk category — look every one up, every time: version numbers and semver ranges,
+CVE/advisory affected-vs-patched ranges, controller `$` settings and their semantics,
+G-code word behavior, API signatures, and what LightBurn actually does.
 
-The final handoff should state the outcome, the evidence used to verify it, and
-any important limitation or unverified physical behavior. Use headings only when
-they improve a substantial handoff; routine answers do not need a mandatory
-four-section template or a formulaic recommendation line.
+Say "I don't know X; to answer it I need to read/run/fetch Y" and then **go do Y.** Never
+fill the gap with a plausible guess. A confident wrong answer costs far more than the time
+verifying would have taken — on this project it can mean a ruined workpiece or an unsafe
+machine move.
+
+---
+
+# JOB COMPLETION REPORT — every finished job, every branch. Hard rule, no exceptions.
+
+(Maintainer, 2026-07-25. Canonical source: `CLAUDE.md` collaboration rule 8, which
+absorbs and replaces the earlier four-section completion rule. This section restates
+it in full so it is self-contained — do not rely on the reader having opened
+`CLAUDE.md`.)
+
+A **job** is any unit of work you were given and have stopped working on — a fix, a
+feature, an audit, an investigation, a refactor, a PR opened / updated / merged, or
+work that is blocked or abandoned — on **any** branch or worktree, by **any** agent
+(main session, subagent, fleet member, scheduled run). Answering a question or doing
+a single lookup that changes nothing is not a job.
+
+When a job ends, your final message must carry the nine sections below, **in this
+order, under these headings**. A small job gets short sections, but **no section may
+be dropped** — if one is genuinely empty, keep the heading and write "None." Every
+fact must come from a command you actually ran this session; anything you did not
+verify is labelled **not verified** rather than left implied.
+
+1. **Where we are** — branch / worktree name, PR number + link and its state (draft /
+   open / merged / closed), CI state by named check (green / red / pending / not run),
+   whether the work is on `main`, and whether anything is deployed. Facts as of now,
+   not expectations.
+2. **What we did** — the original ask restated in the maintainer's terms, including
+   anything added mid-flight, and the practical result it was meant to produce; then
+   the change list **by file path**, one line of *why* per file. Not "I updated the
+   layers panel."
+3. **Goal status** — **achieved / partially achieved / not achieved**, with the
+   evidence behind that word. Never "achieved" while required work remains.
+4. **What was verified — and what was NOT** — the commands actually run and their
+   results (`pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check` — counts
+   and pass/fail), then the gap stated plainly: no perceptual render, no hardware
+   air-cut, no E2E, mock-only. Green tests are never evidence a feature works.
+5. **How it works now** — the finished user-facing behavior: what the maintainer will
+   see, where in the UI, how to operate it, what to expect, and the limits that remain.
+6. **What's next — numbered steps** — **Step 1, Step 2, Step 3 …** in the order they
+   should be done. Each step gives the exact action (a command in a fenced block, a
+   file path, or a click path), why it comes next, what a good result looks like, and
+   what to do if it fails. No "consider", "maybe", or "look into" — every step must be
+   executable exactly as written by someone who did not watch the session.
+7. **What else we could do** — the optional list, kept strictly separate from section 6
+   so *must* is never confused with *could*: adjacent work, deferred items, follow-ups.
+   One line each, with its cost and its payoff.
+8. **How to improve** — the honest quality read: risk this change introduces, debt
+   taken on, tests not written, the same pattern that may exist elsewhere in the tree,
+   and what a better version would look like with more time.
+9. **Recommended action:** — one line, the single best next step, no menu. If a genuine
+   either/or is the maintainer's call, name your recommended option first and label it
+   as recommended, then the alternative in one line.
+
+Blocked or intentionally incomplete work uses the same skeleton — name what is missing
+under **Goal status** and exactly what unblocks it under **What's next**. If the job
+touched more than one branch, the report covers each branch by name. This report is
+written for the maintainer, not as a changelog: a diff, test log, commit, deployment,
+or pull-request link is supporting evidence **inside** it, never a replacement for it.

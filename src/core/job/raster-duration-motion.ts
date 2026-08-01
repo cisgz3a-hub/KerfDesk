@@ -6,7 +6,7 @@ import {
 } from '../raster/raster-sweep-plan';
 import type { Vec2 } from '../scene';
 import type { RasterGroup } from './job';
-import { rasterRow } from './raster-rows';
+import { rasterRowsInProviderOrder } from './raster-rows';
 import { offsetForSpeed, type ScanOffsetPoint } from './scan-offset';
 
 export type RasterDurationMotion = {
@@ -55,10 +55,10 @@ function* rasterPassDurationMotion(
 ): Generator<RasterDurationMotion> {
   let cursor = initialCursor;
   let emittedRowCount = 0;
-  for (let y = 0; y < group.pixelHeight; y += 1) {
+  for (const { rowIndex, row } of rasterRowsInProviderOrder(group)) {
     const reverse = (group.bidirectional ?? true) && emittedRowCount % 2 === 1;
     const plans = planRasterRowSweeps({
-      row: rasterRow(group, y),
+      row,
       pixelWidthMm: geometry.pixelWidthMm,
       overscanMm: group.overscanMm,
       reverse,
@@ -66,7 +66,7 @@ function* rasterPassDurationMotion(
       minXWorldMm: group.bounds.minX,
     });
     if (plans.length === 0) continue;
-    const worldY = group.bounds.minY + (y + 0.5) * geometry.pixelHeightMm;
+    const worldY = group.bounds.minY + (rowIndex + 0.5) * geometry.pixelHeightMm;
     for (const plan of plans) {
       const motion = rasterSweepMotion(group, plan, worldY, reverse, scanOffsetMm);
       yield { kind: 'seek', from: cursor, to: motion.leadStart };

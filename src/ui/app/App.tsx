@@ -5,6 +5,8 @@
 
 import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
+import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
+import { useCanvasViewStore } from '../state/canvas-view-store';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
@@ -12,6 +14,7 @@ import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
+import { DesignStudioHost } from '../design-studio';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
 import { Cnc3DPane, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
@@ -20,7 +23,6 @@ import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
 import { useCompactRailDefaults } from './use-compact-rail-defaults';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
-import { useImportDragDrop } from './use-import-drag-drop';
 import { useJobCheckpoint } from './use-job-checkpoint';
 import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
 import { useMaterialLibraryPersistence } from './use-material-library-persistence';
@@ -47,7 +49,6 @@ export function App(): JSX.Element {
   useCompactRailDefaults();
   useLayerDefaultsPersistence();
   useGlobalErrorHandlers();
-  useImportDragDrop();
   useJobShortcuts();
   useShortcuts();
   useSpacePan();
@@ -61,13 +62,7 @@ export function App(): JSX.Element {
       <CommandShell />
       <main style={mainStyle}>
         <ToolStrip />
-        <div style={canvasAreaStyle}>
-          <Workspace />
-          <WorkspaceCameraOverlay />
-          <RegistrationJigPanel />
-          <CameraPanel />
-          <BoardCapturePanel />
-        </div>
+        <CanvasArea />
         <Cnc3DPane />
         <WorkspaceSidePanels />
       </main>
@@ -81,9 +76,47 @@ export function App(): JSX.Element {
       <ConfirmSaveDialog />
       <JobReviewDialog />
       <ImageEditorHost />
+      <DesignStudioHost />
     </div>
   );
 }
+
+// The main canvas has two modes (ADR-255): the design view, and a G-code 3D
+// PREVIEW of what this project compiles to. The switch is on the canvas
+// because it is a glance, not a workbench — the toolbar's "Inspect G-code
+// (3D)" opens the in-depth screen. Both stay usable during a job, where
+// watching the running program is the point.
+function CanvasArea(): JSX.Element {
+  const showGcode = useCanvasViewStore((store) => store.showGcode);
+  const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
+  return (
+    <div style={canvasAreaStyle}>
+      <Workspace />
+      <WorkspaceCameraOverlay />
+      <RegistrationJigPanel />
+      <CameraPanel />
+      <BoardCapturePanel />
+      {showGcode ? <CanvasGcodeView active /> : null}
+      <div style={canvasSwitchStyle}>
+        <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />
+      </div>
+    </div>
+  );
+}
+
+// Top-CENTRE, deliberately: the rulers own the left edge and the motion
+// badge owns top-right (canvas-motion-badge.tsx, top/right 12) — anchoring
+// either side buries one of them. Its own elevation so it reads as a
+// control rather than part of the drawing.
+const canvasSwitchStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 10,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 4,
+  boxShadow: 'var(--lf-shadow)',
+  borderRadius: 'var(--lf-radius-lg)',
+};
 
 const shellStyle: React.CSSProperties = {
   display: 'flex',

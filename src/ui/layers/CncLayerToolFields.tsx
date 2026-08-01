@@ -4,23 +4,19 @@
 // Split from CncLayerFields.tsx, which sits near the file-size cap.
 
 import {
-  DEFAULT_CNC_TOOLS,
-  activeCncTool,
   sceneObjectUsesOperation,
   type CncLayerSettings,
   type CncTool,
   type Layer,
 } from '../../core/scene';
+import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
+import { CncToolOptions } from '../machine/CncToolOptions';
 import { useStore } from '../state';
-import { materialFeedsPatch } from '../state/cnc-project-material';
-import { withoutCncFeedProvenance } from '../state/cnc-feed-provenance';
+import { useCncTools } from './CncLayerBitSelect';
 
-export function useCncTools(): ReadonlyArray<CncTool> {
-  return useStore((s) =>
-    s.project.machine?.kind === 'cnc' ? s.project.machine.tools : DEFAULT_CNC_TOOLS,
-  );
-}
+export { LayerBitSelect } from './CncLayerBitSelect';
+export { useCncTools };
 
 // Relief roughing (H.5) reads depth-per-pass + stepover from the layer but
 // takes total depth from the relief object — CncLayerFields keys its
@@ -33,68 +29,6 @@ export function useLayerHasReliefObjects(layer: Layer): boolean {
   );
 }
 
-export function LayerBitSelect(props: {
-  readonly layer: Layer;
-  readonly settings: CncLayerSettings;
-  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-  readonly onCommitSettings: (settings: CncLayerSettings) => void;
-}): JSX.Element {
-  const tools = useCncTools();
-  const machine = useStore((s) => s.project.machine);
-  const profile = useStore((s) => s.project.device);
-  const liveCaps = useStore((s) => s.cncLiveCaps);
-  // A material-driven layer must recompute its feeds for the NEW bit's
-  // diameter — otherwise the material hint claims feeds that were computed
-  // for the old bit.
-  const feedsForBit = (toolId: string | undefined): Partial<CncLayerSettings> | null => {
-    const source = props.settings.feedSource;
-    if (machine?.kind !== 'cnc' || source?.kind !== 'material-recipe') return null;
-    const tool = toolId === undefined ? activeCncTool(machine) : tools.find((t) => t.id === toolId);
-    if (tool === undefined) return null;
-    return materialFeedsPatch({
-      materialKey: source.materialKey,
-      tool,
-      spindleRpm: props.settings.spindleRpm,
-      profile,
-      machineSpindleMaxRpm: machine.params.spindleMaxRpm,
-      liveCaps,
-      fluteCount: source.fluteCount,
-    });
-  };
-  return (
-    <Row label="Bit">
-      <select
-        value={props.settings.toolId ?? ''}
-        onChange={(e) => {
-          const toolId = e.target.value === '' ? undefined : e.target.value;
-          const feeds = feedsForBit(toolId);
-          let base: CncLayerSettings;
-          if (e.target.value === '') {
-            // Clearing the override removes the key (exact optional field).
-            const { toolId: _removed, ...rest } = props.settings;
-            base = rest;
-          } else {
-            base = { ...props.settings, toolId: e.target.value };
-          }
-          props.onCommitSettings(
-            feeds === null ? withoutCncFeedProvenance(base) : { ...base, ...feeds },
-          );
-        }}
-        aria-label={`Bit for ${props.layer.color}`}
-        title="Which bit cuts this layer. Layers with different bits become a multi-bit job with M0 tool-change pauses."
-        style={selectStyle}
-      >
-        <option value="">Machine bit (active)</option>
-        {tools.map((tool) => (
-          <option key={tool.id} value={tool.id}>
-            {tool.name}
-          </option>
-        ))}
-      </select>
-    </Row>
-  );
-}
-
 export function VClearToolSelect(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -102,7 +36,16 @@ export function VClearToolSelect(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const tools = useCncTools();
-  const flatTools = tools.filter((tool) => tool.kind !== 'v-bit');
+  // Floor clearing emits ordinary constant-Z pocket passes. Only the flat
+  // end-mill kernel can truthfully leave that floor; ball/core-box tools and
+  // legacy engraving geometry must not be offered here.
+  const flatTools = tools.filter((tool) => tool.kind === 'end-mill');
+  const currentClearTool = tools.find((tool) => tool.id === props.settings.vClearToolId);
+  const unavailableClearToolId =
+    props.settings.vClearToolId !== undefined &&
+    !flatTools.some((tool) => tool.id === props.settings.vClearToolId)
+      ? props.settings.vClearToolId
+      : null;
   return (
     <Row label="Clear floors">
       <select
@@ -120,14 +63,22 @@ export function VClearToolSelect(props: {
         style={selectStyle}
       >
         <option value="">Single stage (v-bit only)</option>
-        {flatTools.map((tool) => (
-          <option key={tool.id} value={tool.id}>
-            {tool.name}
+        {unavailableClearToolId === null ? null : (
+          <option value={unavailableClearToolId} disabled>
+            {unavailableClearToolLabel(unavailableClearToolId, currentClearTool)}
           </option>
-        ))}
+        )}
+        <CncToolOptions tools={flatTools} />
       </select>
     </Row>
   );
+}
+
+function unavailableClearToolLabel(toolId: string, tool: CncTool | undefined): string {
+  const prefix = 'Current unsupported clearing bit (choose a flat end mill)';
+  return tool === undefined
+    ? `${prefix} — missing ${toolId}`
+    : `${prefix} — ${cncToolGeometryLabel(tool)} — ${tool.name}`;
 }
 
 // The relief block for layers carrying relief objects: the honest-card
@@ -164,6 +115,11 @@ function ReliefFinishRow(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const tools = useCncTools();
+  const unavailableFinishToolId =
+    props.settings.reliefFinishToolId !== undefined &&
+    !tools.some((tool) => tool.id === props.settings.reliefFinishToolId)
+      ? props.settings.reliefFinishToolId
+      : null;
   return (
     <Row label="Finish with">
       <select
@@ -181,11 +137,12 @@ function ReliefFinishRow(props: {
         style={selectStyle}
       >
         <option value="">Roughing only</option>
-        {tools.map((tool) => (
-          <option key={tool.id} value={tool.id}>
-            {tool.name}
+        {unavailableFinishToolId === null ? null : (
+          <option value={unavailableFinishToolId} disabled>
+            Current missing finishing bit — {unavailableFinishToolId}
           </option>
-        ))}
+        )}
+        <CncToolOptions tools={tools} />
       </select>
       <ClearableNumberField
         min={0.005}
@@ -208,28 +165,34 @@ export function MotionPolishRows(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
+  const showCutDirection =
+    props.settings.cutType === 'profile-outside' ||
+    props.settings.cutType === 'profile-inside' ||
+    props.settings.cutType === 'pocket';
   return (
     <Row label="Entry">
-      <select
-        value={props.settings.cutDirection ?? ''}
-        onChange={(e) => {
-          if (e.target.value === '') {
-            const { cutDirection: _removed, ...rest } = props.settings;
-            props.onCommitSettings(rest);
-          } else {
-            props.onCommit({
-              cutDirection: e.target.value === 'climb' ? 'climb' : 'conventional',
-            });
-          }
-        }}
-        aria-label={`Cut direction for ${props.layer.color}`}
-        title="Climb or conventional cutting for profile/pocket toolpaths (also moves entry points to mid-segment). Default keeps the compiler's natural direction."
-        style={directionSelectStyle}
-      >
-        <option value="">Default direction</option>
-        <option value="climb">Climb</option>
-        <option value="conventional">Conventional</option>
-      </select>
+      {showCutDirection ? (
+        <select
+          value={props.settings.cutDirection ?? ''}
+          onChange={(e) => {
+            if (e.target.value === '') {
+              const { cutDirection: _removed, ...rest } = props.settings;
+              props.onCommitSettings(rest);
+            } else {
+              props.onCommit({
+                cutDirection: e.target.value === 'climb' ? 'climb' : 'conventional',
+              });
+            }
+          }}
+          aria-label={`Cut direction for ${props.layer.color}`}
+          title="Climb or conventional cutting for profile/pocket toolpaths (also moves entry points to mid-segment). Default keeps the compiler's natural direction."
+          style={directionSelectStyle}
+        >
+          <option value="">Default direction</option>
+          <option value="climb">Climb</option>
+          <option value="conventional">Conventional</option>
+        </select>
+      ) : null}
       <ClearableNumberField
         min={0}
         max={45}

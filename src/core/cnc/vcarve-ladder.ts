@@ -3,7 +3,7 @@
 //
 // For the closed shapes of a layer, successive inward offsets at insets
 // d_k = k·δ are cut at z(d) = −min(d / tan(θ/2), maxDepth), where θ is the
-// v-bit's included tip angle. The union of the bit's cone surfaces along
+// v-bit's included angle. The union of the bit's cone surfaces along
 // those rings converges to the true V-groove as δ → 0: the medial axis
 // emerges where the offsets vanish, so sharp corners get their full depth
 // for free, and clipper's containment-aware offsetting handles holes and
@@ -12,28 +12,28 @@
 // floor at δ spacing (the two-stage clearing-tool variant arrives with
 // multi-tool jobs, H.7b).
 //
-// Rings are emitted shallow → deep (outside-in), each expanded through
-// zPassDepths so no single plunge exceeds depthPerPassMm; the emitter's
-// same-XY chaining turns those into efficient stepped plunges.
+// Each disconnected filled region is completed shallow → deep (outside-in)
+// before travelling to the next region. Every contour keeps its original
+// ladder step, and each is expanded through zPassDepths so no single plunge
+// exceeds depthPerPassMm; the emitter's same-XY chaining turns those into
+// efficient stepped plunges.
 //
-// Pure and deterministic: fixed ring ordering (k ascending, input order
-// within a ring), no clock, no random.
+// Pure and deterministic: source-region order, then k ascending and offset
+// engine order within a region, no clock, no random.
 
-import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncPass, CncContourPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
 import { hasFinitePoints } from './profile-paths';
+import { vcarveIncludedAngleDeg } from './vcarve-angle';
+import { vcarveRegionOrder } from './vcarve-region-order';
 
 const MIN_CLOSED_POINTS = 3;
 const MIN_RESOLUTION_MM = 0.1;
 const AUTO_RESOLUTION_TOOL_FRACTION = 8;
 // Backstop against degenerate inputs (huge region + microscopic δ).
 const MAX_VCARVE_RINGS = 8192;
-// A v-bit with no/degenerate angle carves as a 60° cone rather than
-// dividing by tan(0) — preflight separately warns when the active tool is
-// not a v-bit at all.
-const FALLBACK_TIP_ANGLE_DEG = 60;
 
 export type VCarveOptions = {
   readonly tool: CncTool;
@@ -42,16 +42,35 @@ export type VCarveOptions = {
   readonly resolutionMm: number; // 0 = auto
 };
 
+export type VCarveLadder = {
+  readonly passes: ReadonlyArray<CncPass>;
+  // True when the ring ladder stopped on an offset-engine failure rather than
+  // on reaching the medial axis: the carve is shallower and narrower than the
+  // artwork asks for. Reported to Job Review, never a refusal (rule 7).
+  readonly offsetFailed: boolean;
+};
+
 export function vcarvePasses(
   polylines: ReadonlyArray<Polyline>,
   options: VCarveOptions,
 ): ReadonlyArray<CncPass> {
+  return vcarveLadderPasses(polylines, options).passes;
+}
+
+// Same passes as vcarvePasses, keeping the reason the ladder ended so a carve
+// truncated by the offset engine can be reported instead of shipped silently.
+export function vcarveLadderPasses(
+  polylines: ReadonlyArray<Polyline>,
+  options: VCarveOptions,
+): VCarveLadder {
+  const tipAngleDeg = vcarveIncludedAngleDeg(options.tool);
+  if (tipAngleDeg === null) return { passes: [], offsetFailed: false };
   const contours = polylines.filter(
     (polyline) =>
       polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
   );
   const delta = vcarveResolutionMm(options.resolutionMm, options.tool.diameterMm);
-  const tanHalf = Math.tan(halfAngleRad(options.tool));
+  const tanHalf = Math.tan((tipAngleDeg / 2) * (Math.PI / 180));
   // The bit's cutting flank ends where the cone reaches the full diameter:
   // (D/2)/tan(θ/2). Deeper "V" cuts do not physically exist — the shank
   // would rub and the modeled groove width past the diameter would be a lie
@@ -61,17 +80,16 @@ export function vcarvePasses(
       ? options.tool.diameterMm / 2 / tanHalf
       : Number.POSITIVE_INFINITY;
   const maxDepth = Math.min(options.maxDepthMm, coneHeightMm);
-  if (contours.length === 0 || !(maxDepth > 0)) return [];
+  if (contours.length === 0 || !(maxDepth > 0)) return { passes: [], offsetFailed: false };
 
+  // Ring k (1-based in the depth law above) is ladder step k - 1.
+  const ladder = buildOffsetLadder(contours, MAX_VCARVE_RINGS, (step) => (step + 1) * delta);
   const passes: CncContourPass[] = [];
-  for (let k = 1; k <= MAX_VCARVE_RINGS; k += 1) {
-    const inset = k * delta;
-    const ring = offsetClosedPolylinesForKerf(contours, -inset);
-    if (ring.length === 0) break;
-    const ringDepth = Math.min(inset / tanHalf, maxDepth);
-    appendRingPasses(passes, ring, ringDepth, options.depthPerPassMm);
+  for (const { step, polyline } of vcarveRegionOrder(contours, ladder.rings)) {
+    const ringDepth = Math.min(((step + 1) * delta) / tanHalf, maxDepth);
+    appendRingPasses(passes, [polyline], ringDepth, options.depthPerPassMm);
   }
-  return passes;
+  return { passes, offsetFailed: ladder.offsetFailed };
 }
 
 // Ring spacing: explicit setting wins; 0 = auto at toolDiameter/8 with a
@@ -96,12 +114,6 @@ function appendRingPasses(
       passes.push({ kind: 'contour', zMm, polyline: ringClosure(polyline), closed: true });
     }
   }
-}
-
-function halfAngleRad(tool: CncTool): number {
-  const angleDeg = tool.tipAngleDeg ?? FALLBACK_TIP_ANGLE_DEG;
-  const safeDeg = Number.isFinite(angleDeg) && angleDeg >= 1 ? angleDeg : FALLBACK_TIP_ANGLE_DEG;
-  return (safeDeg / 2) * (Math.PI / 180);
 }
 
 // Job convention: a closed pass's polyline ends where it starts (the offset

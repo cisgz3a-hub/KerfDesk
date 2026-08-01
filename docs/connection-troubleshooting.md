@@ -64,7 +64,7 @@ hobby CNC and laser boards does **not** and must be installed by hand.
 
 ## Step 3 — Pick the right port in KerfDesk
 
-1. Click **Connect** (or run **Set up device** for the guided wizard).
+1. Click **Connect** (or run **Machine Setup** for the guided wizard).
 2. In the port picker, choose the entry that matches the COM port you saw in
    Device Manager (for example, the CH340 port).
 3. If several ports are listed and you're unsure which is the machine, unplug the

@@ -7,10 +7,12 @@ import {
   type JobPlacementSettings,
   type ResolvedJobPlacement,
 } from '../job-placement';
-import { buildCanvasMotionPlan } from '../state/canvas-motion-plan';
+import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
+import { buildCanvasMotionPlan, reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import type { MachineStartSnapshot, StartJobPreparation } from './start-job-readiness';
+import { buildPreparedJobMetrics } from './prepared-job-metrics';
 
 export function withControllerReportUnits(
   machine: MachineStartSnapshot,
@@ -48,21 +50,35 @@ export function okPreparation(
   reportInches: boolean,
   retentionKey: string,
 ): StartJobPreparation {
+  const canvasPlan = buildCanvasMotionPlan({
+    gcode,
+    prepared,
+    machine,
+    ...(machine.statusQuery === undefined ? {} : { statusQuery: machine.statusQuery }),
+    reportInches,
+    retentionKey,
+    ...(jobOrigin === undefined ? {} : { jobOrigin }),
+  });
+  const jobTimingPlan = canvasJobTimingPlan(
+    gcode,
+    prepared.project.device,
+    reportedWorkPositionMm(machine, reportInches),
+    {
+      controllerSessionEpoch: machine.controllerSessionEpoch,
+      positionEpoch: machine.trustedPositionEpoch,
+      activeControllerKind: machine.activeControllerKind,
+      detectedControllerKind: machine.detectedControllerKind,
+    },
+  );
   return {
     ok: true,
     gcode,
     warnings,
     prepared,
+    metrics: buildPreparedJobMetrics(prepared, jobOrigin),
     ...(preflightMotionOffset === undefined ? {} : { preflightMotionOffset }),
-    canvasPlan: buildCanvasMotionPlan({
-      gcode,
-      prepared,
-      machine,
-      ...(machine.statusQuery === undefined ? {} : { statusQuery: machine.statusQuery }),
-      reportInches,
-      retentionKey,
-      ...(jobOrigin === undefined ? {} : { jobOrigin }),
-    }),
+    canvasPlan,
+    jobTimingPlan,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
     ...(toolPlan.length === 0 ? {} : { cncToolPlan: toolPlan }),
   };

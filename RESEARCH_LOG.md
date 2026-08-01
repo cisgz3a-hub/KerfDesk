@@ -33,7 +33,7 @@ Each entry here corresponds to a `package.json` dependency. New rows are added w
 
 ### DOMPurify
 
-- **Version:** ^3.4.11 (resolved 3.4.11; the security floor remains 3.3.2)
+- **Version:** ≥ 3.3.2 (pinned floor; latest at adoption: 3.4.6 — verified via `cure53/DOMPurify` `package.json` on 2026-05-27)
 - **License:** MPL-2.0 OR Apache-2.0 (verified MIT-compatible per ADR-017)
 - **Source:** https://github.com/cure53/DOMPurify
 - **Decision affected:** ADR-017 (library policy); used in `src/io/svg/` for sanitization
@@ -89,18 +89,18 @@ not separately evaluated against ADR-017's per-library criteria — the stack
 choice itself was the ADR. Listed here for completeness so the bundle / CVE
 audit can find them.
 
-Versions below reflect the current `package.json` (last refreshed 2026-07-22).
-When you bump anything in this table, also
+Versions below reflect the current `package.json` (last refreshed 2026-05-28
+after the F-2 security bump). When you bump anything in this table, also
 append a row to the "Re-verification log" further down so the diff stays
 auditable.
 
 | Package | Version (pinned ^) | License | Role |
 |---|---|---|---|
 | `typescript` | ^5.5.0 | Apache-2.0 | Type-checker |
-| `vite` | ^6.4.3 | MIT | Web build + dev server |
+| `vite` | ^6.4.2 | MIT | Web build + dev server |
 | `@vitejs/plugin-react` | ^4.3.0 | MIT | JSX transform for Vite |
-| `vitest` | ^3.2.6 | MIT | Test runner |
-| `@vitest/coverage-v8` | ^3.2.6 | MIT | Coverage |
+| `vitest` | ^3.2.4 | MIT | Test runner |
+| `@vitest/coverage-v8` | ^3.2.4 | MIT | Coverage |
 | `jsdom` | ^25.0.0 | MIT | DOM env for Vitest |
 | `fast-check` | ^3.22.0 | BSD-2-Clause | Property tests |
 | `eslint` | ^9.10.0 | MIT | Linter |
@@ -114,17 +114,38 @@ auditable.
 | `eslint-import-resolver-typescript` | ^3.6.3 | ISC | TS path resolution for boundaries |
 | `prettier` | ^3.3.0 | MIT | Formatter |
 | `globals` | ^15.9.0 | MIT | Predefined env globals |
+| `scripts/check-licenses.mjs` | in-tree | MIT | pnpm-aware production package-license gate |
 | `@types/node`, `@types/react`, `@types/react-dom`, `@types/opentype.js` | various | MIT (DefinitelyTyped) | Type declarations |
 | `electron` | ^42.3.0 | MIT | Windows desktop shell (bumped F-2; CVE-2026-34769/34780 patched) |
-| `electron-builder` | ^26.15.3 | MIT | Desktop installer pipeline |
-| `@playwright/test` | ^1.61.1 | Apache-2.0 | Isolated browser smoke |
-| `vite-plugin-pwa` | ^1.3.0 | MIT | PWA/service-worker build integration |
-| `workbox-window` | ^7.4.1 | MIT | Service-worker registration helper |
-| `wrangler` | ^4.100.0 | MIT / Apache-2.0 | Cloudflare Pages deploy CLI |
+| `electron-builder` | ^26.11.1 | MIT | Desktop installer pipeline |
+| `@electron/asar` | 3.4.1 | MIT | Inspect packaged Preview metadata in release gates |
+| `wrangler` | ^4.95.0 | MIT / Apache-2.0 | Cloudflare Pages deploy CLI |
 
-Production licenses are checked by `pnpm license-check`; development tools are
-reviewed when adopted or upgraded. `pnpm release:check` runs the production
-license check in CI.
+All licenses verified MIT-compatible by `pnpm license-check` (production-only)
++ manual review of dev-dep tree. The CI workflow re-runs the check on every
+push.
+
+### @electron/asar — adopted for packaged Preview verification (2026-07-22)
+
+- **Version:** 3.4.1 exact; this is the version already resolved transitively by
+  electron-builder. Upstream latest at evaluation was 4.2.1 (2026-07-21).
+- **License:** MIT, verified from the installed package and official repository.
+- **Source:** https://github.com/electron/asar/releases/tag/v3.4.1
+- **Decision affected:** ADR-248/249 and
+  `scripts/verify-packaged-preview-metadata.mjs`.
+- **Role:** dev/release-only reader for `app.asar/package.json`; proves the built
+  version, Preview marker, and updater-trust false value actually landed in each
+  Windows/macOS package. It is never bundled into the application runtime.
+- **Maintenance:** official Electron project; actively maintained. The older
+  compatible major is pinned deliberately to reuse electron-builder's installed
+  copy rather than add a second ASAR implementation to the release toolchain.
+- **Evaluated:** 2026-07-22, Codex session.
+- **Confidence:** high.
+- **Re-verify by:** 2027-01-22.
+- **Alternatives considered:** leave the archive unchecked (rejected because
+  source YAML cannot prove runtime metadata); disable ASAR (rejected because it
+  changes package structure); install an unpinned CLI in CI (rejected as a
+  supply-chain and reproducibility regression).
 
 ---
 
@@ -145,7 +166,7 @@ These have been chosen in advance but are not yet in `package.json`. Re-verify a
   - `fontkit` (MIT) — heavier (~600 KB unminified); supports more font formats than we need (WOFF2, etc.). Skipped.
   - `harfbuzzjs` (MIT) — text shaping for complex scripts; overkill for Latin-script MVP-D and 10× the size.
 - **Bundle impact:** adds ~265 KB to the JS bundle (524 KB total → 161 KB gzip). Within PROJECT.md's "< 1 MB compressed" target with margin. Lazy-loading deferred — could re-evaluate if a future feature pushes the bundle past 200 KB gzip.
-- **Bundled fonts:** Roboto Regular (Apache-2.0), Inconsolata Regular (OFL-1.1), Pacifico Regular (OFL-1.1), Dancing Script Regular (OFL-1.1). All MIT-compatible per ADR-017. Loaded on-demand via UI-layer `font-loader.ts` — fonts are not in the initial JS bundle.
+- **Bundled fonts:** Roboto Regular (Apache-2.0), Inconsolata Regular (OFL-1.1), Pacifico Regular (OFL-1.1), Dancing Script Regular (OFL-1.1). Reviewed separately as permissively licensed assets with their own notices, not as blanket npm-package approvals under ADR-017. Loaded on-demand via UI-layer `font-loader.ts` — fonts are not in the initial JS bundle.
 
 ### imagetracerjs — adopted Phase E (2026-05-27)
 
@@ -171,25 +192,6 @@ These have been chosen in advance but are not yet in `package.json`. Re-verify a
   - **vtracer** (MIT, Rust-based, has WASM build) — visioncortex group; known higher quality than imagetracerjs. Strong candidate for a future evaluation. Would need a bundle-impact + integration-shape review before adoption per ADR-017.
   - **potrace** (GPL-2) — gold standard but license-incompatible per ADR-017. Algorithm (Selinger 2003 paper) could be re-implemented from scratch if the preprocessing-upgrade path stops being enough.
 
-### clipper2-ts — adopted geometry kernel
-
-- **Version:** 2.0.1-17
-- **License:** BSL-1.0 (Boost Software License 1.0)
-- **Source:** https://github.com/ErikSom/Clipper2-ts
-- **Role:** deterministic polygon offsetting and clipping in core geometry,
-  including kerf, pockets, and later CNC geometry flows.
-- **Decision affected:** ADR-098 and ADR-209.
-
-### workbox-window — adopted PWA registration helper
-
-- **Version:** ^7.4.1
-- **License:** MIT
-- **Source:** https://github.com/GoogleChrome/workbox
-- **Role:** browser-side registration and lifecycle handling for the service
-  worker produced by `vite-plugin-pwa`; it is a build dependency that contributes
-  code to the shipped web application.
-- **Decision affected:** ADR-060.
-
 ---
 
 ## External standards and references (non-dependencies)
@@ -210,6 +212,25 @@ These are not in `package.json`; they are sources of record we rely on for proto
   - We do not link, vendor, or distribute GRBL source. We implement a client against its serial protocol — protocol implementations are not subject to source license.
   - Key spec areas referenced: real-time commands (`?`, `~`, `!`, `\x18`), status report format, alarm codes, settings (`$$`, `$30`, `$32`), homing cycle.
   - When a Phase B implementation question is ambiguous (e.g., timing of position polling), this wiki + the CNCjs source code (see below) are the resolution sources, in that order.
+
+### GRBL / grblHAL firmware source — buffer, planner, and ack-timing constants
+
+- **Version / date:** gnea/grbl `master` (1.1h, archived 2019-08-30) and grblHAL `core/master`, both read 2026-07-27
+- **License:** GPL-3 (grbl) / BSD-3-Clause (grblHAL). **Neither is vendored, linked, or distributed** — these are read as documentation of wire behaviour, and no firmware code was copied.
+- **Source:** raw files read this session —
+  `gnea/grbl/grbl/serial.h`, `serial.c`, `planner.h`, `motion_control.c`, `protocol.c`, `protocol.h`, `doc/script/stream.py`; `grblHAL/core/stream.h`, `config.h`
+- **Decision affected:** ADR-265 (`src/__fixtures__/controllers/grbl-sim-{rx-window,planner,backpressure}.ts`)
+- **Evaluated:** 2026-07-27, Claude Code session
+- **Confidence:** high (constants read verbatim from source, not from the archived wiki or secondary senders)
+- **Re-verify by:** 2027-07-27 (grbl is archived and will not move; grblHAL may)
+- **Notes:**
+  - `serial.h`: `RX_BUFFER_SIZE 128`. The ring reserves one slot — `serial_get_rx_buffer_available()` returns `rtail - head - 1` when wrapped — so 127 bytes are usable, and grbl's own `doc/script/stream.py` counts against `RX_BUFFER_SIZE - 1`. Our streamer's 120 (CNCjs parity) sits safely inside that.
+  - `serial.c` `ISR(SERIAL_RX)`: realtime bytes are executed in the ISR and never stored, so they cost no ring space; a byte arriving at a full ring is dropped **silently** — no error, no notification.
+  - `planner.h`: `BLOCK_BUFFER_SIZE 16` (15 with `USE_LINE_NUMBERS`).
+  - `motion_control.c` `mc_line()`: spins on `plan_check_full_buffer()` before planning.
+  - `protocol.c` `protocol_main_loop()`: `report_status_message(gc_execute_line(line))` — **the `ok` is sent only after `gc_execute_line()` returns**, so a full planner withholds the ack and stops serial reads. This is the exact mechanism ADR-265 models.
+  - `protocol.h`: `LINE_BUFFER_SIZE 80` — shorter than the RX ring; a >80-char block is truncated. Not currently modelled by the simulator.
+  - **grblHAL differs and the difference is large:** `stream.h` `RX_BUFFER_SIZE 1024` (8× stock) and `config.h` `DEFAULT_PLANNER_BUFFER_BLOCKS 100` (`$398`, runtime-settable). Code that assumes 128/16 is wrong on grblHAL; `build-info.ts` already reads the real values from `$I`.
 
 ### CNCjs source code
 
@@ -762,9 +783,7 @@ compiler.
 - Be concrete. "Used by many projects" is not a useful claim; "4,281 npm dependents as of 2026-05-26" is.
 - Be honest about confidence. "high" means you'd defend this in a code review; "low" means you'd want a second opinion.
 - Verify licenses against the actual `LICENSE` file in the upstream repo, not against npm metadata or reputation.
-- A library should be documented here when it is adopted. `package.json` and the
-  production license check are the enforced dependency sources; this log provides
-  the human rationale and is reviewed for drift during dependency changes.
+- A library is not added to `package.json` until its row exists here. CI enforces this with a custom lint rule cross-checking `package.json` against this file.
 
 ### Playwright - adopted for isolated browser smoke (2026-07-13, ADR-158)
 
@@ -822,6 +841,38 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
   scale — kept as the documented IMPORT path instead), The Noun Project
   (not license-compatible).
 
+### @tabler/icons — adopted for the curated Design Library (2026-07-31)
+
+- **Version:** exactly `3.43.0`; npm integrity
+  `sha512-qXwS17Op9jqr3Asvu31fejyw8+OnRDKH7oR8nQXyUgW1pI44ET8OKG9kssy+XIvvAIyej6gZdGmviNUn1VMfPw==`.
+- **License:** MIT. Verified against the upstream `v3.43.0` `LICENSE`
+  (copyright 2020–2026 Paweł Kuna) and the installed npm package.
+- **Source:** https://github.com/tabler/tabler-icons/tree/v3.43.0
+  (annotated tag commit `e40738b64486f857128ae58335354681e4e9dc9b`).
+- **Decision affected:** ADR-017 dependency policy and the M2/M5 source
+  decision in `docs/audits/2026-07-31-library-redesign-program.md`.
+- **Role:** data-only source for 46 intentionally selected, non-brand outline
+  SVGs in six practical Library collections. Preview URLs are emitted as
+  separate offline assets and browser-lazy-loaded. Exact SVG text is
+  code-split and imported into the renderer only when an item is added; package
+  code never runs. The web PWA may fetch those emitted chunks during its
+  whole-app offline precache, but it does not parse or execute them in the
+  renderer before insertion. Every file retains an immutable upstream URL and
+  SHA-256 in the canonical catalog manifest, then passes through CurveDesk's
+  normal sanitized SVG importer.
+- **Maintenance/fit:** the exact upstream release was tagged 2026-05-06; the
+  package has no dependencies. The final M5 gate records emitted asset sizes,
+  renderer impact, and parse/insert timings before merge.
+- **Evaluated:** 2026-07-31, Codex session.
+- **Confidence:** high for source identity, licence, and exact file integrity;
+  visual and insertion quality remains subject to the M5 browser/audit gate.
+- **Re-verify by:** 2027-01-31 or before changing the pinned version.
+- **Alternatives considered:** keeping Lucide as customer artwork (mixed UI and
+  customer-asset roles, less coherent provenance); Iconoir (MIT but redundant);
+  Google Material Icons (Apache-2.0 but a second visual family); additional
+  Openclipart/CC0 ingestion (inconsistent and per-item provenance-heavy);
+  proprietary/generic SVG aggregators (rejected).
+
 ### electron-updater — adopted for Windows desktop auto-update (2026-07-04, ADR-024)
 
 - **Version:** ^6.8.9 (resolved 6.8.9 at adoption, 2026-07-04). VERIFY no
@@ -853,8 +904,9 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
   - Transitive `sax@1.6.0` (via `builder-util-runtime`) is **BlueOak-1.0.0** —
     a permissive, MIT-compatible license (Blue Oak Council permissive list;
     no copyleft). Added to the `scripts/check-licenses.mjs` allow-list on
-    adoption (maintainer-approved 2026-07-04), consistent with the existing
-    permissive non-MIT entries (BSL-1.0, CC-BY-4.0, CC0-1.0).
+    adoption (maintainer-approved 2026-07-04), consistent with the reviewed
+    permissive package entries such as Boost `BSL-1.0`. Creative Commons and
+    OFL terms are reviewed for assets/content, not blanket-approved npm packages.
 
 ## GRBL axis-specific origin semantics (2026-07-13)
 
@@ -1174,3 +1226,81 @@ evidence: `docs/audits/2026-07-21-image-editor-web-research.md`; roadmap:
 ## 2026-07-21 - Image Size resampling: pica evaluated, in-house chosen
 
 PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worker, but ADR-242 holds Image Studio to zero new dependencies through IE-3, and the editor's need is engrave-resolution conversion, not print-grade interpolation. Shipped src/core/image-resample: a 2x2 box-halving chain while the source exceeds 2x the target (anti-aliases heavy downscales - the failure mode that matters for 20 MP photos), bilinear tail for the remainder. Pinned by an alternating-columns test naive bilinear fails. A Lanczos upgrade (pica or in-house) can slot behind the same resampleBuffer signature if fidelity work later demands it.
+
+---
+
+## Unsigned Preview update discovery — 2026-07-22 (ADR-249)
+
+- **Behavioral reference:** Rayforge's public desktop distribution was studied as
+  a product pattern: notify about a newer release, then send the operator to an
+  official installation page for a manual upgrade. No Rayforge code was copied.
+- **Rejected:** `electron-updater` for Preview. It is retained only for the
+  future signed stable Windows feed because its download/install capability is
+  inappropriate for deliberately unsigned artifacts.
+- **Rejected:** OS notification as the sole Preview UI. Notification identity
+  and permission are OS-dependent, especially for unsigned Mac builds, while
+  the existing status bar is deterministic and non-modal.
+- **Rejected:** a new preload/context bridge or `ipcMain` handler. The existing
+  privileged `app://` protocol can expose one exact same-origin read-only route
+  without broadening renderer privileges or CSP.
+- **GitHub API:** `/releases/latest` excludes prereleases, so the checker uses
+  the bounded releases-list endpoint and filters locally. It requires a strict
+  Preview tag, immutable published state, and the current platform's canonical
+  asset. GitHub response URLs never control navigation.
+- **Release setting boundary:** GitHub's immutable-release settings endpoint
+  requires repository Administration-read permission, which `GITHUB_TOKEN`
+  cannot request. Immutability is therefore a maintainer-verified tag
+  prerequisite and a post-publication cryptographic/API assertion; it is not a
+  workflow preflight that would always fail. The setting was enabled on
+  2026-07-22.
+- **Workflow supply chain:** every third-party action in the new Preview lane is
+  pinned to a full commit SHA. The tag commit must belong to current `main`, and
+  the workflow re-peels the remote annotated tag before draft creation and again
+  immediately before publication.
+- **Privacy:** the one anonymous request per packaged Preview launch carries no
+  token, cookie, referrer, user, project, machine, controller, or job data.
+  Ordinary network metadata such as IP/time and a generic product user agent is
+  unavoidable and is disclosed in PROJECT/ADR-249.
+- **User action:** the status-bar link derives only the exact strict
+  `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page; the web
+  download button opens the same repository's release index. The same-origin
+  landing page was rejected for these controls because an already-installed
+  legacy service worker can keep serving its older precached download HTML. The
+  checker also requires the release's complete binary/checksum/manifest/SBOM
+  asset set. No installer bytes are fetched by the application, and Preview
+  updater trust remains false.
+- **Sources:** GitHub Releases REST API and immutable-release documentation;
+  Electron protocol, security, shell, and notification documentation. Links are
+  pinned in ADR-249.
+
+---
+
+## Species-level CNC material selector and explicit preset apply - 2026-07-26
+
+- **Need:** expand the flat Softwood/Hardwood selector into recognizable wood
+  species without shipping invented universal feeds, and prevent browsing a
+  material from silently overwriting every layer.
+- **Inventables cut-settings guidance:** the adjustable values are feed,
+  plunge, depth per pass, and spindle RPM; tested values are specific to the
+  selected machine and material, the fallback feed law is
+  `RPM × chip load × flutes`, and final-project test cuts are strongly
+  recommended. Source (updated 2025-09-09, accessed 2026-07-26):
+  https://inventableshardwaresupport.zendesk.com/hc/en-us/articles/34390465589268-How-do-I-calculate-the-right-cut-settings-for-my-bit
+- **Easel application behavior:** recommendations are matched by machine,
+  material, and bit; selecting a candidate does not overwrite saved values
+  until the operator clicks Apply, and applied settings remain editable.
+  Source (accessed 2026-07-26):
+  https://easel.com/features/community-cut-settings
+- **Manufacturer scope warning:** Carvey documents material presets as starting
+  points, mainly for 1/8-inch and 1/16-inch bits, and warns that other cutter
+  sizes may require slower feeds. Source (accessed 2026-07-26):
+  https://carvey-instructions.inventables.com/materials/
+- **Wood variability:** the USDA Wood Handbook records meaningful natural
+  variation within species and explains that specific gravity is a useful
+  index of mechanical properties, not an exact predictor for every specimen.
+  Source (accessed 2026-07-26):
+  https://research.fs.usda.gov/treesearch/37440
+- **Decision:** named species preserve identity but resolve to the existing
+  family calculation. No new numerical species multipliers were adopted.
+  The project selector previews first and applies only on an explicit click.
+  No runtime dependency or network service was added.

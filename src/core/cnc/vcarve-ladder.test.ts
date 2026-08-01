@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
+import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';
+import { zPassDepths } from './depth-passes';
 import { vcarvePasses, vcarveResolutionMm } from './vcarve-ladder';
 
 const VBIT_90: CncTool = {
@@ -25,6 +27,19 @@ function square(at: number, size: number): Polyline {
 
 function contourDepths(passes: ReturnType<typeof vcarvePasses>): number[] {
   return passes.map((pass) => (pass.kind === 'contour' ? pass.zMm : Number.NaN));
+}
+
+function contourRegionOrder(passes: ReturnType<typeof vcarvePasses>): string {
+  return passes
+    .map((pass) => {
+      if (pass.kind !== 'contour') return '?';
+      return Math.max(...pass.polyline.map((point) => point.x)) < 10 ? 'L' : 'R';
+    })
+    .join('');
+}
+
+function passKey(zMm: number, polyline: ReadonlyArray<{ x: number; y: number }>): string {
+  return `${zMm.toFixed(9)}:${polyline.map((point) => `${point.x},${point.y}`).join(';')}`;
 }
 
 describe('vcarvePasses', () => {
@@ -109,6 +124,62 @@ describe('vcarvePasses', () => {
     }
   });
 
+  it('finishes every ring of one disjoint region before travelling to the next', () => {
+    const passes = vcarvePasses([square(0, 6), square(20, 6)], {
+      tool: VBIT_90,
+      maxDepthMm: 3,
+      depthPerPassMm: 3,
+      resolutionMm: 0.5,
+    });
+
+    expect(contourRegionOrder(passes)).toMatch(/^L+R+$/);
+  });
+
+  it('keeps a hole and its outer boundary together before the next disjoint region', () => {
+    const outer = square(0, 8);
+    const hole = square(2, 4);
+    const separate = square(20, 8);
+    const passes = vcarvePasses([outer, hole, separate], {
+      tool: VBIT_90,
+      maxDepthMm: 2,
+      depthPerPassMm: 2,
+      resolutionMm: 0.5,
+    });
+
+    expect(contourRegionOrder(passes)).toMatch(/^L+R+$/);
+  });
+
+  it('reorders without losing or duplicating any contour/depth pass', () => {
+    const contours = [square(0, 8), square(20, 8)];
+    const resolutionMm = 0.5;
+    const maxDepthMm = 1;
+    const depthPerPassMm = 0.4;
+    const ladder = buildOffsetLadder(contours, 64, (step) => (step + 1) * resolutionMm);
+    const expected = ladder.rings
+      .flatMap((ring, step) => {
+        const ringDepthMm = Math.min((step + 1) * resolutionMm, maxDepthMm);
+        return ring.flatMap((polyline) =>
+          zPassDepths(ringDepthMm, depthPerPassMm).map((zMm) =>
+            passKey(zMm, closeRing(polyline).points),
+          ),
+        );
+      })
+      .sort();
+    const actual = vcarvePasses(contours, {
+      tool: VBIT_90,
+      maxDepthMm,
+      depthPerPassMm,
+      resolutionMm,
+    })
+      .map((pass) => {
+        if (pass.kind !== 'contour') throw new Error('expected contour pass');
+        return passKey(pass.zMm, pass.polyline);
+      })
+      .sort();
+
+    expect(actual).toEqual(expected);
+  });
+
   it('returns nothing for open paths or non-positive depth', () => {
     const open: Polyline = {
       closed: false,
@@ -120,6 +191,42 @@ describe('vcarvePasses', () => {
     const options = { tool: VBIT_90, maxDepthMm: 2, depthPerPassMm: 2, resolutionMm: 0.5 };
     expect(vcarvePasses([open], options)).toEqual([]);
     expect(vcarvePasses([square(0, 10)], { ...options, maxDepthMm: 0 })).toEqual([]);
+  });
+
+  it.each([undefined, 0.5, 179.5, Number.NaN])(
+    'does not invent a 60-degree cone for invalid angle %s',
+    (tipAngleDeg) => {
+      const { tipAngleDeg: _validAngle, ...baseTool } = VBIT_90;
+      const tool: CncTool = {
+        ...baseTool,
+        ...(tipAngleDeg === undefined ? {} : { tipAngleDeg }),
+      };
+      expect(
+        vcarvePasses([square(0, 10)], {
+          tool,
+          maxDepthMm: 2,
+          depthPerPassMm: 1,
+          resolutionMm: 0.5,
+        }),
+      ).toEqual([]);
+    },
+  );
+
+  it('preserves the advisory-only legacy output for a non-V-bit selection', () => {
+    const wrongKind: CncTool = {
+      id: 'end-mill',
+      name: '3 mm end mill',
+      kind: 'end-mill',
+      diameterMm: 3,
+    };
+    expect(
+      vcarvePasses([square(0, 10)], {
+        tool: wrongKind,
+        maxDepthMm: 2,
+        depthPerPassMm: 1,
+        resolutionMm: 0.5,
+      }).length,
+    ).toBeGreaterThan(0);
   });
 
   it('property: depths always in [−maxDepth, 0) and byte-deterministic (100 seeds)', () => {
@@ -145,6 +252,14 @@ describe('vcarvePasses', () => {
     );
   });
 });
+
+function closeRing(polyline: Polyline): Polyline {
+  const first = polyline.points[0];
+  const last = polyline.points[polyline.points.length - 1];
+  return first === undefined || last === undefined || (first.x === last.x && first.y === last.y)
+    ? polyline
+    : { ...polyline, points: [...polyline.points, first] };
+}
 
 describe('vcarveResolutionMm', () => {
   it('auto = diameter/8 with a 0.1 mm floor; explicit setting wins', () => {

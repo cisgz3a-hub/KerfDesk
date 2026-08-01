@@ -17,6 +17,9 @@ export type CncRestPocketOperation =
       readonly finishTool: CncTool;
       readonly roughToolpaths: ReadonlyArray<Polyline>;
       readonly restToolpaths: ReadonlyArray<Polyline>;
+      // Natural exhaustion is complete; geometry failure and a fixed pass
+      // budget are advisory incomplete-output states.
+      readonly completion: 'complete' | 'geometry-failed' | 'pass-limit';
     };
 
 export function resolveRestPocketOperation(
@@ -34,6 +37,12 @@ export function resolveRestPocketOperation(
   const roughTool = config.tools.find((tool) => tool.id === settings.pocketRoughToolId);
   if (roughTool === undefined) {
     return { kind: 'error', reason: 'The selected pocket roughing bit is missing.' };
+  }
+  if (roughTool.kind !== 'end-mill') {
+    return {
+      kind: 'error',
+      reason: `Pocket roughing requires a flat end mill; "${roughTool.name}" is ${roughTool.kind}.`,
+    };
   }
   const finishTool = layerCncTool(config, settings);
   const rest = planRestPocketToolpaths(
@@ -53,6 +62,7 @@ export function resolveRestPocketOperation(
     finishTool,
     roughToolpaths,
     restToolpaths: rest.toolpaths,
+    completion: rest.completion,
   };
 }
 

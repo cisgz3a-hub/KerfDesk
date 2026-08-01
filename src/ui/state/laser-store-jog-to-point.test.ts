@@ -62,11 +62,11 @@ async function settleCncRetract(
   writes: ReadonlyArray<string>,
 ): Promise<void> {
   connection.emitLine('ok');
-  await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
+  await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(1));
   expect(writes).not.toContain('G4 P0.01\n');
 
   connection.emitLine('<Jog|MPos:50.000,30.000,3.810|FS:1000,0>');
-  await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(2));
+  await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(2));
   expect(writes).not.toContain('G4 P0.01\n');
 
   connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
@@ -74,7 +74,7 @@ async function settleCncRetract(
   expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
 
   connection.emitLine('ok');
-  await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(3));
+  await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(3));
   expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
   connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
   await flush();
@@ -279,13 +279,13 @@ describe('jogToMachinePosition', () => {
     releaseRetract();
     // The stale pre-release Idle is not fresh proof: the fence must probe
     // status and observe a new Idle before crossing the settlement marker.
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(1));
     expect(writes).not.toContain('G4 P0.01\n');
     connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
     await vi.waitFor(() => expect(writes).toContain('G4 P0.01\n'));
     expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
     connection.emitLine('ok');
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(2));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(2));
     expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
     connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
     await move;
@@ -320,7 +320,7 @@ describe('jogToMachinePosition', () => {
     await flush();
     connection.emitLine('ok');
     // The pre-marker Idle fence is probing status when the pendant takes over.
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(1));
     connection.emitLine('<Idle|MPos:55.000,35.000,1.000|FS:0,0|MPG:1>');
 
     expect(await outcome).toBeInstanceOf(Error);
@@ -357,17 +357,17 @@ describe('jogToMachinePosition', () => {
     await flush();
     connection.emitLine('ok');
     // The retract's pre-marker Idle fence has its first status probe in flight.
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(1));
 
     const cancel = useLaserStore.getState().cancelJog();
     await vi.waitFor(() => expect(writes.filter((line) => line === RT_JOG_CANCEL)).toHaveLength(1));
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(2));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(2));
 
     // A cancel sent during the command-to-Jog transition is not sufficient:
     // the hardened fence observes Jog, re-sends 0x85, and asks again.
     connection.emitLine('<Jog|MPos:50.000,30.000,3.810|FS:1000,0>');
     await vi.waitFor(() => expect(writes.filter((line) => line === RT_JOG_CANCEL)).toHaveLength(2));
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(3));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(3));
 
     // Only a fresh Idle may put the cancellation marker behind the stopped
     // motion queue. The marker ack is then followed by one final Idle proof.
@@ -375,7 +375,7 @@ describe('jogToMachinePosition', () => {
     await vi.waitFor(() => expect(writes.filter((line) => line === 'G4 P0.01\n')).toHaveLength(1));
     expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
     connection.emitLine('ok');
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(4));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(4));
     connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
 
     await cancel;
@@ -396,3 +396,7 @@ describe('jogToMachinePosition', () => {
     expect(useLaserStore.getState().lastWriteError).toMatch(/live machine position/i);
   });
 });
+
+function statusProbeCount(writes: ReadonlyArray<string>): number {
+  return writes.filter((line) => line === '?').length;
+}

@@ -56,6 +56,7 @@ export function SelectedOperationInspector(props: {
 
   return (
     <SelectedOperationEditor
+      key={active.id}
       active={active}
       candidates={context.candidates}
       objects={props.objects}

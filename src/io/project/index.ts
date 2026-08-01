@@ -5,3 +5,7 @@ export {
   prepareProjectForPersistence,
   type PreparedProjectPersistence,
 } from './prepare-project-persistence';
+export {
+  prepareProjectForAutosave,
+  type PreparedProjectAutosave,
+} from './prepare-project-autosave';

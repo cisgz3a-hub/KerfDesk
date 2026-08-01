@@ -87,12 +87,12 @@ export type TraceOptions = {
   // thinness + area guards keep letter counters, spacing gaps, and intended
   // thin highlights untouched. See fill-pinholes.ts.
   readonly fillPinholeCracks?: boolean;
-  // supersampleContour: quality supersample for the binary contour presets —
-  // trace at 2x resolution and scale the vectors back down. Thin features
-  // (hooked apex tips, small pale letters) binarize with double the
-  // resolution, removing mask-level shape distortion no downstream geometry
-  // stage can repair (mkbitmap's published recipe). Sharp opts out: bilinear
-  // supersampling anti-aliases the pixel notches it exists to preserve.
+  // supersampleContour: opt into feature-aware quality supersampling for the
+  // binary contour presets. Cleaned masks with coherent 1-3px detail trace at
+  // 2x and scale back down; broad solid art stays at native resolution, while
+  // large dense color pictures use a bounded working grid. Sharp opts out
+  // because bilinear supersampling anti-aliases the pixel notches it exists to
+  // preserve.
   readonly supersampleContour?: boolean;
   // pixelScale: INTERNAL — set by the upscale wrapper so pixel-denominated
   // cleanup caps (despeckle area, pinhole radius/area, contour min-area,

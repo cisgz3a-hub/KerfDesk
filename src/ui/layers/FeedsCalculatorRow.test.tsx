@@ -33,17 +33,14 @@ function install4040Cnc(): void {
 
 async function render(
   onCommitSettings: (settings: CncLayerSettings) => void,
+  settings: CncLayerSettings = DEFAULT_CNC_LAYER_SETTINGS,
 ): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
     root.render(
-      <FeedsCalculatorRow
-        layer={LAYER}
-        settings={DEFAULT_CNC_LAYER_SETTINGS}
-        onCommitSettings={onCommitSettings}
-      />,
+      <FeedsCalculatorRow layer={LAYER} settings={settings} onCommitSettings={onCommitSettings} />,
     );
   });
   return { host, root };
@@ -56,12 +53,36 @@ async function apply(host: HTMLElement): Promise<void> {
 }
 
 describe('FeedsCalculatorRow', () => {
+  // Audit 1.20: the panel opened on hardcoded 'plywood-mdf' / 2 flutes whatever
+  // the layer's own recipe said, so it previewed - and on Apply committed -
+  // another material's numbers under this layer's name.
+  it('opens on the layer’s own material recipe rather than the chart default', async () => {
+    install4040Cnc();
+    const onCommitSettings = vi.fn();
+    const { host, root } = await render(onCommitSettings, {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      feedSource: { kind: 'material-recipe', materialKey: 'hardwood', fluteCount: 3 },
+    });
+    try {
+      await apply(host);
+      const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
+      expect(next.feedSource).toMatchObject({
+        kind: 'material-recipe',
+        materialKey: 'hardwood',
+        fluteCount: 3,
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('applies the central 4040-aware material recipe with provenance', async () => {
     install4040Cnc();
     const onCommitSettings = vi.fn();
     const { host, root } = await render(onCommitSettings);
     try {
-      expect(host.textContent).toContain('machine-aware feed 600');
+      expect(host.textContent).toContain('machine-aware feed 300');
       expect(host.textContent).toContain('plunge 120');
       expect(host.textContent).toContain('0.75 mm/pass');
       await apply(host);
@@ -69,7 +90,7 @@ describe('FeedsCalculatorRow', () => {
       const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
       expect(next).toMatchObject({
         materialKey: 'plywood-mdf',
-        feedMmPerMin: 600,
+        feedMmPerMin: 300,
         plungeMmPerMin: 120,
         spindleRpm: 12_000,
         depthPerPassMm: 0.75,
@@ -80,6 +101,56 @@ describe('FeedsCalculatorRow', () => {
         },
       });
       expect(next.cutType).toBe(DEFAULT_CNC_LAYER_SETTINGS.cutType);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('starts from the active catalog bit flute count when no recipe exists', async () => {
+    install4040Cnc();
+    const onCommitSettings = vi.fn();
+    const { host, root } = await render(onCommitSettings);
+    try {
+      await act(async () => {
+        useStore.getState().addCustomCncTool({
+          name: '3.175 mm single O-flute',
+          kind: 'end-mill',
+          diameterMm: 3.175,
+          family: 'o-flute-upcut',
+          fluteCount: 1,
+          catalogId: 'o-upcut-0125',
+        });
+        const toolId = useStore.getState().cncLibrary.customTools[0]?.id;
+        if (toolId === undefined) throw new Error('Catalog tool missing');
+        useStore.getState().updateCncMachine({ toolId });
+      });
+      const fluteSelect = host.querySelector('select[aria-label="Bit flute count"]');
+      expect(fluteSelect).toHaveProperty('value', '1');
+      await apply(host);
+      expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({
+        feedSource: { kind: 'material-recipe', fluteCount: 1 },
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('preserves an explicit flute override across unrelated machine rerenders', async () => {
+    install4040Cnc();
+    const { host, root } = await render(vi.fn());
+    try {
+      const fluteSelect = host.querySelector('select[aria-label="Bit flute count"]');
+      if (!(fluteSelect instanceof HTMLSelectElement)) throw new Error('Flute select missing');
+      await act(async () => {
+        fluteSelect.value = '3';
+        fluteSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      expect(fluteSelect.value).toBe('3');
+
+      await act(async () => useStore.getState().updateCncMachine({ stock: { thicknessMm: 12 } }));
+      expect(fluteSelect.value).toBe('3');
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -99,9 +170,43 @@ describe('FeedsCalculatorRow', () => {
     try {
       await apply(host);
       expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({
-        feedMmPerMin: 450,
+        feedMmPerMin: 300,
         plungeMmPerMin: 80,
         spindleRpm: 10_000,
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('keeps Apply enabled for a V-bit while disclosing the unchanged rough-guide model', async () => {
+    install4040Cnc();
+    const onCommitSettings = vi.fn();
+    const { host, root } = await render(onCommitSettings, {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      toolId: 'vb-90',
+    });
+    try {
+      const applyButton = host.querySelector('button');
+      expect(applyButton).toBeInstanceOf(HTMLButtonElement);
+      expect((applyButton as HTMLButtonElement).disabled).toBe(false);
+      expect(host.textContent).toContain('machine-aware feed 300');
+      expect(host.textContent).toContain(
+        'V-bit rough guide: the material recipe uses the stored 12.7 mm diameter band.',
+      );
+      expect(host.textContent).toContain(
+        'It does not model the 90° included angle or the cutting width at each depth.',
+      );
+      expect(host.textContent).toContain("Start with the cutter manufacturer's data");
+
+      await apply(host);
+      expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({
+        feedMmPerMin: 300,
+        plungeMmPerMin: 120,
+        spindleRpm: 12_000,
+        depthPerPassMm: 0.75,
+        feedSource: { kind: 'material-recipe', materialKey: 'plywood-mdf', fluteCount: 2 },
       });
     } finally {
       await act(async () => root.unmount());

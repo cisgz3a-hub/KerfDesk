@@ -138,7 +138,25 @@ function eventsForPass(
 
 function recoverySupport(pass: CncPass, canUseRunway: boolean): CncRecoverySupport {
   if (!canUseRunway) return 'manual-only';
-  return pass.kind === 'contour' ? 'runway-v1' : 'manual-only';
+  // A led profile pass (ADR-250) is a FLAT path3d — every point sits at the cut
+  // depth — so its XY points form a contour the runway recovery can back-track
+  // just like a plain contour pass. Ramp and relief path3d passes vary in Z and
+  // stay manual-only.
+  if (pass.kind === 'contour' || flatPath3dZMm(pass) !== null) return 'runway-v1';
+  return 'manual-only';
+}
+
+/**
+ * The single cut depth of a FLAT path3d (a led profile pass), or null for a
+ * non-path3d pass or a path3d whose Z varies (a ramp descent or a relief path).
+ * Lets runway recovery treat a led profile's XY points as a contour.
+ */
+export function flatPath3dZMm(pass: CncPass): number | null {
+  if (pass.kind !== 'path3d' || pass.points.length < 2) return null;
+  const first = pass.points[0];
+  if (first === undefined || !Number.isFinite(first.z)) return null;
+  const zMm = first.z;
+  return pass.points.every((point) => point.z === zMm) ? zMm : null;
 }
 
 function cutSegmentCount(pass: CncPass): number {

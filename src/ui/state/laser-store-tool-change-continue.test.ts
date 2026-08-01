@@ -5,8 +5,13 @@
 // a trimmed local serial harness keeps this file self-contained.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { buildMotionManifest } from '../../core/job/motion-manifest';
+import { fingerprintGcode } from '../../core/recovery';
 import { createProject } from '../../core/scene';
 import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
+import type { CanvasMotionPlan } from './canvas-motion-plan';
+import { canvasJobTimingPlan } from './canvas-job-timing-plan';
 import {
   cncControllerEpochOf,
   createCncSetupAttestation,
@@ -16,10 +21,13 @@ import { useStore } from './store';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
+type ProgramWriteControl = { gate: Promise<void> | null };
 
 const IDLE = '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>';
+const INITIAL_POSITION = { x: 0, y: 0, z: 0 };
+const TOOL_CHANGE_COUNTDOWN_RETENTION_KEY = 'tool-change-countdown';
 
-function makeConnection(writes: string[]): FakeConnection {
+function makeConnection(writes: string[], writeControl?: ProgramWriteControl): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const connection: FakeConnection = {
     write: async (data) => {
@@ -34,6 +42,14 @@ function makeConnection(writes: string[]): FakeConnection {
         connection.emitLine('[OPT:VM,15,128]');
         connection.emitLine('ok');
       }
+      const gate = writeControl?.gate;
+      if (
+        (data.includes('G1 X1 Y1 F600') || data.includes('M3 S12000')) &&
+        gate !== null &&
+        gate !== undefined
+      ) {
+        await gate;
+      }
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -46,6 +62,24 @@ function makeConnection(writes: string[]): FakeConnection {
     },
   };
   return connection;
+}
+
+function deferred(): { readonly promise: Promise<void>; readonly resolve: () => void } {
+  let resolve: () => void = () => undefined;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+async function waitForToolChangeStream(): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (useLaserStore.getState().streamer?.status === 'tool-change') return;
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+  throw new Error('Timed out waiting for the tool-change stream.');
 }
 
 function makeAdapter(connection: SerialConnection): PlatformAdapter {
@@ -78,6 +112,23 @@ function currentCncSetupAttestation(gcode: string): CncSetupAttestation {
   return createCncSetupAttestation(gcode, cncControllerEpochOf(useLaserStore.getState()));
 }
 
+function currentPositionEpoch(): number {
+  return useLaserStore.getState().trustedPositionEpoch ?? 0;
+}
+
+function expectStreamStatus(status: 'streaming' | 'tool-change'): void {
+  expect(useLaserStore.getState().streamer?.status).toBe(status);
+}
+
+function expectCountdownState(
+  lifecycle: 'running' | 'paused' | 'tool-change',
+  timing: 'running' | 'paused',
+): void {
+  const liveRun = useLaserStore.getState().liveCanvasRun;
+  expect(liveRun?.lifecycle).toBe(lifecycle);
+  expect(liveRun?.timing?.kind).toBe(timing);
+}
+
 // Three tools = two M0 holds, with a SHORT middle section that fits the RX
 // buffer whole: continuing from hold 1 lands directly in hold 2 within one fill.
 const CNC_THREE_TOOL = [
@@ -104,6 +155,80 @@ const CNC_THREE_PLAN = [
   { id: 'em-3000', name: '3.0 mm end mill' },
 ];
 
+const CNC_IMMEDIATE_TOOL_CHANGE = [
+  `${TOOL_CHANGE_LOAD_PREFIX}6.35 mm end mill`,
+  'M0',
+  'G0 Z5',
+  'M3 S12000',
+  'G1 X3 Y3 F600',
+].join('\n');
+
+const CNC_IMMEDIATE_TOOL_PLAN = [
+  { id: 'em-3175', name: '3.175 mm end mill' },
+  { id: 'em-6350', name: '6.35 mm end mill' },
+];
+
+function countdownCanvasPlan(gcode: string, positionEpoch: number): CanvasMotionPlan {
+  const manifest = buildMotionManifest(gcode, {
+    machineKind: 'cnc',
+    initialPosition: INITIAL_POSITION,
+  });
+  return {
+    manifest,
+    fingerprint: fingerprintGcode(gcode),
+    retentionKey: TOOL_CHANGE_COUNTDOWN_RETENTION_KEY,
+    machineKind: 'cnc',
+    device: DEFAULT_DEVICE_PROFILE,
+    coordinateFrame: { kind: 'machine', workOffsetMm: INITIAL_POSITION },
+    framePerimeter: [],
+    jobStart: null,
+    approachFrom: null,
+    capability: 'realtime',
+    unavailableReason: null,
+    resumed: false,
+    positionEpoch,
+  };
+}
+
+function countdownTimingPlan(gcode: string) {
+  const laser = useLaserStore.getState();
+  return canvasJobTimingPlan(gcode, DEFAULT_DEVICE_PROFILE, INITIAL_POSITION, {
+    controllerSessionEpoch: laser.controllerSessionEpoch,
+    positionEpoch: laser.trustedPositionEpoch,
+    activeControllerKind: laser.activeControllerKind,
+    detectedControllerKind: laser.detectedControllerKind,
+  });
+}
+
+function startCountdownJob(
+  gcode: string = CNC_THREE_TOOL,
+  cncToolPlan: ReadonlyArray<{ readonly id: string; readonly name: string }> = CNC_THREE_PLAN,
+): Promise<void> {
+  return useLaserStore.getState().startJob(gcode, {
+    machineKind: 'cnc',
+    cncToolPlan,
+    cncSetupAttestation: currentCncSetupAttestation(gcode),
+    canvasPlan: countdownCanvasPlan(gcode, currentPositionEpoch()),
+    jobTimingPlan: countdownTimingPlan(gcode),
+  });
+}
+
+async function settleToolChange(connection: FakeConnection, toolId: string): Promise<void> {
+  while ((useLaserStore.getState().streamer?.inFlight.length ?? 0) > 0) {
+    connection.emitLine('ok');
+    await flush();
+  }
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+  await flush();
+  useLaserStore.setState({
+    workZZeroEvidence: {
+      source: 'manual-zero',
+      referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+      toolId,
+    },
+  });
+}
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -120,41 +245,55 @@ afterEach(async () => {
 });
 
 describe('CNC tool-change Continue into the next hold (F22)', () => {
-  it('invalidates Z evidence and advances the label when Continue lands directly in the next hold', async () => {
+  it('starts paused when the first executable boundary is an immediate M0', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
     await connectWith(connection);
     writes.length = 0;
 
-    await useLaserStore.getState().startJob(CNC_THREE_TOOL, {
-      machineKind: 'cnc',
-      cncToolPlan: CNC_THREE_PLAN,
-      cncSetupAttestation: currentCncSetupAttestation(CNC_THREE_TOOL),
-    });
+    await startCountdownJob(CNC_IMMEDIATE_TOOL_CHANGE, CNC_IMMEDIATE_TOOL_PLAN);
+
+    expectStreamStatus('tool-change');
+    expectCountdownState('tool-change', 'paused');
+    expect(writes).toEqual(['G4 P0.01\n', '?']);
+  });
+
+  it('invalidates Z evidence and advances the label when Continue lands directly in the next hold', async () => {
+    const writes: string[] = [];
+    const writeControl: ProgramWriteControl = { gate: null };
+    const connection = makeConnection(writes, writeControl);
+    await connectWith(connection);
+    writes.length = 0;
+
+    await startCountdownJob();
     // Hold 1 — the pending bit is tool 2.
-    expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
+    expectStreamStatus('tool-change');
     expect(useLaserStore.getState().pendingToolId).toBe('em-6350');
+    expectCountdownState('running', 'running');
+
+    // Host M0 ownership arrives before the already-buffered pre-M0 tail is
+    // physically stopped. Fresh Run evidence keeps the execution clock live.
+    connection.emitLine('<Run|MPos:0.500,0.500,0.000|FS:600,12000>');
+    await flush();
+    expectCountdownState('running', 'running');
 
     // Drain hold 1's pre-M0 tail and observe a fresh Idle, then touch off tool 2.
-    while ((useLaserStore.getState().streamer?.inFlight.length ?? 0) > 0) {
-      connection.emitLine('ok');
-      await flush();
-    }
-    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-    await flush();
-    useLaserStore.setState({
-      workZZeroEvidence: {
-        source: 'manual-zero',
-        referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
-        toolId: 'em-6350',
-      },
-    });
+    await settleToolChange(connection, 'em-6350');
+    expectCountdownState('tool-change', 'paused');
 
     // The whole tool-2 section fits the buffer, so this single fill resumes and
     // lands straight in hold 2.
     writes.length = 0;
-    await useLaserStore.getState().continueToolChange();
-    expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
+    const continueWrite = deferred();
+    writeControl.gate = continueWrite.promise;
+    const continuing = useLaserStore.getState().continueToolChange();
+    await flush();
+    expectStreamStatus('tool-change');
+    expectCountdownState('tool-change', 'paused');
+    continueWrite.resolve();
+    await continuing;
+    writeControl.gate = null;
+    expectCountdownState('running', 'running');
     expect(writes.join('')).toContain('M3 S12000');
     expect(writes.join('')).not.toContain('M3 S9000'); // tool-3 section not sent
 
@@ -164,5 +303,51 @@ describe('CNC tool-change Continue into the next hold (F22)', () => {
     expect(useLaserStore.getState().pendingToolId).toBe('em-3000');
     expect(useLaserStore.getState().pendingToolLabel).toBe('3.0 mm end mill');
     expect(useLaserStore.getState().toolChangeIdleSeen).toBe(false);
+
+    // After the second hold settles and tool 3 is touched off, a normal
+    // Continue must resume both the stream and its frozen countdown.
+    await settleToolChange(connection, 'em-3000');
+    expectCountdownState('tool-change', 'paused');
+
+    await useLaserStore.getState().continueToolChange();
+    expectStreamStatus('streaming');
+    expectCountdownState('running', 'running');
+  });
+
+  it('does not restart a physically settled hold when Start transport resolves late', async () => {
+    const writes: string[] = [];
+    const startWrite = deferred();
+    const writeControl: ProgramWriteControl = { gate: startWrite.promise };
+    const connection = makeConnection(writes, writeControl);
+    await connectWith(connection);
+
+    const starting = startCountdownJob();
+    await waitForToolChangeStream();
+    await settleToolChange(connection, 'em-6350');
+    expectCountdownState('tool-change', 'paused');
+
+    startWrite.resolve();
+    await starting;
+    expectCountdownState('tool-change', 'paused');
+  });
+
+  it.each([
+    ['Hold', '<Hold:0|MPos:0.000,0.000,0.000|FS:0,0>'],
+    ['Door', '<Door:0|MPos:0.000,0.000,0.000|FS:0,0>'],
+  ])('does not overwrite a fresh %s pause when Start transport resolves late', async (_, line) => {
+    const startWrite = deferred();
+    const writeControl: ProgramWriteControl = { gate: startWrite.promise };
+    const connection = makeConnection([], writeControl);
+    await connectWith(connection);
+
+    const starting = startCountdownJob();
+    await waitForToolChangeStream();
+    connection.emitLine(line);
+    await flush();
+    expectCountdownState('paused', 'paused');
+
+    startWrite.resolve();
+    await starting;
+    expectCountdownState('paused', 'paused');
   });
 });

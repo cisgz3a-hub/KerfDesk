@@ -4,7 +4,7 @@
 
 import { RGBA_CHANNELS, type RgbaBuffer } from '../image-edit';
 
-export type LayerBlend = 'normal' | 'multiply';
+export type LayerBlend = 'normal' | 'multiply' | 'screen' | 'overlay' | 'difference';
 
 export type EditorLayer = {
   readonly id: string;

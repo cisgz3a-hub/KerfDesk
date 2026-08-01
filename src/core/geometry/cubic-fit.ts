@@ -41,9 +41,17 @@ export function fitCubicsThroughPoints(
 ): CubicBezier[] {
   if (points.length < 2) return [];
   const runs = segmentRuns(points, closed, corners);
+  // A closed chain with no corners becomes ONE wrapping run whose seam is index
+  // 0. Its start and end tangents must be the SAME tangent, centered across the
+  // seam — otherwise the loop leaves index 0 on the forward chord and re-enters
+  // on the backward chord, a cusp on every traced circle / disc / O-bowl. (A
+  // corner-bounded closed chain rotates so its seam is an exact corner, where
+  // one-sided tangents are correct.)
+  const seamTangent =
+    closed && !points.some((point) => corners.has(point)) ? wrappedSeamTangent(points) : undefined;
   const out: CubicBezier[] = [];
   for (const run of runs) {
-    fitRun(run, tolerance, out);
+    fitRun(run, tolerance, out, seamTangent);
   }
   return out;
 }
@@ -106,9 +114,19 @@ function runsFromBounds(points: ReadonlyArray<Vec2>, bounds: ReadonlyArray<numbe
 
 // ——— recursive fitting ———
 
-function fitRun(run: ReadonlyArray<Vec2>, tolerance: number, out: CubicBezier[]): void {
-  const tangentStart = chordTangent(run, 'start');
-  const tangentEnd = chordTangent(run, 'end');
+// `seamTangent` (closed cornerless rings only) forces the run's start and end
+// to share one centered heading at index 0. End tangents point BACKWARD in this
+// parameterization (P2 extends from P3 toward the curve), so the run ends with
+// the negated seam tangent while it starts with it as-is — G1 across the seam,
+// the same construction the interior splits use.
+function fitRun(
+  run: ReadonlyArray<Vec2>,
+  tolerance: number,
+  out: CubicBezier[],
+  seamTangent?: Vec2,
+): void {
+  const tangentStart = seamTangent ?? chordTangent(run, 'start');
+  const tangentEnd = seamTangent === undefined ? chordTangent(run, 'end') : negate(seamTangent);
   fitRecursive(run, 0, run.length - 1, tangentStart, tangentEnd, tolerance, out, 0);
 }
 
@@ -280,6 +298,18 @@ function centeredTangent(points: ReadonlyArray<Vec2>, i: number): Vec2 {
   const prev = points[Math.max(0, i - 1)] as Vec2;
   const next = points[Math.min(points.length - 1, i + 1)] as Vec2;
   return normalize({ x: next.x - prev.x, y: next.y - prev.y });
+}
+
+// The tangent at a closed cornerless ring's seam (index 0), centered by
+// spanning the same reach on BOTH sides — wrapping past index 0 to the ring's
+// tail — so the first and last cubics leave and re-enter the seam on one
+// heading. `points` is the ring's distinct vertices (the seam is not repeated).
+function wrappedSeamTangent(points: ReadonlyArray<Vec2>): Vec2 {
+  const n = points.length;
+  const reach = Math.min(TANGENT_REACH_POINTS, n - 1);
+  const after = points[reach] as Vec2;
+  const before = points[(n - reach) % n] as Vec2;
+  return normalize({ x: after.x - before.x, y: after.y - before.y });
 }
 
 function normalize(v: Vec2): Vec2 {

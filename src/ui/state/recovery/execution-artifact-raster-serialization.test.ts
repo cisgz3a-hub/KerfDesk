@@ -5,20 +5,30 @@ import {
   DEFAULT_OUTPUT_SCOPE,
   DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,
+  addLayer,
+  addObject,
+  createLayer,
   createProject,
   type RasterImage,
 } from '../../../core/scene';
 import { emitPreparedGcode, type PreparedOutput } from '../../../io/gcode';
+import { recoveryArtifactPreparedProgramMatches } from '../../laser/recovery-artifact-binding';
 import type { CanvasMotionPlan } from '../canvas-motion-plan';
-import { createExecutionArtifact, MAX_EXECUTION_ARTIFACT_RASTER_BYTES } from './execution-artifact';
+import {
+  createExecutionArtifact,
+  hydratePreparedExecutionOutput,
+  MAX_EXECUTION_ARTIFACT_RASTER_BYTES,
+} from './execution-artifact';
 import { MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES } from './execution-artifact-size';
 
 describe('streamed raster execution artifact persistence', () => {
-  it('materializes only the stored copy and preserves exact emitted G-code through structured clone', () => {
-    const rows = [new Uint16Array([100, 0]), new Uint16Array([0, 100])] as const;
+  it('persists a provider recipe and preserves exact emitted G-code through structured clone', () => {
+    const rows = [new Uint16Array([0, 100]), new Uint16Array([100, 0])] as const;
     const raster: RasterGroup = {
       kind: 'raster',
       layerId: 'streamed-image',
+      sourceObjectId: 'streamed-source',
+      source: 'streamed.png',
       color: '#000000',
       power: 50,
       speed: 1_000,
@@ -32,9 +42,36 @@ describe('streamed raster execution artifact persistence', () => {
       overscanMm: 0,
       dotWidthCorrectionMm: 0,
     };
+    const base = createProject(DEFAULT_DEVICE_PROFILE);
+    const project = {
+      ...base,
+      scene: addLayer(
+        addObject(base.scene, {
+          kind: 'raster-image' as const,
+          id: 'streamed-source',
+          color: '#000000',
+          source: 'streamed.png',
+          dataUrl: 'data:image/png;base64,source',
+          lumaBase64: 'AP//AA==',
+          pixelWidth: 2,
+          pixelHeight: 2,
+          dither: 'threshold' as const,
+          linesPerMm: 1,
+          bounds: { minX: 10, minY: 10, maxX: 12, maxY: 12 },
+          transform: IDENTITY_TRANSFORM,
+        }),
+        {
+          ...createLayer({ id: 'streamed-image', color: '#000000', mode: 'image' }),
+          power: 10,
+          linesPerMm: 1,
+          ditherAlgorithm: 'threshold' as const,
+          fillOverscanMm: 0,
+        },
+      ),
+    };
     const prepared = {
       ok: true,
-      project: createProject(DEFAULT_DEVICE_PROFILE),
+      project,
       job: { groups: [raster] },
       jobOriginOffset: { x: 0, y: 0 },
     } satisfies Extract<PreparedOutput, { readonly ok: true }>;
@@ -63,7 +100,8 @@ describe('streamed raster execution artifact persistence', () => {
     expect(storedRaster?.kind).toBe('raster');
     if (storedRaster?.kind !== 'raster') throw new Error('Expected stored raster.');
     expect(storedRaster.rowProvider).toBeUndefined();
-    expect(storedRaster.sValues).toEqual(new Uint16Array([100, 0, 0, 100]));
+    expect(storedRaster.sValues).toEqual(new Uint16Array(0));
+    expect(storedRaster.archivedRowProviderRecipe).toBe('prepared-project');
 
     const cloned = structuredClone(artifact);
     const clonedRaster = cloned.prepared.job.groups[0];
@@ -72,15 +110,18 @@ describe('streamed raster execution artifact persistence', () => {
     // instanceof is not portable even though the binary view type is retained.
     expect(ArrayBuffer.isView(clonedSValues)).toBe(true);
     expect(clonedSValues?.constructor.name).toBe('Uint16Array');
+    const hydrated = hydratePreparedExecutionOutput(cloned.prepared);
+    expect(hydrated).not.toBeNull();
     expect(
-      emitPreparedGcode(cloned.prepared, {
+      emitPreparedGcode(hydrated ?? cloned.prepared, {
         outputScope: cloned.outputScope,
         allowRotaryRaster: true,
       }).gcode,
     ).toBe(emitted);
+    expect(recoveryArtifactPreparedProgramMatches(cloned)).toBe(true);
   });
 
-  it('refuses oversized archive materialization before asking the row provider for data', () => {
+  it('archives a raster above the former materialization limit without reading its provider', () => {
     const pixelWidth = MAX_EXECUTION_ARTIFACT_RASTER_BYTES / Uint16Array.BYTES_PER_ELEMENT + 1;
     const rowProvider = vi.fn(() => new Uint16Array(pixelWidth));
     const raster: RasterGroup = {
@@ -106,18 +147,21 @@ describe('streamed raster execution artifact persistence', () => {
       jobOriginOffset: { x: 0, y: 0 },
     } satisfies Extract<PreparedOutput, { readonly ok: true }>;
 
-    expect(() =>
-      createExecutionArtifact({
-        artifactSchemaVersion: 1,
-        runId: 'run-oversized-streamed-raster',
-        gcode: 'G21\nM5\n',
-        prepared,
-        outputScope: DEFAULT_OUTPUT_SCOPE,
-        canvasPlan: { retentionKey: 'oversized-streamed-raster' } as CanvasMotionPlan,
-        controllerSettings: null,
-        createdAtIso: '2026-07-19T03:00:00.000Z',
-      }),
-    ).toThrow('too large to archive safely');
+    const artifact = createExecutionArtifact({
+      artifactSchemaVersion: 1,
+      runId: 'run-oversized-streamed-raster',
+      gcode: 'G21\nM5\n',
+      prepared,
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      canvasPlan: { retentionKey: 'oversized-streamed-raster' } as CanvasMotionPlan,
+      controllerSettings: null,
+      createdAtIso: '2026-07-19T03:00:00.000Z',
+    });
+    const stored = artifact.prepared.job.groups[0];
+    expect(stored?.kind === 'raster' ? stored.archivedRowProviderRecipe : undefined).toBe(
+      'prepared-project',
+    );
+    expect(stored?.kind === 'raster' ? stored.sValues.length : -1).toBe(0);
     expect(rowProvider).not.toHaveBeenCalled();
   });
 

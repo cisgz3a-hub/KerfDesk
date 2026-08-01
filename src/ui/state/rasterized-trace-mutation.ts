@@ -19,6 +19,7 @@ import {
   type StateSlice,
   type TraceExistingImageOptions,
 } from './scene-mutations';
+import { releaseTraceSourcePalette } from './trace-source-palette';
 
 /**
  * Atomically replace a trace result with an Image-pipeline raster.
@@ -60,21 +61,14 @@ export function applyRasterizedTraceToExisting(
     committed = { ...prepared, operationIds: reusableOperationIds };
     scene = placeRasterizedTrace(scene, committed, replaceInPlace);
   } else {
-    const created = createArtworkOperation(scene, prepared, { mode: 'image' });
-    committed = {
-      ...(created.object as RasterImage),
-      operationOverride: {
-        ...(prepared.operationOverride ?? { negativeImage: false }),
-        // No active Image binding was reusable. The fresh operation and this
-        // object override must both be Image mode or a source `mode: line`
-        // override would silently suppress the raster output.
-        mode: 'image',
-      },
-    };
-    scene = addLayer(
-      placeRasterizedTrace(scene, committed, replaceInPlace),
-      operationForRasterizedTrace(created.operation, prepared, source, fallbackLayer),
-    );
+    const allocated = allocateFreshRasterOperation(scene, prepared, {
+      source,
+      fallbackLayer,
+      deleteSource: options.deleteSourceAfterTrace === true,
+      replaceInPlace,
+    });
+    scene = allocated.scene;
+    committed = allocated.committed;
   }
   scene = pruneOrphanLayers(scene);
 
@@ -86,6 +80,48 @@ export function applyRasterizedTraceToExisting(
     redoStack: [],
     dirty: true,
   };
+}
+
+type FreshRasterOperationContext = {
+  readonly source: RasterImage | undefined;
+  readonly fallbackLayer: Layer | undefined;
+  readonly deleteSource: boolean;
+  readonly replaceInPlace: boolean;
+};
+
+// The no-reusable-Image-operation branch: allocate a fresh Image operation for
+// the rasterized trace. Extracted so applyRasterizedTraceToExisting stays under
+// the complexity cap once palette-freeing is added.
+function allocateFreshRasterOperation(
+  scene: Scene,
+  prepared: RasterImage,
+  ctx: FreshRasterOperationContext,
+): { readonly scene: Scene; readonly committed: RasterImage } {
+  // Free the source's palette slot before allocating (mirror of
+  // applyTraceToExisting) so the trace takes OPERATION_PALETTE[0], not the
+  // runner-up. A deleted source's operation is already orphaned — prune it so
+  // its slot frees too.
+  let working = scene;
+  if (ctx.source !== undefined) {
+    working = ctx.deleteSource
+      ? pruneOrphanLayers(working)
+      : releaseTraceSourcePalette(working, ctx.source);
+  }
+  const created = createArtworkOperation(working, prepared, { mode: 'image' });
+  const committed: RasterImage = {
+    ...(created.object as RasterImage),
+    operationOverride: {
+      ...(prepared.operationOverride ?? { negativeImage: false }),
+      // The fresh operation and this object override must both be Image mode or
+      // a source `mode: line` override would silently suppress the raster output.
+      mode: 'image',
+    },
+  };
+  const nextScene = addLayer(
+    placeRasterizedTrace(working, committed, ctx.replaceInPlace),
+    operationForRasterizedTrace(created.operation, prepared, ctx.source, ctx.fallbackLayer),
+  );
+  return { scene: nextScene, committed };
 }
 
 function prepareRasterizedTrace(

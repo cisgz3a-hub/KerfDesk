@@ -14,9 +14,11 @@ import {
   assertNever,
   type CncCoolantMode,
   type CncCutType,
+  type CncToolKind,
   type LayerFillStyle,
   type Vec2,
 } from '../scene';
+import type { CncFeedSource } from '../scene/cnc-feed-source';
 import type { Vec3 } from '../geometry/vec3';
 import type { IslandFillMotionPolicy } from './island-fill-motion';
 import type { FillRunwayPolicy } from './fill-runway-policy';
@@ -81,6 +83,15 @@ export type RasterGroup = {
   // S-values per pixel, already scaled by power %. Row-major.
   readonly sValues: Uint16Array;
   readonly rowProvider?: (y: number) => Uint16Array;
+  // Raster storage and streamed error-diffusion providers are consumed from
+  // source row 0 upward. A descending physical order maps those source rows
+  // onto the job from maxY to minY without reversing storage or rewinding a
+  // provider.
+  readonly rowProviderOrder?: RasterRowProviderOrder;
+  // Execution archives cannot structured-clone a function-valued provider.
+  // This marker records that the provider must be deterministically rebuilt
+  // from the archived prepared project before any semantic replay.
+  readonly archivedRowProviderRecipe?: 'prepared-project';
   readonly pixelWidth: number;
   readonly pixelHeight: number;
   readonly bounds: {
@@ -98,6 +109,8 @@ export type RasterGroup = {
   readonly bidirectional?: boolean;
   readonly scanDirection?: EffectiveScanDirection;
 };
+
+export type RasterRowProviderOrder = 'ascending-y' | 'descending-y';
 
 // CNC (router/mill) passes. Pre-expanded by core/cnc/compile-cnc-job.ts
 // (depth ramping, tab splitting, pocket rings) so the emitter is a dumb, safe
@@ -197,6 +210,14 @@ export type CncGroup = {
   readonly toolId?: string;
   readonly toolName?: string;
   readonly toolDiameterMm: number;
+  // Incident provenance copied from the exact compiled settings. Optional so
+  // legacy archives and hand-built Job fixtures remain readable.
+  readonly toolKind?: CncToolKind;
+  readonly toolTipAngleDeg?: number;
+  readonly requestedDepthMm?: number;
+  readonly depthPerPassMm?: number;
+  readonly vResolutionMm?: number;
+  readonly feedSource?: CncFeedSource;
   readonly feedMmPerMin: number; // already capped to device.maxFeed
   readonly plungeMmPerMin: number;
   readonly spindleRpm: number; // S value; capped to machine spindleMaxRpm
@@ -206,6 +227,11 @@ export type CncGroup = {
   // jobs keep byte-identical output and unchanged group shape.
   readonly coolant?: CncCoolantMode;
   readonly safeZMm: number; // retract height for travel between passes
+  // ADR-253: when true, the emitter lifts to safe Z and replunges before every
+  // pass (profile/engrave line cuts) instead of stepping Z down in place.
+  // Resolved from the layer setting at compile. Absent = off (the emitter reads
+  // it as false), so pre-ADR-253 groups and non-profile cuts stay byte-identical.
+  readonly retractBetweenPasses?: boolean;
   // H.9 parking parity: postamble/tool-change park position. Absent = the
   // machine origin (pre-H.9 output stays byte-identical).
   readonly parkXMm?: number;
@@ -215,8 +241,35 @@ export type CncGroup = {
 
 export type Group = CutGroup | FillGroup | RasterGroup | CncGroup;
 
+// Something the compile path noticed that the operator should know about, but
+// which must never refuse the job (rule 7). Surfaced in the Job Review warnings
+// list. Optional on Job so every existing Job literal stays valid.
+export type JobDiagnostic =
+  | { readonly kind: 'offset-fill-failed'; readonly layerName: string }
+  | {
+      readonly kind: 'offset-fill-pass-limit';
+      readonly layerName: string;
+      readonly passLimit: number;
+    }
+  // Line mode's kerf compensation failed in the geometry engine, so every
+  // closed contour on the layer was dropped from the cut. Same silent-loss
+  // shape as the offset fill, on the path that cuts the part itself.
+  | { readonly kind: 'kerf-offset-failed'; readonly layerName: string }
+  // Hatch geometry existed, but every sweep rounded to a stationary point at
+  // emitted G-code precision. Keep this advisory so microscopic fill loss is
+  // visible without turning it into a Start, Frame, or export refusal.
+  | { readonly kind: 'fill-collapsed-at-precision'; readonly layerName: string }
+  | {
+      readonly kind: 'raster-source-luma-mismatch';
+      readonly layerName: string;
+      readonly source: string;
+      readonly expectedPixels: number;
+      readonly actualPixels: number;
+    };
+
 export type Job = {
   readonly groups: ReadonlyArray<Group>;
+  readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
 };
 
 export const EMPTY_JOB: Job = { groups: [] };

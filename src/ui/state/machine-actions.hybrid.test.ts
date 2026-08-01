@@ -49,4 +49,36 @@ describe('hybrid machine mode switching', () => {
     if (restoredAgain?.kind !== 'cnc') throw new Error('expected CNC mode');
     expect(restoredAgain.params.safeZMm).toBe(19);
   });
+
+  it('adds catalog-backed starters when restoring an older cached CNC machine', () => {
+    const legacyTools = DEFAULT_CNC_MACHINE_CONFIG.tools.filter(
+      (tool) => !tool.id.startsWith('vb-90-') || !tool.id.endsWith('-hobby'),
+    );
+    useStore.setState((state) => ({
+      cachedCncMachine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        toolId: 'em-6350',
+        tools: legacyTools,
+      },
+      project: {
+        ...state.project,
+        device: {
+          ...state.project.device,
+          capabilities: ['laser-output', 'cnc-output'],
+        },
+        machine: LASER_MACHINE_CONFIG,
+      },
+    }));
+
+    useStore.getState().setMachineKind('cnc');
+
+    const machine = useStore.getState().project.machine;
+    if (machine?.kind !== 'cnc') throw new Error('expected CNC mode');
+    expect(machine.toolId).toBe('em-6350');
+    expect(machine.tools.slice(0, legacyTools.length)).toEqual(legacyTools);
+    expect(machine.tools.slice(legacyTools.length).map((tool) => tool.id)).toEqual([
+      'vb-90-6350-hobby',
+      'vb-90-12700-hobby',
+    ]);
+  });
 });

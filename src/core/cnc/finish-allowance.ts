@@ -1,7 +1,9 @@
 import type { CncPass } from '../job';
 import type { CncLayerSettings, Polyline, Vec2 } from '../scene';
-import { passNeedsTabs, splitPassForTabs, splitPassForTabsAlignedToReference } from './cnc-tabs';
+import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
+import { tabFractionsFromReference, tabRampedPoints } from './cnc-tab-ramp';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
+import type { FrameHandedness } from './machine-frame-handedness';
 import { enforceCutDirection } from './motion-polish';
 import { orderInnerFirst } from './profile-ordering';
 import { profileToolpathPolylines } from './profile-paths';
@@ -24,6 +26,7 @@ export function finishingProfilePasses(
   settings: CncLayerSettings,
   toolDiameterMm: number,
   roughingToolpaths: ReadonlyArray<Polyline>,
+  handedness: FrameHandedness,
   tabSources: ReadonlyArray<CollectedCncContour> = [],
 ): ReadonlyArray<CncPass> {
   const side = settings.cutType === 'profile-inside' ? 'inside' : 'outside';
@@ -31,31 +34,60 @@ export function finishingProfilePasses(
   const toolpaths =
     settings.cutDirection === undefined
       ? raw
-      : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
+      : enforceCutDirection(raw, settings.cutDirection, settings.cutType, handedness);
   const zMm = -settings.depthMm;
   const manualTabCenters = manualTabCentersForToolpaths(toolpaths, tabSources);
   const passes: CncPass[] = [];
   for (const toolpath of toolpaths) {
-    const needsTabs =
-      settings.tabsEnabled &&
-      toolpath.closed &&
-      passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
-    const tabSettings = {
-      tabWidthMm: settings.tabWidthMm,
-      tabsPerShape: settings.tabsPerShape,
+    const pass = finishingPass(toolpath, zMm, {
+      settings,
       toolDiameterMm,
-    };
-    const manualCenters = manualTabCenters.get(toolpath);
-    const pieces = !needsTabs
-      ? [toolpath]
-      : manualCenters !== undefined
-        ? splitPassForTabs(toolpath, tabSettings, manualCenters)
-        : splitPassForTabsAlignedToReference(toolpath, roughingToolpaths, tabSettings);
-    for (const piece of pieces) {
-      if (piece.points.length >= 2) passes.push(passFromPolyline(piece, zMm));
-    }
+      roughingToolpaths,
+      manualCenters: manualTabCenters.get(toolpath),
+    });
+    if (pass !== null) passes.push(pass);
   }
   return passes;
+}
+
+type FinishingPassContext = {
+  readonly settings: CncLayerSettings;
+  readonly toolDiameterMm: number;
+  readonly roughingToolpaths: ReadonlyArray<Polyline>;
+  readonly manualCenters: ReadonlyArray<number> | undefined;
+};
+
+// ADR-258: a tabbed finishing pass is ONE path3d that rises to the tab top, like
+// the roughing passes. Persisted anchors win; otherwise the centres are projected
+// from the matching roughing toolpath so an offset start vertex or perimeter change
+// cannot move the physical bridges. Anything untabbed stays an ordinary contour.
+function finishingPass(toolpath: Polyline, zMm: number, ctx: FinishingPassContext): CncPass | null {
+  const { settings, toolDiameterMm, roughingToolpaths, manualCenters } = ctx;
+  const needsTabs =
+    settings.tabsEnabled &&
+    toolpath.closed &&
+    passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
+  if (needsTabs) {
+    const centres =
+      manualCenters ??
+      tabFractionsFromReference(toolpath, roughingToolpaths, settings.tabsPerShape) ??
+      undefined;
+    const points = tabRampedPoints(
+      toolpath,
+      zMm,
+      tabTopZMm(settings.depthMm, settings.tabHeightMm),
+      {
+        tabWidthMm: settings.tabWidthMm,
+        tabsPerShape: settings.tabsPerShape,
+        toolDiameterMm,
+      },
+      centres,
+    );
+    if (points !== null && points.length >= 2) {
+      return { kind: 'path3d', points, closed: false };
+    }
+  }
+  return toolpath.points.length >= 2 ? passFromPolyline(toolpath, zMm) : null;
 }
 
 function passFromPolyline(polyline: Polyline, zMm: number): CncPass {

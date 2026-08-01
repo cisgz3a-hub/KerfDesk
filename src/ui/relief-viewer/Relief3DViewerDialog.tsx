@@ -6,6 +6,7 @@
 
 import { useCallback } from 'react';
 import { heightmapCellSize, meshToHeightmap, reliefSurfaceMesh } from '../../core/relief';
+import { cachedFloat32Array } from '../../core/util';
 import type { ReliefObject } from '../../core/scene';
 import { createReliefThreeScene } from './relief-three-scene';
 import { Viewer3DDialogShell } from './Viewer3DDialogShell';
@@ -51,7 +52,7 @@ async function buildReliefScene(
       return { kind: 'no-webgl', reason: displayCellSize.reason };
     }
     const heightmap = meshToHeightmap(
-      { positions: Float32Array.from(relief.meshPositions) },
+      { positions: cachedFloat32Array(relief, relief.meshPositions) },
       {
         targetWidthMm: relief.targetWidthMm,
         reliefDepthMm: relief.reliefDepthMm,

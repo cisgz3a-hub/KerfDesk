@@ -120,6 +120,41 @@ describe('CncMaterialRow', () => {
     }
   });
 
+  it('keeps V-bit material auto-fill available while disclosing its diameter-only model', async () => {
+    install4040Cnc();
+    const onCommitSettings = vi.fn();
+    const settings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      toolId: 'vb-90',
+    };
+    const { host, root } = await render(settings, vi.fn(), onCommitSettings);
+    try {
+      const select = host.querySelector('select');
+      expect(select).toBeInstanceOf(HTMLSelectElement);
+      expect((select as HTMLSelectElement).disabled).toBe(false);
+      expect(host.textContent).toContain(
+        'V-bit rough guide: the material recipe uses the stored 12.7 mm diameter band.',
+      );
+      expect(host.textContent).toContain(
+        'It does not model the 90° included angle or the cutting width at each depth.',
+      );
+      expect(host.textContent).toContain("Start with the cutter manufacturer's data");
+
+      await act(async () => selectMaterial(host, 'plywood-mdf'));
+      const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
+      expect(next).toMatchObject({
+        feedMmPerMin: 300,
+        plungeMmPerMin: 120,
+        spindleRpm: 12_000,
+        depthPerPassMm: 0.75,
+        feedSource: { kind: 'material-recipe', materialKey: 'plywood-mdf', fluteCount: 2 },
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('clears the material key on Custom via a whole-settings commit', async () => {
     installCnc();
     const onCommit = vi.fn();
@@ -157,19 +192,19 @@ describe('CncMaterialRow', () => {
       feedSource: {
         kind: 'machine-starter',
         starterId: 'neotronics-4040-shallow-wood-mdf',
-        revision: 1,
+        revision: 2,
       },
     };
     const { host, root } = await render(automatic, vi.fn(), onCommitSettings);
     try {
       const optionLabels = [...host.querySelectorAll('option')].map((option) => option.textContent);
       expect(optionLabels).toContain(
-        'Neotronics 4040 shallow wood / MDF starter — revision 1 (engineering starter)',
+        'Neotronics 4040 shallow wood / MDF starter — revision 2 (maintainer verified)',
       );
       expect(optionLabels).toContain('Manual — verify feeds');
-      expect(host.textContent).toContain('revision 1 is active');
+      expect(host.textContent).toContain('revision 2 is active');
       expect(host.textContent).toContain(
-        'Engineering starter — assumes a 3.175 mm 2-flute cutter; verify on this machine.',
+        'Maintainer-verified starter (ADR-256) — feed and plunge come from cutting experience on this machine with a 3.175 mm 2-flute cutter; confirm on scrap for a new bit or stock.',
       );
 
       await act(async () => selectMaterial(host, ''));
@@ -214,7 +249,7 @@ describe('CncMaterialRow', () => {
     };
     const { host, root } = await render(settings, vi.fn(), vi.fn());
     try {
-      expect(host.textContent).toContain('saved revision 7 (current revision 1)');
+      expect(host.textContent).toContain('saved revision 7 (current revision 2)');
       expect(host.textContent).toContain('is outdated');
     } finally {
       await act(async () => root.unmount());

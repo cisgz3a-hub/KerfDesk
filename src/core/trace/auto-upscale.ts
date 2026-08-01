@@ -184,21 +184,28 @@ export function downscaleTracedPaths(
   factor: number,
 ): ColoredPath[] {
   if (!isValidUpscaleFactor(factor)) return paths.map((path) => ({ ...path }));
+  return scaleTracedPathsUniform(paths, 1 / factor);
+}
+
+/** Uniformly scale traced polylines and canonical curves. */
+export function scaleTracedPathsUniform(
+  paths: ReadonlyArray<ColoredPath>,
+  scale: number,
+): ColoredPath[] {
+  if (!Number.isFinite(scale) || scale <= 0) return paths.map((path) => ({ ...path }));
   return paths.map((path) => ({
     color: path.color,
-    polylines: path.polylines.map((pl) => scalePolyline(pl, factor)),
+    polylines: path.polylines.map((polyline) => scalePolyline(polyline, scale)),
     ...(path.curves === undefined
       ? {}
       : {
-          curves: path.curves.map((curve) =>
-            transformCurveSubpathUniform(curve, { scale: 1 / factor }),
-          ),
+          curves: path.curves.map((curve) => transformCurveSubpathUniform(curve, { scale })),
         }),
   }));
 }
 
-function scalePolyline(polyline: Polyline, factor: number): Polyline {
-  const points: Vec2[] = polyline.points.map((p) => ({ x: p.x / factor, y: p.y / factor }));
+function scalePolyline(polyline: Polyline, scale: number): Polyline {
+  const points: Vec2[] = polyline.points.map((p) => ({ x: p.x * scale, y: p.y * scale }));
   return { points, closed: polyline.closed };
 }
 

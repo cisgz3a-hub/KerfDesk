@@ -2,13 +2,11 @@
 
 > Architecturally significant decisions only. A future maintainer should understand the *why* without needing to ask.
 >
-> **Current ordinary Start policy — frame-first (ADR-228, ADR-230, ADR-232).** A completed Frame for
-> the exact current job is the sole product-policy authorization for ordinary laser and CNC Start;
-> the Job Review dialog is the single warning surface. This does not remove transport readiness,
-> compilation validity, placement inputs, handoff/recovery confirmation, security/trust checks,
-> unsupported-capability boundaries, or explicit destructive-action confirmation. Older gate ADRs
-> below that mandated additional ordinary Start blocks are superseded; their evidence models often
-> remain useful, but those product-policy refusals do not. Per-gate disposition:
+> **Current Start policy — frame-first (ADR-228, ADR-230, ADR-232).** A completed Frame for the exact
+> current job is the sole Start guard on laser and CNC; the Job Review dialog is the single
+> warning surface. Older gate ADRs below that mandated Start blocks are stamped
+> "Superseded by ADR-228" in their Status lines — their evidence models often remain in use,
+> but their *refusals* do not. Per-gate disposition:
 > `docs/audits/2026-07-18-guard-inventory-frame-first.md`.
 
 ## Decision index
@@ -25,7 +23,7 @@
 | ADR-004 | 2026-05-26 | Accepted | Streaming to laser is in MVP; delivered in phases |
 | ADR-005 | 2026-05-26 | Accepted | Color-driven layers (multi-op); only Line mode in MVP |
 | ADR-006 | 2026-05-26 | Accepted | GRBL v1.1+ only; extensible strategy for future controllers |
-| ADR-007 | 2026-05-26 | Accepted | Windows-only desktop; web app covers macOS and Linux |
+| ADR-007 | 2026-05-26 | Amended by ADR-248 (macOS Preview only) | Windows-only desktop; web app covers macOS and Linux |
 | ADR-008 | 2026-05-26 | Superseded | MIT open source, public from first commit (see ADR-018) |
 | ADR-009 | 2026-05-26 | Accepted | TypeScript + React + Vite + Vitest stack |
 | ADR-010 | 2026-05-26 | Accepted | Architectural discipline to prevent cascading regressions |
@@ -35,8 +33,8 @@
 | ADR-014 | 2026-05-26 | Accepted | SceneObject as discriminated union, extensible from day one |
 | ADR-015 | 2026-05-26 | Accepted | File-size discipline and anti-god-file enforcement |
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
-| ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
-| ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
+| ADR-017 | 2026-05-26 | Accepted; macOS-target example amended by ADR-248 | Third-party library evaluation policy; DOMPurify pinned for Phase A |
+| ADR-018 | 2026-05-27 | Superseded by ADR-120 | Proprietary license, private repo (supersedes ADR-008) |
 | ADR-019 | — | Accepted | Phase F kickoff: Fill is a geometry decision in `compileJob` |
 | ADR-020 | — | Accepted | Phase F.2 raster image engrave (kickoff) |
 | ADR-021 | 2026-05-28 | Accepted, code shipped, hardware verification pending | Phase F.3 set-work-origin via G92 (kickoff) |
@@ -81,12 +79,12 @@
 | ADR-095 | 2026-07-02 | Accepted | Marlin controller support (queued status, stream-side pause, inline/fan dialects) |
 | ADR-096 | 2026-07-02 | Accepted | Smoothieware controller support (fractional S power scale) |
 | ADR-097 | 2026-07-02 | Accepted | Ruida: experimental .rd export, file-only transport |
-| ADR-098 | 2026-07-02 | Amended by ADR-209 | CNC router mode becomes a first-class product track (Phase H "Router") |
+| ADR-098 | 2026-07-02 | Amended by ADR-209; macOS Phase-J deferral amended by ADR-248 | CNC router mode becomes a first-class product track (Phase H "Router") |
 | ADR-100 | — | Accepted | Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params |
 | ADR-101 | 2026-07-02 | Accepted | CNC/laser UI separation policy: gate-and-hide |
-| ADR-102 | 2026-07-03 | Accepted | three.js for the 3D relief viewer (explicit ADR-098 §2 override) |
+| ADR-102 | 2026-07-03 | Accepted; §2 amended by ADR-255 | three.js for the 3D relief viewer (explicit ADR-098 §2 override) |
 | ADR-103 | — | accepted (maintainer session directive) | Market-parity build-out: sender workflows, vector booleans, 3D cut preview (2026-07-03) |
-| ADR-104 | — | accepted (recorded at the merge of `claude/determined-dew... | Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03) |
+| ADR-104 | — | Accepted; Phase-J schedule amended by ADR-248 | Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03) |
 | ADR-105 | — | accepted (maintainer directive: "make sure that we have | Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03) |
 | ADR-106 | — | accepted (maintainer-approved build plan, 2026-07-03) | Parametric finger-joint box generator: claim-model joinery (2026-07-03) |
 | ADR-107 | 2026-06-27 | Accepted | Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4) |
@@ -96,13 +94,13 @@
 | ADR-111 | — | accepted (maintainer directive after a real 4040 cut wand... | CNC beginner-mode UX pack: material picker, machine auto-fill, limit advisories, Basic/Advanced disclosure (Phase H.13, 2026-07-04) |
 | ADR-112 | — | accepted (maintainer follow-up to ADR-111: on the live ap... | Project-level CNC material picker: set material once for the job (Phase H.14, 2026-07-04) |
 | ADR-113 | — | accepted (maintainer-directed follow-up to the trace-fide... | Region-enhance re-trace (dialog boundary mode) (Trace fidelity, 2026-07-05) |
-| ADR-114 | — | Accepted | Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05) |
+| ADR-114 | — | Amended by ADR-120 (restrictive EULA terms superseded); notice scope amended by ADR-248 | Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05) |
 | ADR-115 | — | accepted (maintainer-directed after rejecting ADR-059's l... | Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05) |
 | ADR-116 | — | accepted (maintainer directive: "I need my box designer t... | Box generator v2: panel cutouts, divider grid, slide lid (2026-07-07) |
 | ADR-117 | — | accepted | Keep-awake during active jobs: renderer screen wake lock, Electron permission allowlist (2026-07-07) |
 | ADR-118 | — | amended (repository schema v3, exact-artifact provenance, execution archive, 2026-07-19) | Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07) |
 | ADR-119 | — | accepted | Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07) |
-| ADR-120 | 2026-07-07 | Accepted | MIT license, open-source release (supersedes ADR-018) |
+| ADR-120 | 2026-07-07 | Accepted; clarified by ADR-247 | MIT license, open-source release (supersedes ADR-018) |
 | ADR-121 | — | accepted | Machine-camera frames ride the loopback bridge: frame proxy and server-side discovery (Camera, 2026-07-07) |
 | ADR-122 | — | accepted | Camera-driven positioning and burn-target alignment wizard (Camera, 2026-07-07) |
 | ADR-123 | 2026-07-08 | Accepted | Own-engine trace: remove the potrace-derived backend (closes the ADR-120 blocker) |
@@ -123,8 +121,8 @@
 | ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
 | ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
-| ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
-| ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
+| ADR-141 | 2026-07-12 | Accepted; macOS Preview RTSP qualification amended by ADR-248 | Network-camera bridge is desktop and local-development only |
+| ADR-142 | 2026-07-12 | Accepted; manual-dispatch topology amended by ADR-248 | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted (narrowed by ADR-215) | Disable executable CNC checkpoint and start-from-line recovery |
 | ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
 | ADR-150 | 2026-07-13 | Accepted | Adopt bounded variable-data production as a Phase D extension |
@@ -146,7 +144,7 @@
 | ADR-172 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Superseded in part (ADR-228: mismatch warns, not blocks) | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-179 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Block controller-reported active spindle/coolant before CNC Start |
-| ADR-180 | 2026-07-13 | Accepted | Generic same-session CNC Resume is manual-recovery-only |
+| ADR-180 | 2026-07-13 | Amended through 2026-07-27 | Generic same-session CNC Resume is one-click, door-confirmed, and progress-bounded |
 | ADR-181 | 2026-07-13 | Accepted | CNC Start requires epoch-bound exclusive-access attestation |
 | ADR-182 | 2026-07-13 | Accepted | grblHAL MPG ownership is a latched CNC Start blocker |
 | ADR-183 | 2026-07-13 | Accepted | Unexpected GRBL terminal responses invalidate controller ownership |
@@ -187,7 +185,7 @@
 | ADR-218 | 2026-07-16 | Accepted | CNC line-art contour side selection (inner / outer / both) |
 | ADR-219 | 2026-07-16 | Accepted | Centerline arc-length quadratic fairing (anti-wobble stage) |
 | ADR-220 | 2026-07-16 | Accepted | Show the live spindle RPM on the CNC canvas motion badge |
-| ADR-221 | 2026-07-17 | Accepted | Show wall-clock elapsed job time on the canvas motion badge |
+| ADR-221 | 2026-07-17 | Amended 2026-07-27 | Show wall-clock elapsed job time on the canvas motion badge |
 | ADR-222 | 2026-07-17 | Accepted | Single-artwork scenes select the artwork by default |
 | ADR-223 | 2026-07-17 | Accepted | Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice |
 | ADR-224 | 2026-07-17 | Accepted | Pre-start Job Review dialog consolidates the Start confirmations |
@@ -206,12 +204,15 @@
 | ADR-237 | 2026-07-21 | Accepted | Job Review runs at Start; plain Frame is dialog-free |
 | ADR-238 | 2026-07-21 | Accepted | Laser trace output defaults to editable vectors; raster scan remains selectable |
 | ADR-239 | 2026-07-21 | Accepted, hardware verification pending | Tangential feed-matched contour entries for the 4040-safe profile |
-| ADR-240 | 2026-07-21 | Accepted | Capability-first six-step Machine Setup wizard with a searchable catalog |
-| ADR-241 | 2026-07-21 | Accepted | Curve/fill segment budget advises in Job Review instead of refusing output |
-| ADR-242 | 2026-07-21 | Accepted | Image Studio for in-app raster editing |
-| ADR-243 | 2026-07-21 | Accepted | Stream rasters of any size row-by-row; make raster budgets advisory |
-| ADR-244 | 2026-07-21 | Accepted | Prepare large-job preview and estimates off the main thread |
-| ADR-245 | 2026-07-21 | Accepted | Image Studio active-layer document with composite bake |
+| ADR-240 | 2026-07-21 | Accepted | Machine Setup: capability-first six-step wizard with a searchable catalog |
+| ADR-241 | 2026-07-21 | Accepted | The curve/fill segment budget no longer refuses output; it advises in Job Review |
+| ADR-242 | 2026-07-21 | Accepted | Image Studio: in-app raster editing of RasterImage sources |
+| ADR-243 | 2026-07-21 | Accepted | Rasters of any size stream row-by-row; the raster budget becomes advisories |
+| ADR-244 | 2026-07-21 | Accepted | Large-job preview and estimate prepare off the main thread |
+| ADR-245 | 2026-07-21 | Accepted | Image Studio layers: active-layer document with a composite bake |
+| ADR-246 | 2026-07-22 | Accepted | Image Studio v2: scoped history, dirty-window compositing, retouch module |
+| ADR-247 | 2026-07-22 | Accepted | Public MIT baseline and future-license boundary |
+| ADR-248 | 2026-07-22 | Accepted | Unsigned Windows and macOS Preview distribution |
 
 ---
 
@@ -309,7 +310,7 @@ Connection handshake rejects non-GRBL. `OutputStrategy` is implementable by a st
 
 ## ADR-007 — Windows-only desktop; web app covers macOS and Linux
 
-**Status:** Accepted | **Date:** 2026-05-26
+**Status:** Amended by ADR-248 (macOS Preview only) | **Date:** 2026-05-26
 
 ### Decision
 - Desktop: Windows 10 and 11 only.
@@ -329,9 +330,10 @@ Phase A: Windows `.exe` opens and runs on Windows 10 and 11.
 - License: **MIT**.
 - Repo public from first commit.
 - Permitted dependency licenses: MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD.
-- Rejected: GPL family (GPL-2, GPL-3, AGPL, LGPL), proprietary, source-available (BSL, Elastic).
-- Enforcement at adoption was planned around `license-checker`; the current CI
-  implementation is `pnpm license-check` / `scripts/check-licenses.mjs`.
+- Rejected: GPL family (GPL-2, GPL-3, AGPL, LGPL), proprietary,
+  source-available Business Source License (BUSL), Elastic License.
+- Enforcement: `pnpm license-check` (`scripts/check-licenses.mjs`) runs in CI;
+  disallowed production-tree licenses fail the build.
 
 ### Verification
 `LICENSE` in repo root. CI dependency audit fails on GPL.
@@ -456,7 +458,7 @@ Phase A acceptance: stub `TextObject` variant compiles through `JobCompiler` wit
 LF1's `App.tsx` was 1,631 lines. AI-assisted coding tends to pile into existing files. Enforcement (not aspiration) prevents recurrence.
 
 ### Decision
-Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-131):
+Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-132):
 - File: 400 lines hard, 250 soft
 - React component: 250 hard, 150 soft
 - Function: 80 hard, 40 soft
@@ -469,7 +471,7 @@ Plus: co-located tests required, single responsibility (no "and" in description)
 ### Verification
 ESLint's `max-lines` rule is the authoritative gate and fails CI on violation: 400 lines **excluding blank and comment lines** (`skipBlankLines: true, skipComments: true`). CI additionally runs a coarse raw-line backstop (`wc -l`, threshold 600) that counts *every* line — including the explanatory comments CLAUDE.md mandates — purely as a guard against catastrophic bloat; its threshold is deliberately looser than the 400 code-line rule and is not the real limit.
 
-The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-131). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
+The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-132). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
 
 ---
 
@@ -495,10 +497,10 @@ Reviewer answers "what should this UI do?" from `WORKFLOW.md` alone; "why this a
 
 ## ADR-017 — Third-party library evaluation policy; DOMPurify pinned for Phase A
 
-**Status:** Accepted | **Date:** 2026-05-26
+**Status:** Accepted; macOS-target example amended by ADR-248 | **Date:** 2026-05-26
 
 ### Context
-The project source code is proprietary (ADR-018) but uses MIT-compatible dependencies freely (the dep-policy half of the original ADR-008 survived into ADR-018 unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
+The project source code is MIT-licensed under ADR-120/247 and uses compatible dependencies freely (the dependency-policy half of the original ADR-008 survived ADR-018 and remains unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
 
 It is also the most common cause of project drift. "We can add X because the library is free" is the most common rationalization that leads to scope explosions, dependency bloat, and the exact cascading-bug pattern Q10 warned against. Library availability does not change product scope. The phase plan in `PROJECT.md` is what determines what ships when.
 
@@ -510,7 +512,15 @@ This ADR defines the policy that lets us adopt third-party code safely.
 
 1. **It serves a use case in the current phase or an earlier phase's debt.** Not "it might be useful later." Speculative dependencies are rejected. Future-phase libraries are *evaluated* at the start of their phase, not adopted preemptively.
 
-2. **Its license is in the permitted list** (ADR-008): MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD. The license is verified against the package's actual `LICENSE` file, not just the npm metadata.
+2. **Its package license is in the reviewed set:** MIT, MIT-0,
+   BSD-2-Clause, BSD-3-Clause, 0BSD, BSL-1.0 (the permissive Boost Software
+   License), Apache-2.0, MPL-2.0, ISC, Unlicense, BlueOak-1.0.0, or
+   Python-2.0. A compound SPDX expression is permitted only when every
+   constituent license is approved. The license is verified against the
+   package's actual `LICENSE` file, not just npm metadata. OFL-1.1 and Creative
+   Commons terms require separate asset/content review and are not blanket
+   approvals for npm runtime packages. `scripts/check-licenses.mjs` is the
+   enforced production-package allowlist.
 
 3. **It is actively maintained.** Last release within 12 months, no unresolved security advisories in the version we'd pin, issue response time visible in the repo.
 
@@ -575,19 +585,18 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 
 - **No policy (treat every dep as a one-off decision):** rejected — exactly the kind of unrigorous adoption that bloats projects.
 - **Stricter policy (no new deps without a full RFC):** rejected — too heavyweight for solo development.
-- **Centralized "dependency review" step in CI:** considered. The production
-  license check plus `RESEARCH_LOG.md` discipline provides the same protection
-  at lower process cost.
+- **Centralized "dependency review" step in CI:** considered. The pnpm-aware
+  `scripts/check-licenses.mjs` gate plus `RESEARCH_LOG.md` discipline and this
+  policy provides the same protection at lower process cost.
 
 ### Consequences
 - Easier: justifiable adoption decisions; clean license audit; CVE tracking; bounded bundle size.
 - Harder: no quick "throw a library at it" shortcuts. Every new dep is a small ADR-shaped artifact in `RESEARCH_LOG.md`.
 
 ### Verification
-- CI includes `pnpm license-check` through `pnpm release:check`.
+- Phase A CI includes the `pnpm license-check` step.
 - `RESEARCH_LOG.md` has an entry for DOMPurify before the first PR that imports it lands.
-- Future PRs that add a runtime dependency must update `RESEARCH_LOG.md`; this is
-  a review requirement, while CI separately enforces the production license set.
+- Future PR that adds a runtime dependency without a `RESEARCH_LOG.md` entry is rejected by CI lint (custom rule).
 
 ---
 
@@ -604,7 +613,7 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 
 ## ADR-018 — Proprietary license, private repo (supersedes ADR-008)
 
-**Status:** Accepted | **Date:** 2026-05-27
+**Status:** Superseded by ADR-120 | **Date:** 2026-05-27
 
 ### Context
 ADR-008 committed the project to MIT and a public repo from the first
@@ -631,7 +640,8 @@ monetization plan would be premature.
   private repos, so this costs nothing.
 - **Dependency policy preserved from ADR-008.** Permitted licenses:
   MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD. Rejected:
-  GPL family, source-available (BSL, Elastic), proprietary.
+  GPL family, source-available Business Source License (BUSL), Elastic
+  License, proprietary.
   Rationale: deps are about what we consume, not how we publish; an
   MIT-compatible dep tree keeps every future license option open
   (commercial, dual, OSS, hybrid).
@@ -664,7 +674,8 @@ monetization plan would be premature.
 
 ### Reversal triggers
 Promote to a permissive license (MIT, Apache-2.0) or source-available
-(BSL, Elastic) when *any* of the following becomes true:
+(Business Source License (BUSL), Elastic License) when *any* of the following
+becomes true:
 1. Monetization model is decided and an OSS release supports it
    (e.g., open-core, hosted-paid, support-paid).
 2. External contributors materially help and need a contributor
@@ -814,7 +825,7 @@ add a `forceMMode` field on DeviceProfile then.
 that.** A 50×50 mm photo at 5 lines/mm is ~250 lines × ~30 chars =
 7.5 KB — fits in memory. A 200×200 mm photo at 10 lines/mm balloons
 to ~6 MB — must stream. The 100 KB threshold matches the heuristic
-the original audit's A6 mitigation used for bundle splits (the order
+the AUDIT.md A6 mitigation already uses for bundle splits (the order
 where allocation becomes user-visible). Implementation: emit-raster
 returns either a `string` or an `AsyncIterable<string>`; the file/
 serial writer adapts.
@@ -2119,6 +2130,18 @@ calibration-free lever and the right first step.
   set unidirectional and confirm the edge serration is reduced. Expect a subtle
   effect at 1500 mm/min (the zipper is small at this feed); the bigger small-text
   wins are ADR-036 (density) and ADR-037 (trace fidelity).
+
+### Amendment (2026-07-28) - generic traced Scan Line starts one-way
+
+The original `default true` and `new layers default to snake` statements above
+remain authoritative for ordinary vector Fill layers. A newly committed traced
+image is narrower: when it creates a generic/default Scan Line operation with no
+explicit direction and no verified or legacy-verified scan-offset calibration,
+that operation starts one-way so the uncalibrated trace workflow does not
+alternate direction by default. An explicitly requested direction or qualifying
+calibration remains authoritative. Island Fill, Raster Image, ordinary vector
+operations, and the qualified 4040 direction policy retain their existing
+defaults; opening an old project does not rewrite its scan direction.
 
 ---
 
@@ -4263,7 +4286,7 @@ The maintainer chose **full auto-update** (over notify-only) for the desktop app
 - Green tests never prove the installer runs (CLAUDE.md): a workflow-shape test +
   an auto-update-config unit test guard structure, but install / serial / update
   behavior is verified manually on Windows 10 and 11 (WORKFLOW.md desktop flow,
-  `docs/hardware/verification-status.md`) before the launch is called done.
+  AUDIT.md CLAIMED row) before the launch is called done.
 
 ### References
 ADR-007 (Windows-only desktop), ADR-011 (platform adapter), ADR-018 (private
@@ -4294,7 +4317,7 @@ Setup wizard) is the first.
 
 ## ADR-098 — CNC router mode becomes a first-class product track (Phase H "Router")
 
-**Status:** Amended by ADR-209
+**Status:** Amended by ADR-209; macOS Phase-J deferral amended by ADR-248
 **Date:** 2026-07-02
 
 ### Context
@@ -4326,7 +4349,7 @@ motion polish (ramps, climb/conventional, leads, parking), and tiling.
    are planned for Phase H.
 3. **Hardware verification targets the 4040 machine.** Every output-affecting
    sub-phase ends with an air-cut checklist executed by the maintainer;
-   ledger entries stay Claimed until that evidence exists.
+   AUDIT.md rows stay CLAIMED until that evidence exists.
 4. The laser non-negotiables extend to CNC with analogs: bounds check, origin
    honesty, no partial output, deterministic G-code (snapshot + fuzz), units
    honest, pure core — plus the CNC-specific **no XY rapid below safe Z**
@@ -4339,8 +4362,7 @@ Home → clamp scrap / set work XY zero → set Z zero ~30 mm above the
 spoilboard (air gap) → feed override 50% → run the job end-to-end → verify:
 retract before every travel, pass ordering (pockets/engraves before profiles,
 inner before outer), spindle spin-up dwell before first plunge, correct park.
-Log the result in `docs/hardware/verification-status.md`; only then may an entry
-move from Claimed to Hardware-verified.
+Log the result in AUDIT.md; only then may a row flip CLAIMED → VERIFIED.
 
 ### Alternatives considered
 
@@ -4389,7 +4411,7 @@ move from Claimed to Hardware-verified.
 
 ## ADR-101 — CNC/laser UI separation policy: gate-and-hide
 
-**Status:** Accepted
+**Status:** Accepted; amended by ADR-255 (Open G-code / Inspect G-code becomes mode-independent)
 **Date:** 2026-07-02
 
 > **Numbering note:** ADR-101 follows ADR-098 on this branch by design, not
@@ -4544,7 +4566,7 @@ the laser-only set" assertion updates from the source of truth automatically.
 
 ## ADR-102 — three.js for the 3D relief viewer (explicit ADR-098 §2 override)
 
-**Status:** Accepted
+**Status:** Accepted; §2 import location amended by ADR-255 (adds `src/ui/viewer3d/`)
 **Date:** 2026-07-03
 
 ### Context
@@ -4565,6 +4587,8 @@ buffers, and lighting is weeks of risk for zero product differentiation.
    canon-critical.
 2. **three.js is UI-only.** It may be imported beneath
    `src/ui/relief-viewer/` and nowhere else — never in `core/` or `io/`.
+   **AMENDED by ADR-254 (2026-07-25):** `src/ui/cnc-viewer3d/` is also permitted.
+   Everything else in this clause stands unchanged.
    clipper2-ts remains the only geometry dependency of the core. The
    heightmap→mesh conversion stays a PURE core function returning plain
    `Float32Array`s (positions/indices/normals feed three's BufferGeometry
@@ -4588,8 +4612,8 @@ buffers, and lighting is weeks of risk for zero product differentiation.
 
 ### Verification
 
-- RESEARCH_LOG.md dependency row with version and license re-verified; reviewers
-  cross-check it against `package.json`.
+- RESEARCH_LOG.md dependency row (version, license re-verified) — CI
+  cross-checks package.json against it.
 - Pure mesh-builder unit tests against analytic heightmaps; component
   fallback test in jsdom; full gate.
 - Visual check of the rendered relief in the isolated preview browser.
@@ -4680,12 +4704,12 @@ defect), which will carry the snapshot acknowledgment line.
 
 Per feature: unit + property tests, WORKFLOW.md flows (success / error /
 empty / edge) before UI, full gate per commit, isolated-preview
-perceptual pass where renderable, hardware-ledger entries with named
+perceptual pass where renderable, AUDIT.md CLAIMED rows with named
 pending hardware checks.
 
 ## ADR-104 — Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03)
 
-**Status:** accepted (recorded at the merge of `claude/determined-dewdney-7ec915` into `main`).
+**Status:** Accepted; Phase-J schedule amended by ADR-248 (original decision recorded at the merge of `claude/determined-dewdney-7ec915` into `main`).
 
 ### Context
 
@@ -4864,7 +4888,7 @@ design is built around:
    for a canonical spec; IoU vs analytic expectation + opt-in PNG
    artifact for human eyeballing.
 4. **Hardware:** physical fit is NOT software-verifiable — the feature
-   lands Claimed in `docs/hardware/verification-status.md` with a named pending check:
+   lands CLAIMED per AUDIT.md convention with a named pending check:
    cut a 60×40×30 mm, T=3 box on the Falcon (laser) / 4040 (router)
    and assemble it.
 
@@ -5444,6 +5468,9 @@ perceptual pass (CLAUDE.md §2); green tests are not fidelity proof.
 (ADR-113 is reserved by the trace-fidelity track on its own branch; this entry
 deliberately skips it to avoid a repeat of the ADR-094/ADR-106 collisions.)
 
+**Status:** Amended by ADR-120 (restrictive EULA terms superseded); notice
+scope amended by ADR-248
+
 **Context.** The 2026-07-05 release audit found the product legally unsellable:
 the repo LICENSE (ADR-018) affirmatively denies everyone the right to *use* the
 software and no EULA, terms surface, or machine-safety disclaimer existed
@@ -5461,12 +5488,14 @@ Rayforge camera adaptation and was not bundled.
    still governs the *source*; the EULA governs the *distributed binary* —
    they are complementary, not conflicting.
 2. `scripts/generate-third-party-notices.mjs` builds
-   `public/third-party-notices.txt` from real sources — each production
-   dependency's `node_modules` LICENSE verbatim plus each font's name-table
+   `public/third-party-notices.txt` from real sources — the direct production
+   dependencies' `node_modules` LICENSE files plus each font's name-table
    copyright record — with the canonical Apache-2.0/OFL-1.1 full texts
    committed under `scripts/license-texts/` (downloaded from apache.org and
-   openfontlicense.org). `build:web` regenerates it and the generator fails
-   loudly on a missing LICENSE, so a new dependency cannot ship un-attributed.
+   openfontlicense.org). `build:web` regenerates it and fails on a missing direct
+   LICENSE. This generator is a notice input, not proof that a distributable's
+   full transitive/runtime/asset license closure is complete; ADR-248 requires
+   that artifact-scoped closure before Preview distribution.
 3. The About dialog names both files and carries a short safety notice.
 
 **Consequences.** The EULA text is an engineering draft: it must be reviewed
@@ -5474,6 +5503,17 @@ by a lawyer before the first sale (jurisdiction/governing-law clause is
 deliberately absent). First-run in-app acceptance (web) remains open — the
 web bundle surfaces the EULA via About, not a blocking dialog; revisit when
 the storefront exists.
+
+### Current amendment
+
+ADR-120 supersedes Decision 1 and its proprietary-binary consequences. The
+current `public/eula.txt` is an MIT License & Safety Notice, not a restrictive
+EULA; displaying it in NSIS adds no restriction to the MIT grant or applicable
+third-party rights. ADR-248 also replaces any completeness assumption about the
+direct-dependency generator with an artifact-scoped closure requirement for
+shipped transitive packages, Electron/Chromium runtime notices, fonts, and
+assets. A first sale or future restrictive term requires a new lawyer-reviewed
+commercial ADR. This historical ADR cannot authorize either one by itself.
 
 ## ADR-115 — Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05)
 
@@ -5738,7 +5778,7 @@ jsdom hook tests pin acquire/release/re-acquire and the one-shot warning
 (denied + missing API); policy tests pin `screen-wake-lock` granted for
 trusted check+request and denied for untrusted origins and subframes.
 NOT verified: the packaged Electron runtime grant, and a real hours-long
-burn with display sleep armed — Claimed in the hardware ledger until the maintainer
+burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
 runs one.
 
 ## ADR-118 — Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07)
@@ -5799,7 +5839,7 @@ from the live editor/controller state.
   conservative 64 MiB allocation-free estimate. A larger executable job continues
   without recovery/archive capture and shows the existing forensic-record warning
   instead of allocating an unbounded archive copy before Start.
-  The read-only Execution archive can export a retained exact artifact as `.lfexec.json`; its versioned
+  The read-only Execution archive can export a retained exact artifact as `.lfexecution.json`; its versioned
   tagged-binary envelope preserves typed arrays, hashes every encoded field, and
   never recompiles or overlays live editor/controller state.
 - Fresh Start stages the artifact before the first write, but does not replace an
@@ -5920,7 +5960,9 @@ controller reset look like job recovery even though the durable checkpoint is a 
   controller evidence, but its incomplete/failed state is not itself a hard Laser Start gate.
   Missing `$30`/`$32` evidence follows the already accepted warning-and-acknowledgement path in Job
   Review, matching controllers that expose no numeric settings dump. A reported `$30` mismatch or
-  reported `$32=0` remains blocking. An in-flight settings transaction still owns the serial channel
+  reported `$32=0` remains blocking. **[SUPERSEDED later the same day by ADR-228 (2026-07-17): both
+  the `$30`-mismatch and `$32=0` Start blocks are withdrawn and are now Job Review warnings; a
+  completed Frame is the sole Start gate.]** An in-flight settings transaction still owns the serial channel
   until it settles. CNC Start and every supervised recovery keep the strict fresh-qualification
   requirement because spindle/WCS re-entry semantics cannot be inferred safely.
 - **Forget Controller** safely stops when necessary, closes/revokes transport, advances epochs, and
@@ -5992,7 +6034,7 @@ informative.
 
 ## ADR-120 - MIT license, open-source release (supersedes ADR-018)
 
-**Status:** Accepted | **Date:** 2026-07-07
+**Status:** Accepted; clarified by ADR-247 | **Date:** 2026-07-07
 
 ### Context
 
@@ -6015,10 +6057,11 @@ from public-facing copy per the standing neutrality policy.
   Johann Stolk. `package.json` declares `"license": "MIT"`.
 - **Repo visibility: public** (the flip itself is a maintainer action on
   GitHub, executed after the release-blocking item below is resolved).
-- **Dependency policy unchanged** (ADR-017): MIT-compatible licenses only;
-  GPL-family dependencies remain rejected now because the combined MIT
-  work must stay redistributable under MIT, not merely by policy.
-- **EULA (ADR-114) reduced to a distribution notice.** With an MIT source
+- **Dependency policy unchanged** (ADR-017): only the reviewed permissive and
+  weak-copyleft package licenses enforced by `scripts/check-licenses.mjs` are
+  allowed; GPL-family dependencies remain rejected.
+- **ADR-114's proprietary Decision 1 and consequences are superseded; its EULA
+  is reduced to a distribution notice.** With an MIT source
   license the restrictive use-grant/no-redistribution clauses are void;
   `public/eula.txt` becomes a License & Safety Notice (MIT grant reference,
   machine-safety warning, warranty disclaimer, third-party pointer). The
@@ -6046,7 +6089,9 @@ presets through the in-house contour backend. This blocker is closed.**
   existing dependency ecosystem and the ADR-008 posture being restored.
 - **AGPL-3.0:** protects against closed hosted forks but deters the
   hobbyist audience and contradicts the MIT-compatible dependency story.
-- **Source-available (BSL):** not open source; fails the adoption goal.
+- **Source-available Business Source License (BUSL):** not open source; fails
+  the adoption goal. This is distinct from the permissive Boost `BSL-1.0` SPDX
+  identifier allowed by ADR-017.
 
 ### Verification
 
@@ -6611,6 +6656,28 @@ Consequences.
   letters, serifs, arch bands, waves and roof lines; NOT verified on physical
   laser output (this changes trace geometry only, no G-code semantics).
 
+### 2026-07-22 performance amendment
+
+The 2x quality path is feature-aware rather than unconditional. The cleaned
+source-resolution contour mask is scanned for coherent 1-3px runs; qualifying
+thin details retain 2x supersampling, while broad solid artwork traces at native
+resolution. The existing small-source and thin-source policies still apply,
+and the working-pixel budget remains the final cap. This removes the routine
+4x working-pixel cost from thick logos without weakening the Arch House
+thin-detail acceptance fixture. A relative wall-clock regression test compares
+the native route with the former forced-2x route.
+
+Dense color pictures are a separate profile: frequent mask transitions plus
+auto-sketch routing distinguish photo-like inputs from sparse colored logos.
+They never take the optional 2x contour route; above 1.5 MP they trace on a
+roughly 1.25 MP working grid, then both polylines and canonical curves scale
+back into source coordinates. This bounds texture-driven contour work while
+leaving Edge Detection, Sharp, monochrome hatching, and the Arch House sparse
+color fixture on their existing paths. The repo color-photo fixture measured
+about 6.9s before and 2.8s after at 2048px on the same host. Rendered comparison
+preserved the primary shapes and lettering while simplifying high-frequency
+wood grain and speckle; physical laser output remains unqualified.
+
 ## ADR-129 - Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10)
 
 **Status:** accepted (audit DEV-04: no-go zones gated Start/Frame/export/resume, but jog was zone-blind end to end).
@@ -6972,7 +7039,7 @@ Consequences.
 
 ## ADR-141 - The network-camera bridge is desktop and local-development only
 
-**Status:** Accepted | **Date:** 2026-07-12
+**Status:** Accepted; macOS Preview RTSP qualification amended by ADR-248 | **Date:** 2026-07-12
 
 > **Numbering note.** ADR-140 records the CNC finish allowance; **ADR-141** is the next allocated decision number.
 
@@ -6998,7 +7065,7 @@ network camera oracle. Desktop is the supported network-camera workflow.
 
 ## ADR-142 - Production desktop tags require a valid Windows signature
 
-**Status:** Accepted | **Date:** 2026-07-12
+**Status:** Accepted; manual-dispatch topology amended by ADR-248 | **Date:** 2026-07-12
 
 > **Numbering note.** ADR-141 records the network-camera bridge restriction; **ADR-142** is the next allocated decision number.
 
@@ -7011,7 +7078,9 @@ secrets were absent.
 
 Tag builds fail before packaging unless `CSC_LINK` and `CSC_KEY_PASSWORD`
 exist. After packaging, `Get-AuthenticodeSignature` must report `Valid` before
-publication. Manual dispatch remains an unsigned, non-publishing dry run.
+publication. ADR-248 removes manual dispatch from the production workflow;
+credential-free unsigned packaging uses a separate workflow-artifact-only dry
+run that never publishes a GitHub Release, R2 object, or updater feed.
 
 ### Consequences
 
@@ -7660,9 +7729,9 @@ interlock or machine-specific supervisory protocol.
 
 ---
 
-## ADR-180 - Generic same-session CNC Resume is manual-recovery-only
+## ADR-180 - Generic same-session CNC Pause/Resume is door-confirmed and progress-bounded
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Amended through 2026-07-27 (the former resume refusal is withdrawn; see amendments) | **Date:** 2026-07-13
 
 ### Context
 
@@ -7707,6 +7776,104 @@ engagement boundary and removes the stationary-cutter failure described by the
 maintainer. Hardware-backed spindle-at-speed and machine-specific continuation
 remain a separate, fault-injected implementation rather than an inference from
 legacy GRBL telemetry.
+
+### Amendment 2 (2026-07-25) — CNC Pause parks the spindle via the safety-door byte
+
+Amendment 1 left CNC Pause as a bare feed hold, which stops motion but leaves the
+spindle commanded. The maintainer's requirement is the opposite: **pause should stop
+the spindle in place, and resume should spin it back up and continue the same line.**
+
+Researched against the firmware rather than reasoned about (CLAUDE.md rule 9). In
+[grbl/config.h](https://github.com/gnea/grbl/blob/master/grbl/config.h):
+`SAFETY_DOOR_SPINDLE_DELAY 4.0` and `SAFETY_DOOR_COOLANT_DELAY 1.0` are **active by
+default**, while `PARKING_ENABLE` is **commented out by default**. So GRBL's Door
+state decelerates in place and de-energizes spindle and coolant, and door-resume
+restores them and holds motion for the spin-up delay before continuing the
+interrupted move — exactly the requested behavior, minus any retract.
+
+- CNC Pause now sends the **safety-door byte** (`\x84`), the same path laser already
+  used, instead of `!`. The door branch is selected by driver capability
+  (`realtime.safetyDoor !== null`), no longer by machine kind.
+- CNC Resume is correspondingly **door-confirmed**: it waits for a fresh `Run`/`Idle`
+  report before refilling the stream, rather than firing `~` blind.
+- **No retract.** `PARKING_ENABLE` is off in stock GRBL, and its `PARKING_TARGET` is a
+  *machine coordinate* — meaningless on this project's no-homing router. A host-side
+  lift is deliberately not built: it would require abandoning the door hold for a
+  drain-to-Idle pause, reintroducing a re-entry seam. The cutter therefore spins up
+  while still engaged; the advisory says so.
+- **Accessory proof is required for laser only.** GRBL omits `A:` when nothing is
+  energized and emits `Ov:` only periodically, so a CNC controller can settle into
+  Door before any report carries accessory data. Demanding the field would time out
+  and fail-dark a correctly stopped job. A settled Door state is itself the
+  controller's report that it de-energized the spindle. The laser path keeps its
+  positive proof-of-beam-off requirement (ADR-179) unchanged — this narrows a
+  refusal, which rule 7 permits, and widens none.
+- Both CNC copy strings are rewritten; they previously told the operator the spindle
+  keeps spinning, which this makes false.
+- **Not hardware-verified.** No air-cut on a spindle machine. Whether this specific
+  4040 build reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build
+  facts confirmed only by running it.
+
+### Amendment (2026-07-24) — same-session CNC Resume is one-click again
+
+The original decision's resume **refusal is withdrawn.** ADR-228 / CLAUDE.md
+rule 7 ("FRAME IS THE ONLY GUARD"), adopted four days after this ADR, forbids
+policy-judgment refusals: an agent's concern belongs in an informational warning,
+never a block, and the operator's real safeguards are the physical E-stop and eyes
+on the machine — not a disabled button. This ADR's resume block was exactly such a
+policy judgment (it is none of the three permitted refusal classes — transport
+precondition, compile integrity, handoff consistency), so rule 7 supersedes it.
+
+- Same-session CNC Resume now sends realtime cycle start (`~`) and refills the
+  paused stream, taking the same store branch as a laser controller with no
+  safety-door capability. This matches LightBurn and every GRBL sender (rule 3).
+- The stationary-cutter concern is **not** discarded — it is demoted to a passive
+  advisory shown beside the (now-enabled) Resume control: "confirm the spindle is
+  still spinning and the cutter is clear; if it stopped during the hold, Abort
+  instead." It informs; it never gates. No confirm dialog (that would itself be a
+  rule-7 guard).
+- What stays refused is unchanged and unrelated: CNC **checkpoint** and
+  **start-from-line** recovery (ADR-143) and **pass-boundary** recovery jobs
+  (ADR-215) are a different feature from live Pause/Resume and are untouched here.
+- The CNC Pause copy no longer claims the job "cannot be resumed automatically."
+- Not hardware-verified on a spindle machine at amendment time; the GRBL
+  feed-hold/cycle-start behavior is documented and sender-standard, but an
+  air-cut coupon on the router remains the real proof.
+
+### Amendment 3 (2026-07-25) — CNC confirmation timeout preserves the paused job
+
+A missed CNC Pause/Resume confirmation no longer requests a controller reset.
+The streamer stays frozen and recoverable, and the operator may retry Resume,
+request ABORT JOB, or use the physical E-stop. The laser branch retains its
+existing fail-dark reset because an unconfirmed beam-off transition is a
+different hazard.
+
+### Amendment 4 (2026-07-27) — live Door progress has silence and absolute deadlines
+
+The previous owner used the active-stream heartbeat's 2-second interval as one
+absolute deadline. That is shorter than GRBL's 3-second 5 mm pullout at
+100 mm/min when `PARKING_ENABLE` is compiled in and its stock 4-second spindle
+restore delay, so compliant `Door:2` and `Door:3` sequences falsely timed out.
+
+- The 2-second interval remains the transport/status-silence watchdog.
+- Successful owned writes begin the next silence window. Within the status
+  wait, only fresh post-command same-session CNC `Door:2` Pause, `Door:3`
+  Resume, or the existing terminal proof refreshes silence. Door progress
+  never proves completion or releases the stream.
+- A non-resettable 30-second maximum prevents continuous progress from owning
+  the controller transition forever. Custom builds beyond that envelope remain
+  unqualified.
+- The UI remains explicitly **JOB PAUSING**/**JOB RESUMING** while ownership is
+  pending. Pause still requires its settled Door/Hold proof; Resume releases
+  host refill only after fresh `Run`/`Idle`, and publishes running only after
+  every immediately stageable owned stream write settles. A timed-out but
+  unresolved Pause/Resume transport write retains token- and session-scoped
+  ownership, so a retry cannot overlap it; settlement or session replacement
+  retires that ownership. An actual transport rejection remains the existing
+  active-stream fail-dark/quarantine case, distinct from a confirmation timeout's
+  CNC no-reset behavior.
+- Laser timing/fail-dark behavior, non-Door controller families, Start, Frame,
+  recovery, settings, and emitted G-code are unchanged.
 
 ---
 
@@ -8666,7 +8833,7 @@ beam/spindle behavior, clearances, and calibration remain the operator's hardwar
 
 ## ADR-206 - Require explicit maintainer permission for every new guard
 
-**Status:** Superseded by ADR-228 for ordinary Start policy. Use the current-policy note at the top of this file for the governing scope. | **Date:** 2026-07-15
+**Status:** Superseded in mechanism by ADR-228 — the permission process is replaced by a standing denial: no guard will ever be created again. | **Date:** 2026-07-15
 
 ### Context
 
@@ -8772,7 +8939,9 @@ Work-Z matching.
   its non-blocking warning, and the one-click Scanline recovery action remain available.
 - Display general Start readiness warnings as non-blocking warning toasts. ADR-210's explicitly
   approved exception requires one focused acknowledgement when a laser controller's `$32` state
-  cannot be verified; a reported `$32=0` remains a hard refusal.
+  cannot be verified; a reported `$32=0` remains a hard refusal. **[SUPERSEDED by ADR-228
+  (2026-07-17): the reported-`$32=0` Start refusal is withdrawn and is now a Job Review warning.
+  ADR-228 lists "$32=0 on laser" among the controller-readiness Start errors it removed.]**
 - Classify Console effects by what a command can change. Accessory-only commands, dwell, and
   non-positional setting writes still invalidate their own stale observations, but preserve homing,
   frame, origin, Work-Z, WCO, and trusted-position evidence. Motion, coordinate, tool, reference,
@@ -9058,7 +9227,10 @@ containment strategy.
 - Recovery re-entry is hard-off: `M5`/`S0` precedes positioning, rapid repositioning is explicitly
   unpowered, and positive power is restored only on the first burn-motion line.
 - A laser Start whose controller cannot report `$32` requires one explicit Start-anyway
-  acknowledgement. A reported `$32=0` is still refused, and neither Machine Setup nor the confirmed
+  acknowledgement. A reported `$32=0` is still refused **[Start refusal SUPERSEDED by ADR-228
+  (2026-07-17): a reported `$32=0` no longer refuses laser Start — it is a Job Review warning, and
+  Frame is the sole Start gate. The setting-write restriction in the rest of this bullet stands.]**,
+  and neither Machine Setup nor the confirmed
   Console setting lane may write `$32=0` while the active project is a laser. Ordinary Start,
   start-from-line/recovery, and camera-marker burns all carry the same session-bound evidence to the
   final wire boundary. CNC/router projects retain their required `$32=0` path.
@@ -9425,7 +9597,7 @@ configured correctly; the badge faithfully shows what the controller reports, as
 
 ## ADR-221 - Show wall-clock elapsed job time on the canvas motion badge
 
-**Status:** Accepted | **Date:** 2026-07-17
+**Status:** Amended 2026-07-27 | **Date:** 2026-07-17
 
 ### Context
 
@@ -9458,6 +9630,48 @@ Operators see live elapsed time next to the machine state for both laser and CNC
 its final value when the run ends however it ends. The readout is display-only and wall-clock —
 it makes no claim about cutting time vs held time. Fixtures and archived runs without a start
 stamp simply omit it.
+
+### Amendment 2026-07-27 — exact emitted-program remaining time
+
+The elapsed clock above remains a separate wall-clock fact. The in-job remaining-time display uses
+one additional timing model:
+
+- Its initial baseline is the exact emitted G-code timeline, including modeled motion and every
+  deterministic timing command. In particular, CNC spindle spin-up `G4` dwells contribute their
+  emitted duration. Lookahead restarts across dwell/pause/`M400` boundaries and real spindle or
+  coolant state changes, matching the emitted program's planner drains; redundant modal re-arms do
+  not invent a stop, and laser power carried on planned motion remains in that motion span.
+- Acknowledged-line percentage remains a separate transport diagnostic and a ceiling for route
+  reconciliation. It is never converted into elapsed or remaining time.
+- Only fresh, trustworthy, same-session controller positions that reconcile to the active route may
+  calibrate modeled motion pacing. Arc/helix progress maps by exact raw G-code line across the two
+  parser tessellations, and partial-segment time follows the planner's acceleration profile.
+  Deterministic dwell time is not pace-scaled.
+- The display states are **estimating**, **running**, **paused**, **disconnected**, **finishing**,
+  and **complete**. Estimating is the pre-first-write initialization state; once executable bytes
+  are accepted (or a trustworthy fresh same-session `Run` report proves execution while that write
+  settles), Running consumes the baseline pace until route samples calibrate it. Pause freezes the
+  last estimate. A host-side CNC `M0` freezes it only after the existing fresh-`Idle` tool-change
+  proof, not while buffered pre-`M0` motion may still execute. Disconnect makes remaining time
+  unavailable rather than drifting across a replacement session.
+- Final acknowledgement does not select Finishing: realtime families keep numeric route correction
+  while fresh same-session status still reports `Run`. Finishing begins only when the active
+  driver's settle marker or equivalent physical `Idle` boundary proves queued execution drained;
+  Complete still requires the existing stable-`Idle` release contract.
+- Timing-unknown syntax, unknown initial position/feed, controller-family dwell-unit mismatch, or a
+  program beyond the 25,000-line/segment live-timing sidecar budget makes remaining time
+  unavailable instead of inviting a false estimate. The sidecar is also stamped with the exact
+  G-code fingerprint and current initial-position/session/position-epoch/active-and-detected-family
+  evidence; drift before handoff degrades the timer only and never refuses Start. A failed
+  settle-only completion marker remains unavailable through later position-only reports rather
+  than fabricating Complete. The segment budget is enforced during render construction, allowing
+  only the current source line's bounded expansion before parsing stops.
+
+The model uses the existing scalar configured velocity/acceleration limits. Axis-specific dynamics,
+controller buffering, live override response, spindle-at-speed behavior, and real material/machine
+pacing still require physical calibration; controller reports and simulator evidence do not prove
+them. The amendment is display and estimation state only: it changes no emitted G-code, Start or
+Frame authorization, controller command, settle contract, or other safety boundary.
 
 ---
 
@@ -9814,11 +10028,6 @@ operator clicks whenever they choose.
 **Status:** Accepted (maintainer directive, verbatim: "FRAME IS SOURCE OF TRUTH... when a frame
 completes. start can start with no blocks or guards or checks at all. no alarm. frame is good
 start is open... no guard will ever be created again.")
-
-**Current interpretation:** "guard" here means an additional ordinary
-product-policy Start gate. It does not waive transport readiness, compilation
-validity, required placement inputs, recovery handoff, security/trust,
-unsupported-capability boundaries, or explicit destructive-action confirmation.
 
 ### Decision
 
@@ -10216,9 +10425,10 @@ transitions untouched, especially on alternating reverse rows.
 ### Decision
 
 1. Ordinary scanline Fill compiled for the `neotronics-4040-safe` dialect carries a
-   `feed-matched-entry` runway policy. Default/Falcon-compatible motion bodies remain
-   byte-compatible; exported metadata intentionally advances to the new emitter revision. Offset
-   Fill and Island Fill keep their existing policies.
+   `feed-matched-entry` runway policy. At this decision's acceptance,
+   Default/Falcon-compatible motion bodies remained byte-compatible; the 2026-07-28 ADR-238
+   amendment supersedes that generic-motion statement. Offset Fill and Island Fill keep their
+   existing policies.
 2. ADR-035's 5 mm split threshold remains unchanged. At every internal split, the preceding sweep
    owns no trailing runway. The next sweep starts with G0/S0 over the gap remainder, followed by up
    to `min(configured overscan, 5 mm)` of monotonic `G1 F<fill feed> S0` before laser-on motion.
@@ -10401,16 +10611,18 @@ quality policy while preserving generic/Falcon output.
 - Compute Print-and-Cut/registration warnings from the prepared output-scoped project, not the
   unscoped source scene. Selecting only artwork or only the registration box therefore cannot inherit
   a false warning that both will burn in the same pass.
-- Export provenance advances to `adr-235-4040-quality-controlled-v2` because the combined controller
-  program differs from ADR-234 even though its non-overlapping split geometry remains governing.
+- At ADR-236 acceptance, export provenance advanced to
+  `adr-235-4040-quality-controlled-v2` because the combined controller program differed from
+  ADR-234 even though its non-overlapping split geometry remained governing.
 
 ### Consequences
 
 The 4040 now favors repeatable motion and aligned scan direction over minimum runtime. Bounded
 scanline entries and full-where-safe Island runways increase travel for fragmented art, and one-way
 scanning can approach twice the scan time; those costs are intentional and visible in the same
-planner used for ETA. Generic and Falcon profiles retain legacy direction, runway, and `G0` behavior
-unless explicitly configured otherwise.
+planner used for ETA. At ADR-236 acceptance, generic and Falcon profiles retained legacy direction,
+runway, and `G0` behavior unless explicitly configured otherwise; the 2026-07-28 ADR-238 amendment
+supersedes that runway statement for newly compiled generic Scan Line groups.
 Their ordinary vector bytes also remain unchanged; only paths with points equal at controller
 precision lose non-moving commands.
 
@@ -10505,10 +10717,9 @@ The maintainer directed this default on 2026-07-21.
   4040-safe dialect they engrave through ADR-234's feed-matched entry runways; that geometry is
   structurally pinned by tests but its physical burn quality remains hardware-verification
   pending, exactly as ADR-234 states.
-- Profiles that are not on the 4040-safe dialect keep ADR-234's deliberately-preserved legacy
-  fill motion (including the ADR-033 short-run overscan skip). The existing conditional
-  advisories for a suspected 4040 on a generic profile are the sanctioned mitigation; this ADR
-  does not widen any policy or add any guard.
+- At ADR-238 acceptance, profiles outside the 4040-safe dialect kept ADR-234's legacy fill motion.
+  The 2026-07-28 amendment below supersedes that statement for newly compiled generic Scan Line
+  groups while retaining the historical behavior for explicit legacy artifacts and fixtures.
 - Operators who prefer the photo-parity scan motion — the pipeline the maintainer physically
   verified as clean — pick Raster scan in the dialog; nothing about that path changes.
 
@@ -10519,6 +10730,36 @@ The maintainer directed this default on 2026-07-21.
   Raster scan; CNC tracing remains vector-only with no output picker.
 - No compiler, emitter, or G-code change: the diff is dialog state, option labels/order, the
   select parser fallback, and these tests.
+
+### Amendment (2026-07-28) - generic Scan Line every-sweep runway
+
+The original consequence that non-4040 profiles keep the ADR-033 short-run skip
+is superseded for newly compiled generic Scan Line groups. They now carry an
+explicit `feed-matched-every-sweep` plan: every independent sweep receives a
+laser-off entry and exit at burn feed, even when the powered span is shorter
+than twice the configured runway. Adjacent sweeps split the available blank gap
+symmetrically so their runways never overlap; a gap wider than both full runways
+retains a laser-off rapid across only the unused center.
+
+This does not change close-gap `S0` bridging, Raster Image motion, Island Fill,
+Follow Shape, or the qualified 4040 policy. A stored zero on a newly compiled
+generic Scan Line group now resolves to the bounded 5 mm generic fallback so it
+cannot reintroduce a rapid-to-powered start; the editor retains the stored value
+and Job Review reports the effective target separately. Newly
+committed generic traced Scan Line operations default one-way as amended under
+ADR-038 unless an explicit choice or verified/legacy-verified calibration applies.
+`computeJobMotionBounds`, and therefore the physical Frame rectangle and its
+recorded signature, consume the same
+planned entry/exit endpoints as G-code, preview, and duration estimation.
+Export provenance advances to `adr-238-generic-scanline-runway-v1`.
+
+The added travel is an explicit quality/runtime trade. A planner regression with
+twenty 0.5 mm fragments, 12 mm apart, at 1500 mm/min on the reported 2250 mm/min,
+300 mm/s² motion constraints accepts at most one second per fragment (20 seconds
+total). The current plan estimates below that bound while retaining full bounded
+runways around every sweep.
+Software establishes geometry and parity only; physical burn quality on the
+reported 440 remains controlled-test qualification work.
 
 ---
 
@@ -10956,6 +11197,41 @@ informative, but blind.
   worker on a real over-budget scene (vitest has no Worker runtime; needs a dev-server
   session or the e2e suite).
 
+### 2026-07-22 implementation amendment
+
+The PR #329 audit found that the accepted design still left several real gaps. The
+implementation now makes the following refinements without introducing a size, policy,
+or predictive refusal:
+
+1. Preview and ETA derive from one `prepareOutput` result in the worker. A worker failure
+   settles both consumers into an explicit retryable unavailable state instead of leaving
+   either UI permanently in "preparing".
+2. Large plain-project Start, Save, and Frame requests use a dedicated output-preparation
+   worker. Start and Frame receive exact precomputed duration/bounds/park metrics and a
+   clone-safe prepared-output recipe; Save receives the emitted program. Projects whose
+   variable-text or registration callbacks cannot cross the worker boundary retain the
+   synchronous path. Missing or failed Worker support also falls back synchronously, so
+   this responsiveness mechanism cannot stop machine operation.
+3. Streamed raster recovery archives a deterministic `prepared-project` row-provider
+   recipe rather than expanding the raster into the former 32 MiB grid. Recovery hydrates
+   the provider from the sealed project, re-emits the program, and accepts it only when
+   exact G-code and fingerprint comparison still pass. The overall artifact storage-size
+   envelope remains unchanged.
+4. Reverse rotary output records descending physical row order while consuming each
+   provider sequentially. This removes the quadratic restart pattern for streamed
+   error-diffusion rows without changing emitted coordinates.
+5. Only recognizable allocation/string-capacity failures become
+   `program-materialization-failed`; unrelated `RangeError`s propagate with their original
+   meaning. Extreme but valid serialized raster dimensions therefore return a controlled
+   compile-integrity result instead of leaking a typed-array exception.
+
+Verification now includes a production Vite build of the output worker, unit/integration
+coverage for the clone/hydrate/re-emit/fingerprint recovery path, and a live in-app-browser
+run of a 4.04-million-pixel Save. The worker returned a 136,892-character program in
+2,159 ms while a 10 ms main-thread heartbeat advanced 159 times, with no browser warnings
+or errors. Physical burn behavior remains hardware verification, not a claim established
+by this software audit.
+
 ## ADR-245 - Image Studio layers: active-layer document with a composite bake
 
 **Status:** Accepted 2026-07-21 (Phase L, parity plan PP-F; extends ADR-242).
@@ -10998,3 +11274,2963 @@ editor session grows a layers array that stashes/resumes as before. The
 Layers panel (visibility, opacity, blend, add/duplicate/delete/merge-down,
 reorder) docks beside History. Undo does not cross layer switches in v1 -
 stated in the panel, not blocked.
+
+## ADR-246 - Image Studio v2: scoped history, dirty-window compositing, retouch module
+
+**Status:** Accepted 2026-07-22 (the maintainer-selected v2 arc; plan in
+docs/audits/2026-07-22-image-studio-v2-plan.md; extends ADR-242/245).
+
+**Decisions:**
+
+1. **History entries carry a scope** (`HistoryEntry.scope` = the layer id
+   they were recorded against; '' = untagged). Undo/redo peek the next
+   entry's scope and follow it - swapping the active-layer pointer WITHOUT
+   touching the history - so Ctrl+Z walks strokes across layer switches.
+   Layer ops adopt per-op history policies: switch/add/duplicate/move KEEP,
+   remove PURGES exactly the removed layer's entries, merge-down and every
+   dimension change (crop, resize) still CLEAR, because those replace
+   buffer identities the tiles were captured against. Quick Mask gets its
+   own small EditHistory over the rubylith (same core primitives); Ctrl+Z
+   inside the mode pops rubylith strokes and never leaks into session undo.
+2. **The composite is cached and patched by dirty window.** Sessions record
+   `lastDirtyRect` per revision (precise for paint/fill/move/adjust, empty
+   for selection-only changes, null = full for structure ops). The canvas
+   cache recomposites only that window; any missed revision falls back to a
+   full rebuild. Correctness is pinned by a byte-equivalence property test
+   against the uncached composite.
+3. **New core module `core/image-retouch`** hosts the v2 paint surface
+   (gradient fill, clone stroke, masked-median spot heal - the patent-safe
+   variant; PatchMatch stays excluded) because all three original Studio
+   barrels sit at the 20-export cap. Bucket fill composes existing wand +
+   masked-fill primitives and adds no core surface.
+4. **Laser advisories stay advisories** (rule 7 / ADR-228): ink coverage and
+   engrave-time readouts inform; kerf thin-stroke detection warns with an
+   overlay and offers a one-click undoable Thicken - nothing refuses.
+5. **Apply & Trace** closes the tracer loop through the existing
+   `openImageDialog` seam: bake first (one project-undo entry), then open
+   the trace dialog on the updated raster. No new trace machinery.
+
+## ADR-247 - Public MIT baseline and future-license boundary
+
+**Date:** 2026-07-22
+**Status:** Accepted
+
+### Context
+
+KerfDesk/LaserForge is currently public under the MIT License. The maintainer
+wants the source, CI, and downloadable previews to remain free and public now
+while preserving the ability to consider paid terms later. Repository
+visibility, copyright licensing, binary pricing, and runtime entitlement are
+separate decisions: a later notice cannot withdraw MIT permissions already
+granted, and publicly visible code under restrictive terms is source-available
+rather than OSI open source.
+
+### Decision
+
+1. **The current first-party baseline remains public MIT.** First-party source
+   and the first-party portions of Preview artifacts released under this ADR
+   remain governed by the existing MIT License. Bundled dependencies, fonts,
+   assets, and other third-party portions remain governed by their own licenses
+   and `THIRD_PARTY_NOTICES`. Every recipient keeps the MIT permissions attached
+   to each first-party version or copy received under MIT. This ADR approves
+   neither a license change nor a delayed license change.
+2. **Any future boundary needs a new ADR before it takes effect.** That ADR must
+   record the exact cutoff commit and date, create a final annotated MIT tag,
+   establish contributor rights through legal review, and align `LICENSE`,
+   `package.json`, `CONTRIBUTING.md`, the EULA/notices, and release copy. Only
+   rights actually controlled by the project may be relicensed. The post-cutoff
+   license must be described accurately; public restrictive source must not be
+   advertised as open source. Third-party license, notice, source, attribution,
+   and asset duties survive every cutoff.
+3. **No latent commercialization gate is authorized.** This ADR adds no account,
+   trial, rolling 30-day lease, activation, subscription, device binding,
+   paywall, dormant entitlement path, or license/entitlement network call. Any
+   reconsideration first requires the maintainer's explicit prior permission and
+   coordinated supersession of the no-new-guard rule in `AGENTS.md`,
+   `CLAUDE.md`, PROJECT non-negotiable #21, and ADR-228 where applicable. An ADR
+   or workflow edit alone cannot authorize such a gate. Only after that authority
+   exists may a new commercial-runtime ADR define offline and failure behavior,
+   privacy, security, recovery, and support.
+4. **The public CI posture is intentional.** The repository stays public and
+   uses standard GitHub-hosted runners; under GitHub's current billing policy
+   that runner usage is free for public repositories. Larger runners and
+   unrelated paid services are outside this decision. Public-repository builds
+   may also use GitHub artifact attestations and the public Sigstore transparency
+   log for downloadable binaries and manifests.
+
+### Alternatives considered
+
+- **Make the repository private or restrictive now:** rejected for this phase;
+  it would lose the intended public-CI/community posture and could not retract
+  MIT rights already granted.
+- **Add a renewable 30-day trial now:** rejected. It creates an entitlement
+  service, offline/failure/support obligations, and a new launch guard before a
+  commercial model has been authorized.
+- **Keep the MIT app public and later charge for official binaries, support, or
+  services:** legally compatible with MIT and potentially viable, but it is a
+  future business decision and does not make the MIT version exclusive.
+
+### Consequences
+
+- No licensing, account, or entitlement implementation starts under this ADR.
+- This ADR does not authorize a sale or paid distribution. A first sale requires
+  a new lawyer-reviewed commercial decision satisfying this ADR's cutoff,
+  contributor-rights, notice, and release requirements. ADR-114 cannot authorize
+  a sale by itself. If later authorized, charging for official binaries, support,
+  or services would not create exclusivity over an MIT version: recipients and
+  forks retain its MIT rights.
+- A future restrictive cutoff can govern only later material for which the
+  project has the necessary rights; it cannot retroactively close the MIT
+  history.
+- GitHub service pricing is an external dependency and must be rechecked if its
+  published policy changes.
+
+### Verification
+
+- Root `LICENSE` and `package.json` remain MIT and the repository remains public.
+- `pnpm license-check` enforces ADR-017's reviewed production-package set.
+- This ADR introduces no account, trial, activation, paywall, entitlement
+  storage, or license-network implementation.
+
+### References
+
+- GitHub Actions billing: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+- GitHub artifact attestations: https://docs.github.com/en/actions/concepts/security/artifact-attestations
+- Using artifact attestations: https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations
+- Open Source Definition: https://opensource.org/osd
+
+## ADR-248 - Unsigned Windows and macOS Preview distribution
+
+**Date:** 2026-07-22
+**Status:** Accepted
+
+### Context
+
+ADR-007/017/098 limit the downloadable desktop to Windows, while
+ADR-024/135/142 reserve publishing and update trust for signed production
+artifacts. A public, explicitly non-production Preview is needed on Windows and
+both current Mac architectures before the project commits to paid
+signing/notarization or a production macOS channel. The Preview must exercise
+the existing renderer and shell without becoming a second product or a trusted
+update source.
+
+### Decision
+
+1. **Narrow governance exception.** This ADR amends only ADR-007's Windows-only
+   scope, ADR-017's specific example rejecting a macOS electron-builder target,
+   ADR-098/104's macOS Phase-J deferral, and ADR-141's macOS RTSP qualification.
+   ADR-017's dependency policy and all other provisions remain in force. The
+   annotated `vX.Y.Z-preview.N` lane is explicitly non-production and sits
+   outside ADR-142's production-tag scope. It is consistent with ADR-024/135
+   because it emits no updater metadata and never touches R2; ADR-024/135/142
+   stable production policies remain unchanged. Stable `vX.Y.Z` releases retain
+   the existing signed Windows, R2, `dl.kerfdesk.com`, and trusted-updater
+   policy. Linux desktop remains out of scope.
+2. **One application runtime.** Every Preview packages the same `dist/web`
+   output and adds no IPC, preload API, entitlement behavior, or machine/CAM
+   runtime feature. The only renderer-facing changes authorized here are
+   visible **KerfDesk** branding and the existing desktop-download affordance's
+   copy/link destination. Existing internal LaserForge identifiers and storage
+   names remain: preserve `app://app` and Windows app ID `dev.laserforge.app`
+   (which also preserves electron-builder's NSIS upgrade GUID), and explicitly
+   pin both `userData` and `sessionData` to the verified legacy
+   `%APPDATA%\laserforge` directory before Electron's `ready` event. A
+   pre-rename packaged identity probe must assert that the current app resolves
+   that root and fail the migration if it differs. Keep all IndexedDB,
+   local-storage, and recovery keys. The new macOS bundle identifier is
+   `com.kerfdesk.app`.
+3. **Preview matrix.** Publish Windows 10/11 x64 as NSIS and macOS 12+ as two
+   separate DMGs, one `x64` and one `arm64`; do not publish a Linux artifact.
+   Windows Preview artifacts are unsigned. On Mac, `mac.identity: null` disables
+   electron-builder bundle signing; packaging also sets
+   `mac.hardenedRuntime: false`, `mac.notarize: false`, and
+   `CSC_IDENTITY_AUTO_DISCOVERY=false`. No Developer ID/distribution identity or
+   notarization ticket is permitted. Tooling-created ad-hoc signatures on nested
+   Apple Silicon executables may remain, but they are not a trusted app identity
+   and must not be represented as one. Post-build checks recursively inventory
+   the outer app and every nested executable/bundle, permit only unsigned/ad-hoc
+   state, and fail any Developer ID/distribution authority or trusted Team ID;
+   they also prove there is no stapled notarization ticket. Release notes and
+   download instructions prominently explain SmartScreen/Gatekeeper warnings and
+   the manual trust/override steps.
+4. **No trusted update channel.** Preview builds keep updater trust false and
+   perform no updater check. They publish no `latest*` updater metadata, do not
+   publish to R2, and do not alter the stable feed. Stable tag events and future
+   Preview tag events call one checked-in Node validator that also proves the ref
+   is an annotated Git tag. Stable production moves to the new
+   `release-desktop-stable.yml` path, exposes no manual trigger, and references
+   only new `STABLE_*` secrets in the protected `desktop-production` environment.
+   A separate credential-free job validates the tag before GitHub can request
+   approval for, or expose secrets to, that environment. The workflow migration
+   has two explicit cutover boundaries: before merge, create the new Pages-only
+   `PAGES_CLOUDFLARE_*` repo secrets alongside the legacy names and disable the
+   historical `release-desktop.yml` workflow ID; after merge, require a successful
+   main Pages deploy through the new names before deleting legacy
+   `CLOUDFLARE_*`/`CSC_*` repo names. The `desktop-production` environment and its
+   signing/R2 secrets are not a merge prerequisite and need not be purchased now;
+   they are required only before a deliberate future stable tag, which remains
+   prohibited until that setup is recorded. A separate credential-free desktop
+   packaging dry-run remains unsigned and trust-false at every selected ref. It
+   uploads only a workflow artifact and never publishes a GitHub Release, R2
+   object, or updater feed. The validator's strict
+   ECMAScript patterns are
+   `^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$` for stable and
+   `^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)-preview\.(?:0|[1-9][0-9]*)$`
+   for Preview. Both fail closed for every other name, leading-zero numeric
+   identifier, or lightweight tag; structural tests pin the mutual exclusion
+   before the first Preview tag. **No Preview tag may be created or pushed until
+   the Preview workflow and its stable-tag rejection are merged.** Preview users
+   update by explicitly downloading a later prerelease.
+5. **Public prerelease destination.** Assets may be published only as
+   prereleases in the same public source repository, initially
+   `cisgz3a-hub/KerfDesk`. The release uses the exact existing source tag and
+   equivalent `--verify-tag` enforcement; the workflow must not generate another
+   tag or require cross-repository credentials. Repository release immutability
+   must be enabled. The workflow creates a private draft, uploads and validates
+   the complete canonical asset set, and only then publishes the draft as an
+   immutable prerelease with `latest=false`. A failed build never exposes a
+   partial release. Every individual release asset remains below GitHub's 2 GiB
+   limit. Artifact `<version>` is the tag without its leading `v`; canonical
+   binary, checksum, manifest, and CycloneDX SBOM names are fixed in WORKFLOW
+   F-DESK1/F-DESK3.
+6. **Integrity and provenance travel with the binaries.** Each prerelease
+   records the exact source commit SHA and includes a SHA-256 manifest,
+   dependency inventory/SBOM, and GitHub artifact provenance attestations for
+   the downloadable artifacts. These identify what CI built; they do not
+   convert an unsigned binary into a trusted or signed binary. The manifest and
+   release notes record `sourceRepository`, `sourceSha`, `sourceRef` (the exact
+   `refs/tags/...` ref), and `signerWorkflow`; the last field must equal
+   `<sourceRepository>/.github/workflows/release-desktop-preview.yml`.
+   Verification binds all four recorded values:
+   `gh attestation verify <asset> --repo <sourceRepository> --source-digest
+   <sourceSha> --source-ref <sourceRef> --signer-workflow <signerWorkflow>
+   --deny-self-hosted-runners`. Before any Preview release, an
+   artifact-scoped closure gate must enumerate the shipped transitive production
+   packages, Electron/Chromium runtime notices, fonts, and assets; it fails on
+   missing required license/notice material. The current direct-dependency
+   notice generator alone cannot satisfy that gate.
+7. **Web and macOS permissions.** Web/PWA deployment, caching, and update
+   behavior are unchanged. Before a Mac Preview is distributed, its Info.plist
+   must contain accurate `NSCameraUsageDescription` and
+   `NSLocalNetworkUsageDescription` strings for the existing camera and
+   network-camera workflows. USB and private-network JPEG cameras remain in
+   scope. Mac RTSP input remains unqualified and follows the existing explicit
+   FFmpeg-missing error path when `ffmpeg` cannot be found: Finder-launched
+   apps do not reliably inherit Homebrew's path, no FFmpeg binary is bundled,
+   and a Finder-safe discovery/configuration flow requires a separate reviewed
+   design. `CFBundleIdentifier` identifies the bundle but an unsigned build has
+   no durable signed-code identity for TCC permission continuity; camera or
+   local-network permission may prompt again after a Preview upgrade. macOS 15+
+   qualification therefore covers camera and local-network allow, deny, recovery
+   in System Settings, retry, and upgrade/re-prompt behavior. The macOS 12 floor
+   separately covers launch, USB-camera allow/deny/Settings recovery/retry, and
+   private-network JPEG capture; local-network privacy itself starts with macOS
+   15.
+8. **Qualification remains honest.** CI/package success does not verify
+   installation, serial access, camera permission, or machine behavior. Real
+   Windows 10/11, Intel Mac, and Apple Silicon Mac installation and workflow
+   checks remain **CLAIMED** until their evidence is recorded. A
+   signed/notarized production macOS release, Mac auto-update trust, or Mac App
+   Store release requires a separate ADR.
+
+### Alternatives considered
+
+- **Remain Windows-only:** rejected because the Preview is meant to qualify both
+  current Mac architectures without forking the product.
+- **Buy Developer ID signing and notarization now:** deferred until a production
+  Mac channel and its recurring operational cost are approved.
+- **Publish one universal DMG:** rejected for Preview qualification; separate
+  x64 and arm64 artifacts make architecture failures and evidence explicit.
+- **Reuse stable R2/updater publication:** rejected because it would mix
+  deliberately unsigned Preview artifacts into a trusted production channel.
+
+### Consequences
+
+- Preview artifacts can be downloaded publicly without weakening the stable
+  signed/R2 release contract or adding a licensing service.
+- Users accept explicit unsigned-software friction; the project does not
+  represent these builds as production-trusted.
+- Preserving identifiers avoids a Windows storage migration. The new Mac bundle
+  ID names the app consistently, but it does not give an unsigned Preview durable
+  TCC identity; permission prompts may recur across upgrades.
+
+### Verification
+
+- WORKFLOW F-DESK3 is the load-bearing release and real-OS/hardware checklist.
+- Shared tag-policy tests prove stable/Preview mutual exclusion and annotated-tag
+  enforcement before any Preview tag is permitted.
+- Publication remains blocked until the Preview workflow, artifact/legal closure
+  gate, same-repository draft-to-immutable release path, and exact attestation
+  checks exist.
+- Merge remains blocked until the new Pages-only secret names exist and the
+  historical workflow is disabled; legacy names are removed only after the first
+  successful post-merge Pages deploy.
+- Stable publication remains blocked until the protected environment and its new
+  signing/R2 secrets are deliberately configured later.
+- Identity migration, absence of updater traffic, macOS 15 permission behavior,
+  and installation/serial/files/camera behavior require recorded real-system
+  evidence; green CI alone does not satisfy them.
+
+### References
+
+- electron-builder macOS targets and architecture support: https://www.electron.build/mac/
+- electron-builder multi-platform constraints: https://www.electron.build/docs/features/multi-platform-build/
+- electron-builder macOS signing behavior: https://www.electron.build/docs/features/code-signing/code-signing-mac/
+- Electron 42 release: https://releases.electronjs.org/release/v42.0.0
+- Electron macOS 12 support boundary: https://www.electronjs.org/docs/latest/breaking-changes#removed-macos-12-support
+- GitHub release assets and limits: https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases
+- GitHub prerelease publishing: https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository
+- GitHub immutable releases: https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases
+- GitHub artifact attestations: https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations
+- Apple camera usage description: https://developer.apple.com/documentation/bundleresources/information-property-list/nscamerausagedescription
+- Apple local-network usage description: https://developer.apple.com/documentation/bundleresources/information-property-list/nslocalnetworkusagedescription
+- Apple local-network privacy on macOS: https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy
+- Electron application data paths: https://www.electronjs.org/docs/latest/api/app
+- electron-builder NSIS upgrade identity: https://www.electron.build/nsis/
+
+## ADR-249 - Notify-only update discovery for unsigned Desktop Preview
+
+**Date:** 2026-07-22
+**Status:** Accepted; amended 2026-07-23 to require a successful release workflow
+
+### Context
+
+ADR-248 deliberately gave unsigned Preview builds no update request because the
+only updater already in the app, `electron-updater`, downloads and installs from
+a trusted production feed. The maintainer subsequently selected the Rayforge
+business/distribution pattern: keep the core public, free, and MIT-licensed;
+publish unsigned Previews; tell users when a newer Preview exists; and require a
+manual browser download and installation until signed stable releases exist.
+Rayforge informed the behavioral choice only; no Rayforge code is copied.
+
+An unsigned Mac application cannot rely on OS-native notification identity and
+permission as the sole cross-platform surface. Adding a general preload or IPC
+bridge merely to show a version would also expand the deliberately absent
+privilege surface. The existing custom `app://` protocol and status bar can
+provide a narrower path.
+
+### Decision
+
+1. **Specific supersession.** This ADR supersedes only ADR-248 item 2's limit on
+   renderer-visible Preview changes, item 4's prohibition on a Preview metadata
+   request, and corresponding "absence of updater traffic" verification text.
+   Preview updater trust remains false. Every prohibition on unsigned download,
+   execution, installation, R2, `latest*` metadata, and stable-feed mutation
+   remains in force. Web/PWA behavior remains unchanged.
+2. **One metadata check per launch.** Only a packaged app whose embedded
+   `kerfdeskDesktopReleaseChannel` is exactly `preview` and whose current version
+   is strict `X.Y.Z-preview.N` may query the fixed public successful-runs endpoint
+   for `.github/workflows/release-desktop-preview.yml` with `event=push`,
+   `status=success`, and `per_page=20`. The memoized main-process request is
+   GET-only, rejects redirects, omits credentials/referrer, uses no token, times
+   out, and bounds the response body. Dev, stable, web, malformed metadata, and
+   unsupported targets are inert.
+3. **Untrusted response, green-workflow result.** Main treats workflow-run JSON as
+   untrusted. It accepts only `status:completed`, `conclusion:success`,
+   `event:push`, the exact Preview workflow path, a 40-hex source SHA, and a strict
+   `vX.Y.Z-preview.N` tag newer than `app.getVersion()`. Numeric identifiers
+   compare as arbitrary-size integers. A successful run is the release
+   certificate because its final job verifies the published immutable
+   prerelease, exact three binaries plus checksum/manifest/SBOM companions,
+   downloaded checksums, source identity, and attestations. Failed, cancelled, or
+   incomplete release runs are never advertised even if they left an immutable
+   release behind. API-provided URLs are ignored. The renderer receives only
+   `{ kind:'none' }` or `{ kind:'available', version }`.
+4. **No preload or IPC.** The renderer calls the exact same-origin GET route
+   `app://app/api/desktop-preview-update`. The existing main-process protocol
+   handler performs the pinned external request; renderer CSP remains
+   `connect-src 'self'`. The route rejects a different scheme, host, path,
+   method, query, fragment, credentials, or port. There is still no preload and
+   no `ipcMain` surface.
+5. **Passive status-bar notification.** A newer Preview adds a compact
+   **Download update** link to the existing status bar plus a polite screen-reader
+   live region. It never pops up, steals focus, auto-opens, or changes machine
+   state. It remains visible during a job: opening an informational browser page
+   is not a machine action, and hiding it would create a new guard contrary to
+   the FRAME-only guard policy. The PWA Update button remains separate because
+   that action reloads the app.
+6. **One derived external destination.** A user click may open only
+   `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` for the strict
+   version already accepted by main. Electron canonicalizes that exact repository
+   URL and always denies creation of a child window; no API-provided URL chooses
+   it. The exact tag page prevents version/date drift and a legacy service worker
+   from substituting an older cached download page. Release notes retain the
+   manual SmartScreen/Gatekeeper steps.
+7. **Privacy and failure.** No account, project, design, machine, controller,
+   job, device identifier, token, cookie, or telemetry is sent. GitHub still
+   receives unavoidable connection metadata such as IP address, time, and the
+   generic `KerfDesk-Desktop-Preview` user agent. Offline, rate-limit, HTTP,
+   timeout, oversized, malformed, failed/cancelled/in-progress workflow, and
+   downgrade cases are silent and non-fatal.
+8. **Release prerequisite.** The repository's immutable-release setting and the
+   ADR-248 Preview publication gates must be enabled before the first Preview
+   tag. The checker intentionally stays silent for mutable releases. No Preview
+   tag is created by this implementation.
+
+### Consequences
+
+- Preview users can learn about a newer version without granting unsigned code
+  an automatic update path or being directed to a red release run.
+- The desktop app gains one narrow third-party metadata request, recorded as a
+  specific exception to PROJECT non-negotiable 8; web and machining remain
+  offline.
+- Signed stable Windows updates remain the separate `electron-updater` path and
+  retain background download plus install-on-natural-quit behavior.
+- Automated tests can prove request, parsing, UI, and external-link policy, but
+  real packaged Windows/Intel Mac/Apple Silicon behavior remains CLAIMED until
+  an older Preview is tested against a newer published immutable Preview.
+
+### Verification
+
+- Unit tests cover channel metadata, exact route/method, request headers,
+  timeout/error containment, response bounds, strict tags, large numeric version
+  ordering, exact workflow identity, successful/completed state, failed and
+  cancelled runs, source-SHA shape, supported targets, and one-check memoization.
+- Renderer tests cover fail-closed response parsing, request coalescing, passive
+  status-bar rendering, accessibility announcement, fixed link destination, and
+  availability during a job.
+- Navigation tests pin exact URL allowlisting, external browser opening, and
+  child-window denial; existing auto-updater tests continue proving unsigned
+  channels never touch `electron-updater`.
+- WORKFLOW F-DESK3 remains the load-bearing real-OS and network-observation gate.
+
+### References
+
+- GitHub Releases REST API: https://docs.github.com/en/rest/releases/releases
+- GitHub immutable releases: https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases
+- Electron custom protocols: https://www.electronjs.org/docs/latest/api/protocol
+- Electron security guidance: https://www.electronjs.org/docs/latest/tutorial/security
+- Electron notifications: https://www.electronjs.org/docs/latest/api/notification
+- Electron shell external opening: https://www.electronjs.org/docs/latest/api/shell
+
+---
+
+## ADR-250 - Arc/line lead-in and lead-out for closed CNC profile cuts
+
+**Date:** 2026-07-23
+**Status:** Accepted — default-on for closed, untabbed profile-outside/inside cuts; `shape: 'none'` opts out
+
+### Context
+
+A CNC profile pass enters the material with a straight vertical plunge (`G1 Z` at the
+plunge feed) onto the toolpath's first vertex, then cuts the contour
+(`cnc-grbl-strategy.ts` `appendContourPass`). For `profile-outside` / `profile-inside`
+the toolpath is the tool-center path, offset from the finished wall by exactly the
+cutter radius (`profile-paths.ts`), so the cutter is **tangent** to the finished wall
+along every straight span — zero radial clearance. A dead-stop, full-depth plunge at a
+tangent point marks that wall (runout, deflection, plunge dwell, acceleration from
+rest). The maintainer reproduced this on hardware as a localized bite on one edge
+exactly where the cut starts, with the rest of the outline clean and the part correctly
+sized — which rules out an undersized-tool or on-path miscompensation.
+
+Enabling climb/conventional makes it worse: `enforceCutDirection` relocates the start to
+the midpoint of the longest edge (`motion-polish.ts`), i.e. onto the tangent line at the
+most visible span. Phase H.9 recorded "arc leads deferred" (PROJECT.md) and CNC
+lead-in/lead-out sits on the out-of-scope list; there is no CNC lead geometry today. The
+`contour-entry.ts` runway is laser-only (ADR-234/239) and never touches `kind:'cnc'`
+output. LightBurn, Fusion, and Easel all default a profile cut to a lead that plunges in
+the scrap and arrives on the contour tangentially — the fidelity reference this project
+follows.
+
+### Decision
+
+1. Add a pure-core geometry module `core/cnc/profile-lead.ts`. Given a closed,
+   already-offset profile toolpath, the profile side, and a lead configuration
+   (`shape: 'arc' | 'line'`, `radiusMm`, optional `sweepDeg`), it returns the plunge
+   point and the tangent lead-in / lead-out point sequences. The plunge lands in the
+   **waste**: exterior of the loop for `profile-outside`, interior for `profile-inside`.
+   The waste side is derived from the loop's shoelace winding (`polyline-orientation.ts`;
+   Y up, positive area = CCW, interior to the left of travel) and the profile side —
+   never guessed. The arc is tangent to the first (lead-in) / last (lead-out)
+   non-degenerate edge at the contour start vertex; the `line` shape enters perpendicular
+   from the waste.
+2. `profile-on-path` returns a typed refusal — an on-path lead would need the part side,
+   which on-path cuts do not carry. Degenerate input (open path, fewer than three points,
+   zero area, no non-degenerate edge, non-positive/`NaN` radius) also returns a typed
+   refusal, never a throw or poison geometry (the core `Result`-union convention).
+3. Leads are baked at COMPILE time (`profile-lead-passes.ts`, wired in
+   `compile-cnc-job.ts` `cncGroupForLayer`): a closed profile contour pass becomes a
+   path3d pass (plunge point → tangent lead-in → contour → lead-out) at the pass depth,
+   reusing the existing path3d emitter (no emitter change). Because `cncPassXyPoints`
+   reads path3d points, the Frame motion envelope (`computeJobMotionBounds`) and the
+   G-code motion-bounds preflight cover the lead automatically. Leads are DEFAULT-ON for
+   closed profile-outside / profile-inside cuts (`resolveProfileLeadOptions`: absent
+   per-layer settings resolve to a tool-radius arc); `shape: 'none'` opts back to the
+   legacy straight plunge.
+4. This is toolpath geometry, not a guard (CLAUDE.md #7 / PROJECT.md #21). It blocks,
+   gates, caps, clamps, and refuses nothing operational; it changes only emitted motion,
+   and only once wired. Frame and Start are untouched.
+
+### Consequences
+
+- Once wired, a closed profile cut plunges into scrap and arrives on the finished wall
+  tangentially, so the entry mark lands in the offcut rather than on the part — for both
+  the default-corner start and the climb/conventional mid-edge start. This narrows the
+  PROJECT.md "lead-in / lead-out" out-of-scope entry and supersedes the H.9 "arc leads
+  deferred" note for profile cuts.
+- The lead adds motion outside the contour on the waste side; when wired, the Frame
+  motion envelope must include it (mirroring ADR-239's envelope parity) while the artwork
+  AABB excludes it.
+- The waste side is resolved PER CONTOUR, not per layer, so a hole inside a profile-outside
+  part leads into the hole slug rather than into the kept body (the original P1 gouge).
+  Outer boundaries and holes leave the kerf offset with OPPOSITE windings, and that winding
+  is invariant to concentric roughing/finishing offsets — so a loop whose winding matches
+  the job's outermost loop keeps the layer side and the opposite winding (a hole) flips to
+  the inverse. Containment depth was rejected because it mistakes a finishing loop for a
+  nested hole.
+- Three guards each drop the lead back to the legacy straight plunge, so a lead never cuts
+  kept material: a bed guard (any lead point off the bed), a self-collision guard (a lead
+  point on the part side of its own contour — catches a concave lead curling in or a lead
+  larger than the feature), and a sibling guard (a lead point inside a disjoint neighbouring
+  part — the arrayed/nested-parts case). Because a corner-entry inside-lead pokes just past
+  the wall, most holes fall back to a plunge (safe) rather than gaining a lead.
+- Recovery parity: a led profile pass is a FLAT `path3d` (every point at the cut depth), so
+  `cnc-recovery-manifest` grants it runway-v1 (via `flatPath3dZMm`) and the runway planner
+  presents its XY points as a contour view — lead-enabled profile cuts keep automatic
+  recovery instead of falling to manual-only. Ramp and relief `path3d` passes vary in Z and
+  correctly stay manual-only. A stop inside the tangent-broken lead arc yields insufficient
+  cleared runway and falls back to review, never an unsafe re-entry.
+- Tabbed profiles keep the legacy entry for now: tabs split the loop into open segments,
+  and a lead on only the surviving full loops would be inconsistent. Tab-aware leads are a
+  follow-up.
+- The default-on flip changes emitted G-code for closed untabbed profile cuts. The CNC
+  emitter tests build jobs directly and are unaffected; the compile-level tests that assert
+  contour-pass structure now set `profileLead: { shape: 'none' }` to isolate their feature.
+  No G-code snapshot file changed (the CNC corpus asserts inline, not via snapshots), so no
+  `Snapshot change acknowledged:` line is required — but the behavior change must be called
+  out in the PR body.
+- Persistence: the `profileLead` field is not yet round-tripped by the `.lf2` serializer and
+  there is no UI to set it; both are follow-ups. Default-on needs neither (absent = on).
+- Software output is structurally verified only; a 4040 scrap-coupon burn comparing a
+  square's entry edge before and after remains required before the hardware pass is
+  claimed.
+
+### Verification
+
+- `profile-lead.test.ts` pins: the plunge lands on the waste side for outside and inside
+  profiles across CCW and CW windings; the lead-in ends exactly on, and the lead-out
+  begins exactly on, the contour start vertex; the arc arrives tangent to the first edge
+  (entry heading matches the edge direction); every arc point stays on the waste side of
+  the entry tangent (no dip toward the part); the plunge lies on the lead-radius circle
+  about the entry offset; the `line` lead approaches perpendicular from the waste; and
+  on-path, open, sub-three-point, zero-area, and non-positive/`NaN`-radius inputs return
+  typed refusals.
+- `profile-lead-passes.test.ts` pins the compile-time transform: default-on applies a
+  tool-radius arc when unset, `shape: 'none'` and non-profile / ramp-configured / open
+  passes are left untouched, and the bed and self-collision guards fall back to the legacy
+  plunge. `compile-cnc-lead.test.ts` pins the end-to-end wiring (a default outside profile
+  gains a path3d lead pass; `shape: 'none'` keeps plain contours). No G-code snapshot file
+  changed — the CNC corpus asserts inline, and the emitter tests construct jobs directly.
+
+## ADR-251 - Profile cuts default to climb cutting
+
+**Date:** 2026-07-24
+**Status:** Accepted
+
+### Context
+
+Cut direction (climb vs conventional) shipped in H.9 as an opt-in "motion
+polish." H.9's stated intent was that every knob stays off by default so default
+G-code is byte-identical to pre-H.9 jobs. A consequence: with `cutDirection`
+unset, the compiler emitted each profile toolpath in whatever winding the kerf
+offset happened to produce — an unpredictable, per-shape mix of climb and
+conventional, the weakest possible default.
+
+For a router cutting the outside of a part, climb milling (outside-profile =
+clockwise with an M3 / top-view-clockwise spindle — see the 2026-07-25
+amendment; this line originally said counter-clockwise) pushes the fibers
+into the kept material and leaves the cleaner edge, and it is the shipped default
+in Vectric, Fusion, and Easel. The one risk — climb's self-feeding force
+snapping an axis across backlash and grabbing — scales with backlash, which
+lead-screw machines have little of. The maintainer runs a lead-screw 4040 and
+chose climb as the shipped default; conventional stays one dropdown click away
+for backlash-prone (e.g. belt-driven) machines.
+
+### Decision
+
+`DEFAULT_CNC_LAYER_SETTINGS.cutDirection` is `'climb'`. New layers start in
+climb: profile-outside toolpaths are emitted clockwise, profile-inside
+and pockets counter-clockwise, with the entry point rotated to the mid-point of the
+longest segment (unchanged `enforceCutDirection` behaviour). The "Default
+direction" dropdown option (unset `cutDirection`) still restores the compiler's
+natural winding per layer, and conventional is directly selectable.
+
+This reverses H.9's "default output byte-identical" stance for cut direction
+only. Ramp entry, helix entry, and park remain opt-in and off by default.
+
+### Consequences
+
+- The G-code snapshot corpus for profile/pocket cuts changes to climb winding
+  and mid-segment entry. Snapshot change acknowledged in the PR.
+- Climb only sets the cut direction. The straight-down entry plunge that
+  motivated the operator's "circle loses its path" report is handled separately
+  by ADR-250's default-on leads (each closed profile pass becomes a led path3d
+  that plunges in the waste and arrives tangentially, retracting between passes).
+- Determinism is preserved (climb is deterministic), so release-integrity
+  fuzz-seed byte-identity still holds.
+
+### Verification
+
+- A compile unit test asserts a default-settings profile-outside contour — with
+  leads off (`shape: 'none'`) to isolate the winding — is emitted
+  clockwise (climb).
+- The existing CNC G-code snapshot suite pins the new default output.
+
+### Amendment 2026-07-25 - the climb winding above was inverted
+
+**Status:** Accepted, supersedes the original winding claim.
+
+As originally written this ADR asserted that climb keeps the material on the
+LEFT of travel, giving outside-profile climb = CCW and inside/pocket climb = CW.
+That is the mirror of the real convention, and `wantsCounterClockwise` in
+`motion-polish.ts` implemented the ADR faithfully — so from ADR-251 until this
+amendment, selecting **Climb** produced conventional motion and selecting
+**Conventional** produced climb, on every profile and pocket layer.
+
+Climb keeps the material on the **RIGHT** of travel for an M3 spindle: the tooth
+enters at maximum chip thickness and thins to zero. Therefore **outside-profile
+climb = CW, inside/pocket climb = CCW.** Four independent references agree:
+
+- VCarve Pro's own 2D Profile manual, which is where this ADR's Vectric claim
+  came from: "Outside … Climb (CW) … Conventional (CCW)" and "Inside … Climb
+  (CCW) … Conventional (CW)". The 2026-07-25 audit reported this page as saying
+  "Climb (CCW)" for both Outside and Inside; it does not.
+- Autodesk Fusion: contour arrows point clockwise for outer-contour selections
+  and counter-clockwise for inner-contour selections, to maintain a climb cut.
+- WoodWeb: "Conventional cutting would be cutting counterclockwise around the
+  outside of a part and clockwise on the inside of a cutout."
+- G41 (compensation left of path ⇒ material right of travel) is the climb side
+  for a right-hand cutter, which Fusion labels "Left (climb milling)".
+
+The fix swaps the two return expressions in `wantsCounterClockwise`. ADR-252's
+hole mirror needed no change — it computes `isHole ? !wantCcw : wantCcw`, so it
+follows the base value — and ADR-250's lead sides resolve from each contour's
+actual winding, so they follow too. The rule-7 surface is unchanged: nothing is
+blocked, gated or clamped by this; it is a corrected mapping.
+
+**Not verified:** no coupon was cut. This rests on documentary agreement between
+four references, not on a measured chip direction from the maintainer's machine.
+
+### Amendment 2026-07-27 - the mapping is stated in the operator's frame but applied to machine numbers
+
+**Status:** Accepted. Corrects the frame the amendment above is evaluated in;
+the CW/CCW convention itself is unchanged and still stands.
+
+"Outside climb = CW" is a claim about the tool seen from above the bed. The code
+applies it to a shoelace sign computed on toolpaths that are already in MACHINE
+coordinates: `collect-cnc-contours.ts:74` runs every contour through
+`toMachineCoords` while collecting it, long before `compile-cnc-job.ts:259`
+calls `enforceCutDirection`, and nothing mirrors afterwards — the CNC emitter
+takes the device parameter but never reads it (`cnc-grbl-strategy.ts:88`).
+
+Two of the five origins mirror exactly one axis, so their machine numbers are a
+reflection of the bed and a numeric CW is a physical CCW. The tree already
+carries the handedness: `jogAxisSignsForOrigin` maps "operator's right" and
+"away from the operator" onto machine axis signs, and `jog-direction.test.ts`
+pins those signs to `origin-transform`'s linear part. The determinant is:
+
+| Origin | jog signs (x, y) | determinant | machine frame |
+|---|---|---|---|
+| `front-left` | (+1, +1) | +1 | matches the physical top view |
+| `front-right` | (-1, +1) | **-1** | **mirrored** |
+| `rear-left` | (+1, -1) | **-1** | **mirrored** |
+| `rear-right` | (-1, -1) | +1 | matches the physical top view |
+| `center` | (+1, +1) | +1 | matches the physical top view |
+
+So on **`front-right` and `rear-left` machines only**, selecting Climb produced
+conventional motion and selecting Conventional produced climb, on
+`profile-outside`, `profile-inside` and `pocket` layers. Measured by compiling
+one square under all five origins: the emitted signed area is identical on every
+origin (-537.08 mm² for outside climb), which is precisely the defect — the same
+numbers on a mirrored bed are the opposite physical rotation. `front-left`
+(the shipped default), `rear-right` and `center` were always correct, as was any
+layer left on the default `profile-on-path` cut type, for which
+`wantsCounterClockwise` returns `null` and enforcement is inert.
+
+### Decision
+
+`machineFrameHandedness(origin)` (new, `src/core/cnc/machine-frame-handedness.ts`)
+derives the determinant from `jogAxisSignsForOrigin` rather than from a second
+hand-maintained table that could drift from the transform.
+`enforceCutDirection` takes it as a required parameter — required so the
+compiler locates every call site — and inverts the target winding on a mirrored
+frame, which is exactly equivalent to flipping the requested direction.
+
+ADR-252's hole mirror needed no change: `dominantWindingSign` and `isHole`
+compare contour windings against EACH OTHER, and a global reflection flips every
+sign together, so that comparison is already mirror-invariant. Only the step
+that compares against an ABSOLUTE convention needed the frame.
+
+The rule-7 surface is unchanged: nothing is blocked, gated, clamped or refused
+by this. It is a corrected mapping, and a wrong-origin job still compiles,
+frames and runs exactly as before — it simply now travels the direction the
+operator asked for.
+
+**Not verified:** no coupon was cut and no hardware was available this session.
+The correction rests on the tree's own jog/origin handedness contract and on
+compiled-output measurement, not on an observed chip load or edge finish.
+
+## ADR-252 - Cut-direction enforcement keeps hole windings opposite the outer
+
+**Date:** 2026-07-24
+**Status:** Accepted
+
+### Context
+
+`enforceCutDirection` (motion-polish.ts) resolved ONE target winding per layer
+from the cut type alone and forced it onto every closed toolpath. That is wrong
+twice over.
+
+First, machining: with an M3 spindle climb keeps the material on the RIGHT of
+travel, as corrected by ADR-251's accepted 2026-07-25 amendment. The material
+lies INSIDE an outer boundary but OUTSIDE a hole, so a hole's climb direction is
+the mirror of its outer boundary's — the module's own header already said so.
+Forcing one winding on both cut every hole in the direction OPPOSITE the one the
+operator asked for.
+
+Second, and the reason this became urgent: ADR-250 identifies a hole by its
+winding being opposite the job's outermost loop, and flips that contour to the
+inverse waste side so its lead plunges into the enclosed slug. Flattening every
+contour onto a single winding destroyed that signal. `dominantWindingSign` then
+matched the hole to the outer, `windingSide` returned the layer's base side, and
+the hole's lead was aimed OUTWARD — into the kept part. Measured on a 100 mm
+square with a 30 mm hole and a 3.175 mm bit: the lead ran a full tool radius
+(1.5875 mm) beyond the finished hole wall. `leadClearsPart` cannot catch it,
+because the points genuinely are outside the loop, which is the correct waste
+side for an outer contour.
+
+ADR-251 made cut direction default to climb, so this shipped on by default. It
+was latent before that for any layer where the operator selected climb or
+conventional by hand — the defect reproduces in BOTH directions.
+
+### Decision
+
+`enforceCutDirection` resolves the outer boundary's winding first (the
+largest-area closed toolpath) and applies the requested direction only to
+contours sharing that winding. A contour winding the other way is a hole and
+receives the MIRRORED direction. Holes therefore stay opposite their outer
+boundary, which both cuts them in the direction the operator actually asked for
+and preserves the winding opposition ADR-250 reads.
+
+Winding — not containment depth — remains the hole test, because concentric
+roughing/finishing offsets of one feature share a winding but nest by
+containment.
+
+### Consequences
+
+- Holed profile/pocket jobs with an enforced cut direction change: the hole
+  reverses, and its lead moves from outside the part to inside the slug.
+- No G-code snapshot changed: no snapshot fixture pairs a holed profile with an
+  enforced direction.
+- Pocket islands (opposite-winding rings) are mirrored too, which is correct —
+  an island boundary is a hole as far as the material side is concerned.
+
+### Verification
+
+- `compile-cnc-hole-lead-side.test.ts` asserts, for climb AND conventional, that
+  no point of a hole's led pass strays outside the hole's TOOL-CENTER ring.
+  Measuring against the drawn hole boundary instead is too loose: a point one
+  tool radius outside the ring still falls inside the drawn boundary while the
+  cutter is already into the kept part — that looseness is exactly what let the
+  defect through review.
+- Reverting only the motion-polish change fails that test at 1.5875 mm, so it is
+  a genuine regression guard rather than a vacuous assertion.
+
+## ADR-253 - Retract between passes for profile and line cuts
+
+**Date:** 2026-07-24
+**Status:** Accepted
+
+### Context
+
+A pocket clears each region as a separate lift/rapid/replunge cycle: the bit
+retracts to safe Z, rapids to the next start, then plunges again. A multi-pass
+closed profile behaves differently - every depth pass starts at the same XY, so
+the emitter (appendContourPass) skipped the retract and stepped Z straight down
+in place from one depth to the next. profile-on-path and engrave ("line") cuts,
+which have no lead-in re-entry, therefore never lifted between passes.
+
+The maintainer asked for the pocket's lift-and-replunge to apply to those cuts
+too - before every plunge, lift clear and replunge - for chip clearing and a
+clean re-entry, matching the pocket G-code.
+
+### Decision
+
+A new per-layer setting, `retractBetweenPasses`, defaults ON. When on for a
+profile or engrave cut, the emitter lifts to safe Z and replunges before every
+pass instead of stepping Z down in place. It is resolved to a concrete flag on
+the emit group at compile time (`resolveRetractBetweenPasses`); only `profile-*`
+and `engrave` cut types honor it. Pocket already retracts by region, and
+v-carve, drill, and relief manage their own motion, so those compile the flag
+off and stay byte-identical.
+
+The emitter change is a single forced `appendRetract` at the top of a contour or
+path3d pass. It is a no-op on the first pass (already at safe Z) and wherever a
+pass already moves to a new XY (the existing retract fires anyway), so it only
+adds a lift where passes previously stacked in place.
+
+### Consequences
+
+- The G-code snapshot corpus for profile/engrave cuts changes: each subsequent
+  same-XY pass gains a `G0 Z<safe>` before its plunge. Snapshot change
+  acknowledged in the PR.
+- The field is optional on both `CncLayerSettings` and `CncGroup`. Absent reads
+  as the resolved default (ON at compile for eligible cuts; OFF in the raw
+  emitter for hand-built groups), so pre-ADR-253 fixtures stay byte-identical.
+- Resume is safe by construction: the forced retract lands inside the pass span
+  it precedes, and lifting before re-entry is always safe.
+
+### Verification
+
+- `cnc-grbl-strategy.test.ts` asserts that with `retractBetweenPasses` on, a
+  same-XY deeper pass emits `G0 Z<safe>` then replunges, and that the first pass
+  gains no spurious retract; with the flag off the step-down-in-place output is
+  unchanged.
+
+---
+
+## ADR-254 - Dependency audit runs on a schedule, not in the merge gate
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+`release:check` chained `pnpm audit:deps` (`pnpm audit --audit-level=low`)
+between `license-check` and `test`. Because the chain is sequential `&&`, an
+audit failure ended the run before the test suite, both builds, and the three
+size/export checks ever executed.
+
+Advisories are published by third parties on their own schedule. Any new one
+touching any transitive dependency - including devDependency-only paths that
+cannot reach shipped code - turned every open PR, every main push, and the
+CI-gated Cloudflare deploy red with no code change. This fired three times in
+July 2026 alone: `tar`, `postcss` (#395, 2026-07-24), and `brace-expansion`
+reached through `electron-builder` -> `@electron/asar`, which had every open
+branch failing at the two-minute mark on 2026-07-25. In each case the author's
+own diff was never verified; the red check said nothing about their work.
+
+The 2026-07-10 full-sweep audit recorded this as S14-F7 and proposed exactly
+this fix. It was not actioned then.
+
+### Decision
+
+Remove `pnpm audit:deps` from the `release:check` chain. The script itself stays
+for local and manual use. A new `.github/workflows/audit.yml` runs it nightly
+(03:17 UTC) plus on demand, and files a single open tracking issue when
+advisories appear - never a duplicate, so a standing finding does not generate
+nightly noise. GitHub Dependabot alerts were enabled the same day as a native
+second channel, alongside secret scanning and push protection.
+
+This is not a change of supply-chain posture. It changes *when* and *how loudly*
+the same signal arrives: from "blocks unrelated work immediately" to "tracked
+within 24 hours". An advisory reachable from a production dependency remains
+release-blocking - PROJECT.md still says a dependency CVE blocks releases until
+patched - but that judgment is now made by a human reading the issue, not by a
+chain position that also hides the test results.
+
+Rejected alternatives: raising the threshold to `--audit-level=high` (the
+brace-expansion advisory *was* high, so this would not have helped);
+`continue-on-error` after `test` (keeps the CI-minute cost on every PR to
+produce a signal nobody is required to read).
+
+### Consequences
+
+- A production-reachable advisory can now merge and deploy without a red check.
+  The nightly issue is the backstop and Dependabot alerts are the second.
+  Accepted deliberately: the previous design blocked so indiscriminately that
+  the standing response was to write an override and move on, which is not
+  triage either.
+- `deploy:web` and `deploy:web:preview` call `release:check`, so deploys stop
+  being blocked by third-party advisory timing. That is the intended effect.
+- The five workflows that invoke `release:check` (ci, deploy, and the three
+  desktop release legs) all lose the audit step. A production CVE matters most
+  at desktop release time, so triage the open audit issue before cutting a `v*`
+  tag.
+
+### Verification
+
+- `deploy-workflow-gate.test.ts` asserts `release:check` no longer contains
+  `audit`, that `audit:deps` still exists unchanged, and that
+  `.github/workflows/audit.yml` runs it under a `cron:` schedule - pinning both
+  halves so neither the outage vector nor the audit itself returns by reflex.
+- NOT verified: the scheduled workflow has never fired. Its issue-filing path is
+  unexercised until the first nightly run or a manual `workflow_dispatch`.
+
+## ADR-255 - G-code Inspector: read-side 3D program viewer and informational health report
+
+**Date:** 2026-07-25
+**Status:** Accepted (maintainer approval 2026-07-25; design + executed
+self-audit in `docs/audits/2026-07-25-gcode-inspector-design-and-self-audit.md`)
+
+### Context
+
+File -> Open G-code (F-CNC10) parses an external program with the clean-room
+modal parser and shows it in the 2D simulator, CNC-only (ADR-101). The tree
+also owns a second line-indexed motion parser (`buildMotionManifest`), a
+planner-grade duration estimator (`estimateJobDuration`), text-level invariant
+scanners, and the ADR-102 three.js scene. Operators need to watch a program
+run in 3D from any angle, scrub it in time, trace every segment to its source
+line, and read a health report - before the machine runs it. Every current
+preview renders the compiled Job (the write side); nothing renders the G-code
+text itself (the read side).
+
+### Decision
+
+1. Build the **G-code Inspector** per the design doc above: a lazy-loaded 3D
+   viewer + timeline + source pane + Program Health panel over a new pure
+   `src/core/gcode-view/` render model (typed arrays, F/S retention, source
+   line map, modal events, stats).
+2. **ADR-102 §2 is amended**: three.js may be imported beneath
+   `src/ui/viewer3d/` (the shared scene home for the Inspector and the CNC 3D
+   pane upgrade track) in addition to `src/ui/relief-viewer/`. All other
+   ADR-102 terms (UI-only, lazy chunk, jsdom fallback, pure typed-array
+   seams) are unchanged.
+3. **ADR-101 is amended for this one command**: Open G-code / Inspect G-code
+   is available in BOTH laser and CNC modes (laser raster programs are the
+   performance stress case, and laser operators own `.gcode` files too).
+4. **No third parser.** Stage 1 extracts the shared modal engine used by
+   `parseGcodeProgram` and `buildMotionManifest` (outputs pinned identical by
+   tests before/after; the arc-sampling tolerance divergence unified or
+   explicitly parameterized), and the render model composes that engine.
+5. **Program Health is informational only** - findings inform and feed the
+   Job Review warning list; nothing blocks Frame, Start, parse, render, or
+   export (rule 7 / ADR-228 compliance is an acceptance criterion of every
+   stage). The only refusals are the parser's existing compile-integrity
+   facts (not-G-code, non-finite targets).
+6. **Zero new runtime dependencies**; three@0.180 (already present) plus its
+   bundled addons only. The three lazy chunk is measured before/after at
+   every stage against the <1 MB budget; postprocessing is deferred.
+7. Adopted defaults from the approved design: GRBL-flavor dialect v1 with
+   never-fatal notes (G54-G59 modal tracking in v2); red = traversal palette
+   (LightBurn convention) with a "show traversal moves" toggle; the Inspector
+   complements the F-CNC10 2D simulator rather than replacing it.
+8. Acceptance gates from design doc §12: **total line accountability** (every
+   raw line classifies into exactly one category - property-tested) and
+   **own-output-clean** (every program emitted by any built-in strategy
+   parses with zero unsupported-word notes and zero junk lines).
+
+### Alternatives considered
+
+- Extend the 2D preview instead of 3D. Rejected - Z motion (plunges, ramps,
+  pecks, helical entries) is exactly the detail the maintainer wants
+  readable, and a top-down canvas cannot show it.
+- A third standalone parser for the Inspector. Rejected - the repo already
+  carries two modal interpreters plus partial scanners; CLAUDE.md's
+  duplication rule forbids a third copy.
+- React-three-fiber component stack. Rejected by the prior ecosystem verdict
+  (requires React 19; the repo is on React 18.3).
+
+### Consequences
+
+- `src/ui/viewer3d/` becomes the sanctioned three.js home shared by two
+  consumers; the relief scene migrates there over time (pane-track stage 3).
+- The modal-engine unification touches two existing parsers; their outputs
+  are pinned by tests before the refactor lands.
+- WCS (G54-G59) and 4-axis words remain counted-not-tracked in v1 -
+  explicitly deferred, surfaced as findings.
+- Emitted G-code is untouched: the Inspector reads, it never writes. No
+  snapshot changes.
+
+### Verification
+
+- Staged plan in the design doc §7: every stage lands green and individually
+  reviewed, with pure-tier CI tests plus the §8 perceptual golden corpus
+  (dev-browser render + screenshots; jsdom cannot see WebGL, so no green
+  suite is ever claimed as visual proof).
+
+## ADR-256 - 4040 starter feeds revised and CNC cut type defaults to On path
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+The Neotronics 4040 machine starter (ADR-233, revision 1) shipped
+engineering guesses: feed 600 mm/min and plunge 120 mm/min for a 3.175 mm
+2-flute cutter in wood/MDF. Separately, a fresh CNC layer defaulted to
+`profile-outside`, so an unedited layer resized the drawn part - the opposite
+of what a laser Line layer does with the same artwork.
+
+The maintainer, from experience on the physical 4040, directed (chat,
+2026-07-25): cut type should default to cutting on the line; RPM 12000,
+plunge 250, feed 300, depth per pass 0.75.
+
+### Decision
+
+- The 4040 starter catalog entry moves to revision 2 with feed 300 mm/min and
+  plunge 250 mm/min. Spindle 12000 RPM and 0.75 mm depth per pass were already
+  the revision-1 values. Layers still carrying `machine-starter` provenance
+  refresh to the new numbers on the next setup action; manual layers are
+  untouched (provenance is withdrawn on any manual feed edit).
+- `DEFAULT_CNC_LAYER_SETTINGS.cutType` becomes `profile-on-path`. This is the
+  scene-wide default (the starter patch deliberately carries no cut type, and
+  CNC text still applies its own v-carve/engrave policy), so it applies to
+  every CNC machine, with the 4040 as the only shipped starter profile.
+
+### Consequences
+
+- The material-recipe path caps its chipload result at the starter feed, so a
+  4040 project-material layer now computes 300 mm/min feed with a 120 mm/min
+  plunge (40% of feed, under the 250 starter cap).
+- Legacy layers without a CNC block, and invalid persisted cut types, now
+  normalize to on-path instead of outside; operators choose outside/inside
+  explicitly when the part size matters.
+---
+
+## ADR-257 - Vector cuts default to M4 dynamic power
+
+**Status:** Accepted | **Date:** 2026-07-25
+
+### Context
+
+Since ADR-036 the laser emitter has armed **M4 dynamic power for fill** and kept **M3 constant
+power for vector cuts**. The code comment defended M3-for-cut as "a slow corner must still cut
+fully through" (`grbl-strategy.ts`).
+
+**No scorched-corner defect has been observed.** The maintainer asked to move to M4 *to prevent*
+over-burnt corners, on the strength of the documentary evidence below - not from a reproduction. This
+ADR is therefore a **parity and prevention** change, not a defect fix. Nothing in this repo has
+demonstrated a scorching problem, and nothing here should be cited as evidence that one existed.
+
+The Phase 2 LightBurn cross-reference (`LIGHTBURN-STUDY.md` section 8, entry D-01) surfaced that
+this is a divergence from every comparable reference, and that our stated rationale is the direct
+inverse of theirs. Three independent primary sources, all read 2026-07-25:
+
+1. **GRBL upstream** (`gnea/grbl` `doc/markdown/laser_mode.md`) - M4 is "very useful for clean,
+   precise engraving and cutting on simple materials across a large range of G-code generation
+   methods." For M3 it warns: "For a clean cut and prevent scorching with `M3` constant power mode,
+   it's a good idea to add lead-in and lead-out motions around the line you want to cut to give some
+   space for the machine to accelerate and decelerate." It also notes M4 "will never burn a hole
+   through your table, if you stop and forget to turn `M3` off."
+2. **LightBurn** (docs.lightburnsoftware.com) - the modern GRBL device profile defaults to M4 for
+   all layer types; a per-layer **Constant Power** toggle opts back into M3. A separate legacy
+   **GRBL-M3** device exists for firmware 1.1e and older, which has no M4.
+3. **Rayforge** (`barebaric/rayforge`, MIT, read at source) -
+   `rayforge/machine/models/dialect/grbl.py` sets `laser_on="M4 S{power:.0f}"`. The same M4 form
+   appears in its per-device profiles (`resources/devices/*/dialect.yaml`), its `base.py` default,
+   and its `lightburn_importer.py`. Its GRBL dialect has **no M3 laser path at all**.
+
+The decisive detail is that GRBL's M3 guidance is **conditional on emitting lead-in/lead-out
+motion**, and our default profiles do not. ADR-239 tangential feed-matched contour entries exist but
+are scoped to the 4040-safe profile, so a default-profile cut gets M3 with no runway - exactly the
+configuration GRBL says will scorch.
+
+### Decision
+
+`cutPowerMode: 'dynamic'` for the two dynamic-oriented GRBL dialects:
+
+- **`grbl-dynamic`** - the KerfDesk default. Cuts now emit M4.
+- **`grbl-raster`** - a dynamic-oriented dialect; its cuts follow. Rayforge's equivalent
+  `grbl_raster` dialect likewise holds M4 active across the job.
+
+Two dialects deliberately keep `cutPowerMode: 'constant'`:
+
+- **`grbl-compatible`** - the escape hatch for firmware without dynamic power (GRBL 1.1e and older,
+  where M4 does not exist). This mirrors LightBurn's separate GRBL-M3 device profile. Its label and
+  description already promise constant-power cuts.
+- **`neotronics-4040-safe`** - a deliberately conservative profile with its own tuning history
+  (ADR-234, ADR-236, ADR-239). Changing it is a separate decision requiring its own hardware pass.
+
+ADR-190's per-layer `powerMode` override is unchanged, so any single layer can still be pinned to
+constant power. ADR-036 is **not** superseded: its fill reasoning stands. This ADR extends the same
+energy-per-mm argument from fill to cut.
+
+### Alternatives considered
+
+- **Keep M3, add default lead-in/lead-out instead.** Rejected for now: it satisfies GRBL's condition
+  but is a much larger geometry change, and it would still leave us diverging from LightBurn and
+  Rayforge on the power word. Worth revisiting as a quality improvement on top of M4.
+- **Expose a user-facing Constant Power toggle and leave the default at M3.** Rejected as the primary
+  fix: ADR-190 already provides the per-layer override, so the only question here is the *default*,
+  and every reference default is M4.
+- **Change all four dialects.** Rejected - see the two exclusions above.
+
+### Consequences
+
+- **G-code output changes.** Cut groups now emit `M4 S0` where they emitted `M3 S0`. Snapshots move.
+- Under M4 the beam is dark whenever motion stops, so the laser-off-on-travel invariant
+  (non-negotiable #3) becomes strictly easier to satisfy, not harder.
+- **Thin-material cut-through must be re-tested.** M4 reduces delivered power in acceleration zones;
+  that is the point, but a job previously tuned to just cut through at M3 may now need a small power
+  increase. This is the one regression risk and it is a real one.
+- Machines on firmware older than 1.1f must select `grbl-compatible`. Detection already records the
+  firmware family (ADR-157), so a follow-up may auto-steer that selection.
+
+### Verification
+
+- Unit: `grbl-dynamic` and `grbl-raster` resolve `cutPowerMode: 'dynamic'`; `grbl-compatible` and
+  `neotronics-4040-safe` resolve `'constant'`. Pinned in `gcode-dialects.test.ts`.
+- Emission: a cut-only job on the default dialect contains `M4 S0` and no `M3`.
+- Invariant: laser-off-on-travel and power-scale property tests stay green.
+- **NOT VERIFIED - hardware, and it cannot be.** No hardware verification is available on this project (maintainer, 2026-07-25): there is no machine to test on. This is a TERMINAL limitation, not a pending task. No scorching was observed before this change either, so both the expected corner-quality benefit and the thin-material cut-through risk stay **permanently CLAIMED**. The benefit is predicted from GRBL's documentation, LightBurn's default and Rayforge's source - not from a defect this project reproduced.
+- **Nearest available check:** this change follows three independent references rather than inventing behavior, which is the strongest position obtainable without a machine. To go further, generate the same cut in LightBurn or Rayforge and diff the emitted power words.
+
+---
+
+## ADR-258 - Holding tabs are a Z-rise in one continuous toolpath, and default on
+
+**Status:** Accepted | **Date:** 2026-07-25
+
+### Context
+
+Tabs were implemented by SPLITTING a closed profile loop into one open piece per span
+between tab windows (`splitPassForTabs`). Each piece then needed its own retract, rapid, and
+**full-depth plunge on the finished wall**. Three consequences followed:
+
+1. **Leads had to be disabled.** `applyProfileLeadPasses` carried an explicit
+   `if (settings.tabsEnabled) return passes`, because leading the surviving full loops while
+   split pieces still plunged on the wall would be inconsistent. ADR-250's own header
+   recorded tabs as falling back to "the legacy straight plunge", with tab-aware leads named
+   as a follow-up. So enabling tabs silently disabled the feature that exists to stop
+   square-entry gouging.
+2. **Small contours lost their deep pass entirely.** When the requested windows swallowed a
+   perimeter the split returned no pieces (AUDIT A5), so a hole under roughly 11.7 mm
+   diameter at the shipped defaults never cut through.
+3. **Tabs could not be defaulted on**, which left a full-depth profile freeing the part under
+   a running spindle with nothing but a neutral "tabs off" line in Job Review.
+
+Research settled the design question. **Fusion 360 does not split the toolpath**: "During
+tabbed toolpaths, the tool goes up in places where tabs are located, leaving a thin layer of
+material", with tab shapes Rectangular or Triangular. Autodesk further documents that "the
+plunge feedrate controls both the plunge and ramp feedrates for tabs and lead-in/out". A tab
+is a **Z-rise inside one continuous path**; the cutter stays engaged. Our split model was the
+outlier, and every problem above was an artifact of it rather than something to work around.
+
+### Decision
+
+A tabbed deep pass becomes ONE `path3d` that rides the cutting depth and rises to the tab top
+across each window. New pure module `src/core/cnc/cnc-tab-ramp.ts`.
+
+- Rectangular tab walls: the rise is a same-XY vertical pair, which the existing emitter
+  already sends at the plunge feed (`appendPath3dCutMoves`). No emitter change was required,
+  and this reproduces Fusion's documented tab-ramp feed behavior for free. Triangular/ramped
+  tab walls remain a follow-up.
+- The `tabsEnabled` early return in `applyProfileLeadPasses` is **removed**, not worked
+  around: one continuous path has one entry, so ADR-250 leads apply normally again.
+- `passNeedsTabs` now requires `depthMm > tabHeightMm`. A tab at least as tall as the cut
+  spans the whole cut and would leave the full depth uncut at each window - four pointless
+  gaps in a shallow groove, holding a part that was never being released. This also makes
+  `tabTopZMm`'s clamped "tabs everywhere" branch unreachable from compilation.
+- **CNC tabs default ON** for profile cuts (`DEFAULT_CNC_LAYER_SETTINGS.tabsEnabled`). Easel
+  adds tabs automatically on a through-cut (EASEL-STUDY D-14); we left them off. This is a
+  default, not a guard: it is visible in the layer card and freely switched off, so PROJECT.md
+  non-negotiable #21 is not engaged. It is inert on the shipped shallow default (1 mm cut
+  against a 2 mm tab), so the default job is unchanged.
+- All three tab call sites converted so a single job cannot mix models: profile passes
+  (`compile-cnc-job.ts`), finishing passes (`finish-allowance.ts`), and inlay male profiles
+  (`inlay-pair-operation.ts`). Finishing tab centres are still projected from the matching
+  roughing toolpath - now via `tabFractionsFromReference` - so an offset start vertex cannot
+  move the physical bridges.
+
+### Alternatives considered
+
+- **Lead every split piece.** The faithful reading of ADR-250's follow-up, and more work:
+  `computeProfileLead` and its waste-side/sibling guards are written against a closed loop, so
+  open-piece semantics would have to be defined rather than inherited. Rejected because
+  Z-modulation removes the need entirely.
+- **Ramp each split piece.** Cheaper, but `applyRampEntry` tracks `previousZ` across a depth
+  ladder and sibling pieces sharing one Z break that assumption.
+- **Lead only the first piece.** Already rejected in-code as inconsistent; the other pieces
+  still plunge on the wall.
+- **Reorder leads before tab splitting.** Does nothing while the explicit early return stands;
+  this was an earlier misdiagnosis of the mechanism.
+
+### Consequences
+
+- **G-code changes for tabbed profile cuts.** Snapshot moved: three `G0 Z<safe>` retracts and
+  three `G1 Z<depth>` replunges disappear, replaced by fed `G1 X Y Z` moves, and a lead-in arc
+  now appears on the tabbed profile where none could exist before.
+- A contour fully covered by tab windows now rides at the tab top instead of losing its pass.
+  The AUDIT A5 safety property - never cut below the tab top in that case - is preserved by a
+  different mechanism, and `compile-cnc-tab-coverage.test.ts` still asserts it unchanged.
+- `splitPassForTabs` and `splitPassForTabsAlignedToReference` are now unused by production
+  code. They remain exported and tested; removing them is deliberate follow-up work, not part
+  of this diff.
+- The CNC motion invariant is untouched: `findPlungedTravelIssues` flags only **G0** rapids
+  below safe Z, and every tab wall here is a fed `G1`.
+
+### Verification
+
+- `cnc-tab-ramp.test.ts` pins: only two Z levels ever appear (cut and tab top, never above),
+  every tab wall is a same-XY vertical move, one rise and one fall per tab, a tiny contour
+  still returns a usable path, manual ADR-156 anchors place the wall half a window before the
+  anchor centre, and open/non-rise/zero-window inputs decline cleanly.
+- Compile-level tests assert one deep pass rather than N pieces, rises landing exactly on the
+  tab top, and tabs surviving on the finishing pass.
+- 417 `src/core` test files green; typecheck, eslint and prettier clean.
+- **NOT VERIFIED - hardware.** This changes full-depth motion: a tabbed profile now rides over
+  each tab instead of retracting and replunging. Better in principle and unproven in material.
+  It cannot be proven here: No hardware verification is available on this project (maintainer, 2026-07-25): there is no machine to test on. This is a TERMINAL limitation, not a pending task.
+- **Nearest available check:** run an exported .nc through an INDEPENDENT viewer (NC Viewer, CAMotics). Our own 3D preview and core/sim share the emitter's codebase, so a geometry fault can look correct in both; an outside parser cannot. Note the Z-rise model itself is Fusion 360's documented behavior, but the `depth > tabHeight` guard and the small-contour ride-at-tab-top fallback are this project's own inventions and match no reference.
+
+## ADR-260 — CNC traces commit machine-faired polylines (2026-07-25)
+
+> Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
+
+### Context
+
+Trace output tolerances are pixel-denominated (DP epsilon 0.45 x lineTolerance,
+which doubles as the output spline's deviation cap; ~1.5 px resample pitch) and
+tuned for visual fidelity. On CNC every polyline vertex becomes a G1 endpoint at
+the object's physical scale (0.1 mm/px at the 254-DPI import default). The
+2026-07-25 chatter audit measured the consequence: Line Art leaves 1 vertex in
+10 turning >=15 deg (p95 22.3 deg) on a clean circle, and on thin-stroke art
+every filled preset emits ~0.6 px segments with 15-22 deg heading jitter. GRBL's
+junction limiter (verified from planner.c) never brakes for bends this shallow,
+so the machine absorbs a lateral velocity impulse v*sin(theta) at every vertex —
+a 15-80 Hz excitation train at F300: the bench chatter. Smooth was machinable by
+accident of its 2x epsilon; nothing guaranteed it, and on thin strokes it
+stopped being true.
+
+### Decision
+
+- At trace commit, and only when the live project is CNC, traced polylines are
+  refaired in physical units by `fairToolpathPolylines` (core/geometry):
+  corner-pinned smoothing (two 1/4-1/2-1/4 passes, per-vertex displacement
+  clamped to 0.05 mm) followed by an even-arclength resample to a 0.4 mm
+  minimum chord. Corners (windowed 60-deg turns with arclength non-max
+  suppression; exact per-vertex turns count only when both legs are >=2 px) and
+  open-chain endpoints are pinned exactly; chords between two nearby corners
+  may undershoot the floor — corners win.
+- `curves` are rebuilt from the faired polylines at commit
+  (`src/ui/trace/cnc-trace-fairing.ts`) because the CNC compiler flattens
+  curves, not polylines — stale curves would feed the machine the unfaired
+  geometry.
+- Laser commits pass the tracer's output through untouched.
+
+### Consequences
+
+- Every preset commits machinable geometry on CNC (pinned in-test: p95 turn
+  <=10 deg, chords >=0.38 mm away from corners, deviation from the traced
+  boundary bounded by the 0.05 mm clamp).
+- The scene stores the faired geometry, so canvas preview, exports, and laser
+  output after a machine-kind switch all match what the CNC cuts (WYSIWYG; the
+  deviation is sub-pixel at the default import scale).
+- Traces committed before this ADR keep their dense geometry — re-trace on a
+  CNC project to refair them.
+- The pass runs in the import dialog's commit path, today's only TracedImage
+  creation site; a future creation site must call it or document why not.
+
+### Amendment — live placement metric and continuous fidelity (2026-07-27)
+
+- CNC trace conditioning uses the exact live placement that will be committed,
+  including uniform or nonuniform source scale. Geometry is mapped through an
+  anisotropic physical metric before welding and fairing, then mapped back and
+  used to rebuild `curves`. Rotation, translation, and mirrors remain
+  isometries.
+- The `0.4 mm` chord is a simplification target, not an unconditional floor.
+  Adaptive resampling raises resolution, without exceeding source density, when
+  a target-length chord would violate the authoritative `0.05 mm` continuous
+  symmetric boundary-deviation budget. Boundary fidelity and pinned corners
+  take precedence.
+- The earlier consequence claiming every non-corner chord is at least
+  `0.38 mm` is superseded. That lower bound remains covered where compatible
+  with the source boundary; a shorter chord is retained when the two contracts
+  cannot coexist.
+- This amendment covers placement at trace commit. Scaling an already committed
+  `TracedImage` does not yet recondition its frozen local paths and curves.
+
+## ADR-261 - CNC 3D viewport: import boundary, world frame, and display-only status
+
+> Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
+
+**Status:** Accepted
+**Date:** 2026-07-25
+
+### Context
+
+The CNC 3D pane renders one thing: a smooth-displaced removal heightfield with
+a wire stock box, lit by one ambient plus one directional light, rebuilt from
+scratch on every project edit. It shows no toolpath, no cutter, no bed, no
+origin, no depth ramp, and it resets the operator's camera on every keystroke.
+
+Research recorded in `docs/audits/2026-07-25-cnc-3d-threejs-research-and-roadmap.md`
+mapped the existing stack and the data already available to a richer viewer,
+and verified the r180 APIs against the installed `three@0.180.0` tree. Three
+decisions in that research are architectural and belong here rather than in a
+commit message.
+
+### Decision
+
+1. **ADR-102 §2 is amended.** three.js may be imported beneath
+   `src/ui/relief-viewer/` **and `src/ui/cnc-viewer3d/`**, and nowhere else — still
+   never in `core/` or `io/`. The rest of ADR-102 §2 is unchanged: clipper2-ts
+   remains the core's only geometry dependency, and heightmap-to-mesh
+   conversion stays a PURE core function returning plain typed arrays, so the
+   viewer's geometry stays testable without WebGL. A dedicated folder is
+   warranted because the viewport grows to a dozen-plus modules whose
+   responsibility is the CNC viewport, not the relief dialog; leaving them in
+   `relief-viewer/` would make that folder's one-sentence description need an
+   "and". ADR-102 §3 (lazy `import()`) and §4 (graceful no-WebGL fallback)
+   apply unchanged to the new folder.
+
+2. **The whole 3D scene shares ONE frame: the removal grid's local frame —
+   scene-space XY relative to the grid origin, machine Z — mirrored once by
+   `geometry.scale(1, -1, 1)` at the geometry boundary, which yields a
+   right-handed Z-up world.** Every drawable in the viewport must be expressed
+   in that frame by the same helper. The prohibition that matters is against
+   drawing SOME geometry in one frame and some in another.
+
+   > **Corrected 2026-07-25, before any toolpath geometry was written.** This
+   > clause originally read "the viewer3d world frame is the MACHINE frame …
+   > 3D geometry is built from machine-frame job data, NOT from the scene
+   > frame". That was wrong for this codebase and would have misaligned the
+   > toolpath against the surface it overlays.
+   > `buildPreviewToolpathFromPrepared` (`src/ui/workspace/draw-preview.ts:217`)
+   > already maps the prepared job through `mapToolpathToScene`, and
+   > `useDesignRemovalGrid` (`src/ui/workspace/Cnc3DPane.tsx:95-117`) stamps
+   > that scene-frame toolpath into a grid whose origin is itself
+   > `toSceneCoords`-derived. The surface already on screen is therefore
+   > scene-derived, and a machine-frame toolpath drawn beside it would be
+   > offset and mirrored. The handedness analysis below is still correct and
+   > still the reason the rule exists — it is why nothing may be drawn in a
+   > half-converted frame — but the resolution is one uniform mirror applied to
+   > everything, not a switch to machine frame.
+
+   The handedness analysis, which is why the single-frame rule matters:
+   `toSceneCoords`
+   (`src/core/devices/origin-transform.ts:28`) inverts a per-origin transform,
+   and `mapToolpathToScene` (`src/ui/workspace/preview-scene-frame.ts:18`)
+   maps only XY through it while every Z field rides through the object spread
+   untouched in machine frame. The resulting mixed triple changes handedness
+   with the configured origin:
+
+   | Origin | Scene XY vs machine | Xs x Ys | Handedness with machine Z |
+   |---|---|---|---|
+   | `front-left` | Y flipped | -Zm | left |
+   | `front-right` | X and Y flipped | +Zm | right |
+   | `rear-left` | identity | +Zm | right |
+   | `rear-right` | X flipped | -Zm | left |
+   | `center` | Y flipped | -Zm | left |
+
+   Mixing the two frames unmirrored is left-handed on three of the five
+   origins and right-handed on two, which is the worst possible failure mode:
+   it looks plausible, it is wrong, and it is wrong differently per machine.
+   No sign flip fixes it because there is no single sign. What fixes it is
+   applying the SAME mirror to every drawable exactly once, so the whole scene
+   is internally consistent no matter which origin is configured — and it then
+   also matches the 2D canvas, which is the reference the operator already
+   knows.
+
+   The 2D canvas keeps using scene frame; nothing about this changes it. Where
+   the two must agree (the shared scrubber, the shared preview grid), they
+   agree on arc-length position in mm, which is frame-independent.
+
+3. **The 3D viewport is display-only and is not a guard.** It may color, tint,
+   label, annotate, or surface a warning; it may never block, gate, disable,
+   delay, cap, or refuse Frame, Start, preview, save, export, or emission, and
+   nothing it computes may become a precondition for any of them. A richer
+   viewport necessarily surfaces more conditions — tool below stock bottom,
+   path outside the bed, no-go entry, unreachable Z — and every one of those is
+   a color cue or a Job Review warning, never a refusal. This restates
+   CLAUDE.md rule 7, PROJECT.md non-negotiable #21, and ADR-228 as clarified by
+   ADR-232, and is called out explicitly because this is exactly the kind of
+   feature that invites a well-meaning guard.
+
+4. **No new runtime dependency.** The ecosystem was evaluated (camera-controls,
+   postprocessing, n8ao, three-mesh-bvh, three-bvh-csg, three-stdlib, meshline,
+   troika-three-text, R3F + drei, gcode-preview) and the verdict is to adopt
+   none. Everything the viewport needs — `Line2`/`LineSegments2`/`LineMaterial`,
+   `EffectComposer` and the AO passes, `ViewHelper`, `PMREMGenerator`,
+   `BufferGeometryUtils`, `CSS2DRenderer` — already ships inside the installed
+   `three@0.180.0` addons and is therefore already paid for. Notable specifics:
+   R3F is flatly incompatible (it requires React 19; this repo is pinned to
+   React 18.3.1), and `gcode-preview` lists `three` as a direct dependency
+   rather than a peer, so installing it would pull a second copy of three into
+   the tree. `lil-gui` and `stats.js` clear the lower devDependency bar if
+   tuning by eye ever needs them. ADR-098 §2 otherwise stands.
+
+### Alternatives considered
+
+- **Keep three.js confined to `src/ui/relief-viewer/`.** Rejected: the folder's
+  responsibility would become "the relief dialog AND the CNC viewport", which
+  fails the single-responsibility test in CLAUDE.md.
+- **Draw 3D in scene frame and flip a sign.** Rejected: there is no single
+  sign, per the table above.
+- **Normalize Z into scene frame inside `mapToolpathToScene`.** Rejected: it
+  would make a function the 2D preview depends on carry a 3D concern, and it
+  would still leave a left-handed frame on three origins.
+- **Adopt R3F and rewrite the scene declaratively.** Rejected: requires React
+  19, and the existing imperative scene is small.
+
+### Verification
+
+- Pure unit tests for everything that can be pure: camera fit maths, color
+  tables, tool profiles, depth banding, source selection.
+- Honest limit, stated up front: `src/__fixtures__/jsdom-canvas-setup.ts:113`
+  forces `getContext` to return null for any WebGL request, so
+  `new WebGLRenderer` throws in vitest and every line after it is unreachable.
+  No automated test in this repo can prove the viewport LOOKS right. Visual
+  confirmation in a real browser is the only evidence for appearance, and any
+  claim about appearance must say whether it was actually looked at.
+
+### Reversal triggers
+
+- ADR-102's own trigger still applies: a bundle-size or supply-chain audit
+  flagging three.js reverts the viewer to a static isometric canvas projection.
+- If the lazily-loaded 3D chunk exceeds the budget the maintainer sets for it,
+  postprocessing is dropped first — it is the most optional layer.
+
+## ADR-259 - Test files get a higher raw-physical-line backstop
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+CI enforces two independent file-size limits. ESLint `max-lines` caps every
+file at 400 **counted** code lines with `skipBlankLines` and `skipComments`
+on; `scripts/check-file-size-policy.mjs` separately caps every file at 600
+**raw physical** lines as a backstop against a file that is enormous but
+mostly comments.
+
+The two disagree about tests. The test override in `eslint.config.mjs` turns
+off `max-lines-per-function` for `**/*.test.ts(x)` but deliberately leaves
+`max-lines` on, so a spec is still held to 400 counted code lines. Raw lines,
+though, count exactly what this repo asks tests to carry: case tables, inline
+fixtures, and the "why, not what" comments CLAUDE.md mandates. A spec can sit
+comfortably inside 400 counted lines and still cross 600 raw.
+
+That is what blocked PR #414: `src/core/output/grbl-strategy.test.ts` reached
+605 raw lines while passing lint, so the only failing gate was the proxy
+metric. The failure also surfaced late — `release:check` is an `&&` chain and
+`check:file-size` is step 10, so it stayed invisible behind an earlier red
+test step for the whole session.
+
+The maintainer directed (chat, 2026-07-25) that 600 raw lines is acceptable
+for a test file and the cap should be raised for tests rather than the file
+split.
+
+### Decision
+
+- `check-file-size-policy.mjs` gains `TEST_MAX_RAW_LINES = 900`, applied to
+  files matching `/\.test\.[cm]?[jt]sx?$/`.
+- `MAX_RAW_LINES = 600` is unchanged for every non-test file, including
+  `src/__fixtures__/`, Electron, scripts, and the root configs.
+- The 400-counted-line ESLint `max-lines` cap continues to apply to tests
+  unchanged. **This ADR relaxes a proxy metric, not the limit that matters.**
+- Failure output now names the limit each offending file breached, since two
+  limits are now in play.
+
+### Consequences
+
+- A test file may reach 900 raw lines, but only by adding blanks and comments:
+  at 400 counted code lines ESLint still fails it. The headroom buys
+  documentation and fixtures, not more logic.
+- `grbl-strategy.test.ts` (605 raw) passes, unblocking PR #414 with no change
+  to its test content.
+- The soft-size report (`pnpm check:soft-size`, ADR-132) is untouched and
+  still lists large files without failing.
+- A genuinely oversized *production* file is caught exactly as before; this
+  narrows nothing outside tests.
+
+---
+
+## ADR-262 - ADR numbers are unique by CI, not by care
+
+**Status:** Accepted
+**Date:** 2026-07-25
+
+### Context
+
+On 2026-07-25 three decisions landed on main all numbered ADR-257 - M4 dynamic
+power (`fcc1c2da`), machine-faired trace polylines (#422), and the CNC 3D
+viewport (#417). Two further branches, `chore/adr-uniqueness` and
+`claude/adr-257-renumber`, were independently mid-fix without knowing about
+each other. A sweep of remote branches found five more still holding an
+ADR-257 heading, one of them holding three.
+
+Every author had checked the number before writing. Each check was correct at
+the moment it ran and stale by the time their CI finished: this repo's merge
+gate takes about 25 minutes, and PRs land faster than that. The failure is
+therefore structural, not careless. Review cannot catch it either, because two
+correct reviews of two independently-correct branches still produce a
+collision at merge.
+
+The cost is not cosmetic. A shared number makes every citation ambiguous. Of
+the 32 in-tree references to ADR-257, 20 belonged to the M4 decision and 12 to
+the viewport, and untangling them required reading each one - a
+find-and-replace would have silently re-pointed twenty comments at a decision
+about a 3D viewport.
+
+### Decision
+
+`scripts/check-adr-numbers.mjs` fails the build when two ADR decision headings
+in `DECISIONS.md` claim the same number. It runs in `release:check` directly
+after `format:check` - early, because it costs under a second and answers a
+question about the diff itself, and learning about a collision after the test
+suite and both builds is the exact delay this gate exists to remove.
+
+Amendment headings (`## ADR-211 Amendment - ...`) deliberately re-use their
+decision's number and are not collisions; they are counted separately.
+
+On success the gate prints the next free number, so the cheapest way to pick
+one is to run the script rather than to grep the file and guess. Grepping is
+what produced the collision: the ADR-257 renumber in #430 was chosen by
+reading `tail -4` of the headings, which did not reach far enough up the file
+to see an existing 257.
+
+### Consequences
+
+- A collision now fails CI on the second branch to run, naming both headings
+  with file:line, instead of being discovered after both have merged.
+- Numbering races still happen; they are just no longer silent. The loser
+  renumbers, which is a one-line edit plus its references.
+- The gate does not verify that an amendment refers to a decision that exists,
+  and does not check the decision index at the top of the file. The index is
+  currently about eleven ADRs stale - out of scope here.
+- Numbers are unique but not gapless, and sections stay in insertion order per
+  the note at the top of this file. Neither is changed by this gate.
+
+---
+
+## ADR-263 - Fragmented traced strokes weld into one cut on CNC (2026-07-25)
+
+### Context
+
+The 2026-07-25 chatter audit measured a second CNC defect class beside heading
+jitter: fragmentation. Centerline traces of rough or solid sources arrive as
+many open chains - the audit measured 6 separate chains on one rough disc -
+because scan cracks and thinning dropouts leave endpoint gaps wider than the
+tracer's own 3 px bridge (`centerlineJoinGapPx`). Each fragment costs a
+retract, reposition and plunge on CNC (pecking), and every fragment boundary
+is a full stop-and-restart in the cut. ADR-260 evened the geometry inside each
+chain but could not join chains, so the pecking survived it.
+
+### Decision
+
+- A new `core/toolpath` module owns machine-facing conditioning of final
+  polylines in physical units. `weldOpenPolylines` joins open chains whose
+  endpoints lie within a physical gap (greedy nearest-pair, endpoint
+  orientation handled), and self-closes a welded chain whose ends meet - gated
+  on the gap being small next to the chain length so a drawn open hook is
+  never stapled into a sliver ring.
+- The CNC trace policy welds at 0.5 mm before fairing
+  (`src/ui/trace/cnc-trace-fairing.ts`): joining fragments first turns pecks
+  into one cut, and the ADR-260 fairing then smooths the stitch joints like
+  any other vertex.
+- The pass NEVER deletes geometry. Standalone short chains (drawn dots and
+  ticks), anything beyond the gap (dashes are drawn content), and closed rings
+  pass through untouched. This is deliberate: pruning was the audit's original
+  phrasing, but deleting traced marks is a fidelity risk the operator cannot
+  see, whereas an unwelded fragment merely cuts as it does today.
+- The gap is crack-scale by construction: 0.5 mm sits above the tracer's 3 px
+  (0.3 mm at the 254-DPI default) bridge, which is what leaves the cracks, and
+  below dash-scale drawn spacing.
+- Laser commits are untouched.
+
+### Consequences
+
+- Measured through the real `compileCncJob` on a four-fragment traced circle:
+  4 contour passes become 1, with heading statistics unchanged (p95 turn 1.4
+  degrees, zero vertices turning >= 15 degrees) - the weld removes pecks
+  without introducing jitter.
+- `core/geometry` was at the ADR-015 20-symbol barrel cap, so the new
+  mechanism could not live there; `core/toolpath` starts a module whose remit
+  (mm-denominated machine conditioning) is distinct from `core/trace`'s
+  visual-fidelity px domain.
+- Traces committed before this ADR keep their fragments - re-trace on a CNC
+  project to weld them.
+- No G-code snapshot changes: the pass runs at trace commit, not in the
+  compiler.
+
+### Amendment (2026-07-28) - continuity-qualified welding avoids fabricated links
+
+Endpoint distance is necessary but no longer sufficient evidence that two open
+chains are fragments of one stroke. The machine-facing weld now samples each
+selected endpoint's inward tangent over 0.3 mm and requires both sides to
+continue across the gap within the existing 35-degree Centerline convention.
+This preserves crack-scale collinear and curved-ring repair without joining
+nearby independent strokes.
+
+An open chain also remains open unless it actually merged with another chain.
+After a real merge, noncoincident self-closure must satisfy the same continuity
+test as pair welding in addition to the existing absolute and proportional gap
+limits. An exact returned-to-start endpoint may close because it adds no new
+geometry. These rules narrow ADR-263's original distance-only wording; they do
+not delete trace geometry or add a Start, Frame, controller, or output gate.
+
+---
+
+## ADR-264 - Species-level CNC material presets apply explicitly (2026-07-26)
+
+### Context
+
+ADR-112 shipped one flat project-material list: Softwood, Hardwood,
+Plywood/MDF, Acrylic, and Aluminum. The maintainer requested the missing
+operator model visible in physical stock: Hardwood contains distinct woods, so
+the Material & Bit panel must let the operator choose the actual species and
+decide when to apply its settings.
+
+The primary-source research does not support pretending one universal numeric
+recipe is certified for every board:
+
+- Inventables says cut settings depend on the project, material, bit, and
+  machine; its tested automatic settings are machine/material/bit-specific,
+  its fallback uses `feed = RPM × chipload × flutes`, and it recommends a test
+  before the final workpiece.
+- Easel's current Community Cut Settings keeps menu exploration read-only and
+  overwrites values only after **Apply these settings**.
+- The USDA Wood Handbook documents substantial natural variation within wood
+  species and identifies specific gravity as an index rather than an exact
+  per-board machining prediction.
+
+### Decision
+
+- `core/cnc/cnc-material-catalog.ts` owns grouped material choices. Softwoods
+  include Cedar, Douglas fir, Pine, and Spruce; Hardwoods include Birch,
+  Cherry, Hard maple, Mahogany, Oak, Poplar, and Walnut. General family choices
+  remain for unknown or mixed stock.
+- The selected species key persists unchanged in `CncStock.materialKey`, each
+  automatically updated layer's `materialKey`, and material-recipe provenance.
+  Save/load validation accepts catalog keys and still drops arbitrary strings.
+- A species resolves to the existing family chipload, plunge, and
+  depth-per-pass model. No unsupported species multiplier is invented.
+  The layer's actual bit, spindle, selected machine profile, machine starter,
+  and live controller limits continue to bound the result.
+- The project picker is now a two-stage interaction. Choosing a menu entry
+  previews the choice and its scope; **Apply [material] preset** performs the
+  existing one-undo bulk update. Choosing Custom likewise waits for
+  **Use manual feeds**. Layer-level material and advanced calculator selectors
+  use the same grouped catalog.
+- The UI calls every result a starting model, states exactly which values will
+  change, and tells the operator to test on scrap. Settings remain editable.
+  This adds no Start, Frame, compile, or transport guard.
+
+### Consequences
+
+- Projects can say Walnut or Hard maple rather than only Hardwood, and Job
+  Review plus the stock preview retain that identity.
+- Species in one family can currently calculate the same numeric settings.
+  That is deliberate evidence discipline, not a claim that the woods are
+  physically identical. A future species-specific numeric revision requires
+  reproducible machine/bit/material evidence and a revisioned catalog.
+- Merely browsing the dropdown no longer rewrites every CNC layer.
+
+### Verification
+
+Catalog and calculator tests pin grouping, key validation, species-to-family
+resolution, and numeric parity with the family model. Project serialization
+tests pin stock/layer species round-trip and unknown-key rejection. The jsdom
+panel test pins no mutation on selection followed by explicit Apply. Typecheck,
+lint, format, file-size, and the full test suite remain required. Physical
+cut quality remains unverified until a scrap test records machine, cutter,
+flutes, RPM, operation, stock, and outcome.
+
+---
+
+## ADR-265 - The GRBL simulator models planner back-pressure, opt-in (2026-07-27)
+
+### Context
+
+`src/__fixtures__/controllers/grbl-sim-machine.ts` documented its own largest
+gap in a header comment: *"Acks are immediate; real GRBL stops acking when the
+planner fills."* KerfDesk streams G-code by character counting against the
+controller's receive buffer, and the sender must model what happens when the
+controller goes quiet because its motion planner filled. A simulator that acks
+instantly can never produce that stall, so no test in the tree exercised it:
+the streaming path was verified against a model that could not reproduce the
+failure mode the path exists to prevent.
+
+Firmware ground truth, read from source on 2026-07-27:
+
+- `gnea/grbl` `grbl/serial.h`: `#define RX_BUFFER_SIZE 128`. The ring reserves
+  one slot (`serial_get_rx_buffer_available()` returns `rtail - head - 1` on the
+  wrapped branch), so 127 bytes are usable — grbl's own `doc/script/stream.py`
+  counts against `RX_BUFFER_SIZE - 1`.
+- `grbl/serial.c` `ISR(SERIAL_RX)`: realtime bytes are executed inside the
+  interrupt and never stored, so they consume no ring space; every other byte is
+  written "unless it is full", and a byte arriving at a full ring is dropped
+  with no error and no notification.
+- `grbl/planner.h`: `#define BLOCK_BUFFER_SIZE 16` (15 with `USE_LINE_NUMBERS`).
+- `grbl/motion_control.c` `mc_line()`: opens with a spin loop that calls
+  `protocol_auto_cycle_start()` while `plan_check_full_buffer()` is true.
+- `grbl/protocol.c` `protocol_main_loop()`: `report_status_message(gc_execute_line(line))`
+  — the `ok` is transmitted only after `gc_execute_line()` returns, so the ack is
+  withheld for exactly as long as the planner stays full, and no serial is read
+  during that spin.
+- `grbl/protocol.h`: `#define LINE_BUFFER_SIZE 80` — shorter than the RX ring.
+- `grblHAL/core/stream.h`: `#define RX_BUFFER_SIZE 1024`;
+  `grblHAL/core/config.h`: `DEFAULT_PLANNER_BUFFER_BLOCKS 100` (`$398`).
+
+### Decision
+
+Two pure models join the fixture, plus a feeder that composes them:
+
+- `grbl-sim-rx-window.ts` — the receive ring: occupancy, peak, and silently
+  dropped bytes. Terminators count against it, as on hardware.
+- `grbl-sim-planner.ts` — the bounded block queue and the single `withheldAck`
+  it parks while full. One withheld line only, because grbl's main loop is
+  single threaded and is stuck inside `gc_execute_line()` for that one line.
+- `grbl-sim-backpressure.ts` — feeds host bytes to the reducer at the rate a
+  real main loop could accept them, withholds the `ok` when the planner is full,
+  retires one block per `blockRetireMs`, and releases the withheld ack on
+  retirement. It identifies a motion line by the effect the reducer schedules
+  for it, so the reducer remains the only G-code parser.
+
+`grbl-sim-machine.ts` is unchanged apart from its fidelity comment: it models
+the parser, not the serial main loop, so instant acks are correct at that layer.
+
+**Back-pressure is opt-in** via `createGrblSimulator({ plannerBlocks })`.
+Defaulting it on would re-time the 18 byte-level characterization tests in
+`src/ui/state/laser-lifecycle.simulator.test.ts`, which stream 30-40 motion
+lines while pumping 5-50 ms and exist specifically as the transcript safety net
+for the ControllerDriver seam. Silently changing a shared fixture underneath
+them would trade a known gap for an unknown one. The knob is named in the
+reducer's fidelity comment so the default cannot be mistaken for fidelity.
+
+Realtime bytes bypass the ring and keep working while the main loop is blocked,
+matching the ISR. That is what keeps a stalled job observable (`?`) and
+abortable (soft reset) — a stall must never become a trap.
+
+Nothing in `src/core/controllers/grbl/streamer.ts` changed. This ADR adds no
+guard, gate, cap, or refusal to the streaming path (rule 7, non-negotiable #21);
+it adds a measuring instrument and the tests that use it.
+
+### Consequences
+
+- The failure mode character counting exists to prevent is now reproducible on
+  demand, and the streamer is proven against it rather than assumed correct.
+- A test that forgets to opt in still gets instant acks. The meters read
+  `capacity: 0` in that case, so an un-opted-in test cannot read a zero drop
+  count and believe it proved flow control.
+- The fixture now encodes firmware constants (128/127, 16, 1024, 100) that a
+  future firmware revision could invalidate. They are pinned by assertion so a
+  change is loud.
+- `protocol_buffer_synchronize()` is still not modelled: real GRBL drains the
+  planner completely before answering `$$`, `$I`, `$#`, `$G`. That is a longer
+  stall than a full planner causes and remains a documented gap.
+
+### Verification
+
+`grbl-sim-rx-window.test.ts` (7) and `grbl-sim-planner.test.ts` (8) pin the two
+pure models, including silent overrun and the withheld-ack release rule.
+`grbl-sim-backpressure.test.ts` (7) pins the simulator: the ack is withheld at a
+full planner, queued bytes wait in the ring, `?` still answers and soft reset
+still clears while blocked, and - as a negative control - a sender that ignores
+back-pressure really does drop bytes.
+
+`src/core/controllers/grbl/streamer-planner-backpressure.test.ts` (4) drives the
+REAL streamer through the same ack-step-write loop production uses in
+`advanceStream()`, and proves across a 200-line job that it never overruns the
+ring while acks stall, makes no progress during silence and then resumes to
+`done`, and survives a 1000 ms-per-block stall delivering every line exactly
+once in order. Each proof first asserts that a stall actually occurred, so none
+of them can pass vacuously. The suite was additionally validated by mutation:
+widening the streamer's buffer bound to `rxBufferBytes * 8` makes three of the
+four fail with 536 bytes dropped.
+
+**Not verified: real hardware.** A simulator that models back-pressure is still
+a simulator. It does not prove USB-serial latency, host driver buffering, or any
+specific controller's timing, and this ADR makes no hardware claim.
+
+---
+
+## ADR-266 - Bundle Tinos as the first serif outline font (2026-07-28)
+
+### Context
+
+The maintainer supplied a reference image - a split-band name plate reading
+"Your Text Here" - and asked for that style of text in KerfDesk. The image is
+set in Times New Roman.
+
+We could not approach it. The bundle had no serif at all: Roboto (sans),
+Inconsolata (mono), Pacifico and Dancing Script (script), and the four
+single-line CNC faces from ADR-226. Every serif job - the single most common
+request for engraved signage, plaques, and monograms - had to arrive as an
+imported SVG or a project-embedded font, neither of which the operator can
+retype or re-kern inside the app.
+
+ADR-213 is the cautionary half of this. It removed an entire bundled font set
+after the fact because the rendered writing quality was wrong. ADR-226 drew the
+lesson: a face is approved from its own rendered output, through our engine,
+before it ships.
+
+### Decision
+
+- Bundle **Tinos Regular** from `googlefonts/tinos` commit
+  `3b4482a99b80ea5fc75f187b1be3120a3f5905b3`, path `fonts/ttf/Tinos-Regular.ttf`
+  - the exact commit `google/fonts` `ofl/tinos/METADATA.pb` names as its source.
+  Canonical bytes: 521,588, SHA-256
+  `60a0e8ef0c04dd5dd69ffe91025fa2ae5836cbd35600a82ba031977557e2cb61`.
+- Record it as **OFL-1.1, not Apache-2.0.** The widely repeated Apache-2.0
+  attribution is the historical Croscore grant. Current upstream ships `OFL.txt`
+  and `METADATA.pb` states `license: "OFL"`; the font's own `name` table carries
+  the SIL text and `https://openfontlicense.org`. **No Reserved Font Name is
+  declared**, so the family ships under the name "Tinos".
+- Add a `serif` style class. The font picker falls back to the CSS generic
+  `serif` while the FontFace loads, so a row never previews a serif face in a
+  sans shape. Other classes keep their existing fallbacks unchanged.
+- Key the entry `tinos-regular` and order it directly after Roboto, so the
+  picker reads sans, serif, mono, script, then the single-line faces.
+- Add no runtime dependency and no project migration. `TextObject.fontKey` is
+  already an open `string` and geometry is materialized onto the object, so a
+  new key needs no schema change and old `.lf2` files are unaffected.
+
+### Consequences
+
+KerfDesk can set Times-metric serif text natively. Because Tinos is metrically
+compatible with Times New Roman, a layout authored against Times elsewhere keeps
+its measure here.
+
+The asset is 521,588 bytes, within a whisker of the already-bundled Roboto
+(515,100). It is a separate `?url` asset, so it stays out of the initial JS
+bundle and a browser visitor who never opens Add Text never fetches it. **The
+PWA is the exception and it was measured, not assumed:** `globPatterns` in
+`vite.config.ts` includes `ttf`, and the built `sw.js` precache manifest lists
+all five outline fonts, so an installed PWA downloads this font up front. Offline
+install size grows by ~509 KiB. That is how every bundled font has always
+behaved; it is recorded here because the lazy-fetch story is only half true.
+
+It is a static TTF. The obvious OFL alternatives - EB Garamond, Playfair
+Display, Libre Baskerville - are now published upstream as **variable** fonts,
+and opentype.js's handling of variation deltas is unverified in this tree. That
+unknown is deliberately avoided rather than taken on, and it is the reason this
+ADR does not simply pick the prettier display serif.
+
+The OFL notice obligation is met by the existing generated pipeline:
+`scripts/third-party-closure.mjs` lists the file, and
+`generate-third-party-notices.mjs` reads the copyright, license, and licenseURL
+records out of the font's own `name` table into `public/third-party-notices.txt`,
+failing the build if any are absent.
+
+`*.ttf binary` in `.gitattributes` already protects the committed bytes. That
+rule exists because a previous Dancing Script download was an HTML error page
+committed under a `.ttf` name and CRLF-normalized into corruption. This download
+is checked against exactly that failure: the byte count matches upstream, the
+file parses, and it renders real outlines.
+
+### Verification
+
+Rendered through the real `textToPolylines` engine before the file entered the
+tree, and reviewed by the maintainer as pixels rather than as a passing test.
+"Your Text Here" at 20 mm produces 121.9 x 13.3 mm of geometry as **16 closed
+loops** - 12 glyphs plus the four counters in `o` and the three `e` - so nothing
+is dropped or doubled, and counters resolve correctly under nonzero fill. The
+same string in Roboto measures 130.4 mm, confirming the narrower Times metric.
+The font's `name` table reports family Tinos, subfamily Regular, version 1.340,
+designer Steve Matteson, 3285 glyphs at 2048 units/em.
+
+**Not verified: no hardware cut.** Nothing here has been engraved or cut on a
+machine, and this ADR makes no claim about how the hairline serifs survive at
+small sizes in a real material. Nor was the running app driven - the dev-server
+preview shares the maintainer's live scene, so verification was done against the
+engine in isolation.
+
+---
+
+## ADR-267 - Bundle eight more outline faces, including the first stencil and the first bold (2026-07-28)
+
+### Context
+
+ADR-266 added Tinos and closed the "no serif at all" gap. Reviewing what was
+still missing turned up two holes, one cosmetic and one functional.
+
+The cosmetic one: no display face for signage, no blackletter, no typewriter,
+and only one sans.
+
+The functional one matters more. **Every bundled face was Regular, and none was
+a stencil.** Stencil is not a style preference on a laser - it is a geometry
+requirement. Our own renderer makes this concrete: "Your Text Here" in Tinos
+materializes as sixteen closed loops, twelve glyphs plus the four counters in
+`o` and the three `e` (measured in ADR-266). Each counter is its own closed
+loop, therefore its own cut. Engrave that and it is fine; **cut** it out of
+plywood and the middles of `O`, `e`, `a`, `R` drop out as loose pieces. A
+stencil face bridges each counter to the outer form so nothing falls free. We
+shipped a laser CAM application with no way to do cut-out lettering.
+
+The maintainer reviewed a verified shortlist and asked for all of it.
+
+### Decision
+
+Bundle eight further outline faces, one file per family:
+
+| Font | SPDX | Class | Bytes |
+|---|---|---|---|
+| Poppins Regular | OFL-1.1 | sans | 160,316 |
+| Tinos Bold | OFL-1.1 | serif | 597,880 |
+| Courier Prime Regular | OFL-1.1 | mono | 71,188 |
+| Anton Regular | OFL-1.1 | display | 170,812 |
+| Special Elite Regular | Apache-2.0 | display | 166,180 |
+| UnifrakturMaguntia Book | OFL-1.1 | display | 88,508 |
+| Stardos Stencil Regular | OFL-1.1 | stencil | 42,624 |
+| Saira Stencil One Regular | OFL-1.1 | stencil | 109,944 |
+
+- **Pin the bytes.** Tinos Bold comes from `googlefonts/tinos`
+  `3b4482a99b80ea5fc75f187b1be3120a3f5905b3`, the same commit ADR-266 already
+  records. The other seven come from `google/fonts`
+  `7ff85c87f93ea6cca5f41c69f2e4edcb90240f26`. Every downloaded file matched the
+  byte count the GitHub API reported for that path at that commit.
+- **Read every licence from `METADATA.pb`, never from the directory or from
+  reputation.** ADR-266 was written after exactly that mistake - Tinos is
+  cited everywhere as Apache-2.0 and is in fact OFL. Seven of these report
+  `license: "OFL"`; **Special Elite reports `APACHE2`**. Both are in the
+  ADR-017 reviewed set.
+- **Add two style classes, `display` and `stencil`.** `display` follows each
+  font's own upstream `METADATA.pb` category. `stencil` deliberately does not:
+  upstream files both stencil faces under DISPLAY, and we split them out
+  because on a laser the distinction is functional, not decorative - it is the
+  difference between a part that survives the cut and one that falls apart.
+- **Take one weight per family**, matching the existing convention, with Tinos
+  Bold as the deliberate exception that closes the no-bold gap.
+- Add no runtime dependency and no project migration, exactly as ADR-266:
+  `TextObject.fontKey` is an open `string` validated by `requireString`, so old
+  `.lf2` files are untouched and new keys need no schema change.
+
+### Consequences
+
+Thirteen outline faces and four CNC stroke faces, seventeen total. The picker
+now groups sans, serif, mono, script, display, stencil, single-line.
+
+**Cut-out lettering is possible for the first time.** That is the point of the
+change; the other seven faces are breadth.
+
+**Weight: +1,407,452 bytes (~1.34 MiB), and this lands in the PWA precache.**
+`globPatterns` in `vite.config.ts` includes `ttf` and the built `sw.js` lists
+every outline font, so an installed PWA downloads all of them up front. Measured
+from the built `sw.js` manifest, not estimated: **6195.59 KiB across 47 entries
+before, 7571.70 KiB across 48 after - a 22.2% increase**, with all thirteen
+`.ttf` files precached and 2.87 MiB of the total now being fonts. Browser
+visitors are unaffected; each `.ttf` is a separate `?url` asset fetched on first
+use. Tinos Bold alone is 42% of the increase, being a full 3285-glyph WGL face;
+it is the obvious first candidate to drop if that budget is ever challenged.
+
+Two facts were checked rather than assumed, and both would have been wrong from
+intuition. **Courier Prime reports `post.isFixedPitch = 1`** and is genuinely
+monospaced. **Special Elite reports `0`** - it is a typewriter *style* face, not
+a monospaced one, so it is classed `display`, not `mono`.
+
+**UnifrakturMaguntia declares a Reserved Font Name** in its own copyright
+record. We ship it unmodified under its own name, which the OFL permits; a
+modified derivative could not reuse the name. No other bundled face declares
+one - verified against each font's copyright string, not against the licence
+boilerplate, which mentions the term regardless.
+
+**Stardos Stencil carries no `license` name record**, only a copyright. The
+notices generator already tolerates this (it omits the line rather than
+failing) and the section still carries the SPDX header and points at the full
+OFL text, so the notice stays complete. Its OFL status comes from `METADATA.pb`,
+which is authoritative.
+
+### Verification
+
+Every one of the thirteen outline faces is rendered through the real
+`textToPolylines` by `bundled-outline-fonts.test.ts` and asserted to produce
+finite, closed, non-empty geometry occupying real space - 15 tests, all passing.
+That test exists because a registry entry alone cannot detect a corrupt binary;
+`opentype.parse` was separately confirmed to throw on an HTML error page, the
+failure `.gitattributes` documents.
+
+Each file's `name` table was read before bundling: all eight carry a copyright
+record, which `generate-third-party-notices.mjs` requires and fails the build
+without. All seventeen font sections regenerate into
+`public/third-party-notices.txt`.
+
+**The stencil property is measured, not asserted.** `stencil-fonts.test.ts`
+renders the sample and counts contours nested inside another contour - the
+piece that physically drops out of a cut part. Loop count alone would have been
+misleading and nearly led this ADR astray: the stencil faces have *more* loops
+than the ordinary ones, not fewer, because their glyphs split into separate
+strokes.
+
+| Face | Loops | Enclosed contours |
+|---|---|---|
+| Tinos (control) | 16 | **4** |
+| Roboto (control) | 16 | **4** |
+| Stardos Stencil | 31 | **0** |
+| Saira Stencil One | 25 | **0** |
+
+The two controls are asserted to enclose exactly four, so a probe that always
+returned zero could not make the stencil assertions pass vacuously.
+
+**Not verified: no hardware cut, on any of the eight.** Zero enclosed contours
+is a geometric fact about the outline; it is strong evidence that nothing falls
+out, but no part has been cut in real material to confirm it, and nothing says
+whether the remaining bridges are wide enough to survive handling in a given
+stock. Nor is any claim made about how Anton's heavy strokes,
+UnifrakturMaguntia's fine blackletter detail, or Special Elite's distressed
+edges behave at a particular size or power.
+
+## ADR-268 - Imports of any size: the import size refusals become advisories, and parsing moves off the main thread (2026-07-30)
+
+**Date:** 2026-07-30
+**Status:** Accepted
+
+### Context
+
+ADR-241 removed the vector/fill segment-budget refusal, ADR-243 removed the raster budget and
+the compiled-output budget, and ADR-244 moved large-job preparation onto a Worker. Together they
+established that the software runs a job of any size, and that a size threshold may inform but
+never refuse. **Import was the one surface that line never reached.**
+
+Ten size refusals stood between the operator and a file over ~100 MB, none of them integrity
+facts (rule 7 / ADR-228, which names `import` explicitly as a guard surface):
+
+- `IMPORT_SOURCE_LIMITS` — 64 MB for `.lf2`, G-code and STL; 16 MB for material libraries.
+- `MAX_LBRN_BYTES` (20 MB), `MAX_CLB_BYTES` (5 MB), `MAX_SHAPES` (50 000), `MAX_CLB_ENTRIES` (10 000).
+- `MAX_PROGRAM_LINES` (500 000) — a 100 MB G-code program is ~3.3 M lines.
+- `RELIEF_EMBED_TRIANGLE_LIMIT` (200 000) — a 100 MB STL is ~2 M triangles.
+- `confirmOversizeImport` — a blocking 25 MB confirm on every SVG/DXF/image import, and a
+  SILENT skip in the multi-file trace batch, which has no toast channel to report it.
+
+Measured on the current tree (Node 22 / V8, the engine Chromium runs): `parseStl` 172 MB/s,
+`parseGcodeProgram` 13 MB/s (~7.6 s per 100 MB), `parseDxf` 9 MB/s (~11.4 s per 100 MB). All of
+it ran on the main thread. `text.split(/\r\n|\n|\r/)` on a 100 MB program cost a measured 570 MB
+of heap before a single line was examined. Separately, autosave called
+`prepareProjectForPersistence` every 30 s, which serializes, deserializes-and-validates,
+re-serializes, and then semantically diffs the two strings — four passes over the whole project,
+then a `localStorage` write whose ~5 MB cap discards the result.
+
+### Decision
+
+1. **Every import size refusal becomes an advisory.** `import-size-guard` and
+   `import-source-limits` are replaced by one `ui/app/import-size-advisory` module: the
+   thresholds survive, but they select WHEN the operator is told an import will be slow, never
+   WHETHER it happens. Advisories fire where the refusal stood — before the read, when the
+   adapter supplies a size — so the cost is known at the moment the old build would have stopped
+   the operator. `MAX_PROGRAM_LINES`, `RELIEF_EMBED_TRIANGLE_LIMIT`, `MAX_SHAPES`,
+   `MAX_CLB_ENTRIES` and the two LightBurn byte ceilings are deleted.
+2. **Genuine integrity bounds stay.** `MAX_XML_DEPTH` (unbounded nesting overflows the recursive
+   walker) and the `<!DOCTYPE`/`<!ENTITY` rejection (XXE) are facts about what can be parsed
+   safely, not policy, and are untouched. This is the same split ADR-243 drew when it kept
+   `materializeProgram`'s real `RangeError`.
+3. **Parsing moves off the main thread.** A new import Worker
+   (`ui/import/import-worker{,-client,-protocol}.ts`) parses DXF, G-code and STL, modelled on the
+   ADR-244 preparation worker — including its `null`-without-Worker contract, which is what keeps
+   the vitest/jsdom suite on the synchronous path. The request carries the **Blob itself**, not
+   already-read text: Blob is structured-cloneable by reference, so the worker performs the read
+   too and the main thread never materializes the file at all.
+4. **The SVG import budget is demoted too.** `SVG_IMPORT_LIMITS` threw mid-walk once an import
+   crossed 256 color groups, 50 000 polylines, or 250 000 points — found by measuring in a real
+   browser, not by grep, because it is named nothing like the other ceilings. Every one of those
+   loops is bounded by the input, so none was a termination guarantee. They are now advisory:
+   `svgImportSizeNote` reports the same measurement through `parseSvg`'s existing `notes`.
+   `assertSvgImportPoints` (non-finite / astronomically large coordinates) STAYS — that is the
+   "NaN coordinates" integrity category, and it is the one refusal this file keeps.
+5. **SVG stays on the main thread, deliberately.** `io/svg/parse-svg.ts` uses DOMPurify and
+   `new DOMParser()`, and the WHATWG HTML specification defines `DOMParser` as `[Exposed=Window]`
+   — there is no DOM in a worker. Moving SVG would mean replacing the sanitizer, which is the
+   ADR-017 security surface, so it is out of scope here and called out rather than hidden.
+6. **Line-oriented parsers stop materializing their lines.** `core/util/iterateLines` yields one
+   line at a time; `parseGcodeProgram` and the DXF tokenizer consume it. The generator is
+   property-tested to be indistinguishable from `text.split(/\r\n|\n|\r/)`, which is what makes
+   the swap a non-change to output.
+7. **Autosave stops doing save-integrity work.** A new `prepareProjectForAutosave` serializes
+   once and validates once, dropping the re-serialization and the semantic diff. Those protect
+   the operator's file of record; an autosave slot is not one, and is re-validated on read
+   anyway. Validation itself is kept, because it is what turns a broken project into a
+   "save manually" warning instead of a recovery slot that silently fails.
+8. **Relief meshes convert once.** `core/util/cachedFloat32Array` memoizes the
+   `number[] -> Float32Array` conversion on the owning object; four call sites rebuilt it
+   independently, twice per prepare in the CNC compile path.
+
+### Consequences
+
+- Any file the operator can pick now imports. Cost is time and an advisory, never a refusal.
+- Autosave preparation on a project holding a 100 MB image measured 971 ms before and 327 ms
+  after — 2.97x, on a 30-second timer.
+- A large DXF/G-code/STL import no longer blocks the UI thread. SVG still does, and it is by far
+  the worst case. Measured in real Chromium against the dev server (isolated function call, no
+  scene touched): `parseSvg` ran at **0.84 MB/s before** this ADR and **1.59 MB/s after**
+  (1 MB 719 ms, 3 MB 1904 ms, 6 MB 3780 ms). The ~2x gain is a side effect of point 4: the
+  polyline/point ceilings were checked on EVERY reserved point, so the refusal machinery was
+  itself a measurable share of the parse. Even so SVG remains ~6x slower than `parseDxf`, and a
+  100 MB SVG still implies roughly a minute of frozen main thread. Making SVG usable at that size
+  needs the sanitizer decision in point 5 and is the largest remaining gap in this work.
+- The same run is the end-to-end proof of point 4: a 6 MB SVG that previously threw
+  "SVG import exceeds 50000 polyline(s)" now imports 104,858 polylines and reports
+  "Large SVG: 104,858 polylines, 419,432 points across 1 color group(s)".
+- The `.lf2` schema is UNCHANGED. Moving raster `dataUrl` payloads out of the persisted project
+  into a Blob side-table — the remaining large-import memory cost — is deliberately not attempted
+  here: it touches ~24 files and the project schema, and needs its own ADR and migration.
+
+### Verification
+
+- `iterate-lines.test.ts` — property test pins the generator equal to `split()` over arbitrary
+  and break-heavy strings (1000 runs), plus CRLF/bare-CR/trailing-break cases.
+- `dxf-tags-streaming-parity.test.ts` — the pre-ADR-268 tokenizer is kept verbatim as an oracle
+  and pinned indistinguishable from the streamed one over 1500 property runs plus 15 edge cases
+  (missing EOF, odd line count, blank tail, content after EOF, CRLF, bare CR, binary sentinel).
+  Swapping index-based pair access for a generator is precisely the change that passes a fixture
+  corpus while mis-numbering an error or dropping the final tag, so it gets its own oracle.
+- `import-size-advisory.test.ts` — replaces the two suites that PINNED the refusals; each case
+  asserts the bytes are actually read and a warning is raised, the inverse of what it replaced.
+- `import-worker-client.test.ts` — stub-Worker: null without Worker, blob-not-text is sent,
+  concurrent requests stay independent, wrong-kind and worker errors reject rather than mis-cast.
+- `prepare-project-autosave.test.ts` — autosave JSON recovers the same project as the manual-save
+  path; validation signal and serialization-failure reason retained.
+- `cached-float32-array.test.ts` — identity reuse, no stale buffer for a rebuilt owner, and
+  recompute when the same owner presents a different array.
+- G-code snapshots unchanged, and the full DXF + G-code suites pass over the streamed tokenizers.
+- **End-to-end on real >100 MB files, in Chromium, rendered and inspected** (rule 2). Two fixtures
+  were generated as a grid of "F" glyphs — chosen because an F is asymmetric in BOTH axes, so a
+  mirror, flip, transpose, or winding error is visible rather than plausible:
+  - **DXF, 104,918,445 bytes / 1,356,600 LINE entities.** Fetched as a Blob and pushed through
+    the real `parseDxfOffThread`. Result `ok`, **1,356,600 polylines** (exactly the entity count),
+    bounds `maxX 6995 / maxY 6458` — arithmetically exact for a 700-column, 646-row grid at 10 mm
+    pitch. Parse 49.6 s; **max main-thread gap 54 ms** across 2380 heartbeat ticks, i.e. the UI
+    thread never stalled where pre-ADR-268 it would have frozen for the whole parse. The rendered
+    glyphs read as correct upright F's with the long bar on top and the short bar at mid-height.
+  - **G-code, 104,884,357 bytes / 3,998,947 lines** — 8x the deleted 500 000-line ceiling. Result
+    `ok`, 3,332,449 toolpath steps, and `cutMm` **10,663,840**, which is exactly
+    666,490 glyphs x 16 mm of modelled cut. Parse 60.8 s; **max main-thread gap 32 ms** over 3082
+    ticks. The rendered toolpath is clean upright F's in the cut color.
+- NOT verified: no hardware run — nothing was cut or engraved, so no claim is made about how any
+  of this behaves on a machine. The >100 MB raster/image and `.lf2` paths were not exercised at
+  size, and SVG was measured only up to 6 MB.
+
+## ADR-269 - Production imports are worker-backed, pressure-disclosed, queued, and cancellable (2026-07-30)
+
+**Date:** 2026-07-30
+**Status:** Accepted
+
+### Context
+
+ADR-268 moved DXF, 2D G-code, and STL parsing into an import worker, but it did not complete the
+large-file path:
+
+- the production 3D G-code Inspector and main-canvas G-code view still read file text and built the
+  render model on the UI thread;
+- the STL worker returned a mesh that was cloned, converted to a heightmap on the UI thread, and
+  expanded from `Float32Array` into a boxed number array;
+- worker clients allowed overlapping requests and exposed no progress or cancellation contract;
+- render/source views could grow substantially without an explicit pressure advisory; and
+- production-worker execution, queue/cancel behavior, typed-relief recovery, and quota pressure
+  lacked browser/large-fixture coverage.
+
+Those gaps meant "parsing moved off the main thread" was true only for selected entry points. They
+also made it easy to mistake off-thread whole-file reads for streaming or bounded peak memory.
+
+### Decision
+
+1. **Every production G-code Inspector render build uses a dedicated module worker.** File-backed
+   requests carry the `Blob` and consume `Blob.stream()` incrementally; already-compiled project
+   output carries the text that already exists. Production does not fall back to UI-thread parsing
+   when workers are unavailable.
+2. **Preview pressure is disclosed, never capped.** The 3D renderer, source pane, and 2D preview
+   retain every parsed segment, source line, and toolpath step. Above 250,000 render items the UI
+   states the exact count and warns about memory and responsiveness. The advisory never blocks,
+   caps, rewrites, hides, or delays open, preview, save, Frame, Start, export, or streaming.
+3. **STL relief preparation stays in the worker.** Parsing and the coarse mesh-to-heightmap
+   validity/aspect probe happen before response delivery. The live relief owns the worker-produced
+   `Float32Array`; consumers reuse it. Serialization converts it to the existing JSON number-array
+   project schema only at the save/autosave boundary, preserving reopen compatibility.
+4. **Large typed results transfer ownership.** The Inspector transfers all typed render buffers,
+   STL transfers its prepared mesh buffer, and DXF plus 2D G-code use packed typed protocols before
+   reconstruction into their unchanged UI domain models.
+5. **Each worker client runs one active request and an explicit FIFO queue.** Queued requests
+   report their one-based position. Workers report honest phases (`reading`, `parsing`, and STL
+   `preparing`), not invented percentages. Cancelling a queued request removes it before posting.
+   Cancelling active synchronous parser work terminates that worker, rejects with `AbortError`, and
+   starts the next queued request on a fresh worker. Queue advancement follows worker retirement,
+   and response/error callbacks are instance-scoped so late events from a retired worker are inert.
+6. **The scalability claim remains narrow.** G-code, DXF, and STL use incremental Blob input
+   readers, but their required results still scale with the parsed output. DXF uses two passes and
+   retains blocks/output; STL retains the mesh and derived relief data; persistence materializes
+   JSON. None has a proven constant peak-memory ceiling.
+7. **Document routes move off the UI thread without a streaming claim.** Native `.lf2`, SVG,
+   LightBurn `.lbrn`/`.lbrn2`, native `.lfml.json`, and LightBurn `.clb` run in a dedicated worker
+   with queue/progress/cancel semantics, but still perform whole-Blob text decoding plus JSON or
+   XML/DOM construction there.
+
+### Consequences
+
+- Opening a large program in the 3D Inspector no longer performs whole-file text/render parsing on
+  the UI thread. The main-canvas G-code view shares the same production worker path.
+- Large previews retain complete render/source data and disclose pressure rather than silently
+  growing memory or dropping a prefix.
+- The Inspector retains the complete source-line array for the source pane and the complete typed
+  render model. Those outputs are intentionally not described as memory-bounded.
+- STL import avoids the former UI-thread heightmap probe, boxed-array expansion, and cloned typed
+  mesh result. Save/autosave retains the existing self-contained `.lf2` format at the unavoidable
+  JSON persistence cost.
+- Queueing prevents concurrent reads on a shared worker client. Cancellation is immediate at the
+  worker boundary; incremental parsers also observe their abort signal between chunks.
+- Worker placement alone does not authorize a streaming or memory-bounded claim for the document
+  routes, result reconstruction, or persistence path.
+- No controller, firmware, settings, machine command, Frame/Start behavior, or physical-output
+  semantics change.
+
+### Verification
+
+- Focused Vitest coverage: 48 queue/progress/cancel and worker-lifecycle tests; 13 transfer
+  protocol tests; 33 Inspector/2D-pressure/file-entry tests; 31 STL/typed-mesh/persistence tests; and
+  3 typed-relief save/autosave/recovery/quota-pressure tests. The final line-retention audit added
+  13 render/accountability tests, including a 600,001-line program.
+- Playwright against the production Vite worker bundle:
+  - a 260,100-segment program completed with a live 10 ms UI heartbeat, retained all segments, and
+    disclosed render pressure;
+  - closing during an 800,000-segment program cancelled the active real-worker request; and
+  - two production-client requests reported queue position 1 and completed in FIFO order.
+- `pnpm typecheck`, `pnpm typecheck:e2e`, `pnpm lint`, focused formatting checks,
+  `git diff --check`, and production web builds passed during the sequential implementation.
+- The implementation-and-audit record is
+  `docs/audits/2026-07-30-large-file-repair-ledger.md`.
+- NOT verified: constant peak-memory behavior, document-route incremental parsing, every
+  operating-system storage/OOM threshold, a hardware air-cut, or physical output.
+
+## ADR-270 - V-carve ladders complete one filled region before moving to the next (2026-07-31)
+
+**Date:** 2026-07-31
+**Status:** Accepted
+
+### Context
+
+`vcarveLadderPasses` built every inward offset for all closed contours together, then emitted the
+result one ladder step at a time. With multiple disconnected regions, that traversal revisited the
+whole design at every inset depth. A two-region regression fixture reproduced the resulting
+alternation as `RLRLRLRLRL`: the first ring of each region, then the second ring of each region,
+and so on. The controller can execute that absolute-coordinate program, but the repeated
+cross-field retracts and rapids add motion that is not needed to form the V-groove.
+
+The geometry engine may also return contours in an order different from the artwork. A carved
+region can include an outer boundary and one or more holes, while an island nested inside a hole
+is a separate filled region under the even-odd fill rule. Reordering by array position alone would
+therefore split holes from their outer boundary or attach a nested island to the wrong region.
+
+### Decision
+
+1. The offset ladder remains global and unchanged. Its contour geometry, termination reason, and
+   ladder step remain the source of truth.
+2. After the ladder is built, each output contour is annotated with its original step and assigned
+   to the innermost source filled-region root that contains it. Even containment depths identify
+   roots; odd depths identify holes that remain with their containing root.
+3. Output is region-major: filled regions follow source-contour order, and within each region the
+   original step order and offset-engine contour order are preserved. Contours that cannot be
+   assigned are retained at the end in their original ladder order.
+4. Zero- and one-region inputs keep the raw ladder order. This preserves existing single-region
+   G-code byte-for-byte.
+5. Depth law, depth-per-pass expansion, feeds, spindle behavior, Safe Z, offset-failure reporting,
+   and Start/Frame policy do not change. This ADR changes traversal only; it introduces no guard.
+6. Export provenance advances to `adr-270-vcarve-region-major-v1` so an affected file can be
+   distinguished from ring-major output.
+
+### Consequences
+
+- One disconnected carved region is completed before travel to the next, so a multi-region job no
+  longer performs a full-design revisit for every offset ring.
+- “Region” is intentionally not “glyph”: text identity is no longer present at this stage, and a
+  glyph with disconnected filled components can contain more than one carved region.
+- The contour/depth multiset is unchanged, but multi-region G-code order and travel distance can
+  change. Region order is artwork order, not a new nearest-neighbour optimization.
+- This reduces unnecessary travel but does not prove or repair a machine that loses position under
+  cutting load. Physical position retention and finished V-groove quality still require a
+  controlled hardware cut.
+
+### Verification
+
+- `vcarve-region-order.test.ts` covers disjoint source order, step order, outer-plus-hole grouping,
+  a nested island, deterministic unassigned fallback, and the single-region fast path.
+- `vcarve-ladder.test.ts` reproduces the old cross-region alternation, pins region-major traversal
+  through the real offset ladder, and compares sorted contour/depth signatures to prove that the
+  reorder loses and duplicates nothing.
+- Existing analytic V-groove and G-code snapshot tests remain the geometry/output regression
+  boundary. Automated tests do not verify physical position retention or surface finish.
+
+## ADR-271 - ExecutablePlan becomes the versioned motion truth through a byte-neutral sidecar first (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The current production chain shares `prepareOutput`, but downstream consumers still use different
+representations: prepared `Job` geometry, preview `Toolpath`, emitted text, controller-oriented
+motion manifests, Inspector render models, timing plans, Frame paths, and recovery spans. Those
+representations have legitimate local purposes, but no versioned artifact currently states the
+complete ordered commanded motion, controller events, intent, terminal state, and exact output
+compatibility in one place.
+
+That makes a reliability-oriented math engine unsafe to introduce in one jump. Replacing the
+emitter, routing, ETA, preview, Frame, and recovery together would remove the independent baseline
+needed to detect semantic or lexical drift. It would also invite optimization estimates to become
+an accidental second Start policy gate.
+
+The reported field symptom—an air run retains coordinates while material cutting loses position
+and doubles letters—makes the evidence boundary especially important. Software can prove what was
+commanded and how the host handled it. Source inspection and simulation cannot determine whether a
+particular machine tracks under load, has backlash, misses steps, supplies stable spindle/laser
+power, or produces acceptable material results.
+
+### Decision
+
+1. **Adopt `ExecutablePlan` as the versioned target motion truth.** Its governing mathematical
+   contract is `docs/architecture/10-executable-plan-mathematical-contract.md`; v1's machine-
+   readable contract is `docs/schemas/executable-plan-v1.schema.json`.
+2. **Land a byte-neutral sidecar before moving any production consumer.** The v1 opt-in path runs
+   today's production preparation and emitter once, builds a typed plan from that exact program,
+   verifies it, and serializes the plan. Existing `emitGcode` behavior and callers remain
+   unchanged in this slice.
+3. **Retain a lossless v1 compatibility carrier.** `compatibility.exactProgram` is deliberately the
+   exact emitted string. The v1 serializer returns it unchanged. This duplicates lexical content in
+   a persisted JSON sidecar, but provides a hard equality boundary while native dialect serializers
+   are not yet plan-first. A later schema may remove it only after every supported dialect has
+   byte-pinned plan serialization.
+4. **Use differential semantic evidence.** Plan construction aligns the existing controller motion
+   manifest with the existing Inspector render model. The parity verifier then compares ordered
+   endpoints with the independent clean-room simulator parser, checks raw-line accounting, checks
+   exact serialization, and rebuilds for determinism. A parser disagreement produces sidecar
+   evidence; it does not mutate the current G-code.
+5. **Make the adversarial corpus executable and non-physical.** The corpus covers laser-off feed
+   runways, powered motion, same-block modal transitions, relative/inch normalization, full-circle
+   and helical CNC arcs, plunge/retract, coolant, Marlin fan power, negative/tiny coordinates,
+   Unicode and mixed line endings, tool/pause events, invalid arcs, and terminal parking. It is a
+   semantic benchmark corpus, not a burn or cutting qualification.
+6. **Migrate consumers incrementally after v1 parity is stable.** Preview, calculated bounds, ETA,
+   Frame geometry, recovery, and finally native dialect emission move to the plan in separate,
+   reviewable slices. Each consumer removes its competing motion construction only after old/new
+   corpus comparison. Physical Frame remains the source of truth for ordinary Start authorization.
+7. **Version dynamics by axis and controller.** A future schema records per-axis speed,
+   acceleration, optional jerk, command resolution, feedback kind, and controller planner
+   semantics. Old profiles retain current feeds and fixed runway behavior when acceleration or jerk
+   is unknown. Unknown values are never invented and cannot justify higher feed or shorter runway.
+8. **Calculate runway and derating only from known conservative dynamics.** The math contract's
+   projected-axis and energy bounds determine reachable feed and deceleration distance. Shortfall
+   and derating are plan annotations and Job Review advisories. Optimization margin does not become
+   a second ordinary Start gate.
+9. **Replace nearest-neighbour only with precedence-preserving deterministic routing.** Small task
+   sets use an exact precedence-aware solver over legal orientations; larger sets use a
+   deterministic ready-set heuristic with stable tie-breaks. Terminal parking is a required final
+   node. The exact/large threshold is versioned and corpus-justified.
+10. **Do not ship thermal or CNC-load confidence without field calibration.** Such models require a
+    versioned machine/controller/material/tool dataset with repeated observed outcomes and an
+    explicit validity domain. Outside that domain the result is unavailable. Host inference is not
+    described as encoder feedback or closed-loop correction.
+11. **Qualify in layers.** Pure tests and simulators establish schema, geometry, semantics,
+    determinism, and protocol properties. De-energized runs establish only gross motion behavior.
+    Instrumented material coupons establish calibration, tracking, backlash, power/load response,
+    and material results for the tested setup. This ADR authorizes no hardware motion.
+12. **Preserve frame-first policy.** Ordinary Start remains authorized by a clean completed Frame
+    for the exact reviewed job under ADR-228/230/232/237. The engine may refuse an unsupported or
+    internally inconsistent execution because it cannot execute correctly. Advisory runway,
+    derating, thermal, load, ETA, or optimization margins never create another ordinary Start gate.
+
+### Delivery phases
+
+| Phase | Deliverable | Completion evidence |
+|---|---|---|
+| 1 (this decision's first slice) | v1 schema, mathematical contract, sidecar builder/serializer, parity verifier, adversarial corpus | exact current laser/CNC output equality plus focused and release gates |
+| 2 | preview, bounds, ETA, Frame, and recovery consume the same plan | old/new semantic corpus parity; exact Frame identity and recovery-epoch tests |
+| 3 | native plan-first dialect serializers | byte-pinned equality for GRBL, GRBL-CNC, Marlin, and Smoothieware; compatibility carrier removable only in a new version |
+| 4 | versioned per-axis/controller dynamics, conservative legacy fallback, runway, derating | analytic/property tests and controller simulators; advisory-only UI proof |
+| 5 | precedence-aware exact-small/deterministic-large routing plus terminal park | optimality oracle for small cases; permutation/precedence/determinism properties for large cases |
+| 6 | calibrated thermal/CNC-load models | accepted field dataset, uncertainty/validity-domain review, and out-of-domain `unavailable` tests |
+| 7 | physical qualification coupons | operator-approved de-energized and instrumented material protocols with recorded plan/profile identity |
+
+### Consequences
+
+- The first slice adds a second representation only as an opt-in sidecar; it intentionally does not
+  claim that production consumers have already converged on one motion truth.
+- Exact compatibility is directly testable rather than inferred from unchanged snapshots.
+- v1 sidecars can be large because they retain the exact program. That cost is accepted only for the
+  compatibility bridge and must be revisited before persistent sidecars become a default artifact.
+- A plan can expose parser disagreement without blocking or rewriting the legacy job. Promoting the
+  plan to production authority requires the staged consumer migrations above.
+- Versioned dynamics and routing decisions become reproducible. Unknown legacy physics remains
+  explicit rather than being hidden in optimistic defaults.
+- A mathematically consistent command remains only a command. Open-loop motion can still lose
+  physical position under load, and software verification cannot certify a material result.
+
+### Rejected alternatives
+
+- **Rewrite all consumers and the emitter in one PR:** rejected because there would be no stable
+  differential baseline and the physical/policy review surface would be too broad.
+- **Canonicalize or pretty-print current G-code:** rejected because even semantically harmless text
+  changes would break the zero-byte migration guarantee and recovery/provenance comparisons.
+- **Treat the Inspector alone as execution truth:** rejected because its forgiving, display-oriented
+  policy deliberately retains partial programs and cannot independently verify itself.
+- **Assume generic acceleration, jerk, thermal, or spindle-load constants:** rejected because a
+  plausible formula with invented inputs is less reliable than an explicit unknown.
+- **Block Start on optimization margins:** rejected by the frame-first governing decisions; those
+  margins remain review information unless execution is unsupported or internally inconsistent.
+
+### Verification
+
+- `build-executable-plan.test.ts` runs the executable adversarial corpus and pins intent, command
+  modes, normalization, terminal state, line-ending identity, UTF-8 length, deterministic rebuild,
+  exact serialization, empty-output behavior, and invalid-arc failure.
+- `executable-plan-parity.test.ts` requires byte identity, line accounting, independent ordered
+  endpoint agreement, and deterministic rebuild; negative tests mutate lexical and semantic state.
+- `executable-plan-emission.test.ts` compares the existing and opt-in plan paths through real laser
+  and CNC production composition and requires identical G-code and preflight results.
+- Existing G-code snapshots remain unchanged. Full release verification is required before merge.
+- NOT verified: no machine was connected or moved; no air cut, material coupon, encoder trace,
+  backlash measurement, load measurement, thermal calibration, burn quality, cut quality, or
+  physical position retention was tested.
+
+**Amendment (2026-08-01) — audit corrections to the parity claim, the refused input class, and the
+duplicated classification.** A review of the landed slice found the accepted decision sound but
+four statements around it stronger than the code supports, and one live-path defect the slice
+documented without fixing. Corrected as follows.
+
+1. **The three readers are not independent.** All three compose the single modal engine in
+   `src/core/gcode/` (ADR-255 stage 1) and share arc centre solving and sampling. The parity gate
+   detects divergence in the policy each reader layers on top; it cannot detect a defect inside that
+   shared engine, and for arcs it compares the same sampler against itself. Contract section 7 now
+   states what the gate does and does not prove. The word "clean-room" is withdrawn.
+2. **The byte check passes by construction while the lexical carrier exists.** `serializeExecutablePlan`
+   returns `compatibility.exactProgram`, so on a freshly built plan it compares a string to itself.
+   It guards storage and transport, not emitter correctness. Byte neutrality for existing callers
+   rests on the seam being opt-in — which is now structural: `emitPreparedGcodeWithExecutablePlan`
+   no longer re-sources `gcode` from the plan on the success path, so neutrality no longer depends
+   on check ordering.
+3. **Canned cycles are a named refusal, not a surprise.** `G73`/`G81`/`G82`/`G83` were already
+   rejected as a mode disagreement; they now return `unsupported-input` with a
+   `canned-cycle-unsupported` issue and are pinned by corpus fixtures. **No input that previously
+   built now fails** — this renames an existing refusal and does not widen one (rule 7). The
+   Inspector is recorded in contract section 13 as explicitly out of scope for v1, because it is
+   the only consumer that reads programs this application did not emit.
+4. **Closed arcs are fixed at the source.** `classifyMotion` measured endpoint displacement, so a
+   flat full-circle `G2`/`G3` was classified `plunge` and never became `firstProcessPoint` — wrong
+   in the live controller/recovery manifest that `canvas-motion-plan.ts` already reads, and
+   contradicting contract section 5. It now measures the travelled XY route. The plan builder's
+   compensating special case is removed, and park classification is no longer re-derived in the
+   plan assembler; both concepts now have exactly one implementation.
+5. **Cost and tolerance.** The deterministic-rebuild check is a property of the builder, so it moved
+   behind an explicit off-by-default option proven once per corpus fixture instead of costing a
+   second full parse on every emission. Manifest-versus-Inspector endpoint agreement is now
+   magnitude-relative (four Float32 ULPs, floored at `1e-6 mm`); a fixed absolute budget would have
+   refused a single-ULP difference on a large-format bed. The versioned schema is now validated
+   against every corpus plan, with compiler-enforced maps pinning its emitter and event-kind enums
+   to the TypeScript unions.
+
+NOT verified by this amendment: still no machine connected or moved, and no air cut, coupon,
+encoder trace, backlash, load, thermal, burn-quality or position-retention measurement.
+
+## ADR-272 - Design Studio: a full-window on-canvas design surface for laser and CNC (2026-07-30)
+
+### Context
+
+The canvas is a **placement** surface, not a design surface. Artwork is
+imported, dragged, scaled, and assigned operations. Phase G (ADR-051) added
+rectangle / ellipse / polygon / star / pen, and ADR-159/164 added bounded node
+editing, but a person still cannot draw a part to size from nothing: there is no
+line tool, no arc tool, no trim, no extend, no fillet, no chamfer, no dimension
+you can type, and no geometric snapping of any kind. `snapping.ts:168` snaps
+axis-aligned bounding-box min/mid/max plus a grid - endpoint, midpoint, centre,
+quadrant, intersection, tangent and perpendicular snapping do not exist anywhere
+in the tree, and nothing snap-related lives in `core/`.
+
+The maintainer asked for an in-detail design tool where shapes and pictures are
+designed by hand directly on canvas, with an "AutoCAD-like" precision layer that
+is "not totally 3D, but still 3D enough for CNC", optionally in a separate
+window like Image Studio. Research and the governing brief are in
+`docs/audits/2026-07-30-design-studio-brief.md` and
+`docs/audits/2026-07-30-design-studio-research-and-plan.md` (215 fetched
+sources).
+
+Three findings from that research constrain this decision, and each was verified
+mechanically rather than assumed.
+
+**1. A geometric constraint solver cannot be bought.** Every browser-capable 2D
+constraint solver is license-blocked: `@salusoft89/planegcs` publishes
+`LGPL-2.0-or-later` on npm while its repository LICENSE file is verbatim
+LGPL-2.1; FreeCAD's planegcs carries `SPDX-License-Identifier: LGPL-2.1-or-later`
+in `GCS.cpp`; SolveSpace and libslvs are GPL-3.0-or-later; JSketcher uses a
+custom Autodrop3d licence requiring irrevocable copyright assignment of
+modifications; CADmium is Elastic License 2.0. `kiwi.js` is genuinely BSD-3, but
+Cassowary is a *linear* solver and tangency, distance, angle, radius and
+concentricity are nonlinear. An npm search across three query variants returned
+exactly one published 2D geometric constraint solver, and it is LGPL.
+`scripts/check-licenses.mjs:22` does not list any GPL-family identifier, so such
+a dependency fails `release:check` mechanically, not by judgement.
+
+**2. Two barrels are full, which forces the module boundary.**
+`node scripts/check-index-exports.mjs` reports `src/core/scene/index.ts` at 208
+exports against a baseline of exactly 208 in `scripts/index-export-baseline.json`
+- ratcheted, may only shrink - and `src/core/geometry/index.ts` at exactly 20,
+the ADR-015 hard cap. A twenty-first geometry export fails CI.
+
+**3. The workspace tool-dispatch chain is out of room.**
+`src/ui/workspace/use-workspace-drag.ts` measures 398 of the 400 counted-line
+cap; `beginToolDrag` is at cyclomatic complexity 11 of 12; `computeMouseDownDrag`
+is already at 12; `useDragMove` and the `useUiStore` factory arrow are each 78 of
+the 80 function-line cap. A design tool with a dozen new tools cannot be grafted
+onto that chain.
+
+### Decision
+
+Build the **Design Studio**: a lazy-loaded, full-window overlay with its own pure
+core module, following ADR-242 (Image Studio) as its structural template.
+
+1. **New pure module `src/core/design/`** with its own barrel and two
+   sub-barrels, `snap/` and `ops/`. Fresh barrels get the full 20-export budget,
+   so the frozen `core/scene` barrel and the saturated `core/geometry` barrel are
+   sidestepped rather than fought. No geometry op is duplicated: existing
+   `vector-path-tools` / `vector-path-booleans` helpers are imported, per
+   ADR-131 and ADR-255 clause 4 ("no third parser").
+
+2. **New lazy overlay `src/ui/design-studio/`**, mounted as an always-present
+   `DesignStudioHost` that returns `null` without a session, so cold start pays
+   nothing. Shell is `position:fixed; inset:0; zIndex:1010`, `role="dialog"`,
+   `aria-modal="true"` - the exact Image Studio values, deliberately above
+   `--lf-z-dialog` (1000) and below toasts (1100).
+
+3. **Session isolation.** A standalone zustand store holds the sketch, tools,
+   view, selection and history. Nothing enters the project store except at
+   Apply, which writes once and produces exactly one project undo entry. Undo
+   inside the Studio is session-local. Closing **stashes and never prompts**
+   (rule 7; ADR-242 clause 5).
+
+4. **The pipeline is not touched.** The Studio materializes into ordinary
+   `ShapeObject` geometry, so compile, preview, emit and serialize are unchanged
+   and G-code stays byte-identical for unchanged input. This is the property that
+   made ADR-051 and ADR-242 land cleanly, and it is retained deliberately.
+
+5. **No general constraint solver.** Precision is delivered by an object-snap
+   engine, ortho/polar tracking, typed numeric entry, and **dimension-driven
+   editing** - a dimension owns its geometry and re-solves that geometry locally
+   when its value changes. Fusion's and Onshape's unified infer-from-selection
+   Dimension tool and their driving-vs-driven distinction are adopted; FreeCAD's
+   numeric degrees-of-freedom readout is adopted in preference to Fusion's and
+   Onshape's documented absence of one. A general nonlinear solver is explicitly
+   **not** in scope and would need its own ADR and its own in-house
+   implementation.
+
+6. **2.5D, not 3D.** A design entity carries an optional depth. Closed profiles
+   extrude to solids in a three.js view via `THREE.Shape` + `ExtrudeGeometry`
+   (verified present in the installed `three@0.180.0`, along with `Path`,
+   `LatheGeometry`, `ShapeGeometry`). **No new runtime dependency.** No B-rep
+   kernel, no mesh CSG, no sculpting. ADR-102 section 2 is satisfied by keeping
+   the Studio's 3D view under `src/ui/viewer3d/`, the ADR-255-designated shared
+   scene home; mesh building stays a pure core function returning plain typed
+   arrays.
+
+7. **Layout copies LightBurn** (CLAUDE.md rule 3): two vertical left rails, a
+   Creation rail above a Modifiers rail; flyout submenus; a context-sensitive
+   options bar that swaps with the active tool; on-canvas parametric handles in
+   distinct colours with the same values typeable in the inspector; destructive
+   ops previewing their damage before the click. Construction geometry is
+   modelled as ordinary objects on a non-output layer, exactly as LightBurn's T1
+   tool layer, because `Layer.output` already exists.
+
+8. **Smoothness is architectural, not incidental.** Tools are state machines
+   (Idle to Pointing to Dragging), following tldraw's published model, so no
+   boolean soup and no complexity cliff. The canvas is two layers on two
+   cadences: committed geometry redraws on change, the interaction overlay
+   redraws on pointer move, both coalesced to one rAF. Snap targets are indexed
+   into a bucketed spatial grid and rebuilt only when geometry changes, never
+   scanned per pointer move. Entity materialization, bounds and hit geometry are
+   memoized per revision.
+
+9. **Rule 7 holds absolutely.** The Studio adds no guard. Operations that cannot
+   produce geometry return `Result<T, DesignOpError>` and surface a message;
+   nothing blocks, gates, caps, delays, disables or confirms before Frame, Start,
+   preview, save, import, export or emission. History eviction informs
+   ("N older steps trimmed") exactly as Image Studio's does.
+
+10. **Staged DS-0..DS-9**, each an individually reviewed, CI-green, shippable
+    diff. The end-to-end slice - open, draw a dimensioned profile by hand, apply,
+    cut - closes at **DS-5**; everything after it is breadth on a working
+    surface. Parametric round-trip through `.lf2` lands at DS-9 by adding a
+    `SketchShape` arm to the already-exported `ShapeSpec` union, which adds no
+    barrel symbol and needs no new `SceneObject` variant.
+
+### Consequences
+
+The Studio is additive: the existing workspace, its tool strip, and every
+existing flow keep working unchanged. Cold start is unaffected because the chunk
+is lazy. Because the Studio commits ordinary geometry, a design made in it is
+indistinguishable downstream from imported artwork - which is the point, and also
+the limitation until DS-9.
+
+Costs accepted. Until DS-9 a sketch is not parametric across save/reload; it
+materializes to polylines like every pen drawing does today. Without a general
+solver, a sketch cannot be made fully-constrained in the CAD sense, and
+dimension-driven editing resolves locally rather than globally - a change that
+would require simultaneous re-solution of a coupled system is not expressible.
+Arc entities materialize to polylines for compilation, because nothing in
+`core/` produces an `elliptical-arc` segment today and compile reads `polylines`,
+not `curves`; native G2/G3 emission already exists on the CNC side
+(`cnc-grbl-strategy.ts:351`) and remains available to a later stage.
+
+Deliberately deferred, each needing its own decision: a general nonlinear
+constraint solver; a typed command line (adjacent to "command palette", which
+`PROJECT.md` lists as out of scope); mesh CSG; STEP/B-rep import; curve-preserving
+booleans, which are blocked upstream by `transformCurveSubpathUniform` supporting
+uniform scale and translate only; and an oriented bounding box for selection
+maths, which today is AABB everywhere.
+
+Not verified at the time of writing: nothing has been rendered, no perceptual
+check exists, no hardware has cut anything designed in the Studio, and the
+Inkscape / Affinity / Illustrator arm of the research fan-out had not returned.
+The verification gap that green tests cannot close applies in full - jsdom cannot
+see WebGL, and per ADR-255's verification note no green suite is ever claimed as
+visual proof.
+
+### Amendment 1 (2026-08-01) - DS-8 becomes the layered carve: design layers with per-layer settings and bits, a live 3D target-surface pane, and a per-bit simulate pass
+
+The maintainer asked for the carved-picture-frame workflow: design in LAYERS,
+each layer with its own settings and its own bit, bit changes mid-job, and a 3D
+view of the layered result while designing. This amendment re-scopes DS-8
+accordingly and resolves the brief's open decision 4.
+
+1. **Depth lives on the DESIGN LAYER - not the entity, and not
+   `ObjectOperationOverride`.** A `DesignLayer` in `core/design` carries
+   `{ id, name, color, cutType, depthMm, toolId?, vClearToolId? }` -
+   deliberately a subset of `CncLayerSettings`, because a scene `Layer` already
+   IS the process operation (`layer.ts:63`, `machine.ts:105`) and per-layer
+   depth/bit is the shipped multi-tool model (H.7). The clause-6 sentence "a
+   design entity carries an optional depth" is superseded: an entity carries an
+   optional `layerId`. `ObjectOperationOverride` stays laser-only and untouched.
+
+2. **Apply materializes one scene operation PER design layer** (name and colour
+   carried over) and patches that fresh layer's `cnc` block with the design
+   layer's cutType / depthMm / toolId / vClearToolId AFTER
+   `applyLayerDefaultsToFreshLayers` stamps project defaults - order matters,
+   the defaults pass would otherwise clobber the carve settings. Multi-bit
+   sectioning (`cnc-tool-sections.ts`), labelled M0 tool-change holds, and the
+   per-bit Z-zero Continue gate are the existing pipeline and gain no new code.
+
+3. **The 3D pane imports scene BUILDERS, never `three`.** The pane lives in
+   `src/ui/design-studio/preview3d/` but contains no three.js import: it
+   consumes `createReliefThreeScene` / `SceneHandle` from
+   `src/ui/relief-viewer/` exactly as `Cnc3DPane` does from `src/ui/workspace/`.
+   ADR-102 section 2's import boundary is satisfied as written; the clause-6
+   sentence nominating `src/ui/viewer3d/` as the Studio's scene home is
+   superseded by this route (that folder remains the Inspector's).
+
+4. **Two fidelity tiers, each labelled as what it is.** The INSTANT tier renders
+   the target surface: pure `core/design-carve` rasterizes the layers into a
+   `Heightmap` - pocket floors flat at depth; v-carve depth = boundary distance
+   divided by tan(tipAngle/2), clamped to layer depth, the same law as
+   `vcarve-ladder.ts` so preview and toolpath cannot disagree about shape;
+   profile kerf slots at tool diameter on the offset side; drill discs; depths
+   at or past stock thickness clamp to a through cut - and `steppedSurfaceMesh`
+   (ADR-261 provenance) renders it with true vertical walls. The SIMULATE tier
+   compiles the designed layers through the real `compileCncJob` one tool bucket
+   at a time and stamps each bucket's removal grid with THAT bucket's kernel
+   (`kernelForTool`), min-combining the grids - honest per-bit cutter shapes,
+   which the single-kernel CNC pane cannot show today.
+
+5. **Rule 7 and ADR-261 section 3 hold.** The pane and everything it computes
+   are display-only: nothing gates Apply, Frame, or Start.
+
+6. **No `.lf2` change in v1.** Studio state stays transient; layers exist in the
+   session and materialize as ordinary scene layers at Apply. DS-9 remains the
+   parametric round-trip stage and will serialize the layer table with the
+   sketch when it lands.
+
+### Amendment 2 (2026-08-01) - The canvas becomes a 3D design space (DS-8b)
+
+The maintainer reviewed the DS-8 result and rejected the docked 3D preview
+pane: "I wanted an AutoCAD/Blender look where your canvas is the design space
+in 3D." Research and verified platform facts:
+`docs/audits/2026-08-01-design-viewport3d-research.md`.
+
+1. **The Studio's centre surface is a three.js viewport** — the stock on a
+   grid in 3D, the sketch drawn as lines floated on the stock top, the carved
+   solid updating live beneath it (the Amendment 1 target-surface pipeline,
+   unchanged). Drawing, selection, and snapping run through the SAME mm-space
+   machinery as the 2D canvas: the pointer maps to the z=0 stock plane by
+   raycast, and hit radii scale by a projected pixels-per-mm at the camera
+   target. Picking never raycasts three.js lines (Line2.raycast is unreliable
+   per the committed r180 research); it reuses design-hit-test in mm space.
+2. **Input mapping (the Fusion synthesis):** left button belongs to the armed
+   tool, middle pans, Shift+middle and right orbit, wheel zooms to cursor,
+   Top/Iso presets, and the Studio opens looking straight down (Fusion's
+   auto-look-at-sketch). Stock OrbitControls provides all of it with
+   `mouseButtons = { LEFT: -1, MIDDLE: PAN, RIGHT: ROTATE }` and
+   `zoomToCursor` (verified against the installed three@0.180 source).
+3. **ADR-102 section 2 is amended**: three.js may additionally be imported
+   beneath `src/ui/design-studio/viewport3d/` — the same single-folder grant
+   ADR-255 and ADR-261 each made. Everything else stands: UI-only, lazy
+   chunks, jsdom fallback, pure typed-array seams (overlay geometry building
+   is a pure module).
+4. **The 2D canvas survives as the fallback surface** behind a top-bar 2D/3D
+   toggle (`session.surface3d`, default 3D). Dimension call-out annotations
+   and marquee selection remain 2D-only in this stage and the toggle says so;
+   parity is a later stage, not an implied promise.
+5. The right rail keeps only the carve-layers card. The Amendment 1 preview
+   pane is deleted; its Design/Bits tier chips and Simulate move into the
+   viewport toolbar (the simulate pipeline is reused unchanged). Rule 7 and
+   ADR-261 section 3 continue to hold: the viewport informs, never gates.
+## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The supplied failed 4040 V-carve export identified only layer, operation, tool diameter, effective
+feed, plunge, spindle RPM, and pass count. It did not record the custom bit's stable id, bit kind,
+included angle, requested depth, depth per pass, V-carve resolution, feed-source provenance, or
+machine-profile identity. That prevents a saved file from proving which of several plausible setup
+inputs produced its motion after the project or custom library changes.
+
+The same export placed all group data in one 129-byte comment. CurveDesk's GRBL streamer strips
+full-line semicolon comments before transmission, so that line cannot explain coordinate loss in an
+in-app run. Other senders have their own parser and buffer behavior, however, and short independent
+fields are easier to inspect. Layer, tool, build, and profile labels also originate in persisted or
+imported data; interpolating an embedded newline directly into G-code could turn the remainder into
+a sendable command rather than a comment.
+
+### Decision
+
+1. `CncGroup` may carry the compiled tool kind and angle, requested depth, depth per pass, V-carve
+   resolution, and feed-source identity. The fields are optional for old execution archives and
+   hand-built jobs. Compilers populate only values that truthfully describe the group; relief does
+   not claim a layer requested depth, and tile-registration groups record their fixed peck depth.
+2. The CNC emitter writes provenance as short, single-purpose full-line semicolon comments. Dynamic
+   values have line breaks and control characters flattened, are UTF-8 truncated without splitting
+   code points, and are bounded so each `; cnc` provenance line stays at most 96 bytes.
+3. Export headers record the machine profile name and, when present, profile id, source, and catalog
+   version for ordinary, tiled, and standalone CNC files. The canonical custom-profile hash remains
+   in the execution archive; the plain-text export does not invent a hash it does not already own.
+4. Provenance is diagnostic only. Numeric compiled fields remain the motion source of truth;
+   `feedSource` may change comments but cannot change emitted motion. The in-app streamer continues
+   to strip comments before sending, and no Start, Frame, controller, or machine-policy gate changes.
+5. Tool labels in both the initial-load and mid-job tool-change comments use the same one-line
+   sanitizer. Emitter revision advances to `adr-273-cnc-incident-provenance-v1`.
+
+### Consequences
+
+- A saved CNC file can now distinguish a 3 mm 90-degree custom V-bit from a diameter-only tool and
+  can reconstruct the relevant requested/effective setup without the live project.
+- Newline-bearing imported labels remain inert comments instead of creating controller commands.
+- Motion commands and their order are unchanged. Raw comment-line counts and pass-span line numbers
+  advance together when the exact artifact is emitted, so recovery continues to use matching spans.
+- Provenance can narrow a coordinate-loss investigation but cannot prove physical position
+  retention. Stepper load, workholding, couplers, electrical noise, and controller state still need
+  controlled hardware qualification.
+
+### Verification
+
+- Compiler coverage pins the 3 mm 90-degree V-bit, requested depth, depth-per-pass, V-resolution,
+  and feed-source fields on the compiled group.
+- Emitter coverage compares sendable lines before and after provenance enrichment, rejects malicious
+  newline labels as commands, exercises initial and mid-job tool comments, and caps CNC comment size.
+- Ordinary, tiled, and standalone export tests pin profile identity; metadata tests pin control-byte
+  sanitization and the new emitter revision.
+- Automated tests and an air cut do not verify cutting-load position retention or finished geometry.
+
+## ADR-274 - V-bit geometry is explicit before a contributing V-carve can compile (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The custom-bit form previously began with populated diameter and angle values. An operator could
+name a physically different cutter, add it without replacing every field, and leave a plausible
+but false geometry record. Older or hand-edited projects can also contain a V-bit with no usable
+included angle. The V-carve ladder and its optional clearing stage silently substituted a
+60-degree cone for that missing or degenerate value, so generated depth geometry could disagree
+with the cutter in the spindle while the file still looked structurally valid.
+
+An included angle is not a tunable warning threshold: it is a required operand in
+`z(d) = -d / tan(angle / 2)`. Inventing it changes the requested toolpath. Conversely, a layer with
+no closed contour that survives the first configured V-carve inset or can produce a requested
+two-stage clearing pocket does not generate a V-carve pass and must not block an otherwise valid
+selected output. Selecting a non-V-bit for V-carve already has an established
+`cnc-settings-invalid` advisory contract; changing that separate path into a refusal is outside
+this decision.
+
+### Decision
+
+1. New custom bits start with blank diameter and included-angle fields. Diameter must be finite
+   and within 0.1 through 50 mm. V-bit and engraving-bit included angle must be finite and within
+   1 through 179 degrees. The saved library and the bit list display the exact stored values.
+2. Entry, library persistence, project deserialization, feed guidance, and V-carve geometry share
+   one 1-through-179-degree included-angle contract. Invalid persisted angles are not presented as
+   trusted cutter geometry.
+3. Prepared CNC output reports `cnc-tool-geometry-invalid` as a compile-integrity refusal only when
+   an output-enabled V-carve operation uses an actual V-bit with an invalid included angle and has
+   at least one closed, finite contour whose first configured V-carve inset produces a path or whose
+   requested two-stage clearing operation could produce a pocket for an allowed angle. The same
+   exact-artifact check therefore
+   applies before Save, Frame, and Start; output-disabled, unused, and selection-filtered operations
+   do not block another artifact.
+4. The V-carve ladder and two-stage clearing calculation no longer invent a 60-degree angle for an
+   actual V-bit. Direct core calls return no ladder or clearing paths for that invalid input, so a
+   caller that bypasses prepared-output preflight cannot emit a partial carve.
+5. A non-V-bit assigned as the primary V-carve cutter retains its historical 60-degree fallback
+   and advisory-only behavior. This preserves current output/policy for that pre-existing
+   wrong-kind condition while keeping the angle refusal strictly about missing mathematical
+   geometry on a real V-bit.
+6. The optional flat-floor clearing cutter is a separate geometry contract: a contributing
+   clearing stage accepts only `end-mill`. A persisted ball-nose or engraving assignment remains
+   visible for diagnosis, but prepared output reports `cnc-tool-geometry-invalid` when it would
+   produce clearing motion, and direct compile omits the incompatible clearing group. A contour
+   with no flat-floor clearing path does not create a new refusal.
+
+### Consequences
+
+- A newly created 3 mm, 90-degree V-bit is stored and displayed as exactly 3 mm and 90 degrees;
+  the form no longer supplies a hidden 3.175 mm or 60-degree starting value.
+- A contributing V-carve cannot be generated from an invented included angle. The refusal names
+  the affected layer and bit and tells the operator to edit or replace it.
+- This is a compile-integrity boundary, not a feed, spindle, material, calculated-bounds, or
+  machine-motion heuristic. It does not claim that a valid angle, an air cut, or valid G-code proves
+  that the 4040 will retain position under cutting load.
+- Existing wrong-kind guidance for the primary V-carve cutter remains an advisory and is not
+  silently converted into a wider Start policy gate by this change. The secondary clearing
+  cutter's flat-end-mill requirement is a compile-integrity boundary because a ball or point
+  kernel cannot truthfully produce the requested flat floor.
+
+### Verification
+
+- Form and persistence tests cover blank entry, exact 3 mm / 90-degree storage, and rejection of
+  out-of-range or non-finite angles. Shared-contract tests accept the exact 1- and 179-degree
+  boundaries and reject values immediately outside them.
+- V-carve ladder and clearance tests prove invalid actual V-bit angles produce no partial geometry
+  and that the legacy primary non-V-bit advisory path still produces its prior output. Focused
+  ball-nose and engraving clearing tests prove prepared output refuses a contributing incompatible
+  stage while direct compile omits it.
+- Preflight and prepared-output tests cover contributing geometry, a too-narrow single-stage
+  contour, a narrow contour with a possible two-stage clearing pocket, invalid depth-per-pass
+  fallback behavior, output-disabled and unused layers, and an unselected invalid V-carve beside a
+  selected valid CNC operation.
+- Automated checks cannot verify spindle load, lost steps, coupler slip, electrical noise,
+  workholding, or physical coordinate retention; those require a controlled loaded scrap cut.
+
+## ADR-275 - CNC cutter families are catalog metadata, not invented CAM geometry (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The CNC bit library began as a short starter list. Operators need a much broader set of common
+router and milling cutters, including the small-shank 60° and 90° V-bits sold for hobby routers.
+Simply appending every commercial cutter under an existing `kind` would be unsafe and misleading:
+
+- CAM and removal simulation currently understand a flat cylinder, a full-radius ball nose, and a
+  point-tip cone; the legacy `engraving` kind is also simulated as a flat cylinder;
+- cutter names such as upcut, compression, O-flute, dovetail, surfacing, and roundover describe
+  flute direction, operation constraints, or geometry that is not equivalent to those three
+  envelopes;
+- the existing starter list is serialized into every CNC project, so turning it into a large
+  global catalog would bloat every `.lf2`; and
+- automatic material feeds consume flute metadata, so a generic catalog must neither assume two
+  flutes nor synthesize a count that its family evidence does not establish.
+
+Primary manufacturer catalogs were used to establish the taxonomy and, for exact-product entries,
+the stated dimensions, including LMT Onsrud, Whiteside, Inventables, Amana Tool, Carbide 3D, Harvey
+Tool, ShopSabre, and Zund. They are catalog evidence, not authorization to copy manufacturer feeds or to
+claim physical qualification.
+
+### Decision
+
+1. **`CncTool.kind` remains load-bearing geometry.** It is not expanded with marketing or product
+   families. CAM, offsets, removal simulation, and 3D profiles continue to branch only on the
+   existing geometry kind.
+2. **Family is descriptive metadata.** `family`, `shankDiameterMm`, `fluteCount`, and stable
+   `catalogId` fields may accompany a tool. Project deserialization and app-library restoration
+   rebuild these fields through bounded validation; unknown fields remain stripped. Optional
+   physical metadata is stored only when the source scope establishes it, not because a generated
+   diameter shares a broad family link.
+3. **The starter list stays small and append-only.** The two manufacturer-listed hobby 90° V-bit
+   cutting/shank dimensions are appended with stable IDs and identified as nominal point-cone
+   models. On open, an older nonempty CNC tool list receives exactly these missing starters,
+   deduplicated by stable ID or catalog identity; existing tool objects, metadata, ordering,
+   references, custom tools, and Active bit are preserved. The broader catalog lives outside the
+   default project payload and copies only the operator-selected entry into the app-level custom
+   library.
+4. **The catalog has an explicit model-fit boundary.** Generic flat and untapered full-radius-ball
+   rows are addable only as operator-matched nominal diameter envelopes when their gross geometry
+   matches a current kernel. Addability does not assert that a manufacturer sells the generated
+   size, that the cutter is center-cutting or plunge-capable, or that its entry strategy or
+   automatic feed is known. Generic flute count is also unknown except for the explicit
+   single/double O-flute family identity described in item 7. Exact-product nominal V-groove rows
+   retain separately evidenced cutting/shank dimensions; product angle/tip tolerances remain a
+   physical qualification boundary. Two exact Amana O-flute upcut ball-nose products retain their
+   evidenced full-radius form, cutting diameter, and shank diameter without a numeric flute count,
+   because the primary product source does not state one. Families needing unmodeled geometry, motion, rotation,
+   controller capability, or operation semantics remain searchable reference-only entries with a
+   reason and primary source.
+5. **Catalog breadth means families plus representative sizes, not every manufacturer SKU.** The
+   generic catalog offers common metric and imperial nominal diameters for operator matching
+   without presenting a manufacturer part number, cutting length, coating, material, flute
+   geometry, or capability that the app has not verified.
+6. **Angles use the included cone angle.** A manufacturer side, chamfer, or dovetail angle must
+   never be copied into `tipAngleDeg` without converting and verifying that it describes a
+   point-tip cone. Cutting diameter and shank diameter remain separate values.
+7. **Flute metadata participates only in trusted automatic calculation.** Generic square, spiral,
+   compression, mortise, ball-nose, and core-box envelopes carry no catalog flute count. Explicit
+   single/double O-flute family identity may carry its evidenced one/two-flute count; when present,
+   that count is used when a material recipe is first calculated and when trusted tool identity
+   changes through active-bit selection, profile application, catalog adoption, or deletion
+   fallback. Otherwise calculation uses the existing explicit/operator/default assumption. Only
+   layers carrying automatic provenance are eligible for an identity-driven rewrite: an explicit
+   count on a layer pinned to another tool and manual/legacy numeric settings retain operator
+   intent. Retained-value advisories treat flute count as effective cutter identity even when the
+   stable ID and gross geometry are unchanged; a successfully recalculated automatic recipe stays
+   silent.
+8. **Selection feedback shows the modeled cutting envelope.** A transient preview may reuse the
+   same tool profile and mesh builder as simulation for a flat cutter, full-radius ball, or valid
+   point V-bit, but must be labeled “Modeled cutting envelope.” It must not depict unmodeled flutes,
+   bearings, pilots, coatings, or shanks as though they were physically exact. Shank diameter is
+   text metadata only: without cutting length or transition height, the mesh's display stub stays at
+   cutter radius. The legacy `engraving` kind does not store enough tip geometry for a truthful 3D
+   cutting envelope, so selection shows a readable no-shape fallback rather than repeating its
+   flat-cylinder simulator approximation. An actual V-bit must satisfy the shared included-angle
+   contract of 1 through 179 degrees before the preview may draw a cone; invalid geometry receives the
+   same readable fallback treatment. Three.js remains lazy-loaded inside the CNC 3D UI boundary. If
+   WebGL/scene initialization fails, animation rendering throws, or the WebGL context is lost after
+   startup, the preview disposes acquired resources and transitions to readable fallback copy.
+9. **This feature adds no ordinary Start policy gate and changes no machine command.**
+   Reference-only entries cannot become selectable through the catalog. Existing input validation,
+   Frame-first Start authorization, controller behavior, and physical emergency controls are
+   unchanged. New refusals stay inside the existing compile-integrity boundary: a contributing
+   V-clear or rest-pocket roughing stage must resolve to a flat end mill, and an active V-clear or
+   relief-finish binding must resolve to a present tool. Prepared output names those impossible
+   bindings while direct compile defensively omits the incompatible or unavailable stage. Dormant,
+   output-disabled, geometry-free, and otherwise inapplicable secondary bindings do not block.
+
+### Consequences
+
+- Operators can browse many more cutter families without every project carrying the whole catalog.
+- Upcut, downcut, compression, O-flute, and straight tools may share the flat kernel while remaining
+  distinguishable in the UI; generic names claim neither center-cut capability nor flute-resolved
+  simulation, and only explicit single/double O-flute family identity supplies flute metadata.
+- Dovetail, T-slot, keyhole, edge-forming, finite-tip and parallel engraving, tapered-ball,
+  multi-axis lens/oval, high-feed form, panel-folding V-groove, surfacing, hybrid drilling/threading,
+  plug-cutting, spade-drilling, drag-engraving, reverse-rotation, driven rotary-wheel and bevel
+  knife, honeycomb, foam, and other unsupported families remain
+  visible without being misrepresented as an ordinary end mill.
+- Old projects without family metadata retain their exact tool IDs and geometry. UI grouping falls
+  back from `kind`, and unknown future families display as custom rather than changing CAM behavior.
+  The two catalog-backed starter V-bits are appended only when neither stable ID nor catalog identity
+  exists.
+- Opening an already-compatible CNC project merges saved app-library tools as well as the starter
+  enrichment. ID or catalog matches retain the project's copy, so app aliases do not replace saved
+  layer references or project metadata.
+- A catalog Add is rejected when the local saved library already owns that identity. When an
+  imported project already carries it, Add adopts that project ID and refreshes its trusted catalog
+  metadata rather than appending another alias.
+- Profile application canonicalizes only incoming catalog aliases. Every existing project tool ID
+  survives, while the profile's requested active ID maps to the retained current or incoming copy.
+- Deleting a custom tool is refused while an active V-clear, relief-finish, or pocket-roughing
+  stage uses it; dormant hidden references are cleared. Deleting the sole active custom tool also
+  restores the shared default tool list and a valid active ID.
+- Software tests can verify catalog integrity, persistence, grouping, selection, and modeled mesh
+  construction. They cannot verify runout, cutter balance, flute clearance, feeds, chip evacuation,
+  material finish, machine rigidity, or the result of a physical cut.
+
+### Verification
+
+- Catalog integrity tests cover 88 modeled, 72 reference-only, and 160 total entries; unique IDs;
+  HTTPS source fields; reviewed exact/representative evidence-scope ID sets and all three visible
+  source labels; family/model separation; generic no-center-cut and non-O no-flute invariants; and
+  the two hobby-router 90° V-bit cutting/shank dimensions; and the two exact Amana O-flute
+  ball-nose cutting/shank dimensions without an invented flute count.
+- Project and local-library tests cover valid metadata round-trips, malformed optional fields,
+  deeply normalized machine-profile payloads, duplicate catalog identity, additive old-project
+  starter enrichment, and matching-project app-library merge without replacing project copies.
+- Layer and automatic-seeding tests cover single O-flute material-feed provenance, active catalog
+  adoption, profile transitions, sole-tool deletion fallback, active auxiliary-reference refusal,
+  dormant-reference cleanup, incoming profile-alias normalization, exact-snapshot ordering,
+  existing project-ID preservation, and pinned/manual intent.
+- Profile UI coverage proves a same-ID flute-count change warns when manual values are retained and
+  remains silent when an automatic material recipe successfully recalculates.
+- Grouped-selector and catalog-panel tests cover legacy fallback grouping, reference-only entries,
+  and add-once behavior.
+- Preview tests cover shank metadata without invented geometry, engraving no-shape and invalid-angle
+  no-cone fallbacks, WebGL initialization and post-start render/context-loss fallbacks, idempotent
+  acquired/late-load disposal, reduced motion, ready-state auto-dismiss, pause behavior, and
+  active-bit selection.
+- The research/model-fit record is `docs/audits/2026-08-01-cnc-bit-catalog-research.md`.
+- NOT verified: manufacturer SKU completeness, manufacturer feed recommendations, real spindle or
+  collet compatibility, an air cut, a material cut, surface finish, or perceptual 3D fidelity.

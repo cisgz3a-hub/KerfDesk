@@ -50,6 +50,7 @@ export function commitImageSize(
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,
+    lastDirtyRect: null,
   };
 }
 
@@ -88,6 +89,7 @@ export function commitCanvasSize(
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,
+    lastDirtyRect: null,
   };
 }
 

@@ -8,7 +8,7 @@
 //
 // Pure and deterministic: no clock, random input, or I/O.
 
-import { type DeviceProfile } from '../devices';
+import { machineBoundsForDevice, type DeviceProfile } from '../devices';
 import { artworkOperationRuns } from '../artwork-order';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -22,7 +22,8 @@ import {
   type Scene,
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
-import { passNeedsTabs, splitPassForTabs, tabTopZMm } from './cnc-tabs';
+import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
+import { tabRampedPoints } from './cnc-tab-ramp';
 import { coolantFields } from './coolant-fields';
 import {
   capFeed,
@@ -30,6 +31,7 @@ import {
   contourPassFromPolyline,
   isProfileCutType,
   orderInnerFirst,
+  resolveRetractBetweenPasses,
 } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
@@ -43,12 +45,15 @@ import {
   lineArtSelectionApplies,
   selectLineArtContours,
 } from './line-art-contours';
+import { machineFrameHandedness, type FrameHandedness } from './machine-frame-handedness';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
+import { applyProfileLeadPasses } from './profile-lead-passes';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
 import { collectLayerContours } from './collect-cnc-contours';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
+import { cncGroupProvenance } from './cnc-group-provenance';
 
 export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
   const clearingGroups: CncGroup[] = [];
@@ -70,8 +75,24 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
       polylines,
       settings,
       config,
+      // The inlay pair builds its groups directly rather than through
+      // cncGroupForLayer, so it has to apply the ADR-250 lead itself or the
+      // male insert plunges full-depth onto the very wall that must fit the
+      // pocket. applyProfileLeadPasses is a no-op for the female pocket.
       (groupSettings, tool, passes) =>
-        cncGroupForPasses(layer, groupSettings, tool, passes, device, config),
+        cncGroupForPasses(
+          layer,
+          groupSettings,
+          tool,
+          applyProfileLeadPasses(
+            passes,
+            groupSettings,
+            tool.diameterMm,
+            machineBoundsForDevice(device),
+          ),
+          device,
+          config,
+        ),
     );
     if (inlayGroups !== null) {
       clearingGroups.push(tagArtworkGroup(inlayGroups.female, priorityObjectId));
@@ -111,8 +132,19 @@ export function cncGroupForLayer(
   tabSources?: ReadonlyArray<CollectedCncContour>,
 ): CncGroup | null {
   const tool = layerCncTool(config, settings);
-  const passes = passesForLayer(polylines, settings, tool, config, tabSources);
-  return cncGroupForPasses(layer, settings, tool, passes, device, config);
+  // Cut direction is a physical rule applied to machine numbers, and
+  // front-right / rear-left mirror the frame — see machine-frame-handedness.
+  const handedness = machineFrameHandedness(device.origin);
+  const passes = passesForLayer(polylines, settings, tool, config, handedness, tabSources);
+  // ADR-250: bake profile lead-in/out into closed profile passes (default-on
+  // for profile-outside/inside; a no-op for other cut types and shape 'none').
+  const led = applyProfileLeadPasses(
+    passes,
+    settings,
+    tool.diameterMm,
+    machineBoundsForDevice(device),
+  );
+  return cncGroupForPasses(layer, settings, tool, led, device, config);
 }
 
 function restPocketRoughingGroupForLayer(
@@ -151,6 +183,7 @@ function cncGroupForPasses(
     toolId: tool.id,
     toolName: tool.name,
     toolDiameterMm: tool.diameterMm,
+    ...cncGroupProvenance(settings, tool),
     feedMmPerMin: capFeed(cutFeed, device.maxFeed),
     plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
@@ -158,6 +191,7 @@ function cncGroupForPasses(
     ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
+    retractBetweenPasses: resolveRetractBetweenPasses(settings),
     passes,
   };
 }
@@ -173,7 +207,7 @@ export function vcarveClearanceGroupForLayer(
 ): CncGroup | null {
   if (settings.cutType !== 'v-carve' || settings.vClearToolId === undefined) return null;
   const clearTool = config.tools.find((tool) => tool.id === settings.vClearToolId);
-  if (clearTool === undefined) return null;
+  if (clearTool === undefined || clearTool.kind !== 'end-mill') return null;
   const vBit = layerCncTool(config, settings);
   const toolpaths = vcarveClearanceToolpaths(polylines, {
     vBit,
@@ -191,6 +225,7 @@ export function vcarveClearanceGroupForLayer(
     toolId: clearTool.id,
     toolName: clearTool.name,
     toolDiameterMm: clearTool.diameterMm,
+    ...cncGroupProvenance(settings, clearTool, { includeVResolution: false }),
     feedMmPerMin: capFeed(settings.feedMmPerMin, device.maxFeed),
     plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
@@ -198,6 +233,8 @@ export function vcarveClearanceGroupForLayer(
     ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
+    // A pocket already retracts between its regions; nothing to force here.
+    retractBetweenPasses: false,
     passes: depthMajorPasses(toolpaths, depths),
   };
 }
@@ -207,6 +244,7 @@ function passesForLayer(
   settings: CncLayerSettings,
   tool: CncTool,
   config: CncMachineConfig,
+  handedness: FrameHandedness,
   tabSources: ReadonlyArray<CollectedCncContour> = [],
 ): ReadonlyArray<CncPass> {
   const specialized = specializedPassesForLayer(polylines, settings, tool);
@@ -226,7 +264,7 @@ function passesForLayer(
   const toolpaths =
     settings.cutDirection === undefined
       ? raw
-      : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
+      : enforceCutDirection(raw, settings.cutDirection, settings.cutType, handedness);
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
   if (toolpaths.length === 0 || depths.length === 0) return [];
   const helicalPasses = helicalPocketPasses(settings, toolpaths, depths);
@@ -246,7 +284,14 @@ function passesForLayer(
     allowanceMm > 0
       ? [
           ...roughing,
-          ...finishingProfilePasses(contours, settings, tool.diameterMm, toolpaths, tabSources),
+          ...finishingProfilePasses(
+            contours,
+            settings,
+            tool.diameterMm,
+            toolpaths,
+            handedness,
+            tabSources,
+          ),
         ]
       : roughing;
   // H.9 (opt-in): plunges become along-path ramps at the configured angle.
@@ -374,6 +419,10 @@ function depthsWithTabTopPass(
   return [...depths, tabTop].sort((a, b) => b - a);
 }
 
+// ADR-258: a tabbed deep pass stays ONE continuous path that rises to the tab top
+// across each window, instead of splitting into pieces that each replunge at full
+// depth. When the rise cannot be built (open/degenerate loop, zero window) the
+// ordinary contour pass is kept, which is the same fallback the split model used.
 function appendTabbedPasses(
   passes: CncPass[],
   toolpath: Polyline,
@@ -382,17 +431,22 @@ function appendTabbedPasses(
   toolDiameterMm: number,
   manualCenters?: ReadonlyArray<number>,
 ): void {
-  for (const piece of splitPassForTabs(
+  const points = tabRampedPoints(
     toolpath,
+    zMm,
+    tabTopZMm(settings.depthMm, settings.tabHeightMm),
     {
       tabWidthMm: settings.tabWidthMm,
       tabsPerShape: settings.tabsPerShape,
       toolDiameterMm,
     },
     manualCenters,
-  )) {
-    if (piece.points.length >= 2) passes.push(contourPassFromPolyline(piece, zMm));
+  );
+  if (points === null || points.length < 2) {
+    passes.push(contourPassFromPolyline(toolpath, zMm));
+    return;
   }
+  passes.push({ kind: 'path3d', points, closed: false });
 }
 
 // Clear every ring at one depth before stepping down — pockets remove the

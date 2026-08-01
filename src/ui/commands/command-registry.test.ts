@@ -83,6 +83,19 @@ describe('buildAppCommands', () => {
     expect(newProject).not.toHaveBeenCalled();
   });
 
+  it('keeps every File command available while a job is active', () => {
+    const commands = buildAppCommands(baseCtx({ jobActive: true })).filter(
+      (command) => command.family === 'file',
+    );
+
+    expect(commands).toHaveLength(10);
+    for (const command of commands) {
+      expect(command.enabled, command.id).toBe(true);
+      expect(command.disabledReason, command.id).toBeUndefined();
+      expect(runCommand(command), command.id).toBe(true);
+    }
+  });
+
   it('does not run disabled image tools', () => {
     const traceImage = vi.fn();
     const commands = buildAppCommands(baseCtx({ hasRasterSelection: false, traceImage }));

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_ASSUMED_FLUTE_COUNT,
   resolveCncAutoLayerSettings,
   resolveCncMaterialFeedPatch,
   resolveCncStarterFeedPatch,
@@ -19,6 +20,9 @@ export type CncAutoSeedContext = {
   readonly device: DeviceProfile;
   readonly machine: CncMachineConfig;
   readonly liveCaps: CncMachineStarterLiveCaps | null;
+  // A machine-bit selection invalidates the inherited tool's flute-derived
+  // recipe. Other machine edits preserve an explicit calculator override.
+  readonly activeToolChanged?: boolean;
 };
 
 // Call only for an operation proven fresh by its mutation boundary. Existing
@@ -102,16 +106,32 @@ function refreshMaterialRecipeLayer(
   source: Extract<NonNullable<CncLayerSettings['feedSource']>, { kind: 'material-recipe' }>,
   context: CncAutoSeedContext,
 ): Layer {
+  const tool = layerCncTool(context.machine, settings);
+  const fluteCount =
+    context.activeToolChanged === true && settingsFollowActiveTool(settings, context.machine)
+      ? (tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT)
+      : source.fluteCount;
   const patch = resolveCncMaterialFeedPatch({
     profile: context.device,
-    tool: layerCncTool(context.machine, settings),
+    tool,
     materialKey: source.materialKey,
     spindleRpm: settings.spindleRpm,
     machineSpindleMaxRpm: context.machine.params.spindleMaxRpm,
-    fluteCount: source.fluteCount,
+    fluteCount,
     ...(context.liveCaps === null ? {} : { liveCaps: context.liveCaps }),
   });
-  return patch === null ? layer : layerWithAutomaticPatch(layer, settings, patch);
+  if (patch !== null) return layerWithAutomaticPatch(layer, settings, patch);
+  // The recipe no longer resolves for this cutter/material/profile. Keep the
+  // operator-visible numbers exact, but withdraw automatic rewrite authority
+  // so the UI can identify them honestly as retained manual values.
+  const { feedSource: _source, ...withoutSource } = settings;
+  return { ...layer, cnc: withoutSource };
+}
+
+function settingsFollowActiveTool(settings: CncLayerSettings, machine: CncMachineConfig): boolean {
+  return (
+    settings.toolId === undefined || !machine.tools.some((tool) => tool.id === settings.toolId)
+  );
 }
 
 function layerWithAutomaticPatch(
@@ -128,18 +148,19 @@ export function refreshAutomaticCncFeedsAfterToolRemoval(
   context: CncAutoSeedContext,
   removedToolId: string,
 ): Scene {
-  let changed = false;
   const layers = scene.layers.map((layer) => {
     const settings = layer.cnc;
     if (settings?.feedSource?.kind !== 'material-recipe' || settings.toolId !== removedToolId) {
-      return layer;
+      return refreshAutomaticCncLayer(layer, context);
     }
     const { toolId: _removed, ...withoutRemovedTool } = settings;
-    changed = true;
-    return { ...layer, cnc: withoutRemovedTool };
+    return refreshAutomaticCncLayer(
+      { ...layer, cnc: withoutRemovedTool },
+      { ...context, activeToolChanged: true },
+    );
   });
-  const prepared = changed ? { ...scene, layers } : scene;
-  return refreshAutomaticCncFeeds(prepared, context);
+  const changed = layers.some((layer, index) => layer !== scene.layers[index]);
+  return changed ? { ...scene, layers } : scene;
 }
 
 function automaticFeedFieldsEqual(left: CncLayerSettings, right: CncLayerSettings): boolean {

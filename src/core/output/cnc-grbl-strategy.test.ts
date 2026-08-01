@@ -41,7 +41,9 @@ describe('cncGrblStrategy', () => {
     const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
     // The safe-Z lift comes BEFORE M3: after touch-off the bit rests on the
     // stock top, and the spindle must not spin up there.
-    expect(gcode.startsWith('G21\nG90\nG54\nG94\nG0 Z3.810\nM3 S12000\nG4 P3.000\n')).toBe(true);
+    expect(gcode.startsWith('G21\nG90\nG54\nG94\nG17\nG0 Z3.810\nM3 S12000\nG4 P3.000\n')).toBe(
+      true,
+    );
   });
 
   it('retracts before XY travel and plunges at the plunge feed', () => {
@@ -55,6 +57,21 @@ describe('cncGrblStrategy', () => {
     const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
     // The loop closes at X10 Y10, then the deeper pass plunges directly.
     expect(gcode).toContain('G1 X10.000 Y10.000\nG1 Z-3.000 F300');
+  });
+
+  it('ADR-253: lifts to safe Z and replunges before each pass when retractBetweenPasses is on', () => {
+    const gcode = cncGrblStrategy.emit({ groups: [group({ retractBetweenPasses: true })] }, dev);
+    // Same-XY deeper pass now lifts clear of the cut and replunges instead of
+    // stepping Z down in place.
+    expect(gcode).toContain('G1 X10.000 Y10.000\nG0 Z3.810\nG1 Z-3.000 F300');
+    expect(gcode).not.toContain('G1 X10.000 Y10.000\nG1 Z-3.000 F300');
+  });
+
+  it('ADR-253: does not add a spurious retract before the first plunge (already at safe Z)', () => {
+    const gcode = cncGrblStrategy.emit({ groups: [group({ retractBetweenPasses: true })] }, dev);
+    // First pass rapids to the start and plunges once — no doubled G0 Z.
+    expect(gcode).toContain('G0 X10.000 Y10.000\nG1 Z-1.500 F300');
+    expect(gcode).not.toContain('G0 Z3.810\nG0 Z3.810');
   });
 
   it('repositions XY after a tool change even when the pass starts at the park XY (F23)', () => {

@@ -15,6 +15,7 @@ import {
   type Project,
   type RasterImage,
 } from '../../core/scene';
+import { compileDiagnosticWarnings } from './compile-diagnostic-warnings';
 import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 
 // ADR-234's feed-matched entry runway derives its length from the layer's
@@ -22,12 +23,17 @@ import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 // scorch the runway exists to prevent. Advisory only — never a gate (rule 7).
 const OVERSCAN_ZERO_DISABLES_4040_FILL_RUNWAY_WARNING =
   'Fill overscan is 0, which disables the 4040-safe burn-entry runway: split fill fragments will start burning straight out of a rapid and can scorch where each fragment begins. Restore fill overscan (KerfDesk uses up to 5 mm of it as feed-matched runway).';
+const GENERIC_SCAN_LINE_4040_POLICY_WARNING = (deviceName: string): string =>
+  `Generic Scan Line feed-matched entry and exit runways are active. The Neotronics-qualified 4040 fill policy is not selected because ${deviceName} is selected. KerfDesk cannot identify a Neotronics 4040 from bed size or controller settings. If this is that machine, open Machine Setup, choose Neotronics 4040 Max / LT-4LDS-V2, review it, and Save before this Scanline Fill.`;
 
 export function detectJobIntentWarnings(project: Project): ReadonlyArray<string> {
   const job = compileJob(project.scene, project.device);
-  const warnings = [...detectUncalibratedJobWarnings(job, project.scene.layers)];
+  const warnings = [
+    ...detectUncalibratedJobWarnings(job, project.scene.layers),
+    ...compileDiagnosticWarnings(job),
+  ];
   append4040FillPolicyWarning(project, job, warnings);
-  appendFillHeatWarnings(job, warnings);
+  appendFillHeatWarnings(job, project.device.scanningOffsets, warnings);
 
   const outputLayers = project.scene.layers.filter((layer) => layer.output);
   const seen = new Set<string>();
@@ -67,13 +73,15 @@ function append4040FillPolicyWarning(
       group.segments.length > 0,
   );
   if (!hasScanlineFill) return;
-  warnings.push(
-    `4040 fill-quality policy is inactive because ${project.device.name} is selected. KerfDesk cannot identify a Neotronics 4040 from bed size or controller settings. If this is that machine, open Machine Setup, choose Neotronics 4040 Max / LT-4LDS-V2, review it, and Save before this Scanline Fill.`,
-  );
+  warnings.push(GENERIC_SCAN_LINE_4040_POLICY_WARNING(project.device.name));
 }
 
-function appendFillHeatWarnings(job: ReturnType<typeof compileJob>, warnings: string[]): void {
-  const heat = analyzeFillHeatRisk(job);
+function appendFillHeatWarnings(
+  job: ReturnType<typeof compileJob>,
+  scanningOffsets: Project['device']['scanningOffsets'],
+  warnings: string[],
+): void {
+  const heat = analyzeFillHeatRisk(job, scanningOffsets);
   if (
     heat.fillDisabledRunwaySweepCount > 0 &&
     job.groups.some(isRunwayDisabledFeedMatchedFillGroup)

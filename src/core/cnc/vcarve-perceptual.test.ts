@@ -35,6 +35,18 @@ const MAX_DEPTH = 2;
 const RESOLUTION = 0.25;
 const CELL = 0.2;
 
+function squarePolyline(atX: number, atY: number, size: number) {
+  return {
+    closed: true,
+    points: [
+      { x: atX, y: atY },
+      { x: atX + size, y: atY },
+      { x: atX + size, y: atY + size },
+      { x: atX, y: atY + size },
+    ],
+  } as const;
+}
+
 function expectGrid(result: ReturnType<typeof computeRemovalGrid>) {
   if (result.kind === 'error') throw new Error(result.reason);
   return result.grid;
@@ -50,17 +62,7 @@ function vcarveScene(): Scene {
     paths: [
       {
         color: '#ff0000',
-        polylines: [
-          {
-            closed: true,
-            points: [
-              { x: AT, y: AT },
-              { x: AT + SIZE, y: AT },
-              { x: AT + SIZE, y: AT + SIZE },
-              { x: AT, y: AT + SIZE },
-            ],
-          },
-        ],
+        polylines: [squarePolyline(AT, AT, SIZE)],
       },
     ],
   };
@@ -76,6 +78,27 @@ function vcarveScene(): Scene {
           depthPerPassMm: MAX_DEPTH,
           vResolutionMm: RESOLUTION,
         },
+      },
+    ],
+  };
+}
+
+function multiRegionVcarveScene(): Scene {
+  const secondX = AT + 30;
+  const source = vcarveScene().objects[0];
+  if (source?.kind !== 'imported-svg') throw new Error('expected imported SVG fixture');
+  return {
+    ...vcarveScene(),
+    objects: [
+      {
+        ...source,
+        bounds: { ...source.bounds, maxX: secondX + SIZE },
+        paths: [
+          {
+            color: '#ff0000',
+            polylines: [squarePolyline(AT, AT, SIZE), squarePolyline(secondX, AT, SIZE)],
+          },
+        ],
       },
     ],
   };
@@ -152,5 +175,32 @@ describe('v-carve — perceptual (analytic pyramid field)', () => {
     const gcode = cncGrblStrategy.emit(job, device);
     expect(gcode.length).toBeGreaterThan(0);
     expect(gcode).toMatchSnapshot();
+  });
+
+  it('carries region-major traversal through compile and final G-code emission', () => {
+    const device = DEFAULT_DEVICE_PROFILE;
+    const job = compileCncJob(multiRegionVcarveScene(), device, vbitConfig());
+    const group = job.groups[0];
+    if (group?.kind !== 'cnc') throw new Error('expected CNC group');
+    const passOrder = group.passes
+      .map((pass) => {
+        if (pass.kind !== 'contour') throw new Error('expected contour pass');
+        return Math.max(...pass.polyline.map((point) => point.x)) < AT + 20 ? 'L' : 'R';
+      })
+      .join('');
+    expect(passOrder).toMatch(/^L+R+$/);
+
+    const entryOrder = cncGrblStrategy
+      .emit(job, device)
+      .split('\n')
+      .flatMap((line) => {
+        const match = /^G0 X(-?\d+(?:\.\d+)?) Y/.exec(line);
+        if (match?.[1] === undefined) return [];
+        const x = Number(match[1]);
+        if (x < AT - 1 || x > AT + 30 + SIZE + 1) return [];
+        return [x < AT + 20 ? 'L' : 'R'];
+      })
+      .join('');
+    expect(entryOrder).toMatch(/^L+R+$/);
   });
 });

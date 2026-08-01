@@ -30,6 +30,12 @@ import {
 } from './gcode-metadata';
 import { prepareOutput } from './prepare-output';
 import type { PreparedOutput } from './prepare-output';
+import {
+  isProgramMaterializationRangeError,
+  programMaterializationFailure,
+} from './program-materialization';
+
+export { PROGRAM_MATERIALIZATION_FAILED_MESSAGE } from './program-materialization';
 
 export type EmitGcodeResult = {
   readonly gcode: string;
@@ -130,14 +136,15 @@ export function emitPreparedGcodeWithCncPassSpans(
   // preflight input makes that guarantee explicit.
   const preflight = runEmitPreflight(prepared.project, body, options, rotaryStage);
   const gcode = options.metadata
-    ? gcodeMetadataHeader(options.metadata, headerAssumptionsFor(prepared.project)) + body
+    ? gcodeMetadataHeader(
+        options.metadata,
+        headerAssumptionsFor(prepared.project),
+        prepared.project.device,
+      ) + body
     : body;
   const spans = cncEmission !== null && options.metadata === undefined ? cncEmission.spans : null;
   return { gcode, preflight, spans };
 }
-
-export const PROGRAM_MATERIALIZATION_FAILED_MESSAGE =
-  'The compiled program is too large to hold as a single G-code file in this environment, so it cannot be produced. Lower the image resolution (lines/mm), reduce passes, or split the job.';
 
 type MaterializedProgram<T> =
   | { readonly kind: 'ok'; readonly value: T }
@@ -153,18 +160,10 @@ export function materializeProgram<T>(build: () => T): MaterializedProgram<T> {
   try {
     return { kind: 'ok', value: build() };
   } catch (error) {
-    if (error instanceof RangeError) {
+    if (isProgramMaterializationRangeError(error)) {
       return {
         kind: 'too-large',
-        preflight: {
-          ok: false,
-          issues: [
-            {
-              code: 'program-materialization-failed',
-              message: PROGRAM_MATERIALIZATION_FAILED_MESSAGE,
-            },
-          ],
-        },
+        preflight: programMaterializationFailure(),
       };
     }
     throw error;

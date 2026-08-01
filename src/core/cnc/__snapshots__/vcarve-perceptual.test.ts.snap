@@ -5,10 +5,20 @@ exports[`v-carve — perceptual (analytic pyramid field) > emits deterministic, 
 G90
 G54
 G94
+G17
 G0 Z3.810
 M3 S12000
 G4 P3.000
-; cnc layer L1 v-carve tool 6.000 mm feed 1000 plunge 300 spindle 12000 rpm passes 19
+; cnc layer-id: L1
+; cnc operation: v-carve; passes: 19
+; cnc tool-id: v90
+; cnc tool-name: 90° v-bit
+; cnc tool: v-bit; diameter-mm: 6.000; angle-deg: 90.000
+; cnc depth: requested-mm: 2.000; per-pass-mm: 2.000
+; cnc v-resolution-mm: 0.250
+; cnc motion: feed-mm-min: 1000; plunge-mm-min: 300
+; cnc spindle-rpm: 12000
+; cnc feed-source: manual
 G0 X59.750 Y340.250
 G1 Z-0.250 F300
 G1 X50.250 Y340.250 F1000

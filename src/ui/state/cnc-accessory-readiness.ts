@@ -29,33 +29,34 @@ export function cncAccessoryStartIssue(
   if (machineKind !== 'cnc') return null;
   if (accessories == null) {
     return (
-      'CNC Start requires a fresh GRBL accessory-state observation before the controlled preamble. ' +
-      'Wait for an Ov:/A: status report that confirms spindle and coolant state.'
+      'No fresh GRBL accessory-state observation has arrived, so spindle and coolant state ' +
+      'before the controlled preamble is unknown. An Ov:/A: status report confirms them.'
     );
   }
   if (accessories.secondarySpindlePresent === true) {
     return (
-      'CNC Start is blocked because grblHAL reports a secondary system spindle (SPn:). ' +
-      "KerfDesk does not yet model that spindle's selection, stop, or recovery semantics."
+      'grblHAL reports a secondary system spindle (SPn:). ' +
+      "KerfDesk does not model that spindle's selection, stop, or recovery semantics, " +
+      'so its state is not represented anywhere in this job.'
     );
   }
   if (accessories.spindleEncoderFault === true) {
     return (
-      'CNC Start is blocked because grblHAL reports a spindle encoder fault (A:E). ' +
-      'Inspect the spindle feedback hardware and clear the controller fault before starting.'
+      'grblHAL reports a spindle encoder fault (A:E). ' +
+      'Inspect the spindle feedback hardware and clear the controller fault.'
     );
   }
   if (accessories.toolChangePending === true) {
     return (
-      'CNC Start is blocked because grblHAL reports a firmware-managed tool change still pending (A:T). ' +
-      'Complete or cancel that controller workflow before starting a new job.'
+      'grblHAL reports a firmware-managed tool change still pending (A:T). ' +
+      'Complete or cancel that controller workflow first.'
     );
   }
   const active = activeAccessoryLabels(accessories);
   if (active.length === 0) return null;
   return (
-    `CNC Start requires spindle and coolant off before the controlled preamble. GRBL currently reports active: ${active.join(', ')}. ` +
-    'Stop them with M5 and M9, then wait for a fresh all-off status report before starting.'
+    `The controlled preamble expects spindle and coolant off. GRBL currently reports active: ${active.join(', ')}. ` +
+    'Stop them with M5 and M9, then wait for a fresh all-off status report.'
   );
 }
 

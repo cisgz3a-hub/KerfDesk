@@ -425,11 +425,15 @@ describe('controller-confirmed laser Pause and Resume', () => {
       const observed = observeOutcome(resume);
       await flushPromises();
       expect(observed.outcome()).toBe('pending');
+      expect(useLaserStore.getState().pauseResumeTransition).toMatchObject({
+        action: 'resume',
+      });
 
       await useLaserStore.getState().stopJob();
       await flushPromises();
 
       expect(observed.outcome()).toBe('rejected');
+      expect(useLaserStore.getState().pauseResumeTransition).toBeNull();
       expect(writes.filter((data) => data === GRBL_SOFT_RESET)).toHaveLength(1);
       expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
       const writesAfterStop = writes.length;

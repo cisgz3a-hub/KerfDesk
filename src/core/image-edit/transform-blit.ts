@@ -5,8 +5,12 @@
 // deterministic. The live preview draws the same affine through Canvas2D;
 // this function is the byte-authoritative commit.
 
+import { sourceOverPixelInPlace } from '../image-composite';
 import { RGBA_CHANNELS, type RgbaBuffer } from './rgba-buffer';
 import type { PixelRect } from './tiles';
+
+const MAX_BYTE = 255;
+const ALPHA_CHANNEL = 3;
 
 export type FloatingPixels = {
   readonly rect: PixelRect;
@@ -55,7 +59,7 @@ export function transformedBounds(floating: FloatingPixels, affine: AffineTransf
 /**
  * Composite the floating region through the affine (mutates the buffer in
  * place). Returns the document-clamped touched rect — capture history for
- * `transformedBounds` BEFORE white-filling the source and calling this.
+ * `transformedBounds` before clearing the source layer and calling this.
  */
 export function blitTransformedInPlace(
   buffer: RgbaBuffer,
@@ -89,25 +93,21 @@ export function blitTransformedInPlace(
       const sampled = sampleBilinear(floating, rx - 0.5, ry - 0.5);
       if (sampled === null || sampled.a === 0) continue;
       const base = (y * buffer.width + x) * RGBA_CHANNELS;
-      const alpha = sampled.a / 255;
-      blend(buffer, base, sampled.r, alpha);
-      blend(buffer, base + 1, sampled.g, alpha);
-      blend(buffer, base + 2, sampled.b, alpha);
-      buffer.data[base + 3] = 255;
+      sourceOverPixelInPlace(buffer.data, base, {
+        r: sampled.r,
+        g: sampled.g,
+        b: sampled.b,
+        alpha: sampled.a,
+      });
     }
   }
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-function blend(buffer: RgbaBuffer, index: number, target: number, alpha: number): void {
-  const current = buffer.data[index] ?? 0;
-  buffer.data[index] = Math.round(target * alpha + current * (1 - alpha));
-}
-
 type Sample = { readonly r: number; readonly g: number; readonly b: number; readonly a: number };
 
-// Bilinear sample of the floating pixels weighted by the mask alpha; null
-// outside the region entirely.
+// Bilinear sample in premultiplied-alpha space; transparent RGB contributes
+// no colour, and the selection mask scales the pixel's intrinsic alpha.
 function sampleBilinear(floating: FloatingPixels, fx: number, fy: number): Sample | null {
   const { width, height } = floating.rect;
   if (fx <= -1 || fy <= -1 || fx >= width || fy >= height) return null;
@@ -119,17 +119,19 @@ function sampleBilinear(floating: FloatingPixels, fx: number, fy: number): Sampl
   const addTap = (ox: number, oy: number, w: number): void => {
     if (ox < 0 || oy < 0 || ox >= width || oy >= height || w === 0) return;
     const idx = oy * width + ox;
-    const pa = ((floating.alpha[idx] ?? 0) / 255) * w;
     const base = idx * RGBA_CHANNELS;
-    acc.r += (floating.pixels[base] ?? 0) * pa;
-    acc.g += (floating.pixels[base + 1] ?? 0) * pa;
-    acc.b += (floating.pixels[base + 2] ?? 0) * pa;
-    acc.a += pa;
+    const pixelAlpha = (floating.pixels[base + ALPHA_CHANNEL] ?? 0) / MAX_BYTE;
+    const maskAlpha = (floating.alpha[idx] ?? 0) / MAX_BYTE;
+    const tapAlpha = pixelAlpha * maskAlpha * w;
+    acc.r += (floating.pixels[base] ?? 0) * tapAlpha;
+    acc.g += (floating.pixels[base + 1] ?? 0) * tapAlpha;
+    acc.b += (floating.pixels[base + 2] ?? 0) * tapAlpha;
+    acc.a += tapAlpha;
   };
   addTap(x0, y0, (1 - tx) * (1 - ty));
   addTap(x0 + 1, y0, tx * (1 - ty));
   addTap(x0, y0 + 1, (1 - tx) * ty);
   addTap(x0 + 1, y0 + 1, tx * ty);
   if (acc.a === 0) return null;
-  return { r: acc.r / acc.a, g: acc.g / acc.a, b: acc.b / acc.a, a: Math.round(acc.a * 255) };
+  return { r: acc.r / acc.a, g: acc.g / acc.a, b: acc.b / acc.a, a: acc.a };
 }

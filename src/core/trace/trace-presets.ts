@@ -44,10 +44,9 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // Fill hairline threshold cracks enclosed in solid ink (letter-stem
     // slivers) so they don't trace as spurious inner contours.
     fillPinholeCracks: true,
-    // Quality supersample (2x) for mid-size art: thin features (hooked apex
-    // tips, pale subtitle strokes) binarize with double the resolution —
-    // mask-level shape distortion no geometry stage can repair (mkbitmap's
-    // recipe; pixel-denominated caps scale via pixelScale).
+    // Feature-aware quality path: coherent thin details (hooked apex tips,
+    // pale subtitle strokes) supersample; broad art stays native and large
+    // dense color pictures use a bounded working grid.
     supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,
@@ -108,9 +107,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     edgeJoinGapPx: 5,
     // undefined = AUTO median: applied only when impulse noise is detected,
     // so clean art keeps its small features (see edge-trace.ts).
-    // Same 2x quality supersample as Line Art — the edge lane is
-    // contour-finished from a local-contrast mask, so it benefits from the
-    // identical measured-boundary stack (sub-pixel field + fit tail).
+    // Same feature-aware 2x quality path as Line Art. The edge lane shares the
+    // measured-boundary stack but broad solid source art stays native.
     supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,
@@ -143,7 +141,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // Same hairline-crack cleanup as Line Art; Sharp deliberately omits it
     // (pixel-fidelity preset — every notch matters, even a crack).
     fillPinholeCracks: true,
-    // Same 2x quality supersample as Line Art (Sharp opts out: bilinear
+    // Same feature-aware 2x quality path as Line Art (Sharp opts out: bilinear
     // supersampling anti-aliases the pixel notches it exists to preserve).
     supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).

@@ -28,6 +28,26 @@ const TOOLS: readonly ToolEntry[] = [
   },
   { tool: { kind: 'lasso' }, label: 'Lasso — Shift adds, Alt subtracts', shortcut: 'S' },
   { tool: { kind: 'wand' }, label: 'Magic wand — Shift adds, Alt subtracts', shortcut: 'W' },
+  {
+    tool: { kind: 'bucket' },
+    label: 'Paint bucket — fills the clicked region of what you see',
+    shortcut: 'G',
+  },
+  {
+    tool: { kind: 'gradient', shape: 'linear' },
+    label: 'Gradient — drag foreground→background; G cycles bucket/linear/radial',
+    shortcut: 'G',
+  },
+  {
+    tool: { kind: 'clone', source: null, offset: null },
+    label: 'Clone stamp — Alt-click sets the source, then paint the copy',
+    shortcut: 'K',
+  },
+  {
+    tool: { kind: 'heal' },
+    label: 'Spot heal — click a blemish; the surround patches it',
+    shortcut: 'J',
+  },
   { tool: { kind: 'crop' }, label: 'Crop — drag a box, Enter commits, Esc cancels', shortcut: 'C' },
   { tool: { kind: 'move' }, label: 'Move selected pixels', shortcut: 'V' },
 ];
@@ -40,7 +60,8 @@ export function EditorToolStrip(): JSX.Element {
       {TOOLS.map((entry) => {
         const isActive = entry.tool.kind === activeTool.kind;
         const shapeSuffix =
-          entry.tool.kind === 'marquee' && activeTool.kind === 'marquee'
+          (entry.tool.kind === 'marquee' && activeTool.kind === 'marquee') ||
+          (entry.tool.kind === 'gradient' && activeTool.kind === 'gradient')
             ? ` — ${activeTool.shape}`
             : '';
         return (

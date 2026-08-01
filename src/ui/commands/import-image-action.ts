@@ -9,7 +9,7 @@ import {
 import type { ToastVariant } from '../state/toast-store';
 import { readImageDensity } from '../common/image-density';
 import { describeImportedImageSize, rasterImportGeometry } from '../common/image-import';
-import { confirmOversizeImport } from '../app/import-size-guard';
+import { largeImportAdvisory } from '../app/import-size-advisory';
 
 /** Imports the file into the scene; resolves with the created object (null
  * when skipped or failed) so callers like Image Studio can chain onto it. */
@@ -18,9 +18,10 @@ export async function importImageFile(
   importRasterImage: (object: SceneObject) => void,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): Promise<SceneObject | null> {
-  // F-A3: confirm before importing a very large file (both the toolbar picker
-  // and drag-drop route through here).
-  if (!confirmOversizeImport(file.name, file.size)) return null;
+  // F-A3: advise (never refuse) before importing a very large file — both the
+  // toolbar picker and drag-drop route through here.
+  const advisory = largeImportAdvisory(file.name, file.size);
+  if (advisory !== null) pushToast(advisory, 'warning');
   try {
     const natural = await readImageNaturalSize(file);
     const image = await loadImageAsRawData(file, burnDecodeMaxEdge(natural.width, natural.height));

@@ -3,7 +3,11 @@
 // PROJECT.md Phase C item: "path optimization (2-opt)". Ships as a
 // nearest-neighbor heuristic, NOT full 2-opt:
 //
-//   * Nearest-neighbor is O(n²) total; pure greedy from a fixed start.
+//   * Nearest-neighbor is pure greedy from a fixed start. The naive form is
+//     O(n²); every nearest-pick here is indexed instead — segment entries and
+//     island-fill group entries both through segment-entry-index, containment
+//     depth through containment-depth — so there is no size ceiling anywhere
+//     in this module.
 //   * Full 2-opt with proper delta-computation is O(n²) per pass and
 //     several passes — adds several hundred lines of edge-case logic
 //     (slice reversal, segment-direction flipping, convergence loop).
@@ -43,11 +47,11 @@ import type { ScanOffsetPoint } from '../devices';
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
-import type { CutGroup, CutSegment, FillGroup, Group, Job } from './job';
-import { offsetForSpeed, shiftedScanSweepEndpoints } from './scan-offset';
+import type { CutGroup, FillGroup, Group, Job } from './job';
+import { offsetForSpeed } from './scan-offset';
+import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
+import { configuredSegmentOrder, startCursorForSegments } from './segment-order';
 
-const ORIGIN: Vec2 = { x: 0, y: 0 };
-export const MAX_NEAREST_NEIGHBOR_SEGMENTS = 2_000;
 type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
   'travelPolicy' | 'insideFirst' | 'layerPriority' | 'pathDirection' | 'startPoint'
@@ -67,6 +71,7 @@ export function optimizePaths(
 ): Job {
   const prioritized = prioritizeLayerGroups(job.groups, settings.layerPriority);
   return {
+    ...job,
     groups:
       settings.travelPolicy === 'source-order'
         ? prioritized
@@ -149,11 +154,9 @@ function optimizeGroupAny(group: Group, settings: PathOptimizationSettings): Gro
 
 function optimizeGroup(group: CutGroup, settings: PathOptimizationSettings): CutGroup {
   if (group.segments.length === 0) return group;
-  // Nearest-neighbor is O(n^2). Large traces can produce tens of
-  // thousands of cut/hatch segments, and optimizing them synchronously
-  // pins the UI. Keep deterministic source order once the optimizer
-  // would do more harm than good.
-  if (group.segments.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return group;
+  // No size ceiling: traced artwork routinely runs to tens of thousands of
+  // segments, and those are the jobs with the most travel to recover. The
+  // former 2,000 cap silently returned them unoptimized.
   // N=1 still benefits — open polylines can be entered from either
   // endpoint; reversal isn't a no-op when start ≠ origin.
   const ordered = configuredSegmentOrder(group.segments, settings);
@@ -162,7 +165,6 @@ function optimizeGroup(group: CutGroup, settings: PathOptimizationSettings): Cut
 
 function optimizeOffsetFillGroup(group: FillGroup, settings: PathOptimizationSettings): FillGroup {
   if (group.segments.length === 0) return group;
-  if (group.segments.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return group;
   return { ...group, segments: configuredSegmentOrder(group.segments, settings) };
 }
 
@@ -171,169 +173,33 @@ function optimizeIslandFillGroups(
   settings: PathOptimizationSettings,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): FillGroup[] {
-  if (groups.length <= 1 || groups.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return [...groups];
+  // No size ceiling. The former MAX_ISLAND_FILL_GROUP_REORDER existed only
+  // because this loop rescanned every remaining group on every step, and above
+  // it the groups came back in source order with no travel recovered at all.
+  if (groups.length <= 1) return [...groups];
   const endpoints = groups.map((group) => islandGroupEndpoints(group, scanningOffsets));
   if (endpoints.some((entry) => entry === null)) return [...groups];
 
+  const nearest = createNearestEntryQuery(islandGroupEntries(endpoints));
   const remaining = new Set<number>();
   for (let i = 0; i < groups.length; i += 1) remaining.add(i);
+  const isAvailable = (index: number): boolean => remaining.has(index);
   const out: FillGroup[] = [];
   let cursor = startCursorForSegments(
     groups.flatMap((group) => group.segments),
     settings.startPoint,
   );
   while (remaining.size > 0) {
-    const pick = pickBestIslandGroup(endpoints, remaining, cursor);
+    const pick = nearest(cursor, isAvailable);
     if (pick === null) break;
-    remaining.delete(pick);
-    const group = groups[pick];
-    const endpoint = endpoints[pick];
+    remaining.delete(pick.segmentIndex);
+    const group = groups[pick.segmentIndex];
+    const endpoint = endpoints[pick.segmentIndex];
     if (group === undefined || endpoint === undefined || endpoint === null) continue;
     out.push(group);
     cursor = endpoint.exit;
   }
   return out.length === groups.length ? out : [...groups];
-}
-
-function configuredSegmentOrder<T extends CutSegment>(
-  segments: ReadonlyArray<T>,
-  settings: PathOptimizationSettings,
-): T[] {
-  const startCursor = startCursorForSegments(segments, settings.startPoint);
-  if (!settings.insideFirst) {
-    return nearestNeighborOrderFrom(
-      segments,
-      startCursor,
-      settings.pathDirection === 'allow-reverse',
-    ).segments;
-  }
-  return insideFirstNearestNeighborOrder(
-    segments,
-    startCursor,
-    settings.pathDirection === 'allow-reverse',
-  );
-}
-
-function startCursorForSegments(
-  segments: ReadonlyArray<CutSegment>,
-  policy: PathOptimizationSettings['startPoint'],
-): Vec2 {
-  if (policy === 'machine-origin') return ORIGIN;
-  const bounds = segments.map(segmentBounds).filter((entry) => entry !== null);
-  if (bounds.length === 0) return ORIGIN;
-  const minX = Math.min(...bounds.map((entry) => entry.minX));
-  const minY = Math.min(...bounds.map((entry) => entry.minY));
-  if (policy === 'job-lower-left') return { x: minX, y: minY };
-  const maxX = Math.max(...bounds.map((entry) => entry.maxX));
-  const maxY = Math.max(...bounds.map((entry) => entry.maxY));
-  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
-}
-
-function insideFirstNearestNeighborOrder<T extends CutSegment>(
-  segments: ReadonlyArray<T>,
-  startCursor: Vec2,
-  allowReverse: boolean,
-): T[] {
-  const depths = containmentDepths(segments);
-  const maxDepth = depths.reduce((m, d) => Math.max(m, d), 0);
-  const out: T[] = [];
-  let cursor = startCursor;
-  for (let depth = maxDepth; depth >= 0; depth -= 1) {
-    const bucket = segments.filter((_, i) => depths[i] === depth);
-    const ordered = nearestNeighborOrderFrom(bucket, cursor, allowReverse);
-    out.push(...ordered.segments);
-    cursor = ordered.cursor;
-  }
-  return out;
-}
-
-// Greedy: at each step, pick the segment whose nearest endpoint (start
-// for forward, end for reversed) is closest to the current cursor.
-// Cursor starts at machine origin — matches the preamble's M3 S0 +
-// homed position. After picking, advance cursor to the segment's
-// far endpoint. Repeat until every segment is placed.
-function nearestNeighborOrderFrom<T extends CutSegment>(
-  segments: ReadonlyArray<T>,
-  startCursor: Vec2,
-  allowReverse: boolean,
-): { readonly segments: T[]; readonly cursor: Vec2 } {
-  const remaining = new Set<number>();
-  for (let i = 0; i < segments.length; i += 1) remaining.add(i);
-  const out: T[] = [];
-  let cursor: Vec2 = startCursor;
-  while (remaining.size > 0) {
-    const pick = pickBestNext(segments, remaining, cursor, allowReverse);
-    if (pick === null) break;
-    remaining.delete(pick.index);
-    const placed = pick.reverse ? reverseSegment(pick.segment) : pick.segment;
-    out.push(placed);
-    const last = placed.polyline[placed.polyline.length - 1];
-    if (last !== undefined) cursor = last;
-  }
-  return { segments: out, cursor };
-}
-
-type SegmentPick<T extends CutSegment> = {
-  readonly index: number;
-  readonly reverse: boolean;
-  readonly segment: T;
-};
-
-// Scan every remaining segment, return the (index, reverse-flag) pair
-// whose entry endpoint is closest to the cursor. Extracted from
-// nearestNeighborOrder to keep both functions under the cyclomatic
-// complexity cap (CLAUDE.md size limits — complexity max 12).
-function pickBestNext<T extends CutSegment>(
-  segments: ReadonlyArray<T>,
-  remaining: ReadonlySet<number>,
-  cursor: Vec2,
-  allowReverse: boolean,
-): SegmentPick<T> | null {
-  let best: SegmentPick<T> | null = null;
-  let bestDistSq = Number.POSITIVE_INFINITY;
-  for (const i of remaining) {
-    const seg = segments[i];
-    if (seg === undefined) continue;
-    const entries = segmentEntries(seg, allowReverse);
-    for (const entry of entries) {
-      const d = distanceSquared(cursor, entry.point);
-      if (d < bestDistSq) {
-        bestDistSq = d;
-        best = { index: i, reverse: entry.reverse, segment: seg };
-      }
-    }
-  }
-  return best;
-}
-
-// Candidate entry points for a segment: always the polyline start;
-// also the end if the polyline is open (closed loops have first==last
-// so reverse is a no-op for travel).
-function segmentEntries(
-  seg: CutSegment,
-  allowReverse: boolean,
-): ReadonlyArray<{ readonly point: Vec2; readonly reverse: boolean }> {
-  const start = seg.polyline[0];
-  if (start === undefined) return [];
-  if (seg.closed || !allowReverse) return [{ point: start, reverse: false }];
-  const end = seg.polyline[seg.polyline.length - 1];
-  if (end === undefined) return [{ point: start, reverse: false }];
-  return [
-    { point: start, reverse: false },
-    { point: end, reverse: true },
-  ];
-}
-
-function reverseSegment<T extends CutSegment>(seg: T): T {
-  return { ...seg, polyline: [...seg.polyline].reverse(), closed: seg.closed };
-}
-
-// Squared distance only — we compare distances, never need the sqrt.
-// Saves a Math.sqrt call per candidate per step.
-function distanceSquared(a: Vec2, b: Vec2): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  return dx * dx + dy * dy;
 }
 
 type RouteEndpoints = { readonly entry: Vec2; readonly exit: Vec2 };
@@ -367,9 +233,9 @@ function islandGroupEndpoints(
   group: FillGroup,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): RouteEndpoints | null {
-  const plans = planFillSweeps(group);
   const scanOffsetMm =
     group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed);
+  const plans = planFillSweeps(group, scanOffsetMm);
   let entry: Vec2 | null = null;
   let exit: Vec2 | null = null;
   for (const plan of plans) {
@@ -377,8 +243,7 @@ function islandGroupEndpoints(
     const first = sweep.spans[0];
     const last = sweep.spans[sweep.spans.length - 1];
     if (first === undefined || last === undefined) continue;
-    const burn = shiftedScanSweepEndpoints(first, last, sweep.reverse, scanOffsetMm);
-    const run = expandFillHatchWithRunways([burn.start, burn.end], plan);
+    const run = expandFillHatchWithRunways([first.start, last.end], plan);
     if (run === null) continue;
     if (entry === null) entry = run.leadStart;
     exit = run.leadEnd;
@@ -386,95 +251,30 @@ function islandGroupEndpoints(
   return entry === null || exit === null ? null : { entry, exit };
 }
 
-function pickBestIslandGroup(
-  endpoints: ReadonlyArray<RouteEndpoints | null>,
-  remaining: ReadonlySet<number>,
-  cursor: Vec2,
-): number | null {
-  let best: number | null = null;
-  let bestDistSq = Number.POSITIVE_INFINITY;
-  for (const i of remaining) {
+// One entry per group, reversed never — a group is entered at exactly one
+// point, unlike a segment, which an open polyline lets us enter from either
+// end. So the index's third tie-break key (forward before reversed) can never
+// fire here, and its comparator reduces to the lexicographic minimum over
+// (distanceSquared, groupIndex).
+//
+// DETERMINISM (PROJECT.md non-negotiable #5): that is exactly what the scan
+// this replaces computed. It walked `remaining`, a Set filled with 0..n-1 in
+// ascending order and only ever deleted from — so iteration was ascending
+// index — and kept the first candidate with a strictly smaller squared
+// distance. A non-finite distance never won there either: `d < bestDistSq` is
+// false for NaN in both directions, and Infinity never beats the Infinity the
+// scan started from. So the index returns the SAME group, not merely an
+// equally-near one, and G-code stays byte-identical.
+//
+// A group whose endpoints could not be computed contributes no entry, so it is
+// never picked. The loop then ends early with a short `out`, and the caller
+// falls back to source order — the same outcome as the scan's `continue`.
+function islandGroupEntries(endpoints: ReadonlyArray<RouteEndpoints | null>): SegmentEntry[] {
+  const entries: SegmentEntry[] = [];
+  for (let i = 0; i < endpoints.length; i += 1) {
     const endpoint = endpoints[i];
     if (endpoint === undefined || endpoint === null) continue;
-    const d = distanceSquared(cursor, endpoint.entry);
-    if (d < bestDistSq) {
-      best = i;
-      bestDistSq = d;
-    }
+    entries.push({ point: endpoint.entry, segmentIndex: i, reverse: false });
   }
-  return best;
-}
-
-type SegmentBounds = {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-};
-
-function containmentDepths(segments: ReadonlyArray<CutSegment>): number[] {
-  const bounds = segments.map(segmentBounds);
-  return segments.map((_, i) => {
-    const targetBounds = bounds[i] ?? null;
-    const ref = representativePoint(targetBounds);
-    if (ref === null) return 0;
-    let depth = 0;
-    for (let j = 0; j < segments.length; j += 1) {
-      if (i === j) continue;
-      const container = segments[j];
-      const containerBounds = bounds[j] ?? null;
-      if (container === undefined || !container.closed) continue;
-      if (containerBounds === null || targetBounds === null) continue;
-      if (!boundsContains(containerBounds, targetBounds)) continue;
-      if (pointInPolygon(ref, container.polyline)) depth += 1;
-    }
-    return depth;
-  });
-}
-
-function segmentBounds(seg: CutSegment): SegmentBounds | null {
-  if (seg.polyline.length === 0) return null;
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const p of seg.polyline) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  }
-  return { minX, minY, maxX, maxY };
-}
-
-function representativePoint(bounds: SegmentBounds | null): Vec2 | null {
-  if (bounds === null) return null;
-  return {
-    x: (bounds.minX + bounds.maxX) / 2,
-    y: (bounds.minY + bounds.maxY) / 2,
-  };
-}
-
-function boundsContains(container: SegmentBounds, target: SegmentBounds): boolean {
-  return (
-    target.minX >= container.minX &&
-    target.maxX <= container.maxX &&
-    target.minY >= container.minY &&
-    target.maxY <= container.maxY
-  );
-}
-
-function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
-  if (polygon.length < 3) return false;
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const pi = polygon[i];
-    const pj = polygon[j];
-    if (pi === undefined || pj === undefined) continue;
-    const crosses = pi.y > point.y !== pj.y > point.y;
-    if (!crosses) continue;
-    const xAtY = ((pj.x - pi.x) * (point.y - pi.y)) / (pj.y - pi.y) + pi.x;
-    if (point.x < xAtY) inside = !inside;
-  }
-  return inside;
+  return entries;
 }

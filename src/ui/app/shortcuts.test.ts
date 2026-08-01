@@ -5,17 +5,12 @@ import {
   handleTransformShortcut,
   handleViewShortcut,
 } from './shortcuts';
-import {
-  createProject,
-  DEFAULT_OUTPUT_SCOPE,
-  IDENTITY_TRANSFORM,
-  type Project,
-  type SceneObject,
-  type Transform,
-} from '../../core/scene';
+import { createProject, DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import type { ImportOutcome } from '../state/store';
+import { projectWithLine } from '../../__fixtures__/file-actions';
+import { projectWithObject, shapeObject } from './shortcuts-test-helpers';
 
 const mockPlatform: PlatformAdapter = {
   id: 'mock',
@@ -41,6 +36,7 @@ function fileCtx(
     outputScope: DEFAULT_OUTPUT_SCOPE,
     machine: { statusReport: null, workOriginActive: false, wcoCache: null },
     controllerSettings: null,
+    settingsCapability: 'grbl-dollar',
     lastSaveTarget: null,
     markSaved: vi.fn(),
     markLoaded: vi.fn(),
@@ -51,24 +47,40 @@ function fileCtx(
 }
 
 describe('handleFileShortcut - LightBurn-compatible Save G-code binding', () => {
-  it('leaves Ctrl+E free for the future Ellipse tool instead of exporting G-code', () => {
-    const event = fakeKeydown({ key: 'e', ctrlKey: true });
+  it('leaves Ctrl+E free and handles Ctrl+Shift+E as Save G-code', () => {
+    const plainEvent = fakeKeydown({ key: 'e', ctrlKey: true });
+    expect([handleFileShortcut(plainEvent, fileCtx()), plainEvent.defaultPrevented]).toEqual([
+      false,
+      false,
+    ]);
 
-    expect(handleFileShortcut(event, fileCtx())).toBe(false);
-    expect(event.defaultPrevented).toBe(false);
+    vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    const saveEvent = fakeKeydown({ key: 'e', ctrlKey: true, shiftKey: true });
+    expect([handleFileShortcut(saveEvent, fileCtx()), saveEvent.defaultPrevented]).toEqual([
+      true,
+      true,
+    ]);
   });
 
-  it('handles Ctrl+Shift+E as Save G-code', () => {
-    vi.spyOn(window, 'alert').mockImplementation(() => undefined);
-    const event = fakeKeydown({ key: 'e', ctrlKey: true, shiftKey: true });
-
-    expect(handleFileShortcut(event, fileCtx())).toBe(true);
-    expect(event.defaultPrevented).toBe(true);
+  it('keeps a no-dump readiness advisory non-blocking for Ctrl+Shift+E', async () => {
+    const [pickFileForSave, pushToast] = [vi.fn(async () => null), vi.fn()];
+    const context = fileCtx({
+      project: projectWithLine(),
+      settingsCapability: 'none',
+      pushToast,
+      platform: { ...mockPlatform, pickFileForSave },
+    });
+    expect(
+      handleFileShortcut(fakeKeydown({ key: 'e', ctrlKey: true, shiftKey: true }), context),
+    ).toBe(true);
+    await vi.waitFor(() => expect(pickFileForSave).toHaveBeenCalledOnce());
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringContaining('does not report GRBL $-settings'),
+      'warning',
+    );
   });
 });
 
-// Minimal stub for the EditCtx so each test only spies on the action it
-// cares about. Anything that fires unexpectedly trips its assertion.
 function editCtx(
   overrides: Partial<Parameters<typeof handleEditShortcut>[1]> = {},
 ): Parameters<typeof handleEditShortcut>[1] {
@@ -370,23 +382,6 @@ describe('handleTransformShortcut — flip keeps object position', () => {
     expect(flipSelection).toHaveBeenCalledWith('horizontal');
   });
 });
-
-function projectWithObject(object: SceneObject): Project {
-  const project = createProject();
-  return { ...project, scene: { ...project.scene, objects: [object] } };
-}
-
-function shapeObject(transform: Transform): SceneObject {
-  return {
-    kind: 'shape',
-    id: 'shape-1',
-    spec: { kind: 'rect', widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
-    color: '#000000',
-    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
-    transform: { ...IDENTITY_TRANSFORM, ...transform },
-    paths: [],
-  };
-}
 
 describe('handleEditShortcut - grouping', () => {
   it('Cmd+G groups the current selection', () => {

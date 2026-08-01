@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { COMPILE_INTEGRITY_PREFLIGHT_CODES } from '../../core/preflight';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import { emitStandaloneCncGcode } from './standalone-cnc-gcode';
 import type { GcodeMetadata } from './gcode-metadata';
@@ -35,15 +36,22 @@ describe('emitStandaloneCncGcode', () => {
     expect(result.preflight).toEqual({ ok: true, issues: [] });
     expect(result.gcode).toContain('; KerfDesk\n; version: 1.2.3');
     expect(result.gcode).toContain('; emitter: surfacing-test');
+    expect(result.gcode).toContain(`; profile-name: ${cncProject().device.name}`);
+    expect(result.gcode).toContain(`; profile-id: ${cncProject().device.profileId}`);
     expect(result.gcode).toContain('; assumes: GRBL $30=12000');
     expect(result.gcode.indexOf('G0 Z3.810')).toBeLessThan(result.gcode.indexOf('M3 S12000'));
     expect(result.gcode.endsWith('\n')).toBe(true);
   });
 
+  // Rule 7 category (b): no program is produced, so this must carry a
+  // COMPILE_INTEGRITY_PREFLIGHT_CODES member. Consumers partition on that set,
+  // and a heuristic code here would let one write the zero-byte result.
   it('refuses a standalone CNC wrapper without CNC machine configuration', () => {
     const result = emitStandaloneCncGcode(createProject(), BODY, METADATA);
     expect(result.gcode).toBe('');
     expect(result.preflight.ok).toBe(false);
-    expect(result.preflight.issues[0]?.code).toBe('cnc-settings-invalid');
+    const code = result.preflight.issues[0]?.code;
+    expect(code).toBe('empty-output');
+    expect(code !== undefined && COMPILE_INTEGRITY_PREFLIGHT_CODES.has(code)).toBe(true);
   });
 });

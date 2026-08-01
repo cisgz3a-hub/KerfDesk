@@ -7,14 +7,10 @@
 import type { OverrideValues } from '../../../core/controllers/grbl';
 import {
   analyzeFillHeatRisk,
-  computeJobBounds,
-  computeJobMotionBounds,
-  estimateJobDuration,
   formatDuration,
   type Job,
+  type ScanOffsetPoint,
 } from '../../../core/job';
-import type { DeviceProfile } from '../../../core/devices';
-import { finishOptionsForJobOrigin } from '../../../core/output';
 import { machineKindOf, type MachineKind, type Project } from '../../../core/scene';
 import type { CncToolPlanEntry } from '../../state/cnc-tool-plan';
 import type { LaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
@@ -37,7 +33,7 @@ import {
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
-import { detectParkOutsideFrameWarnings } from './park-outside-frame-warnings';
+import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 
 export type PreparedCurrentStart = Extract<
   Awaited<ReturnType<typeof prepareCurrentStartJob>>,
@@ -76,7 +72,7 @@ export function buildJobReviewModel(args: {
   const machineKind = machineKindOf(args.project.machine);
   return {
     machineKind,
-    stats: buildStatTiles(args.project, args.prepared, machineKind),
+    stats: buildStatTiles(args.prepared, machineKind, args.project.device.scanningOffsets),
     // prepared.warnings already carries controller/readiness/WCS/override
     // warnings; the intent set (raster upsample, trace-as-vector, fill heat)
     // was previously only a transient toast, so it joins the review here.
@@ -90,13 +86,9 @@ export function buildJobReviewModel(args: {
         buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
       ),
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
-      // The park point is resolved with the emitters' own precedence and the
-      // same finish-position seam emission uses (finishOptionsForJobOrigin).
-      ...detectParkOutsideFrameWarnings(
-        args.prepared.prepared.job,
-        args.project.device,
-        machineKind,
-        finishOptionsForJobOrigin(args.prepared.jobOrigin).finishPosition,
+      ...detectParkOutsideFrameWarningsFromMetrics(
+        args.prepared.metrics.motionBounds,
+        args.prepared.metrics.parkTarget,
       ),
     ]),
     resolvedOriginLabel: describeJobOrigin(args.prepared.jobOrigin),
@@ -105,6 +97,7 @@ export function buildJobReviewModel(args: {
     outputQualityFacts: buildOutputQualityReviewFacts(
       args.prepared.prepared.job,
       args.project.scene.layers,
+      args.project.device.scanningOffsets,
     ),
   };
 }
@@ -117,24 +110,26 @@ function buildInfoObservationIsCurrent(snapshot: LaserModeStartSnapshot): boolea
 }
 
 function buildStatTiles(
-  project: Project,
   prepared: PreparedCurrentStart,
   machineKind: MachineKind,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): ReadonlyArray<JobReviewStatTile> {
   const job = prepared.prepared.job;
-  const device = project.device;
   return [
-    timeTile(job, device, prepared.jobOrigin),
-    sizeTile(job, device),
+    timeTile(prepared.metrics.duration),
+    sizeTile(prepared.metrics.jobBounds, prepared.metrics.motionBounds),
     operationsTile(job, machineKind, prepared.cncToolPlan),
-    ...fillRunwayTiles(job),
+    ...fillRunwayTiles(job, scanningOffsets),
     gcodeTile(prepared.gcode),
     originTile(prepared.jobOrigin),
   ];
 }
 
-function fillRunwayTiles(job: Job): ReadonlyArray<JobReviewStatTile> {
-  const coverage = analyzeFillHeatRisk(job);
+function fillRunwayTiles(
+  job: Job,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
+): ReadonlyArray<JobReviewStatTile> {
+  const coverage = analyzeFillHeatRisk(job, scanningOffsets);
   if (coverage.fillSweepCount === 0) return [];
   const requested = coverage.fillRequestedRunwayValuesMm.join(' / ');
   return [
@@ -142,7 +137,7 @@ function fillRunwayTiles(job: Job): ReadonlyArray<JobReviewStatTile> {
       label: 'Fill runway',
       value: `${formatCount(coverage.fillFullRunwaySweepCount)} / ${formatCount(coverage.fillSweepCount)} full`,
       detail:
-        `Requested ${requested} mm · ` +
+        `Effective target ${requested} mm · ` +
         `${formatCount(coverage.fillPartialRunwaySweepCount)} partial · ` +
         `${formatCount(coverage.fillNoRunwaySweepCount)} skipped · ` +
         `${formatCount(coverage.fillDisabledRunwaySweepCount)} disabled`,
@@ -162,18 +157,7 @@ function originTile(origin: PreparedCurrentStart['jobOrigin']): JobReviewStatTil
   };
 }
 
-function timeTile(
-  job: Job,
-  device: DeviceProfile,
-  origin: PreparedCurrentStart['jobOrigin'],
-): JobReviewStatTile {
-  const finishPosition =
-    origin?.startFrom === 'current-position' ? origin.currentPosition : undefined;
-  const estimate = estimateJobDuration(
-    job,
-    device,
-    finishPosition === undefined ? {} : { initialPosition: finishPosition, finishPosition },
-  );
+function timeTile(estimate: PreparedCurrentStart['metrics']['duration']): JobReviewStatTile {
   return {
     label: 'Estimated time',
     value: formatDuration(estimate.totalSeconds),
@@ -181,10 +165,11 @@ function timeTile(
   };
 }
 
-function sizeTile(job: Job, device: DeviceProfile): JobReviewStatTile {
-  const bounds = computeJobBounds(job, device);
+function sizeTile(
+  bounds: PreparedCurrentStart['metrics']['jobBounds'],
+  motionBounds: PreparedCurrentStart['metrics']['motionBounds'],
+): JobReviewStatTile {
   if (bounds === null) return { label: 'Job size', value: '—', detail: 'No cut motion' };
-  const motionBounds = computeJobMotionBounds(job, device);
   const motionDiffers =
     motionBounds !== null &&
     (motionBounds.minX !== bounds.minX ||

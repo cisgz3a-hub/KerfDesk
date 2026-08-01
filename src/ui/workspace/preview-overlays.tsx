@@ -20,6 +20,15 @@ function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX
       </div>
     );
   }
+  if (props.issue?.kind === 'render-pressure') {
+    return (
+      <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
+        Large 2D preview: all {props.issue.observed.toLocaleString()} parsed steps are shown.
+        Drawing more than {props.issue.threshold.toLocaleString()} steps can use substantial memory
+        and may respond slowly.
+      </div>
+    );
+  }
   if (props.issue?.kind === 'preparing-large-job') {
     return (
       <div className="lf-banner" style={bannerStyle} role="status">
@@ -38,7 +47,7 @@ function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX
   if (props.issue?.kind === 'preparation-failed') {
     return (
       <div className="lf-banner lf-banner--danger" style={bannerStyle} role="alert">
-        Preview blocked: {props.issue.messages.join(' ')}
+        Preview unavailable: {props.issue.messages.join(' ')}
       </div>
     );
   }
@@ -65,8 +74,8 @@ export function PreviewStatusOverlays(props: {
       ) : null}
       {outOfBounds ? (
         <div className="lf-banner lf-banner--danger" style={bannerStyle} role="alert">
-          Some objects extend past the bed (red dashed outlines). Preflight will refuse Start / Save
-          G-code until they fit.
+          Some objects extend past the bed (red dashed outlines). This is a warning, not a block —
+          it appears in Job Review and after a save, and the physical Frame decides.
         </div>
       ) : null}
     </div>
@@ -415,5 +424,6 @@ function formatMm(value: number): string {
 function formatEstimate(estimate: LiveJobEstimate): string {
   if (estimate.kind === 'estimated') return estimate.label;
   if (estimate.kind === 'too-large') return 'ETA skipped';
+  if (estimate.kind === 'preparation-failed') return 'ETA unavailable';
   return '-';
 }

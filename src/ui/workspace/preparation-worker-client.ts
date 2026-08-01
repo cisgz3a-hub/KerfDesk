@@ -16,24 +16,14 @@
 //   - Environments without Worker (vitest/jsdom) get null: callers keep the
 //     paused fallback behavior.
 
-import type { JobOriginPlacement } from '../../core/job';
-import type { OutputScope, Project } from '../../core/scene';
+import type { Project } from '../../core/scene';
+import type { LargeJobPreparation, LargeJobPreparationOptions } from './large-job-preparation';
 import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
 } from './preparation-worker-protocol';
-import type { LiveJobEstimate } from '../laser/live-job-estimate';
-import type { PreviewToolpath } from './preview-status';
 
-export type LargeJobPreparation = {
-  readonly toolpath: PreviewToolpath;
-  readonly estimate: LiveJobEstimate;
-};
-
-export type LargeJobPreparationOptions = {
-  readonly jobOrigin?: JobOriginPlacement;
-  readonly outputScope?: OutputScope;
-};
+export type { LargeJobPreparation, LargeJobPreparationOptions } from './large-job-preparation';
 
 type Pending = {
   readonly project: Project;

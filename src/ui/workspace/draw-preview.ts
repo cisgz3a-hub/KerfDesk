@@ -145,21 +145,35 @@ export function buildPreviewToolpath(
   // complexity gates run first so huge traces/fills never reach synchronous
   // compile on the MAIN thread; the worker path (ADR-244) prepares them
   // unbounded off-thread instead.
+  const issue = previewPreparationIssue(project, options);
+  if (issue !== null) return emptyPreviewToolpath(issue);
+  return buildPreviewToolpathUnbounded(project, options);
+}
+
+/**
+ * The gates every synchronous preview build runs before preparing on the main
+ * thread: output-scope validation, then the canvas-responsiveness complexity
+ * fallbacks (ADR-241/ADR-243). Null means the project is safe to prepare
+ * synchronously; an issue is the reason it is not. Start, Save, and Frame
+ * prepare these scenes regardless — only the live preview pauses.
+ */
+export function previewPreparationIssue(
+  project: Project,
+  options: { readonly outputScope?: OutputScope } = {},
+): PreviewIssue | null {
   const scoped =
     options.outputScope === undefined
       ? null
       : validateOutputScope(project.scene, options.outputScope);
   if (scoped !== null && !scoped.ok) {
-    return emptyPreviewToolpath({ kind: 'preparation-failed', messages: scoped.messages });
+    return { kind: 'preparation-failed', messages: scoped.messages };
   }
   const complexityScene = scoped === null ? project.scene : scoped.scene;
-  // Canvas-responsiveness fallbacks only (ADR-241/ADR-243): Start, Save, and
-  // Frame prepare these scenes regardless; the live preview pauses.
-  if (scenePreparationTooComplex(complexityScene))
-    return emptyPreviewToolpath({ kind: 'too-complex' });
-  if (rasterPreparationTooComplex({ ...project, scene: complexityScene }))
-    return emptyPreviewToolpath({ kind: 'too-complex' });
-  return buildPreviewToolpathUnbounded(project, options);
+  if (scenePreparationTooComplex(complexityScene)) return { kind: 'too-complex' };
+  if (rasterPreparationTooComplex({ ...project, scene: complexityScene })) {
+    return { kind: 'too-complex' };
+  }
+  return null;
 }
 
 /**
@@ -175,7 +189,7 @@ export function buildPreviewToolpathUnbounded(
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });
-  return previewFromPrepared(project, prepared, options.jobOrigin);
+  return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin);
 }
 
 export async function buildPreviewToolpathSnapshot(
@@ -185,25 +199,13 @@ export async function buildPreviewToolpathSnapshot(
     'clock' | 'renderVariableText' | 'jobOrigin' | 'outputScope' | 'registration'
   >,
 ): Promise<PreviewToolpath> {
-  const scoped =
-    options.outputScope === undefined
-      ? null
-      : validateOutputScope(project.scene, options.outputScope);
-  if (scoped !== null && !scoped.ok) {
-    return emptyPreviewToolpath({ kind: 'preparation-failed', messages: scoped.messages });
-  }
-  const complexityScene = scoped === null ? project.scene : scoped.scene;
-  if (scenePreparationTooComplex(complexityScene)) {
-    return emptyPreviewToolpath({ kind: 'too-complex' });
-  }
-  if (rasterPreparationTooComplex({ ...project, scene: complexityScene })) {
-    return emptyPreviewToolpath({ kind: 'too-complex' });
-  }
+  const issue = previewPreparationIssue(project, options);
+  if (issue !== null) return emptyPreviewToolpath(issue);
   const prepared = await prepareOutputSnapshot(project, options);
-  return previewFromPrepared(project, prepared, options.jobOrigin);
+  return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin);
 }
 
-function previewFromPrepared(
+export function buildPreviewToolpathFromPrepared(
   project: Project,
   prepared: PreparedOutput,
   jobOrigin?: JobOriginPlacement,

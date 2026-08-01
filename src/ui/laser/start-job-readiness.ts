@@ -7,6 +7,7 @@ import {
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
+import type { CanvasJobTimingPlanResult } from '../state/canvas-job-timing-plan';
 import type { SimilarityTransform } from '../../core/registration';
 import type { JobOriginPlacement } from '../../core/job';
 import type {
@@ -58,6 +59,8 @@ import {
 } from './start-job-readiness-policy';
 import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
 import { startControllerPolicy } from './start-job-controller-policy';
+import type { PreparedJobMetrics } from './prepared-job-metrics';
+import { controllerIdentityWarnings } from './controller-identity-warnings';
 
 export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
@@ -73,6 +76,10 @@ export type StartJobPreparation =
       readonly warnings: ReadonlyArray<string>;
       readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
       readonly canvasPlan: CanvasMotionPlan;
+      /** Exact emitted-program timing result kept in memory beside the
+       * prepared program. It is not part of the persisted canvas artifact. */
+      readonly jobTimingPlan?: CanvasJobTimingPlanResult;
+      readonly metrics: PreparedJobMetrics;
       /** Exact compiled/placed Job used for this G-code. Recovery may only
        * derive a smaller semantic Job from this already-gated source. */
       readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
@@ -303,7 +310,7 @@ function finalizeStartPreparation({
   const largeJobWarning = largeJobPreparationWarning(prepared.project.scene);
   const largeRasterWarning = largeRasterPreparationWarning(prepared.project);
   const warnings = collectStartWarnings(
-    project,
+    prepared.project,
     controllerSettings,
     [
       ...(largeJobWarning === null ? [] : [largeJobWarning]),
@@ -317,6 +324,13 @@ function finalizeStartPreparation({
         printCutRegistrationActive,
         placement.jobOrigin,
       ),
+      ...(machine.activeControllerKind === undefined
+        ? []
+        : controllerIdentityWarnings(
+            project.device.controllerKind ?? 'grbl-v1.1',
+            machine.activeControllerKind,
+            machine.detectedControllerKind ?? null,
+          )),
       ...controllerPolicy.advisories,
       ...controller.warnings.map((issue) => issue.message),
     ],

@@ -26,7 +26,7 @@ import { ProbePanel } from './ProbePanel';
 import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { useStartBlockerStore } from './start-blocker-store';
+import { clearStartBlockers } from './start-blocker-invalidation';
 import { useToastStore } from '../state/toast-store';
 
 export function LaserWindow(): JSX.Element {
@@ -124,7 +124,7 @@ export async function forgetControllerAndClearStartBlockers(): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     useToastStore.getState().pushToast(`Forget Controller could not finish: ${message}`, 'error');
   } finally {
-    useStartBlockerStore.getState().clear();
+    clearStartBlockers();
   }
 }
 

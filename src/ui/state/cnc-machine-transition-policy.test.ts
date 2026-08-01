@@ -46,6 +46,12 @@ function cncSettings(id: string): CncLayerSettings | undefined {
   return useStore.getState().project.scene.layers.find((layer) => layer.id === id)?.cnc;
 }
 
+function requiredCncSettings(id: string): CncLayerSettings {
+  const settings = cncSettings(id);
+  if (settings === undefined) throw new Error(`CNC settings missing for ${id}`);
+  return settings;
+}
+
 beforeEach(resetStore);
 afterEach(resetStore);
 
@@ -63,7 +69,7 @@ describe('CNC automatic-setting transition policy', () => {
             operation('manual', manual),
             operation('known', starterSettings(333)),
             operation('unknown', starterSettings(444, 'unknown-starter')),
-            operation('newer', starterSettings(555, STARTER_ID, 2)),
+            operation('newer', starterSettings(555, STARTER_ID, 3)),
           ],
         },
       },
@@ -72,11 +78,11 @@ describe('CNC automatic-setting transition policy', () => {
     useStore.getState().setMachineKind('cnc');
 
     expect(cncSettings('absent')).toMatchObject({
-      feedMmPerMin: 600,
-      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 1 },
+      feedMmPerMin: 300,
+      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 2 },
     });
     expect(cncSettings('manual')).toEqual(manual);
-    expect(cncSettings('known')).toMatchObject({ feedMmPerMin: 600 });
+    expect(cncSettings('known')).toMatchObject({ feedMmPerMin: 300 });
     expect(cncSettings('unknown')?.feedMmPerMin).toBe(444);
     expect(cncSettings('unknown')?.feedSource).toBeUndefined();
     expect(cncSettings('newer')?.feedMmPerMin).toBe(555);
@@ -108,8 +114,8 @@ describe('CNC automatic-setting transition policy', () => {
 
     useStore.getState().replaceMachineSetup(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, machine);
 
-    expect(cncSettings('absent')?.feedMmPerMin).toBe(600);
-    expect(cncSettings('automatic')?.feedMmPerMin).toBe(600);
+    expect(cncSettings('absent')?.feedMmPerMin).toBe(300);
+    expect(cncSettings('automatic')?.feedMmPerMin).toBe(300);
     expect(cncSettings('manual')).toEqual(manual);
   });
 
@@ -133,11 +139,11 @@ describe('CNC automatic-setting transition policy', () => {
     expect(useStore.getState().project.scene).toBe(sceneBeforeBedEdit);
     expect(cncSettings('automatic')?.feedMmPerMin).toBe(333);
 
-    useStore.getState().updateDeviceProfile({ maxFeed: 500 });
+    useStore.getState().updateDeviceProfile({ maxFeed: 250 });
 
     expect(cncSettings('automatic')).toMatchObject({
-      feedMmPerMin: 500,
-      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 1 },
+      feedMmPerMin: 250,
+      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 2 },
     });
     expect(cncSettings('manual')).toEqual(manual);
   });
@@ -197,11 +203,76 @@ describe('CNC automatic-setting transition policy', () => {
     expect(cncSettings('manual')).toEqual(manual);
   });
 
-  it('removes a deleted tool override only from automatic material recipes and recalculates them', () => {
+  it('refreshes inherited flute count when a profile selects another bit without changing pinned or manual intent', () => {
     useStore.getState().setMachineKind('cnc');
-    useStore
+    useStore.getState().addCustomCncTool({
+      name: '3.175 mm single O-flute',
+      kind: 'end-mill',
+      diameterMm: 3.175,
+      family: 'o-flute-upcut',
+      fluteCount: 1,
+      catalogId: 'o-upcut-0125',
+    });
+    const customId = useStore.getState().cncLibrary.customTools[0]?.id;
+    if (customId === undefined) throw new Error('Custom tool missing');
+    useStore.getState().updateCncMachine({ toolId: customId });
+    useStore.getState().saveCncMachineProfile('Single flute');
+    useStore.getState().updateCncMachine({ toolId: 'em-3175' });
+
+    const pinned = materialSettings(222, {
+      toolId: 'em-6350',
+      feedSource: {
+        kind: 'material-recipe',
+        materialKey: 'plywood-mdf',
+        fluteCount: 3,
+      },
+    });
+    const manual = { ...DEFAULT_CNC_LAYER_SETTINGS, feedMmPerMin: 777 };
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          layers: [
+            operation('inherited', materialSettings(111)),
+            operation('pinned', pinned),
+            operation('manual', manual),
+          ],
+        },
+      },
+    }));
+
+    const profile = useStore
       .getState()
-      .addCustomCncTool({ name: 'Wide custom bit', kind: 'end-mill', diameterMm: 6.35 });
+      .cncLibrary.machineProfiles.find((candidate) => candidate.name === 'Single flute');
+    if (profile === undefined) throw new Error('Machine profile missing');
+    useStore.getState().applyCncMachineProfile(profile.id);
+
+    const appliedMachine = useStore.getState().project.machine;
+    if (appliedMachine?.kind !== 'cnc') throw new Error('CNC machine missing');
+    expect(appliedMachine.toolId).toBe(customId);
+    expect(appliedMachine.tools.find((tool) => tool.id === customId)?.fluteCount).toBe(1);
+    expect(cncSettings('inherited')?.feedSource).toEqual({
+      kind: 'material-recipe',
+      materialKey: 'plywood-mdf',
+      fluteCount: 1,
+    });
+    expect(cncSettings('inherited')?.feedMmPerMin).not.toBe(111);
+    expect(cncSettings('pinned')?.toolId).toBe(pinned.toolId);
+    expect(cncSettings('pinned')?.feedSource).toEqual(pinned.feedSource);
+    expect(cncSettings('manual')).toEqual(manual);
+  });
+
+  it('refreshes inherited and removed overrides when deleting the active bit while preserving pinned and manual intent', () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().addCustomCncTool({
+      name: '3.175 mm single O-flute',
+      kind: 'end-mill',
+      diameterMm: 3.175,
+      family: 'o-flute-upcut',
+      fluteCount: 1,
+      catalogId: 'o-upcut-0125',
+    });
     const customId = useStore.getState().cncLibrary.customTools[0]?.id;
     if (customId === undefined) throw new Error('Custom tool missing');
     useStore.getState().updateCncMachine({ toolId: customId });
@@ -216,7 +287,38 @@ describe('CNC automatic-setting transition policy', () => {
         scene: {
           ...state.project.scene,
           layers: [
-            operation('automatic', materialSettings(111, { toolId: customId })),
+            operation(
+              'inherited',
+              materialSettings(111, {
+                feedSource: {
+                  kind: 'material-recipe',
+                  materialKey: 'plywood-mdf',
+                  fluteCount: 1,
+                },
+              }),
+            ),
+            operation(
+              'removed-override',
+              materialSettings(222, {
+                toolId: customId,
+                feedSource: {
+                  kind: 'material-recipe',
+                  materialKey: 'plywood-mdf',
+                  fluteCount: 1,
+                },
+              }),
+            ),
+            operation(
+              'pinned-other',
+              materialSettings(333, {
+                toolId: 'em-6350',
+                feedSource: {
+                  kind: 'material-recipe',
+                  materialKey: 'plywood-mdf',
+                  fluteCount: 3,
+                },
+              }),
+            ),
             operation('manual', manual),
           ],
         },
@@ -229,9 +331,79 @@ describe('CNC automatic-setting transition policy', () => {
     if (machine?.kind !== 'cnc') throw new Error('CNC machine missing');
     expect(machine.tools.some((tool) => tool.id === customId)).toBe(false);
     expect(machine.toolId).not.toBe(customId);
-    expect(cncSettings('automatic')?.toolId).toBeUndefined();
-    expect(cncSettings('automatic')?.feedMmPerMin).not.toBe(111);
-    expect(cncSettings('automatic')?.feedSource?.kind).toBe('material-recipe');
+    expect(machine.tools.find((tool) => tool.id === machine.toolId)?.fluteCount).toBeUndefined();
+    const inherited = requiredCncSettings('inherited');
+    const removedOverride = requiredCncSettings('removed-override');
+    const pinnedOther = requiredCncSettings('pinned-other');
+    expect(inherited.feedSource).toEqual({
+      kind: 'material-recipe',
+      materialKey: 'plywood-mdf',
+      fluteCount: 2,
+    });
+    expect(inherited.feedMmPerMin).not.toBe(111);
+    expect(removedOverride.toolId).toBeUndefined();
+    expect(removedOverride.feedSource).toEqual({
+      kind: 'material-recipe',
+      materialKey: 'plywood-mdf',
+      fluteCount: 2,
+    });
+    expect(removedOverride.feedMmPerMin).not.toBe(222);
+    expect(pinnedOther.toolId).toBe('em-6350');
+    expect(pinnedOther.feedSource).toEqual({
+      kind: 'material-recipe',
+      materialKey: 'plywood-mdf',
+      fluteCount: 3,
+    });
     expect(cncSettings('manual')).toEqual(manual);
+  });
+
+  it('recalculates inherited material feeds with a newly selected catalog bit flute count', () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().addCustomCncTool({
+      name: '3.175 mm single O-flute',
+      kind: 'end-mill',
+      diameterMm: 3.175,
+      family: 'o-flute-upcut',
+      fluteCount: 1,
+      catalogId: 'o-upcut-0125',
+    });
+    const customId = useStore.getState().cncLibrary.customTools[0]?.id;
+    if (customId === undefined) throw new Error('Custom tool missing');
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          layers: [
+            operation('inherited', materialSettings(111)),
+            operation(
+              'pinned',
+              materialSettings(222, {
+                toolId: 'em-6350',
+                feedSource: {
+                  kind: 'material-recipe',
+                  materialKey: 'plywood-mdf',
+                  fluteCount: 3,
+                },
+              }),
+            ),
+          ],
+        },
+      },
+    }));
+
+    useStore.getState().updateCncMachine({ toolId: customId });
+
+    expect(cncSettings('inherited')?.feedSource).toEqual({
+      kind: 'material-recipe',
+      materialKey: 'plywood-mdf',
+      fluteCount: 1,
+    });
+    expect(cncSettings('inherited')?.feedMmPerMin).not.toBe(111);
+    expect(cncSettings('pinned')?.feedSource).toEqual({
+      kind: 'material-recipe',
+      materialKey: 'plywood-mdf',
+      fluteCount: 3,
+    });
   });
 });

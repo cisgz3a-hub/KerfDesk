@@ -18,11 +18,13 @@ import {
   type TraceBoundary,
   type TraceOptions,
 } from '../../core/trace';
-import { useStore } from '../state';
+import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { Dialog } from '../kit';
 import {
+  CNC_TRACE_PRESET_NAME,
+  DEFAULT_TRACE_PRESET_NAME,
   DialogActions,
   DeleteImageAfterTraceToggle,
   PresetHint,
@@ -40,6 +42,7 @@ import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
 import { useBoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
+import { fairTracedPathsForCnc } from './cnc-trace-fairing';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import { commitTraceOutput } from './trace-output-commit';
 import { useTracePreview } from './use-trace-preview';
@@ -87,7 +90,11 @@ function DialogBody(props: {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
   const file = useTraceSourceFile(seed, pushToast);
-  const [preset, setPreset] = useState<string>('Line Art');
+  // CNC opens on Smooth, the preset that traces cleanly on a router. It is a
+  // starting selection, not a restriction — every preset stays selectable.
+  const [preset, setPreset] = useState<string>(
+    machineKind === 'cnc' ? CNC_TRACE_PRESET_NAME : DEFAULT_TRACE_PRESET_NAME,
+  );
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
   const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
   const [traceOutput, setTraceOutput] = useState<TraceOutput>('vector');
@@ -123,8 +130,8 @@ function DialogBody(props: {
       options,
       seed,
       traceOutput: effectiveTraceOutput,
-      traceFillStyle:
-        effectiveTraceOutput === 'vector' && supportsTraceFillStyle ? traceFillStyle : 'scanline',
+      machineKind,
+      traceFillStyle,
       deleteSourceAfterTrace,
       boundary: boundarySelection.boundary,
       boundaryMode: boundarySelection.boundaryMode,
@@ -151,7 +158,7 @@ function DialogBody(props: {
         traceFillStyle={traceFillStyle}
         onTraceFillStyleChange={setTraceFillStyle}
       />
-      <PresetPicker value={preset} onChange={setPreset} />
+      <PresetPicker machineKind={machineKind} value={preset} onChange={setPreset} />
       <TraceSettingsControls
         preset={presetOptions}
         overrides={traceSettings}
@@ -245,6 +252,28 @@ function TracePreviewPanel(props: {
   );
 }
 
+// CNC submits no fill style at all, so the committed object carries no fill
+// override. fillStyle is read only by the laser compiler (src/core/job), so on
+// CNC it was a value the operator could not see — the picker is hidden there —
+// and could not act on, yet it still pinned the object to mode:'fill'. That
+// would silently hatch-engrave it if the project were later switched to laser.
+// Omitting it lets the object follow its layer's mode instead. Laser behaviour
+// is unchanged: vector output on a filled-contour preset sends the operator's
+// choice, anything else sends the scanline default exactly as before.
+function submittedFillStyle(deps: {
+  readonly machineKind: 'laser' | 'cnc';
+  readonly traceOutput: TraceOutput;
+  readonly options: TraceOptions;
+  readonly traceFillStyle: TraceFillStyle;
+}): { readonly traceFillStyle?: TraceFillStyle } {
+  if (deps.machineKind === 'cnc') return {};
+  const supportsFillStyle = isFilledContourTraceOptions(deps.options);
+  return {
+    traceFillStyle:
+      deps.traceOutput === 'vector' && supportsFillStyle ? deps.traceFillStyle : 'scanline',
+  };
+}
+
 // Assemble the trace args from the dialog's live state and hand them to commit.
 // Extracted from DialogBody so that render function stays inside the 80-line
 // function cap (ADR-015) after the CNC-hint conditional was added.
@@ -253,6 +282,7 @@ function submitTraceDialog(deps: {
   readonly options: TraceOptions;
   readonly seed: RasterImage;
   readonly traceOutput: TraceOutput;
+  readonly machineKind: 'laser' | 'cnc';
   readonly traceFillStyle: TraceFillStyle;
   readonly deleteSourceAfterTrace: boolean;
   readonly boundary: TraceBoundary | null;
@@ -274,7 +304,7 @@ function submitTraceDialog(deps: {
     options: deps.options,
     seed: deps.seed,
     traceOutput: deps.traceOutput,
-    traceFillStyle: deps.traceFillStyle,
+    ...submittedFillStyle(deps),
     deleteSourceAfterTrace: deps.deleteSourceAfterTrace,
     boundary: deps.boundary,
     boundaryMode: deps.boundaryMode,
@@ -348,7 +378,20 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       );
       return;
     }
-    if (await commitTraceOutput(args, ctx, traced, liveProject)) ctx.close();
+    // CNC conditioning uses the exact live placement that the store will
+    // apply. Transform-only source changes are intentionally accepted, so
+    // fairing before this point would use stale physical units.
+    const commitTraced =
+      liveProject.machine?.kind === 'cnc'
+        ? {
+            ...traced,
+            paths: fairTracedPathsForCnc(
+              paths,
+              positionTraceOverRasterSource(liveSource, traced).transform,
+            ),
+          }
+        : traced;
+    if (await commitTraceOutput(args, ctx, commitTraced, liveProject)) ctx.close();
   } catch (err) {
     ctx.pushToast(
       `Could not trace ${args.seed.source}: ${err instanceof Error ? err.message : String(err)}`,
@@ -359,11 +402,13 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
   }
 }
 
-// True when the live object is still the same raster the trace was computed from
-// — same kind, image content (dataUrl), and pixel grid. A transform-only change
-// is allowed (the overlay registers to the live transform). Used to refuse a
-// commit whose source changed or was removed mid-dialog (P2-A).
-export function sameTraceSource(live: SceneObject | undefined, seed: RasterImage): boolean {
+/** Compare trace-source content and pixel grids while intentionally allowing a
+ * transform-only change. A true result narrows `live` to the current
+ * `RasterImage`, whose transform can then register the trace at commit. */
+export function sameTraceSource(
+  live: SceneObject | undefined,
+  seed: RasterImage,
+): live is RasterImage {
   return (
     live !== undefined &&
     live.kind === 'raster-image' &&

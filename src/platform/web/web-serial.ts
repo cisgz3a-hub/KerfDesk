@@ -26,6 +26,7 @@ import type {
   SerialPortIdentity,
   SerialPortRef,
 } from '../types';
+import { closeWriterBounded } from './bounded-writer-close';
 
 export const webSerial: SerialAdapter = {
   isSupported: () => typeof navigator !== 'undefined' && 'serial' in navigator,
@@ -333,11 +334,12 @@ async function closeStreams(
     }
   }
   if (writer !== undefined) {
-    try {
-      await writer.close();
-    } catch {
-      // ignore
-    }
+    // Bounded, not bare: close() alone never settles on a sink that cannot
+    // drain, and nothing above this awaits with a deadline — Disconnect would
+    // spin forever and never release the connection ref, so Connect could not
+    // replace the port either. See bounded-writer-close.ts for why abort is
+    // the fallback rather than the first move.
+    await closeWriterBounded(writer);
     try {
       writer.releaseLock();
     } catch {

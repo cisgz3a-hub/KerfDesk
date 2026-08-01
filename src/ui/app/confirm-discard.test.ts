@@ -1,7 +1,7 @@
-// Pins the LU18 confirm-discard semantics: clean passes through, an
-// active job fails closed (H13), Cancel aborts, Don't Save proceeds, and
-// Save proceeds ONLY when the save actually lands — a cancelled picker
-// aborts the destructive action.
+// Pins the LU18 confirm-discard semantics: clean passes through, active jobs
+// retain the normal flow, Cancel aborts, Don't Save proceeds, and Save proceeds
+// ONLY when the save actually lands — a cancelled picker aborts the
+// destructive action.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
@@ -44,16 +44,31 @@ describe('confirmDiscardAsync (LU18)', () => {
     expect(useConfirmSaveStore.getState().request).toBeNull();
   });
 
-  it('fails closed with a toast while a job is active (H13)', async () => {
+  it("opens the normal Save / Don't Save / Cancel flow while a job is active", async () => {
     useStore.setState({ dirty: true });
     useLaserStore.setState({
       streamer: step(createStreamer('G1 X1 S100')).state,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
 
-    await expect(confirmDiscardAsync(neverPick, 'start a new project')).resolves.toBe(false);
+    const result = confirmDiscardAsync(neverPick, 'start a new project');
+    expect(useConfirmSaveStore.getState().request?.action).toBe('start a new project');
+    expect(useToastStore.getState().toasts.some((t) => t.message.includes('job is running'))).toBe(
+      false,
+    );
+    useConfirmSaveStore.getState().choose('cancel');
+    await expect(result).resolves.toBe(false);
+  });
+
+  it('keeps the clean-project fast path while a job is active', async () => {
+    useStore.setState({ dirty: false });
+    useLaserStore.setState({
+      streamer: step(createStreamer('G1 X1 S100')).state,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+
+    await expect(confirmDiscardAsync(neverPick, 'start a new project')).resolves.toBe(true);
     expect(useConfirmSaveStore.getState().request).toBeNull();
     expect(useToastStore.getState().toasts.some((t) => t.message.includes('job is running'))).toBe(
-      true,
+      false,
     );
   });
 

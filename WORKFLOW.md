@@ -1,16 +1,8 @@
 # WORKFLOW.md — KerfDesk user flows
 
-> Current user flows aim to cover **success**, **error**, **empty**, and **edge/recovery**
-> states. This file is the workflow specification; accepted later ADRs and passages
-> explicitly marked historical or superseded take precedence until the affected flow
-> is corrected. UI changes must update the relevant flow in the same change.
+> Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> Detailed flows exist for the baseline app/controller paths, Phase F laser production,
-> CNC/router (`F-CNC*` + `F-CNC-PROBE`), multi-controller behavior, Phase K box
-> generation, Phase L Image Studio, Camera Mode, and the Windows desktop app. Phase C
-> contains the current Machine Setup flow but retains older placeholder bullets; Phase D/E
-> remain compact indexes rather than full four-state specifications. Use `docs/README.md`
-> as the section map.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC45 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -30,8 +22,9 @@
 > opens when the operator presses **Start** on a review-pending permit; its confirm button is
 > **Start job**, and confirming claims the permit and streams. Warnings, the G54 normalization
 > disclosure, and the acknowledgement/attestation prompts all surface in that Start-time review.
-> Transient camera-marker Frames remain reviewed before dispatch and stream without
-> reopening the dialog.
+> Passages below that describe a pre-Frame Job Review or an **Accept & Frame** confirm predate
+> ADR-237 — read "Job Review before Frame" as "Job Review at Start". Transient camera-marker
+> Frames remain reviewed before dispatch and stream without reopening the dialog.
 
 ---
 
@@ -82,7 +75,7 @@
 - **Laptop workspace**: at 1100 px wide or below, the machine rail starts collapsed while Cuts/Layers remains visible, preserving editing space without hiding the layer workflow.
 - **CNC Canvas Focus**: at 1439 px wide or below, CNC starts with the 3D result collapsed to a named 44 px restore strip unless the operator has already chosen otherwise. Expanding or collapsing 3D is one click, persists across reloads, and overrides later responsive defaults.
 - **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering either responsive range again reapplies only its collapsed default.
-- **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button. Preview lives in the top toolbar and the Window menu, not here.
+- **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button and a "Design" button that opens the Design Studio (ADR-272, flows F-DS1..F-DS4). Preview lives in the top toolbar and the Window menu, not here.
 - **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores both panels. Panel visibility does not affect the Live Motion bar.
 
 #### Disabled controls
@@ -479,15 +472,21 @@ Identical to F-A3 except:
 ### F-A10. Pre-flight check (before G-code save)
 
 Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. For **Save
-G-code**, any failing check surfaces the pre-flight modal and cancels the save
-until it clears. For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232): the only
-findings that still cancel the Start are unstreamable output (`non-finite-
-coordinate`, `empty-output`, `relief-needs-cnc`, `no-output-layer`) and compile
-failures. Calculated bed bounds, configured no-go zones, and live output-setting findings are
-carried into Job Review as warnings before the Frame trace; they do not refuse Frame. The actual
-controller outcome is authoritative: only a cleanly completed trace and return earns the exact-job
-permit. A Frame still cannot dispatch when transport cannot accept it or when the executable motion
-cannot be constructed. Start itself adds no policy gate.
+G-code**, a factual no-file outcome stops before the picker: placement cannot be
+resolved; selection, variable, registration, or output-snapshot preparation
+produces no program; the post-prepare emitter refuses the requested output (for
+example, rotary raster while its Labs permission is off); or emitted preflight
+contains one of the six codes in `COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
+other preflight finding is an advisory reported after a successful save.
+
+For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232): the same six
+compile-integrity codes cover unproducible or unstreamable output. Calculated
+bed bounds, configured no-go zones, and live output-setting findings are carried
+into Job Review as warnings before the Frame trace; they do not refuse Frame.
+The actual controller outcome is authoritative: only a cleanly completed trace
+and return earns the exact-job permit. A Frame still cannot dispatch when
+transport cannot accept it or when the executable motion cannot be constructed.
+Start itself adds no policy gate.
 
 The authoritative list is the `PreflightCode` set in
 `src/core/preflight/preflight.ts` (laser + CNC shared codes) and
@@ -527,10 +526,17 @@ grouped by what each validates:
     operator-selected; stock thickness does not impose a universal depth cap.
 20. **No single pass cuts deeper than the configured maximum.**
 21. **No rapid (G0) travel before a safe-Z retract is established** (plunged-travel guard).
+22. **An actual selected V-bit on a contributing V-carve layer has an explicit
+    finite included angle from 1 through 179 degrees.** The compiler does not
+    invent an angle for a legacy or hand-edited V-bit because that would change
+    every calculated cut depth. Selecting a non-V-bit remains the established
+    advisory-only wrong-kind path.
 
-For **Save G-code**, all applicable blocking checks must pass. For the ordinary
-job flow, factual placement/compile-integrity failures stop preparation. Calculated
-bed/no-go/settings findings are confirmed in Job Review and never refuse Frame;
+For **Save G-code**, the six-code set controls the emitted-preflight partition;
+it is not an exhaustive list of reasons no file can exist. Factual
+placement/preparation failures and a post-prepare emission refusal return
+distinct non-writable outcomes before that partition. Calculated
+bed/no-go/settings findings remain advisories, and never refuse Frame or Start;
 the completed physical Frame is the spatial source of truth.
 
 ---
@@ -963,7 +969,8 @@ and action groups instead of shrinking the controls below their minimum target s
 #### Success — pause (GRBL-family laser)
 1. User clicks **Pause**. The app freezes host refill before writing any controller byte.
 2. App writes resumable real-time Safety Door (`0x84`), which decelerates motion and disables the
-   laser output. The Live Motion bar shows **JOB PAUSED** and keeps **ABORT JOB** available.
+   laser output. The Live Motion bar shows **JOB PAUSING** until controller proof arrives and keeps
+   **ABORT JOB** available; it then changes to **JOB PAUSED**.
 3. Pause becomes confirmed only after a fresh same-session report shows a settled `Door` state and
    explicit controller-commanded spindle/laser-off evidence. Until then no further G-code is sent.
 4. If every G-code line has already been acknowledged but the controller still reports physical
@@ -985,23 +992,43 @@ and action groups instead of shrinking the controls below their minimum target s
    (`$32=1`), because feed hold alone can leave laser output asserted.
 2. Software Abort requests the controller-specific reset/de-energize path but cannot guarantee delivery or physical beam-off. Use the machine's physical E-stop or power isolation when unsafe.
 
-#### Exempt — CNC / router jobs
-1. A CNC (router) job pauses with `!` without the `$32` proof: feed hold with a spinning spindle is standard sender behavior, and a router runs `$32=0`. Demanding the laser proof would block CNC pause outright.
-2. The pause warning states that generic CNC continuation is not available; Pause is a controlled hold that routes to software Abort and supervised manual recovery.
+#### Exempt — CNC / router jobs (ADR-180 amendment 2)
+1. A CNC (router) job pauses with the **safety-door byte** (`0x84`), the same path a laser uses — not a bare feed hold. GRBL's Door state decelerates the machine **in place** and de-energizes spindle and coolant, so the spindle stops. Position is kept; nothing jogs or repositions.
+2. The `$32` proof is **not** required. It is a laser-only concern (a hold at `$32=0` can leave the beam asserted); a router runs `$32=0` and demanding the proof would block CNC pause outright.
+3. Pause holds the transition open until a fresh same-session report proves a **settled Door state**. Accessory (`A:`) proof of spindle-off is required for **laser only**: GRBL omits `A:` when nothing is energized and emits `Ov:` only periodically, so demanding the field on CNC would time out and fail-dark a job that stopped correctly. A settled Door state is itself the controller reporting spindle and coolant off.
+4. During CNC parking, fresh post-command same-session `Door:2` reports keep **JOB PAUSING**
+   live. Two seconds without trustworthy progress still fails the transition, and an absolute
+   30-second ceiling prevents endless ownership. Progress never confirms Pause.
+5. The pause copy states that motion stopped in place, the spindle is off, and the job can be resumed. ABORT JOB and the physical E-stop remain the answer when the cutter is unsafe.
 
 #### Degraded — controller with no realtime hold (e.g. Marlin)
 1. When the driver has no feed-hold byte, Pause is stream-side only: outbound sending stops but buffered motion finishes. The Console directs the operator to request **ABORT**, or use the physical E-stop when unsafe.
 
-#### Success — laser / non-CNC resume
+#### Success — safety-door-capable laser resume
 1. User clicks **Resume**. App writes real-time `~` while the host streamer remains frozen.
-2. The Live Motion bar remains **JOB PAUSED** until a fresh same-session post-write report proves
+2. The Live Motion bar shows **JOB RESUMING** until a fresh same-session post-write report proves
    `Run` or a completed `Idle` transition. `Hold` and Door restore substates do not release the sender.
 3. Only after that proof does the streamer resume and send more G-code.
 
-#### Blocked — generic CNC resume
-1. The CNC **Resume** button remains visible but disabled, while **ABORT JOB** remains available.
-2. The store independently refuses CNC Resume before writing `~` or refilling the stream because a GRBL status snapshot cannot prove that the physical spindle stayed turning while the cutter may be engaged.
-3. The operator must request ABORT, inspect and clear the cutter using a machine-specific procedure, and start a newly reviewed recovery job.
+#### Success — controller without Safety Door confirmation
+1. A controller family that exposes Resume but no Safety Door byte keeps the established behavior:
+   the host stream resumes after the owned Resume transport write settles.
+2. It does not claim Door-state progress or fresh `Run`/`Idle` confirmation. The 2-second transport
+   bound still applies; the CNC-only Door progress extension does not.
+
+#### Success — generic CNC resume (ADR-180 amendment 2)
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits for it to reach speed, then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming.
+2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues.
+3. Fresh post-command same-session `Door:3` reports keep **JOB RESUMING** live without refilling.
+   Two seconds of silence fails; a non-resettable 30-second maximum bounds custom firmware. Only
+   fresh `Run`/`Idle` proof releases host refill. Every immediately stageable owned stream write
+   must settle before the store publishes the job as running. A timed-out but unresolved write leaves
+   the job frozen and prevents an overlapping same-session Pause/Resume; **ABORT JOB** and the physical
+   E-stop remain available. An actual write rejection uses the existing active-stream fail-dark
+   containment and transport quarantine rather than treating ambiguously staged bytes as retryable.
+4. **No retract.** `PARKING_ENABLE` is commented out in stock GRBL, and its `PARKING_TARGET` is a *machine coordinate* — meaningless on a no-homing router. A host-side lift is deliberately not built: it would require abandoning the door hold for a drain-to-Idle pause, reintroducing a re-entry seam. If a lift is wanted, it is a firmware setting.
+5. The advisory informs but never gates (rule 7). What stays refused is unrelated to this flow: CNC checkpoint, start-from-line, and pass-boundary recovery jobs (ADR-143/215).
+6. **Not hardware-verified.** Whether a given controller reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build facts. Air-cut before cutting material.
 
 ### F-B8. Software Abort / Controller Reset
 
@@ -1030,7 +1057,58 @@ link; it does not claim that bytes can cross a cable that is already physically 
 
 ### F-B11. Job progress UI
 
-The Live Motion bar shows `completed / total` lines and a percentage beside the active-job state, and the Machine rail may retain its detailed progress bar. Both update whenever the streamer advances. A pre-job time estimate is shown before the run starts; a mid-job estimated-time-remaining label is not yet implemented.
+The Live Motion bar shows `completed / total` lines and a percentage beside the active-job state,
+and the Machine rail may retain its detailed progress bar. Both update whenever the streamer
+advances. This acknowledged-line value remains a transport diagnostic and a ceiling for route
+reconciliation; it is not presented as elapsed-time or remaining-time progress.
+
+Before Start, the existing project estimate remains visible. Once the exact output artifact exists,
+the in-job remaining-time baseline comes from the exact emitted G-code timeline: modeled motion and
+every deterministic timing command, including CNC `G4` spindle spin-up dwells. A deterministic dwell
+keeps its emitted duration and is never multiplied by an observed motion-pacing correction. Motion
+lookahead also restarts where the emitted program makes the controller drain its planner: dwell/
+pause/`M400` boundaries and actual spindle or coolant state changes. Redundant `M3`/`M4`/`M7`/`M8`/
+`M9` re-arms do not invent another stop, and laser power carried by a planned motion stays on that
+motion span.
+
+While the job runs, only fresh, trustworthy, same-session controller positions that reconcile to the
+active route may calibrate the modeled motion pace. Acknowledged-line counts may bound that
+reconciliation, but they cannot calibrate time by themselves. Arc and helix progress maps by exact
+raw G-code line between the live-motion and timing tessellations; partial straight-segment progress
+uses the same acceleration profile as the baseline. The badge moves through one explicit state
+model:
+
+- **Estimating:** the exact emitted-program baseline is initialized before the first program write
+  is accepted; it does not consume wall time.
+- **Running:** executable program bytes have been accepted, or a trustworthy fresh same-session
+  `Run` report proves execution while the first write is settling. The baseline pace applies until
+  fresh route samples calibrate it, while deterministic dwell always retains its emitted duration.
+- **Paused:** the last estimate freezes; hold time does not silently consume the remaining estimate.
+  A host-side CNC `M0` alone is not physical pause proof: the clock keeps running through the
+  buffered pre-`M0` tail and freezes only after the existing fresh `Idle` tool-change proof.
+- **Disconnected:** remaining time is unavailable rather than counting down or carrying a stale
+  number across the replacement connection session.
+- **Finishing:** the active driver's settle marker (or equivalent physical `Idle` boundary) has
+  proved queued execution drained, and the final stable-controller release is still pending. Final
+  line acknowledgement alone does not select this state or remove the numeric countdown.
+- **Complete:** the active-driver settle marker has completed and the required stable `Idle` reports
+  have released the job. An acknowledged final line alone cannot select this state.
+
+The in-memory sidecar carries the emitted-program fingerprint plus initial position, connection
+session, position epoch, active driver, and current-session detected-family evidence. If any of that
+evidence changes before controller handoff, Start continues normally but remaining time is
+unavailable. A failed settle-only completion marker likewise remains unavailable through later
+position-only reports. Sidecars are bounded at 25,000 raw lines and 25,000 motion segments; larger
+jobs run normally with the countdown marked unavailable. The segment cap is enforced during render
+model construction, with at most the current source line expanded before parsing stops.
+
+If the emitted program cannot be modeled truthfully — for example, its initial controller position
+or feed state is unknown, its `G4 P` units do not match the active family, or its timing sidecar
+exceeds the bounded line/segment budget — remaining time is unavailable. The estimate uses the
+existing scalar machine-limit model, so axis-specific acceleration, controller buffering, override
+response, spindle-at-speed behavior, and real material/machine pacing remain hardware-calibration
+limits rather than software proof. This display model changes no emitted output, Start
+authorization, Frame proof, controller command, or safety boundary.
 
 ### F-B12. Disconnect during job (cable yank)
 
@@ -1152,7 +1230,7 @@ The Live Motion bar shows `completed / total` lines and a percentage beside the 
 #### Success — export backup
 1. After at least one setting row has been read, **Export backup** is enabled.
 2. User chooses a save target.
-3. App writes `.lfgrbl.json` containing every visible row, including unknown settings.
+3. App writes `.lfgrbl-settings.json` containing every visible row, including unknown settings.
 4. Exporting a backup sends no command to the controller.
 
 #### Error — disconnected
@@ -1551,18 +1629,24 @@ or traced image) with at least one closed polyline.
 - *Tiny shapes* (cap height < ~2× hatchSpacing): produce only 1–2 hatch
   lines, which engraves as a near-line. Acceptable; no minimum-size
   guard. The user can lower `hatchSpacingMm` or switch to Line mode.
-- *4040-safe scaled lettering*: ordinary scanline fragments separated by more than 5 mm retain a
-  controlled F800/S0 gap remainder, then receive up to 5 mm of feed-matched G1/S0 entry before each
-  burn. This preserves ADR-234's non-overlapping split geometry while ADR-235 replaces only the 4040
-  transport; Default/Falcon and Offset Fill behavior remain unchanged. Sensitive 4040 Island Fill
-  remains one-way and uses full-where-safe feed-matched runway.
+- *Fragmented Scan Line lettering*: generic/default Scan Line gives every independent sweep bounded
+  feed-matched laser-off entry and exit motion. A split gap shares its available distance between
+  the preceding exit and next entry without overlap; gaps wider than two full runways retain a
+  laser-off rapid only across the unused center. Close gaps remain one continuous `S0`-bridged
+  sweep. Newly committed generic traced Scan Line operations default one-way when no direction was
+  explicitly selected and the profile has no verified or legacy-verified scan-offset calibration;
+  ordinary vector layers, calibrated profiles, and explicitly saved choices retain their direction.
+  The 4040-safe, Raster Image, Island Fill, and Offset Fill policies remain separate. For generic
+  Scan Line, a stored Overscan value of zero uses the bounded 5 mm generic runway default rather
+  than allowing a rapid-to-powered start; Frame includes that effective motion.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
 - *Overscan near a bed edge*: Fill Overscan adds laser-off runway before
-  and after each hatch line. The framed burn area does not grow, but
-  preflight checks the emitted G-code. An outside-bed runway is a Job Review
-  warning before Frame, not an ordinary Frame/Start block; Save G-code may
-  still require moving the artwork inward or lowering Overscan.
+  and after each hatch line. The ink/burn AABB does not grow, while Job Review
+  reports the larger motion size and Frame traces the exact compiled runway
+  envelope. If that physical trace does not fit the intended usable area, the
+  operator moves the artwork inward or lowers Overscan and frames again. There
+  is no separate computed-bounds Start guard.
 
 ### F-F2. Image-engrave a raster (Phase F.2 — code shipped through F.2.e; hardware burn pending)
 
@@ -1649,8 +1733,9 @@ Hardware burn on the Falcon (must be confirmed by user):
    right group boundaries (`M5` between groups; no laser-on travel
    between groups).
 4. **Frame works on an image layer**: clicking Frame on a scene
-   with only a RasterImage traces the 4 corners of the image's
-   mm-bounds (not the overscan-extended rectangle).
+   with only a RasterImage traces the 4 corners of the exact compiled
+   motion envelope, including row overscan and any active reverse-row
+   scan-offset shift.
 5. **No "burn-line on travel" artefacts**: between rows, the head
    moves at S=0 — verify by looking at the row-end overscan zone
    for any unintended burn marks.
@@ -1766,8 +1851,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     2–3. The cache should still update — WCO is reported on a
     separate bit from MPos/WPos.
 
-When this checklist passes on the Falcon, record the machine, firmware, procedure,
-measurements, and evidence in `docs/hardware/verification-status.md`.
+When this checklist passes on the Falcon, promote Phase F.3's
+"Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
+Shipped" and update the hardware verification inventory.
 
 #### No-homing positioning guide (ADR-193)
 
@@ -2281,9 +2367,10 @@ F-CNC19 tiling.
 4. Artwork run controls set priority inside each safe phase. The compiler never moves a profile
    ahead of remaining clearing work or splits a contiguous tool section merely to satisfy priority.
 
-#### Error — depth exceeds stock
-1. Preflight (F-CNC3) reports depth > stock thickness + 1 mm; the save/start
-   path is blocked until fixed.
+#### Warning — depth exceeds stock
+1. Preflight (F-CNC3) surfaces depth > stock thickness as a Job Review warning.
+   It never blocks save or Start: ADR-228 made a completed Frame the sole Start
+   gate, and F-A10 documents the same non-blocking behavior.
 
 #### Empty
 1. An operation with no bound geometry compiles to no passes and is skipped; no G-code group is
@@ -2297,12 +2384,19 @@ F-CNC19 tiling.
 
 #### Success
 1. User clicks **Save G-code** in CNC mode.
-2. CNC preflight runs: settings validity, depth ≤ stock + 1 mm, machine
+2. CNC preflight runs: settings validity, depth vs stock thickness, machine
    bounds, no-go zones, plunged-travel scan (no XY rapid below safe Z, no
-   rapid plunge), non-empty output.
+   rapid plunge), non-empty output. Findings surface as Job Review warnings,
+   not refusals (ADR-228).
 3. The file emits through `cncGrblStrategy`: G21/G90/G94 preamble, M3 +
    spin-up dwell, safe-Z discipline, per-layer comment headers, M5 + park
    postamble.
+4. Each CNC operation's short comment block records the selected tool id/name,
+   stored kind/diameter/angle, requested depth and depth/pass, V-carve
+   resolution where relevant, effective feed/plunge/RPM, and automatic feed
+   source. Dynamic labels are flattened into one inert comment line. Export
+   metadata also records the selected machine-profile identity for ordinary,
+   tiled, and standalone CNC files.
 
 #### Error — preflight violation
 1. The modal lists each issue with its code and message; no file is written
@@ -2380,21 +2474,25 @@ F-CNC19 tiling.
 #### Success
 1. In CNC mode, the user drags an `.stl` file onto the workspace. Both
    binary and ASCII STLs parse (a binary file whose header starts with
-   "solid" is detected by its length signature).
+   "solid" is detected by its length signature). Reading, parsing, and
+   the coarse relief-preparation probe run in the import worker; the
+   progress toast names the current phase and Escape cancels the request.
 2. The mesh lands as a relief object at 100 mm wide (height by aspect),
    5 mm relief depth, background carved away ('floor'), on a wood-brown
-   layer created automatically. Toast reports the triangle count.
+   layer created automatically. Toast reports the triangle count. The
+   worker transfers its typed mesh into the live object without expanding
+   it into a boxed number array on the UI thread.
 3. The canvas shows the relief as a grayscale depth map — light = stock
    top, dark = floor. It selects, moves, and saves/loads like any object;
-   `.lf2` embeds the mesh so projects stay self-contained.
+   `.lf2` embeds the mesh as the existing JSON number-array schema so
+   projects stay self-contained and older saved projects still reopen.
 4. Roughing toolpaths compile from it starting with H.5.
 
-#### Error — wrong mode / malformed / oversized
+#### Error — wrong mode / malformed
 1. Dropping an STL in laser mode toasts "STL relief import needs CNC
    mode" and imports nothing.
 2. Truncated binaries, partial ASCII facets, and non-numeric vertices are
-   rejected with the specific reason; meshes over 200k triangles ask for
-   decimation.
+   rejected with the specific reason.
 
 #### Empty
 1. An STL with zero facets is rejected ("contains no vertices").
@@ -2419,9 +2517,24 @@ F-CNC19 tiling.
 4. V-carve groups run BEFORE profile cuts (they never free the part).
 
 #### Error — active bit is not a v-bit
-1. The layer panel and Start-time Job Review show "V-carve requires a v-bit."
-   It is an ordinary Frame/Start warning, not a Start gate. Save G-code keeps
-   its export preflight until a v-bit is selected.
+1. The layer panel and pre-Frame Job Review show "V-carve requires a v-bit."
+   It is an ordinary Save/Frame/Start warning, not a gate. Output remains
+   available for compatibility and can use the legacy 60-degree wrong-kind
+   fallback, so the operator is told to select the actual V-bit.
+2. A selected V-bit with a missing, non-finite, or out-of-range included angle
+   cannot produce the requested V-carve depth math. Save and Start stop before
+   compilation and tell the operator to edit or replace the bit; no silent
+   60-degree fallback is permitted.
+3. The optional flat-floor clearing bit must be a flat end mill. An older
+   project that assigned a ball-nose or engraving cutter keeps that selection
+   visible as a disabled diagnostic choice instead of silently changing it. If
+   the selected geometry would emit a clearing pocket, prepared output refuses
+   it and names the incompatible cutter; the direct compiler also omits the
+   clearing group. A contour with no flat floor adds no refusal because that
+   clearing stage contributes no motion.
+4. A missing configured clearing bit follows the same compile-integrity rule:
+   it remains visible as an unavailable choice, prepared output refuses it only
+   when a flat-floor stage can contribute, and direct compile omits that stage.
 
 #### Empty
 1. Open paths and layers with no closed shapes compile to no passes; the
@@ -2502,11 +2615,17 @@ F-CNC19 tiling.
 
 ### F-CNC10. Open a G-code program in the simulator — Phase H.6
 
+*(This 2D flow remains. ADR-255's 3D G-code Inspector — F-M1 — complements it
+and lifts the command's CNC-only gate.)*
+
 #### Success
 1. In CNC mode, the user picks a `.nc` / `.gcode` / `.tap` file via
    File → Open G-code (Preview). The command is CNC-only (ADR-101
    gate-and-hide, first CNC-only command).
-2. The clean-room modal parser (ADR-098 §2) reads GRBL-dialect G-code:
+2. The clean-room modal parser (ADR-098 §2) reads GRBL-dialect G-code in
+   the import worker. A progress toast names the current phase; Escape
+   cancels the request. Concurrent import-worker requests wait in FIFO
+   order rather than starting overlapping whole-file reads:
    G0/G1 (including ramped XY+Z and pure-Z moves), G2/G3 arcs (I/J center
    and R radius form, helical Z), G90/G91, G20/G21 units, F/S words,
    `(...)` and `;` comments, `%` markers, and N line numbers. Unsupported
@@ -2533,8 +2652,10 @@ F-CNC19 tiling.
 #### Edge — relative arcs / early end / huge files / other planes
 1. G91 relative coordinates apply to XY, Z, and arc targets alike.
 2. M2 / M30 ends the program mid-file; later lines are ignored.
-3. Programs beyond 500k lines are rejected with a note (guard against
-   runaway files, not a real-world limit).
+3. The parser reads the complete program and the 2D renderer retains every
+   parsed step. Above 250,000 steps a visible pressure advisory states the
+   exact count and warns that drawing may use substantial memory or respond
+   slowly. The advisory never reduces, rewrites, or rejects the preview.
 4. G18/G19 plane arcs are not supported: rejected with the line number
    (XY-plane G17 is the GRBL default and the only plane GRBL arcs use
    here).
@@ -2542,26 +2663,114 @@ F-CNC19 tiling.
 ### F-CNC11. Manage the bit library — Phase H.7
 
 #### Success
-1. Material & Bit → Manage bits lists every bit (starters + custom).
-   The add form takes name, kind (end mill / ball nose / v-bit /
-   engraving), diameter, and tip angle (v/engraving only).
-2. An added bit is selectable immediately (machine bit list and every
+1. Material & Bit → Manage bits lists every bit (starters + custom),
+   grouped by cutter family. The manual add form takes name, kind (end
+   mill / ball nose / v-bit / engraving), diameter, and included angle
+   (v/engraving only). Diameter and angle start blank and return to blank
+   after each successful Add so a prior cutter's geometry cannot be reused
+   accidentally.
+2. Add from bit catalog searches 88 modeled envelopes and 72 reference-only
+   family entries (160 entries total). A generic flat or full-radius-ball
+   template is an operator-matched nominal diameter envelope whose gross
+   geometry fits the current kernel; Add does not claim that its family source
+   verifies the generated size, shank, center-cut/plunge capability, entry
+   strategy, or automatic feed. Apart from explicitly single/double O-flute
+   family identity, it also does not establish flute count. Exact-product
+   point-V and O-flute ball-nose evidence is labeled separately; the two Amana
+   ball-nose products retain their exact product diameter and shank but no
+   numeric flute count because the product source does not state one. Modeled
+   envelopes can be copied into the saved custom-bit library unless already
+   built in or saved. Unsupported
+   entries remain visible with their source and the reason they are
+   reference-only; they have no Add action.
+3. An added bit is selectable immediately (machine bit list and every
    per-layer Bit select) and persists app-level in localStorage — it
-   merges into the tool list of every future CNC session, across
-   projects.
-3. Deleting a custom bit removes it from the library and the open
-   machine (undoable). Starters have no Delete button.
+   merges into the tool list whenever a CNC project is opened, across
+   projects. Existing project copies win an ID or catalog-identity match, so
+   opening a project never replaces its saved ID or metadata with a library
+   alias.
+4. Catalog family, optional evidenced shank/flute metadata, and stable catalog
+   identity survive both app-library persistence and `.lf2` project
+   round-trips. Generic non-O-flute envelopes carry no trusted flute count and
+   make no automatic-feed claim. An explicit single/double O-flute family
+   count becomes the default for material-feed calculations; the operator can
+   still override it in the Feeds calculator.
+5. Deleting a custom bit removes it from the saved library and, when
+   present, from the open machine. The open-project machine edit is
+   undoable; project Undo does not restore the app-level library entry.
+   If the bit is still assigned to an active V-carve clearing, non-adaptive
+   pocket roughing, or bound relief-finishing stage, deletion is refused and
+   the warning names the role and layer that must be changed first. Starters
+   have no Delete button.
+6. Every list row shows the canonical stored diameter and, for an angled
+   cutter, the stored included angle independently of the operator-entered
+   name.
+7. Choosing an Active bit briefly shows a dismissible **Modeled cutting
+   envelope** preview. For an end mill, full-radius ball, or valid point V-bit,
+   it uses the same profile as removal simulation, reports a catalog shank
+   diameter as metadata only when known, and states that flutes, coating,
+   cutting length, and the shank transition are not modeled. A legacy engraving
+   tool does not store enough tip geometry for a truthful 3D cutting envelope,
+   so it receives a readable no-shape fallback rather than the simulator's flat
+   approximation. A V-bit without a valid included angle likewise receives a
+   readable fallback instead of an invented cone.
+   If WebGL or scene initialization is unavailable, the bit name and geometry
+   notice remain readable. A later render exception or WebGL context loss
+   disposes the acquired scene and transitions to the same fallback. Selection
+   still succeeds and no machine command is sent. The visible timer starts only
+   after the 3D scene or fallback is ready, pauses while hovered or focused, and
+   reduced-motion users receive a static frame.
 
 #### Error — invalid fields
-1. Empty names and non-positive/oversized diameters are ignored — the
+1. Empty names and diameters outside 0.1 through 50 mm are ignored — the
    Add button does nothing until the fields are sane.
+2. V-bit and engraving-bit angles must be finite values from 1 through 179
+   degrees. An invalid Add shows an inline reason and stores no tool.
 
 #### Empty
 1. No custom bits: the list shows only starters; nothing is deletable.
 
+#### Edge — old and custom tools without a family
+1. Tools saved before family metadata existed remain usable. Their existing
+   geometry kind supplies a display group; an unknown future family is shown
+   under Custom / other and never changes CAM geometry.
+
+#### Edge — adding the same catalog bit twice
+1. Stable catalog identity makes the second Add a no-op, so the library and
+   open machine cannot accumulate duplicate copies of the same catalog entry.
+
+#### Edge — catalog bit already present in an imported project
+1. Add adopts the existing project ID and replaces its catalog metadata from
+   the trusted catalog instead of appending another copy. If that bit is active
+   and its trusted flute count changes, inherited automatic material recipes
+   recalculate; layers pinned to another bit and manual/legacy values preserve
+   operator intent.
+
+#### Edge — project saved before the two catalog-backed starter V-bits
+1. Opening a nonempty older CNC tool list appends the 6.35 mm-cut / 3.175 mm-shank
+   and 12.7 mm-cut / 6.35 mm-shank 90-degree V-bit starters when neither their
+   stable ID nor catalog identity is already present. Existing tool order,
+   objects, metadata, project-owned custom tools, layer references, and Active
+   bit remain unchanged.
+
 #### Edge — layers referencing a deleted bit
-1. Layers keep the stale toolId; compile falls back to the machine's
-   active bit (layerCncTool), so output never references a missing bit.
+1. Deleting the active bit selects a surviving bit. If no bit survives, the
+   shared default tool list and default active bit are restored.
+2. Inherited automatic material recipes recalculate for the new active bit.
+   An automatic material-recipe layer pinned to the deleted bit loses that pin
+   and recalculates against the fallback. Automatic layers pinned to another
+   surviving bit and manual/legacy numeric settings retain their intent.
+3. A manual/legacy primary `toolId` may remain stale; `layerCncTool` resolves
+   it to the active bit during compile, so output does not reference a missing
+   primary bit.
+4. Deletion is refused while an active V-clear, relief-finish, or
+   pocket-roughing stage uses the bit. Dormant hidden secondary-tool bindings
+   are cleared as part of deletion rather than becoming unreachable stale
+   state.
+5. If deletion changes an output operation's effective cutter while its manual
+   feed, plunge, spindle RPM, and depth-per-pass values remain exact, the same
+   retained-values warning used by the bit selectors is shown. A successfully
+   recalculated material recipe remains silent.
 
 ### F-CNC12. Save and apply feeds/speeds presets — Phase H.7
 
@@ -2588,8 +2797,10 @@ F-CNC19 tiling.
 #### Success
 1. Material & Bit → Machine profiles: Save snapshots the whole CNC
    setup (stock, bit list, active bit, safe Z, spindle, park, tiling)
-   under a name; Apply replaces the current setup (undoable); Delete
-   removes the profile.
+   under a name. Apply restores the profile's machine settings and
+   active-bit intent while merging its tool list with the current project;
+   bits added after the profile was saved remain available. The open-project
+   edit is undoable. Delete removes the app-level profile.
 2. Profiles are app-level (localStorage), usable across projects.
 
 #### Error — non-CNC project
@@ -2602,6 +2813,18 @@ F-CNC19 tiling.
 #### Edge — profile with bits the library no longer has
 1. The snapshot carries its own tool list, so applying restores those
    bits for the project even if the library changed since.
+2. If Apply changes an output operation's effective cutter while keeping manual
+   numeric settings, it shows the retained-values warning. Effective cutter
+   identity includes flute count even when ID and gross geometry are unchanged.
+   Material-recipe values that successfully recalculate for the applied profile
+   remain silent.
+
+#### Edge — duplicate catalog identities in an imported or legacy profile
+1. Incoming profile aliases are matched to an existing current-project tool
+   when possible; otherwise the first incoming copy is retained. The profile's
+   requested active ID is mapped to that retained ID.
+2. Existing project tool IDs are never removed merely because they share a
+   catalog identity. Current layer references remain unchanged and resolvable.
 
 ### F-CNC14. Run a multi-bit job (M0 tool change) — Phase H.7
 
@@ -2616,8 +2839,9 @@ F-CNC19 tiling.
 3. Geometry offsets use each layer's OWN bit diameter.
 
 #### Error — v-carve layer with a flat bit
-1. Preflight blocks with the layer's bit named (not just the machine
-   bit).
+1. Job Review warns with the layer's bit named (not just the machine bit), but
+   wrong-kind output remains available through the legacy fallback. An actual
+   V-bit with invalid included angle is the separate compile-integrity refusal.
 
 #### Empty
 1. All layers on one bit → no M0 blocks; output is byte-identical to a
@@ -2625,6 +2849,10 @@ F-CNC19 tiling.
 
 #### Edge — unknown per-layer bit id
 1. Falls back to the machine's active bit at compile time.
+2. Changing a layer Bit keeps existing manual or machine-starter feed, plunge,
+   spindle RPM, and depth-per-pass values. A warning names that retention and
+   asks the operator to verify the numbers for the newly selected cutter.
+   Material-recipe settings are recalculated for the new cutter instead.
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
@@ -2707,7 +2935,10 @@ F-CNC19 tiling.
    pass); finishing consumes it down to the true surface.
 
 #### Error — unknown finishing bit id
-1. The finishing group is skipped (roughing-only), never a crash.
+1. The missing ID stays visible as a disabled diagnostic choice. Prepared
+   output refuses the unavailable active finishing stage; direct compile still
+   skips it and remains roughing-only rather than crashing. A binding on a
+   layer with no relief object is dormant and does not block.
 
 #### Empty
 1. "Roughing only" (the default) emits no finishing group.
@@ -2719,11 +2950,12 @@ F-CNC19 tiling.
 ### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
 
 #### Success
-1. The layer card's "Entry" row (profile/pocket/engrave) offers
-   Climb / Conventional / Default direction and a ramp angle.
+1. The layer card's "Entry" row offers a ramp angle for profile/pocket/engrave
+   cuts. Climb / Conventional / Default direction appears only for
+   outside/inside profiles and pockets, where direction affects winding.
 2. Direction enforcement re-orients closed toolpaths (M3 spindle: climb
-   keeps material LEFT of travel — outside profiles run CCW,
-   inside/pocket run CW) and rotates entry points to the midpoint of
+   keeps material RIGHT of travel — outside profiles run CW,
+   inside/pocket run CCW) and rotates entry points to the midpoint of
    the longest segment so witness marks land on a flat span.
 3. A ramp angle > 0 turns plunges into descents ALONG the toolpath at
    that angle; closed loops re-cut the ramped span level afterwards.
@@ -2762,6 +2994,18 @@ F-CNC19 tiling.
 #### Error — a tile fails preflight
 1. Every tile preflights BEFORE any file is written; a failure names
    the tile and writes nothing (no-partial-output over the whole set).
+
+#### Error — the complete grid exceeds the export work budget
+1. Grid size is resolved before tile records, G-code, or file dialogs are
+   created. A grid above 500 planned cells reports a factual non-writable
+   outcome and writes nothing; increase tile size or reduce overlap.
+
+#### Edge — requested overlap leaves no positive tile step
+1. Planning uses one disclosed effective overlap that leaves a positive
+   representable step on both axes (at least 1 mm for UI-supported tile
+   sizes). Grid placement and registration holes use that same value. A
+   loaded legacy request remains unchanged until the operator makes an
+   explicit numeric tiling edit.
 
 #### Empty
 1. An empty compile toasts "Nothing to tile"; a job smaller than one
@@ -2931,7 +3175,7 @@ F-CNC19 tiling.
    PROVISIONAL industry-typical mid-range chiploads per diameter band.
 4. A recognized machine starter and the active CNC machine/controller ceilings
    can only lower the displayed automatic result. For the Neotronics 4040,
-   Plywood/MDF with the 3.175 mm two-flute starter resolves to 600 mm/min feed,
+   Plywood/MDF with the 3.175 mm two-flute starter resolves to 300 mm/min feed,
    120 mm/min plunge, 12000 RPM, and 0.75 mm/pass rather than the generic result.
 
 #### Error — none (inputs are bounded)
@@ -2945,6 +3189,11 @@ F-CNC19 tiling.
 1. The calculator uses the bit's DIAMETER regardless of kind; for
    v-carving the chipload model is a rough guide only — the flow says
    so rather than pretending precision.
+2. For a V-bit or engraving bit, the calculator shows the exact stored
+   diameter and included angle and states that the diameter band is used while
+   included angle and depth-dependent cutting engagement are not modeled. Material,
+   flute, and Apply controls remain enabled and the numeric result is unchanged;
+   the operator is directed to the cutter maker's data and a scrap test.
 
 ### F-CNC25. Surface the spoilboard — Phase H.11 (ADR-103 G8)
 
@@ -3126,15 +3375,20 @@ F-CNC19 tiling.
 ### F-CNC31. Auto-fill feeds from a material — ADR-111 #1
 
 #### Success
-1. Every CNC layer card has a "Material" select at the top (Custom +
-   Softwood / Hardwood / Plywood-MDF / Acrylic / Aluminium). Picking one
-   fills feed, plunge, and depth-per-pass in a single undoable patch from
-   the chipload engine, using the layer's own bit and a 2-flute
-   assumption. A recognized machine starter and live limits can lower those
-   automatic values. Cut type, depth, bit, and tabs stay put.
+1. Every CNC layer card has a grouped "Material" select at the top (Manual +
+   common Softwood and Hardwood species / Plywood-MDF / Acrylic / Aluminium).
+   Picking one fills feed, plunge, and depth-per-pass in a single undoable
+   patch from the chipload engine, using the layer's own bit and a 2-flute
+   assumption. A named wood keeps its species identity but uses its researched
+   family starting model; a recognized machine starter and live limits can
+   lower those automatic values. Cut type, depth, bit, and tabs stay put.
 2. The choice and automatic-source provenance are remembered on the layer and
    round-trip in the .lf2 file; they are display-only and do not change compiled
    output beyond the persisted numeric settings themselves.
+3. When the layer uses a V-bit or engraving bit, the row names the cutter's
+   stored diameter and included angle and discloses that the automatic model
+   uses the diameter band but not depth-dependent cutting engagement. The
+   material select remains enabled and applies the same bounded numeric patch.
 
 #### Error — none (bounded)
 1. Material is a select; the engine floors tiny results (feed / per-pass)
@@ -3214,24 +3468,36 @@ F-CNC19 tiling.
 #### Edge — which layers count
 1. The feed check considers only layers set to output; a hidden/off layer
    with an aggressive feed does not raise the advisory.
+2. An output layer carrying material-recipe provenance and using a V-bit or
+   engraving bit adds a Job Review warning with the exact feed, plunge, RPM,
+   and depth/pass values plus the diameter-band model limitation. Manual and
+   machine-starter values do not claim that material-recipe calculation.
 
 ### F-CNC35. Set the project material once (Easel-style) — ADR-112
 
 #### Success
-1. The Material & Bit panel shows a "Material" dropdown (above Bit) the
-   moment you switch to CNC — no design needed. Pick your stock material and
-   every layer's feed / plunge / depth-per-pass fills from it (each layer's
-   own bit + spindle), in one undoable step.
+1. The Material & Bit panel shows a grouped "Material" dropdown (above Bit)
+   the moment you switch to CNC — no design needed. Softwoods and Hardwoods
+   expose common species such as Pine, Cedar, Oak, Hard maple, and Walnut.
+   Choosing an entry previews its family model without changing the job;
+   **Apply [material] preset** then fills every layer's feed / plunge /
+   depth-per-pass (each layer's own bit + spindle) in one undoable step.
 2. New layers inherit it: add a layer or import an SVG after choosing the
    material and the fresh layers come in with those feeds (not the generic
    1000 / 1.5 default). Set material first, then import — the Easel order.
+3. Before Apply, each distinct angled cutter used by the project is disclosed
+   with its stored geometry and the same rough-guide model boundary. Apply
+   remains available and recalculates the same values as the per-layer path.
 
 #### Error — none (bounded select)
-1. Material is a dropdown; feeds floor at safe minimums via the calculator.
+1. Unknown saved keys are dropped during project normalization. Known species
+   resolve to a bounded family calculation; feeds floor at the calculator's
+   minimums.
 
 #### Empty
-1. The dropdown shows in CNC mode only. "Custom" clears the project material
-   and leaves current feeds untouched for hand-tuning.
+1. The dropdown shows in CNC mode only. Choosing "Custom" changes nothing
+   until **Use manual feeds** is clicked; that clears the project material and
+   leaves current feeds untouched for hand-tuning.
 
 #### Edge — per-layer override and other object types
 1. A layer's own Material picker (F-CNC31) overrides the project material for
@@ -3242,8 +3508,8 @@ F-CNC19 tiling.
 
 #### Success
 1. With the Neotronics 4040 profile active, a fresh CNC operation starts with
-   the revisioned 3.175 mm two-flute engineering starter: 600 mm/min feed,
-   120 mm/min plunge, 12000 RPM, and 0.75 mm/pass. The layer card and Job Review
+   the revisioned 3.175 mm two-flute engineering starter: 300 mm/min feed,
+   250 mm/min plunge, 12000 RPM, and 0.75 mm/pass. The layer card and Job Review
    identify the starter and revision; the numbers remain fully editable.
 2. A selected project material outranks the machine starter. An operator-saved
    per-color or all-color layer default outranks both and is copied exactly.
@@ -3264,6 +3530,11 @@ F-CNC19 tiling.
    numeric settings are never rewritten. Explicit machine/profile changes may
    refresh only values carrying trusted automatic provenance; an unknown, newer,
    or no-longer-matching starter keeps its numbers and becomes Manual.
+2. Changing the machine Active bit recalculates material-recipe layers that
+   follow it. If any following layer instead keeps manual or withdrawn-starter
+   feed, plunge, RPM, and depth/pass numbers, a warning tells the operator to
+   verify those retained values for the new bit. Selecting the same bit is a
+   no-op and emits no warning.
 
 ### F-CNC38. Keep origin and work-Z evidence axis-honest — Phase H.11
 
@@ -3336,8 +3607,8 @@ F-CNC19 tiling.
    status frames where the intermittent field is absent.
 2. An `Ov:` report without `A:` is the protocol-backed all-off observation.
    An active accessory in that fresh cache surfaces as a Job Review warning
-   (ADR-228) rather than refusing Start; generic CNC Resume is disabled by
-   F-CNC41.
+   (ADR-228) rather than refusing Start; generic CNC Resume is one-click with a
+   spindle-check advisory per F-CNC41.
 3. When a CNC controller is otherwise idle but reports an active accessory,
    the job panel names every active channel and offers **Stop spindle & coolant**.
    After the operator confirms the cutter is clear of material and stopping is
@@ -3377,47 +3648,65 @@ F-CNC19 tiling.
    bytes, so pendant, WebUI, PLC, macro, or second-sender mutations after the
    observation require an external interlock or machine-specific protocol.
 
-### F-CNC41. Refuse generic same-session CNC Resume - Phase H.11
+### F-CNC41. Generic same-session CNC Resume with a spindle advisory - Phase H.11
 
-#### Success - controlled pause
-1. **Pause** still sends realtime feed hold and immediately stops refilling the
-   controller stream. It remains useful as the first controlled response when
-   continuing motion would be unsafe.
-2. The paused UI keeps **ABORT** available and explains that this CNC job cannot
-   be resumed automatically.
+> Amended 2026-07-24 (ADR-180 amendment / rule 7). The former refusal is withdrawn:
+> same-session CNC Resume is one-click, and the spindle concern is an advisory, not a block.
+>
+> Amended again 2026-07-25 (ADR-180 amendment 2). Pause no longer leaves the spindle
+> turning: it uses the safety-door byte, so the controller stops in place and cuts the
+> spindle. Resume restarts it, waits for spin-up, and continues the same line.
 
-#### Error - cutter may be engaged and spindle continuity is unproven
-1. **Resume** is disabled for a CNC job. A direct/stale caller is also rejected
-   by the store before the realtime cycle-start byte or any queued job bytes are
-   written.
-2. The job remains paused so the operator can request ABORT and follow a machine-specific
-   manual recovery procedure. KerfDesk never attempts `M3`, spindle orientation,
-   or a generic Z retract while cutter engagement is unknown.
+#### Success - one-click resume
+1. **Pause** sends the realtime **safety-door byte** (`0x84`) and stops refilling the
+   controller stream. GRBL decelerates **in place** and de-energizes spindle and
+   coolant — the machine stops and the spindle stops, with position kept. Nothing
+   jogs or repositions.
+2. **Resume** is enabled. The store writes realtime cycle-start `~`, waits for a fresh
+   report proving `Run` or `Idle`, then refills the stream. GRBL restores spindle and
+   coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s stock) so the
+   cutter is at speed before the interrupted move continues — same G-code line, same
+   point. There is **no retract**: `PARKING_ENABLE` is off in stock GRBL, so the bit
+   spins back up still engaged in the cut. The paused UI says so.
+3. The Live Motion bar shows **JOB PAUSING** or **JOB RESUMING** while confirmation is
+   pending. Fresh same-session `Door:2`/`Door:3` progress keeps the corresponding CNC
+   transition alive across the strict 2-second silence watchdog, within a non-resettable
+   30-second maximum. Progress does not release the sender; fresh `Run`/`Idle` remains
+   the only Resume proof. Every immediately stageable owned refill remains host-paused until its
+   transport write settles, so early acknowledgements cannot dispatch another batch through a
+   failed transition.
 
-#### Edge - future machine-specific continuation
-1. `A:` and `FS:` prove controller-commanded state at one instant, not physical
-   RPM, uninterrupted rotation, VFD health, coolant flow, or exclusive command
-   ownership. Legacy GRBL therefore cannot satisfy the generic proof.
-2. A future opt-in requires a machine-profile policy, exclusive control of all
-   mutating paths, controller-visible safety/VFD faults, and an ack-neutral
-   realtime-status arbiter that proves stable `Hold:0` continuity before `~`.
-   This flow does not silently opt any current profile into that contract.
+#### Edge - spindle may have stopped during the hold
+1. A safety-door transition, spindle-stop override, VFD fault, pendant, or other
+   sender can stop the cutter during the hold; blind cycle-start would then feed a
+   stationary cutter. The advisory tells the operator to confirm spindle rotation
+   and a clear cutter, and to Abort instead if in doubt.
+2. This is surfaced as an advisory, never a refusal (rule 7): the operator's real
+   safeguards are the physical E-stop and eyes on the machine. `A:`/`FS:` snapshots
+   prove controller-commanded state at one instant, not uninterrupted RPM, VFD
+   health, coolant flow, or exclusive ownership — so the app informs rather than
+   pretending to that proof by blocking.
+
+#### Edge - unrelated recovery paths stay refused
+1. CNC checkpoint resume, start-from-line execution, and pass-boundary recovery
+   jobs (ADR-143/215) are a different feature from live Pause/Resume and remain as
+   specified in their own flows. This amendment changes only same-session Resume.
 
 ### F-CNC42. Attest exclusive controller access before CNC Frame - Phase H.11
 
-#### Success - one Start-time Job Review acknowledgement
-1. After a matching Frame completes and the operator presses Start, Job Review names physical
+#### Success - one pre-Frame Job Review acknowledgement
+1. After compile/readiness succeeds, Job Review names physical
    workholding/clearance and every common competing command path: pendant/MPG,
    WebUI/network, another sender app, PLC motion or spindle commands, controller
    macros, and SD/file jobs.
 2. The operator confirms KerfDesk is the sole command owner while emergency-
    stop, safety-door, and feed-hold circuits remain enabled.
 3. The resulting evidence is bound to the exact program fingerprint plus the
-   current trusted-position and work-Z-reference epochs before streaming.
+   current trusted-position and work-Z-reference epochs before Frame.
 
 #### Error - missing, incomplete, or stale evidence
-1. A missing acknowledgement keeps the Start-time Job Review incomplete; no job
-   bytes are streamed.
+1. A missing acknowledgement keeps Job Review incomplete; there is no separate
+   post-Frame ordinary Start confirmation.
 2. A reconnect, controller banner/reset, alarm/sleep, homing, origin/probe
    change, tool change, or other setup-trust invalidation expires the exact
    candidate/permit and requires a new Job Review plus completed Frame.
@@ -3853,7 +4142,7 @@ F-CNC19 tiling.
 1. Without a 2D context (headless/jsdom) the preview renders an empty
    canvas without crashing, matching BoxPreview's guard.
 
-## Phase L flows (Image Studio — ADR-243)
+## Phase L flows (Image Studio — ADR-242)
 
 ### F-L1. Open, edit, apply
 
@@ -3967,7 +4256,7 @@ F-CNC19 tiling.
 #### Edge — app reload
 1. Sessions are in-memory (IE-1..3): reloading the app drops unapplied
    editor sessions. Applied work is in the project and its undo history.
-   Session persistence is an IE-4 schema decision (ADR-243).
+   Session persistence is an IE-4 schema decision (ADR-242).
 
 ## Camera Mode flows
 
@@ -4069,7 +4358,7 @@ F-CNC19 tiling.
 - **Edge / encoder failure.** A platform without 2D canvas support fails
   typed ('could not build the bed image') instead of half-completing.
 
-### F-CAM6. Machine camera via the local bridge (ADR-121)
+### F-CAM6. Machine camera via the local bridge (ADR-121, ADR-141, ADR-248)
 
 - **Success / first-class machine camera.** The operator opens the Camera
   panel, the local bridge is healthy, and **Discover machine camera** finds a
@@ -4080,12 +4369,17 @@ F-CNC19 tiling.
   machine-camera capture show an actionable message. Local-development users
   are pointed to the bridge command; the desktop app starts it automatically.
   Hosted web builds cannot call the loopback network-camera bridge and support
-  USB cameras only (ADR-136).
+  USB cameras only (ADR-141).
 - **Empty / no camera found.** Discovery completes with no candidate camera;
   the panel stays usable for USB cameras and manual RTSP entry.
 - **Edge / slow or single-threaded camera.** Frame fetches for the same camera
   host are serialized and shared while in flight so preview polling and capture
   do not overload embedded camera servers.
+- **Edge / Mac Preview RTSP qualification.** Mac Preview supports USB and
+  private-network JPEG cameras. RTSP remains unqualified and follows the
+  existing explicit FFmpeg-missing error path when a Finder launch cannot
+  discover `ffmpeg`; the Preview does not bundle FFmpeg or add a
+  platform-specific gate.
 
 ### F-CAM7. Click-to-position the laser head (ADR-122)
 
@@ -4130,90 +4424,315 @@ F-CNC19 tiling.
 
 ---
 
-## Desktop app (Windows installer) flows
+## Desktop app (Windows + macOS Preview) flows
 
-The desktop app is the same web build wrapped in Electron (ADR-003, ADR-024):
-the `dist/web` bundle runs in Electron's Chromium renderer, so every laser/CNC
-flow above behaves identically. These flows cover only what is *new* on the
-desktop target — getting it, updating it, and proving it works.
+The desktop app is the same web build wrapped in Electron (ADR-003, ADR-024,
+ADR-248): the `dist/web` bundle runs in Electron's Chromium renderer, so every
+laser/CNC flow above behaves identically. These flows cover only what is *new*
+on a desktop target — getting it, updating it, and proving it works. Preview is
+an unsigned, exact-version distribution lane; it does not change machine
+behavior or create a second product implementation.
 
-### F-DESK1. Download and install (Windows 10/11, 64-bit)
+### F-DESK1. Download and install an unsigned Preview (ADR-248)
 
-1. In the web app, the operator clicks **Download for Windows** (Toolbar) or
-   opens `https://kerfdesk.com/download`.
-2. The download page links the installer on the Cloudflare R2 feed
-   (`https://dl.kerfdesk.com/desktop/kerfdesk-latest-x64-setup.exe`).
-3. Running the installer (NSIS, per-user, `oneClick:false`) lets the operator
-   choose an install directory, then installs and creates a "LaserForge 2.0"
-   shortcut.
-4. First launch opens the app over the `app://` scheme at bed dimensions — the
-   same as the web app's F-A1.
+1. In the web app, the operator opens the Camera panel and clicks **Download
+   desktop app** to open the public KerfDesk GitHub Releases page directly. The
+   explanatory `https://kerfdesk.com/download` page remains available manually.
+2. The download page is static, scriptless, and opens the public
+   **cisgz3a-hub/KerfDesk** Releases list for each platform. It names the exact
+   asset pattern the operator must choose from the newest immutable prerelease.
+   It does not send Preview users through a `latest` alias, a dynamic resolver,
+   or the stable R2 update feed:
+   - **Windows 10/11, x64:** `KerfDesk-<version>-windows-x64-setup.exe`
+     (NSIS, per-user, `oneClick:false`, user-selectable install directory).
+   - **macOS 12+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
+   - **macOS 12+, Apple Silicon arm64:**
+     `KerfDesk-<version>-macos-arm64.dmg`.
+   Here `<version>` is the tag text without its leading `v` (for example,
+   `0.2.0-preview.1`). The companion files are
+   `KerfDesk-<version>-SHA256SUMS.txt`,
+   `KerfDesk-<version>-release-manifest.json`, and
+   `KerfDesk-<version>-sbom.cdx.json`.
+3. Every visible app, shortcut, installer, disk-image, and artifact name is
+   **KerfDesk**. Windows installation creates a KerfDesk shortcut; macOS users
+   drag **KerfDesk.app** from the DMG to Applications.
+4. Preview installation is manual on every OS. First launch opens the same app
+   over the `app://` scheme at bed dimensions — the same as the web app's F-A1.
 
-#### Error — unsigned-build SmartScreen warning (v1, expected)
-1. Until code signing lands (ADR-024 §5), Windows Defender SmartScreen shows
-   "Windows protected your PC" on first run.
-2. The `/download` page documents the bypass: **More info → Run anyway.**
-3. Once signed, the warning disappears with no app change.
+#### Error — unsigned Windows SmartScreen warning (Preview, expected)
+1. Windows Defender SmartScreen may show "Windows protected your PC" because a
+   Preview installer is unsigned.
+2. The `/download` page labels the asset **Unsigned Preview** and documents the
+   deliberate bypass: **More info → Run anyway**.
 
-#### Empty — no desktop build on macOS / Linux
-1. The download page states the installer is Windows-only and links macOS/Linux
-   users to the web app (ADR-007).
+#### Error — unsigned and unnotarized macOS Gatekeeper warning (Preview, expected)
+1. Gatekeeper may refuse the first normal open because the Preview app is
+   unsigned and unnotarized. The `/download` page labels both Mac assets
+   **Unsigned, unnotarized Preview** before download.
+2. The page documents the deliberate manual-open path supported by macOS:
+   Control-click **KerfDesk.app** → **Open**. After a blocked attempt, macOS 12
+   Monterey uses **System Preferences → Security & Privacy → General → Open
+   Anyway**; newer macOS uses **System Settings → Privacy & Security → Open
+   Anyway**. Preview never claims Apple notarization or silently weakens
+   Gatekeeper.
+
+#### Empty — no desktop build on Linux
+1. The download page links Linux users to the web app. Linux desktop packaging
+   remains out of scope for ADR-248.
 
 #### Edge — inside the desktop app the download/install affordances vanish
-1. When running under Electron (`adapter.id === 'electron'`), the Toolbar hides
-   both **Download for Windows** and the PWA **Install app** button — you don't
-   download or PWA-install the app from within itself.
+1. When running under Electron (`adapter.id === 'electron'`), the Camera panel's
+   `DownloadDesktopLink` returns `null`. The Toolbar's PWA **Install app** button
+   also remains absent because packaged Chromium offers no PWA install prompt—an
+   installed desktop app does not download or PWA-install itself.
+
+#### Edge — Preview is free to launch without an account or gate
+1. Preview shows no account, sign-in, activation, license-key, trial-renewal,
+   subscription, or paywall flow. Launch continues directly to F-A1. Any future
+   commercial entitlement flow is not authorized by this workflow. It first
+   requires the maintainer's explicit prior permission and coordinated
+   supersession of the no-new-guard governance where applicable; only then may a
+   new ADR, workflow, and implementation be proposed.
 
 ### F-DESK2. Desktop updates (trust-gated, burn-safe)
 
-1. An unsigned build performs no automatic update check, download, or install
-   (ADR-135). The operator downloads a newer installer from the pinned KerfDesk
-   download page and runs it after ending the current session.
-2. Once production signing is enabled and verified, each packaged launch checks
-   the R2 feed's `latest.yml` (`electron/auto-update.ts`).
-3. A newer signed version downloads in the background; the OS shows a native
-   "update ready" notification. The current session is never interrupted.
-4. The signed update installs on the **next quit** (`autoInstallOnAppQuit`), and
-   the app relaunches on the new version.
+1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
+   metadata request to the fixed public `cisgz3a-hub/KerfDesk` GitHub Actions
+   endpoint for successful runs of
+   `.github/workflows/release-desktop-preview.yml` (ADR-249). Main accepts only a
+   completed successful push run with a strict newer `vX.Y.Z-preview.N` tag and
+   exact workflow path. A green run means the workflow's final job verified the
+   immutable prerelease, canonical six-asset set, checksums, source manifest, and
+   attestations. Dev, web, stable-version, unsupported-platform, malformed,
+   failed/cancelled/in-progress, downgrade, offline, rate-limited, and failed
+   requests produce no visible control and never block startup.
+2. When a newer Preview exists, a passive **Download update** control appears at
+   the right edge of the status bar and a polite live region announces its exact
+   version. There is no popup and the control receives no automatic focus. It
+   remains available during a job because it cannot reload, download, execute,
+   install, restart, or change machine state.
+3. Clicking **Download update** opens only the fixed public
+   `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page for the
+   exact announced version in the system browser. This bypasses any legacy
+   service-worker copy of the first-party landing page and cannot drift to a
+   newer-by-date but lower semantic version.
+   The Electron child window is denied. API-provided URLs are ignored, Preview
+   updater trust stays false, and the app never consumes
+   `latest.yml`, a `latest` redirect, R2 update metadata, or installer bytes.
+   The operator selects an exact GitHub prerelease asset and installs it manually.
+4. The signed stable Windows path remains governed by ADR-024, ADR-135, and
+   ADR-142. Once production signing is enabled and verified, each signed stable
+   packaged launch checks the R2 feed's `latest.yml` (`electron/auto-update.ts`).
+5. A newer correctly signed stable Windows version downloads in the background;
+   the OS shows a native "update ready" notification. The current session is
+   never interrupted. It installs only on the next **natural quit**
+   (`autoInstallOnAppQuit`). KerfDesk never calls `quitAndInstall`. A signed and
+   notarized macOS stable updater remains out of scope.
 
 #### Error — offline or feed unreachable
-1. For a signed build, the check fails silently (logged via `onError`, never
-   fatal). The app runs normally on the installed version.
+1. Preview GitHub metadata failures are silent and non-fatal; the status control
+   remains absent and the installed version continues normally. Signed stable R2
+   failures are also logged only through `onError` and never block startup.
 
 #### Edge — a job is streaming
-1. Updates NEVER install mid-burn: the app never calls `quitAndInstall`, and a
-   quit can't happen during a running job without the operator stopping it
+1. Updates NEVER install mid-burn. Preview only opens a manual download page and
+   does not mutate the running app; signed stable waits for a natural quit, and a
+   quit cannot happen during a running job without the operator stopping it
    (`use-unload-stop.ts` soft-resets the machine on unload). Non-negotiable #9
    holds.
 
 ### F-DESK3. Release + manual verification checklist (load-bearing)
 
-Cutting a release is `git tag vX.Y.Z && git push --tags`, which runs
-`release-desktop.yml` (build → R2 publish). **Green CI does not prove the
-installer runs** (CLAUDE.md). Before a desktop release is called done, a human
-runs this on real Windows:
+**Transition prohibition:** the commands below are future release procedure. No
+Preview tag may be created or pushed until the Preview workflow and its
+stable-tag rejection are merged. After that implementation exists, a Preview
+tag is created as an annotated tag, for example
+`git tag -a vX.Y.Z-preview.N -m "KerfDesk vX.Y.Z Preview N"`, then pushed with
+`git push origin vX.Y.Z-preview.N`. After source CI succeeds, the Preview
+workflow builds all three exact-version assets in the same public
+**cisgz3a-hub/KerfDesk** source repository. It uses the exact existing source
+tag with `--verify-tag`; it never generates another tag. The workflow first
+creates a private draft, uploads and validates the complete asset set, then
+publishes it as an immutable GitHub **prerelease** with `latest=false`. A failed
+build exposes no partial release. The prerelease records the exact source commit
+SHA and includes a SHA-256 manifest, dependency/SBOM inventory, and
+build/provenance attestations for the published assets. Preview tag events invoke
+the checked-in Node validator and verify the ref is an annotated Git tag object.
+Preview accepts only the strict ECMAScript pattern
+`^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)-preview\.(?:0|[1-9][0-9]*)$`;
+stable, leading-zero, lightweight, and malformed tags fail closed. Preview
+publishing never mutates the stable R2 feed or its metadata.
 
-- [ ] `pnpm build:desktop` locally (or download the CI artifact) produces
-      `release/<version>/LaserForge-2.0-<version>-x64-setup.exe`.
-- [ ] Installs cleanly on **Windows 10** and **Windows 11**; the shortcut
-      launches the app over `app://app/index.html`.
-- [ ] **Serial (hardware):** a GRBL laser/CNC plugged in appears in the
-      `select-serial-port` picker; connect → jog → frame → stream a small job.
-- [ ] **Files:** a `.lf2` round-trips via the File System Access pickers; G-code
-      export saves.
-- [ ] **Camera (optional):** a USB webcam previews (getUserMedia); an RTSP/IP
-      camera previews only if `ffmpeg` is on PATH (documented optional dep).
-- [ ] **Unsigned update gate:** an unsigned packaged build performs no update
-      network request, download, or install.
-- [ ] **Signed auto-update (after signing lands):** publish a higher `vX.Y.Z`;
-      a running older signed install downloads it, notifies, and on quit installs
-      + relaunches on the new version. Confirm **no install occurs while a job
-      streams** and a wrong-publisher update is refused.
-- [ ] **Download surface:** `/download` serves the installer on the web; inside
-      the desktop app the Download/Install affordances are hidden.
+**Workflow cutover and later stable activation (state updated 2026-07-25):** historical
+workflow ID `308419274` is now `deleted`, the `desktop-production`
+environment deliberately does not yet exist (step 4), and the repository holds
+only the `PAGES_CLOUDFLARE_API_TOKEN` / `PAGES_CLOUDFLARE_ACCOUNT_ID` secret
+names and no CSC secrets. The cutover merged; steps 1–3 and 7 are completed and
+recorded below, and only step 4 remains deliberately open:
 
-Until every box is checked on real hardware, the desktop installer stays
-**Claimed** in `docs/hardware/verification-status.md`.
+1. [x] Create repo secrets `PAGES_CLOUDFLARE_API_TOKEN` (Pages-only scope) and
+   `PAGES_CLOUDFLARE_ACCOUNT_ID` alongside the legacy names. Completed
+   2026-07-22; both names exist (the legacy names were later deleted under
+   step 3).
+2. [x] `gh workflow disable 308419274` completed and the historical workflow is
+   verified `disabled_manually`; this deliberately pauses the old stable/manual
+   lane during cutover and is reversible. The workflow has since been removed
+   outright (API state `deleted`, file gone from the tree).
+3. [x] Merge only after exact-head CI passes. Wait for the first main Pages deploy to
+   succeed through the new names, then delete legacy `CLOUDFLARE_API_TOKEN`,
+   `CLOUDFLARE_ACCOUNT_ID`, `CSC_LINK`, and `CSC_KEY_PASSWORD` repo names if
+   present. Completed 2026-07-25: main Pages deploys succeed via the `PAGES_*`
+   names, both legacy Cloudflare names were deleted, and no `CSC_*` repo
+   secrets existed.
+4. [ ] Only when a future signed stable release is deliberately authorized, create
+   the protected `desktop-production` environment and add
+   `STABLE_WINDOWS_CSC_LINK`, `STABLE_WINDOWS_CSC_KEY_PASSWORD`,
+   `STABLE_R2_API_TOKEN`, and `STABLE_CLOUDFLARE_ACCOUNT_ID` there.
+5. [x] Use the checked-in local tag-policy/workflow tests—not a remote malformed or
+   Preview tag—to prove rejection precedes the protected-environment job.
+
+6. [x] Repository release immutability was enabled on 2026-07-22. The workflow's
+   token cannot read repository Administration settings, so the maintainer must
+   re-check this setting before each tag; publication then verifies the release
+   attestation and `immutable:true` result.
+7. [x] Before the first Preview tag, enable repository rules that prevent direct
+   or forced changes to `main` and restrict `v*` tag creation/update/deletion to
+   the release maintainer. Completed and verified 2026-07-25: active rulesets
+   "Protect main branch" and "Protect release tags" (`refs/tags/v*` creation,
+   update, deletion, and non-fast-forward restricted to the release
+   maintainer). The workflow independently requires the tagged commit
+   to be in current `main` history and re-resolves the remote annotated tag
+   immediately before draft creation and publication.
+
+Only after the later stable setup is recorded do stable tag semantics resume:
+create an annotated tag with
+`git tag -a vX.Y.Z -m "KerfDesk vX.Y.Z"`, then push only that tag with
+`git push origin vX.Y.Z`. The new `release-desktop-stable.yml` path performs the
+signed stable Windows build and R2 publish. Its shared validator accepts only
+`^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$` and rejects Preview,
+leading-zero, lightweight, or malformed tags before the protected-environment
+job. Credential-free manual packaging uses the separate
+`release-desktop-dry-run.yml` workflow, which has no signing or R2 secret
+references, uses a throwaway dispatch version, remains unsigned and trust-false
+at every selected ref, and uploads only a workflow artifact—never a GitHub
+Release, R2 object, or updater feed. Stable signing, trust, updater, and R2
+transport otherwise remain unchanged; visible product, shortcut, artifact, and
+release names become KerfDesk. **Green CI does
+not prove an installer or disk image runs** (CLAUDE.md). Before either lane is
+called done, humans complete the applicable checks on real operating systems and
+real hardware:
+
+- [ ] **Release identity:** the public prerelease names the exact source SHA; its
+      SHA-256 manifest verifies all three KerfDesk assets; the dependency/SBOM
+      inventory and attestations are present and correspond to that release. The
+      manifest records `sourceRepository` (initially `cisgz3a-hub/KerfDesk`),
+      `sourceSha`, `sourceRef` (the exact `refs/tags/...` ref), and
+      `signerWorkflow`; that last field equals
+      `<sourceRepository>/.github/workflows/release-desktop-preview.yml`. Each
+      downloaded asset passes
+      `gh attestation verify <asset> --repo <sourceRepository> --source-digest
+      <sourceSha> --source-ref <sourceRef> --signer-workflow <signerWorkflow>
+      --deny-self-hosted-runners`.
+- [ ] **Atomic immutable publication:** release immutability is enabled; the
+      workflow uses the already-pushed source tag with `--verify-tag`, creates a
+      private draft, and validates all binaries, checksums, manifest, SBOM,
+      notices, and attestations before publication. The published result reports
+      both immutable and prerelease, never latest.
+- [ ] **Tag-lane isolation:** structural tests prove the stable workflow rejects
+      Preview/malformed tags and the Preview workflow rejects stable/malformed
+      tags before either lane can sign, publish R2 metadata, or create a release.
+      The stable production workflow has a new path and no manual trigger. Its
+      credential-free prerequisite rejects invalid tags before the
+      `desktop-production` environment is reached. That environment contains only
+      new `STABLE_*` secret names. New Pages-only `PAGES_CLOUDFLARE_*` names exist
+      and the historical workflow ID is disabled before merge; the first
+      post-merge Pages deploy succeeds before legacy `CLOUDFLARE_*`/`CSC_*` names
+      are deleted. The separate dry-run is credential-free, unsigned,
+      trust-false, and workflow-artifact-only at every selected ref; it never
+      publishes a GitHub Release, R2 object, or updater feed.
+- [ ] **Shipped legal notices:** every web/desktop distribution carries the
+      current `LICENSE`, `THIRD_PARTY_NOTICES.md`, generated third-party notice,
+      and every dependency/font/asset notice or license text required for that
+      artifact. An artifact-scoped closure gate covers shipped transitive
+      production packages, Electron/Chromium runtime notices, fonts, and assets;
+      the current direct-dependency generator alone is not sufficient.
+- [ ] **Windows packaging:** the x64 NSIS installer installs cleanly on real
+      **Windows 10** and **Windows 11**, creates only KerfDesk-visible names, and
+      launches `app://app/index.html` after the documented SmartScreen path.
+- [ ] **Intel Mac packaging:** the x64 DMG installs and launches KerfDesk over
+      `app://app/index.html` on a real Intel Mac after the documented Gatekeeper
+      manual-open path. Evidence includes macOS 12.x for the claimed floor and a
+      currently supported macOS version for the architecture.
+- [ ] **Apple Silicon packaging:** the arm64 DMG installs and launches KerfDesk
+      over `app://app/index.html` natively on a real Apple Silicon Mac after the
+      documented Gatekeeper manual-open path. Evidence includes macOS 12.x for
+      the claimed floor and a currently supported macOS version for the
+      architecture.
+- [ ] **Serial (hardware, each desktop architecture):** a plugged-in GRBL
+      laser/CNC appears in the platform serial picker; connect → jog → frame →
+      stream a small job and exercise Abort.
+- [ ] **Files (each desktop architecture):** a `.lf2` project round-trips through
+      the existing File System Access pickers and G-code export saves to the
+      chosen path.
+- [ ] **Camera:** a USB webcam previews through `getUserMedia` on every desktop
+      architecture, and private-network JPEG capture works on both Mac
+      architectures. Windows RTSP/IP previews when the optional `ffmpeg` binary
+      is on `PATH`, and its absence fails clearly. Mac RTSP remains unqualified
+      and follows the explicit FFmpeg-missing path; no FFmpeg binary or unreliable
+      Homebrew-path assumption is bundled into the release.
+- [ ] **Mac permission metadata:** both DMGs contain accurate
+      `NSCameraUsageDescription` and `NSLocalNetworkUsageDescription` strings,
+      `CFBundleIdentifier=com.kerfdesk.app`, and
+      `LSMinimumSystemVersion=12.0`; first-use prompts match USB camera and
+      private-network JPEG discovery/capture workflows. The bundle identifier
+      names the app but is not represented as durable TCC identity for unsigned
+      builds.
+- [ ] **Mac permission behavior:** at the macOS 12 floor, test launch, USB-camera
+      allow, deny, recovery in System Settings, retry, and private-network JPEG
+      capture. On macOS 15+ and on both architectures, additionally test camera
+      and local-network allow/deny/Settings recovery/retry plus Preview upgrade
+      and any re-prompt; local-network privacy begins on macOS 15.
+- [ ] **Data continuity:** first install the current **LaserForge 2.0** desktop
+      build and create identifiable projects, device settings, libraries,
+      preferences, and IndexedDB recovery/archive state. Before renaming, a
+      packaged identity probe records `app.getPath('userData')` and
+      `app.getPath('sessionData')` and confirms the verified legacy
+      `%APPDATA%\laserforge` root. The first KerfDesk Preview pins both paths to
+      that root before `ready`, retains app ID `dev.laserforge.app` and its NSIS
+      upgrade identity, and preserves the data. Repeat Preview → newer Preview
+      and Preview → future signed stable; machine state is never fabricated from
+      stale data.
+- [ ] **Mac signature state:** CI sets `mac.identity:null`,
+      `mac.hardenedRuntime:false`, `mac.notarize:false`, and
+      `CSC_IDENTITY_AUTO_DISCOVERY=false`; packaged checks recursively inventory
+      the outer app and every nested executable/bundle, permit only unsigned or
+      ad-hoc state, and fail any Developer ID/distribution authority or trusted
+      Team ID. They also confirm no stapled notarization ticket. Fresh Intel/Apple
+      Silicon Macs launch only through the documented manual trust path;
+      tooling-created nested ad-hoc signatures are not treated as bundle trust.
+- [ ] **Unsigned notify-only update gate:** on Windows, Intel Mac, and Apple
+      Silicon, an older packaged Preview makes one anonymous GitHub metadata
+      request and surfaces only a newer Preview whose exact release workflow
+      completed successfully. Clicking opens only the fixed KerfDesk download
+      page. Confirm failed/cancelled release runs remain invisible and confirm
+      zero installer, `latest.yml`, mutable alias, R2, download, execution, or
+      install traffic; repeat offline, malformed-response, and active-job cases.
+- [ ] **Signed stable Windows update (after signing lands):** publish a higher
+      `vX.Y.Z`; a running older correctly signed install downloads it, notifies,
+      and on natural quit installs and relaunches. Confirm no install occurs while
+      a job streams and a wrong-publisher update is refused.
+- [ ] **Download surface:** `/download` is static/scriptless, sends each Preview
+      platform choice to the public KerfDesk GitHub Releases list, names the
+      exact matching prerelease asset pattern to choose, and never uses a
+      mutable `latest` alias or stable R2 update feed. Inside Electron, desktop
+      Download and PWA Install affordances are hidden.
+- [ ] **Web/PWA regression:** the hosted web app still loads the same `dist/web`
+      product, its PWA Install/Update affordances remain available in web context,
+      WebSerial and File System Access flows retain their documented behavior,
+      and desktop packaging introduces no target-specific laser/CNC divergence.
+
+Until every applicable box is checked on the named real OS and hardware, that
+desktop artifact stays **CLAIMED** in the hardware verification inventory.
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 
@@ -4271,3 +4790,477 @@ validation must be supervised without cutting load.
 2. These stamps do not yet establish a safe probe envelope. Production XYZ
    probing still requires an owned complete build/settings exchange and a fresh
    direct MPos in the same session before any probe motion is permitted.
+
+## Phase M flows (G-code Inspector — ADR-255)
+
+### F-M1. Inspect a G-code program in 3D
+
+#### Success
+
+1. User picks File → Open G-code… (available in BOTH laser and CNC modes —
+   ADR-255 amends the ADR-101 CNC-only gate for this command), or clicks
+   **Inspect G-code** in Job Review / after Save G-code, or drops a
+   `.nc` / `.gcode` / `.tap` file on the workspace.
+2. The program parses into the render model (off the UI thread past the
+   synchronous cap); the Inspector opens: 3D viewport (work coordinates,
+   Z-up, bed/grid/origin triad), timeline (play / pause / speed / scrub),
+   DRO, stats, source pane, and the Program Health panel.
+3. Playback reveals motion in program order; the tool marker interpolates
+   within the active segment. Hover/click a segment shows kind, F, S, Z,
+   length, and source line; clicking a source line flashes its segment and
+   jumps the playhead (two-way sync).
+4. Program Health lists findings (severity info / notice / warning, count,
+   first line, click-to-jump). The panel header states: "Findings inform.
+   Nothing here blocks Frame, Start, or export."
+
+#### Success — G-code as a main-canvas view
+
+1. The canvas carries a **Design / G-code 3D** switch (top-left). Choosing
+   **G-code 3D** replaces the design canvas with the 3D view of the program
+   this project compiles to — the same viewer the file Inspector uses.
+2. It compiles on entry and on **Refresh**, not on every edit. After the
+   design changes, the view marks itself **Design changed** so what is on
+   screen is never silently stale.
+3. The switch stays available **during a job**: watching the running program
+   is the point. The view only reads — it never writes, streams, or advances
+   variable text.
+4. Choosing **Design** returns to the canvas with the artwork untouched.
+
+#### Empty — nothing to compile
+
+1. A project with no artwork shows "This design produces no G-code yet."
+   in the G-code view; the switch still works both ways.
+
+#### Error — unreadable program
+
+1. Not-G-code or non-finite targets: the Inspector opens with whatever
+   motion parsed, plus findings explaining the rest. If nothing parsed at
+   all, a toast reports the first junk line (existing parser wording).
+   Nothing is blocked and nothing retries in a loop.
+
+#### Empty
+
+1. A program with no motion (comments/setup only) opens the Inspector with
+   an empty viewport, zeroed stats, and a "no motion found" finding.
+
+#### Edge — very large program
+
+1. Production file-backed and compiled-program sources parse in the
+   Inspector worker. Reading/parsing phases and FIFO queue position are
+   shown; Close cancels an active request by retiring that worker.
+2. Parsing continues through the complete program. The 3D renderer and
+   source pane retain every motion segment and source line. Above 250,000
+   segments a visible pressure advisory states the exact count and warns
+   that drawing may use substantial memory or respond slowly.
+3. File-backed input is decoded incrementally from `Blob.stream()`. The
+   complete render model and source-line result still scale with output, so
+   this is not a proven constant-memory ceiling.
+
+#### Edge — our own emitted output
+
+1. Opening a program emitted by any built-in strategy shows zero
+   unsupported-word notes and zero junk lines (ADR-255 acceptance gate —
+   own-output-clean).
+
+## Phase N flows (Design Studio — ADR-272)
+
+The Design Studio is a full-window overlay for drawing a part to size by hand.
+Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
+router flows). Stages DS-2 and DS-3 are what these flows describe today; flows
+for the modify operations, dimensions, and the 2.5D view land with DS-6..DS-8.
+
+Nothing in this surface refuses anything (rule 7). Closing never prompts, an
+unfinished tool explains itself in the status bar rather than being disabled, and
+history eviction is an advisory.
+
+### F-DS1. Open the Design Studio
+
+1. Click **Design** at the bottom of the left tool rail (below **Lib**).
+2. The overlay chunk loads lazily on first open; a "Opening Design Studio…"
+   card shows while it does.
+3. The Studio opens full-window over the app: title row, Create rail above
+   Modify rail on the left, canvas centre, status bar at the bottom.
+4. The canvas frames the configured bed on first open with a light bed, a
+   1/2/5-decade grid, and the bed outline.
+5. Every app-level keyboard shortcut is suppressed while the Studio is open, so
+   Ctrl+Z inside the Studio undoes a drawing step and never the project.
+
+#### Success
+
+The Studio is open, Select is armed, snapping and the grid are on, and the
+status bar reads `X —  Y —` until the pointer enters the canvas.
+
+#### Error — the overlay chunk fails to load
+
+1. The loading card stays visible. Nothing is written to the project.
+2. Closing the app or reloading returns to a working canvas; the project is
+   untouched because the Studio never wrote to it.
+
+#### Empty — nothing drawn yet
+
+1. The canvas shows the bed and grid with no geometry.
+2. The status bar reads `0 entities`.
+
+#### Edge — reopening after closing
+
+1. Closing stashes the session. Reopening restores the same sketch, the same
+   tool, and the same view — no prompt on either transition.
+
+### F-DS2. Navigate the canvas
+
+1. Move the pointer: the status bar X/Y readout tracks it in millimetres, in
+   tabular figures so the digits do not jitter.
+2. Wheel: zooms about the pointer, so the millimetre under the cursor stays
+   under the cursor.
+3. **Fit** in the title row (or Shift+F) re-frames the bed.
+
+#### Success
+
+Zoom stays inside 0.05–200 px/mm. The grid coarsens as the view zooms out and
+never becomes a grey wash.
+
+#### Error — a degenerate viewport
+
+1. A zero-size canvas produces no view rather than NaN coordinates; the readout
+   stays `X —  Y —`.
+
+#### Empty — pointer outside the canvas
+
+1. Leaving the canvas clears the readout to `X —  Y —`.
+
+#### Edge — a hidden or background window
+
+1. Painting is coalesced into one animation frame, which the browser does not
+   run while the page is not compositing. The canvas paints on the first frame
+   after the window becomes visible again; no work is lost and no state drifts.
+
+### F-DS3. Choose a tool
+
+1. Click a tool in the Create or Modify rail, or press its letter (V select,
+   N nodes, L line, P polyline, R rectangle, C circle, A arc, G polygon,
+   D dimension, T trim, E extend, F fillet, H chamfer, O offset, M mirror,
+   Y array, B boolean).
+2. View toggles take the Shift variant so the plain letters stay with the
+   tools: Shift+F fit, Shift+S snap, Shift+O ortho, Shift+G grid.
+3. The status bar shows the armed tool's own hint — discoverability lives on the
+   tool, as it does in LightBurn.
+
+#### Success
+
+The chosen tool is pressed in its rail and its hint is on the status bar.
+
+#### Error — a tool whose behaviour is not built yet
+
+1. The tool still arms and is never disabled. Its rail button is drawn quieter
+   and the status bar says "<Tool> — not built yet" ahead of the hint.
+2. Nothing is blocked and nothing is refused.
+
+#### Empty — no selection for a selection-only tool
+
+1. The tool arms and the hint says what to pick. It does not refuse.
+
+#### Edge — typing in a field inside the Studio
+
+1. Tool letters are ignored while focus is in an input, textarea, or
+   contenteditable, so typing a dimension never switches tools.
+
+### F-DS4. Undo, redo, and close
+
+1. Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) step the Studio's own history, up to 200
+   steps.
+2. Esc is a ladder, not a close: it clears the selection, then returns to
+   Select, then closes.
+3. **Close** in the title row closes immediately and keeps the drawing.
+
+#### Success
+
+Undo and redo round-trip the sketch exactly. Selection ids that undo removed are
+dropped so the inspector never reads a vanished shape.
+
+#### Error — undo with nothing to undo
+
+1. The Undo button is inert and drawn at reduced opacity. Pressing Ctrl+Z does
+   nothing. This is a no-op control, not a policy gate.
+
+#### Empty — closing an untouched session
+
+1. Closing asks nothing and writes nothing to the project.
+
+#### Edge — more than 200 steps
+
+1. The oldest steps are evicted and the status bar reports "N older steps
+   trimmed". The drawing is unaffected; this informs and never blocks.
+
+### F-DS5. Draw a shape (DS-3)
+
+1. Arm Rectangle (R), Circle (C), or Line (L) in the Create rail.
+2. Press on the canvas and drag. The live shape and its dimension label follow
+   the pointer on the interaction layer; the committed drawing underneath is not
+   redrawn.
+3. Hold **Shift** to constrain — a square, or a 45-degree-locked line that keeps
+   the length the pointer implies. Hold **Alt** to draw from the centre; for a
+   circle, Alt reinterprets the drag as the diameter.
+4. With Snap on, both ends land on the grid. With Ortho on, the moving point
+   locks to the axis it has travelled further along.
+5. Release to commit. The shape becomes one entity, one undo step, and the new
+   selection.
+
+#### Success
+
+The entity count rises by one, the status bar shows the new count, and the shape
+is selected so it can be acted on immediately.
+
+#### Error — a degenerate gesture
+
+1. A press-and-release that never moved commits nothing and consumes no undo
+   step. A click is not a draw. Nothing is reported as a failure.
+
+#### Empty — no drag yet
+
+1. Between pressing and moving, the draft exists but the entity count is
+   unchanged; the drawing only gains geometry on release.
+
+#### Edge — Esc mid-drag
+
+1. Esc discards the draft outright and the following pointer-up does NOT commit
+   it. (The main workspace draw tool has the opposite behaviour today - see the
+   defects noted in the research document.)
+
+### F-DS6. Select geometry (DS-3)
+
+1. Arm Select (V). Click a shape to select it; Shift+click adds or removes.
+2. Click empty space and drag to marquee-select.
+
+#### Success
+
+Clicked geometry highlights in the accent colour at double width. The topmost
+entity under the pointer wins, because entity order is z-order.
+
+#### Error — clicking near but not on geometry
+
+1. Hit tolerance is a fixed pixel radius converted to millimetres through the
+   current zoom, so the same slop applies at every zoom level. Outside it, the
+   click starts a marquee instead.
+
+#### Empty — marquee that catches nothing
+
+1. The selection clears. A marquee never creates an undo step.
+
+#### Edge — marquee that only overlaps
+
+1. Selection is enclose-not-touch: a shape crossing the marquee edge is not
+   selected, matching the main workspace.
+
+### F-DS7. Read and type exact dimensions (DS-3b)
+
+1. Select a single shape. A floating **properties box** appears, titled with the
+   shape kind, grouped Position / Size / Shape / Measured. Drag its header to move
+   it; it cannot be dragged off-screen.
+2. Editable dimensions depend on the shape: a rectangle shows X, Y, Width, Height
+   and Corner radius; a circle shows Centre X/Y, Radius **and** Diameter; a line
+   shows both endpoints **and** Length and Angle; an arc shows Centre, Radius,
+   Start angle, Sweep and Arc length.
+3. Measured values are shown read-only alongside: area, perimeter, circumference,
+   chord, node count.
+4. Hover or focus any row and the exact distance it controls is called out **on the
+   shape** - a dimension line with arrowheads at both ends, witness lines out to
+   the geometry, and the value in a chip. Radius shows centre-to-rim; Angle and
+   Sweep show a swept arc with both legs; an endpoint field marks that point.
+   Leaving the row removes the call-out.
+5. Type a value and press Enter, or click away, to commit. Millimetres accept two
+   decimals; a comma decimal separator and a trailing unit are both accepted.
+
+#### Success
+
+The geometry is rebuilt from the typed number, not nudged toward it. Resizing grows
+from the origin so X and Y stay put; typing a length keeps the start point and the
+direction; typing an angle rotates about the start and preserves length; diameter is
+radius doubled. Each committed value is one undo step.
+
+#### Error - a value that cannot apply
+
+1. A non-numeric entry, a blank field, or a value below the dimension's floor is
+   ignored and the field returns to the geometry's value. Nothing is reported as a
+   failure and the shape is not changed.
+2. A dimension that does not belong to the selected shape is simply absent from the
+   box rather than shown disabled.
+
+#### Empty - nothing selected, or several things selected
+
+1. With no selection, or with more than one shape selected, the box is not shown.
+   Per-shape dimensions are unambiguous only for a single shape.
+
+#### Edge - the shape changes underneath the box
+
+1. Undo, redo, or a drag updates every field live, because the inputs mirror the
+   geometry whenever they are not being typed into.
+2. Deleting the shape closes the box. Escape while typing abandons that edit and
+   restores the shown value without stepping the Escape ladder.
+3. A freehand path exposes X and Y (which translate it) plus read-only extents,
+   node count and run length; it has no parametric dimension to call out, so no
+   arrow is drawn.
+
+### F-DS8. Apply the drawing to the project (DS-5)
+
+1. With output geometry drawn, **Apply** in the title row adds it to the project as
+   cuttable artwork. **Apply & Close** does the same and then closes.
+2. Every entity becomes one scene object. A rectangle and a circle stay
+   **parametric** — they arrive as ordinary drawn shapes the main canvas can still
+   edit through Shape properties. A line, arc, or path arrives as exact baked
+   geometry, deliberately never re-fitted.
+3. All of it shares one auto-created `Design` cut operation, and everything
+   inserted is selected so it can be moved or re-assigned immediately.
+4. The whole apply is **one** project undo step, however many drawing steps went
+   into it. The Studio keeps its own separate history.
+5. The Studio stays open after Apply, so you can check the canvas and keep drawing.
+
+#### Success
+
+Objects appear on the main canvas at the millimetre positions drawn, on a `Design`
+layer, and the project is marked dirty. Apply goes inert until the drawing changes
+again.
+
+#### Error — nothing to apply
+
+1. An empty sketch, or one containing only construction guides, applies nothing and
+   leaves the project untouched. Apply is inert rather than refusing.
+
+#### Empty — first Apply of a session
+
+1. A fresh session has nothing to apply until something is drawn.
+
+#### Edge — applying twice
+
+1. A second Apply inserts a second copy on its own `Design 2` operation rather than
+   replacing the first, so re-applying never silently destroys earlier work.
+2. Construction guides are excluded from output every time; they exist to design
+   against, not to cut.
+
+### F-DS9. Snap to existing geometry (DS-4)
+
+1. With **Snap** on, moving the pointer near existing geometry captures it on the
+   nearest meaningful reference point rather than on the grid.
+2. Six kinds are offered, each drawn with its own glyph so you can tell which one
+   caught you:
+
+   | Kind | Glyph | Where |
+   |---|---|---|
+   | node | filled square | line ends, path nodes, rectangle corners, arc ends |
+   | midpoint | hollow triangle | halfway along any edge |
+   | centre | circle with crosshair | centre of a circle, arc, or rectangle |
+   | quadrant | hollow diamond | the 0/90/180/270 rim points of a circle or arc |
+   | intersection | X | where two different shapes cross |
+   | edge | short bar | anywhere along an edge |
+
+3. The status bar names the live one, e.g. `Snap: centre`.
+4. Reach is a fixed screen distance, so it feels the same at every zoom.
+
+#### Success
+
+The point lands exactly on the reference — a corner at 103.4 mm snaps to 103.4 mm,
+not to the nearest grid line. Priority is by specificity, so a node always wins over
+the edge it sits on, and a midpoint over the same edge.
+
+#### Error — nothing in reach
+
+1. Beyond the snap radius, the grid takes over; with the grid off, the raw pointer
+   position is used. Nothing is refused and no marker is drawn.
+
+#### Empty — an empty sketch
+
+1. With no geometry there is nothing to snap to, so only the grid applies.
+
+#### Edge — snapping while drawing
+
+1. The shape being drawn is excluded from its own snap candidates, so a rectangle
+   cannot capture its own corner mid-drag.
+2. An arc offers only the quadrants it actually sweeps through — a compass point the
+   arc never reaches is not a snap target.
+3. A shape crossing itself reports no intersection; a crossing is a reference
+   between two shapes, and self-crossings fight the node snap on closed paths.
+4. Turning Snap off (Shift+S) disables both mechanisms at once.
+
+### F-DS10. Design in carve layers (DS-8, ADR-272 Amendment 1)
+
+1. The right panel lists the sketch's carve layers. A fresh sketch has one
+   ("Layer 1"); **+ New** adds another, named and colored by position, and the
+   new layer becomes active immediately.
+2. New shapes land on the ACTIVE layer; the 2D canvas strokes each shape in its
+   layer's color so the drawing, the panel, and the 3D view tell one story.
+3. Click a row to make it active. The row reads back the layer's cut type,
+   depth, bit, and shape count.
+4. The active layer's settings edit below the list: name, cut type
+   (profile outside/inside/on-path, pocket, engrave, v-carve, drill), depth
+   (with a **Through** helper that sets the stock thickness), the bit, and —
+   for v-carve — an optional clearing bit for flat floors.
+5. Select shapes and press **Assign** to move them onto the active layer.
+6. Layer edits ride the sketch history: Ctrl+Z walks them like drawing steps.
+
+#### Error — removing the last layer
+
+1. The remove button is inert with one layer (its title says why); a sketch
+   always keeps a layer. Removing any other layer re-homes its shapes to the
+   first layer.
+
+#### Empty — no selection
+
+1. **Assign** is inert until shapes are selected; its title explains.
+
+#### Edge — undo removes the active layer
+
+1. The active layer falls back to the first remaining layer; nothing dangles.
+
+### F-DS11. Design in the 3D space (DS-8b, ADR-272 Amendment 2)
+
+1. The Studio's canvas IS the 3D design space: the stock sits on a grid, the
+   sketch draws on its top face in each layer's colour, and the carve renders
+   live underneath — pockets flat-floor, v-carves groove by boundary distance
+   with the layer's v-bit angle, profiles slot at bit diameter on the offset
+   side, drills bore at circle centres, and depths at the stock thickness
+   read as through cuts.
+2. The left button always belongs to the armed tool — draw, select, and move
+   exactly as in 2D, from any camera angle (the pointer lands on the stock
+   plane). Middle drag pans, Shift+middle or right drag orbits, the wheel
+   zooms at the cursor. Object snapping and hit radii keep their on-screen
+   size at any zoom or tilt.
+3. The Studio opens looking straight down (the precision view). The viewport
+   toolbar's **Top** and **Iso** buttons snap the camera back; **Design** /
+   **Bits** chips switch the carve tiers, and **Simulate** compiles the layers
+   into real toolpaths carved with each tool section's own bit shape. If the
+   drawing changes after a run, the Bits chip says "(stale)" until Simulate
+   runs again.
+4. The top bar's **3D** toggle switches to the flat 2D canvas — the fallback
+   surface, and where dimension call-outs and marquee selection still live in
+   this stage.
+
+#### Error — no WebGL / not a CNC machine
+
+1. Without WebGL the viewport says so and points at the 2D toggle; drawing
+   and Apply work the same there.
+2. On a laser machine profile, Simulate reports it needs a CNC machine; the
+   design-surface tier still previews. Nothing is refused (rule 7).
+
+#### Empty — nothing drawn
+
+1. The viewport shows the untouched stock slab on the grid.
+
+#### Edge — drawing while orbited off Top
+
+1. A drag still draws: the pointer maps through the camera onto the stock
+   plane, so a rectangle drawn from an isometric angle lands exactly where
+   its corners touched the stock. A ray that misses the plane (aimed at the
+   sky) simply does nothing.
+
+### F-DS12. Apply layers → a multi-bit job (DS-8)
+
+1. **Apply** commits each contributing layer as ONE scene operation carrying
+   the layer's name, color, cut type, depth, and bit; feeds, passes, and tabs
+   take the operator's defaults. One project undo entry removes the whole
+   apply, as before.
+2. The job pipeline is unchanged: layers with different bits become contiguous
+   per-bit tool sections (profile sections last), and each boundary emits the
+   labelled M0 tool-change hold — jog, swap the bit, re-zero Z, Continue.
+
+#### Edge — same bit on every layer
+
+1. One tool section, no tool-change pause: exactly the pre-layer behavior.

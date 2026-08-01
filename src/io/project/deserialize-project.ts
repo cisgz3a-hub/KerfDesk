@@ -3,6 +3,7 @@
 
 import { normalizeCameraAlignment, normalizeCameraCalibration } from '../../core/camera';
 import { isChiploadMaterialKey } from '../../core/cnc';
+import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import {
   DEFAULT_DEVICE_PROFILE,
   isKnownControllerKind,
@@ -18,17 +19,19 @@ import { normalizeScanOffsetCalibrationStatus } from '../../core/devices/scan-of
 import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
+  type CncMachineConfig,
   type CncCoolantMode,
+  type CncTool,
   type CncTiling,
-  DEFAULT_PROJECT_OPTIMIZATION,
   DEFAULT_CNC_TOOLS,
   isCncCoolantMode,
-  PROJECT_SCHEMA_VERSION,
   type Project,
 } from '../../core/scene';
+import { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
 import { normalizeLayer } from './normalize-layer';
+import { normalizeLibraryAssetProvenance } from './project-library-provenance-normalizer';
 import { validateProjectShape } from './project-shape-validator';
 
 export type DeserializeResult =
@@ -122,7 +125,11 @@ function normalizeProject(raw: Record<string, unknown>): Project {
 function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefined {
   if (!isObject(raw)) return undefined;
   if (raw['kind'] === 'laser') return { kind: 'laser' };
-  if (raw['kind'] !== 'cnc') return undefined;
+  return normalizeCncMachineConfig(raw) ?? undefined;
+}
+
+export function normalizeCncMachineConfig(raw: unknown): CncMachineConfig | null {
+  if (!isObject(raw) || raw['kind'] !== 'cnc') return null;
   const d = DEFAULT_CNC_MACHINE_CONFIG;
   const stock = isObject(raw['stock']) ? raw['stock'] : {};
   const params = isObject(raw['params']) ? raw['params'] : {};
@@ -130,7 +137,7 @@ function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefine
   const toolId =
     typeof raw['toolId'] === 'string' && tools.some((tool) => tool['id'] === raw['toolId'])
       ? raw['toolId']
-      : d.toolId;
+      : (tools[0]?.id ?? d.toolId);
   return {
     kind: 'cnc',
     stock: {
@@ -170,13 +177,14 @@ function normalizeCncTiling(raw: unknown): { tiling: CncTiling } | Record<string
   const overlapMm = raw['overlapMm'];
   if (!isFiniteNumber(tileWidthMm) || tileWidthMm <= 0) return {};
   if (!isFiniteNumber(tileHeightMm) || tileHeightMm <= 0) return {};
-  if (
-    !isFiniteNumber(overlapMm) ||
-    overlapMm < 0 ||
-    overlapMm >= Math.min(tileWidthMm, tileHeightMm)
-  ) {
-    return {};
-  }
+  // Overlap is checked for shape only, not against the tile size. The panel
+  // clamps tile width/height and overlap independently with no cross-field
+  // check, so an overlap at or above the smaller tile dimension is a value the
+  // UI freely produces - and dropping the block here made every save fail the
+  // ADR-204 drift check with nothing naming Overlap as the cause. Nothing
+  // downstream needs the guarantee: planTiles already floors the step at
+  // MIN_TILE_STEP_MM. A degenerate overlap belongs in Job Review, not here.
+  if (!isFiniteNumber(overlapMm) || overlapMm < 0) return {};
   return {
     tiling: {
       tileWidthMm,
@@ -210,11 +218,12 @@ function normalizeStockOriginOffset(
 // the field, and an unknown kind degrades to end-mill (same junk-to-default
 // contract as coolantModeOrOff).
 const CNC_TOOL_KINDS = ['end-mill', 'ball-nose', 'v-bit', 'engraving'] as const;
-const MAX_TIP_ANGLE_DEG = 180;
+const MAX_TOOL_METADATA_LENGTH = 120;
+const MAX_TOOL_FLUTES = 16;
 
-function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {
+function normalizeCncTools(raw: unknown): Array<CncTool> {
   if (!Array.isArray(raw)) return DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
-  const tools: Array<Record<string, unknown>> = [];
+  const tools: Array<CncTool> = [];
   for (const tool of raw) {
     const normalized = normalizeCncTool(tool);
     if (normalized !== null) tools.push(normalized);
@@ -222,21 +231,52 @@ function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {
   return tools.length > 0 ? tools : DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
 }
 
-function normalizeCncTool(tool: unknown): Record<string, unknown> | null {
+function normalizeCncTool(tool: unknown): CncTool | null {
   if (!isObject(tool)) return null;
+  const core = normalizeCncToolCore(tool);
+  if (core === null) return null;
+  return { ...core, ...normalizeCncToolMetadata(tool) };
+}
+
+function normalizeCncToolCore(tool: Record<string, unknown>): CncTool | null {
+  if (typeof tool['id'] !== 'string') return null;
+  if (typeof tool['name'] !== 'string') return null;
   const diameterMm = tool['diameterMm'];
-  if (typeof tool['id'] !== 'string' || typeof tool['name'] !== 'string') return null;
   if (!isFiniteNumber(diameterMm) || diameterMm <= 0) return null;
-  const tipAngleDeg = tool['tipAngleDeg'];
-  const tipAngleValid =
-    isFiniteNumber(tipAngleDeg) && tipAngleDeg > 0 && tipAngleDeg < MAX_TIP_ANGLE_DEG;
   return {
     id: tool['id'],
     name: tool['name'],
     kind: isCncToolKindValue(tool['kind']) ? tool['kind'] : 'end-mill',
     diameterMm,
-    ...(tipAngleValid ? { tipAngleDeg } : {}),
   };
+}
+
+function normalizeCncToolMetadata(tool: Record<string, unknown>): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {};
+  const family = boundedToolString(tool['family']);
+  const catalogId = boundedToolString(tool['catalogId']);
+  if (isValidCncTipAngleDeg(tool['tipAngleDeg'])) {
+    metadata['tipAngleDeg'] = tool['tipAngleDeg'];
+  }
+  if (family !== null) metadata['family'] = family;
+  if (isFiniteNumber(tool['shankDiameterMm']) && tool['shankDiameterMm'] > 0) {
+    metadata['shankDiameterMm'] = tool['shankDiameterMm'];
+  }
+  if (validFluteCount(tool['fluteCount'])) metadata['fluteCount'] = tool['fluteCount'];
+  if (catalogId !== null) metadata['catalogId'] = catalogId;
+  return metadata;
+}
+
+function validFluteCount(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_TOOL_FLUTES
+  );
+}
+
+function boundedToolString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_TOOL_METADATA_LENGTH
+    ? value
+    : null;
 }
 
 function isCncToolKindValue(value: unknown): value is (typeof CNC_TOOL_KINDS)[number] {
@@ -407,7 +447,16 @@ function normalizeAirAssistCommand(value: unknown): Project['device']['airAssist
 
 function normalizeSceneObject(obj: unknown): unknown {
   if (!isObject(obj)) return obj;
-  if (obj['kind'] !== 'text') return obj;
-  if (typeof obj['letterSpacing'] === 'number') return obj;
-  return { ...obj, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };
+  const { libraryProvenance: rawLibraryProvenance, ...withoutLibraryProvenance } = obj;
+  const libraryProvenance =
+    obj['kind'] === 'imported-svg'
+      ? normalizeLibraryAssetProvenance(rawLibraryProvenance)
+      : undefined;
+  const normalized =
+    libraryProvenance === undefined
+      ? withoutLibraryProvenance
+      : { ...withoutLibraryProvenance, libraryProvenance };
+  if (obj['kind'] !== 'text') return normalized;
+  if (typeof obj['letterSpacing'] === 'number') return normalized;
+  return { ...normalized, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };
 }

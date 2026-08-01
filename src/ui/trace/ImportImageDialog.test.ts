@@ -218,6 +218,20 @@ describe('commit source revalidation (P2-A)', () => {
     );
   });
 
+  it('commits no fill override when the dialog sends no fill style (CNC)', async () => {
+    const seed = seedRaster();
+    const ctx = ctxWith(() => seedRaster());
+    // The CNC submit path omits traceFillStyle entirely: the picker is hidden
+    // there and nothing under src/core/cnc reads fillStyle. Pinning the object
+    // to mode:'fill' would silently hatch-engrave it if the project were later
+    // switched to laser, from a setting the operator never saw.
+    const { traceFillStyle: _omitted, ...cncArgs } = args(seed);
+    await commit(cncArgs, ctx);
+    const committed = vi.mocked(ctx.traceExistingImage).mock.calls[0]?.[1];
+    expect(committed).toMatchObject({ kind: 'traced-image', traceMode: 'filled-contours' });
+    expect(committed).not.toHaveProperty('operationOverride');
+  });
+
   it('applies Follow Shape as an object-level offset fill override', async () => {
     const seed = seedRaster();
     const ctx = ctxWith(() => seedRaster());

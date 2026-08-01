@@ -5,8 +5,7 @@
 
 import type { JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
-import type { LiveJobEstimate } from '../laser/live-job-estimate';
-import type { PreviewToolpath } from './preview-status';
+import type { LargeJobPreparation } from './large-job-preparation';
 
 export type PreparationWorkerRequest = {
   readonly id: number;
@@ -16,10 +15,8 @@ export type PreparationWorkerRequest = {
 };
 
 export type PreparationWorkerResponse =
-  | {
+  | ({
       readonly id: number;
       readonly kind: 'ok';
-      readonly toolpath: PreviewToolpath;
-      readonly estimate: LiveJobEstimate;
-    }
+    } & LargeJobPreparation)
   | { readonly id: number; readonly kind: 'error'; readonly message: string };

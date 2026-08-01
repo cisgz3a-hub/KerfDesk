@@ -5,16 +5,16 @@
 // preflight is deliberately skipped — an oversized job is the point of
 // tiling — and each tile's G-code preflights individually instead.
 
-import { tileFileName, tileJobs } from '../../core/cnc';
-import { runCncPreflight, type ControllerSettingsSnapshot } from '../../core/preflight';
-import { cncGrblStrategy } from '../../core/output';
-import { gcodeMetadataHeader, prepareOutput } from '../../io/gcode';
+import { tileJobs } from '../../core/cnc';
+import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
+import { prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
 import type { OutputScope, Project } from '../../core/scene';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
-import { confirmControllerReadiness } from './confirm-controller-readiness';
-import { buildGcodeMetadata } from './build-info';
+import { controllerReadinessAdvisories } from './controller-readiness-advisories';
+import { emitTileFiles, pushAdvisoryToasts, type TileFile } from './tile-emission';
+import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
 
@@ -26,8 +26,10 @@ export type SaveTiledGcodeCtx = {
   // silently tile the whole scene.
   readonly outputScope?: OutputScope;
   // The connected controller's live $$ snapshot, for the same $30/$32 readiness
-  // gate the single-file Save runs (GCO-02). null/undefined = nothing to prove.
+  // REPORT the single-file Save makes (GCO-02, demoted from a gate by rule 7 /
+  // ADR-228). null/undefined = nothing to prove.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
+  readonly settingsCapability?: ReadinessSettingsCapability;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -46,59 +48,42 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
     jobAwareAlert(`Cannot export tiles:\n\n${lines}`);
     return true;
   }
-  const tiles = tileJobs(prepared.job, machine.tiling);
-  if (tiles.length === 0) {
+  const tiled = tileJobs(prepared.job, machine.tiling);
+  if (tiled.kind === 'empty') {
     ctx.pushToast('Nothing to tile — the compiled job is empty.', 'warning');
     return true;
   }
-  const emitted = emitTileFiles(ctx, machine, tiles);
-  if (emitted === null) return true;
-  // Every tile has passed preflight and nothing is written yet — run the
-  // controller-readiness gate ONCE for the whole set (a bad $30/$32 is the
-  // same hazard whether the job is tiled or not). Declining writes no tiles.
-  if (!confirmControllerReadiness(ctx.project, ctx.controllerSettings)) return true;
-  const saved = await saveTileFiles(ctx, emitted);
-  ctx.pushToast(
-    saved === emitted.length
-      ? `Saved all ${saved} tile files. Cut them in index order, re-registering the stock between tiles.`
-      : `Saved ${saved} of ${emitted.length} tile files.`,
-    saved === emitted.length ? 'success' : 'warning',
-  );
-  return true;
-}
-
-type TileFile = { readonly name: string; readonly gcode: string };
-
-// Every tile must pass preflight BEFORE any file is written (the
-// no-partial-output invariant applies to the whole tile set). null = a
-// tile failed; the user already saw the alert.
-function emitTileFiles(
-  ctx: SaveTiledGcodeCtx,
-  machine: Extract<Project['machine'], { kind: 'cnc' }>,
-  tiles: ReturnType<typeof tileJobs>,
-): TileFile[] | null {
-  const emitted: TileFile[] = [];
-  for (const { tile, job } of tiles) {
-    const body = cncGrblStrategy.emit(job, ctx.project.device);
-    const preflight = runCncPreflight(ctx.project, machine, body);
-    if (!preflight.ok) {
-      const lines = preflight.issues.map((issue) => `• ${issue.message}`).join('\n');
-      jobAwareAlert(
-        `Tile r${tile.row + 1}-c${tile.col + 1} failed preflight:\n\n${lines}\n\n` +
-          'No files were written.',
-      );
-      return null;
-    }
-    const header = gcodeMetadataHeader(buildGcodeMetadata(), {
-      kind: 'cnc',
-      spindleMaxRpm: machine.params.spindleMaxRpm,
-    });
-    emitted.push({
-      name: tileFileName(baseName(ctx.savedName), tile),
-      gcode: `${header}; tile: row ${tile.row + 1}, column ${tile.col + 1}\n${body}`,
-    });
+  if (tiled.kind === 'work-budget-exceeded') {
+    jobAwareAlert(tiledSaveWorkBudgetMessage(tiled.grid));
+    return true;
   }
-  return emitted;
+  // Per-tile preflight must inspect the same selected artifact that produced
+  // prepared.job; rescanning the original scene can overblock on unselected
+  // operations that are absent from every tile.
+  const emitted = emitTileFiles(prepared.project, machine, tiled.tiles, ctx.savedName);
+  if (emitted === null) return true;
+  const files = emitted.files;
+  // Rule 7 / ADR-228: a disagreeing $30/$32 is the same hazard whether the job
+  // is tiled or not, so it is stated ONCE for the whole set. Reported here,
+  // where the deleted confirm stood — the confirm fired before any tile was
+  // written, so reporting only after a successful run would say less than the
+  // refusal did when the operator cancels part-way through the pickers.
+  for (const advisory of controllerReadinessAdvisories(
+    ctx.project,
+    ctx.controllerSettings,
+    ctx.settingsCapability,
+  )) {
+    ctx.pushToast(advisory, 'warning');
+  }
+  const saved = await saveTileFiles(ctx, files);
+  ctx.pushToast(
+    saved === files.length
+      ? `Saved all ${saved} tile files. Cut them in index order, re-registering the stock between tiles.`
+      : `Saved ${saved} of ${files.length} tile files.`,
+    saved === files.length ? 'success' : 'warning',
+  );
+  pushAdvisoryToasts(ctx.pushToast, prepared.advisories, emitted.advisories);
+  return true;
 }
 
 // Sequential save dialogs; a cancel stops the remaining tiles.
@@ -134,9 +119,4 @@ async function saveTileFiles(
     }
   }
   return saved;
-}
-
-function baseName(savedName: string | null): string {
-  const name = savedName ?? 'job';
-  return name.replace(/\.(lf2|gcode|nc)$/i, '');
 }

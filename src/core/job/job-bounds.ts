@@ -1,7 +1,5 @@
-// computeJobBounds — AABB across every cut segment in a compiled Job.
-// Used by F-B4 Frame to drive the laser around the perimeter of the planned
-// cut, and (future) by preflight to short-circuit the per-point bounds
-// check on jobs whose AABB already fails.
+// computeJobBounds measures emitted burn geometry. computeJobMotionBounds adds
+// every planned laser-off runway so Frame traces the full physical envelope.
 
 import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
@@ -17,8 +15,8 @@ import {
   type Job,
   type RasterGroup,
 } from './job';
-import { rasterRow } from './raster-rows';
-import { offsetForSpeed, shiftAlongTravel } from './scan-offset';
+import { rasterRowsInProviderOrder } from './raster-rows';
+import { offsetForSpeed } from './scan-offset';
 
 export type JobBounds = {
   readonly minX: number;
@@ -111,21 +109,16 @@ function extendBoundsForFill(
   includeOverscanMotion: boolean,
   device: DeviceProfile | undefined,
 ): boolean {
-  let any = extendBoundsForCut(b, group);
+  const usesPlannedBurnBounds = group.fillRunwayPolicy === 'feed-matched-every-sweep';
+  let any = usesPlannedBurnBounds ? false : extendBoundsForCut(b, group);
   // Only Follow Shape (offset) groups carry entryRunwayMm (ADR-239).
   extendBoundsForContourEntries(b, group, includeOverscanMotion, device);
   const scanOffsetMm = group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);
-  const plans = planFillSweeps(group);
+  const plans = planFillSweeps(group, scanOffsetMm);
   for (const plan of plans) {
     const sweep = plan.sweep;
-    const spans =
-      sweep.reverse && scanOffsetMm !== 0
-        ? sweep.spans.map((span) => {
-            const shifted = shiftAlongTravel(span.start, span.end, scanOffsetMm);
-            return { start: shifted.from, end: shifted.to };
-          })
-        : sweep.spans;
-    if (sweep.reverse && scanOffsetMm !== 0) {
+    const spans = sweep.spans;
+    if (usesPlannedBurnBounds || (sweep.reverse && scanOffsetMm !== 0)) {
       for (const span of spans) {
         extendBoundsForPoint(b, span.start);
         extendBoundsForPoint(b, span.end);
@@ -145,8 +138,8 @@ function extendBoundsForFill(
   return any;
 }
 
-// F.2.d: raster groups carry their burn bounds directly. Motion bounds add
-// overscan only for safety checks; Frame still traces the burn area itself.
+// F.2.d: raster groups carry their burn bounds directly. Motion bounds add the
+// same overscan and reverse-row shift the emitted raster path uses.
 function extendBoundsForRaster(
   b: MutableBounds,
   group: RasterGroup,
@@ -204,24 +197,19 @@ function extendBoundsForPoint(
 }
 
 function hasActiveRasterPixel(group: RasterGroup): boolean {
-  for (let y = 0; y < group.pixelHeight; y += 1)
-    if (rasterRow(group, y).some((s) => s > 0)) return true;
+  for (const { row } of rasterRowsInProviderOrder(group)) if (row.some((s) => s > 0)) return true;
   return false;
 }
 
 function hasActiveReverseRasterRow(group: RasterGroup): boolean {
   if (group.bidirectional === false) return false;
   let emittedRowCount = 0;
-  for (let y = 0; y < group.pixelHeight; y += 1) {
-    if (!hasActivePixelInRasterRow(group, y)) continue;
+  for (const { row } of rasterRowsInProviderOrder(group)) {
+    if (!row.some((s) => s > 0)) continue;
     if (emittedRowCount % 2 === 1) return true;
     emittedRowCount += 1;
   }
   return false;
-}
-
-function hasActivePixelInRasterRow(group: RasterGroup, y: number): boolean {
-  return rasterRow(group, y).some((s) => s > 0);
 }
 
 function scanOffsetForGroup(device: DeviceProfile | undefined, speed: number): number {

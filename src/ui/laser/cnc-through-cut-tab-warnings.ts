@@ -1,8 +1,14 @@
 // detectCncThroughCutTabWarnings — CNC-mode advisory: a profile layer whose
 // cut depth reaches (or passes) the stock thickness with holding tabs disabled
 // frees the part — and any interior hole slugs — on the final pass, where they
-// can catch the bit or fly off. The out-of-box default layer is exactly this
-// (profile-outside, depth == stock == 6.35 mm, tabs off).
+// can catch the bit or fly off. The out-of-box layer does NOT trip this: the
+// default cut depth is 1 mm against 6.35 mm stock (machine.ts), so the advisory
+// only fires once the operator deepens the cut.
+//
+// It also reports the plainer case the free-part rule misses: any cut type at
+// all — pocket, engrave, v-carve, relief — set deeper than the stock is cutting
+// into the spoilboard. Easel warns for every carve type; we did so only for
+// profiles with tabs off, so a pocket 1.65 mm into the spoilboard was silent.
 //
 // This is an advisory, not a hard gate — through-cutting onto a spoilboard is a
 // legitimate workflow. KerfDesk warns rather than silently auto-adding tabs
@@ -29,6 +35,15 @@ export function detectCncThroughCutTabWarnings(project: Project): ReadonlyArray<
         `Layer ${layer.id} cuts through the stock (${settings.depthMm} mm ≥ ${stockThicknessMm} mm) ` +
           'with no holding tabs — the part and any hole slugs come free on the final pass. ' +
           'Enable Tabs or reduce the cut depth.',
+      );
+    } else if (settings.depthMm > stockThicknessMm) {
+      // Spoilboard overcut. Legitimate on purpose, so this informs and never
+      // refuses; the free-part case above is the louder one and wins the row.
+      const pastMm = settings.depthMm - stockThicknessMm;
+      warnings.push(
+        `Layer ${layer.id} cuts ${settings.depthMm} mm into ${stockThicknessMm} mm stock — ` +
+          `${pastMm.toFixed(2)} mm past the bottom, into the spoilboard. ` +
+          'Reduce the cut depth if that is not intended.',
       );
     }
   }

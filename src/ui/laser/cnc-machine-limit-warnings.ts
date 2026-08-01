@@ -29,16 +29,23 @@ export function detectCncMachineLimitWarnings(
     ...feedVsMax(project, limits),
     ...plungeVsZMax(project, limits),
     ...spindleVsMax(project, limits),
+    ...spindleVsConfiguredCeiling(project),
   ];
 }
 
+// Compare the stock's FAR EDGE against travel, not its raw size: stock placed
+// at an origin offset reaches originOffset + size, so a 300 mm sheet at (150,
+// 150) runs 50 mm past a 400 mm axis while its width alone looks in range. The
+// sibling detector already works in extents (cnc-stock-warnings.ts).
 function stockVsBed(stock: CncStock, limits: ControllerSettingsSnapshot): ReadonlyArray<string> {
+  const maxX = stock.originOffset.x + stock.widthMm;
+  const maxY = stock.originOffset.y + stock.heightMm;
   const over: string[] = [];
-  if (limits.bedWidth !== undefined && stock.widthMm > limits.bedWidth) {
-    over.push(`width ${stock.widthMm} mm > ${limits.bedWidth} mm`);
+  if (limits.bedWidth !== undefined && maxX > limits.bedWidth) {
+    over.push(`X reaches ${maxX} mm > ${limits.bedWidth} mm`);
   }
-  if (limits.bedHeight !== undefined && stock.heightMm > limits.bedHeight) {
-    over.push(`height ${stock.heightMm} mm > ${limits.bedHeight} mm`);
+  if (limits.bedHeight !== undefined && maxY > limits.bedHeight) {
+    over.push(`Y reaches ${maxY} mm > ${limits.bedHeight} mm`);
   }
   if (over.length === 0) return [];
   return [
@@ -67,6 +74,23 @@ function plungeVsZMax(project: Project, limits: ControllerSettingsSnapshot): Rea
     `A layer's plunge ${topPlunge} mm/min is above the machine's reported Z max rate ($112) ` +
       `${limits.zMaxFeed} mm/min — the controller clamps to its limit, so plunges ` +
       'run slower than planned.',
+  ];
+}
+
+// The app's OWN configured ceiling, distinct from the controller's reported $30
+// above. capSpindle clamps the layer to this at compile time, so the job still
+// runs - it just runs slower than the layer asks, with feeds that assume the
+// higher RPM. Preflight used to refuse this outright; it is an advisory now.
+function spindleVsConfiguredCeiling(project: Project): ReadonlyArray<string> {
+  const machine = project.machine;
+  if (machine === undefined || machine.kind !== 'cnc') return [];
+  const ceiling = machine.params.spindleMaxRpm;
+  const topRpm = maxOutputLayerValue(project, (cnc) => cnc.spindleRpm);
+  if (topRpm === null || topRpm <= ceiling) return [];
+  return [
+    `A layer requests spindle ${topRpm} RPM but the machine's Spindle maximum is ` +
+      `${ceiling} RPM — the job will run at ${ceiling}, while that layer's feeds ` +
+      'assume the higher speed.',
   ];
 }
 

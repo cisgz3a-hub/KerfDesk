@@ -8,13 +8,17 @@ import {
   handleImportDxf,
   handleImportSvg,
   handleOpenProject,
-  handleSaveGcode,
   handleSaveProject,
 } from '../app/file-actions';
-import { handleOpenGcodePreview } from '../app/gcode-open-action';
+import {
+  inspectCurrentGcodeAction,
+  openGcodeInspectorAction,
+  saveGcodeAction,
+  type GcodeActionDeps,
+} from './gcode-command-actions';
 import { connectOptionsForDevice } from './connect-options';
 import { railPanelCommandContext } from './command-context-helpers';
-import { currentOutputScope, useStore } from '../state';
+import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -212,7 +216,15 @@ function fileCommandContext(
   | 'importImage'
   | 'saveGcode'
   | 'openGcodePreview'
+  | 'inspectCurrentGcode'
 > {
+  const gcodeDeps: GcodeActionDeps = {
+    platform,
+    app,
+    laser,
+    pushToast,
+    openInspector: callbacks.requestGcodeInspector,
+  };
   return {
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
@@ -222,9 +234,9 @@ function fileCommandContext(
     importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
     importDxf: () => void handleImportDxf(platform, app.importSvgObject, pushToast),
     importImage: callbacks.requestImportImage,
-    saveGcode: saveGcodeAction(platform, app, laser, pushToast),
-    openGcodePreview: () =>
-      void handleOpenGcodePreview(platform, app.openExternalGcodePreview, pushToast),
+    saveGcode: saveGcodeAction(gcodeDeps),
+    openGcodePreview: openGcodeInspectorAction(gcodeDeps),
+    inspectCurrentGcode: inspectCurrentGcodeAction(gcodeDeps),
   };
 }
 
@@ -336,34 +348,6 @@ function windowHelpCommandContext(
   };
 }
 
-function saveGcodeAction(
-  platform: ReturnType<typeof usePlatform>,
-  app: ReturnType<typeof useStore.getState>,
-  laser: ReturnType<typeof useLaserStore.getState>,
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-): () => void {
-  return () =>
-    void handleSaveGcode({
-      platform,
-      project: app.project,
-      savedName: app.savedName,
-      jobPlacement: app.jobPlacement,
-      outputScope: currentOutputScope(app),
-      machine: {
-        statusReport: laser.statusReport,
-        workOriginActive: laser.workOriginActive,
-        wcoCache: laser.wcoCache,
-      },
-      controllerSettings: laser.controllerSettings,
-      activeWcs: laser.activeWcs,
-      allowRotaryRaster:
-        useExperimentalLaserFeatures.getState().features.rotaryRaster &&
-        profileSupportsCapability(app.project.device, 'rotary'),
-      advanceVariablesAfter: app.advanceVariablesAfter,
-      pushToast,
-    });
-}
-
 function openProject(
   platform: ReturnType<typeof usePlatform>,
   setProject: ReturnType<typeof useStore.getState>['setProject'],
@@ -397,6 +381,10 @@ function saveProject(
 
 function deleteSelection(): void {
   const state = useStore.getState();
+  if (state.selectedPathNode !== null) {
+    state.deleteSelectedPathNodes();
+    return;
+  }
   const ids = [
     ...(state.selectedObjectId !== null ? [state.selectedObjectId] : []),
     ...state.additionalSelectedIds,

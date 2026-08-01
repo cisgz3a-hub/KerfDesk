@@ -51,6 +51,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     importSvg: vi.fn(),
     importDxf: vi.fn(),
     openGcodePreview: vi.fn(),
+    inspectCurrentGcode: vi.fn(),
     importImage: vi.fn(),
     multiFileTrace: vi.fn(),
     saveGcode: vi.fn(),

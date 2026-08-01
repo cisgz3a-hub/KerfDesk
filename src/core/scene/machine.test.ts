@@ -79,6 +79,23 @@ describe('DEFAULT_CNC_LAYER_SETTINGS', () => {
   it('starts with a shallow pass instead of releasing the part', () => {
     expect(DEFAULT_CNC_LAYER_SETTINGS.depthMm).toBeGreaterThan(0);
     expect(DEFAULT_CNC_LAYER_SETTINGS.depthMm).toBeLessThan(DEFAULT_CNC_STOCK.thicknessMm);
-    expect(DEFAULT_CNC_LAYER_SETTINGS.tabsEnabled).toBe(false);
+  });
+
+  // ADR-258: tabs are ON by default so a through-cut profile does not free the part
+  // under a running spindle. They are inert on the shallow default because
+  // passNeedsTabs requires the cut to be deeper than the tab height, and the default
+  // is a 1 mm cut against a 2 mm tab — so the default job is unchanged.
+  it('enables holding tabs by default but leaves the shallow default cut untabbed', () => {
+    expect(DEFAULT_CNC_LAYER_SETTINGS.tabsEnabled).toBe(true);
+    // Inertness is a property of this numeric relationship: passNeedsTabs (core/cnc)
+    // requires depth > tabHeight, so a 1 mm default cut against a 2 mm tab is never
+    // tabbed. Asserted here as data; the behavior is covered in the cnc suite.
+    expect(DEFAULT_CNC_LAYER_SETTINGS.depthMm).toBeLessThanOrEqual(
+      DEFAULT_CNC_LAYER_SETTINGS.tabHeightMm,
+    );
+  });
+
+  it('cuts on the drawn line by default (ADR-256)', () => {
+    expect(DEFAULT_CNC_LAYER_SETTINGS.cutType).toBe('profile-on-path');
   });
 });

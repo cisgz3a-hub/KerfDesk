@@ -6,13 +6,22 @@
 
 import { selectControllerDriver } from '../../core/controllers';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
-import type { ControllerSettingsSnapshot, PreflightIssue } from '../../core/preflight';
-import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
-import { emitGcodeSnapshot } from '../../io/gcode';
-import { buildGcodeMetadata } from './build-info';
-import { deserializeProject, prepareProjectForPersistence } from '../../io/project';
-import { importLightBurnProject } from '../../io/lightburn';
-import { parseSvg } from '../../io/svg';
+import type {
+  ControllerSettingsSnapshot,
+  PreflightIssue,
+  ReadinessSettingsCapability,
+} from '../../core/preflight';
+import {
+  DEFAULT_OUTPUT_SCOPE,
+  machineKindOf,
+  validateOutputScope,
+  type OutputScope,
+  type Project,
+  type SceneObject,
+} from '../../core/scene';
+import type { importLightBurnProject } from '../../io/lightburn';
+import { prepareProjectForPersistence } from '../../io/project';
+import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -24,25 +33,18 @@ import { repairedMachineCapabilityMessage } from '../machine/machine-capability-
 import {
   DEFAULT_JOB_PLACEMENT,
   resolveExportJobPlacement,
-  trustedMotionOffsetForPreflight,
   type JobPlacementSettings,
   type MachinePlacementSnapshot,
-  type ResolvedJobPlacement,
 } from '../job-placement';
-import {
-  describeImportError,
-  describeImportResult,
-  describeReimportOutcome,
-} from './import-toasts';
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
-import { partitionSavePreflight } from './save-preflight-policy';
-import { confirmControllerReadiness } from './confirm-controller-readiness';
+import { controllerReadinessAdvisories } from './controller-readiness-advisories';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
-import { confirmOversizeImport } from './import-size-guard';
-import { renderVariableText } from '../text/render-variable-text';
-import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
-import { importSourceSizeIssue } from './import-source-limits';
+import { importSourceSizeAdvisory } from './import-size-advisory';
+import { prepareGcodeSave } from './prepare-gcode-save';
+import { parseOpenedProjectFile, type OpenProjectFile } from './project-open-parser';
+import { importSvgFiles } from './svg-import-action';
+import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -53,6 +55,7 @@ export async function handleImportDxf(
     readonly name: string;
     readonly size?: number;
     readonly text: () => Promise<string>;
+    readonly blob?: () => Promise<Blob>;
   }>;
   try {
     files = await platform.pickFilesForOpen({ accept: ['.dxf'], multiple: true });
@@ -72,6 +75,7 @@ export async function handleImportSvg(
     readonly name: string;
     readonly size?: number;
     readonly text: () => Promise<string>;
+    readonly blob?: () => Promise<Blob>;
   }>;
   try {
     files = await platform.pickFilesForOpen({ accept: ['.svg'], multiple: true });
@@ -79,38 +83,7 @@ export async function handleImportSvg(
     pushToast(`Could not import SVG: ${errMsg(err)}`, 'error');
     return;
   }
-  let successIdx = 0;
-  for (const file of files) {
-    try {
-      // F-A4 oversize confirm. Gate on the file size BEFORE reading when the
-      // adapter supplies it, so a huge file can't OOM the tab before the user is
-      // asked; adapters without size fall back to the post-read length gate.
-      if (file.size !== undefined && !confirmOversizeImport(file.name, file.size)) continue;
-      const text = await file.text();
-      if (file.size === undefined && !confirmOversizeImport(file.name, text.length)) continue;
-      const id = crypto.randomUUID();
-      const result = parseSvg({ svgText: text, id, source: file.name });
-      if (result.object !== null) {
-        const outcome = importSvgObject(result.object, successIdx);
-        successIdx += 1;
-        if (outcome.kind === 'replaced') {
-          // Phase C re-import: store recognised the source filename and
-          // swapped the existing object in place, keeping layer settings
-          // and transform. Toast the diff so the user sees what changed.
-          const t = describeReimportOutcome(outcome);
-          pushToast(t.message, t.variant);
-          continue; // skip the generic "imported" toast
-        }
-      }
-      for (const t of describeImportResult(file.name, result)) {
-        pushToast(t.message, t.variant);
-      }
-    } catch (err) {
-      const t = describeImportError(file.name, err);
-      pushToast(t.message, t.variant);
-      console.error(`Failed to import ${file.name}:`, err);
-    }
-  }
+  await importSvgFiles(files, importSvgObject, pushToast);
 }
 
 export type SaveGcodeCtx = {
@@ -120,9 +93,13 @@ export type SaveGcodeCtx = {
   readonly jobPlacement?: JobPlacementSettings;
   readonly outputScope?: OutputScope;
   readonly machine?: MachinePlacementSnapshot;
-  // null = never connected this session; a snapshot = run the $30/$32
-  // comparison before saving (M11). Omitted = caller doesn't track it.
+  // null = never connected this session; a snapshot = report any $30/$32
+  // disagreement as a warning before the picker opens (M11, demoted from a
+  // confirm by rule 7 / ADR-228). Omitted = caller doesn't track it.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
+  // How the active controller exposes settings. This only controls the
+  // readiness advisory interpretation; Save remains non-blocking.
+  readonly settingsCapability?: ReadinessSettingsCapability;
   // Operator-selected active WCS (C6): a non-G54 value warns the saved job's
   // G54 emission will mismatch a placement measured from the active offset.
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
@@ -130,6 +107,12 @@ export type SaveGcodeCtx = {
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
 };
+
+function optionalSettingsCapability(
+  settingsCapability: ReadinessSettingsCapability | undefined,
+): Pick<SaveGcodeCtx, 'settingsCapability'> | Record<never, never> {
+  return settingsCapability === undefined ? {} : { settingsCapability };
+}
 
 export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   // H.10: tiling-enabled CNC projects export one file per tile instead
@@ -143,6 +126,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
       ...(ctx.controllerSettings === undefined
         ? {}
         : { controllerSettings: ctx.controllerSettings }),
+      ...optionalSettingsCapability(ctx.settingsCapability),
       pushToast: ctx.pushToast,
     })
   ) {
@@ -176,17 +160,22 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     await handleSaveRd(ctx, placement);
     return;
   }
-  const { gcode, preflight } = await emitSaveGcode(ctx, placement);
-  // Rule 7 / ADR-228: advisory preflight findings (the scan-offset magnitude
-  // cap) warn after the save instead of refusing it — mirrors the Start
-  // path's partitionEmitPreflight split.
-  const { blocking, advisories } = partitionSavePreflight(preflight.issues);
-  if (blocking.length > 0) {
-    const lines = blocking.map((i) => `• ${i.message}`).join('\n');
-    jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
-    return;
+  // prepareGcodeSave owns factual non-writable preparation/emission outcomes
+  // plus the Rule 7 / ADR-228 blocking-vs-advisory split for emitted output.
+  // Advisory findings remain available for post-save toasts.
+  const prepared = await prepareGcodeSave(ctx, placement);
+  if (prepared.kind === 'failed') return;
+  // Rule 7 / ADR-228: stated HERE, where the deleted confirm stood, rather than
+  // with the post-save advisories. The confirm was raised on every save
+  // ATTEMPT, so reporting it only after a successful write would tell the
+  // operator less than the refusal did whenever the picker is cancelled.
+  for (const advisory of controllerReadinessAdvisories(
+    ctx.project,
+    ctx.controllerSettings,
+    ctx.settingsCapability,
+  )) {
+    ctx.pushToast(advisory, 'warning');
   }
-  if (!confirmControllerReadiness(ctx.project, ctx.controllerSettings)) return;
   let target: SaveTarget | null;
   try {
     target = await ctx.platform.pickFileForSave({
@@ -199,10 +188,10 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   }
   if (target === null) return;
   try {
-    await target.write(gcode);
+    await target.write(prepared.gcode);
     advanceExportVariables(ctx);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
-    pushPostSaveAdvisories(ctx, advisories);
+    pushPostSaveAdvisories(ctx, prepared.advisories);
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }
@@ -225,8 +214,9 @@ function pushPostSaveAdvisories(
   for (const advisory of preflightAdvisories) {
     ctx.pushToast(advisory.message, 'warning');
   }
+  const warningProject = outputScopedWarningProject(ctx);
   for (const warning of detectMachineJobWarnings(
-    ctx.project,
+    warningProject,
     ctx.controllerSettings,
     ctx.activeWcs ?? null,
   )) {
@@ -240,22 +230,10 @@ function pushPostSaveAdvisories(
   }
 }
 
-async function emitSaveGcode(
-  ctx: SaveGcodeCtx,
-  placement: Extract<ResolvedJobPlacement, { ok: true }>,
-): ReturnType<typeof emitGcodeSnapshot> {
-  const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
-  const registration = currentPrintCutOutputRegistration(ctx.project);
-  return emitGcodeSnapshot(ctx.project, {
-    clock: () => new Date(),
-    renderVariableText,
-    ...(registration === undefined ? {} : { registration }),
-    metadata: buildGcodeMetadata(),
-    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
-    ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
-    ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
-    ...(ctx.allowRotaryRaster === true ? { allowRotaryRaster: true } : {}),
-  });
+function outputScopedWarningProject(ctx: SaveGcodeCtx): Project {
+  const scoped = validateOutputScope(ctx.project.scene, ctx.outputScope ?? DEFAULT_OUTPUT_SCOPE);
+  if (!scoped.ok || scoped.scene === ctx.project.scene) return ctx.project;
+  return { ...ctx.project, scene: scoped.scene };
 }
 
 export type SaveProjectCtx = {
@@ -344,11 +322,7 @@ export type OpenProjectCtx = {
 };
 
 export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
-  let files: ReadonlyArray<{
-    readonly name: string;
-    readonly size?: number;
-    readonly text: () => Promise<string>;
-  }>;
+  let files: ReadonlyArray<OpenProjectFile>;
   try {
     files = await ctx.platform.pickFilesForOpen({
       accept: ['.lf2', '.lbrn', '.lbrn2'],
@@ -360,26 +334,31 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   }
   const file = files[0];
   if (file === undefined) return;
-  const sizeIssue = importSourceSizeIssue(
+  const sizeAdvisory = importSourceSizeAdvisory(
     file,
     /\.lbrn2?$/i.test(file.name) ? 'lightburn-project' : 'native-project',
   );
-  if (sizeIssue !== null) {
-    ctx.pushToast(`Could not open ${file.name}: ${sizeIssue}`, 'error');
-    return;
-  }
-  let text: string;
+  if (sizeAdvisory !== null) ctx.pushToast(sizeAdvisory, 'warning');
+  const controls = createImportWorkerControls(file.name, ctx.pushToast);
+  let result: ReturnType<typeof deserializeProject>;
   try {
-    text = await file.text();
+    const parsed = await parseOpenedProjectFile(file, controls.options, ctx.pushToast);
+    if (parsed.kind === 'lightburn') {
+      openLightBurnMigration(ctx, file.name, parsed.result);
+      return;
+    }
+    result = parsed.result;
   } catch (err) {
-    ctx.pushToast(`Could not open ${file.name}: ${errMsg(err)}`, 'error');
+    ctx.pushToast(
+      isImportCancellation(err)
+        ? `${file.name}: open cancelled.`
+        : `Could not open ${file.name}: ${errMsg(err)}`,
+      isImportCancellation(err) ? 'warning' : 'error',
+    );
     return;
+  } finally {
+    controls.dispose();
   }
-  if (/\.lbrn2?$/i.test(file.name)) {
-    openLightBurnMigration(ctx, file.name, text);
-    return;
-  }
-  const result = deserializeProject(text);
   if (result.kind === 'ok') {
     const loadResult = ctx.setProject(result.project);
     markCapabilityAwareLoad(ctx, file.name, loadResult);
@@ -402,14 +381,17 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   ctx.pushToast(`Could not open ${file.name}: ${describeResult(result)}`, 'error');
 }
 
-function openLightBurnMigration(ctx: OpenProjectCtx, fileName: string, text: string): void {
-  const result = importLightBurnProject(text, fileName);
+function openLightBurnMigration(
+  ctx: OpenProjectCtx,
+  fileName: string,
+  result: ReturnType<typeof importLightBurnProject>,
+): void {
   if (!result.ok) {
     ctx.pushToast(`Could not import ${fileName}: ${result.reason}`, 'error');
     return;
   }
   const loadResult = ctx.setProject(result.project);
-  markCapabilityAwareLoad(ctx, fileName.replace(/\.lbrn2?$/i, '.lf2'), loadResult);
+  ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'), { dirty: true });
   clearAutosave();
   const unsupported = result.report.unsupportedShapeTypes.length;
   const warnings = result.report.warnings.length;

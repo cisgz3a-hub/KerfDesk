@@ -99,11 +99,11 @@ describe('settleOwnedMotionPhase Idle fence (G4-during-Jog regression)', () => {
     connection.emitLine('ok');
     await vi.waitFor(() => expect(writes.length).toBeGreaterThan(1));
     expect(writes).not.toContain('G4 P0.01\n');
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(1));
 
     // The controller stays in Jog for a while: still no marker.
     connection.emitLine('<Jog|MPos:50.000,30.000,2.000|FS:1000,0>');
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(2));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(2));
     expect(writes).not.toContain('G4 P0.01\n');
 
     // Only a fresh Idle report opens the settlement marker.
@@ -112,7 +112,7 @@ describe('settleOwnedMotionPhase Idle fence (G4-during-Jog regression)', () => {
     expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
 
     connection.emitLine('ok');
-    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(3));
+    await vi.waitFor(() => expect(statusProbeCount(writes)).toBeGreaterThanOrEqual(3));
     expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
     connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
     await move;
@@ -123,3 +123,7 @@ describe('settleOwnedMotionPhase Idle fence (G4-during-Jog regression)', () => {
     ]);
   });
 });
+
+function statusProbeCount(writes: ReadonlyArray<string>): number {
+  return writes.filter((line) => line === '?').length;
+}

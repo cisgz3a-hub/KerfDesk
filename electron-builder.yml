@@ -1,5 +1,6 @@
 appId: dev.laserforge.app
-productName: LaserForge 2.0
+productName: KerfDesk
+copyright: Copyright © 2026 Johann Stolk
 
 directories:
   output: release/${version}
@@ -15,6 +16,7 @@ files:
   - package.json
 
 win:
+  icon: public/favicon.svg
   # electron-updater verifies downloaded NSIS updates against the publisher
   # identity from the installed signed build. Keep this explicit in config.
   verifyUpdateCodeSignature: true
@@ -22,18 +24,19 @@ win:
     - target: nsis
       arch:
         - x64
-  artifactName: LaserForge-2.0-${version}-${arch}-setup.${ext}
+  artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}
 
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
-  shortcutName: LaserForge 2.0
-  # The installer shows the EULA and requires acceptance before install —
-  # the sold desktop build must surface the use grant + safety terms.
+  shortcutName: KerfDesk
+  # NSIS displays the MIT License & Safety Notice before installation; this
+  # adds no restriction and does not authorize future commercial terms.
   license: public/eula.txt
 
-# macOS / Linux targets remain commented; ADR-007 keeps them out of MVP.
+# This stable Windows config keeps macOS / Linux targets absent. ADR-248 governs
+# the future Mac Preview config/workflow; Linux remains out of scope.
 # mac:
 #   target: dmg
 # linux:

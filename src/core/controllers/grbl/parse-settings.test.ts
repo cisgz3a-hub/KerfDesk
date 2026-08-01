@@ -155,6 +155,49 @@ describe('settingsMapToProfilePatch', () => {
     });
   });
 
+  // grblHAL widened $32 from grbl's laser-mode boolean into a three-way
+  // "Mode of operation" enum (system.h: machine_mode_t { Mode_Standard = 0,
+  // Mode_Laser, Mode_Lathe }), so a lathe reports $32=2. Reading $32 as 0/1
+  // dropped the field entirely, which every downstream reader interprets as
+  // "the controller never reported $32" — a different fact from "the
+  // controller reported lathe mode".
+  it('records a grblHAL lathe ($32=2) as lathe, not as an unreported setting', () => {
+    const settings = settingsMapToControllerSettings(new Map([[32, '2']]));
+
+    expect(settings.machineMode).toEqual({ kind: 'lathe' });
+    // A lathe is provably NOT in laser mode: grblHAL holds one mode enum.
+    expect(settings.laserModeEnabled).toBe(false);
+  });
+
+  it('keeps the reported mode on the snapshot for $32=0 and $32=1', () => {
+    expect(settingsMapToControllerSettings(new Map([[32, '0']]))).toMatchObject({
+      machineMode: { kind: 'standard' },
+      laserModeEnabled: false,
+    });
+    expect(settingsMapToControllerSettings(new Map([[32, '1']]))).toMatchObject({
+      machineMode: { kind: 'laser' },
+      laserModeEnabled: true,
+    });
+  });
+
+  it('leaves laser mode unproven for a $32 value no firmware defines', () => {
+    const settings = settingsMapToControllerSettings(new Map([[32, '7']]));
+
+    expect(settings.machineMode).toEqual({ kind: 'unrecognized', raw: '7' });
+    expect(settings).not.toHaveProperty('laserModeEnabled');
+  });
+
+  it('omits the mode entirely when the dump did not report $32', () => {
+    expect(settingsMapToControllerSettings(new Map([[30, '1000']]))).not.toHaveProperty(
+      'machineMode',
+    );
+  });
+
+  // machineMode is controller evidence, not a DeviceProfile field.
+  it('keeps machineMode out of the DeviceProfile patch', () => {
+    expect(settingsMapToProfilePatch(new Map([[32, '2']]))).toEqual({ laserModeEnabled: false });
+  });
+
   it('rejects non-numeric or non-positive values rather than poisoning the profile', () => {
     // A machine reporting $130=0 (no homing, no max travel) shouldn't
     // collapse the bed to zero — drop the field instead.

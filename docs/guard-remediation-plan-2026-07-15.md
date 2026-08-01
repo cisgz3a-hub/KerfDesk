@@ -1,10 +1,15 @@
 # Guard remediation implementation plan
 
-> **Historical and superseded.** This plan records the pre-ADR-228 remediation
-> model. Its fail-closed policy recommendations are not current instructions.
-> Use `AGENTS.md`, PROJECT non-negotiable 21, ADR-228/230/232/237, and
-> `docs/audits/2026-07-18-guard-inventory-frame-first.md` for current ordinary
-> Start behavior. The original plan is preserved below for provenance.
+> **SUPERSEDED — HISTORICAL ONLY. DO NOT IMPLEMENT.** This plan was written on
+> 2026-07-15, two days before the maintainer's standing directive of 2026-07-17
+> (`CLAUDE.md` collaboration rule 7, `PROJECT.md` non-negotiable #21, ADR-228 as
+> clarified by ADR-232): **Frame is the only guard, and no guard will ever be
+> created again.** Items below that direct an implementer to refuse Frame, keep
+> Start blocked, or hold a condition fail-closed — including the Work-Z/safe-
+> clearance Frame refusal, the internal no-go-zone Start block, and the unknown-
+> controller-state and unsafe-spindle gates — are **void**. Under the current rule
+> those concerns belong in the Job Review warnings list, which informs and never
+> refuses. Retained only as a record of what was considered before the directive.
 
 **Branch:** `codex/guard-safety-main`  
 **Baseline:** `origin/main` at `e3c2b4b7a4e00cd1a576922f8d5046dda5217ffb`  

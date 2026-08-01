@@ -5,9 +5,11 @@
 // see core/cnc/feeds-calculator.ts); every number stays editable after.
 
 import { useState } from 'react';
-import { CHIPLOAD_MATERIALS, chiploadFor, type ChiploadMaterial } from '../../core/cnc';
+import { chiploadFor, isChiploadMaterialKey, type ChiploadMaterial } from '../../core/cnc';
 import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
-import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
+import { layerCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
+import { CncMaterialOptions } from '../common/CncMaterialOptions';
+import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
 
@@ -19,11 +21,21 @@ export function FeedsCalculatorRow(props: {
   const machine = useStore((s) => s.project.machine);
   const profile = useStore((s) => s.project.device);
   const liveCaps = useStore((s) => s.cncLiveCaps);
-  const [material, setMaterial] = useState<ChiploadMaterial>('plywood-mdf');
-  const [flutes, setFlutes] = useState(DEFAULT_ASSUMED_FLUTE_COUNT);
-  if (machine?.kind !== 'cnc') return null;
+  // Open on the layer's own recipe when it has one. Seeding these from
+  // constants meant the panel previewed - and on Apply committed - a different
+  // material's numbers under this layer's name.
+  const recipe = props.settings.feedSource;
+  const tool = machine?.kind === 'cnc' ? layerCncTool(machine, props.settings) : null;
+  const [material, setMaterial] = useState<ChiploadMaterial>(
+    // materialKey is a plain string on the wire, so a foreign or stale .lf2 can
+    // carry a key the chipload chart no longer has.
+    recipe?.kind === 'material-recipe' && isChiploadMaterialKey(recipe.materialKey)
+      ? recipe.materialKey
+      : 'plywood-mdf',
+  );
+  const [flutes, setFlutes] = useFluteSelection(tool, props.settings);
+  if (machine?.kind !== 'cnc' || tool === null) return null;
 
-  const tool = layerCncTool(machine, props.settings);
   const rpm = props.settings.spindleRpm;
   const result = materialFeedResult(
     materialFeedsPatch({
@@ -69,6 +81,7 @@ export function FeedsCalculatorRow(props: {
         chiploadMm={chiploadFor(material, tool.diameterMm)}
         result={result}
       />
+      <AngledToolFeedNotice tool={tool} />
       <button
         type="button"
         disabled={!canApply}
@@ -84,6 +97,39 @@ export function FeedsCalculatorRow(props: {
   );
 }
 
+function AngledToolFeedNotice(props: { readonly tool: CncTool }): JSX.Element | null {
+  const advisory = cncAngledToolFeedAdvisory(props.tool);
+  return advisory === null ? null : (
+    <p role="note" style={advisoryStyle}>
+      {advisory}
+    </p>
+  );
+}
+
+function useFluteSelection(
+  tool: CncTool | null,
+  settings: CncLayerSettings,
+): readonly [number, (flutes: number) => void] {
+  const contextKey = fluteContextKey(tool, settings);
+  const fallback = initialFluteCount(tool, settings);
+  const [selection, setSelection] = useState(() => ({ contextKey, flutes: fallback }));
+  const flutes = selection.contextKey === contextKey ? selection.flutes : fallback;
+  return [flutes, (next) => setSelection({ contextKey, flutes: next })];
+}
+
+function initialFluteCount(tool: CncTool | null, settings: CncLayerSettings): number {
+  const recipe = settings.feedSource;
+  if (recipe?.kind === 'material-recipe') return recipe.fluteCount;
+  return tool?.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT;
+}
+
+function fluteContextKey(tool: CncTool | null, settings: CncLayerSettings): string {
+  const source = settings.feedSource;
+  return source?.kind === 'material-recipe'
+    ? `${tool?.id ?? 'none'}:${source.materialKey}:${source.fluteCount}`
+    : `${tool?.id ?? 'none'}:manual`;
+}
+
 function MaterialSelect(props: {
   readonly value: ChiploadMaterial;
   readonly onPick: (material: ChiploadMaterial) => void;
@@ -96,15 +142,10 @@ function MaterialSelect(props: {
         title="Material family — picks the starting chipload band."
         value={props.value}
         onChange={(e) => {
-          const next = CHIPLOAD_MATERIALS.find((m) => m.value === e.target.value);
-          if (next !== undefined) props.onPick(next.value);
+          if (isChiploadMaterialKey(e.target.value)) props.onPick(e.target.value);
         }}
       >
-        {CHIPLOAD_MATERIALS.map((m) => (
-          <option key={m.value} value={m.value}>
-            {m.label}
-          </option>
-        ))}
+        <CncMaterialOptions />
       </select>
     </label>
   );
@@ -186,5 +227,10 @@ const resultStyle: React.CSSProperties = {
 const errorStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-danger)',
+  margin: '4px 0 6px 0',
+};
+const advisoryStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-warning-fg)',
   margin: '4px 0 6px 0',
 };

@@ -114,7 +114,7 @@ Use absolute coordinates on a homed machine. Print five identical two-target she
 For each sheet:
 
 1. Capture the two printed target centers with the machine head.
-2. Apply registration and confirm job-origin controls are disabled.
+2. Apply registration and confirm job-origin controls remain available — they are not disabled. With registration and a non-absolute job origin both active, confirm Frame and Job Review warn that the Frame traces the combined transform.
 3. Frame and mark at least three verification targets not used to solve registration.
 4. Measure every target center error.
 5. After one coupon, invalidate trusted position by disconnecting or resetting and prove registration becomes unusable until recaptured.

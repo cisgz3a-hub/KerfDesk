@@ -43,6 +43,12 @@ export async function handleSaveRd(
     // types cleanly (its buffer is a plain ArrayBuffer) without an assertion.
     await target.write(new Blob([new Uint8Array(result.bytes)]));
     ctx.pushToast(`Saved .rd job to ${target.displayName}`, 'success');
+    // Rule 7 / ADR-228: a pre-emit policy finding no longer refuses this
+    // export, so the operator must still SEE it — otherwise the fix turned a
+    // refusal into silence. Mirrors the G-code path's post-save advisories.
+    for (const advisory of result.advisories) {
+      ctx.pushToast(advisory.message, 'warning');
+    }
     ctx.pushToast(RD_EXPERIMENTAL_WARNING, 'warning');
   } catch (err) {
     ctx.pushToast(`Could not save .rd file: ${errorMessage(err)}`, 'error');

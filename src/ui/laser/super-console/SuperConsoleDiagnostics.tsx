@@ -36,11 +36,13 @@ export function SuperConsoleDiagnostics(props: {
       </p>
       {fillPolicyActive ? (
         <p role="status" style={policyActiveStyle}>
-          4040 fill-quality policy active: Scanline Fill uses feed-matched laser-off entries.
+          Neotronics-qualified 4040 fill policy active: Scanline Fill uses feed-matched laser-off
+          entries.
         </p>
       ) : fillPolicyNeedsReview ? (
         <p role="alert" style={policyWarningStyle}>
-          4040 fill-quality policy inactive. Controller settings and a 400 x 400 work area do not
+          Generic Scan Line feed-matched entry and exit runways are active. The Neotronics-qualified
+          4040 fill policy is not selected. Controller settings and a 400 x 400 work area do not
           identify the attached machine. If this is a Neotronics 4040, open Machine Setup, choose
           the Neotronics 4040 profile, review it, and Save before the next Scanline Fill.
         </p>

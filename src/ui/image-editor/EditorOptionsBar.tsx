@@ -17,7 +17,14 @@ const SWATCHES: readonly PaintColor[] = [
 ];
 
 function isPaintToolKind(kind: string): boolean {
-  return kind === 'brush' || kind === 'pencil' || kind === 'eraser' || kind === 'line';
+  return (
+    kind === 'brush' ||
+    kind === 'pencil' ||
+    kind === 'eraser' ||
+    kind === 'line' ||
+    kind === 'clone' ||
+    kind === 'heal'
+  );
 }
 
 function isSelectionToolKind(kind: string): boolean {
@@ -32,12 +39,53 @@ export function EditorOptionsBar(): JSX.Element {
   return (
     <div style={barStyle} aria-label="Tool options">
       {showModes ? <SelectionModeButtons /> : null}
-      {isPaintTool ? <PaintOptions showColor={tool.kind !== 'eraser'} /> : null}
-      {tool.kind === 'wand' ? <WandOptions /> : null}
+      {isPaintTool ? <PaintOptions showColor={showsColor(tool.kind)} /> : null}
+      {tool.kind === 'clone' ? <CloneHint hasSource={tool.source !== null} /> : null}
+      {tool.kind === 'wand' || tool.kind === 'bucket' ? <WandOptions /> : null}
+      {tool.kind === 'gradient' ? <GradientOptions shape={tool.shape} /> : null}
       {tool.kind === 'crop' ? <CropActions /> : null}
       {isSelectTool ? <SelectionActions /> : null}
       {isSelectTool ? <SelectionModifyRow /> : null}
     </div>
+  );
+}
+
+// Swatches make sense only for tools that paint the foreground color.
+function showsColor(kind: string): boolean {
+  return kind !== 'eraser' && kind !== 'clone' && kind !== 'heal';
+}
+
+function CloneHint(props: { readonly hasSource: boolean }): JSX.Element {
+  return (
+    <span style={{ fontSize: 12, color: 'var(--lf-text-muted)' }}>
+      {props.hasSource ? 'Source set — paint to clone' : 'Alt-click to set the clone source'}
+    </span>
+  );
+}
+
+// Linear/radial pair for the gradient tool (G also cycles them).
+function GradientOptions(props: { readonly shape: 'linear' | 'radial' }): JSX.Element {
+  const setTool = useImageEditorStore((s) => s.setTool);
+  return (
+    <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+      {(['linear', 'radial'] as const).map((shape) => (
+        <button
+          key={shape}
+          type="button"
+          className={props.shape === shape ? 'lf-btn lf-btn--primary' : 'lf-btn'}
+          style={{ padding: '2px 10px' }}
+          onClick={() => setTool({ kind: 'gradient', shape })}
+          aria-pressed={props.shape === shape}
+          title={
+            shape === 'linear'
+              ? 'Linear gradient along the drag'
+              : 'Radial gradient out from the drag start'
+          }
+        >
+          {shape === 'linear' ? 'Linear' : 'Radial'}
+        </button>
+      ))}
+    </span>
   );
 }
 

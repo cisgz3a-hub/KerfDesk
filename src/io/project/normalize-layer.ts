@@ -11,6 +11,7 @@ import { normalizeCncFeedSource } from './normalize-cnc-feed-source';
 
 const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y', 'adaptive']);
 const LINE_ART_CONTOUR_SIDES = new Set<string>(['inner', 'outer', 'both']);
+const PROFILE_LEAD_SHAPES = new Set<string>(['arc', 'line', 'none']);
 
 // Keep a raw string field only when it is one of a known set of values —
 // used for the closed-union optional CNC layer keys.
@@ -20,6 +21,12 @@ function enumPassthrough(
   allowed: ReadonlySet<string>,
 ): Record<string, unknown> {
   return typeof value === 'string' && allowed.has(value) ? { [key]: value } : {};
+}
+
+// Keep an optional boolean field only when it is actually a boolean; anything
+// else is dropped so the compile default applies by omission.
+function booleanPassthrough(key: string, value: unknown): Record<string, unknown> {
+  return typeof value === 'boolean' ? { [key]: value } : {};
 }
 
 export function normalizeLayer(layer: unknown): unknown {
@@ -121,6 +128,10 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...(raw['cutDirection'] === 'climb' || raw['cutDirection'] === 'conventional'
       ? { cutDirection: raw['cutDirection'] }
       : {}),
+    // ADR-253 retract-between-passes (per-layer boolean, default-on at compile
+    // for eligible cuts). Persisted so an operator's explicit OFF survives a
+    // save/load — absent stays absent and reads as the compile default.
+    ...booleanPassthrough('retractBetweenPasses', raw['retractBetweenPasses']),
     // Finish allowance: non-negative (0 = off), so a hand-edited negative value
     // is dropped rather than inflating the roughing offset the wrong way.
     ...(isNonNegativeNumber(raw['finishAllowanceMm'])
@@ -129,6 +140,23 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     // ADR-218 traced double-line side; unknown values are dropped so the
     // compile default ('inner') applies by omission.
     ...enumPassthrough('lineArtContours', raw['lineArtContours'], LINE_ART_CONTOUR_SIDES),
+    // ADR-250 profile lead-in/out. An unknown shape drops the whole block so the
+    // default-on tool-radius arc applies by omission; malformed radius/sweep are
+    // dropped field-by-field, matching every other optional CNC setting.
+    ...normalizeProfileLead(raw['profileLead']),
+  };
+}
+
+function normalizeProfileLead(value: unknown): Record<string, unknown> {
+  if (!isObject(value)) return {};
+  const shape = value['shape'];
+  if (typeof shape !== 'string' || !PROFILE_LEAD_SHAPES.has(shape)) return {};
+  return {
+    profileLead: {
+      shape,
+      ...(isPositiveNumber(value['radiusMm']) ? { radiusMm: value['radiusMm'] } : {}),
+      ...(isPositiveNumber(value['sweepDeg']) ? { sweepDeg: value['sweepDeg'] } : {}),
+    },
   };
 }
 

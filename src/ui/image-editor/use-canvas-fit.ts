@@ -23,6 +23,10 @@ export function useCanvasFit(
     const canvas = canvasRef.current;
     if (host === null || canvas === null || doc === undefined) return;
     const resize = (): void => {
+      // A collapsed host (occluded/zero-sized pane) must never size the
+      // canvas or fit the view — fitView on a 0×0 viewport emits scale 0,
+      // which poisons every later canvas↔doc mapping with division by zero.
+      if (host.clientWidth === 0 || host.clientHeight === 0) return;
       // Assigning canvas.width ALWAYS clears the canvas, and a freshly
       // observed ResizeObserver fires once immediately — skipping the no-op
       // assignment keeps the pixels the draw effect just painted

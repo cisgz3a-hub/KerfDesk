@@ -1,12 +1,22 @@
-// Motion polish (Phase H.9, F-CNC18) — all OPT-IN so default output stays
-// byte-identical to pre-H.9 jobs (the snapshot corpus pins it):
+// Motion polish (Phase H.9, F-CNC18). These transforms run only when a layer's
+// settings opt in. Ramp entry and park stay off by default; cut direction is
+// opted in by DEFAULT_CNC_LAYER_SETTINGS (ADR-251), which defaults profile and
+// pocket cuts to CLIMB — so default output is climb-oriented, no longer
+// byte-identical to pre-H.9 jobs:
 //
 // * Cut direction. With an M3 (top-view clockwise) spindle, CLIMB cutting
-//   keeps the material on the LEFT of travel. Circling a part's exterior
-//   counter-clockwise puts the part on the left → outside-profile climb =
-//   CCW; walking a hole/pocket boundary clockwise puts the material (which
-//   lies outside the boundary) on the left → inside/pocket climb = CW.
-//   Conventional is each mirror. Enforced by reversing closed toolpaths
+//   keeps the material on the RIGHT of travel: the tooth meets the work at
+//   maximum chip thickness and thins to zero. Circling a part's exterior
+//   clockwise puts the part on the right → outside-profile climb = CW;
+//   walking a hole/pocket boundary counter-clockwise puts the material
+//   (which lies outside the boundary) on the right → inside/pocket climb =
+//   CCW. Conventional is each mirror. This matches VCarve's own profile
+//   help ("Outside … Climb (CW)", "Inside … Climb (CCW)"), Fusion's contour
+//   arrows (CW for outer, CCW for inner, to maintain a climb cut), and G41
+//   (compensation left of path ⇒ material right of travel) being the climb
+//   side for a right-hand cutter. ADR-251 originally asserted the mirror of
+//   this and shipped inverted for both cut types; see ADR-251 amendment.
+//   Enforced by reversing closed toolpaths
 //   whose shoelace orientation disagrees; open paths are left alone.
 //   Direction enforcement also rotates each closed toolpath's start to the
 //   midpoint of its longest segment, so entry witness marks land on a flat
@@ -26,6 +36,7 @@ import {
   signedAreaMm2,
 } from '../geometry/polyline-orientation';
 import type { Vec3 } from '../geometry/vec3';
+import type { FrameHandedness } from './machine-frame-handedness';
 import type { CncCutDirection, CncCutType, CncMachineConfig, Polyline, Vec2 } from '../scene';
 
 const MIN_CLOSED_POINTS = 3;
@@ -33,25 +44,71 @@ const MAX_RAMP_ANGLE_DEG = 45;
 
 // The material side flips between outside profiles and inside/pocket work;
 // engraves and on-path cuts have no defined material side.
+//
+// `toolpaths` are already in MACHINE coordinates (collect-cnc-contours.ts runs
+// toMachineCoords before compile), and front-right / rear-left mirror one axis,
+// so `handedness` says whether a shoelace sign in those numbers still means the
+// physical rotation the climb/conventional convention is stated in.
 export function enforceCutDirection(
   toolpaths: ReadonlyArray<Polyline>,
   direction: CncCutDirection,
   cutType: CncCutType,
+  handedness: FrameHandedness,
 ): ReadonlyArray<Polyline> {
-  const wantCcw = wantsCounterClockwise(direction, cutType);
+  const wantCcw = wantsCounterClockwise(direction, cutType, handedness);
   if (wantCcw === null) return toolpaths;
+  // ADR-252: a hole's material lies OUTSIDE its boundary, so its climb direction
+  // is the mirror of the outer boundary's. Forcing one winding on every contour
+  // cut holes the wrong way round AND destroyed the winding opposition ADR-250
+  // reads to find holes, which aimed their leads into the kept part.
+  const outerSign = dominantWindingSign(toolpaths);
   return toolpaths.map((toolpath) => {
     if (!toolpath.closed || toolpath.points.length < MIN_CLOSED_POINTS) return toolpath;
-    if (Math.abs(signedAreaMm2(toolpath.points)) === 0) return toolpath;
-    const oriented =
-      isCounterClockwise(toolpath) === wantCcw ? toolpath : reversedPolyline(toolpath);
+    const area = signedAreaMm2(toolpath.points);
+    if (Math.abs(area) === 0) return toolpath;
+    const isHole = outerSign !== 0 && Math.sign(area) !== outerSign;
+    const want = isHole ? !wantCcw : wantCcw;
+    const oriented = isCounterClockwise(toolpath) === want ? toolpath : reversedPolyline(toolpath);
     return rotateStartToLongestSegment(oriented);
   });
 }
 
-function wantsCounterClockwise(direction: CncCutDirection, cutType: CncCutType): boolean | null {
-  if (cutType === 'profile-outside') return direction === 'climb';
-  if (cutType === 'profile-inside' || cutType === 'pocket') return direction === 'conventional';
+// The largest-area closed toolpath carries the outer boundary's winding; a
+// contour winding the other way is a hole. Winding survives concentric
+// roughing/finishing offsets of one feature, which containment depth does not.
+function dominantWindingSign(toolpaths: ReadonlyArray<Polyline>): number {
+  let maxAbsArea = 0;
+  let sign = 0;
+  for (const toolpath of toolpaths) {
+    if (!toolpath.closed || toolpath.points.length < MIN_CLOSED_POINTS) continue;
+    const area = signedAreaMm2(toolpath.points);
+    if (Math.abs(area) > maxAbsArea) {
+      maxAbsArea = Math.abs(area);
+      sign = Math.sign(area);
+    }
+  }
+  return sign;
+}
+
+// The CW/CCW half of this mapping is stated for the operator's view from above.
+// On a mirrored machine frame the emitted numbers run the other way round, so
+// the target winding inverts to keep the PHYSICAL travel direction the same.
+function wantsCounterClockwise(
+  direction: CncCutDirection,
+  cutType: CncCutType,
+  handedness: FrameHandedness,
+): boolean | null {
+  const wantCcw = wantsCounterClockwiseInPhysicalFrame(direction, cutType);
+  if (wantCcw === null) return null;
+  return handedness === 1 ? wantCcw : !wantCcw;
+}
+
+function wantsCounterClockwiseInPhysicalFrame(
+  direction: CncCutDirection,
+  cutType: CncCutType,
+): boolean | null {
+  if (cutType === 'profile-outside') return direction === 'conventional';
+  if (cutType === 'profile-inside' || cutType === 'pocket') return direction === 'climb';
   return null;
 }
 
@@ -108,9 +165,11 @@ function rampContour(pass: CncContourPass, fromZ: number, tangent: number): CncP
   if (!(drop > 0) || pass.polyline.length < 2) return pass;
   const rampLengthMm = drop / tangent;
   const points: Vec3[] = [];
-  appendRampSpan(points, pass, fromZ, rampLengthMm);
-  // The remainder of the loop at full depth…
-  for (const point of walkFrom(pass, points.length > 0)) {
+  const resumeIndex = appendRampSpan(points, pass, fromZ, rampLengthMm);
+  // The remainder of the loop at full depth, resuming from the vertex the ramp
+  // actually reached — NOT always source[1], which doubled the path back down a
+  // ramp that spanned more than the first segment.
+  for (const point of walkFrom(pass, resumeIndex)) {
     points.push({ x: point.x, y: point.y, z: pass.zMm });
   }
   // …then re-cut the ramped span level so no slope is left (closed only).
@@ -121,13 +180,16 @@ function rampContour(pass: CncContourPass, fromZ: number, tangent: number): CncP
   return path;
 }
 
-// Walks the pass polyline emitting the descending ramp vertices.
+// Walks the pass polyline emitting the descending ramp vertices. Returns the
+// index of the source vertex the at-depth walk should RESUME from — the vertex
+// just past where the ramp reached full depth — so a ramp spanning several
+// segments does not make the caller double back to source[1].
 function appendRampSpan(
   points: Vec3[],
   pass: CncContourPass,
   fromZ: number,
   rampLengthMm: number,
-): void {
+): number {
   const drop = fromZ - pass.zMm;
   let travelled = 0;
   const source = pass.polyline;
@@ -145,23 +207,24 @@ function appendRampSpan(
         y: a.y + (b.y - a.y) * t,
         z: pass.zMm,
       });
-      travelled = rampLengthMm;
-      return;
+      // The ramp ended inside segment [i-1, i]; resume at source[i].
+      return i;
     }
     travelled += segment;
     points.push({ x: b.x, y: b.y, z: fromZ - (travelled / rampLengthMm) * drop });
   }
   // Path shorter than the ramp: finish the descent vertically at the end
-  // point (the ramp consumed the whole path).
+  // point (the ramp consumed the whole path); nothing left to walk forward.
   const last = source[source.length - 1] as Vec2;
   points.push({ x: last.x, y: last.y, z: pass.zMm });
+  return source.length;
 }
 
-// The full loop at depth, starting from the polyline's first vertex (the
-// ramp already stands somewhere along the first span).
-function* walkFrom(pass: CncContourPass, skipFirst: boolean): Generator<Vec2> {
+// The full loop at depth, resuming from `resumeIndex` (the vertex just past
+// where the ramp reached full depth).
+function* walkFrom(pass: CncContourPass, resumeIndex: number): Generator<Vec2> {
   const source = pass.polyline;
-  for (let i = skipFirst ? 1 : 0; i < source.length; i += 1) {
+  for (let i = resumeIndex; i < source.length; i += 1) {
     yield source[i] as Vec2;
   }
   if (pass.closed) yield source[0] as Vec2;

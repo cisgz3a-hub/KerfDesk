@@ -1,7 +1,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ImmediateBoxGenerationWorker } from '../../__fixtures__/box/immediate-box-generation-worker';
 import { BoxGeneratorDialog } from './BoxGeneratorDialog';
 import type { BoxMachineContext } from './box-draft';
 
@@ -32,9 +33,12 @@ async function renderDialog(machine: BoxMachineContext = LASER): Promise<{
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   localStorage.clear();
   document.body.innerHTML = '';
 });
+
+beforeEach(() => vi.stubGlobal('Worker', ImmediateBoxGenerationWorker));
 
 function input(host: HTMLElement, label: string): HTMLInputElement {
   const element = host.querySelector(`input[aria-label="${label}"]`);

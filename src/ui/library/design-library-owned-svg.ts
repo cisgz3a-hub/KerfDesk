@@ -2,8 +2,12 @@ import type { LibraryEntry } from './design-library-types';
 
 const OWNED_PROVENANCE = {
   sourceKind: 'owned',
-  license: 'KerfDesk first-party asset (MIT)',
-  notice: 'Authored for KerfDesk/LaserForge in this repository.',
+  sourceName: 'CurveDesk',
+  creator: 'CurveDesk contributors',
+  license: 'MIT',
+  licenseId: 'MIT',
+  licenseUrl: 'https://opensource.org/license/mit',
+  notice: 'Authored for CurveDesk in this repository.',
 } as const;
 
 function svg(width: number, height: number, body: string): string {
@@ -46,8 +50,8 @@ function ownedEntry(args: {
     operations: args.operations,
     tags: args.tags,
     provenance: OWNED_PROVENANCE,
-    previewSvgText: args.svgText,
-    insert: { kind: 'svg', svgText: args.svgText },
+    preview: { kind: 'inline-svg', svgText: args.svgText },
+    insert: { kind: 'svg', loadSvgText: async () => args.svgText },
   };
 }
 

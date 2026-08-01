@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { laserCountdownTestHandoff } from './laser-countdown-test-handoff';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
-import { useLaserStore } from './laser-store';
+import { type LaserState, useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
@@ -76,17 +77,34 @@ function controllerOperation(): ControllerOperationSnapshot {
 // A five-line job whose lines all fit the first RX window, so five oks reach
 // 'done' and the post-job settle begins.
 const JOB_GCODE = 'G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n';
+const POST_JOB_COUNTDOWN_RETENTION_KEY = 'post-job-settle-countdown';
+const STALE_FINISHED_JOB_STATE = {
+  activeJobMachineKind: 'laser',
+  pauseResumeTransition: { token: Symbol('stale-pause-resume'), action: 'resume' },
+  toolChangeIdleSeen: true,
+  toolChangeLabels: ['stale tool'],
+  toolChangeToolIds: ['stale-tool'],
+  pendingToolLabel: 'pending tool',
+  pendingToolId: 'pending-tool',
+} satisfies Partial<LaserState>;
 
 // Mirrors DEFAULT_IDLE_TIMEOUT_MS in laser-interactive-command.ts.
 const IDLE_WAIT_TIMEOUT_MS = 8_000;
 const FRESH_STATUS_INTERVAL_MS = ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS / 2;
 
 async function runJobUntilSettleAwaitsIdle(connection: FakeConnection): Promise<void> {
-  await startTestLaserJob(JOB_GCODE);
+  await startTestLaserJob(JOB_GCODE, {
+    ...laserCountdownTestHandoff({
+      gcode: JOB_GCODE,
+      retentionKey: POST_JOB_COUNTDOWN_RETENTION_KEY,
+      capability: 'realtime',
+    }),
+  });
   for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
   await flush();
   expect(useLaserStore.getState().streamer?.status).toBe('done');
   expect(controllerOperation()).toMatchObject({ kind: 'post-job-settle', phase: 'dwell' });
+  expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('running');
   connection.emitLine('ok');
   await flush();
   expect(controllerOperation()).toMatchObject({
@@ -128,6 +146,43 @@ afterEach(async () => {
 });
 
 describe('post-job settle failure handling', () => {
+  it('keeps the countdown finishing until the settle marker and two fresh Idle reports', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    await runJobUntilSettleAwaitsIdle(connection);
+
+    useLaserStore.setState(STALE_FINISHED_JOB_STATE);
+
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('finishing');
+
+    connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: { status: 'done' },
+      controllerOperation: {
+        kind: 'post-job-settle',
+        phase: 'awaiting-idle',
+      },
+      ...STALE_FINISHED_JOB_STATE,
+      liveCanvasRun: { timing: { kind: 'finishing' } },
+    });
+
+    connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: null,
+      controllerOperation: null,
+      activeJobMachineKind: null,
+      pauseResumeTransition: null,
+      toolChangeIdleSeen: false,
+      toolChangeLabels: [],
+      toolChangeToolIds: [],
+      pendingToolLabel: null,
+      pendingToolId: null,
+      liveCanvasRun: { timing: { kind: 'complete' } },
+    });
+  });
+
   // GRBL acks lines when they are parsed, not executed — after the last ok a
   // slow-feed job can keep the machine in Run for well over the idle-wait
   // timeout. Live status reports prove the controller is healthy, so the wait

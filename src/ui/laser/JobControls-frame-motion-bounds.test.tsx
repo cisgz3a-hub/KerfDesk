@@ -127,6 +127,7 @@ function installNeotronicsFillProject(): void {
             ...createLayer({ id: 'L-fill', color: '#ff0000', mode: 'fill' }),
             fillOverscanMm: 5,
             hatchSpacingMm: 2,
+            fillBidirectional: true,
             allowUncalibratedBidirectionalScan: true,
             bidirectionalScanOffsetMm: 2,
             power: 10,

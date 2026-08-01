@@ -22,6 +22,33 @@ function span(polyline: Polyline): number {
 }
 
 describe('pocketToolpathRings', () => {
+  // Audit 1.10: the ring ladder broke on the first empty offset with no final
+  // ring, so a stepover wider than the tool radius left a full-depth core.
+  it('clears the core when the stepover exceeds the tool radius', () => {
+    // The audit's case: 6.35 mm bit at the 85% UI maximum in a pocket of
+    // inradius 8.175. Pre-fix this produced one ring at inset 3.175, sweeping
+    // only to 1.825 from the centre - a 3.65 mm full-depth pillar.
+    const SIZE_MM = 16.35;
+    const TOOL_MM = 6.35;
+    const rings = pocketToolpathRings([square(0, 0, SIZE_MM)], TOOL_MM, 85);
+    expect(rings.length).toBeGreaterThan(1);
+    const innermost = rings[0] as Polyline;
+    const inset = (SIZE_MM - span(innermost)) / 2;
+    // The innermost ring's sweep must reach the medial axis: its distance from
+    // the centre cannot exceed the tool radius, or material is left standing.
+    expect(SIZE_MM / 2 - inset).toBeLessThanOrEqual(TOOL_MM / 2 + 1e-6);
+  });
+
+  it('keeps every ring on the stepover lattice at the 40% default', () => {
+    // Below 50% the final sweep always covers the centre, so the bisection must
+    // not run and existing output must not move.
+    const rings = pocketToolpathRings([square(0, 0, 20)], TOOL_DIAMETER_MM, 40);
+    const stepMm = 0.4 * TOOL_DIAMETER_MM;
+    const inset = (20 - span(rings[0] as Polyline)) / 2;
+    const k = (inset - TOOL_DIAMETER_MM / 2) / stepMm;
+    expect(k).toBeCloseTo(Math.round(k), 6);
+  });
+
   it('produces multiple clearing rings for a pocket larger than the bit', () => {
     const rings = pocketToolpathRings([square(0, 0, 20)], TOOL_DIAMETER_MM, 40);
     expect(rings.length).toBeGreaterThan(2);

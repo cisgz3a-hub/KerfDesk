@@ -3,7 +3,7 @@
 // CNC strategy settings, and the material each operation is bound to. The
 // table renders these as a muted detail line under each row.
 
-import { CHIPLOAD_MATERIALS } from '../../../core/cnc';
+import { CHIPLOAD_MATERIALS, zPassDepths } from '../../../core/cnc';
 import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
 import type { CncLayerSettings, Layer, LayerOperationSettings } from '../../../core/scene';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
@@ -45,7 +45,7 @@ function fillDetail(settings: LayerOperationSettings): string {
     `${formatMm(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
-    `overscan ${formatMm(settings.fillOverscanMm)} mm`,
+    `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
     ...powerModePart(settings),
   ].join(SEPARATOR);
 }
@@ -64,11 +64,17 @@ function imageDetail(settings: LayerOperationSettings): string {
 
 /** The read-only strategy a CNC operation cuts with, joined for one line. */
 export function cncOperationDetail(settings: CncLayerSettings): string {
-  const passes = depthPassCount(settings);
+  // Read the pass count from the same helper the compiler steps with, rather
+  // than re-deriving it: zPassDepths carries an epsilon and a per-pass clamp,
+  // and a bare Math.ceil disagreed with the emitter on imperial depths
+  // (19.05 / 1.5875 floats to 12.000000000000002, showing 13 for 12 passes).
+  const passes = zPassDepths(settings.depthMm, settings.depthPerPassMm).length;
   return [
     `${passes} ${passes === 1 ? 'pass' : 'passes'}`,
     `stepover ${settings.stepoverPercent}%`,
-    ...(settings.cutDirection === undefined ? [] : [settings.cutDirection]),
+    ...(settings.cutDirection === undefined || !DIRECTED_CUT_TYPES.has(settings.cutType)
+      ? []
+      : [settings.cutDirection]),
     cncTabsPart(settings),
     ...cncEntryPart(settings),
     ...(settings.finishAllowanceMm !== undefined && settings.finishAllowanceMm > 0
@@ -97,11 +103,15 @@ export function boundMaterialLabel(
   return `${entry.materialName}${thickness}`;
 }
 
-// The Z-stepping the planner performs: full passes to reach depthMm.
-function depthPassCount(settings: CncLayerSettings): number {
-  if (settings.depthPerPassMm <= 0) return 1;
-  return Math.max(1, Math.ceil(settings.depthMm / settings.depthPerPassMm));
-}
+// Cut direction only reaches the toolpath for cut types with a defined material
+// side; enforceCutDirection returns null for engrave and profile-on-path, so
+// printing the stored word there tells the operator about motion that never
+// happens.
+const DIRECTED_CUT_TYPES: ReadonlySet<CncLayerSettings['cutType']> = new Set([
+  'profile-outside',
+  'profile-inside',
+  'pocket',
+]);
 
 function laserTabsPart(settings: LayerOperationSettings): string {
   if (!settings.tabsEnabled) return 'tabs off';

@@ -15,3 +15,4 @@ export {
 } from './box-spec';
 export { generateFitCoupon, type FitCouponResult, type FitCouponSpec } from './fit-coupon';
 export { framePoint, partFrame, type PartFrame } from './assembled-layout';
+export { estimateBoxWork } from './box-work-estimate';

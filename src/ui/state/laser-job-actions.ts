@@ -8,20 +8,13 @@ import {
   cancel as cancelStreamer,
   continueToolChange as continueToolChangeStreamer,
   createStreamer,
-  findOversizedLine,
-  isSendableGcodeLine,
   markErrored,
   step,
   wipeInFlight,
 } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import { extractToolChangeLabels } from '../../core/output';
-import {
-  CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
-  cncControllerEpochOf,
-  cncSetupAttestationMatches,
-  type CncControllerEpoch,
-} from './cnc-setup-attestation';
+import { cncControllerEpochOf, type CncControllerEpoch } from './cnc-setup-attestation';
 import {
   assertCncLiveStartReady,
   assertCncMpgInactive,
@@ -30,10 +23,16 @@ import {
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { clearCncLiveCaps } from './detected-settings-action';
-import { laserModeStartEvidenceIssue } from './laser-mode-start-evidence';
+import {
+  assertCncSetupAttested,
+  assertGcodeFitsController,
+  assertProgramHasSendableLine,
+  assertStartControllerEvidence,
+} from './laser-start-program-assertions';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
+import { finishedJobStateReset } from './laser-session-reset';
 import { disconnectStopUnconfirmedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
   hasPendingControllerWrite,
@@ -49,7 +48,12 @@ import {
 } from './laser-store-helpers';
 import type { LaserState, StartJobOptions } from './laser-store';
 import { normalizeStartJobOptions } from './laser-job-options';
-import { liveCanvasLifecyclePatch, liveCanvasStartPatch } from './live-canvas-run';
+import { validatedStartJobTimingPlan } from './laser-job-timing-handoff';
+import {
+  liveCanvasExecutionAcceptedPatch,
+  liveCanvasLifecyclePatch,
+  liveCanvasStartPatch,
+} from './live-canvas-run';
 import { runConfirmedPauseJob, runConfirmedResumeJob } from './laser-job-pause-resume';
 import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
@@ -65,7 +69,10 @@ type StartSetupEpoch = CncControllerEpoch;
 type JobActionContext = {
   readonly set: SetFn;
   readonly get: GetFn;
-  readonly refs: ResetCleanupRefs & ControllerLifecycleRefs;
+  readonly refs: ResetCleanupRefs &
+    ControllerLifecycleRefs & {
+      readonly driver: ControllerDriver;
+    };
   readonly safeWrite: SafeWriteFn;
   readonly driver: DriverFn;
 };
@@ -79,12 +86,14 @@ const UNTRACKED_ACK_DRAIN_TIMEOUT_MS = 1_500;
 const UNTRACKED_ACK_DRAIN_POLL_MS = 25;
 export const TOOL_CHANGE_PLAN_MISMATCH_MESSAGE =
   'The compiled tool plan does not match the CNC program pauses. Start was blocked so tool identity cannot drift at a change boundary.';
-const EMPTY_PROGRAM_MESSAGE = 'The job contains no sendable G-code commands.';
 
 export function jobActions(
   set: SetFn,
   get: GetFn,
-  refs: ResetCleanupRefs & ControllerLifecycleRefs,
+  refs: ResetCleanupRefs &
+    ControllerLifecycleRefs & {
+      readonly driver: ControllerDriver;
+    },
   safeWrite: SafeWriteFn,
   driver: DriverFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob' | 'continueToolChange'> {
@@ -130,10 +139,16 @@ async function runStartJob(
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, options);
     const entersHoldNow = stepped.state.status === 'tool-change';
+    const isImmediateToolChange = entersHoldNow && stepped.toSend.length === 0;
     set((state) => ({
       streamer: stepped.state,
       activeRunId: options.runId ?? null,
-      ...liveCanvasStartPatch(options.canvasPlan),
+      ...liveCanvasStartPatch(
+        options.canvasPlan,
+        Date.now(),
+        validatedStartJobTimingPlan(gcode, options, state),
+        isImmediateToolChange ? 'tool-change' : 'running',
+      ),
       accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
       activeJobMachineKind: options.machineKind ?? 'laser',
       toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
@@ -145,6 +160,7 @@ async function runStartJob(
     if (stepped.toSend.length === 0) return;
     try {
       await safeWrite(stepped.toSend, 'start');
+      set((state) => liveCanvasExecutionAcceptedPatch(state));
     } catch (error) {
       containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start');
       // The first transport write did not resolve as accepted, so the staged
@@ -162,11 +178,6 @@ async function runStartJob(
         state.controllerOperation?.kind === 'start-arming' ? null : state.controllerOperation,
     }));
   }
-}
-
-function assertProgramHasSendableLine(gcode: string): void {
-  if (gcode.split('\n').some(isSendableGcodeLine)) return;
-  throw new Error(EMPTY_PROGRAM_MESSAGE);
 }
 
 async function prepareStartBoundary(
@@ -249,6 +260,9 @@ async function runStopJob(context: JobActionContext): Promise<void> {
     }
   }
   set((state) => ({
+    // Abort ends the run, so its machine kind and any tool-change bits it never
+    // reached are no longer the operator's pending work.
+    ...finishedJobStateReset(),
     wcoCache: null,
     accessoryCache: null,
     airAssistOn: false,
@@ -272,30 +286,6 @@ function resetCleanupLines(driver: ControllerDriver): ReadonlyArray<string> {
   return lines.some((line) => line.trim().toUpperCase() === 'M5') ? lines : ['M5', ...lines];
 }
 
-function assertStartControllerEvidence(
-  machineKind: 'laser' | 'cnc',
-  options: StartJobOptions,
-  gcode: string,
-): void {
-  // M7 support is a Job Review advisory (rule 7 / ADR-228), not a wire-boundary
-  // refusal, so there is no live controller re-check here. For laser output the
-  // reviewed evidence still gates handoff consistency ($30/$32 acknowledgement
-  // and unchanged M7 program shape).
-  if (machineKind !== 'laser') return;
-  const issue = laserModeStartEvidenceIssue(options.laserModeStartEvidence, gcode);
-  if (issue !== null) throw new Error(issue);
-}
-
-function assertGcodeFitsController(gcode: string, options: StartJobOptions): void {
-  const streamOptions = normalizeStartJobOptions(options);
-  const oversized = findOversizedLine(gcode, streamOptions.rxBufferBytes);
-  if (oversized === null) return;
-  throw new Error(
-    `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
-      `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
-  );
-}
-
 function prepareInitialStream(
   gcode: string,
   options: StartJobOptions,
@@ -309,16 +299,6 @@ function prepareInitialStream(
     createStreamer(gcode, { ...streamOptions, toolChangePause: options.machineKind === 'cnc' }),
   );
   return { stepped, ...toolChangeManifest(gcode, options) };
-}
-
-function assertCncSetupAttested(
-  gcode: string,
-  options: StartJobOptions,
-  controllerEpoch: CncControllerEpoch,
-): void {
-  if (options.machineKind !== 'cnc') return;
-  if (cncSetupAttestationMatches(options.cncSetupAttestation, gcode, controllerEpoch)) return;
-  throw new Error(CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE);
 }
 
 function toolChangeManifest(
@@ -436,12 +416,17 @@ async function runContinueToolChange(
     const enteredNextHold = stepped.state.status === 'tool-change';
     return {
       streamer: stepped.state,
-      ...(enteredNextHold ? toolChangeHoldEntryPatch(s) : {}),
+      ...(enteredNextHold
+        ? {
+            ...toolChangeHoldEntryPatch(s),
+          }
+        : {}),
     };
   });
   if (toSend.length > 0) {
     try {
       await safeWrite(toSend, 'resume');
+      set((state) => liveCanvasExecutionAcceptedPatch(state));
     } catch (err) {
       containActiveStreamWriteFailure(set, refs, safeWrite, 'resume');
       throw err;

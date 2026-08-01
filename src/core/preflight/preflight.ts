@@ -73,6 +73,7 @@ export type PreflightCode =
   | 'spindle-start-before-clearance'
   | 'relief-needs-cnc'
   | 'non-finite-coordinate'
+  | 'cnc-tool-geometry-invalid'
   // ADR-127: image engraves are refused while the rotary is enabled (v1).
   | 'rotary-raster-unsupported'
   | 'empty-output';

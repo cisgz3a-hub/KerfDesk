@@ -58,6 +58,40 @@ describe('scallopRowSpacingMm', () => {
 });
 
 describe('reliefFinishingPasses', () => {
+  // Audit 1.11: the row loop stepped `row += rowStep` while `row < heightCells`,
+  // so the last rowStep-1 rows were never emitted and kept their roughing
+  // allowance as a ridge along the far edge.
+  it('emits the far-Y row when the scallop stride steps over it', () => {
+    // END_MILL spacing 1.27 mm at 0.5 mm/cell -> rowStep 3; rows 0,3..18 stop
+    // short of the final row 19.
+    const map = flatMap(-3, 20, 20, 0.5);
+    const passes = reliefFinishingPasses(map, {
+      tool: END_MILL,
+      kernel: kernelForTool(END_MILL, 0.5),
+      scallopMm: 0.025,
+    });
+    const last = passes.at(-1);
+    if (last?.kind !== 'path3d') throw new Error('path3d row expected');
+    expect(last.points[0]?.y).toBeCloseTo((19 + 0.5) * 0.5, 9);
+    // Serpentine alternation must survive the appended row.
+    expect(rowDirectionSign(last)).toBe(-rowDirectionSign(passes.at(-2)));
+  });
+
+  it('does not duplicate the final row when the stride lands on it', () => {
+    // 19 cells: rows 0,3..18 land exactly on the far row, so nothing is added.
+    const passes = reliefFinishingPasses(flatMap(-3, 20, 19, 0.5), {
+      tool: END_MILL,
+      kernel: kernelForTool(END_MILL, 0.5),
+      scallopMm: 0.025,
+    });
+    const last = passes.at(-1);
+    const previous = passes.at(-2);
+    if (last?.kind !== 'path3d' || previous?.kind !== 'path3d') {
+      throw new Error('path3d rows expected');
+    }
+    expect(last.points[0]?.y).not.toBeCloseTo(previous.points[0]?.y ?? 0, 9);
+  });
+
   it('skims a flat surface at exactly its depth on every sample', () => {
     const passes = reliefFinishingPasses(flatMap(-3), {
       tool: BALL_NOSE,

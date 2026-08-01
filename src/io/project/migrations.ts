@@ -8,7 +8,7 @@
 // migrator in order, until it reaches PROJECT_SCHEMA_VERSION or finds a
 // gap.
 
-import { PROJECT_SCHEMA_VERSION } from '../../core/scene';
+import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { migrateV2OperationBindings } from './migrate-v2-operation-bindings';
 
 export type RawProject = Record<string, unknown>;

@@ -3,6 +3,7 @@
 // (use-brush-cursor.ts), and fit/zoom/pan through the store view.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { RgbaBuffer } from '../../core/image-edit';
 import { useAdjustPreviewDoc } from './adjust-dialog-store';
 import {
   docToCanvas,
@@ -10,7 +11,6 @@ import {
   drawQuickMaskOverlay,
   drawTransformPreview,
 } from './editor-canvas-draw';
-import { useCompositeDoc } from './use-composite-doc';
 import { useImageEditorStore } from './image-editor-store';
 import { useQuickMaskStore } from './quick-mask-store';
 import { BRUSH_CURSOR_STYLE } from './use-brush-cursor';
@@ -22,7 +22,12 @@ import { MODE_BADGE_STYLE } from './use-mode-badge';
 
 const ANTS_TICK_MS = 120;
 
-export function EditorCanvas(): JSX.Element {
+type EditorCanvasProps = {
+  readonly composite: RgbaBuffer | undefined;
+};
+
+/** Render one shared layer composite plus transient editor overlays. */
+export function EditorCanvas(props: EditorCanvasProps): JSX.Element {
   const session = useImageEditorStore((s) => s.session);
   const brush = useImageEditorStore((s) => s.brush);
   const foreground = useImageEditorStore((s) => s.foreground);
@@ -42,8 +47,7 @@ export function EditorCanvas(): JSX.Element {
   // The canvas shows the layer composite (identity for single-layer
   // sessions); an enabled adjustment preview substitutes for it.
   const adjustPreview = useAdjustPreviewDoc();
-  const composite = useCompositeDoc(session, revision);
-  const doc = adjustPreview ?? composite;
+  const doc = adjustPreview ?? props.composite;
   // The doc canvas rebuilds only when pixels changed (revision bump or a
   // fresh preview buffer identity).
   // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the doc's change signal

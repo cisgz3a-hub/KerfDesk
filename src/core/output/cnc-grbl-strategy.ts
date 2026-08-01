@@ -28,6 +28,7 @@
 // cnc-grbl-coolant.ts.
 
 import type { DeviceProfile } from '../devices';
+import { sanitizeGcodeCommentValue } from '../gcode-comments';
 import {
   circularArcGeometry,
   isCircularArcFullCircle,
@@ -45,6 +46,7 @@ import type {
 import { assertNever } from '../scene';
 import { appendCoolantStart } from './cnc-grbl-coolant';
 import { appendRetract, fmt, fmtFeed, type Head } from './cnc-grbl-emit-head';
+import { appendCncGroupComments } from './cnc-grbl-group-comments';
 import { prepareHelicalMotion, type PreparedHelicalMotion } from './cnc-grbl-helical';
 import { collectIndexedCncGroups } from './cnc-grbl-job-groups';
 import {
@@ -110,8 +112,14 @@ function emitCncProgram(
   // let a stale G55-G59 redirect an otherwise valid program.
   lines.push('G54');
   lines.push('G94');
+  // Helical entry and adaptive clearing emit real G2/G3 with I/J offsets, which
+  // are read in the active plane. GRBL's plane is modal and a console command or
+  // $N startup block can leave it on G18/G19, where an XY I/J pair is an invalid
+  // offset (error:33) and Z becomes the circular axis.
+  lines.push('G17');
   if (isMultiTool && firstGroup.toolName !== undefined) {
-    lines.push(`; tool: ${firstGroup.toolName} (load before starting)`);
+    const toolName = sanitizeGcodeCommentValue(firstGroup.toolName, 40) || 'unnamed tool';
+    lines.push(`; tool: ${toolName} (load before starting)`);
   }
   // Lift to safe height BEFORE the spindle spins up: after Z touch-off the
   // bit is resting on the stock top, and starting the spindle there burns
@@ -135,6 +143,7 @@ function emitCncProgram(
     currentToolKey: firstGroup.toolId ?? '',
     maxSafeZ: 0,
     finish: options.finishPosition,
+    coolant: firstGroup.coolant,
   };
   for (const { group, jobGroupIndex } of cncGroups) {
     appendGroupTransition(lines, head, group, state);
@@ -171,14 +180,10 @@ function appendGroup(
 ): void {
   const feed = fmtFeed(group.feedMmPerMin);
   const plunge = fmtFeed(group.plungeMmPerMin);
-  lines.push(
-    `; cnc layer ${group.layerId} ${group.cutType} tool ${fmt(group.toolDiameterMm)} mm ` +
-      `feed ${feed} plunge ${plunge} spindle ${Math.round(group.spindleRpm)} rpm ` +
-      `passes ${group.passes.length}`,
-  );
+  appendCncGroupComments(lines, group);
   for (const [passIndex, pass] of group.passes.entries()) {
     const firstRawLine = lines.length + 1;
-    appendPass(lines, head, pass, group.safeZMm, feed, plunge);
+    appendPass(lines, head, pass, group.safeZMm, feed, plunge, group.retractBetweenPasses ?? false);
     // A degenerate pass (under two distinct points at emit precision) emits
     // nothing and gets no span; resume mapping treats it as zero-length.
     if (onPassSpan !== undefined && lines.length >= firstRawLine) {
@@ -194,15 +199,19 @@ function appendPass(
   safeZMm: number,
   feed: number,
   plunge: number,
+  retractBetweenPasses: boolean,
 ): void {
   switch (pass.kind) {
     case 'contour':
-      appendContourPass(lines, head, pass, safeZMm, feed, plunge);
+      appendContourPass(lines, head, pass, safeZMm, feed, plunge, retractBetweenPasses);
       break;
     case 'path3d':
-      appendPath3dPass(lines, head, pass, safeZMm, feed, plunge);
+      appendPath3dPass(lines, head, pass, safeZMm, feed, plunge, retractBetweenPasses);
       break;
     case 'arc':
+      // Arc passes are self-contained single moves; helical passes do their own
+      // retract/entry (positionForHelix). Neither participates in the per-pass
+      // retract mode, so they ignore the flag.
       appendArcPass(lines, head, pass, safeZMm, feed, plunge);
       break;
     case 'helical-contour':
@@ -276,6 +285,7 @@ function appendContourPass(
   safeZMm: number,
   feed: number,
   plunge: number,
+  retractBetweenPasses: boolean,
 ): void {
   const first = pass.polyline[0];
   if (first === undefined || pass.polyline.length < 2) return;
@@ -283,6 +293,10 @@ function appendContourPass(
   const startY = fmt(first.y);
   const passZ = fmt(pass.zMm);
 
+  // ADR-253: lift clear of the cut before this pass replunges, instead of
+  // stepping Z down in place. A no-op on the first pass (already at safe Z) and
+  // wherever the next pass starts at a new XY (the retract below already fires).
+  if (retractBetweenPasses) appendRetract(lines, head, safeZMm);
   const alreadyAtStartXy = head.x === startX && head.y === startY;
   if (!alreadyAtStartXy) {
     appendRetract(lines, head, safeZMm);
@@ -361,6 +375,7 @@ function appendPath3dPass(
   safeZMm: number,
   feed: number,
   plunge: number,
+  retractBetweenPasses: boolean,
 ): void {
   const first = pass.points[0];
   if (first === undefined || pass.points.length < 2) return;
@@ -368,6 +383,9 @@ function appendPath3dPass(
   const startY = fmt(first.y);
   const startZ = fmt(first.z);
 
+  // ADR-253: lift clear before a lead-in profile pass replunges (see
+  // appendContourPass). Relief/surfacing path3d groups compile the flag false.
+  if (retractBetweenPasses) appendRetract(lines, head, safeZMm);
   const alreadyAtStartXy = head.x === startX && head.y === startY;
   if (!alreadyAtStartXy) {
     appendRetract(lines, head, safeZMm);

@@ -44,13 +44,14 @@ export function resolveCncAutoLayerSettings(input: CncAutoSettingsInput): CncLay
   const base = input.baseSettings ?? DEFAULT_CNC_LAYER_SETTINGS;
   const materialKey = input.machine.stock.materialKey;
   if (materialKey !== undefined) {
+    const tool = layerCncTool(input.machine, base);
     const materialPatch = resolveCncMaterialFeedPatch({
       profile: input.profile,
-      tool: layerCncTool(input.machine, base),
+      tool,
       materialKey,
       spindleRpm: base.spindleRpm,
       machineSpindleMaxRpm: input.machine.params.spindleMaxRpm,
-      fluteCount: DEFAULT_ASSUMED_FLUTE_COUNT,
+      fluteCount: tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
       ...(input.liveCaps === undefined ? {} : { liveCaps: input.liveCaps }),
     });
     return materialPatch === null ? null : { ...base, ...materialPatch };

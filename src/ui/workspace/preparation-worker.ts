@@ -9,9 +9,7 @@
 
 /// <reference lib="webworker" />
 
-import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
-import { estimateLiveJobUnbounded } from '../laser/live-job-estimate';
-import { buildPreviewToolpathUnbounded } from './draw-preview';
+import { prepareLargeJob } from './large-job-preparation';
 import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
@@ -27,8 +25,7 @@ self.onmessage = (e: MessageEvent<PreparationWorkerRequest>): void => {
     const response: PreparationWorkerResponse = {
       id,
       kind: 'ok',
-      toolpath: buildPreviewToolpathUnbounded(project, options),
-      estimate: estimateLiveJobUnbounded(project, outputScope ?? DEFAULT_OUTPUT_SCOPE, jobOrigin),
+      ...prepareLargeJob(project, options),
     };
     self.postMessage(response);
   } catch (err) {

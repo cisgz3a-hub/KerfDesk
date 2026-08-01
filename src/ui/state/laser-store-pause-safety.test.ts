@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_HOLD, RT_RESUME } from '../../core/controllers/grbl';
-import { RT_SAFETY_DOOR } from '../../core/controllers/grbl/commands';
+import { RT_SAFETY_DOOR, RT_SOFT_RESET } from '../../core/controllers/grbl/commands';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { buildMotionManifest } from '../../core/job/motion-manifest';
+import { fingerprintGcode } from '../../core/recovery';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { canvasJobTimingPlan } from './canvas-job-timing-plan';
+import type { CanvasMotionPlan } from './canvas-motion-plan';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
@@ -9,6 +14,40 @@ import { startTestLaserJob } from './laser-test-start-helpers';
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
 };
+
+const END_STREAM_GCODE = 'G21\nG90\nM4 S0\nG1 X1 F600 S100\nM5';
+const ORIGIN = { x: 0, y: 0, z: 0 };
+
+function countdownCanvasPlan(gcode: string): CanvasMotionPlan {
+  return {
+    manifest: buildMotionManifest(gcode, {
+      machineKind: 'laser',
+      initialPosition: ORIGIN,
+    }),
+    fingerprint: fingerprintGcode(gcode),
+    retentionKey: 'pause-resume-countdown',
+    machineKind: 'laser',
+    device: DEFAULT_DEVICE_PROFILE,
+    coordinateFrame: { kind: 'machine', workOffsetMm: ORIGIN },
+    framePerimeter: [],
+    jobStart: ORIGIN,
+    approachFrom: ORIGIN,
+    capability: 'realtime',
+    unavailableReason: null,
+    resumed: false,
+    positionEpoch: useLaserStore.getState().trustedPositionEpoch ?? 0,
+  };
+}
+
+function countdownTimingPlan(gcode: string) {
+  const laser = useLaserStore.getState();
+  return canvasJobTimingPlan(gcode, DEFAULT_DEVICE_PROFILE, ORIGIN, {
+    controllerSessionEpoch: laser.controllerSessionEpoch,
+    positionEpoch: laser.trustedPositionEpoch,
+    activeControllerKind: laser.activeControllerKind,
+    detectedControllerKind: laser.detectedControllerKind,
+  });
+}
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
@@ -115,20 +154,26 @@ describe('laser-store pause safety', () => {
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 
-  it('allows feed-hold pause for a CNC job with laser mode off ($32=0 is router-correct)', async () => {
-    // Feed hold on a spindle machine is safe (motion holds, spindle keeps
-    // spinning — standard sender behavior); the $32 proof is a laser-only
-    // requirement and must not block router pause.
+  it('parks a CNC job with the safety-door byte even with laser mode off ($32=0 is router-correct)', async () => {
+    // ADR-180 amendment 2: CNC Pause sends the safety-door byte, so the
+    // controller stops in place AND de-energizes the spindle. The $32 proof
+    // stays a laser-only requirement and must not block router pause.
     const writes: string[] = [];
     let liveConnection: FakeConnection | null = null;
+    let doorParked = false;
     const connection = makeConnection(async (data) => {
       writes.push(data);
+      if (data === RT_SAFETY_DOOR) doorParked = true;
       if (data === 'G4 P0.01\n') {
         setTimeout(() => liveConnection?.emitLine('ok'), 0);
       }
       if (data === '?') {
         setTimeout(() => {
-          liveConnection?.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+          liveConnection?.emitLine(
+            doorParked
+              ? '<Door:0|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>'
+              : '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
+          );
         }, 0);
       }
     });
@@ -155,16 +200,75 @@ describe('laser-store pause safety', () => {
 
     await useLaserStore.getState().pauseJob();
 
-    expect(writes).toContain(RT_HOLD);
+    expect(writes).toContain(RT_SAFETY_DOOR);
+    expect(writes).not.toContain(RT_HOLD);
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 
-  it('refuses CNC Resume without writing cycle-start or refilling the stream', async () => {
+  // ADR-180 amendment (2026-07-24): same-session CNC Resume is one-click.
+  // Feed hold keeps the spindle commanded, so cycle-start continues the job
+  // exactly like the laser plain-resume branch — matching LightBurn and every
+  // GRBL sender. The former refusal is demoted to a passive advisory (rule 7).
+  it('resumes a CNC job with cycle-start and unfreezes the stream', async () => {
+    const writes: string[] = [];
+    let liveConnection: FakeConnection | null = null;
+    // ADR-180 amendment 2: Pause parks via the door byte, so the controller
+    // reports a settled Door until cycle-start restores it to Idle/Run.
+    let doorParked = false;
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (data === RT_SAFETY_DOOR) doorParked = true;
+      if (data === RT_RESUME) doorParked = false;
+      if (data === 'G4 P0.01\n') setTimeout(() => liveConnection?.emitLine('ok'), 0);
+      if (data === '?') {
+        setTimeout(() => {
+          liveConnection?.emitLine(
+            doorParked
+              ? '<Door:0|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>'
+              : '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
+          );
+        }, 0);
+      }
+    });
+    liveConnection = connection;
+    await connectWith(connection);
+    useLaserStore.setState({
+      controllerSettings: { laserModeEnabled: false },
+      accessoryCache: {
+        spindleCw: false,
+        spindleCcw: false,
+        flood: false,
+        mist: false,
+      },
+    });
+    const gcode = 'G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n';
+    await useLaserStore.getState().startJob(gcode, {
+      machineKind: 'cnc',
+      cncSetupAttestation: createCncSetupAttestation(
+        gcode,
+        cncControllerEpochOf(useLaserStore.getState()),
+      ),
+    });
+    await useLaserStore.getState().pauseJob();
+    writes.length = 0;
+
+    await expect(useLaserStore.getState().resumeJob()).resolves.toBeUndefined();
+
+    expect(writes).toContain(RT_RESUME);
+    expect(useLaserStore.getState().streamer?.status).not.toBe('paused');
+  });
+
+  // ADR-180 amendment 3: amendment 2 made CNC Pause wait for a settled Door.
+  // A controller that never reports one would previously fall through to
+  // `requestFailDarkStop` — a soft reset that scraps a recoverable job. Pause
+  // failing is acceptable; Pause destroying the run is not.
+  it('keeps a CNC job when Pause never confirms — no fail-dark reset', async () => {
     const writes: string[] = [];
     let liveConnection: FakeConnection | null = null;
     const connection = makeConnection(async (data) => {
       writes.push(data);
       if (data === 'G4 P0.01\n') setTimeout(() => liveConnection?.emitLine('ok'), 0);
+      // Never reports Door — the exact controller shape that used to kill the job.
       if (data === '?') {
         setTimeout(() => {
           liveConnection?.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
@@ -173,15 +277,7 @@ describe('laser-store pause safety', () => {
     });
     liveConnection = connection;
     await connectWith(connection);
-    useLaserStore.setState({
-      controllerSettings: { laserModeEnabled: false },
-      accessoryCache: {
-        spindleCw: false,
-        spindleCcw: false,
-        flood: false,
-        mist: false,
-      },
-    });
+    useLaserStore.setState({ controllerSettings: { laserModeEnabled: false } });
     const gcode = 'G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n';
     await useLaserStore.getState().startJob(gcode, {
       machineKind: 'cnc',
@@ -190,15 +286,16 @@ describe('laser-store pause safety', () => {
         cncControllerEpochOf(useLaserStore.getState()),
       ),
     });
-    await useLaserStore.getState().pauseJob();
     writes.length = 0;
 
-    await expect(useLaserStore.getState().resumeJob()).rejects.toThrow(/cannot prove.*spindle/i);
+    await useLaserStore
+      .getState()
+      .pauseJob()
+      .catch(() => undefined);
 
-    expect(writes).not.toContain(RT_RESUME);
-    expect(writes).toEqual([]);
-    expect(useLaserStore.getState().streamer?.status).toBe('paused');
-  });
+    expect(writes).not.toContain(RT_SOFT_RESET);
+    expect(useLaserStore.getState().streamer).not.toBeNull();
+  }, 10_000);
 
   it('uses Safety Door when GRBL reports laser mode disabled', async () => {
     const writes: string[] = [];
@@ -226,6 +323,25 @@ describe('laser-store pause safety', () => {
 });
 
 describe('laser-store pause at end of stream', () => {
+  it('starts normally but makes a mismatched timing sidecar unavailable', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    const actualGcode = `${END_STREAM_GCODE}\n; exact-program fingerprint changed`;
+
+    await expect(
+      startTestLaserJob(actualGcode, {
+        canvasPlan: countdownCanvasPlan(actualGcode),
+        jobTimingPlan: countdownTimingPlan(END_STREAM_GCODE),
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(useLaserStore.getState().streamer).not.toBeNull();
+    expect(useLaserStore.getState().liveCanvasRun?.timing).toEqual({
+      kind: 'unavailable',
+      reason: 'exact emitted-program timing evidence changed before controller handoff',
+    });
+  });
+
   it('uses Safety Door after all lines are acknowledged while physical Run continues', async () => {
     const writes: string[] = [];
     let stateLine = '<Run|MPos:1.000,0.000,0.000|FS:1000,100|Ov:100,100,100|A:C>';
@@ -241,7 +357,10 @@ describe('laser-store pause at end of stream', () => {
     });
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    await startTestLaserJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5');
+    await startTestLaserJob(END_STREAM_GCODE, {
+      canvasPlan: countdownCanvasPlan(END_STREAM_GCODE),
+      jobTimingPlan: countdownTimingPlan(END_STREAM_GCODE),
+    });
     for (let index = 0; index < 5; index += 1) connection.emitLine('ok');
     connection.emitLine(stateLine);
     await flushConnect();
@@ -252,12 +371,14 @@ describe('laser-store pause at end of stream', () => {
 
     expect(writes).toContain(RT_SAFETY_DOOR);
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('paused');
 
     writes.length = 0;
     await useLaserStore.getState().resumeJob();
 
     expect(writes).toContain(RT_RESUME);
     expect(useLaserStore.getState().streamer?.status).toBe('done');
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('running');
     expect(writes.some((data) => data.includes('G1 X'))).toBe(false);
   });
 
@@ -265,10 +386,12 @@ describe('laser-store pause at end of stream', () => {
   // the end of a job drains every ack while the machine still holds
   // unexecuted motion — the job must stay paused (Resume mounted), and Resume
   // must complete it through the normal Idle release.
-  it('stays paused when the held tail acks out; resume completes the job at Idle', async () => {
+  it('stays paused when the held tail acks out; resume completes through settlement', async () => {
+    const writes: string[] = [];
     let resumed = false;
     let liveConnection: FakeConnection | null = null;
     const connection = makeConnection(async (data) => {
+      writes.push(data);
       if (data === RT_RESUME) resumed = true;
       if (data === '?') {
         setTimeout(() => {
@@ -294,9 +417,23 @@ describe('laser-store pause at end of stream', () => {
 
     await useLaserStore.getState().resumeJob();
     expect(useLaserStore.getState().streamer?.status).toBe('done');
+    expect(writes).toContain('G4 P0.01\n');
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'post-job-settle',
+      phase: 'dwell',
+    });
 
+    connection.emitLine('ok');
+    await flushConnect();
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'post-job-settle',
+      phase: 'awaiting-idle',
+    });
     connection.emitLine('<Idle|MPos:1.000,0.000,0.000|FS:0,0>');
-    await Promise.resolve();
+    await flushConnect();
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+    connection.emitLine('<Idle|MPos:1.000,0.000,0.000|FS:0,0>');
+    await flushConnect();
     expect(useLaserStore.getState().streamer).toBeNull();
   });
 });

@@ -19,7 +19,11 @@ export type ControllerReadinessErrorCode =
 export type ControllerReadinessWarningCode =
   | 'min-power-nonzero'
   | 'power-scale-unverified'
-  | 'laser-mode-unverified';
+  | 'laser-mode-unverified'
+  // grblHAL's $32 is a three-way mode enum, so a lathe reports $32=2. That is
+  // operator information, never a refusal (CLAUDE.md rule 7): it goes in the
+  // Job Review warnings list like any other controller-setting judgement.
+  | 'lathe-mode';
 
 /** How the connected firmware exposes settings — mirrors
  *  ControllerCapabilities['settings'] without importing the driver layer. */
@@ -79,9 +83,12 @@ export function runControllerReadiness(
   // A read-only compat dump (FluidNC's legacy $$ emulation) is not
   // guaranteed to include every setting and cannot be fixed from the app,
   // so ABSENT values downgrade to warnings instead of blocking Start.
-  // Values that WERE reported are still verified strictly — a mismatch or
-  // a provably wrong $32 blocks either way. grbl-dollar keeps absent =
-  // error: a real GRBL $$ always reports $30/$31/$32.
+  // Values that WERE reported are still verified strictly and returned as
+  // errors. Those errors do NOT refuse Start: since #291 the Start path maps
+  // them to Job Review warnings (start-job-controller-policy.ts). Since #482
+  // they no longer refuse Save/export either — that path states them as
+  // advisory toasts (controller-readiness-advisories.ts). grbl-dollar keeps
+  // absent = error: a real GRBL $$ always reports $30/$31/$32.
   const absentPolicy: AbsentSettingPolicy =
     settingsCapability === 'readonly-dump' ? 'warn' : 'error';
 
@@ -92,13 +99,24 @@ export function runControllerReadiness(
     return cncReadiness(cncMachine.params.spindleMaxRpm, controller, absentPolicy);
   }
   // Missing laser settings are review warnings; known mismatches are still
-  // errors inside laserReadiness. This prevents a partial/failed $$ response
-  // from becoming a dead Start button while preserving proven hazard blocks.
+  // errors inside laserReadiness. Neither refuses Start — the Start path
+  // demotes every error returned here to a Job Review warning (#291), and
+  // since #482 the Save/export path states them as advisories rather than
+  // refusing, so nothing returned here gates an action on its own.
   return laserReadiness(project, controller, 'warn');
 }
 
 type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;
 type ReadinessWarnings = Array<ControllerReadinessMessage<ControllerReadinessWarningCode>>;
+
+// grblHAL's set_mode() clears G7 diameter mode for Mode_Standard and
+// Mode_Laser but NOT for Mode_Lathe, so a lathe-mode controller can still be
+// interpreting X as a diameter. It states the fact and never refuses.
+const CNC_LATHE_MODE_MESSAGE =
+  'Controller reports $32=2 (grblHAL lathe mode), not router mode ($32=0). Laser mode is off, so spindle output is not gated by motion, but lathe mode leaves G7 diameter mode available — X may be interpreted as a diameter. Confirm the controller mode before cutting.';
+
+const LASER_LATHE_MODE_MESSAGE =
+  'Controller reports $32=2 (grblHAL lathe mode), so GRBL laser mode is NOT enabled. The beam will not gate with motion the way a laser job expects. Set $32=1 before burning.';
 
 /** The laser `max-power-mismatch` message text. Operator Start treats this
  * reported contradiction as a refusal; missing evidence remains review-grade. */
@@ -141,7 +159,9 @@ function cncReadiness(
       message: `Controller $30 is ${controller.maxPowerS} but this machine's spindle max RPM is ${spindleMaxRpm}. Set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`,
     });
   }
-  if (controller.laserModeEnabled === undefined) {
+  if (controller.machineMode?.kind === 'lathe') {
+    warnings.push({ code: 'lathe-mode', message: CNC_LATHE_MODE_MESSAGE });
+  } else if (controller.laserModeEnabled === undefined) {
     if (absentPolicy === 'error') {
       errors.push({
         code: 'laser-mode-unknown',
@@ -192,7 +212,9 @@ function laserReadiness(
     });
   }
 
-  if (controller.laserModeEnabled === undefined) {
+  if (controller.machineMode?.kind === 'lathe') {
+    warnings.push({ code: 'lathe-mode', message: LASER_LATHE_MODE_MESSAGE });
+  } else if (controller.laserModeEnabled === undefined) {
     if (absentPolicy === 'error') {
       errors.push({
         code: 'laser-mode-unknown',

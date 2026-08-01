@@ -5,7 +5,9 @@
 // cnc-grbl-coolant.ts.
 
 import type { CncGroup } from '../job';
-import type { Vec2 } from '../scene';
+import { sanitizeGcodeCommentValue } from '../gcode-comments';
+import type { CncCoolantMode, Vec2 } from '../scene';
+import { appendCoolantStart, appendCoolantStop } from './cnc-grbl-coolant';
 import { appendRetract, fmt, type Head } from './cnc-grbl-emit-head';
 import { TOOL_CHANGE_LOAD_PREFIX } from './tool-change-labels';
 
@@ -16,6 +18,10 @@ export type EmitState = {
   currentToolKey: string;
   maxSafeZ: number;
   readonly finish: Vec2 | undefined;
+  // Coolant is machine-wide for the job, but the tool-change hold has to close
+  // and reopen it, so the mode has to reach this module rather than staying a
+  // local of the preamble.
+  readonly coolant: CncCoolantMode | undefined;
 };
 
 // H.9 parking parity: the configured park position wins; without one, a
@@ -60,11 +66,13 @@ export function appendGroupTransition(
 function appendToolChange(lines: string[], head: Head, group: CncGroup, state: EmitState): void {
   appendRetract(lines, head, state.maxSafeZ);
   lines.push('M5');
+  appendCoolantStop(lines, state.coolant);
   const park = parkTarget(group, state.finish);
   lines.push(`G0 X${fmt(park.x)} Y${fmt(park.y)}`);
   head.x = fmt(park.x);
   head.y = fmt(park.y);
-  lines.push(`${TOOL_CHANGE_LOAD_PREFIX}${group.toolName ?? 'next tool'}`);
+  const toolName = sanitizeGcodeCommentValue(group.toolName ?? 'next tool', 40) || 'next tool';
+  lines.push(`${TOOL_CHANGE_LOAD_PREFIX}${toolName}`);
   lines.push('; re-zero Z on the stock top, then cycle-start to resume');
   lines.push('M0');
   // The operator physically moves the head during the pause: jogging XY over the
@@ -76,6 +84,9 @@ function appendToolChange(lines: string[], head: Head, group: CncGroup, state: E
   // location and drag to the start (F23).
   head.x = head.y = head.z = null;
   appendSpindleStart(lines, head, state.maxSafeZ, group.spindleRpm, group.spindleSpinupSec);
+  // Mirror of the preamble ordering: coolant reopens only after the spindle is
+  // up to speed, never while the new bit is still resting on the stock.
+  appendCoolantStart(lines, state.coolant);
 }
 
 // Central spindle-start invariant: every native CNC M3 is preceded by a known

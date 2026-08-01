@@ -28,14 +28,17 @@ function cc0Entry(args: {
     tags: args.tags,
     provenance: {
       sourceKind: 'cc0',
-      license: 'CC0-1.0 / Public Domain',
+      sourceName: 'Openclipart',
+      license: 'CC0 1.0 / Public Domain',
+      licenseId: 'CC0-1.0',
       sourceUrl: args.sourceUrl,
+      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
       downloadedAt: '2026-07-06',
       assetHash: args.assetHash,
       notice: 'Openclipart states submitted clipart is released to the public domain under CC0.',
     },
-    previewSvgText: args.svgText,
-    insert: { kind: 'svg', svgText: args.svgText },
+    preview: { kind: 'inline-svg', svgText: args.svgText },
+    insert: { kind: 'svg', loadSvgText: async () => args.svgText },
   };
 }
 

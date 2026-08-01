@@ -21,7 +21,7 @@ import {
   reportStartAuthorizationRefusal,
   startAuthorizationRefusalMessage,
 } from './start-job-authorization-reporting';
-import { useStartBlockerStore } from './start-blocker-store';
+import { reportStartBlockers } from './start-blocker-invalidation';
 import type { FramedRunStartClaim } from './framed-run-start-claim';
 
 export type PreparedStartArgs = {
@@ -78,7 +78,7 @@ export async function transmitPreparedStart(input: {
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
-    useStartBlockerStore.getState().report([message]);
+    reportStartBlockers([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
 }
@@ -105,6 +105,9 @@ function preparedStartOptions(
       ? {}
       : { cncSetupAttestation: args.cncSetupAttestation }),
     canvasPlan: args.prepared.canvasPlan,
+    ...(args.prepared.jobTimingPlan === undefined
+      ? {}
+      : { jobTimingPlan: args.prepared.jobTimingPlan }),
     ...(args.framedRunClaim === undefined ? {} : { framedRunPermit: args.framedRunClaim.permit }),
   };
 }

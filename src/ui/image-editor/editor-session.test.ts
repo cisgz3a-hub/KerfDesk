@@ -22,8 +22,14 @@ import {
   withSelection,
   type BrushSettings,
 } from './editor-session';
+import { addLayerAboveActive, undoScoped } from './editor-session-layers';
 
 const PENCIL: BrushSettings = { diameterPx: 3, hardness: 1, opacity: 1 };
+const ALPHA_CHANNEL = 3;
+const MAX_BYTE = 255;
+const PARTIAL_ALPHA = 64;
+const HALF_MASK_ALPHA = 128;
+const SUBPIXEL_MOVE_DELTA = 0.49;
 
 function newSession() {
   return createSession('obj-1', 'test.png', createRgbaBuffer(24, 24), {
@@ -36,6 +42,10 @@ function newSession() {
 
 function channelAt(session: ReturnType<typeof newSession>, x: number, y: number): number {
   return session.doc.data[(y * session.doc.width + x) * RGBA_CHANNELS] ?? -1;
+}
+
+function alphaAt(session: ReturnType<typeof newSession>, x: number, y: number): number {
+  return session.doc.data[(y * session.doc.width + x) * RGBA_CHANNELS + ALPHA_CHANNEL] ?? -1;
 }
 
 describe('editor session ops', () => {
@@ -104,6 +114,54 @@ describe('editor session ops', () => {
     // The mask travelled: deleting now clears the moved block.
     session = commitFillSelection(session, WHITE, 'Delete selection');
     expect(channelAt(session, 7, 2)).toBe(255);
+  });
+
+  it('moves upper-layer pixels without fabricating opacity and undoes exactly', () => {
+    let session = addLayerAboveActive(newSession(), 'text');
+    const source = (2 * session.doc.width + 2) * RGBA_CHANNELS;
+    session.doc.data.set([10, 20, 240, PARTIAL_ALPHA], source);
+    session = withSelection(
+      session,
+      rectSelection(session.doc.width, session.doc.height, { x: 2, y: 2, width: 1, height: 1 }),
+    );
+    const original = Uint8ClampedArray.from(session.doc.data);
+
+    session = commitMoveSelection(session, 5, 0);
+
+    const destination = (2 * session.doc.width + 7) * RGBA_CHANNELS;
+    expect(alphaAt(session, 2, 2)).toBe(0);
+    expect(Array.from(session.doc.data.slice(destination, destination + RGBA_CHANNELS))).toEqual([
+      10,
+      20,
+      240,
+      PARTIAL_ALPHA,
+    ]);
+    expect(session.history.undoStack).toHaveLength(1);
+
+    session = undoScoped(session);
+    expect(Array.from(session.doc.data)).toEqual(Array.from(original));
+    expect(alphaAt(session, 7, 2)).toBe(0);
+  });
+
+  it('leaves feathered pixels and history unchanged when movement rounds to zero', () => {
+    let session = addLayerAboveActive(newSession(), 'text');
+    const source = (2 * session.doc.width + 2) * RGBA_CHANNELS;
+    session.doc.data.set([10, 20, 30, MAX_BYTE], source);
+    const selection = rectSelection(session.doc.width, session.doc.height, {
+      x: 2,
+      y: 2,
+      width: 1,
+      height: 1,
+    });
+    selection.alpha[2 * selection.width + 2] = HALF_MASK_ALPHA;
+    session = withSelection(session, selection);
+    const original = Uint8ClampedArray.from(session.doc.data);
+
+    const moved = commitMoveSelection(session, SUBPIXEL_MOVE_DELTA, -SUBPIXEL_MOVE_DELTA);
+
+    expect(moved).toBe(session);
+    expect(Array.from(moved.doc.data)).toEqual(Array.from(original));
+    expect(moved.history.undoStack).toHaveLength(0);
   });
 
   it('nudgeOutline moves only the selection, never the pixels', () => {

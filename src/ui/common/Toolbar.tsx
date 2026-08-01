@@ -161,8 +161,9 @@ const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['tools.trace-image', 'tools.edit-image', 'tools.convert-to-bitmap'],
   ['file.save-gcode'],
   // M27: Preview is the operator's primary pre-burn verification surface —
-  // it gets a visible toggle, not just the P shortcut.
-  ['window.toggle-preview'],
+  // it gets a visible toggle, not just the P shortcut. ADR-255's 3D Inspector
+  // joins it: same verification group, one click from the canvas.
+  ['window.toggle-preview', 'file.inspect-gcode'],
 ];
 
 const ICON_ONLY_TOOLBAR_COMMANDS = new Set<CommandId>([
@@ -174,6 +175,7 @@ const ICON_ONLY_TOOLBAR_COMMANDS = new Set<CommandId>([
   'file.import-image',
   'file.save-gcode',
   'window.toggle-preview',
+  'file.inspect-gcode',
 ]);
 
 const barStyle: React.CSSProperties = {

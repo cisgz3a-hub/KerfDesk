@@ -16,6 +16,7 @@ import { type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { openEditorForSelectedObject } from './open-selected-object-editor';
 import { drawScene } from './draw-scene';
 import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
 import { finishPen } from './pen-tool';
@@ -357,34 +358,7 @@ function handleCanvasDoubleClick(e: React.MouseEvent<HTMLCanvasElement>): void {
     if (ui.penDraft !== null && !s.previewMode) {
       finishPen({ closed: false, project: s.project, drawShape: s.drawShape });
     }
-    return; // in pen mode, never open the text editor
+    return; // in pen mode, never open the in-place editor
   }
-  openTextEditForSelectedText();
-}
-
-// Phase D — double-click on a selected text opens the edit dialog
-// with its current values pre-populated. Non-text objects are a
-// no-op (a future "rename / properties" dialog could land here).
-// Module-level so the canvas onDoubleClick prop reference is stable
-// and the parent Workspace function stays under the line cap.
-function openTextEditForSelectedText(): void {
-  const s = useStore.getState();
-  const id = s.selectedObjectId;
-  if (id === null) return;
-  const obj = s.project.scene.objects.find((o) => o.id === id);
-  if (obj === undefined || obj.kind !== 'text') return;
-  useUiStore.getState().openTextDialog({
-    mode: 'edit',
-    id: obj.id,
-    content: obj.content,
-    fontKey: obj.fontKey,
-    sizeMm: obj.sizeMm,
-    alignment: obj.alignment,
-    lineHeight: obj.lineHeight,
-    letterSpacing: obj.letterSpacing,
-    bendDeg: obj.bendDeg ?? 0,
-    ...(obj.pathText === undefined ? {} : { pathText: obj.pathText }),
-    ...(obj.variableTemplate === undefined ? {} : { variableTemplate: obj.variableTemplate }),
-    color: obj.color,
-  });
+  openEditorForSelectedObject();
 }

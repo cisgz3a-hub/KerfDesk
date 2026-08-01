@@ -38,7 +38,9 @@ import {
   type JobReviewModel,
   type PreparedCurrentStart,
 } from './job-review-model';
+import { detectFluidncDivergenceWarnings } from './fluidnc-divergence-warnings';
 import { useJobReviewStore, type JobReviewPurpose } from './job-review-store';
+import { refreshControllerIdentityWarnings } from '../controller-identity-warnings';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
  * by another successful prepare, so the bundle that streams is provably the
@@ -71,7 +73,8 @@ export async function runJobReviewGate(args: {
 }): Promise<ConfirmedJobReview | null> {
   const purpose = args.purpose ?? 'start';
   let current = args.initial;
-  if (!useJobReviewStore.getState().open(modelFor(current), purpose)) return null;
+  let displayedModel = modelFor(current);
+  if (!useJobReviewStore.getState().open(displayedModel, purpose)) return null;
   for (;;) {
     const signal = await useJobReviewStore.getState().nextSignal();
     if (signal === 'cancel') {
@@ -79,7 +82,7 @@ export async function runJobReviewGate(args: {
       return null;
     }
     if (signal === 'confirm') {
-      const confirmed = confirmReviewedStart(current);
+      const confirmed = confirmReviewedStart(current, displayedModel);
       useJobReviewStore.getState().close();
       return confirmed;
     }
@@ -95,26 +98,52 @@ export async function runJobReviewGate(args: {
       continue;
     }
     current = rebuilt.bundle;
-    useJobReviewStore.getState().completePrepare(modelFor(current));
+    displayedModel = modelFor(current);
+    useJobReviewStore.getState().completePrepare(displayedModel);
   }
 }
 
 function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
-  const model = buildJobReviewModel({
+  const liveLaser = useLaserStore.getState();
+  const configured = bundle.project.device.controllerKind ?? 'grbl-v1.1';
+  const baseModel = buildJobReviewModel({
     project: bundle.project,
     prepared: bundle.prepared,
     laserModeStartSnapshot: bundle.laserModeStartSnapshot,
     overrides: bundle.laser.ovCache,
   });
+  // FluidNC disclosures need the live identities, not just the profile, so
+  // they join here rather than inside buildJobReviewModel. Advisory only.
+  const fluidnc = detectFluidncDivergenceWarnings({
+    configured,
+    active: liveLaser.activeControllerKind,
+    detected: liveLaser.detectedControllerKind,
+    gcode: bundle.prepared.gcode,
+  });
+  const disclosed =
+    fluidnc.length === 0
+      ? baseModel
+      : { ...baseModel, warnings: [...baseModel.warnings, ...fluidnc] };
   const warning = bundle.frameWcsNormalizationWarning;
-  if (warning === undefined || model.warnings.includes(warning)) return model;
-  return { ...model, warnings: [warning, ...model.warnings] };
+  const model =
+    warning === undefined || disclosed.warnings.includes(warning)
+      ? disclosed
+      : { ...disclosed, warnings: [warning, ...disclosed.warnings] };
+  return refreshControllerIdentityWarnings(
+    model,
+    configured,
+    liveLaser.activeControllerKind,
+    liveLaser.detectedControllerKind,
+  );
 }
 
 // A Confirm click is the acknowledgement: the dialog showed the exact prompt
 // text, so the evidence builders run with an always-true confirm — one
 // affirmative click, the same as accepting today's native dialogs.
-function confirmReviewedStart(bundle: ReviewedStartBundle): ConfirmedJobReview {
+function confirmReviewedStart(
+  bundle: ReviewedStartBundle,
+  reviewModel: JobReviewModel,
+): ConfirmedJobReview {
   const machineKind = machineKindOf(bundle.project.machine);
   const laserModeStartEvidence = confirmLaserModeStartEvidence(
     bundle.project,
@@ -131,7 +160,7 @@ function confirmReviewedStart(bundle: ReviewedStartBundle): ConfirmedJobReview {
   return {
     bundle,
     reviewedAtIso: new Date().toISOString(),
-    reviewModel: modelFor(bundle),
+    reviewModel,
     laserModeStartEvidence: laserModeStartEvidence ?? undefined,
     cncSetupAttestation: cncSetupAttestation ?? undefined,
   };

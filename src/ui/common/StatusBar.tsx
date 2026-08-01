@@ -1,13 +1,18 @@
 // StatusBar — WORKFLOW.md F-A16. Bottom bar with cursor position, selection
 // summary, object / layer counts, device name, bed dimensions, and the
 // right-aligned Update button when a new version is ready (ADR-227). Job
-// estimate is Phase C.
+// estimate is Phase C. Also hosts the canvas motion status slot (see
+// `status-bar-slots.ts`) so machine-status text lands here instead of on the
+// canvas.
 
 import { transformedBBox, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { selectedOpenFillContourCount } from './fill-diagnostics';
+import { DesktopPreviewUpdateButton } from './DesktopPreviewUpdateButton';
 import { PwaUpdateButton } from './PwaUpdateButton';
+import { CANVAS_MOTION_SLOT_ID } from './status-bar-slots';
+import './status-bar.css';
 
 export function StatusBar(): JSX.Element {
   const project = useStore((s) => s.project);
@@ -22,7 +27,7 @@ export function StatusBar(): JSX.Element {
   const outputLayerCount = project.scene.layers.filter((l) => l.output).length;
   const selectedFillWarning = fillWarning(project, selectedObjectId, additionalSelectedIds);
   return (
-    <footer aria-label="Status bar" style={barStyle}>
+    <footer aria-label="Status bar" className="lf-status-bar" style={barStyle}>
       <Segment>
         {cursorMm === null
           ? 'Cursor: —'
@@ -41,6 +46,13 @@ export function StatusBar(): JSX.Element {
         Bed: {project.device.bedWidth} × {project.device.bedHeight} mm
       </Segment>
       <Segment>Zoom: {Math.round(zoomFactor * 100)}%</Segment>
+      {/* Mount point for the canvas motion overlay's machine-status line, which
+          the workspace portals in rather than floating over the drawing area.
+          display:contents keeps the empty slot from becoming a flex item (and
+          adding a phantom gap), and lets the portalled text sit in the bar's
+          own flex flow. */}
+      <span id={CANVAS_MOTION_SLOT_ID} style={slotStyle} />
+      <DesktopPreviewUpdateButton />
       <PwaUpdateButton />
     </footer>
   );
@@ -94,3 +106,4 @@ const barStyle: React.CSSProperties = {
   borderTop: '1px solid var(--lf-border)',
 };
 const segStyle: React.CSSProperties = { whiteSpace: 'nowrap' };
+const slotStyle: React.CSSProperties = { display: 'contents' };

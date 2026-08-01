@@ -410,6 +410,21 @@ body {
   max-width: none;
 }
 
+/* The Inspector is a full workbench, but still uses the shared modal shell so
+   focus containment and the application-wide shortcut gate remain active. */
+.lf-dialog--gcode-inspector {
+  width: min(1400px, 96vw);
+  height: min(760px, 92vh);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  gap: 0;
+  box-sizing: border-box;
+  border-color: var(--lf-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 /* Super console owns a dense transcript + diagnostics workspace. Keep this
    feature-specific so other xl dialogs retain their established footprint. */
 .lf-dialog--super-console {

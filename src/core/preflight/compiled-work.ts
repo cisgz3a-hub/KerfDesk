@@ -1,5 +1,5 @@
 import { cncPassXyPoints, type Job, type RasterGroup } from '../job';
-import { rasterRow } from '../job/raster-rows';
+import { rasterRowsInProviderOrder } from '../job/raster-rows';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 export const MAX_COMPILED_MOTION_SEGMENTS = 250_000;
@@ -103,8 +103,8 @@ function measureRasterWork(
   let activeRows = 0;
   const passes = Math.max(1, Math.floor(group.passes));
   const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
-  for (let y = 0; y < group.pixelHeight; y += 1) {
-    const measured = measureRasterRow(rasterRow(group, y), pixelWidthMm);
+  for (const { row } of rasterRowsInProviderOrder(group)) {
+    const measured = measureRasterRow(row, pixelWidthMm);
     if (measured.runs === 0) continue;
     activeRows += 1;
     runs += measured.runs;

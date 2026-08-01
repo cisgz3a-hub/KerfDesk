@@ -8,6 +8,7 @@ import { maskOutline, type SelectionMask } from '../../core/image-select';
 import type { EditorDrag } from './editor-drag';
 import { dragRect, marqueeRect } from './editor-drag';
 import { handlePositions, transformCentre } from './editor-transform';
+import { transformPreviewPixels } from './editor-transform-preview-pixels';
 import type { EditorView } from './image-editor-types';
 
 export type TransformPreview = {
@@ -127,11 +128,11 @@ export function drawTransformPreview(
   floatCanvas.height = rect.height;
   const fctx = floatCanvas.getContext('2d');
   if (fctx === null) return;
-  const image = new ImageData(new Uint8ClampedArray(preview.pixels), rect.width, rect.height);
-  // Weight visibility by the selection alpha so soft masks preview honestly.
-  for (let i = 0; i < preview.alpha.length; i += 1) {
-    image.data[i * 4 + 3] = preview.alpha[i] ?? 0;
-  }
+  const image = new ImageData(
+    transformPreviewPixels(preview.pixels, preview.alpha),
+    rect.width,
+    rect.height,
+  );
   fctx.putImageData(image, 0, 0);
 
   ctx.save();
@@ -214,6 +215,19 @@ function drawDragPreview(
       break;
     case 'crop-drag':
       drawDashedRect(ctx, dragRect(drag), view);
+      break;
+    case 'gradient-drag':
+      // The drag axis: from-anchor to live end, with a small origin square.
+      ctx.strokeStyle = PREVIEW_ACCENT;
+      ctx.lineWidth = 1 / view.scale;
+      ctx.setLineDash([]);
+      strokePolyline(ctx, [drag.from, drag.to]);
+      ctx.strokeRect(
+        drag.from.x - 2 / view.scale,
+        drag.from.y - 2 / view.scale,
+        4 / view.scale,
+        4 / view.scale,
+      );
       break;
     case 'paint':
       ctx.strokeStyle = style.color;

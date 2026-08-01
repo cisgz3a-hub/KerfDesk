@@ -32,6 +32,7 @@ import {
   type ConvertibleVector,
 } from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
+import { useImportDragDrop } from '../app/use-import-drag-drop';
 import { Toolbar } from '../common/Toolbar';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
@@ -44,6 +45,7 @@ import { ProjectNotesDialog } from './ProjectNotesDialog';
 import { selectedConvertibleVectors, selectedObjectIds } from './selection-command-state';
 import { UndoHistoryDialog } from './UndoHistoryDialog';
 import { useAppCommands } from './use-app-commands';
+import { useGcodeInspectorSlot } from './use-gcode-inspector-slot';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 import { ArrayDialogHost } from './ArrayDialogHost';
 import { QuickNestDialogHost } from './QuickNestDialogHost';
@@ -73,6 +75,8 @@ export function CommandShell(): JSX.Element {
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
+  const gcodeInspector = useGcodeInspectorSlot();
+  useImportDragDrop(gcodeInspector.open);
   const selectedConvertibles = useSelectedConvertibles();
   const selectedRaster = useSelectedRaster();
   const onImagePick = useImagePickHandler();
@@ -83,6 +87,7 @@ export function CommandShell(): JSX.Element {
     requestMultiFileTrace: onMultiFileTracePick,
     requestConvertToBitmap: openConvertBitmapDialog,
     requestAdjustImage: () => setAdjustDialogOpen(true),
+    requestGcodeInspector: gcodeInspector.open,
     requestBoxGenerator: () => setBoxGeneratorOpen(true),
     requestBoxFitTest: () => setBoxFitTestOpen(true),
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
@@ -132,6 +137,7 @@ export function CommandShell(): JSX.Element {
       {closeToleranceDialogOpen ? (
         <CloseOpenFillContoursPanel onClose={() => setCloseToleranceDialogOpen(false)} />
       ) : null}
+      {gcodeInspector.element}
     </>
   );
 }

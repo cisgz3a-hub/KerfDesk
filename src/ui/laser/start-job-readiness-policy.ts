@@ -5,7 +5,7 @@
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import { scenePreparationTooComplex, type Job } from '../../core/job';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
-import type { PreflightIssue } from '../../core/preflight';
+import { COMPILE_INTEGRITY_PREFLIGHT_CODES, type PreflightIssue } from '../../core/preflight';
 import { runCompiledWorkPreflight } from '../../core/preflight/compiled-work';
 import { machineKindOf, type Project, type Scene } from '../../core/scene';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
@@ -59,15 +59,9 @@ export function compiledWorkAdvisories(job: Job): ReadonlyArray<string> {
   return runCompiledWorkPreflight(job).issues.map((issue) => issue.message);
 }
 
-const EMIT_BLOCKING_PREFLIGHT_CODES: ReadonlySet<string> = new Set([
-  'non-finite-coordinate',
-  'empty-output',
-  'relief-needs-cnc',
-  'no-output-layer',
-  // Engine factually failed to materialize the program string (ADR-243) —
-  // compile integrity, not policy.
-  'program-materialization-failed',
-]);
+// Canonical set lives in core/preflight so the Start and Save paths cannot
+// drift apart (they did — see save-preflight-policy.ts).
+const EMIT_BLOCKING_PREFLIGHT_CODES: ReadonlySet<string> = COMPILE_INTEGRITY_PREFLIGHT_CODES;
 
 export function partitionEmitPreflight(preflight: {
   readonly issues: ReadonlyArray<PreflightIssue>;

@@ -110,7 +110,7 @@ describe('JobReviewLayersTable', () => {
     const cnc = storedLayer('red').cnc;
     expect(cnc?.feedMmPerMin).toBe(777);
     expect(cnc?.depthMm).toBe(1);
-    expect(cnc?.cutType).toBe('profile-outside');
+    expect(cnc?.cutType).toBe('profile-on-path');
   });
 
   it('states plainly when nothing has Output enabled', async () => {
@@ -133,6 +133,11 @@ describe('JobReviewLayersTable', () => {
     seedLayers([createLayer({ id: 'red', color: '#ff0000' })], 'cnc');
     await render('cnc');
 
-    expect(host.textContent).toContain('1 pass · stepover 40% · tabs off');
+    // Two decisions meet on this line. ADR-258 defaults tabs ON, so the tab
+    // configuration is reported rather than "tabs off". Audit 3.8 removes the
+    // cut direction: the default cut type is profile-on-path (ADR-256), which
+    // has no material side, so no direction applies and printing one was
+    // inert noise.
+    expect(host.textContent).toContain('1 pass · stepover 40% · tabs 4 per shape (6 × 2 mm)');
   });
 });

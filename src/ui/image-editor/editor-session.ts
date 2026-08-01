@@ -35,8 +35,9 @@ import {
   smoothMask,
   type SelectionMask,
 } from '../../core/image-select';
+import { BACKGROUND_LAYER_ID, clearEditorLayerInPlace } from './editor-layer-clear';
 
-export const BACKGROUND_LAYER_ID = 'background';
+export { BACKGROUND_LAYER_ID } from './editor-layer-clear';
 
 export type SelectionModifyKind = 'expand' | 'contract' | 'border' | 'smooth' | 'feather';
 
@@ -74,6 +75,16 @@ export type EditorTool =
   | { readonly kind: 'marquee'; readonly shape: 'rect' | 'ellipse' }
   | { readonly kind: 'lasso' }
   | { readonly kind: 'wand' }
+  // Bucket/gradient share the fill slot (G cycles, like M for marquee).
+  | { readonly kind: 'bucket' }
+  | { readonly kind: 'gradient'; readonly shape: 'linear' | 'radial' }
+  // Clone: Alt-click sets the source; the aligned offset fixes on first use.
+  | {
+      readonly kind: 'clone';
+      readonly source: PaintPoint | null;
+      readonly offset: PaintPoint | null;
+    }
+  | { readonly kind: 'heal' }
   | { readonly kind: 'crop' }
   | { readonly kind: 'move' };
 
@@ -109,7 +120,17 @@ export type EditorSession = {
   readonly revision: number;
   /** True once any op landed after open or the last Apply. */
   readonly dirtySinceApply: boolean;
+  /**
+   * Pixels changed by the op that produced this revision: a rect for the
+   * hot ops (stroke/fill/move/adjust), EMPTY_DIRTY_RECT for selection-only
+   * changes, null = everything (layer/structure ops, crop, undo). Drives
+   * the dirty-window composite cache (V2 plan A1).
+   */
+  readonly lastDirtyRect: PixelRect | null;
 };
+
+/** Zero-area marker: the revision changed nothing the composite can see. */
+export const EMPTY_DIRTY_RECT: PixelRect = { x: 0, y: 0, width: 0, height: 0 };
 
 export function createSession(
   objectId: string,
@@ -130,6 +151,7 @@ export function createSession(
     selection: null,
     revision: 0,
     dirtySinceApply: false,
+    lastDirtyRect: null,
   };
 }
 
@@ -146,6 +168,7 @@ export function revertSession(session: EditorSession): EditorSession {
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,
+    lastDirtyRect: null,
   };
 }
 
@@ -204,6 +227,7 @@ export function commitCrop(session: EditorSession, rect: PixelRect): EditorSessi
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,
+    lastDirtyRect: null,
   };
 }
 
@@ -231,12 +255,26 @@ export function brushFor(tool: EditorTool, settings: BrushSettings): BrushParams
   return { diameterPx: settings.diameterPx, opacity: settings.opacity, tip };
 }
 
-function committed(session: EditorSession, history: EditHistory): EditorSession {
+/** History capture tagged with the active layer (V2 plan A2). */
+export function captureScoped(
+  session: EditorSession,
+  rect: PixelRect,
+  label: string,
+): ReturnType<typeof captureRect> {
+  return captureRect(session.doc, rect, label, undefined, session.activeLayerId);
+}
+
+function committed(
+  session: EditorSession,
+  history: EditHistory,
+  dirtyRect: PixelRect,
+): EditorSession {
   return {
     ...session,
     history,
     revision: session.revision + 1,
     dirtySinceApply: true,
+    lastDirtyRect: dirtyRect,
   };
 }
 
@@ -256,10 +294,10 @@ export function commitStroke(
   };
   const rect = strokeDirtyRect(stroke, session.doc);
   if (rect.width === 0 || rect.height === 0) return session;
-  const entry = captureRect(session.doc, rect, label);
+  const entry = captureScoped(session, rect, label);
   // Photoshop: an active selection clamps every stroke.
   paintStrokeInPlace(session.doc, stroke, session.selection ?? undefined);
-  return committed(session, pushHistoryEntry(session.history, entry));
+  return committed(session, pushHistoryEntry(session.history, entry), rect);
 }
 
 /** Line tool: a two-point stroke; Shift constrains to 45°. */
@@ -279,7 +317,8 @@ export function withSelection(
   session: EditorSession,
   selection: SelectionMask | null,
 ): EditorSession {
-  return { ...session, selection, revision: session.revision + 1 };
+  // Selection changes never move pixels — the composite cache stays valid.
+  return { ...session, selection, revision: session.revision + 1, lastDirtyRect: EMPTY_DIRTY_RECT };
 }
 
 /** Move the selection OUTLINE only (selection-tool drag / arrow nudge). */
@@ -297,44 +336,57 @@ export function commitFillSelection(
   if (session.selection === null) return session;
   const bounds = maskBounds(session.selection);
   if (bounds === null) return session;
-  const entry = captureRect(session.doc, bounds, label);
+  const entry = captureScoped(session, bounds, label);
   fillMaskedInPlace(session.doc, session.selection, color);
-  return committed(session, pushHistoryEntry(session.history, entry));
+  return committed(session, pushHistoryEntry(session.history, entry), bounds);
 }
 
-/** Move the selected pixels by (dx, dy): extract → white-fill → blit. */
+/** Move selected pixels by (dx, dy): extract, layer-aware clear, then blit. */
 export function commitMoveSelection(session: EditorSession, dx: number, dy: number): EditorSession {
   if (session.selection === null) return session;
+  const roundedDx = Math.round(dx);
+  const roundedDy = Math.round(dy);
+  if (roundedDx === 0 && roundedDy === 0) return session;
   const floating = extractFloatingRegion(session.doc, session.selection);
   if (floating === null) return session;
   const target: PixelRect = {
-    x: floating.rect.x + Math.round(dx),
-    y: floating.rect.y + Math.round(dy),
+    x: floating.rect.x + roundedDx,
+    y: floating.rect.y + roundedDy,
     width: floating.rect.width,
     height: floating.rect.height,
   };
   const touched = unionRects(floating.rect, target);
-  const entry = captureRect(session.doc, touched, 'Move selection');
-  fillMaskedInPlace(session.doc, session.selection, WHITE);
-  blitFloatingInPlace(session.doc, floating, dx, dy);
+  const entry = captureScoped(session, touched, 'Move selection');
+  clearEditorLayerInPlace(session.doc, session.activeLayerId, session.selection);
+  blitFloatingInPlace(session.doc, floating, roundedDx, roundedDy);
   // The selection travels with its contents; a shifted mask keeps later ops
   // (delete/fill/second move) anchored on the moved pixels.
   return {
-    ...committed(session, pushHistoryEntry(session.history, entry)),
-    selection: shiftMask(session.selection, Math.round(dx), Math.round(dy)),
+    ...committed(session, pushHistoryEntry(session.history, entry), touched),
+    selection: shiftMask(session.selection, roundedDx, roundedDy),
   };
 }
 
 export function undoSession(session: EditorSession): EditorSession {
   const result = undoInPlace(session.history, session.doc);
   if (result.applied === null) return session;
-  return { ...session, history: result.history, revision: session.revision + 1 };
+  return {
+    ...session,
+    history: result.history,
+    revision: session.revision + 1,
+    lastDirtyRect: null,
+  };
 }
 
 export function redoSession(session: EditorSession): EditorSession {
   const result = redoInPlace(session.history, session.doc);
   if (result.applied === null) return session;
-  return { ...session, history: result.history, revision: session.revision + 1 };
+  return {
+    ...session,
+    history: result.history,
+    revision: session.revision + 1,
+    lastDirtyRect: null,
+  };
 }
 
 function unionRects(a: PixelRect, b: PixelRect): PixelRect {

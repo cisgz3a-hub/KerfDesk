@@ -51,6 +51,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
         />
       ) : null}
       <ReliefNumberField
+        key={`${relief.id}:width`}
         relief={relief}
         label="Width"
         value={relief.targetWidthMm}
@@ -61,6 +62,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
         commitKey="targetWidthMm"
       />
       <ReliefNumberField
+        key={`${relief.id}:depth`}
         relief={relief}
         label="Depth"
         value={relief.reliefDepthMm}

@@ -204,6 +204,56 @@ afterEach(() => {
 });
 
 describe('runJobReviewGate through runStartJobFlow', () => {
+  it('refreshes controller identity disclosure from the live session at Job Review', async () => {
+    useLaserStore.setState({
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'grbl-v1.1',
+    });
+    const initial = await unframedReviewBundle();
+    const capture = captureJobReviewModels();
+
+    useLaserStore.setState({ detectedControllerKind: 'marlin' });
+    const review = runJobReviewGate({
+      initial,
+      checkpointToReplace: null,
+      completedReceipt: null,
+      purpose: 'frame',
+    });
+    await vi.waitFor(() => expect(capture.models).toHaveLength(1));
+
+    expect(capture.models[0]?.warnings.join('\n')).toContain('Controller identity mismatch:');
+    expect(capture.models[0]?.warnings.join('\n')).toContain('firmware banner identifies Marlin');
+    useJobReviewStore.getState().cancel();
+    await review;
+    capture.stop();
+  });
+
+  it('returns the exact identity evidence displayed even if detection changes before Confirm', async () => {
+    useLaserStore.setState({
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'grbl-v1.1',
+    });
+    const initial = await unframedReviewBundle();
+    const capture = captureJobReviewModels();
+    const review = runJobReviewGate({
+      initial,
+      checkpointToReplace: null,
+      completedReceipt: null,
+      purpose: 'frame',
+    });
+    await vi.waitFor(() => expect(capture.models).toHaveLength(1));
+
+    const displayedModel = capture.models[0];
+    expect(displayedModel?.warnings.join('\n')).not.toContain('Controller identity');
+    useLaserStore.setState({ detectedControllerKind: 'marlin' });
+    useJobReviewStore.getState().confirm();
+
+    const confirmed = await review;
+    capture.stop();
+    expect(confirmed?.reviewModel).toBe(displayedModel);
+    expect(confirmed?.reviewModel.warnings.join('\n')).not.toContain('Controller identity');
+  });
+
   it('preserves frame purpose and rebuilds without requiring an earlier Frame', async () => {
     useLaserStore.setState({ frameVerification: null });
     const frameWcsNormalizationWarning =

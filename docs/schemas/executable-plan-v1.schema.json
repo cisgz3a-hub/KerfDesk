@@ -1,0 +1,358 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:curvedesk:executable-plan:v1",
+  "title": "CurveDesk ExecutablePlan v1",
+  "description": "Deterministic semantic sidecar for one exact legacy G-code program (ADR-271).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schemaVersion",
+    "machineKind",
+    "controller",
+    "coordinateSystem",
+    "source",
+    "motions",
+    "events",
+    "bounds",
+    "totals",
+    "terminal",
+    "diagnostics",
+    "compatibility"
+  ],
+  "properties": {
+    "schema": { "const": "curvedesk.executable-plan" },
+    "schemaVersion": { "const": 1 },
+    "machineKind": { "enum": ["laser", "cnc"] },
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["emitter", "profileControllerKind"],
+      "properties": {
+        "emitter": { "enum": ["grbl", "grbl-cnc", "marlin", "smoothieware"] },
+        "profileControllerKind": { "type": ["string", "null"] }
+      }
+    },
+    "coordinateSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["units", "distanceMode", "initialPositionMm", "initialPositionBasis"],
+      "properties": {
+        "units": { "const": "mm" },
+        "distanceMode": { "const": "absolute" },
+        "initialPositionMm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "z"],
+          "properties": {
+            "x": { "const": 0 },
+            "y": { "const": 0 },
+            "z": { "const": 0 }
+          }
+        },
+        "initialPositionBasis": { "const": "assumed-work-origin-v1" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rawLineCount", "sendableLineCount", "utf8ByteLength", "lineEnding"],
+      "properties": {
+        "rawLineCount": { "type": "integer", "minimum": 1 },
+        "sendableLineCount": { "type": "integer", "minimum": 0 },
+        "utf8ByteLength": { "type": "integer", "minimum": 1 },
+        "lineEnding": { "enum": ["none", "lf", "crlf", "cr", "mixed"] }
+      }
+    },
+    "motions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/motion" }
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allMotionMm", "processMm"],
+      "properties": {
+        "allMotionMm": { "oneOf": [{ "$ref": "#/$defs/bounds" }, { "type": "null" }] },
+        "processMm": { "oneOf": [{ "$ref": "#/$defs/bounds" }, { "type": "null" }] }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["routeMm", "travelMm", "processMm", "plungeMm", "retractMm", "parkMm"],
+      "properties": {
+        "routeMm": { "$ref": "#/$defs/nonNegativeNumber" },
+        "travelMm": { "$ref": "#/$defs/nonNegativeNumber" },
+        "processMm": { "$ref": "#/$defs/nonNegativeNumber" },
+        "plungeMm": { "$ref": "#/$defs/nonNegativeNumber" },
+        "retractMm": { "$ref": "#/$defs/nonNegativeNumber" },
+        "parkMm": { "$ref": "#/$defs/nonNegativeNumber" }
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["positionMm", "spindleMode", "coolant", "programEnded"],
+      "properties": {
+        "positionMm": { "oneOf": [{ "$ref": "#/$defs/point" }, { "type": "null" }] },
+        "spindleMode": { "enum": ["off", "constant", "dynamic"] },
+        "coolant": { "enum": ["off", "mist", "flood", "mist-and-flood"] },
+        "programEnded": { "type": "boolean" }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unsupportedWords"],
+      "properties": {
+        "unsupportedWords": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unsupportedWord" }
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serializer", "exactProgram"],
+      "properties": {
+        "serializer": { "const": "legacy-gcode-v1" },
+        "exactProgram": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "nonNegativeNumber": { "type": "number", "minimum": 0 },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minX", "maxX", "minY", "maxY", "minZ", "maxZ"],
+      "properties": {
+        "minX": { "type": "number" },
+        "maxX": { "type": "number" },
+        "minY": { "type": "number" },
+        "maxY": { "type": "number" },
+        "minZ": { "type": "number" },
+        "maxZ": { "type": "number" }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "rawLineIndex",
+        "sendableLineIndex",
+        "programLineNumber",
+        "mode",
+        "intent",
+        "pointsMm",
+        "lengthMm",
+        "routeStartMm",
+        "routeEndMm",
+        "feedMmPerMin",
+        "power",
+        "sourceSegmentCount"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^motion-[0-9]{6,}$" },
+        "rawLineIndex": { "type": "integer", "minimum": 0 },
+        "sendableLineIndex": { "type": "integer", "minimum": 0 },
+        "programLineNumber": { "type": ["number", "null"] },
+        "mode": {
+          "enum": ["rapid", "linear", "clockwise-arc", "counterclockwise-arc"]
+        },
+        "intent": { "enum": ["travel", "process", "plunge", "retract", "park"] },
+        "pointsMm": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/point" }
+        },
+        "lengthMm": { "$ref": "#/$defs/nonNegativeNumber" },
+        "routeStartMm": { "$ref": "#/$defs/nonNegativeNumber" },
+        "routeEndMm": { "$ref": "#/$defs/nonNegativeNumber" },
+        "feedMmPerMin": { "type": ["number", "null"], "minimum": 0 },
+        "power": { "type": "number", "minimum": 0 },
+        "sourceSegmentCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "unsupportedWord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["word", "count", "firstLine"],
+      "properties": {
+        "word": { "type": "string", "minLength": 1 },
+        "count": { "type": "integer", "minimum": 1 },
+        "firstLine": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "event": {
+      "oneOf": [
+        { "$ref": "#/$defs/unitsEvent" },
+        { "$ref": "#/$defs/spindleOnEvent" },
+        { "$ref": "#/$defs/spindleOffEvent" },
+        { "$ref": "#/$defs/coolantOnEvent" },
+        { "$ref": "#/$defs/coolantOffEvent" },
+        { "$ref": "#/$defs/dwellEvent" },
+        { "$ref": "#/$defs/pauseEvent" },
+        { "$ref": "#/$defs/synchronizationEvent" },
+        { "$ref": "#/$defs/programEndEvent" },
+        { "$ref": "#/$defs/wcsEvent" },
+        { "$ref": "#/$defs/cannedCycleEvent" },
+        { "$ref": "#/$defs/toolEvent" },
+        { "$ref": "#/$defs/homeEvent" }
+      ]
+    },
+    "unitsEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "units"],
+      "properties": {
+        "kind": { "const": "units" },
+        "line": { "type": "integer", "minimum": 0 },
+        "units": { "enum": ["mm", "inch"] }
+      }
+    },
+    "spindleOnEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "mode", "power"],
+      "properties": {
+        "kind": { "const": "spindle-on" },
+        "line": { "type": "integer", "minimum": 0 },
+        "mode": { "enum": ["constant", "dynamic"] },
+        "power": { "type": "number", "minimum": 0 }
+      }
+    },
+    "spindleOffEvent": { "$ref": "#/$defs/simpleEventSpindleOff" },
+    "coolantOnEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "channel"],
+      "properties": {
+        "kind": { "const": "coolant-on" },
+        "line": { "type": "integer", "minimum": 0 },
+        "channel": { "enum": ["mist", "flood"] }
+      }
+    },
+    "coolantOffEvent": { "$ref": "#/$defs/simpleEventCoolantOff" },
+    "dwellEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "seconds"],
+      "properties": {
+        "kind": { "const": "dwell" },
+        "line": { "type": "integer", "minimum": 0 },
+        "seconds": { "type": "number", "minimum": 0 }
+      }
+    },
+    "pauseEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "optional"],
+      "properties": {
+        "kind": { "const": "pause" },
+        "line": { "type": "integer", "minimum": 0 },
+        "optional": { "type": "boolean" }
+      }
+    },
+    "synchronizationEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "code", "isBeforeMotion"],
+      "properties": {
+        "kind": { "const": "synchronization" },
+        "line": { "type": "integer", "minimum": 0 },
+        "code": { "enum": ["M400", "spindle", "coolant"] },
+        "isBeforeMotion": { "type": "boolean" }
+      }
+    },
+    "programEndEvent": { "$ref": "#/$defs/simpleEventProgramEnd" },
+    "wcsEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "code"],
+      "properties": {
+        "kind": { "const": "wcs-select" },
+        "line": { "type": "integer", "minimum": 0 },
+        "code": { "type": "number" }
+      }
+    },
+    "cannedCycleEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "code"],
+      "properties": {
+        "kind": { "const": "canned-cycle" },
+        "line": { "type": "integer", "minimum": 0 },
+        "code": { "type": "number" }
+      }
+    },
+    "toolEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "tool"],
+      "properties": {
+        "kind": { "const": "tool-word" },
+        "line": { "type": "integer", "minimum": 0 },
+        "tool": { "type": "number" }
+      }
+    },
+    "homeEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "axes"],
+      "properties": {
+        "kind": { "const": "home" },
+        "line": { "type": "integer", "minimum": 0 },
+        "axes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["X", "Y", "Z"] }
+        }
+      }
+    },
+    "simpleEventSpindleOff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line"],
+      "properties": {
+        "kind": { "const": "spindle-off" },
+        "line": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "simpleEventCoolantOff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line"],
+      "properties": {
+        "kind": { "const": "coolant-off" },
+        "line": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "simpleEventProgramEnd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line"],
+      "properties": {
+        "kind": { "const": "program-end" },
+        "line": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

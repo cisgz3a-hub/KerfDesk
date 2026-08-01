@@ -28,6 +28,7 @@ export type CommandId =
   | 'file.import-image'
   | 'file.save-gcode'
   | 'file.open-gcode'
+  | 'file.inspect-gcode'
   | 'edit.undo'
   | 'edit.redo'
   | 'edit.select-all'
@@ -164,6 +165,7 @@ export type AppCommandContext = {
   readonly importDxf: () => void;
   readonly importImage: () => void;
   readonly openGcodePreview: () => void;
+  readonly inspectCurrentGcode: () => void;
   readonly saveGcode: () => void;
   readonly undo: () => void;
   readonly redo: () => void;

@@ -37,8 +37,14 @@ describe('laserOperationDetail', () => {
   it('summarizes a fill operation: style, hatch, direction, overscan', () => {
     const layer: Layer = { ...baseLayer, mode: 'fill', fillCrossHatch: true };
     expect(laserOperationDetail(layer)).toBe(
-      'Scanline fill · 0.1 mm hatch at 0° · bidirectional · cross-hatch · overscan 5 mm',
+      'Scanline fill · 0.1 mm hatch at 0° · bidirectional · cross-hatch · stored overscan 5 mm',
     );
+  });
+
+  it('keeps a stored zero distinct from the prepared job effective runway target', () => {
+    const layer: Layer = { ...baseLayer, mode: 'fill', fillOverscanMm: 0 };
+
+    expect(laserOperationDetail(layer)).toContain('stored overscan 0 mm');
   });
 
   it('summarizes an image operation: dither, resolution, extras only when set', () => {
@@ -56,9 +62,16 @@ describe('laserOperationDetail', () => {
 });
 
 describe('cncOperationDetail', () => {
-  it('summarizes the default profile cut with a computed pass count', () => {
+  // Audit 3.8: the shipped default cut type is profile-on-path (ADR-256), and
+  // enforceCutDirection returns null for it — no material side, so no direction
+  // is applied. Printing "climb" here told the operator about motion that never
+  // happens.
+  it('summarizes the default on-path cut without a direction it does not apply', () => {
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS)).toBe(
-      '1 pass · stepover 40% · tabs off · Manual feeds',
+      // ADR-258 defaults tabs ON, so the default profile cut reports its tab
+      // configuration here instead of "tabs off". Audit 3.8 drops the cut
+      // direction: profile-on-path has no material side, so none applies.
+      '1 pass · stepover 40% · tabs 4 per shape (6 × 2 mm) · Manual feeds',
     );
   });
 
@@ -67,6 +80,9 @@ describe('cncOperationDetail', () => {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       depthMm: 12,
       depthPerPassMm: 2.5,
+      // Explicit: direction only renders for cut types that have a material
+      // side, and the default is now on-path (ADR-256), which has none.
+      cutType: 'pocket',
       cutDirection: 'climb',
       tabsEnabled: true,
       tabsPerShape: 3,
@@ -79,6 +95,33 @@ describe('cncOperationDetail', () => {
     };
     expect(cncOperationDetail(settings)).toBe(
       '5 passes · stepover 40% · climb · tabs 3 per shape (6 × 2 mm) · ramp entry 3° · finish allowance 0.5 mm · raster-x pocket · Plywood / MDF feeds (legacy/unscoped)',
+    );
+  });
+
+  // Audit 1.8: the count used to be a bare Math.ceil, which disagreed with the
+  // emitter's zPassDepths on 3/4" stock with imperial bits.
+  it('reports the pass count the emitter actually steps on imperial depths', () => {
+    const settings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      depthMm: 19.05, // 3/4"
+      depthPerPassMm: 1.5875, // 1/16"
+    };
+    expect(cncOperationDetail(settings)).toContain('12 passes');
+  });
+
+  // Audit 3.8: enforceCutDirection is inert for engrave and profile-on-path, so
+  // the stored word describes motion that never happens.
+  it('omits the cut direction for cut types that have no material side', () => {
+    for (const cutType of ['engrave', 'profile-on-path'] as const) {
+      const settings: CncLayerSettings = {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType,
+        cutDirection: 'climb',
+      };
+      expect(cncOperationDetail(settings)).not.toContain('climb');
+    }
+    expect(cncOperationDetail({ ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket' })).toContain(
+      'climb',
     );
   });
 
@@ -95,7 +138,7 @@ describe('cncOperationDetail', () => {
       'Machine starter values: Neotronics 4040 shallow wood / MDF starter (revision 1)',
     );
     expect(cncOperationDetail(settings)).toContain(
-      'Engineering starter — assumes a 3.175 mm 2-flute cutter; verify on this machine.',
+      'Maintainer-verified starter (ADR-256) — feed and plunge come from cutting experience on this machine with a 3.175 mm 2-flute cutter; confirm on scrap for a new bit or stock.',
     );
   });
 

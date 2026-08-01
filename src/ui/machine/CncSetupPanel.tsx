@@ -2,20 +2,16 @@
 // project machine is CNC. The Easel-style job setup: what stock is on the
 // bed, which bit is in the spindle, and the machine's Z/spindle parameters.
 
-import { CHIPLOAD_MATERIALS } from '../../core/cnc';
-import {
-  activeCncTool,
-  isCncCoolantMode,
-  type CncCoolantMode,
-  type CncMachineConfig,
-} from '../../core/scene';
+import { isCncCoolantMode, type CncCoolantMode, type CncMachineConfig } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
 import { ProbeControls } from '../laser/ProbeControls';
 import { ProbePlateRemovalNotice } from '../laser/ProbePlateRemovalNotice';
+import { CncActiveBitSelect } from './CncActiveBitSelect';
 import { CncDetectedSettingsRow } from './CncDetectedSettingsRow';
 import { CncMachineProfilesRow, CncToolManager } from './CncLibraryPanels';
 import { CncMachineCatalogRow } from './CncMachineCatalogRow';
+import { CncProjectMaterialPicker } from './CncProjectMaterialPicker';
 import { CncTilingPanel } from './CncTilingPanel';
 import { SurfacingPanel } from './SurfacingPanel';
 
@@ -27,27 +23,13 @@ export function CncSetupPanel(): JSX.Element | null {
 
 function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Element {
   const { machine } = props;
-  const updateCncMachine = useStore((s) => s.updateCncMachine);
-  const tool = activeCncTool(machine);
   return (
     <section aria-label="Material and bit setup" style={cardStyle}>
       <h3 style={headingStyle}>Material &amp; Bit</h3>
       <CncDetectedSettingsRow machine={machine} />
-      <CncMaterialSelectRow machine={machine} />
+      <CncProjectMaterialPicker activeMaterialKey={machine.stock.materialKey} />
       <Row label="Bit">
-        <select
-          value={tool.id}
-          onChange={(e) => updateCncMachine({ toolId: e.target.value })}
-          aria-label="Active bit"
-          title="The bit in the spindle. Profile offsets and pocket clearing use its diameter."
-          style={selectStyle}
-        >
-          {machine.tools.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.name} ({candidate.diameterMm} mm)
-            </option>
-          ))}
-        </select>
+        <CncActiveBitSelect machine={machine} style={selectStyle} />
       </Row>
       <CncStockFields machine={machine} />
       <CncMachineParamsFields machine={machine} />
@@ -72,32 +54,6 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
   );
 }
 
-// Project-level material (ADR-112): Easel's "set material once for the job".
-// Picking one auto-fills safe feeds for every layer (and seeds new ones);
-// "Custom" clears the association and leaves feeds for hand-tuning. The
-// per-layer Material picker on each card overrides this for that layer.
-function CncMaterialSelectRow(props: { readonly machine: CncMachineConfig }): JSX.Element {
-  const applyCncStockMaterial = useStore((s) => s.applyCncStockMaterial);
-  return (
-    <Row label="Material">
-      <select
-        value={props.machine.stock.materialKey ?? ''}
-        onChange={(e) => applyCncStockMaterial(e.target.value === '' ? null : e.target.value)}
-        aria-label="Project material"
-        title="Pick your stock material to auto-fill safe feeds for every layer. Choose Custom to set feeds by hand; each layer can still override."
-        style={selectStyle}
-      >
-        <option value="">Custom (manual feeds)</option>
-        {CHIPLOAD_MATERIALS.map((material) => (
-          <option key={material.value} value={material.value}>
-            {material.label}
-          </option>
-        ))}
-      </select>
-    </Row>
-  );
-}
-
 // Stock (workpiece) dimensions + placement — split from CncSetupFields to
 // keep both components inside the size limits (H.2 added the XY footprint).
 function CncStockFields(props: { readonly machine: CncMachineConfig }): JSX.Element {
@@ -113,7 +69,7 @@ function CncStockFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         min={0.1}
         max={200}
         step={0.05}
-        title="Workpiece thickness. Cut depths deeper than this (plus 1 mm) are blocked."
+        title="Workpiece thickness. Cutting deeper than this is allowed — Job Review warns how far past the stock bottom the cut goes."
         onCommit={(thicknessMm) => updateCncMachine({ stock: { thicknessMm } })}
       />
       <NumberRow

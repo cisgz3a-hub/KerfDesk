@@ -7,7 +7,7 @@ import type { OverrideValues, StatusReport } from '../../../core/controllers/grb
 import type { ActiveWorkCoordinateSystem } from '../../../core/controllers/grbl/work-offset-readback';
 import type { ControllerKind } from '../../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
-import { analyzeFillHeatRisk, type Job } from '../../../core/job';
+import { analyzeFillHeatRisk, type Job, type ScanOffsetPoint } from '../../../core/job';
 import type { ScanDirectionReason } from '../../../core/job/scan-direction-policy';
 import {
   activeCncTool,
@@ -126,18 +126,22 @@ export function buildMachineReviewFacts(project: Project): ReadonlyArray<JobRevi
 export function buildOutputQualityReviewFacts(
   job: Job,
   layers: ReadonlyArray<Layer>,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint> = [],
 ): ReadonlyArray<JobReviewFact> {
-  return [...buildFillRunwayFacts(job), ...buildScanDirectionFacts(job, layers)];
+  return [...buildFillRunwayFacts(job, scanningOffsets), ...buildScanDirectionFacts(job, layers)];
 }
 
-function buildFillRunwayFacts(job: Job): ReadonlyArray<JobReviewFact> {
+function buildFillRunwayFacts(
+  job: Job,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
+): ReadonlyArray<JobReviewFact> {
   const facts: JobReviewFact[] = [];
-  const coverage = analyzeFillHeatRisk(job);
+  const coverage = analyzeFillHeatRisk(job, scanningOffsets);
   if (coverage.fillSweepCount > 0) {
     facts.push(
       fact(
         'Fill runway coverage',
-        `requested ${coverage.fillRequestedRunwayValuesMm.join(' / ')} mm · ${coverage.fillFullRunwaySweepCount} full · ${coverage.fillPartialRunwaySweepCount} partial · ${coverage.fillNoRunwaySweepCount} skipped · ${coverage.fillDisabledRunwaySweepCount} disabled (${coverage.fillSweepCount} emitted sweeps)`,
+        `effective target ${coverage.fillRequestedRunwayValuesMm.join(' / ')} mm · ${coverage.fillFullRunwaySweepCount} full · ${coverage.fillPartialRunwaySweepCount} partial · ${coverage.fillNoRunwaySweepCount} skipped · ${coverage.fillDisabledRunwaySweepCount} disabled (${coverage.fillSweepCount} emitted sweeps)`,
         coverage.fillPartialRunwaySweepCount > 0 || coverage.fillNoRunwaySweepCount > 0
           ? 'warning'
           : 'default',
@@ -295,6 +299,11 @@ function laserModeFact(
   settings: ControllerSettingsSnapshot,
   machineKind: MachineKind,
 ): JobReviewFact {
+  // grblHAL reports $32=2 for lathe mode. Showing that as a plain "Off" would
+  // hide which of the two not-laser modes the controller is actually in.
+  if (settings.machineMode?.kind === 'lathe') {
+    return fact('Laser mode $32', 'Lathe mode ($32=2)', 'warning');
+  }
   const expected = machineKind === 'laser';
   const tone: JobReviewFact['tone'] =
     settings.laserModeEnabled === undefined || settings.laserModeEnabled !== expected

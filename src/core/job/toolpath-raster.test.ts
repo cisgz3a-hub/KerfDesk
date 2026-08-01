@@ -27,6 +27,83 @@ function rasterJob(group: RasterGroup): Job {
   return { groups: [group] };
 }
 
+describe('buildToolpath raster preview runs', () => {
+  // Regression: the preview drew ONE cut polyline across the whole active
+  // span, so an internal white gap inside a span rendered as burn. The emitter
+  // walks the same sweep plan's runs and emits S0 across that gap, and the
+  // duration model classifies it as feed-travel -- so canvas and 3D showed
+  // burn the machine never makes.
+  it('breaks a span at internal white pixels instead of drawing one solid cut', () => {
+    const tp = buildToolpath(
+      rasterJob(
+        rasterGroup({
+          pixelWidth: 4,
+          pixelHeight: 1,
+          bounds: { minX: 0, minY: 0, maxX: 4, maxY: 1 },
+          overscanMm: 0,
+          sValues: new Uint16Array([500, 0, 0, 500]),
+        }),
+      ),
+    );
+    const cuts = tp.steps.filter((step) => step.kind === 'cut');
+
+    expect(cuts.map((step) => step.polyline)).toEqual([
+      [
+        { x: 0, y: 0.5 },
+        { x: 1, y: 0.5 },
+      ],
+      [
+        { x: 3, y: 0.5 },
+        { x: 4, y: 0.5 },
+      ],
+    ]);
+  });
+
+  it('reports the pixel range of each burn run, not of the whole span', () => {
+    const tp = buildToolpath(
+      rasterJob(
+        rasterGroup({
+          pixelWidth: 4,
+          pixelHeight: 1,
+          bounds: { minX: 0, minY: 0, maxX: 4, maxY: 1 },
+          overscanMm: 0,
+          sValues: new Uint16Array([500, 0, 0, 500]),
+        }),
+      ),
+    );
+    const cuts = tp.steps.filter((step) => step.kind === 'cut');
+
+    expect(cuts.map((step) => step.source)).toMatchObject([
+      { pixelStartX: 0, pixelEndX: 0 },
+      { pixelStartX: 3, pixelEndX: 3 },
+    ]);
+  });
+
+  // The emitter trims each burn run by the dot-width correction; the preview
+  // ignored the setting entirely, so it drew the untrimmed extent.
+  it('applies dot width correction to the drawn burn extent', () => {
+    const tp = buildToolpath(
+      rasterJob(
+        rasterGroup({
+          pixelWidth: 4,
+          pixelHeight: 1,
+          bounds: { minX: 0, minY: 0, maxX: 4, maxY: 1 },
+          overscanMm: 0,
+          dotWidthCorrectionMm: 0.25,
+          sValues: new Uint16Array([500, 500, 500, 500]),
+        }),
+      ),
+    );
+    const cuts = tp.steps.filter((step) => step.kind === 'cut');
+
+    expect(cuts).toHaveLength(1);
+    expect(cuts[0]?.polyline).toEqual([
+      { x: 0.25, y: 0.5 },
+      { x: 3.75, y: 0.5 },
+    ]);
+  });
+});
+
 describe('buildToolpath raster preview rows', () => {
   it('renders raster image rows as route preview sweeps with overscan and bidirectional travel', () => {
     const tp = buildToolpath(

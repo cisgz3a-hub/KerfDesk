@@ -1,0 +1,99 @@
+name: Dependency audit
+
+# `pnpm audit` used to sit inside the `release:check` chain, so a newly
+# published advisory against a transitive devDependency turned every open PR
+# and every main push red with no code change — three times in July 2026
+# (tar, postcss, brace-expansion). Worse, release:check is a sequential `&&`
+# chain, so the audit failure masked the seven verification steps after it:
+# a two-minute "failure" told the author nothing about their own diff.
+#
+# Advisories are published by third parties on their schedule, not ours, so
+# supply-chain findings belong on a clock, not in the merge gate. This runs
+# nightly and files ONE tracking issue; PRs stay green. GitHub Dependabot
+# alerts (enabled 2026-07-25) cover the same ground natively — this leg still
+# exists because it reads the tree through the same `pnpm audit` that the
+# `pnpm.overrides` entries in pnpm-workspace.yaml are written against.
+#
+# See ADR-254.
+on:
+  schedule:
+    # 03:17 UTC, deliberately off the hour: GitHub delays cron runs scheduled
+    # on the hour under peak load, and nothing here is time-critical.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Needed only by the tracking-issue step below.
+  issues: write
+
+jobs:
+  audit:
+    name: pnpm audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        # No `with.version` — see ci.yml. package.json's packageManager field
+        # is the single source of truth.
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run dependency audit
+        id: audit
+        # Deliberately never fails the step: the report is the product, not
+        # the exit code. Capturing the status lets the next step decide.
+        run: |
+          set +e
+          pnpm audit:deps > "${RUNNER_TEMP}/audit.txt" 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/audit.txt"
+
+      - name: File tracking issue
+        if: steps.audit.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_TITLE: 'Dependency audit: advisories found'
+        run: |
+          set -euo pipefail
+          # One open issue at a time — a nightly cron that opens a fresh issue
+          # (or comments) every run trains you to ignore the label entirely.
+          existing=$(gh issue list --state open --limit 100 --json number,title \
+            --jq '.[] | select(.title == env.ISSUE_TITLE) | .number' | head -1)
+          if [ -n "${existing}" ]; then
+            echo "Already tracked in issue #${existing} — not filing a duplicate."
+            exit 0
+          fi
+          {
+            echo "\`pnpm audit:deps\` (\`pnpm audit --audit-level=low\`) reported advisories."
+            echo
+            echo "This does **not** block CI or deploys (ADR-254). Triage:"
+            echo
+            echo "- **Every path devDependency-only?** Add a \`pnpm.overrides\` entry in"
+            echo "  \`pnpm-workspace.yaml\` — follow the \`tmp\` precedent documented there."
+            echo "- **Reachable from a production dependency?** Treat as release-blocking"
+            echo "  and patch before the next desktop or web release."
+            echo
+            echo '<details><summary>Audit output</summary>'
+            echo
+            echo '```'
+            cat "${RUNNER_TEMP}/audit.txt"
+            echo '```'
+            echo
+            echo '</details>'
+          } > "${RUNNER_TEMP}/issue-body.md"
+          gh issue create --title "${ISSUE_TITLE}" --body-file "${RUNNER_TEMP}/issue-body.md"

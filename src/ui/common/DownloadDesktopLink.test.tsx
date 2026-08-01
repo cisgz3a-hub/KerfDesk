@@ -36,13 +36,13 @@ afterEach(() => {
 });
 
 describe('DownloadDesktopLink', () => {
-  it('links to the static download page in a new tab in the browser', async () => {
+  it('links directly to the public release repository in a new tab', async () => {
     const host = await renderInProvider('web');
     const link = host.querySelector('a');
-    expect(link?.getAttribute('href')).toBe('/download');
+    expect(link?.getAttribute('href')).toBe('https://github.com/cisgz3a-hub/KerfDesk/releases');
     expect(link?.getAttribute('target')).toBe('_blank');
     expect(link?.getAttribute('rel')).toContain('noopener');
-    expect(link?.textContent).toBe('Download for Windows');
+    expect(link?.textContent).toBe('Download desktop app');
   });
 
   it('is hidden inside the desktop app (id=electron)', async () => {

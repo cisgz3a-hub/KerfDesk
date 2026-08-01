@@ -5,7 +5,6 @@
 // layer color; width/depth/background are edited afterwards in the Relief
 // properties panel (SelectedReliefProperties).
 
-import { meshToHeightmap, triangleCount } from '../../core/relief';
 import {
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
@@ -16,13 +15,25 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { parseStl } from '../../io/stl';
+import { parseStlOffThread } from '../import/import-worker-client';
+import {
+  type PreparedStlImportResult,
+  type StlImportPreparationOptions,
+  prepareParsedStlImport,
+} from '../import/stl-import-preparation';
 import type { ToastVariant } from '../state/toast-store';
-import { importSourceSizeIssue } from './import-source-limits';
+import { importSourceSizeAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
+import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
 export const DEFAULT_RELIEF_WIDTH_MM = 100;
 export const DEFAULT_RELIEF_DEPTH_MM = 5;
 // Coarse probe cell — only validates the mesh and derives the aspect ratio.
 const PROBE_CELL_MM = 1;
+const STL_PREPARATION_OPTIONS: StlImportPreparationOptions = {
+  targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
+  reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
+  mmPerCell: PROBE_CELL_MM,
+};
 
 export function isStlFile(file: File): boolean {
   return file.name.toLowerCase().endsWith('.stl');
@@ -46,17 +57,23 @@ export async function importStlFiles(
   }
   let successIdx = 0;
   for (const file of files) {
-    const sizeIssue = importSourceSizeIssue(file, 'stl');
-    if (sizeIssue !== null) {
-      ctx.pushToast(sizeIssue, 'error');
-      continue;
-    }
+    const sizeAdvisory = importSourceSizeAdvisory(file, 'stl');
+    if (sizeAdvisory !== null) ctx.pushToast(sizeAdvisory, 'warning');
+    const controls = createImportWorkerControls(file.name, ctx.pushToast);
     try {
-      const relief = reliefFromStlBytes(await file.arrayBuffer(), file.name);
+      // Parsing and the aspect-ratio heightmap probe normally stay in the import
+      // worker. Constructor-time Worker unavailability retains the legacy valid
+      // path with a responsiveness warning; worker errors/cancellation do not retry.
+      const pending = parseStlOffThread(file, STL_PREPARATION_OPTIONS, controls.options);
+      const prepared =
+        pending === null ? await prepareStlOnMainThread(file, ctx.pushToast) : await pending;
+      const relief = reliefFromPreparedStl(prepared, file.name);
       if (typeof relief === 'string') {
         ctx.pushToast(`${file.name}: ${relief}`, 'error');
         continue;
       }
+      const denseAdvisory = denseMeshAdvisory(file.name, relief.meshPositions.length / 9);
+      if (denseAdvisory !== null) ctx.pushToast(denseAdvisory, 'warning');
       ctx.importObject(relief, successIdx);
       successIdx += 1;
       ctx.pushToast(
@@ -65,38 +82,54 @@ export async function importStlFiles(
         'success',
       );
     } catch (err) {
-      ctx.pushToast(`${file.name}: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      ctx.pushToast(
+        isImportCancellation(err)
+          ? `${file.name}: import cancelled.`
+          : `${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+        isImportCancellation(err) ? 'warning' : 'error',
+      );
+    } finally {
+      controls.dispose();
     }
   }
 }
 
+async function prepareStlOnMainThread(
+  file: File,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): Promise<PreparedStlImportResult> {
+  pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
+  return prepareParsedStlImport(parseStl(await file.arrayBuffer()), STL_PREPARATION_OPTIONS);
+}
+
+// Rule 7 / ADR-228: the RELIEF_EMBED_TRIANGLE_LIMIT refusal ("decimate the mesh
+// and re-export") was a policy cap, not an integrity fact — a dense mesh embeds
+// and carves correctly, it is merely slower and heavier in the .lf2. It now
+// advises at the point the refusal stood, and the import proceeds.
+function denseMeshAdvisory(name: string, triangles: number): string | null {
+  if (triangles <= RELIEF_EMBED_TRIANGLE_LIMIT) return null;
+  return (
+    `${name} carries ${triangles.toLocaleString()} triangles — the project file will be large ` +
+    'and editing this relief may be slow. Decimating the mesh in your CAD tool will speed it up.'
+  );
+}
+
 // Returns the ReliefObject, or a human-readable rejection reason.
-function reliefFromStlBytes(bytes: ArrayBuffer, source: string): ReliefObject | string {
-  const parsed = parseStl(bytes);
-  if (parsed.kind === 'error') return parsed.reason;
-  const triangles = triangleCount(parsed.mesh);
-  if (triangles > RELIEF_EMBED_TRIANGLE_LIMIT) {
-    return (
-      `${triangles} triangles is beyond the ${RELIEF_EMBED_TRIANGLE_LIMIT} embed limit — ` +
-      'decimate the mesh in your CAD tool and re-export.'
-    );
-  }
-  const probe = meshToHeightmap(parsed.mesh, {
-    targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
-    reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
-    mmPerCell: PROBE_CELL_MM,
-  });
-  if (probe.kind === 'error') return probe.reason;
+function reliefFromPreparedStl(
+  prepared: PreparedStlImportResult,
+  source: string,
+): ReliefObject | string {
+  if (prepared.kind === 'error') return prepared.reason;
   return {
     kind: 'relief',
     id: crypto.randomUUID(),
     source,
-    meshPositions: Array.from(parsed.mesh.positions),
+    meshPositions: prepared.positions,
     targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
     reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
     emptyCells: 'floor',
     color: DEFAULT_RELIEF_LAYER_COLOR,
-    bounds: { minX: 0, minY: 0, maxX: probe.widthMm, maxY: probe.heightMm },
+    bounds: { minX: 0, minY: 0, maxX: prepared.widthMm, maxY: prepared.heightMm },
     transform: IDENTITY_TRANSFORM,
   };
 }

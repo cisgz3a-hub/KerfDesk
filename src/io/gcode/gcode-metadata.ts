@@ -9,6 +9,9 @@
 // in. EMITTER_REVISION is a code constant HERE because it describes this
 // emitter's behavior, not the build environment.
 
+import type { DeviceProfile } from '../../core/devices';
+import { sanitizeGcodeCommentValue } from '../../core/gcode-comments';
+
 export type GcodeMetadata = {
   readonly appName: string;
   readonly appVersion: string;
@@ -17,12 +20,16 @@ export type GcodeMetadata = {
   readonly emitterRevision: string;
 };
 
-// Bump when the emitter's G-code-shaping behavior changes. Currently covers the
-// continuous-sweep fill (ADR-034), the >5 mm fill gap-rapid split (ADR-035), M4
-// dynamic power for fill (ADR-036), raster gap-rapid splitting (ADR-039), and
-// standalone surfacing safe-Z-before-M3 ordering (ADR-103), ADR-234's bounded
-// 4040 Fill entry geometry, and ADR-236's controlled seeks/scan-quality policy.
-export const EMITTER_REVISION = 'adr-235-4040-quality-controlled-v2';
+/**
+ * Bump when the emitter's G-code-shaping behavior changes. Currently covers the
+ * continuous-sweep fill (ADR-034), the >5 mm fill gap-rapid split (ADR-035), M4
+ * dynamic power for fill (ADR-036), raster gap-rapid splitting (ADR-039), and
+ * standalone surfacing safe-Z-before-M3 ordering (ADR-103), ADR-234's bounded
+ * 4040 Fill entry geometry, ADR-236's controlled seeks/scan-quality policy,
+ * ADR-238's generic Scan Line entry/exit runway geometry, ADR-270's
+ * region-major V-carve traversal, and ADR-273's incident-grade CNC provenance.
+ */
+export const EMITTER_REVISION = 'adr-273-cnc-incident-provenance-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
@@ -32,6 +39,11 @@ export const EMITTER_REVISION = 'adr-235-4040-quality-controlled-v2';
 export type GcodeHeaderAssumptions =
   | { readonly kind: 'laser'; readonly maxPowerS: number }
   | { readonly kind: 'cnc'; readonly spindleMaxRpm: number };
+
+export type GcodeProfileIdentity = Pick<
+  DeviceProfile,
+  'name' | 'profileId' | 'profileSource' | 'catalogVersion'
+>;
 
 // Leading `;` comment lines; GRBL ignores them. Ends with a trailing newline so
 // the motion body starts cleanly on its own line when concatenated.
@@ -43,13 +55,14 @@ export type GcodeHeaderAssumptions =
 export function gcodeMetadataHeader(
   metadata: GcodeMetadata,
   assumed: GcodeHeaderAssumptions,
+  profile?: GcodeProfileIdentity,
 ): string {
   const safe = {
-    appName: sanitizeMetadataCommentValue(metadata.appName),
-    appVersion: sanitizeMetadataCommentValue(metadata.appVersion),
-    gitSha: sanitizeMetadataCommentValue(metadata.gitSha),
-    buildTimeUtc: sanitizeMetadataCommentValue(metadata.buildTimeUtc),
-    emitterRevision: sanitizeMetadataCommentValue(metadata.emitterRevision),
+    appName: sanitizeGcodeCommentValue(metadata.appName),
+    appVersion: sanitizeGcodeCommentValue(metadata.appVersion),
+    gitSha: sanitizeGcodeCommentValue(metadata.gitSha),
+    buildTimeUtc: sanitizeGcodeCommentValue(metadata.buildTimeUtc),
+    emitterRevision: sanitizeGcodeCommentValue(metadata.emitterRevision),
   };
   return [
     `; ${safe.appName}`,
@@ -57,9 +70,30 @@ export function gcodeMetadataHeader(
     `; commit: ${safe.gitSha}`,
     `; built: ${safe.buildTimeUtc}`,
     `; emitter: ${safe.emitterRevision}`,
+    ...profileLines(profile),
     ...assumptionLines(assumed),
     '',
   ].join('\n');
+}
+
+function profileLines(profile: GcodeProfileIdentity | undefined): ReadonlyArray<string> {
+  if (profile === undefined) return [];
+  return [
+    `; profile-name: ${profileValue(profile.name)}`,
+    ...(profile.profileId === undefined
+      ? []
+      : [`; profile-id: ${profileValue(profile.profileId)}`]),
+    ...(profile.profileSource === undefined
+      ? []
+      : [`; profile-source: ${profileValue(profile.profileSource)}`]),
+    ...(profile.catalogVersion === undefined
+      ? []
+      : [`; profile-catalog: ${profileValue(profile.catalogVersion)}`]),
+  ];
+}
+
+function profileValue(value: string): string {
+  return sanitizeGcodeCommentValue(value, 48) || '(blank)';
 }
 
 function assumptionLines(assumed: GcodeHeaderAssumptions): ReadonlyArray<string> {
@@ -71,17 +105,6 @@ function assumptionLines(assumed: GcodeHeaderAssumptions): ReadonlyArray<string>
   }
   return [
     `; assumes: GRBL $30=${assumed.maxPowerS} (max S), $32=1 (laser mode)`,
-    '; safety: laser-off travel is explicit S0; ordinary split-fill entry <=5mm; fill+raster dynamic power (M4)',
+    '; safety: laser-off travel is explicit S0; ordinary Scan Line runway <=5mm per side; fill+raster dynamic power (M4)',
   ];
-}
-
-function sanitizeMetadataCommentValue(value: string): string {
-  return Array.from(value, (char) => (isMetadataLineBreakOrControl(char) ? ' ' : char))
-    .join('')
-    .trim();
-}
-
-function isMetadataLineBreakOrControl(value: string): boolean {
-  const code = value.charCodeAt(0);
-  return code < 0x20 || code === 0x7f || code === 0x2028 || code === 0x2029;
 }

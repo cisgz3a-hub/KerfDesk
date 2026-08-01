@@ -4,6 +4,7 @@ import {
   duplicateLayer,
   mergeDown,
   moveLayer,
+  moveLayerTo,
   removeLayer,
   setLayerProps,
 } from './layer-ops';
@@ -44,6 +45,18 @@ describe('layer list ops', () => {
     const layers = stack();
     expect(moveLayer(layers, 'bg', 1).map((l) => l.id)).toEqual(['l1', 'bg']);
     expect(moveLayer(layers, 'l1', 1)).toBe(layers); // already on top
+  });
+
+  it('moveLayerTo lands on the exact index and clamps out-of-range', () => {
+    const layers = [
+      createLayer('a', 'A', 2, 2, 'white'),
+      createLayer('b', 'B', 2, 2, 'transparent'),
+      createLayer('c', 'C', 2, 2, 'transparent'),
+    ];
+    expect(moveLayerTo(layers, 'c', 0).map((l) => l.id)).toEqual(['c', 'a', 'b']);
+    expect(moveLayerTo(layers, 'a', 99).map((l) => l.id)).toEqual(['b', 'c', 'a']);
+    expect(moveLayerTo(layers, 'b', 1)).toBe(layers); // already there
+    expect(moveLayerTo(layers, 'nope', 0)).toBe(layers);
   });
 
   it('mergeDown composites into the lower layer and keeps its identity', () => {

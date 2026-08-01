@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { formatDuration } from '../../core/job';
+import { CANVAS_MOTION_SLOT_ID } from '../common/status-bar-slots';
 import { cncPassPosition, type CncPassPosition } from '../state/canvas-pass-progress';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 
@@ -10,19 +12,42 @@ export function CanvasMotionBadge(props: {
 }): JSX.Element | null {
   const overlay = props.overlay;
   const nowMs = useElapsedTick(overlay);
+  const slot = useStatusBarSlot();
   if (overlay === null) return null;
   const passes = overlayPassPosition(overlay);
   const message = badgeMessage(overlay, passes, nowMs);
   return (
     <>
       <CanvasMotionProbe overlay={overlay} passes={passes} nowMs={nowMs} />
-      {message === null ? null : (
-        <div role="status" data-testid="canvas-motion-status" style={badgeStyle}>
-          {message}
-        </div>
-      )}
+      {message === null || slot === null
+        ? null
+        : createPortal(
+            <span
+              role="status"
+              data-testid="canvas-motion-status"
+              style={overlay.run === null ? cautionMessageStyle : messageStyle}
+            >
+              {message}
+            </span>,
+            slot,
+          )}
     </>
   );
+}
+
+// The message reads as bottom-bar status, not as an annotation of the artwork,
+// so it renders into the StatusBar's slot and the drawing area stays clear
+// (maintainer, 2026-07-25). The slot belongs to a sibling branch of the tree
+// and only exists once that branch has committed, so it is resolved in an
+// effect rather than during render; a tree with no StatusBar simply shows no
+// machine-status line. The probe span stays in place — it is visually hidden
+// and its e2e selectors are anchored to the canvas overlay.
+function useStatusBarSlot(): HTMLElement | null {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setSlot(document.getElementById(CANVAS_MOTION_SLOT_ID));
+  }, []);
+  return slot;
 }
 
 // Status frames alone can be sparse (settle-only controllers report only at
@@ -220,20 +245,19 @@ function lifecycleLabel(lifecycle: NonNullable<CanvasMotionOverlay['run']>['life
   }
 }
 
-const badgeStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 12,
-  right: 12,
-  maxWidth: 420,
-  padding: '6px 10px',
-  borderRadius: 6,
-  border: '1px solid var(--lf-danger)',
-  background: 'var(--lf-tint-danger)',
-  color: 'var(--lf-danger-fg)',
-  fontSize: 12,
+// Inline status-bar text, not a floating chip: the bar supplies the background,
+// font size and gap. An idle overlay's message is always a limitation the
+// operator should notice (relative view, or why the start markers are
+// unavailable) so it keeps the caution colour; a live run's readout is ordinary
+// telemetry and would be crying wolf in red on every job.
+const messageStyle: React.CSSProperties = {
+  whiteSpace: 'nowrap',
   fontWeight: 600,
-  pointerEvents: 'none',
-  zIndex: 4,
+  color: 'var(--lf-text)',
+};
+const cautionMessageStyle: React.CSSProperties = {
+  ...messageStyle,
+  color: 'var(--lf-danger-fg)',
 };
 
 const visuallyHiddenStyle: React.CSSProperties = {

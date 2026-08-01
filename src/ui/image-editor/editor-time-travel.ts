@@ -4,7 +4,8 @@
 // jump is just N sequential steps — no special state model needed.
 
 import { useImageEditorStore } from './image-editor-store';
-import { redoSession, undoSession, type EditorSession } from './editor-session';
+import type { EditorSession } from './editor-session';
+import { redoScoped, undoScoped } from './editor-session-layers';
 
 export type HistoryTarget =
   /** Before the first recorded op (undo everything). */
@@ -23,8 +24,8 @@ export function jumpToHistoryState(session: EditorSession, target: HistoryTarget
         : 0;
   const redoTimes = target.kind === 'future' ? target.index + 1 : 0;
   let current = session;
-  for (let i = 0; i < undoTimes; i += 1) current = undoSession(current);
-  for (let i = 0; i < redoTimes; i += 1) current = redoSession(current);
+  for (let i = 0; i < undoTimes; i += 1) current = undoScoped(current);
+  for (let i = 0; i < redoTimes; i += 1) current = redoScoped(current);
   return current;
 }
 

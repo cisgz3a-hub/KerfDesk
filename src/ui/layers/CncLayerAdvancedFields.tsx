@@ -7,7 +7,7 @@
 // from CncLayerFields to keep that file under the size cap and so the
 // Basic/Advanced toggle gates this group with one conditional (ADR-111).
 
-import { activeCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
+import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { CncFinishAllowanceField } from './CncFinishAllowanceField';
 import {
@@ -267,15 +267,19 @@ function VCarveSection(props: {
   );
 }
 
-// H.3 V-carve options: ring detail + a live warning when the spindle's
-// active bit is not a v-bit (preflight blocks output until it is).
+// H.3 V-carve options: ring detail + a live warning when THIS LAYER's bit is
+// not a v-bit. Wrong-kind selection remains advisory-only and keeps its legacy
+// fallback geometry; an actual V-bit with invalid angle is the separate exact
+// compile-integrity refusal. Read the layer tool so overrides are represented.
 function VCarveFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
   const activeToolIsVBit = useStore(
-    (s) => s.project.machine?.kind === 'cnc' && activeCncTool(s.project.machine).kind === 'v-bit',
+    (s) =>
+      s.project.machine?.kind === 'cnc' &&
+      layerCncTool(s.project.machine, props.settings).kind === 'v-bit',
   );
   return (
     <>
@@ -292,8 +296,8 @@ function VCarveFields(props: {
       />
       {!activeToolIsVBit ? (
         <div style={vbitWarningStyle} role="alert">
-          V-carve needs a v-bit — pick one in Material &amp; Bit. Preflight blocks output until
-          then.
+          V-carve needs a V-bit — pick one in Material &amp; Bit. Output remains available for
+          compatibility, but a wrong-kind selection may use legacy 60° fallback geometry.
         </div>
       ) : null}
     </>

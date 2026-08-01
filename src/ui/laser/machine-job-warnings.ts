@@ -8,9 +8,11 @@ import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { Project } from '../../core/scene';
 import { detectActiveWcsMismatchWarnings } from './active-wcs-warnings';
+import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings';
 import { detectCncDefaultFeedWarnings } from './cnc-default-feed-warnings';
 import { detectCncFullTabCoverageWarnings } from './cnc-full-tab-coverage-warnings';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
+import { detectCncOffsetLadderWarnings } from './cnc-offset-ladder-warnings';
 import { detectCncRasterWarnings } from './cnc-raster-warnings';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
@@ -35,8 +37,10 @@ export function detectMachineJobWarnings(
           ...detectCncThroughCutTabWarnings(project),
           ...detectCncFullTabCoverageWarnings(project),
           ...detectCncDefaultFeedWarnings(project),
+          ...detectCncAngledToolFeedWarnings(project),
           ...detectCncMachineLimitWarnings(project, controllerSettings),
           ...detectCncRasterWarnings(project),
+          ...detectCncOffsetLadderWarnings(project),
         ]
       : [
           ...detectJobIntentWarnings(project),

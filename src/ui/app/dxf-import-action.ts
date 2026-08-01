@@ -5,11 +5,14 @@
 // replace flow for free.
 
 import type { SceneObject } from '../../core/scene';
-import { parseDxf } from '../../io/dxf';
+import { parseDxf, type ParseDxfResult } from '../../io/dxf';
+import { importByteSize, resolveImportBlob } from '../import/import-file-blob';
+import { parseDxfOffThread, type ImportWorkerRequestOptions } from '../import/import-worker-client';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
-import { confirmOversizeImport } from './import-size-guard';
+import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { describeReimportOutcome } from './import-toasts';
+import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
 // Minimal file shape shared by DataTransfer Files and the platform
 // pickFilesForOpen handles.
@@ -17,6 +20,7 @@ type TextFileHandle = {
   readonly name: string;
   readonly size?: number; // byte size when the adapter supplies it (IMP-07)
   readonly text: () => Promise<string>;
+  readonly blob?: () => Promise<Blob>;
 };
 
 export function isDxfFile(file: { readonly name: string }): boolean {
@@ -33,12 +37,12 @@ export async function importDxfFiles(
   let successIdx = 0;
   for (const file of files) {
     try {
-      // Gate on the file size before reading when the adapter supplies it, so a
-      // huge file can't OOM the tab first; fall back to the post-read length gate.
-      if (file.size !== undefined && !confirmOversizeImport(file.name, file.size)) continue;
-      const text = await file.text();
-      if (file.size === undefined && !confirmOversizeImport(file.name, text.length)) continue;
-      const result = parseDxf({ dxfText: text, id: crypto.randomUUID(), source: file.name });
+      // Advise on size before any read, so the operator learns the cost up front.
+      const blob = await resolveImportBlob(file);
+      const sizeBytes = importByteSize(file, blob);
+      const advisory = sizeBytes === null ? null : largeImportAdvisory(file.name, sizeBytes);
+      if (advisory !== null) ctx.pushToast(advisory, 'warning');
+      const result = await parseDxfFile(file, blob, ctx.pushToast);
       if (result.kind === 'error') {
         ctx.pushToast(`${file.name}: ${result.reason}`, 'error');
         continue;
@@ -56,9 +60,49 @@ export async function importDxfFiles(
       }
       ctx.pushToast(successMessage(file.name, result.pathCount, result.skippedSummary), 'success');
     } catch (err) {
-      ctx.pushToast(`${file.name}: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      ctx.pushToast(
+        isImportCancellation(err)
+          ? `${file.name}: import cancelled.`
+          : `${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+        isImportCancellation(err) ? 'warning' : 'error',
+      );
     }
   }
+}
+
+// Parse in the import worker when a Blob is reachable — the worker reads the
+// file itself, so a 100 MB DXF never becomes a main-thread string (measured:
+// ~11.4 s of blocked UI at that size). Text-only adapters and mocks keep their
+// compatibility path. If Worker construction itself is unavailable, the same
+// valid parser remains available on the UI thread with an explicit responsiveness
+// warning; a started, failed, or cancelled worker request never enters that fallback.
+async function parseDxfFile(
+  file: TextFileHandle,
+  blob: Blob | null,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): Promise<ParseDxfResult> {
+  const id = crypto.randomUUID();
+  const controls = createImportWorkerControls(file.name, pushToast);
+  try {
+    const offThread = parseDxfInWorker(blob, id, file.name, controls.options);
+    if (offThread !== null) return await offThread;
+    if (blob !== null) {
+      pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
+      return parseDxf({ dxfText: await file.text(), id, source: file.name });
+    }
+    return parseDxf({ dxfText: await file.text(), id, source: file.name });
+  } finally {
+    controls.dispose();
+  }
+}
+
+function parseDxfInWorker(
+  blob: Blob | null,
+  id: string,
+  name: string,
+  options: ImportWorkerRequestOptions,
+): Promise<ParseDxfResult> | null {
+  return blob === null ? null : parseDxfOffThread(blob, id, name, options);
 }
 
 function successMessage(name: string, pathCount: number, skippedSummary: string | null): string {

@@ -12,8 +12,7 @@
 // heightmap needs positions only). A facet with missing/non-numeric vertices
 // is a hard error — silently dropping geometry would carve the wrong relief.
 
-import { FLOATS_PER_TRIANGLE, type TriangleMesh } from '../../core/relief';
-import { MAX_STL_TRIANGLES } from './parse-stl-binary';
+import type { TriangleMesh } from '../../core/relief';
 
 export type AsciiStlResult =
   | { readonly kind: 'ok'; readonly mesh: TriangleMesh }
@@ -41,9 +40,6 @@ export function parseAsciiStl(text: string): AsciiStlResult {
     }
     coords.push(vertex.x, vertex.y, vertex.z);
     i += 4;
-    if (coords.length > MAX_STL_TRIANGLES * FLOATS_PER_TRIANGLE) {
-      return { kind: 'error', reason: `ASCII STL exceeds the ${MAX_STL_TRIANGLES} facet limit.` };
-    }
   }
   if (coords.length === 0) {
     return { kind: 'error', reason: 'ASCII STL contains no vertices.' };

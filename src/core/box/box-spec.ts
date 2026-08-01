@@ -120,16 +120,28 @@ function collectFieldIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
   }
   if (!Number.isFinite(spec.partSpacingMm) || spec.partSpacingMm < 0) {
     issues.push({ field: 'partSpacing', message: 'Part spacing must be 0 or greater.' });
+  } else if (!Number.isFinite(2 * spec.partSpacingMm)) {
+    issues.push({
+      field: 'partSpacing',
+      message: 'Part spacing is too large to lay out the panel sheet.',
+    });
   }
 }
 
 function collectInteriorIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
   const dims = deriveBoxDims(spec);
-  for (const [field, innerMm, enteredMm] of [
-    ['width', dims.innerWidthMm, spec.widthMm],
-    ['depth', dims.innerDepthMm, spec.depthMm],
-    ['height', dims.innerHeightMm, spec.heightMm],
+  for (const [field, innerMm, outerMm, enteredMm] of [
+    ['width', dims.innerWidthMm, dims.outerWidthMm, spec.widthMm],
+    ['depth', dims.innerDepthMm, dims.outerDepthMm, spec.depthMm],
+    ['height', dims.innerHeightMm, dims.outerHeightMm, spec.heightMm],
   ] as const) {
+    if (!Number.isFinite(innerMm) || !Number.isFinite(outerMm)) {
+      issues.push({
+        field,
+        message: `The ${field} and material thickness produce a dimension outside the numeric range.`,
+      });
+      continue;
+    }
     if (innerMm <= 0) {
       issues.push({
         field,

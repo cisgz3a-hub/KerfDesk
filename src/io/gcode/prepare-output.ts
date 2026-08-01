@@ -4,7 +4,7 @@
 // from RAW compileJob (no optimize, no job-origin) while Save/Start emitted from
 // the OPTIMIZED job, so the operator could approve one path order in the preview
 // and burn another (roadmap P1-C). prepareOutput runs the identical pipeline for
-// every consumer: pre-emit budget guard -> compile -> optional job-origin ->
+// every consumer: pre-emit integrity/advisory checks -> compile -> optional job-origin ->
 // optimize. Pure: no clock, no random, no I/O.
 
 import {
@@ -19,7 +19,12 @@ import {
   type JobOriginPlacement,
 } from '../../core/job';
 import { compileCncJob } from '../../core/cnc';
-import { runPreEmitPreflight, type PreflightResult } from '../../core/preflight';
+import {
+  COMPILE_INTEGRITY_PREFLIGHT_CODES,
+  runPreEmitPreflight,
+  type PreflightIssue,
+  type PreflightResult,
+} from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,
   validateOutputScope,
@@ -27,6 +32,10 @@ import {
   type Project,
   type Vec2,
 } from '../../core/scene';
+import {
+  isProgramMaterializationRangeError,
+  programMaterializationFailure,
+} from './program-materialization';
 
 export type PrepareOutputOptions = {
   readonly jobOrigin?: JobOriginPlacement;
@@ -41,6 +50,11 @@ export type PreparedOutput =
       // Translation applyJobOrigin applied (zero for absolute placements).
       // The preview undoes it to register the toolpath with the scene (H3).
       readonly jobOriginOffset: Vec2;
+      // Pre-emit findings that inform but never refuse (rule 7 / ADR-228).
+      // Optional because a prepared output archived by an earlier build is
+      // restored from IndexedDB without this field (prepared-output-persistence);
+      // prepareOutput itself always sets it. Read it as `advisories ?? []`.
+      readonly advisories?: ReadonlyArray<PreflightIssue>;
     }
   | { readonly ok: false; readonly preflight: PreflightResult };
 
@@ -69,24 +83,48 @@ export function prepareOutput(
   // segment count compile, and rasters of any pixel size stream row-by-row.
   // Compiled-work size measurements surface as Job Review advisories in the
   // Start path instead of failing preparation.
+  // Rule 7 / ADR-228: preparation refuses ONLY on compile integrity. Pre-emit
+  // reports heuristic policy codes too (speed-out-of-range,
+  // scan-offset-out-of-range), and PreflightResult.ok is issues.length === 0 —
+  // so refusing on `!preEmit.ok` turned any policy finding into a refusal, and
+  // the operator saw a REFUSED .rd export (emit-rd) and a refused tiled CNC
+  // export for a finding that merely warns on Start. Split against the one
+  // canonical set both the Start and Save paths key off so the three cannot
+  // drift apart. An invalid V-carve tool angle is the current pre-compile
+  // integrity refusal: there is no honest depth program to materialize without
+  // that geometry. Other pre-emit findings remain advisory.
   const preEmit = runPreEmitPreflight(outputProject);
-  if (!preEmit.ok) return { ok: false, preflight: preEmit };
-  const compiled = compileForMachine(outputProject);
-  const outputScope = options.outputScope ?? DEFAULT_OUTPUT_SCOPE;
-  const offset = options.jobOrigin
-    ? resolveJobOriginOffset(project, compiled, options.jobOrigin, outputScope)
-    : ZERO_OFFSET;
-  const placed = applyJobOriginOffset(compiled, offset);
-  // Optimization preserves cut geometry/settings while reordering and possibly
-  // reversing paths. Joining formerly separated paths can also change planner
-  // junction timing, not only travel distance. Doing it HERE means the preview
-  // and duration estimate use the exact order the machine will run.
-  return {
-    ok: true,
-    project: outputProject,
-    job: optimizePaths(placed, project.optimization, project.device.scanningOffsets),
-    jobOriginOffset: offset,
-  };
+  const blocking = preEmit.issues.filter((issue) =>
+    COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code),
+  );
+  if (blocking.length > 0) return { ok: false, preflight: { ok: false, issues: blocking } };
+  const advisories = preEmit.issues.filter(
+    (issue) => !COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code),
+  );
+  try {
+    const compiled = compileForMachine(outputProject);
+    const outputScope = options.outputScope ?? DEFAULT_OUTPUT_SCOPE;
+    const offset = options.jobOrigin
+      ? resolveJobOriginOffset(project, compiled, options.jobOrigin, outputScope)
+      : ZERO_OFFSET;
+    const placed = applyJobOriginOffset(compiled, offset);
+    // Optimization preserves cut geometry/settings while reordering and possibly
+    // reversing paths. Joining formerly separated paths can also change planner
+    // junction timing, not only travel distance. Doing it HERE means the preview
+    // and duration estimate use the exact order the machine will run.
+    return {
+      ok: true,
+      project: outputProject,
+      job: optimizePaths(placed, project.optimization, project.device.scanningOffsets),
+      jobOriginOffset: offset,
+      advisories,
+    };
+  } catch (error) {
+    if (isProgramMaterializationRangeError(error)) {
+      return { ok: false, preflight: programMaterializationFailure() };
+    }
+    throw error;
+  }
 }
 
 // One compile entry per machine kind: the project's machine choice routes to

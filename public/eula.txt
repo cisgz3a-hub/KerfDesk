@@ -7,7 +7,8 @@ Copyright (c) 2026 Johann Stolk
    under the MIT License. You may use, copy, modify, and redistribute it
    under the MIT License terms, which are reproduced at the end of this
    notice. The source code is available in the project's public
-   repository.
+   repository. This notice adds no restriction to the MIT permissions
+   or to rights granted by applicable third-party licenses.
 
 2. MACHINE SAFETY — READ CAREFULLY. The Software generates toolpaths
    and streams commands to laser cutters, CNC routers, and similar

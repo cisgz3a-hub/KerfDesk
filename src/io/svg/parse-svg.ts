@@ -19,12 +19,18 @@ import {
 } from '../../core/scene';
 import { type SvgStripCounts, sanitizeSvg } from './sanitize';
 import { applySvgMatrix, transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform';
+import {
+  multiplySvgMatrix,
+  parseSvgTransform,
+  translateSvgMatrix,
+} from './svg-transform-attribute';
 import { elementToSubPaths } from './shape-to-polylines';
 import { linearScaleMagnitude } from './transform-scale';
 import {
   assertSvgImportPoints,
   createSvgImportBudget,
   reserveSvgPolyline,
+  svgImportSizeNote,
   type SvgImportBudget,
 } from './svg-import-budget';
 import { resolveUnitScale } from './svg-units';
@@ -196,7 +202,10 @@ function appendUseGeometry(
   if (referenced === null || referenced === el) return;
   const placedState = {
     ...state,
-    transform: multiplyMatrix(state.transform, translate(numAttr(el, 'x'), numAttr(el, 'y'))),
+    transform: multiplySvgMatrix(
+      state.transform,
+      translateSvgMatrix(numAttr(el, 'x'), numAttr(el, 'y')),
+    ),
   };
   if (isDefinitionContainer(referenced)) {
     walkReferencedDefinition(referenced, placedState, byColor, counts, budget, depth + 1);
@@ -267,9 +276,9 @@ function presentationStateFor(el: Element, parent: PresentationState): Presentat
   const strokeOpacity =
     parent.strokeOpacity * parseOpacity(presentationValue(el, 'stroke-opacity'));
   const fillOpacity = parent.fillOpacity * parseOpacity(presentationValue(el, 'fill-opacity'));
-  const transform = multiplyMatrix(
+  const transform = multiplySvgMatrix(
     parent.transform,
-    parseTransform(presentationValue(el, 'transform')),
+    parseSvgTransform(presentationValue(el, 'transform')),
   );
   const normalizedVisibility = visibility?.trim().toLowerCase();
   const hidden =
@@ -324,91 +333,18 @@ function parseOpacity(input: string | null): number {
   return Math.min(1, Math.max(0, value));
 }
 
-function parseTransform(input: string | null): Matrix {
-  if (input === null || input.trim() === '') return IDENTITY_MATRIX;
-  let matrix = IDENTITY_MATRIX;
-  for (const match of input.matchAll(/([a-zA-Z]+)\s*\(([^)]*)\)/g)) {
-    const op = match[1]?.toLowerCase();
-    const nums = parseTransformNumbers(match[2] ?? '');
-    matrix = multiplyMatrix(
-      matrix,
-      op === undefined ? IDENTITY_MATRIX : transformOperation(op, nums),
-    );
-  }
-  return matrix;
-}
-
-function parseTransformNumbers(input: string): ReadonlyArray<number> {
-  return (input.match(/[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g) ?? [])
-    .map(Number)
-    .filter(Number.isFinite);
-}
-
-// Dispatch table per SVG transform function (lower-cased). A map keeps the
-// per-op cyclomatic complexity out of one switch as the op set grows (skewX/
-// skewY were added for H4); each builder applies the SVG spec defaults for
-// its own missing args. Unknown ops resolve to identity.
-const TRANSFORM_BUILDERS: Record<string, (nums: ReadonlyArray<number>) => Matrix> = {
-  matrix: (n) => matrixFromNumbers(n),
-  translate: (n) => translate(n[0] ?? 0, n[1] ?? 0),
-  scale: (n) => scale(n[0] ?? 1, n[1] ?? n[0] ?? 1),
-  rotate: (n) => rotate(n[0] ?? 0, n[1], n[2]),
-  skewx: (n) => ({ a: 1, b: 0, c: tanDeg(n[0] ?? 0), d: 1, e: 0, f: 0 }),
-  skewy: (n) => ({ a: 1, b: tanDeg(n[0] ?? 0), c: 0, d: 1, e: 0, f: 0 }),
-};
-
-function transformOperation(op: string, nums: ReadonlyArray<number>): Matrix {
-  return (TRANSFORM_BUILDERS[op] ?? (() => IDENTITY_MATRIX))(nums);
-}
-
-function tanDeg(deg: number): number {
-  return Math.tan((deg / 180) * Math.PI);
-}
-
-function matrixFromNumbers(nums: ReadonlyArray<number>): Matrix {
-  if (nums.length < 6) return IDENTITY_MATRIX;
-  return {
-    a: nums[0] ?? 1,
-    b: nums[1] ?? 0,
-    c: nums[2] ?? 0,
-    d: nums[3] ?? 1,
-    e: nums[4] ?? 0,
-    f: nums[5] ?? 0,
-  };
-}
-
-function translate(x: number, y: number): Matrix {
-  return { a: 1, b: 0, c: 0, d: 1, e: x, f: y };
-}
-
-function scale(x: number, y: number): Matrix {
-  return { a: x, b: 0, c: 0, d: y, e: 0, f: 0 };
-}
-
-function rotate(deg: number, cx?: number, cy?: number): Matrix {
-  const rad = (deg / 180) * Math.PI;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const rotation = { a: cos, b: sin, c: -sin, d: cos, e: 0, f: 0 };
-  if (cx === undefined || cy === undefined) return rotation;
-  return multiplyMatrix(multiplyMatrix(translate(cx, cy), rotation), translate(-cx, -cy));
-}
-
-function multiplyMatrix(left: Matrix, right: Matrix): Matrix {
-  return {
-    a: left.a * right.a + left.c * right.b,
-    b: left.b * right.a + left.d * right.b,
-    c: left.a * right.c + left.c * right.d,
-    d: left.b * right.c + left.d * right.d,
-    e: left.a * right.e + left.c * right.f + left.e,
-    f: left.b * right.e + left.d * right.f + left.f,
-  };
-}
-
 export function parseSvg(args: { svgText: string; id: string; source: string }): ParseSvgResult {
   const { clean, stripped } = sanitizeSvg(args.svgText);
 
   const doc = new DOMParser().parseFromString(clean, 'image/svg+xml');
+  return parseSvgDocument(doc, args, stripped);
+}
+
+export function parseSvgDocument(
+  doc: Document,
+  args: { readonly id: string; readonly source: string },
+  stripped: SvgStripCounts,
+): ParseSvgResult {
   const parserError = doc.querySelector('parsererror');
   if (parserError !== null) {
     const msg = parserError.textContent?.split('\n')[0] ?? 'invalid SVG';
@@ -439,6 +375,10 @@ export function parseSvg(args: { svgText: string; id: string; source: string }):
 
   const notes: string[] = [];
   if (paths.length === 0) notes.push('SVG has no drawable geometry');
+  // Rule 7 / ADR-268: this used to THROW mid-walk once the polyline/point/color
+  // ceilings were crossed. It now reports the same measurement and imports.
+  const sizeNote = svgImportSizeNote(budget);
+  if (sizeNote !== null) notes.push(sizeNote);
   if (counts.text > 0) {
     notes.push(`Ignored ${counts.text} text element(s) — convert to paths or wait for Phase D`);
   }

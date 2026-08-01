@@ -1,5 +1,6 @@
 import type { Project } from '../../core/scene';
-import { deserializeProject, type DeserializeResult } from './deserialize-project';
+import { deserializeProject } from './deserialize-project';
+import { deserializeFailureReason, errorMessage } from './deserialize-failure-reason';
 import { serializeProject } from './serialize-project';
 import { firstPersistenceSemanticDrift } from './persistence-semantic-integrity';
 
@@ -35,14 +36,4 @@ export function prepareProjectForPersistence(project: Project): PreparedProjectP
     project: validated.project,
     json: normalizedJson,
   };
-}
-
-function deserializeFailureReason(result: Exclude<DeserializeResult, { kind: 'ok' }>): string {
-  if (result.kind === 'invalid') return result.reason;
-  if (result.kind === 'schema-too-new') return `unsupported schemaVersion ${result.sawVersion}`;
-  return `legacy schemaVersion ${result.sawVersion}`;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

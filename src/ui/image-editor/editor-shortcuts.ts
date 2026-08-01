@@ -8,6 +8,7 @@ import { useAdjustDialogStore } from './adjust-dialog-store';
 import type { EditorTool } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
 import { useQuickMaskStore } from './quick-mask-store';
+import { useTextDialogStore } from './text-dialog-store';
 
 export function handleEditorKeyDown(e: React.KeyboardEvent): void {
   const key = e.key.toLowerCase();
@@ -83,7 +84,7 @@ function handleBrushSizeKey(key: string): boolean {
 
 function handlePlainKey(key: string): boolean {
   const store = useImageEditorStore.getState();
-  if (handleBrushSizeKey(key)) return true;
+  if (handleBrushSizeKey(key) || handleModalCanvasKey(key, store)) return true;
   switch (key) {
     case 'x':
       store.swapColors();
@@ -91,18 +92,9 @@ function handlePlainKey(key: string): boolean {
     case 'd':
       store.resetColors();
       return true;
-    case 'enter':
-      // Enter commits the active modal canvas state: transform, then crop.
-      if (store.transform !== null) store.commitTransform();
-      else store.commitPendingCrop();
-      return true;
-    case 'escape':
-      // Esc steps outward: transform → cancel; pending crop → discard;
-      // non-default tool → Brush; Brush → close (session kept, F-L1).
-      if (store.transform !== null) store.cancelTransform();
-      else if (store.pendingCrop !== null) store.setPendingCrop(null);
-      else if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
-      else store.closeEditor();
+    case 't':
+      // Add text to a new layer (Photoshop's T; plain — Ctrl+T is transform).
+      useTextDialogStore.getState().open();
       return true;
     case 'delete':
     case 'backspace':
@@ -111,6 +103,27 @@ function handlePlainKey(key: string): boolean {
     default:
       return false;
   }
+}
+
+// Enter / Esc drive the active modal canvas state (transform, then crop);
+// Esc otherwise steps outward to Brush, then closes (session kept, F-L1).
+function handleModalCanvasKey(
+  key: string,
+  store: ReturnType<typeof useImageEditorStore.getState>,
+): boolean {
+  if (key === 'enter') {
+    if (store.transform !== null) store.commitTransform();
+    else store.commitPendingCrop();
+    return true;
+  }
+  if (key === 'escape') {
+    if (store.transform !== null) store.cancelTransform();
+    else if (store.pendingCrop !== null) store.setPendingCrop(null);
+    else if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
+    else store.closeEditor();
+    return true;
+  }
+  return false;
 }
 
 export function handleEditorKeyUp(e: React.KeyboardEvent): void {
@@ -167,17 +180,25 @@ function handleSelectionKey(key: string, shift: boolean): boolean {
   }
 }
 
+// Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y — an active Quick Mask consumes them for
+// its own stroke history (V2 plan A2); otherwise the scoped session undo.
+function handleUndoRedoKey(key: string, shift: boolean): boolean {
+  if (key !== 'z' && key !== 'y') return false;
+  const store = useImageEditorStore.getState();
+  const quickMask = useQuickMaskStore.getState();
+  const isRedo = key === 'y' || shift;
+  if (isRedo ? quickMask.redoStroke() : quickMask.undoStroke()) return true;
+  if (isRedo) store.redo();
+  else store.undo();
+  return true;
+}
+
 function handleControlKey(key: string, shift: boolean): boolean {
   const store = useImageEditorStore.getState();
-  if (handleZoomKey(key) || handleSelectionKey(key, shift)) return true;
+  if (handleZoomKey(key) || handleSelectionKey(key, shift) || handleUndoRedoKey(key, shift)) {
+    return true;
+  }
   switch (key) {
-    case 'z':
-      if (shift) store.redo();
-      else store.undo();
-      return true;
-    case 'y':
-      store.redo();
-      return true;
     case 't':
       // Ctrl+T free transform of the selection (or the whole image).
       store.startTransform();
@@ -208,41 +229,41 @@ function cycledMarquee(tool: EditorTool): EditorTool {
   return { kind: 'marquee', shape: tool.shape === 'rect' ? 'ellipse' : 'rect' };
 }
 
+// G cycles bucket → linear gradient → radial gradient (the fill flyout).
+function cycledFill(tool: EditorTool): EditorTool {
+  if (tool.kind === 'bucket') return { kind: 'gradient', shape: 'linear' };
+  if (tool.kind === 'gradient' && tool.shape === 'linear') {
+    return { kind: 'gradient', shape: 'radial' };
+  }
+  return { kind: 'bucket' };
+}
+
+// One factory per tool key — the map keeps the handler's complexity flat no
+// matter how many tools the Studio grows.
+const TOOL_KEYS: Readonly<Record<string, (current: EditorTool) => EditorTool>> = {
+  b: () => ({ kind: 'brush' }),
+  p: () => ({ kind: 'pencil' }),
+  e: () => ({ kind: 'eraser' }),
+  l: () => ({ kind: 'line' }),
+  m: cycledMarquee,
+  g: cycledFill,
+  s: () => ({ kind: 'lasso' }),
+  w: () => ({ kind: 'wand' }),
+  k: () => ({ kind: 'clone', source: null, offset: null }),
+  j: () => ({ kind: 'heal' }),
+  c: () => ({ kind: 'crop' }),
+  v: () => ({ kind: 'move' }),
+};
+
 function handleToolKey(key: string): boolean {
   const store = useImageEditorStore.getState();
-  switch (key) {
-    case 'b':
-      store.setTool({ kind: 'brush' });
-      return true;
-    case 'p':
-      store.setTool({ kind: 'pencil' });
-      return true;
-    case 'e':
-      store.setTool({ kind: 'eraser' });
-      return true;
-    case 'l':
-      store.setTool({ kind: 'line' });
-      return true;
-    case 'm':
-      store.setTool(cycledMarquee(store.tool));
-      return true;
-    case 'q':
-      // Quick Mask: paint the selection as a red rubylith (Photoshop Q).
-      useQuickMaskStore.getState().toggle();
-      return true;
-    case 's':
-      store.setTool({ kind: 'lasso' });
-      return true;
-    case 'w':
-      store.setTool({ kind: 'wand' });
-      return true;
-    case 'c':
-      store.setTool({ kind: 'crop' });
-      return true;
-    case 'v':
-      store.setTool({ kind: 'move' });
-      return true;
-    default:
-      return false;
+  if (key === 'q') {
+    // Quick Mask: paint the selection as a red rubylith (Photoshop Q).
+    useQuickMaskStore.getState().toggle();
+    return true;
   }
+  const factory = TOOL_KEYS[key];
+  if (factory === undefined) return false;
+  store.setTool(factory(store.tool));
+  return true;
 }

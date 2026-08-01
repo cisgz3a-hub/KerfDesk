@@ -24,14 +24,30 @@ import type { DeviceProfile, ScanOffsetPoint } from '../devices';
 import type { Vec2 } from '../scene';
 export type { ScanOffsetPoint } from '../devices';
 
+/**
+ * Normalize a layer's bidirectional scan-offset override.
+ *
+ * Returns `undefined` for a missing OR non-finite override, so the caller omits
+ * the per-group value and falls through to the device calibration table
+ * (`group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(...)`). A NaN or
+ * Infinity override carries no meaning, so the calibrated value is the right
+ * answer — not zero, which would silently disable a working calibration.
+ *
+ * This used to throw a RangeError. That throw was unreachable-by-design: the
+ * `scan-offset-out-of-range` preflight was expected to stop the job first. But
+ * that code is not among the compile-integrity codes either path refuses (rule 7
+ * / ADR-228 — see core/preflight/blocking-codes.ts), and its message does not
+ * match `isProgramMaterializationRangeError`, so the throw escaped uncaught on
+ * the Start path. Sanitizing here removes the crash without adding a refusal,
+ * and satisfies the pure-core "no throwing for control flow" rule. Preflight
+ * still reports the bad value as an advisory, so the operator is told.
+ */
 export function validatedScanOffsetMm(
   _device: DeviceProfile,
   offsetMm: number | undefined,
 ): number | undefined {
   if (offsetMm === undefined) return undefined;
-  if (!Number.isFinite(offsetMm)) {
-    throw new RangeError(`Bidirectional scan offset ${String(offsetMm)} mm must be finite.`);
-  }
+  if (!Number.isFinite(offsetMm)) return undefined;
   return offsetMm;
 }
 

@@ -21,6 +21,7 @@ import {
   upscaleBy,
   upscaleDouble,
   downscaleTracedPaths,
+  scaleTracedPathsUniform,
 } from './auto-upscale';
 import type { RawImageData } from './trace-image';
 import { TRACE_PRESETS, traceImageToColoredPaths } from './index';
@@ -249,6 +250,56 @@ describe('downscaleTracedPaths', () => {
       const out = downscaleTracedPaths(paths, bad);
       expect(out[0]?.polylines[0]?.points).toEqual([{ x: 4, y: 8 }]);
     }
+  });
+});
+
+describe('scaleTracedPathsUniform', () => {
+  it('restores both polyline and canonical-curve coordinates to source space', () => {
+    const paths: ColoredPath[] = [
+      {
+        color: '#123456',
+        polylines: [
+          {
+            points: [
+              { x: 2, y: 4 },
+              { x: 5, y: 10 },
+            ],
+            closed: true,
+          },
+        ],
+        curves: [
+          {
+            start: { x: 2, y: 4 },
+            segments: [
+              {
+                kind: 'cubic',
+                control1: { x: 3, y: 5 },
+                control2: { x: 4, y: 7 },
+                to: { x: 5, y: 10 },
+              },
+            ],
+            closed: true,
+          },
+        ],
+      },
+    ];
+
+    const out = scaleTracedPathsUniform(paths, 2);
+
+    expect(out[0]?.polylines[0]?.points).toEqual([
+      { x: 4, y: 8 },
+      { x: 10, y: 20 },
+    ]);
+    expect(out[0]?.curves?.[0]).toMatchObject({
+      start: { x: 4, y: 8 },
+      segments: [
+        {
+          control1: { x: 6, y: 10 },
+          control2: { x: 8, y: 14 },
+          to: { x: 10, y: 20 },
+        },
+      ],
+    });
   });
 });
 

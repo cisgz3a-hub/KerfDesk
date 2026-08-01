@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+version="${1:?Preview version is required}"
+arch="${2:?Mac architecture is required}"
+release_dir="release/${version}"
+dmg="${release_dir}/KerfDesk-${version}-macos-${arch}.dmg"
+
+require_file() {
+  local label="${1:?file label is required}"
+  shift
+  local candidate
+  for candidate in "$@"; do
+    if [[ -f "${candidate}" ]]; then
+      return 0
+    fi
+  done
+  {
+    echo "Missing ${label}; checked:"
+    for candidate in "$@"; do
+      echo "  ${candidate}"
+    done
+  } >&2
+  exit 1
+}
+
+test -f "${dmg}" || { echo "Missing canonical DMG: ${dmg}" >&2; exit 1; }
+
+if find "${release_dir}" -type f \
+  \( -name 'latest*.yml' -o -name 'latest*.yaml' -o -name 'latest*.json' -o -name '*.blockmap' \) \
+  | grep -q .; then
+  echo 'Preview emitted forbidden updater metadata.' >&2
+  exit 1
+fi
+
+mount_dir="$(mktemp -d)"
+is_mounted=false
+cleanup() {
+  if [[ "${is_mounted}" == true ]]; then
+    hdiutil detach "${mount_dir}" >/dev/null
+  fi
+  rmdir "${mount_dir}"
+}
+trap cleanup EXIT
+hdiutil attach -readonly -nobrowse -mountpoint "${mount_dir}" "${dmg}" >/dev/null
+is_mounted=true
+app_dir="${mount_dir}/KerfDesk.app"
+test -d "${app_dir}" || { echo 'Canonical DMG does not contain KerfDesk.app.' >&2; exit 1; }
+plist="${app_dir}/Contents/Info.plist"
+executable="${app_dir}/Contents/MacOS/KerfDesk"
+
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "${plist}")" = 'com.kerfdesk.app'
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "${plist}")" = 'KerfDesk'
+test "$(/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' "${plist}")" = \
+  'Copyright © 2026 Johann Stolk'
+test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${plist}")" = '12.0'
+/usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription' "${plist}" | grep -q 'KerfDesk'
+/usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "${plist}" | grep -q 'KerfDesk'
+expected_macho_arch="${arch}"
+if [[ "${arch}" == 'x64' ]]; then expected_macho_arch='x86_64'; fi
+test "$(lipo -archs "${executable}")" = "${expected_macho_arch}"
+node scripts/verify-packaged-preview-metadata.mjs \
+  "${app_dir}/Contents/Resources/app.asar" "${version}"
+
+require_file 'KerfDesk LICENSE' "${app_dir}/Contents/Resources/legal/LICENSE"
+require_file \
+  'KerfDesk third-party notices markdown' \
+  "${app_dir}/Contents/Resources/legal/THIRD_PARTY_NOTICES.md"
+require_file \
+  'KerfDesk third-party notices text' \
+  "${app_dir}/Contents/Resources/legal/third-party-notices.txt"
+require_file \
+  'Electron runtime LICENSE' \
+  "${app_dir}/Contents/Resources/legal/electron/LICENSE"
+require_file \
+  'Electron Chromium license bundle' \
+  "${app_dir}/Contents/Resources/legal/electron/LICENSES.chromium.html"
+
+if xcrun stapler validate "${app_dir}"; then
+  echo "Preview app unexpectedly has a notarization ticket: ${app_dir}" >&2
+  exit 1
+fi
+if xcrun stapler validate "${dmg}"; then
+  echo "Preview DMG unexpectedly has a notarization ticket: ${dmg}" >&2
+  exit 1
+fi
+
+while IFS= read -r -d '' candidate; do
+  details="$(codesign --display --verbose=4 "${candidate}" 2>&1 || true)"
+  if grep -q '^Authority=' <<<"${details}"; then
+    echo "Preview contains a distribution signing authority: ${candidate}" >&2
+    exit 1
+  fi
+  if grep '^TeamIdentifier=' <<<"${details}" | grep -vq 'TeamIdentifier=not set'; then
+    echo "Preview contains a trusted Team ID: ${candidate}" >&2
+    exit 1
+  fi
+  if grep -q '^Signature=' <<<"${details}" && ! grep -q '^Signature=adhoc$' <<<"${details}"; then
+    echo "Preview contains a non-ad-hoc signature: ${candidate}" >&2
+    exit 1
+  fi
+done < <(find "${app_dir}" \
+  \( -type d \( -name '*.app' -o -name '*.framework' -o -name '*.xpc' \) \
+  -o -type f -perm -111 \) -print0)
+
+echo "macOS ${arch} Preview package contract verified for ${version}"
+exit 0

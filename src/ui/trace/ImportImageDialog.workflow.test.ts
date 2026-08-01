@@ -111,13 +111,41 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
+  it('opens CNC on Smooth while leaving every preset selectable', async () => {
+    const prior = useStore.getState().project;
+    useStore.setState({ project: { ...prior, machine: DEFAULT_CNC_MACHINE_CONFIG } });
+    try {
+      await withTraceDialog(async (host) => {
+        const select = presetSelect(host);
+        // Smooth is the recommended CNC starting point (bench result).
+        expect(select.value).toBe('Smooth');
+        // Rule 7 / ADR-228 pin: recommending a preset must never disable the
+        // others. Greying them out would be a new guard on an available input.
+        const disabledByName = Object.fromEntries(
+          Array.from(select.options).map((option) => [option.value, option.disabled]),
+        );
+        expect(disabledByName).toEqual({
+          'Line Art': false,
+          Smooth: false,
+          Sharp: false,
+          Centerline: false,
+          'Edge Detection': false,
+        });
+      });
+    } finally {
+      useStore.setState({ project: prior });
+    }
+  });
+
   it('keeps CNC tracing vector-only', async () => {
     const prior = useStore.getState().project;
     useStore.setState({ project: { ...prior, machine: DEFAULT_CNC_MACHINE_CONFIG } });
     try {
       await withTraceDialog(async (host) => {
         expect(outputSelect(host)).toBeNull();
-        expect(fillStyleSelect(host)).toBeInstanceOf(HTMLSelectElement);
+        // Fill style is laser-only: nothing under src/core/cnc reads fillStyle,
+        // so the picker is hidden rather than shown with no effect.
+        expect(fillStyleSelect(host)).toBeNull();
         expect(host.textContent ?? '').toContain('Cutting on CNC');
         expect(host.textContent ?? '').not.toContain(
           'Raster scan uses the same Raster/Image scan motion',
@@ -125,6 +153,38 @@ describe('Trace Image workflow controls', () => {
       });
     } finally {
       useStore.setState({ project: prior });
+    }
+  });
+
+  it('commits a CNC trace with no laser fill override', async () => {
+    const prior = useStore.getState();
+    const traceExistingImage = vi.fn();
+    useStore.setState({
+      project: {
+        ...prior.project,
+        machine: DEFAULT_CNC_MACHINE_CONFIG,
+        scene: { ...prior.project.scene, objects: [seedRaster()] },
+      },
+      traceExistingImage,
+    });
+    try {
+      await withTraceDialog(async (host) => {
+        const form = host.querySelector('form');
+        expect(form).toBeInstanceOf(HTMLFormElement);
+        await act(async () => {
+          form?.requestSubmit();
+        });
+        // commit() awaits the trace worker and the live-source re-check.
+        for (let i = 0; i < 5; i += 1) await act(async () => undefined);
+        expect(traceExistingImage).toHaveBeenCalledTimes(1);
+        // The fill style is laser-only and its picker is hidden on CNC.
+        // Committing mode:'fill' would silently hatch-engrave this object if
+        // the project were later switched to laser, from a setting the
+        // operator never saw.
+        expect(traceExistingImage.mock.calls[0]?.[1]).not.toHaveProperty('operationOverride');
+      });
+    } finally {
+      useStore.setState(prior, true);
     }
   });
 

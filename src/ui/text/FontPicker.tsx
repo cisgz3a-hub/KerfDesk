@@ -218,11 +218,20 @@ function optionMetaStyle(selected: boolean): React.CSSProperties {
   };
 }
 
+// CSS generic families for the classes whose shape a sans fallback would
+// misrepresent. Anything absent here falls through to the sans default.
+const GENERIC_FALLBACK: Readonly<Partial<Record<FontEntry['styleClass'], string>>> = {
+  mono: 'monospace',
+  serif: 'serif',
+};
+
 // CSS font stack with a sensible per-class fallback so labels stay
 // readable while the real font is still loading.
 function cssFontFamilyStack(key: OutlineFontKey): string {
   const entry = FONT_REGISTRY.find((f) => f.key === key);
-  const fallback = entry?.styleClass === 'mono' ? 'monospace' : 'system-ui, sans-serif';
+  const fallback =
+    (entry === undefined ? undefined : GENERIC_FALLBACK[entry.styleClass]) ??
+    'system-ui, sans-serif';
   return `'${cssFamilyForFont(key)}', ${fallback}`;
 }
 

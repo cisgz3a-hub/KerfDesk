@@ -10,7 +10,6 @@ export const BINARY_STL_RECORD_BYTES = 50;
 const COUNT_BYTES = 4;
 // ~5M triangles ≈ 180 MB of positions — beyond this the file is not a relief
 // candidate and would only OOM the tab.
-export const MAX_STL_TRIANGLES = 5_000_000;
 
 export type BinaryStlResult =
   | { readonly kind: 'ok'; readonly mesh: TriangleMesh }
@@ -34,12 +33,10 @@ export function parseBinaryStl(bytes: ArrayBuffer): BinaryStlResult {
   }
   const view = new DataView(bytes);
   const count = view.getUint32(BINARY_STL_HEADER_BYTES, true);
-  if (count > MAX_STL_TRIANGLES) {
-    return {
-      kind: 'error',
-      reason: `STL declares ${count} triangles — beyond the ${MAX_STL_TRIANGLES} limit.`,
-    };
-  }
+  // No triangle ceiling (rule 7 / ADR-268): a dense mesh carves correctly, it is
+  // merely slower and heavier. A bogus `count` cannot cause a runaway allocation
+  // either — the byte-length identity below is the integrity check, and it fails
+  // immediately unless the declared count matches the actual file size.
   const expected = BINARY_STL_HEADER_BYTES + COUNT_BYTES + count * BINARY_STL_RECORD_BYTES;
   if (bytes.byteLength !== expected) {
     return {

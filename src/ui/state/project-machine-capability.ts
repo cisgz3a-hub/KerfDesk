@@ -9,7 +9,7 @@ import {
   type MachineKind,
   type Project,
 } from '../../core/scene';
-import { cncMachineWithCustomTools } from './machine-actions';
+import { cncMachineWithReusableTools } from './machine-actions';
 
 export type ProjectMachineCapabilityLoadResult =
   | { readonly kind: 'loaded' }
@@ -38,7 +38,7 @@ export function resolveProjectMachineCapability(
   const hasMatchingMachine =
     currentKind === activeKind && (activeKind === 'laser' || project.machine?.kind === 'cnc');
   if (hasMatchingMachine) {
-    return { project, cachedCncMachine: null, loadResult: { kind: 'loaded' } };
+    return loadedProjectResolution(project, customTools);
   }
   const cachedCncMachine = project.machine?.kind === 'cnc' ? project.machine : null;
   return {
@@ -53,6 +53,21 @@ export function resolveProjectMachineCapability(
   };
 }
 
+function loadedProjectResolution(
+  project: Project,
+  customTools: ReadonlyArray<CncTool>,
+): ProjectMachineCapabilityResolution {
+  if (project.machine?.kind !== 'cnc') {
+    return { project, cachedCncMachine: null, loadResult: { kind: 'loaded' } };
+  }
+  const machine = cncMachineWithReusableTools(project.machine, customTools);
+  return {
+    project: machine === project.machine ? project : { ...project, machine },
+    cachedCncMachine: null,
+    loadResult: { kind: 'loaded' },
+  };
+}
+
 function machineForKind(
   device: DeviceProfile,
   machineKind: MachineKind,
@@ -63,5 +78,5 @@ function machineForKind(
     device.cncSubProfile === undefined
       ? DEFAULT_CNC_MACHINE_CONFIG
       : { ...DEFAULT_CNC_MACHINE_CONFIG, params: { ...device.cncSubProfile } };
-  return cncMachineWithCustomTools(machine, customTools);
+  return cncMachineWithReusableTools(machine, customTools);
 }

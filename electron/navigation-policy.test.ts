@@ -26,4 +26,13 @@ describe('navigation policy wiring', () => {
     // instead.
     expect(readMain()).not.toContain('event.url.length');
   });
+
+  it('opens only the fixed download page externally and denies a child window', () => {
+    const main = readMain();
+    const policyStart = main.indexOf('if (isOfficialDesktopDownloadUrl(details.url))');
+    expect(policyStart).toBeGreaterThanOrEqual(0);
+    expect(main.slice(policyStart)).toContain('canonicalOfficialDesktopDownloadUrl(details.url)');
+    expect(main.slice(policyStart)).toContain('shell.openExternal(downloadUrl)');
+    expect(main.slice(policyStart)).toContain("return { action: 'deny' }");
+  });
 });

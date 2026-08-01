@@ -124,7 +124,7 @@ describe('drawCanvasMotionOverlay', () => {
         offsetY: 0,
       },
     );
-    expect(recording.strokeStyles).toContain('#dc2626');
+    expect(recording.strokeStyles).toContain('#f87171');
     expect(recording.dashes).toContainEqual([]);
     expect(recording.dashes).toContainEqual([6, 4]);
   });

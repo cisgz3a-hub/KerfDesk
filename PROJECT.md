@@ -1,39 +1,28 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Current status (2026-07-22):** Phase L Image Studio is active. The base editor,
-> PP-A through PP-F Photoshop-parity stack, adjustments/filters, resize/transform,
-> Quick Mask, History, and the ADR-245 layer model are merged. The maintainer-selected
-> V2 retouch/advisory/Apply-and-Trace arc is planned in
-> `docs/audits/2026-07-22-image-studio-v2-plan.md` and has not been implemented by that
-> plan. Recent governing decisions also cover the six-step Machine Setup (ADR-240),
-> advisory-only large-job budgets (ADR-241/243), background preparation (ADR-244), and
-> profile-scoped 4040 scan hardening (ADR-236). The ADR tail is **245**. Software,
-> browser/perceptual, and real-hardware qualification remain separate claims; see
-> `docs/hardware/verification-status.md`.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 255. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
-> **Read also:** `docs/README.md` for documentation routing, `WORKFLOW.md` for user
-> flows, `DECISIONS.md` for architecture rationale, and `AGENTS.md` / `CLAUDE.md`
-> for repository and engineering rules.
+> **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
 ---
 
 ## Product goal
 
-LaserForge 2.0 is the internal repository/project name for KerfDesk, a focused LightBurn-style CAM application for **GRBL** laser cutters and engravers, delivered as **both a web app and a Windows desktop app from a single codebase**. KerfDesk takes vector designs, text, traced artwork, raster images, and generated shapes; assigns named cut, fill, image, or CNC operations to artwork; previews the toolpath; generates correct G-code; and streams it to the connected machine.
+LaserForge 2.0 is the internal repository/project name for KerfDesk, a focused LightBurn-style CAM application for **GRBL** laser cutters and engravers, delivered today as a **web/PWA** from the codebase that will also produce the planned **Windows and macOS Electron Previews**. KerfDesk takes vector designs, text, traced artwork, raster images, and generated shapes; assigns named cut, fill, image, or CNC operations to artwork; previews the toolpath; generates correct G-code; and streams it to the connected machine.
 
-Naming contract: **KerfDesk** is the user-facing product and release URL. **LaserForge 2.0** remains the repo/package/internal architecture name. The Cloudflare Pages API project is still named `laserforge` for historical reasons.
+Preview naming contract: **KerfDesk** will be the user-facing product and release URL when the Preview implementation lands. Its visible app name, installer, downloadable artifacts, download surfaces, and release titles will use **KerfDesk**. **LaserForge 2.0** remains the current repo/package/internal architecture name, and existing persistence identifiers may remain LaserForge where changing them would break identity or stored user data. The Cloudflare Pages API project is still named `laserforge` for historical reasons.
 
 It deliberately copies LightBurn's UX shape and workflow. It deliberately does not copy LightBurn's feature breadth or controller fan-out.
 
 The 1.0 codebase shipped a working app but had a coupling problem: fixes in one module broke others. **2.0 is a clean rewrite designed against shotgun-surgery from day one — pure-function pipeline core, strict module boundaries, enforced file-size limits, snapshot tests on G-code, property tests on invariants.** See ADR-010 and ADR-015.
 
-**The project source code is MIT-licensed (ADR-120, superseding ADR-018).** The dependency policy is unchanged: third-party libraries must be MIT-compatible (MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD) per ADR-017. GPL-family licenses are rejected for dependencies — the combined MIT work must stay redistributable under MIT.
+**The current first-party software and associated documentation, in source and compiled/bundled form, are MIT-licensed, free, and public (ADR-120, superseding ADR-018; clarified by ADR-247/248).** Bundled dependencies, fonts, assets, and other third-party portions remain under their own licenses and notices. Existing MIT grants persist and cannot be revoked retroactively. A restrictive source-visible commercial license, dual-license arrangement, or other monetization model would be a separate future decision and is not part of the Desktop Preview track. The conservative package-license policy is enforced by ADR-017 and `scripts/check-licenses.mjs`; GPL-family dependencies remain rejected so current and future distribution options are not constrained by incompatible copyleft terms.
 
 ---
 
 ## Users and roles
 
-Single role: **operator**. No accounts, no auth, no multi-tenancy. The app trusts whoever launches it with full control of their local machine.
+Single role: **operator**. No accounts, auth, multi-tenancy, activation, entitlement, trial, subscription, device binding, paywall, or dormant monetization code exists in the Desktop Preview track. The app trusts whoever launches it with full control of their local machine.
 
 User profile:
 - Owns a GRBL-based diode or CO₂ laser (xTool, Sculpfun, Ortur, Atomstack, NEJE, OpenBuilds, FluidNC retrofits).
@@ -45,12 +34,25 @@ User profile:
 
 ## Delivery targets
 
-- **Web app:** Chromium browsers (Chrome, Edge, Brave, Arc) on any OS. WebSerial for machine connection. File System Access API for projects. PWA-installable, fully offline (ADR-060).
+- **Web app/PWA:** unchanged first-class delivery target on Chromium browsers (Chrome, Edge, Brave, Arc) on any OS. WebSerial provides machine connection; the File System Access API handles projects. It remains PWA-installable and fully offline (ADR-060).
   - *Brave note:* WebSerial is shipped but Brave may gate it behind a Shields/flags toggle in some versions (upstream issue brave-browser#24404, status last re-verified 2026-05-28 — still open). Surface a one-line "Enable WebSerial in Brave settings" hint in the F-B1 connect error path.
-- **Windows desktop app:** Electron. Same UI, same core, native menus and file system, robust offline.
-- **macOS / Linux desktop:** out of scope for MVP. Those users get the web app.
+- **Planned Windows desktop preview:** Electron on Windows 10/11 x64. Same UI and core, native shell, robust offline. It will be distributed as an unsigned KerfDesk NSIS preview installer only after the Preview workflow lands.
+- **Planned macOS desktop preview:** Electron on macOS 12+ for x64 and arm64. Same UI and core, robust offline. It will be distributed as separate unsigned and unnotarized KerfDesk DMG previews only after qualification.
+- **Linux:** web/PWA only. A Linux desktop build remains Phase J.
 
-Both targets ship from one codebase, sharing every line of pipeline and UI code, separated only by a thin **platform adapter** for file I/O, serial port, and drag-and-drop. See ADR-011.
+Every current and planned target uses one codebase, sharing every line of pipeline and UI code, separated only by a thin **platform adapter** for file I/O, serial port, and drag-and-drop. See ADR-011 and ADR-248.
+
+## Desktop Preview track — scope and acceptance
+
+The Desktop Preview track is additive packaging and release governance. Its application-facing changes are visible KerfDesk branding, the desktop-download surface, and ADR-249's passive notify-only status-bar link. It changes no machining workflow, core logic, project format, preview/toolpath behavior, G-code, controller behavior, machine guard, or web/PWA behavior.
+
+1. Build one Windows 10/11 x64 NSIS installer and separate macOS 12+ x64 and arm64 DMGs. Every visible product, installer, artifact, download, and release title says **KerfDesk**.
+2. Publish only exact-version assets through a draft-to-immutable prerelease in the same public source repository, using the existing source tag and never marking Preview latest. Each prerelease includes checksums, an artifact manifest, an SBOM, and build-provenance evidence bound to the repository, source SHA/ref, and signer workflow; strict tag guards keep Preview and stable/R2 workflows mutually exclusive.
+3. Preview artifacts are explicitly labeled unsigned and, on macOS, unnotarized. Mac builds disable electron-builder bundle signing, identity auto-discovery, notarization, and hardened runtime; no Developer ID identity or notarization ticket is present, any tooling-created nested ad-hoc signature is not treated as trust, installation is manual, and permission prompts may recur across upgrades.
+4. Do not publish Preview artifacts to R2, a mutable `latest` path, or an update feed. Updater trust remains false. A packaged Preview may make one anonymous, metadata-only request per app launch to the fixed public GitHub Actions workflow-runs API to surface only a newer Preview whose complete immutable-release workflow succeeded; it never downloads, executes, installs, or silently navigates to an update (ADR-249).
+5. Preserve Windows app ID `dev.laserforge.app`, its NSIS upgrade GUID, `app://app`, and the verified legacy `%APPDATA%\laserforge` `userData`/`sessionData` root. A packaged identity probe must prove that root before the visible rename; prove first-brand migration and later upgrades do not hide projects, recovery state, settings, or libraries.
+6. Keep the current web/PWA build, release, installability, and offline checks green. Desktop CI is additive and must not replace or weaken the web deployment path.
+7. Passing builds and automated tests prove only packaging integrity. Launch, install, file I/O, serial permissions, and representative machine behavior remain **CLAIMED** until real-OS/hardware verification; Mac Preview supports USB and private-network JPEG cameras, while RTSP remains unqualified and follows the existing explicit FFmpeg-missing error path until Finder-safe FFmpeg discovery is separately designed.
 
 ---
 
@@ -108,21 +110,16 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 
 Import a raster (JPG/PNG), trace to vectors with the in-house contour/centerline/edge engine (ADR-123 — binary presets route to `contour-trace.ts`; Centerline is a shipped preset). `imagetracerjs` (Unlicense — MIT-compatible; `potrace-wasm` rejected on GPL grounds) remains only as a UI-unreachable multi-colour fallback. Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013 and ADR-123.
 
-**Trace pipeline status.** Transparent-PNG decode, the ADR-025 perceptual harness,
-source retention/re-trace, the clean-room contour engine, measured Centerline, and Edge
-Detection have shipped (ADR-025/026/058/059/100/123). Fresh laser traces default to
-editable vectors while raster scan remains an explicit output choice (ADR-238). Fidelity is
-still a perceptual and physical-output claim: structural tests alone do not prove that a
-particular source traces or burns correctly.
+**Trace pipeline hardening (2026-05-29).** Fixed transparent-PNG decode (composite onto white — it was producing all-black traces); added a perceptual-fidelity test harness that renders trace output and diffs it against analytic ground-truth masks via IoU (ADR-025, `src/__fixtures__/perceptual/`); and made a committed trace keep its source bitmap as a coexisting `RasterImage` for LightBurn-style overlay (ADR-026, new `src/ui/state/import-actions.ts`). **Known open gap — the next frontier:** imagetracerjs is outline-only, so a single pen stroke becomes two parallel contours; closing this outline-vs-centerline gap (a centerline/skeleton trace mode + metric) is the core remaining "faulty vs LightBurn" issue and is *not* caught by the IoU harness. Also open: `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input (the `Line Art` preset sidesteps it), and the ADR-026 follow-ups (re-trace-from-source, source dimming/opacity, grouping the trace+source pair). See ADR-025 'Scope'/'Consequences' and ADR-026 'Consequences'.
 
-### Phase F — v0.6 "Raster engrave" [Built; hardware qualification remains feature-specific]
+### Phase F — v0.6 "Raster engrave" [In progress]
 
 Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005. See ADR-019 (Fill) + ADR-020 (Image).
 
-- **F.1 — Fill** [Shipped]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Snake fill alternates row direction.
+- **F.1 — Fill** [Shipped]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Requested or calibrated bidirectional Fill alternates row direction; a fresh generic traced Scan Line starts one-way when it has neither an explicit direction nor verified or legacy-verified scan-offset calibration. Generic Scan Line sweeps use bounded feed-matched laser-off entry and exit motion inside the exact Frame motion envelope.
 - **F.2 — Image** [F.2.a-e shipped; F.2.f hardware burn pending]. True raster engrave: new `RasterImage` SceneObject variant (PNG data URL + base64 luma); `dither.ts` runs threshold/Floyd-Steinberg/grayscale; `emit-raster.ts` emits M4-mode per-pixel S-modulation G1 sweeps with overscan. Job.groups is now a CutGroup-or-RasterGroup discriminated union; grbl-strategy dispatches per kind. Toolbar `Engrave Image…` opens a file picker; Layer dropdown enables `Image` mode and surfaces Dither + lines/mm fields. ADR-020. Hardware verification checklist in WORKFLOW.md F-F2; not yet burned on Falcon.
-- **F.3 — Set work origin** [Code shipped; hardware verification remains profile-specific]. The ordinary control sends `G92 X0 Y0` and Reset sends `G92.1`; advanced controls can store/clear the G54 origin with `G10 L20 P1` / `G10 L2 P1`. WCO parsing, transaction acknowledgement, and origin-state invalidation live in `laser-store`. ADR-021 records the original G92 decision; ADR-022 and `WORKFLOW.md` F-F3 describe current placement and verification behavior.
-- **F.4 — Convert to Bitmap** [A1–A5 shipped]. Selected vector artwork is rasterized into a `RasterImage` engrave source using Fill All, Outlines, or Use Cut Settings, with DPI and Default Brightness controls. The operation supports multi-selection, worker execution, transform baking, budget/error handling, and one in-place project change. See ADR-029 and `WORKFLOW.md` F-F4. Visual equivalence for a particular design still requires rendered comparison.
+- **F.3 — Set work origin** [Code shipped; hardware verification pending]. Operator jogs the laser head to a workpiece corner and presses *Set origin here* to declare that physical point as work-coord (0, 0). New `OriginRow` in `JobControls.tsx` (Set / Reset buttons), origin readout in `StatusDisplay.tsx`, GRBL command constants (`G92 X0 Y0` / `G92.1`), WCO parsing + caching across status frames in `laser-store`. Pipeline change is zero: GRBL applies the WCS offset to absolute-G90 G-code at run time. ADR-021; WORKFLOW.md F-F3. G92 only — persistent G10 L20 P1 deferred. Bed-bounds preflight remains machine-relative; operator framing after Set Origin is the documented safety check (future ADR-022).
+- **F.4 — Convert to Bitmap** [A1–A4 shipped (Fill All / Outlines / Use Cut Settings + DPI control); A5 placement/brightness polish pending]. Vector→raster: rasterize selected vector objects into a `RasterImage` engrave source, matching LightBurn (Outlines / Fill All / Use Cut Settings render types, DPI control, 50% gray pixels, **source vector deleted**). New pure-core `src/core/raster/rasterize-vector.ts`; additive (no `SceneObject`/schema change). ADR-029; WORKFLOW.md F-F4. Staged: **A1** ✓ pure-core Fill-All luma rasterizer; **A2** ✓ Toolbar `Convert to Bitmap` button → PNG encode + `RasterImage` in-place swap (Fill All only — the render-type picker + DPI control arrive with A3/A4); A3 = Outlines; A4 = Use Cut Settings; A5 = placement/brightness polish. A2 fill+encode fidelity verified in-browser side-effect-free (real PNG round-trips to 200×200 at 254 DPI; ink 50% gray, even-odd hole preserved); live in-app render/placement and a LightBurn side-by-side not yet done.
 
 - **F.5 - Material calibration workflow** [Shipped; hardware calibration pending]. Minimal LightBurn-style Material Test and Interval Test generators, native `.lfml.json` libraries, multi-library UI, bounded LightBurn `.clb` import, and refreshable native preset-to-layer bindings are in scope. Manufacturer profile packs, `.clb` export, and LightBurn `LinkPath` synchronization remain deferred. ADR-044, ADR-045, ADR-093, ADR-164.
 - **F.6 - Experimental laser safety surface** [Shipped; hardware features remain CLAIMED]. Tools → Labs stores fail-closed, local feature gates for rotary, rotary raster, low-power Fire, print-and-cut, and camera alignment v2. Low-power Fire additionally requires controller capability and an opted-in profile, is hard-capped at 5%, and is hold-to-run with redundant release paths (ADR-161, ADR-162).
@@ -151,12 +148,12 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults | Built |
 | H.7 | Tool + feeds/speeds libraries (material-library pattern), multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |
 | H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover | Built |
-| H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity (helical entry + arc leads deferred — DECISIONS.md) | Built |
+| H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity (helical entry deferred; arc/line profile leads shipped — ADR-250) | Built |
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
 | H.11 | Market-parity build-out (ADR-103): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator, machine-aware G-code banner | Built (G1–G8) |
 | H.12 | Easel-parity pack (ADR-105): persistent live 3D pane, pocket raster fill (offset/raster-X/raster-Y), bundled local design library | Built |
 | H.13 | Beginner-mode UX pack (ADR-111): layer material picker (auto-fills feeds), Basic/Advanced disclosure + through-cut, machine auto-fill from detected `$$`, stock/feed limit advisories | Built |
-| H.14 | Project material picker (ADR-112): Easel-style set-material-once in the Material & Bit panel; auto-fills feeds for every layer and seeds new ones (manual Add, SVG import); per-layer picker still overrides | Built |
+| H.14 | Project material picker (ADR-112/264): grouped species-level wood presets in Material & Bit; explicit Apply auto-fills feeds for every layer and seeds new ones (manual Add, SVG import); per-layer picker still overrides | Built |
 | H.15 | Two-tool pocket rest machining with bounded 2D remaining-stock geometry and guarded manual tool change (ADR-153) | Built; hardware CLAIMED |
 | H.16 | Verified constant-load adaptive clearing for bounded island-free pockets (ADR-154) | Built; hardware CLAIMED |
 | H.17 | Linked straight-sided inlay pocket and insert pairs with radius-matched geometry (ADR-155) | Built; hardware CLAIMED |
@@ -209,7 +206,7 @@ laser and CNC router modes — the first multi-panel parametric generator
 (Material Test precedent, ADR-044). Claim-model joinery designed against
 the two classic assembly failure classes (corner conflicts; fit
 compensation applied wrong) — see ADR-106. (Phase J stays reserved for
-macOS/Linux desktop, per ADR-104's renumbering note.)
+Linux desktop; macOS Preview moved into the ADR-247/248 Desktop Preview track.)
 
 - Pure core `src/core/box/` (spec validation → per-edge finger patterns →
   panel claims → outline walk → fit/relief → sheet layout); UI dialog +
@@ -239,7 +236,7 @@ and the seeded benchmark — new categories must score 100% without
 regressing v1. Deferred with names in ADR-116: lip/hinged/living-hinge
 lids, polygon prisms, dovetails, CNC dado 2.5D, T-slot hardware joints.
 
-### Phase L — v0.11 "Image Studio" [In progress — base/parity editor shipped; V2 planned]
+### Phase L — v0.11 "Image Studio" [In progress — IE-1 under construction]
 
 Full in-app raster editing of `RasterImage` engrave/trace sources — the pixel-repair loop
 LightBurn lacks (it has no painting, selections, levels, or background removal; verified
@@ -254,10 +251,67 @@ Abort stays reachable while a job streams (non-negotiable #9). The edit→re-tra
 
 | Stage | Delivers | Status |
 |---|---|---|
-| IE-1 | Editor overlay, session store, brush/pencil/eraser/line tools, marquee/lasso/wand selections, crop/free transform, Quick Mask, History, and Apply | Shipped |
-| IE-2 | Levels/curves/histogram, threshold/invert/posterize, blur/unsharp/high-pass/median, halftone/line-screen, and Image/Canvas Size | Shipped |
-| IE-3 | Retouch/content tools selected for the V2 arc: gradient, clone/heal, text layer, laser advisories, and Apply & Trace | Planned; see the 2026-07-22 V2 plan |
-| IE-4 | ADR-245 layers, visibility/opacity, normal/multiply blend, reorder/merge, and composite Apply | Core and UI shipped; cross-layer history, project-session persistence, and acceleration remain deferred |
+| IE-1 | Line work & selections: editor overlay + session store, brush/pencil/eraser/line tools, marquee/lasso/wand selections with delete/fill/paint-clipped/move, crop, editor-local undo/History, Apply→re-trace, engrave-preview view | In progress |
+| IE-2 | Adjust & filters: levels/curves/histogram, Enhance (unsharp) parity, blur/median/despeckle, selection-scoped adjustments, Image/Canvas Size with bilinear resample, arbitrary rotate, Halftone/Newsprint/Sketch image modes, live trace overlay | Planned |
+| IE-3 | Retouch & content: clone stamp, dodge/burn, classical background removal, raster text stamp, gradient fill, non-PatchMatch spot-heal | Planned |
+| IE-4 | Layers/blend modes/masks, `.lf2` session persistence, acceleration — each requires its own ADR | Deferred |
+
+### Phase M — v0.12 "G-code Inspector" [Approved 2026-07-25 — ADR-255; build starting at Stage 1]
+
+Read-side 3D program viewer: open any `.nc` / `.gcode` / `.tap` — or the exact
+emitted output from Job Review — into a lazy-loaded three.js Inspector with
+multi-angle playback, planner-true time, per-segment source-line links, and an
+informational Program Health report (rule 7 compliant: findings inform, never
+block). Design + executed self-audit, rendering spec, detail ladder, and the
+staged tight-leash build plan (each stage an individually reviewed, shippable
+diff): `docs/audits/2026-07-25-gcode-inspector-design-and-self-audit.md`.
+Key structural moves: shared modal G-code engine (no third parser), pure
+`src/core/gcode-view/` render model, shared `src/ui/viewer3d/` scene home
+(ADR-102 §2 amended), Open G-code available in both machine modes (ADR-101
+amended). Zero new runtime dependencies. Acceptance gates: total line
+accountability; own-output-clean (every built-in strategy's output parses
+with zero unsupported-word notes).
+
+### Phase N — v0.13 "Design Studio" [Approved 2026-07-30 — ADR-272; build starting at DS-0]
+
+An on-canvas design surface: draw a part to size by hand, from nothing, and cut
+it. Today the canvas places artwork; Phase G gave it rectangle/ellipse/polygon/
+star/pen and ADR-159/164 gave it bounded node editing, but there is still no
+line tool, no arc tool, no trim/extend/fillet/chamfer, no dimension you can
+type, and no geometric snapping at all (`snapping.ts` snaps bounding boxes and a
+grid — endpoint/midpoint/centre/quadrant/intersection/tangent snapping exists
+nowhere in the tree). Delivered as a lazy-loaded full-window overlay on the
+ADR-242 Image Studio template, with a new pure `src/core/design/` module and a
+new `src/ui/design-studio/` folder. Zero new runtime dependencies: the 2.5D view
+uses `THREE.Shape` + `ExtrudeGeometry` from the already-pinned `three@0.180.0`,
+and open-path offset / simplification / hole-aware booleans are reachable
+through capabilities already shipped in `clipper2-ts`. **No general constraint
+solver** — every browser-capable 2D geometric solver is GPL-family or otherwise
+license-blocked (ADR-272 Context), so precision comes from object snaps,
+ortho/polar tracking, typed numeric entry, and dimension-driven editing. The
+pipeline is untouched: the Studio materializes into ordinary `ShapeObject`
+geometry, so compile/preview/emit/serialize are unchanged and G-code stays
+byte-identical for unchanged input. Design + research:
+`docs/audits/2026-07-30-design-studio-brief.md` and
+`docs/audits/2026-07-30-design-studio-research-and-plan.md`.
+
+| Stage | Delivers | Status |
+|---|---|---|
+| DS-0 | Governance: ADR-272, this entry, `F-DS` flows in WORKFLOW.md | Done |
+| DS-1 | Pure `src/core/design/` sketch model, entity geometry, bounds | Built |
+| DS-2 | Overlay shell: host + lazy chunk + session store + local undo + Esc ladder + two-rail palette + status bar + canvas with bed/grid/geometry paint, rAF coalescing, cursor-anchored zoom | Built |
+| DS-3 | Drawing tools: Line/Rect/Circle drag gestures with Shift/Alt modifiers, second canvas layer for the live draft + dimension label, click/marquee selection, grid snap, ortho | Built |
+| DS-3b | Floating precision inspector: per-shape editable dimensions, derived measurements (area / perimeter / circumference / chord / arc length), and a draughting-style dimension call-out drawn on the shape while a field is touched | Built |
+| DS-3c | Typed numeric entry during a draw gesture, per-tool options bar | Planned |
+| DS-4 | Object-snap engine (`core/design/snap/`): endpoint / midpoint / centre / quadrant / intersection / on-edge, ranked so geometry always beats the grid, each with its own on-canvas glyph and a status-bar readout | Built |
+| DS-4b | Polar/angle tracking, tangent and perpendicular snaps, alignment guides between objects | Planned |
+| DS-5 | Apply → commits designed geometry as one project undo entry; rect/circle land parametric, line/arc/path bake exact. **End-to-end slice closed** — verified from sketch through `compileJob` to emitted G-code | Built |
+| DS-6 | Corner ops in `core/design/ops/`: fillet (tangent arc at the shared chord tolerance) and chamfer (exact, no sampling), both refusing a size that will not fit rather than clamping | Built (core) |
+| DS-6b | Fillet and chamfer wired to the Modify rail with a context-sensitive options bar (trim/extend still planned) | Built |
+| DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit | Planned |
+| DS-8 | Layered carve (ADR-272 Amendment 1): design layers with per-layer cut type / depth / bit, layers panel with assign-selection, per-bit simulate pass, Apply → one operation per layer feeding the existing multi-bit tool-change job | Built |
+| DS-8b | The canvas becomes the 3D design space (ADR-272 Amendment 2): stock on a grid, drawing on its top face through the shared gesture machine, carve live underneath, Fusion input mapping (left = tool, middle pan, Shift+middle/right orbit, wheel zoom-to-cursor), Top/Iso presets, Design/Bits tiers in the viewport toolbar, 2D canvas kept as fallback toggle | In progress |
+| DS-9 | `SketchShape` arm on `ShapeSpec` — parametric round-trip through `.lf2` | Planned |
 
 ### Anything past Phase F
 
@@ -268,9 +322,9 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
   grblHAL burn; community Marlin/Smoothie/FluidNC verification), Ruida
   real-controller validation then the Electron UDP transport, wizard
   controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
-- Phase J: macOS/Linux desktop builds. Free with electron-builder — but ADR-007 still says Windows-only for MVP. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
+- Phase J: Linux desktop build. Linux remains web/PWA-only until that phase; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
 
-**MIT-availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the policy.
+**Public MIT availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the dependency policy and ADR-247/248 for the current public-source and preview-distribution posture.
 
 ### Future feature notes (uncommitted; capture-only)
 
@@ -305,12 +359,12 @@ phase; tracked here so they don't get lost.
 
 1. **Bounds check** — generated paths must fit inside the configured bed.
 2. **Origin honesty** — output coordinates match the device profile's origin.
-3. **Laser-off on travel** — every `G0` move ends with `S0` or precedes an `M5`. Property-tested.
+3. **Laser-off on travel** — every `G0` move either carries `S0` on the same line, immediately **follows** an `M5`/`M107`, or runs while the last commanded `S` is already `0`. Property-tested (`src/core/invariants/predicates.ts`).
 4. **No partial output** — pipeline failure writes no file and sends no stream.
 5. **Deterministic G-code** — same input + same parameters → byte-identical output. Snapshot-tested.
 6. **Units honest** — internal model is mm. Inches accepted only at import boundary via explicit conversion.
 7. **Power scale honest** — `S` values match the device profile's max-power scale (`$30`). Property-tested.
-8. **No telemetry, no third-party network calls** — local-first. No analytics, no error-reporting service, no cloud sync; no user data leaves the machine, ever. The **one** permitted network call is the trusted desktop app's self-hosted **auto-update check** against our own pinned `kerfdesk.com` release feed (ADR-024/135) — it transmits no user data and no telemetry, is confined to that origin, and stays disabled until production code signing is operational. The web app and every CAM/preview/streaming path stay fully offline.
+8. **No telemetry; only pinned release discovery** — local-first. No analytics, error-reporting service, cloud sync, account data, project data, machine data, or job data leaves the machine. Two desktop-only release checks are permitted: the future trusted production updater's pinned first-party `kerfdesk.com` feed (ADR-024/135), disabled until signing is operational; and one anonymous metadata-only GitHub Releases request per packaged Preview launch (ADR-249). The Preview request sends no application identifier beyond a generic product user agent and no token, cookies, or referrer, although GitHub necessarily receives ordinary connection metadata such as IP address and time. Web/PWA and every CAM/preview/streaming path stay fully offline.
 9. **Abort reachable always** — the software Abort / Controller Reset control is reachable from any window state during a job. No modal can block it. This command is not a safety-rated E-stop; dangerous conditions require the machine's physical E-stop or power isolation.
 
 ### Architectural (anti-shotgun-surgery)
@@ -322,22 +376,14 @@ phase; tracked here so they don't get lost.
 14. **G-code snapshot-tested** (ADR-010).
 15. **File-size limits enforced** (ADR-015): files ≤ 400 lines hard, ≤ 250 soft; components ≤ 250 hard; functions ≤ 80 hard.
 16. **Co-located tests** (ADR-015): tests live beside their source (`Foo.ts` has a `Foo.test.ts`). Not every source file has a sibling and CI does not enforce a strict sibling rule (see CLAUDE.md); PR review rejects untested source changes.
-17. **Single responsibility per file** (CLAUDE.md). Split by cohesion and change risk,
-    not by an arbitrary wording test.
+17. **Single responsibility per file** (CLAUDE.md). One-sentence description without "and."
 18. **Discriminated unions for state** (ADR-010, ADR-014).
 19. **`SceneObject` extensible from day one** (ADR-014).
 20. **Third-party libraries pass evaluation policy** (ADR-017): license, maintenance, fit, size, CVE status.
 
 ### Maintainer authority
 
-21. **Ordinary Start is frame-first; integrity boundaries remain enforced** (ADR-228,
-    ADR-230, ADR-232, ADR-237). A clean completed Frame for the exact current job is
-    the sole ordinary operator-policy authorization on laser and CNC. Calculated bed,
-    no-go, settings, and similar advisory findings belong in Start-time Job Review.
-    Transport readiness, required placement inputs, compile integrity, exact-handoff/
-    recovery consistency, security validation, unsupported capabilities, and explicit
-    destructive intent may still refuse an operation that cannot be executed correctly.
-    Frame-first must not be used to weaken physical interlocks or trust boundaries.
+21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-228, ADR-230, ADR-232). A clean completed Frame for the exact current job is the sole ordinary Start authorization on laser and CNC; Start only claims that one-use permit plus unavoidable live transport/handoff facts, and Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories.
 
 ---
 
@@ -349,9 +395,7 @@ phase; tracked here so they don't get lost.
 - Web cold-start < 2 s, desktop cold-start < 3 s.
 - 60 fps pan/zoom on a 5,000-segment scene.
 - A fix that changes G-code output produces a visible snapshot diff in CI.
-- Checked production source stays within the 400 counted-line ESLint limit and the
-  600-physical-line repository backstop; tests, fixtures, documents, and explicit
-  policy scopes are described in `CLAUDE.md` and the check scripts.
+- **No file in the repo exceeds 400 lines.** Enforced by ESLint.
 - **Every third-party dependency has an entry in `RESEARCH_LOG.md`** with license, version, maintenance status at adoption.
 
 ---
@@ -366,23 +410,23 @@ phase; tracked here so they don't get lost.
 - **Platform adapter:** `platform/web/` implements the `PlatformAdapter` interface for the browser; the main-process desktop (Electron) code lives in the top-level `electron/` folder, and `src/platform/electron/` holds the renderer-side Electron detection (`isElectronRenderer`, imported by `ui/app/main.tsx`) plus the release-workflow gate.
 - **SVG parse:** native `DOMParser` (browser and jsdom in Node tests).
 - **SVG sanitize:** **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible). Pinned per ADR-017.
-- **Text (Phase D):** `opentype.js` (MIT) for outlines. Bundled permissive fonts (Roboto Apache-2.0; Inconsolata / Pacifico / Dancing Script / Relief SingleLine / three reviewed EMS stroke faces OFL-1.1).
+- **Text (Phase D):** `opentype.js` (MIT) for outlines. Seventeen bundled permissive fonts — thirteen outline plus four native CNC stroke faces (Roboto / Special Elite Apache-2.0; Poppins / Tinos Regular + Bold / Inconsolata / Courier Prime / Pacifico / Dancing Script / Anton / UnifrakturMaguntia / Stardos Stencil / Saira Stencil One / Relief SingleLine / three reviewed EMS stroke faces OFL-1.1). Stencil faces bridge their counters so cut-out lettering leaves no loose centres (ADR-267).
 - **Vectorize (Phase E):** in-house contour/centerline/edge trace engine (ADR-123); `imagetracerjs` (Unlicense — MIT-compatible) kept only as a multi-colour fallback.
 - **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property), and Playwright for a dedicated real-browser smoke workflow (ADR-158).
-- **Build:** Vite → web bundle; Vite + electron-builder → Windows `.exe` (unsigned in v1 — ADR-024 §5; code signing is secret-gated and a no-op until the certs exist).
+- **Build:** Vite currently produces the unchanged web/PWA bundle and the existing electron-builder path remains Windows-only. ADR-248 plans Vite + electron-builder packaging for an unsigned Windows 10/11 x64 NSIS Preview and separate unsigned/unnotarized macOS 12+ x64 and arm64 DMG Previews; no Preview artifact exists until that workflow and its gates land. Production code signing and notarization remain secret-gated and inactive until credentials and release governance exist (ADR-024/135/248).
 - **Lint/format:**
   - ESLint with `eslint-plugin-boundaries` (module isolation).
   - `eslint max-lines`, `max-lines-per-function`, `complexity` (file-size enforcement).
-  - `scripts/check-licenses.mjs` using `pnpm licenses list --prod` in CI.
+  - `pnpm license-check` / `scripts/check-licenses.mjs` in CI (pnpm-aware license-compliance enforcement).
   - Prettier.
-- **CI:** GitHub Actions on `ubuntu-latest`. The release/deploy gate runs lint, typecheck, license-check, unit, property, snapshot, web build, and Electron main-process compile. Playwright runs in a separate pull-request/manual browser-smoke workflow so browser provisioning cannot time out a production deploy (ADR-158). The Windows desktop `.exe` (`build:desktop`, electron-builder) and hardware verification remain release-manual (S02-001/003).
-- **Repo:** Single Git repo, MIT license, public (ADR-120 supersedes ADR-018's private posture).
+- **CI:** GitHub Actions keeps the existing `ubuntu-latest` release/deploy gate for lint, typecheck, license-check, unit, property, snapshot, web/PWA build, and Electron main-process compile. Playwright remains a separate pull-request/manual browser-smoke workflow (ADR-158). The planned Desktop Preview workflow will add Windows and macOS packaging jobs and publish only exact-version, same-repository, draft-to-immutable GitHub prerelease assets with checksums, a manifest, an SBOM, and provenance; no Preview tag is permitted until that workflow exists. It does not publish R2 assets, a mutable `latest`, or updater metadata. Real-OS launch, install, serial, and hardware verification remain manual and CLAIMED until recorded (ADR-247/248; S02-001/003).
+- **Repo:** Single public Git repo under the current MIT license (ADR-120, clarified by ADR-247/248). Public CI and the free/public app continue in this track; any future restrictive source-visible license is a separate decision, and existing MIT rights persist.
 
 ---
 
 ## External services
 
-**None.** The app must work fully offline. No analytics, no error reporting service, no cloud sync.
+**No application data services.** The app must work fully offline: no analytics, error-reporting service, cloud sync, account, entitlement, activation, or trial service. Desktop-only release discovery is limited to the signed stable feed described above and the packaged Preview's one anonymous GitHub metadata request per launch. Preview installation remains manual and never consumes R2, a mutable `latest` channel, or executable bytes in-app.
 
 ---
 
@@ -501,11 +545,11 @@ an assumption that every folder must have an `index.ts`.
 - **Imported SVG is untrusted.** Parsed via native `DOMParser`, sanitized via **DOMPurify** with `USE_PROFILES: { svg: true, svgFilters: true }` and a custom hook removing external `xlink:href` and non-image data URIs.
 - **Imported raster images (Phase E)** decoded inside a sandbox. Memory-bounded.
 - **Bundled fonts (Phase D)** stay in managed code: TTF outlines use `opentype.js`; pinned SVG centerline glyph data uses the pure TypeScript stroke parser. They are never passed to native font APIs.
-- **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No IPC handlers (no `ipcMain` surface). `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
+- **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No preload and no IPC handlers (`ipcMain` surface). The notify-only Preview checker is one exact GET-only `app://app/api/desktop-preview-update` route, so the renderer retains `connect-src 'self'`; main performs the pinned GitHub metadata request and returns only `{ kind, version }`. `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.
-- **No auto-update from arbitrary or unsigned channels.** The desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin and remains inert until production code signing is operational (ADR-024/135). No `quitAndInstall`; trusted updates apply on quit only, never mid-burn.
-- **Dependency CVE monitoring:** GitHub Dependabot enabled on first push. A dependency CVE blocks releases until patched. NOTE: the CI `audit:deps` gate (`pnpm audit --audit-level=low`, part of `release:check`) fails on ANY advisory (direct OR transitive) at low+ severity - stricter than "direct only", and time-dependent (a new transitive advisory can block deploys with no code change).
+- **No auto-update from arbitrary or unsigned channels.** The production desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin and remains inert until production code signing is operational (ADR-024/135). Preview updater trust stays false and no unsigned executable is downloaded or run. Its separate checker accepts only a newer strict Preview tag reported by a completed, successful run of the exact Preview release workflow; that workflow's final job verifies the immutable six-asset release, checksums, manifest, and attestations. The app then shows a passive status-bar link to that exact version's public `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page. API-provided URLs are ignored. No `quitAndInstall`; future trusted updates apply on quit only, never mid-burn.
+- **Dependency CVE monitoring:** GitHub Dependabot alerts, secret scanning, and secret-scanning push protection are enabled on the repository (2026-07-25). A dependency CVE reachable from a production dependency blocks releases until patched — that judgment is made by a human, not by CI. Since ADR-254 the `audit:deps` scan (`pnpm audit --audit-level=low`, still stricter than "direct only") runs nightly in `.github/workflows/audit.yml` and files one tracking issue; it is **not** part of `release:check` and does not block PRs or deploys, because a third-party advisory publication is not a defect in the diff under review. Triage the open audit issue before cutting a `v*` desktop release.
 
 ---
 
@@ -522,12 +566,12 @@ an assumption that every folder must have an `index.ts`.
 
 ## Out of scope (no phase assigned)
 
-Reject any of these mid-development without a `PROJECT.md` revision and a `DECISIONS.md` entry. **MIT availability does not change this list.**
+Reject any of these mid-development without a `PROJECT.md` revision and a `DECISIONS.md` entry. **Current public MIT availability does not change this list.**
 
 - ~~Raster engrave (Fill, Image modes).~~ **Shipped in Phase F** (F.1 Fill, F.2 Image) — no longer out of scope.
 - ~~Marlin, Smoothieware, and Ruida export.~~ **Shipped under Phase I** with
   simulator/evidence labels; Trocen and TopWisdom remain out of scope.
-- macOS / Linux desktop builds.
+- Linux desktop build. Linux remains supported through the web/PWA; Windows and macOS Preview packaging is in scope under ADR-247/248.
 - ~~Node editing of imported paths.~~ **Shipped as bounded node/Bezier editing** with schema-v2 canonical-curve invalidation rules (ADR-159, ADR-164); a general geometry kernel remains out of scope.
 - Boolean ops.
 - ~~Camera alignment, overhead camera.~~ **Scoped by ADR-107** (Camera Mode —
@@ -541,7 +585,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   `LinkPath` synchronization. Bounded `.clb` import and refreshable native
   preset-to-layer bindings have shipped under Phase F.5 and ADR-164.
 - Multi-machine, networked control.
-- Cloud, accounts, sharing, sync.
+- Cloud, accounts, sharing, sync, activation, entitlement, trials, subscriptions, device binding, paywalls, and dormant monetization code.
 - ~~DXF~~, AI, PDF import. **DXF moved in-scope by Phase H.6 (clean-room
   parser, ADR-098)**; AI and PDF import remain out of scope.
 - Manual tabs / bridges, lead-in / lead-out, advanced fill patterns. Several
@@ -549,7 +593,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   Line-mode kerf compensation (`core/geometry/kerf-offset.ts`, per-layer
   `kerfOffsetMm`), automatic Line-mode hard-skip tabs
   (`core/geometry/tabs-bridges.ts`), simple Cross-Hatch fill (per-layer
-  `fillCrossHatch`), and simple Offset Fill output (`core/job/offset-fill.ts`);
+  `fillCrossHatch`), simple Offset Fill output (`core/job/offset-fill.ts`), and
+  CNC profile arc/line lead-in/out (`core/cnc/profile-lead.ts`, ADR-250;
+  profile-outside/inside only — laser lead-in/out stays out of scope);
   a narrow ordered sub-layer "fill then line" operation stack is partially in
   place. **These landed without dedicated ADR headings** — the build plan
   reserved ADR-054..091 for its tickets, and the earlier citations here of
@@ -573,12 +619,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 | `PROJECT.md` | Scope, non-negotiables, phase plan. (This file.) |
 | `WORKFLOW.md` | Detailed user flows for the current phase. |
 | `DECISIONS.md` | Architecturally significant decisions with rationale. |
-| `AGENTS.md` | Tool-neutral repository operating contract and machine-control policy. |
-| `CLAUDE.md` | Engineering standards, enforcement map, and verification guidance. |
-| `docs/README.md` | Documentation routing and current-vs-historical ownership. |
+| `CLAUDE.md` | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. |
 | `RESEARCH_LOG.md` | External claims and library adoptions, with source, version, license, date. |
-| `docs/hardware/verification-status.md` | Living hardware/perceptual qualification register. |
-| `LICENSE` | MIT (ADR-120). |
+| `LICENSE` | Current MIT license (ADR-120, clarified by ADR-247/248). Existing grants persist; any future source-license change requires a separate decision. |
 
 External authorities:
 - **GRBL v1.1h wire protocol** — defined in the `gnea/grbl` wiki, which has been archived since Aug 2019. The 1.1h streaming protocol (simple send-response, character-counted buffer) remains the de-facto wire authority; actively maintained protocol-compatible forks are **grblHAL**, **FluidNC**, and **µCNC**.
@@ -588,11 +631,7 @@ External authorities:
 
 ---
 
-## Historical vertical slice — Phase A acceptance baseline
-
-This section records the original Phase A merge bar. It is retained for provenance;
-the active release gate is `pnpm release:check`, current scope is described above,
-and current physical qualification lives in `docs/hardware/verification-status.md`.
+## Vertical slice — Phase A acceptance
 
 Phase A merges only when **all** of these are true. Phase B starts only after Phase A is green.
 
@@ -602,16 +641,15 @@ Phase A merges only when **all** of these are true. Phase B starts only after Ph
 4. Tests pass in CI:
    - **Snapshot:** five fixture SVGs produce byte-identical G-code to recorded snapshots.
    - **Determinism property:** same input + same params → identical output over 100 random fuzz seeds.
-   - **Laser-off invariant property:** every `G0` line has `S0` or precedes an `M5` block, across 100 generated inputs.
+   - **Laser-off invariant property:** every `G0` line has inline `S0`, follows an `M5`/`M107`, or runs under a sticky `S0`, across 100 generated inputs.
    - **Bounds invariant property:** output coordinates fall within configured bed, across 100 generated inputs.
    - **Power-scale invariant property:** 50% slider produces correct `S` value across `$30 ∈ {100, 255, 1000}`.
    - **SVG sanitizer (via DOMPurify):** strips `<script>`, external `xlink:href`, foreign objects, non-image data URIs on a corpus of crafted-malicious SVGs.
    - **Module boundary:** ESLint passes; no `core` file imports from `platform`, `ui`, or `io`.
    - **File-size discipline:** ESLint passes; no file > 400 lines; no component > 250 lines; no function > 80 lines.
-   - **License compliance:** `scripts/check-licenses.mjs` finds no disallowed production licenses.
+   - **License compliance:** `pnpm license-check` finds zero disallowed production-tree licenses; distributable artifacts additionally close notices over shipped transitive packages, Electron/Chromium runtime notices, fonts, and assets (ADR-248).
    - **SceneObject extensibility:** a stub `TextObject` variant added to the union compiles through `JobCompiler` without modifying existing tests.
-5. Checked production source satisfies the file-size policies; behavior changes carry
-   focused tests; CI is green.
+5. No file in the repo over 400 lines. No untested source file. CI green.
 6. `RESEARCH_LOG.md` contains an entry for every adopted runtime dependency (license, version, justification, evaluation date).
 
 Anything outside this list is Phase B or later.

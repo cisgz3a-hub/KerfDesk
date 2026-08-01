@@ -140,7 +140,8 @@ describe('grblStrategy machine compatibility dialects', () => {
         'G90',
         'G54',
         'G94',
-        'M3 S0',
+        // ADR-257: the default dialect arms M4 dynamic power for vector cuts.
+        'M4 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
         'G0 X10.000 Y20.000 S0',
@@ -153,7 +154,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     );
   });
 
-  it('keeps generic legacy Fill runway bytes on G0 while 4040 uses the quality policy', () => {
+  it('keeps explicitly tagged legacy Fill runway bytes on G0', () => {
     const source = twoSweepFillJob.groups[0];
     if (source?.kind !== 'fill') throw new Error('Expected fill fixture');
     const out = grblStrategy.emit(
@@ -167,8 +168,9 @@ describe('grblStrategy machine compatibility dialects', () => {
         'G90',
         'G54',
         'G94',
-        'M3 S0',
-        'M5',
+        // ADR-257: cut and fill are both dynamic on the default dialect now, so the
+        // preamble arm carries straight into the fill body — the old M5 + M4 S0 flip
+        // pair is gone. Fewer mode changes per job is a side benefit of the change.
         'M4 S0',
         '; fill layer fill color #000000 power 90% speed 800 mm/min passes 1 overscan 3.000 mm (skipped on runs shorter than 6.000 mm; ADR-033)',
         '; pass 1 of 1',

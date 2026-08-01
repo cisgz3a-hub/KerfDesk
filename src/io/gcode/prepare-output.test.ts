@@ -11,6 +11,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { prepareOutput } from './prepare-output';
+import { deserializeProject, serializeProject } from '../project';
 
 function vectorProject(): Project {
   const obj: SceneObject = {
@@ -196,6 +197,43 @@ describe('prepareOutput', () => {
     }
   });
 
+  it('returns a controlled integrity failure when a valid .lf2 exhausts an actual allocation', () => {
+    const source = streamableRasterProject();
+    const extreme: Project = {
+      ...source,
+      scene: {
+        ...source.scene,
+        layers: source.scene.layers.map((layer) => ({
+          ...layer,
+          ditherAlgorithm: 'floyd-steinberg' as const,
+          linesPerMm: Number.MAX_VALUE,
+        })),
+        objects: source.scene.objects.map((object) =>
+          object.kind === 'raster-image'
+            ? { ...object, dither: 'floyd-steinberg' as const }
+            : object,
+        ),
+      },
+    };
+    const loaded = deserializeProject(serializeProject(extreme));
+    expect(loaded.kind).toBe('ok');
+    if (loaded.kind !== 'ok') return;
+
+    expect(prepareOutput(loaded.project)).toEqual({
+      ok: false,
+      preflight: {
+        ok: false,
+        issues: [
+          {
+            code: 'program-materialization-failed',
+            message:
+              'The compiled program could not be materialized in this environment. Reduce image resolution, reduce passes, or split the job, then try again.',
+          },
+        ],
+      },
+    });
+  });
+
   it('compiles only selected objects when Cut Selected Graphics is enabled', () => {
     const prepared = prepareOutput(twoObjectProject(), { outputScope: selectedScope(['B']) });
 
@@ -239,7 +277,40 @@ describe('prepareOutput', () => {
     const project = vectorProject();
     expect(prepareOutput(project)).toEqual(prepareOutput(project));
   });
+
+  // Rule 7 / ADR-228: runPreEmitPreflight emits heuristic policy codes
+  // (speed-out-of-range, scan-offset-out-of-range), and PreflightResult.ok is
+  // issues.length === 0 — so preparation used to refuse on a finding that
+  // merely warns on Start. That refusal reached the operator as a REFUSED
+  // Ruida export (emit-rd) and a refused tiled CNC export.
+  it('prepares the job when pre-emit reports a policy finding, carrying it as an advisory', () => {
+    const prepared = prepareOutput(policyFindingProject());
+
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(prepared.job.groups.length).toBeGreaterThan(0);
+    expect(prepared.advisories).toEqual([expect.objectContaining({ code: 'speed-out-of-range' })]);
+  });
+
+  it('reports no advisories for a project with no pre-emit findings', () => {
+    const prepared = prepareOutput(vectorProject());
+
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(prepared.advisories).toEqual([]);
+  });
 });
+
+// A controlled laser-off travel feed of 0 is unusable, so pre-emit reports
+// speed-out-of-range. It is a configuration judgment, not a compile-integrity
+// fact: the job still compiles, so preparation must not refuse it.
+function policyFindingProject(): Project {
+  const base = vectorProject();
+  return {
+    ...base,
+    device: { ...base.device, controlledLaserOffTravelFeedMmPerMin: 0 },
+  };
+}
 
 function travelOptimizationProject(): Project {
   const obj: SceneObject = {

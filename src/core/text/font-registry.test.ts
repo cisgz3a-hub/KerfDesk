@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FONT_REGISTRY } from './font-registry';
 
 describe('bundled font registry', () => {
-  it('contains four outline fonts and the four approved OFL CNC stroke fonts', () => {
+  it('contains thirteen outline fonts and the four approved OFL CNC stroke fonts', () => {
     expect(FONT_REGISTRY).toEqual([
       {
         key: 'roboto-regular',
@@ -12,8 +12,36 @@ describe('bundled font registry', () => {
         geometry: 'outline',
       },
       {
+        key: 'poppins-regular',
+        displayName: 'Poppins',
+        license: 'OFL-1.1',
+        styleClass: 'sans',
+        geometry: 'outline',
+      },
+      {
+        key: 'tinos-regular',
+        displayName: 'Tinos',
+        license: 'OFL-1.1',
+        styleClass: 'serif',
+        geometry: 'outline',
+      },
+      {
+        key: 'tinos-bold',
+        displayName: 'Tinos Bold',
+        license: 'OFL-1.1',
+        styleClass: 'serif',
+        geometry: 'outline',
+      },
+      {
         key: 'inconsolata-regular',
         displayName: 'Inconsolata',
+        license: 'OFL-1.1',
+        styleClass: 'mono',
+        geometry: 'outline',
+      },
+      {
+        key: 'courier-prime-regular',
+        displayName: 'Courier Prime',
         license: 'OFL-1.1',
         styleClass: 'mono',
         geometry: 'outline',
@@ -30,6 +58,41 @@ describe('bundled font registry', () => {
         displayName: 'Dancing Script',
         license: 'OFL-1.1',
         styleClass: 'script',
+        geometry: 'outline',
+      },
+      {
+        key: 'anton-regular',
+        displayName: 'Anton',
+        license: 'OFL-1.1',
+        styleClass: 'display',
+        geometry: 'outline',
+      },
+      {
+        key: 'special-elite-regular',
+        displayName: 'Special Elite',
+        license: 'Apache-2.0',
+        styleClass: 'display',
+        geometry: 'outline',
+      },
+      {
+        key: 'unifraktur-maguntia-book',
+        displayName: 'UnifrakturMaguntia',
+        license: 'OFL-1.1',
+        styleClass: 'display',
+        geometry: 'outline',
+      },
+      {
+        key: 'stardos-stencil-regular',
+        displayName: 'Stardos Stencil',
+        license: 'OFL-1.1',
+        styleClass: 'stencil',
+        geometry: 'outline',
+      },
+      {
+        key: 'saira-stencil-one-regular',
+        displayName: 'Saira Stencil One',
+        license: 'OFL-1.1',
+        styleClass: 'stencil',
         geometry: 'outline',
       },
       {

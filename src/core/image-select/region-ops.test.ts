@@ -6,6 +6,9 @@ import { createEmptyMask } from './selection-mask';
 
 const BLACK = { r: 0, g: 0, b: 0 };
 const WHITE = { r: 255, g: 255, b: 255 };
+const MAX_BYTE = 255;
+const PARTIAL_ALPHA = 200;
+const HALF_MASK_ALPHA = 128;
 
 function channelAt(buffer: ReturnType<typeof createRgbaBuffer>, x: number, y: number): number {
   return buffer.data[(y * buffer.width + x) * RGBA_CHANNELS] ?? -1;
@@ -83,5 +86,35 @@ describe('extractFloatingRegion + blitFloatingInPlace (the move protocol)', () =
     expect(touched).toEqual({ x: 5, y: 5, width: 1, height: 1 });
     const gone = blitFloatingInPlace(buffer, floating, 10, 10);
     expect(gone.width).toBe(0);
+  });
+
+  it('preserves intrinsic RGBA alpha while applying selection alpha', () => {
+    const buffer = {
+      width: 1,
+      height: 1,
+      data: new Uint8ClampedArray(RGBA_CHANNELS),
+    };
+    const floating = {
+      rect: { x: 0, y: 0, width: 1, height: 1 },
+      pixels: new Uint8ClampedArray([10, 20, 30, PARTIAL_ALPHA]),
+      alpha: new Uint8Array([HALF_MASK_ALPHA]),
+    };
+    blitFloatingInPlace(buffer, floating, 0, 0);
+    expect(Array.from(buffer.data)).toEqual([10, 20, 30, 100]);
+  });
+
+  it('does not make transparent coloured source pixels opaque', () => {
+    const buffer = {
+      width: 1,
+      height: 1,
+      data: new Uint8ClampedArray(RGBA_CHANNELS),
+    };
+    const floating = {
+      rect: { x: 0, y: 0, width: 1, height: 1 },
+      pixels: new Uint8ClampedArray([0, MAX_BYTE, 0, 0]),
+      alpha: new Uint8Array([MAX_BYTE]),
+    };
+    blitFloatingInPlace(buffer, floating, 0, 0);
+    expect(Array.from(buffer.data)).toEqual([0, 0, 0, 0]);
   });
 });

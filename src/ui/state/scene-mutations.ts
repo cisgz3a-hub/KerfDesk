@@ -27,7 +27,9 @@ import {
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateArtworkWithOperations } from './duplicate-artwork';
+import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
+import { releaseTraceSourcePalette } from './trace-source-palette';
 
 export { positionTraceOverRasterSource } from './trace-placement';
 
@@ -86,8 +88,15 @@ export function pushUndo(prev: Project, stack: ReadonlyArray<Project>): Readonly
 // semantics (Phase C re-import).
 export function findReimportTarget(scene: Scene, object: SceneObject): ImportedSvg | null {
   if (object.kind !== 'imported-svg') return null;
+  // Catalog items are reusable artwork, not file revisions. Adding the same
+  // Library asset twice must append two independently editable objects.
+  if (object.libraryProvenance !== undefined) return null;
   for (const existing of scene.objects) {
-    if (existing.kind === 'imported-svg' && existing.source === object.source) {
+    if (
+      existing.kind === 'imported-svg' &&
+      existing.libraryProvenance === undefined &&
+      existing.source === object.source
+    ) {
       return existing;
     }
   }
@@ -223,9 +232,10 @@ export function applyFreshImport(
   const created = createArtworkOperations(s.project.scene, positioned, {
     mode: freshArtworkMode(positioned),
   });
+  const operations = applyFreshTraceScanDirection(positioned, created.operations, s.project.device);
   positioned = created.object;
   let scene = addObject(s.project.scene, positioned);
-  for (const operation of created.operations) scene = addLayer(scene, operation);
+  for (const operation of operations) scene = addLayer(scene, operation);
   return {
     project: { ...s.project, scene },
     selectedObjectId: positioned.id,
@@ -278,6 +288,15 @@ export function applyTraceToExisting(
   const existing = s.project.scene.objects.find((o) => o.id === sourceId);
   const prepared = prepareTraceSource(s.project.scene, existing, options);
   let scene = prepared.scene;
+  // Free the source's palette slot BEFORE the trace allocates, so the artwork
+  // being cut takes OPERATION_PALETTE[0] instead of the runner-up. A deleted
+  // source leaves its operation orphaned (pruning it below would come too late
+  // to matter); a retained one stays as a no-output backing and steps aside.
+  if (prepared.source !== undefined) {
+    scene = prepared.shouldPruneLayers
+      ? pruneOrphanLayers(scene)
+      : releaseTraceSourcePalette(scene, prepared.source);
+  }
   const positionedTrace =
     prepared.source === undefined ? traced : positionTraceOverRasterSource(prepared.source, traced);
   if (options.replaceTraceId !== undefined && options.replaceTraceId !== positionedTrace.id) {
@@ -289,10 +308,15 @@ export function applyTraceToExisting(
   const created = createArtworkOperations(scene, positionedTrace, {
     mode: freshArtworkMode(positionedTrace),
   });
+  const operations = applyFreshTraceScanDirection(
+    positionedTrace,
+    created.operations,
+    s.project.device,
+  );
   scene = replaceInPlace
     ? replaceObject(scene, positionedTrace.id, created.object)
     : addObject(scene, created.object);
-  for (const operation of created.operations) scene = addLayer(scene, operation);
+  for (const operation of operations) scene = addLayer(scene, operation);
   if (prepared.shouldPruneLayers || options.replaceTraceId !== undefined) {
     scene = pruneOrphanLayers(scene);
   }

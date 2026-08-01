@@ -3,6 +3,7 @@ import {
   countOutputVectorSegments,
   estimateJobDuration,
   formatDuration,
+  machineSpaceJob,
   PREPARATION_COMPILED_SEGMENT_BUDGET,
   PREPARATION_RAW_VECTOR_SEGMENT_BUDGET,
   type Job,
@@ -36,7 +37,8 @@ export type LiveJobEstimate =
       readonly totalSeconds: number;
       readonly breakdown: JobDurationBreakdown;
     }
-  | { readonly kind: 'too-large' };
+  | { readonly kind: 'too-large' }
+  | { readonly kind: 'preparation-failed'; readonly message: string };
 
 export function estimateLiveJob(
   project: Project,
@@ -67,7 +69,7 @@ export function estimateLiveJob(
     outputScope,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimatePrepared(prepared, jobOrigin);
+  return estimateLiveJobFromPrepared(prepared, jobOrigin);
 }
 
 export async function estimateLiveJobSnapshot(
@@ -98,7 +100,7 @@ export async function estimateLiveJobSnapshot(
     ...(registration === undefined ? {} : { registration }),
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimatePrepared(prepared, jobOrigin);
+  return estimateLiveJobFromPrepared(prepared, jobOrigin);
 }
 
 /**
@@ -117,15 +119,20 @@ export function estimateLiveJobUnbounded(
     outputScope,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimatePrepared(prepared, jobOrigin, { unbounded: true });
+  return estimateLiveJobFromPrepared(prepared, jobOrigin, { unbounded: true });
 }
 
-function estimatePrepared(
+export function estimateLiveJobFromPrepared(
   prepared: PreparedOutput,
   jobOrigin?: JobOriginPlacement,
   options: { readonly unbounded?: boolean } = {},
 ): LiveJobEstimate {
-  if (!prepared.ok) return { kind: 'too-large' };
+  if (!prepared.ok) {
+    return {
+      kind: 'preparation-failed',
+      message: prepared.preflight.issues.map((issue) => issue.message).join(' '),
+    };
+  }
   if (prepared.job.groups.length === 0) return { kind: 'empty' };
   if (
     options.unbounded !== true &&
@@ -136,8 +143,11 @@ function estimatePrepared(
 
   const currentPosition =
     jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : undefined;
+  // ADR-127: measure the machine-space job. Identity when no rotary is active,
+  // so flat jobs are unchanged. Kept in step with buildPreparedJobMetrics so
+  // the live tile and Job Review cannot report different durations.
   const result = estimateJobDuration(
-    prepared.job,
+    machineSpaceJob(prepared.job, prepared.project.device, prepared.project.machine),
     prepared.project.device,
     currentPosition === undefined
       ? {}

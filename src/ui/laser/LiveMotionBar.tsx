@@ -1,9 +1,14 @@
 import { progress } from '../../core/controllers/grbl';
 import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
-import { cncResumeBlockMessage } from '../state/cnc-pause-resume-policy';
+import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob, toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
+import {
+  LiveMotionActionButton,
+  LIVE_MOTION_ACTION_BUTTON_STYLE,
+  PendingPauseResumeAction,
+} from './LiveMotionActionButton';
 import { pauseControlMessage, resumeControlTitle } from './job-control-copy';
 
 const MAXIMUM_STACKING_ORDER = 2_147_483_647;
@@ -14,6 +19,7 @@ type LaserSnapshot = ReturnType<typeof useLaserStore.getState>;
 type Streamer = NonNullable<LaserSnapshot['streamer']>;
 type ControllerOperation = NonNullable<LaserSnapshot['controllerOperation']>;
 type MotionOperation = NonNullable<LaserSnapshot['motionOperation']>;
+type PauseResumeTransition = NonNullable<LaserSnapshot['pauseResumeTransition']>;
 
 type MotionDescription = {
   readonly heading: string;
@@ -26,6 +32,7 @@ export function LiveMotionBar(): JSX.Element | null {
   const controllerOperation = useLaserStore((state) => state.controllerOperation);
   const motionOperation = useLaserStore((state) => state.motionOperation);
   const fireActive = useLaserStore((state) => state.fireActive);
+  const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   const stopJob = useLaserStore((state) => state.stopJob);
   const setFireActive = useLaserStore((state) => state.setFireActive);
   const description = describeLiveMotion(
@@ -33,6 +40,7 @@ export function LiveMotionBar(): JSX.Element | null {
     controllerOperation,
     motionOperation,
     fireActive,
+    pauseResumeTransition,
   );
   if (description === null) return null;
   const abort = description.abortLabel === 'LASER OFF' ? () => setFireActive(false) : stopJob;
@@ -71,12 +79,22 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
   const machineKind = useLaserStore((state) => state.activeJobMachineKind);
   const isControllerRunning = useLaserStore((state) => state.statusReport?.state === 'Run');
   const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
-  const resumeBlockMessage = cncResumeBlockMessage(machineKind);
+  const resumeAdvisory = cncResumeAdvisoryNotice(machineKind);
+  const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
+  if (pauseResumeTransition !== null) {
+    return (
+      <PendingPauseResumeAction
+        action={pauseResumeTransition.action}
+        pauseJob={pauseJob}
+        resumeJob={resumeJob}
+      />
+    );
+  }
   const canPause =
     streamer?.status === 'streaming' || (streamer?.status === 'done' && isControllerRunning);
   if (canPause) {
     return (
-      <ActionButton
+      <LiveMotionActionButton
         label="Pause"
         title={pauseControlMessage(machineKind, hasRealtimePause)}
         onClick={pauseJob}
@@ -85,17 +103,16 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
   }
   if (streamer?.status === 'paused') {
     return (
-      <ActionButton
+      <LiveMotionActionButton
         label="Resume"
-        title={resumeControlTitle(resumeBlockMessage, hasRealtimePause)}
-        disabled={resumeBlockMessage !== null}
+        title={resumeControlTitle(resumeAdvisory, hasRealtimePause)}
         onClick={resumeJob}
       />
     );
   }
   if (streamer?.status === 'tool-change') {
     return (
-      <ActionButton
+      <LiveMotionActionButton
         label="Continue"
         title={toolChangeBlockMessage ?? TOOL_CHANGE_CONTINUE_TITLE}
         disabled={toolChangeBlockMessage !== null}
@@ -106,35 +123,16 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
   return null;
 }
 
-function ActionButton(props: {
-  readonly label: string;
-  readonly title: string;
-  readonly disabled?: boolean;
-  readonly onClick: () => Promise<void>;
-}): JSX.Element {
-  return (
-    <button
-      type="button"
-      className="lf-btn lf-btn--primary"
-      style={actionButtonStyle}
-      title={props.title}
-      disabled={props.disabled}
-      onClick={() => void props.onClick().catch(() => undefined)}
-    >
-      {props.label}
-    </button>
-  );
-}
-
 function describeLiveMotion(
   streamer: Streamer | null,
   controllerOperation: ControllerOperation | null,
   motionOperation: MotionOperation | null,
   fireActive: boolean,
+  pauseResumeTransition: PauseResumeTransition | null,
 ): MotionDescription | null {
   if (streamer !== null && isActiveJob(streamer)) {
     return {
-      heading: jobHeading(streamer.status),
+      heading: jobHeading(streamer.status, pauseResumeTransition),
       detail: jobProgress(streamer),
       abortLabel: 'ABORT JOB',
     };
@@ -163,7 +161,12 @@ function describeLiveMotion(
   return null;
 }
 
-function jobHeading(status: Streamer['status']): string {
+function jobHeading(
+  status: Streamer['status'],
+  pauseResumeTransition: PauseResumeTransition | null,
+): string {
+  if (pauseResumeTransition?.action === 'pause') return 'JOB PAUSING';
+  if (pauseResumeTransition?.action === 'resume') return 'JOB RESUMING';
   if (status === 'streaming') return 'JOB RUNNING';
   if (status === 'paused') return 'JOB PAUSED';
   if (status === 'tool-change') return 'TOOL CHANGE';
@@ -221,14 +224,8 @@ const actionsStyle: React.CSSProperties = {
   gap: 12,
   marginLeft: 'auto',
 };
-const actionButtonStyle: React.CSSProperties = {
-  minWidth: 128,
-  minHeight: 48,
-  fontSize: 16,
-  fontWeight: 700,
-};
 const abortButtonStyle: React.CSSProperties = {
-  ...actionButtonStyle,
+  ...LIVE_MOTION_ACTION_BUTTON_STYLE,
   minWidth: 144,
   fontWeight: 800,
   letterSpacing: 0.4,

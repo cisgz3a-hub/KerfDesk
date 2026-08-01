@@ -1,151 +1,373 @@
-# Engineering guide
+# CLAUDE.md — Operating manual for Claude Code
 
-`AGENTS.md` is the canonical, tool-neutral operating contract. This file defines
-repository engineering standards for Claude Code and every other contributor.
-Rules are labeled so guidance is not confused with a CI gate.
+> **Read this file at the start of every session.** Every rule here is enforced in CI or rejected at PR review. If you find yourself reasoning toward an exception, write a new ADR in `DECISIONS.md` first — **except for collaboration rule 7 (Frame is the only guard), where no ADR, test, or grant of permission can ever create an exception**: put the concern in the Job Review warnings list and stop.
 
-## Before changing code
+---
 
-1. Confirm the current checkout and preserve unrelated work.
-2. Read `PROJECT.md` for scope, the relevant `WORKFLOW.md` section, and the
-   governing ADRs. Use [`docs/README.md`](docs/README.md) to route the task; do
-   not read the multi-thousand-line logs end to end unless the task requires it.
-3. Reproduce a bug before fixing it. Search with `rg` and inspect callers, tests,
-   state transitions, persistence, and recovery paths.
-4. Identify what automated, browser, perceptual, simulator, or hardware evidence
-   can actually prove the result.
+## Read-in-order on session start
 
-Scope changes require a `PROJECT.md` update. Architecturally significant,
-machine-policy, dependency, persistence-schema, or trust-boundary changes require
-an ADR. Routine bug fixes, tests, documentation corrections, and behavior-neutral
-refactors do not.
+1. This file (`CLAUDE.md`).
+2. `PROJECT.md` — what to build, current phase, scope.
+3. `DECISIONS.md` — every architectural choice and why.
+4. `WORKFLOW.md` — exact user flows for the current phase.
+5. The specific ticket you've been given.
 
-## Collaboration and evidence — review conventions
+If any of these contradict each other, **stop and ask.** Do not proceed.
 
-- Keep diffs cohesive and reviewable. Do not batch unrelated fixes.
-- Audits are report-only unless the user asks for implementation.
-- Never invent an API, file, setting, or behavior. Verify it in the current tree.
-- Green tests do not establish visual fidelity or physical burn quality. Use the
-  perceptual harness, rendered output, isolated browser verification, simulator
-  evidence, or the documented hardware protocol, and report what remains untested.
-- Do not drive the maintainer's real browser scene with synthetic events or commit
-  actions. Use an isolated test project/profile or ask for supervised verification.
-- LightBurn is the default behavior and UX reference where the product contract
-  adopts it. Deliberate divergences are allowed when documented by the maintainer;
-  do not call an unverified behavior parity.
-- Follow the frame-first machine-control policy in `AGENTS.md`. It governs
-  ordinary Start policy, not security, capability, recovery, or integrity checks.
+---
 
-## Enforced architecture
+## Working with the maintainer — collaboration rules
 
-These rules are enforced by TypeScript, ESLint, or repository scripts.
+These are behavioral norms for *how* to work in this repo. Unlike the coding rules below, they are **not CI-enforced** — they are enforced by the maintainer's review. They exist because LaserForge's hard problem is **output fidelity vs LightBurn**, which the automated suite does not measure.
 
-### Size and complexity
+1. **Tight leash — small, individually-verified diffs.** Make the smallest reviewable change that advances the goal, verify it, and let the maintainer review each diff before continuing. No large unreviewed rewrites, no multi-concern diffs, no batching unrelated fixes. When **auditing, report findings and let the maintainer choose what to fix — do not auto-fix.**
 
-| Unit | Policy | Enforcement |
-|---|---|---|
-| Production source file | 250 counted lines is report-only; 400 counted lines is an error | `pnpm check:soft-size`, ESLint `max-lines` |
-| Source/config physical size | 600 raw lines | `pnpm check:file-size` |
-| Function, including React components | 80 counted lines | ESLint `max-lines-per-function` |
-| Cyclomatic complexity | 12 | ESLint `complexity` |
-| New `index.ts` barrel | 10 exports is the soft target; 20 is the hard cap | `pnpm check:index-exports` |
+2. **Verify perceptually — green tests are NOT proof a feature works.** The suite asserts *structure and determinism* (SVG prefixes, path counts, byte-identical G-code over fuzz seeds), never *fidelity* (does the trace / fill / engrave look like the input?). Output can be geometrically wrong and still pass everything. Never call a trace/fill/engrave/raster feature "working" because `pnpm test` is green. Render it and compare to the source — the perceptual harness (`src/__fixtures__/perceptual/`, ADR-025), a rendered preview, or a golden-image diff — and **state plainly what was NOT verified.** When unsure, say "I have not verified the output looks correct," not "it works."
 
-Tests and fixtures have documented exceptions for function length, non-null
-assertions, module boundaries, and Node imports. Legacy over-cap barrels use the
-checked-in no-growth ratchet. Do not describe the 250-line tier as a lint warning;
-it is a non-blocking report.
+3. **LightBurn is the reference for every behavior.** For any behavior, UX, default, layer/cut semantics, mode (Line/Fill/Image), or G-code decision, match LightBurn unless the maintainer says otherwise. State the LightBurn behavior and check ours against it; call divergences bugs, not choices. Baseline semantics: Line = vector outline cut; Fill/Scan = hatch-fill interior; Image = dithered/grayscale raster engrave of a bitmap (not vectors). Layers are keyed by color; a layer's mode applies to every object on it; hiding a layer hides its objects on the canvas.
 
-### Module boundaries
+4. **Live-app verification must be side-effect-free.** The dev-server preview shares the maintainer's *real* working scene — treat its canvas as live work, not a sandbox. Validate a changed function in isolation (real browser APIs on throwaway DOM nodes / a throwaway canvas), not by driving the real file `<input>` or clicking commit buttons. Synthetic DOM events (`change`, `keydown` on `window`) DO fire real handlers — they have committed objects into the maintainer's scene before. If a full UI render is truly needed, ask the maintainer to do the import, or confirm first.
 
-```text
-core/              imports core/
-io/                imports core/, io/
-platform/types.ts  imports core/
-platform/web/      imports core/, platform/types
-platform/electron/ imports core/, platform/types
-ui/                imports core/, io/, platform/types
+5. **No invention.** Don't state an API, file, config value, or behavior you haven't verified in the current tree — read the code or run the command first. "I don't know" is fine; inventing is not. (Restated from "When you don't know — say so" because it is the rule most often violated here.)
+
+6. **End every response with a recommended action.** After any fix, audit, answer, or investigation, close with a line that starts with **Recommended action:** (or **Recommended fix:**) stating plainly the single best next step — not a menu of options. If the best next step is "nothing, ship as-is" or "no change needed," say exactly that. When a genuine either/or decision is the maintainer's to make, name your recommended option first and label it as recommended, then the alternative in one line. The maintainer should never have to ask "so what do you suggest?" — every message already answers it.
+
+7. **FRAME IS THE ONLY GUARD — no guard will ever be created again. Hard rule, no exceptions.** (Maintainer, 2026-07-17; ADR-228, clarified by ADR-232.) A *guard* is any behavior that blocks, refuses, gates, caps, clamps, delays, hides, disables, rewrites, or adds confirmation before an otherwise available action, input, output, machine command, job start, preview, save, import, export, or G-code emission. The ONE Start guard is the frame-first gate: a completed Frame for the exact current job (bounds signature + origin identity) opens Start on both laser and CNC; the Job Review dialog is the single warning surface the operator confirms. **Frame is the source of truth: calculated bed bounds, configured no-go zones, and controller-setting policy may warn in Job Review, but must never refuse Frame or Start. The actual clean Frame completion decides whether a permit exists.** Never add a new guard, re-add a deleted one, expand any refusal surface, or promote a warning into a block — not for "safety," not for "defense in depth," not with tests or an ADR, not ever. Anything an agent believes the operator should know goes into the Job Review warnings list, which informs and never refuses. The only non-guard refusals permitted to exist are: (a) transport preconditions — the serial channel factually cannot accept a stream (disconnected, no status yet, controller Alarm/not-Idle, a job/jog/frame/operation already running, MPG owning control, a line larger than the RX buffer) — each of which must offer its fix in place where one exists; (b) compile integrity — the program factually cannot be produced or contains unstreamable bytes (compile failure, NaN coordinates, empty output); and (c) handoff consistency — the exact reviewed program/setup must be the one streamed (evidence epochs, attestation binding, resume fingerprints). Re-labeling a policy judgment as one of these three categories is a violation of this rule. Narrowing, correcting, or removing refusals remains normal work; widening any of them requires the maintainer's explicit prior permission in chat, which should be presumed denied (PROJECT.md non-negotiable #21).
+
+8. **Every finished job ends with a full Job Completion Report. Hard rule, no exceptions.** (Maintainer, 2026-07-25.) A *job* is any unit of work an agent was given and has stopped working on — a fix, a feature, an audit, an investigation, a refactor, a PR opened / updated / merged, or work that is blocked or abandoned — on **any** branch or worktree, by **any** agent (main session, subagent, fleet, scheduled run). Answering a question or doing a single lookup that changes nothing is not a job; rule 6 alone covers those. When a job ends, the final message must carry the nine sections below, in this order, under these headings. A small job gets short sections, but **no section may be dropped** — if one is genuinely empty, keep the heading and write "None." Every fact in the report must come from a command actually run in this session (rule 5); anything not verified is labeled **not verified** rather than left implied.
+
+   1. **Where we are** — branch / worktree name, PR number + link and its state (draft / open / merged / closed), CI state by named check (green / red / pending / not run), whether the work is on `main`, and whether anything is deployed. Facts as of now, not expectations.
+   2. **What we did** — the original ask restated in the maintainer's terms, including anything added mid-flight, and the practical result it was meant to produce; then the change list **by file path**, one line of *why* per file. Not "I updated the layers panel."
+   3. **Goal status** — **achieved / partially achieved / not achieved**, with the evidence behind that word. Never "achieved" while required work remains.
+   4. **What was verified — and what was NOT** — the commands actually run and their results (`pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check` — counts and pass/fail), then the gap stated plainly: no perceptual render, no hardware air-cut, no E2E, mock-only. Rule 2 governs this section; green tests are never evidence a feature works.
+   5. **How it works now** — the finished user-facing behavior: what the maintainer will see, where in the UI, how to operate it, what to expect, and the limits that remain.
+   6. **What's next — numbered steps** — **Step 1, Step 2, Step 3 …** in the order they should be done. Each step gives the exact action (a command in a fenced block, a file path, or a click path), why it comes next, what a good result looks like, and what to do if it fails. No "consider", "maybe", or "look into" — every step must be executable exactly as written by someone who did not watch the session.
+   7. **What else we could do** — the optional list, kept strictly separate from step 6 so *must* is never confused with *could*: adjacent work, deferred items, follow-ups. One line each, with its cost and its payoff.
+   8. **How to improve** — the honest quality read: risk this change introduces, debt taken on, tests not written, the same pattern that may exist elsewhere in the tree, and what a better version would look like with more time.
+   9. **Recommended action:** — rule 6 unchanged: one line, the single best next step, no menu.
+
+   Blocked or intentionally incomplete work uses the same skeleton — name what is missing under **Goal status** and exactly what unblocks it under **What's next**. If the job touched more than one branch, the report covers each branch by name. This report is written for the maintainer, not as a changelog: a diff, test log, commit, or PR link is supporting evidence inside it, never a replacement for it.
+
+---
+
+## Size limits — hard
+
+Every **hard** limit below is enforced by ESLint, `tsc`, or a CI script, not by judgment — except the React-component row, which has no lint rule and is enforced at review. Every **soft** limit is advisory: `pnpm check:soft-size` lists files over the soft file limit but always exits 0 (ADR-132). ESLint's file line limit counts code lines excluding blank and comment lines; CI also runs a 600 raw physical lines backstop to catch files that grow too large physically.
+
+| Unit | Soft limit | Hard limit | Rule |
+|---|---|---|---|
+| File | 250 counted code lines | 400 counted code lines | Report-only listing at soft (`pnpm check:soft-size`, always exits 0 — ADR-132), ESLint `max-lines` error at hard, excluding blank and comment lines. No exceptions to this counted-code limit; CI also enforces 600 raw physical lines. |
+| React component | 150 lines | 250 lines | **Review-enforced — no component-specific lint rule exists**; the 400-counted-line file cap is the only mechanical limit on a `.tsx`. If approaching, split into sub-components in a folder. |
+| Function | 40 lines | 80 lines | If approaching, extract helpers. |
+| Cyclomatic complexity per function | 8 | 12 | Lint error at hard. |
+| Default exports per file | 1 | 1 | Named exports allowed if cohesive. |
+| Public exports from a module's `index.ts` | 10 | 20 | New barrels are capped at 20. Legacy over-cap barrels are CI-ratcheted to their checked-in baseline and may only shrink until they reach the cap. |
+
+If a generated file exceeds the soft limit during a session, **stop and split before continuing.** Do not finish the file then refactor.
+
+---
+
+## File creation — default action
+
+When implementing a feature, the default is **create a new file**, not "add to an existing file."
+
+- Adding a new utility used by two callers? New file in the nearest shared folder.
+- Adding a new React component? New file, new folder if it has subcomponents.
+- Adding a new pipeline stage? New module under `src/core/` with its own `index.ts`.
+- Adding a new test? New file alongside the source (`Foo.ts` → `Foo.test.ts`).
+
+You may only add to an existing file when:
+- The addition is < 20 lines and clearly part of the same single responsibility, AND
+- The existing file is under 60% of its soft limit, AND
+- The addition doesn't introduce a new concept worth naming.
+
+If any of those three is false, create a new file.
+
+---
+
+## Single responsibility — operationally defined
+
+A file has one responsibility if you can describe what it does in one sentence without using "and."
+
+- ✅ "Parses an SVG string into a Scene." → one responsibility.
+- ❌ "Parses an SVG string into a Scene and applies layer color mapping." → two; split.
+- ❌ "Renders the layers panel and handles layer reordering and persists layer state." → three; split.
+
+**If your one-sentence description has "and" in it, split before continuing.**
+
+---
+
+## Naming conventions — non-negotiable
+
+- **Files**: `kebab-case.ts` for modules, `PascalCase.tsx` for React components.
+- **Types and interfaces**: `PascalCase`. No `I` prefix on interfaces.
+- **Functions and variables**: `camelCase`.
+- **Constants**: `SCREAMING_SNAKE_CASE` at module level only. Local constants are `camelCase`.
+- **Booleans**: prefix with `is`, `has`, `can`, `should`. Never `flag`, never negative names (`isNotReady` is banned; use `isPending` or `isLoading`).
+- **Event handlers**: `handleX` for the function definition, `onX` for the prop name (`handleSubmit` defined locally is passed as `onSubmit` to a child).
+- **Test files**: same name as source + `.test.ts` / `.test.tsx`.
+
+File name must match the primary export. `Layer.ts` exports `Layer`. `svg-parser.ts` exports `svgParser` or `parseSvg`.
+
+---
+
+## Imports — boundaries enforced
+
+```
+core/  ← imports from: core/, nothing else
+io/    ← imports from: core/, io/
+platform/ ← imports from: core/, platform/types, nothing in ui/ or io/
+ui/    ← imports from: core/, io/, platform/types (never platform/web or platform/electron directly)
 ```
 
-Cross-module imports go through the owning module's public surface. Production
-code must not create import cycles. `src/ui/app/main.tsx` is the composition-root
-exception, and tests/fixtures may cross boundaries for scaffolding.
+Enforced by `eslint-plugin-boundaries`. Violation is a CI fail, not a warning. Two scoped exceptions, both deliberate: `src/ui/app/main.tsx` is the composition root and may wire `platform/web` → `ui` (ADR-011), and **test files (`*.test.ts`, `*.test.tsx`) plus `src/__fixtures__/` are exempt from boundary enforcement** — a test may import across modules for scaffolding. Do not read the exemption as license to couple production code through a test.
 
-### Pure core and type safety
+Cross-module imports must go through `index.ts`. Reaching into `../scene/internal/foo.ts` from outside `scene/` is forbidden — **a review-enforced convention, not a mechanical one**: `boundaries/entry-point` is not configured, and because elements are declared in folder mode a deep path still classifies as its top-level module and passes lint.
 
-Production `src/core/` code must not read browser or Node globals, perform I/O,
-read the clock, generate randomness, or log directly. Pass those capabilities in
-or move the work to the appropriate boundary.
+No circular imports. ESLint rule `import/no-cycle` set to error.
 
-TypeScript is strict. Production code forbids explicit `any` and non-null
-assertions, enforces type-only imports and exhaustive switches, and checks
-floating/misused promises. Prefer discriminated unions for mutually exclusive
-states. Use `unknown` plus narrowing at untrusted boundaries.
+---
 
-Module-level mutable state is not categorically banned. Keep it isolated and
-lifecycle-owned; ADR-050 permits narrow memoized loader caches, and platform or
-worker handles may need bounded mutable ownership. Do not introduce hidden
-cross-project state.
+## State — discriminated unions only
 
-### UI and async safety
+When a thing can be in one of N states, model it as a tagged union:
 
-- Raw `window.alert`, `confirm`, and `prompt` are forbidden outside the
-  job-aware wrapper because they can freeze the renderer during a job.
-- UI chrome colors use shared theme tokens; justified scene-data colors are the
-  documented exception.
-- Await or explicitly handle promises. Async continuations that can outlive a
-  project, session, modal, worker, or controller epoch must reject stale results.
-
-## Design guidance — review conventions
-
-- Choose the smallest cohesive home for a change. Create a new file when it owns
-  a distinct concept; extend an existing file when the behavior belongs to its
-  current responsibility and remains within enforced limits.
-- Prefer clear names: `PascalCase` for types/components, `camelCase` for values,
-  `handleX` for local handlers, and `onX` for callback props. Follow the existing
-  folder's filename convention and make the primary export easy to find.
-- Name domain limits, units, tolerances, protocol values, and reused messages.
-  Obvious local literals do not need ceremonial constants.
-- Comments explain constraints and reasons. Public APIs should document
-  non-obvious contracts; internal helpers need comments only when the reason is
-  not clear from code.
-- Avoid god files, copy/paste variants, boolean-flag APIs, stringly typed modes,
-  mutated arguments, floating promises, and platform checks inside UI logic.
-  Cohesion and change risk—not whether a sentence contains the word “and”—decide
-  when to split a module.
-
-## Tests and change process
-
-- Co-locate directly relevant tests with source. CI does not require one sibling
-  test for every source file, but behavior changes need focused evidence.
-- For a bug, add a failing reproduction when practical, make the smallest fix,
-  then prove the reproduction and affected regression suite pass.
-- Property-test safety/output invariants and snapshot intentional G-code changes.
-  A G-code snapshot change must include `Snapshot change acknowledged: <reason>`
-  in the PR description.
-- Keep behavior-neutral refactors separate from feature work when the refactor is
-  not required to deliver the feature safely.
-- Use Conventional Commit prefixes: `feat:`, `fix:`, `refactor:`, `test:`,
-  `docs:`, `chore:`, `ci:`.
-
-## Verification commands
-
-Choose commands proportional to the change:
-
-```powershell
-pnpm typecheck
-pnpm lint
-pnpm lint:electron
-pnpm format:check
-pnpm test
-pnpm test:e2e
-pnpm release:check
+```ts
+type LoadState =
+  | { kind: 'idle' }
+  | { kind: 'loading'; startedAt: number }
+  | { kind: 'loaded'; data: Project }
+  | { kind: 'failed'; error: Error };
 ```
 
-`pnpm release:check` is the full blocking release gate: typecheck, lint, Electron
-lint, formatting, license and dependency audit, Vitest, web/Electron builds, and
-size/export policies. `pnpm test:e2e` is the separate Playwright browser-smoke
-suite. Documentation-only work normally does not justify running every source and
-browser test; verify formatting, relative links, commands, and factual claims.
+Not:
 
-When handing off, list the meaningful files changed, the verification performed,
-and any unverified browser, perceptual, controller, or hardware behavior.
+```ts
+// ❌ banned
+type LoadState = {
+  isLoading: boolean;
+  isLoaded: boolean;
+  isFailed: boolean;
+  data?: Project;
+  error?: Error;
+};
+```
+
+When pattern-matching on `kind`, the default arm must be `assertNever(state)` so TypeScript catches missing cases at compile time. This is how Phase D and Phase E land cleanly — the compiler tells you exactly where new variants need handling.
+
+---
+
+## Mutable state — none, except in Zustand slices
+
+- No module-level mutable variables.
+- No `let` outside function bodies.
+- No mutation of objects after construction. Build a new value with spreads — the store uses spreads throughout. (Immer is **not** a dependency: it is only an optional peer of Zustand and is absent from the tree, so do not import `produce`.)
+- React state lives in either local `useState` or a Zustand slice — never a global object, never a singleton.
+
+---
+
+## Pure core
+
+Nothing in `src/core/` is allowed to:
+- Read from disk
+- Read from the network
+- Read from `process`, `navigator`, `window`, `document`
+- Read the system clock (`Date.now()`) — pass time in as a parameter for testability
+- Generate random values — pass an RNG in as a parameter
+- Call `console.*` (use a logger passed in)
+- Throw exceptions for control flow — return a `Result<T, E>` discriminated union
+
+Enforced by ESLint `no-restricted-globals`, `no-restricted-imports`, and `no-restricted-syntax` (the clock and randomness bans). The Result-instead-of-throw rule is **review-enforced only** — no lint rule detects a `throw` inside `src/core/`.
+
+---
+
+## Tests — co-located, written first for bug fixes
+
+- Source file `Foo.ts` → test file `Foo.test.ts` in the same folder when the source has direct testable behavior.
+- CI does not enforce a direct sibling-test rule. PR review rejects source changes without modified or added tests unless the change is a pure refactor or an explicitly documented policy/docs/build-only change.
+- Property tests for all invariants (`PROJECT.md` non-negotiables 1–7).
+- Snapshot tests for G-code output on the fixture corpus.
+- **Bug fix workflow**: write a failing test that demonstrates the bug, then fix it, then verify the test passes. PR must include both the test (new) and the fix.
+
+PR review rejects PRs that:
+- Modify source without modifying or adding tests, except for pure refactors flagged as such.
+- Modify the G-code snapshot without an explicit acknowledgment line in the PR description: `Snapshot change acknowledged: <reason>`.
+
+(These are review conventions, not CI-mechanical gates — `release:check` runs lint, typecheck, format, license, audit, tests, builds, and file-size, none of which inspect test-file presence or the PR description. See "Session hygiene" below and PROJECT.md #16.)
+
+---
+
+## Type strictness
+
+- `tsconfig.json` has `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`.
+- `any` is banned. Use `unknown` and narrow.
+- Type assertions (`as Foo`) require a comment justifying why narrowing isn't sufficient.
+- Non-null assertions (`!`) banned outside test files.
+
+---
+
+## Magic numbers, magic strings
+
+Inline literals are allowed for:
+- `0`, `1`, `-1`
+- `''` (empty string)
+- Array indices in obviously-bounded loops
+
+Everything else gets a named constant. Tolerances, default values, limits, error messages, key names, route paths, file extensions — all named.
+
+```ts
+// ✅
+const MAX_BED_DIMENSION_MM = 1500;
+if (workspace.width > MAX_BED_DIMENSION_MM) ...
+
+// ❌
+if (workspace.width > 1500) ...
+```
+
+---
+
+## Comments — why, not what
+
+Code says what; comments say why.
+
+```ts
+// ✅
+// GRBL $30 defines the max S value the firmware maps to 100% laser power.
+// We scale our 0-100 percentage into this range at the strategy boundary.
+const sValue = (powerPercent / 100) * device.maxPowerS;
+
+// ❌
+// Multiply power percent by max power S
+const sValue = (powerPercent / 100) * device.maxPowerS;
+```
+
+JSDoc on public exports. Internal helpers don't need doc comments unless the why isn't obvious.
+
+---
+
+## Anti-patterns — recognize and refactor
+
+Watch for these in your own output. If you generate code that matches one of these patterns, **stop and refactor before continuing the session.**
+
+- **God file.** Any file approaching 250 lines. The fix is *split*, not "add a TODO."
+- **Copy-paste duplication.** Same logic written twice with small variations. The fix is *extract* to a helper module the second time it appears, not the third.
+- **Long parameter list.** Function with > 4 parameters. The fix is *introduce a parameter object* type.
+- **Boolean parameter.** `doThing(input, true)`. The fix is *split into two functions* or use a discriminated union for the option.
+- **Stringly-typed.** `mode: string` where it should be `mode: 'line' | 'fill' | 'image'`.
+- **Comment instead of refactor.** `// TODO: this is messy` is a code smell. Refactor or open an issue.
+- **Conditional platform code.** `if (isElectron()) { ... }` inside `ui/`. The fix is *push to platform adapter*.
+- **Mutable args.** Function that modifies an array or object passed in. The fix is *return a new value*.
+- **Throwing for control flow.** `try { parseX() } catch { return null }`. The fix is *return a Result type from parseX*.
+- **Ignored async.** `await`able functions called without `await`. CI rule `no-floating-promises`.
+
+---
+
+## Adding a new feature — checklist
+
+Before writing code:
+
+- [ ] Does the feature appear in `PROJECT.md` under the current phase?
+- [ ] If it's architectural, is there an ADR in `DECISIONS.md`?
+- [ ] Are user flows in `WORKFLOW.md` for the four states (success, error, empty, edge)?
+- [ ] Have I identified which module(s) the change lives in?
+- [ ] Have I checked which existing files might need updates? (Use grep, don't guess.)
+- [ ] Have I planned tests? Which invariants apply?
+- [ ] What's the smallest reviewable diff that accomplishes this?
+
+If any answer is no, fix it before writing code.
+
+---
+
+## Fixing a bug — checklist
+
+- [ ] Have I reproduced the bug?
+- [ ] Have I written a failing test that demonstrates it?
+- [ ] Have I identified the root cause, not just the symptom?
+- [ ] Have I checked whether the same pattern exists elsewhere in the codebase? (`grep -r` for similar code.)
+- [ ] Have I made the smallest fix that makes the failing test pass?
+- [ ] Have I run the full test suite, not just the new test?
+- [ ] Does my PR description explain root cause, not just symptom?
+
+---
+
+## Refactoring — separate from features
+
+Refactors and feature work do not go in the same PR. Two principles:
+
+1. **Tidy first.** If a feature would be easier to implement after a refactor, do the refactor *first*, in its own PR, with no behavior change. Merge. Then do the feature.
+2. **Same diff = same intent.** A reviewer should be able to look at a PR and answer "what is this trying to do?" in one sentence. If the answer is "refactor X *and* add Y," split it.
+
+PR titles use Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`, `ci:`.
+
+---
+
+## We only build with verified research — never guess, never hallucinate
+
+You are not penalized for saying "I don't know." You are penalized for inventing — and
+equally for **speculating out loud instead of going and finding out.** When you don't know
+something, go do the research: read the source, run the command, fetch the upstream document.
+Then answer. Uncertainty is a trigger to investigate, never a licence to guess.
+
+**Banned moves.** If you catch yourself writing one of these, stop mid-sentence and go
+research instead:
+- "Maybe I should…" / "I think it works like this" / "It probably…" / "This should be fine"
+- Proposing a design whose feasibility you have not checked
+- Stating an API, flag, version range, CVE range, config key, default, or firmware behavior
+  from memory
+- Recommending a fix you have not confirmed actually fixes the thing
+
+**Evidence you must hold, from this session, before stating a fact or recommending a fix:**
+- The actual source read in the current tree — cite `file:line`; or
+- The actual command run, with its real output and exit code; or
+- The **upstream primary source fetched and read** — vendor docs, the advisory record, the
+  spec, the changelog, the firmware manual, the issue thread; or
+- A reproduction you ran yourself.
+
+"I read it somewhere," "that's how it usually works," and "the docs probably say" are not
+sources. **External research is expected, not a last resort** — fetch the page, read the
+GRBL/LightBurn documentation, read the advisory, read the datasheet. Cite what you used so
+the maintainer can check it. Time spent verifying is never wasted; a confident wrong answer
+costs far more, and on this project it can mean a ruined workpiece or an unsafe machine move.
+
+Highest-risk category, look every one up every time: version numbers and semver ranges,
+CVE/advisory affected-vs-patched ranges, controller settings (`$` numbers) and their
+semantics, G-code word behavior, API signatures, and what LightBurn actually does.
+
+If you are about to:
+- Reference an API you haven't verified
+- Assume a file structure you haven't read
+- Claim a behavior you haven't tested
+- Quote a config value you haven't checked
+
+**Stop.** Read the actual code, run the actual command, fetch the actual documentation. Then
+proceed.
+
+If you cannot verify something in the current session, say:
+
+> I don't know X. To proceed, I need to [read file / run command / verify in docs]. Should I do that now, or do you want to confirm Y?
+
+This is the most important rule in the file. Most "AI broke my codebase" stories are this rule violated.
+
+---
+
+## Session hygiene
+
+- Run `pnpm test` before declaring work done.
+- Run `pnpm lint` before declaring work done.
+- Run `pnpm typecheck` before declaring work done.
+- Run `pnpm format:check` before declaring work done — CI runs `prettier --check .` repo-wide (in `release:check`), and it is NOT part of `pnpm lint`, so a Prettier-dirty file passes lint locally but fails the release gate.
+- Report what you changed, by file. Not "I updated the layer panel" — list `src/ui/layers/CutsLayersPanel.tsx` and `src/ui/layers/index.ts`.
+- Report what you didn't verify. If you didn't run the E2E suite, say so.
+- Don't write `// TODO` without opening a corresponding issue.
+
+---
+
+## When in doubt — defer to these documents
+
+- Product question? → `PROJECT.md`
+- Architecture question? → `DECISIONS.md`
+- "What should happen when…?" → `WORKFLOW.md`
+- Coding rule? → this file.
+- Contradiction between them? → ask the user.
+
+Never invent the answer. The answer is in one of the four files, or it doesn't exist yet and we need to write it down before the code.

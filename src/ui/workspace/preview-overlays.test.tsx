@@ -121,7 +121,7 @@ describe('PreviewStatusOverlays', () => {
       },
     } as Toolpath & { readonly previewIssue: PreviewIssue });
 
-    expect(host.textContent).toContain('Preview blocked');
+    expect(host.textContent).toContain('Preview unavailable');
     expect(host.textContent).toContain('Raster output requires 5,000,000 burn pixels.');
     expect(host.textContent).not.toContain('Nothing to preview');
   });

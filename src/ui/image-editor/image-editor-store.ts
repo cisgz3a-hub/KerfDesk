@@ -7,18 +7,7 @@
 // store as exactly one undo entry.
 
 import { create } from 'zustand';
-import {
-  blitTransformedInPlace,
-  captureRect,
-  IDENTITY_AFFINE,
-  pushHistoryEntry,
-  transformedBounds,
-  type AffineTransform,
-  type PaintColor,
-  type PaintPoint,
-  type PixelRect,
-} from '../../core/image-edit';
-import { extractFloatingRegion, fillMaskedInPlace, selectAllMask } from '../../core/image-select';
+import type { AffineTransform, PaintColor, PaintPoint, PixelRect } from '../../core/image-edit';
 import {
   combineMasks,
   featherMask,
@@ -28,22 +17,16 @@ import {
   type SelectionMask,
 } from '../../core/image-select';
 import type { RasterImage } from '../../core/scene';
-import { useStore } from '../state';
-import { useToastStore } from '../state/toast-store';
 import {
-  appliedBounds,
   BLACK,
   commitCrop,
   commitFillSelection,
   commitLine,
   commitMoveSelection,
   commitStroke,
-  createSession,
   modifySelectionMask,
   nudgeOutline,
-  redoSession,
   revertSession,
-  undoSession,
   WHITE,
   withSelection,
   type BrushSettings,
@@ -51,8 +34,18 @@ import {
   type EditorTool,
   type SelectionModifyKind,
 } from './editor-session';
-import { compositeSession } from './editor-session-layers';
-import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
+import { compositeSession, redoScoped, undoScoped } from './editor-session-layers';
+import {
+  commitEditorTransform,
+  startEditorTransform,
+  type EditorTransformSession,
+} from './editor-transform-session';
+import {
+  applyAction,
+  applyAndTraceAction,
+  closeEditorAction,
+  openEditorAction,
+} from './image-editor-lifecycle';
 import type { EditorView } from './image-editor-types';
 
 const DEFAULT_BRUSH: BrushSettings = { diameterPx: 12, hardness: 0.8, opacity: 1 };
@@ -60,10 +53,15 @@ const DEFAULT_WAND_TOLERANCE = 32;
 
 type LoadState =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'loading'; readonly objectId: string }
+  | {
+      readonly kind: 'loading';
+      readonly objectId: string;
+      readonly requestToken: symbol;
+    }
   | { readonly kind: 'failed'; readonly message: string };
 
-type ImageEditorState = {
+/** Ephemeral Image Studio state and actions owned outside project undo. */
+export type ImageEditorState = {
   readonly session: EditorSession | null;
   readonly stash: Readonly<Record<string, EditorSession>>;
   readonly loadState: LoadState;
@@ -87,7 +85,7 @@ type ImageEditorState = {
   /** Crop-tool rect awaiting Enter/✓ (Esc/✕ discards). */
   readonly pendingCrop: PixelRect | null;
   /** Ctrl+T free-transform session (Enter commits, Esc cancels). */
-  readonly transform: TransformSession | null;
+  readonly transform: EditorTransformSession | null;
   readonly openEditor: (image: RasterImage) => void;
   readonly closeEditor: () => void;
   readonly setTool: (tool: EditorTool) => void;
@@ -126,6 +124,8 @@ type ImageEditorState = {
   readonly redo: () => void;
   readonly revert: () => void;
   readonly apply: () => void;
+  /** Apply, close, then open the trace dialog on the updated scene raster. */
+  readonly applyAndTrace: (onApplied: (objectId: string) => void) => void;
 };
 
 export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
@@ -209,14 +209,17 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   moveSelection: (dx, dy) =>
     withSession(set, get, (session) => commitMoveSelection(session, dx, dy)),
 
-  undo: () => withSession(set, get, (session) => undoSession(session)),
-  redo: () => withSession(set, get, (session) => redoSession(session)),
+  // Scoped: undo/redo follow the entry's layer across switches (A2).
+  undo: () => withSession(set, get, (session) => undoScoped(session)),
+  redo: () => withSession(set, get, (session) => redoScoped(session)),
   revert: () => withSession(set, get, (session) => revertSession(session)),
 
   apply: () => applyAction(set, get),
+  applyAndTrace: (onApplied) => applyAndTraceAction(set, get, onApplied),
 }));
 
-type Setter = (
+/** Zustand setter accepted by extracted Image Studio action modules. */
+export type Setter = (
   partial: Partial<ImageEditorState> | ((state: ImageEditorState) => Partial<ImageEditorState>),
 ) => void;
 
@@ -234,62 +237,22 @@ function strokeAction(
   });
 }
 
-type TransformSession = {
-  readonly floating: NonNullable<ReturnType<typeof extractFloatingRegion>>;
-  readonly mask: SelectionMask;
-  readonly affine: AffineTransform;
-};
-
 // Ctrl+T: lift the selection (or the whole image) into a floating region.
 // The document stays untouched until commit, so cancel is free and the
 // commit is exactly ONE history entry.
 function startTransformAction(set: Setter, get: () => ImageEditorState): void {
   const { session, transform } = get();
   if (session === null || transform !== null) return;
-  const mask = session.selection ?? selectAllMask(session.doc.width, session.doc.height);
-  const floating = extractFloatingRegion(session.doc, mask);
-  if (floating === null) return;
-  set({ transform: { floating, mask, affine: IDENTITY_AFFINE }, pendingCrop: null });
+  const next = startEditorTransform(session);
+  if (next === null) return;
+  set({ transform: next, pendingCrop: null });
 }
 
 function commitTransformAction(set: Setter, get: () => ImageEditorState): void {
   const { session, transform } = get();
   if (session === null || transform === null) return;
   set({ transform: null });
-  const identity =
-    transform.affine.translateX === 0 &&
-    transform.affine.translateY === 0 &&
-    transform.affine.scaleX === 1 &&
-    transform.affine.scaleY === 1 &&
-    transform.affine.rotateDeg === 0;
-  if (identity) return;
-  withSession(set, get, (s) => {
-    const target = transformedBounds(transform.floating, transform.affine);
-    const union = {
-      x: Math.min(transform.floating.rect.x, target.x),
-      y: Math.min(transform.floating.rect.y, target.y),
-      width:
-        Math.max(
-          transform.floating.rect.x + transform.floating.rect.width,
-          target.x + target.width,
-        ) - Math.min(transform.floating.rect.x, target.x),
-      height:
-        Math.max(
-          transform.floating.rect.y + transform.floating.rect.height,
-          target.y + target.height,
-        ) - Math.min(transform.floating.rect.y, target.y),
-    };
-    const entry = captureRect(s.doc, union, 'Free transform');
-    fillMaskedInPlace(s.doc, transform.mask, WHITE);
-    blitTransformedInPlace(s.doc, transform.floating, transform.affine);
-    return {
-      ...s,
-      history: pushHistoryEntry(s.history, entry),
-      selection: null,
-      revision: s.revision + 1,
-      dirtySinceApply: true,
-    };
-  });
+  withSession(set, get, (s) => commitEditorTransform(s, transform));
 }
 
 function commitPendingCropAction(set: Setter, get: () => ImageEditorState): void {
@@ -297,17 +260,6 @@ function commitPendingCropAction(set: Setter, get: () => ImageEditorState): void
   if (pendingCrop === null) return;
   set({ pendingCrop: null });
   withSession(set, get, (session) => commitCrop(session, pendingCrop));
-}
-
-function closeEditorAction(set: Setter, get: () => ImageEditorState): void {
-  const { session } = get();
-  set((s) => ({
-    session: null,
-    loadState: { kind: 'idle' },
-    view: null,
-    isSpacePanning: false,
-    stash: session === null ? s.stash : { ...s.stash, [session.objectId]: session },
-  }));
 }
 
 function wandAtAction(
@@ -327,64 +279,6 @@ function wandAtAction(
     }),
     override,
   );
-}
-
-function openEditorAction(set: Setter, get: () => ImageEditorState, image: RasterImage): void {
-  const { stash, session } = get();
-  if (session !== null && session.objectId === image.id) return;
-  const stashed = stash[image.id];
-  if (stashed !== undefined) {
-    set((s) => {
-      const { [image.id]: _resumed, ...rest } = s.stash;
-      return { session: stashed, stash: rest, loadState: { kind: 'idle' } };
-    });
-    return;
-  }
-  set({ loadState: { kind: 'loading', objectId: image.id } });
-  decodeRasterToBuffer(image)
-    .then((doc) => {
-      // The open may have been superseded (closed / another image opened).
-      if (get().loadState.kind !== 'loading') return;
-      set({
-        session: createSession(image.id, image.source, doc, image.bounds),
-        loadState: { kind: 'idle' },
-      });
-    })
-    .catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      set({ loadState: { kind: 'failed', message } });
-      useToastStore.getState().pushToast(`Could not open image for editing: ${message}`, 'error');
-    });
-}
-
-function applyAction(set: Setter, get: () => ImageEditorState): void {
-  const { session, isApplying } = get();
-  // dirtySinceApply, not undo depth: crop clears the tile history but still
-  // needs applying (found by the 2026-07-21 interactive self-test).
-  if (session === null || isApplying || !session.dirtySinceApply) return;
-  set({ isApplying: true });
-  // ADR-245: Apply always bakes the layer composite (fast-path identity for
-  // a single-layer session), never the active layer alone.
-  bakeBufferToBitmapFields(compositeSession(session))
-    .then((fields) => {
-      const bounds = appliedBounds(session);
-      useStore.getState().applyEditedImage(session.objectId, {
-        ...fields,
-        ...(bounds === null
-          ? {}
-          : { pixelWidth: session.doc.width, pixelHeight: session.doc.height, bounds }),
-      });
-      set((s) => ({
-        isApplying: false,
-        session: s.session === null ? null : { ...s.session, dirtySinceApply: false },
-      }));
-      useToastStore.getState().pushToast('Image edits applied.', 'success');
-    })
-    .catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      set({ isApplying: false });
-      useToastStore.getState().pushToast(`Could not apply image edits: ${message}`, 'error');
-    });
 }
 
 function withSession(

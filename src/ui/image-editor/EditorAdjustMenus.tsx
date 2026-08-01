@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useAdjustDialogStore } from './adjust-dialog-store';
 import { ADJUSTMENTS, type AdjustmentSpec } from './editor-adjustments';
 import { useResizeDialogStore } from './resize-dialog-store';
+import { useTextDialogStore } from './text-dialog-store';
 
 type MenuItem = {
   readonly key: string;
@@ -35,11 +36,20 @@ export function EditorAdjustMenus(): JSX.Element {
       pick: () => openResize('canvas-size'),
     },
   ];
+  const openText = useTextDialogStore((s) => s.open);
   return (
     <span style={menusStyle}>
       <MenuButton label="Image" items={imageItems} />
       <MenuButton label="Adjust" items={catalogItems('adjust', openAdjust)} />
       <MenuButton label="Filter" items={catalogItems('filter', openAdjust)} />
+      <button
+        type="button"
+        className="lf-btn lf-btn--ghost"
+        onClick={openText}
+        title="Add text on a new layer (T)"
+      >
+        Text…
+      </button>
     </span>
   );
 }

@@ -6,20 +6,13 @@
 
 import type { Vec2 } from './scene-object';
 import type { CncFeedSource } from './cnc-feed-source';
+import type { CncTool } from './cnc-tool';
+import { DEFAULT_CNC_TOOLS } from './cnc-tool-starters';
+
+export type { CncTool, CncToolKind } from './cnc-tool';
+export { DEFAULT_CNC_TOOLS } from './cnc-tool-starters';
 
 export type MachineKind = 'laser' | 'cnc';
-
-export type CncToolKind = 'end-mill' | 'ball-nose' | 'v-bit' | 'engraving';
-
-export type CncTool = {
-  readonly id: string;
-  readonly name: string;
-  readonly kind: CncToolKind;
-  readonly diameterMm: number;
-  // v-bit / engraving tools only: included tip angle.
-  readonly tipAngleDeg?: number;
-};
-
 // Stock (workpiece) parameters. Z0 is the stock TOP surface; cut depths are
 // measured down from it. The XY footprint (Phase H.2) locates the workpiece
 // on the bed: originOffset is the stock's min-XY corner in machine
@@ -52,7 +45,7 @@ export type CncStock = {
 //                      never selectable on a layer (absent from
 //                      CNC_CUT_TYPES, rejected by .lf2 normalization).
 // H.9: which side of the travel direction the material sits on. With an M3
-// spindle, climb keeps material on the LEFT of travel (see motion-polish).
+// spindle, climb keeps material on the RIGHT of travel (see motion-polish).
 export type CncCutDirection = 'climb' | 'conventional';
 
 // Provenance for feed / plunge / spindle / depth-per-pass values. Absence is
@@ -90,6 +83,17 @@ export const CNC_CUT_TYPES: ReadonlyArray<CncCutType> = [
   'inlay-pair',
   'drill',
 ];
+
+// ADR-250 arc/line lead-in and lead-out for closed profile cuts. radiusMm
+// absent = the tool radius; sweepDeg absent = 90 degrees. Leads are default-on:
+// an absent profileLead field means a tool-radius arc; `shape: 'none'` opts out.
+export type CncProfileLeadSettings = {
+  // 'none' is the explicit opt-out back to the legacy straight plunge; absent
+  // settings default to a tool-radius arc (ADR-250 default-on).
+  readonly shape: 'arc' | 'line' | 'none';
+  readonly radiusMm?: number;
+  readonly sweepDeg?: number;
+};
 
 export type CncLayerSettings = {
   readonly cutType: CncCutType;
@@ -142,8 +146,9 @@ export type CncLayerSettings = {
   // key). Absent = feeds were entered manually ("Custom"). Display/round-trip
   // only — does not affect compiled output.
   readonly materialKey?: string;
-  // Display/round-trip provenance only. It never changes emitted output;
-  // numeric settings above remain the source of truth for compilation.
+  // Display/round-trip provenance only. It never changes emitted motion;
+  // numeric settings above remain the source of truth for compilation, while
+  // export comments may record this source for incident diagnosis.
   readonly feedSource?: CncFeedSource;
   readonly tabsEnabled: boolean; // profile cuts only
   readonly tabHeightMm: number; // material left under a tab
@@ -161,6 +166,16 @@ export type CncLayerSettings = {
   // both. Absent = 'inner' (the traced-shape reading); 'both' restores the
   // cut-every-contour behavior. Outline + engrave cuts only.
   readonly lineArtContours?: 'inner' | 'outer' | 'both';
+  // ADR-250: per-layer profile lead-in/out (profile-outside / profile-inside
+  // closed cuts only). Absent = default-on tool-radius arc; `shape: 'none'`
+  // restores the legacy straight plunge.
+  readonly profileLead?: CncProfileLeadSettings;
+  // ADR-253: lift to safe Z and replunge before every pass on profile/engrave
+  // ("line") cuts, matching how pocket clearing re-enters each region. Absent =
+  // ON (the default); set false to keep the old step-down-in-place plunge.
+  // Cut types that manage their own motion (pocket, v-carve, drill, relief)
+  // ignore it — they compile with retract-between-passes off.
+  readonly retractBetweenPasses?: boolean;
 };
 
 // Machine-wide flood/mist coolant for the whole CNC job (a router setting,
@@ -211,38 +226,6 @@ export type MachineConfig = LaserMachineConfig | CncMachineConfig;
 
 export const LASER_MACHINE_CONFIG: LaserMachineConfig = { kind: 'laser' };
 
-// Starter bit library — common hobby-router bits. Names are mm-first with the
-// imperial fraction the bit is physically sold by in parens, so an operator can
-// match the bit in hand while the app stays metric. Diameters in mm. Existing
-// ids are STABLE (referenced by .lf2 files, the default toolId, and tests) —
-// only ever append here.
-export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
-  { id: 'em-3175', name: '3.175 mm (1/8") end mill', kind: 'end-mill', diameterMm: 3.175 },
-  { id: 'em-1588', name: '1.588 mm (1/16") end mill', kind: 'end-mill', diameterMm: 1.588 },
-  { id: 'em-6350', name: '6.35 mm (1/4") end mill', kind: 'end-mill', diameterMm: 6.35 },
-  { id: 'em-9525', name: '9.525 mm (3/8") end mill', kind: 'end-mill', diameterMm: 9.525 },
-  { id: 'em-1000', name: '1 mm end mill', kind: 'end-mill', diameterMm: 1 },
-  { id: 'em-2000', name: '2 mm end mill', kind: 'end-mill', diameterMm: 2 },
-  { id: 'em-3000', name: '3 mm end mill', kind: 'end-mill', diameterMm: 3 },
-  { id: 'em-6000', name: '6 mm end mill', kind: 'end-mill', diameterMm: 6 },
-  { id: 'dc-3175', name: '3.175 mm (1/8") downcut end mill', kind: 'end-mill', diameterMm: 3.175 },
-  { id: 'cp-6350', name: '6.35 mm (1/4") compression bit', kind: 'end-mill', diameterMm: 6.35 },
-  { id: 'bn-3175', name: '3.175 mm (1/8") ball nose', kind: 'ball-nose', diameterMm: 3.175 },
-  { id: 'bn-1588', name: '1.588 mm (1/16") ball nose', kind: 'ball-nose', diameterMm: 1.588 },
-  { id: 'bn-6350', name: '6.35 mm (1/4") ball nose', kind: 'ball-nose', diameterMm: 6.35 },
-  { id: 'vb-30', name: '30° V-bit', kind: 'v-bit', diameterMm: 3.175, tipAngleDeg: 30 },
-  { id: 'vb-45', name: '45° V-bit', kind: 'v-bit', diameterMm: 6.35, tipAngleDeg: 45 },
-  { id: 'vb-60', name: '60° V-bit', kind: 'v-bit', diameterMm: 6.35, tipAngleDeg: 60 },
-  { id: 'vb-90', name: '90° V-bit', kind: 'v-bit', diameterMm: 12.7, tipAngleDeg: 90 },
-  {
-    id: 'eng-15',
-    name: '15° engraving bit',
-    kind: 'engraving',
-    diameterMm: 3.175,
-    tipAngleDeg: 15,
-  },
-];
-
 // Footprint defaults sized to the 4040 target machine's 400 × 400 mm bed
 // (ADR-098): a full-bed sheet at the machine origin until the operator says
 // otherwise.
@@ -272,7 +255,10 @@ export const DEFAULT_CNC_MACHINE_PARAMS: CncMachineParams = {
 // Conservative wood/MDF starting point for a 1/8 in bit — same spirit as
 // Easel's recommended settings.
 export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
-  cutType: 'profile-outside',
+  // ADR-256: new CNC layers cut ON the drawn line — the same reading a laser
+  // Line layer gives the path — so an unedited layer never resizes the part.
+  // Outside/inside remain explicit per-layer choices.
+  cutType: 'profile-on-path',
   // ADR-218: literal must match DEFAULT_LINE_ART_CONTOURS in core/cnc
   // (scene cannot import cnc without a cycle).
   lineArtContours: 'inner',
@@ -285,10 +271,25 @@ export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   plungeMmPerMin: 300,
   spindleRpm: 12000,
   stepoverPercent: 40,
-  tabsEnabled: false,
+  // ADR-258: holding tabs default ON for profile cuts. A full-depth profile with
+  // tabs off frees the part under a running spindle; Easel adds tabs automatically
+  // in that case (EASEL-STUDY D-14) while we left them off and only reported
+  // "tabs off" as a neutral Job Review fact. This is a default, not a guard — it is
+  // visible in the layer card and the operator can switch it off.
+  //
+  // Safe to default on only since ADR-258 made tabs a Z-rise inside one continuous
+  // path (cnc-tab-ramp.ts). Under the previous split model this flip silently
+  // disabled ADR-250 leads and could drop a small contour's deep pass entirely.
+  // Scoped to profile cut types (compile-cnc-job.ts:351) and to passes below the
+  // tab top (passNeedsTabs), so pockets, engraves and shallow passes are untouched.
+  tabsEnabled: true,
   tabHeightMm: 2,
   tabWidthMm: 6,
   tabsPerShape: 4,
+  // ADR-251: profile/pocket cuts default to CLIMB — it leaves the clean edge on
+  // the kept part and matches Vectric/Fusion/Easel. Overridable per layer; the
+  // "Default direction" option (unset) restores the compiler's natural winding.
+  cutDirection: 'climb',
 };
 
 export const DEFAULT_CNC_MACHINE_CONFIG: CncMachineConfig = {

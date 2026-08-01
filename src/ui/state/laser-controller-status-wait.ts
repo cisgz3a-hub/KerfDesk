@@ -9,6 +9,7 @@ type ControllerStatusWaitRequest = {
   readonly sessionEpoch: number;
   readonly afterSequence: number;
   readonly accept: (report: StatusReport) => boolean;
+  readonly onFreshReport?: (report: StatusReport) => void;
   readonly resolve: (report: StatusReport) => void;
   readonly reject: (error: Error) => void;
   readonly timer: ReturnType<typeof setTimeout>;
@@ -21,6 +22,7 @@ export type ControllerStatusWaitRefs = {
 type FreshControllerStatusOptions = {
   readonly after: ControllerStatusStamp;
   readonly accept: (report: StatusReport) => boolean;
+  readonly onFreshReport?: (report: StatusReport) => void;
   readonly timeoutMs?: number;
   readonly timeoutMessage: string;
 };
@@ -39,6 +41,7 @@ export function waitForFreshControllerStatus(
       sessionEpoch: options.after.sessionEpoch,
       afterSequence: options.after.sequence,
       accept: options.accept,
+      ...(options.onFreshReport === undefined ? {} : { onFreshReport: options.onFreshReport }),
       resolve,
       reject,
       timer: setTimeout(() => {
@@ -65,6 +68,7 @@ export function observeFreshControllerStatus(
     finishControllerStatusWait(refs, request, 'reject', `Controller entered ${report.state}.`);
     return;
   }
+  request.onFreshReport?.(report);
   if (request.accept(report))
     finishControllerStatusWait(refs, request, 'resolve', undefined, report);
 }

@@ -19,13 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-NOTE ON THIRD-PARTY DEPENDENCIES
-
-This project uses third-party libraries and fonts under their own open-source
-licenses (MIT, BSD, Apache-2.0, MPL-2.0, ISC, BSL-1.0, OFL-1.1, Unlicense).
-Those components remain governed by their respective upstream licenses; see
-THIRD_PARTY_NOTICES.md. This LICENSE file applies to the first-party source
-code authored for this project.

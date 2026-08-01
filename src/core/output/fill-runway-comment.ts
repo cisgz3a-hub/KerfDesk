@@ -1,5 +1,9 @@
 import { fillOverscanCommentText } from '../job/fill-overscan';
-import { feedMatchedFillRunwayMm, usesFeedMatchedFillEntry } from '../job/fill-sweep-plan';
+import {
+  feedMatchedFillRunwayMm,
+  genericFeedMatchedFillRunwayMm,
+  usesFeedMatchedFillRunway,
+} from '../job/fill-sweep-plan';
 import type { FillGroup } from '../job';
 
 export function fillRunwayCommentText(
@@ -16,7 +20,13 @@ export function fillRunwayCommentText(
   if (group.fillRunwayPolicy === 'raster-bounded') {
     return `${setting} (bounded feed-matched raster split runways; ADR-039)`;
   }
-  if (!usesFeedMatchedFillEntry(group)) {
+  if (group.fillRunwayPolicy === 'feed-matched-every-sweep') {
+    const appliedMm = genericFeedMatchedFillRunwayMm(group.overscanMm);
+    const fallback =
+      group.overscanMm > 0 ? '' : `; generic minimum ${formatMm(appliedMm)} mm applied`;
+    return `overscan ${formatMm(group.overscanMm)} mm${fallback} (feed-matched entry and exit up to ${formatMm(appliedMm)} mm on every Scan Line sweep)`;
+  }
+  if (!usesFeedMatchedFillRunway(group)) {
     return fillOverscanCommentText(
       group.overscanMm,
       group.fillStyle,

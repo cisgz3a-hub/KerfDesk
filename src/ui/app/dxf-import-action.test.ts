@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SceneObject } from '../../core/scene';
 import { importDxfFiles, isDxfFile } from './dxf-import-action';
 
@@ -57,6 +57,31 @@ describe('isDxfFile', () => {
 });
 
 describe('importDxfFiles', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('imports through the disclosed main-thread fallback when worker construction fails', async () => {
+    vi.stubGlobal('Worker', function WorkerUnavailable(): never {
+      throw new Error('workers blocked');
+    });
+    const blob = { size: dxfLine().length } as unknown as Blob;
+    const readFile = vi.fn(async () => dxfLine());
+    const importObject = vi.fn(() => ({ kind: 'added' as const }));
+    const pushToast = vi.fn();
+
+    await importDxfFiles([{ name: 'fallback.dxf', text: readFile, blob: async () => blob }], {
+      importObject,
+      pushToast,
+    });
+
+    expect(readFile).toHaveBeenCalledOnce();
+    expect(importObject).toHaveBeenCalledOnce();
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/fallback\.dxf.*main thread.*unresponsive/i),
+      'warning',
+    );
+    expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('Imported 1 path'), 'success');
+  });
+
   it('imports parsed geometry and toasts the path count', async () => {
     const imported: SceneObject[] = [];
     const pushToast = vi.fn();
@@ -76,19 +101,21 @@ describe('importDxfFiles', () => {
   // IMP-07: when the handle reports its size, gate the oversize confirm BEFORE
   // reading, so a declined huge file is never pulled into memory. (The existing
   // no-size handles above exercise the post-read fallback.)
-  it('gates on size before reading; a declined oversize file is never read', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  // Rule 7 / ADR-228: was "a declined oversize file is never read". Size is a
+  // policy judgement, so an oversize DXF now imports and merely warns first.
+  it('advises on size before reading, then imports the oversize file anyway', async () => {
     const text = vi.fn(async () => dxfLine());
-    const importObject = vi.fn();
+    const importObject = vi.fn(() => ({ kind: 'added' as const }));
+    const pushToast = vi.fn();
 
     await importDxfFiles([{ name: 'huge.dxf', size: 26 * 1024 * 1024, text }], {
       importObject: importObject as never,
-      pushToast: vi.fn(),
+      pushToast,
     });
 
-    expect(text).not.toHaveBeenCalled();
-    expect(importObject).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
+    expect(text).toHaveBeenCalled();
+    expect(importObject).toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(expect.stringMatching(/may take a while/i), 'warning');
   });
 
   it('routes re-imports through the replace toast', async () => {

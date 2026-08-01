@@ -4,7 +4,15 @@
 // Machine-touching actions (apply profile) go through the project with
 // undo, exactly like updateCncMachine.
 
-import type { CncLayerSettings, CncMachineConfig, CncTool } from '../../core/scene';
+import {
+  activeCncTool,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  DEFAULT_CNC_TOOLS,
+  type CncLayerSettings,
+  type CncMachineConfig,
+  type CncTool,
+  type Scene,
+} from '../../core/scene';
 import {
   EMPTY_CNC_LIBRARY,
   feedPresetFromSettings,
@@ -16,10 +24,19 @@ import {
   refreshAutomaticCncFeeds,
   refreshAutomaticCncFeedsAfterToolRemoval,
 } from './cnc-auto-seeding';
+import {
+  activeCncToolFeedIdentityChanged,
+  mergeCncMachineProfileForCurrentProject,
+} from './cnc-machine-profile-merge';
+import {
+  blockingCncSecondaryToolReferences,
+  sceneWithoutDormantCncSecondaryToolReferences,
+} from './cnc-tool-references';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+type StatePatch = AppState | Partial<AppState>;
 
 export type CncLibraryActions = {
   readonly setCncLibrary: (library: CncLibrary) => void;
@@ -49,68 +66,120 @@ function customToolActions(
   set: Setter,
 ): Pick<CncLibraryActions, 'addCustomCncTool' | 'deleteCustomCncTool'> {
   return {
-    addCustomCncTool: (tool) =>
-      set((s) => {
-        const withId: CncTool = { ...tool, id: crypto.randomUUID() };
-        const library: CncLibrary = {
-          ...s.cncLibrary,
-          customTools: [...s.cncLibrary.customTools, withId],
-        };
-        // The new bit becomes selectable immediately in an open CNC project.
-        const machine = s.project.machine;
-        if (machine?.kind !== 'cnc') return { cncLibrary: library };
-        return {
-          cncLibrary: library,
-          project: {
-            ...s.project,
-            machine: { ...machine, tools: [...machine.tools, withId] },
-          },
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
-    deleteCustomCncTool: (toolId) =>
-      set((s) => {
-        const library: CncLibrary = {
-          ...s.cncLibrary,
-          customTools: s.cncLibrary.customTools.filter((tool) => tool.id !== toolId),
-        };
-        const machine = s.project.machine;
-        if (machine?.kind !== 'cnc' || !machine.tools.some((tool) => tool.id === toolId)) {
-          return { cncLibrary: library };
-        }
-        const tools = machine.tools.filter((tool) => tool.id !== toolId);
-        const nextMachine: CncMachineConfig = {
-          ...machine,
-          tools,
-          toolId:
-            machine.toolId === toolId && tools[0] !== undefined ? tools[0].id : machine.toolId,
-        };
-        const scene = refreshAutomaticCncFeedsAfterToolRemoval(
-          s.project.scene,
-          {
-            device: s.project.device,
-            machine: nextMachine,
-            liveCaps: s.cncLiveCaps,
-          },
-          toolId,
+    addCustomCncTool: (tool) => set((state) => addCustomToolPatch(state, tool)),
+    deleteCustomCncTool: (toolId) => set((state) => stateAfterCustomToolDeletion(state, toolId)),
+  };
+}
+
+function addCustomToolPatch(state: AppState, tool: Omit<CncTool, 'id'>): StatePatch {
+  if (catalogToolAlreadySaved(state, tool.catalogId)) return state;
+  const machine = state.project.machine;
+  const matchingMachineTool =
+    machine?.kind === 'cnc' && tool.catalogId !== undefined
+      ? matchingMachineCatalogTool(machine, tool.catalogId)
+      : undefined;
+  const withId: CncTool = { ...tool, id: matchingMachineTool?.id ?? crypto.randomUUID() };
+  const library: CncLibrary = {
+    ...state.cncLibrary,
+    customTools: [...state.cncLibrary.customTools, withId],
+  };
+  if (machine?.kind !== 'cnc') return { cncLibrary: library };
+  const tools =
+    matchingMachineTool === undefined
+      ? [...machine.tools, withId]
+      : machine.tools.map((candidate) =>
+          candidate.id === matchingMachineTool.id ? withId : candidate,
         );
-        // Manual/legacy layer settings remain exact. Only material recipes
-        // carrying automatic provenance drop a deleted override and recalculate
-        // against the surviving active bit.
-        return {
-          cncLibrary: library,
-          project: {
-            ...s.project,
-            scene,
-            machine: nextMachine,
-          },
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+  const nextMachine: CncMachineConfig = { ...machine, tools };
+  const scene =
+    matchingMachineTool === undefined
+      ? state.project.scene
+      : refreshAutomaticCncFeeds(state.project.scene, {
+          device: state.project.device,
+          machine: nextMachine,
+          liveCaps: state.cncLiveCaps,
+          activeToolChanged: activeCncToolFeedIdentityChanged(machine, nextMachine),
+        });
+  return {
+    cncLibrary: library,
+    project: { ...state.project, scene, machine: nextMachine },
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+function matchingMachineCatalogTool(
+  machine: CncMachineConfig,
+  catalogId: string,
+): CncTool | undefined {
+  const activeTool = activeCncTool(machine);
+  return activeTool.catalogId === catalogId
+    ? activeTool
+    : machine.tools.find((candidate) => candidate.catalogId === catalogId);
+}
+
+function catalogToolAlreadySaved(state: AppState, catalogId: string | undefined): boolean {
+  return (
+    catalogId !== undefined &&
+    (DEFAULT_CNC_TOOLS.some((candidate) => candidate.catalogId === catalogId) ||
+      state.cncLibrary.customTools.some((candidate) => candidate.catalogId === catalogId))
+  );
+}
+
+function stateAfterCustomToolDeletion(state: AppState, toolId: string): StatePatch {
+  // Active clearing/finishing/roughing stages have no safe implicit fallback.
+  // Keep this refusal below the UI so command callers cannot bypass it.
+  if (blockingCncSecondaryToolReferences(state.project.scene, toolId).length > 0) return state;
+  const preparedScene = sceneWithoutDormantCncSecondaryToolReferences(state.project.scene, toolId);
+  const library: CncLibrary = {
+    ...state.cncLibrary,
+    customTools: state.cncLibrary.customTools.filter((tool) => tool.id !== toolId),
+  };
+  const machine = state.project.machine;
+  if (machine?.kind !== 'cnc' || !machine.tools.some((tool) => tool.id === toolId)) {
+    return libraryDeletionWithoutMachineUpdate(state, library, preparedScene);
+  }
+  const remainingTools = machine.tools.filter((tool) => tool.id !== toolId);
+  const tools = remainingTools.length === 0 ? DEFAULT_CNC_MACHINE_CONFIG.tools : remainingTools;
+  const machineWithSurvivingTools: CncMachineConfig = { ...machine, tools };
+  const nextMachine: CncMachineConfig = {
+    ...machineWithSurvivingTools,
+    toolId: activeCncTool(machineWithSurvivingTools).id,
+  };
+  const scene = refreshAutomaticCncFeedsAfterToolRemoval(
+    preparedScene,
+    {
+      device: state.project.device,
+      machine: nextMachine,
+      liveCaps: state.cncLiveCaps,
+      activeToolChanged: activeCncToolFeedIdentityChanged(machine, nextMachine),
+    },
+    toolId,
+  );
+  // Manual/legacy primary settings remain exact. Material recipes carrying
+  // automatic provenance recalculate against the surviving Active bit.
+  return {
+    cncLibrary: library,
+    project: { ...state.project, scene, machine: nextMachine },
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+function libraryDeletionWithoutMachineUpdate(
+  state: AppState,
+  library: CncLibrary,
+  scene: Scene,
+): Partial<AppState> {
+  if (scene === state.project.scene) return { cncLibrary: library };
+  return {
+    cncLibrary: library,
+    project: { ...state.project, scene },
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
   };
 }
 
@@ -162,24 +231,18 @@ function machineProfileActions(
         if (s.project.machine?.kind !== 'cnc') return s;
         const profile = s.cncLibrary.machineProfiles.find((p) => p.id === profileId);
         if (profile === undefined) return s;
-        // Bits added after the profile was saved survive the apply — a
-        // wholesale replace silently deleted them and layers referencing
-        // them fell back to the machine bit.
-        const currentTools = s.project.machine.tools;
-        const machine: CncMachineConfig = {
-          ...profile.machine,
-          tools: [
-            ...profile.machine.tools,
-            ...currentTools.filter(
-              (tool) => !profile.machine.tools.some((kept) => kept.id === tool.id),
-            ),
-          ],
-        };
+        // Bits added after the profile was saved survive the apply. Catalog
+        // identity also preserves the project's copy (and therefore layer
+        // references) when a profile carries the same physical bit under a
+        // different generated id.
+        const previousMachine = s.project.machine;
+        const machine = mergeCncMachineProfileForCurrentProject(profile.machine, previousMachine);
         const device = { ...s.project.device, cncSubProfile: { ...machine.params } };
         const scene = refreshAutomaticCncFeeds(s.project.scene, {
           device,
           machine,
           liveCaps: s.cncLiveCaps,
+          activeToolChanged: activeCncToolFeedIdentityChanged(previousMachine, machine),
         });
         return {
           project: { ...s.project, scene, device, machine },

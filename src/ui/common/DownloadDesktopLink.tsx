@@ -1,14 +1,10 @@
-// "Download for Windows" affordance (ADR-024). Links to the static /download
-// page, which carries the installer link and the unsigned-build SmartScreen
-// note. A plain anchor — no fetch — so it respects the renderer CSP
-// (connect-src 'self'); the browser downloads the R2-hosted .exe from the
-// download page, not from here. Opens in a new tab so the operator never loses
-// their working scene. Hidden inside the desktop app, where downloading the
-// installer is pointless.
+// Cross-platform desktop Preview affordance (ADR-248/249). Go straight to the
+// public source repository so a legacy cached service worker cannot substitute
+// an old mutable download page. Hidden inside the desktop app.
 
 import { usePlatformOptional } from '../app/platform-context';
 
-const DOWNLOAD_PAGE_PATH = '/download';
+const DOWNLOAD_PAGE_URL = 'https://github.com/cisgz3a-hub/KerfDesk/releases';
 
 const linkStyle: React.CSSProperties = { textDecoration: 'none' };
 
@@ -19,12 +15,12 @@ export function DownloadDesktopLink(): JSX.Element | null {
     <a
       className="lf-btn"
       style={linkStyle}
-      href={DOWNLOAD_PAGE_PATH}
+      href={DOWNLOAD_PAGE_URL}
       target="_blank"
       rel="noopener noreferrer"
-      title="Download the KerfDesk desktop app for Windows (10/11, 64-bit)"
+      title="Download the KerfDesk desktop Preview for Windows or macOS"
     >
-      Download for Windows
+      Download desktop app
     </a>
   );
 }

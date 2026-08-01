@@ -12,15 +12,33 @@
 import { embeddedFontBuffer, findFontEntry, type FontEntry } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
 import robotoUrl from './fonts/Roboto-Regular.ttf?url';
+import poppinsUrl from './fonts/Poppins-Regular.ttf?url';
+import tinosUrl from './fonts/Tinos-Regular.ttf?url';
+import tinosBoldUrl from './fonts/Tinos-Bold.ttf?url';
 import inconsolataUrl from './fonts/Inconsolata-Regular.ttf?url';
+import courierPrimeUrl from './fonts/CourierPrime-Regular.ttf?url';
 import pacificoUrl from './fonts/Pacifico-Regular.ttf?url';
 import dancingScriptUrl from './fonts/DancingScript-Regular.ttf?url';
+import antonUrl from './fonts/Anton-Regular.ttf?url';
+import specialEliteUrl from './fonts/SpecialElite-Regular.ttf?url';
+import unifrakturMaguntiaUrl from './fonts/UnifrakturMaguntia-Book.ttf?url';
+import stardosStencilUrl from './fonts/StardosStencil-Regular.ttf?url';
+import sairaStencilOneUrl from './fonts/SairaStencilOne-Regular.ttf?url';
 
 const URL_BY_KEY: Readonly<Record<OutlineFontKey, string>> = {
   'roboto-regular': robotoUrl,
+  'poppins-regular': poppinsUrl,
+  'tinos-regular': tinosUrl,
+  'tinos-bold': tinosBoldUrl,
   'inconsolata-regular': inconsolataUrl,
+  'courier-prime-regular': courierPrimeUrl,
   'pacifico-regular': pacificoUrl,
   'dancing-script-regular': dancingScriptUrl,
+  'anton-regular': antonUrl,
+  'special-elite-regular': specialEliteUrl,
+  'unifraktur-maguntia-book': unifrakturMaguntiaUrl,
+  'stardos-stencil-regular': stardosStencilUrl,
+  'saira-stencil-one-regular': sairaStencilOneUrl,
 };
 
 type OutlineFontKey = Extract<FontEntry, { readonly geometry: 'outline' }>['key'];

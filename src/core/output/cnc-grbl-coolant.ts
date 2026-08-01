@@ -15,6 +15,16 @@ export function appendCoolantStart(lines: string[], mode: CncCoolantMode | undef
   return true;
 }
 
+// Emit the coolant-off command, but only for a mode that actually opened one.
+// Used at the manual tool-change hold as well as at job end: M0 parks the
+// operator's hands inside the machine, and flood/mist running through that
+// pause soaks the work area and the bit being swapped.
+export function appendCoolantStop(lines: string[], mode: CncCoolantMode | undefined): boolean {
+  if (cncCoolantOnCommand(mode) === null) return false;
+  lines.push('M9');
+  return true;
+}
+
 // Coolant-on command for the machine's mode: mist runs the mist-coolant
 // relay (M7), flood the flood-coolant relay (M8). 'off'/absent ⇒ null.
 function cncCoolantOnCommand(mode: CncCoolantMode | undefined): 'M7' | 'M8' | null {

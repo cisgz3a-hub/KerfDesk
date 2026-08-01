@@ -1,14 +1,20 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  createLayer,
-  createProject,
-  IDENTITY_TRANSFORM,
-  type OutputScope,
-  type Project,
-  type SceneObject,
-} from '../../core/scene';
-import type { FileHandle, PlatformAdapter, SaveTarget } from '../../platform/types';
+  mockPlatform,
+  projectWithLine,
+  projectWithTwoLines,
+  reject,
+  SAVE_PREPARATION_FAILURE_CASES,
+  SAVE_TARGET_NAME,
+  selectedScope,
+  toasts,
+} from '../../__fixtures__/file-actions';
+import { rotaryRasterSaveProject } from '../../__fixtures__/rotary-raster-save-project';
+import { createProject } from '../../core/scene';
+import type { SaveTarget } from '../../platform/types';
+import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
+import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import {
   handleImportSvg,
   handleOpenProject,
@@ -16,117 +22,22 @@ import {
   handleSaveProject,
 } from './file-actions';
 
-function mockPlatform(
-  args: {
-    readonly open?: () => Promise<ReadonlyArray<FileHandle>>;
-    readonly save?: () => Promise<SaveTarget | null>;
-  } = {},
-): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: args.open ?? (async () => []),
-    pickFileForSave: args.save ?? (async () => null),
-    serial: {
-      isSupported: () => false,
-      requestPort: async () => null,
-    },
-  };
-}
-
-function projectWithLine(): Project {
-  const project = createProject();
-  return {
-    ...project,
-    scene: {
-      layers: [createLayer({ id: '#000000', color: '#000000', mode: 'line' })],
-      objects: [
-        {
-          kind: 'imported-svg',
-          id: 'line-1',
-          source: 'line.svg',
-          bounds: { minX: 0, minY: 0, maxX: 10, maxY: 0 },
-          transform: IDENTITY_TRANSFORM,
-          paths: [
-            {
-              color: '#000000',
-              polylines: [
-                {
-                  closed: false,
-                  points: [
-                    { x: 0, y: 0 },
-                    { x: 10, y: 0 },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  };
-}
-
-function projectWithTwoLines(): Project {
-  const project = createProject();
-  return {
-    ...project,
-    scene: {
-      layers: [createLayer({ id: '#000000', color: '#000000', mode: 'line' })],
-      objects: [lineObject('A', 10), lineObject('B', 120)],
-    },
-  };
-}
-
-function lineObject(id: string, x: number): SceneObject {
-  return {
-    kind: 'imported-svg',
-    id,
-    source: `${id}.svg`,
-    bounds: { minX: x, minY: 0, maxX: x + 10, maxY: 0 },
-    transform: IDENTITY_TRANSFORM,
-    paths: [
-      {
-        color: '#000000',
-        polylines: [
-          {
-            closed: false,
-            points: [
-              { x, y: 0 },
-              { x: x + 10, y: 0 },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
-function selectedScope(selectedObjectIds: ReadonlyArray<string>): OutputScope {
-  return {
-    cutSelectedGraphics: true,
-    useSelectionOrigin: false,
-    selectedObjectIds,
-  };
-}
-
-function reject(message: string): Promise<never> {
-  return Promise.reject(new Error(message));
-}
-
-function toasts(): {
-  readonly pushToast: (message: string, variant?: string) => void;
-  readonly messages: ReadonlyArray<{ readonly message: string; readonly variant?: string }>;
-} {
-  const messages: Array<{ readonly message: string; readonly variant?: string }> = [];
-  return {
-    pushToast: (message, variant) => {
-      messages.push(variant === undefined ? { message } : { message, variant });
-    },
-    messages,
-  };
-}
-
 describe('file actions contextual failure handling', () => {
+  it('keeps a no-dump controller readiness advisory non-blocking', async () => {
+    const toast = toasts();
+    const pickFileForSave = vi.fn(async () => null);
+    await handleSaveGcode({
+      platform: mockPlatform({ save: pickFileForSave }),
+      project: projectWithLine(),
+      savedName: null,
+      controllerSettings: null,
+      settingsCapability: 'none',
+      pushToast: toast.pushToast,
+    });
+    expect(pickFileForSave).toHaveBeenCalledOnce();
+    expect(toast.messages).toContainEqual(expect.objectContaining({ variant: 'warning' }));
+  });
+
   it('handles import picker failures with import-specific toast copy', async () => {
     const toast = toasts();
 
@@ -215,10 +126,15 @@ describe('file actions contextual failure handling', () => {
     ]);
   });
 
-  // M11 (AUDIT-2026-06-10): the $30 power-scale check used to protect only
-  // the streamed Start path — a project max S of 1000 saved for a $30=255
-  // machine clamps every S>255 to 100% beam power from the saved file.
-  it('gates the export behind a confirm when the connected controller $30 disagrees', async () => {
+  // M11 (AUDIT-2026-06-10) added a confirm here: a project max S of 1000 saved
+  // for a $30=255 machine clamps every S>255 to 100% beam power from the saved
+  // file. The hazard is real, but rule 7 / ADR-228 names "save … export" and
+  // "adds confirmation before an otherwise available action" in the guard
+  // definition and makes controller-setting policy warn-only — so the export
+  // proceeds to the picker unasked, and the $30 mismatch is stated as a
+  // post-save warning instead. The exact warning and cancel-path behavior are
+  // pinned in file-actions.controller-readiness.test.ts.
+  it('reaches the file picker unasked when the connected controller $30 disagrees', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const save = vi.fn(async () => null);
     const toast = toasts();
@@ -231,26 +147,7 @@ describe('file actions contextual failure handling', () => {
       pushToast: toast.pushToast,
     });
 
-    expect(confirm).toHaveBeenCalledTimes(1);
-    expect(confirm.mock.calls[0]?.[0]).toContain('$30 is 255');
-    expect(save).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
-  });
-
-  it('saves anyway when the operator confirms the controller mismatch', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const save = vi.fn(async () => null);
-    const toast = toasts();
-
-    await handleSaveGcode({
-      platform: mockPlatform({ save }),
-      project: projectWithLine(),
-      savedName: null,
-      controllerSettings: { maxPowerS: 255, laserModeEnabled: true },
-      pushToast: toast.pushToast,
-    });
-
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
     expect(save).toHaveBeenCalledTimes(1);
     vi.restoreAllMocks();
   });
@@ -427,5 +324,114 @@ describe('file actions contextual failure handling', () => {
     expect(toast.messages).toEqual([
       { message: 'Could not save project: disk full', variant: 'error' },
     ]);
+  });
+});
+
+describe('handleSaveGcode preparation failures', () => {
+  beforeEach(() => {
+    useExperimentalLaserFeatures.getState().resetFeatures();
+    useExperimentalLaserFeatures.getState().setFeature('printAndCut', true);
+    usePrintCutSessionStore.getState().clear();
+  });
+
+  afterEach(() => {
+    usePrintCutSessionStore.getState().clear();
+    useExperimentalLaserFeatures.getState().resetFeatures();
+    vi.restoreAllMocks();
+  });
+
+  it.each(SAVE_PREPARATION_FAILURE_CASES)(
+    'does not create an empty successful export for $name',
+    async ({ project, message }) => {
+      const write = vi.fn(async () => undefined);
+      const target: SaveTarget = { displayName: SAVE_TARGET_NAME, write };
+      const pickFileForSave = vi.fn(async () => target);
+      const advanceVariablesAfter = vi.fn();
+      const notifications: Array<{ readonly message: string; readonly variant?: string }> = [];
+      const alert = vi.spyOn(window, 'alert').mockReturnValue(undefined);
+
+      await handleSaveGcode({
+        platform: mockPlatform({ save: pickFileForSave }),
+        project: project(),
+        savedName: null,
+        advanceVariablesAfter,
+        pushToast: (toastMessage, variant) => {
+          notifications.push(
+            variant === undefined ? { message: toastMessage } : { message: toastMessage, variant },
+          );
+        },
+      });
+
+      expect(pickFileForSave).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
+      expect(advanceVariablesAfter).not.toHaveBeenCalled();
+      expect(notifications.some((toast) => toast.variant === 'success')).toBe(false);
+      expect(alert).toHaveBeenCalledOnce();
+      expect(alert.mock.calls[0]?.[0]).toContain(message);
+    },
+  );
+});
+
+describe('handleSaveGcode rotary raster emission', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('stops before picker, write, advancement, and success when Labs permission is absent', async () => {
+    const project = rotaryRasterSaveProject();
+    const write = vi.fn<SaveTarget['write']>();
+    const target: SaveTarget = { displayName: SAVE_TARGET_NAME, write };
+    const pickFileForSave = vi.fn(async () => target);
+    const advanceVariablesAfter = vi.fn();
+    const pushToast = vi.fn();
+    const alert = vi.spyOn(window, 'alert').mockReturnValue(undefined);
+
+    await handleSaveGcode({
+      platform: mockPlatform({ save: pickFileForSave }),
+      project,
+      savedName: null,
+      pushToast,
+      advanceVariablesAfter,
+    });
+
+    expect(pickFileForSave).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+    expect(advanceVariablesAfter).not.toHaveBeenCalled();
+    expect(pushToast).not.toHaveBeenCalledWith(expect.any(String), 'success');
+    expect(alert).toHaveBeenCalledWith(
+      expect.stringContaining('Rotary image engraving is experimental and disabled'),
+    );
+  });
+
+  it('writes non-empty rotary raster bytes and reports success with explicit permission', async () => {
+    const project = rotaryRasterSaveProject();
+    const written: string[] = [];
+    const target: SaveTarget = {
+      displayName: SAVE_TARGET_NAME,
+      write: async (data) => {
+        if (typeof data !== 'string') throw new Error('expected text G-code');
+        written.push(data);
+      },
+    };
+    const pickFileForSave = vi.fn(async () => target);
+    const advanceVariablesAfter = vi.fn();
+    const pushToast = vi.fn();
+    const alert = vi.spyOn(window, 'alert').mockReturnValue(undefined);
+
+    await handleSaveGcode({
+      platform: mockPlatform({ save: pickFileForSave }),
+      project,
+      savedName: null,
+      allowRotaryRaster: true,
+      pushToast,
+      advanceVariablesAfter,
+    });
+
+    expect(alert).not.toHaveBeenCalled();
+    expect(pickFileForSave).toHaveBeenCalledTimes(1);
+    expect(written).toHaveLength(1);
+    expect(written[0]).not.toBe('');
+    expect(advanceVariablesAfter).toHaveBeenCalledWith(project, 'successful-export');
+    expect(pushToast).toHaveBeenCalledWith(`Saved G-code to ${SAVE_TARGET_NAME}`, 'success');
   });
 });
