@@ -1,7 +1,7 @@
 // CameraCalibrationWizard — the lens-calibration dialog (ADR-108 v2.e):
 // describe/print the board, auto-capture diverse poses with live detection,
-// solve through the focal sweep, and gate Apply behind the A/B perceptual
-// check. State lives in camera-wizard-store; steps are thin renderers. The
+// solve through the focal sweep, and present the A/B perceptual check before
+// Apply. State lives in camera-wizard-store; steps are thin renderers. The
 // wizard can minimize (CameraWizardFrame) so the operator watches the camera
 // while positioning the board with a fixed overhead camera.
 
@@ -32,11 +32,11 @@ export function CameraCalibrationWizard(): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
 
   useEffect(() => {
-    if (captureBinding === null || sourceState.kind !== 'live') return;
+    if (step !== 'capture' || captureBinding === null || sourceState.kind !== 'live') return;
     invalidateCaptureSource(
       cameraCaptureBindingForFrame(sourceState.source, captureBinding.width, captureBinding.height),
     );
-  }, [captureBinding, invalidateCaptureSource, sourceState]);
+  }, [captureBinding, invalidateCaptureSource, sourceState, step]);
 
   return (
     <CameraWizardFrame
