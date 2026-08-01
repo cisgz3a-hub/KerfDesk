@@ -3,6 +3,7 @@ import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import { estimateLiveJobFromPrepared, type LiveJobEstimate } from '../laser/live-job-estimate';
 import { buildPreviewToolpathFromPrepared } from './draw-preview';
+import { serializeExecutablePlanPreviewRoute } from './executable-plan-preview-route';
 import type { PreviewToolpath } from './preview-status';
 
 export type LargeJobPreparation = {
@@ -28,8 +29,11 @@ export function prepareLargeJob(
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });
+  const toolpath = buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
+    executablePlan: true,
+  });
   return {
-    toolpath: buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin),
+    toolpath: serializeExecutablePlanPreviewRoute(toolpath),
     estimate: estimateLiveJobFromPrepared(prepared, options.jobOrigin, { unbounded: true }),
   };
 }

@@ -9,6 +9,7 @@ import {
 import { prepareOutput } from '../../io/gcode';
 
 import { prepareLargeJob } from './large-job-preparation';
+import { previewRouteSource } from './executable-plan-preview-route';
 
 describe('prepareLargeJob', () => {
   it('derives preview and ETA from one prepared output', () => {
@@ -46,6 +47,9 @@ describe('prepareLargeJob', () => {
 
     expect(compile).toHaveBeenCalledTimes(1);
     expect(result.toolpath.totalLength).toBeGreaterThan(0);
+    expect(previewRouteSource(result.toolpath)).toBe('executable-plan');
+    expect(result.toolpath.executablePlanPreview?.source).toBe('executable-plan');
+    expect(previewRouteSource(structuredClone(result.toolpath))).toBe('executable-plan');
     expect(result.estimate.kind).toBe('estimated');
   });
 });

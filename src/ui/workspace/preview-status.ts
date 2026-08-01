@@ -6,6 +6,7 @@
 
 import type { Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
+import type { ExecutablePlanPreviewCarrier } from './executable-plan-preview-route';
 
 export type PreviewIssue =
   | { readonly kind: 'too-complex' }
@@ -23,9 +24,10 @@ export type PreviewIssue =
   // instead of the scope-oriented "enable Output" hint.
   | { readonly kind: 'placement-unavailable'; readonly messages: ReadonlyArray<string> };
 
-export type PreviewToolpath = Toolpath & {
-  readonly previewIssue?: PreviewIssue;
-};
+export type PreviewToolpath = Toolpath &
+  ExecutablePlanPreviewCarrier & {
+    readonly previewIssue?: PreviewIssue;
+  };
 
 export function previewIssueFor(toolpath: Toolpath): PreviewIssue | null {
   return (toolpath as PreviewToolpath).previewIssue ?? null;
