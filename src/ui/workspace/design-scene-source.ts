@@ -10,7 +10,6 @@ import { toSceneCoords } from '../../core/devices';
 import type { Group } from '../../core/job';
 import {
   activeCncTool,
-  layerCncTool,
   type CncMachineConfig,
   type CncTool,
   type OutputScope,
@@ -21,6 +20,7 @@ import { toolpathMoves3d } from '../../core/toolpath3d';
 import { prepareOutput } from '../../io/gcode';
 import { buildPreviewToolpathFromPrepared, previewPreparationIssue } from './draw-preview';
 import { sectionToolKeys, stampRemovalPerTool } from './stamp-removal-per-tool';
+import { machineToolForKey } from './toolpath-tools';
 import type { DesignSceneSource } from './use-cnc-3d-scene';
 
 // Coarser than the Preview grid — the pane recomputes on every edit.
@@ -89,12 +89,6 @@ function paneGridSpec(project: Project, machine: CncMachineConfig): RemovalGridS
     heightMm,
     mmPerCell,
   };
-}
-
-// '' is the "machine's active bit" section key; unknown ids also resolve to
-// the active bit, matching the compiler (F-CNC1: unknown tools are dropped).
-function machineToolForKey(machine: CncMachineConfig, toolKey: string): CncTool {
-  return layerCncTool(machine, toolKey === '' ? {} : { toolId: toolKey });
 }
 
 // The drawn bit silhouette. A single-bit job draws the bit that stamped its

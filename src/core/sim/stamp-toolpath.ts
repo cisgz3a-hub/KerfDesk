@@ -5,6 +5,12 @@
 // (V-carve, relief): the perceptual tests compare this grid against analytic
 // ground truth.
 //
+// Multi-bit jobs (H.7) stamp PER STEP: each cut/plunge carries the bit that
+// cut it, so one ordered walk of the path leaves a v-groove where the v-bit
+// ran and a flat floor where the end mill ran. Stamping per step rather than
+// per tool section is what lets the scrubber's uptoLengthMm stay meaningful —
+// the budget is measured along the one real path the machine runs.
+//
 // Pure and deterministic: the grid is allocated and filled inside this
 // function — no caller-visible mutation, indexed loops only. Sampling walks
 // each cut segment at half-cell spacing plus exact endpoints, so no cell the
@@ -16,6 +22,7 @@
 // between — adequate for a preview grid at 0.2 mm cells.
 
 import type { Toolpath, ToolpathStep } from '../job';
+import type { CncTool } from '../scene';
 import {
   createRemovalGrid,
   gridCellIndex,
@@ -24,12 +31,19 @@ import {
   type RemovalGridResult,
   type RemovalGridSpec,
 } from './removal-grid';
-import type { ToolKernel } from './tool-kernels';
+import { kernelForTool, type ToolKernel } from './tool-kernels';
 
 export type ComputeRemovalOptions = {
   // Only stamp the first `uptoLengthMm` of the toolpath — the scrubber's
   // partial-progress view. Omit for the finished cut.
   readonly uptoLengthMm?: number;
+  // Multi-bit jobs (H.7): the bit each tool section cuts with, keyed by the
+  // step's toolId ('' = the machine's active bit). Kernels are derived HERE,
+  // from the grid's RESOLVED cell size, so a grid that coarsened itself under
+  // MAX_GRID_CELLS can never be stamped with kernels sized for the requested
+  // cell. A step whose key is absent from the map — and every step when the
+  // map is omitted — is stamped with the `kernel` argument.
+  readonly toolsByToolKey?: ReadonlyMap<string, CncTool>;
 };
 
 export type ComputeRemovalGridResult = RemovalGridResult;
@@ -43,15 +57,37 @@ export function computeRemovalGrid(
   const result = createRemovalGrid(spec);
   if (result.kind === 'error') return result;
   const { grid } = result;
+  const kernels = kernelsByToolKey(options.toolsByToolKey, grid.mmPerCell);
   const limit = options.uptoLengthMm ?? Number.POSITIVE_INFINITY;
   let traversed = 0;
   for (const step of toolpath.steps) {
     if (traversed >= limit) break;
     const budget = limit - traversed;
-    stampStep(grid, kernel, step, budget);
+    stampStep(grid, stepKernel(kernels, kernel, step), step, budget);
     traversed += step.length;
   }
   return { kind: 'ok', grid };
+}
+
+function kernelsByToolKey(
+  tools: ReadonlyMap<string, CncTool> | undefined,
+  mmPerCell: number,
+): ReadonlyMap<string, ToolKernel> | null {
+  if (tools === undefined || tools.size === 0) return null;
+  const kernels = new Map<string, ToolKernel>();
+  for (const [toolKey, tool] of tools) kernels.set(toolKey, kernelForTool(tool, mmPerCell));
+  return kernels;
+}
+
+// Travel removes nothing, so its key never matters; cuts and plunges carry
+// the bit that was in the spindle for that move.
+function stepKernel(
+  kernels: ReadonlyMap<string, ToolKernel> | null,
+  fallback: ToolKernel,
+  step: ToolpathStep,
+): ToolKernel {
+  if (kernels === null || step.kind === 'travel') return fallback;
+  return kernels.get(step.toolId ?? '') ?? fallback;
 }
 
 function stampStep(
