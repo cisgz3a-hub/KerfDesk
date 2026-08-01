@@ -2568,12 +2568,16 @@ F-CNC19 tiling.
    regions clamp to it and cut a flat floor); a **Detail** field controls
    ring spacing (0 = auto, bit diameter ÷ 8).
 2. Compile produces an inward offset ladder: rings at inset d cut at
-   z = −min(d / tan(θ/2), depth). Sharp corners reach their full depth via
-   the vanishing offset (medial axis); holes are respected.
-3. The preview's removal shading shows the V-groove deepening toward shape
+   z = −min(d / tan(θ/2), effective depth), where effective depth is the
+   shallower of the requested maximum and the V-bit cone height
+   `(diameter / 2) / tan(θ/2)`. Sharp corners reach their full depth via the
+   vanishing offset (medial axis); holes are respected.
+3. When a flat clearing end mill is selected, its floor boundary and Z passes
+   use that same effective depth. It cannot cut a floor below the V walls.
+4. The preview's removal shading shows the V-groove deepening toward shape
    centers; the emitted G-code passes both motion and depth invariants.
-4. V-carve groups run BEFORE profile cuts (they never free the part).
-5. Advanced → Entry offers an optional maximum contour-ramp angle. With an
+5. V-carve groups run BEFORE profile cuts (they never free the part).
+6. Advanced → Entry offers an optional maximum contour-ramp angle. With an
    exact manufacturer-qualified angle, each ring descends from stock top over
    as many complete laps as both that angle and depth-per-pass require, at the
    plunge feed, then makes one level cleanup lap at cutting feed. 0 leaves the
@@ -2598,6 +2602,11 @@ F-CNC19 tiling.
 4. A missing configured clearing bit follows the same compile-integrity rule:
    it remains visible as an unavailable choice, prepared output refuses it only
    when a flat-floor stage can contribute, and direct compile omits that stage.
+5. ADR-280 does not widen either clearing-bit refusal. The eligibility probe
+   retains its established requested-depth footprint, while valid executable
+   clearing motion uses the cone-limited effective depth. A case that did not
+   refuse before ADR-280 still does not refuse; direct compile omits an invalid
+   secondary stage and the complete V-bit ladder remains available.
 
 #### Empty
 1. Open paths and layers with no closed shapes compile to no passes; the
@@ -2612,6 +2621,9 @@ F-CNC19 tiling.
 3. A configured ramp that is invalid or has no usable closed contour at
    emitted precision retains the complete legacy stepped-plunge V-carve group
    and raises a Job Review advisory. G-code provenance names the fallback.
+4. A requested depth beyond the V-bit cone height stops at the cone height.
+   The optional clearing end mill uses the same floor inset and final Z, both
+   with legacy stepped entry and with an accepted contour ramp.
 
 ### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
 

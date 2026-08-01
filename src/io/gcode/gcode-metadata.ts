@@ -27,9 +27,11 @@ export type GcodeMetadata = {
  * standalone surfacing safe-Z-before-M3 ordering (ADR-103), ADR-234's bounded
  * 4040 Fill entry geometry, ADR-236's controlled seeks/scan-quality policy,
  * ADR-238's generic Scan Line entry/exit runway geometry, ADR-270's
- * region-major V-carve traversal, and ADR-273's incident-grade CNC provenance.
+ * region-major V-carve traversal, ADR-273's incident-grade CNC provenance,
+ * ADR-278's contour ramp, and ADR-280's shared cone-limited V-carve floor
+ * depth.
  */
-export const EMITTER_REVISION = 'adr-278-vcarve-contour-ramp-v1';
+export const EMITTER_REVISION = 'adr-280-vcarve-effective-depth-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

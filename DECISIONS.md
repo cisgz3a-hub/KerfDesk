@@ -14577,3 +14577,65 @@ sources and barcode/QR generation remain deferred.
   success/error/empty/edge workflow.
 - NOT verified by this decision: production throughput, a complete imposed-sheet UI, persisted
   imposition, physical placement, camera accuracy, controller tracking, or output on hardware.
+
+## ADR-280 - Two-stage V-carve shares one cone-limited floor depth (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The V-bit ladder already stopped at the physical cone height, but the optional clearing end
+mill derived both its XY floor inset and its Z ladder from the raw requested layer depth. With
+a 6 mm 90-degree V-bit, 3 mm end mill, and 10 mm requested depth, the V-bit stopped at 3 mm.
+A 40 mm square nevertheless cleared to 10 mm, below the floor its V walls could reach; a
+20 mm square lost the clearing stage because the raw 10 mm inset erased the region entirely.
+ADR-278's optional contour ramp changed entry motion but not this mismatch.
+
+The supplied failed 4040 artifact did not activate this defect: it contains one cutter, no
+clearing stage, and a 1.191 mm minimum Z. This correction is not evidence for the reported
+physical coordinate loss.
+
+### Decision
+
+1. `vcarveEffectiveDepthMm` in `src/core/cnc/vcarve-depth.ts` is the shared executable depth
+   law: the shallower of requested depth and `(diameter / 2) / tan(included angle / 2)`.
+   Invalid actual V-bit angles remain unresolved; legacy wrong-kind selections retain the
+   established angle fallback, and invalid diameters retain the prior infinite-cone behavior.
+2. The V-bit ladder uses that helper instead of an inline cap. A valid two-stage compiler
+   resolves the depth once and supplies it to both the clearing floor geometry and clearing Z
+   passes. Offset-ladder diagnostics inspect the same executable floor. ADR-278 ramp fallback,
+   region-major ordering, and shallower-than-cone depth behavior remain unchanged.
+3. The existing `cnc-tool-geometry-invalid` refusal surface does not widen. Its missing- and
+   wrong-kind clearing-tool eligibility probes continue to use their historical raw requested
+   depth. This intentional compile/preflight asymmetry is required by the standing Frame-only
+   guard rule. Direct compilation still omits an invalid secondary stage; the V-bit ladder can
+   complete the effective floor without it.
+4. Executable G-code changes for over-cone two-stage jobs, so the emitter revision advances to
+   `adr-280-vcarve-effective-depth-v1`.
+
+### Consequences
+
+- A valid clearing end mill and the V-bit now end on one reachable floor. The 40 mm fixture
+  emits both groups to -3 mm instead of clearing to -10 mm; the 20 mm fixture retains its
+  effective-depth clearing region.
+- Jobs at or above the cone height can change XY clearing coverage, pass count, and deepest Z.
+  Jobs shallower than the cone height retain their requested floor.
+- A missing or wrong-kind clearing selection can remain non-refusing in a case where a valid
+  clearing cutter would now contribute. That preserves the existing refusal boundary; it does
+  not certify the invalid selection. The primary V-bit stage remains complete but may be slower.
+- No software result proves physical axis position. Loaded cutting, couplers, drivers, power,
+  EMI, workholding, and independent coordinate retention remain hardware qualification work.
+
+### Verification
+
+- The compiler regression was red on current main: the 20 mm fixture had no clearing group and
+  both 40 mm variants cleared to -10 mm while the V-bit stopped at -3 mm.
+- With the correction, 20 mm and 40 mm fixtures use a 3 mm shared floor; both absent and
+  3-degree ramp entry are covered, including path3d vertex Z, contour Z, and emitted G-code Z.
+- A 2 mm shallower-than-cone fixture remains at -2 mm. Angle, ladder, region-order, and
+  offset-diagnostic suites cover the existing adjacent contracts.
+- A dedicated preflight regression freezes missing and wrong-kind over-cone cases outside the
+  blocking issue set, proving this decision did not add or widen a guard.
+- NOT verified: physical cutting, surface finish, bit capability, chip evacuation, workholding,
+  or the cause of the reported coordinate loss.
