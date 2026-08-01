@@ -16,6 +16,7 @@ function mockBridge(overrides?: Partial<CameraBridgeAdapter>): CameraBridgeAdapt
   return {
     isSupported: () => true,
     probeRtspCamera: async () => ({ kind: 'unavailable', reason: 'not under test' }),
+    rtspStreamStatus: async () => ({ kind: 'live' }),
     discoverMachineCamera: async () => ({ kind: 'not-found' }),
     proxiedFrameUrl: (cameraUrl) =>
       `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(cameraUrl)}`,
@@ -303,6 +304,7 @@ describe('camera-store', () => {
         codec: 'H264',
         ffmpegAvailable: true,
         previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
+        streamSessionId: 'session-a',
       }),
     });
     await useCameraStore.getState().startRtspSource(bridge, 'rtsp://192.168.10.1:8554/');
@@ -314,6 +316,7 @@ describe('camera-store', () => {
         frameUrl: `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(
           'rtsp://192.168.10.1:8554/',
         )}`,
+        streamSessionId: 'session-a',
         sourceId: 'rtsp://192.168.10.1:8554/',
       },
     });

@@ -148,6 +148,7 @@ export type CameraBridgeProbeResult =
       readonly codec?: string;
       readonly ffmpegAvailable: boolean;
       readonly previewUrl?: string;
+      readonly streamSessionId?: string;
     }
   | { readonly kind: 'invalid'; readonly reason: string }
   | { readonly kind: 'unavailable'; readonly reason: string };
@@ -166,9 +167,16 @@ export type CameraBridgeHealth =
   | { readonly kind: 'ok'; readonly ffmpegAvailable: boolean; readonly frameProxy: boolean }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
+export type CameraBridgeStreamStatus =
+  | { readonly kind: 'starting' }
+  | { readonly kind: 'live' }
+  | { readonly kind: 'failed'; readonly reason: string }
+  | { readonly kind: 'unavailable'; readonly reason: string };
+
 export type CameraBridgeAdapter = {
   readonly isSupported: () => boolean;
   readonly probeRtspCamera: (req: CameraBridgeProbeRequest) => Promise<CameraBridgeProbeResult>;
+  readonly rtspStreamStatus: (streamSessionId: string) => Promise<CameraBridgeStreamStatus>;
   // Probe the machine's snapshot camera server-side via the bridge (ADR-116).
   readonly discoverMachineCamera: () => Promise<MachineCameraDiscovery>;
   // Bridge frame-proxy URL for a camera URL. Responses carry CORS for this

@@ -4414,10 +4414,13 @@ and lifts the command's CNC-only gate.)*
   are pointed to the bridge command; the desktop app starts it automatically.
   Hosted web builds cannot call the loopback network-camera bridge and support
   USB cameras only (ADR-141).
-- **Error / RTSP preview interrupted.** Unexpected FFmpeg end or ten seconds without preview
-  output aborts the MJPEG response. The exact active source leaves `live`, and the RTSP section
-  shows **Reconnect**; pressing it probes again and opens a fresh preview request. No background
-  FFmpeg respawn or automatic camera reconnection runs after failure.
+- **Error / RTSP preview interrupted.** Each probe creates an unguessable bridge-owned stream
+  session shared by every view of that exact source. The renderer polls its status because
+  Chromium does not reliably emit `<img>` error after an established MJPEG socket dies.
+  Unexpected FFmpeg end, ten seconds without output, bridge loss, or the last preview connection
+  closing makes that exact source leave `live`; the RTSP section shows **Reconnect**. Pressing it
+  probes again and creates a fresh session. No background FFmpeg respawn or automatic camera
+  reconnection runs after failure.
 - **Empty / no camera found.** Discovery completes with no candidate camera;
   the panel stays usable for USB cameras and manual RTSP entry.
 - **Edge / slow or single-threaded camera.** Frame fetches for the same camera

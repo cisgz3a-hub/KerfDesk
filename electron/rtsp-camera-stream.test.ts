@@ -65,12 +65,21 @@ describe('streamWithFfmpeg lifecycle', () => {
     const ffmpeg = fakeFfmpeg();
     const response = fakeResponse();
     spawnMock.mockReturnValue(ffmpeg);
-    streamWithFfmpeg(new URL('rtsp://192.168.1.20/live'), response as unknown as ServerResponse);
+    const lifecycle = { onLive: vi.fn(), onFailure: vi.fn(), onClosed: vi.fn() };
+    streamWithFfmpeg(
+      new URL('rtsp://192.168.1.20/live'),
+      response as unknown as ServerResponse,
+      lifecycle,
+    );
     ffmpeg.stdout.emit('data', Buffer.from('frame'));
+
+    expect(lifecycle.onLive).toHaveBeenCalledOnce();
 
     ffmpeg.stdout.emit('end');
 
     expect(response.destroy).toHaveBeenCalledWith(expect.any(Error));
+    expect(lifecycle.onFailure).toHaveBeenCalledWith('FFmpeg camera preview ended unexpectedly.');
+    expect(lifecycle.onClosed).not.toHaveBeenCalled();
     expect(response.end).not.toHaveBeenCalled();
 
     response.emit('drain');
@@ -78,6 +87,24 @@ describe('streamWithFfmpeg lifecycle', () => {
     expect(ffmpeg.stdout.resume).not.toHaveBeenCalled();
     expect(response.destroy).toHaveBeenCalledTimes(1);
     ffmpeg.emit('exit', 0, null);
+  });
+
+  it('reports an active client close without relabeling a prior stream failure', () => {
+    const ffmpeg = fakeFfmpeg();
+    const response = fakeResponse();
+    const lifecycle = { onLive: vi.fn(), onFailure: vi.fn(), onClosed: vi.fn() };
+    spawnMock.mockReturnValue(ffmpeg);
+    streamWithFfmpeg(
+      new URL('rtsp://192.168.1.20/live'),
+      response as unknown as ServerResponse,
+      lifecycle,
+    );
+
+    response.emit('close');
+
+    expect(lifecycle.onClosed).toHaveBeenCalledOnce();
+    expect(lifecycle.onFailure).not.toHaveBeenCalled();
+    expect(ffmpeg.kill).toHaveBeenCalledWith('SIGTERM');
   });
 
   it.each([

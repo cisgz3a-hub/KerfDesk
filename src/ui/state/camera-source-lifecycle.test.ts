@@ -45,16 +45,21 @@ function controlledCamera(initialStatus: CameraStreamStatus = 'live'): Controlle
   };
 }
 
-function rtspBridge(probe = vi.fn()): CameraBridgeAdapter {
-  probe.mockResolvedValue({
+function rtspBridge(
+  probe = vi.fn(),
+  rtspStreamStatus: CameraBridgeAdapter['rtspStreamStatus'] = async () => ({ kind: 'live' }),
+): CameraBridgeAdapter {
+  probe.mockImplementation(async () => ({
     kind: 'ok',
     url: 'rtsp://192.168.10.1:8554/',
     ffmpegAvailable: true,
     previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
-  });
+    streamSessionId: `session-${probe.mock.calls.length}`,
+  }));
   return {
     isSupported: () => true,
     probeRtspCamera: probe,
+    rtspStreamStatus,
     discoverMachineCamera: async () => ({ kind: 'not-found' }),
     proxiedFrameUrl: () => 'http://127.0.0.1:51731/frame.jpg?url=x',
     health: async () => ({ kind: 'ok', ffmpegAvailable: true, frameProxy: true }),
@@ -145,6 +150,48 @@ describe('USB camera lifecycle', () => {
 });
 
 describe('RTSP camera lifecycle', () => {
+  it('uses authoritative bridge failure to leave live without probing or reconnecting again', async () => {
+    const probe = vi.fn();
+    const status = vi.fn(async () => ({
+      kind: 'failed' as const,
+      reason: 'FFmpeg camera preview ended unexpectedly.',
+    }));
+    const bridge = rtspBridge(probe, status);
+
+    await useCameraStore.getState().startRtspSource(bridge, 'rtsp://192.168.10.1:8554/');
+
+    await vi.waitFor(() =>
+      expect(useCameraStore.getState().sourceState).toMatchObject({
+        kind: 'error',
+        sourceKind: 'machine-rtsp',
+      }),
+    );
+    expect(status).toHaveBeenCalledWith('session-1');
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a late failed heartbeat from a superseded source epoch', async () => {
+    let resolveFirstStatus: ((status: { kind: 'failed'; reason: string }) => void) | undefined;
+    const firstStatus = vi.fn(
+      () =>
+        new Promise<{ kind: 'failed'; reason: string }>((resolve) => {
+          resolveFirstStatus = resolve;
+        }),
+    );
+    const firstBridge = rtspBridge(vi.fn(), firstStatus);
+    const secondBridge = rtspBridge();
+    const url = 'rtsp://192.168.10.1:8554/';
+    await useCameraStore.getState().startRtspSource(firstBridge, url);
+    await useCameraStore.getState().startRtspSource(secondBridge, url);
+    const replacement = useCameraStore.getState().sourceState;
+
+    resolveFirstStatus?.({ kind: 'failed', reason: 'Old FFmpeg ended.' });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(useCameraStore.getState().sourceState).toBe(replacement);
+  });
+
   it('moves only the exact failed preview to error and reconnects through a fresh probe', async () => {
     const probe = vi.fn();
     const bridge = rtspBridge(probe);
@@ -164,6 +211,9 @@ describe('RTSP camera lifecycle', () => {
     const replacement = useCameraStore.getState().sourceState;
     expect(replacement.kind).toBe('live');
     expect(probe).toHaveBeenCalledTimes(2);
+    if (replacement.kind === 'live' && replacement.source.kind === 'machine-rtsp') {
+      expect(replacement.source.streamSessionId).toBe('session-2');
+    }
 
     useCameraStore.getState().reportSourceFailure(first.source);
     expect(useCameraStore.getState().sourceState).toBe(replacement);

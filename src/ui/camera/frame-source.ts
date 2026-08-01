@@ -28,6 +28,7 @@ export type ActiveCameraSource =
       readonly kind: 'machine-rtsp';
       readonly frameUrl: string;
       readonly previewUrl: string;
+      readonly streamSessionId: string;
       readonly sourceId: string;
     };
 

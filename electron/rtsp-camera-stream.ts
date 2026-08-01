@@ -68,7 +68,17 @@ function spawnPreviewFfmpeg(url: URL) {
   ]);
 }
 
-export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
+export type RtspPreviewLifecycleObserver = {
+  readonly onLive: () => void;
+  readonly onFailure: (reason: string) => void;
+  readonly onClosed: () => void;
+};
+
+export function streamWithFfmpeg(
+  url: URL,
+  res: ServerResponse,
+  lifecycle?: RtspPreviewLifecycleObserver,
+): void {
   const ffmpeg = spawnPreviewFfmpeg(url);
   const releaseSlot = acquireFfmpegSlot();
   const stderrChunks: Buffer[] = [];
@@ -77,14 +87,11 @@ export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
   let settled = false;
   let activityWatch: PreviewActivityWatch | null = null;
 
-  const cleanup = (): void => {
-    activityWatch?.stop();
-  };
-
   const failStream = (err: Error): void => {
     if (settled) return;
     settled = true;
-    cleanup();
+    activityWatch?.stop();
+    lifecycle?.onFailure(err.message);
     ffmpeg.kill('SIGTERM');
     if (clientClosed) return;
     if (responseStarted || res.headersSent) {
@@ -109,15 +116,14 @@ export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
   });
   ffmpeg.stdout.on('data', (chunk: Buffer) => {
     if (settled || clientClosed) return;
-    activityWatch?.touch();
-    if (!responseStarted) {
-      responseStarted = true;
-      writeMjpegResponseHeaders(res);
-    }
-    if (!res.write(chunk)) {
-      activityWatch?.stop();
-      ffmpeg.stdout.pause();
-    }
+    responseStarted = writePreviewChunk(
+      ffmpeg,
+      res,
+      chunk,
+      responseStarted,
+      activityWatch,
+      lifecycle,
+    );
   });
   ffmpeg.stdout.on('end', () => {
     if (!settled && !clientClosed) {
@@ -132,10 +138,12 @@ export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
     ffmpeg.stdout.resume();
   });
   res.on('close', () => {
+    const closedWhileActive = !settled;
     clientClosed = true;
     settled = true;
-    cleanup();
+    activityWatch?.stop();
     ffmpeg.kill('SIGTERM');
+    if (closedWhileActive) lifecycle?.onClosed();
   });
   ffmpeg.on('error', (err) => {
     releaseSlot();
@@ -148,6 +156,26 @@ export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
       new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview ended unexpectedly.')),
     );
   });
+}
+
+function writePreviewChunk(
+  ffmpeg: ReturnType<typeof spawnPreviewFfmpeg>,
+  res: ServerResponse,
+  chunk: Buffer,
+  responseStarted: boolean,
+  activityWatch: PreviewActivityWatch | null,
+  lifecycle: RtspPreviewLifecycleObserver | undefined,
+): true {
+  activityWatch?.touch();
+  if (!responseStarted) {
+    writeMjpegResponseHeaders(res);
+    lifecycle?.onLive();
+  }
+  if (!res.write(chunk)) {
+    activityWatch?.stop();
+    ffmpeg.stdout.pause();
+  }
+  return true;
 }
 
 function appendLimitedStderrChunk(chunks: Buffer[], chunk: Buffer): void {

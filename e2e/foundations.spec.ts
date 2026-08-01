@@ -111,7 +111,15 @@ async function installRtspBridgeRoutes(
           codec: 'h264',
           ffmpegAvailable: true,
           previewUrl: 'http://127.0.0.1:51731/stream.mjpg?camera=e2e',
+          streamSessionId: 'e2e-session',
         }),
+      });
+      return;
+    }
+    if (requestUrl.pathname === '/stream-status') {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ kind: 'live' }),
       });
       return;
     }

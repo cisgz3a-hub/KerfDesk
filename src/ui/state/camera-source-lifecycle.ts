@@ -1,5 +1,10 @@
 import { assertNever } from '../../core/scene';
-import type { CameraAdapter, CameraStreamStatus } from '../../platform/types';
+import type {
+  CameraAdapter,
+  CameraBridgeAdapter,
+  CameraBridgeStreamStatus,
+  CameraStreamStatus,
+} from '../../platform/types';
 import type { ActiveCameraSource } from '../camera/frame-source';
 import type {
   CameraSourceActions,
@@ -14,6 +19,7 @@ const RTSP_SOURCE_ENDED =
   'RTSP preview stopped. Check the camera and bridge, then press Reconnect.';
 const MACHINE_JPEG_SOURCE_ENDED =
   'Machine camera preview stopped. Check the camera and bridge, then reconnect it.';
+export const RTSP_STATUS_POLL_INTERVAL_MS = 1_000;
 
 export function handleUsbStatus(
   set: CameraSourceSet,
@@ -76,6 +82,47 @@ export function makeStopSource(
       usbSourceRelease: null,
     }));
   };
+}
+
+export async function monitorRtspSource(
+  get: CameraSourceGet,
+  bridge: CameraBridgeAdapter,
+  source: Extract<ActiveCameraSource, { readonly kind: 'machine-rtsp' }>,
+  epoch: number,
+): Promise<void> {
+  while (isCurrentSourceAtEpoch(get, source, epoch)) {
+    const status = await readRtspStatus(bridge, source.streamSessionId);
+    if (!isCurrentSourceAtEpoch(get, source, epoch)) return;
+    if (status.kind === 'failed' || status.kind === 'unavailable') {
+      get().reportSourceFailure(source);
+      return;
+    }
+    await waitForNextRtspStatus();
+  }
+}
+
+async function readRtspStatus(
+  bridge: CameraBridgeAdapter,
+  streamSessionId: string,
+): Promise<CameraBridgeStreamStatus> {
+  try {
+    return await bridge.rtspStreamStatus(streamSessionId);
+  } catch {
+    return { kind: 'unavailable', reason: 'The local camera bridge status request failed.' };
+  }
+}
+
+function waitForNextRtspStatus(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, RTSP_STATUS_POLL_INTERVAL_MS));
+}
+
+function isCurrentSourceAtEpoch(
+  get: CameraSourceGet,
+  source: ActiveCameraSource,
+  epoch: number,
+): boolean {
+  const state = get();
+  return state.sourceEpoch === epoch && isCurrentSource(state.sourceState, source);
 }
 
 function releaseUsbSource(get: CameraSourceGet, source: UsbCameraSource): void {
