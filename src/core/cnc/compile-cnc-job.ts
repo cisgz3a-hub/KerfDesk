@@ -42,6 +42,7 @@ import { finishingProfilePasses, profileFinishAllowanceMm } from './finish-allow
 import { compileStraightInlayGroups } from './inlay-pair-operation';
 import {
   DEFAULT_LINE_ART_CONTOURS,
+  lineArtPairableSet,
   lineArtSelectionApplies,
   selectLineArtContours,
 } from './line-art-contours';
@@ -129,13 +130,13 @@ export function cncGroupForLayer(
   polylines: ReadonlyArray<Polyline>,
   device: DeviceProfile,
   config: CncMachineConfig,
-  tabSources?: ReadonlyArray<CollectedCncContour>,
+  sourceContours?: ReadonlyArray<CollectedCncContour>,
 ): CncGroup | null {
   const tool = layerCncTool(config, settings);
   // Cut direction is a physical rule applied to machine numbers, and
   // front-right / rear-left mirror the frame — see machine-frame-handedness.
   const handedness = machineFrameHandedness(device.origin);
-  const passes = passesForLayer(polylines, settings, tool, config, handedness, tabSources);
+  const passes = passesForLayer(polylines, settings, tool, config, handedness, sourceContours);
   // ADR-250: bake profile lead-in/out into closed profile passes (default-on
   // for profile-outside/inside; a no-op for other cut types and shape 'none').
   const led = applyProfileLeadPasses(
@@ -248,11 +249,11 @@ function passesForLayer(
   tool: CncTool,
   config: CncMachineConfig,
   handedness: FrameHandedness,
-  tabSources: ReadonlyArray<CollectedCncContour> = [],
+  sourceContours: ReadonlyArray<CollectedCncContour> = [],
 ): ReadonlyArray<CncPass> {
   const specialized = specializedPassesForLayer(polylines, settings, tool);
   if (specialized !== null) return specialized;
-  const contours = lineArtContoursForLayer(polylines, settings, tool.diameterMm);
+  const contours = lineArtContoursForLayer(polylines, settings, tool.diameterMm, sourceContours);
   // Finish allowance: roughing toolpaths stay `allowanceMm` proud of the wall
   // (0 for every non-profile cut and for profile cuts without an allowance, so
   // the offset — and therefore the output — is byte-identical to before).
@@ -280,7 +281,7 @@ function passesForLayer(
           depths,
           settings,
           tool.diameterMm,
-          manualTabCentersForToolpaths(toolpaths, tabSources),
+          manualTabCentersForToolpaths(toolpaths, sourceContours),
         );
   // One full-depth finishing pass at the true contour, appended after roughing.
   const passes =
@@ -293,7 +294,7 @@ function passesForLayer(
             tool.diameterMm,
             toolpaths,
             handedness,
-            tabSources,
+            sourceContours,
           ),
         ]
       : roughing;
@@ -307,17 +308,20 @@ function passesForLayer(
 // any offsetting, so the surviving contour offsets as a lone shape. Only
 // edge-following cut types select; pocket reaches passesForLayer too but its
 // toolpaths come from resolveRestPocketOperation / pocketToolpathsForSettings
-// on the unfiltered contours (a ring's band needs both edges).
+// on the unfiltered contours (a ring's band needs both edges). Pairing is
+// provenance-scoped (ADR-277): text and shape contours never pair.
 function lineArtContoursForLayer(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   toolDiameterMm: number,
+  sourceContours: ReadonlyArray<CollectedCncContour> = [],
 ): ReadonlyArray<Polyline> {
   if (!lineArtSelectionApplies(settings.cutType)) return polylines;
   return selectLineArtContours(
     polylines,
     settings.lineArtContours ?? DEFAULT_LINE_ART_CONTOURS,
     toolDiameterMm,
+    lineArtPairableSet(sourceContours),
   );
 }
 

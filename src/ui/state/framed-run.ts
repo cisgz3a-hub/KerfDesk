@@ -32,9 +32,6 @@ export type PreparedStartProgram = {
 };
 
 export type FramedRunExternalEnvironment = {
-  readonly cameraPlacementActive: boolean;
-  readonly cameraConfirmedPositionEpoch: number | null;
-  readonly cameraSurfaceHeightMm: number;
   readonly rotaryRasterAllowed: boolean;
 };
 

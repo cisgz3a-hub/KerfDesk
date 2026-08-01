@@ -54,6 +54,6 @@ async function reportChangedExecutionInputs(
     return;
   }
   reportBlockedStart(
-    'The current project, output scope, placement, registration, camera setup, or rotary-raster policy changed while Start was being prepared. Review the current job and press Start again.',
+    'The current project, output scope, placement, registration, or rotary-raster policy changed while Start was being prepared. Review the current job and press Start again.',
   );
 }

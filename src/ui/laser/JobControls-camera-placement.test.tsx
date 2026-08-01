@@ -2,7 +2,6 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
-import { CAMERA_HOME_REQUIRED_MESSAGE } from '../camera/camera-placement-safety';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
@@ -85,7 +84,7 @@ afterEach(() => {
 });
 
 describe('JobControls camera placement', () => {
-  it('locks camera-owned placement controls while allowing a watched tool-off Frame', async () => {
+  it('keeps placement controls editable while allowing a watched tool-off Frame', async () => {
     installProject();
     const originalFrame = useLaserStore.getState().frame;
     const frame = vi.fn(async (_bounds, _feed, candidate?: FramedRunCandidate) => {
@@ -120,7 +119,8 @@ describe('JobControls camera placement', () => {
       });
       const startFrom = host.querySelector<HTMLSelectElement>('select[aria-label="Start from"]');
       expect(startFrom?.value).toBe('absolute');
-      expect(startFrom?.disabled).toBe(true);
+      expect(startFrom?.disabled).toBe(false);
+      expect(host.textContent).not.toContain('Camera placement locks Absolute Coordinates');
 
       const frameButton = [...host.querySelectorAll('button')].find(
         (button) => button.textContent === 'Frame job',
@@ -129,9 +129,6 @@ describe('JobControls camera placement', () => {
       await act(async () => frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
       await vi.waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
-      expect(useToastStore.getState().toasts.map((toast) => toast.message)).not.toContain(
-        CAMERA_HOME_REQUIRED_MESSAGE,
-      );
     } finally {
       uninstallAutoReview();
       if (root !== null) await act(async () => root?.unmount());
@@ -140,7 +137,7 @@ describe('JobControls camera placement', () => {
     }
   });
 
-  it('expires a ready framed job when the camera setup changes afterward', async () => {
+  it('keeps a ready framed job when camera-only setup changes afterward', async () => {
     installProject();
     useLaserStore.setState({
       connection: { kind: 'connected' },
@@ -162,10 +159,9 @@ describe('JobControls camera placement', () => {
       confirmedPositionEpoch: null,
       surfaceHeightMm: 0,
     });
-    const camera = useCameraStore.getState();
     const candidate = {
       executionSignature: currentReplayExecutionSignature(),
-      externalEnvironment: captureStartExternalEnvironment(useStore.getState().project, camera),
+      externalEnvironment: captureStartExternalEnvironment(useStore.getState().project),
     } as FramedRunCandidate;
     useLaserStore.setState((laser) => ({
       framedRun: createFramedRunPermit(candidate, laser),
@@ -182,11 +178,18 @@ describe('JobControls camera placement', () => {
       expect(host.textContent).toContain('Start framed job');
       expect(host.textContent).toContain('Ready to start');
 
-      await act(async () => useCameraStore.setState({ surfaceHeightMm: 2 }));
+      const framedRun = useLaserStore.getState().framedRun;
+      await act(async () =>
+        useCameraStore.setState({
+          placementActive: false,
+          confirmedPositionEpoch: 4,
+          surfaceHeightMm: 2,
+        }),
+      );
 
-      expect(host.textContent).toContain('Set up & Frame');
-      expect(host.textContent).toContain('Not framed');
-      expect(useLaserStore.getState().framedRun).toBeNull();
+      expect(host.textContent).toContain('Start framed job');
+      expect(host.textContent).toContain('Ready to start');
+      expect(useLaserStore.getState().framedRun).toBe(framedRun);
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

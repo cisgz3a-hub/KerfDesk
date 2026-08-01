@@ -134,7 +134,7 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
     reportFramePreparationRefusal(placement.messages, wcsNormalization.warning);
     return null;
   }
-  const externalEnvironment = captureStartExternalEnvironment(app.project, camera);
+  const externalEnvironment = captureStartExternalEnvironment(app.project);
   const prepared = await prepareCurrentStartJob(
     app,
     laser,
@@ -339,7 +339,6 @@ function reviewedFrameIsCurrent(
     startExternalEnvironmentMatches(
       bundle.externalEnvironment,
       transientProject ? bundle.project : useStore.getState().project,
-      useCameraStore.getState(),
     ) &&
     controllerStartPreparationStillCurrent(bundle.laser, currentLaser)
   );

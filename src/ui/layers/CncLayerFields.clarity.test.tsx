@@ -26,19 +26,21 @@ afterEach(() => {
   useUiStore.getState().setShowCncAdvanced(false);
 });
 
-function installCnc(): void {
+function installCnc(layer: Layer = LAYER): void {
   useStore.setState({
-    project: { ...createProject(), scene: { objects: [], layers: [LAYER] } },
+    project: { ...createProject(), scene: { objects: [], layers: [layer] } },
   });
   useStore.getState().setMachineKind('cnc');
   useUiStore.getState().setShowCncAdvanced(false);
 }
 
-async function renderFields(): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
+async function renderFields(
+  layer: Layer = LAYER,
+): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
-  await act(async () => root.render(<CncLayerFields layer={LAYER} />));
+  await act(async () => root.render(<CncLayerFields layer={layer} />));
   return { host, root };
 }
 
@@ -65,14 +67,29 @@ describe('CNC layer clarity', () => {
     }
   });
 
-  it('labels the revealed advanced group inside the layer card', async () => {
-    installCnc();
-    const view = await renderFields();
+  it('reveals V-carve Detail directly below the clicked Advanced control', async () => {
+    const layer: Layer = {
+      ...LAYER,
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' },
+    };
+    installCnc(layer);
+    const view = await renderFields(layer);
     try {
+      const toggle = view.host.querySelector('input[aria-label="Show advanced cut settings"]');
+      if (!(toggle instanceof HTMLInputElement)) throw new Error('advanced toggle missing');
       expect(view.host.querySelector('section[aria-label="Advanced cut settings"]')).toBeNull();
-      await act(async () => useUiStore.getState().setShowCncAdvanced(true));
+      expect(view.host.querySelector(`input[aria-label="Detail for ${layer.color}"]`)).toBeNull();
+
+      await act(async () => toggle.click());
+
       const section = view.host.querySelector('section[aria-label="Advanced cut settings"]');
       expect(section?.textContent).toContain('Advanced');
+      expect(
+        view.host.querySelector(`input[aria-label="Detail for ${layer.color}"]`),
+      ).not.toBeNull();
+      expect(toggle.closest('label')?.nextElementSibling).toBe(section);
+      expect(toggle.getAttribute('aria-label')).toBe('Hide advanced cut settings');
+      expect(view.host.textContent).toContain('Hide advanced cut settings');
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();

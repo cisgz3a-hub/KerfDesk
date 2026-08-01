@@ -21,10 +21,10 @@ export function CncAdvancedToggle(): JSX.Element | null {
         type="checkbox"
         checked={showAdvanced}
         onChange={(e) => setShowAdvanced(e.target.checked)}
-        aria-label="Show advanced cut settings"
+        aria-label={showAdvanced ? 'Hide advanced cut settings' : 'Show advanced cut settings'}
         title="Show every cut setting. Off keeps the layer cards to the essentials."
       />
-      <span>Advanced cut settings</span>
+      <span>{showAdvanced ? 'Hide advanced cut settings' : 'Show advanced cut settings'}</span>
     </label>
   );
 }
