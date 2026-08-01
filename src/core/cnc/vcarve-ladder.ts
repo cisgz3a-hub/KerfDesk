@@ -37,6 +37,12 @@ import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
 import { hasFinitePoints } from './profile-paths';
 import { vcarveIncludedAngleDeg } from './vcarve-angle';
+import {
+  detailPath3dPoints,
+  sourceBoundarySegments,
+  type BoundarySegment,
+  type DetailDepthLaw,
+} from './vcarve-detail-depth';
 import { orderDetailBySliver } from './vcarve-detail-order';
 import { planVCarveRampEntry } from './vcarve-entry';
 import { vcarveRegionBuckets, type OrderedVCarvePolyline } from './vcarve-region-order';
@@ -78,8 +84,18 @@ export type VCarveLadder = {
 };
 
 type VCarveRing = {
+  // δ ladder rings keep their pitch depth; detail rings carry the junction
+  // blend on the stepped path (per-vertex depths, ADR-279 Amendment 2).
+  readonly kind: 'ring' | 'detail';
   readonly polyline: Polyline;
   readonly depthMm: number;
+};
+
+// The layer's true boundary, flattened once, plus the depth law — what a
+// detail vertex measures its groove against.
+type DetailBlend = {
+  readonly segments: ReadonlyArray<BoundarySegment>;
+  readonly law: DetailDepthLaw;
 };
 
 export function vcarvePasses(
@@ -136,7 +152,11 @@ export function vcarveLadderPasses(
     tanHalf,
     maxDepthMm: maxDepth,
   });
-  const entry = passesForRings(rings, options.depthPerPassMm, options.rampAngleDeg);
+  const blend: DetailBlend = {
+    segments: sourceBoundarySegments(contours),
+    law: { tanHalf, maxDepthMm: maxDepth },
+  };
+  const entry = passesForRings(rings, options.depthPerPassMm, options.rampAngleDeg, blend);
   return {
     ...entry,
     offsetFailed: ladder.offsetFailed || detail.offsetFailed,
@@ -187,11 +207,12 @@ function zipRegionRings(
   const rings: VCarveRing[] = [];
   for (let bucket = 0; bucket < Math.max(coarse.length, fine.length); bucket += 1) {
     rings.push(
-      ...ringsForBucket(coarse[bucket] ?? [], clamp.deltaMm, clamp),
+      ...ringsForBucket(coarse[bucket] ?? [], clamp.deltaMm, clamp, 'ring'),
       ...ringsForBucket(
         orderDetailBySliver(fine[bucket] ?? [], detail.sliverRoots),
         clamp.finePitchMm,
         clamp,
+        'detail',
       ),
     );
   }
@@ -202,8 +223,10 @@ function ringsForBucket(
   entries: ReadonlyArray<OrderedVCarvePolyline>,
   pitchMm: number,
   clamp: RingDepthClamp,
+  kind: VCarveRing['kind'],
 ): ReadonlyArray<VCarveRing> {
   return entries.map(({ step, polyline }) => ({
+    kind,
     polyline,
     depthMm: Math.min(((step + 1) * pitchMm) / clamp.tanHalf, clamp.maxDepthMm),
   }));
@@ -213,9 +236,13 @@ function passesForRings(
   rings: ReadonlyArray<VCarveRing>,
   depthPerPassMm: number,
   rampAngleDeg: number | undefined,
+  blend: DetailBlend,
 ): Pick<VCarveLadder, 'passes' | 'entryIssue'> {
-  const legacyPasses = legacyPassesForRings(rings, depthPerPassMm);
+  const legacyPasses = legacyPassesForRings(rings, depthPerPassMm, blend);
   if (rampAngleDeg === undefined) return { passes: legacyPasses, entryIssue: null };
+  // The ramp planner descends to one constant depth per ring (ADR-278), so a
+  // ramp-configured layer keeps pitch-depth detail rings; the junction blend
+  // applies to the stepped path.
   const passes: CncPass[] = [];
   for (const ring of rings) {
     const plan = planVCarveRampEntry(ring.polyline, ring.depthMm, depthPerPassMm, rampAngleDeg);
@@ -228,15 +255,38 @@ function passesForRings(
 function legacyPassesForRings(
   rings: ReadonlyArray<VCarveRing>,
   depthPerPassMm: number,
+  blend: DetailBlend,
 ): ReadonlyArray<CncPass> {
-  return rings.flatMap(({ polyline, depthMm }) =>
-    zPassDepths(depthMm, depthPerPassMm).map((zMm) => ({
-      kind: 'contour' as const,
-      zMm,
-      polyline: ringClosure(polyline),
-      closed: true,
-    })),
+  return rings.flatMap((ring) =>
+    ring.kind === 'detail'
+      ? detailPassesForRing(ring.polyline, depthPerPassMm, blend)
+      : zPassDepths(ring.depthMm, depthPerPassMm).map((zMm) => ({
+          kind: 'contour' as const,
+          zMm,
+          polyline: ringClosure(ring.polyline),
+          closed: true,
+        })),
   );
+}
+
+// The junction blend (ADR-279 Amendment 2): a detail ring's vertices carry
+// the true-boundary groove depth, split through depthPerPassMm on the
+// deepest vertex so plunge-load limits still hold. Shallower levels clamp
+// each vertex to the level floor; the final level is the exact profile.
+function detailPassesForRing(
+  polyline: Polyline,
+  depthPerPassMm: number,
+  blend: DetailBlend,
+): ReadonlyArray<CncPass> {
+  const points = detailPath3dPoints(polyline, blend.segments, blend.law);
+  let deepest = 0;
+  for (const point of points) deepest = Math.min(deepest, point.z);
+  if (deepest >= 0) return [];
+  return zPassDepths(-deepest, depthPerPassMm).map((levelZ) => ({
+    kind: 'path3d' as const,
+    points: points.map((point) => ({ x: point.x, y: point.y, z: Math.max(point.z, levelZ) })),
+    closed: true,
+  }));
 }
 
 // Job convention: a closed pass's polyline ends where it starts (the offset

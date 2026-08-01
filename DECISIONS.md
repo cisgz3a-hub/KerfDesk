@@ -14729,3 +14729,62 @@ panel note) folded in.
   polygon-difference, gcode-metadata, advisory warnings) passes on the re-land head.
 - NOT verified: physical cutting; the junction under-cut blend remains as documented in the
   base decision.
+
+## ADR-279 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
+
+**Date:** 2026-08-02
+**Status:** Accepted
+
+### Context
+
+The base decision documented its one accepted approximation: detail depths measured the inset
+from the SLIVER boundary, so across the artificial junction cut-line — where a sliver meets
+ladder-covered material — the groove was under-cut for about one δ of travel. On script
+lettering those under-cuts render as dark seams wherever a stroke's width crosses the
+2δ threshold (the maintainer's "Safe" screenshot). Prerequisite: the removal-grid simulator
+had to become vertex-exact for path3d passes first (landed separately as the sim fix), or the
+blend could not be honestly verified — its endpoint-span lerp stamped a closed variable-Z
+ring as no cut at all.
+
+### Decision
+
+1. On the stepped (default) path, a thin-detail ring is emitted as a `path3d` pass whose
+   vertices carry z = −min(distToSourceBoundary / tan(θ/2), maxDepth) — the analytic groove
+   law — computed against the layer's flattened source contours
+   (`src/core/cnc/vcarve-detail-depth.ts`). Depth-per-pass still applies: levels split on the
+   deepest vertex, shallower levels clamp each vertex to the level floor, the final level is
+   the exact profile.
+2. Clipper rings keep vertices only at corners, and a straight ring edge crossing the
+   junction would lerp shallow corner depths across the deep middle; segments subdivide
+   adaptively (midpoint recursion) until the linear G1 interpolation tracks the depth law
+   within 0.02 mm, floored at the 0.05 mm fine pitch — boundary-parallel sides stay two
+   vertices, junction crossings gain vertices at the depth knee.
+3. Ramp-configured layers (ADR-278 opt-in) keep constant pitch-depth detail rings: the ramp
+   planner descends to one depth per ring by design. The blend applies to the stepped path.
+4. δ rings are untouched (constant-Z contours, byte-identical); `EMITTER_REVISION` bumps to
+   `adr-279-vcarve-junction-blend-v3` because detail output shaping changed.
+
+### Consequences
+
+- The junction under-cut seam is gone: the thin-tail perceptual window now starts 0.05 mm
+  from the cut-line (previously excluded a full δ + 0.5 mm) and holds the same ≤ 0.15 mm
+  error bound; before the blend that window measured 0.225 mm.
+- Detail passes emit G1 XYZ moves; the thin-stroke G-code snapshot changed once
+  (acknowledged), and pass counts for detail rings can differ where the true profile is
+  deeper than the pitch depth.
+- Compile cost adds an exact point-to-segment distance query per detail vertex (plus
+  refinement probes) against the layer's source segments — bounded by adaptive subdivision;
+  a spatial index remains an optimization if very large lettering layers ever need it.
+
+### Verification
+
+- `vcarve-thin-perceptual.test.ts`: the Drive-tail case asserts coverage and depth accuracy
+  INSIDE the junction zone (0.05 mm margin) — red at 0.225 mm error before the blend, green
+  after; band and #575 clamp probes unchanged and green.
+- `vcarve-ladder.test.ts` and siblings updated to read both pass kinds; the δ-ring reorder
+  completeness check is pinned on contour passes, detail completeness on the thin-detail
+  suites. 49 tests green across the five v-carve suites.
+- The sim fix's non-monotone-valley and closed variable-Z ring tests are the instrument-side
+  guarantee this blend is measured against.
+- NOT verified: physical cutting; ramp-configured layers intentionally retain the pre-blend
+  seam (documented above); the 3D viewer still shades path3d by endpoint span.

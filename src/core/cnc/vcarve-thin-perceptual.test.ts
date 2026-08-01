@@ -35,7 +35,6 @@ const VBIT_90: CncTool = {
 
 // Auto resolution for the 6 mm bit is 0.75 mm, so anything narrower than
 // 1.5 mm vanishes from the δ ladder — exactly the reported failure mode.
-const AUTO_DELTA_MM = VBIT_90.diameterMm / 8;
 const AT = 50;
 const MAX_DEPTH = 2;
 const CELL = 0.05;
@@ -192,12 +191,10 @@ describe('v-carve thin artwork — perceptual (ADR-279)', () => {
       polygon,
     );
 
-    // The tail's interior, clear of the junction blend (one δ) and of the
-    // near-zero-depth edges.
-    const tailA = toMachineCoords(
-      { x: AT + 6 + AUTO_DELTA_MM + 0.5, y: AT + 2.7 + 0.15 },
-      DEFAULT_DEVICE_PROFILE,
-    );
+    // The tail's interior INCLUDING the junction zone (the ADR-279 junction
+    // blend carves true-boundary depths right up to the hand-off; only the
+    // near-zero-depth long edges and one cell against the body stay out).
+    const tailA = toMachineCoords({ x: AT + 6 + 0.05, y: AT + 2.7 + 0.15 }, DEFAULT_DEVICE_PROFILE);
     const tailB = toMachineCoords(
       { x: AT + 12 - 0.15, y: AT + 2.7 + STROKE_W - 0.15 },
       DEFAULT_DEVICE_PROFILE,

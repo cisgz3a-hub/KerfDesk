@@ -4,7 +4,6 @@ import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
 import { vcarveLadderPasses, vcarvePasses, vcarveResolutionMm } from './vcarve-ladder';
-import { THIN_DETAIL_RESOLUTION_MM, vcarveThinDetailRings } from './vcarve-thin-detail';
 
 const VBIT_90: CncTool = {
   id: 'v90',
@@ -26,15 +25,30 @@ function square(at: number, size: number): Polyline {
   };
 }
 
+// δ rings stay constant-Z contours; detail rings are path3d since the
+// junction blend (ADR-279 Amendment 2) — helpers read both.
+function passXy(
+  pass: ReturnType<typeof vcarvePasses>[number],
+): ReadonlyArray<{ readonly x: number; readonly y: number }> {
+  if (pass.kind === 'contour') return pass.polyline;
+  if (pass.kind === 'path3d') return pass.points;
+  return [];
+}
+
 function contourDepths(passes: ReturnType<typeof vcarvePasses>): number[] {
-  return passes.map((pass) => (pass.kind === 'contour' ? pass.zMm : Number.NaN));
+  return passes.map((pass) => {
+    if (pass.kind === 'contour') return pass.zMm;
+    if (pass.kind === 'path3d') return Math.min(...pass.points.map((point) => point.z));
+    return Number.NaN;
+  });
 }
 
 function contourRegionOrder(passes: ReturnType<typeof vcarvePasses>): string {
   return passes
     .map((pass) => {
-      if (pass.kind !== 'contour') return '?';
-      return Math.max(...pass.polyline.map((point) => point.x)) < 10 ? 'L' : 'R';
+      const xy = passXy(pass);
+      if (xy.length === 0) return '?';
+      return Math.max(...xy.map((point) => point.x)) < 10 ? 'L' : 'R';
     })
     .join('');
 }
@@ -208,22 +222,18 @@ describe('vcarvePasses', () => {
         );
       });
     const ladder = buildOffsetLadder(contours, 64, (step) => (step + 1) * resolutionMm);
-    // ADR-279: the corner/thin detail rings are part of the reorder contract.
-    const detail = vcarveThinDetailRings(contours, ladder.rings[0] ?? [], resolutionMm);
-    const expected = [
-      ...ringKeys(ladder.rings, resolutionMm),
-      ...ringKeys(detail.rings, THIN_DETAIL_RESOLUTION_MM),
-    ].sort();
+    // Detail rings became per-vertex path3d passes with the junction blend;
+    // their completeness is pinned by the thin-detail suites. This test pins
+    // that the region reorder loses/duplicates no δ ring (all contour passes
+    // are δ rings).
+    const expected = [...ringKeys(ladder.rings, resolutionMm)].sort();
     const actual = vcarvePasses(contours, {
       tool: VBIT_90,
       maxDepthMm,
       depthPerPassMm,
       resolutionMm,
     })
-      .map((pass) => {
-        if (pass.kind !== 'contour') throw new Error('expected contour pass');
-        return passKey(pass.zMm, pass.polyline);
-      })
+      .flatMap((pass) => (pass.kind === 'contour' ? [passKey(pass.zMm, pass.polyline)] : []))
       .sort();
 
     expect(actual).toEqual(expected);
@@ -352,8 +362,7 @@ describe('vcarvePasses — thin detail (ADR-279)', () => {
     expect(Math.min(...depths)).toBeLessThanOrEqual(-0.15);
     expect(Math.min(...depths)).toBeGreaterThanOrEqual(-0.25 - 1e-9);
     for (const pass of passes) {
-      if (pass.kind !== 'contour') continue;
-      for (const p of pass.polyline) {
+      for (const p of passXy(pass)) {
         expect(p.x).toBeGreaterThanOrEqual(-1e-6);
         expect(p.x).toBeLessThanOrEqual(10 + 1e-6);
         expect(p.y).toBeGreaterThanOrEqual(-1e-6);
@@ -418,12 +427,13 @@ describe('vcarvePasses — thin detail (ADR-279)', () => {
     });
     const fingerOrder = passes
       .flatMap((pass) => {
-        if (pass.kind !== 'contour') return [];
+        const xy = passXy(pass);
+        if (xy.length === 0) return [];
         // Coverage of the square's δ ladder ends at its right edge (x = 6),
         // so finger detail rings live entirely at x > 6.
-        const inFinger = pass.polyline.every((point) => point.x >= 6.01);
+        const inFinger = xy.every((point) => point.x >= 6.01);
         if (!inFinger) return [];
-        const maxY = Math.max(...pass.polyline.map((point) => point.y));
+        const maxY = Math.max(...xy.map((point) => point.y));
         return [maxY <= 1.2 ? 'A' : 'B'];
       })
       .join('');
