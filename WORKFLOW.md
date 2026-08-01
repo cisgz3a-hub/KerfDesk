@@ -3434,28 +3434,27 @@ and lifts the command's CNC-only gate.)*
    flute count or RPM use the advanced Feeds calculator, which composes
    with H.7 presets.
 
-### F-CNC32. Switch a layer card between Basic and Advanced — ADR-111 #4
+### F-CNC32. Review core and Advanced layer settings together — ADR-111 #4 amended
 
 #### Success
-1. CNC layer cards default to **Basic** and lead with Material, followed by
+1. CNC layer cards lead with Material, followed by
    Cut type, Bit, Cut depth, Depth per pass, Feed, Plunge, Spindle, and Tabs.
-   The core machining values stay visible for review. The Cuts/Layers panel's
-   "Advanced cut settings" checkbox reveals helpers and specialist controls
-   (presets, calculator, stepover, pocket fill, and cut-type tails) on every
-   card; the choice persists across sessions.
+   The core machining values stay visible for review. A labeled **Advanced**
+   section immediately follows with helpers and specialist controls (presets,
+   calculator, stepover, pocket fill, and cut-type tails). It is always visible.
 2. Cut depth carries a one-click "Set to stock thickness (N mm)" button. It
    sets the exact measured thickness without silently adding spoilboard
    overcut; any verified overcut remains an explicit operator edit.
 
-#### Error — none (view toggle only)
-1. Toggling never changes cut settings; it only shows/hides fields.
+#### Error — none (presentation only)
+1. The Advanced heading groups specialist controls without changing values.
 
 #### Empty
-1. The toggle and its fields appear only in CNC mode.
+1. The Advanced section appears only for a selected CNC operation.
 
-#### Edge — a hidden advanced value still applies
-1. Specialist fields hidden by Basic keep their values and still drive output
-   (e.g. a pocket's stepover); Basic hides complexity, it does not reset it.
+#### Edge — long specialist sections remain available
+1. The panel scrolls normally when a cut type exposes many specialist fields;
+   no setting is hidden behind a separate visibility state.
 
 ### F-CNC33. Fill machine settings from the connected controller — ADR-111 #3a
 
