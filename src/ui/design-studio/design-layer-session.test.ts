@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import type { SketchEntity } from '../../core/design';
 import { DEFAULT_DESIGN_LAYER_ID, sketchLayers } from '../../core/design/layers';
 import {
   addSessionLayer,
+  armLayerOfSelection,
   assignSelectionToSessionLayer,
   patchSessionLayer,
   removeSessionLayer,
@@ -25,6 +27,53 @@ const sessionWithRect = () => {
     ],
   });
 };
+
+// The maintainer's ask: "clicking on the shape it's assigned to should auto
+// open the settings for that layer." The settings editor always shows the
+// ACTIVE layer, so selecting has to arm it.
+describe('selecting a shape arms its layer', () => {
+  const twoLayerSketch = () => {
+    const base = addSessionLayer(sessionWithRect(), 'layer-b');
+    return withSketch(base, {
+      entities: [
+        { ...(sessionSketch(base).entities[0] as SketchEntity) },
+        {
+          id: 'r2',
+          kind: 'rect' as const,
+          origin: { x: 40, y: 40 },
+          widthMm: 10,
+          heightMm: 10,
+          cornerRadiusMm: 0,
+          layerId: 'layer-b',
+        },
+      ],
+      layers: sketchLayers(sessionSketch(base)),
+    });
+  };
+
+  it('arms the layer of the shape just selected', () => {
+    const session = { ...twoLayerSketch(), activeLayerId: DEFAULT_DESIGN_LAYER_ID };
+    const armed = armLayerOfSelection({ ...session, selectedIds: new Set(['r2']) });
+    expect(armed.activeLayerId).toBe('layer-b');
+  });
+
+  it('leaves the active layer alone when the selection spans layers', () => {
+    const session = { ...twoLayerSketch(), activeLayerId: DEFAULT_DESIGN_LAYER_ID };
+    const mixed = { ...session, selectedIds: new Set(['r1', 'r2']) };
+    expect(armLayerOfSelection(mixed)).toBe(mixed);
+  });
+
+  it('leaves the active layer alone when nothing is selected', () => {
+    const session = { ...twoLayerSketch(), selectedIds: new Set<string>() };
+    expect(armLayerOfSelection(session)).toBe(session);
+  });
+
+  it('is a no-op when the shape is already on the active layer', () => {
+    const session = { ...twoLayerSketch(), activeLayerId: 'layer-b' };
+    const already = { ...session, selectedIds: new Set(['r2']) };
+    expect(armLayerOfSelection(already)).toBe(already);
+  });
+});
 
 describe('design-layer-session', () => {
   it('adding a layer makes it active and one undo step', () => {
