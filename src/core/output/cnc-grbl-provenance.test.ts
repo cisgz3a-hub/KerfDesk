@@ -45,6 +45,7 @@ describe('CNC G-code provenance comments', () => {
       requestedDepthMm: 1.191,
       depthPerPassMm: 0.5,
       vResolutionMm: 0,
+      rampEntryDeg: 3,
       feedSource: { kind: 'machine-starter', starterId: 'neotronics-4040-safe', revision: 2 },
     });
     const plainGcode = cncGrblStrategy.emit({ groups: [plain] }, DEFAULT_DEVICE_PROFILE);
@@ -57,6 +58,7 @@ describe('CNC G-code provenance comments', () => {
     expect(enrichedGcode).toContain('; cnc tool: v-bit; diameter-mm: 3.175; angle-deg: 90.000');
     expect(enrichedGcode).toContain('; cnc depth: requested-mm: 1.191; per-pass-mm: 0.500');
     expect(enrichedGcode).toContain('; cnc v-resolution-mm: auto');
+    expect(enrichedGcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 3.000');
     expect(enrichedGcode).toContain('; cnc feed-source: machine-starter');
     expect(enrichedGcode).toContain('; cnc starter-id: neotronics-4040-safe; revision: 2');
     expect(sendableLines(enrichedGcode)).toEqual(sendableLines(plainGcode));
@@ -98,6 +100,43 @@ describe('CNC G-code provenance comments', () => {
     for (const line of injected.split('\n').filter((candidate) => candidate.startsWith('; cnc '))) {
       expect(new TextEncoder().encode(line).byteLength).toBeLessThanOrEqual(96);
     }
+  });
+
+  it('discloses V-carve fallback and a tiled entry that starts below stock top', () => {
+    const fallback = cncGrblStrategy.emit(
+      { groups: [group({ cutType: 'v-carve', rampEntryDeg: 3 })] },
+      DEFAULT_DEVICE_PROFILE,
+    );
+    expect(fallback).toContain('; cnc entry: stepped-plunge-fallback; max-angle-deg: 3.000');
+
+    const clipped = cncGrblStrategy.emit(
+      {
+        groups: [
+          group({
+            cutType: 'v-carve',
+            rampEntryDeg: 3,
+            rampEntryTiled: true,
+            passes: [
+              {
+                kind: 'path3d',
+                closed: false,
+                lateralFeed: 'plunge',
+                points: [
+                  { x: 10, y: 10, z: -0.25 },
+                  { x: 20, y: 10, z: -0.5 },
+                ],
+              },
+            ],
+          }),
+        ],
+      },
+      DEFAULT_DEVICE_PROFILE,
+    );
+    expect(clipped).toContain('; cnc entry: contour-ramp; requested-max-angle-deg: 3.000');
+    expect(clipped).toContain(
+      '; cnc entry-advisory: tiled output does not retain the max-angle guarantee',
+    );
+    expect(clipped).toContain('; cnc entry-advisory: tiled ramp starts below stock top');
   });
 });
 

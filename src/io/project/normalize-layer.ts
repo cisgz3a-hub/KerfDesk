@@ -29,6 +29,10 @@ function booleanPassthrough(key: string, value: unknown): Record<string, unknown
   return typeof value === 'boolean' ? { [key]: value } : {};
 }
 
+function positiveNumberPassthrough(key: string, value: unknown): Record<string, unknown> {
+  return isPositiveNumber(value) ? { [key]: value } : {};
+}
+
 export function normalizeLayer(layer: unknown): unknown {
   if (!isObject(layer)) return layer;
   const out: Record<string, unknown> = { ...layer };
@@ -124,6 +128,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
       ? { reliefScallopMm: raw['reliefScallopMm'] }
       : {}),
     ...(isPositiveNumber(raw['rampEntryDeg']) ? { rampEntryDeg: raw['rampEntryDeg'] } : {}),
+    ...positiveNumberPassthrough('vCarveRampEntryDeg', raw['vCarveRampEntryDeg']),
     ...normalizeHelixEntry(raw['helixEntry']),
     ...(raw['cutDirection'] === 'climb' || raw['cutDirection'] === 'conventional'
       ? { cutDirection: raw['cutDirection'] }

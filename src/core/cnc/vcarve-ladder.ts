@@ -14,19 +14,22 @@
 //
 // Each disconnected filled region is completed shallow → deep (outside-in)
 // before travelling to the next region. Every contour keeps its original
-// ladder step, and each is expanded through zPassDepths so no single plunge
-// exceeds depthPerPassMm; the emitter's same-XY chaining turns those into
-// efficient stepped plunges.
+// ladder step. With no entry angle it retains the legacy zPassDepths stepped
+// plunges. An explicitly qualified angle instead produces continuous multi-lap
+// contour descent plus one full-depth cleanup lap. If that requested plan is
+// not representable, Job Review names the issue and output retains the legacy
+// stepped entry instead of dropping the layer.
 //
 // Pure and deterministic: source-region order, then k ascending and offset
 // engine order within a region, no clock, no random.
 
 import { buildOffsetLadder } from '../geometry/offset-ladder';
-import type { CncPass, CncContourPass } from '../job';
+import type { CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
 import { hasFinitePoints } from './profile-paths';
 import { vcarveIncludedAngleDeg } from './vcarve-angle';
+import { planVCarveRampEntry } from './vcarve-entry';
 import { vcarveRegionOrder } from './vcarve-region-order';
 
 const MIN_CLOSED_POINTS = 3;
@@ -40,6 +43,9 @@ export type VCarveOptions = {
   readonly maxDepthMm: number;
   readonly depthPerPassMm: number;
   readonly resolutionMm: number; // 0 = auto
+  // Opt-in maximum along-contour entry angle. Absent preserves the legacy
+  // stepped-plunge program for saved jobs whose cutter entry data is unknown.
+  readonly rampAngleDeg?: number;
 };
 
 export type VCarveLadder = {
@@ -48,6 +54,14 @@ export type VCarveLadder = {
   // on reaching the medial axis: the carve is shallower and narrower than the
   // artwork asks for. Reported to Job Review, never a refusal (rule 7).
   readonly offsetFailed: boolean;
+  // A configured ramp that could not be planned and therefore used the legacy
+  // stepped entry. Reported to Job Review, never a refusal (rule 7).
+  readonly entryIssue: string | null;
+};
+
+type VCarveRing = {
+  readonly polyline: Polyline;
+  readonly depthMm: number;
 };
 
 export function vcarvePasses(
@@ -64,7 +78,7 @@ export function vcarveLadderPasses(
   options: VCarveOptions,
 ): VCarveLadder {
   const tipAngleDeg = vcarveIncludedAngleDeg(options.tool);
-  if (tipAngleDeg === null) return { passes: [], offsetFailed: false };
+  if (tipAngleDeg === null) return { passes: [], offsetFailed: false, entryIssue: null };
   const contours = polylines.filter(
     (polyline) =>
       polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
@@ -80,16 +94,18 @@ export function vcarveLadderPasses(
       ? options.tool.diameterMm / 2 / tanHalf
       : Number.POSITIVE_INFINITY;
   const maxDepth = Math.min(options.maxDepthMm, coneHeightMm);
-  if (contours.length === 0 || !(maxDepth > 0)) return { passes: [], offsetFailed: false };
+  if (contours.length === 0 || !(maxDepth > 0)) {
+    return { passes: [], offsetFailed: false, entryIssue: null };
+  }
 
   // Ring k (1-based in the depth law above) is ladder step k - 1.
   const ladder = buildOffsetLadder(contours, MAX_VCARVE_RINGS, (step) => (step + 1) * delta);
-  const passes: CncContourPass[] = [];
-  for (const { step, polyline } of vcarveRegionOrder(contours, ladder.rings)) {
-    const ringDepth = Math.min(((step + 1) * delta) / tanHalf, maxDepth);
-    appendRingPasses(passes, [polyline], ringDepth, options.depthPerPassMm);
-  }
-  return { passes, offsetFailed: ladder.offsetFailed };
+  const rings = vcarveRegionOrder(contours, ladder.rings).map(({ step, polyline }) => ({
+    polyline,
+    depthMm: Math.min(((step + 1) * delta) / tanHalf, maxDepth),
+  }));
+  const entry = passesForRings(rings, options.depthPerPassMm, options.rampAngleDeg);
+  return { ...entry, offsetFailed: ladder.offsetFailed };
 }
 
 // Ring spacing: explicit setting wins; 0 = auto at toolDiameter/8 with a
@@ -101,19 +117,34 @@ export function vcarveResolutionMm(settingMm: number, toolDiameterMm: number): n
   return Math.max(MIN_RESOLUTION_MM, toolDiameterMm / AUTO_RESOLUTION_TOOL_FRACTION);
 }
 
-function appendRingPasses(
-  passes: CncContourPass[],
-  ring: ReadonlyArray<Polyline>,
-  ringDepthMm: number,
+function passesForRings(
+  rings: ReadonlyArray<VCarveRing>,
   depthPerPassMm: number,
-): void {
-  // Complete each contour to its full ring depth before the next contour —
-  // same-XY chaining makes the intermediate levels cheap stepped plunges.
-  for (const polyline of ring) {
-    for (const zMm of zPassDepths(ringDepthMm, depthPerPassMm)) {
-      passes.push({ kind: 'contour', zMm, polyline: ringClosure(polyline), closed: true });
-    }
+  rampAngleDeg: number | undefined,
+): Pick<VCarveLadder, 'passes' | 'entryIssue'> {
+  const legacyPasses = legacyPassesForRings(rings, depthPerPassMm);
+  if (rampAngleDeg === undefined) return { passes: legacyPasses, entryIssue: null };
+  const passes: CncPass[] = [];
+  for (const ring of rings) {
+    const plan = planVCarveRampEntry(ring.polyline, ring.depthMm, depthPerPassMm, rampAngleDeg);
+    if (!plan.ok) return { passes: legacyPasses, entryIssue: plan.reason };
+    passes.push(...plan.passes);
   }
+  return { passes, entryIssue: null };
+}
+
+function legacyPassesForRings(
+  rings: ReadonlyArray<VCarveRing>,
+  depthPerPassMm: number,
+): ReadonlyArray<CncPass> {
+  return rings.flatMap(({ polyline, depthMm }) =>
+    zPassDepths(depthMm, depthPerPassMm).map((zMm) => ({
+      kind: 'contour' as const,
+      zMm,
+      polyline: ringClosure(polyline),
+      closed: true,
+    })),
+  );
 }
 
 // Job convention: a closed pass's polyline ends where it starts (the offset

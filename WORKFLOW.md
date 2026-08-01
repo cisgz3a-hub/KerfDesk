@@ -2515,6 +2515,11 @@ F-CNC19 tiling.
 3. The preview's removal shading shows the V-groove deepening toward shape
    centers; the emitted G-code passes both motion and depth invariants.
 4. V-carve groups run BEFORE profile cuts (they never free the part).
+5. Advanced → Entry offers an optional maximum contour-ramp angle. With an
+   exact manufacturer-qualified angle, each ring descends from stock top over
+   as many complete laps as both that angle and depth-per-pass require, at the
+   plunge feed, then makes one level cleanup lap at cutting feed. 0 leaves the
+   legacy stepped-plunge program unchanged.
 
 #### Error — active bit is not a v-bit
 1. The layer panel and pre-Frame Job Review show "V-carve requires a v-bit."
@@ -2544,7 +2549,11 @@ F-CNC19 tiling.
 1. Regions too narrow for even one ring at δ produce no rings there —
    the groove simply ends (no gouge, no error).
 2. depthMm larger than the shape supports: the ladder stops where offsets
-   vanish; depth per pass still caps every plunge.
+   vanish. Depth per pass caps each legacy plunge or, for a ramped V-carve,
+   the descent per complete ring lap.
+3. A configured ramp that is invalid or has no usable closed contour at
+   emitted precision retains the complete legacy stepped-plunge V-carve group
+   and raises a Job Review advisory. G-code provenance names the fallback.
 
 ### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
 
@@ -2950,8 +2959,9 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
 
 #### Success
-1. The layer card's "Entry" row offers a ramp angle for profile/pocket/engrave
-   cuts. Climb / Conventional / Default direction appears only for
+1. The layer card's "Entry" row offers a ramp angle for
+   profile/pocket/engrave/V-carve cuts. Climb / Conventional / Default
+   direction appears only for
    outside/inside profiles and pockets, where direction affects winding.
 2. Direction enforcement re-orients closed toolpaths (M3 spindle: climb
    keeps material RIGHT of travel — outside profiles run CW,
@@ -2959,15 +2969,25 @@ and lifts the command's CNC-only gate.)*
    the longest segment so witness marks land on a flat span.
 3. A ramp angle > 0 turns plunges into descents ALONG the toolpath at
    that angle; closed loops re-cut the ramped span level afterwards.
+   V-carve uses its dedicated full-contour strategy: every ring starts at
+   stock top, descends over one or more complete laps, and then cuts one level
+   cleanup lap. It does not use the ordinary short-path vertical fallback.
 4. Offset pockets can instead enable **Helical entry**. Each ring retracts,
    relocates, and descends through a native tangent helix that ends at the
    contour start. Raster pockets, islands, disconnected pockets, and a minimum
    diameter that cannot fit are blocked before output.
    Depth ladders ramp each step from the previous level.
 
-#### Error — none (both options are clamped)
-1. Ramp angle clamps to [0.5°, 45°]; direction only applies where a
-   material side exists (engraves/open paths are left alone).
+#### Advisory — invalid or unrepresentable V-carve entry
+1. Ordinary profile/pocket/engrave ramp angles retain their [0.5°, 45°]
+   behavior. A V-carve uses the separate `vCarveRampEntryDeg` opt-in, so a
+   generic ramp retained from an older cut type cannot activate it. Its stored
+   maximum is never raised: it must be finite, greater than 0, and less than
+   90°. An entry that cannot be represented at emitted precision uses the
+   complete legacy stepped entry and names that fallback in Job Review and
+   G-code provenance; it does not refuse output.
+2. Direction only applies where a material side exists (engraves/open paths
+   are left alone).
 
 #### Empty
 1. Defaults (no direction, 0 ramp) keep output byte-identical to
@@ -2999,6 +3019,17 @@ and lifts the command's CNC-only gate.)*
 1. Grid size is resolved before tile records, G-code, or file dialogs are
    created. A grid above 500 planned cells reports a factual non-writable
    outcome and writes nothing; increase tile size or reduce overlap.
+
+#### Advisory — tiled V-carve entry semantics
+1. Every tiled V-carve ramp warns that the entered angle is requested
+   provenance, not a re-verified emitted maximum, because per-tile derivation
+   can create new segment endpoints. Export remains available.
+2. If clipping makes a plunge-fed V-carve ramp piece begin below stock top,
+   that tile starts with a direct plunge at the configured plunge feed. Tiled
+   export remains available, but CurveDesk raises a separate warning toast and
+   writes an inert G-code provenance comment. Keep the contour inside one tile
+   when the exact cutter cannot plunge or requires a guaranteed maximum ramp
+   angle.
 
 #### Edge — requested overlap leaves no positive tile step
 1. Planning uses one disclosed effective overlap that leaves a positive

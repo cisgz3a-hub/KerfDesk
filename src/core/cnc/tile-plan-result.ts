@@ -16,6 +16,7 @@ export type TiledJobsResult =
       readonly kind: 'ready';
       readonly grid: EffectiveCncTileGrid;
       readonly tiles: ReadonlyArray<TiledJob>;
+      readonly advisories?: ReadonlyArray<string>;
     }
   | { readonly kind: 'empty' }
   | Extract<EffectiveCncTileGridResult, { readonly kind: 'work-budget-exceeded' }>;

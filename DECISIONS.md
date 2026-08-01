@@ -14259,3 +14259,91 @@ claim physical qualification.
 - The research/model-fit record is `docs/audits/2026-08-01-cnc-bit-catalog-research.md`.
 - NOT verified: manufacturer SKU completeness, manufacturer feed recommendations, real spindle or
   collet compatibility, an air cut, a material cut, surface finish, or perceptual 3D fidelity.
+
+## ADR-276 - V-carve entry uses an opt-in emission-accurate contour ramp (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+CurveDesk's V-carve ladder reached each ring depth through discrete same-XY plunges. That motion is
+mathematically valid, but it concentrates load at entry and is a poor fit for a cutting-load
+position-loss investigation. Vectric documents that along-path ramping avoids vertical entry and
+reduces cutter wear, heat, and spindle/Z-axis load; its spiral profile mode descends over the whole
+perimeter and uses cutter pass depth to select the number of laps. LMT Onsrud likewise explains
+that a straight plunge can recut trapped chips and generate heat, while simultaneous XY/Z ramp-in
+motion reduces that entry dwell.
+
+Those sources establish a useful strategy, not a universal numeric setting. Vectric says a ramp
+angle is commonly supplied by the cutter manufacturer. Autodesk constrains both ramp angle and
+stepdown per revolution and warns that an entry must fit without gouging; its FeatureCAM guidance
+requires more XY travel for a non-center-cutting tool. Amana documents at least one 90-degree
+V-groove cutter as non-end-cutting and unable to plunge. A nominal diameter and included angle
+therefore do not establish center-cutting geometry, flute clearance, ramp angle, or material feed.
+
+### Decision
+
+1. V-carve exposes a dedicated optional `vCarveRampEntryDeg` setting. Absence (shown as 0 in the UI)
+   preserves the exact legacy stepped-plunge program; CurveDesk does not invent or auto-enable an
+   angle for an unknown cutter. It is deliberately separate from generic `rampEntryDeg`, which old
+   projects may retain after changing cut type and which V-carve previously ignored.
+2. For an enabled V-carve, every inward-offset ring starts at stock top at the deterministic
+   midpoint of its longest segment and descends continuously around that exact ring. Planning uses
+   the emitter's 0.001 mm coordinate grid. Job-origin placement can put a grid point on a binary
+   floating-point rounding tie, so each XY component is conservatively allowed to lose one emitted
+   quantum before segment length `L_i` is calculated. Its maximum descent capacity is then
+   `floor(L_i * tan(a) / 0.001)` Z quanta. One lap may use no more than both the sum of those
+   capacities and `floor(depthPerPass / 0.001)`; the lap count is the emitted target depth in quanta
+   divided by that conservative per-lap capacity, rounded up. Integer Z quanta are distributed by
+   cumulative segment capacity, so ordinary final G-code formatting and job-origin translation
+   cannot steepen a segment above the configured maximum. A separate full-depth cleanup lap
+   restores the requested V-carve geometry after the descending laps.
+3. All descending XYZ segments use the group's plunge feed. The level cleanup lap uses the normal
+   cutting feed. GRBL receives ordinary absolute `G1 X Y Z F` moves; this change adds no controller
+   dialect, live load feedback, adaptive feed, spindle, acceleration, or firmware behavior.
+4. The entered angle is a true maximum: it must be finite, greater than 0, and less than 90 degrees,
+   and it is never raised to a software minimum. Planning also requires a non-degenerate closed
+   contour at emitted precision and a safely representable JavaScript motion count. If a configured
+   entry cannot be represented, CurveDesk preserves the complete legacy stepped-plunge ladder and
+   reports a nonblocking Job Review advisory. It does not omit the layer, impose a predictive
+   segment budget, or create a new refusal.
+5. Every tiled ramp warns that per-tile derivation can create arbitrary segment endpoints, so tiled
+   files retain the entered angle only as `requested-max-angle-deg` provenance and explicitly do not
+   assert the ordinary final-emission maximum-angle guarantee. Tiling may also split a valid contour
+   ramp into a piece whose first point is already below stock top; that tile necessarily begins with
+   a direct plunge at the configured plunge feed. Export remains available under the frame-first
+   policy, while a separate warning toast and inert G-code provenance comment disclose that loss of
+   the low-load entry guarantee.
+6. The configured angle and any legacy fallback or tiled-entry caveat are written into CNC
+   provenance comments. The emitter revision advances to `adr-276-vcarve-contour-ramp-v1`.
+
+### Consequences
+
+- A qualified cutter can enter each V-carve ring without a same-XY downward cutting move, while
+  depth-per-pass and maximum-angle constraints both remain effective.
+- Small contours may require many laps. CurveDesk does not impose a predictive output-size cap;
+  only emission-precision or numeric representability failures retain legacy entry with disclosure.
+- Existing projects and new layers remain unchanged until an operator enters an exact
+  manufacturer-approved angle. The tool's SKU/datasheet, material, machine rigidity, and chip
+  evacuation still determine whether a real cut is appropriate.
+- Lower entry load is a risk reduction, not a coordinate-recovery mechanism. An open-loop machine
+  can still miss steps under cutting load, while controller status continues to reflect commanded
+  step accounting rather than independent physical-axis feedback.
+
+### Verification
+
+- Planner tests pin exact final depth, full-depth cleanup, deterministic entry point,
+  segment-by-segment angle and depth-per-pass bounds after 0.001 mm G-code rounding and a
+  half-quantum job-origin translation (including a 0.1-degree persisted maximum), absence of a
+  same-XY descent on a 0.171 mm-perimeter fixture, and numeric-domain fallback without substituting
+  an arbitrary maximum angle.
+- Compiler/emitter tests prove V-carve produces paired plunge-fed XYZ ramps and cut-fed cleanup
+  laps, emits no direct negative-Z plunge for the ramped fixture, and preserves the legacy path when
+  the setting is absent.
+- Preflight and tiling tests prove an invalid or numerically unrepresentable entry preserves the
+  legacy layer with an advisory, while every tiled entry remains exportable with requested-only
+  angle provenance and a boundary-clipped entry separately discloses its initial plunge.
+- Source record: `docs/audits/2026-08-01-cnc-vcarve-ramp-entry-acceptance.md`.
+- NOT verified: exact-cutter ramp capability, loaded-cut position retention, chip evacuation,
+  workholding, tool temperature, surface finish, or finished V-groove dimensions.

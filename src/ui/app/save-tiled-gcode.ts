@@ -6,6 +6,7 @@
 // tiling — and each tile's G-code preflights individually instead.
 
 import { tileJobs } from '../../core/cnc';
+import type { TiledJobsResult } from '../../core/cnc/tile-plan';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
@@ -48,15 +49,8 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
     jobAwareAlert(`Cannot export tiles:\n\n${lines}`);
     return true;
   }
-  const tiled = tileJobs(prepared.job, machine.tiling);
-  if (tiled.kind === 'empty') {
-    ctx.pushToast('Nothing to tile — the compiled job is empty.', 'warning');
-    return true;
-  }
-  if (tiled.kind === 'work-budget-exceeded') {
-    jobAwareAlert(tiledSaveWorkBudgetMessage(tiled.grid));
-    return true;
-  }
+  const tiled = readyTiledJobs(tileJobs(prepared.job, machine.tiling), ctx);
+  if (tiled === null) return true;
   // Per-tile preflight must inspect the same selected artifact that produced
   // prepared.job; rescanning the original scene can overblock on unselected
   // operations that are absent from every tile.
@@ -75,6 +69,7 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   )) {
     ctx.pushToast(advisory, 'warning');
   }
+  pushTiledAdvisories(ctx, tiled);
   const saved = await saveTileFiles(ctx, files);
   ctx.pushToast(
     saved === files.length
@@ -84,6 +79,28 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   );
   pushAdvisoryToasts(ctx.pushToast, prepared.advisories, emitted.advisories);
   return true;
+}
+
+function pushTiledAdvisories(
+  ctx: SaveTiledGcodeCtx,
+  tiled: Extract<TiledJobsResult, { readonly kind: 'ready' }>,
+): void {
+  for (const advisory of tiled.advisories ?? []) ctx.pushToast(advisory, 'warning');
+}
+
+function readyTiledJobs(
+  tiled: TiledJobsResult,
+  ctx: SaveTiledGcodeCtx,
+): Extract<TiledJobsResult, { readonly kind: 'ready' }> | null {
+  if (tiled.kind === 'empty') {
+    ctx.pushToast('Nothing to tile — the compiled job is empty.', 'warning');
+    return null;
+  }
+  if (tiled.kind === 'work-budget-exceeded') {
+    jobAwareAlert(tiledSaveWorkBudgetMessage(tiled.grid));
+    return null;
+  }
+  return tiled;
 }
 
 // Sequential save dialogs; a cancel stops the remaining tiles.

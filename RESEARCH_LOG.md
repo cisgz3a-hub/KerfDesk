@@ -1304,3 +1304,53 @@ PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worke
   family calculation. No new numerical species multipliers were adopted.
   The project selector previews first and applies only on an explicit click.
   No runtime dependency or network service was added.
+
+---
+
+## Lower-load V-carve entry - 2026-08-01
+
+- **Observed software baseline:** V-carve rings used a same-XY depth ladder.
+  The generic ramp transformer did not own specialized V-carve passes and its
+  short-path fallback could finish with a direct vertical descent, so it was
+  not reused for this safety-sensitive entry.
+- **Vectric:** profile ramps prevent vertical entry and reduce cutter wear,
+  heat, router-spindle load, and Z-axis load; ramp moves use the tool's plunge
+  rate. Spiral mode descends over the complete profile circumference, with
+  pass depth determining the number of spiral passes. Vectric also says the
+  ramp angle is typically manufacturer-specified for cutters that cannot
+  plunge vertically. Source (accessed 2026-08-01):
+  https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/uiProfileMachineForm/index.html
+- **V-carve scope caveat:** Vectric describes V-carving as flowing
+  variable-depth motion; its V-carve form's `Ramp Plunge Moves` control applies
+  to the separate clearance tool. It is not evidence that every V-bit accepts
+  an arbitrary helix or angle. Source (accessed 2026-08-01):
+  https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/VCarve%20Toolpath%20Creator/
+- **Autodesk:** Fusion's maximum ramp stepdown constrains tool load during
+  full-width ramp cuts, while too-small helical diameters can impair chip
+  evacuation, create jerking motion, and break tools. FeatureCAM requires more
+  XY travel per ramp for non-center-cutting tools and prioritizes avoiding
+  gouges. Sources (accessed 2026-08-01):
+  https://help.autodesk.com/cloudhelp/ENU/Fusion-CAM/files/GUIDA73542E9-ED9C-4BD9-A87D-3A0ECA8BEB41.htm
+  and
+  https://help.autodesk.com/cloudhelp/2018/ENU/FCAM/files/GUID-6CFBBFC3-4DA6-44B7-B47F-9B7B0141554F.htm
+- **LMT Onsrud:** straight entry can recontact the surface and recut trapped
+  chips, generating heat; simultaneous XY/Z ramp-in motion gradually enters
+  the cut and a return pass may clean the slope. Its paper says many wood
+  routing techniques transfer to plastics, while feeds and chip evacuation
+  remain tool/material specific. Source (accessed 2026-08-01):
+  https://www.onsrud.com/images/Fixturing%20and%20Routing%20of%20Plastics%20with%20CNC.pdf
+- **Exact-cutter boundary:** Amana's official answer for model 45747 says that
+  specific 90-degree V-groove cutter is non-end-cutting and cannot plunge.
+  This proves nominal angle/diameter do not establish entry capability for an
+  unknown V-bit. Source (accessed 2026-08-01):
+  https://www.amanatool.com/45747-carbide-v-groove-90-deg-folding-for-composite-material-panels-like-tcm-ccm-acm-0-090-inch-tip-width-x-13-64-x-1-2-dia-x-1-2-inch-shank-zrn-coated-router-bit.html
+- **Adopted:** an opt-in, exact-contour, multi-lap descent. Laps satisfy both
+  maximum manufacturer-qualified angle and depth-per-pass; all ramp motion
+  uses plunge feed; a level cleanup lap restores final geometry. No universal
+  angle, generic helix, or peck entry was adopted. Planning is checked on the
+  exact 0.001 mm emitted coordinate grid. If the requested ramp cannot be
+  represented at emitted precision, the full legacy stepped ladder remains
+  available and Job Review warns that fallback occurred. A
+  tiled boundary split likewise remains exportable but warns that the clipped
+  tile begins with a direct plunge. See ADR-276 and
+  `docs/audits/2026-08-01-cnc-vcarve-ramp-entry-acceptance.md`.

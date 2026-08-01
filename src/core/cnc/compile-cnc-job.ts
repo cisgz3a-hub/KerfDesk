@@ -225,7 +225,10 @@ export function vcarveClearanceGroupForLayer(
     toolId: clearTool.id,
     toolName: clearTool.name,
     toolDiameterMm: clearTool.diameterMm,
-    ...cncGroupProvenance(settings, clearTool, { includeVResolution: false }),
+    ...cncGroupProvenance(settings, clearTool, {
+      includeVResolution: false,
+      includeRampEntry: false,
+    }),
     feedMmPerMin: capFeed(settings.feedMmPerMin, device.maxFeed),
     plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),

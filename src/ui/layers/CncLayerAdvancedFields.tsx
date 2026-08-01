@@ -195,7 +195,11 @@ export function CutTypeSections(props: {
 }): JSX.Element {
   const { layer, settings, onCommit, onCommitSettings } = props;
   const isProfile = settings.cutType.startsWith('profile');
-  const showPolish = isProfile || settings.cutType === 'pocket' || settings.cutType === 'engrave';
+  const showPolish =
+    isProfile ||
+    settings.cutType === 'pocket' ||
+    settings.cutType === 'engrave' ||
+    settings.cutType === 'v-carve';
   return (
     <>
       <CncFinishAllowanceField layer={layer} settings={settings} onCommit={onCommit} />

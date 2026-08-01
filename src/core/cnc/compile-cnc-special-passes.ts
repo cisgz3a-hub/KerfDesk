@@ -17,6 +17,9 @@ export function specializedPassesForLayer(
       maxDepthMm: settings.depthMm,
       depthPerPassMm: settings.depthPerPassMm,
       resolutionMm: settings.vResolutionMm,
+      ...(settings.vCarveRampEntryDeg === undefined
+        ? {}
+        : { rampAngleDeg: settings.vCarveRampEntryDeg }),
     });
   }
   if (settings.cutType === 'drill') {
