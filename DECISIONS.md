@@ -14499,3 +14499,81 @@ therefore do not establish center-cutting geometry, flute clearance, ramp angle,
 - Source record: `docs/audits/2026-08-01-cnc-vcarve-ramp-entry-acceptance.md`.
 - NOT verified: exact-cutter ramp capability, loaded-cut position retention, chip evacuation,
   workholding, tool temperature, surface finish, or finished V-groove dimensions.
+
+## ADR-279 - Offline variable-data imposition plans every slot before output (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+CurveDesk already stores bounded offline CSV rows, serial values, date/time fields, and cut-setting
+fields in a project. Compilation currently resolves every variable-text object from one shared
+record and serial context, while an ordinary array repeats the resulting design. A production sheet
+therefore cannot yet assign the next record and serial value to each copy.
+
+LightBurn's official Variable Text reference documents automatic arrays and offsets plus explicit
+current, start, end, and advance-by controls. That is comparison evidence for the operator workflow,
+not authority to copy an internal format or to relax CurveDesk's offline, deterministic, and
+frame-first contracts. ADR-164 deliberately deferred automatic imposition until those contracts
+could be specified. ADR-279 narrowly amends ADR-164 to adopt bounded offline imposition; live data
+sources and barcode/QR generation remain deferred.
+
+### Decision
+
+1. Adopt a bounded, offline variable-data imposition workflow for one selected design unit. The
+   first delivery is transient: it does not change the persisted project schema.
+2. A pure sequence planner accepts the current `ProjectVariableData` and a caller-supplied ordered
+   slot-seed list. It records ordered slot indices and variable contexts, not the seed values or
+   bounds-derived translations.
+   Slot zero records the current record index and serial value; every later slot applies the existing
+   `advanceVariableSequence(..., 'next')` semantics, including record wrap, serial wrap, and
+   `advanceBy` as the per-slot stride. The plan records the exact `nextVariables` state after all
+   supplied seeds. Existing array validation and the one-through-500 copy rule remain with the
+   layout request; the sequence planner adds no second cap, clamp, or rewrite.
+3. The first transient workflow retains the original grid `ArraySpec`, captures one clock for the
+   whole batch, and renders every slot before calculating final placements. It uses the maximum
+   actual rendered envelope with the retained rows, columns, and spacing, then derives row-major
+   `ArrayPlacement` values. This prevents a longer later value from overlapping merely because the
+   old layout measured only the first record. Circular imposition remains deferred until its
+   variable-width collision policy is specified; the sequence planner itself is layout-independent.
+4. The prepared output owns an exact slot manifest and post-success variable state bound to its
+   artifact identity. Preview, Save Project, Frame, compile failure, cancellation, stale preparation,
+   and retry consume zero records. `manual` advancement changes on neither output trigger;
+   `after-successful-export` applies the saved state once only after successful Save G-code export,
+   including tiled G-code and the experimental file-only `.rd` path; and
+   `after-successful-stream` applies it once only after a fully completed stream. Recovery must not
+   double-advance a policy-matched artifact.
+5. Frame remains the only guard. This program adds no block, refusal, gate, cap, clamp, delay, hide,
+   disable, rewrite, or confirmation to preview, project save, import/export, Apply, output, Frame,
+   or Start beyond the existing factual compile-integrity, transport, and handoff preconditions.
+   Placement and setup concerns are editor or Job Review information. This ADR does not couple
+   imposition to camera or stock-simulation evidence.
+6. Live databases, barcode/QR generation, camera-assisted filling, and persisted editable
+   imposition remain out of scope. Persisting the layout requires a later decision only if the
+   transient workflow proves insufficient.
+
+### Consequences
+
+- Operators can prepare a whole offline production sheet while preserving the existing meaning of
+  current record, serial range, and advance-by.
+- Planning and cursor movement are independently testable before UI, persistence, output, or machine
+  code changes. Existing single-record output remains byte-identical until a batch is explicitly
+  requested.
+- The full feature needs policy-matched artifact advancement and recovery tests before release. A
+  visual grid alone is incomplete because it could silently skip or double-consume production
+  records.
+- The existing grid array generator currently yields one through 500 placements. That inherited
+  behavior does not establish acceptable interactive performance; async materialization and a
+  measured 500-placement pressure fixture are still required. Imposition adds no second size rule.
+
+### Verification
+
+- The first slice adds pure planner tests for slot order/count, wrap, stride, determinism, input
+  immutability, geometry independence, no planner cap/rewrite, and the exact post-batch state.
+- Later slices require renderer fixtures with unequal string widths, artifact identity and stale-state
+  tests, all three advancement policies across single-file/tiled `.gcode` export, file-only `.rd`
+  export, and stream triggers, success and failure tests, recovery tests, and a real-browser
+  success/error/empty/edge workflow.
+- NOT verified by this decision: production throughput, a complete imposed-sheet UI, persisted
+  imposition, physical placement, camera accuracy, controller tracking, or output on hardware.

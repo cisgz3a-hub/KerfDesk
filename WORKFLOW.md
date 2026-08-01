@@ -1548,6 +1548,59 @@ enumeration of ADR-186/ADR-205):
 - F-D4. Adjust character spacing / line height
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 
+### F-D6. Impose offline variable data across one sheet [Planned — ADR-279]
+
+*Not implemented yet. This section records the accepted target workflow for staged delivery under
+ADR-279.*
+
+**Success:**
+
+1. Select one design unit whose text may contain the shipped bounded offline fields.
+2. Open **Variable-data imposition** and choose a grid layout. Slot 1 uses the current CSV record and
+   serial value; each later slot advances by the existing `Advance by` value. Grid order is
+   row-major. Circular imposition remains deferred until its variable-width collision behavior is
+   specified.
+3. CurveDesk materializes every slot against one captured clock before showing the result. Layout
+   uses the maximum rendered envelope across the batch, so a longer later value cannot silently
+   overlap its neighbour.
+4. Preview, Save Project, and Frame do not consume records; Save Project also does not persist the
+   transient imposition. Successful Save G-code export, including tiled G-code and experimental
+   file-only `.rd`, applies the exact post-batch state once only for `after-successful-export`; a
+   completed stream applies it once only for `after-successful-stream`; `manual` changes on neither
+   trigger. Failed, cancelled, stale, mismatched-policy, or retried preparation consumes nothing.
+5. For machine output, complete Frame for the exact current job as usual. Frame remains the only
+   guard. This flow adds no block, refusal, gate, cap, clamp, delay, hide, disable, rewrite, or
+   confirmation to preview, project save, import/export, Apply, output, Frame, or Start beyond the
+   existing factual compile-integrity, transport, and handoff preconditions. Imposition concerns
+   appear in the editor or Job Review.
+
+**Error:**
+
+- A missing field, malformed embedded CSV value, or materialization failure identifies the affected
+  slot and leaves the project and variable cursor unchanged.
+- A prepared artifact whose source project or variable state changed is stale and cannot apply its
+  saved post-batch cursor. Re-prepare from the current state.
+
+**Empty:**
+
+- With no selected design unit, explain that one design must be selected; do not create an empty
+  batch.
+- A design with no CSV tokens can still batch serial and date/time fields without an embedded CSV.
+  A CSV field with no embedded dataset or addressed row reports the affected slot and leaves the
+  variable cursor unchanged.
+
+**Edge:**
+
+- The batch sequences ordered slot indices independently of final geometry. The original grid rows,
+  columns, and spacing remain available until every slot has been measured; only then are final
+  placements calculated. The existing grid layout currently returns one through 500 placements;
+  imposition adds no second size rule.
+- Date/time values use one captured clock for the whole batch.
+- Phase one is transient and offline. It does not add live databases, barcode/QR generation,
+  camera-detected placement, persisted imposition schema, or a new machine policy gate.
+- Record wrap, serial wrap, and `Advance by` semantics reuse the existing variable-sequence rules;
+  the batch plan records the exact next state rather than recalculating it after output.
+
 ## Phase E flows
 
 ### F-E1. Import and trace a raster image
