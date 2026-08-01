@@ -1,4 +1,5 @@
 import type {
+  ExecutablePlanBuildIssue,
   ExecutablePlanController,
   ExecutablePlanMotionIntent,
   ExecutablePlanMotionMode,
@@ -179,5 +180,79 @@ export const EXECUTABLE_PLAN_CORPUS: ReadonlyArray<ExecutablePlanCorpusCase> = [
       lineEnding: 'lf',
       programEnded: true,
     },
+  },
+  {
+    // Float32 storage has a ~1.2e-4 mm ULP out here, so a fixed absolute endpoint
+    // budget would reject a single-ULP difference on a large-format bed.
+    name: 'large-format coordinates survive the Float32 storage round trip',
+    machineKind: 'laser',
+    controller: 'grbl',
+    gcode: [
+      'G21 G90',
+      'M4 S300',
+      'G0 X1234.567 Y987.654',
+      'G1 X1456.789 Y1123.456 F2000',
+      'G1 X1456.789 Y1400.001 S250',
+      'M5',
+      'G0 X0.000 Y0.000',
+      'M2',
+      '',
+    ].join('\n'),
+    expected: {
+      intents: ['travel', 'process', 'process', 'park'],
+      modes: ['rapid', 'linear', 'linear', 'rapid'],
+      finalPosition: { x: 0, y: 0, z: 0 },
+      lineEnding: 'lf',
+      programEnded: true,
+    },
+  },
+];
+
+/**
+ * Input classes ExecutablePlan v1 deliberately refuses. The Inspector expands a
+ * canned cycle into a whole drilling sequence while the controller manifest sees
+ * one move, so no plan can represent the line. These pin the refusal so the class
+ * cannot start silently succeeding with a wrong motion count.
+ */
+export const EXECUTABLE_PLAN_REFUSED_CORPUS: ReadonlyArray<{
+  readonly name: string;
+  readonly machineKind: MachineKind;
+  readonly controller: ExecutablePlanController;
+  readonly gcode: string;
+  readonly expectedCode: ExecutablePlanBuildIssue['code'];
+}> = [
+  {
+    name: 'G81 drilling cycle is refused as an unrepresentable input',
+    machineKind: 'cnc',
+    controller: 'grbl-cnc',
+    gcode: [
+      'G21',
+      'G90',
+      'M3 S12000',
+      'G0 X10.000 Y10.000 Z5.000',
+      'G81 X10.000 Y10.000 Z-3.000 R1.000',
+      'M5',
+      'M2',
+      '',
+    ].join('\n'),
+    expectedCode: 'canned-cycle-unsupported',
+  },
+  {
+    name: 'G83 peck cycle with a sticky repeat is refused',
+    machineKind: 'cnc',
+    controller: 'grbl-cnc',
+    gcode: [
+      'G21',
+      'G90',
+      'M3 S12000',
+      'G0 X0.000 Y0.000 Z5.000',
+      'G83 X5.000 Y5.000 Z-6.000 R1.000 Q2.000',
+      'X15.000 Y5.000',
+      'G80',
+      'M5',
+      'M2',
+      '',
+    ].join('\n'),
+    expectedCode: 'canned-cycle-unsupported',
   },
 ];

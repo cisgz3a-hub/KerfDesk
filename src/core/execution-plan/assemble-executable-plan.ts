@@ -19,10 +19,15 @@ type AssembleExecutablePlanInput = {
   readonly sendableLineCount: number;
 };
 
-/** Assembles the validated semantic components into an immutable v1 plan. */
+/**
+ * Assembles the validated semantic components into an immutable v1 plan.
+ *
+ * Park classification is not repeated here. `buildMotionManifest` already applies
+ * the terminal-park and M0/M1 pause-boundary rules, and a second pass over the
+ * same rules is a second place for that safety-relevant concept to drift.
+ */
 export function assembleExecutablePlan(input: AssembleExecutablePlanInput): ExecutablePlanV1 {
-  const { gcode, model, options, sendableLineCount } = input;
-  const motions = classifyPlanParks(input.motions, model.events);
+  const { gcode, model, options, sendableLineCount, motions } = input;
   return {
     schema: EXECUTABLE_PLAN_SCHEMA,
     schemaVersion: EXECUTABLE_PLAN_SCHEMA_VERSION,
@@ -54,61 +59,6 @@ export function assembleExecutablePlan(input: AssembleExecutablePlanInput): Exec
     diagnostics: { unsupportedWords: model.unsupportedWords },
     compatibility: { serializer: 'legacy-gcode-v1', exactProgram: gcode },
   };
-}
-
-function classifyPlanParks(
-  motions: ReadonlyArray<ExecutablePlanMotion>,
-  events: ReadonlyArray<ProgramEvent>,
-): ReadonlyArray<ExecutablePlanMotion> {
-  const lastProcess = lastMotionIndex(motions, (motion) => motion.intent === 'process');
-  if (lastProcess < 0) return motions;
-  const parkIndexes = new Set<number>();
-  motions.forEach((motion, index) => {
-    if (motion.intent === 'park') parkIndexes.add(index);
-  });
-  const hasTerminalPark = motions.some(
-    (motion, index) => index > lastProcess && motion.intent === 'park',
-  );
-  if (!hasTerminalPark) {
-    const finalTravel = lastMotionIndex(
-      motions,
-      (motion, index) => index > lastProcess && motion.intent === 'travel',
-    );
-    if (finalTravel >= 0) parkIndexes.add(finalTravel);
-  }
-  for (const index of pauseParkIndexes(motions, events)) parkIndexes.add(index);
-  return motions.map((motion, index) =>
-    parkIndexes.has(index) && motion.intent === 'travel' ? { ...motion, intent: 'park' } : motion,
-  );
-}
-
-function lastMotionIndex(
-  motions: ReadonlyArray<ExecutablePlanMotion>,
-  matches: (motion: ExecutablePlanMotion, index: number) => boolean,
-): number {
-  for (let index = motions.length - 1; index >= 0; index -= 1) {
-    const motion = motions[index];
-    if (motion !== undefined && matches(motion, index)) return index;
-  }
-  return -1;
-}
-
-function pauseParkIndexes(
-  motions: ReadonlyArray<ExecutablePlanMotion>,
-  events: ReadonlyArray<ProgramEvent>,
-): ReadonlySet<number> {
-  const result = new Set<number>();
-  let motionIndex = 0;
-  let lastTravel = -1;
-  for (const event of events) {
-    if (event.kind !== 'pause') continue;
-    while ((motions[motionIndex]?.rawLineIndex ?? Number.POSITIVE_INFINITY) < event.line) {
-      if (motions[motionIndex]?.intent === 'travel') lastTravel = motionIndex;
-      motionIndex += 1;
-    }
-    if (lastTravel >= 0) result.add(lastTravel);
-  }
-  return result;
 }
 
 function motionBounds(

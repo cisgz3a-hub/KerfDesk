@@ -121,14 +121,15 @@ export type BuildExecutablePlanOptions = {
   readonly profileControllerKind?: string;
 };
 
-/** Fail-closed disagreement found while aligning independent parsers. */
+/** Fail-closed disagreement found while aligning the readers, or a refused input. */
 export type ExecutablePlanBuildIssue = {
   readonly code:
     | 'render-parse-error'
     | 'skipped-motion'
     | 'motion-line-mismatch'
     | 'compound-motion-line'
-    | 'endpoint-mismatch';
+    | 'endpoint-mismatch'
+    | 'canned-cycle-unsupported';
   readonly message: string;
   readonly rawLineIndex?: number;
 };
@@ -139,6 +140,6 @@ export type BuildExecutablePlanResult =
   | { readonly kind: 'unavailable'; readonly reason: 'no-program' }
   | {
       readonly kind: 'error';
-      readonly reason: 'parse-error' | 'semantic-mismatch';
+      readonly reason: 'parse-error' | 'semantic-mismatch' | 'unsupported-input';
       readonly issues: ReadonlyArray<ExecutablePlanBuildIssue>;
     };

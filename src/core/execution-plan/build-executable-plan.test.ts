@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { EXECUTABLE_PLAN_CORPUS } from '../../__fixtures__/executable-plan-corpus';
+import {
+  EXECUTABLE_PLAN_CORPUS,
+  EXECUTABLE_PLAN_REFUSED_CORPUS,
+} from '../../__fixtures__/executable-plan-corpus';
 import { buildExecutablePlan } from './build-executable-plan';
 import { serializeExecutablePlan } from './serialize-executable-plan';
 
@@ -28,6 +31,20 @@ describe('buildExecutablePlan adversarial corpus', () => {
         controller: fixture.controller,
       });
       expect(second).toEqual(result);
+    });
+  }
+
+  for (const fixture of EXECUTABLE_PLAN_REFUSED_CORPUS) {
+    it(fixture.name, () => {
+      const result = buildExecutablePlan(fixture.gcode, {
+        machineKind: fixture.machineKind,
+        controller: fixture.controller,
+      });
+
+      expect(result.kind).toBe('error');
+      if (result.kind !== 'error') return;
+      expect(result.reason).toBe('unsupported-input');
+      expect(result.issues.map((issue) => issue.code)).toEqual([fixture.expectedCode]);
     });
   }
 
