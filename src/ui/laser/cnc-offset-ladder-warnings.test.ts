@@ -6,6 +6,7 @@ import {
   IDENTITY_TRANSFORM,
   createLayer,
   createProject,
+  type CncTool,
   type Project,
   type SceneObject,
 } from '../../core/scene';
@@ -27,6 +28,7 @@ vi.mock('../../core/geometry/kerf-offset', () => ({
   offsetClosedPolylinesForKerf: () => [],
   offsetClosedPolylinesForKerfChecked: offsetChecked,
   offsetClosedPolylinesWithRoundJoins: () => [],
+  offsetClosedPolylinesWithRoundJoinsChecked: () => ({ kind: 'ok', value: [] }),
 }));
 
 vi.mock('../../core/cnc/cnc-rest-operation', async (importOriginal) => ({
@@ -78,6 +80,29 @@ function pocketProject(): Project {
           cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket' as const },
         },
       ],
+    },
+  };
+}
+
+const VBIT_90: CncTool = {
+  id: 'v90',
+  name: '90° v-bit',
+  kind: 'v-bit',
+  diameterMm: 6,
+  tipAngleDeg: 90,
+};
+
+function vcarveProject(): Project {
+  const base = pocketProject();
+  return {
+    ...base,
+    machine: { ...DEFAULT_CNC_MACHINE_CONFIG, tools: [VBIT_90], toolId: VBIT_90.id },
+    scene: {
+      ...base.scene,
+      layers: base.scene.layers.map((layer) => ({
+        ...layer,
+        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' as const },
+      })),
     },
   };
 }
@@ -171,6 +196,22 @@ describe('detectCncOffsetLadderWarnings', () => {
     expect(warnings[0]).toContain(LAYER_NAME);
     expect(warnings[0]).toContain('4096-ring planning limit');
     expect(warnings[0]).toContain('still cut');
+  });
+
+  it('notes v-carve artwork finer than the detail pitch — advisory, layer-named (ADR-279)', () => {
+    // Every inset — coarse δ and fine detail alike — finds no interior, so
+    // the layer's visible artwork is below even the detail pitch and partly
+    // stays uncut. That is Job Review information, never a refusal.
+    restOperation.mockReturnValue({ kind: 'not-requested' });
+    offsetChecked.mockReset();
+    offsetChecked.mockReturnValue({ kind: 'ok', value: [] });
+
+    const warnings = detectCncOffsetLadderWarnings(vcarveProject());
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(LAYER_NAME);
+    expect(warnings[0]).toContain('narrower than 0.1 mm');
+    expect(warnings[0]).toContain('still cuts');
   });
 
   it('returns nothing for a laser project', () => {
