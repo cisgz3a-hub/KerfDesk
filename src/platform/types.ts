@@ -28,6 +28,17 @@ export type FileOpenRequest = {
   readonly multiple: boolean;
 };
 
+// Chromium validates every showSaveFilePicker accept-type before the dialog can
+// open, in this order: it must start with '.', it must contain only letters,
+// digits and '.', and it must be no longer than MAX_SAVE_EXTENSION_LENGTH
+// counting the leading dot. A rejected extension throws a TypeError instead of
+// prompting, so it makes the export unreachable rather than merely oddly named.
+// Verified against Chrome 2026-08-01: '.lfexecution.json' (17) reported the
+// length error, '.lfgrbl-settings.json' reported invalid characters for its
+// hyphen, and '.lfsettings.json' (16) passed — the bound is inclusive.
+// A branded double extension is fine; keep it short and hyphen-free.
+export const MAX_SAVE_EXTENSION_LENGTH = 16;
+
 export type FileSaveRequest = {
   readonly suggestedName: string;
   readonly extensions: ReadonlyArray<string>; // e.g. ['.gcode', '.nc']

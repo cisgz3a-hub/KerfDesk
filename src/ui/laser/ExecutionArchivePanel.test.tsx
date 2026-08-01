@@ -4,7 +4,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { DEFAULT_OUTPUT_SCOPE, type Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
-import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import {
+  MAX_SAVE_EXTENSION_LENGTH,
+  type PlatformAdapter,
+  type SaveTarget,
+} from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import type { LaserState } from '../state/laser-store';
@@ -21,6 +25,7 @@ import {
 } from '../state/recovery/testing';
 import { ExecutionArchivePanel } from './ExecutionArchivePanel';
 import { decodeExecutionArtifactExport } from './execution-artifact-export-codec';
+import { EXECUTION_ARTIFACT_EXTENSION } from './export-execution-artifact';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -61,7 +66,7 @@ describe('ExecutionArchivePanel', () => {
     const stored = await completeArchivedRun(repository, 'run-export-proof');
     let written = '';
     const target: SaveTarget = {
-      displayName: 'saved-execution.lfexecution.json',
+      displayName: 'saved-execution.lfexec.json',
       write: vi.fn(async (data) => {
         if (typeof data !== 'string') throw new Error('expected JSON text');
         written = data;
@@ -77,8 +82,8 @@ describe('ExecutionArchivePanel', () => {
     });
 
     expect(save).toHaveBeenCalledWith({
-      suggestedName: 'kerfdesk-execution-2026-07-19-run-export-proof.lfexecution.json',
-      extensions: ['.lfexecution.json'],
+      suggestedName: 'kerfdesk-execution-2026-07-19-run-export-proof.lfexec.json',
+      extensions: ['.lfexec.json'],
     });
     expect(JSON.parse(written)).toMatchObject({
       format: 'kerfdesk-execution-artifact',
@@ -88,7 +93,14 @@ describe('ExecutionArchivePanel', () => {
     });
     await expect(decodeExecutionArtifactExport(written)).resolves.toEqual(stored);
     expect(repository.getSnapshot()).toEqual(snapshotBefore);
-    expect(host?.textContent).toContain('Execution exported to saved-execution.lfexecution.json.');
+    expect(host?.textContent).toContain('Execution exported to saved-execution.lfexec.json.');
+  });
+
+  // Regression: '.lfexecution.json' (17) exceeded the Chromium accept-type
+  // limit, so showSaveFilePicker threw before the dialog opened and every
+  // archived run reported an export failure the operator could not clear.
+  it('keeps the artifact extension short enough for the browser save picker', () => {
+    expect(EXECUTION_ARTIFACT_EXTENSION.length).toBeLessThanOrEqual(MAX_SAVE_EXTENSION_LENGTH);
   });
 
   it('shows an in-panel error when a retained history row has no readable artifact', async () => {
@@ -113,7 +125,7 @@ describe('ExecutionArchivePanel', () => {
     await render(
       repository,
       platformAdapter(async () => ({
-        displayName: 'unwritable.lfexecution.json',
+        displayName: 'unwritable.lfexec.json',
         write: async () => {
           writeAttempted = true;
           throw new Error('disk is read-only');

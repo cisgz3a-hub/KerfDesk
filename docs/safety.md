@@ -23,10 +23,11 @@ instructions and the laws and regulations where you live.
   "air" run (job run with the tool clear of the material) to confirm the path,
   depth, and travel are what you expect. Generated G-code can be geometrically
   wrong and still run.
-- **Know where your machine's physical emergency stop is** and how to cut power.
-  Software commands can be lost — a USB disconnect, a crash, or a firmware buffer
-  already full means the machine may keep moving after you click Stop. **Only the
-  physical E-stop / power switch is guaranteed to stop the machine.**
+- **Know where your machine's emergency stop and power-isolation controls are**
+  and follow the manufacturer's procedure. Software commands can be lost — a USB
+  disconnect, a crash, or a firmware buffer already full means the machine may
+  keep moving after you click Stop. KerfDesk's Stop control is not a safety-rated
+  emergency stop, and no generic mechanism can be guaranteed for every machine.
 - **Never leave a running machine unattended.**
 - **Keep a fire extinguisher within reach** (a CO₂ or dry-chemical extinguisher;
   water is not appropriate for electrical fires).

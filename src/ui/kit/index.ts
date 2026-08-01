@@ -9,3 +9,4 @@ export { Icon, type IconName } from './icons';
 export { IconButton } from './IconButton';
 export { NumberInput, type NumberInputProps } from './NumberInput';
 export { PanelHeading } from './PanelHeading';
+export { RailSection } from './RailSection';

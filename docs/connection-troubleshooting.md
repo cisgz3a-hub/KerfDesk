@@ -91,9 +91,10 @@ If KerfDesk connects but position never updates or commands do nothing:
 ## Camera not working?
 
 - **USB webcams** work directly — no extra software needed.
-- **RTSP / IP cameras** require **`ffmpeg`** to be installed on your computer.
-  KerfDesk will tell you if `ffmpeg` isn't found; install it from
-  [ffmpeg.org](https://ffmpeg.org) and restart the app.
+- **RTSP / IP cameras** are supported by KerfDesk Desktop and local development,
+  not by the hosted web app. They require **`ffmpeg`** on the computer running the
+  local bridge. KerfDesk will tell you if `ffmpeg` is missing; install it from
+  [ffmpeg.org](https://ffmpeg.org) and restart the desktop app or bridge.
 
 ---
 
