@@ -1016,3 +1016,103 @@ audit approval and fresh draft-PR checks pending.
   are not newly refused.
 - No PNG/lifecycle, Trace, Image Editor, hardware, controller, firmware, setting, Frame, Start,
   deployment, or merge action is part of this repair.
+
+## Corrective audit 8 - incremental production native-project JSON source
+
+**Status:** fixed, exact-tree release-verified, and independently audit-approved; draft publication
+remains pending.
+
+### Finding
+
+- The production document worker received native `.lf2` files as `Blob` values but still called
+  `Blob.text()` and then `JSON.parse`. The normal worker path therefore retained a complete decoded
+  source string while also building the parsed object graph and normalized project.
+- Worker execution removed the UI-thread parse stall but did not remove this duplicate whole-input
+  retention. Native material-library JSON remains a separate whole-text route outside this fix.
+
+### Repair
+
+- Native-project requests with `Blob.stream()` now decode UTF-8 incrementally, tokenize and
+  assemble JSON with small local state machines, and produce one parsed value without first
+  materializing the whole decoded document string.
+- The parsed value enters the exact existing schema checks, migrations, security validators, and
+  normalization through a value-level extraction of `deserializeProject`; string callers continue
+  through `JSON.parse` and the same value-level path.
+- The local token assembler defines every object key as an own enumerable data property, preserving
+  `JSON.parse` behavior for duplicate and prototype-shaped keys such as `__proto__` without changing
+  an object's prototype.
+- `reading` now includes streamed UTF-8 decode, tokenization, and parsed-value construction;
+  `parsing` begins before the established project validation/normalization pass. Malformed JSON or a
+  failed active stream can therefore finish without a `parsing` phase.
+- Malformed JSON returns the established native-project `invalid` result shape. A source-stream
+  infrastructure failure propagates and is never retried through `Blob.text()`. Environments
+  without `Blob.stream()` and constructor-time Worker failure keep the established valid whole-text
+  compatibility fallbacks and their existing responsiveness disclosure.
+
+### Test-first verification
+
+- Red: the production native-project regression failed 1/1 because the worker source path invoked a
+  `Blob.text()` spy that throws instead of using the supplied stream.
+- Green post-correction compatibility sweep: 47 files / 293 tests. This includes the complete
+  selected project
+  persistence/validation/migration corpus, document-worker routing and fallback coverage, malformed
+  syntax, no-stream compatibility, partial-stream failure without text retry, one-byte UTF-8 chunk
+  splits, BOM and malformed-byte decoding, duplicate/prototype-shaped and UTF-16-sensitive keys,
+  strings spanning the local 4 KiB token buffer, and 2,000 deterministic generated JSON documents
+  compared with `JSON.parse`.
+- Green real Chrome default fixture: a measured 24 MiB whitespace-heavy but valid `.lf2` opened
+  through `document-import-worker`, kept the reset UI heartbeat advancing, and produced the expected
+  one-object scene in 4.5 seconds for the test and 5.7 seconds total.
+- Green one-off real Chrome scale run: the same production test passed with
+  `CURVEDESK_NATIVE_PROJECT_TEST_MIB=200`, measuring at least 200 MiB of valid `.lf2` input and
+  completing the open in 5.6 seconds for the test and 6.8 seconds total while the UI heartbeat
+  advanced.
+- Green exact-tree full unit corpus: `pnpm test --reporter=json` exited 0 after 1,108.4 seconds. Its
+  JSON result reported 3,653/3,653 suites passed, 9,351 tests passed, 22 pending/skipped, zero failed,
+  and overall success across 9,373 tests.
+- Green exact-tree release constituents: TypeScript application and E2E configs; application and
+  Electron ESLint; formatting; ADR numbering; 50-package license closure; 14/14 release-integrity
+  tests; web and Electron-main builds; raw/soft file-size policy; and index-export ratchet.
+- Fresh independent exact-diff audit of staged patch `e348580e` found no actionable issue. The
+  reviewer independently reran 3 files / 60 focused tests, the real Chrome 24 MiB production-worker
+  check, targeted staged-path lint/format, typecheck, release integrity, and size/export policies;
+  the primary verification separately covered the full lint/build/unit gates and 200 MiB fixture.
+
+### Audit corrections
+
+- The first UTF-8 parity run caught that the provisional dependency's raw-byte writer corrupted a
+  supplementary code point when its four-byte sequence was divided across write calls. A streaming
+  `TextDecoder` now owns byte-boundary handling and feeds bounded decoded chunks to the tokenizer;
+  one-byte split coverage and the generated corpus pass.
+- Source inspection then found that the dependency's object assembler did not preserve
+  `JSON.parse` semantics for an own `__proto__` property. The local grammar/object assembler defines
+  own data properties explicitly; direct coverage proves an own property and unchanged prototype.
+- The first independent frozen-diff audit found two blockers in the remaining dependency tokenizer:
+  valid escaped lone surrogates and a string-leading U+FEFF were silently deleted/replaced, and the
+  published package omitted the LICENSE file required by the release-integrity closure. Six exact
+  code-unit cases failed 5/6 before correction, including the auditor's serialized project-note
+  reproduction. The dependency has been removed; the local tokenizer preserves UTF-16 escape code
+  units and literal U+FEFF, and both direct and production project-note regressions pass.
+- The same audit found a cross-module deep import of the value-level project deserializer. The
+  project barrel now exports that narrow function and the worker imports it through the barrel.
+- The first full lint pass found that the local tokenizer's central state method exceeded the
+  repository's method-size and complexity policies. It was split into state-specific consumers;
+  focused ESLint, parity tests, full lint, and the independent final audit all pass afterward.
+- A focused test initially used the test environment's `Blob`, which lacks `stream()`. The corrected
+  test supplies the same explicit one-byte `ReadableStream` used by the parity corpus; production
+  Chrome coverage exercises the browser's real `File.stream()`.
+
+### Remaining boundary
+
+- This removes the normal worker path's complete decoded input string. The original `Blob`, parsed
+  raw graph, normalized project/scene, worker transfer result, and rendering state still scale with
+  project content; normalization can transiently retain both raw and normalized output graphs.
+- Any single JSON string or number token can itself be large. Browser stream chunk size is not a
+  CurveDesk memory contract. This is incremental input parsing, not constant total memory.
+- The 200 MiB fixture is whitespace-heavy and output-light. It proves that this valid native `.lf2`
+  input route can open that measured size in the tested Chrome environment; it does not prove that a
+  dense 200 MiB object/bitmap/relief project, another format, another device, or storage pressure has
+  the same peak memory or completion behavior.
+- Native material-library JSON remains whole-text. Save, autosave, recovery, PNG/lifecycle, Trace,
+  Image Editor, hardware, controller, firmware, settings, Frame, Start, deployment, and merge are
+  outside this one-fix repair.

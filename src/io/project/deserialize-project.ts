@@ -53,6 +53,10 @@ export function deserializeProject(jsonText: string): DeserializeResult {
     return { kind: 'invalid', reason: `not valid JSON: ${message}` };
   }
 
+  return deserializeProjectValue(raw);
+}
+
+export function deserializeProjectValue(raw: unknown): DeserializeResult {
   if (!isObject(raw)) {
     return { kind: 'invalid', reason: 'top-level value is not an object' };
   }
