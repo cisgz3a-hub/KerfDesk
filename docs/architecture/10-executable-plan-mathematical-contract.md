@@ -148,6 +148,16 @@ travel, not process motion. A full-circle arc has equal endpoints but non-zero r
 misclassified as a vertical plunge. Terminal parking is represented as a real final node/motion,
 never inferred later by a preview.
 
+That closed-arc rule is enforced where intent is first assigned: `classifyMotion` measures the
+travelled XY route along the sampled path rather than endpoint displacement, so a closed arc is
+`process` for both the plan and the live controller/recovery manifest. It is deliberately not
+corrected downstream in the plan builder — a rule applied twice is a rule that can disagree with
+itself, and the manifest is what recovery and the canvas overlay already read.
+
+Park classification follows the same principle. `buildMotionManifest` applies the terminal-park and
+`M0`/`M1` pause-boundary rules once; the plan assembler consumes that result and does not re-derive
+it.
+
 ## 6. Bounds and totals
 
 For point set `Q`, bounds are component-wise extrema:
@@ -173,23 +183,81 @@ The v1 builder and verifier reuse three existing, differently purposed readers i
 fourth parser:
 
 - controller/recovery-oriented `buildMotionManifest` supplies sendable-line identity and intent;
-- Inspector `buildGcodeRenderModel` supplies modal command mode, feed/power, events, and an
-  independently expanded endpoint stream; and
-- clean-room simulator `parseGcodeProgram` supplies the adversarial endpoint sequence.
+- Inspector `buildGcodeRenderModel` supplies modal command mode, feed/power, events, and its own
+  expanded endpoint stream; and
+- simulator `parseGcodeProgram` supplies the adversarial endpoint sequence.
 
 A plan is accepted only when:
 
 1. the manifest and Inspector assign motion to the same raw lines;
 2. their start/end coordinates agree after the Inspector's documented Float32 storage round trip;
 3. the serializer returns the exact current program;
-4. raw-line counts agree with the clean-room parser;
-5. every ordered clean-room start/end pair agrees within `1e-6 mm`; and
-6. a second pure build is structurally identical.
+4. raw-line counts agree with the simulator; and
+5. every ordered simulator start/end pair agrees within `1e-6 mm`.
+
+### What these three readers can and cannot prove
+
+The readers are **not independent implementations**. All three compose the single modal engine in
+`src/core/gcode/` established by ADR-255 stage 1 — `scanGcodeWords`, `stripInlineComments`,
+`applySharedGCode`, `resolveAxisTarget` — and the manifest and simulator both sample arcs through
+`ijArcCenter`/`rArcGeometry` and `core/geometry`'s `sampleArcPoints`. `parser-equivalence.test.ts`
+pins that shared agreement deliberately.
+
+The consequence must not be overstated in either direction:
+
+- **Detected:** divergence in the *policy* each reader layers on top of the shared engine — motion
+  mode classification, degenerate-move epsilon branching, canned-cycle expansion, intent
+  assignment, line accounting and ordering. This is real and has caught real defects.
+- **Not detected:** any defect *inside* the shared engine. Unit scaling, `G90`/`G91` accumulation,
+  arc centre solving and arc sampling are common-mode. For an arc in particular, the endpoint
+  comparison evaluates the same centre solver and the same sampler twice, so agreement there is
+  true by construction and carries no evidential weight.
+
+Closing that gap requires a genuinely separate implementation or a differential oracle, not another
+consumer of `core/gcode`. Until then, engine-level correctness rests on `core/gcode`'s own tests.
+
+### The byte check while the lexical carrier exists
+
+Check 3 compares `serializeExecutablePlan(plan)` against the emitted program, and v1's serializer
+returns `compatibility.exactProgram`. On a freshly built plan that string *is* the program it is
+compared against, so the check passes by construction and is **not evidence that the emitter is
+correct**. It has real force only against a plan that was stored, transported or edited between
+build and verification, and it becomes a genuine fidelity check when a native serializer replaces
+the carrier. Byte neutrality for existing callers rests on a different fact: the sidecar seam is
+opt-in and never rewrites `emitPreparedGcode`'s output.
+
+### Determinism is proven per builder, not per emission
+
+A second full build is a property of `buildExecutablePlan`, not of any one program. The corpus
+suite proves it once for every fixture; re-running it on every emission would cost a second parse,
+a second manifest and a second traversal for no added coverage. It is therefore an explicit
+`deterministicRebuild` option, off by default and enabled by the corpus suite and by diagnostics on
+a suspect program.
+
+### Tolerances
 
 `1e-6 mm` is a software comparison tolerance only. It is not machine resolution, backlash
 allowance, kerf tolerance, or evidence of physical accuracy. Current emitters format commanded
 coordinates to three decimal places; the verifier compares readers of those already formatted
 commands.
+
+Manifest-versus-Inspector endpoints are compared with a **magnitude-relative** budget — the larger
+of `1e-6 mm` and four Float32 ULPs — because the Inspector stores positions in a `Float32Array`
+whose ULP already exceeds `1.2e-4 mm` at `1200 mm`. A fixed absolute budget would refuse a
+single-ULP difference on a large-format bed. Simulator endpoints stay on the flat `1e-6 mm` budget
+because both sides of that comparison are double precision.
+
+### Input classes v1 refuses
+
+Canned drilling cycles (`G73`, `G81`, `G82`, `G83`) are **not representable in v1**. The Inspector
+expands one cycle word into a whole drilling sequence (ADR-255 stage 12) while the controller
+manifest models that line as a single move, so the readers can never agree on it. `buildExecutablePlan`
+detects the `canned-cycle` event and returns `unsupported-input` with a `canned-cycle-unsupported`
+issue rather than an opaque mode disagreement. This names a refusal that already existed; it does
+not add one.
+
+KerfDesk's own emitters never produce canned cycles, so this bounds *imported* programs only — which
+is why the Inspector's position in section 13 matters.
 
 ## 8. Versioned dynamics contract (staged, not implemented)
 
@@ -319,3 +387,24 @@ After v1 parity is stable, one pull request at a time moves these consumers to t
 
 Each migration must compare old and new behavior on the adversarial corpus and retain a rollback
 path until parity is demonstrated. No consumer may silently construct a competing motion order.
+
+### The Inspector is explicitly out of scope for v1
+
+ADR-271's context lists Inspector render models among the representations to unify, but the
+Inspector is **not** in the list above and must not be added to it while v1 stands. It is the only
+consumer that reads programs KerfDesk did not emit, and therefore the only one that meets canned
+cycles, `G18`/`G19` plane arcs and other constructs section 7 refuses. Migrating it would trade a
+rendered drilling program for a refused one.
+
+Admitting the Inspector requires a schema version that can represent a cycle word as a first-class
+motion group, plus manifest support for the same expansion. That is a v2 question. Until then the
+Inspector keeps its own render model, and "ExecutablePlan is the versioned motion truth" means for
+programs this application emits.
+
+### Route length is a chord sum
+
+Arc motions store a sampled polyline, so `lengthMm` and every total derived from it sit slightly
+below true arc length — roughly 0.3% on a 5 mm-radius full circle at current sampling density.
+Section 6's identity holds because both sides use the same sampled lengths. An ETA consumer
+inherits the bias as a small systematic underestimate on arc-heavy work; a native arc primitive
+with a closed-form length is the fix, not denser sampling.

@@ -28,6 +28,17 @@ export type ExecutablePlanParityResult = {
   readonly checks: ReadonlyArray<ExecutablePlanParityCheck>;
 };
 
+/** Optional checks that cost a second full parse of the program. */
+export type VerifyExecutablePlanParityOptions = {
+  /**
+   * Re-runs the whole builder and compares the result. Determinism is a property
+   * of the builder rather than of one program, so the corpus suite proves it once
+   * instead of every emission paying for a second parse and traversal. Enable it
+   * for diagnostics on a suspect program.
+   */
+  readonly deterministicRebuild?: boolean;
+};
+
 type EndpointPair = {
   readonly start: ExecutablePlanPoint;
   readonly end: ExecutablePlanPoint;
@@ -37,6 +48,7 @@ type EndpointPair = {
 export function verifyExecutablePlanParity(
   plan: ExecutablePlanV1,
   currentGcode: string,
+  options: VerifyExecutablePlanParityOptions = {},
 ): ExecutablePlanParityResult {
   const checks: ExecutablePlanParityCheck[] = [];
   checks.push(byteParity(plan, currentGcode));
@@ -60,7 +72,7 @@ export function verifyExecutablePlanParity(
     });
     checks.push(endpointParity(plan, parsed.toolpath.steps));
   }
-  checks.push(determinismParity(plan, currentGcode));
+  if (options.deterministicRebuild === true) checks.push(determinismParity(plan, currentGcode));
   return {
     ok: checks.every((check) => check.ok),
     toleranceMm: EXECUTABLE_PLAN_PARITY_TOLERANCE_MM,
@@ -68,6 +80,13 @@ export function verifyExecutablePlanParity(
   };
 }
 
+/**
+ * While v1 carries the emitted program verbatim, a freshly built plan holds the
+ * very string it is compared against, so this passes by construction. It earns
+ * its keep against a plan that was stored, transported or edited between build
+ * and verification, and it becomes a real fidelity check the moment a native
+ * serializer replaces the carrier. It is not evidence that the emitter is correct.
+ */
 function byteParity(plan: ExecutablePlanV1, gcode: string): ExecutablePlanParityCheck {
   const serialized = serializeExecutablePlan(plan);
   return {
@@ -175,10 +194,24 @@ function determinismParity(plan: ExecutablePlanV1, gcode: string): ExecutablePla
       ? {}
       : { profileControllerKind: plan.controller.profileControllerKind }),
   });
-  const ok = rebuilt.kind === 'ok' && JSON.stringify(rebuilt.plan) === JSON.stringify(plan);
+  const ok = rebuilt.kind === 'ok' && sameStructure(rebuilt.plan, plan);
   return {
     name: 'deterministic-rebuild',
     ok,
     detail: ok ? 'A second pure build produced the same plan.' : 'A second build changed the plan.',
   };
+}
+
+/**
+ * Compares everything except the lexical carrier, which `byteParity` already
+ * covers. Serializing the whole program twice more would dominate the cost of
+ * this check on a large job for no added coverage.
+ */
+function sameStructure(left: ExecutablePlanV1, right: ExecutablePlanV1): boolean {
+  return JSON.stringify(withoutCarrier(left)) === JSON.stringify(withoutCarrier(right));
+}
+
+function withoutCarrier(plan: ExecutablePlanV1): Omit<ExecutablePlanV1, 'compatibility'> {
+  const { compatibility: _carrier, ...rest } = plan;
+  return rest;
 }

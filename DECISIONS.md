@@ -13658,6 +13658,46 @@ power, or produces acceptable material results.
 - NOT verified: no machine was connected or moved; no air cut, material coupon, encoder trace,
   backlash measurement, load measurement, thermal calibration, burn quality, cut quality, or
   physical position retention was tested.
+
+**Amendment (2026-08-01) — audit corrections to the parity claim, the refused input class, and the
+duplicated classification.** A review of the landed slice found the accepted decision sound but
+four statements around it stronger than the code supports, and one live-path defect the slice
+documented without fixing. Corrected as follows.
+
+1. **The three readers are not independent.** All three compose the single modal engine in
+   `src/core/gcode/` (ADR-255 stage 1) and share arc centre solving and sampling. The parity gate
+   detects divergence in the policy each reader layers on top; it cannot detect a defect inside that
+   shared engine, and for arcs it compares the same sampler against itself. Contract section 7 now
+   states what the gate does and does not prove. The word "clean-room" is withdrawn.
+2. **The byte check passes by construction while the lexical carrier exists.** `serializeExecutablePlan`
+   returns `compatibility.exactProgram`, so on a freshly built plan it compares a string to itself.
+   It guards storage and transport, not emitter correctness. Byte neutrality for existing callers
+   rests on the seam being opt-in — which is now structural: `emitPreparedGcodeWithExecutablePlan`
+   no longer re-sources `gcode` from the plan on the success path, so neutrality no longer depends
+   on check ordering.
+3. **Canned cycles are a named refusal, not a surprise.** `G73`/`G81`/`G82`/`G83` were already
+   rejected as a mode disagreement; they now return `unsupported-input` with a
+   `canned-cycle-unsupported` issue and are pinned by corpus fixtures. **No input that previously
+   built now fails** — this renames an existing refusal and does not widen one (rule 7). The
+   Inspector is recorded in contract section 13 as explicitly out of scope for v1, because it is
+   the only consumer that reads programs this application did not emit.
+4. **Closed arcs are fixed at the source.** `classifyMotion` measured endpoint displacement, so a
+   flat full-circle `G2`/`G3` was classified `plunge` and never became `firstProcessPoint` — wrong
+   in the live controller/recovery manifest that `canvas-motion-plan.ts` already reads, and
+   contradicting contract section 5. It now measures the travelled XY route. The plan builder's
+   compensating special case is removed, and park classification is no longer re-derived in the
+   plan assembler; both concepts now have exactly one implementation.
+5. **Cost and tolerance.** The deterministic-rebuild check is a property of the builder, so it moved
+   behind an explicit off-by-default option proven once per corpus fixture instead of costing a
+   second full parse on every emission. Manifest-versus-Inspector endpoint agreement is now
+   magnitude-relative (four Float32 ULPs, floored at `1e-6 mm`); a fixed absolute budget would have
+   refused a single-ULP difference on a large-format bed. The versioned schema is now validated
+   against every corpus plan, with compiler-enforced maps pinning its emitter and event-kind enums
+   to the TypeScript unions.
+
+NOT verified by this amendment: still no machine connected or moved, and no air cut, coupon,
+encoder trace, backlash, load, thermal, burn-quality or position-retention measurement.
+
 ## ADR-272 - Design Studio: a full-window on-canvas design surface for laser and CNC (2026-07-30)
 
 ### Context

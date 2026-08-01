@@ -13,11 +13,32 @@ describe('verifyExecutablePlanParity', () => {
       expect(built.kind).toBe('ok');
       if (built.kind !== 'ok') return;
 
-      const parity = verifyExecutablePlanParity(built.plan, fixture.gcode);
+      const parity = verifyExecutablePlanParity(built.plan, fixture.gcode, {
+        deterministicRebuild: true,
+      });
       expect(parity.ok, parity.checks.map((check) => check.detail).join('\n')).toBe(true);
       expect(parity.checks.every((check) => check.ok)).toBe(true);
     });
   }
+
+  it('leaves the second full build out of the default check set', () => {
+    const fixture = EXECUTABLE_PLAN_CORPUS[0];
+    if (fixture === undefined) throw new Error('corpus is empty');
+    const built = buildExecutablePlan(fixture.gcode, {
+      machineKind: fixture.machineKind,
+      controller: fixture.controller,
+    });
+    if (built.kind !== 'ok') throw new Error('fixture did not build');
+
+    const lean = verifyExecutablePlanParity(built.plan, fixture.gcode);
+    const full = verifyExecutablePlanParity(built.plan, fixture.gcode, {
+      deterministicRebuild: true,
+    });
+
+    expect(lean.ok).toBe(true);
+    expect(lean.checks.some((check) => check.name === 'deterministic-rebuild')).toBe(false);
+    expect(full.checks.some((check) => check.name === 'deterministic-rebuild')).toBe(true);
+  });
 
   it('detects a lexical carrier change', () => {
     const fixture = EXECUTABLE_PLAN_CORPUS[0];

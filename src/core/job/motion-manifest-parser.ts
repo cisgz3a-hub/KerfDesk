@@ -189,10 +189,11 @@ function classifyMotion(
   state: ModalState,
   points: ReadonlyArray<MotionPoint>,
 ): MotionBlockKind {
-  const from = points[0] ?? state.position;
-  const to = points.at(-1) ?? from;
-  const xyChanged = Math.hypot(to.x - from.x, to.y - from.y) > EPSILON;
-  if (!xyChanged) return 'plunge';
+  // A closed arc ends where it started, so endpoint displacement is zero while the
+  // path still sweeps the XY plane. Measure the travelled XY route instead, or a
+  // full circle is classified as a vertical plunge and never counts as material
+  // entry (ADR-271 mathematical contract, section 5).
+  if (xyRouteLength(points) <= EPSILON) return 'plunge';
   if (state.motion === 0) return 'travel';
   if (machineKind === 'cnc') return state.spindleArmed ? 'process' : 'travel';
   return state.spindleArmed && state.power > 0 ? 'process' : 'travel';
@@ -228,6 +229,17 @@ function polylineLength(points: ReadonlyArray<MotionPoint>): number {
     if (a !== undefined && b !== undefined) {
       length += Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
     }
+  }
+  return length;
+}
+
+/** Distance travelled in the XY plane, ignoring Z, along the sampled path. */
+function xyRouteLength(points: ReadonlyArray<MotionPoint>): number {
+  let length = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const a = points[index - 1];
+    const b = points[index];
+    if (a !== undefined && b !== undefined) length += Math.hypot(b.x - a.x, b.y - a.y);
   }
   return length;
 }
