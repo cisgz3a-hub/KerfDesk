@@ -1,13 +1,12 @@
 // computeDesignSceneSource — the CNC pane's design-time scene source: the
 // removal grid AND the 3D moves that carved it, both derived from ONE
-// prepareOutput call. The grid is stamped per tool section (H.7 per-layer
-// bits), so a v-carve border reads as a v-groove even when the machine's
-// active bit is a flat end mill. Display-only (ADR-261 §3): a null source
-// shows a hint and gates nothing.
+// prepareOutput call. Each step is stamped with the bit that made it (H.7
+// per-layer bits), so a v-carve border reads as a v-groove even when the
+// machine's active bit is a flat end mill. Display-only (ADR-261 §3): a null
+// source shows a hint and gates nothing.
 
 import { isChiploadMaterialKey } from '../../core/cnc';
 import { toSceneCoords } from '../../core/devices';
-import type { Group } from '../../core/job';
 import {
   activeCncTool,
   type CncMachineConfig,
@@ -15,12 +14,17 @@ import {
   type OutputScope,
   type Project,
 } from '../../core/scene';
-import { DEFAULT_CELL_MM, toolProfile, type RemovalGridSpec } from '../../core/sim';
+import {
+  computeRemovalGrid,
+  DEFAULT_CELL_MM,
+  kernelForTool,
+  toolProfile,
+  type RemovalGridSpec,
+} from '../../core/sim';
 import { toolpathMoves3d } from '../../core/toolpath3d';
 import { prepareOutput } from '../../io/gcode';
 import { buildPreviewToolpathFromPrepared, previewPreparationIssue } from './draw-preview';
-import { sectionToolKeys, stampRemovalPerTool } from './stamp-removal-per-tool';
-import { machineToolForKey } from './toolpath-tools';
+import { toolpathToolsByToolKey } from './toolpath-tools';
 import type { DesignSceneSource } from './use-cnc-3d-scene';
 
 // Coarser than the Preview grid — the pane recomputes on every edit.
@@ -50,22 +54,23 @@ export function computeDesignSceneSource(
   // surface share one frame, as ADR-261 §2 requires.
   const toolpath = buildPreviewToolpathFromPrepared(project, prepared);
   if (toolpath.totalLength <= 0) return null;
-  const stamped = stampRemovalPerTool({
-    project,
-    prepared,
-    spec: paneGridSpec(project, machine),
-    resolveTool: (toolKey) => machineToolForKey(machine, toolKey),
-    fullToolpath: toolpath,
-  });
-  if (stamped.kind !== 'ok') return null;
+  const spec = paneGridSpec(project, machine);
+  const tools = toolpathToolsByToolKey(machine, toolpath);
+  const result = computeRemovalGrid(
+    toolpath,
+    spec,
+    kernelForTool(activeCncTool(machine), spec.mmPerCell ?? DEFAULT_CELL_MM),
+    { toolsByToolKey: tools },
+  );
+  if (result.kind !== 'ok') return null;
   const materialKey = machine.stock.materialKey;
   return {
-    grid: stamped.grid,
+    grid: result.grid,
     // materialKey is a plain string on the model, so an unrecognised key from
     // an older project file falls back to the default palette.
     ...(isChiploadMaterialKey(materialKey) ? { materialKey } : {}),
     moves: toolpathMoves3d(toolpath),
-    toolProfile: toolProfile(profileTool(machine, prepared.job.groups)),
+    toolProfile: toolProfile(profileTool(machine, tools)),
   };
 }
 
@@ -92,11 +97,10 @@ function paneGridSpec(project: Project, machine: CncMachineConfig): RemovalGridS
 }
 
 // The drawn bit silhouette. A single-bit job draws the bit that stamped its
-// grid, so the drawn cutter and the simulated one cannot disagree. A
-// multi-bit job has no single honest silhouette; the machine's active bit
-// stands in while the GRID stays per-bit.
-function profileTool(machine: CncMachineConfig, groups: ReadonlyArray<Group>): CncTool {
-  const keys = sectionToolKeys(groups);
-  const sole = keys.length === 1 ? keys[0] : undefined;
-  return sole === undefined ? activeCncTool(machine) : machineToolForKey(machine, sole);
+// grid — read from the SAME map the stamping used, so the drawn cutter and
+// the simulated one cannot disagree. A multi-bit job has no single honest
+// silhouette; the machine's active bit stands in while the GRID stays per-bit.
+function profileTool(machine: CncMachineConfig, tools: ReadonlyMap<string, CncTool>): CncTool {
+  const sole = tools.size === 1 ? [...tools.values()][0] : undefined;
+  return sole ?? activeCncTool(machine);
 }
