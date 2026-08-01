@@ -19,7 +19,7 @@ const EDITOR_DECODE_FILENAME = 'image-studio-source';
 export async function decodeRasterToBuffer(image: RasterImage): Promise<RgbaBuffer> {
   // Production CSP intentionally excludes data: from connect-src. Decode the
   // embedded source directly instead of routing it through fetch(dataUrl).
-  const file = await dataUrlToFile(image.dataUrl, EDITOR_DECODE_FILENAME);
+  const file = await dataUrlToFile(image.dataUrl as string, EDITOR_DECODE_FILENAME);
   // Native resolution: the stored pixel dims are already inside the import
   // caps, so the cap argument only prevents an unexpected upscale.
   const maxEdge = Math.max(image.pixelWidth, image.pixelHeight, 1);

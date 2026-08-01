@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { IDBFactory as FakeIDBFactory, IDBKeyRange as FakeIDBKeyRange } from 'fake-indexeddb';
+import { Blob as NodeBlob } from 'node:buffer';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rotaryRasterSaveProject } from '../../__fixtures__/rotary-raster-save-project';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { computeJobBounds, computeJobMotionBounds } from '../../core/job';
@@ -16,6 +18,8 @@ import { emitPreparedGcode } from '../../io/gcode';
 import { hydratePreparedExecutionOutput } from '../../io/gcode/prepared-output-persistence';
 import { canvasExecutablePlan } from '../state/canvas-preview-motion';
 import { selectExecutablePlanCalculatedBounds } from './executable-plan-calculated-bounds';
+import { PagedAssetByteWriter } from '../import/paged-asset-byte-writer';
+import { IndexedDbPagedAssetRepository } from '../import/paged-asset-indexeddb';
 import { prepareOutputRequest } from './output-preparation';
 
 const IDLE: StatusReport = {
@@ -30,8 +34,12 @@ const IDLE: StatusReport = {
 const MISSING_OBJECT_ID = 'missing-object';
 
 describe('output preparation worker payload', () => {
-  it('preserves a failed Save preparation as a distinct worker result', () => {
-    const response = prepareOutputRequest({
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('preserves a failed Save preparation as a distinct worker result', async () => {
+    const response = await prepareOutputRequest({
       kind: 'save',
       project: createProject(),
       options: {
@@ -54,8 +62,8 @@ describe('output preparation worker payload', () => {
     expect(() => structuredClone(response)).not.toThrow();
   });
 
-  it('returns a cloneable non-writable Save result when rotary raster permission is absent', () => {
-    const response = prepareOutputRequest({
+  it('returns a cloneable non-writable Save result when rotary raster permission is absent', async () => {
+    const response = await prepareOutputRequest({
       kind: 'save',
       project: rotaryRasterSaveProject(),
       options: {},
@@ -72,8 +80,8 @@ describe('output preparation worker payload', () => {
     expect(() => structuredClone(response)).not.toThrow();
   });
 
-  it('returns emitted rotary raster bytes when worker permission is explicit', () => {
-    const response = prepareOutputRequest({
+  it('returns emitted rotary raster bytes when worker permission is explicit', async () => {
+    const response = await prepareOutputRequest({
       kind: 'save',
       project: rotaryRasterSaveProject(),
       options: { allowRotaryRaster: true },
@@ -88,9 +96,9 @@ describe('output preparation worker payload', () => {
     expect(() => structuredClone(response)).not.toThrow();
   });
 
-  it('returns an exact cloneable large Start result without a function-valued raster', () => {
+  it('returns an exact cloneable large Start result without a function-valued raster', async () => {
     const project = streamedProject();
-    const response = prepareOutputRequest({
+    const response = await prepareOutputRequest({
       kind: 'start',
       project,
       controllerSettings: null,
@@ -125,8 +133,8 @@ describe('output preparation worker payload', () => {
     ).toBe(response.result.gcode);
   });
 
-  it('uses the same verified plan for calculated bounds without changing emitted bytes', () => {
-    const response = prepareOutputRequest({
+  it('uses the same verified plan for calculated bounds without changing emitted bytes', async () => {
+    const response = await prepareOutputRequest({
       kind: 'start',
       project: fullBedLineProject(),
       controllerSettings: null,
@@ -160,6 +168,38 @@ describe('output preparation worker payload', () => {
     expect(metrics.motionBounds).toEqual(selected.motionBounds);
     expect(plan.compatibility.exactProgram).toBe(gcode);
     expect(emitPreparedGcode(prepared).gcode).toBe(gcode);
+  });
+
+  it('hydrates page-backed luma before the production Save preparation emits G-code', async () => {
+    const factory = new FakeIDBFactory();
+    vi.stubGlobal('indexedDB', factory);
+    vi.stubGlobal('IDBKeyRange', FakeIDBKeyRange);
+    vi.stubGlobal('Blob', NodeBlob);
+    const repository = new IndexedDbPagedAssetRepository(factory, FakeIDBKeyRange);
+    const writer = await PagedAssetByteWriter.create(repository, {
+      assetId: 'worker-luma',
+      sourceName: 'large.png.luma',
+      mimeType: 'application/x-curvedesk-luma',
+      byteLength: 2,
+      createdAtEpochMs: 1,
+      pageBytes: 1,
+    });
+    await writer.write(Uint8Array.of(0, 255));
+    await writer.finish();
+
+    const response = await prepareOutputRequest({
+      kind: 'save',
+      project: pageBackedProject(),
+      options: {},
+    });
+    const embedded = await prepareOutputRequest({
+      kind: 'save',
+      project: embeddedRasterProject(),
+      options: {},
+    });
+
+    expect(response).toEqual(embedded);
+    expect(response.kind === 'save' ? response.result.gcode : '').toContain('S300');
   });
 });
 
@@ -221,6 +261,73 @@ function fullBedLineProject(): Project {
         ],
       }),
       createLayer({ id: color, color, mode: 'line' }),
+    ),
+  };
+}
+
+function pageBackedProject(): Project {
+  return rasterProject({
+    imageAsset: {
+      schemaVersion: 1,
+      repository: 'curvedesk-import-assets-v1',
+      sourceAssetId: 'worker-source',
+      lumaAssetId: 'worker-luma',
+      sourceMimeType: 'image/png',
+      sourceByteLength: 300_000_000,
+      lumaByteLength: 2,
+      naturalWidth: 2,
+      naturalHeight: 1,
+      sampledWidth: 2,
+      sampledHeight: 1,
+      thumbnail: {
+        mimeType: 'image/bmp',
+        dataUrl: 'data:image/bmp;base64,thumbnail',
+        width: 2,
+        height: 1,
+      },
+    },
+  });
+}
+
+function embeddedRasterProject(): Project {
+  return rasterProject({
+    dataUrl: 'data:image/png;base64,source',
+    lumaBase64: 'AP8=',
+  });
+}
+
+function rasterProject(
+  source:
+    | Pick<Extract<Project['scene']['objects'][number], { kind: 'raster-image' }>, 'imageAsset'>
+    | Pick<
+        Extract<Project['scene']['objects'][number], { kind: 'raster-image' }>,
+        'dataUrl' | 'lumaBase64'
+      >,
+): Project {
+  const base = createProject();
+  const color = '#111111';
+  return {
+    ...base,
+    scene: addLayer(
+      addObject(base.scene, {
+        kind: 'raster-image',
+        id: 'image',
+        color,
+        source: 'image.png',
+        ...source,
+        pixelWidth: 2,
+        pixelHeight: 1,
+        dither: 'threshold',
+        linesPerMm: 1,
+        bounds: { minX: 0, minY: 0, maxX: 2, maxY: 1 },
+        transform: IDENTITY_TRANSFORM,
+      }),
+      {
+        ...createLayer({ id: 'image', color, mode: 'image' }),
+        linesPerMm: 1,
+        ditherAlgorithm: 'threshold',
+        fillOverscanMm: 0,
+      },
     ),
   };
 }

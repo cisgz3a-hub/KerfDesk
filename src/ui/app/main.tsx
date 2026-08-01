@@ -9,6 +9,8 @@ import { createDesktopPreviewUpdateAdapter, isElectronRenderer } from '../../pla
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
 import { ErrorBoundary, type SoftwareAbort } from '../common/ErrorBoundary';
+import { startPagedAssetReconciliation } from '../import/paged-asset-startup';
+import { watchPagedRasterOwnership } from '../import/paged-raster-ownership-watch';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
@@ -21,6 +23,9 @@ const rootElement = document.getElementById('app-root');
 if (rootElement === null) {
   throw new Error('Root element #app-root not found in index.html.');
 }
+
+startPagedAssetReconciliation();
+watchPagedRasterOwnership();
 
 // Reuse every web-adapter method; only override `id` so the UI can hide the
 // browser-only PWA install + desktop-download affordances inside the app.

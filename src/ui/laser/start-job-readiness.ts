@@ -57,6 +57,7 @@ import {
   largeRasterPreparationWarning,
   partitionEmitPreflight,
 } from './start-job-readiness-policy';
+import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
 import { startControllerPolicy } from './start-job-controller-policy';
 import type { PreparedJobMetrics } from './prepared-job-metrics';
@@ -217,8 +218,9 @@ export async function prepareStartJobSnapshot(
   if (!placement.ok) return { ok: false, messages: placement.messages };
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
 
+  const preparationProject = await hydratePagedRasterProject(project);
   const inspected = inspectPreparedStart(
-    await prepareOutputSnapshot(project, {
+    await prepareOutputSnapshot(preparationProject, {
       clock: options.clock,
       renderVariableText: options.renderVariableText,
       ...registrationOption(options.registration),
@@ -229,7 +231,7 @@ export async function prepareStartJobSnapshot(
   );
   if (!inspected.ok) return inspected;
   return finalizeStartPreparation({
-    project,
+    project: preparationProject,
     controllerSettings,
     machine,
     machineWithReportUnits,

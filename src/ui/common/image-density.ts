@@ -23,6 +23,10 @@ const MAX_VALID_DPI = 10_000;
 
 export function densityFromBytes(bytes: Uint8Array): number | null {
   const dpi = pngDensity(bytes) ?? jpegDensity(bytes);
+  return normalizeImageDensity(dpi);
+}
+
+export function normalizeImageDensity(dpi: number | null): number | null {
   if (dpi === null || dpi < MIN_VALID_DPI || dpi > MAX_VALID_DPI) return null;
   return dpi;
 }

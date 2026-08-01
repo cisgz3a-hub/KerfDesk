@@ -14,8 +14,9 @@ import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
 } from './preparation-worker-protocol';
+import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 
-self.onmessage = (e: MessageEvent<PreparationWorkerRequest>): void => {
+self.onmessage = async (e: MessageEvent<PreparationWorkerRequest>): Promise<void> => {
   const { id, project, jobOrigin, outputScope } = e.data;
   try {
     const options = {
@@ -25,7 +26,7 @@ self.onmessage = (e: MessageEvent<PreparationWorkerRequest>): void => {
     const response: PreparationWorkerResponse = {
       id,
       kind: 'ok',
-      ...prepareLargeJob(project, options),
+      ...prepareLargeJob(await hydratePagedRasterProject(project), options),
     };
     self.postMessage(response);
   } catch (err) {

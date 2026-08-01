@@ -9,7 +9,7 @@
 // subscribe to the load event and schedule one redraw.
 
 import { canvasTheme } from '../theme/canvas-theme';
-import type { AABB, Transform as ObjTransform } from '../../core/scene';
+import type { AABB, RasterImage, Transform as ObjTransform } from '../../core/scene';
 import type { ViewTransform } from './view-transform';
 
 type RasterImageCacheEntry = {
@@ -92,7 +92,8 @@ function tintedTraceSource(dataUrl: string, img: HTMLImageElement): HTMLCanvasEl
 export function drawRasterImage(
   ctx: CanvasRenderingContext2D,
   obj: {
-    readonly dataUrl: string;
+    readonly dataUrl?: string;
+    readonly imageAsset?: NonNullable<RasterImage['imageAsset']>;
     readonly bounds: AABB;
     readonly transform: ObjTransform;
     readonly role?: 'trace-source';
@@ -100,7 +101,8 @@ export function drawRasterImage(
   view: ViewTransform,
   options: DrawRasterImageOptions = {},
 ): void {
-  const entry = rasterImageEntry(obj.dataUrl);
+  const displayDataUrl = rasterDisplayDataUrl(obj);
+  const entry = rasterImageEntry(displayDataUrl);
   const { img } = entry;
   if (!img.complete || img.naturalWidth === 0) {
     if (!entry.failed && options.onBitmapReady !== undefined) {
@@ -111,8 +113,14 @@ export function drawRasterImage(
 
   // Trace-source backings draw tinted so the operator can tell the
   // deletable original apart from the trace stacked on top (ADR-026).
-  const paint = obj.role === 'trace-source' ? (tintedTraceSource(obj.dataUrl, img) ?? img) : img;
+  const paint = obj.role === 'trace-source' ? (tintedTraceSource(displayDataUrl, img) ?? img) : img;
   drawBitmapAtTransform(ctx, paint, obj.bounds, obj.transform, view);
+}
+
+export function rasterDisplayDataUrl(obj: Pick<RasterImage, 'dataUrl' | 'imageAsset'>): string {
+  if (obj.imageAsset !== undefined) return obj.imageAsset.thumbnail.dataUrl;
+  if (obj.dataUrl !== undefined) return obj.dataUrl;
+  throw new Error('Raster image has no display source.');
 }
 
 // Blit a decoded bitmap (an HTMLImageElement, or an offscreen canvas

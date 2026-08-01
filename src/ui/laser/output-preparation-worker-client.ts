@@ -9,6 +9,7 @@ import type {
   StartOutputPreparationRequest,
 } from './output-preparation-protocol';
 import type { SaveOutputEmission } from './save-output-emission';
+import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 
 export function outputPreparationShouldRunOffThread(
   project: Project,
@@ -19,7 +20,9 @@ export function outputPreparationShouldRunOffThread(
   const scene = scoped === null ? project.scene : scoped.scene;
   const scopedProject = scene === project.scene ? project : { ...project, scene };
   return (
-    outputVectorPreparationTooComplex(scopedProject) || rasterPreparationTooComplex(scopedProject)
+    projectHasPagedRasterAssets(scopedProject) ||
+    outputVectorPreparationTooComplex(scopedProject) ||
+    rasterPreparationTooComplex(scopedProject)
   );
 }
 

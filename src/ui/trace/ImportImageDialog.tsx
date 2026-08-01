@@ -215,7 +215,7 @@ function useTraceSourceFile(
   const [file, setFile] = useState<File | null>(null);
   useEffect(() => {
     let cancelled = false;
-    dataUrlToFile(seed.dataUrl, seed.source)
+    dataUrlToFile(seed.dataUrl as string, seed.source)
       .then((f) => {
         if (!cancelled) setFile(f);
       })
@@ -239,7 +239,7 @@ function TracePreviewPanel(props: {
     <>
       <TracePreview
         state={props.preview}
-        sourceDataUrl={props.seed.dataUrl}
+        sourceDataUrl={props.seed.dataUrl as string}
         imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
         boundary={selection.boundary}
         onBoundaryChange={selection.setBoundary}

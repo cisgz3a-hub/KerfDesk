@@ -6,10 +6,10 @@ import type {
   OutputPreparationResponse,
 } from './output-preparation-protocol';
 
-self.onmessage = (event: MessageEvent<OutputPreparationRequest>): void => {
+self.onmessage = async (event: MessageEvent<OutputPreparationRequest>): Promise<void> => {
   let response: OutputPreparationResponse;
   try {
-    response = prepareOutputRequest(event.data);
+    response = await prepareOutputRequest(event.data);
   } catch (error) {
     response = {
       kind: 'error',
