@@ -89,6 +89,8 @@ export type CameraDevice = {
   readonly label: string;
 };
 
+export type CameraStreamStatus = 'live' | 'muted' | 'ended';
+
 export type CameraStream = {
   // The live MediaStream to attach to a <video> element for the overlay.
   readonly stream: MediaStream;
@@ -96,6 +98,12 @@ export type CameraStream = {
   // binds to these values, not merely to the pre-permission picker choice.
   readonly sourceId: string;
   readonly resizeMode: 'none' | 'crop-and-scale' | 'unknown';
+  // Adapters backed by an observable live track report temporary input loss
+  // separately from terminal end. The callback receives the current state
+  // immediately; disposal prevents an old stream from affecting its successor.
+  readonly onStatusChange?:
+    | ((handler: (status: CameraStreamStatus) => void) => () => void)
+    | undefined;
   // Stop every track and release the camera.
   readonly stop: () => void;
 };
@@ -121,6 +129,9 @@ export type CameraAdapter = {
   // Open a live stream for `deviceId` (or the default camera). Resolves to
   // null when the user denies permission; other errors propagate.
   readonly openStream: (deviceId?: string) => Promise<CameraStream | null>;
+  // Observe changes to the browser-exposed device set. This refreshes picker
+  // choices only; it never opens camera hardware or requests permission.
+  readonly onDeviceChange?: ((handler: () => void) => () => void) | undefined;
   // Probe the local RNDIS link for a machine-integrated HTTP camera (Falcon
   // A1 Pro). Resolves to its frame URL, or null if none is reachable.
   readonly discoverNetworkCamera: () => Promise<NetworkCamera | null>;

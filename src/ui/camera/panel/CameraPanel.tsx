@@ -27,17 +27,15 @@ export function CameraPanel(): JSX.Element | null {
 }
 
 function CameraPanelOpen(): JSX.Element {
-  const close = useCameraStore((s) => s.closePanel);
-  const platform = usePlatform();
-  const camera = platform.camera;
-  const bridge = platform.cameraBridge;
-  const bridgeAvailable = localCameraBridgeAvailable(platform.id, window.location.hostname);
-  const isSupported = useCameraStore((s) => s.isSupported);
-  const detectSupport = useCameraStore((s) => s.detectSupport);
-  const refreshCameras = useCameraStore((s) => s.refreshCameras);
-  const stopSource = useCameraStore((s) => s.stopSource);
-  const machineCamera = useCameraStore((s) => s.machineCamera);
-  const detectMachineCamera = useCameraStore((s) => s.detectMachineCamera);
+  const {
+    bridge,
+    bridgeAvailable,
+    camera,
+    close,
+    detectMachineCamera,
+    isSupported,
+    machineCamera,
+  } = useCameraPanelOpenState();
   const [wide, setWide] = useState(() => loadCameraPanelWide());
   const toggleWide = (): void => {
     setWide((current) => {
@@ -45,25 +43,6 @@ function CameraPanelOpen(): JSX.Element {
       return !current;
     });
   };
-
-  useEffect(() => {
-    detectSupport(camera);
-    void refreshCameras(camera);
-    // Probe the machine-integrated camera once on open; the button re-probes.
-    if (bridgeAvailable && machineCamera.kind === 'idle') void detectMachineCamera(bridge);
-    return () => stopSource();
-    // machineCamera is deliberately NOT a dependency: the probe fires once per
-    // panel open, not on every probe-state transition.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    camera,
-    bridge,
-    bridgeAvailable,
-    detectSupport,
-    refreshCameras,
-    detectMachineCamera,
-    stopSource,
-  ]);
 
   return (
     <div
@@ -109,6 +88,55 @@ function CameraPanelOpen(): JSX.Element {
       <CameraDiagnostics bridgeAvailable={bridgeAvailable} />
     </div>
   );
+}
+
+function useCameraPanelOpenState() {
+  const close = useCameraStore((s) => s.closePanel);
+  const platform = usePlatform();
+  const camera = platform.camera;
+  const bridge = platform.cameraBridge;
+  const bridgeAvailable = localCameraBridgeAvailable(platform.id, window.location.hostname);
+  const isSupported = useCameraStore((s) => s.isSupported);
+  const detectSupport = useCameraStore((s) => s.detectSupport);
+  const refreshCameras = useCameraStore((s) => s.refreshCameras);
+  const stopSource = useCameraStore((s) => s.stopSource);
+  const machineCamera = useCameraStore((s) => s.machineCamera);
+  const detectMachineCamera = useCameraStore((s) => s.detectMachineCamera);
+
+  useEffect(() => {
+    detectSupport(camera);
+    void refreshCameras(camera);
+    const stopWatchingDevices = camera?.onDeviceChange?.(() => {
+      void refreshCameras(camera);
+    });
+    // Probe the machine-integrated camera once on open; the button re-probes.
+    if (bridgeAvailable && machineCamera.kind === 'idle') void detectMachineCamera(bridge);
+    return () => {
+      stopWatchingDevices?.();
+      stopSource();
+    };
+    // machineCamera is deliberately NOT a dependency: the probe fires once per
+    // panel open, not on every probe-state transition.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    camera,
+    bridge,
+    bridgeAvailable,
+    detectSupport,
+    refreshCameras,
+    detectMachineCamera,
+    stopSource,
+  ]);
+
+  return {
+    bridge,
+    bridgeAvailable,
+    camera,
+    close,
+    detectMachineCamera,
+    isSupported,
+    machineCamera,
+  };
 }
 
 function HostedNetworkCameraNotice(): JSX.Element {

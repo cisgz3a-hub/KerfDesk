@@ -17,15 +17,16 @@ import type { LiveCaptureElement } from './frame-capture';
 export function CameraSourceView(props: {
   readonly source: ActiveCameraSource;
   readonly onElement?: ((element: LiveCaptureElement | null) => void) | undefined;
+  readonly onFailure?: (() => void) | undefined;
 }): JSX.Element {
-  const { source, onElement } = props;
+  const { source, onElement, onFailure } = props;
   switch (source.kind) {
     case 'usb':
       return <UsbVideo stream={source.stream.stream} onElement={onElement} />;
     case 'machine-jpeg':
       return <PolledJpeg url={source.frameUrl} onElement={onElement} />;
     case 'machine-rtsp':
-      return <MjpegImage url={source.previewUrl} onElement={onElement} />;
+      return <MjpegImage url={source.previewUrl} onElement={onElement} onFailure={onFailure} />;
     default:
       return assertNever(source, 'camera source');
   }
@@ -74,9 +75,15 @@ function PolledJpeg(props: {
 function MjpegImage(props: {
   readonly url: string;
   readonly onElement?: ((element: LiveCaptureElement | null) => void) | undefined;
+  readonly onFailure?: (() => void) | undefined;
 }): JSX.Element {
   return (
-    <CapturableImage src={props.url} alt="Machine camera stream" onElement={props.onElement} />
+    <CapturableImage
+      src={props.url}
+      alt="Machine camera stream"
+      onElement={props.onElement}
+      onFailure={props.onFailure}
+    />
   );
 }
 
@@ -85,6 +92,7 @@ function CapturableImage(props: {
   readonly alt: string;
   readonly onElement?: ((element: LiveCaptureElement | null) => void) | undefined;
   readonly expectedRefreshMs?: number;
+  readonly onFailure?: (() => void) | undefined;
 }): JSX.Element {
   const { onElement } = props;
   const imgRef = useRef<HTMLImageElement>(null);
@@ -116,14 +124,17 @@ function CapturableImage(props: {
           setLoadedAt(Date.now());
           setLoadState('live');
         }}
-        onError={() => setLoadState('error')}
+        onError={() => {
+          setLoadState('error');
+          props.onFailure?.();
+        }}
         style={surfaceStyle}
       />
       {loadState === 'stale' || loadState === 'error' ? (
         <p role="status" style={sourceErrorStyle}>
           {loadState === 'stale'
             ? 'Camera frame is stale. Check the connection; precision actions will verify a fresh capture before continuing.'
-            : 'Camera preview failed. Check the camera/bridge connection; KerfDesk will retry.'}
+            : 'Camera preview failed. Check the camera/bridge connection, then reconnect.'}
         </p>
       ) : null}
     </div>

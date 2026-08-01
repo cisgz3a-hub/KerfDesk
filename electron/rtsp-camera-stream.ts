@@ -10,6 +10,7 @@ import { writeJson } from './bridge-json.js';
 // Bound concurrent ffmpeg transcodes so a burst of stream requests cannot
 // exhaust the machine (S03-001 DoS hardening).
 const MAX_CONCURRENT_FFMPEG = 4;
+const PREVIEW_ACTIVITY_TIMEOUT_MS = 10_000;
 let activeFfmpegCount = 0;
 
 /** True when another ffmpeg transcode may start (S03-001 concurrency bound). */
@@ -29,8 +30,26 @@ function acquireFfmpegSlot(): () => void {
   };
 }
 
-export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
-  const ffmpeg = spawn('ffmpeg', [
+type PreviewActivityWatch = { readonly touch: () => void; readonly stop: () => void };
+
+function createPreviewActivityWatch(onTimeout: () => void): PreviewActivityWatch {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const touch = (): void => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(onTimeout, PREVIEW_ACTIVITY_TIMEOUT_MS);
+  };
+  touch();
+  return {
+    touch,
+    stop: () => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
+    },
+  };
+}
+
+function spawnPreviewFfmpeg(url: URL) {
+  return spawn('ffmpeg', [
     '-hide_banner',
     '-loglevel',
     'error',
@@ -47,18 +66,19 @@ export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
     '5',
     'pipe:1',
   ]);
+}
+
+export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
+  const ffmpeg = spawnPreviewFfmpeg(url);
   const releaseSlot = acquireFfmpegSlot();
   const stderrChunks: Buffer[] = [];
   let clientClosed = false;
   let responseStarted = false;
   let settled = false;
-
-  const startupTimer = setTimeout(() => {
-    failStream(new Error('FFmpeg did not produce camera preview data.'));
-  }, 10000);
+  let activityWatch: PreviewActivityWatch | null = null;
 
   const cleanup = (): void => {
-    clearTimeout(startupTimer);
+    activityWatch?.stop();
   };
 
   const failStream = (err: Error): void => {
@@ -74,22 +94,43 @@ export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
     writeJson(res, { kind: 'unavailable', reason: err.message }, 502);
   };
 
+  activityWatch = createPreviewActivityWatch(() => {
+    failStream(
+      new Error(
+        responseStarted
+          ? 'FFmpeg camera preview stopped producing data.'
+          : 'FFmpeg did not produce camera preview data.',
+      ),
+    );
+  });
+
   ffmpeg.stderr.on('data', (chunk: Buffer) => {
     appendLimitedStderrChunk(stderrChunks, chunk);
   });
   ffmpeg.stdout.on('data', (chunk: Buffer) => {
     if (settled || clientClosed) return;
+    activityWatch?.touch();
     if (!responseStarted) {
       responseStarted = true;
-      cleanup();
       writeMjpegResponseHeaders(res);
     }
-    if (!res.write(chunk)) ffmpeg.stdout.pause();
+    if (!res.write(chunk)) {
+      activityWatch?.stop();
+      ffmpeg.stdout.pause();
+    }
   });
   ffmpeg.stdout.on('end', () => {
-    if (!settled && responseStarted && !clientClosed) res.end();
+    if (!settled && !clientClosed) {
+      failStream(
+        new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview ended unexpectedly.')),
+      );
+    }
   });
-  res.on('drain', () => ffmpeg.stdout.resume());
+  res.on('drain', () => {
+    if (settled || clientClosed) return;
+    activityWatch?.touch();
+    ffmpeg.stdout.resume();
+  });
   res.on('close', () => {
     clientClosed = true;
     settled = true;
@@ -100,16 +141,12 @@ export function streamWithFfmpeg(url: URL, res: ServerResponse): void {
     releaseSlot();
     failStream(err);
   });
-  ffmpeg.on('exit', (code, signal) => {
+  ffmpeg.on('exit', () => {
     releaseSlot();
     if (settled) return;
-    if (code === 0 || signal === 'SIGTERM') {
-      settled = true;
-      cleanup();
-      if (responseStarted && !clientClosed) res.end();
-      return;
-    }
-    failStream(new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview failed.')));
+    failStream(
+      new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview ended unexpectedly.')),
+    );
   });
 }
 

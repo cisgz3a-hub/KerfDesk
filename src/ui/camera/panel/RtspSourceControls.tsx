@@ -7,17 +7,32 @@
 import { useState } from 'react';
 import { usePlatform } from '../../app';
 import { loadRtspCameraUrl, saveRtspCameraUrl } from '../../state/camera-preference-storage';
-import { useCameraStore } from '../../state/camera-store';
+import { type CameraSourceState, useCameraStore } from '../../state/camera-store';
 import { CameraSourceView } from '../CameraSourceView';
+import type { ActiveCameraSource } from '../frame-source';
 import { noteStyle, rowStyle, sectionStyle } from './panel-styles';
+
+type RtspControlState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'starting' }
+  | { readonly kind: 'error'; readonly message: string }
+  | {
+      readonly kind: 'live';
+      readonly source: Extract<ActiveCameraSource, { readonly kind: 'machine-rtsp' }>;
+    };
 
 export function RtspSourceControls(): JSX.Element {
   const bridge = usePlatform().cameraBridge;
   const startRtspSource = useCameraStore((s) => s.startRtspSource);
   const sourceState = useCameraStore((s) => s.sourceState);
+  const reportSourceFailure = useCameraStore((s) => s.reportSourceFailure);
+  const stopSource = useCameraStore((s) => s.stopSource);
   const [url, setUrl] = useState(() => loadRtspCameraUrl() ?? '');
 
-  const rtspActive = sourceState.kind === 'live' && sourceState.source.kind === 'machine-rtsp';
+  const control = rtspControlState(sourceState);
+  const rtspSource = control.kind === 'live' ? control.source : null;
+  const rtspStarting = control.kind === 'starting';
+  const rtspError = control.kind === 'error' ? control.message : null;
   const connect = (): void => {
     saveRtspCameraUrl(url);
     void startRtspSource(bridge, url);
@@ -48,19 +63,53 @@ export function RtspSourceControls(): JSX.Element {
         <button
           type="button"
           className="lf-btn"
-          disabled={url.trim() === '' || sourceState.kind === 'starting' || rtspActive}
-          onClick={connect}
-          title="Probe the RTSP camera through the local bridge and use it as the camera source."
+          disabled={rtspSource === null && (url.trim() === '' || rtspStarting)}
+          onClick={rtspSource === null ? connect : stopSource}
+          title={
+            rtspSource === null
+              ? 'Probe the RTSP camera through the local bridge and use it as the camera source.'
+              : 'Stop the RTSP camera preview.'
+          }
         >
-          {rtspActive ? 'Connected' : 'Connect'}
+          {rtspButtonLabel(control)}
         </button>
       </div>
-      {rtspActive && sourceState.kind === 'live' ? (
-        <CameraSourceView source={sourceState.source} />
+      {rtspError === null ? null : (
+        <p role="status" style={errorStyle}>
+          {rtspError}
+        </p>
+      )}
+      {rtspSource !== null ? (
+        <CameraSourceView source={rtspSource} onFailure={() => reportSourceFailure(rtspSource)} />
       ) : null}
     </details>
   );
 }
 
+function rtspControlState(state: CameraSourceState): RtspControlState {
+  if (state.kind === 'live' && state.source.kind === 'machine-rtsp') {
+    return { kind: 'live', source: state.source };
+  }
+  if (state.kind === 'starting' && state.sourceKind === 'machine-rtsp') return { kind: 'starting' };
+  if (state.kind === 'error' && state.sourceKind === 'machine-rtsp') {
+    return { kind: 'error', message: state.message };
+  }
+  return { kind: 'idle' };
+}
+
+function rtspButtonLabel(control: RtspControlState): string {
+  switch (control.kind) {
+    case 'live':
+      return 'Stop';
+    case 'starting':
+      return 'Connecting…';
+    case 'error':
+      return 'Reconnect';
+    case 'idle':
+      return 'Connect';
+  }
+}
+
 const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12 };
 const urlStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+const errorStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger)' };

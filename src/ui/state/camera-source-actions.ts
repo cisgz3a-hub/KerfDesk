@@ -5,14 +5,28 @@
 
 import type { CameraAdapter, CameraBridgeAdapter } from '../../platform/types';
 import { publicCameraSourceId, type ActiveCameraSource } from '../camera/frame-source';
+import {
+  handleUsbStatus,
+  makeReportSourceFailure,
+  makeStopSource,
+} from './camera-source-lifecycle';
+import { managedUsbCameraSource } from './camera-usb-source';
+
+export type UsbCameraAvailability = { readonly kind: 'available' } | { readonly kind: 'muted' };
+
+type StartableCameraSourceKind = 'usb' | 'machine-rtsp';
 
 export type CameraSourceState =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'starting' }
+  | { readonly kind: 'starting'; readonly sourceKind: StartableCameraSourceKind }
   | { readonly kind: 'live'; readonly source: ActiveCameraSource }
   // getUserMedia permission denied (USB path only).
-  | { readonly kind: 'denied' }
-  | { readonly kind: 'error'; readonly message: string };
+  | { readonly kind: 'denied'; readonly sourceKind: 'usb' }
+  | {
+      readonly kind: 'error';
+      readonly sourceKind: ActiveCameraSource['kind'];
+      readonly message: string;
+    };
 
 export type MachineCameraState =
   | { readonly kind: 'idle' }
@@ -27,23 +41,26 @@ export type CameraSourceActions = {
   readonly activateMachineCamera: () => void;
   readonly startUsbSource: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly startRtspSource: (bridge: CameraBridgeAdapter | undefined, url: string) => Promise<void>;
+  readonly reportSourceFailure: (source: ActiveCameraSource) => void;
   readonly stopSource: () => void;
 };
 
 // The slice of camera-store these actions read and write. Structural, so the
 // store file can import this module without a type cycle.
-type CameraSourceSlice = CameraSourceActions & {
+export type CameraSourceSlice = CameraSourceActions & {
   readonly sourceState: CameraSourceState;
   readonly sourceEpoch: number;
+  readonly usbAvailability: UsbCameraAvailability;
+  readonly usbSourceRelease: (() => void) | null;
   readonly machineCamera: MachineCameraState;
   readonly selectedDeviceId: string | null;
   readonly refreshCameras: (camera: CameraAdapter | undefined) => Promise<void>;
 };
 
-type Set = (
+export type CameraSourceSet = (
   partial: Partial<CameraSourceSlice> | ((state: CameraSourceSlice) => Partial<CameraSourceSlice>),
 ) => void;
-type Get = () => CameraSourceSlice;
+export type CameraSourceGet = () => CameraSourceSlice;
 
 const ADAPTER_MISSING = 'Camera is not available on this platform';
 const BRIDGE_MISSING =
@@ -51,7 +68,6 @@ const BRIDGE_MISSING =
 const FFMPEG_MISSING =
   'FFmpeg is not installed on this computer — RTSP cameras need it for preview and capture. Install it, then reconnect.';
 const NO_PREVIEW_URL = 'The camera bridge did not return a preview URL for this RTSP camera.';
-
 function cameraErrorMessage(err: unknown): string {
   if (err instanceof DOMException) {
     return err.message === '' ? err.name : `${err.name}: ${err.message}`;
@@ -60,12 +76,16 @@ function cameraErrorMessage(err: unknown): string {
   return 'Failed to open the camera';
 }
 
-export function createCameraSourceActions(set: Set, get: Get): CameraSourceActions {
+export function createCameraSourceActions(
+  set: CameraSourceSet,
+  get: CameraSourceGet,
+): CameraSourceActions {
   return {
     detectMachineCamera: makeDetectMachineCamera(set),
     activateMachineCamera: makeActivateMachineCamera(set, get),
     startUsbSource: makeStartUsbSource(set, get),
     startRtspSource: makeStartRtspSource(set, get),
+    reportSourceFailure: makeReportSourceFailure(set, get),
     stopSource: makeStopSource(set, get),
   };
 }
@@ -73,7 +93,7 @@ export function createCameraSourceActions(set: Set, get: Get): CameraSourceActio
 // Machine cameras are probed by the bridge server-side (ADR-116): the
 // browser-side <img> probe is CSP-blocked in the desktop app and on the
 // deployed site, so the bridge is the one discovery path.
-function makeDetectMachineCamera(set: Set): CameraSourceActions['detectMachineCamera'] {
+function makeDetectMachineCamera(set: CameraSourceSet): CameraSourceActions['detectMachineCamera'] {
   return async (bridge) => {
     if (bridge === undefined) {
       set({ machineCamera: { kind: 'unavailable', reason: BRIDGE_MISSING } });
@@ -105,8 +125,8 @@ function makeDetectMachineCamera(set: Set): CameraSourceActions['detectMachineCa
 // it exactly like a USB stream — this is what un-disables "Calibrate
 // lens…" for machine cameras.
 function makeActivateMachineCamera(
-  set: Set,
-  get: Get,
+  set: CameraSourceSet,
+  get: CameraSourceGet,
 ): CameraSourceActions['activateMachineCamera'] {
   return () => {
     const machine = get().machineCamera;
@@ -125,15 +145,18 @@ function makeActivateMachineCamera(
   };
 }
 
-function makeStartUsbSource(set: Set, get: Get): CameraSourceActions['startUsbSource'] {
+function makeStartUsbSource(
+  set: CameraSourceSet,
+  get: CameraSourceGet,
+): CameraSourceActions['startUsbSource'] {
   return async (camera) => {
     if (camera === undefined) {
-      set({ sourceState: { kind: 'error', message: ADAPTER_MISSING } });
+      set({ sourceState: { kind: 'error', sourceKind: 'usb', message: ADAPTER_MISSING } });
       return;
     }
     get().stopSource(); // stop any current source and bump the epoch
     const epoch = get().sourceEpoch;
-    set({ sourceState: { kind: 'starting' } });
+    set({ sourceState: { kind: 'starting', sourceKind: 'usb' } });
     const deviceId = get().selectedDeviceId ?? undefined;
     try {
       const opened = await camera.openStream(deviceId);
@@ -144,43 +167,62 @@ function makeStartUsbSource(set: Set, get: Get): CameraSourceActions['startUsbSo
         return;
       }
       if (opened === null) {
-        set({ sourceState: { kind: 'denied' } });
+        set({ sourceState: { kind: 'denied', sourceKind: 'usb' } });
         return;
       }
-      set({ sourceState: { kind: 'live', source: { kind: 'usb', stream: opened } } });
+      const managed = managedUsbCameraSource(opened);
+      set({
+        sourceState: { kind: 'live', source: managed.source },
+        usbAvailability: { kind: 'available' },
+        usbSourceRelease: managed.stop,
+      });
+      managed.observe((status) => handleUsbStatus(set, get, camera, managed.source, epoch, status));
       // Permission is granted now, so device labels/ids are finally
       // readable — refresh the list so the picker can show real names.
       void get().refreshCameras(camera);
     } catch (err) {
       if (get().sourceEpoch !== epoch) return;
-      set({ sourceState: { kind: 'error', message: cameraErrorMessage(err) } });
+      set({
+        sourceState: { kind: 'error', sourceKind: 'usb', message: cameraErrorMessage(err) },
+      });
     }
   };
 }
 
 // Connect an operator-entered RTSP camera: probe it through the bridge,
 // then go live on the bridge's MJPEG preview + single-frame capture URLs.
-function makeStartRtspSource(set: Set, get: Get): CameraSourceActions['startRtspSource'] {
+function makeStartRtspSource(
+  set: CameraSourceSet,
+  get: CameraSourceGet,
+): CameraSourceActions['startRtspSource'] {
   return async (bridge, url) => {
     if (bridge === undefined) {
-      set({ sourceState: { kind: 'error', message: BRIDGE_MISSING } });
+      set({
+        sourceState: { kind: 'error', sourceKind: 'machine-rtsp', message: BRIDGE_MISSING },
+      });
       return;
     }
     get().stopSource();
     const epoch = get().sourceEpoch;
-    set({ sourceState: { kind: 'starting' } });
+    set({ sourceState: { kind: 'starting', sourceKind: 'machine-rtsp' } });
     const probe = await bridge.probeRtspCamera({ url });
     if (get().sourceEpoch !== epoch) return;
     if (probe.kind !== 'ok') {
-      set({ sourceState: { kind: 'error', message: probe.reason } });
+      set({
+        sourceState: { kind: 'error', sourceKind: 'machine-rtsp', message: probe.reason },
+      });
       return;
     }
     if (!probe.ffmpegAvailable) {
-      set({ sourceState: { kind: 'error', message: FFMPEG_MISSING } });
+      set({
+        sourceState: { kind: 'error', sourceKind: 'machine-rtsp', message: FFMPEG_MISSING },
+      });
       return;
     }
     if (probe.previewUrl === undefined) {
-      set({ sourceState: { kind: 'error', message: NO_PREVIEW_URL } });
+      set({
+        sourceState: { kind: 'error', sourceKind: 'machine-rtsp', message: NO_PREVIEW_URL },
+      });
       return;
     }
     set({
@@ -194,15 +236,5 @@ function makeStartRtspSource(set: Set, get: Get): CameraSourceActions['startRtsp
         },
       },
     });
-  };
-}
-
-function makeStopSource(set: Set, get: Get): CameraSourceActions['stopSource'] {
-  return () => {
-    const current = get().sourceState;
-    if (current.kind === 'live' && current.source.kind === 'usb') {
-      current.source.stream.stop();
-    }
-    set((state) => ({ sourceState: { kind: 'idle' }, sourceEpoch: state.sourceEpoch + 1 }));
   };
 }

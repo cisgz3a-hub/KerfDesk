@@ -61,6 +61,14 @@ describe('webCamera', () => {
     expect(await webCamera.openStream()).toBeNull();
   });
 
+  it('re-throws AbortError as a device-access failure, not permission denial', async () => {
+    const getUserMedia = vi
+      .fn()
+      .mockRejectedValue(new DOMException('camera aborted', 'AbortError'));
+    stubNavigator({ getUserMedia, enumerateDevices: vi.fn() });
+    await expect(webCamera.openStream()).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
   it('re-throws non-permission errors', async () => {
     const getUserMedia = vi.fn().mockRejectedValue(new DOMException('busy', 'NotReadableError'));
     stubNavigator({ getUserMedia, enumerateDevices: vi.fn() });
@@ -122,6 +130,23 @@ describe('webCamera', () => {
       audio: false,
     });
     expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: PREFERRED_VIDEO, audio: false });
+  });
+
+  it('subscribes to device changes and disposes the listener', () => {
+    const mediaDevices = Object.assign(new EventTarget(), {
+      getUserMedia: vi.fn(),
+      enumerateDevices: vi.fn(),
+    });
+    stubNavigator(mediaDevices);
+    const changed = vi.fn();
+
+    const dispose = webCamera.onDeviceChange?.(changed);
+    mediaDevices.dispatchEvent(new Event('devicechange'));
+    expect(changed).toHaveBeenCalledTimes(1);
+
+    dispose?.();
+    mediaDevices.dispatchEvent(new Event('devicechange'));
+    expect(changed).toHaveBeenCalledTimes(1);
   });
 });
 

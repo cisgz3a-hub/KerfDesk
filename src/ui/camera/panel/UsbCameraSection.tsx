@@ -4,7 +4,11 @@
 // the wizard captures through the active source.
 
 import type { CameraAdapter } from '../../../platform/types';
-import { type CameraSourceState, useCameraStore } from '../../state/camera-store';
+import {
+  type CameraSourceState,
+  type UsbCameraAvailability,
+  useCameraStore,
+} from '../../state/camera-store';
 import { CameraSourceView } from '../CameraSourceView';
 import { CameraCalibrationWizard } from '../wizard/CameraCalibrationWizard';
 import { useCameraWizardStore } from '../wizard/camera-wizard-store';
@@ -17,6 +21,7 @@ export function UsbCameraSection(props: {
   const cameras = useCameraStore((s) => s.cameras);
   const selectedDeviceId = useCameraStore((s) => s.selectedDeviceId);
   const sourceState = useCameraStore((s) => s.sourceState);
+  const usbAvailability = useCameraStore((s) => s.usbAvailability);
   const selectCamera = useCameraStore((s) => s.selectCamera);
   const startUsbSource = useCameraStore((s) => s.startUsbSource);
   const stopSource = useCameraStore((s) => s.stopSource);
@@ -24,6 +29,7 @@ export function UsbCameraSection(props: {
   const openWizard = useCameraWizardStore((s) => s.openWizard);
 
   const usbLive = sourceState.kind === 'live' && sourceState.source.kind === 'usb';
+  const usbStarting = sourceState.kind === 'starting' && sourceState.sourceKind === 'usb';
   return (
     <>
       {cameras.length > 1 ? (
@@ -34,7 +40,7 @@ export function UsbCameraSection(props: {
           onChange={(e) => {
             selectCamera(e.currentTarget.value);
             // Switch the live feed immediately to the picked camera.
-            if (usbLive || sourceState.kind === 'starting') {
+            if (usbLive || usbStarting) {
               void startUsbSource(camera);
             }
           }}
@@ -65,11 +71,11 @@ export function UsbCameraSection(props: {
           <button
             type="button"
             className="lf-btn"
-            disabled={sourceState.kind === 'starting'}
+            disabled={usbStarting}
             onClick={() => void startUsbSource(camera)}
             title="Start the live USB camera feed."
           >
-            {sourceState.kind === 'starting' ? 'Starting…' : 'Start USB camera'}
+            {usbStarting ? 'Starting…' : 'Start USB camera'}
           </button>
         )}
         <button
@@ -82,21 +88,37 @@ export function UsbCameraSection(props: {
           Calibrate lens…
         </button>
       </div>
-      <SourceNote sourceState={sourceState} />
+      <SourceNote sourceState={sourceState} usbAvailability={usbAvailability} />
       {wizardOpen ? <CameraCalibrationWizard /> : null}
     </>
   );
 }
 
-function SourceNote(props: { readonly sourceState: CameraSourceState }): JSX.Element | null {
-  const { sourceState } = props;
+function SourceNote(props: {
+  readonly sourceState: CameraSourceState;
+  readonly usbAvailability: UsbCameraAvailability;
+}): JSX.Element | null {
+  const { sourceState, usbAvailability } = props;
+  if (
+    sourceState.kind === 'live' &&
+    sourceState.source.kind === 'usb' &&
+    usbAvailability.kind === 'muted'
+  ) {
+    return (
+      <p role="status" style={warnStyle}>
+        The USB camera is temporarily not providing frames. It will resume when the browser reports
+        the camera available again.
+      </p>
+    );
+  }
   if (sourceState.kind === 'denied') {
     return <p style={errStyle}>Permission denied. Allow camera access and press Start again.</p>;
   }
-  if (sourceState.kind === 'error') {
+  if (sourceState.kind === 'error' && sourceState.sourceKind === 'usb') {
     return <p style={errStyle}>{sourceState.message}</p>;
   }
   return null;
 }
 
 const selectStyle: React.CSSProperties = { width: '100%' };
+const warnStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-warning-fg)' };

@@ -33,6 +33,8 @@ beforeEach(() => {
     cameras: [],
     selectedDeviceId: null,
     sourceState: { kind: 'idle' },
+    usbAvailability: { kind: 'available' },
+    usbSourceRelease: null,
     alignment: { kind: 'idle' },
     sourceEpoch: 0,
     machineCamera: { kind: 'idle' },
