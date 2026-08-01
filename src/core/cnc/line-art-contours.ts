@@ -14,9 +14,16 @@
 // unpaired (lone contours, open paths), and crossing geometry always cut, so
 // 'both' — and every scene without tight double-lines — is byte-identical to
 // the pre-option pipeline.
+//
+// Pairing is also provenance-scoped (ADR-277): only contours a boundary trace
+// could have produced participate. A letter glyph's counter bbox-hugs its
+// outer exactly like a traced ring (the Drive/Safe field incident cut a "D"
+// with no counter), but it is real type design — text and drawn-shape
+// contours never pair.
 
 import { pointInPolygon } from '../geometry';
 import type { CncCutType, CncLayerSettings, Polyline } from '../scene';
+import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 
 export type LineArtContourSide = NonNullable<CncLayerSettings['lineArtContours']>;
 
@@ -51,9 +58,12 @@ export function selectLineArtContours(
   polylines: ReadonlyArray<Polyline>,
   side: LineArtContourSide,
   toolDiameterMm: number,
+  pairable?: ReadonlySet<Polyline>,
 ): ReadonlyArray<Polyline> {
   if (side === 'both' || !(toolDiameterMm > 0)) return polylines;
-  const rings = polylines.filter(isClosedRing);
+  const rings = polylines.filter(
+    (polyline) => isClosedRing(polyline) && (pairable === undefined || pairable.has(polyline)),
+  );
   if (rings.length < 2) return polylines;
   const bounds = new Map<Polyline, Bounds>(rings.map((ring) => [ring, ringBounds(ring)]));
   const dropped = new Set<Polyline>();
@@ -67,6 +77,23 @@ export function selectLineArtContours(
   }
   if (dropped.size === 0) return polylines;
   return polylines.filter((polyline) => !dropped.has(polyline));
+}
+
+// Which collected contours may form a traced double-line pair at all. Text
+// glyph counters and drawn-shape holes are real geometry that merely nests
+// tightly, so those families are excluded; traces and imported vector art
+// keep the ADR-218 behavior. Returns undefined — "no restriction" — when
+// nothing is excluded, so pure-trace scenes stay byte-identical, and when no
+// provenance was collected (legacy callers).
+export function lineArtPairableSet(
+  sources: ReadonlyArray<CollectedCncContour>,
+): ReadonlySet<Polyline> | undefined {
+  if (sources.length === 0) return undefined;
+  const pairable = sources.filter(
+    (source) => source.sourceKind !== 'text' && source.sourceKind !== 'shape',
+  );
+  if (pairable.length === sources.length) return undefined;
+  return new Set(pairable.map((source) => source.polyline));
 }
 
 function isClosedRing(polyline: Polyline): boolean {
