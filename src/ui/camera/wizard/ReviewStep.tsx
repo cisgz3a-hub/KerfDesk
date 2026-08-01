@@ -71,13 +71,13 @@ function SolvedView(): JSX.Element {
           captureBinding.height,
         )
       : null;
-  const sourceMatchesCapture =
+  const sourceDiffersFromCapture =
     captureBinding !== null &&
-    currentCapture !== null &&
-    cameraBindingCompatibility(captureBinding, currentCapture) === 'match';
+    (currentCapture === null ||
+      cameraBindingCompatibility(captureBinding, currentCapture) !== 'match');
 
   const apply = (): void => {
-    if (!sourceMatchesCapture || captureBinding === null) return;
+    if (captureBinding === null) return;
     updateDeviceProfile({
       cameraCalibration: toCameraCalibration(result, Date.now(), captureBinding),
     });
@@ -115,11 +115,17 @@ function SolvedView(): JSX.Element {
         Flip between Original and Corrected: straight edges in the scene should LOOK straight in the
         corrected view. Apply only if they do.
       </p>
+      {sourceDiffersFromCapture ? (
+        <p style={warnStyle}>
+          This calibration belongs to the camera source recorded with these captures. The current
+          camera is different or unavailable; applying still saves the recorded source identity.
+        </p>
+      ) : null}
       <div style={rowStyle}>
         <Button variant="ghost" onClick={() => setStep('capture')}>
           Capture more poses
         </Button>
-        <Button variant="primary" onClick={apply} disabled={!sourceMatchesCapture}>
+        <Button variant="primary" onClick={apply}>
           Apply calibration
         </Button>
       </div>

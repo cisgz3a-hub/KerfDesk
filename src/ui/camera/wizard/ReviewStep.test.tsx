@@ -93,15 +93,16 @@ describe('calibration review provenance', () => {
     expect(useStore.getState().project.device.cameraCalibration?.capture).toEqual(CAPTURE_A);
   });
 
-  it('does not apply the capture set while a different camera is active', () => {
+  it('applies the recorded capture binding without blocking on the current camera', () => {
     useCameraStore.setState({ sourceState: { kind: 'live', source: CAMERA_B } });
     act(() => root.render(<ReviewStep />));
 
     const apply = applyButton();
-    expect(apply.disabled).toBe(true);
+    expect(apply.disabled).toBe(false);
+    expect(host.textContent).toContain('applying still saves the recorded source identity');
     act(() => apply.click());
 
-    expect(useStore.getState().project.device.cameraCalibration).toBeUndefined();
+    expect(useStore.getState().project.device.cameraCalibration?.capture).toEqual(CAPTURE_A);
   });
 });
 
