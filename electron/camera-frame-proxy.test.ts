@@ -150,6 +150,24 @@ describe('camera frame proxy over the real bridge server', () => {
     expect(await response.json()).toMatchObject({ kind: 'ok', frameProxy: true });
   });
 
+  it('keeps RTSP stream status behind the same trusted-origin CORS gate', async () => {
+    const trusted = await fetch(bridgeUrl('/stream-status?session=missing'), {
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    expect(trusted.headers.get('access-control-allow-origin')).toBe(TRUSTED_ORIGIN);
+    expect(trusted.headers.get('cache-control')).toBe('no-store');
+    expect(await trusted.json()).toEqual({
+      kind: 'unavailable',
+      reason: 'RTSP preview session is missing or expired.',
+    });
+
+    const untrusted = await fetch(bridgeUrl('/stream-status?session=missing'), {
+      headers: { Origin: 'https://evil.example' },
+    });
+    expect(untrusted.status).toBe(403);
+    expect(untrusted.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
   it('acknowledges Private Network Access preflights', async () => {
     const withPna = await fetch(bridgeUrl('/health'), {
       method: 'OPTIONS',

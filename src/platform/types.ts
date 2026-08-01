@@ -89,6 +89,8 @@ export type CameraDevice = {
   readonly label: string;
 };
 
+export type CameraStreamStatus = 'live' | 'muted' | 'ended';
+
 export type CameraStream = {
   // The live MediaStream to attach to a <video> element for the overlay.
   readonly stream: MediaStream;
@@ -96,6 +98,12 @@ export type CameraStream = {
   // binds to these values, not merely to the pre-permission picker choice.
   readonly sourceId: string;
   readonly resizeMode: 'none' | 'crop-and-scale' | 'unknown';
+  // Adapters backed by an observable live track report temporary input loss
+  // separately from terminal end. The callback receives the current state
+  // immediately; disposal prevents an old stream from affecting its successor.
+  readonly onStatusChange?:
+    | ((handler: (status: CameraStreamStatus) => void) => () => void)
+    | undefined;
   // Stop every track and release the camera.
   readonly stop: () => void;
 };
@@ -121,6 +129,9 @@ export type CameraAdapter = {
   // Open a live stream for `deviceId` (or the default camera). Resolves to
   // null when the user denies permission; other errors propagate.
   readonly openStream: (deviceId?: string) => Promise<CameraStream | null>;
+  // Observe changes to the browser-exposed device set. This refreshes picker
+  // choices only; it never opens camera hardware or requests permission.
+  readonly onDeviceChange?: ((handler: () => void) => () => void) | undefined;
   // Probe the local RNDIS link for a machine-integrated HTTP camera (Falcon
   // A1 Pro). Resolves to its frame URL, or null if none is reachable.
   readonly discoverNetworkCamera: () => Promise<NetworkCamera | null>;
@@ -137,6 +148,7 @@ export type CameraBridgeProbeResult =
       readonly codec?: string;
       readonly ffmpegAvailable: boolean;
       readonly previewUrl?: string;
+      readonly streamSessionId?: string;
     }
   | { readonly kind: 'invalid'; readonly reason: string }
   | { readonly kind: 'unavailable'; readonly reason: string };
@@ -155,9 +167,16 @@ export type CameraBridgeHealth =
   | { readonly kind: 'ok'; readonly ffmpegAvailable: boolean; readonly frameProxy: boolean }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
+export type CameraBridgeStreamStatus =
+  | { readonly kind: 'starting' }
+  | { readonly kind: 'live' }
+  | { readonly kind: 'failed'; readonly reason: string }
+  | { readonly kind: 'unavailable'; readonly reason: string };
+
 export type CameraBridgeAdapter = {
   readonly isSupported: () => boolean;
   readonly probeRtspCamera: (req: CameraBridgeProbeRequest) => Promise<CameraBridgeProbeResult>;
+  readonly rtspStreamStatus: (streamSessionId: string) => Promise<CameraBridgeStreamStatus>;
   // Probe the machine's snapshot camera server-side via the bridge (ADR-116).
   readonly discoverMachineCamera: () => Promise<MachineCameraDiscovery>;
   // Bridge frame-proxy URL for a camera URL. Responses carry CORS for this

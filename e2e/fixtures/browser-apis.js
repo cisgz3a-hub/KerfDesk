@@ -185,20 +185,28 @@ function saveHandle(name) {
 }
 
 function installCamera() {
-  const track = { stop: () => record('camera-track-stop') };
+  const track = Object.assign(new EventTarget(), {
+    kind: 'video',
+    readyState: 'live',
+    muted: false,
+    getSettings: () => ({ deviceId: 'e2e-camera', resizeMode: 'none' }),
+    stop: () => record('camera-track-stop'),
+  });
   const stream = new MediaStream();
   Object.defineProperty(stream, 'getTracks', { value: () => [track] });
+  Object.defineProperty(stream, 'getVideoTracks', { value: () => [track] });
+  const mediaDevices = Object.assign(new EventTarget(), {
+    enumerateDevices: async () => [
+      { deviceId: 'e2e-camera', groupId: 'e2e', kind: 'videoinput', label: 'E2E Camera' },
+    ],
+    getUserMedia: async (constraints) => {
+      record('camera-open', { constraints });
+      return stream;
+    },
+  });
   Object.defineProperty(navigator, 'mediaDevices', {
     configurable: true,
-    value: {
-      enumerateDevices: async () => [
-        { deviceId: 'e2e-camera', groupId: 'e2e', kind: 'videoinput', label: 'E2E Camera' },
-      ],
-      getUserMedia: async (constraints) => {
-        record('camera-open', { constraints });
-        return stream;
-      },
-    },
+    value: mediaDevices,
   });
 }
 

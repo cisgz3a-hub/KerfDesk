@@ -4933,8 +4933,10 @@ each a few dozen lines — and hand-rolls to ~150–250 LOC of pure TypeScript.
    bundle size, not licence (OpenCV.js is Apache-2.0, which is permitted). RANSAC (v3) injects
    its RNG per the pure-core no-random rule.
 2. **Capture via a new `CameraAdapter` on `PlatformAdapter`** (`getUserMedia` / enumerate /
-   stream), mirroring the existing `SerialAdapter` contract (`isSupported` / request,
-   AbortError → null). Electron is Chromium, so one web code path serves web and desktop.
+   stream), mirroring the existing `SerialAdapter` contract (`isSupported` / request).
+   `NotAllowedError` maps to permission denial/null; device-access failures such as
+   `AbortError` propagate as retryable errors. Electron is Chromium, so one web code path
+   serves web and desktop.
 3. **v1 live overlay via CSS `matrix3d`** (the GPU performs the perspective divide; Canvas2D is
    affine-only and physically cannot warp). `matrix3d` covers the homography only — distortion
    correction (v2) cannot ride it and its live-undistort tech (WebGL shader / CPU remap /

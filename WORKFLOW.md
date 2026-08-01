@@ -4302,6 +4302,15 @@ and lifts the command's CNC-only gate.)*
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
   and the rest of the app is unaffected.
+- **Error / USB source ended.** If the browser reports the exact active camera track ended, the
+  source leaves `live`, releases its remaining tracks, refreshes the device list, and tells the
+  operator to reconnect the camera and press **Start USB camera**. An old track callback cannot
+  replace a newer source. Camera access is never restarted automatically.
+- **Edge / temporary USB mute.** `mute` is shown as an informational temporary-unavailability
+  note while the source remains live; `unmute` clears it. Camera actions are not newly gated.
+- **Edge / device list changed.** While Camera Mode is open, browser `devicechange` refreshes the
+  picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
+  is shown as a retryable open failure rather than mislabeled as denial.
 - **Empty / no camera.** With no camera detected, Camera Mode shows an empty state ("No camera
   found — connect a USB camera") and the camera picker is disabled.
 - **Edge / degenerate corners.** If the four chosen points are collinear or coincident (no
@@ -4404,6 +4413,16 @@ and lifts the command's CNC-only gate.)*
   are pointed to the bridge command; the desktop app starts it automatically.
   Hosted web builds cannot call the loopback network-camera bridge and support
   USB cameras only (ADR-141).
+- **Error / RTSP preview interrupted.** Each probe creates an unguessable bridge-owned stream
+  session shared by every view of that exact source. The renderer polls its status because
+  Chromium does not reliably emit `<img>` error after an established MJPEG socket dies.
+  Unexpected FFmpeg end, ten seconds without output, bridge loss, or the last preview connection
+  closing makes that exact source leave `live`; the RTSP section shows **Reconnect**. Pressing it
+  probes again and creates a fresh session. No background FFmpeg respawn or automatic camera
+  reconnection runs after failure.
+- **Edge / older bridge.** A bridge that returns a usable RTSP preview but no liveness session does
+  not block the preview. The RTSP section labels it unmonitored and explains that a frozen image
+  may not be detected; no session is fabricated and no automatic reconnect or probe runs.
 - **Empty / no camera found.** Discovery completes with no candidate camera;
   the panel stays usable for USB cameras and manual RTSP entry.
 - **Edge / slow or single-threaded camera.** Frame fetches for the same camera

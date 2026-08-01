@@ -28,6 +28,7 @@ describe('web RTSP camera bridge client', () => {
           codec: 'H264',
           ffmpegAvailable: true,
           previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
+          streamSessionId: 'session-a',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -42,7 +43,51 @@ describe('web RTSP camera bridge client', () => {
       codec: 'H264',
       ffmpegAvailable: true,
       previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
+      streamSessionId: 'session-a',
     });
+  });
+
+  it('reads and validates the exact RTSP stream-session status', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ kind: 'failed', reason: 'FFmpeg preview ended.' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
+
+    await expect(bridge.rtspStreamStatus('session/a')).resolves.toEqual({
+      kind: 'failed',
+      reason: 'FFmpeg preview ended.',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:51731/stream-status?session=session%2Fa',
+      expect.objectContaining({
+        method: 'GET',
+        cache: 'no-store',
+        signal: expect.any(AbortSignal),
+      }),
+    );
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ kind: 'mystery' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    await expect(bridge.rtspStreamStatus('session-a')).resolves.toEqual({
+      kind: 'unavailable',
+      reason: 'The local camera bridge returned an invalid RTSP stream status.',
+    });
+  });
+
+  it('reports an unreachable RTSP status endpoint as unavailable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('failed to fetch'));
+    const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
+
+    const result = await bridge.rtspStreamStatus('session-a');
+
+    expect(result.kind).toBe('unavailable');
   });
 
   it('rejects malformed bridge JSON instead of trusting a cast', async () => {

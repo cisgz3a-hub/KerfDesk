@@ -3,6 +3,7 @@ import { Socket } from 'node:net';
 import { writeJson } from './bridge-json.js';
 import { handleDiscoverRequest, handleFrameRequest } from './camera-frame-proxy.js';
 import { rtspCameraUrlPolicy } from './rtsp-camera-bridge-policy.js';
+import { RtspPreviewSessions } from './rtsp-camera-session.js';
 import { hasFfmpeg, hasFreeFfmpegSlot, streamWithFfmpeg } from './rtsp-camera-stream.js';
 
 export const CAMERA_BRIDGE_PORT = 51731;
@@ -18,8 +19,9 @@ export type RtspCameraBridgeHandle = {
 export async function startLocalRtspCameraBridge(
   port = CAMERA_BRIDGE_PORT,
 ): Promise<RtspCameraBridgeHandle> {
+  const previewSessions = new RtspPreviewSessions();
   const server = createServer((req, res) => {
-    void handleBridgeRequest(req, res, boundPort).catch((err: unknown) =>
+    void handleBridgeRequest(req, res, boundPort, previewSessions).catch((err: unknown) =>
       handleBridgeError(err, res),
     );
   });
@@ -31,6 +33,7 @@ async function handleBridgeRequest(
   req: IncomingMessage,
   res: ServerResponse,
   bridgePort: number,
+  previewSessions: RtspPreviewSessions,
 ): Promise<void> {
   const requestUrl = new URL(req.url ?? '/', `http://127.0.0.1:${bridgePort}`);
   setCorsHeaders(req, res);
@@ -50,16 +53,29 @@ async function handleBridgeRequest(
     res.writeHead(403).end('Forbidden');
     return;
   }
+  await routeBridgeRequest(requestUrl, res, bridgePort, previewSessions);
+}
+
+async function routeBridgeRequest(
+  requestUrl: URL,
+  res: ServerResponse,
+  bridgePort: number,
+  previewSessions: RtspPreviewSessions,
+): Promise<void> {
   if (requestUrl.pathname === '/health') {
     writeJson(res, { kind: 'ok', ffmpegAvailable: await hasFfmpeg(), frameProxy: true });
     return;
   }
   if (requestUrl.pathname === '/probe') {
-    await handleProbe(requestUrl, res, bridgePort);
+    await handleProbe(requestUrl, res, bridgePort, previewSessions);
     return;
   }
   if (requestUrl.pathname === '/stream.mjpg') {
-    await handleStream(requestUrl, res);
+    await handleStream(requestUrl, res, previewSessions);
+    return;
+  }
+  if (requestUrl.pathname === '/stream-status') {
+    writeJson(res, previewSessions.status(requestUrl.searchParams.get('session') ?? ''));
     return;
   }
   if (requestUrl.pathname === '/frame.jpg') {
@@ -77,6 +93,7 @@ async function handleProbe(
   requestUrl: URL,
   res: ServerResponse,
   bridgePort: number,
+  previewSessions: RtspPreviewSessions,
 ): Promise<void> {
   const policy = rtspCameraUrlPolicy(requestUrl.searchParams.get('url') ?? '');
   if (policy.kind !== 'ok') {
@@ -84,6 +101,11 @@ async function handleProbe(
     return;
   }
   const rtsp = await probeRtsp(policy.url);
+  const streamSessionId = previewSessions.create(policy.url.toString());
+  if (streamSessionId === null) {
+    writeJson(res, { kind: 'unavailable', reason: 'Too many active RTSP preview sessions.' }, 503);
+    return;
+  }
   writeJson(res, {
     kind: 'ok',
     url: policy.url.toString(),
@@ -91,25 +113,46 @@ async function handleProbe(
     ffmpegAvailable: await hasFfmpeg(),
     previewUrl: `http://127.0.0.1:${bridgePort}/stream.mjpg?url=${encodeURIComponent(
       policy.url.toString(),
-    )}`,
+    )}&session=${encodeURIComponent(streamSessionId)}`,
+    streamSessionId,
   });
 }
 
-async function handleStream(requestUrl: URL, res: ServerResponse): Promise<void> {
+async function handleStream(
+  requestUrl: URL,
+  res: ServerResponse,
+  previewSessions: RtspPreviewSessions,
+): Promise<void> {
   const policy = rtspCameraUrlPolicy(requestUrl.searchParams.get('url') ?? '');
   if (policy.kind !== 'ok') {
     writeJson(res, policy);
     return;
   }
+  const lifecycle = previewSessions.claim(
+    requestUrl.searchParams.get('session') ?? '',
+    policy.url.toString(),
+  );
+  if (lifecycle === null) {
+    writeJson(res, { kind: 'invalid', reason: 'RTSP preview session is missing or expired.' }, 409);
+    return;
+  }
   if (!(await hasFfmpeg())) {
-    writeJson(res, { kind: 'unavailable', reason: 'FFmpeg is not available on this computer.' });
+    const reason = 'FFmpeg is not available on this computer.';
+    lifecycle.markRejected(reason);
+    writeJson(res, { kind: 'unavailable', reason });
     return;
   }
   if (!hasFreeFfmpegSlot()) {
-    writeJson(res, { kind: 'unavailable', reason: 'Too many concurrent camera streams.' }, 503);
+    const reason = 'Too many concurrent camera streams.';
+    lifecycle.markRejected(reason);
+    writeJson(res, { kind: 'unavailable', reason }, 503);
     return;
   }
-  streamWithFfmpeg(policy.url, res);
+  streamWithFfmpeg(policy.url, res, {
+    onLive: lifecycle.markLive,
+    onFailure: lifecycle.markFailed,
+    onClosed: lifecycle.markClosed,
+  });
 }
 
 async function probeRtsp(url: URL): Promise<{ readonly codec?: string }> {

@@ -22,10 +22,15 @@ import {
   type CameraSourceActions,
   type CameraSourceState,
   type MachineCameraState,
+  type UsbCameraAvailability,
 } from './camera-source-actions';
 import { loadPreferredCameraId, savePreferredCameraId } from './camera-preference-storage';
 
-export type { CameraSourceState, MachineCameraState } from './camera-source-actions';
+export type {
+  CameraSourceState,
+  MachineCameraState,
+  UsbCameraAvailability,
+} from './camera-source-actions';
 
 export type CameraStore = CameraSourceActions & {
   // Camera panel visibility — floating, NON-modal like the registration jig
@@ -36,6 +41,11 @@ export type CameraStore = CameraSourceActions & {
   readonly selectedDeviceId: string | null;
   // The active source every camera consumer captures through (ADR-116).
   readonly sourceState: CameraSourceState;
+  // Temporary MediaStream mute is informational and never disables camera
+  // actions; terminal track end moves sourceState out of live instead.
+  readonly usbAvailability: UsbCameraAvailability;
+  // Store-owned listener cleanup/release for the exact active USB stream.
+  readonly usbSourceRelease: (() => void) | null;
   readonly alignment: AlignmentState;
   // Bumped on every stop/restart so an in-flight start that resolves late can
   // tell it has been superseded and release its now-orphaned stream.
@@ -106,6 +116,8 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   cameras: [],
   selectedDeviceId: null,
   sourceState: { kind: 'idle' },
+  usbAvailability: { kind: 'available' },
+  usbSourceRelease: null,
   alignment: { kind: 'idle' },
   sourceEpoch: 0,
   machineCamera: { kind: 'idle' },
