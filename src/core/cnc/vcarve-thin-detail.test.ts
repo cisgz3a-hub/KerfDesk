@@ -85,6 +85,29 @@ describe('vcarveThinDetailRings', () => {
     }
   });
 
+  it('detects a sub-pitch tail attached to an otherwise-rescued sliver', () => {
+    // A 0.5 mm band the fine ladder rings happily — with a 0.06 × 3 mm
+    // hairline tail hanging off its end that no fine ring can reach. The
+    // tail is real, visible artwork (0.18 mm²): the advisory must fire even
+    // though its parent sliver received rings.
+    const bandWithTail: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 6, y: 0 },
+        { x: 6, y: 0.22 },
+        { x: 9, y: 0.22 },
+        { x: 9, y: 0.28 },
+        { x: 6, y: 0.28 },
+        { x: 6, y: 0.5 },
+        { x: 0, y: 0.5 },
+      ],
+    };
+    const detail = vcarveThinDetailRings([bandWithTail], [], DELTA_MM);
+    expect(detail.rings.length).toBeGreaterThan(0);
+    expect(detail.residualThin).toBe(true);
+  });
+
   it('artwork below the fine pitch reports residualThin instead of vanishing silently', () => {
     // 0.06 mm band: even the 0.05 mm pitch cannot ring it, but at 10 mm long
     // it is real, visible artwork — the advisory must fire.
