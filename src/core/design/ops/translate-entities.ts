@@ -15,6 +15,7 @@ export function translateEntity(entity: SketchEntity, deltaMm: Vec2): SketchEnti
     case 'rect':
       return { ...entity, origin: shift(entity.origin) };
     case 'circle':
+    case 'ellipse':
     case 'arc':
       return { ...entity, center: shift(entity.center) };
     case 'line':

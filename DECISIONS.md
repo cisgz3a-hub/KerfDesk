@@ -13971,6 +13971,44 @@ otherwise fixed).
 4. **Precedence on open:** the in-memory stash first (this page's drawing), then
    the saved drawing, then blank.
 
+### Amendment 4 (2026-08-01) - Edge grips stretch one axis, and the model gains an ellipse (DS-8g)
+
+The selection carried four corner grips, all of them uniform scales, because a
+per-axis stretch had nowhere to put its result: `SketchCircle` holds a single
+radius, so widening a circle would have deformed it into something the model
+could not represent. The layered carve the Studio exists for is built from
+nested rectangles, and "make this one 20 mm wider without making it taller" had
+no gesture at all — only two typed numbers in the inspector.
+
+1. **Four edge grips join the four corner grips.** A corner grip scales
+   uniformly, exactly as before; an edge grip stretches its own axis and reports
+   a factor of exactly `1` on the other, so the held dimension is untouched by
+   rounding as well as by intent. An edge grip is omitted only when its own axis
+   has no extent, where the factor is a division by zero rather than a resize.
+2. **`SketchEllipse` joins the entity union**, axis-aligned, with independent
+   radii. It exists to hold what a stretched circle becomes. A circle is NOT
+   re-expressed as an equal-axis ellipse: a circle drawn as a circle keeps its
+   radius, its diameter field, and its exact arcs.
+3. **Per-axis exactness is stated per kind, not assumed.** Rectangles with
+   square corners, lines, paths, circles-to-ellipses, and ellipses are exact. A
+   rounded rectangle's corner radius follows the SMALLER factor — a true stretch
+   makes the corners elliptical, which `RectangleSpec` cannot hold, and the
+   smaller factor keeps the fillet inside the shorter side while agreeing with
+   the uniform case when the factors are equal. An arc is BAKED to a path at the
+   sampled tolerance, because a stretched arc is an elliptical arc, which
+   neither this model nor `G2`/`G3` can express; the sampled polyline is the
+   honest form rather than an arc of a radius the operator never asked for.
+4. **`stretchEntities` is a separate operation from `scaleEntities`**, and
+   delegates to it whenever the two factors are equal. The two have different
+   exactness rules, and one function hiding that difference is how a precision
+   tool starts lying — in particular, a corner grip must never quietly bake an
+   arc.
+5. **The scene needed no change.** An ellipse materializes through the existing
+   `EllipseSpec` carrier that a circle already used, so the applied part stays
+   re-editable on the main canvas and `.lf2` gains no new shape.
+6. There is deliberately **no ellipse drawing tool**. The arm exists to make the
+   stretch honest; a tool for it is separable work.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01
