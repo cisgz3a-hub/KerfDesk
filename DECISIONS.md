@@ -14483,3 +14483,101 @@ therefore do not establish center-cutting geometry, flute clearance, ramp angle,
 - Source record: `docs/audits/2026-08-01-cnc-vcarve-ramp-entry-acceptance.md`.
 - NOT verified: exact-cutter ramp capability, loaded-cut position retention, chip evacuation,
   workholding, tool temperature, surface finish, or finished V-groove dimensions.
+
+## ADR-279 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The V-carve ring ladder (ADR-098) inward-offsets the source at pitch δ (auto = diameter/8,
+floor 0.1 mm). Any sub-region narrower than 2δ vanishes before the first ring exists, so with
+the default 3.175 mm 90° bit anything under ~0.79 mm silently dropped from the carve while the
+rest of the glyph cut — the toolpath looked finished. Field case (2026-08-01): a script-font
+"Drive" V-carve cut only in sections; the thin connectors and stroke tails never received a
+single cut, and the operator read the gaps as a broken bit.
+
+Every surveyed reference tool carves thin strokes shallow instead of dropping them: Vectric
+V-Carve computes depth purely from local vector width and tool angle (docs.vectric.com V12
+VCarve Toolpath Creator); Carbide Create v8's perimeter engine and Easel Pro's fill v-carve do
+the same (carbide3d.com/blog/create-v8, Easel article 360012848873 — "carve deeper on thicker
+parts … and shallower in thinner areas"); F-Engrave cuts depth = inscribed-circle radius /
+tan(θ/2) and drops only features below its explicit "V-Carve Loop Accuracy"
+(scorchworks.com/Fengrave/f-engrave_calculations.htm, change log v1.30). Dropping thin regions
+is straight-bit behavior — Easel forums tell users to escape it by switching to a v-bit. The
+drop was a fidelity bug against the whole reference field, not a design choice.
+
+### Decision
+
+1. Coverage law: the material the δ ladder actually reaches is its first ring grown back out
+   by δ with round joins — the bit's cone footprint is a disc — i.e. the morphological opening
+   of the source. Everything the opening misses is "thin detail": strokes narrower than 2δ and
+   the sharp-corner wedges the miter limit bevels away (a disc cannot reach a mitered corner
+   tip).
+2. A new stage, `src/core/cnc/vcarve-thin-detail.ts`, computes
+   uncovered = source − (ring₁ ⊕ (δ + 0.002 mm rounding slack)) and walks a second offset
+   ladder over exactly those slivers at the fixed fine pitch `THIN_DETAIL_RESOLUTION_MM`
+   = 0.05 mm (half the ladder's 0.1 mm floor). Same depth law (inset / tan(θ/2)), same
+   maxDepth and cone-height clamps, same per-pass splitting. Always on; deliberately not a
+   setting — it is a fidelity floor, not a speed/quality trade.
+3. Ordering: `vcarveRegionBuckets` (vcarve-region-order.ts) keeps the ADR-270 region grouping
+   per bucket, and the ladder zips δ-ring buckets with detail buckets so a region finishes its
+   rings, then its detail, before the cutter travels on. Wide-only artwork produces no slivers
+   and byte-identical G-code.
+4. Depth reference caveat: detail depths measure the inset from the SLIVER boundary. Along a
+   stroke's sides that is the artwork edge (exact); across the artificial junction where a
+   sliver meets ladder-covered material the groove is under-cut for about one δ of travel —
+   always shallower than true, never a gouge. Accepted for v1 and documented in the module
+   header.
+5. Residual reporting: a visible sliver (≥ 0.01 mm² area floor) that even the fine pitch
+   cannot ring sets `thinResidual` on the ladder result; a new advisory diagnostic kind
+   `'thin-detail-dropped'` renders a layer-named Job Review / Save warning naming the 0.1 mm
+   limit and the remedy. Advisory only — informs, never refuses (rule 7). Engine failures in
+   the new stage fold into the existing `offsetFailed` advisory, and a failed δ ladder skips
+   the detail stage entirely (its coverage is unknowable — detail against it would re-carve
+   everything at fine pitch).
+6. New geometry leaves, both deep-imported because the geometry barrel sits at its 20-export
+   cap and the cnc barrel is ratcheted: `polygon-difference.ts`
+   (`differenceClosedPolylinesChecked`, raw-Polyline even-odd difference with the
+   engine-failure/empty distinction) and `offsetClosedPolylinesWithRoundJoinsChecked` in
+   kerf-offset.ts.
+7. Interaction with ADR-278 (opt-in contour ramp entry): detail rings are ordinary
+   `VCarveRing`s and flow through the same shared entry planner. With no ramp configured the
+   legacy stepped entry applies to both ring kinds; with a ramp configured, a detail ring the
+   planner cannot represent falls the layer back to the legacy stepped entry with ADR-278's
+   existing advisory — the same degradation ADR-278 defined.
+
+### Consequences
+
+- Script and lettering V-carve jobs cut the full word: thin strokes get the shallow centerline
+  groove their width asks for, matching Vectric / F-Engrave semantics. The removal-grid depth
+  field inside a 0.6 mm stroke now tracks the analytic groove within 0.15 mm.
+- Sharp convex corners gain shallow corner-wedge detail passes (closer to true V-carve
+  corners). Square-fixture outputs gain a few −0.05 mm passes where δ ≥ ~0.5 mm, so some
+  structure-pinned v-carve tests changed once; the existing single-square perceptual G-code
+  snapshot is byte-identical (δ = 0.25 leaves corner wedges below the fine pitch).
+- Compile cost per v-carve layer: one round offset, one boolean difference, and at most
+  ~δ/0.05 fine insets over sliver geometry only, ring-capped at 8192 like the main ladder.
+
+### Verification
+
+- `vcarve-thin-detail.test.ts`: thin band → centerline rings bounded by half-width; partial
+  collapse rescues only the tail; hairline artwork sets residualThin; rounding dust does not;
+  deterministic across runs.
+- `vcarve-ladder.test.ts`: a 0.5 mm stroke that previously produced zero passes now carves
+  (test was red before the fix); detail passes respect maxDepth; region-major order holds
+  across mixed thick/thin regions; 100-seed property — detail passes never cut deeper than the
+  band half-width; the reorder-completeness reconstruction now includes detail rings.
+- `polygon-difference.test.ts`: covering/partial/empty clips and even-odd annulus semantics.
+- `vcarve-thin-perceptual.test.ts` (ADR-025 pattern): REAL pipeline (compileCncJob →
+  buildToolpath → removal grid) against the analytic groove — ≥ 90 % coverage and ≤ 0.15 mm
+  depth error inside a 0.6 mm stroke and inside the thin tail of a thick-body glyph; both were
+  0 % coverage before this ADR. Deterministic G-code snapshot pinned.
+- `cnc-offset-ladder-warnings.test.ts`: the thin-detail advisory is layer-named, mentions the
+  0.1 mm limit, and remains a plain string (no refusal channel).
+- Visual artifact: a script-word fixture (thick glyph + 0.55 mm sine flourish + 0.7 mm dot,
+  the user's 3.175 mm 90° bit, auto resolution) rendered through the removal grid reaches
+  99.7 % coverage with the detail grooves tracking the analytic field.
+- NOT verified: a physical cut (no hardware available), and the junction under-cut blend is
+  bounded analytically but has not been rendered on hardware.
