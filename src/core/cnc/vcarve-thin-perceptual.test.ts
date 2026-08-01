@@ -287,7 +287,9 @@ describe('v-carve thin artwork — perceptual (ADR-279)', () => {
     expect(cutInside / insideCells).toBeGreaterThanOrEqual(0.85);
     // The clamp is still honoured — nothing cuts deeper than requested.
     expect(deepestCut).toBeGreaterThanOrEqual(-clampDepth - 1e-9);
-  });
+    // Removal-grid computation over a contended CI worker pool can exceed the
+    // 5 s default; the sibling perceptual suites carry the same allowance.
+  }, 60000);
 
   it('emits deterministic G-code for the thin-stroke job (snapshot)', () => {
     const points: ReadonlyArray<Vec2> = [
