@@ -93,7 +93,9 @@ describe('compileCncJob pocket strategies', () => {
     const rest = job.groups[1];
     if (rough?.kind !== 'cnc' || rest?.kind !== 'cnc') throw new Error('expected CNC groups');
     expect(rough.toolId).toBe('em-6350');
+    expect(rough.layerPrimaryToolId).toBe('em-1588');
     expect(rest.toolId).toBe('em-1588');
+    expect(rest.layerPrimaryToolId).toBe('em-1588');
     expect(rough.passes.length).toBeGreaterThan(rest.passes.length);
     expect(rest.passes.length).toBeGreaterThan(0);
     const gcode = cncGrblStrategy.emit(job, dev);

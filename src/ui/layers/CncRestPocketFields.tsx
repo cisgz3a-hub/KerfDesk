@@ -1,7 +1,9 @@
 import { activeCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
+import { CNC_SECONDARY_RETAINED_FEEDS_WARNING } from '../common/cnc-bit-change-advisory';
 import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
 import { CncToolOptions } from '../machine/CncToolOptions';
 import { useStore } from '../state';
+import { useToastStore } from '../state/toast-store';
 import { Row } from './CncLayerPrimitives';
 import { useCncTools } from './CncLayerToolFields';
 
@@ -12,6 +14,7 @@ export function RestPocketToolSelect(props: {
 }): JSX.Element {
   const tools = useCncTools();
   const machine = useStore((state) => state.project.machine);
+  const pushToast = useToastStore((state) => state.pushToast);
   const currentTool =
     tools.find((tool) => tool.id === props.settings.toolId) ??
     (machine?.kind === 'cnc' ? activeCncTool(machine) : tools[0]);
@@ -31,7 +34,12 @@ export function RestPocketToolSelect(props: {
     <Row label="Rough first">
       <select
         value={props.settings.pocketRoughToolId ?? ''}
-        onChange={(event) => commitRoughingTool(event.target.value, props)}
+        onChange={(event) => {
+          commitRoughingTool(event.target.value, props);
+          if (event.target.value !== '' && event.target.value !== currentTool?.id) {
+            pushToast(CNC_SECONDARY_RETAINED_FEEDS_WARNING, 'warning');
+          }
+        }}
         aria-label={`Pocket roughing bit for ${props.layer.color}`}
         title="Clear the bulk with a larger end mill, then use this layer's bit only on stock the rougher could not reach."
         style={selectStyle}

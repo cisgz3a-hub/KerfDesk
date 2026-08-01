@@ -2450,9 +2450,11 @@ F-CNC19 tiling.
    spin-up dwell, safe-Z discipline, per-layer comment headers, M5 + park
    postamble.
 4. Each CNC operation's short comment block records the selected tool id/name,
-   stored kind/diameter/angle, requested depth and depth/pass, V-carve
+   stored kind/diameter/angle/flute count, applicable requested depth and depth/pass, V-carve
    resolution where relevant, effective feed/plunge/RPM, and automatic feed
-   source. Dynamic labels are flattened into one inert comment line. Export
+   source. A secondary-cutter group also records the layer's current primary
+   cutter; it does not claim which cutter historically produced manual or starter values. Dynamic
+   labels are flattened into one inert comment line. Export
    metadata also records the selected machine-profile identity for ordinary,
    tiled, and standalone CNC files.
 
@@ -2920,6 +2922,20 @@ and lifts the command's CNC-only gate.)*
    spindle RPM, and depth-per-pass values. A warning names that retention and
    asks the operator to verify the numbers for the newly selected cutter.
    Material-recipe settings are recalculated for the new cutter instead.
+
+#### Edge — secondary cutter shares primary layer values
+1. V-carve clearing, non-adaptive pocket roughing, and relief finishing choose
+   secondary geometry but do not own a second set of cutting values. Selecting
+   one warns that feed, plunge, and spindle RPM remain the layer's shared values
+   associated with the current primary cutter. V-carve clearing and pocket roughing also
+   retain depth/pass; relief finishing follows the surface and scallop setting
+   instead. The warning appears in both the main layer controls and Design
+   Studio's V-carve Clear selector.
+2. The exact ordinary or tiled artifact repeats that warning with the emitted
+   values. Its comments identify both the selected secondary cutter (including
+   stored flute count when known) and the layer's current primary cutter that
+   shares those values. The warning is advisory and does not alter motion or add a policy
+   gate; the operator must verify the shared values before cutting.
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 

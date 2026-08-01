@@ -12,6 +12,12 @@ import {
 export const CNC_RETAINED_FEEDS_WARNING =
   'Bit changed. Feed, plunge, spindle RPM, and depth/pass were kept. Verify them for the selected bit before cutting.';
 
+export const CNC_SECONDARY_RETAINED_FEEDS_WARNING =
+  "Secondary bit selected. This layer's feed, plunge, spindle RPM, and depth/pass are shared with the primary bit. Verify them for the secondary bit before cutting.";
+
+export const CNC_SECONDARY_RETAINED_RELIEF_FEEDS_WARNING =
+  "Secondary finishing bit selected. This layer's feed, plunge, and spindle RPM are shared with the primary bit. Relief finishing follows the surface and scallop setting, not depth/pass. Verify the shared values for the finishing bit before cutting.";
+
 /**
  * True when at least one operation follows the machine's Active bit while its
  * numeric cutting values remain manual/unscoped. A stale explicit id also

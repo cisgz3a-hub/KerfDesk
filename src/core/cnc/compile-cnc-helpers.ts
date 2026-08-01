@@ -1,5 +1,11 @@
 import type { CncPass } from '../job';
-import type { CncCutType, CncLayerSettings, Polyline, Vec2 } from '../scene';
+import type { CncCutType, CncLayerSettings, CncTool, Polyline, Vec2 } from '../scene';
+
+export type CncGroupCompileOptions = {
+  readonly layerPrimaryTool?: CncTool;
+  readonly includeRampEntry?: boolean;
+  readonly retractBetweenPasses?: boolean;
+};
 
 const MIN_FEED_MM_PER_MIN = 1;
 const COORD_EPS = 1e-9;

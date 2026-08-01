@@ -14061,12 +14061,26 @@ a sendable command rather than a comment.
    `feedSource` may change comments but cannot change emitted motion. The in-app streamer continues
    to strip comments before sending, and no Start, Frame, controller, or machine-policy gate changes.
 5. Tool labels in both the initial-load and mid-job tool-change comments use the same one-line
-   sanitizer. Emitter revision advances to `adr-273-cnc-incident-provenance-v1`.
+   sanitizer.
+6. A secondary V-carve clearing, rest-pocket roughing, or relief-finishing cutter continues to use
+   the layer's shared feed, plunge, and spindle RPM. V-carve clearing and rest-pocket roughing also
+   share depth per pass; relief finishing follows the sampled surface and scallop setting and does
+   not claim that value. The compiler records the layer's current primary cutter separately from
+   the secondary cutter that runs the group; it does not claim which cutter historically produced
+   manual or starter values. Every selector, including Design
+   Studio's V-carve Clear selector, and the exact ordinary/tiled artifact warn the operator to verify
+   those retained values; this advisory does not become a new ordinary Start or Save refusal.
+7. Each compiled group records the selected cutter's stored flute count when known. This is distinct
+   from a material recipe's calculation flute count, which describes the assumption behind the
+   retained numeric values. After ADR-278's V-carve contour ramp, the combined emitter revision
+   advances to `adr-278-vcarve-contour-ramp-secondary-settings-v2`.
 
 ### Consequences
 
 - A saved CNC file can now distinguish a 3 mm 90-degree custom V-bit from a diameter-only tool and
-  can reconstruct the relevant requested/effective setup without the live project.
+  can reconstruct the relevant requested/effective setup without the live project. It can also
+  distinguish the selected cutter's stored flute count from the recipe assumption and identify a
+  secondary group that uses shared layer values associated with the current primary cutter.
 - Newline-bearing imported labels remain inert comments instead of creating controller commands.
 - Motion commands and their order are unchanged. Raw comment-line counts and pass-span line numbers
   advance together when the exact artifact is emitted, so recovery continues to use matching spans.
@@ -14082,6 +14096,8 @@ a sendable command rather than a comment.
   newline labels as commands, exercises initial and mid-job tool comments, and caps CNC comment size.
 - Ordinary, tiled, and standalone export tests pin profile identity; metadata tests pin control-byte
   sanitization and the new emitter revision.
+- Compiler tests cover every secondary-cutter role; ordinary and tiled export tests pin the
+  retained-value advisory, and selector tests pin the immediate warning.
 - Automated tests and an air cut do not verify cutting-load position retention or finished geometry.
 
 ## ADR-274 - V-bit geometry is explicit before a contributing V-carve can compile (2026-08-01)

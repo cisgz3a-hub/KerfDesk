@@ -81,21 +81,23 @@ async function render(
 
 async function renderClearToolSelect(
   settings: CncLayerSettings = DEFAULT_CNC_LAYER_SETTINGS,
-): Promise<{ host: HTMLDivElement; root: Root }> {
+): Promise<{ host: HTMLDivElement; root: Root; onCommit: ReturnType<typeof vi.fn> }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
+  const onCommit = vi.fn();
+  const onCommitSettings = vi.fn();
   await act(async () => {
     root.render(
       <VClearToolSelect
         layer={LAYER}
         settings={settings}
-        onCommit={vi.fn()}
-        onCommitSettings={vi.fn()}
+        onCommit={onCommit}
+        onCommitSettings={onCommitSettings}
       />,
     );
   });
-  return { host, root };
+  return { host, root, onCommit };
 }
 
 function selectBit(host: HTMLElement, value: string): void {
@@ -362,6 +364,26 @@ describe('LayerBitSelect', () => {
 });
 
 describe('VClearToolSelect', () => {
+  it('warns that a secondary clearing bit retains the layer cutting values', async () => {
+    installCnc();
+    const { host, root, onCommit } = await renderClearToolSelect({
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'v-carve',
+      toolId: 'vb-90',
+    });
+    try {
+      await act(async () => selectBit(host, 'em-3175'));
+      expect(onCommit).toHaveBeenCalledWith({ vClearToolId: 'em-3175' });
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'warning',
+        message: expect.stringMatching(/secondary.*feed.*plunge.*RPM.*depth\/pass.*verify/i),
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('offers only flat end mills for flat-floor clearing', async () => {
     installCnc();
     const { host, root } = await renderClearToolSelect();

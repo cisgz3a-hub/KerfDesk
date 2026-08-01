@@ -78,6 +78,7 @@ export function DesignLayersCard(props: {
         <DesignLayerSettings
           layer={active}
           tools={props.tools}
+          activeTool={props.activeTool}
           stockThicknessMm={props.stockThicknessMm}
           onPatch={(patch) => patchLayer(active.id, patch)}
         />

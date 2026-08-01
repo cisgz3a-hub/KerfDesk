@@ -75,6 +75,9 @@ export type PreflightCode =
   | 'relief-needs-cnc'
   | 'non-finite-coordinate'
   | 'cnc-tool-geometry-invalid'
+  // Advisory-only: secondary CNC cutters share values established for the
+  // layer's primary cutter and require explicit operator verification.
+  | 'cnc-secondary-tool-feed-retained'
   // ADR-127: image engraves are refused while the rotary is enabled (v1).
   | 'rotary-raster-unsupported'
   | 'empty-output';

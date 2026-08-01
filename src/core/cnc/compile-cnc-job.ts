@@ -31,6 +31,7 @@ import {
   contourPassFromPolyline,
   isProfileCutType,
   resolveRetractBetweenPasses,
+  type CncGroupCompileOptions,
 } from './compile-cnc-helpers';
 import { orderInnerFirst } from './profile-ordering';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
@@ -160,7 +161,10 @@ function restPocketRoughingGroupForLayer(
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
   let passes: ReadonlyArray<CncPass> = depthMajorPasses(operation.roughToolpaths, depths);
   if (settings.rampEntryDeg !== undefined) passes = applyRampEntry(passes, settings.rampEntryDeg);
-  return cncGroupForPasses(layer, settings, operation.roughTool, passes, device, config);
+  const primaryTool = layerCncTool(config, settings);
+  return cncGroupForPasses(layer, settings, operation.roughTool, passes, device, config, {
+    layerPrimaryTool: primaryTool,
+  });
 }
 
 function cncGroupForPasses(
@@ -170,6 +174,7 @@ function cncGroupForPasses(
   passes: ReadonlyArray<CncPass>,
   device: DeviceProfile,
   config: CncMachineConfig,
+  options: CncGroupCompileOptions = {},
 ): CncGroup | null {
   if (passes.length === 0) return null;
   const cutFeed =
@@ -184,7 +189,7 @@ function cncGroupForPasses(
     toolId: tool.id,
     toolName: tool.name,
     toolDiameterMm: tool.diameterMm,
-    ...cncGroupProvenance(settings, tool),
+    ...cncGroupProvenance(settings, tool, options),
     feedMmPerMin: capFeed(cutFeed, device.maxFeed),
     plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
@@ -192,7 +197,7 @@ function cncGroupForPasses(
     ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
-    retractBetweenPasses: resolveRetractBetweenPasses(settings),
+    retractBetweenPasses: options.retractBetweenPasses ?? resolveRetractBetweenPasses(settings),
     passes,
   };
 }
@@ -218,29 +223,16 @@ export function vcarveClearanceGroupForLayer(
   });
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
   if (toolpaths.length === 0 || depths.length === 0) return null;
-  return {
-    kind: 'cnc',
-    layerId: layer.id,
-    color: layer.color,
-    cutType: 'pocket',
-    toolId: clearTool.id,
-    toolName: clearTool.name,
-    toolDiameterMm: clearTool.diameterMm,
-    ...cncGroupProvenance(settings, clearTool, {
-      includeVResolution: false,
-      includeRampEntry: false,
-    }),
-    feedMmPerMin: capFeed(settings.feedMmPerMin, device.maxFeed),
-    plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
-    spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
-    spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
-    ...coolantFields(config),
-    safeZMm: Math.max(0, config.params.safeZMm),
-    ...parkFields(config),
-    // A pocket already retracts between its regions; nothing to force here.
-    retractBetweenPasses: false,
-    passes: depthMajorPasses(toolpaths, depths),
-  };
+  const clearingSettings: CncLayerSettings = { ...settings, cutType: 'pocket' };
+  return cncGroupForPasses(
+    layer,
+    clearingSettings,
+    clearTool,
+    depthMajorPasses(toolpaths, depths),
+    device,
+    config,
+    { layerPrimaryTool: vBit, includeRampEntry: false, retractBetweenPasses: false },
+  );
 }
 
 function passesForLayer(

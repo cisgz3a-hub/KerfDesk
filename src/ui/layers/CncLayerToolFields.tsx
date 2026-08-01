@@ -4,15 +4,21 @@
 // Split from CncLayerFields.tsx, which sits near the file-size cap.
 
 import {
+  layerCncTool,
   sceneObjectUsesOperation,
   type CncLayerSettings,
   type CncTool,
   type Layer,
 } from '../../core/scene';
+import {
+  CNC_SECONDARY_RETAINED_FEEDS_WARNING,
+  CNC_SECONDARY_RETAINED_RELIEF_FEEDS_WARNING,
+} from '../common/cnc-bit-change-advisory';
 import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { CncToolOptions } from '../machine/CncToolOptions';
 import { useStore } from '../state';
+import { useToastStore } from '../state/toast-store';
 import { useCncTools } from './CncLayerBitSelect';
 
 export { LayerBitSelect } from './CncLayerBitSelect';
@@ -36,6 +42,10 @@ export function VClearToolSelect(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const tools = useCncTools();
+  const machine = useStore((state) => state.project.machine);
+  const pushToast = useToastStore((state) => state.pushToast);
+  const primaryToolId =
+    machine?.kind === 'cnc' ? layerCncTool(machine, props.settings).id : undefined;
   // Floor clearing emits ordinary constant-Z pocket passes. Only the flat
   // end-mill kernel can truthfully leave that floor; ball/core-box tools and
   // legacy engraving geometry must not be offered here.
@@ -56,6 +66,9 @@ export function VClearToolSelect(props: {
             props.onCommitSettings(rest);
           } else {
             props.onCommit({ vClearToolId: e.target.value });
+            if (e.target.value !== primaryToolId) {
+              pushToast(CNC_SECONDARY_RETAINED_FEEDS_WARNING, 'warning');
+            }
           }
         }}
         aria-label={`Clearing bit for ${props.layer.color}`}
@@ -115,6 +128,10 @@ function ReliefFinishRow(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const tools = useCncTools();
+  const machine = useStore((state) => state.project.machine);
+  const pushToast = useToastStore((state) => state.pushToast);
+  const primaryToolId =
+    machine?.kind === 'cnc' ? layerCncTool(machine, props.settings).id : undefined;
   const unavailableFinishToolId =
     props.settings.reliefFinishToolId !== undefined &&
     !tools.some((tool) => tool.id === props.settings.reliefFinishToolId)
@@ -130,6 +147,9 @@ function ReliefFinishRow(props: {
             props.onCommitSettings(rest);
           } else {
             props.onCommit({ reliefFinishToolId: e.target.value });
+            if (e.target.value !== primaryToolId) {
+              pushToast(CNC_SECONDARY_RETAINED_RELIEF_FEEDS_WARNING, 'warning');
+            }
           }
         }}
         aria-label={`Relief finishing bit for ${props.layer.color}`}
