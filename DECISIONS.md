@@ -91,7 +91,7 @@
 | ADR-108 | 2026-06-28 | Accepted | Camera Mode v2: fisheye lens calibration + de-fisheye render |
 | ADR-109 | 2026-07-03 | Accepted | Camera Mode v3: automatic marker alignment (no-click homography) |
 | ADR-110 | 2026-07-03 | Accepted | Camera Mode v4: capture-to-trace at true bed coordinates |
-| ADR-111 | — | accepted (maintainer directive after a real 4040 cut wand... | CNC beginner-mode UX pack: material picker, machine auto-fill, limit advisories, Basic/Advanced disclosure (Phase H.13, 2026-07-04) |
+| ADR-111 | — | accepted; decision #4 amended by maintainer directive 2026-08-01 | CNC usability pack: material picker, machine auto-fill, limit advisories, always-visible Advanced section (Phase H.13, 2026-07-04) |
 | ADR-112 | — | accepted (maintainer follow-up to ADR-111: on the live ap... | Project-level CNC material picker: set material once for the job (Phase H.14, 2026-07-04) |
 | ADR-113 | — | accepted (maintainer-directed follow-up to the trace-fide... | Region-enhance re-trace (dialog boundary mode) (Trace fidelity, 2026-07-05) |
 | ADR-114 | — | Amended by ADR-120 (restrictive EULA terms superseded); notice scope amended by ADR-248 | Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05) |
@@ -5296,6 +5296,10 @@ auto-fill feeds from a material, hide advanced fields, and pull limits from
 the controller. This pack adds those affordances without removing any pro
 control.
 
+**2026-08-01 maintainer amendment:** Decision #4's disclosure is superseded.
+The labeled Advanced section is always visible; there is no checkbox and no
+persisted Basic/Advanced state. Decisions #1, #3a, and #3b remain unchanged.
+
 ### Decisions
 
 - **#1 Material picker (layer card).** A "Material" select
@@ -5306,14 +5310,14 @@ control.
   keeps full flute/RPM control. `CncLayerSettings.materialKey?: string`
   records the choice (display/round-trip only — absent = manual "Custom",
   byte-identical output); normalize validates it against the material set.
-- **#4 Basic/Advanced disclosure.** A persisted `showCncAdvanced` flag
-  (localStorage; default **Basic = false**) gates the advanced field group
-  (feeds, stepover, pocket fill, cut-type tails). Basic keeps Material, Cut
-  type, Bit, Cut depth, Tabs. A one-click **Through cut (= N mm)** button
-  sets cut depth to the stock thickness — disambiguating the
-  cut-depth-vs-stock-thickness pair. The two "Spindle" fields are
-  relabelled: the machine's "Spindle max" is the RPM ceiling (GRBL $30);
-  the layer's "Spindle" is that layer's running speed.
+- **#4 Always-visible Advanced section (amended 2026-08-01).** Core cut
+  parameters lead the card, followed by a labeled Advanced section containing
+  feeds helpers, stepover, pocket fill, and cut-type tails. No disclosure or
+  persisted visibility flag remains. A one-click **Through cut (= N mm)**
+  button sets cut depth to the stock thickness — disambiguating the
+  cut-depth-vs-stock-thickness pair. The two "Spindle" fields are relabelled:
+  the machine's "Spindle max" is the RPM ceiling (GRBL $30); the layer's
+  "Spindle" is that layer's running speed.
 - **#3a Machine auto-fill.** An opt-in "Machine reports …" banner on the
   Material & Bit card, shown only when the connected controller's detected
   `$$` values differ. Apply writes spindle max ($30 → `params.spindleMaxRpm`)
@@ -5341,9 +5345,10 @@ already has one; fields stay mm).
 
 Unit tests (material-apply + normalize round-trip; through-cut helper;
 detected-apply thresholds; limit-advisory thresholds) and jsdom component
-tests (material pick fills feeds; Basic hides advanced; detected Apply
+tests (material pick fills feeds; the original Basic mode hid Advanced; detected Apply
 patches params + device, leaves stock untouched). Full gate per commit.
-Perceptual pass in an isolated preview: Basic/Advanced toggle, material
+The original perceptual pass covered the Basic/Advanced toggle; the 2026-08-01
+amendment replaces it with an always-visible section. Material
 pick fills safe numbers (not 1000/1.5), injected `controllerSettings` shows
 the Apply banner + stock/feed advisories. Defaults improve, but the
 physical cut stays CLAIMED per ADR-098 §3 — the operator owns clamping,
@@ -8005,6 +8010,10 @@ multi-sender machines still require a sole gateway or machine interlock.
 
 **Status:** Accepted | **Date:** 2026-07-14
 
+**2026-08-01 maintainer amendment:** The in-card Advanced section remains
+labeled and narrow-panel safe but is now always visible. The Basic/Advanced
+visibility distinction and persisted disclosure state are removed.
+
 ### Context
 
 The guided setup reducer was safe and draft-only, but every project traversed the same seven-step
@@ -8393,8 +8402,8 @@ the four core machining values visible.
 
 - Lead each CNC layer card with Material. Manual mode visibly tells the operator to verify the values;
   calculated values are described as starting points, never universally safe settings.
-- Keep Depth per pass, Feed, Plunge, and Spindle visible in Basic. Advanced is an in-card labelled
-  section for helpers and specialist controls, not a claim that the core machining values disappear.
+- Keep Depth per pass, Feed, Plunge, and Spindle ahead of Advanced. Advanced is an always-visible,
+  in-card labelled section for helpers and specialist controls.
 - Rename the exact-depth shortcut to **Set to stock thickness**. It adds no hidden overcut; cutting
   below measured stock remains an explicit, setup-specific operator decision.
 - Split feed-preset application and creation into separate responsive rows. Empty libraries say so,

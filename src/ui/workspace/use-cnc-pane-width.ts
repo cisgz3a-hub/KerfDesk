@@ -1,9 +1,8 @@
 // useCncPaneWidth — drives the drag-resizable width of the CNC 3D result pane
 // (Cnc3DPane, ADR-191). The handle sits on the pane's LEFT edge (the border
 // with the flexible canvas), so dragging left widens the pane and dragging
-// right narrows it. The chosen width persists in localStorage — like the CNC
-// Basic/Advanced disclosure (ADR-111) — so it survives reloads; storage access
-// is guarded so non-browser test/SSR contexts stay safe.
+// right narrows it. The chosen width persists in localStorage so it survives
+// reloads; storage access is guarded so non-browser test/SSR contexts stay safe.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 

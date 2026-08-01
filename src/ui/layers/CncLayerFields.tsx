@@ -4,10 +4,9 @@
 // setLayerParam action as a whole `cnc` patch, so undo/dirty tracking and
 // .lf2 persistence come for free.
 //
-// Basic fields (material, cut type, bit, cut depth, depth-per-pass, feed,
-// plunge, spindle, tabs) are always shown — the core numbers every cut needs;
-// the advanced field set (feeds preset + calculator, stepover, pocket fill,
-// cut-type tails) is gated behind the ui-store Basic/Advanced toggle (ADR-111).
+// Core fields (material, cut type, bit, cut depth, depth-per-pass, feed,
+// plunge, spindle, tabs) lead the card. The always-visible Advanced section
+// follows with feed helpers, stepover, pocket fill, and cut-type tails.
 // Shared row/input controls live in CncLayerPrimitives; the advanced group in
 // CncLayerAdvancedFields.
 
@@ -20,7 +19,6 @@ import {
   type Layer,
 } from '../../core/scene';
 import { useStore } from '../state';
-import { useUiStore } from '../state/ui-store';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
 import { CncCoreCutFields, CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
 import { CncLineArtContoursField } from './CncLineArtContoursField';
@@ -28,7 +26,6 @@ import { CncRetractPassesField } from './CncRetractPassesField';
 import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
 import { CncMaterialRow } from './CncMaterialRow';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
-import { CncAdvancedToggle } from './CncAdvancedToggle';
 
 export function CncLayerFields(props: {
   readonly layer: Layer;
@@ -38,7 +35,6 @@ export function CncLayerFields(props: {
   const setLayerParam = useStore((s) => s.setLayerParam);
   const maxFeed = useStore((s) => s.project.device.maxFeed);
   const machine = useStore((s) => s.project.machine);
-  const showAdvanced = useUiStore((s) => s.showCncAdvanced);
   const hasReliefObjects = useLayerHasReliefObjects(layer);
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   const isCnc = machine?.kind === 'cnc';
@@ -97,16 +93,13 @@ export function CncLayerFields(props: {
       />
       {isProfile ? <TabFields layer={layer} settings={settings} onCommit={commit} /> : null}
       <CncRetractPassesField layer={layer} settings={settings} onCommit={commit} />
-      <CncAdvancedToggle />
-      {showAdvanced ? (
-        <CncLayerAdvancedGroup
-          layer={layer}
-          settings={settings}
-          hasReliefObjects={hasReliefObjects}
-          onCommit={commit}
-          onCommitSettings={commitSettings}
-        />
-      ) : null}
+      <CncLayerAdvancedGroup
+        layer={layer}
+        settings={settings}
+        hasReliefObjects={hasReliefObjects}
+        onCommit={commit}
+        onCommitSettings={commitSettings}
+      />
     </>
   );
 }
