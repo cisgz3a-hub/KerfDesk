@@ -4,6 +4,7 @@ import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
 import { vcarveLadderPasses, vcarvePasses, vcarveResolutionMm } from './vcarve-ladder';
+import { THIN_DETAIL_RESOLUTION_MM, vcarveThinDetailRings } from './vcarve-thin-detail';
 
 const VBIT_90: CncTool = {
   id: 'v90',
@@ -51,9 +52,11 @@ describe('vcarvePasses', () => {
       depthPerPassMm: 10,
       resolutionMm: 0.5,
     });
-    const depths = [...new Set(contourDepths(passes))].sort((a, b) => b - a);
-    expect(depths[0]).toBeCloseTo(-0.5, 9);
-    expect(depths[1]).toBeCloseTo(-1.0, 9);
+    const depths = contourDepths(passes);
+    // Rings 1 and 2 of the δ ladder (corner-detail passes from ADR-279 may
+    // sit shallower — they follow the same law at the fine pitch).
+    expect(depths.some((z) => Math.abs(z + 0.5) < 1e-9)).toBe(true);
+    expect(depths.some((z) => Math.abs(z + 1.0) < 1e-9)).toBe(true);
     // The 6 mm 90° bit's cutting flank ends at (6/2)/tan(45°) = 3 mm — the
     // ladder must stop there, not at the 20 mm square's 10 mm medial axis.
     const deepest = Math.min(...depths);
@@ -192,17 +195,25 @@ describe('vcarvePasses', () => {
     const resolutionMm = 0.5;
     const maxDepthMm = 1;
     const depthPerPassMm = 0.4;
-    const ladder = buildOffsetLadder(contours, 64, (step) => (step + 1) * resolutionMm);
-    const expected = ladder.rings
-      .flatMap((ring, step) => {
-        const ringDepthMm = Math.min((step + 1) * resolutionMm, maxDepthMm);
+    const ringKeys = (
+      rings: ReadonlyArray<ReadonlyArray<Polyline>>,
+      pitchMm: number,
+    ): ReadonlyArray<string> =>
+      rings.flatMap((ring, step) => {
+        const ringDepthMm = Math.min((step + 1) * pitchMm, maxDepthMm);
         return ring.flatMap((polyline) =>
           zPassDepths(ringDepthMm, depthPerPassMm).map((zMm) =>
             passKey(zMm, closeRing(polyline).points),
           ),
         );
-      })
-      .sort();
+      });
+    const ladder = buildOffsetLadder(contours, 64, (step) => (step + 1) * resolutionMm);
+    // ADR-279: the corner/thin detail rings are part of the reorder contract.
+    const detail = vcarveThinDetailRings(contours, ladder.rings[0] ?? [], resolutionMm);
+    const expected = [
+      ...ringKeys(ladder.rings, resolutionMm),
+      ...ringKeys(detail.rings, THIN_DETAIL_RESOLUTION_MM),
+    ].sort();
     const actual = vcarvePasses(contours, {
       tool: VBIT_90,
       maxDepthMm,
@@ -305,5 +316,94 @@ describe('vcarveResolutionMm', () => {
     expect(vcarveResolutionMm(0, 0.4)).toBe(0.1);
     expect(vcarveResolutionMm(0.3, 6.35)).toBe(0.3);
     expect(vcarveResolutionMm(0.02, 6.35)).toBe(0.1);
+  });
+});
+
+// ADR-279: strokes narrower than 2·δ used to vanish from the carve entirely —
+// the first coarse inset already consumed them, so a thin script stroke
+// contributed no rings while the rest of the glyph cut. The thin-detail stage
+// must carve them with a fine-pitch ladder instead of dropping them.
+describe('vcarvePasses — thin detail (ADR-279)', () => {
+  function band(widthMm: number, lengthMm: number, atX = 0): Polyline {
+    return {
+      closed: true,
+      points: [
+        { x: atX, y: 0 },
+        { x: atX + lengthMm, y: 0 },
+        { x: atX + lengthMm, y: widthMm },
+        { x: atX, y: widthMm },
+      ],
+    };
+  }
+
+  it('carves a stroke narrower than 2·δ instead of dropping it (the script-font bug)', () => {
+    // 0.5 mm × 10 mm band, δ = 0.5: the first coarse inset exceeds the
+    // 0.25 mm half-width, so the ring ladder alone yields nothing.
+    const passes = vcarvePasses([band(0.5, 10)], {
+      tool: VBIT_90,
+      maxDepthMm: 2,
+      depthPerPassMm: 2,
+      resolutionMm: 0.5,
+    });
+    expect(passes.length).toBeGreaterThan(0);
+    const depths = contourDepths(passes);
+    // Depth law: detail rings walk toward the band's centerline; the deepest
+    // must approach half-width/tan(45°) = 0.25 without ever exceeding it.
+    expect(Math.min(...depths)).toBeLessThanOrEqual(-0.15);
+    expect(Math.min(...depths)).toBeGreaterThanOrEqual(-0.25 - 1e-9);
+    for (const pass of passes) {
+      if (pass.kind !== 'contour') continue;
+      for (const p of pass.polyline) {
+        expect(p.x).toBeGreaterThanOrEqual(-1e-6);
+        expect(p.x).toBeLessThanOrEqual(10 + 1e-6);
+        expect(p.y).toBeGreaterThanOrEqual(-1e-6);
+        expect(p.y).toBeLessThanOrEqual(0.5 + 1e-6);
+      }
+    }
+  });
+
+  it('detail passes respect the maxDepth clamp', () => {
+    const passes = vcarvePasses([band(0.5, 10)], {
+      tool: VBIT_90,
+      maxDepthMm: 0.1,
+      depthPerPassMm: 0.1,
+      resolutionMm: 0.5,
+    });
+    expect(passes.length).toBeGreaterThan(0);
+    for (const z of contourDepths(passes)) {
+      expect(z).toBeGreaterThanOrEqual(-0.1 - 1e-9);
+      expect(z).toBeLessThan(0);
+    }
+  });
+
+  it('still finishes each region — ladder and detail — before travelling on', () => {
+    // Thick left square gets coarse rings; thin right band gets only detail
+    // rings; the region-major promise must hold across both kinds (ADR-270).
+    const passes = vcarvePasses([square(0, 6), band(0.5, 10, 20)], {
+      tool: VBIT_90,
+      maxDepthMm: 3,
+      depthPerPassMm: 3,
+      resolutionMm: 0.5,
+    });
+    expect(contourRegionOrder(passes)).toMatch(/^L+R+$/);
+  });
+
+  it('property: detail passes never cut deeper than the band half-width (100 seeds)', () => {
+    // A 90° bit's groove over a band of width w is w/2 deep at the centerline;
+    // cutting deeper than the artwork asks for would gouge the workpiece.
+    const width = fc.double({ min: 0.15, max: 0.95, noNaN: true });
+    fc.assert(
+      fc.property(width, (w) => {
+        const options = { tool: VBIT_90, maxDepthMm: 5, depthPerPassMm: 5, resolutionMm: 1 };
+        const a = vcarvePasses([band(w, 8)], options);
+        const b = vcarvePasses([band(w, 8)], options);
+        expect(a).toEqual(b);
+        for (const z of contourDepths(a)) {
+          expect(z).toBeGreaterThanOrEqual(-(w / 2) - 1e-9);
+          expect(z).toBeLessThan(0);
+        }
+      }),
+      { numRuns: 100 },
+    );
   });
 });
