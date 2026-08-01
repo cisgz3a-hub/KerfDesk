@@ -33,6 +33,10 @@ import {
 import { buildDisplayPolylines } from './display-polylines';
 import { strideForSegmentBudget } from './draw-complexity';
 import { strokePolylinesBatched } from './draw-vector-strokes';
+import {
+  previewRouteForDrawing,
+  registerExecutablePlanPreviewRoute,
+} from './executable-plan-preview-route';
 import type { PreviewIssue, PreviewToolpath } from './preview-status';
 import { mapToolpathToScene } from './preview-scene-frame';
 import type { ViewTransform } from './view-transform';
@@ -116,23 +120,24 @@ export function drawPreview(
     readonly showEndpoints?: boolean;
   } = {},
 ): void {
-  if (toolpath.totalLength === 0) return;
+  const route = previewRouteForDrawing(toolpath);
+  if (route.totalLength === 0) return;
   const showTravel = options.showTravel !== false;
   const showFuture = options.showFuture !== false;
   const showEndpoints = options.showEndpoints !== false;
   if (showFuture && scrubberT < 1) {
     ctx.save();
     ctx.globalAlpha = 0.18;
-    drawWholeSteps(ctx, toolpath.steps, view, showTravel);
+    drawWholeSteps(ctx, route.steps, view, showTravel);
     ctx.restore();
   }
-  const sliced = sliceToolpath(toolpath, scrubberT * toolpath.totalLength);
+  const sliced = sliceToolpath(route, scrubberT * route.totalLength);
   ctx.save();
   ctx.globalAlpha = 0.72;
   drawWholeSteps(ctx, sliced.whole, view, showTravel);
   if (sliced.partial !== null) drawStep(ctx, sliced.partial, view, showTravel);
   ctx.restore();
-  if (showEndpoints) drawEndpoints(ctx, toolpath.steps, view);
+  if (showEndpoints) drawEndpoints(ctx, route.steps, view);
   if (sliced.head !== null && scrubberT < 1) drawHead(ctx, sliced.head, view);
 }
 
@@ -189,7 +194,9 @@ export function buildPreviewToolpathUnbounded(
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });
-  return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin);
+  return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
+    executablePlan: true,
+  });
 }
 
 export async function buildPreviewToolpathSnapshot(
@@ -202,13 +209,16 @@ export async function buildPreviewToolpathSnapshot(
   const issue = previewPreparationIssue(project, options);
   if (issue !== null) return emptyPreviewToolpath(issue);
   const prepared = await prepareOutputSnapshot(project, options);
-  return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin);
+  return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
+    executablePlan: true,
+  });
 }
 
 export function buildPreviewToolpathFromPrepared(
   project: Project,
   prepared: PreparedOutput,
   jobOrigin?: JobOriginPlacement,
+  options: { readonly executablePlan?: boolean } = {},
 ): PreviewToolpath {
   if (!prepared.ok) {
     return emptyPreviewToolpath({
@@ -221,16 +231,28 @@ export function buildPreviewToolpathFromPrepared(
   // the design instead of mirroring about the bed midline (H3).
   const startPoint = previewStartPoint(jobOrigin);
   const parkPoint = previewParkPoint(project, jobOrigin);
-  return mapToolpathToScene(
-    buildToolpath(prepared.job, {
-      startPoint,
-      ...(parkPoint === undefined ? {} : { parkPoint }),
-      scanningOffsets: project.device.scanningOffsets,
-      bedSizeMm: { widthMm: project.device.bedWidth, heightMm: project.device.bedHeight },
-    }),
+  const machineToolpath = buildToolpath(prepared.job, {
+    startPoint,
+    ...(parkPoint === undefined ? {} : { parkPoint }),
+    scanningOffsets: project.device.scanningOffsets,
+    bedSizeMm: { widthMm: project.device.bedWidth, heightMm: project.device.bedHeight },
+  });
+  const previewToolpath = mapToolpathToScene(
+    machineToolpath,
     prepared.jobOriginOffset,
     project.device,
   );
+  if (options.executablePlan === true) {
+    registerExecutablePlanPreviewRoute({
+      previewToolpath,
+      legacyMachineToolpath: machineToolpath,
+      prepared,
+      ...(jobOrigin === undefined ? {} : { jobOrigin }),
+      jobOriginOffset: prepared.jobOriginOffset,
+      device: project.device,
+    });
+  }
+  return previewToolpath;
 }
 
 function previewStartPoint(jobOrigin: JobOriginPlacement | undefined): Vec2 {
