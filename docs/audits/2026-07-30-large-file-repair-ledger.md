@@ -831,8 +831,8 @@ cold-optimizer correction.
   DXF, hardware, controller, settings, Frame, Start, or deployment claim is part of this repair.
 ## Corrective audit 5 - incremental production SVG source
 
-**Status:** implementation reverified on current main; fresh independent audit, publication, and
-GitHub checks pending.
+**Status:** implementation corrected after independent exact-diff audit and rebased onto current
+main; fresh GitHub checks remain required on the corrected draft head.
 
 ### Finding
 
@@ -892,7 +892,13 @@ GitHub checks pending.
   the old worker result.
 - A second independent pass found the XML 1.1 NEL and line-separator normalization hole after the
   first three cases were repaired. Both cases failed before the detector was extended and pass
-  afterward; a final independent confirmation is still required on the frozen corrected diff.
+  afterward.
+- The frozen-head audit then found the same class of geometry change for character references.
+  `linkedom` and `saxes` decode numeric C1 references differently, so a mixed literal/reference
+  `<use>` ID could gain or lose its referenced path. Eight hex/decimal, ID/href, match/no-match
+  regressions failed first. The raw-tag fallback now also covers quoted character references, and
+  those cases plus predefined, greater-than, non-breaking-space, and ancestor-scoped xlink
+  attributes match the established worker again.
 - The functional re-audit then found the new parser file over the 250 counted-line soft policy.
   `RawOpenTagScanner` was moved unchanged into a cohesive sibling module: the two new production
   files are 121 and 191 raw physical lines and neither appears in the soft-limit report.
@@ -903,7 +909,8 @@ GitHub checks pending.
   read was proven and that production source imports crossed the SVG module boundary. The fixture
   now errors from the second `pull()` after one chunk, and the production code imports through
   `src/io/svg/index.ts`.
-- A fresh independent exact-diff audit is required after the final gate before publication.
+- The corrected branch remains draft until its current-main GitHub gates and final exact-head review
+  complete.
 
 - **Confirmed:** the normal production SVG worker no longer materializes or retains a whole source
   string before DOM construction.

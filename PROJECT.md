@@ -408,8 +408,11 @@ phase; tracked here so they don't get lost.
 - **Canvas:** Canvas2D.
 - **Desktop shell:** Electron LTS. `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
 - **Platform adapter:** `platform/web/` implements the `PlatformAdapter` interface for the browser; the main-process desktop (Electron) code lives in the top-level `electron/` folder, and `src/platform/electron/` holds the renderer-side Electron detection (`isElectronRenderer`, imported by `ui/app/main.tsx`) plus the release-workflow gate.
-- **SVG parse:** native `DOMParser` (browser and jsdom in Node tests).
-- **SVG sanitize:** **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible). Pinned per ADR-017.
+- **SVG parse:** normal file-backed imports use `saxes` plus a detached `linkedom` DOM in the import
+  Worker; the disclosed main-thread fallback uses native `DOMParser` (browser and jsdom in tests).
+- **SVG sanitize:** the file-backed Worker allowlists SVG elements and removes event handlers,
+  external references, and non-image data URIs before geometry extraction. The main-thread fallback
+  uses **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible), pinned per ADR-017.
 - **Text (Phase D):** `opentype.js` (MIT) for outlines. Seventeen bundled permissive fonts — thirteen outline plus four native CNC stroke faces (Roboto / Special Elite Apache-2.0; Poppins / Tinos Regular + Bold / Inconsolata / Courier Prime / Pacifico / Dancing Script / Anton / UnifrakturMaguntia / Stardos Stencil / Saira Stencil One / Relief SingleLine / three reviewed EMS stroke faces OFL-1.1). Stencil faces bridge their counters so cut-out lettering leaves no loose centres (ADR-267).
 - **Vectorize (Phase E):** in-house contour/centerline/edge trace engine (ADR-123); `imagetracerjs` (Unlicense — MIT-compatible) kept only as a multi-colour fallback.
 - **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property), and Playwright for a dedicated real-browser smoke workflow (ADR-158).
@@ -542,7 +545,11 @@ an assumption that every folder must have an `index.ts`.
 
 ## Security posture
 
-- **Imported SVG is untrusted.** Parsed via native `DOMParser`, sanitized via **DOMPurify** with `USE_PROFILES: { svg: true, svgFilters: true }` and a custom hook removing external `xlink:href` and non-image data URIs.
+- **Imported SVG is untrusted.** Normal file-backed imports validate with `saxes`, construct a
+  detached `linkedom` Worker DOM, then allowlist SVG elements and remove event handlers, external
+  references, and non-image data URIs before geometry extraction. The disclosed main-thread
+  fallback uses native `DOMParser` plus **DOMPurify** with `USE_PROFILES: { svg: true, svgFilters:
+  true }` and the existing reference-removal hook.
 - **Imported raster images (Phase E)** decoded inside a sandbox. Memory-bounded.
 - **Bundled fonts (Phase D)** stay in managed code: TTF outlines use `opentype.js`; pinned SVG centerline glyph data uses the pure TypeScript stroke parser. They are never passed to native font APIs.
 - **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No preload and no IPC handlers (`ipcMain` surface). The notify-only Preview checker is one exact GET-only `app://app/api/desktop-preview-update` route, so the renderer retains `connect-src 'self'`; main performs the pinned GitHub metadata request and returns only `{ kind, version }`. `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).

@@ -13429,10 +13429,15 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
    readers, but their required results still scale with the parsed output. DXF uses two passes and
    retains blocks/output; STL retains the mesh and derived relief data; persistence materializes
    JSON. None has a proven constant peak-memory ceiling.
-7. **Document routes move off the UI thread without a streaming claim.** Native `.lf2`, SVG,
-   LightBurn `.lbrn`/`.lbrn2`, native `.lfml.json`, and LightBurn `.clb` run in a dedicated worker
-   with queue/progress/cancel semantics, but still perform whole-Blob text decoding plus JSON or
-   XML/DOM construction there.
+7. **Document routes move off the UI thread.** Native `.lf2`, LightBurn `.lbrn`/`.lbrn2`, native
+   `.lfml.json`, and LightBurn `.clb` run in a dedicated worker with queue/progress/cancel semantics
+   but still perform whole-Blob text decoding plus JSON or XML/DOM construction there. File-backed
+   SVG is the narrow exception: it consumes `Blob.stream()` through one streaming UTF-8 decoder,
+   validates incrementally with `saxes`, and builds the detached `linkedom` worker DOM from SAX
+   events before the established worker sanitizer and geometry walk. A missing `Blob.stream()`
+   keeps the whole-text worker path; constructor-time Worker failure keeps the disclosed main-thread
+   fallback. The SVG DOM, scene result, browser stream chunk, decoder state, and an individual XML
+   token remain content-scaled, so this is not a constant-memory or unlimited-import claim.
 
 ### Consequences
 
@@ -13447,8 +13452,9 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
   JSON persistence cost.
 - Queueing prevents concurrent reads on a shared worker client. Cancellation is immediate at the
   worker boundary; incremental parsers also observe their abort signal between chunks.
-- Worker placement alone does not authorize a streaming or memory-bounded claim for the document
-  routes, result reconstruction, or persistence path.
+- Worker placement alone does not authorize a memory-bounded claim for document reconstruction or
+  persistence. SVG input decoding is incremental, while its DOM and scene result remain complete;
+  the other document routes still materialize their whole decoded source.
 - No controller, firmware, settings, machine command, Frame/Start behavior, or physical-output
   semantics change.
 
@@ -13467,8 +13473,11 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
   `git diff --check`, and production web builds passed during the sequential implementation.
 - The implementation-and-audit record is
   `docs/audits/2026-07-30-large-file-repair-ledger.md`.
-- NOT verified: constant peak-memory behavior, document-route incremental parsing, every
-  operating-system storage/OOM threshold, a hardware air-cut, or physical output.
+- The SVG amendment adds direct malformed-input, chunk-boundary, legacy-attribute, sanitizer,
+  fallback, and stream-failure parity coverage plus a real-browser 24 MiB bounded-token import.
+- NOT verified: constant peak-memory behavior, SVGs larger than the 24 MiB browser fixture, other
+  document-route incremental parsing, every operating-system storage/OOM threshold, a hardware
+  air-cut, or physical output.
 
 ## ADR-270 - V-carve ladders complete one filled region before moving to the next (2026-07-31)
 

@@ -80,7 +80,10 @@ class SvgDocumentBuilder {
 }
 
 function applyAttributes(element: Element, tag: SaxesTagPlain, rawOpenTag: string): void {
-  if (!hasLiteralAttributeWhitespace(rawOpenTag)) {
+  // The established linkedom worker preserves some raw whitespace and character-reference
+  // spellings that saxes normalizes. Keep those rare tags on linkedom so an ID/reference pair
+  // cannot silently gain or lose geometry when the source moves to incremental parsing.
+  if (!needsLegacyAttributeParsing(rawOpenTag)) {
     for (const [name, value] of Object.entries(tag.attributes)) element.setAttribute(name, value);
     return;
   }
@@ -96,7 +99,7 @@ function applyAttributes(element: Element, tag: SaxesTagPlain, rawOpenTag: strin
   }
 }
 
-function hasLiteralAttributeWhitespace(rawOpenTag: string): boolean {
+function needsLegacyAttributeParsing(rawOpenTag: string): boolean {
   let quote: '"' | "'" | null = null;
   for (const character of rawOpenTag) {
     if (quote === null) {
@@ -104,6 +107,7 @@ function hasLiteralAttributeWhitespace(rawOpenTag: string): boolean {
     } else if (character === quote) {
       quote = null;
     } else if (
+      character === '&' ||
       character === '\t' ||
       character === '\r' ||
       character === '\n' ||
