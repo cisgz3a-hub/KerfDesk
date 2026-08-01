@@ -32,11 +32,14 @@ export function useDesignApply(): DesignApplyHandlers {
     if (current === null) return false;
     const sketch = sessionSketch(current);
     if (!hasOutputGeometry(sketch)) return false;
-    applyDesignSketch(
+    // Handing back what the last Apply created is what makes a second Apply an
+    // EDIT of that artwork rather than a duplicate of it.
+    const record = applyDesignSketch(
       sketch,
       sketch.entities.map(() => crypto.randomUUID()),
+      current.applied,
     );
-    markApplied();
+    markApplied(record);
     return true;
   }, [applyDesignSketch, markApplied]);
 

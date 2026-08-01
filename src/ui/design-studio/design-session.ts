@@ -4,6 +4,7 @@
 // project undo. The one crossing point is Apply.
 
 import { EMPTY_SKETCH, type Sketch } from '../../core/design';
+import type { DesignApplyRecord } from '../state/design-apply-record';
 import type { ResizeHandle } from './design-handles';
 import { DEFAULT_DESIGN_LAYER_ID, sketchLayers } from '../../core/design/layers';
 import type { Vec2 } from '../../core/scene';
@@ -85,6 +86,10 @@ export type DesignSession = {
   // Whether the centre surface is the 3D design space (Amendment 2) or the
   // flat 2D canvas fallback. Survives close via the stash.
   readonly surface3d: boolean;
+  // What the last Apply from this session put in the scene, so the next Apply
+  // updates that artwork instead of stacking a second copy beside it. Null
+  // until the session has applied once.
+  readonly applied: DesignApplyRecord | null;
   // True once the sketch has changed since the last Apply. Apply gates on THIS,
   // not on undo depth, because a view-only step must not look like a change and
   // a change that was undone-then-redone must still apply.
@@ -116,6 +121,7 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     chamferDistanceMm: DEFAULT_CHAMFER_DISTANCE_MM,
     activeLayerId: DEFAULT_DESIGN_LAYER_ID,
     surface3d: true,
+    applied: null,
     dirtySinceApply: false,
   };
 }
@@ -149,9 +155,13 @@ function withValidActiveLayer(session: DesignSession): DesignSession {
 
 // Called after a successful Apply. History is deliberately NOT cleared: undo
 // inside the Studio still walks the drawing, while the project keeps its own
-// single undo entry for the apply itself.
-export function markSessionApplied(session: DesignSession): DesignSession {
-  return session.dirtySinceApply ? { ...session, dirtySinceApply: false } : session;
+// single undo entry for the apply itself. The record of what went into the
+// scene is kept so the NEXT Apply replaces it rather than duplicating it.
+export function markSessionApplied(
+  session: DesignSession,
+  applied: DesignApplyRecord | null,
+): DesignSession {
+  return { ...session, dirtySinceApply: false, applied: applied ?? session.applied };
 }
 
 export function undoSession(session: DesignSession): DesignSession {
