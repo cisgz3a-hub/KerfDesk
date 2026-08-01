@@ -182,7 +182,7 @@ async function runStartJobFlowWithCheckpoint(
   const { project } = app;
   const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
   const camera = useCameraStore.getState();
-  const externalEnvironment = captureStartExternalEnvironment(project, camera);
+  const externalEnvironment = captureStartExternalEnvironment(project);
   const prepared = await prepareCurrentStartJob(
     app,
     laser,

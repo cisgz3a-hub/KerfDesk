@@ -20,7 +20,6 @@ export function TraceFromCameraButton(): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
   const surfaceHeightMm = useCameraStore((s) => s.surfaceHeightMm);
   const activatePlacement = useCameraStore((s) => s.activatePlacement);
-  const setJobPlacement = useStore((s) => s.setJobPlacement);
   const openImageDialog = useUiStore((s) => s.openImageDialog);
   const pushToast = useToastStore((s) => s.pushToast);
 
@@ -61,10 +60,9 @@ export function TraceFromCameraButton(): JSX.Element {
       pushToast(cameraTraceFailureMessage(built.reason, surfaceIssue), 'error');
       return;
     }
-    // The traced image is emitted in physical bed coordinates. Keep the job in
-    // that same coordinate frame even if the overlay is later hidden.
+    // Keep camera placement visible in the Camera panel without rewriting the
+    // operator's selected origin mode. The watched Frame verifies exact motion.
     activatePlacement();
-    setJobPlacement({ startFrom: 'absolute' });
     openImageDialog(built.source);
   };
 

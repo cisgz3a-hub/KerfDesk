@@ -6,7 +6,6 @@ import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { useCameraStore } from '../state/camera-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { jobTimeNoun } from '../machine/machine-labels';
 import {
@@ -153,11 +152,10 @@ function useSetupRowModel(props: { readonly disabled: boolean; readonly streamin
   const onFrame = useFrameAction();
   const onAutofocus = useAutofocusAction();
   // A permit can become stale from an artwork, scope, placement, controller,
-  // or camera change. Subscribe to all three owning stores so the status text
+  // or rotary-policy change. Subscribe to the owning stores so the status text
   // changes immediately; Start repeats the same comparison at handoff.
   const app = useStore();
   const laser = useLaserStore();
-  const camera = useCameraStore();
   // The resolved rotary-raster policy is part of the framed environment but
   // lives outside the app store, so subscribe explicitly for immediate expiry.
   useExperimentalLaserFeatures((s) => s.features.rotaryRaster);
@@ -169,7 +167,7 @@ function useSetupRowModel(props: { readonly disabled: boolean; readonly streamin
   const home = useLaserStore((s) => s.home);
   const estimate = useJobEstimate();
   const busy = props.disabled || props.streaming;
-  const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser, camera);
+  const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser);
   const framedReady = framedRunIssue === null;
   return {
     onFrame,

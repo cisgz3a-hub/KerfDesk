@@ -102,7 +102,7 @@ async function prepareTransientCameraReview(
     jobAwareConfirm,
   );
   if (machineKind === 'cnc' && cncSetupAttestation === null) return null;
-  const externalEnvironment = captureStartExternalEnvironment(project, camera);
+  const externalEnvironment = captureStartExternalEnvironment(project);
   return {
     bundle: {
       app: useStore.getState(),

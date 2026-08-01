@@ -50,10 +50,7 @@ async function openReviewWithLongLine(): Promise<{
 }> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
-  const externalEnvironment = captureStartExternalEnvironment(
-    app.project,
-    useCameraStore.getState(),
-  );
+  const externalEnvironment = captureStartExternalEnvironment(app.project);
   const prepared = await prepareCurrentStartJob(
     app,
     laser,

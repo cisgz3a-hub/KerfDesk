@@ -134,7 +134,7 @@ async function unframedReviewBundle() {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
-  const externalEnvironment = captureStartExternalEnvironment(app.project, camera);
+  const externalEnvironment = captureStartExternalEnvironment(app.project);
   const prepared = await prepareCurrentStartJob(
     app,
     laser,
