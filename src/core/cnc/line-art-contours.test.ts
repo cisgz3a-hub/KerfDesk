@@ -98,6 +98,22 @@ describe('selectLineArtContours', () => {
       selectLineArtContours([heartOuter, heartInner, starOuter, starInner], 'inner', BIT_MM),
     ).toEqual([heartInner, starInner]);
   });
+
+  it('never pairs rings outside the pairable set (ADR-277 provenance scope)', () => {
+    expect(selectLineArtContours([OUTER, INNER], 'inner', BIT_MM, new Set())).toEqual([
+      OUTER,
+      INNER,
+    ]);
+  });
+
+  it('pairs pairable rings while an unpairable pair beside them keeps both edges', () => {
+    const glyphOuter = square(100, 15);
+    const glyphInner = square(101, 13);
+    const pairable = new Set([OUTER, INNER]);
+    expect(
+      selectLineArtContours([OUTER, INNER, glyphOuter, glyphInner], 'inner', BIT_MM, pairable),
+    ).toEqual([INNER, glyphOuter, glyphInner]);
+  });
 });
 
 describe('lineArtSelectionApplies', () => {

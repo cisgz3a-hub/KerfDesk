@@ -14345,3 +14345,53 @@ source filled region.
   profile-on-path layer (counter ladder, outer ladder, next letter).
 - NOT verified: a physical cut. No hardware is available; the evidence is the compiled pass
   sequence and the existing motion invariants.
+
+## ADR-277 - Line-art double-line pairing is provenance-scoped (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+> **Numbering note.** ADR-276 (profile part-major ordering) is claimed by the sibling PR from the
+> same session; this ADR takes the next number. ADR-262's CI uniqueness gate arbitrates races.
+
+### Context
+
+ADR-218 dedupes the two edges a boundary trace makes of one drawn stroke: a nested closed pair
+whose bounding boxes hug within one bit diameter on every side is treated as one drawn line, and
+only the selected edge (`lineArtContours`, default 'inner') is machined. The heuristic is purely
+geometric — and a letter glyph with a counter is geometrically the same picture. Field case
+(2026-08-01, "Drive / Safe" profile-on-path, 3.175 mm bit): a text "D" whose counter sits ~2.1 mm
+inside its outer on all four sides was classified as a traced ring, and the layer's 'outer'
+selection silently dropped the counter — the job cut a D with no hole. The "e" and "a" counters
+on the same layer survived only because their glyph bounding boxes extend far below the counter.
+O, o, 0, and Q glyphs lose their counters the same way; under the default 'inner' a D-like glyph
+loses its *outer* instead, which is worse. `lineArtContours` is a layer setting, so one traced
+object sharing a layer with text is enough to expose every glyph on that layer.
+
+### Decision
+
+- `collectLayerContours` stamps each collected contour with its source object family
+  (`sourceKind: 'imported-svg' | 'text' | 'traced-image' | 'shape'`).
+- `selectLineArtContours` takes an optional pairable set; rings outside it neither pair nor act
+  as pair parents. `lineArtPairableSet` (same module) excludes `text` and `shape` contours —
+  glyph counters and drawn-shape holes are real geometry, never duplicate traced edges.
+  `traced-image` and `imported-svg` contours keep the ADR-218 behavior unchanged.
+- No provenance (legacy fixtures, direct `cncGroupForLayer` callers) or nothing excluded means
+  no restriction — pure-trace scenes and existing tests stay byte-identical.
+
+### Consequences
+
+- Text and drawn shapes on profile/engrave layers always machine every contour, regardless of the
+  layer's `lineArtContours` setting and bit size.
+- An imported SVG of *outlined text* (text converted to paths upstream) still pairs — provenance
+  cannot see through an export. The 'both' setting remains the escape hatch there; accepted
+  residual, documented in the UI field's help.
+- The job111 double-cut protection (ADR-218's reason to exist) is untouched for traces.
+
+### Verification
+
+- `compile-cnc-line-art-provenance.test.ts` (new): a tight text glyph pair keeps both contours
+  under 'inner' and 'outer'; the same geometry as a traced image still selects one edge.
+- `line-art-contours.test.ts`: rings outside the pairable set never pair; pairable and
+  unpairable pairs coexist independently; the existing ADR-218 suite is unchanged and green.
+- NOT verified: a physical cut. No hardware is available; evidence is the compiled contour set.

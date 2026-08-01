@@ -75,6 +75,7 @@ function appendObjectContours(
           ),
           closed: polyline.closed,
         },
+        sourceKind: object.kind,
         ...(manualTabPoints.length === 0 ? {} : { manualTabPoints }),
       });
     });

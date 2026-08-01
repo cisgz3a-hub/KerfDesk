@@ -4,7 +4,9 @@
 // re-cuts the same kerf and reads as a phantom second job. Shown for the
 // outline cut types + engrave; band-based types (pocket, v-carve, inlay,
 // drill) always keep both edges. Only nested pairs tighter than the bit
-// diameter are affected, so real ring parts (washers) machine unchanged.
+// diameter are affected, so real ring parts (washers) machine unchanged —
+// and only traced/imported contours pair at all (ADR-277): text glyph
+// counters and drawn-shape holes always machine, whatever this selects.
 
 import type { CncLayerSettings, Layer } from '../../core/scene';
 import { Row, selectStyle } from './CncLayerPrimitives';
@@ -38,7 +40,7 @@ export function CncLineArtContoursField(props: {
         value={props.settings.lineArtContours ?? 'inner'}
         onChange={(e) => props.onCommit({ lineArtContours: e.target.value as LineArtContourSide })}
         aria-label={`Line art contours for ${props.layer.color}`}
-        title="Traced line drawings arrive as two nested outlines one stroke-width apart. Cut only the inner one (the drawn shape), only the outer, or both. Applies to nested pairs closer than the bit diameter; anything wider always cuts."
+        title="Traced line drawings arrive as two nested outlines one stroke-width apart. Cut only the inner one (the drawn shape), only the outer, or both. Applies to traced and imported nested pairs closer than the bit diameter; anything wider always cuts, and text or shape outlines (like a letter's counter) always cut both."
         style={selectStyle}
       >
         {SIDE_OPTIONS.map((option) => (
