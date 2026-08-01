@@ -104,7 +104,9 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height. (Glyph weld is **not** implemented — it depends on the geometry kernel, anticipated post-Phase-F; do not describe it as shipped.)
 - Imported `.ttf` / `.otf` user fonts are embedded in the project under fixed count and byte budgets; KerfDesk does not enumerate or depend on host system fonts (ADR-164).
 - Four bundled outline fonts cover sans, monospace, handwritten, and calligraphic text. Four reviewed OFL native-stroke fonts add technical, display, calligraphic, and casual-hand centerline writing for CNC engraving. Text can be assigned independently to CNC machining layers; outline text supports variable-depth V-carving, while open stroke text defaults to Engrave/on-path.
-- Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields; live databases, barcode/QR generation, and automatic imposition remain deferred (ADR-164).
+- Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields;
+  bounded offline sheet imposition is adopted for staged implementation (ADR-279). Live databases
+  and barcode/QR generation remain deferred (ADR-164).
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
 
@@ -612,8 +614,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   and advanced fill-pattern systems, node/graph-based operation editors, and plugin
   operation pipelines remain out of scope.
 - Macros, scripting, command palette, plugins, extensions.
-- ~~Variable text (CSV / counter / date).~~ **Bounded offline fields shipped**;
-  live databases, barcode/QR generation, and automatic imposition remain deferred (ADR-164).
+- ~~Variable text (CSV / counter / date).~~ **Bounded offline fields shipped**; bounded offline sheet
+  imposition is adopted for staged implementation (ADR-279). Live databases and barcode/QR
+  generation remain deferred (ADR-164).
 - Host system-font enumeration. Explicitly imported user fonts are embedded in
   the project under fixed budgets and no longer depend on the host after save (ADR-164).
 
