@@ -27,7 +27,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
-import { buildExecutablePlanSidecar } from '../../io/gcode/executable-plan-emission';
+import { buildExecutablePlanSidecar } from '../../io/gcode/executable-plan';
 import type { MachineStartSnapshot } from '../laser/start-job-readiness';
 import { cncPassRouteSpans, type CncPassRouteSpan } from './canvas-pass-progress';
 import { registerCanvasExecutablePlan } from './canvas-preview-motion';

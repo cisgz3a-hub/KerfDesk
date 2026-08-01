@@ -407,8 +407,10 @@ The second integration slice applies the same rule to the non-live 2D preview. O
 previews keep the plan association in a `WeakMap`, preserving the public `Toolpath` object shape;
 ADR-244's large-job Worker explicitly serializes only the verified plan-derived route. The drawing
 consumer selects that route, while timeline, 3D, CNC-removal metadata, and other rich legacy
-`Toolpath` consumers remain unchanged for their own later slices. Current-position jobs and any
-ordered segment kind, coordinate, or route-length mismatch fall back. ADR-243 streamed rasters also
+`Toolpath` consumers remain unchanged for their own later slices. Current-position jobs fall back
+regardless of their numeric XY because v1 does not carry that live start basis. Any ordered segment
+kind, coordinate, cumulative segment-distance allocation, or total route-length mismatch also falls
+back. ADR-243 streamed rasters also
 fall back because v1's exact-program carrier would defeat their bounded-memory row-provider path;
 a streaming plan representation is required before that case can migrate. CNC currently falls back
 because the emitted plan includes the preamble safe-Z rise and postamble retract that

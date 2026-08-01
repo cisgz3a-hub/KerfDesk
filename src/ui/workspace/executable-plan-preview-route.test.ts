@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { projectWithLine } from '../../__fixtures__/file-actions';
-import { buildToolpath, type JobOriginPlacement, type Toolpath } from '../../core/job';
+import {
+  buildToolpath,
+  sliceToolpath,
+  type JobOriginPlacement,
+  type Toolpath,
+} from '../../core/job';
 import {
   createLayer,
   createProject,
@@ -11,7 +16,7 @@ import {
 } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import { emitPreparedGcode } from '../../io/gcode/emit-gcode';
-import { emitPreparedGcodeWithExecutablePlan } from '../../io/gcode/executable-plan-emission';
+import { emitPreparedGcodeWithExecutablePlan } from '../../io/gcode/executable-plan';
 import {
   buildPreviewToolpath,
   buildPreviewToolpathFromPrepared,
@@ -84,12 +89,15 @@ describe('ExecutablePlan non-live preview route', () => {
     expect(lineTo).toHaveBeenCalledTimes(2);
   });
 
-  it('retains the legacy route when the current-position start basis differs', () => {
+  it.each([
+    { label: 'nonzero coordinates', currentPosition: { x: 120, y: 80 } },
+    { label: 'coordinates numerically equal to work zero', currentPosition: { x: 0, y: 0 } },
+  ])('retains the legacy route for a current-position basis: $label', ({ currentPosition }) => {
     const project = projectWithLine();
     const jobOrigin: JobOriginPlacement = {
       startFrom: 'current-position',
       anchor: 'front-left',
-      currentPosition: { x: 120, y: 80 },
+      currentPosition,
     };
     const prepared = prepareOutput(project, { jobOrigin });
     expect(prepared.ok).toBe(true);
@@ -101,6 +109,70 @@ describe('ExecutablePlan non-live preview route', () => {
 
     expect(previewRouteSource(preview)).toBe('legacy-toolpath');
     expect(previewRouteForDrawing(preview)).toBe(preview);
+  });
+
+  it('rejects equal geometry and total length when cumulative scrubber allocation differs', () => {
+    const legacy: Toolpath = {
+      steps: [
+        cutStep(9, [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ]),
+        cutStep(1, [
+          { x: 1, y: 0 },
+          { x: 10, y: 0 },
+        ]),
+      ],
+      totalLength: 10,
+    };
+    const plan: Toolpath = {
+      steps: [
+        cutStep(1, [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ]),
+        cutStep(9, [
+          { x: 1, y: 0 },
+          { x: 10, y: 0 },
+        ]),
+      ],
+      totalLength: 10,
+    };
+
+    expect(sliceToolpath(legacy, 5).head).not.toEqual(sliceToolpath(plan, 5).head);
+    expect(comparePreviewRoutesAtEmitPrecision(legacy, plan)).toMatchObject({
+      ok: false,
+      reason: 'segment-mismatch',
+      index: 1,
+    });
+  });
+
+  it('accepts equivalent cumulative allocation across different cut-step grouping', () => {
+    const grouped: Toolpath = {
+      steps: [
+        cutStep(2, [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+          { x: 2, y: 0 },
+        ]),
+      ],
+      totalLength: 2,
+    };
+    const split: Toolpath = {
+      steps: [
+        cutStep(1, [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ]),
+        cutStep(1, [
+          { x: 1, y: 0 },
+          { x: 2, y: 0 },
+        ]),
+      ],
+      totalLength: 2,
+    };
+
+    expect(comparePreviewRoutesAtEmitPrecision(grouped, split)).toEqual({ ok: true });
   });
 
   it('retains the legacy CNC route when the plan exposes omitted boundary retracts', () => {
@@ -125,12 +197,12 @@ describe('ExecutablePlan non-live preview route', () => {
       legacyCount: 4,
       planCount: 6,
       planSample: [
-        'vertical 0,0->0,0 z:0->3.81',
-        'rapid-travel 0,0->10,390 z:3.81->3.81',
-        'vertical 10,390->10,390 z:3.81->-1',
-        'process 10,390->20,390',
-        'vertical 20,390->20,390 z:-1->3.81',
-        'rapid-travel 20,390->0,0 z:3.81->3.81',
+        'vertical 0,0->0,0 z:0->3.81 route:0.000->3.810',
+        'rapid-travel 0,0->10,390 z:3.81->3.81 route:3.810->393.938',
+        'vertical 10,390->10,390 z:3.81->-1 route:393.938->398.748',
+        'process 10,390->20,390 route:398.748->408.748',
+        'vertical 20,390->20,390 z:-1->3.81 route:408.748->413.558',
+        'rapid-travel 20,390->0,0 z:3.81->3.81 route:413.558->804.071',
       ],
     });
 
