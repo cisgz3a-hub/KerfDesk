@@ -1,11 +1,16 @@
 import type { ExecutablePlanPoint, ExecutablePlanV1 } from '../../core/execution-plan';
-import { formatGcodeCoordinateMm } from '../../core/gcode';
 import type { JobOriginPlacement, Toolpath, ToolpathStep } from '../../core/job';
 import type { DeviceProfile } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
-import { emitPreparedGcodeWithExecutablePlan } from '../../io/gcode/executable-plan-emission';
+import { emitPreparedGcodeWithExecutablePlan } from '../../io/gcode/executable-plan';
+import { comparePreviewRoutesAtEmitPrecision } from './preview-route-parity';
 import { mapToolpathToScene } from './preview-scene-frame';
+
+export {
+  comparePreviewRoutesAtEmitPrecision,
+  type PreviewRouteParityResult,
+} from './preview-route-parity';
 
 type PreparedSuccess = Extract<PreparedOutput, { readonly ok: true }>;
 
@@ -25,30 +30,6 @@ export type ExecutablePlanPreviewCarrier = {
   readonly executablePlanPreview?: ExecutablePlanPreviewRoute;
 };
 
-export type PreviewRouteParityResult =
-  | { readonly ok: true }
-  | {
-      readonly ok: false;
-      readonly reason: 'segment-count';
-      readonly legacyCount: number;
-      readonly planCount: number;
-      readonly legacySample: ReadonlyArray<string>;
-      readonly planSample: ReadonlyArray<string>;
-    }
-  | {
-      readonly ok: false;
-      readonly reason: 'segment-mismatch';
-      readonly index: number;
-      readonly legacy: string;
-      readonly plan: string;
-    }
-  | {
-      readonly ok: false;
-      readonly reason: 'route-length';
-      readonly legacy: string;
-      readonly plan: string;
-    };
-
 type PreviewRouteSource = ExecutablePlanPreviewRoute['source'] | 'legacy-toolpath';
 
 const executableRouteCache = new WeakMap<Toolpath, ExecutablePlanPreviewRoute>();
@@ -66,6 +47,10 @@ export function registerExecutablePlanPreviewRoute(args: {
   readonly jobOriginOffset: Vec2;
   readonly device: DeviceProfile;
 }): PreviewRouteSource {
+  // v1 interprets the emitted program from an assumed work-origin start.
+  // Current-position placement has a live runtime basis even when its numeric
+  // XY happens to be zero, so coordinate equality cannot prove identity.
+  if (args.jobOrigin?.startFrom === 'current-position') return 'legacy-toolpath';
   // ADR-243's row provider exists specifically to avoid materializing a full
   // raster. v1 plans retain the exact emitted program, so building one here
   // would defeat that bounded-memory preview path and repeat every streamed
@@ -200,119 +185,4 @@ function xy(point: ExecutablePlanPoint): Vec2 {
 
 function pointDistance(from: ExecutablePlanPoint, to: ExecutablePlanPoint): number {
   return Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
-}
-
-type PreviewRouteSegment = {
-  readonly kind: 'process' | 'rapid-travel' | 'feed-travel' | 'vertical';
-  readonly from: Vec2;
-  readonly to: Vec2;
-  readonly fromZ?: number;
-  readonly toZ?: number;
-};
-
-export function comparePreviewRoutesAtEmitPrecision(
-  left: Toolpath,
-  right: Toolpath,
-): PreviewRouteParityResult {
-  const leftSegments = routeSegments(left);
-  const rightSegments = routeSegments(right);
-  if (leftSegments.length !== rightSegments.length) {
-    return {
-      ok: false,
-      reason: 'segment-count',
-      legacyCount: leftSegments.length,
-      planCount: rightSegments.length,
-      legacySample: leftSegments.slice(0, 8).map(routeSegmentText),
-      planSample: rightSegments.slice(0, 8).map(routeSegmentText),
-    };
-  }
-  for (let index = 0; index < leftSegments.length; index += 1) {
-    const segment = leftSegments[index];
-    const candidate = rightSegments[index];
-    if (segment === undefined || candidate === undefined || !sameRouteSegment(segment, candidate)) {
-      return {
-        ok: false,
-        reason: 'segment-mismatch',
-        index,
-        legacy: routeSegmentText(segment),
-        plan: routeSegmentText(candidate),
-      };
-    }
-  }
-  const legacyLength = formatGcodeCoordinateMm(left.totalLength);
-  const planLength = formatGcodeCoordinateMm(right.totalLength);
-  if (legacyLength !== planLength) {
-    return {
-      ok: false,
-      reason: 'route-length',
-      legacy: legacyLength,
-      plan: planLength,
-    };
-  }
-  return { ok: true };
-}
-
-function routeSegments(toolpath: Toolpath): ReadonlyArray<PreviewRouteSegment> {
-  return toolpath.steps.flatMap((step) => {
-    if (step.kind === 'travel') {
-      return [
-        {
-          kind: step.motion === 'feed' ? ('feed-travel' as const) : ('rapid-travel' as const),
-          from: step.from,
-          to: step.to,
-          ...(step.z === undefined ? {} : { fromZ: step.z.from, toZ: step.z.to }),
-        },
-      ];
-    }
-    if (step.kind === 'plunge') {
-      return [
-        {
-          kind: 'vertical' as const,
-          from: step.at,
-          to: step.at,
-          fromZ: step.fromZ,
-          toZ: step.toZ,
-        },
-      ];
-    }
-    const segments: PreviewRouteSegment[] = [];
-    for (let index = 1; index < step.polyline.length; index += 1) {
-      const from = step.polyline[index - 1];
-      const to = step.polyline[index];
-      if (from === undefined || to === undefined) continue;
-      segments.push({ kind: 'process', from, to });
-    }
-    return segments;
-  });
-}
-
-function sameRouteSegment(left: PreviewRouteSegment, right: PreviewRouteSegment): boolean {
-  return (
-    left.kind === right.kind &&
-    samePointAtEmitPrecision(left.from, right.from) &&
-    samePointAtEmitPrecision(left.to, right.to) &&
-    sameOptionalCoordinate(left.fromZ, right.fromZ) &&
-    sameOptionalCoordinate(left.toZ, right.toZ)
-  );
-}
-
-function routeSegmentText(segment: PreviewRouteSegment | undefined): string {
-  if (segment === undefined) return 'missing';
-  const z =
-    segment.fromZ === undefined && segment.toZ === undefined
-      ? ''
-      : ` z:${String(segment.fromZ)}->${String(segment.toZ)}`;
-  return `${segment.kind} ${segment.from.x},${segment.from.y}->${segment.to.x},${segment.to.y}${z}`;
-}
-
-function samePointAtEmitPrecision(left: Vec2, right: Vec2): boolean {
-  return (
-    formatGcodeCoordinateMm(left.x) === formatGcodeCoordinateMm(right.x) &&
-    formatGcodeCoordinateMm(left.y) === formatGcodeCoordinateMm(right.y)
-  );
-}
-
-function sameOptionalCoordinate(left: number | undefined, right: number | undefined): boolean {
-  if (left === undefined || right === undefined) return left === right;
-  return formatGcodeCoordinateMm(left) === formatGcodeCoordinateMm(right);
 }
