@@ -3,13 +3,16 @@ import {
   computeJobMotionBounds,
   estimateJobDuration,
   machineSpaceJob,
+  rotaryAppliesTo,
   type JobBounds,
   type JobDurationEstimate,
   type JobOriginPlacement,
 } from '../../core/job';
+import type { ExecutablePlanV1 } from '../../core/execution-plan';
 import { resolveJobParkTarget } from '../../core/output';
 import { machineKindOf, type Vec2 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
+import { selectExecutablePlanCalculatedBounds } from './executable-plan-calculated-bounds';
 
 type SuccessfulPreparedOutput = Extract<PreparedOutput, { readonly ok: true }>;
 
@@ -28,6 +31,7 @@ export type PreparedJobMetrics = {
 export function buildPreparedJobMetrics(
   prepared: SuccessfulPreparedOutput,
   jobOrigin?: JobOriginPlacement,
+  executablePlan?: ExecutablePlanV1,
 ): PreparedJobMetrics {
   const device = prepared.project.device;
   const machineKind = machineKindOf(prepared.project.machine);
@@ -45,14 +49,19 @@ export function buildPreparedJobMetrics(
     device,
     finishPosition === undefined ? {} : { initialPosition: finishPosition, finishPosition },
   );
-  const jobBounds = computeJobBounds(prepared.job, device);
-  const motionBounds = computeJobMotionBounds(prepared.job, device);
+  const calculatedBounds = selectExecutablePlanCalculatedBounds({
+    legacyJobBounds: computeJobBounds(prepared.job, device),
+    legacyMotionBounds: computeJobMotionBounds(prepared.job, device),
+    ...(executablePlan === undefined ? {} : { executablePlan }),
+    ...(jobOrigin === undefined ? {} : { jobOrigin }),
+    rotaryApplies: rotaryAppliesTo(device, prepared.project.machine),
+  });
   const frameJobBounds = computeJobBounds(framedJob, device);
   const frameMotionBounds = computeJobMotionBounds(framedJob, device);
   return {
     duration,
-    jobBounds,
-    motionBounds,
+    jobBounds: calculatedBounds.jobBounds,
+    motionBounds: calculatedBounds.motionBounds,
     frameJobBounds,
     frameMotionBounds,
     parkTarget: resolveJobParkTarget(prepared.job, device, machineKind, finishPosition),

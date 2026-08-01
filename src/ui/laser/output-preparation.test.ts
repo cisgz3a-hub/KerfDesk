@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rotaryRasterSaveProject } from '../../__fixtures__/rotary-raster-save-project';
 import type { StatusReport } from '../../core/controllers/grbl';
+import { computeJobBounds, computeJobMotionBounds } from '../../core/job';
 import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -13,6 +14,8 @@ import {
 } from '../../core/scene';
 import { emitPreparedGcode } from '../../io/gcode';
 import { hydratePreparedExecutionOutput } from '../../io/gcode/prepared-output-persistence';
+import { canvasExecutablePlan } from '../state/canvas-preview-motion';
+import { selectExecutablePlanCalculatedBounds } from './executable-plan-calculated-bounds';
 import { prepareOutputRequest } from './output-preparation';
 
 const IDLE: StatusReport = {
@@ -121,6 +124,43 @@ describe('output preparation worker payload', () => {
       }).gcode,
     ).toBe(response.result.gcode);
   });
+
+  it('uses the same verified plan for calculated bounds without changing emitted bytes', () => {
+    const response = prepareOutputRequest({
+      kind: 'start',
+      project: fullBedLineProject(),
+      controllerSettings: null,
+      machine: {
+        statusReport: IDLE,
+        alarmCode: null,
+        hasActiveStreamer: false,
+        settingsCapability: 'none',
+      },
+      jobPlacement: DEFAULT_JOB_PLACEMENT,
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      allowRotaryRaster: false,
+      requireFrame: false,
+    });
+
+    expect(response.kind).toBe('start');
+    if (response.kind !== 'start' || !response.result.ok) throw new Error('Start did not prepare.');
+    const { prepared, canvasPlan, gcode, metrics } = response.result;
+    const plan = canvasExecutablePlan(canvasPlan);
+    expect(plan).toBeDefined();
+    if (plan === undefined) return;
+    const selected = selectExecutablePlanCalculatedBounds({
+      legacyJobBounds: computeJobBounds(prepared.job, prepared.project.device),
+      legacyMotionBounds: computeJobMotionBounds(prepared.job, prepared.project.device),
+      executablePlan: plan,
+      rotaryApplies: false,
+    });
+
+    expect(selected.source).toBe('executable-plan');
+    expect(metrics.jobBounds).toEqual(selected.jobBounds);
+    expect(metrics.motionBounds).toEqual(selected.motionBounds);
+    expect(plan.compatibility.exactProgram).toBe(gcode);
+    expect(emitPreparedGcode(prepared).gcode).toBe(gcode);
+  });
 });
 
 function streamedProject(): Project {
@@ -149,6 +189,38 @@ function streamedProject(): Project {
         ditherAlgorithm: 'threshold',
         fillOverscanMm: 0,
       },
+    ),
+  };
+}
+
+function fullBedLineProject(): Project {
+  const base = createProject();
+  const color = '#222222';
+  return {
+    ...base,
+    scene: addLayer(
+      addObject(base.scene, {
+        kind: 'imported-svg',
+        id: 'full-bed-line',
+        source: 'full-bed-line.svg',
+        bounds: { minX: 0, minY: 0, maxX: 0, maxY: base.device.bedHeight },
+        transform: IDENTITY_TRANSFORM,
+        paths: [
+          {
+            color,
+            polylines: [
+              {
+                closed: false,
+                points: [
+                  { x: 0, y: 0 },
+                  { x: 0, y: base.device.bedHeight },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+      createLayer({ id: color, color, mode: 'line' }),
     ),
   };
 }

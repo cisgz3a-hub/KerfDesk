@@ -418,6 +418,19 @@ because the emitted plan includes the preamble safe-Z rise and postamble retract
 `toolpath-cnc.ts` deliberately omits at the job boundaries. That source-confirmed difference is not
 hidden by a projection rule; reconciling it requires its own reviewed compatibility decision.
 
+The third integration slice applies the rule to the Start-time calculated bounds held in
+`PreparedJobMetrics.jobBounds` and `PreparedJobMetrics.motionBounds`. The first value reads the
+plan's process-only XY bounds; the second reads its all-motion XY bounds. Both values change
+authority together only when both agree with the existing prepared-Job calculations at the three
+decimal places emitted for millimetre coordinates. A missing sidecar or either disagreement keeps
+both legacy values. Current-position jobs always retain the legacy runtime start basis, even at
+numeric `(0, 0)`, and rotary jobs retain design-surface bounds because the emitted plan is already
+scaled into machine space. Realtime and settle-only Start preparation reuse the exact plan object
+already associated with the canvas; file-only preparation constructs the same verified sidecar.
+This slice deliberately leaves duration, park calculation, Frame-specific bounds, Frame motion,
+recovery, and emitted bytes unchanged. In particular, a plan all-motion envelope widened by its
+initial approach or terminal park falls back instead of inventing an undocumented projection rule.
+
 ### The Inspector is explicitly out of scope for v1
 
 ADR-271's context lists Inspector render models among the representations to unify, but the
