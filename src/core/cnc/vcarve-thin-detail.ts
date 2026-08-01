@@ -134,4 +134,3 @@ function sliverRoots(slivers: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> 
     return containmentDepth % 2 === 0;
   });
 }
-
