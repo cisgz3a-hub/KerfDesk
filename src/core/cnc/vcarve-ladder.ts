@@ -101,7 +101,7 @@ export function vcarveLadderPasses(
     (polyline) =>
       polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
   );
-  const delta = vcarveResolutionMm(options.resolutionMm, options.tool.diameterMm);
+  const requestedDeltaMm = vcarveResolutionMm(options.resolutionMm, options.tool.diameterMm);
   const tanHalf = Math.tan((tipAngleDeg / 2) * (Math.PI / 180));
   // The bit's cutting flank ends where the cone reaches the full diameter:
   // (D/2)/tan(θ/2). Deeper "V" cuts do not physically exist — the shank
@@ -113,6 +113,15 @@ export function vcarveLadderPasses(
       : Number.POSITIVE_INFINITY;
   const maxDepth = Math.min(options.maxDepthMm, coneHeightMm);
   if (contours.length === 0 || !(maxDepth > 0)) return NO_LADDER;
+  // A depth-clamped ring cuts a footprint of only maxDepth·tan(θ/2) radius, so
+  // rings spaced wider than twice that leave untouched stripes between them —
+  // the defect the #575 revert measured (10.7 % floor coverage at a 0.05 mm
+  // max depth). The configured Detail is a MAXIMUM spacing; the clamp physics
+  // may demand finer. Same law at the fine pitch. Ring counts stay bounded by
+  // MAX_VCARVE_RINGS / MAX_THIN_DETAIL_RINGS as before.
+  const footprintPitchMm = 2 * maxDepth * tanHalf;
+  const delta = Math.min(requestedDeltaMm, footprintPitchMm);
+  const finePitchMm = Math.min(THIN_DETAIL_RESOLUTION_MM, footprintPitchMm);
 
   // Ring k (1-based in the depth law above) is ladder step k - 1.
   const ladder = buildOffsetLadder(contours, MAX_VCARVE_RINGS, (step) => (step + 1) * delta);
@@ -120,9 +129,10 @@ export function vcarveLadderPasses(
   // re-carve everything at fine pitch. offsetFailed already reports the gap.
   const detail = ladder.offsetFailed
     ? NO_DETAIL
-    : vcarveThinDetailRings(contours, ladder.rings[0] ?? [], delta);
+    : vcarveThinDetailRings(contours, ladder.rings[0] ?? [], delta, finePitchMm);
   const rings = zipRegionRings(contours, ladder.rings, detail, {
     deltaMm: delta,
+    finePitchMm,
     tanHalf,
     maxDepthMm: maxDepth,
   });
@@ -161,6 +171,7 @@ export function vcarveResolutionMm(settingMm: number, toolDiameterMm: number): n
 // rings, then its detail, before the cutter travels on (ADR-270, ADR-279).
 type RingDepthClamp = {
   readonly deltaMm: number;
+  readonly finePitchMm: number;
   readonly tanHalf: number;
   readonly maxDepthMm: number;
 };
@@ -179,7 +190,7 @@ function zipRegionRings(
       ...ringsForBucket(coarse[bucket] ?? [], clamp.deltaMm, clamp),
       ...ringsForBucket(
         orderDetailBySliver(fine[bucket] ?? [], detail.sliverRoots),
-        THIN_DETAIL_RESOLUTION_MM,
+        clamp.finePitchMm,
         clamp,
       ),
     );

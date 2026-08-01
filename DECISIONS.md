@@ -14597,3 +14597,57 @@ drop was a fidelity bug against the whole reference field, not a design choice.
   99.7 % coverage with the detail grooves tracking the analytic field.
 - NOT verified: a physical cut (no hardware available), and the junction under-cut blend is
   bounded analytically but has not been rendered on hardware.
+
+## ADR-279 Amendment - coverage law corrected after the #575 revert (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+PR #575 reverted the first landing of this decision (#572, `597422d7`) after an independent
+exact-head review reproduced five defects. Each is answered here; the stage re-lands with the
+corrections and with the #577 refinements (sliver-major detail ordering, exact residual, layer
+panel note) folded in.
+
+### Findings and corrections
+
+1. **Depth-clamp coverage (real defect).** A ring clamped to maxDepth cuts a surface footprint
+   of only maxDepth·tan(θ/2) radius; the ladder's δ spacing and the detail stage's coverage
+   claim both assumed the unclamped footprint (inset-sized), so a 2×2 mm square at Detail
+   0.5 mm and max depth 0.05 mm carved ~11 % of its floor while reporting nothing. Corrected:
+   ring pitch is now min(configured Detail, 2·maxDepth·tan(θ/2)) and the fine pitch is
+   min(0.05 mm, the same bound), so adjacent footprints always overlap. The configured Detail
+   is a MAXIMUM spacing; clamp physics may demand finer. The #575 probe is a pinned perceptual
+   regression test (coverage ≥ 85 %, clamp still honoured; it measured 13.8 % before the fix).
+2. **Tapering-tail residual (real defect in #572).** Fixed by the exact-residual computation
+   from #577 (sliver minus its fine first ring grown by the pitch), folded into this landing.
+3. **Difference precision (real sloppiness).** `differenceD` was called without a precision
+   argument (clipper defaults to 2 decimals) while the coverage-slack comment claimed a
+   3-decimal grid. Corrected: explicit `DIFFERENCE_PRECISION_DECIMALS = 3`, matching
+   kerf-offset's `OFFSET_PRECISION_DECIMALS`.
+4. **Byte-identity overclaim.** Decision 3's "wide-only artwork produces byte-identical
+   G-code" was false for sharp-cornered wide shapes where δ ≥ ~0.4 mm: corner-wedge detail
+   passes change those outputs (19 → 23 passes on the reviewer's fixture). The accurate
+   statement: wide artwork without rescued corner wedges is byte-identical; sharp corners
+   gain shallow wedge passes by design (the disc cannot reach a mitered corner tip).
+5. **Emitter revision (process).** Output shaping changed without a revision bump. Corrected:
+   `EMITTER_REVISION` is now `adr-279-vcarve-thin-detail-v2`.
+
+### Consequences
+
+- Heavily depth-clamped v-carves emit more rings than the configured Detail implies — that is
+  the physical price of full floor coverage at the requested depth; counts remain bounded by
+  the existing 8192-ring backstops. Unclamped carves (2·maxDepth·tan(θ/2) ≥ Detail) are
+  unchanged by the pitch law.
+- The pre-existing "shallow flat-floor sampling" limitation #575 names is thereby corrected
+  for the ladder itself, not merely patched in the detail stage.
+
+### Verification
+
+- `vcarve-thin-perceptual.test.ts` pins the #575 probe (2×2 mm, Detail 0.5, max depth
+  0.05 mm): coverage ≥ 85 % and no cut deeper than the clamp.
+- The full v-carve battery (ladder, thin-detail, region-order, both perceptual suites,
+  polygon-difference, gcode-metadata, advisory warnings) passes on the re-land head.
+- NOT verified: physical cutting; the junction under-cut blend remains as documented in the
+  base decision.

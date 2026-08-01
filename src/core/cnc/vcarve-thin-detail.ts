@@ -62,11 +62,14 @@ export type ThinDetailRings = {
  * Fine-pitch rings for every part of `sourceContours` the δ ladder's first
  * ring does not cover. `firstRing` is the ladder's step-0 output — empty when
  * the whole region is thinner than 2δ, in which case everything is detail.
+ * `finePitchMm` defaults to THIN_DETAIL_RESOLUTION_MM; a depth-clamped carve
+ * passes a tighter pitch so fine footprints overlap too (#575).
  */
 export function vcarveThinDetailRings(
   sourceContours: ReadonlyArray<Polyline>,
   firstRing: ReadonlyArray<Polyline>,
   coarseInsetMm: number,
+  finePitchMm: number = THIN_DETAIL_RESOLUTION_MM,
 ): ThinDetailRings {
   const uncovered = uncoveredByFirstRing(sourceContours, firstRing, coarseInsetMm);
   if (uncovered.kind === 'error') {
@@ -78,12 +81,12 @@ export function vcarveThinDetailRings(
   const fine = buildOffsetLadder(
     uncovered.value,
     MAX_THIN_DETAIL_RINGS,
-    (step) => (step + 1) * THIN_DETAIL_RESOLUTION_MM,
+    (step) => (step + 1) * finePitchMm,
   );
   return {
     rings: fine.rings,
     offsetFailed: fine.offsetFailed,
-    residualThin: hasResidualThin(uncovered.value, fine.rings[0] ?? []),
+    residualThin: hasResidualThin(uncovered.value, fine.rings[0] ?? [], finePitchMm),
     sliverRoots: sliverRoots(uncovered.value),
   };
 }
@@ -111,8 +114,9 @@ function uncoveredByFirstRing(
 function hasResidualThin(
   slivers: ReadonlyArray<Polyline>,
   fineFirstRing: ReadonlyArray<Polyline>,
+  finePitchMm: number,
 ): boolean {
-  const residual = uncoveredByFirstRing(slivers, fineFirstRing, THIN_DETAIL_RESOLUTION_MM);
+  const residual = uncoveredByFirstRing(slivers, fineFirstRing, finePitchMm);
   // An engine failure leaves the question unanswerable; stay silent rather
   // than warn on speculation — this is advisory input either way (rule 7).
   if (residual.kind === 'error') return false;

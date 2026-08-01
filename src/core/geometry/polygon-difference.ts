@@ -18,6 +18,10 @@ import {
 } from './vector-path-tools';
 
 const MIN_CLOSED_POINTS = 3;
+// Same 1 µm rounding grid as kerf-offset's OFFSET_PRECISION_DECIMALS — the
+// clipper default is 2 decimals, which would quantize hairline slivers more
+// coarsely than the coverage slack that filters them (#575 finding).
+const DIFFERENCE_PRECISION_DECIMALS = 3;
 
 /**
  * Area of `subject` not inside `clip`, both read with even-odd fill. An empty
@@ -35,7 +39,9 @@ export function differenceClosedPolylinesChecked(
   if (subjectPaths.length === 0) return ok([]);
   const clipPaths = clip.map(polylineToPathD).filter((path) => path.length >= MIN_CLOSED_POINTS);
   if (clipPaths.length === 0) return ok(subject);
-  const combined = tryVectorOp(() => differenceD(subjectPaths, clipPaths, FillRule.EvenOdd));
+  const combined = tryVectorOp(() =>
+    differenceD(subjectPaths, clipPaths, FillRule.EvenOdd, DIFFERENCE_PRECISION_DECIMALS),
+  );
   if (combined.kind === 'error') return combined;
   // Drop the sub-micron needle vertices clipper leaves along the seam, the
   // same cleanup every offset in kerf-offset.ts applies before the emitter.

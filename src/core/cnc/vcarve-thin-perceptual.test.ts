@@ -41,7 +41,11 @@ const MAX_DEPTH = 2;
 const CELL = 0.05;
 const STROKE_W = 0.6;
 
-function scene(polyline: Polyline, bounds: ImportedSvg['bounds']): Scene {
+function scene(
+  polyline: Polyline,
+  bounds: ImportedSvg['bounds'],
+  cnc?: Partial<Scene['layers'][number]['cnc'] & object>,
+): Scene {
   const object: ImportedSvg = {
     kind: 'imported-svg',
     id: 'O1',
@@ -61,6 +65,7 @@ function scene(polyline: Polyline, bounds: ImportedSvg['bounds']): Scene {
           depthMm: MAX_DEPTH,
           depthPerPassMm: MAX_DEPTH,
           vResolutionMm: 0, // auto — the setting the bug was reported with
+          ...cnc,
         },
       },
     ],
@@ -219,6 +224,69 @@ describe('v-carve thin artwork — perceptual (ADR-279)', () => {
     // Before ADR-279: 0.0 — the connector never received a single cut.
     expect(tailCut / tailCells).toBeGreaterThanOrEqual(0.9);
     expect(tailMaxError).toBeLessThanOrEqual(tolerance);
+  });
+
+  it('a depth-clamped carve still covers the floor (the #575 revert probe)', () => {
+    // 2×2 mm square, Detail 0.5 mm, max depth 0.05 mm: a clamped ring's
+    // footprint is only maxDepth·tan(45°) = 0.05 mm wide, so 0.5 mm ring
+    // spacing left ~89 % of the floor untouched while reporting nothing —
+    // the defect #575 measured (683/6400 cells). Ring pitch must tighten to
+    // 2·maxDepth·tan(θ/2) so adjacent footprints overlap.
+    const clampDepth = 0.05;
+    const points: ReadonlyArray<Vec2> = [
+      { x: AT, y: AT },
+      { x: AT + 2, y: AT },
+      { x: AT + 2, y: AT + 2 },
+      { x: AT, y: AT + 2 },
+    ];
+    const polygon = machinePolygon(points);
+    const job = compileCncJob(
+      scene(
+        { closed: true, points },
+        { minX: AT, minY: AT, maxX: AT + 2, maxY: AT + 2 },
+        { depthMm: clampDepth, depthPerPassMm: clampDepth, vResolutionMm: 0.5 },
+      ),
+      DEFAULT_DEVICE_PROFILE,
+      vbitConfig(),
+    );
+    const toolpath = buildToolpath(job);
+    const xs = polygon.map((point) => point.x);
+    const ys = polygon.map((point) => point.y);
+    const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
+    const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
+    const cell = 0.02;
+    const grid = expectGrid(
+      computeRemovalGrid(
+        toolpath,
+        {
+          originX: minX - 1,
+          originY: minY - 1,
+          widthMm: maxX - minX + 2,
+          heightMm: maxY - minY + 2,
+          mmPerCell: cell,
+        },
+        kernelForTool(VBIT_90, cell),
+      ),
+    );
+    let insideCells = 0;
+    let cutInside = 0;
+    let deepestCut = 0;
+    for (let cy = 0; cy < grid.heightCells; cy += 1) {
+      for (let cx = 0; cx < grid.widthCells; cx += 1) {
+        const x = grid.originX + (cx + 0.5) * grid.mmPerCell;
+        const y = grid.originY + (cy + 0.5) * grid.mmPerCell;
+        if (x < minX || x > maxX || y < minY || y > maxY) continue;
+        const cellDepth = grid.depth[cy * grid.widthCells + cx] ?? 0;
+        insideCells += 1;
+        if (cellDepth < 0) cutInside += 1;
+        deepestCut = Math.min(deepestCut, cellDepth);
+      }
+    }
+    expect(insideCells).toBeGreaterThan(0);
+    // #575 measured 10.67 % here; overlapping footprints must cover the floor.
+    expect(cutInside / insideCells).toBeGreaterThanOrEqual(0.85);
+    // The clamp is still honoured — nothing cuts deeper than requested.
+    expect(deepestCut).toBeGreaterThanOrEqual(-clampDepth - 1e-9);
   });
 
   it('emits deterministic G-code for the thin-stroke job (snapshot)', () => {
