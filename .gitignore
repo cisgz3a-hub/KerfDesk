@@ -64,5 +64,11 @@ Thumbs.db
 # Local Claude / planning artifacts that should not ship to the repo
 .claude/
 
+# Codex agent worktrees — full working copies of this repo, checked out
+# beside it. Not cosmetic: `prettier --check .` reads .gitignore, so this
+# line is what keeps `pnpm format:check` from walking every copy. ESLint
+# does NOT read .gitignore — it needs its own entry in eslint.config.mjs.
+.codex-worktrees/
+
 # Local reference repos for study only
 references/
