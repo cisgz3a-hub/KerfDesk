@@ -1,4 +1,3 @@
-import { pointInPolygon } from '../geometry';
 import type { CncPass } from '../job';
 import type { CncCutType, CncLayerSettings, Polyline, Vec2 } from '../scene';
 
@@ -24,20 +23,6 @@ export function resolveRetractBetweenPasses(settings: CncLayerSettings): boolean
   return eligible ? (settings.retractBetweenPasses ?? true) : false;
 }
 
-export function orderInnerFirst(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> {
-  const closedPolylines = polylines.filter(
-    (polyline) => polyline.closed && polyline.points.length >= 3,
-  );
-  return polylines
-    .map((polyline, index) => ({
-      polyline,
-      index,
-      depth: containmentDepth(polyline, closedPolylines),
-    }))
-    .sort((a, b) => b.depth - a.depth || a.index - b.index)
-    .map((entry) => entry.polyline);
-}
-
 export function capFeed(feedMmPerMin: number, maxFeed: number): number {
   if (!Number.isFinite(feedMmPerMin) || feedMmPerMin <= 0) return MIN_FEED_MM_PER_MIN;
   return Math.min(feedMmPerMin, maxFeed);
@@ -46,16 +31,6 @@ export function capFeed(feedMmPerMin: number, maxFeed: number): number {
 export function capSpindle(spindleRpm: number, spindleMaxRpm: number): number {
   if (!Number.isFinite(spindleRpm) || spindleRpm <= 0) return 0;
   return Math.min(spindleRpm, spindleMaxRpm);
-}
-
-function containmentDepth(polyline: Polyline, closed: ReadonlyArray<Polyline>): number {
-  const probe = polyline.points[0];
-  if (probe === undefined) return 0;
-  let depth = 0;
-  for (const candidate of closed) {
-    if (candidate !== polyline && pointInPolygon(probe, candidate.points)) depth += 1;
-  }
-  return depth;
 }
 
 function ensureRingClosure(polyline: Polyline): ReadonlyArray<Vec2> {

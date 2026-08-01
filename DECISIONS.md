@@ -14259,3 +14259,51 @@ claim physical qualification.
 - The research/model-fit record is `docs/audits/2026-08-01-cnc-bit-catalog-research.md`.
 - NOT verified: manufacturer SKU completeness, manufacturer feed recommendations, real spindle or
   collet compatibility, an air cut, a material cut, surface finish, or perceptual 3D fidelity.
+
+## ADR-276 - Profile cuts finish one part before travelling to the next (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+`orderInnerFirst` ordered a profile layer's toolpaths by containment depth alone: every inner
+contour in the scene, then every outer. The inner-before-outer property is load-bearing — cutting
+a hole after the outer that frees its part machines a workpiece that can move — but the global
+partition also meant the cutter visited every letter counter across a multi-part job before
+returning to the first part's outer. Field case (2026-08-01): a two-line "Drive / Safe"
+profile-on-path job cut one counter in the top word, dived to two counters in the bottom word,
+then travelled back to the top-left letter — three cross-field rapids before any letter was
+complete. ADR-270 already fixed the same class of defect for V-carve ladders by grouping on the
+source filled region.
+
+### Decision
+
+- `orderInnerFirst` (`src/core/cnc/profile-ordering.ts`) groups toolpaths into parts: each
+  top-level contour owns every contour nested inside it. Parts run in the order their top-level
+  contours appear in the input — the same source-order rule as ADR-270 — and inside a part the
+  order stays innermost-first, ties by input order, outer last.
+- A nested contour's owner is the first top-level contour containing its probe point; anything no
+  top-level contour contains owns itself, so lone open engravings keep their input position.
+- The duplicate `orderInnerFirst` copy in `compile-cnc-helpers.ts` is deleted; the roughing path
+  (`compile-cnc-job.ts`) and the finishing path (`finish-allowance.ts`) now share the one
+  `profile-ordering.ts` implementation, so both walk parts identically.
+
+### Consequences
+
+- A letter (or any part) is machined completely — counters, then its outer, at every depth —
+  before the cutter travels on. The safety ordering inside each part is unchanged; freeing part A
+  never affects part B's uncut counters, which sit inside B.
+- Single-part layers order exactly as before. Multi-part profile layers reorder, so multi-part
+  G-code snapshots change once; single-part snapshots stay byte-identical.
+- Travel distance is not globally minimized (parts follow scene order, matching ADR-270), only
+  degrouped cross-field hops are eliminated.
+
+### Verification
+
+- `profile-ordering.test.ts` pins part completion, part order by input, innermost-first within a
+  part, open-detail grouping, lone-contour position, and single/empty passthrough.
+- `compile-cnc-part-order.test.ts` pins the compiled pass sequence end-to-end for a two-letter
+  profile-on-path layer (counter ladder, outer ladder, next letter).
+- NOT verified: a physical cut. No hardware is available; the evidence is the compiled pass
+  sequence and the existing motion invariants.
