@@ -926,7 +926,6 @@ main; fresh GitHub checks remain required on the corrected draft head.
   pressure behavior, or equivalent behavior for native project, LightBurn, or material imports.
 - No hardware, controller, firmware, setting, Frame, Start, deployment, or merge action is part of
   this repair.
-
 ## Corrective audit 7 - incremental production LightBurn XML source
 
 **Status:** corrected and re-verified after independent exact-diff audit on current main; final
@@ -1116,3 +1115,66 @@ remains pending.
 - Native material-library JSON remains whole-text. Save, autosave, recovery, PNG/lifecycle, Trace,
   Image Editor, hardware, controller, firmware, settings, Frame, Start, deployment, and merge are
   outside this one-fix repair.
+
+## Corrective audit 6 - typed STL mesh project serialization
+
+**Status:** fixed and independently approved; review readiness requires exact-head GitHub checks.
+
+### Finding
+
+- STL import retains the parsed mesh as a transferable `Float32Array`, but every manual save and
+  autosave called `Array.from(meshPositions)` on the UI thread before JSON serialization.
+- That expanded the dense mesh into a second boxed-number object graph even though JSON output can
+  be produced by indexed access to the existing typed buffer.
+- A failing regression replaced the typed array iterator with a throwing function. Before the
+  repair, `serializeProject` failed at the `Array.from` call: 1 failed and 6 passed tests.
+
+### Repair
+
+- Projects without typed relief meshes retain the existing native `JSON.stringify` path.
+- A project containing a typed relief mesh uses a JSON-compatible writer that preserves the
+  existing two-space format, property order, line endings, trailing newline, and plain-array
+  bytes while reading `Float32Array` values without its iterator.
+- The normal finite STL path uses the typed array's indexed `join`; malformed non-finite data uses
+  indexed JSON encoding and is still rejected by the existing persistence validator.
+- The output remains one complete project string. This removes the explicit boxed `number[]`
+  expansion; it does not move save/autosave off the UI thread or make persistence memory-bounded.
+
+### Test-first verification
+
+- Red: the new direct regression failed at `Array.from` with the typed mesh iterator disabled.
+- Green focused suite: 2 files / 11 tests. It proves byte parity across representative Float32
+  number formats, continued rejection of non-finite coordinates, a 200,001-triangle save/reopen,
+  manual save, autosave, recovery, and quota-preservation behavior without typed-array iteration.
+- Green broader persistence suite: 41 files / 228 tests across every `src/io/project` test plus
+  the large typed-relief manual save/autosave/recovery/quota suite.
+- An initial indexed writer preserved bytes but made the 200,001-triangle test exceed its existing
+  five-second timeout. The finite fast path restored that test to 2.4 seconds without raising the
+  timeout.
+- Green focused ESLint and Prettier. Full renderer typecheck passed in 222 seconds after the first
+  attempt exceeded its 120-second command timeout.
+- The exact-tree composite `pnpm release:check` was not green. Typecheck, renderer/Electron lint,
+  formatting, ADR numbering, and license checks passed; the repo-wide test run then reported nine
+  unrelated load/timing failures across seven camera, V-carve, trace, accessibility, and release
+  shell files. Those seven files passed immediately in isolation: 7 files / 28 tests. The stages
+  the composite did not reach were run separately and passed: release integrity 14/14, production
+  web build, Electron-main build, hard/soft size policy, and public-export policy. Exact-head
+  GitHub CI remains required; this is not recorded as a green composite release gate.
+
+### Independent audit
+
+- A separate read-only reviewer approved the frozen five-file diff with no actionable findings.
+- The reviewer reproduced the focused and broader suites, confirmed validation was unchanged,
+  and compared the new writer with the former `Array.from` plus `JSON.stringify` path across
+  49,820 finite Float32 values and JSON special cases without invoking the typed-array iterator.
+- `origin/main` advanced during verification. The approved source/test patch was rebased without
+  overlap onto `09ba8d3d`; the ledger conflict retained merged SVG audit 5 before this audit 6.
+
+### Remaining boundary
+
+- Save/autosave still synchronously create and validate a complete JSON string on the UI thread;
+  peak memory still scales with serialized project size.
+- Reopen still parses the complete project JSON and materializes mesh coordinates as a plain
+  JavaScript array. This slice removes one source-side boxed duplicate only.
+- No greater-than-200 MiB, unlimited-import, streaming-persistence, PNG/lifecycle, hardware,
+  controller, settings, Frame, Start, merge, or deployment claim is part of this repair.

@@ -62,6 +62,59 @@ describe('.lf2 relief round-trip (H.4)', () => {
     expect(result.project.scene.objects[0]).toEqual(relief());
   });
 
+  it('serializes a typed mesh without iterating it into a boxed array', () => {
+    const meshPositions = Float32Array.from([
+      0,
+      -0,
+      1 / 3,
+      1e-7,
+      1e20,
+      -1.25,
+      3.402_823_5e38,
+      1.175_494e-38,
+      42,
+    ]);
+    const base = reliefProject();
+    const plainProject: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [{ ...relief(), meshPositions: Array.from(meshPositions) }],
+      },
+    };
+    const expected = serializeProject(plainProject);
+    Object.defineProperty(meshPositions, Symbol.iterator, {
+      value: (): never => {
+        throw new Error('typed mesh iterator must not be used during persistence');
+      },
+    });
+    const typedProject: Project = {
+      ...plainProject,
+      scene: {
+        ...plainProject.scene,
+        objects: [{ ...relief(), meshPositions }],
+      },
+    };
+
+    expect(serializeProject(typedProject)).toBe(expected);
+  });
+
+  it('still rejects non-finite typed mesh coordinates without using their iterator', () => {
+    const meshPositions = Float32Array.from([0, 0, 0, 10, 0, 0, 0, 10, Number.NaN]);
+    Object.defineProperty(meshPositions, Symbol.iterator, {
+      value: (): never => {
+        throw new Error('invalid typed mesh iterator must not be used during persistence');
+      },
+    });
+    const base = reliefProject();
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [{ ...relief(), meshPositions }] },
+    };
+
+    expect(prepareProjectForPersistence(project)).toMatchObject({ kind: 'invalid' });
+  });
+
   it('rejects a relief whose mesh is not a whole number of triangles', () => {
     const raw = JSON.parse(serializeProject(reliefProject())) as {
       scene: { objects: Array<Record<string, unknown>> };
@@ -100,7 +153,12 @@ describe('.lf2 relief round-trip (H.4)', () => {
 describe('dense relief round-trips (no embed ceiling)', () => {
   it('serializes and reloads a relief far past the old 200k-triangle limit', () => {
     const triangles = 200_001;
-    const meshPositions = new Array<number>(triangles * 9).fill(1);
+    const meshPositions = new Float32Array(triangles * 9).fill(1);
+    Object.defineProperty(meshPositions, Symbol.iterator, {
+      value: (): never => {
+        throw new Error('dense typed mesh iterator must not be used during persistence');
+      },
+    });
     const base = createProject();
     const denseRelief = { ...relief(), meshPositions };
     const project: Project = {
