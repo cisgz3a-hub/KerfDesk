@@ -6,9 +6,20 @@
 // byte-deterministic given a byte-deterministic Project.
 
 import { polylineToCurveSubpath, type Project, type SceneObject } from '../../core/scene';
+import { stringifyProjectJson } from './stringify-project-json';
 
 export function serializeProject(project: Project): string {
-  return `${JSON.stringify(withCurveGeometry(project), null, 2)}\n`;
+  const serializable = withCurveGeometry(project);
+  const json = hasTypedRelief(project)
+    ? stringifyProjectJson(serializable)
+    : JSON.stringify(serializable, null, 2);
+  return `${json}\n`;
+}
+
+function hasTypedRelief(project: Project): boolean {
+  return project.scene.objects.some(
+    (object) => object.kind === 'relief' && object.meshPositions instanceof Float32Array,
+  );
 }
 
 function withCurveGeometry(project: Project): Project {
@@ -22,9 +33,6 @@ function withCurveGeometry(project: Project): Project {
 }
 
 function withSerializableObject(object: SceneObject): SceneObject {
-  if (object.kind === 'relief' && object.meshPositions instanceof Float32Array) {
-    return { ...object, meshPositions: Array.from(object.meshPositions) };
-  }
   if (!('paths' in object)) return object;
   return {
     ...object,

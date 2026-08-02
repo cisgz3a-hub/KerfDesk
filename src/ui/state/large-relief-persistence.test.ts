@@ -17,11 +17,17 @@ const POSITION_COUNT = 90_000;
 
 function typedReliefProject(notes = ''): Project {
   const project = createProject();
+  const meshPositions = new Float32Array(POSITION_COUNT).fill(1);
+  Object.defineProperty(meshPositions, Symbol.iterator, {
+    value: (): never => {
+      throw new Error('typed mesh iterator must not be used during persistence');
+    },
+  });
   const relief: ReliefObject = {
     kind: 'relief',
     id: 'typed-relief',
     source: 'large.stl',
-    meshPositions: new Float32Array(POSITION_COUNT).fill(1),
+    meshPositions,
     targetWidthMm: 100,
     reliefDepthMm: 5,
     emptyCells: 'floor',
