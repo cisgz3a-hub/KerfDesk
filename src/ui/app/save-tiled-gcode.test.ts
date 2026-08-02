@@ -154,7 +154,7 @@ describe('handleSaveTiledGcode', () => {
     expect(maxX(written.join('\n'))).toBeGreaterThan(55);
   });
 
-  it('writes tiles and warns when a split V-carve ramp starts below stock top', async () => {
+  it('writes tiles and discloses the thin-detail ramp fallback before clipping', async () => {
     const base = tiledCncProject();
     const machine = base.machine;
     if (machine?.kind !== 'cnc') throw new Error('expected CNC project');
@@ -199,12 +199,13 @@ describe('handleSaveTiledGcode', () => {
     expect(handled).toBe(true);
     expect(written.length).toBeGreaterThan(0);
     expect(toasts).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('not a re-verified emitted maximum'),
-        expect.stringContaining('direct plunge'),
-      ]),
+      expect.arrayContaining([expect.stringContaining('variable-depth thin-detail profile')]),
     );
-    expect(written.join('\n')).toContain('requested-max-angle-deg: 3.000');
+    expect(toasts.join('\n')).not.toContain('not a re-verified emitted maximum');
+    expect(toasts.join('\n')).not.toContain('direct plunge');
+    expect(written.join('\n')).toContain(
+      '; cnc entry: stepped-plunge-fallback; max-angle-deg: 3.000',
+    );
   });
 
   it('prepends provenance, machine assumptions, and tile identity to every file', async () => {
