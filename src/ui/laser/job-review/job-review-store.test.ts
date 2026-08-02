@@ -9,6 +9,7 @@ const model: JobReviewModel = {
   resolvedOriginLabel: 'Absolute coordinates (machine space)',
   toolPlanLabels: [],
   outputQualityFacts: [],
+  effectiveOperations: [],
   acknowledgement: { kind: 'laser-verified' },
 };
 const rebuiltModel: JobReviewModel = { ...model, warnings: ['changed'] };

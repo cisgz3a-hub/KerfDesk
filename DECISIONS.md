@@ -9864,6 +9864,14 @@ into a dropdown. Changes, none touching the gate contract:
   chevroned fact sections with counts, sticky Cancel/Start footer with a play glyph.
 - **Guard surface unchanged:** still one affirmative click, warnings still never block, and
   in-dialog blockers still only re-surface refusals the readiness pipeline already issues.
+
+### Amendment - exact compiled operation disclosure (2026-08-02)
+
+The editable Artwork settings rows continue to show the shared layer values, while a read-only
+detail row now reports every distinct effective operation from the exact prepared `Job`. This makes
+object overrides, per-object power scaling, split tools, and other compile-time resolution visible
+before Start instead of implying that the base layer row is the emitted truth. The disclosure is
+advisory only: it adds no guard, refusal, clamp, confirmation, or change to Frame or streamed bytes.
 > **Numbering note.** Drafted as ADR-221, but the fleet landed ADR-221 (elapsed-time badge),
 > ADR-222 (single-artwork selection), and ADR-223 (Canvas Focus layout) on main mid-flight - so
 > this entry is **ADR-224**. Re-verify the tail and open-PR claims before merge.
