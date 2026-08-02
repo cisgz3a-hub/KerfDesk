@@ -3,16 +3,7 @@
 // and the Device-Setup wizard can host it (F-CNC20) without duplicating the
 // G38.2 logic. CNC-only (null otherwise); the caller supplies the chrome.
 
-import { useState } from 'react';
-import {
-  DEFAULT_PLATE_CENTER_OFFSET_X_MM,
-  DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
-  DEFAULT_SIDE_CLEARANCE_MM,
-  DEFAULT_SIDE_DROP_MM,
-  DEFAULT_Z_PROBE_PARAMS,
-  type ProbeCorner,
-  type ZProbeParams,
-} from '../../core/controllers/grbl';
+import { type ProbeCorner, type ZProbeParams } from '../../core/controllers/grbl';
 import { type CornerProbeParams, type ProbeRequest } from '../../core/controllers/grbl/probe';
 import { activeCncTool } from '../../core/scene';
 import { useStore } from '../state';
@@ -24,8 +15,8 @@ import {
   type CornerProbeGeometryDraft,
 } from './CornerProbeGeometryFields';
 import { ProbeNumberField } from './ProbeNumberField';
+import { effectiveProbeBitDiameterMm, useProbeFormStore, type ProbeMode } from './probe-form-store';
 
-type ProbeMode = 'z' | 'corner';
 type ProbeFieldsProps = {
   readonly mode: ProbeMode;
   readonly corner: ProbeCorner;
@@ -54,16 +45,20 @@ export function ProbeControls(): JSX.Element | null {
   const probeBusy = useLaserStore((s) => s.probeBusy);
   const probe = useLaserStore((s) => s.probe);
   const pushToast = useToastStore((s) => s.pushToast);
-  const [mode, setMode] = useState<ProbeMode>('z');
-  const [corner, setCorner] = useState<ProbeCorner>('front-left');
-  const [zParams, setZParams] = useState<ZProbeParams>(DEFAULT_Z_PROBE_PARAMS);
-  const [bitDiameterMm, setBitDiameterMm] = useState<number | null>(null);
-  const [cornerGeometry, setCornerGeometry] = useState({
-    plateCenterOffsetXmm: DEFAULT_PLATE_CENTER_OFFSET_X_MM,
-    plateCenterOffsetYmm: DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
-    sideDropMm: DEFAULT_SIDE_DROP_MM,
-    sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
-  });
+  // One shared form across all three mounts (rail, wizard step, ProbePanel):
+  // per-component state meant plate geometry dialled in one was invisible to
+  // the other, which then probed with defaults.
+  const mode = useProbeFormStore((s) => s.mode);
+  const setMode = useProbeFormStore((s) => s.setMode);
+  const corner = useProbeFormStore((s) => s.corner);
+  const setCorner = useProbeFormStore((s) => s.setCorner);
+  const zParams = useProbeFormStore((s) => s.zParams);
+  const setZParams = useProbeFormStore((s) => s.setZParams);
+  const bitDiameterMm = useProbeFormStore((s) => s.bitDiameterMm);
+  const bitDiameterToolId = useProbeFormStore((s) => s.bitDiameterToolId);
+  const setBitDiameterMm = useProbeFormStore((s) => s.setBitDiameterMm);
+  const cornerGeometry = useProbeFormStore((s) => s.cornerGeometry);
+  const setCornerGeometry = useProbeFormStore((s) => s.setCornerGeometry);
   if (machine?.kind !== 'cnc') return null;
   if (!probingSupported) {
     // The probe runner speaks the GRBL response grammar; on firmwares with a
@@ -78,7 +73,14 @@ export function ProbeControls(): JSX.Element | null {
   }
 
   const effectiveTool = activeCncTool(machine);
-  const effectiveBitDiameter = bitDiameterMm ?? effectiveTool.diameterMm;
+  // A typed diameter applies only while the bit it was typed against is still
+  // active; swapping bits re-follows the machine rather than probing with the
+  // previous cutter's diameter.
+  const effectiveBitDiameter = effectiveProbeBitDiameterMm(
+    { bitDiameterMm, bitDiameterToolId },
+    effectiveTool.id,
+    effectiveTool.diameterMm,
+  );
   const toolSupported = mode !== 'corner' || effectiveTool.kind === 'end-mill';
   const readiness = probeControlReadiness({
     isConnected: connection.kind === 'connected',
@@ -117,7 +119,7 @@ export function ProbeControls(): JSX.Element | null {
         onMode={setMode}
         onCorner={setCorner}
         onZParams={setZParams}
-        onBitDiameter={setBitDiameterMm}
+        onBitDiameter={(value) => setBitDiameterMm(value, effectiveTool.id)}
         onCornerGeometry={setCornerGeometry}
       />
       <button type="button" onClick={run} disabled={!readiness.ready} title={readiness.title}>
