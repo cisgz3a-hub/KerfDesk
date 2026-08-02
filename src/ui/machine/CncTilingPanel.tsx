@@ -3,6 +3,7 @@
 // row/col grid) with optional registration holes in the overlap strips.
 
 import { DEFAULT_CNC_TILING, type CncMachineConfig, type CncTiling } from '../../core/scene';
+import { RailSection } from '../kit';
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
 import { CncTilingDisclosure, cncTilingAfterEdit } from './CncTilingDisclosure';
@@ -11,13 +12,12 @@ export function CncTilingPanel(props: { readonly machine: CncMachineConfig }): J
   const updateCncMachine = useStore((s) => s.updateCncMachine);
   const tiling = props.machine.tiling;
   return (
-    <details style={detailsStyle} open={tiling !== undefined}>
-      <summary
-        style={summaryStyle}
-        title="Split jobs larger than the bed into an indexed tile grid; Save G-code writes one file per tile."
-      >
-        Tiling {tiling === undefined ? '(off)' : '(on)'}
-      </summary>
+    <RailSection
+      label="Tiling"
+      badge={tiling === undefined ? 'Off' : 'On'}
+      hint="Split jobs larger than the bed into an indexed tile grid; Save G-code writes one file per tile."
+      open={tiling !== undefined}
+    >
       <label style={enableRowStyle}>
         <input
           type="checkbox"
@@ -31,7 +31,7 @@ export function CncTilingPanel(props: { readonly machine: CncMachineConfig }): J
         <span>Split the job into tiles</span>
       </label>
       {tiling !== undefined ? <TilingFields tiling={tiling} /> : null}
-    </details>
+    </RailSection>
   );
 }
 
@@ -118,24 +118,12 @@ function TilingNumberRow(props: {
   );
 }
 
-const detailsStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 4,
-  padding: '4px 6px',
-  marginTop: 4,
-};
-const summaryStyle: React.CSSProperties = {
-  fontSize: 12,
-  cursor: 'pointer',
-  userSelect: 'none',
-  color: 'var(--lf-text-muted)',
-};
 const enableRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
   fontSize: 12,
-  margin: '6px 0',
+  margin: '2px 0',
   cursor: 'pointer',
 };
 const rowStyle: React.CSSProperties = {
@@ -144,6 +132,11 @@ const rowStyle: React.CSSProperties = {
   gap: 8,
   minHeight: 28,
 };
-const labelStyle: React.CSSProperties = { width: 108, fontSize: 12, color: 'var(--lf-text-muted)' };
-const inputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
+const labelStyle: React.CSSProperties = {
+  width: 100,
+  flexShrink: 0,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};
+const inputStyle: React.CSSProperties = { width: 92, boxSizing: 'border-box' };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };

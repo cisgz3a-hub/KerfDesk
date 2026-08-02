@@ -222,6 +222,12 @@ body {
   }
 }
 
+.lf-btn--sm {
+  font-size: var(--lf-text-sm);
+  padding: 2px 8px;
+  min-height: 24px;
+}
+
 .lf-iconbtn {
   display: inline-flex;
   align-items: center;
@@ -364,6 +370,153 @@ body {
   color: var(--lf-text-muted);
   font-size: var(--lf-text-sm);
   padding: 0 4px;
+}
+
+/* ---------- Rail form grammar (ADR: unified operations-rail design) ---------- */
+
+/* Scoped normalization for form panes (the Artwork/Operations rail): native
+   buttons, inputs, and selects pick up the chrome look without per-file class
+   wiring. Only paint properties live here — component code keeps layout
+   (width/flex) inline, so a caller's inline width still wins. Buttons that
+   already carry a class (.lf-btn…) are excluded and keep their variant look. */
+.lf-pane-form button:not([class]) {
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  color: var(--lf-text);
+  background: var(--lf-bg-1);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-md);
+  padding: 2px 8px;
+  min-height: 24px;
+  cursor: pointer;
+  transition:
+    background-color 80ms,
+    border-color 80ms;
+}
+.lf-pane-form button:not([class]):hover:not(:disabled) {
+  background: #e5eaf0;
+  border-color: var(--lf-border-strong);
+}
+.lf-pane-form button:not([class]):active:not(:disabled) {
+  background: var(--lf-bg-2);
+}
+.lf-pane-form button:not([class]):disabled {
+  color: var(--lf-text-faint);
+  cursor: default;
+}
+
+.lf-pane-form select,
+.lf-pane-form input:not([type='checkbox']):not([type='radio']):not([type='color']) {
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  color: var(--lf-text);
+  background: var(--lf-bg-input);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-sm);
+  padding: 3px 6px;
+  min-height: 24px;
+  box-sizing: border-box;
+  color-scheme: light;
+}
+/* Closed selects ellipsize long options instead of running under the arrow. */
+.lf-pane-form select {
+  text-overflow: ellipsis;
+}
+.lf-pane-form select:hover:not(:disabled),
+.lf-pane-form input:not([type='checkbox']):not([type='radio']):hover:not(:disabled) {
+  border-color: var(--lf-border-strong);
+}
+.lf-pane-form select:focus,
+.lf-pane-form input:not([type='checkbox']):not([type='radio']):focus {
+  border-color: var(--lf-accent);
+  outline: none;
+}
+.lf-pane-form select:disabled,
+.lf-pane-form input:disabled {
+  color: var(--lf-text-faint);
+}
+.lf-pane-form input[type='checkbox'] {
+  accent-color: var(--lf-accent);
+  color-scheme: light;
+}
+
+/* One disclosure chrome for every collapsible rail section: hairline
+   separator, rotating chevron, optional right-aligned status badge. */
+.lf-section {
+  border-top: 1px solid var(--lf-border);
+  margin-top: var(--lf-space-2);
+}
+.lf-section > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-3);
+  min-height: 28px;
+  padding: var(--lf-space-2) 0;
+  font-size: var(--lf-text-sm);
+  font-weight: 600;
+  color: var(--lf-text);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.lf-section > summary::-webkit-details-marker {
+  display: none;
+}
+.lf-section > summary::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid var(--lf-text-faint);
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  flex: 0 0 auto;
+  transition: transform 80ms;
+}
+.lf-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+.lf-section > summary:hover {
+  color: var(--lf-accent-fg);
+}
+.lf-section-badge {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: var(--lf-text-xs);
+  color: var(--lf-text-faint);
+}
+.lf-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-2);
+  padding: 0 0 var(--lf-space-4) 10px;
+  min-width: 0;
+}
+
+/* The rail's own label column. Scoped to .lf-pane-form on purpose: the shared
+   .lf-field-label--sm width belongs to the dialogs that use kit/Field's default
+   and must not move when the rail's grammar changes. */
+.lf-pane-form .lf-field-label--sm {
+  width: 100px;
+}
+
+/* Group subhead inside a card or pane: quiet uppercase label over a hairline. */
+.lf-subhead {
+  margin: 0;
+  padding-top: var(--lf-space-4);
+  border-top: 1px solid var(--lf-border);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lf-text-muted);
+}
+
+/* Helper/annotation text under a field. */
+.lf-hint {
+  margin: 0;
+  font-size: var(--lf-text-xs);
+  line-height: 1.35;
+  color: var(--lf-text-faint);
 }
 
 /* ---------- Dialogs ---------- */

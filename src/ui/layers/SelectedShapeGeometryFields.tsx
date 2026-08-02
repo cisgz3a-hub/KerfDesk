@@ -268,11 +268,7 @@ function ShapeNumberInput(props: ShapeNumberFieldProps): JSX.Element {
     format: (value) => formatShapeValue(value * scale, props.integer),
   });
   return (
-    <Field
-      label={props.label}
-      labelWidth="md"
-      {...(props.unit === undefined ? {} : { unit: props.unit })}
-    >
+    <Field label={props.label} {...(props.unit === undefined ? {} : { unit: props.unit })}>
       <input
         type="number"
         min={props.min * scale}
@@ -319,13 +315,6 @@ export function isParametricShapeObject(object: ShapeObject): object is ShapeObj
   return object.spec.kind !== 'polyline';
 }
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  minWidth: 0,
-  boxSizing: 'border-box',
-  padding: '4px 6px',
-  border: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-input)',
-  color: 'var(--lf-text)',
-  borderRadius: 4,
-};
+// Paint (border, background, padding) comes from the .lf-pane-form scope in
+// tokens.css so this field matches every other control on the rail.
+const inputStyle: React.CSSProperties = { width: 84, minWidth: 0, boxSizing: 'border-box' };
