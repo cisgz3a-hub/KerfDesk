@@ -15150,3 +15150,52 @@ had to stop deleting on absence and now retains ready pages indefinitely.
   `imageAsset`, and no worker-progress toast; the existing paged-route tests continue to pass.
 - NOT verified: portability of a page-backed `.lf2` across machines, ready-page collection, worker
   or operating-system peak memory, and any hardware behaviour. No machine was involved.
+
+## ADR-282 Amendment 5 - the plunge rate bounds the descent, not the whole move (2026-08-02)
+
+Amendment 4 closed the #592 blocker "a detail ring's XYZ segments descend faster
+than the configured plunge rate" by tagging every detail ring `lateralFeed:
+'plunge'`: the whole ring rides the plunge feed, so no component of any move can
+outrun it. That is correct, and it is what shipped in #600.
+
+It is also more conservative than the operator asked for. A detail ring is a
+variable-depth cutting profile, and away from its ends it is mostly FLAT: the
+level-clamped passes (`Math.max(point.z, levelZ)`) are flat everywhere except
+where the profile rises above the level. An independent probe of the landed code
+measured **768 flat cutting moves against 194 sloped ones** on a tapering script
+stroke, all emitted at the plunge feed. With the default 1000 / 300 mm/min pair
+that is a measured **1.88x** increase in cutting time (0.64 min against 0.34 min)
+buying nothing: a flat move has no Z component to limit.
+
+The constraint the operator actually configured is a **rate of descent**. A
+segment's Z speed is `feed · |dz| / length3d`, so the honest reading of "plunge
+300" on a sloped cutting move is `feed <= plunge · length3d / |dz|` — full
+cutting feed on the flat, and a reduction on a descent only as steep as the
+descent requires.
+
+`CncPath3dPass.lateralFeed` therefore gains a second opt-in value:
+
+- `'plunge'` — every lateral move rides the plunge feed. **Unchanged**, and still
+  what ADR-278 entry ramps use, so ramp G-code stays byte-identical.
+- `'z-rate-capped'` — the cutting feed, reduced per segment so the Z component
+  stays within the plunge rate. V-carve detail rings use this.
+
+The cap is computed in the emitter on the **formatted** coordinates, because
+those are the distances the controller actually traverses, and it uses `floor`
+rather than `round`: rounding up could emit a rate a fraction above the
+configured plunge rate, which is precisely the defect being prevented. Pure
+vertical segments keep riding the plunge feed exactly as before.
+
+Consequences. Detail-ring G-code changes (feed words only; no coordinates move),
+so `EMITTER_REVISION` becomes `adr-282-vcarve-detail-z-rate-cap` and the v-carve
+snapshots move. Duration estimation improves without a code change: `z-rate-capped`
+passes are not in the `'plunge'` set `estimate-duration.ts` splits on, so they
+estimate at the cutting feed, which is now the feed most of their motion really
+uses. Rule 7 is untouched — this widens no refusal and adds no gate; it makes the
+emitter honour the operator's two feed settings jointly instead of applying the
+stricter one everywhere.
+
+What is NOT claimed: no hardware cut has verified the finish at the higher feed
+on sloped detail segments. The Z rate is bounded by the operator's own setting by
+construction and by test, but surface finish at feed on a descending cut is a
+machine-and-material question this project cannot settle without a spindle.

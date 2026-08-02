@@ -162,7 +162,7 @@ describe('vcarvePasses — thin detail (ADR-282)', () => {
     });
     const detail = passes.filter((pass) => pass.kind === 'path3d');
     expect(detail.length).toBeGreaterThan(0);
-    for (const pass of detail) expect(pass.lateralFeed).toBe('plunge');
+    for (const pass of detail) expect(pass.lateralFeed).toBe('z-rate-capped');
   });
 
   it('falls back to the complete stepped profile when a ramp would flatten thin detail', () => {
@@ -177,8 +177,34 @@ describe('vcarvePasses — thin detail (ADR-282)', () => {
       ...options,
       rampAngleDeg: 3,
     });
+    // An all-detail layer has no constant-depth ring to ramp, so its program is
+    // unchanged and the advisory explains why.
     expect(rampRequested.passes).toEqual(stepped.passes);
-    expect(rampRequested.entryIssue).toContain('variable-depth thin-detail profile');
+    expect(rampRequested.entryIssue).toContain('thin-detail passes keep their');
+  });
+
+  it('still ramps the ring ladder when the layer ALSO has thin detail', () => {
+    // Dropping the configured ramp for the whole layer the moment any thin
+    // stroke appeared punished exactly the artwork this stage exists to carve:
+    // in script lettering every glyph has a thin stroke, so ramp entry would
+    // never apply. The δ rings are ordinary constant-depth contours and ramp
+    // fine; only the variable-depth detail passes must stay stepped.
+    const result = vcarveLadderPasses([square(30, 6), band(0.5, 10)], {
+      tool: VBIT_90,
+      maxDepthMm: 2,
+      depthPerPassMm: 0.1,
+      resolutionMm: 0.5,
+      rampAngleDeg: 3,
+    });
+    const ramps = result.passes.filter((pass) => pass.kind === 'path3d' && pass.entryRamp === true);
+    const detail = result.passes.filter(
+      (pass) => pass.kind === 'path3d' && pass.lateralFeed === 'z-rate-capped',
+    );
+
+    expect(ramps.length).toBeGreaterThan(0);
+    expect(detail.length).toBeGreaterThan(0);
+    // The advisory still fires — the detail passes really did keep stepped entry.
+    expect(result.entryIssue).toContain('thin-detail passes keep their');
   });
 
   it('detail passes respect the maxDepth clamp', () => {

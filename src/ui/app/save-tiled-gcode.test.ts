@@ -7,6 +7,7 @@ import {
   DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_CNC_TILING,
 } from '../../core/scene';
+import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { capturingPlatform, tiledCncProject } from './save-tiled-gcode-testing';
 
@@ -18,6 +19,28 @@ function maxX(gcode: string): number {
 }
 
 describe('handleSaveTiledGcode', () => {
+  // Tiling is CNC-only, so skipping the machine-job advisory set here silenced
+  // every CNC warning — stock footprint, tabs, feeds, raster, and the v-carve
+  // offset-ladder family — on exactly the machine class they exist for. The
+  // operator saw nothing and had no way to know something was worth checking.
+  it('surfaces the machine job warnings the single-file save shows', async () => {
+    const project = tiledCncProject();
+    const expected = detectMachineJobWarnings(project);
+    // Guard the fixture: an advisory-free project would pass vacuously.
+    expect(expected.length).toBeGreaterThan(0);
+    const toasts: string[] = [];
+
+    const handled = await handleSaveTiledGcode({
+      platform: capturingPlatform([]),
+      project,
+      savedName: 'job',
+      pushToast: (message) => toasts.push(message),
+    });
+
+    expect(handled).toBe(true);
+    for (const warning of expected) expect(toasts).toContain(warning);
+  });
+
   it('applies "Cut selected graphics" to tiled exports', async () => {
     const written: string[] = [];
     const handled = await handleSaveTiledGcode({
@@ -234,13 +257,18 @@ describe('handleSaveTiledGcode', () => {
     expect(handled).toBe(true);
     expect(written.length).toBeGreaterThan(0);
     expect(toasts).toEqual(
-      expect.arrayContaining([expect.stringContaining('variable-depth thin-detail profile')]),
+      expect.arrayContaining([expect.stringContaining('thin-detail passes keep their')]),
     );
-    expect(toasts.join('\n')).not.toContain('not a re-verified emitted maximum');
-    expect(toasts.join('\n')).not.toContain('direct plunge');
-    expect(written.join('\n')).toContain(
-      '; cnc entry: stepped-plunge-fallback; max-angle-deg: 3.000',
-    );
+    // The ring ladder really does ramp now (ADR-282 Amendment 5), so tiling's
+    // "the angle is requested provenance, not a re-verified emitted maximum"
+    // advisory is the honest report for a tiled ramp.
+    expect(toasts.join('\n')).toContain('not a re-verified emitted maximum');
+    // A ramp that crosses a tile boundary leaves the clipped tile starting
+    // below stock top — the pre-existing hazard of tiling ANY ramped layer,
+    // which this layer now reaches because its ladder ramps. Disclosed, not
+    // refused (rule 7); keeping a contour inside one tile avoids it.
+    expect(toasts.join('\n')).toContain('begins with a direct plunge');
+    expect(written.join('\n')).toContain('requested-max-angle-deg: 3.000');
   });
 
   it('prepends provenance, machine assumptions, and tile identity to every file', async () => {

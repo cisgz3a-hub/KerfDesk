@@ -183,11 +183,13 @@ describe('compileCncJob multi-tool', () => {
     expect(vcarve?.layerPrimaryToolId).toBe('vb-60');
     expect(vcarve).toMatchObject({ rampEntryDeg: 3 });
     const gcode = cncGrblStrategy.emit(job, DEVICE);
-    // Thin-detail rings carry a variable-depth profile that the constant-depth
-    // contour-ramp planner cannot preserve. The requested angle remains in
-    // provenance, but emission deliberately falls back to stepped entry.
-    expect(gcode.match(/; cnc entry: stepped-plunge-fallback/g)).toHaveLength(1);
-    expect(gcode).not.toContain('; cnc entry: contour-ramp');
+    // The constant-depth ring ladder ramps as requested (ADR-282 Amendment 5).
+    // Thin-detail rings carry a variable-depth profile the contour-ramp planner
+    // cannot preserve, so those passes alone keep stepped entry — and the
+    // provenance says so rather than claiming the whole layer ramped.
+    expect(gcode.match(/; cnc entry: contour-ramp/g)).toHaveLength(1);
+    expect(gcode).toContain('; cnc entry-advisory: thin-detail passes use stepped entry');
+    expect(gcode).not.toContain('; cnc entry: stepped-plunge-fallback');
   });
 
   it('a shape too narrow for a flat floor produces no clearance stage', () => {

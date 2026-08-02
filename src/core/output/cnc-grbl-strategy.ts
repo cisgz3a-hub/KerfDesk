@@ -59,6 +59,9 @@ import type { CncPassSpan, CncPassSpanEmission, CncPassSpanRecorder } from './cn
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 
 const LINE_END = '\n';
+// A capped segment feed still has to be a feed the controller accepts; the
+// same floor fmtFeed applies to every other emitted rate.
+const MIN_SEGMENT_FEED_MM_PER_MIN = 1;
 
 function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
   return emitCncProgram(job, device, undefined, options);
@@ -397,15 +400,44 @@ function appendPath3dPass(
     lines.push(`G1 Z${startZ} F${plunge}`);
     head.z = startZ;
   }
-  const lateralFeed = pass.lateralFeed === 'plunge' ? plunge : feed;
-  appendPath3dCutMoves(lines, head, pass, lateralFeed, plunge);
+  appendPath3dCutMoves(lines, head, pass, feed, plunge);
+}
+
+// The feed for one emitted XYZ segment. A move's Z speed is feed·|dz|/length3d,
+// so honouring the operator's plunge rate on a sloped move needs only enough
+// reduction to bring that component down — the flat segments of a
+// variable-depth profile keep the full cutting feed. Computed on the FORMATTED
+// coordinates because those are the distances the controller actually moves.
+function path3dSegmentFeed(
+  head: Head,
+  next: { readonly x: string; readonly y: string; readonly z: string },
+  mode: CncPath3dPass['lateralFeed'],
+  feed: number,
+  plunge: number,
+): number {
+  // Pure-vertical segments ride the plunge feed, never the XY cutting feed.
+  if (next.x === head.x && next.y === head.y) return plunge;
+  if (mode === 'plunge') return plunge;
+  if (mode !== 'z-rate-capped') return feed;
+  if (head.x === null || head.y === null || head.z === null) return plunge;
+  const dz = Math.abs(Number(next.z) - Number(head.z));
+  const length3d = Math.hypot(Number(next.x) - Number(head.x), Number(next.y) - Number(head.y), dz);
+  if (!(dz > 0) || !(length3d > 0) || !Number.isFinite(dz) || !Number.isFinite(length3d)) {
+    return feed;
+  }
+  // floor, never round: rounding up would emit a rate fractionally above the
+  // configured plunge rate, which is the defect this cap exists to prevent.
+  return Math.min(
+    feed,
+    Math.max(MIN_SEGMENT_FEED_MM_PER_MIN, Math.floor((plunge * length3d) / dz)),
+  );
 }
 
 function appendPath3dCutMoves(
   lines: string[],
   head: Head,
   pass: CncPath3dPass,
-  lateralFeed: number,
+  feed: number,
   plunge: number,
 ): void {
   let modalFeed: number | null = null;
@@ -416,9 +448,8 @@ function appendPath3dCutMoves(
     const y = fmt(point.y);
     const z = fmt(point.z);
     if (x === head.x && y === head.y && z === head.z) continue; // zero-length at emit precision
-    // Pure-vertical segments ride the plunge feed, never the XY cutting feed;
-    // the selected lateral feed is re-issued on the next lateral move.
-    const wantFeed = x === head.x && y === head.y ? plunge : lateralFeed;
+    // The selected lateral feed is re-issued on the next lateral move.
+    const wantFeed = path3dSegmentFeed(head, { x, y, z }, pass.lateralFeed, feed, plunge);
     const feedWord = modalFeed === wantFeed ? '' : ` F${wantFeed}`;
     modalFeed = wantFeed;
     lines.push(`G1 X${x} Y${y} Z${z}${feedWord}`);

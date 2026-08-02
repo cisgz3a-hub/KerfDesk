@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import type { CncGroup } from '../job';
+import type { CncGroup, CncPass } from '../job';
 import { cncGrblStrategy } from '../output';
 import {
   createLayer,
@@ -141,18 +141,26 @@ describe('two-stage V-carve effective floor depth', () => {
       const contourDepths = vcarve.passes.flatMap((pass) =>
         pass.kind === 'contour' ? [pass.zMm] : [],
       );
-      const detailPasses = vcarve.passes.filter((pass) => pass.kind === 'path3d');
+      // With a ramp angle the ladder's constant-depth rings become path3d entry
+      // ramps too, so the detail passes are the path3d ones that are NOT ramps.
+      const detailPasses = vcarve.passes.filter(
+        (pass): pass is Extract<CncPass, { readonly kind: 'path3d' }> =>
+          pass.kind === 'path3d' && pass.entryRamp !== true,
+      );
       expect(Math.min(...contourDepths)).toBeCloseTo(-3, 9);
       expect(detailPasses.length).toBeGreaterThan(0);
       expect(
-        detailPasses.every((pass) => pass.lateralFeed === 'plunge' && pass.entryRamp === undefined),
+        detailPasses.every(
+          (pass) => pass.lateralFeed === 'z-rate-capped' && pass.entryRamp === undefined,
+        ),
       ).toBe(true);
 
       const gcode = cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
       if (rampAngleDeg === undefined) {
         expect(gcode).not.toContain('; cnc entry:');
       } else {
-        expect(gcode).toContain('; cnc entry: stepped-plunge-fallback; max-angle-deg: 3.000');
+        expect(gcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 3.000');
+        expect(gcode).toContain('; cnc entry-advisory: thin-detail passes use stepped entry');
       }
     },
   );

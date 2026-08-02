@@ -32,7 +32,7 @@ export type GcodeMetadata = {
  * ADR-273's secondary-cutter settings provenance, and ADR-282's thin-detail
  * rescue stage.
  */
-export const EMITTER_REVISION = 'adr-282-vcarve-thin-detail-safe-v1';
+export const EMITTER_REVISION = 'adr-282-vcarve-detail-z-rate-cap';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
