@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PROGRAM_PARSE_REASON } from '../../core/gcode';
 import { parseGcodeProgram } from './parse-gcode-program';
 
 function ok(text: string) {
@@ -109,6 +110,14 @@ describe('parseGcodeProgram rejection and notes', () => {
     const result = parseGcodeProgram('hello world\nthis is prose\n');
     expect(result.kind).toBe('error');
     if (result.kind === 'error') expect(result.reason).toContain('line 1');
+  });
+
+  // A header-only program (every line a comment) parses perfectly — it just
+  // commands nothing. Saying "not G-code" misdirected the operator.
+  it('names an empty program rather than blaming the syntax', () => {
+    const result = parseGcodeProgram('; KerfDesk\n; version: 0.1.0\n');
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') expect(result.reason).toBe(PROGRAM_PARSE_REASON.noMotion);
   });
 
   it('counts unsupported words instead of failing', () => {
