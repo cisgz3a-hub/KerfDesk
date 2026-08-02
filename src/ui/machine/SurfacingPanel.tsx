@@ -32,13 +32,14 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
   const platform = usePlatform();
   const pushToast = useToastStore((s) => s.pushToast);
   const project = useStore((s) => s.project);
+  const projectDocumentEpoch = useStore((s) => s.projectDocumentEpoch);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const settingsCapability = useLaserStore((s) => s.capabilities.settings);
   const { machine } = props;
   // The facing area prefills from the stock footprint and must FOLLOW it: a
   // plain useState seed froze at mount, so changing stock size (or opening
   // another project) left this panel saving a program for the old area.
-  const stockKey = `${machine.stock.widthMm}x${machine.stock.heightMm}`;
+  const stockKey = `${projectDocumentEpoch}:${machine.stock.widthMm}x${machine.stock.heightMm}`;
   const [widthMm, setWidthMm] = useSourceTrackedState(machine.stock.widthMm, stockKey);
   const [heightMm, setHeightMm] = useSourceTrackedState(machine.stock.heightMm, stockKey);
   const [stepoverPct, setStepoverPct] = useState(SURFACING_DEFAULT_STEPOVER_PCT);
