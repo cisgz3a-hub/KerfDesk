@@ -7,7 +7,7 @@ import {
   type Project,
   type RasterImage,
 } from '../../core/scene';
-import { drawRasterPreview } from './draw-raster-preview';
+import { drawRasterPreview, type RasterPreviewBuildScheduler } from './draw-raster-preview';
 import type { ViewTransform } from './view-transform';
 
 const VIEW: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 };
@@ -18,10 +18,10 @@ afterEach(() => {
 });
 
 describe('drawRasterPreview canvas cache', () => {
-  // Keyed on the RasterImage's identity, so a raster that leaves and re-enters
-  // the scene keeps its canvas. The entry is released by GC once the deleted
-  // object is unreachable, which no sweep can observe from in here.
-  it('keeps the preview canvas for a raster that leaves and re-enters the scene', () => {
+  // Canvases are up to 2048x2048 RGBA (~16.8 MB) and the undo stack pins 50
+  // superseded Project versions, so a canvas whose raster left the scene has to
+  // be released by the sweep — nothing else can observe that it is dead.
+  it('releases the preview canvas of a raster that left the scene', () => {
     const createdCanvases = trackCreatedCanvases();
     const projectWithRaster = projectForRaster(burnRaster('data:image/png;base64,preview-cache-a'));
 
@@ -29,7 +29,37 @@ describe('drawRasterPreview canvas cache', () => {
     drawRasterPreviewSync(emptyProject());
     drawRasterPreviewSync(projectWithRaster);
 
+    expect(createdCanvases).toHaveLength(2);
+  });
+
+  // A move commits `{ ...object, transform }`: a brand-new RasterImage holding
+  // the very same pixels. Rebuilding the burn simulation for it blanked the
+  // preview for a frame and re-ran resample+dither on the main thread.
+  it('reuses the preview canvas after a translation-only move', () => {
+    const createdCanvases = trackCreatedCanvases();
+    const scheduler = countingScheduler();
+    const raster = burnRaster('data:image/png;base64,nudged-raster');
+
+    drawRasterPreviewWith(projectForRaster(raster), scheduler.schedule);
+    const buildsAfterFirstDraw = scheduler.count();
+    drawRasterPreviewWith(projectForRaster(movedRaster(raster, 12)), scheduler.schedule);
+
     expect(createdCanvases).toHaveLength(1);
+    expect(scheduler.count()).toBe(buildsAfterFirstDraw);
+  });
+
+  // Image Studio Apply keeps the object id and swaps dataUrl + lumaBase64, so
+  // the id alone must never authorize a cache hit.
+  it('rebuilds the preview canvas when the raster pixels change under one id', () => {
+    const createdCanvases = trackCreatedCanvases();
+    const raster = burnRaster('data:image/png;base64,pixels-before-edit');
+
+    drawRasterPreviewSync(projectForRaster(raster));
+    drawRasterPreviewSync(
+      projectForRaster({ ...raster, dataUrl: 'data:image/png;base64,pixels-after-edit' }),
+    );
+
+    expect(createdCanvases).toHaveLength(2);
   });
 
   it('reads the base64 source only while building, never to look the cache up', () => {
@@ -68,14 +98,31 @@ describe('drawRasterPreview canvas cache', () => {
     expect(createdCanvases).toHaveLength(2);
   });
 
-  it('builds a separate preview canvas for a distinct raster object', () => {
+  // Canvases are scoped to the scene object that owns them, so a duplicate --
+  // which is a new scene object with a new id -- builds its own.
+  it('builds a separate preview canvas for a distinct scene object', () => {
     const createdCanvases = trackCreatedCanvases();
     const dataUrl = 'data:image/png;base64,duplicated-raster';
 
     drawRasterPreviewSync(projectForRaster(burnRaster(dataUrl)));
-    drawRasterPreviewSync(projectForRaster(burnRaster(dataUrl)));
+    drawRasterPreviewSync(projectForRaster({ ...burnRaster(dataUrl), id: 'R-cache-copy' }));
 
     expect(createdCanvases).toHaveLength(2);
+  });
+
+  // Cancelling a paged raster's build aborts its IndexedDB hydration, so a drag
+  // that cancelled once per frame never let the hydration finish.
+  it('keeps an in-flight preview build running across a translation-only move', () => {
+    vi.stubGlobal('ImageData', FakeImageData);
+    const cancelBuild = vi.fn();
+    const scheduleBuild = vi.fn((): (() => void) => cancelBuild);
+    const raster = burnRaster('data:image/png;base64,in-flight-move');
+
+    drawRasterPreviewWith(projectForRaster(raster), scheduleBuild);
+    drawRasterPreviewWith(projectForRaster(movedRaster(raster, 8)), scheduleBuild);
+
+    expect(cancelBuild).not.toHaveBeenCalled();
+    expect(scheduleBuild).toHaveBeenCalledOnce();
   });
 
   it('cancels an in-flight preview build when its raster leaves the scene', () => {
@@ -137,6 +184,29 @@ function countingDataUrlRaster(dataUrl: string): {
 
 function drawRasterPreviewSync(project: Project): void {
   drawRasterPreview(noOpContext(), project, VIEW, { scheduleBuild: runImmediately });
+}
+
+function drawRasterPreviewWith(project: Project, scheduleBuild: RasterPreviewBuildScheduler): void {
+  drawRasterPreview(noOpContext(), project, VIEW, { scheduleBuild });
+}
+
+/** Exactly what a nudge, drag or align commits: a new object, the same pixels. */
+function movedRaster(raster: RasterImage, xMm: number): RasterImage {
+  return { ...raster, transform: { ...raster.transform, x: xMm } };
+}
+
+function countingScheduler(): {
+  readonly schedule: RasterPreviewBuildScheduler;
+  readonly count: () => number;
+} {
+  let scheduled = 0;
+  return {
+    schedule: (work) => {
+      scheduled += 1;
+      return runImmediately(work);
+    },
+    count: () => scheduled,
+  };
 }
 
 function runImmediately(work: () => void): () => void {
