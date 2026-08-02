@@ -49,9 +49,20 @@ export function maskCirclePoints(
   return points;
 }
 
+// A contour with no extent has no meaningful box; the parity suite reaches
+// this only through `maskCase.points[0] ?? []`, where an empty list is a type
+// fallback rather than real geometry, so an empty box beats throwing.
+const EMPTY_BOUNDS: Bounds = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+
 // Reduced rather than spread: a traced-mask fixture can carry thousands of
-// points, which would overflow the argument list of Math.min(...xs).
+// points, which would overflow the argument list of Math.min(...xs). Seeded
+// from the FIRST point, not the origin — an origin seed silently forces (0,0)
+// into the box of every contour that does not straddle it, so a mask sitting
+// at 10..90 reported minX/minY 0 and the fixture's declared bounds disagreed
+// with its own geometry.
 function boundsOfPoints(points: ReadonlyArray<Vec2>): Bounds {
+  const first = points[0];
+  if (first === undefined) return EMPTY_BOUNDS;
   return points.reduce<Bounds>(
     (bounds, point) => ({
       minX: Math.min(bounds.minX, point.x),
@@ -59,6 +70,6 @@ function boundsOfPoints(points: ReadonlyArray<Vec2>): Bounds {
       maxX: Math.max(bounds.maxX, point.x),
       maxY: Math.max(bounds.maxY, point.y),
     }),
-    { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+    { minX: first.x, minY: first.y, maxX: first.x, maxY: first.y },
   );
 }

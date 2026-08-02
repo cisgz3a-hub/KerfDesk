@@ -25,34 +25,26 @@ type EntityPassOutcome =
 
 type MetadataPassScope = 'until-entities' | 'whole-file';
 
-type PassProgress = {
-  readonly completedBytes: number;
-  readonly totalBytes: number;
-  readonly report: ((progress: BlobReadProgress) => void) | undefined;
-};
+type ProgressReport = (progress: BlobReadProgress) => void;
 
 const ENTITIES_SECTION = 'ENTITIES';
 const METADATA_SECTIONS: ReadonlySet<string> = new Set(['HEADER', 'TABLES', 'BLOCKS']);
-const PASS_COUNT = 2;
 
 export async function parseDxfBlob(
   blob: Blob,
   args: { readonly id: string; readonly source: string },
-  onProgress?: (progress: BlobReadProgress) => void,
+  onProgress?: ProgressReport,
 ): Promise<ParseDxfResult> {
-  const totalBytes = blob.size * PASS_COUNT;
-  const first = await runMetadataPass(blob, 'until-entities', {
-    completedBytes: 0,
-    totalBytes,
-    report: onProgress,
-  });
+  // The metadata pass abandons the file at the ENTITIES header, so it covers an
+  // unknowable sliver of it. Counting that sliver against a two-file
+  // denominator left the bar crawling near 0% and then snapping to ~50% the
+  // instant the entity pass began — on virtually every conformant DXF. Only the
+  // entity pass, which always reads to EOF, drives what the operator sees; the
+  // metadata pass runs silent.
+  const first = await runMetadataPass(blob, 'until-entities');
   if (first.kind === 'error') return first.error;
 
-  const entities = await runEntityPass(blob, first.metadata, args, {
-    completedBytes: blob.size,
-    totalBytes,
-    report: onProgress,
-  });
+  const entities = await runEntityPass(blob, first.metadata, args, onProgress);
   if (entities.kind === 'error') return entities.error;
   if (!entities.hasLateMetadata) return entities.result;
 
@@ -60,18 +52,13 @@ export async function parseDxfBlob(
   // shortened first pass never saw what followed. Redo both passes over the
   // whole file. Progress stays silent because it already reported completion —
   // better than rewinding the operator's bar on a rare file layout.
-  const silent: PassProgress = { completedBytes: 0, totalBytes, report: undefined };
-  const full = await runMetadataPass(blob, 'whole-file', silent);
+  const full = await runMetadataPass(blob, 'whole-file');
   if (full.kind === 'error') return full.error;
-  const replayed = await runEntityPass(blob, full.metadata, args, silent);
+  const replayed = await runEntityPass(blob, full.metadata, args, undefined);
   return replayed.kind === 'error' ? replayed.error : replayed.result;
 }
 
-async function runMetadataPass(
-  blob: Blob,
-  scope: MetadataPassScope,
-  progress: PassProgress,
-): Promise<MetadataPassOutcome> {
+async function runMetadataPass(blob: Blob, scope: MetadataPassScope): Promise<MetadataPassOutcome> {
   const collector = createDxfMetadataCollector();
   let outcome: TagOutcome = 'continue';
   // The entity list is the bulk of a real DXF and holds nothing this pass wants,
@@ -79,7 +66,7 @@ async function runMetadataPass(
   const scanner = createDxfSectionNameScanner((name) => {
     if (scope === 'until-entities' && name === ENTITIES_SECTION) outcome = 'stop';
   });
-  const error = await runPass(blob, progress, (tag) => {
+  const error = await runPass(blob, undefined, (tag) => {
     collector.pushTag(tag);
     scanner(tag);
     return outcome;
@@ -91,7 +78,7 @@ async function runEntityPass(
   blob: Blob,
   metadata: DxfMetadata,
   args: { readonly id: string; readonly source: string },
-  progress: PassProgress,
+  report: ProgressReport | undefined,
 ): Promise<EntityPassOutcome> {
   const collector = createDxfEntityCollector(metadata, args);
   let hasSeenEntities = false;
@@ -100,7 +87,7 @@ async function runEntityPass(
     if (name === ENTITIES_SECTION) hasSeenEntities = true;
     else if (hasSeenEntities && METADATA_SECTIONS.has(name)) hasLateMetadata = true;
   });
-  const error = await runPass(blob, progress, (tag) => {
+  const error = await runPass(blob, report, (tag) => {
     collector.pushTag(tag);
     scanner(tag);
     return 'continue';
@@ -112,7 +99,7 @@ async function runEntityPass(
 
 async function runPass(
   blob: Blob,
-  progress: PassProgress,
+  report: ProgressReport | undefined,
   onTag: (tag: DxfTag) => TagOutcome,
 ): Promise<DxfParseError | null> {
   let isStopRequested = false;
@@ -125,12 +112,9 @@ async function runPass(
       parser.pushLine(line);
       if (isStopRequested) control.stop();
     },
-    ({ bytesRead }) => {
-      progress.report?.({
-        bytesRead: progress.completedBytes + bytesRead,
-        totalBytes: progress.totalBytes,
-      });
-    },
+    // readBlobLines already scales to the whole blob, which is exactly the span
+    // the reporting pass covers.
+    report,
   );
   const result = parser.finish();
   return result.kind === 'error' ? result : null;

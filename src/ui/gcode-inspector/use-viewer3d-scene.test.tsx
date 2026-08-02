@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import type * as Viewer3dModule from '../viewer3d';
-import { useViewer3dScene } from './use-viewer3d-scene';
+import { useViewer3dScene, type Viewer3dSceneBinding } from './use-viewer3d-scene';
 
 const sceneMocks = vi.hoisted(() => ({
   createViewer3dScene: vi.fn(),
@@ -23,6 +23,7 @@ vi.mock('../viewer3d', async (importOriginal) => {
 
 const FIRST_PROGRAM = ['G21 G90', 'M3 S500', 'G0 X10 Y0', 'G1 X20 Y0 F600'].join('\n');
 const SECOND_PROGRAM = ['G21 G90', 'M3 S500', 'G0 X0 Y0', 'G1 X40 Y30 F900'].join('\n');
+const NO_WEBGL_REASON = 'no context';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -53,8 +54,13 @@ function renderModel(text: string): GcodeRenderModel {
   return result.model;
 }
 
+// The hook's binding is what the Inspector renders from, so the harness keeps
+// the latest one: asserting only on the scene mocks cannot see a state or
+// reason the hook failed to report.
+let binding: Viewer3dSceneBinding | null = null;
+
 function Probe(props: { readonly model: GcodeRenderModel }): null {
-  useViewer3dScene(canvasRef, props.model);
+  binding = useViewer3dScene(canvasRef, props.model);
   return null;
 }
 
@@ -74,6 +80,7 @@ async function rerender(model: GcodeRenderModel): Promise<void> {
 }
 
 beforeEach(() => {
+  binding = null;
   canvasRef.current = document.createElement('canvas');
   sceneMocks.createViewer3dScene.mockReset();
   sceneMocks.createViewer3dScene.mockImplementation(async () => ({
@@ -142,11 +149,13 @@ describe('useViewer3dScene', () => {
   it('reports the reason when WebGL is unavailable', async () => {
     sceneMocks.createViewer3dScene.mockImplementation(async () => ({
       kind: 'no-webgl' as const,
-      reason: 'no context',
+      reason: NO_WEBGL_REASON,
     }));
 
     await mount(renderModel(FIRST_PROGRAM));
 
+    expect(binding?.state).toBe('no-webgl');
+    expect(binding?.reason).toBe(NO_WEBGL_REASON);
     expect(sceneMocks.setSegments).not.toHaveBeenCalled();
   });
 });

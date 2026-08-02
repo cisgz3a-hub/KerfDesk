@@ -42,9 +42,11 @@ describe('parseDxfBlob', () => {
     const result = await parseDxfBlob(new NodeBlob([text]) as unknown as Blob, args, progress);
 
     expect(result).toEqual(parseDxf({ dxfText: text, ...args }));
+    // Only the entity pass, which always reads to EOF, is visible progress, so
+    // the denominator is one file rather than two passes.
     expect(progress).toHaveBeenLastCalledWith({
-      bytesRead: text.length * 2,
-      totalBytes: text.length * 2,
+      bytesRead: text.length,
+      totalBytes: text.length,
     });
   });
 
@@ -122,9 +124,44 @@ describe('parseDxfBlob', () => {
     expect(reads.chunks).toBeLessThan(lineCount + PRE_ENTITIES_LINE_BUDGET);
     expect(result).toEqual(parseDxf({ dxfText: text, id: 'early-stop', source: 'early-stop.dxf' }));
   });
+
+  // The metadata pass abandons the file at the ENTITIES header, so counting it
+  // in the denominator left the bar crawling near 0% and then snapping to ~50%
+  // the moment the entity pass started — on virtually every normal DXF.
+  it('advances progress in small steps instead of jumping when the entity pass starts', async () => {
+    const text = conformantDxf(ENTITY_COUNT);
+    const fractions: number[] = [];
+
+    await parseDxfBlob(
+      lineChunkedBlob(text, { chunks: 0 }),
+      { id: 'progress', source: 'progress.dxf' },
+      ({ bytesRead, totalBytes }) => {
+        fractions.push(bytesRead / totalBytes);
+      },
+    );
+
+    expect(fractions.length).toBeGreaterThan(0);
+    expect(Math.max(...progressSteps(fractions))).toBeLessThan(MAX_PROGRESS_STEP);
+    expect(Math.min(...progressSteps(fractions))).toBeGreaterThanOrEqual(0);
+    expect(fractions.at(-1)).toBe(1);
+  });
 });
 
 const ENTITY_COUNT = 40;
+// A jump this large can only come from a pass boundary: one chunk of this
+// fixture is a single short DXF line, well under a percent of the file.
+const MAX_PROGRESS_STEP = 0.25;
+
+// Rises from the implicit 0% the bar starts at, so a first report that already
+// sits at half the file counts as a jump too.
+function progressSteps(fractions: ReadonlyArray<number>): ReadonlyArray<number> {
+  let previous = 0;
+  return fractions.map((fraction) => {
+    const step = fraction - previous;
+    previous = fraction;
+    return step;
+  });
+}
 // Header lines before ENTITIES, plus slack for the stream's read-ahead.
 const PRE_ENTITIES_LINE_BUDGET = 32;
 
