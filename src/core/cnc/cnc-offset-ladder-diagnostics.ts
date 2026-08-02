@@ -171,7 +171,7 @@ function vcarveLadderKinds(
   if (ladder.offsetFailed || vcarveClearanceFailed(polylines, settings, config, tool)) {
     kinds.push('geometry-failed');
   }
-  // Artwork finer than even the detail pitch (ADR-281) stays uncut — worth a
+  // Artwork finer than even the detail pitch (ADR-282) stays uncut — worth a
   // Job Review note on lettering jobs, and never a refusal (rule 7).
   if (ladder.thinResidual) kinds.push('thin-detail-dropped');
   // Ring budget or coverage-floor pitch exhausted at valid settings (#584):

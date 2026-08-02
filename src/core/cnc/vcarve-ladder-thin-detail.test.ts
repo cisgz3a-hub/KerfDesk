@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import type { CncTool, Polyline } from '../scene';
 import { vcarveLadderPasses, vcarvePasses } from './vcarve-ladder';
 
-// ADR-281: strokes narrower than 2·δ used to vanish from the carve entirely —
+// ADR-282: strokes narrower than 2·δ used to vanish from the carve entirely —
 // the first coarse inset already consumed them, so a thin script stroke
 // contributed no rings while the rest of the glyph cut. The thin-detail stage
 // must carve them with a fine-pitch ladder instead of dropping them. Split
@@ -43,7 +43,7 @@ function band(widthMm: number, lengthMm: number, atX = 0): Polyline {
 }
 
 // δ rings stay constant-Z contours; detail rings are path3d since the
-// junction blend (ADR-281 Amendment 2) — helpers read both.
+// junction blend (ADR-282 Amendment 2) — helpers read both.
 function passXy(
   pass: ReturnType<typeof vcarvePasses>[number],
 ): ReadonlyArray<{ readonly x: number; readonly y: number }> {
@@ -70,7 +70,7 @@ function regionOrder(passes: ReturnType<typeof vcarvePasses>): string {
     .join('');
 }
 
-describe('vcarvePasses — thin detail (ADR-281)', () => {
+describe('vcarvePasses — thin detail (ADR-282)', () => {
   it('carves a stroke narrower than 2·δ instead of dropping it (the script-font bug)', () => {
     // 0.5 mm × 10 mm band, δ = 0.5: the first coarse inset exceeds the
     // 0.25 mm half-width, so the ring ladder alone yields nothing.

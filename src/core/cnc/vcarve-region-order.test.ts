@@ -138,7 +138,7 @@ describe('vcarveRegionOrder', () => {
   });
 });
 
-// ADR-281: the ladder zips δ-ring buckets with thin-detail buckets by index,
+// ADR-282: the ladder zips δ-ring buckets with thin-detail buckets by index,
 // so bucket layout must depend only on the source contours.
 describe('vcarveRegionBuckets', () => {
   it('returns no buckets for an empty ring set', () => {

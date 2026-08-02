@@ -39,7 +39,7 @@ function rectangle(minX: number, minY: number, width: number, height: number): P
 }
 
 // δ rings stay constant-Z contours; detail rings are path3d since the
-// junction blend (ADR-281 Amendment 2) — helpers read both.
+// junction blend (ADR-282 Amendment 2) — helpers read both.
 function passXy(
   pass: ReturnType<typeof vcarvePasses>[number],
 ): ReadonlyArray<{ readonly x: number; readonly y: number }> {
@@ -80,7 +80,7 @@ describe('vcarvePasses', () => {
       resolutionMm: 0.5,
     });
     const depths = contourDepths(passes);
-    // Rings 1 and 2 of the δ ladder (corner-detail passes from ADR-281 may
+    // Rings 1 and 2 of the δ ladder (corner-detail passes from ADR-282 may
     // sit shallower — they follow the same law at the fine pitch).
     expect(depths.some((z) => Math.abs(z + 0.5) < 1e-9)).toBe(true);
     expect(depths.some((z) => Math.abs(z + 1.0) < 1e-9)).toBe(true);

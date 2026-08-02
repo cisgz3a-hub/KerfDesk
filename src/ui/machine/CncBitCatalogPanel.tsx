@@ -7,10 +7,10 @@ import {
   type ModeledCncBitCatalogEntry,
   type ReferenceCncBitCatalogEntry,
 } from './cnc-bit-catalog';
+import { RailSection } from '../kit';
 import {
   addedStyle,
   catalogListStyle,
-  detailsStyle,
   emptyStyle,
   entryNameStyle,
   familyHeadingStyle,
@@ -23,7 +23,6 @@ import {
   searchStyle,
   sourceStyle,
   sourceUrlStyle,
-  summaryStyle,
 } from './CncBitCatalogPanel.styles';
 
 const BUILT_IN_CATALOG_IDS = new Set(
@@ -53,13 +52,11 @@ export function CncBitCatalogPanel(): JSX.Element {
   const groups = useMemo(() => groupModeledCatalog(modeled), [modeled]);
 
   return (
-    <details style={detailsStyle}>
-      <summary
-        style={summaryStyle}
-        title="Browse researched cutter families and common nominal envelope sizes."
-      >
-        Add from bit catalog ({MODELED_CNC_BIT_CATALOG.length} modeled envelopes)
-      </summary>
+    <RailSection
+      label="Add from bit catalog"
+      badge={`${MODELED_CNC_BIT_CATALOG.length} modeled envelopes`}
+      hint="Browse researched cutter families and common nominal envelope sizes."
+    >
       <p style={noticeStyle}>
         Selectable generic entries are operator-matched nominal cutting envelopes that CurveDesk can
         model. A family reference documents the cutter type, not each generated size, shank,
@@ -85,7 +82,7 @@ export function CncBitCatalogPanel(): JSX.Element {
         query={query}
         onAdd={(entry) => addCustomCncTool({ ...entry.tool, catalogId: entry.id })}
       />
-    </details>
+    </RailSection>
   );
 }
 

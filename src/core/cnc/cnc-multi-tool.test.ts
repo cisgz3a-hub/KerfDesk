@@ -176,9 +176,11 @@ describe('compileCncJob multi-tool', () => {
     const [clearance, vcarve] = cnc;
     expect(clearance?.cutType).toBe('pocket');
     expect(clearance?.toolId).toBe('em-3175');
+    expect(clearance?.layerPrimaryToolId).toBe('vb-60');
     expect(clearance).not.toHaveProperty('rampEntryDeg');
     expect(vcarve?.cutType).toBe('v-carve');
     expect(vcarve?.toolId).toBe('vb-60');
+    expect(vcarve?.layerPrimaryToolId).toBe('vb-60');
     expect(vcarve).toMatchObject({ rampEntryDeg: 3 });
     const gcode = cncGrblStrategy.emit(job, DEVICE);
     // Thin-detail rings carry a variable-depth profile that the constant-depth

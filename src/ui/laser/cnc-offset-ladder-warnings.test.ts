@@ -237,7 +237,7 @@ describe('detectCncOffsetLadderWarnings', () => {
     for (const warning of warnings) expect(typeof warning).toBe('string');
   });
 
-  it('notes v-carve artwork finer than the detail pitch — advisory, layer-named (ADR-281)', () => {
+  it('notes v-carve artwork finer than the detail pitch — advisory, layer-named (ADR-282)', () => {
     // Every inset — coarse δ and fine detail alike — finds no interior, so
     // the layer's visible artwork is below even the detail pitch and partly
     // stays uncut. That is Job Review information, never a refusal.

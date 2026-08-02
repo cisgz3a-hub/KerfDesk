@@ -12,6 +12,16 @@ export function appendCncGroupComments(lines: string[], group: CncGroup): void {
   if (group.toolId !== undefined) lines.push(`; cnc tool-id: ${label(group.toolId)}`);
   if (group.toolName !== undefined) lines.push(`; cnc tool-name: ${label(group.toolName)}`);
   lines.push(toolGeometryComment(group));
+  if (group.toolFluteCount !== undefined) {
+    lines.push(`; cnc tool-flutes: ${shortNumber(group.toolFluteCount)}`);
+  }
+  if (
+    group.layerPrimaryToolId !== undefined &&
+    group.toolId !== undefined &&
+    group.layerPrimaryToolId !== group.toolId
+  ) {
+    lines.push(`; cnc layer-primary-tool-id: ${label(group.layerPrimaryToolId)}`);
+  }
   const depth = depthComment(group);
   if (depth !== null) lines.push(depth);
   if (group.vResolutionMm !== undefined) {

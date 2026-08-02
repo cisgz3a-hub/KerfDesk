@@ -70,7 +70,7 @@ export function buildVCarveRegionLayout(
  * region in source order, then one trailing bucket for contours matching no
  * region. Bucket layout depends only on `sourceContours`, so two ring sets
  * bucketed against the same sources zip by index — the ladder zips its δ
- * rings with the thin-detail rings (ADR-281) so a region finishes BOTH before
+ * rings with the thin-detail rings (ADR-282) so a region finishes BOTH before
  * the cutter travels on, keeping ADR-270's promise. An empty ring set returns
  * no buckets.
  */

@@ -42,10 +42,12 @@ describe('CNC G-code provenance comments', () => {
       toolName: 'Custom 3 mm 90 degree V-bit',
       toolKind: 'v-bit',
       toolTipAngleDeg: 90,
+      toolFluteCount: 2,
       requestedDepthMm: 1.191,
       depthPerPassMm: 0.5,
       vResolutionMm: 0,
       rampEntryDeg: 3,
+      layerPrimaryToolId: 'primary-v-bit',
       feedSource: { kind: 'machine-starter', starterId: 'neotronics-4040-safe', revision: 2 },
     });
     const plainGcode = cncGrblStrategy.emit({ groups: [plain] }, DEFAULT_DEVICE_PROFILE);
@@ -56,6 +58,8 @@ describe('CNC G-code provenance comments', () => {
     expect(enrichedGcode).toContain('; cnc tool-id: custom-v-3mm-90');
     expect(enrichedGcode).toContain('; cnc tool-name: Custom 3 mm 90 degree V-bit');
     expect(enrichedGcode).toContain('; cnc tool: v-bit; diameter-mm: 3.175; angle-deg: 90.000');
+    expect(enrichedGcode).toContain('; cnc tool-flutes: 2');
+    expect(enrichedGcode).toContain('; cnc layer-primary-tool-id: primary-v-bit');
     expect(enrichedGcode).toContain('; cnc depth: requested-mm: 1.191; per-pass-mm: 0.500');
     expect(enrichedGcode).toContain('; cnc v-resolution-mm: auto');
     expect(enrichedGcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 3.000');

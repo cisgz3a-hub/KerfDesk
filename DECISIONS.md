@@ -14061,12 +14061,26 @@ a sendable command rather than a comment.
    `feedSource` may change comments but cannot change emitted motion. The in-app streamer continues
    to strip comments before sending, and no Start, Frame, controller, or machine-policy gate changes.
 5. Tool labels in both the initial-load and mid-job tool-change comments use the same one-line
-   sanitizer. Emitter revision advances to `adr-273-cnc-incident-provenance-v1`.
+   sanitizer.
+6. A secondary V-carve clearing, rest-pocket roughing, or relief-finishing cutter continues to use
+   the layer's shared feed, plunge, and spindle RPM. V-carve clearing and rest-pocket roughing also
+   share depth per pass; relief finishing follows the sampled surface and scallop setting and does
+   not claim that value. The compiler records the layer's current primary cutter separately from
+   the secondary cutter that runs the group; it does not claim which cutter historically produced
+   manual or starter values. Every selector, including Design
+   Studio's V-carve Clear selector, and the exact ordinary/tiled artifact warn the operator to verify
+   those retained values; this advisory does not become a new ordinary Start or Save refusal.
+7. Each compiled group records the selected cutter's stored flute count when known. This is distinct
+   from a material recipe's calculation flute count, which describes the assumption behind the
+   retained numeric values. After ADR-278's V-carve contour ramp, the combined emitter revision
+   advances to `adr-278-vcarve-contour-ramp-secondary-settings-v2`.
 
 ### Consequences
 
 - A saved CNC file can now distinguish a 3 mm 90-degree custom V-bit from a diameter-only tool and
-  can reconstruct the relevant requested/effective setup without the live project.
+  can reconstruct the relevant requested/effective setup without the live project. It can also
+  distinguish the selected cutter's stored flute count from the recipe assumption and identify a
+  secondary group that uses shared layer values associated with the current primary cutter.
 - Newline-bearing imported labels remain inert comments instead of creating controller commands.
 - Motion commands and their order are unchanged. Raw comment-line counts and pass-span line numbers
   advance together when the exact artifact is emitted, so recovery continues to use matching spans.
@@ -14082,6 +14096,8 @@ a sendable command rather than a comment.
   newline labels as commands, exercises initial and mid-job tool comments, and caps CNC comment size.
 - Ordinary, tiled, and standalone export tests pin profile identity; metadata tests pin control-byte
   sanitization and the new emitter revision.
+- Compiler tests cover every secondary-cutter role; ordinary and tiled export tests pin the
+  retained-value advisory, and selector tests pin the immediate warning.
 - Automated tests and an air cut do not verify cutting-load position retention or finished geometry.
 
 ## ADR-274 - V-bit geometry is explicit before a contributing V-carve can compile (2026-08-01)
@@ -14640,7 +14656,7 @@ physical coordinate loss.
 - NOT verified: physical cutting, surface finish, bit capability, chip evacuation, workholding,
   or the cause of the reported coordinate loss.
 
-## ADR-281 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
+## ADR-282 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
 
 **Date:** 2026-08-01
 **Status:** Accepted
@@ -14735,7 +14751,7 @@ drop was a fidelity bug against the whole reference field, not a design choice.
 - NOT verified: a physical cut (no hardware available), cutter-tip condition, runout,
   workholding, material response, or surface finish.
 
-## ADR-281 Amendment 1 - coverage law corrected after the #575 revert (2026-08-01)
+## ADR-282 Amendment 1 - coverage law corrected after the #575 revert (2026-08-01)
 
 **Date:** 2026-08-01
 **Status:** Accepted
@@ -14769,7 +14785,7 @@ panel note) folded in.
    statement: wide artwork without rescued corner wedges is byte-identical; sharp corners
    gain shallow wedge passes by design (the disc cannot reach a mitered corner tip).
 5. **Emitter revision (process).** Output shaping changed without a revision bump. The final
-   safe re-land uses `adr-281-vcarve-thin-detail-safe-v1` (Amendment 4).
+   safe re-land uses `adr-282-vcarve-thin-detail-safe-v1` (Amendment 4).
 
 ### Consequences
 
@@ -14788,7 +14804,7 @@ panel note) folded in.
   polygon-difference, gcode-metadata, advisory warnings) passes on the re-land head.
 - NOT verified: physical cutting.
 
-## ADR-281 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
+## ADR-282 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
 
 **Date:** 2026-08-02
 **Status:** Accepted
@@ -14823,7 +14839,7 @@ ring as no cut at all.
    variable profile. If any detail exists, the whole layer retains the complete stepped
    profile and the existing advisory-only ramp fallback reports why.
 4. δ rings remain constant-Z contours. Detail XYZ moves use the configured plunge feed, and
-   the final emitter revision is `adr-281-vcarve-thin-detail-safe-v1`.
+   the final emitter revision is `adr-282-vcarve-thin-detail-safe-v1`.
 
 ### Consequences
 
@@ -14851,7 +14867,7 @@ ring as no cut at all.
 - NOT verified: physical cutting. The simulator and 3D route consume exact per-vertex Z, but
   neither is evidence of real cutter motion or material removal.
 
-## ADR-281 Amendment 3 - coverage floor and honest pass limits after the #584 revert (2026-08-02)
+## ADR-282 Amendment 3 - coverage floor and honest pass limits after the #584 revert (2026-08-02)
 
 **Date:** 2026-08-02
 **Status:** Accepted
@@ -14864,7 +14880,7 @@ PR #584 reverted the #581 re-land with a fail-closed blocker: a valid 1 degree V
 core unvisited with neither offsetFailed nor thinResidual raised. It also noted the 2 mm probe
 tolerated 14.24 % uncut in-shape cells and therefore could not distinguish full floor coverage
 from interior stripes. All four findings verified and answered here; this Amendment lands with
-the junction blend (Amendment 2). The final re-land is ADR-281: ADR-279 belongs to offline
+the junction blend (Amendment 2). The final re-land is ADR-282: ADR-279 belongs to offline
 imposition and ADR-280 belongs to the shared cone-limited floor-depth correction.
 
 ### Findings and corrections
@@ -14915,7 +14931,7 @@ imposition and ADR-280 belongs to the shared cone-limited floor-depth correction
 - NOT verified: physical cutting; ring-count growth on very large clamped floors is bounded
   by the budgets and reported when hit, not eliminated.
 
-## ADR-281 Amendment 4 - safe thin-detail re-land after the #592 review (2026-08-02)
+## ADR-282 Amendment 4 - safe thin-detail re-land after the #592 review (2026-08-02)
 
 **Date:** 2026-08-02
 **Status:** Accepted
@@ -14956,7 +14972,7 @@ outside the artwork.
    malformed/missing arrays keep the endpoint-span fallback. Preview accuracy is not hardware
    proof.
 6. Output shaping is identified by
-   `EMITTER_REVISION = adr-281-vcarve-thin-detail-safe-v1`.
+   `EMITTER_REVISION = adr-282-vcarve-thin-detail-safe-v1`.
 
 ### Consequences
 
@@ -14986,3 +15002,43 @@ outside the artwork.
   focused regression coverage in their owning suites.
 - NOT verified: physical cutting, bit-tip geometry/wear, spindle runout, material tear-out,
   workholding, chip evacuation, surface finish, or controller motion under load.
+## ADR-281 - One design language for the operations rail (2026-08-02)
+
+**Context.** The Artwork/Operations rail grew feature-by-feature: eight hand-rolled
+`<details>/<summary>` stylings (some boxed, some bare), several label-column widths, numeric inputs
+at 64/80/100 %-width, native unstyled buttons beside `.lf-btn` chrome, selects whose text ran under
+the dropdown arrow, and an 11-row Material & Bit wall mixing stock, spindle, and park settings. The
+maintainer called the pane unprofessional and hard to navigate; every complaint traced to a missing
+shared grammar rather than to any one component.
+
+An earlier attempt (#588) was reverted by #594. Its blockers are addressed here: the rail's label
+width no longer edits the shared `.lf-field-label--sm` token that eight non-rail dialogs depend on,
+and this change carries the rail styling ONLY - no docs, no export runtime, no unrelated behavior.
+
+**Decision.**
+1. `tokens.css` gains a rail form grammar: a `.lf-pane-form` scope that paints every native
+   button/input/select inside the pane with the chrome look (classless buttons get the quiet-button
+   treatment; selects ellipsize; checkboxes take the accent), plus `.lf-section` (one disclosure
+   chrome: hairline separator, rotating chevron, right-aligned muted badge), `.lf-subhead`
+   (uppercase group label over a hairline), `.lf-hint`, and `.lf-btn--sm`. Component code keeps
+   layout-only inline styles; paint lives in the stylesheet.
+2. A `RailSection` kit component (label / badge / required hint / open) replaces every hand-rolled
+   disclosure in the pane: probe, Manage bits, bit catalog, machine catalog, machine profiles,
+   tiling, spoilboard, feeds calculator. The hint is required because the hover-help contract scans
+   for a literal `title` on raw JSX controls.
+3. The field grammar standardizes on a 100 px label column and an 84 px numeric input across the
+   setup card, layer cards, selected-artwork panel, and the offset/dogbone rows. The 100 px column
+   is expressed as `.lf-pane-form .lf-field-label--sm` so it applies to the rail and CANNOT move a
+   dialog that uses `kit/Field`'s shared default. Related X/Y values share one row
+   (`Stock size (mm)` W-H, `Stock origin (mm)` X-Y, `Park position (mm)` X-Y) with per-input
+   aria-labels unchanged; the unit moves into the row label because the 300 px rail cannot hold two
+   inputs, two prefixes, and a unit.
+4. Material & Bit reads as labeled groups - STOCK / SPINDLE / MOTION - using the same
+   `.lf-subhead` the layer card's Advanced group already used.
+
+**Consequences.** The pane reads as one system; new rail features compose `RailSection` + the row
+grammar instead of restyling from scratch. The laser rail's `CollapsibleRailSection` and the machine
+rail are NOT migrated - follow-up work, same primitives. Screen-reader contracts are unchanged
+(every aria-label kept; the narrow-rail select shrink contract in `CncSetupPanel.layout.test.tsx`
+still holds). Perceptual verification: before/after screenshots at the 300 px rail width. No G-code,
+state, or behavior changes.

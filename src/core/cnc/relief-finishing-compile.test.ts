@@ -54,6 +54,8 @@ describe('relief finishing compile (H.8)', () => {
     const finish = job.groups[1];
     if (finish?.kind !== 'cnc') throw new Error('finish group missing');
     expect(finish.toolId).toBe('bn-3175');
+    expect(finish.layerPrimaryToolId).toBe(DEFAULT_CNC_MACHINE_CONFIG.toolId);
+    expect(finish.depthPerPassMm).toBeUndefined();
     expect(finish.passes.every((pass) => pass.kind === 'path3d')).toBe(true);
     // Every finishing Z stays within the relief's depth range.
     for (const pass of finish.passes) {
