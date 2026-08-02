@@ -3605,6 +3605,15 @@ diff) lives in its own unit-tested modules under `src/ui/laser/device-setup/`.
   pure logic → profile-only wizard → firmware step → brand presets) so each diff is reviewable
   and the side-effecting firmware step ships isolated.
 
+### Amendment (2026-08-02) — autofocus presets match the one-line runtime
+
+The Auto-focus control already accepts exactly one acknowledged controller line and rejects saved
+values containing a newline before any write. Device Setup must therefore offer only presets that
+satisfy that contract. Remove the multi-line generic GRBL probe sequence from the preset list and
+state beside the editor that multi-step probe/offset/retract programs are not sent from this
+control. Keep the free-form textarea so an existing saved value remains visible and editable; this
+amendment changes no controller command, transport precondition, Frame permit, or Start behavior.
+
 ### Alternatives rejected
 
 - **Auto-open on connect:** rejected by the maintainer — even gated on "unconfirmed," an
