@@ -12,7 +12,9 @@ import {
   type DesignLayerPatch,
 } from '../../../core/design/layers';
 import { cncToolGeometryLabel } from '../../common/cnc-tool-geometry-label';
+import { CNC_SECONDARY_RETAINED_FEEDS_WARNING } from '../../common/cnc-bit-change-advisory';
 import { CncToolOptions } from '../../machine/CncToolOptions';
+import { useToastStore } from '../../state/toast-store';
 import { DESIGN_CUT_TYPE_LABELS } from './design-cut-type-labels';
 
 const ACTIVE_BIT_VALUE = '';
@@ -20,12 +22,15 @@ const ACTIVE_BIT_VALUE = '';
 export function DesignLayerSettings(props: {
   readonly layer: DesignLayer;
   readonly tools: ReadonlyArray<CncTool>;
+  readonly activeTool: CncTool;
   readonly stockThicknessMm: number;
   readonly onPatch: (patch: DesignLayerPatch) => void;
 }): JSX.Element {
   const { layer, tools } = props;
+  const pushToast = useToastStore((state) => state.pushToast);
   const flatTools = tools.filter((tool) => tool.kind === 'end-mill');
   const currentTool = tools.find((tool) => tool.id === layer.toolId);
+  const primaryToolId = currentTool?.id ?? props.activeTool.id;
   const currentClearTool = tools.find((tool) => tool.id === layer.vClearToolId);
   return (
     <div style={settingsStyle}>
@@ -76,7 +81,12 @@ export function DesignLayerSettings(props: {
           tools={flatTools}
           currentTool={currentClearTool}
           unavailablePrefix="Current unsupported clearing bit (choose a flat end mill)"
-          onSelect={(vClearToolId) => props.onPatch({ vClearToolId })}
+          onSelect={(vClearToolId) => {
+            props.onPatch({ vClearToolId });
+            if (vClearToolId !== null && vClearToolId !== primaryToolId) {
+              pushToast(CNC_SECONDARY_RETAINED_FEEDS_WARNING, 'warning');
+            }
+          }}
         />
       ) : null}
     </div>

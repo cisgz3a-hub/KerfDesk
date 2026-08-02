@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DESIGN_LAYER } from '../../../core/design/layers';
 import type { CncTool } from '../../../core/scene';
+import { useToastStore } from '../../state/toast-store';
 import { DesignLayerSettings } from './DesignLayerSettings';
 
 (
@@ -31,6 +32,9 @@ afterEach(() => {
   host?.remove();
   root = null;
   host = null;
+  for (const toast of useToastStore.getState().toasts) {
+    useToastStore.getState().dismissToast(toast.id);
+  }
 });
 
 describe('DesignLayerSettings', () => {
@@ -43,6 +47,7 @@ describe('DesignLayerSettings', () => {
         <DesignLayerSettings
           layer={{ ...DEFAULT_DESIGN_LAYER, cutType: 'v-carve' }}
           tools={tools}
+          activeTool={tools[4]!}
           stockThicknessMm={12}
           onPatch={vi.fn()}
         />,
@@ -79,6 +84,7 @@ describe('DesignLayerSettings', () => {
             vClearToolId: 'ball',
           }}
           tools={tools}
+          activeTool={tools[4]!}
           stockThicknessMm={12}
           onPatch={vi.fn()}
         />,
@@ -99,5 +105,38 @@ describe('DesignLayerSettings', () => {
     expect(clearSelect.querySelector('option[value="core-box"]')).toBeNull();
     expect(clearSelect.querySelector('option[value="engraver"]')).toBeNull();
     expect(clearSelect.querySelector('option[value="v90"]')).toBeNull();
+  });
+
+  it('warns when Design Studio selects a secondary V-carve clearing bit', () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    const onPatch = vi.fn();
+    act(() => {
+      root?.render(
+        <DesignLayerSettings
+          layer={{ ...DEFAULT_DESIGN_LAYER, cutType: 'v-carve', toolId: 'v90' }}
+          tools={tools}
+          activeTool={tools[4]!}
+          stockThicknessMm={12}
+          onPatch={onPatch}
+        />,
+      );
+    });
+    const clearSelect = [...host.querySelectorAll('select')].find((select) =>
+      select.title.startsWith('Two-stage v-carve'),
+    );
+    if (clearSelect === undefined) throw new Error('clearing bit select missing');
+
+    act(() => {
+      clearSelect.value = 'flat';
+      clearSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(onPatch).toHaveBeenCalledWith({ vClearToolId: 'flat' });
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      variant: 'warning',
+      message: expect.stringMatching(/secondary.*feed.*plunge.*RPM.*depth\/pass.*verify/i),
+    });
   });
 });

@@ -10,6 +10,7 @@ import { tileFileName, type tileJobs } from '../../core/cnc';
 import { cncGrblStrategy } from '../../core/output';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
+  findCncSecondaryToolFeedIssues,
   runCncPreflight,
   type PreflightIssue,
 } from '../../core/preflight';
@@ -49,9 +50,8 @@ export function emitTileFiles(
   for (const { tile, job } of tiles) {
     const body = cncGrblStrategy.emit(job, project.device);
     const preflight = runCncPreflight(project, machine, body);
-    const blocking = preflight.issues.filter((issue) =>
-      COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code),
-    );
+    const issues = [...preflight.issues, ...findCncSecondaryToolFeedIssues(job)];
+    const blocking = issues.filter((issue) => COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code));
     if (blocking.length > 0) {
       const lines = blocking.map((issue) => `• ${issue.message}`).join('\n');
       jobAwareAlert(
@@ -60,7 +60,7 @@ export function emitTileFiles(
       );
       return null;
     }
-    for (const issue of preflight.issues) advisories.add(issue.message);
+    for (const issue of issues) advisories.add(issue.message);
     const header = gcodeMetadataHeader(
       buildGcodeMetadata(),
       {

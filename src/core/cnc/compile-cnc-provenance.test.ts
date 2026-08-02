@@ -17,12 +17,21 @@ const V_BIT = {
   kind: 'v-bit' as const,
   diameterMm: 3,
   tipAngleDeg: 90,
+  fluteCount: 1,
+};
+
+const CLEARING_BIT = {
+  id: 'custom-clear-6mm',
+  name: 'Custom 6 mm clearing bit',
+  kind: 'end-mill' as const,
+  diameterMm: 6,
+  fluteCount: 3,
 };
 
 const MACHINE: CncMachineConfig = {
   ...DEFAULT_CNC_MACHINE_CONFIG,
   toolId: V_BIT.id,
-  tools: [V_BIT],
+  tools: [V_BIT, CLEARING_BIT],
 };
 
 const OBJECT: ImportedSvg = {
@@ -86,7 +95,9 @@ describe('compiled CNC provenance', () => {
       toolName: V_BIT.name,
       toolKind: 'v-bit',
       toolTipAngleDeg: 90,
+      toolFluteCount: 1,
       toolDiameterMm: 3,
+      layerPrimaryToolId: V_BIT.id,
       requestedDepthMm: 1.191,
       depthPerPassMm: 0.5,
       vResolutionMm: 0,
@@ -98,6 +109,43 @@ describe('compiled CNC provenance', () => {
         materialKey: 'hardwood',
         fluteCount: 2,
       },
+    });
+  });
+
+  it('marks secondary-tool values as shared with the current layer primary cutter', () => {
+    const scene = vCarveScene();
+    const layer = scene.layers[0];
+    if (layer?.cnc === undefined) throw new Error('expected V-carve settings');
+    const withClearing: Scene = {
+      ...scene,
+      layers: [
+        {
+          ...layer,
+          cnc: { ...layer.cnc, vClearToolId: CLEARING_BIT.id },
+        },
+      ],
+    };
+    const groups = compileCncJob(withClearing, DEFAULT_DEVICE_PROFILE, MACHINE).groups;
+    const clearing = groups.find(
+      (group) => group.kind === 'cnc' && group.toolId === CLEARING_BIT.id,
+    );
+    const carving = groups.find((group) => group.kind === 'cnc' && group.toolId === V_BIT.id);
+    if (clearing?.kind !== 'cnc' || carving?.kind !== 'cnc') {
+      throw new Error('expected clearing and V-carve groups');
+    }
+
+    expect(clearing).toMatchObject({
+      toolFluteCount: 3,
+      layerPrimaryToolId: V_BIT.id,
+      feedSource: {
+        kind: 'material-recipe',
+        materialKey: 'hardwood',
+        fluteCount: 2,
+      },
+    });
+    expect(carving).toMatchObject({
+      toolFluteCount: 1,
+      layerPrimaryToolId: V_BIT.id,
     });
   });
 });

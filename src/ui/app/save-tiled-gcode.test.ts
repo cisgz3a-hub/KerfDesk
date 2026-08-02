@@ -142,6 +142,41 @@ describe('handleSaveTiledGcode', () => {
     expect(messages.filter((m) => m.includes('spin-up delay'))).toHaveLength(1);
   });
 
+  it('writes every tile and warns once for retained secondary-cutter values', async () => {
+    const base = tiledCncProject();
+    const written: string[] = [];
+    const messages: string[] = [];
+    const project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        layers: base.scene.layers.map((layer) =>
+          layer.id === 'L1'
+            ? {
+                ...layer,
+                cnc: {
+                  ...(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS),
+                  cutType: 'pocket' as const,
+                  toolId: 'em-1588',
+                  pocketRoughToolId: 'em-6350',
+                },
+              }
+            : layer,
+        ),
+      },
+    };
+
+    await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project,
+      savedName: 'job',
+      pushToast: (message) => messages.push(message),
+    });
+
+    expect(written.length).toBeGreaterThan(0);
+    expect(messages.filter((message) => message.includes('secondary bit'))).toHaveLength(1);
+  });
+
   it('exports every layer when no scope is given', async () => {
     const written: string[] = [];
     await handleSaveTiledGcode({

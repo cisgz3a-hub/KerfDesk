@@ -10,6 +10,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
+import { useToastStore } from '../state/toast-store';
 import { RestPocketToolSelect } from './CncRestPocketFields';
 
 (
@@ -18,7 +19,12 @@ import { RestPocketToolSelect } from './CncRestPocketFields';
 
 const LAYER: Layer = createLayer({ id: 'rest-pocket-layer', color: '#1166aa' });
 
-afterEach(resetStore);
+afterEach(() => {
+  for (const toast of useToastStore.getState().toasts) {
+    useToastStore.getState().dismissToast(toast.id);
+  }
+  resetStore();
+});
 
 function installCnc(): void {
   useStore.setState({ project: { ...createProject(), scene: { objects: [], layers: [LAYER] } } });
@@ -40,6 +46,29 @@ async function render(
 }
 
 describe('RestPocketToolSelect', () => {
+  it('warns that a secondary roughing bit retains the layer cutting values', async () => {
+    installCnc();
+    const { host, root } = await render({
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'pocket',
+      toolId: 'em-1588',
+    });
+    try {
+      const select = host.querySelector('select');
+      if (select === null) throw new Error('roughing bit select missing');
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+      setter?.call(select, 'em-3175');
+      await act(async () => select.dispatchEvent(new Event('change', { bubbles: true })));
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'warning',
+        message: expect.stringMatching(/secondary.*feed.*plunge.*RPM.*depth\/pass.*verify/i),
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('groups eligible roughers and renders geometry-first labels', async () => {
     installCnc();
     const { host, root } = await render({

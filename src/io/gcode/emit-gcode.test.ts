@@ -5,6 +5,8 @@ import {
   addObject,
   createLayer,
   createProject,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
   type OutputScope,
   type SceneObject,
@@ -163,6 +165,37 @@ describe('emitGcode', () => {
     expect(preflight.ok).toBe(false);
     expect(preflight.issues.some((i) => i.code === 'no-output-layer')).toBe(true);
   });
+
+  it('warns when an exact CNC artifact uses shared layer values with a secondary cutter', () => {
+    const base = createProject();
+    const project = {
+      ...base,
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+      scene: {
+        objects: [closedSquareObject('C1', 30)],
+        layers: [
+          {
+            ...createLayer({ id: 'pocket', color: '#ff0000' }),
+            cnc: {
+              ...DEFAULT_CNC_LAYER_SETTINGS,
+              cutType: 'pocket' as const,
+              toolId: 'em-1588',
+              pocketRoughToolId: 'em-6350',
+              depthMm: 2,
+              depthPerPassMm: 2,
+            },
+          },
+        ],
+      },
+    };
+
+    const { gcode, preflight } = emitGcode(project);
+
+    expect(gcode).toContain('; cnc layer-primary-tool-id: em-1588');
+    expect(preflight.issues).toContainEqual(
+      expect.objectContaining({ code: 'cnc-secondary-tool-feed-retained' }),
+    );
+  });
 });
 
 describe('materializeProgram', () => {
@@ -216,6 +249,32 @@ function lineObject(id: string, x: number): SceneObject {
               { x: x + 10, y: 0 },
             ],
             closed: false,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function closedSquareObject(id: string, size: number): SceneObject {
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 50, minY: 50, maxX: 50 + size, maxY: 50 + size },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            closed: true,
+            points: [
+              { x: 50, y: 50 },
+              { x: 50 + size, y: 50 },
+              { x: 50 + size, y: 50 + size },
+              { x: 50, y: 50 + size },
+            ],
           },
         ],
       },

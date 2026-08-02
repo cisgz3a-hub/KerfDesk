@@ -219,6 +219,12 @@ export type CncGroup = {
   // legacy archives and hand-built Job fixtures remain readable.
   readonly toolKind?: CncToolKind;
   readonly toolTipAngleDeg?: number;
+  readonly toolFluteCount?: number;
+  // Current primary cutter for the layer that owns the shared
+  // feed/plunge/RPM/depth-per-pass settings. This differs from toolId for
+  // secondary clearing/finishing groups. It describes the current sharing
+  // relationship, not which cutter historically produced a numeric value.
+  readonly layerPrimaryToolId?: string;
   readonly requestedDepthMm?: number;
   readonly depthPerPassMm?: number;
   readonly vResolutionMm?: number;
