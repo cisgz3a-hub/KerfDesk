@@ -4,6 +4,7 @@
 // toolpaths assume. Live store reads; renders nothing on a laser profile.
 
 import { CHIPLOAD_MATERIALS } from '../../../core/cnc';
+import { MANUAL_FEEDS_LABEL } from '../../common/cnc-material-vocabulary';
 import { useStore } from '../../state';
 import { formatMm } from './job-review-format';
 import {
@@ -14,7 +15,7 @@ import {
 } from './job-review-table.styles';
 import { sectionHeadingStyle, sectionStyle } from './job-review.styles';
 
-const NO_PROJECT_MATERIAL = 'Custom (manual feeds)';
+const NO_PROJECT_MATERIAL = MANUAL_FEEDS_LABEL;
 
 export function JobReviewStockCard(): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);

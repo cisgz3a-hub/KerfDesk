@@ -13,13 +13,17 @@ import { Row, selectStyle } from './CncLayerPrimitives';
 
 type LineArtContourSide = NonNullable<CncLayerSettings['lineArtContours']>;
 
+// Deliberately free of the word "path": Cut type already owns it in the CAM
+// sense (which side of the line the bit rides), and reading "Cut type: Outside
+// path" above "Line art: Inner path" looked like a contradiction. These name
+// the two EDGES of a traced stroke instead — an orthogonal choice.
 const SIDE_OPTIONS: ReadonlyArray<{
   readonly value: LineArtContourSide;
   readonly label: string;
 }> = [
-  { value: 'inner', label: 'Inner path (traced shape)' },
-  { value: 'outer', label: 'Outer path' },
-  { value: 'both', label: 'Both paths (double cut)' },
+  { value: 'inner', label: 'Inner edge (the drawn shape)' },
+  { value: 'outer', label: 'Outer edge' },
+  { value: 'both', label: 'Both edges (cuts twice)' },
 ];
 
 export function CncLineArtContoursField(props: {
@@ -35,12 +39,12 @@ export function CncLineArtContoursField(props: {
     cutType === 'engrave';
   if (!applies) return null;
   return (
-    <Row label="Line art">
+    <Row label="Traced edges">
       <select
         value={props.settings.lineArtContours ?? 'inner'}
         onChange={(e) => props.onCommit({ lineArtContours: e.target.value as LineArtContourSide })}
         aria-label={`Line art contours for ${props.layer.color}`}
-        title="Traced line drawings arrive as two nested outlines one stroke-width apart. Cut only the inner one (the drawn shape), only the outer, or both. Applies to traced and imported nested pairs closer than the bit diameter; anything wider always cuts, and text or shape outlines (like a letter's counter) always cut both."
+        title="Separate from Cut type: this picks WHICH traced outline is cut, while Cut type picks which side of it the bit rides. Traced line drawings arrive as two nested outlines one stroke-width apart. Cut only the inner one (the drawn shape), only the outer, or both. Applies to traced and imported nested pairs closer than the bit diameter; anything wider always cuts, and text or shape outlines (like a letter's counter) always cut both."
         style={selectStyle}
       >
         {SIDE_OPTIONS.map((option) => (

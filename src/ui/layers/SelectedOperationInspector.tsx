@@ -205,25 +205,30 @@ function LaserOperationFields(props: {
 
 function OperationToggles(props: { readonly operation: Layer }): JSX.Element {
   const setLayerParam = useStore((state) => state.setLayerParam);
+  // "Show" / "Output" — the same two words LightBurn's Cuts/Layers palette
+  // uses, and the same ones the layer card below shows for these exact two
+  // fields. They read as one control named once, not two settings.
   return (
     <div style={toggleRowStyle}>
-      <label>
+      <label title="Show or hide this operation on the workspace">
         <input
           type="checkbox"
           checked={props.operation.visible}
+          aria-label={`Show ${props.operation.name}`}
           title="Show or hide this operation on the workspace"
           onChange={(event) => setLayerParam(props.operation.id, { visible: event.target.checked })}
         />{' '}
-        Show on canvas
+        Show
       </label>
-      <label>
+      <label title="Include this operation in preview and machine output">
         <input
           type="checkbox"
           checked={props.operation.output}
+          aria-label={`Output ${props.operation.name}`}
           title="Include this operation in preview and machine output"
           onChange={(event) => setLayerParam(props.operation.id, { output: event.target.checked })}
         />{' '}
-        Include in output
+        Output
       </label>
     </div>
   );
