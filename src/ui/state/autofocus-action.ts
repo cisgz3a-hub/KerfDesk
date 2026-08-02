@@ -2,8 +2,8 @@
 //
 // Per-machine autofocus is vendor-specific — the Creality Falcon A1 Pro
 // implements `$HZ1` as a single-line GrblHAL macro that runs the internal
-// probe; other machines use G38.2-style probe sequences or proprietary
-// M-codes (some don't support it at all). This module owns the wire
+// probe; other machines may expose one proprietary macro or M-code (and some
+// don't support it at all). This module owns the wire
 // protocol regardless of which command body the user pasted:
 //   1. Pre-flight: connection open, controller idle, single-line command.
 //   2. Send the command through the shared write/ack ledger.

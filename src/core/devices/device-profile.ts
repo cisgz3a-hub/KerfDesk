@@ -231,11 +231,10 @@ export type DeviceProfile = {
   readonly estimateTravelTimeScale?: number;
   readonly origin: Origin;
   readonly homing: HomingConfig;
-  // Multi-line G-code (or vendor M-code) sequence the "Auto-focus" button
-  // sends. Lines are sent in order via the streaming buffer. Default is a
-  // standard GRBL probe-and-offset pattern; users on machines with custom
-  // autofocus protocols (Creality Falcon's M2010, xTool's vendor codes,
-  // proprietary touch-probe sequences) paste their machine's command here.
+  // One G-code or vendor-macro line the "Auto-focus" button sends through the
+  // acknowledged interactive-command path. Multi-step G-code sequences are
+  // intentionally unsupported; users need one firmware command/macro from
+  // their controller documentation. Empty disables Auto-focus.
   readonly autofocusCommand: string;
 };
 
@@ -276,7 +275,8 @@ export function isEstimateTimeScale(value: unknown): value is number {
 //
 // Field reality check: there is no portable autofocus G-code. Real-world
 // behavior we've seen:
-//   * GRBL with Z + probe pin  → `G38.2 Z-30 F100; G92 Z0; G1 Z3 F600` works.
+//   * GRBL with Z + probe pin  → a full probe/offset/retract routine needs
+//     several acknowledged commands, so it is not a valid value for this field.
 //   * GrblHAL on diode lasers   → rejects G38.2 with `error:20` (unsupported)
 //     and on some boards (Creality Falcon "A1 Pro Laser Master", xTool) the
 //     firmware beeps loudly and aborts the line — actively bad UX.
@@ -285,8 +285,8 @@ export function isEstimateTimeScale(value: unknown): value is number {
 //   * xTool                     → vendor-specific M-codes that vary by model.
 //
 // Shipping any "default" we picked would break someone's machine, so the
-// default is empty and the UI tells the user to paste their machine's
-// command. The Auto-focus button is disabled while this is empty (see the
+// default is empty and the UI accepts only one documented firmware command or
+// macro. The Auto-focus button is disabled while this is empty (see the
 // laser store's `autofocus` action).
 const DEFAULT_AUTOFOCUS_COMMAND = '';
 

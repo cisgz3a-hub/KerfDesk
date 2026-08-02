@@ -2,9 +2,9 @@
 // autofocus command. Extracted from DeviceSettings.tsx so the
 // parent stays under the 400-line hard cap (F-1 audit finding).
 //
-// Single-click presets for the autofocus command. Each preset is the
-// minimum the named machine needs; users on something else either paste
-// a known command from their controller docs or leave blank to disable.
+// Single-click presets for the autofocus command. Each preset is one
+// controller line the runtime can execute; users on something else either
+// paste a known command from their controller docs or leave blank to disable.
 //
 // Falcon: GrblHAL on the Creality "A1 Pro Laser Master" mainboard
 // implements `$HZ1` as a single-line firmware macro that runs the
@@ -23,11 +23,6 @@ const AUTOFOCUS_PRESETS: ReadonlyArray<{
     command: '$HZ1',
     hint: 'Firmware ≥ 1.0.38. Older firmware rejects with error:20.',
   },
-  {
-    label: 'GRBL probe (Z-axis machines)',
-    command: 'G91 G21\nG38.2 Z-30 F100\nG92 Z0\nG90\nG1 Z3 F600',
-    hint: 'Standard probe-down sequence. Diode lasers without a probe pin reply error:9.',
-  },
 ];
 
 export function AutofocusEditor(props: {
@@ -37,8 +32,8 @@ export function AutofocusEditor(props: {
   return (
     <div style={focusBlockStyle}>
       <p style={focusIntroStyle}>
-        Choose a known machine preset, or paste the exact command from your controller
-        documentation.
+        Choose a known machine preset, or paste one controller command or firmware macro from your
+        controller documentation.
       </p>
       <span style={presetLabelStyle}>Known machine presets</span>
       <div style={presetsRowStyle}>
@@ -63,13 +58,14 @@ export function AutofocusEditor(props: {
         onChange={(e) => props.onChange(e.target.value)}
         rows={5}
         spellCheck={false}
-        placeholder="Pick a preset below, or paste your machine's autofocus command"
-        title="G-code or firmware command KerfDesk sends when auto-focus is requested. Leave blank to disable auto-focus."
+        placeholder="Pick a preset, or paste one controller command or firmware macro"
+        title="One G-code or firmware command KerfDesk sends when auto-focus is requested. Leave blank to disable auto-focus."
         style={textareaStyle}
       />
       <p style={focusHintStyle}>
-        Leave this empty when the machine has no supported auto-focus routine. Common error replies:{' '}
-        <code style={inlineCodeStyle}>error:9</code> (no probe pin) and{' '}
+        Only one controller line is supported; multi-step G-code probe sequences are not sent from
+        this control. Leave this empty when the machine has no supported auto-focus routine. Common
+        error replies: <code style={inlineCodeStyle}>error:9</code> (no probe pin) and{' '}
         <code style={inlineCodeStyle}>error:20</code> (unsupported G-code on this firmware).
       </p>
     </div>
