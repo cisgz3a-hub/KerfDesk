@@ -48,8 +48,8 @@ function materialSettings(toolId: string): CncLayerSettings {
 
 describe('detectCncAngledToolFeedWarnings', () => {
   it.each([
-    ['vb-90', '90° V-bit', '12.7 mm', '90°'],
-    ['eng-15', '15° engraving bit', '3.175 mm', '15°'],
+    ['vb-90', '90° V-bit — 12.7 mm (1/2") cut', '12.7 mm', '90°'],
+    ['eng-15', '15° engraving bit — 3.175 mm (1/8") cut', '3.175 mm', '15°'],
   ])('warns for output material-recipe angled tool %s', (toolId, name, diameter, angle) => {
     const [warning, ...rest] = detectCncAngledToolFeedWarnings(
       cncProject(materialSettings(toolId)),

@@ -73,9 +73,14 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     diameterMm: 6.35,
     family: 'ball-nose',
   },
+  // An angled bit's CUT diameter is load-bearing, not decoration: it sets the
+  // cone-height depth clamp ((D/2)/tan(θ/2)) and the auto ring pitch (D/8). A
+  // name that states only the angle invites picking a 12.7 mm cutter for a
+  // 3.175 mm bit in hand — 4x the reachable depth and 4x the ring pitch. Every
+  // angled entry therefore names its cut diameter.
   {
     id: 'vb-30',
-    name: '30° V-bit',
+    name: '30° V-bit — 3.175 mm (1/8") cut',
     kind: 'v-bit',
     diameterMm: 3.175,
     tipAngleDeg: 30,
@@ -83,7 +88,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
   },
   {
     id: 'vb-45',
-    name: '45° V-bit',
+    name: '45° V-bit — 6.35 mm (1/4") cut',
     kind: 'v-bit',
     diameterMm: 6.35,
     tipAngleDeg: 45,
@@ -91,7 +96,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
   },
   {
     id: 'vb-60',
-    name: '60° V-bit',
+    name: '60° V-bit — 6.35 mm (1/4") cut',
     kind: 'v-bit',
     diameterMm: 6.35,
     tipAngleDeg: 60,
@@ -99,7 +104,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
   },
   {
     id: 'vb-90',
-    name: '90° V-bit',
+    name: '90° V-bit — 12.7 mm (1/2") cut',
     kind: 'v-bit',
     diameterMm: 12.7,
     tipAngleDeg: 90,
@@ -107,7 +112,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
   },
   {
     id: 'eng-15',
-    name: '15° engraving bit',
+    name: '15° engraving bit — 3.175 mm (1/8") cut',
     kind: 'engraving',
     diameterMm: 3.175,
     tipAngleDeg: 15,
@@ -132,5 +137,40 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     family: 'v-groove',
     shankDiameterMm: 6.35,
     catalogId: 'v90-hobby-025',
+  },
+  // The 1/8"-class angled bits that ship with 3018/desktop routers: the cutter
+  // is ground to the shank, so cut diameter equals shank. Their absence forced
+  // an operator holding one to pick a 6.35 mm or 12.7 mm entry, which lets the
+  // depth clamp allow 3.175 mm / 6.35 mm of depth against a bit that bottoms
+  // out at 1.588 mm.
+  {
+    id: 'vb-90-3175',
+    name: '90° V-bit — 3.175 mm (1/8") cut, 3.175 mm (1/8") shank',
+    kind: 'v-bit',
+    diameterMm: 3.175,
+    tipAngleDeg: 90,
+    family: 'v-groove',
+    shankDiameterMm: 3.175,
+    catalogId: 'v90-cut-0125',
+  },
+  {
+    id: 'vb-90-3000',
+    name: '90° V-bit — 3 mm cut, 3 mm shank',
+    kind: 'v-bit',
+    diameterMm: 3,
+    tipAngleDeg: 90,
+    family: 'v-groove',
+    shankDiameterMm: 3,
+    catalogId: 'v90-cut-3mm',
+  },
+  {
+    id: 'vb-60-3175',
+    name: '60° V-bit — 3.175 mm (1/8") cut, 3.175 mm (1/8") shank',
+    kind: 'v-bit',
+    diameterMm: 3.175,
+    tipAngleDeg: 60,
+    family: 'v-groove',
+    shankDiameterMm: 3.175,
+    catalogId: 'v60-cut-0125',
   },
 ];
