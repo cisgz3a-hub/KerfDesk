@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
-import { clearAutosave, readAutosave, writeAutosave } from './autosave';
+import { autosaveSlotGeneration, clearAutosave, readAutosave, writeAutosave } from './autosave';
 
 const KEY = 'lf2:autosave:v1';
 
@@ -88,6 +88,24 @@ describe('clearAutosave', () => {
 
   it('is a no-op when the slot is already empty', () => {
     expect(() => clearAutosave()).not.toThrow();
+  });
+});
+
+// autosaveSlotGeneration is how a background writer that memoized what it put
+// in the slot learns the slot no longer holds it. Only clearing changes it —
+// re-writing does not, because the writer already knows about its own write.
+describe('autosaveSlotGeneration', () => {
+  it('changes on every clear and holds steady across writes', () => {
+    const beforeClear = autosaveSlotGeneration();
+    writeAutosave(createProject());
+    expect(autosaveSlotGeneration()).toBe(beforeClear);
+
+    clearAutosave();
+
+    const afterClear = autosaveSlotGeneration();
+    expect(afterClear).not.toBe(beforeClear);
+    clearAutosave();
+    expect(autosaveSlotGeneration()).not.toBe(afterClear);
   });
 });
 

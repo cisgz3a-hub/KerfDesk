@@ -125,6 +125,45 @@ describe('startAutosaveLoop skips ticks that would rewrite the same project', ()
   });
 });
 
+// The skip-if-unchanged memo remembers a Project value, but the slot it is
+// reasoning about can be emptied behind the loop's back: handleSaveProject
+// calls clearAutosave() after every successful manual save. Undo then restores
+// the very Project object an earlier tick wrote, so a reference-only memo
+// concludes "already saved" while the slot is in fact empty — silently
+// disarming the 30 s crash-recovery net for the rest of the session.
+describe('startAutosaveLoop re-arms the slot after it is cleared', () => {
+  it('writes again when undo restores the same project a manual save cleared', () => {
+    const beforeEdit = editedProject('before edit');
+    const afterEdit = editedProject('after edit');
+    let snapshot = { project: beforeEdit, dirty: true, isStreaming: false };
+    const stop = startAutosaveLoop(() => snapshot, TICK_MS);
+
+    // (1) a tick autosaves the project, memoizing that exact value.
+    vi.advanceTimersByTime(TICK_MS);
+    expect(readAutosave()?.project.notes).toBe('before edit');
+
+    // (2) the operator edits, then (3) manually saves inside the same window:
+    // the manual save empties the slot and clears dirty.
+    snapshot = { project: afterEdit, dirty: true, isStreaming: false };
+    clearAutosave();
+    snapshot = { project: afterEdit, dirty: false, isStreaming: false };
+    expect(readAutosave()).toBeNull();
+
+    // (4) undo restores the SAME Project reference the tick in (1) wrote.
+    snapshot = { project: beforeEdit, dirty: true, isStreaming: false };
+
+    // (5) the next tick must re-arm the empty slot.
+    vi.advanceTimersByTime(TICK_MS);
+    expect(readAutosave()?.project.notes).toBe('before edit');
+
+    // …and having re-armed it, the memo must go back to skipping idle ticks.
+    const setItem = spyOnSetItem();
+    vi.advanceTimersByTime(TICK_MS * IDLE_TICKS);
+    expect(setItem.mock.calls.length).toBe(0);
+    stop();
+  });
+});
+
 // A project past the ~5 MB localStorage cap fails with 'quota' on every tick.
 // Retrying the identical project can never succeed, so the retry bought nothing
 // and cost a full serialize + validate + setItem attempt every 30 s forever.
