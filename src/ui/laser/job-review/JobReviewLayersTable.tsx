@@ -36,6 +36,8 @@ import {
   sectionHintStyle,
   sectionStyle,
 } from './job-review.styles';
+import type { JobReviewEffectiveOperation } from './job-review-effective-operations';
+import { JobReviewEffectiveOperationRow } from './JobReviewEffectiveOperationRow';
 import {
   CncRowCells,
   LaserRowCells,
@@ -57,7 +59,10 @@ const CNC_COLUMNS = [
   'Artworks',
 ];
 
-export function JobReviewLayersTable(props: { readonly machineKind: MachineKind }): JSX.Element {
+export function JobReviewLayersTable(props: {
+  readonly machineKind: MachineKind;
+  readonly effectiveOperations: ReadonlyArray<JobReviewEffectiveOperation>;
+}): JSX.Element {
   const layers = useStore((s) => s.project.scene.layers);
   const outputLayers = layers.filter((layer) => layer.output);
   return (
@@ -76,9 +81,12 @@ export function JobReviewLayersTable(props: { readonly machineKind: MachineKind 
       ) : (
         <div style={tableWrapStyle}>
           {props.machineKind === 'cnc' ? (
-            <CncLayersTable layers={outputLayers} />
+            <CncLayersTable layers={outputLayers} effectiveOperations={props.effectiveOperations} />
           ) : (
-            <LaserLayersTable layers={outputLayers} />
+            <LaserLayersTable
+              layers={outputLayers}
+              effectiveOperations={props.effectiveOperations}
+            />
           )}
         </div>
       )}
@@ -86,7 +94,10 @@ export function JobReviewLayersTable(props: { readonly machineKind: MachineKind 
   );
 }
 
-function LaserLayersTable(props: { readonly layers: ReadonlyArray<Layer> }): JSX.Element {
+function LaserLayersTable(props: {
+  readonly layers: ReadonlyArray<Layer>;
+  readonly effectiveOperations: ReadonlyArray<JobReviewEffectiveOperation>;
+}): JSX.Element {
   const objects = useStore((s) => s.project.scene.objects);
   const maxFeed = useStore((s) => s.project.device.maxFeed);
   const materialLibrary = useStore((s) => s.materialLibrary);
@@ -114,6 +125,11 @@ function LaserLayersTable(props: { readonly layers: ReadonlyArray<Layer> }): JSX
               chip={materialChip(layer, materialLibrary)}
               text={laserOperationDetail(layer)}
             />
+            <JobReviewEffectiveOperationRow
+              colSpan={LASER_COLUMNS.length}
+              layerId={layer.id}
+              effectiveOperations={props.effectiveOperations}
+            />
             {layer.subLayers
               .filter((subLayer) => subLayer.enabled)
               .map((subLayer) => (
@@ -136,6 +152,11 @@ function LaserLayersTable(props: { readonly layers: ReadonlyArray<Layer> }): JSX
                     chip={null}
                     text={laserOperationDetail(subLayer.settings)}
                   />
+                  <JobReviewEffectiveOperationRow
+                    colSpan={LASER_COLUMNS.length}
+                    layerId={subLayer.id}
+                    effectiveOperations={props.effectiveOperations}
+                  />
                 </Fragment>
               ))}
           </Fragment>
@@ -145,7 +166,10 @@ function LaserLayersTable(props: { readonly layers: ReadonlyArray<Layer> }): JSX
   );
 }
 
-function CncLayersTable(props: { readonly layers: ReadonlyArray<Layer> }): JSX.Element {
+function CncLayersTable(props: {
+  readonly layers: ReadonlyArray<Layer>;
+  readonly effectiveOperations: ReadonlyArray<JobReviewEffectiveOperation>;
+}): JSX.Element {
   const objects = useStore((s) => s.project.scene.objects);
   const machine = useStore((s) => s.project.machine);
   const maxFeed = useStore((s) => s.project.device.maxFeed);
@@ -176,6 +200,11 @@ function CncLayersTable(props: { readonly layers: ReadonlyArray<Layer> }): JSX.E
                 colSpan={CNC_COLUMNS.length}
                 chip={null}
                 text={cncOperationDetail(settings)}
+              />
+              <JobReviewEffectiveOperationRow
+                colSpan={CNC_COLUMNS.length}
+                layerId={layer.id}
+                effectiveOperations={props.effectiveOperations}
               />
             </Fragment>
           );

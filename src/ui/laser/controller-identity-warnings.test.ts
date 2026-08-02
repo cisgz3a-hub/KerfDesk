@@ -55,6 +55,7 @@ describe('controller identity warnings', () => {
       toolPlanLabels: [],
       acknowledgement: { kind: 'laser-verified' },
       outputQualityFacts: [],
+      effectiveOperations: [],
     };
 
     const refreshed = refreshControllerIdentityWarnings(model, 'grbl-v1.1', 'grbl-v1.1', 'marlin');

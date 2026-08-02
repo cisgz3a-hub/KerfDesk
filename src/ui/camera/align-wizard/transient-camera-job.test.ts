@@ -43,6 +43,7 @@ vi.mock('../../laser/job-review', () => ({
       toolPlanLabels: [],
       acknowledgement: { kind: 'laser-verified' },
       outputQualityFacts: [],
+      effectiveOperations: [],
     }),
   ),
 }));

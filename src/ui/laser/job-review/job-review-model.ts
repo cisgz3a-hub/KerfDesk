@@ -1,8 +1,6 @@
-// buildJobReviewModel — pure mapping from one successful Start preparation
-// (plus the store snapshots it was prepared against) to the display model
-// the Job Review dialog renders (ADR-224). The review gate rebuilds this
-// after every re-prepare; live sections (layers table, placement controls,
-// controller/machine facts) read the stores directly instead.
+// buildJobReviewModel maps one successful Start preparation and its store
+// snapshots into the Job Review display model (ADR-224). Live editable sections
+// still read stores directly; compiled facts come from the prepared job.
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
 import {
@@ -30,6 +28,7 @@ import {
   originTileDetail,
   originTileValue,
 } from './job-review-format';
+import { buildEffectiveOperationReview } from './job-review-effective-operations';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
@@ -61,6 +60,7 @@ export type JobReviewModel = {
   readonly toolPlanLabels: ReadonlyArray<string>;
   readonly acknowledgement: JobReviewAcknowledgement;
   readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
+  readonly effectiveOperations: ReturnType<typeof buildEffectiveOperationReview>;
 };
 
 export function buildJobReviewModel(args: {
@@ -99,6 +99,7 @@ export function buildJobReviewModel(args: {
       args.project.scene.layers,
       args.project.device.scanningOffsets,
     ),
+    effectiveOperations: buildEffectiveOperationReview(args.prepared.prepared.job),
   };
 }
 

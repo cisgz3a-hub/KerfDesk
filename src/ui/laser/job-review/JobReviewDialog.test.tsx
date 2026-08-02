@@ -35,6 +35,7 @@ const model: JobReviewModel = {
   resolvedOriginLabel: 'User origin — anchor front left',
   toolPlanLabels: [],
   outputQualityFacts: [],
+  effectiveOperations: [],
   acknowledgement: { kind: 'laser-unverified', prompt: 'Controller laser mode prompt body.' },
 };
 

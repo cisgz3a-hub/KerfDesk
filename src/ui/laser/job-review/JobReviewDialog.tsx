@@ -58,7 +58,10 @@ function OpenJobReview(props: {
       {blocker !== null ? <BlockerBanner blocker={blocker} purpose={purpose} /> : null}
       <JobReviewWarnings warnings={model.warnings} />
       <JobReviewStockCard />
-      <JobReviewLayersTable machineKind={model.machineKind} />
+      <JobReviewLayersTable
+        machineKind={model.machineKind}
+        effectiveOperations={model.effectiveOperations}
+      />
       <section aria-label="Before you start" style={sectionStyle}>
         <h3 style={sectionHeadingStyle}>Before you start</h3>
         <JobReviewControllerSection machineKind={model.machineKind} />

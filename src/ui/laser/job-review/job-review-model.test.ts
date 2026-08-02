@@ -132,6 +132,32 @@ describe('buildJobReviewModel', () => {
     expect(new Set(model.warnings).size).toBe(model.warnings.length);
   });
 
+  it('reports object overrides and power scaling from the exact compiled job', async () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: state.project.scene.objects.map((object) => ({
+            ...object,
+            powerScale: 50,
+            operationOverride: { power: 40, speed: 1234, passes: 2 },
+          })),
+          layers: state.project.scene.layers.map((layer) => ({ ...layer, power: 30 })),
+        },
+      },
+    }));
+
+    const model = await buildModelFromCurrentStores();
+
+    expect(model.effectiveOperations).toEqual([
+      {
+        layerId: 'red',
+        summaries: ['Line · 20% power · 1,234 mm/min · 2 passes · air off'],
+      },
+    ]);
+  });
+
   it('carries the exact unverified-$32 prompt when laser mode is unknown', async () => {
     useLaserStore.setState((state) => ({
       controllerSettings: {

@@ -10,6 +10,7 @@ import {
 } from '../../../core/scene';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
+import type { JobReviewEffectiveOperation } from './job-review-effective-operations';
 import { JobReviewLayersTable } from './JobReviewLayersTable';
 
 (
@@ -42,10 +43,15 @@ function seedLayers(layers: ReadonlyArray<Layer>, machineKind: 'laser' | 'cnc'):
   });
 }
 
-async function render(machineKind: 'laser' | 'cnc'): Promise<void> {
+async function render(
+  machineKind: 'laser' | 'cnc',
+  effectiveOperations: ReadonlyArray<JobReviewEffectiveOperation> = [],
+): Promise<void> {
   root = createRoot(host);
   await act(async () => {
-    root?.render(<JobReviewLayersTable machineKind={machineKind} />);
+    root?.render(
+      <JobReviewLayersTable machineKind={machineKind} effectiveOperations={effectiveOperations} />,
+    );
   });
 }
 
@@ -127,6 +133,24 @@ describe('JobReviewLayersTable', () => {
 
     expect(host.textContent).toContain('Artwork settings');
     expect(host.textContent).toContain('Kerf 0 mm · tabs off · min power 0%');
+  });
+
+  it('keeps editable base values while disclosing every exact compiled variant', async () => {
+    const layer = { ...createLayer({ id: 'red', color: '#ff0000' }), power: 30 };
+    seedLayers([layer], 'laser');
+    await render('laser', [
+      {
+        layerId: 'red',
+        summaries: [
+          'Line · 15% power · 1,000 mm/min · 1 pass · air off · constant power',
+          'Line · 30% power · 1,000 mm/min · 1 pass · air off · constant power',
+        ],
+      },
+    ]);
+
+    expect(numberInput(`Power % for ${layer.name}`).value).toBe('30');
+    expect(host.textContent).toContain('Exact compiled output: Line · 15% power');
+    expect(host.textContent).toContain('Line · 30% power');
   });
 
   it('shows the strategy detail line under a CNC operation', async () => {
