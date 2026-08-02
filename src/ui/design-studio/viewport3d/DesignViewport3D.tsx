@@ -38,6 +38,7 @@ export function DesignViewport3D(): JSX.Element {
         onPointerMove={pointer.onPointerMove}
         onPointerUp={pointer.onPointerUp}
         onPointerLeave={pointer.onPointerLeave}
+        onDoubleClick={pointer.onDoubleClick}
       />
       <DesignViewportToolbar
         tier={tiers.shownTier}
@@ -146,6 +147,7 @@ function useOverlaySync(
           sketch: session.history.present,
           selectedIds: session.selectedIds,
           draft: session.draft,
+          pointSequence: session.pointSequence,
           snapMm: session.activeSnap?.atMm ?? null,
           frame,
         }),
@@ -172,6 +174,7 @@ function useOverlaySync(
         sketch: session.history.present,
         selectedIds: session.selectedIds,
         draft: session.draft,
+        pointSequence: session.pointSequence,
         snapMm: session.activeSnap?.atMm ?? null,
         frame,
       }),

@@ -12,9 +12,14 @@ import type { CornerPick } from './design-corner-pick';
 import { draftToEntity } from './design-draft';
 import { applyEntityField } from './design-entity-edit';
 import type { MeasurementKey } from './design-entity-fields';
+import type { DesignToolKind } from './design-tool';
 import { commitSketch, replacePresent } from './design-history';
 import { entitiesInRectMm } from './design-hit-test';
 import { sessionSketch, withSketch, type DesignSession } from './design-session';
+
+export function setSessionTool(session: DesignSession, tool: DesignToolKind): DesignSession {
+  return session.tool === tool ? session : { ...session, tool, pointSequence: null };
+}
 
 // The draft becomes an entity, the entity becomes one history step, and the new
 // entity becomes the selection — so the operator can immediately edit what they
@@ -29,6 +34,20 @@ export function commitSessionDraft(session: DesignSession, id: string): DesignSe
   const next = addEntity(sessionSketch(session), entity);
   if (next === sessionSketch(session)) return cleared;
   return { ...withSketch(cleared, next), selectedIds: new Set([entity.id]) };
+}
+
+// A completed click sequence follows the same contract as a completed drag:
+// active layer, one history step, immediate selection, and no intermediate
+// points in undo history.
+export function commitSessionPointEntity(
+  session: DesignSession,
+  entity: SketchEntity,
+): DesignSession {
+  const layered = { ...entity, layerId: session.activeLayerId };
+  const cleared: DesignSession = { ...session, pointSequence: null };
+  const next = addEntity(sessionSketch(session), layered);
+  if (next === sessionSketch(session)) return cleared;
+  return { ...withSketch(cleared, next), selectedIds: new Set([layered.id]) };
 }
 
 // The copy lands offset so it is visibly a second shape rather than hiding

@@ -37,11 +37,13 @@ import {
   applyCornerToSession,
   beginSessionMove,
   commitSessionDraft,
+  commitSessionPointEntity,
   commitSessionMarquee,
   duplicateSessionEntity,
   editSessionField,
   endSessionMove,
   nudgeSession,
+  setSessionTool,
   setSessionConstruction,
   updateSessionMove,
 } from './design-session-mutations';
@@ -59,6 +61,7 @@ import {
   type DesignView,
 } from './design-session';
 import type { DesignToolKind } from './design-tool';
+import type { DesignPointSequence } from './design-point-sequence';
 
 type DesignStudioState = {
   readonly session: DesignSession | null;
@@ -78,6 +81,8 @@ type DesignStudioState = {
   readonly drawEntity: (entity: SketchEntity) => void;
   readonly updateEntity: (entity: SketchEntity) => void;
   readonly setDraft: (draft: DesignDraft | null) => void;
+  readonly setPointSequence: (sequence: DesignPointSequence | null) => void;
+  readonly commitPointEntity: (entity: SketchEntity) => void;
   // Commits the live draft as one entity and one undo step. The id comes from the
   // caller because pure core may not generate identity.
   readonly commitDraft: (id: string) => void;
@@ -131,7 +136,7 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   closeStudio: () =>
     set((state) => (state.session === null ? state : { session: null, stash: state.session })),
 
-  setTool: (tool) => set(mapSession((session) => ({ ...session, tool }))),
+  setTool: (tool) => set(mapSession((session) => setSessionTool(session, tool))),
   setView: (view) => set(mapSession((session) => ({ ...session, view }))),
   setCursorMm: (cursorMm) => set(mapSession((session) => ({ ...session, cursorMm }))),
   setActiveSnap: (activeSnap) => set(mapSession((session) => ({ ...session, activeSnap }))),
@@ -156,6 +161,9 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
 
   setDraft: (draft) => set(mapSession((session) => ({ ...session, draft }))),
   commitDraft: (id) => set(mapSession((session) => commitSessionDraft(session, id))),
+  setPointSequence: (pointSequence) =>
+    set(mapSession((session) => ({ ...session, pointSequence }))),
+  commitPointEntity: (entity) => set(mapSession((s) => commitSessionPointEntity(s, entity))),
 
   applyCorner: (pick, op) => set(mapSession((session) => applyCornerToSession(session, pick, op))),
   setFilletRadiusMm: (filletRadiusMm) =>
