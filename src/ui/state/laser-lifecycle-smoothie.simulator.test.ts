@@ -125,7 +125,7 @@ describe('Smoothieware lifecycle against the simulator', () => {
     expect(s.connection.kind).toBe('connected');
     expect(s.detectedControllerKind).toBe('smoothieware');
     expect(s.capabilities).toMatchObject({
-      realtimePause: true,
+      realtimePause: false,
       settings: 'none',
       wcs: 'g92-only',
     });
@@ -157,17 +157,17 @@ describe('Smoothieware lifecycle against the simulator', () => {
     expect(sim.state().isHomed).toBe(true);
   });
 
-  it('pauses with realtime ! WITHOUT the $32 proof and resumes with ~', async () => {
+  it('pauses the host stream without unqualified !/~ bytes', async () => {
     const sim = await connectSmoothieIdle();
     expect(useLaserStore.getState().controllerSettings).toBeNull();
     await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
     await pump(30);
     await useLaserStore.getState().pauseJob(); // must NOT throw the $32 message
-    expect(sim.outbound()).toContain('!');
+    expect(sim.outbound()).not.toContain('!');
     await pump(50);
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
     await useLaserStore.getState().resumeJob();
-    expect(sim.outbound()).toContain('~');
+    expect(sim.outbound()).not.toContain('~');
     await pump(8000);
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(sim.state().pos.x).toBe(39);
@@ -189,7 +189,7 @@ describe('Smoothieware lifecycle against the simulator', () => {
     });
 
     await useLaserStore.getState().resumeJob();
-    expect(sim.outbound()).toContain('~');
+    expect(sim.outbound()).not.toContain('~');
     expect(sim.outbound()).toContain('M400\n');
     expect(useLaserStore.getState()).toMatchObject({
       streamer: { status: 'done' },
