@@ -236,13 +236,18 @@ function NumberField(props: {
   readonly onCommit: (value: number) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState(formatNumber(props.value));
-  useEffect(() => setDraft(formatNumber(props.value)), [props.value]);
+  // Re-snap on every commit ATTEMPT, not only when the value moved. A commit
+  // the store rejects (resizing a rotated selection, a zero dimension) or
+  // normalizes to what it already held (370° on a 10° shape) leaves
+  // `props.value` untouched, so keying the effect on it alone left the box
+  // showing a number the scene never took — the lie useDebouncedCommit's blur
+  // re-snap exists to prevent.
+  const [commitSeq, setCommitSeq] = useState(0);
+  useEffect(() => setDraft(formatNumber(props.value)), [props.value, commitSeq]);
   const commit = (): void => {
     const next = Number(draft);
-    if (!Number.isFinite(next)) {
-      setDraft(formatNumber(props.value));
-      return;
-    }
+    setCommitSeq((seq) => seq + 1);
+    if (!Number.isFinite(next)) return;
     props.onCommit(next);
   };
   return (

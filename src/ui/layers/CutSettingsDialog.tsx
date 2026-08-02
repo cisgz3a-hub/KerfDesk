@@ -19,10 +19,6 @@ type CutSettingsDialogProps = {
 
 export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
   const maxFeed = positiveFiniteLimit(props.maxFeed);
-  const [mode, setMode] = useState<LayerMode>(props.layer.mode);
-  const [dither, setDither] = useState<Layer['ditherAlgorithm']>(props.layer.ditherAlgorithm);
-  const [fillLineIntervalMm, setFillLineIntervalMm] = useState(props.layer.hatchSpacingMm);
-  const [imageLinesPerMm, setImageLinesPerMm] = useState(props.layer.linesPerMm);
   const onSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -31,7 +27,6 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
       readCutSettingsPatch(new FormData(form), props.layer, maxFeed === null ? {} : { maxFeed }),
     );
   };
-  const maxFeedProps = maxFeed === null ? {} : { maxFeed };
   return (
     <Dialog
       onClose={props.onCancel}
@@ -41,6 +36,36 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
       size="md"
     >
       <Header layer={props.layer} />
+      {/* Keyed on the layer's own settings: the fields are uncontrolled drafts
+          that read `defaultValue` once, and OK submits whatever the DOM holds.
+          "Reset to Default" rewrites the layer in the store while the dialog is
+          open, so without this remount the boxes kept the pre-reset numbers and
+          OK wrote them straight back — silently undoing the reset. Typing never
+          changes the stored layer, so an in-progress edit is never remounted. */}
+      <CutSettingsBody
+        key={layerFormSignature(props.layer)}
+        layer={props.layer}
+        {...(maxFeed === null ? {} : { maxFeed })}
+      />
+      {hasDefaultHandlers(props) ? <CutSettingsDefaultActions {...props} /> : null}
+      <DialogActions>
+        <Button onClick={props.onCancel}>Cancel</Button>
+        <Button type="submit" variant="primary">
+          OK
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function CutSettingsBody(props: { readonly layer: Layer; readonly maxFeed?: number }): JSX.Element {
+  const [mode, setMode] = useState<LayerMode>(props.layer.mode);
+  const [dither, setDither] = useState<Layer['ditherAlgorithm']>(props.layer.ditherAlgorithm);
+  const [fillLineIntervalMm, setFillLineIntervalMm] = useState(props.layer.hatchSpacingMm);
+  const [imageLinesPerMm, setImageLinesPerMm] = useState(props.layer.linesPerMm);
+  const maxFeedProps = props.maxFeed === undefined ? {} : { maxFeed: props.maxFeed };
+  return (
+    <>
       <CutSettingsCommonFields
         layer={props.layer}
         mode={mode}
@@ -63,15 +88,17 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
           onImageLinesPerMmChange={setImageLinesPerMm}
         />
       ) : null}
-      {hasDefaultHandlers(props) ? <CutSettingsDefaultActions {...props} /> : null}
-      <DialogActions>
-        <Button onClick={props.onCancel}>Cancel</Button>
-        <Button type="submit" variant="primary">
-          OK
-        </Button>
-      </DialogActions>
-    </Dialog>
+    </>
   );
+}
+
+// Value-based, over the whole layer rather than a hand-listed subset: any
+// store-side rewrite (Reset to Default, undo, a preset apply) re-seeds the
+// form, and a field added to Layer later cannot silently fall out of the
+// signature. Equal values produce an equal string, so the store's ordinary
+// re-renders do not remount anything.
+function layerFormSignature(layer: Layer): string {
+  return JSON.stringify(layer);
 }
 
 function positiveFiniteLimit(value: number | undefined): number | null {

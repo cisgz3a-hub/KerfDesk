@@ -9,6 +9,48 @@ import { CutSettingsDialog } from './CutSettingsDialog';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
+describe('CutSettingsDialog store reconciliation', () => {
+  // The fields are uncontrolled drafts and OK submits whatever the DOM holds.
+  // "Reset to Default" rewrites the layer in the store while the dialog stays
+  // open, so a form still holding the pre-reset numbers wrote them straight
+  // back on OK — silently undoing the reset the operator just asked for.
+  it('re-seeds the form when the layer is rewritten underneath it', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      const before = { ...lineLayer(), power: 30, speed: 1500 };
+      const created = createRoot(host);
+      root = created;
+      const renderWith = async (layer: Layer): Promise<void> => {
+        await act(async () =>
+          created.render(
+            <CutSettingsDialog
+              layer={layer}
+              onCancel={() => undefined}
+              onApply={() => undefined}
+            />,
+          ),
+        );
+      };
+      await renderWith(before);
+      const powerInput = (): HTMLInputElement => {
+        const found = host.querySelector('input[aria-label="Cut settings power"]');
+        if (!(found instanceof HTMLInputElement)) throw new Error('power input missing');
+        return found;
+      };
+      expect(powerInput().value).toBe('30');
+
+      // What Reset to Default does: replace the layer in the store.
+      await renderWith({ ...before, power: 80, speed: 900 });
+      expect(powerInput().value).toBe('80');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+});
+
 describe('CutSettingsDialog fill density controls', () => {
   it('offers Auto, Constant, and Dynamic power modes only for vector layers', async () => {
     const host = document.createElement('div');

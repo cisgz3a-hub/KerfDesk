@@ -92,13 +92,10 @@ function SelectedOperationEditor(props: {
     >
       <div style={titleRowStyle}>
         <span style={{ ...swatchStyle, background: props.active.color }} />
-        <input
-          key={`${props.active.id}:${props.active.name}`}
-          defaultValue={props.active.name}
-          aria-label="Operation name"
-          title="Name this process operation"
-          style={nameInputStyle}
-          onBlur={(event) => renameOperation(props.active.id, event.currentTarget.value)}
+        <OperationNameInput
+          operationId={props.active.id}
+          name={props.active.name}
+          onRename={renameOperation}
         />
       </div>
       {props.candidates.length > 1 ? (
@@ -229,6 +226,33 @@ function OperationToggles(props: { readonly operation: Layer }): JSX.Element {
         Include in output
       </label>
     </div>
+  );
+}
+
+// The box is uncontrolled so typing is never fought mid-edit; the key remounts
+// it whenever the stored name changes. A rename the store REJECTS (blank or
+// whitespace) leaves that name identical, so the key alone left the emptied box
+// standing while the operation still had its old name. The attempt counter
+// remounts on every blur, snapping the display back to the stored truth.
+function OperationNameInput(props: {
+  readonly operationId: string;
+  readonly name: string;
+  readonly onRename: (operationId: string, name: string) => void;
+}): JSX.Element {
+  const [attempt, setAttempt] = useState(0);
+  return (
+    <input
+      key={`${props.operationId}:${props.name}:${attempt}`}
+      defaultValue={props.name}
+      aria-label="Operation name"
+      title="Name this process operation"
+      style={nameInputStyle}
+      onBlur={(event) => {
+        const typed = event.currentTarget.value;
+        setAttempt((value) => value + 1);
+        props.onRename(props.operationId, typed);
+      }}
+    />
   );
 }
 
