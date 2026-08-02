@@ -1,6 +1,12 @@
 // useViewer3dScene — owns the Inspector's three.js scene lifecycle: create it
-// for the current render model, keep the renderer sized to the canvas, and
-// dispose completely on unmount or model change (ADR-255 stage 5 extraction).
+// once for the canvas, draw whichever program is current into it, keep the
+// renderer sized to the canvas, and dispose completely on unmount (ADR-255
+// stage 5 extraction).
+//
+// The renderer belongs to the CANVAS, not to the program. Keying its creation
+// on the model tore down the WebGLRenderer and re-imported/recompiled the
+// whole scene on every program change — while the handle already swaps the
+// drawn toolpath in place (viewer3d-scene.ts setSegments).
 
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { GcodeRenderModel } from '../../core/gcode-view';
@@ -40,8 +46,6 @@ export function useViewer3dScene(
           return;
         }
         handleRef.current = outcome.handle;
-        outcome.handle.setSegments(model);
-        outcome.handle.fitToBounds(model.stats.motionBounds);
         outcome.handle.resize(canvas.clientWidth, canvas.clientHeight);
         setState('ready');
       })
@@ -55,7 +59,17 @@ export function useViewer3dScene(
       handleRef.current?.dispose();
       handleRef.current = null;
     };
-  }, [canvasRef, model]);
+  }, [canvasRef]);
+
+  // Draw the current program. `state` is a dependency so the first model lands
+  // as soon as the scene is ready, and this runs before useSceneSync's effects
+  // (declared after this hook) push the playhead and lens onto the new
+  // geometry.
+  useEffect(() => {
+    if (state !== 'ready') return;
+    handleRef.current?.setSegments(model);
+    handleRef.current?.fitToBounds(model.stats.motionBounds);
+  }, [model, state]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
