@@ -10,9 +10,8 @@
 // read fresh from getState() inside that action instead.
 
 import { useStoreWithEqualityFn } from 'zustand/traditional';
-import { useStore } from '../state';
+import { selectWholeState, useStore, watchedFieldsEqual } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import { selectWholeState, watchedFieldsEqual } from '../state/watched-fields-equal';
 
 type AppState = ReturnType<typeof useStore.getState>;
 type LaserState = ReturnType<typeof useLaserStore.getState>;

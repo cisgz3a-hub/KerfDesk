@@ -8,8 +8,7 @@
 // leaving both surfaces idle during pointer motion.
 
 import { useStoreWithEqualityFn } from 'zustand/traditional';
-import { useStore } from '../state';
-import { selectWholeState, watchedFieldsEqual } from '../state/watched-fields-equal';
+import { selectWholeState, useStore, watchedFieldsEqual } from '../state';
 
 type AppState = ReturnType<typeof useStore.getState>;
 

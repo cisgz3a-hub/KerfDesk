@@ -11,8 +11,8 @@
 // not change its answer (ADR-232).
 
 import { useStoreWithEqualityFn } from 'zustand/traditional';
+import { selectWholeState, watchedFieldsEqual } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import { selectWholeState, watchedFieldsEqual } from '../state/watched-fields-equal';
 
 type LaserState = ReturnType<typeof useLaserStore.getState>;
 
