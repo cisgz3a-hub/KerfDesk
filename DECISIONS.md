@@ -14639,3 +14639,44 @@ physical coordinate loss.
   blocking issue set, proving this decision did not add or widen a guard.
 - NOT verified: physical cutting, surface finish, bit capability, chip evacuation, workholding,
   or the cause of the reported coordinate loss.
+
+## ADR-281 - One design language for the operations rail (2026-08-02)
+
+**Context.** The Artwork/Operations rail grew feature-by-feature: eight hand-rolled
+`<details>/<summary>` stylings (some boxed, some bare), several label-column widths, numeric inputs
+at 64/80/100 %-width, native unstyled buttons beside `.lf-btn` chrome, selects whose text ran under
+the dropdown arrow, and an 11-row Material & Bit wall mixing stock, spindle, and park settings. The
+maintainer called the pane unprofessional and hard to navigate; every complaint traced to a missing
+shared grammar rather than to any one component.
+
+An earlier attempt (#588) was reverted by #594. Its blockers are addressed here: the rail's label
+width no longer edits the shared `.lf-field-label--sm` token that eight non-rail dialogs depend on,
+and this change carries the rail styling ONLY - no docs, no export runtime, no unrelated behavior.
+
+**Decision.**
+1. `tokens.css` gains a rail form grammar: a `.lf-pane-form` scope that paints every native
+   button/input/select inside the pane with the chrome look (classless buttons get the quiet-button
+   treatment; selects ellipsize; checkboxes take the accent), plus `.lf-section` (one disclosure
+   chrome: hairline separator, rotating chevron, right-aligned muted badge), `.lf-subhead`
+   (uppercase group label over a hairline), `.lf-hint`, and `.lf-btn--sm`. Component code keeps
+   layout-only inline styles; paint lives in the stylesheet.
+2. A `RailSection` kit component (label / badge / required hint / open) replaces every hand-rolled
+   disclosure in the pane: probe, Manage bits, bit catalog, machine catalog, machine profiles,
+   tiling, spoilboard, feeds calculator. The hint is required because the hover-help contract scans
+   for a literal `title` on raw JSX controls.
+3. The field grammar standardizes on a 100 px label column and an 84 px numeric input across the
+   setup card, layer cards, selected-artwork panel, and the offset/dogbone rows. The 100 px column
+   is expressed as `.lf-pane-form .lf-field-label--sm` so it applies to the rail and CANNOT move a
+   dialog that uses `kit/Field`'s shared default. Related X/Y values share one row
+   (`Stock size (mm)` W-H, `Stock origin (mm)` X-Y, `Park position (mm)` X-Y) with per-input
+   aria-labels unchanged; the unit moves into the row label because the 300 px rail cannot hold two
+   inputs, two prefixes, and a unit.
+4. Material & Bit reads as labeled groups - STOCK / SPINDLE / MOTION - using the same
+   `.lf-subhead` the layer card's Advanced group already used.
+
+**Consequences.** The pane reads as one system; new rail features compose `RailSection` + the row
+grammar instead of restyling from scratch. The laser rail's `CollapsibleRailSection` and the machine
+rail are NOT migrated - follow-up work, same primitives. Screen-reader contracts are unchanged
+(every aria-label kept; the narrow-rail select shrink contract in `CncSetupPanel.layout.test.tsx`
+still holds). Perceptual verification: before/after screenshots at the 300 px rail width. No G-code,
+state, or behavior changes.

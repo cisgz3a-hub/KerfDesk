@@ -46,7 +46,11 @@ export function CutsLayersPanel(): JSX.Element {
     );
   }
   return (
-    <aside aria-label="Artwork / Operations panel" className="lf-rail" style={panelStyle}>
+    <aside
+      aria-label="Artwork / Operations panel"
+      className="lf-rail lf-pane-form"
+      style={panelStyle}
+    >
       <RailPanelHeading title="Artwork / Operations" onCollapse={() => togglePanel('layers')} />
       <MachineModeToggle />
       <ViewTabs active={activeView} showMaterials={showMaterialLibrary} onSelect={setView} />

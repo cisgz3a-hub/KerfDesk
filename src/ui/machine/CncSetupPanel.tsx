@@ -1,10 +1,12 @@
 // CncSetupPanel — "Material & Bit" card shown in the left rail when the
 // project machine is CNC. The Easel-style job setup: what stock is on the
 // bed, which bit is in the spindle, and the machine's Z/spindle parameters.
+// The card reads as three labeled groups (Stock / Spindle / Motion) with
+// related X/Y values paired on one row — the operations-rail design language.
 
 import { isCncCoolantMode, type CncCoolantMode, type CncMachineConfig } from '../../core/scene';
 import { useStore } from '../state';
-import { useDebouncedCommit } from '../layers/use-debounced-commit';
+import { RailSection } from '../kit';
 import { ProbeControls } from '../laser/ProbeControls';
 import { ProbePlateRemovalNotice } from '../laser/ProbePlateRemovalNotice';
 import { CncActiveBitSelect } from './CncActiveBitSelect';
@@ -13,6 +15,7 @@ import { CncMachineProfilesRow, CncToolManager } from './CncLibraryPanels';
 import { CncMachineCatalogRow } from './CncMachineCatalogRow';
 import { CncProjectMaterialPicker } from './CncProjectMaterialPicker';
 import { CncTilingPanel } from './CncTilingPanel';
+import { NumberPairRow, NumberRow, Row, selectStyle } from './CncSetupRows';
 import { SurfacingPanel } from './SurfacingPanel';
 
 export function CncSetupPanel(): JSX.Element | null {
@@ -33,16 +36,13 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
       </Row>
       <CncStockFields machine={machine} />
       <CncMachineParamsFields machine={machine} />
-      <details style={probeDetailsStyle}>
-        <summary
-          style={probeSummaryStyle}
-          title="Zero work coordinates with a touch plate (G38.2)."
-        >
-          Set work zero (probe)
-        </summary>
+      <RailSection
+        label="Set work zero (probe)"
+        hint="Zero work coordinates with a touch plate (G38.2)."
+      >
         <ProbeControls />
-      </details>
-      {/* Outside the collapsed details: the confirmation gates CNC Start, so it
+      </RailSection>
+      {/* Outside the collapsed section: the confirmation gates CNC Start, so it
           must be visible even when the probe section is folded. */}
       <ProbePlateRemovalNotice />
       <CncToolManager machine={machine} />
@@ -62,6 +62,7 @@ function CncStockFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
   const origin = machine.stock.originOffset;
   return (
     <>
+      <h4 className="lf-subhead">Stock</h4>
       <NumberRow
         label="Stock thickness"
         unit="mm"
@@ -72,68 +73,65 @@ function CncStockFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         title="Workpiece thickness. Cutting deeper than this is allowed — Job Review warns how far past the stock bottom the cut goes."
         onCommit={(thicknessMm) => updateCncMachine({ stock: { thicknessMm } })}
       />
-      <NumberRow
-        label="Stock width"
+      <NumberPairRow
+        label="Stock size"
         unit="mm"
-        value={machine.stock.widthMm}
-        min={1}
-        max={1500}
-        step={1}
-        title="Workpiece width (X). Toolpaths outside the stock footprint raise an advisory."
-        onCommit={(widthMm) => updateCncMachine({ stock: { widthMm } })}
+        prefixes={['W', 'H']}
+        first={{
+          label: 'Stock width',
+          value: machine.stock.widthMm,
+          min: 1,
+          max: 1500,
+          step: 1,
+          title: 'Workpiece width (X). Toolpaths outside the stock footprint raise an advisory.',
+          onCommit: (widthMm) => updateCncMachine({ stock: { widthMm } }),
+        }}
+        second={{
+          label: 'Stock height',
+          value: machine.stock.heightMm,
+          min: 1,
+          max: 1500,
+          step: 1,
+          title: 'Workpiece height (Y). Toolpaths outside the stock footprint raise an advisory.',
+          onCommit: (heightMm) => updateCncMachine({ stock: { heightMm } }),
+        }}
       />
-      <NumberRow
-        label="Stock height"
+      <NumberPairRow
+        label="Stock origin"
         unit="mm"
-        value={machine.stock.heightMm}
-        min={1}
-        max={1500}
-        step={1}
-        title="Workpiece height (Y). Toolpaths outside the stock footprint raise an advisory."
-        onCommit={(heightMm) => updateCncMachine({ stock: { heightMm } })}
-      />
-      <NumberRow
-        label="Stock origin X"
-        unit="mm"
-        value={origin.x}
-        min={-1500}
-        max={1500}
-        step={1}
-        title="Machine-coordinate X of the stock's near-left corner."
-        onCommit={(x) => updateCncMachine({ stock: { originOffset: { ...origin, x } } })}
-      />
-      <NumberRow
-        label="Stock origin Y"
-        unit="mm"
-        value={origin.y}
-        min={-1500}
-        max={1500}
-        step={1}
-        title="Machine-coordinate Y of the stock's near-left corner."
-        onCommit={(y) => updateCncMachine({ stock: { originOffset: { ...origin, y } } })}
+        prefixes={['X', 'Y']}
+        first={{
+          label: 'Stock origin X',
+          value: origin.x,
+          min: -1500,
+          max: 1500,
+          step: 1,
+          title: "Machine-coordinate X of the stock's near-left corner.",
+          onCommit: (x) => updateCncMachine({ stock: { originOffset: { ...origin, x } } }),
+        }}
+        second={{
+          label: 'Stock origin Y',
+          value: origin.y,
+          min: -1500,
+          max: 1500,
+          step: 1,
+          title: "Machine-coordinate Y of the stock's near-left corner.",
+          onCommit: (y) => updateCncMachine({ stock: { originOffset: { ...origin, y } } }),
+        }}
       />
     </>
   );
 }
 
-// Spindle + motion parameters (safe Z, spindle ceiling/spin-up, park point).
-// Split from CncSetupFields to keep both under the function-size cap after the
-// detected-settings banner landed (ADR-111).
+// Spindle + motion parameters (spindle ceiling/spin-up/coolant, then safe Z
+// and the park point). Split from CncSetupFields to keep both under the
+// function-size cap after the detected-settings banner landed (ADR-111).
 function CncMachineParamsFields(props: { readonly machine: CncMachineConfig }): JSX.Element {
   const { machine } = props;
   const updateCncMachine = useStore((s) => s.updateCncMachine);
   return (
     <>
-      <NumberRow
-        label="Safe Z"
-        unit="mm"
-        value={machine.params.safeZMm}
-        min={0.5}
-        max={50}
-        step={0.5}
-        title="Clearance height above the stock top for rapid moves between cuts."
-        onCommit={(safeZMm) => updateCncMachine({ params: { safeZMm } })}
-      />
+      <h4 className="lf-subhead">Spindle</h4>
       <NumberRow
         label="Spindle max"
         unit="RPM"
@@ -154,92 +152,66 @@ function CncMachineParamsFields(props: { readonly machine: CncMachineConfig }): 
         title="Time-based dwell after M3 and before the first plunge. Set enough time for this spindle to reach cutting speed; GRBL does not prove physical RPM."
         onCommit={(spindleSpinupSec) => updateCncMachine({ params: { spindleSpinupSec } })}
       />
-      <Row label="Coolant">
-        <select
-          value={machine.params.coolant ?? 'off'}
-          onChange={(e) =>
-            updateCncMachine({
-              params: { coolant: isCncCoolantMode(e.target.value) ? e.target.value : 'off' },
-            })
-          }
-          aria-label="Coolant"
-          title="Machine-wide coolant for the whole job. Mist emits M7, Flood emits M8, both turned off with M9 at job end."
-          style={selectStyle}
-        >
-          {COOLANT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </Row>
+      <CoolantRow machine={machine} />
+      <h4 className="lf-subhead">Motion</h4>
       <NumberRow
-        label="Park X"
+        label="Safe Z"
         unit="mm"
-        value={machine.params.parkXMm ?? 0}
-        min={-1500}
-        max={1500}
-        step={1}
-        title="Where the head parks after the job and during bit changes (H.9)."
-        onCommit={(parkXMm) => updateCncMachine({ params: { parkXMm } })}
+        value={machine.params.safeZMm}
+        min={0.5}
+        max={50}
+        step={0.5}
+        title="Clearance height above the stock top for rapid moves between cuts."
+        onCommit={(safeZMm) => updateCncMachine({ params: { safeZMm } })}
       />
-      <NumberRow
-        label="Park Y"
+      <NumberPairRow
+        label="Park position"
         unit="mm"
-        value={machine.params.parkYMm ?? 0}
-        min={-1500}
-        max={1500}
-        step={1}
-        title="Where the head parks after the job and during bit changes (H.9)."
-        onCommit={(parkYMm) => updateCncMachine({ params: { parkYMm } })}
+        prefixes={['X', 'Y']}
+        first={{
+          label: 'Park X',
+          value: machine.params.parkXMm ?? 0,
+          min: -1500,
+          max: 1500,
+          step: 1,
+          title: 'Where the head parks after the job and during bit changes (H.9).',
+          onCommit: (parkXMm) => updateCncMachine({ params: { parkXMm } }),
+        }}
+        second={{
+          label: 'Park Y',
+          value: machine.params.parkYMm ?? 0,
+          min: -1500,
+          max: 1500,
+          step: 1,
+          title: 'Where the head parks after the job and during bit changes (H.9).',
+          onCommit: (parkYMm) => updateCncMachine({ params: { parkYMm } }),
+        }}
       />
     </>
   );
 }
 
-function Row(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
+function CoolantRow(props: { readonly machine: CncMachineConfig }): JSX.Element {
+  const updateCncMachine = useStore((s) => s.updateCncMachine);
   return (
-    <div style={rowStyle}>
-      <span style={labelStyle}>{props.label}</span>
-      <div style={valueStyle}>{props.children}</div>
-    </div>
-  );
-}
-
-function NumberRow(props: {
-  readonly label: string;
-  readonly unit: string;
-  readonly value: number;
-  readonly min: number;
-  readonly max: number;
-  readonly step: number;
-  readonly title: string;
-  readonly onCommit: (value: number) => void;
-}): JSX.Element {
-  const debounced = useDebouncedCommit<number>({
-    value: props.value,
-    commit: props.onCommit,
-    parse: (s) => {
-      const n = Number.parseFloat(s);
-      if (!Number.isFinite(n)) return props.value;
-      return Math.max(props.min, Math.min(props.max, n));
-    },
-  });
-  return (
-    <Row label={props.label}>
-      <input
-        type="number"
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={debounced.displayValue}
-        onChange={debounced.onChange}
-        onBlur={debounced.onBlur}
-        style={inputStyle}
-        aria-label={props.label}
-        title={props.title}
-      />
-      <span style={unitStyle}>{props.unit}</span>
+    <Row label="Coolant">
+      <select
+        value={props.machine.params.coolant ?? 'off'}
+        onChange={(e) =>
+          updateCncMachine({
+            params: { coolant: isCncCoolantMode(e.target.value) ? e.target.value : 'off' },
+          })
+        }
+        aria-label="Coolant"
+        title="Machine-wide coolant for the whole job. Mist emits M7, Flood emits M8, both turned off with M9 at job end."
+        style={selectStyle}
+      >
+        {COOLANT_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </Row>
   );
 }
@@ -262,31 +234,4 @@ const cardStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: 4,
 };
-const headingStyle: React.CSSProperties = { margin: '0 0 6px 0', fontSize: 13 };
-const rowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  minHeight: 28,
-};
-const labelStyle: React.CSSProperties = { width: 108, fontSize: 12, color: 'var(--lf-text-muted)' };
-// min-width: 0 lets the value column shrink below its content's intrinsic
-// width — without it a long <select> option (e.g. a full bit name) forces the
-// column wider than the rail and the panel's overflow:hidden clips the box's
-// right edge instead of the select truncating in place.
-const valueStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 4,
-  flex: 1,
-  minWidth: 0,
-};
-const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 12, padding: '2px 4px' };
-const inputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
-const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
-const probeDetailsStyle: React.CSSProperties = {
-  borderTop: '1px solid var(--lf-border)',
-  paddingTop: 6,
-  marginTop: 4,
-};
-const probeSummaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12 };
+const headingStyle: React.CSSProperties = { margin: '0 0 4px 0', fontSize: 13 };

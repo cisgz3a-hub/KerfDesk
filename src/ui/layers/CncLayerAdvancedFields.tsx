@@ -35,7 +35,7 @@ export function CncLayerAdvancedGroup(props: {
 }): JSX.Element {
   return (
     <section aria-label="Advanced cut settings" style={advancedSectionStyle}>
-      <div style={advancedHeadingStyle}>Advanced</div>
+      <h4 className="lf-subhead">Advanced</h4>
       <FeedHelperRows
         layer={props.layer}
         settings={props.settings}
@@ -378,13 +378,4 @@ const advancedSectionStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: 4,
   minWidth: 0,
-};
-const advancedHeadingStyle: React.CSSProperties = {
-  borderTop: '1px solid var(--lf-border)',
-  paddingTop: 8,
-  fontSize: 11,
-  fontWeight: 600,
-  color: 'var(--lf-text-muted)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
 };

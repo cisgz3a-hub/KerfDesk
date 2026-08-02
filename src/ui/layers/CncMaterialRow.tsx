@@ -81,7 +81,9 @@ export function CncMaterialRow(props: {
           <CncMaterialOptions />
         </select>
       </Row>
-      <p style={hintStyle}>{materialHint(settings, tool, starterDisplay)}</p>
+      <p className="lf-hint" style={hintIndentStyle}>
+        {materialHint(settings, tool, starterDisplay)}
+      </p>
     </>
   );
 }
@@ -140,8 +142,4 @@ function machineStarterDisplay(
   };
 }
 
-const hintStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  margin: '2px 0 4px 4px',
-};
+const hintIndentStyle: React.CSSProperties = { margin: '0 0 2px 4px' };
