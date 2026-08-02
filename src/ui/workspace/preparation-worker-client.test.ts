@@ -3,6 +3,7 @@ import { createProject } from '../../core/scene';
 import {
   prepareLargeJobOffThread,
   resetPreparationWorkerForTests,
+  SUPERSEDE_QUIET_WINDOW_MS,
   type LargeJobPreparation,
 } from './preparation-worker-client';
 import type { PreparationWorkerResponse } from './preparation-worker-protocol';
@@ -49,6 +50,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetPreparationWorkerForTests();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -77,7 +79,7 @@ describe('prepareLargeJobOffThread', () => {
     expect(lastWorker().posted).toHaveLength(1);
   });
 
-  it('queues requests with different options for the same project', async () => {
+  it('holds a same-project request with different options until the active compute settles', async () => {
     const project = createProject();
     const first = prepareLargeJobOffThread(project);
     const second = prepareLargeJobOffThread(project, {
@@ -85,20 +87,23 @@ describe('prepareLargeJobOffThread', () => {
     });
     expect(second).not.toBe(first);
     const worker = lastWorker();
-    expect(worker.posted).toHaveLength(2);
+    // Only the active compute is posted; the second request is held so a
+    // newer key can still supersede it before the worker ever starts it.
+    expect(worker.posted).toHaveLength(1);
     expect(worker.terminated).toBe(false);
-    // Both settle independently as the worker drains its queue.
     worker.respond({
       id: worker.posted[0]?.id ?? -1,
       kind: 'ok',
       ...okResult,
     } as PreparationWorkerResponse);
+    await expect(first).resolves.toBeDefined();
+    // The held request dispatches once the active compute settles.
+    expect(worker.posted).toHaveLength(2);
     worker.respond({
       id: worker.posted[1]?.id ?? -1,
       kind: 'ok',
       ...okResult,
     } as PreparationWorkerResponse);
-    await expect(first).resolves.toBeDefined();
     await expect(second).resolves.toBeDefined();
   });
 
@@ -123,6 +128,91 @@ describe('prepareLargeJobOffThread', () => {
       message: 'compile exploded',
     });
     await expect(promise).rejects.toThrow('compile exploded');
+  });
+
+  it('respawns eagerly on supersede but delays dispatch behind the quiet window', async () => {
+    vi.useFakeTimers();
+    const first = prepareLargeJobOffThread(createProject());
+    if (first === null) throw new Error('expected a worker request');
+    // A request that supersedes nothing dispatches immediately.
+    expect(lastWorker().posted).toHaveLength(1);
+    const second = prepareLargeJobOffThread(createProject());
+    if (second === null) throw new Error('expected a worker request');
+    await expect(first).rejects.toThrow('superseded by a newer project');
+    // The replacement worker spawns immediately (module-graph load overlaps
+    // the quiet window), but nothing is posted until the window elapses.
+    expect(FakeWorker.instances).toHaveLength(2);
+    const worker = lastWorker();
+    expect(worker.posted).toHaveLength(0);
+    vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS);
+    expect(worker.posted).toHaveLength(1);
+    worker.respond({
+      id: worker.posted[0]?.id ?? -1,
+      kind: 'ok',
+      ...okResult,
+    } as PreparationWorkerResponse);
+    await expect(second).resolves.toBeDefined();
+  });
+
+  it('coalesces a burst of new-project supersedes into one restart and one dispatch', async () => {
+    vi.useFakeTimers();
+    const first = prepareLargeJobOffThread(createProject());
+    if (first === null) throw new Error('expected a worker request');
+    const stale = prepareLargeJobOffThread(createProject());
+    if (stale === null) throw new Error('expected a worker request');
+    vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS / 2);
+    const latest = prepareLargeJobOffThread(createProject());
+    if (latest === null) throw new Error('expected a worker request');
+    await expect(first).rejects.toThrow('superseded by a newer project');
+    await expect(stale).rejects.toThrow('superseded by a newer project');
+    // The second supersede found an idle worker: no second termination.
+    expect(FakeWorker.instances).toHaveLength(2);
+    // The original deadline passes without a dispatch — the window was reset.
+    vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS / 2);
+    expect(lastWorker().posted).toHaveLength(0);
+    vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS / 2);
+    const worker = lastWorker();
+    expect(worker.posted).toHaveLength(1);
+    worker.respond({
+      id: worker.posted[0]?.id ?? -1,
+      kind: 'ok',
+      ...okResult,
+    } as PreparationWorkerResponse);
+    await expect(latest).resolves.toBeDefined();
+  });
+
+  it('rejects stale queued same-project requests, keeping only the active compute', async () => {
+    const project = createProject();
+    const active = prepareLargeJobOffThread(project);
+    if (active === null) throw new Error('expected a worker request');
+    const staleQueued = prepareLargeJobOffThread(project, {
+      jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+    });
+    if (staleQueued === null) throw new Error('expected a worker request');
+    const latest = prepareLargeJobOffThread(project, {
+      jobOrigin: { startFrom: 'user-origin', anchor: 'center' },
+    });
+    if (latest === null) throw new Error('expected a worker request');
+    const worker = lastWorker();
+    // Only the active compute was ever posted; the stale hold-back entry was
+    // rejected when the newer same-project request arrived.
+    expect(worker.posted).toHaveLength(1);
+    expect(worker.terminated).toBe(false);
+    await expect(staleQueued).rejects.toThrow('superseded by a newer request');
+    worker.respond({
+      id: worker.posted[0]?.id ?? -1,
+      kind: 'ok',
+      ...okResult,
+    } as PreparationWorkerResponse);
+    await expect(active).resolves.toBeDefined();
+    // The latest request dispatches once the active compute settles.
+    expect(worker.posted).toHaveLength(2);
+    worker.respond({
+      id: worker.posted[1]?.id ?? -1,
+      kind: 'ok',
+      ...okResult,
+    } as PreparationWorkerResponse);
+    await expect(latest).resolves.toBeDefined();
   });
 
   it('re-requests after a rejection instead of returning the failed promise', async () => {

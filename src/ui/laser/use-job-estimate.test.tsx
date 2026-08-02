@@ -160,6 +160,59 @@ describe('useJobEstimate debounce (H16)', () => {
     await unmount();
   });
 
+  it('does not reset the estimate debounce on an unrelated store update', async () => {
+    useStore.setState({ project: lineProject() });
+    const unmount = await renderProbe();
+    const initial = probe.current;
+
+    await act(async () => {
+      useStore.setState({ project: { ...useStore.getState().project } });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS / 2);
+    });
+    // A hover writes cursorMm — unrelated to the estimate. Subscribing via
+    // currentOutputScope(s) returned a fresh object per store update, which
+    // re-armed the debounce on every such update and starved the recompute.
+    await act(async () => {
+      useStore.getState().setCursorMm({ x: 5, y: 5 });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS / 2 + 1);
+    });
+
+    // The full window elapsed since the edit: the hover must not have reset it.
+    expect(probe.current).not.toBe(initial);
+    expect(probe.current?.kind).toBe('estimated');
+
+    await unmount();
+  });
+
+  it('resolves User Origin placement with the export fallback so the worker key matches the preview', async () => {
+    workerMocks.prepareLargeJobOffThread.mockReturnValue(new Promise(() => undefined));
+    useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
+    const unmount = await renderProbe();
+
+    await act(async () => {
+      useStore.setState({ project: overBudgetRasterProject() });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+    });
+
+    // Disconnected machine: live resolution fails, but the preview keys its
+    // worker request on the export fallback placement — the estimate must
+    // pass the SAME jobOrigin or the project prepares twice, serially.
+    expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+      }),
+    );
+
+    await unmount();
+  });
+
   it('replaces a too-large estimate with the worker result (ADR-244)', async () => {
     let resolveWorker: (value: { toolpath: unknown; estimate: LiveJobEstimate }) => void = () =>
       undefined;

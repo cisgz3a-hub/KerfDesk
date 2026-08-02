@@ -10,8 +10,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JobOriginPlacement } from '../../core/job';
-import type { Project } from '../../core/scene';
-import { currentOutputScope, useStore } from '../state';
+import type { OutputScope, Project } from '../../core/scene';
+import { useOutputScope, useStore } from '../state';
 import {
   estimateLiveJob,
   estimateLiveJobSnapshot,
@@ -21,7 +21,7 @@ import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
-import { resolveJobPlacement } from '../job-placement';
+import { resolveExportJobPlacement, resolveJobPlacement } from '../job-placement';
 import { prepareLargeJobOffThread } from '../workspace/preparation-worker-client';
 import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 
@@ -37,14 +37,18 @@ type Settled = {
 
 export function useJobEstimate(): LiveJobEstimate {
   const project = useStore((s) => s.project);
-  const outputScope = useStore((s) => currentOutputScope(s));
+  // useOutputScope, not currentOutputScope(s): the raw selector returns a
+  // fresh object per store update, so any unrelated change (a hover writing
+  // cursorMm) re-rendered this hook and re-armed the debounce effect below,
+  // starving the recompute while the mouse moved.
+  const outputScope = useOutputScope();
   const jobPlacement = useStore((s) => s.jobPlacement);
-  const outputScopeKey = JSON.stringify(outputScope);
+  const outputScopeKey = useMemo(() => JSON.stringify(outputScope), [outputScope]);
   const positionEpoch = useLaserStore((state) => state.trustedPositionEpoch ?? 0);
   const firstRegistrationPoint = usePrintCutSessionStore((state) => state.first);
   const secondRegistrationPoint = usePrintCutSessionStore((state) => state.second);
   const resolvedPlacement = useEstimatePlacement(jobPlacement);
-  const placementKey = JSON.stringify(resolvedPlacement);
+  const placementKey = useMemo(() => JSON.stringify(resolvedPlacement), [resolvedPlacement]);
   const jobOrigin = resolvedPlacement.ok ? resolvedPlacement.jobOrigin : undefined;
   const registrationKey = JSON.stringify({
     positionEpoch,
@@ -72,16 +76,22 @@ function useEstimatePlacement(jobPlacement: ReturnType<typeof useStore.getState>
   const workOriginActive = useLaserStore((state) => state.workOriginActive);
   const wcoCache = useLaserStore((state) => state.wcoCache);
   const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
-  return useMemo(
-    () =>
-      resolveJobPlacement(jobPlacement, {
-        statusReport,
-        workOriginActive,
-        wcoCache,
-        reportInches,
-      }),
-    [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches],
-  );
+  return useMemo(() => {
+    // Estimate and preview must resolve placement identically: the worker
+    // client caches by jobOrigin, so a divergent resolution here made the
+    // SAME over-budget project prepare twice, serially. User Origin falls
+    // back to its work-zero-relative export placement when the live
+    // resolution fails (disconnected / origin unset) — the same rule
+    // usePreviewPlacement in use-preview-toolpath.ts applies.
+    const resolvePlacement =
+      jobPlacement.startFrom === 'user-origin' ? resolveExportJobPlacement : resolveJobPlacement;
+    return resolvePlacement(jobPlacement, {
+      statusReport,
+      workOriginActive,
+      wcoCache,
+      reportInches,
+    });
+  }, [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches]);
 }
 
 function useSettledEstimate({
@@ -94,7 +104,7 @@ function useSettledEstimate({
   initiallyAsync,
 }: {
   readonly project: Project;
-  readonly outputScope: ReturnType<typeof currentOutputScope>;
+  readonly outputScope: OutputScope;
   readonly outputScopeKey: string;
   readonly registrationKey: string;
   readonly placementKey: string;
@@ -172,7 +182,7 @@ function hasVariableText(project: Project): boolean {
 
 type RecomputeEstimateArgs = {
   readonly project: Project;
-  readonly outputScope: ReturnType<typeof currentOutputScope>;
+  readonly outputScope: OutputScope;
   readonly jobOrigin: JobOriginPlacement | undefined;
   readonly isCancelled: () => boolean;
   readonly isFollowUpStale: () => boolean;
