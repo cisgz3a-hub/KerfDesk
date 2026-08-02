@@ -149,6 +149,11 @@ function zRateCappedSegmentFeed(
   from: CncPath3dPass['points'][number],
   to: CncPath3dPass['points'][number],
 ): number {
+  // Match the emitter's same-XY rule: a pure vertical in-cut move uses plunge
+  // feed in either direction, while a lateral rise keeps cutting feed.
+  if (to.x === from.x && to.y === from.y && to.z !== from.z) {
+    return group.plungeMmPerMin;
+  }
   const descentMm = from.z - to.z;
   if (!(descentMm > 0) || !Number.isFinite(descentMm)) return group.feedMmPerMin;
   const length3d = Math.hypot(to.x - from.x, to.y - from.y, descentMm);

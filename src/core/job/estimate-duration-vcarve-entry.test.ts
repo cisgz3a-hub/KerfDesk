@@ -107,6 +107,22 @@ describe('V-carve ramp duration', () => {
       9,
     );
   });
+
+  it('prices a pure vertical in-cut rise at plunge feed like the emitter', () => {
+    const points = [
+      { x: 0, y: 0, z: -2 },
+      { x: 0, y: 0, z: -1 },
+    ];
+    const estimate = estimateJobDuration(
+      { groups: [rampGroup('z-rate-capped', points)] },
+      DEFAULT_DEVICE_PROFILE,
+    );
+
+    expect(estimate.breakdown.cutSeconds).toBeCloseTo(
+      expectedCutSeconds(points, [PLUNGE_FEED_MM_PER_MIN]),
+      9,
+    );
+  });
 });
 
 function expectedCutSeconds(
