@@ -143,8 +143,9 @@ export type CncLayerSettings = {
   // Pocket clearing strategy (ADR-105 G10). Absent = contour-parallel
   // offset rings (the original behavior, byte-identical).
   readonly pocketStrategy?: 'offset' | 'raster-x' | 'raster-y' | 'adaptive';
-  // Adaptive-pocket radial engagement ceiling in millimetres. Absent uses
-  // 10% of the selected bit diameter.
+  // Legacy persisted name for a compile-time geometric radial-engagement
+  // ceiling in millimetres. This is not measured machine load and never
+  // changes feed at runtime. Absent uses 10% of the selected bit diameter.
   readonly adaptiveOptimalLoadMm?: number;
   // ADR-111: the material the feeds were auto-filled from (a ChiploadMaterial
   // key). Absent = feeds were entered manually ("Custom"). Display/round-trip
