@@ -45,7 +45,7 @@ import type { Vec2 } from '../scene';
 import { contourEntryPoint } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
-import type { CutGroup, FillGroup, Job, RasterGroup } from './job';
+import type { CutGroup, CutSegment, FillGroup, Job, RasterGroup } from './job';
 import { rasterDurationMotion } from './raster-duration-motion';
 import { offsetForSpeed } from './scan-offset';
 
@@ -274,7 +274,7 @@ function appendCutGroupBlocks(
         appendTravel(out, cursor, entry, travelV);
         appendFeedTravel(out, entry, first, cutV);
       }
-      appendCutPolylineBlocks(out, seg.polyline, cutV);
+      appendCutSegmentBlocks(out, seg, cutV);
       const last = seg.polyline[seg.polyline.length - 1];
       if (last !== undefined) cursor = last;
     }
@@ -282,12 +282,31 @@ function appendCutGroupBlocks(
   return cursor;
 }
 
-function appendCutPolylineBlocks(out: Block[], polyline: ReadonlyArray<Vec2>, cutV: number): void {
-  for (let i = 1; i < polyline.length; i += 1) {
-    const a = polyline[i - 1];
-    const b = polyline[i];
+function appendCutSegmentBlocks(out: Block[], segment: CutSegment, cutV: number): void {
+  if (segment.plannerMotion !== undefined && segment.polyline.length === 2) {
+    appendPlannedCut(out, segment.plannerMotion, cutV);
+    return;
+  }
+  for (let i = 1; i < segment.polyline.length; i += 1) {
+    const a = segment.polyline[i - 1];
+    const b = segment.polyline[i];
     if (a !== undefined && b !== undefined) appendCut(out, a, b, cutV);
   }
+}
+
+function appendPlannedCut(
+  out: Block[],
+  motion: NonNullable<CutSegment['plannerMotion']>,
+  v: number,
+): void {
+  if (!(motion.distanceMm > 0)) return;
+  out.push({
+    kind: 'cut',
+    motion: 'feed',
+    distance: motion.distanceMm,
+    targetVelocity: v,
+    direction: motion.direction,
+  });
 }
 
 function appendTravel(out: Block[], from: Vec2, to: Vec2, v: number): void {

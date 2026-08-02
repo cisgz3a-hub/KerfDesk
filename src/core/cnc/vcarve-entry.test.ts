@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { scanGcodeWords } from '../gcode';
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import { applyJobOriginOffset, type CncGroup } from '../job';
 import { cncGrblStrategy } from '../output';
 import type { Polyline } from '../scene';
@@ -212,24 +214,32 @@ describe('planVCarveRampEntry', () => {
 
 function emittedXyzSlopes(gcode: string): ReadonlyArray<number> {
   let position = { x: 0, y: 0, z: 0 };
+  let motion: GcodeMotionMode | null = 0;
   const slopes: number[] = [];
   for (const line of gcode.split('\n')) {
-    if (!line.startsWith('G0') && !line.startsWith('G1')) continue;
+    const scanned = scanModalMotionLine(line, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || (motion !== 0 && motion !== 1)) continue;
+    const words = scanGcodeWords(line);
     const next = {
-      x: axisValue(line, 'X') ?? position.x,
-      y: axisValue(line, 'Y') ?? position.y,
-      z: axisValue(line, 'Z') ?? position.z,
+      x: axisValue(words, 'X') ?? position.x,
+      y: axisValue(words, 'Y') ?? position.y,
+      z: axisValue(words, 'Z') ?? position.z,
     };
-    if (line.startsWith('G1') && /\bX/.test(line) && /\bY/.test(line) && /\bZ/.test(line)) {
+    if (motion === 1 && hasXyz(words)) {
       const run = Math.hypot(next.x - position.x, next.y - position.y);
-      slopes.push(Math.abs(next.z - position.z) / run);
+      if (run > 0) slopes.push(Math.abs(next.z - position.z) / run);
     }
     position = next;
   }
   return slopes;
 }
 
-function axisValue(line: string, axis: 'X' | 'Y' | 'Z'): number | null {
-  const match = new RegExp(`${axis}(-?\\d+(?:\\.\\d+)?)`).exec(line);
-  return match?.[1] === undefined ? null : Number(match[1]);
+function axisValue(words: ReturnType<typeof scanGcodeWords>, axis: 'X' | 'Y' | 'Z'): number | null {
+  return words.find((word) => word.letter === axis)?.value ?? null;
+}
+
+function hasXyz(words: ReturnType<typeof scanGcodeWords>): boolean {
+  const letters = new Set(words.map((word) => word.letter));
+  return letters.has('X') && letters.has('Y') && letters.has('Z');
 }

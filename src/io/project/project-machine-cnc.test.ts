@@ -408,12 +408,14 @@ describe('.lf2 machine / cnc round-trip', () => {
     layer['cnc'] = { cutType: 'zigzag', depthMm: 0, feedMmPerMin: 'quick' };
     const loaded = deserializeOk(`${JSON.stringify(raw)}\n`);
     // Optional-with-compile-default fields stay absent after normalization: the
-    // compile fallback supplies lineArtContours 'inner' (ADR-218) and, when
-    // cutDirection is absent, the compiler's natural winding (ADR-251 defaults
-    // new layers to climb, but a malformed block carries no direction to keep).
+    // compile fallback supplies lineArtContours 'inner' (ADR-218), legacy
+    // V-carve flat depth, and, when cutDirection is absent, the compiler's
+    // natural winding (ADR-251 defaults new layers to climb, but a malformed
+    // block carries no direction to keep).
     const {
       lineArtContours: _lineArt,
       cutDirection: _cutDirection,
+      vCarveFlatDepthEnabled: _flatDepth,
       ...structuralDefaults
     } = DEFAULT_CNC_LAYER_SETTINGS;
     expect(loaded.scene.layers[0]?.cnc).toEqual(structuralDefaults);

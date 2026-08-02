@@ -9,8 +9,10 @@ import {
 import type { CncContourPass, CncGroup, CncPass } from '../job';
 import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
 import { tabRampedPoints } from './cnc-tab-ramp';
+import { sourceRegionMajorDepthPasses } from './compile-cnc-helpers';
 import { zPassDepths } from './depth-passes';
 import { planStraightInlayPairForSettings, straightInlayPocketDepthMm } from './inlay-pair';
+import { orderInnerFirst } from './profile-ordering';
 
 const COORD_EPS = 1e-9;
 
@@ -59,20 +61,17 @@ export function compileStraightInlayOperation(
     tool,
     femaleSettings,
     maleSettings,
-    femalePasses: depthMajorPasses(plan.femaleToolpaths, femaleSettings),
-    malePasses: tabbedProfilePasses(plan.maleToolpaths, maleSettings, tool.diameterMm),
+    femalePasses: sourceRegionMajorDepthPasses(
+      polylines,
+      plan.femaleToolpaths,
+      zPassDepths(femaleSettings.depthMm, femaleSettings.depthPerPassMm),
+    ),
+    malePasses: tabbedProfilePasses(
+      orderInnerFirst(plan.maleToolpaths),
+      maleSettings,
+      tool.diameterMm,
+    ),
   };
-}
-
-function depthMajorPasses(
-  toolpaths: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-): CncPass[] {
-  const passes: CncPass[] = [];
-  for (const zMm of zPassDepths(settings.depthMm, settings.depthPerPassMm)) {
-    for (const toolpath of toolpaths) passes.push(contourPass(toolpath, zMm));
-  }
-  return passes;
 }
 
 function tabbedProfilePasses(

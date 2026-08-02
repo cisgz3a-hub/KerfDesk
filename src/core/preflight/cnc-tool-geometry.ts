@@ -107,7 +107,9 @@ function invalidVCarveClearToolIssue(
   contours: ReadonlyArray<Polyline>,
   config: CncMachineConfig,
 ): PreflightIssue | null {
-  if (settings.vClearToolId === undefined) return null;
+  if (!(settings.vCarveFlatDepthEnabled ?? true) || settings.vClearToolId === undefined) {
+    return null;
+  }
   const clearTool = config.tools.find((candidate) => candidate.id === settings.vClearToolId);
   if (clearTool === undefined) {
     if (zPassDepths(settings.depthMm, settings.depthPerPassMm).length === 0) return null;
@@ -180,6 +182,7 @@ function twoStageClearanceCouldEmit(
   settings: CncLayerSettings,
   config: CncMachineConfig,
 ): boolean {
+  if (!(settings.vCarveFlatDepthEnabled ?? true)) return false;
   if (zPassDepths(settings.depthMm, settings.depthPerPassMm).length === 0) return false;
   const clearTool = config.tools.find((candidate) => candidate.id === settings.vClearToolId);
   if (clearTool === undefined || !(clearTool.diameterMm > 0)) return false;

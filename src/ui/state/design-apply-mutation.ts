@@ -173,6 +173,9 @@ export function applyCarveSettingsToOperations<T extends { readonly project: Pro
       ...base,
       cutType: design.cutType,
       depthMm: design.depthMm,
+      ...(design.cutType === 'v-carve'
+        ? { vCarveFlatDepthEnabled: design.vCarveFlatDepthEnabled ?? true }
+        : {}),
       ...(design.toolId === undefined ? {} : { toolId: design.toolId }),
       ...(design.vClearToolId === undefined ? {} : { vClearToolId: design.vClearToolId }),
     };

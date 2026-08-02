@@ -3,7 +3,7 @@
 // toolpath compiler applies, so the instant preview and the eventual G-code
 // cannot disagree about shape:
 //   pocket   flat floor at -depthMm over the even-odd region
-//   v-carve  z = -min(dist / tan(tip/2), depthMm, coneHeight)  (vcarve-ladder)
+//   v-carve  z = -min(dist / tan(tip/2), optional flat depth, cone height)
 //   profile  the REAL offset (profileToolpathPolylines) swept at bit radius
 //   engrave  the drawn path swept at bit radius
 //   drill    a bit-diameter hole at each circle centre
@@ -37,7 +37,13 @@ export function applyLayerSurface(
     case 'pocket':
       return applyMaskFloor(depth, rasterizeEvenOdd(polylines, grid), cut);
     case 'v-carve':
-      return applyVCarve(depth, grid, polylines, layer.depthMm, tool);
+      return applyVCarve(
+        depth,
+        grid,
+        polylines,
+        (layer.vCarveFlatDepthEnabled ?? true) ? layer.depthMm : Number.POSITIVE_INFINITY,
+        tool,
+      );
     case 'engrave':
       return stampAlongPolylines(depth, grid, polylines, tool.diameterMm / 2, cut);
     case 'profile-outside':
@@ -59,7 +65,7 @@ function applyMaskFloor(depth: Float32Array, mask: Uint8Array, cut: number): voi
   }
 }
 
-// The same clamp chain as vcarve-ladder: groove depth follows boundary
+// The same clamp chain as the CNC medial planner: groove depth follows boundary
 // distance until it hits the layer depth or the bit's cone height, whichever
 // is shallower — wide regions flat-floor rather than deepening forever.
 function applyVCarve(

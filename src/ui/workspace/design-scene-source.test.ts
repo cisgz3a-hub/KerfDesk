@@ -139,19 +139,21 @@ describe('computeDesignSceneSource', () => {
     // near-border tips' depth (≈ −1), which is the slot the operator saw.
     expect(probeDepth(grid, VEE_X - 0.9, VEE_EDGE_Y)).toBeGreaterThan(-0.2);
 
-    // The v-bit still reaches its full programmed depth inside its region.
+    // Flowing V-carve ignores the generic 3 mm layer depth and reaches the
+    // selected 6.35 mm / 60° bit's modeled cone height (about 5.499 mm).
     let veeDeepest = 0;
     for (let x = VEE_X + 1; x <= VEE_X + VEE_SIZE - 1; x += 0.5) {
       for (let y = VEE_Y + 1; y <= VEE_Y + VEE_SIZE - 1; y += 0.5) {
         veeDeepest = Math.min(veeDeepest, probeDepth(grid, x, y));
       }
     }
-    expect(veeDeepest).toBeLessThan(-2.5);
+    expect(veeDeepest).toBeLessThan(-5.4);
+    expect(veeDeepest).toBeGreaterThanOrEqual(-5.51);
 
-    // Nothing anywhere cuts past the deepest programmed pass (pocket, −4).
+    // Nothing anywhere cuts past that modeled cone height.
     let deepest = 0;
     for (const depth of grid.depth) deepest = Math.min(deepest, depth);
-    expect(deepest).toBeGreaterThanOrEqual(-4.01);
+    expect(deepest).toBeGreaterThanOrEqual(-5.51);
   });
 
   it('resolves a single-bit job to the layer bit even when it is not the active bit', () => {

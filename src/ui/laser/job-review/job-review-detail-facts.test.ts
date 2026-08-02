@@ -75,7 +75,7 @@ describe('cncOperationDetail', () => {
     );
   });
 
-  it('includes direction, tabs, entry, finish allowance, strategy, and material feeds', () => {
+  it('includes direction, entry, finish allowance, strategy, and material feeds', () => {
     const settings: CncLayerSettings = {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       depthMm: 12,
@@ -94,7 +94,7 @@ describe('cncOperationDetail', () => {
       materialKey: 'plywood-mdf',
     };
     expect(cncOperationDetail(settings)).toBe(
-      '5 passes · stepover 40% · climb · tabs 3 per shape (6 × 2 mm) · ramp entry 3° · finish allowance 0.5 mm · raster-x pocket · Plywood / MDF feeds (legacy/unscoped)',
+      '5 passes · stepover 40% · climb · ramp entry 3° · finish allowance 0.5 mm · raster-x pocket · Plywood / MDF feeds (legacy/unscoped)',
     );
   });
 
@@ -107,6 +107,29 @@ describe('cncOperationDetail', () => {
       depthPerPassMm: 1.5875, // 1/16"
     };
     expect(cncOperationDetail(settings)).toContain('12 passes');
+  });
+
+  it('describes flowing and flat-floor V-carves without claiming ignored settings apply', () => {
+    const flowing: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'v-carve',
+      depthMm: 1,
+      depthPerPassMm: 0.5,
+      vCarveFlatDepthEnabled: false,
+      vClearToolId: 'clear',
+    };
+    expect(cncOperationDetail(flowing)).toBe(
+      'flowing V-depth · max stepdown 0.5 mm · Manual feeds',
+    );
+
+    const flat: CncLayerSettings = {
+      ...flowing,
+      vCarveFlatDepthEnabled: true,
+      vCarveRampEntryDeg: 3,
+    };
+    expect(cncOperationDetail(flat)).toBe(
+      'requested flat floor 1 mm · max stepdown 0.5 mm · requested entry 3° (medial depth profile governs) · clear stepover 40% · Manual feeds',
+    );
   });
 
   // Audit 3.8: enforceCutDirection is inert for engrave and profile-on-path, so

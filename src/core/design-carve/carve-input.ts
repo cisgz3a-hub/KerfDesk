@@ -34,9 +34,9 @@ export type DesignCarveInput = {
   readonly activeTool: CncTool;
 };
 
-// Matches core/sim tool-kernels and core/cnc vcarve-ladder: a v-bit with a
-// missing or degenerate tip angle previews as 60 degrees, so the preview and
-// the toolpath fall back identically.
+// Design heightmaps and the simulator retain their historical 60-degree
+// reference-render fallback. CNC toolpath compilation separately requires a
+// usable included angle and does not derive production geometry from this.
 export const FALLBACK_V_TIP_ANGLE_DEG = 60;
 
 export const MIN_CARVE_CELL_MM = 0.05;

@@ -8,7 +8,8 @@
 // distinguishes a *malformed present* coordinate word from an *absent* one and
 // flags it at the text boundary, catching every producer (kerf, tabs, trace,
 // text, offset-fill) regardless of which one emitted the non-finite value.
-import { asGcodeLines, isGcodeMotionCommand, stripGcodeComment } from './gcode-words';
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
+import { asGcodeLines, stripGcodeComment } from './gcode-words';
 import type { Issue } from './predicates';
 
 // X/Y/Z motion coordinates and I/J arc-centre offsets. Feed (F) and power (S)
@@ -23,12 +24,16 @@ const NON_FINITE_COORD =
 export function findNonFiniteCoords(gcode: string | ReadonlyArray<string>): readonly Issue[] {
   const lines = asGcodeLines(gcode);
   const issues: Issue[] = [];
+  let motion: GcodeMotionMode | null = 0;
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];
     if (raw === undefined) continue;
     const stripped = stripGcodeComment(raw);
-    if (!isGcodeMotionCommand(stripped)) continue;
-    for (const match of stripped.matchAll(NON_FINITE_COORD)) {
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotionContext) continue;
+    const matches = [...stripped.matchAll(NON_FINITE_COORD)];
+    for (const match of matches) {
       issues.push({
         lineNumber: i + 1,
         line: raw,

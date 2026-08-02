@@ -19,6 +19,10 @@ import { gcodeMetadataHeader } from '../../io/gcode';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
 import { buildGcodeMetadata } from './build-info';
+import {
+  compiledVCarveLayerDepths,
+  detectCompiledVCarveDepthWarnings,
+} from '../laser/cnc-compiled-depth-warnings';
 
 export type TileFile = { readonly name: string; readonly gcode: string };
 type ReadyTiledJobs = Extract<ReturnType<typeof tileJobs>, { readonly kind: 'ready' }>;
@@ -61,6 +65,12 @@ export function emitTileFiles(
       return null;
     }
     for (const issue of issues) advisories.add(issue.message);
+    for (const warning of detectCompiledVCarveDepthWarnings(
+      compiledVCarveLayerDepths(job),
+      machine.stock.thicknessMm,
+    )) {
+      advisories.add(warning);
+    }
     const header = gcodeMetadataHeader(
       buildGcodeMetadata(),
       {

@@ -89,7 +89,7 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
     ...optionalCncLayerFields(raw),
     depthMm: positiveOr(raw['depthMm'], d.depthMm),
     depthPerPassMm: positiveOr(raw['depthPerPassMm'], d.depthPerPassMm),
-    // 0 = auto ring spacing (H.3), so non-negative rather than positive.
+    // 0 = automatic medial sampling and flat-core pitch (H.3).
     vResolutionMm: isNonNegativeNumber(raw['vResolutionMm'])
       ? raw['vResolutionMm']
       : d.vResolutionMm,
@@ -129,6 +129,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
       : {}),
     ...(isPositiveNumber(raw['rampEntryDeg']) ? { rampEntryDeg: raw['rampEntryDeg'] } : {}),
     ...positiveNumberPassthrough('vCarveRampEntryDeg', raw['vCarveRampEntryDeg']),
+    ...booleanPassthrough('vCarveFlatDepthEnabled', raw['vCarveFlatDepthEnabled']),
     ...normalizeHelixEntry(raw['helixEntry']),
     ...(raw['cutDirection'] === 'climb' || raw['cutDirection'] === 'conventional'
       ? { cutDirection: raw['cutDirection'] }

@@ -143,6 +143,7 @@ describe('invalid CNC tool geometry preflight', () => {
     const layer = vcarveLayer('two-stage-v-carve', {
       depthMm: 0.1,
       vResolutionMm: 0.1,
+      vCarveFlatDepthEnabled: true,
       vClearToolId: clearTool.id,
     });
 
@@ -163,6 +164,7 @@ describe('invalid CNC tool geometry preflight', () => {
     (kind, clearToolId) => {
       const layer = vcarveLayer('wrong-clear-kind', {
         toolId: 'vb-60',
+        vCarveFlatDepthEnabled: true,
         vClearToolId: clearToolId,
       });
       const clearTool = DEFAULT_CNC_MACHINE_CONFIG.tools.find((tool) => tool.id === clearToolId);
@@ -191,6 +193,7 @@ describe('invalid CNC tool geometry preflight', () => {
   it('does not refuse a wrong-kind clearing selection when the contour has no flat floor', () => {
     const layer = vcarveLayer('narrow-wrong-clear-kind', {
       toolId: 'vb-60',
+      vCarveFlatDepthEnabled: true,
       vClearToolId: 'bn-3175',
     });
 
@@ -229,6 +232,7 @@ describe('invalid CNC tool geometry preflight', () => {
         [
           vcarveLayer('over-cone-v-carve', {
             toolId: overConeVBit.id,
+            vCarveFlatDepthEnabled: true,
             vClearToolId,
             depthMm: 10,
             depthPerPassMm: 1,
@@ -275,7 +279,11 @@ describe('invalid CNC tool geometry preflight', () => {
   });
 
   it('refuses a missing active V-clear bit but ignores the same dormant binding', () => {
-    const settings = { toolId: 'vb-60', vClearToolId: 'missing-clear' };
+    const settings = {
+      toolId: 'vb-60',
+      vCarveFlatDepthEnabled: true,
+      vClearToolId: 'missing-clear',
+    };
     const active = preflight(
       [vcarveLayer('missing-v-clear', settings)],
       [rectangle('wide-v-carve', VCARVE_COLOR, 60)],

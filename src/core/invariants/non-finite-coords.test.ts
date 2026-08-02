@@ -19,11 +19,18 @@ describe('findNonFiniteCoords', () => {
 
   it('only scans motion commands (G0-G3)', () => {
     expect(findNonFiniteCoords('M3 S0')).toEqual([]);
+    expect(findNonFiniteCoords('G1X1Y1\nG10L20P1XNaNY0')).toEqual([]);
   });
 
   it('reports the 1-based line number', () => {
     const issues = findNonFiniteCoords('G21\nG1 X1 Y1\nG1 XNaN Y2');
     expect(issues[0]?.lineNumber).toBe(3);
+  });
+
+  it('flags a non-finite coordinate on compact inherited motion', () => {
+    const issues = findNonFiniteCoords('G1X1Y1\nXNaNY2');
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.lineNumber).toBe(2);
   });
 
   it('flags every bad coordinate on a line', () => {

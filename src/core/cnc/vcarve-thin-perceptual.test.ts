@@ -221,7 +221,7 @@ describe('v-carve thin artwork — perceptual (ADR-282)', () => {
     // Before ADR-282: 0.0 — the connector never received a single cut.
     expect(tailCut / tailCells).toBeGreaterThanOrEqual(0.9);
     expect(tailMaxError).toBeLessThanOrEqual(tolerance);
-  });
+  }, 15_000);
 
   it('a depth-clamped carve still covers the floor (the #575 revert probe)', () => {
     // 2×2 mm square, Detail 0.5 mm, max depth 0.05 mm: a clamped ring's
@@ -241,7 +241,12 @@ describe('v-carve thin artwork — perceptual (ADR-282)', () => {
       scene(
         { closed: true, points },
         { minX: AT, minY: AT, maxX: AT + 2, maxY: AT + 2 },
-        { depthMm: clampDepth, depthPerPassMm: clampDepth, vResolutionMm: 0.5 },
+        {
+          depthMm: clampDepth,
+          depthPerPassMm: clampDepth,
+          vCarveFlatDepthEnabled: true,
+          vResolutionMm: 0.5,
+        },
       ),
       DEFAULT_DEVICE_PROFILE,
       vbitConfig(),

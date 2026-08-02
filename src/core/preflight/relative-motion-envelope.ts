@@ -2,14 +2,10 @@
 // size cap. For jobs placed relative to a user origin the absolute machine
 // position is unknown, so bounds checking degrades to a SPAN check: the job's
 // total X/Y motion extent must fit the bed even at the worst-case placement.
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import { arcAabb } from '../invariants/arc-bounds';
-import { asGcodeLines, isArcMotion, isClockwiseArc } from '../invariants/gcode-words';
-import {
-  isGcodeCommand,
-  isGcodeMotionCommand,
-  parseGcodeWord,
-  stripGcodeComment,
-} from '../invariants';
+import { asGcodeLines } from '../invariants/gcode-words';
+import { isGcodeCommand, parseGcodeWord, stripGcodeComment } from '../invariants';
 
 type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
 type Point = { readonly x: number; readonly y: number };
@@ -46,11 +42,15 @@ function collectRelativeMotionEnvelope(gcode: string | ReadonlyArray<string>): B
   };
   let current: Point = { x: 0, y: 0 };
   let absolute = true;
+  let modalMotion: GcodeMotionMode | null = 0;
   let any = false;
   for (const raw of asGcodeLines(gcode)) {
     const stripped = stripGcodeComment(raw);
     absolute = absoluteModeAfterLine(stripped, absolute);
-    const motion = motionEnvelopeForLine(stripped, current, absolute);
+    const scanned = scanModalMotionLine(stripped, modalMotion);
+    modalMotion = scanned.motion;
+    if (!scanned.isMotion || modalMotion === null) continue;
+    const motion = motionEnvelopeForLine(stripped, current, absolute, modalMotion);
     if (motion === null) continue;
     mergePoint(bounds, current);
     mergePoint(bounds, motion.next);
@@ -65,12 +65,12 @@ function motionEnvelopeForLine(
   line: string,
   current: Point,
   absolute: boolean,
+  motion: GcodeMotionMode,
 ): MotionEnvelope | null {
-  if (!isGcodeMotionCommand(line)) return null;
   const x = parseGcodeWord(line, 'X');
   const y = parseGcodeWord(line, 'Y');
   const next = motionEndPoint(current, x, y, absolute);
-  const arcBounds = arcBoundsForLine(line, current, next);
+  const arcBounds = arcBoundsForLine(line, current, next, motion);
   if (x === null && y === null && arcBounds === undefined) return null;
   return {
     next,
@@ -89,11 +89,16 @@ function motionEndPoint(
     : { x: current.x + (x ?? 0), y: current.y + (y ?? 0) };
 }
 
-function arcBoundsForLine(line: string, current: Point, next: Point): Bounds | undefined {
-  if (!isArcMotion(line)) return undefined;
+function arcBoundsForLine(
+  line: string,
+  current: Point,
+  next: Point,
+  motion: GcodeMotionMode,
+): Bounds | undefined {
+  if (motion !== 2 && motion !== 3) return undefined;
   const i = parseGcodeWord(line, 'I');
   const j = parseGcodeWord(line, 'J');
-  return i === null || j === null ? undefined : arcAabb(current, next, i, j, isClockwiseArc(line));
+  return i === null || j === null ? undefined : arcAabb(current, next, i, j, motion === 2);
 }
 
 function absoluteModeAfterLine(line: string, current: boolean): boolean {

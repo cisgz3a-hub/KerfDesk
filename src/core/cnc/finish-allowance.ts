@@ -3,9 +3,10 @@ import type { CncLayerSettings, Polyline, Vec2 } from '../scene';
 import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
 import { tabFractionsFromReference, tabRampedPoints } from './cnc-tab-ramp';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
+import { bucketFinishAllowanceParts } from './finish-allowance-part-buckets';
 import type { FrameHandedness } from './machine-frame-handedness';
 import { enforceCutDirection } from './motion-polish';
-import { orderInnerFirst } from './profile-ordering';
+import { groupInnerFirstByPart, orderInnerFirst } from './profile-ordering';
 import { profileToolpathPolylines } from './profile-paths';
 
 const COORD_EPS = 1e-9;
@@ -18,36 +19,116 @@ export function profileFinishAllowanceMm(settings: CncLayerSettings): number {
   return applies && Number.isFinite(allowance) && allowance > 0 ? allowance : 0;
 }
 
-// The finishing pass runs at full depth on the true contour. Its tab centers
-// are projected from the matching roughing path so offset start vertices and
-// perimeter changes cannot move the physical bridges.
-export function finishingProfilePasses(
+/** Complete roughing and the true-wall finish for one part before the next. */
+export function profilePassesWithFinishAllowance(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   toolDiameterMm: number,
   roughingToolpaths: ReadonlyArray<Polyline>,
   handedness: FrameHandedness,
-  tabSources: ReadonlyArray<CollectedCncContour> = [],
+  tabSources: ReadonlyArray<CollectedCncContour>,
+  roughingPassesForPart: (part: ReadonlyArray<Polyline>) => ReadonlyArray<CncPass>,
 ): ReadonlyArray<CncPass> {
+  const sourceParts = groupInnerFirstByPart(polylines);
+  const roughParts = groupInnerFirstByPart(roughingToolpaths);
+  const finishToolpaths = finishingProfileToolpaths(
+    polylines,
+    settings,
+    toolDiameterMm,
+    handedness,
+  );
+  const finishParts = groupInnerFirstByPart(finishToolpaths);
+  const roughBySource = bucketFinishAllowanceParts(sourceParts, roughParts);
+  const finishBySource = bucketFinishAllowanceParts(sourceParts, finishParts);
+  const manualTabCenters = manualTabCentersForToolpaths(finishToolpaths, tabSources);
+  const passes: CncPass[] = [];
+  for (let index = 0; index < sourceParts.length; index += 1) {
+    const sourceRough = roughBySource.buckets[index]?.flat() ?? [];
+    const sourceFinish = finishBySource.buckets[index]?.flat() ?? [];
+    passes.push(
+      ...roughingPassesForPart(sourceRough),
+      ...finishingPasses(sourceFinish, -settings.depthMm, {
+        settings,
+        toolDiameterMm,
+        roughingToolpaths: sourceRough,
+        manualTabCenters,
+      }),
+    );
+  }
+  appendUnassignedParts(
+    passes,
+    roughBySource.unassigned,
+    finishBySource.unassigned,
+    settings,
+    toolDiameterMm,
+    manualTabCenters,
+    roughingPassesForPart,
+  );
+  return passes;
+}
+
+// Build the true-wall paths independently, then assign both rough and finish
+// topology back to the source parts. Offset output indices are not provenance:
+// a thin part can vanish from only one of the two offsets.
+function finishingProfileToolpaths(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  toolDiameterMm: number,
+  handedness: FrameHandedness,
+): ReadonlyArray<Polyline> {
   const side = settings.cutType === 'profile-inside' ? 'inside' : 'outside';
   const raw = orderInnerFirst(profileToolpathPolylines(polylines, side, toolDiameterMm));
-  const toolpaths =
-    settings.cutDirection === undefined
-      ? raw
-      : enforceCutDirection(raw, settings.cutDirection, settings.cutType, handedness);
-  const zMm = -settings.depthMm;
-  const manualTabCenters = manualTabCentersForToolpaths(toolpaths, tabSources);
-  const passes: CncPass[] = [];
-  for (const toolpath of toolpaths) {
+  return settings.cutDirection === undefined
+    ? raw
+    : enforceCutDirection(raw, settings.cutDirection, settings.cutType, handedness);
+}
+
+type FinishingPassesContext = {
+  readonly settings: CncLayerSettings;
+  readonly toolDiameterMm: number;
+  readonly roughingToolpaths: ReadonlyArray<Polyline>;
+  readonly manualTabCenters: ReadonlyMap<Polyline, ReadonlyArray<number>>;
+};
+
+function finishingPasses(
+  toolpaths: ReadonlyArray<Polyline>,
+  zMm: number,
+  ctx: FinishingPassesContext,
+): ReadonlyArray<CncPass> {
+  return toolpaths.flatMap((toolpath) => {
     const pass = finishingPass(toolpath, zMm, {
-      settings,
-      toolDiameterMm,
-      roughingToolpaths,
-      manualCenters: manualTabCenters.get(toolpath),
+      settings: ctx.settings,
+      toolDiameterMm: ctx.toolDiameterMm,
+      roughingToolpaths: ctx.roughingToolpaths,
+      manualCenters: ctx.manualTabCenters.get(toolpath),
     });
-    if (pass !== null) passes.push(pass);
+    return pass === null ? [] : [pass];
+  });
+}
+
+function appendUnassignedParts(
+  passes: CncPass[],
+  roughParts: ReadonlyArray<ReadonlyArray<Polyline>>,
+  finishParts: ReadonlyArray<ReadonlyArray<Polyline>>,
+  settings: CncLayerSettings,
+  toolDiameterMm: number,
+  manualTabCenters: ReadonlyMap<Polyline, ReadonlyArray<number>>,
+  roughingPassesForPart: (part: ReadonlyArray<Polyline>) => ReadonlyArray<CncPass>,
+): void {
+  const partCount = Math.max(roughParts.length, finishParts.length);
+  for (let index = 0; index < partCount; index += 1) {
+    const rough = roughParts[index] ?? [];
+    const finish = finishParts[index] ?? [];
+    passes.push(
+      ...roughingPassesForPart(rough),
+      ...finishingPasses(finish, -settings.depthMm, {
+        settings,
+        toolDiameterMm,
+        roughingToolpaths: rough,
+        manualTabCenters,
+      }),
+    );
   }
-  return passes;
 }
 
 type FinishingPassContext = {

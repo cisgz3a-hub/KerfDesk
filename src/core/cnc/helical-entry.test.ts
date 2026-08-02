@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Polyline } from '../scene';
+import { DEFAULT_CNC_LAYER_SETTINGS, type Polyline } from '../scene';
+import { helicalPocketPassesBySourceRegion } from './cnc-helical-pocket-passes';
 import { planHelicalPocketPasses } from './helical-entry';
 
 const square: Polyline = {
@@ -21,6 +22,13 @@ const insetSquare: Polyline = {
     { x: 4, y: 16 },
   ],
 };
+
+function shifted(polyline: Polyline, xMm: number): Polyline {
+  return {
+    ...polyline,
+    points: polyline.points.map((point) => ({ x: point.x + xMm, y: point.y })),
+  };
+}
 
 describe('planHelicalPocketPasses', () => {
   it('places a bounded tangent circle and creates a depth ladder of native helix passes', () => {
@@ -70,6 +78,36 @@ describe('planHelicalPocketPasses', () => {
       expect(pass.kind).toBe('helical-contour');
       if (pass.kind === 'helical-contour') expect(pass.polyline[0]).toEqual(pass.start);
     }
+  });
+
+  it('finishes every depth in source-region order when derived rings arrive reversed', () => {
+    const result = helicalPocketPassesBySourceRegion(
+      {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'pocket',
+        helixEntry: { maxDiameterMm: 4, minDiameterMm: 2, angleDeg: 5 },
+      },
+      [square, shifted(square, 40)],
+      [shifted(insetSquare, 40), insetSquare],
+      [-1, -2],
+    );
+    if (result === null) throw new Error('expected source-region helical passes');
+
+    expect(
+      result.map((pass) => {
+        if (pass.kind !== 'helical-contour') throw new Error('expected a helical contour pass');
+        return {
+          owner: pass.start.x < 30 ? 'A' : 'B',
+          startZMm: pass.startZMm,
+          zMm: pass.zMm,
+        };
+      }),
+    ).toEqual([
+      { owner: 'A', startZMm: 0, zMm: -1 },
+      { owner: 'A', startZMm: -1, zMm: -2 },
+      { owner: 'B', startZMm: 0, zMm: -1 },
+      { owner: 'B', startZMm: -1, zMm: -2 },
+    ]);
   });
 
   it('adds revolutions until the configured maximum ramp angle is respected', () => {

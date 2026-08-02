@@ -1,8 +1,10 @@
 import type { Group, Job } from '../../../core/job';
+import { cncGroupMaximumDepthMm } from '../../../core/job/job';
 
 export type JobReviewEffectiveOperation = {
   readonly layerId: string;
   readonly summaries: ReadonlyArray<string>;
+  readonly cncActualMaxDepthMm?: number;
 };
 
 /** Summarize the groups that actually reached the exact prepared Job. */
@@ -10,13 +12,25 @@ export function buildEffectiveOperationReview(
   job: Job,
 ): ReadonlyArray<JobReviewEffectiveOperation> {
   const summariesByLayer = new Map<string, string[]>();
+  const vCarveDepthByLayer = new Map<string, number>();
   for (const group of job.groups) {
     const summary = effectiveGroupSummary(group);
     const summaries = summariesByLayer.get(group.layerId) ?? [];
     if (!summaries.includes(summary)) summaries.push(summary);
     summariesByLayer.set(group.layerId, summaries);
+    if (group.kind === 'cnc' && group.cutType === 'v-carve') {
+      vCarveDepthByLayer.set(
+        group.layerId,
+        Math.max(vCarveDepthByLayer.get(group.layerId) ?? 0, cncGroupMaximumDepthMm(group)),
+      );
+    }
   }
-  return [...summariesByLayer].map(([layerId, summaries]) => ({ layerId, summaries }));
+  return [...summariesByLayer].map(([layerId, summaries]) => {
+    const cncActualMaxDepthMm = vCarveDepthByLayer.get(layerId);
+    return cncActualMaxDepthMm === undefined
+      ? { layerId, summaries }
+      : { layerId, summaries, cncActualMaxDepthMm };
+  });
 }
 
 function effectiveGroupSummary(group: Group): string {
@@ -26,7 +40,12 @@ function effectiveGroupSummary(group: Group): string {
       group.coolant === undefined || group.coolant === 'off'
         ? 'coolant off'
         : `${group.coolant} coolant`;
+    const actualDepth =
+      group.cutType === 'v-carve'
+        ? `Actual max depth ${formatNumber(cncGroupMaximumDepthMm(group))} mm Â· `
+        : '';
     return (
+      actualDepth +
       `${tool} · ${group.passes.length} ${plural(group.passes.length, 'pass', 'passes')}` +
       ` · ${formatNumber(group.feedMmPerMin)} mm/min feed` +
       ` · ${formatNumber(group.plungeMmPerMin)} mm/min plunge` +

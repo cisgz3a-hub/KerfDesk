@@ -7,9 +7,11 @@ import {
   IDENTITY_TRANSFORM,
   createLayer,
   type ImportedSvg,
+  type Polyline,
   type Scene,
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
+import { compileStraightInlayOperation } from './inlay-pair-operation';
 
 function inlayScene(tabsEnabled = true): Scene {
   const color = '#ff0000';
@@ -73,6 +75,22 @@ function passXs(pass: CncPass): ReadonlyArray<number> {
   return [];
 }
 
+function ring(minX: number, minY: number, size: number): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: minX, y: minY },
+      { x: minX + size, y: minY },
+      { x: minX + size, y: minY + size },
+      { x: minX, y: minY + size },
+    ],
+  };
+}
+
+function compress<T>(values: ReadonlyArray<T>): ReadonlyArray<T> {
+  return values.filter((value, index) => index === 0 || value !== values[index - 1]);
+}
+
 describe('compileCncJob inlay pair', () => {
   it('cuts a radius-matched pocket before its mirrored tabbed insert', () => {
     const job = compileCncJob(inlayScene(), DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG);
@@ -110,5 +128,69 @@ describe('compileCncJob inlay pair', () => {
     expect(male.passes.every((pass) => pass.kind === 'path3d')).toBe(true);
     // The lead is profile-only, so the female pocket keeps plain contours.
     expect(female.passes.every((pass) => pass.kind === 'contour')).toBe(true);
+  });
+
+  it('clears every female pocket depth in one source region before starting the next', () => {
+    const settings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'inlay-pair' as const,
+      depthMm: 2,
+      depthPerPassMm: 1,
+      inlayPocketDepthMm: 2,
+      inlayAllowanceMm: 0.1,
+      inlayPairSpacingMm: 10,
+      tabsEnabled: false,
+    };
+    const operation = compileStraightInlayOperation(
+      [ring(0, 0, 20), ring(40, 0, 20)],
+      settings,
+      DEFAULT_CNC_MACHINE_CONFIG,
+    );
+    if (operation === null) throw new Error('expected a straight inlay operation');
+
+    const sequence = operation.femalePasses.map((pass) => {
+      const xs = passXs(pass);
+      const region = Math.max(...xs) < 30 ? 'left' : 'right';
+      return `${region}:${contour(pass).zMm}`;
+    });
+    expect(compress(sequence)).toEqual(['left:-1', 'left:-2', 'right:-1', 'right:-2']);
+  });
+
+  it('finishes each male letter inner-first before starting the next', () => {
+    const settings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'inlay-pair' as const,
+      depthMm: 2,
+      depthPerPassMm: 1,
+      inlayPocketDepthMm: 1,
+      inlayAllowanceMm: 0.1,
+      inlayPairSpacingMm: 10,
+      tabsEnabled: false,
+    };
+    const operation = compileStraightInlayOperation(
+      [ring(0, 0, 20), ring(6, 6, 8), ring(40, 0, 20), ring(46, 6, 8)],
+      settings,
+      DEFAULT_CNC_MACHINE_CONFIG,
+    );
+    if (operation === null) throw new Error('expected a straight inlay operation');
+
+    const centers = operation.malePasses.map((pass) => {
+      const xs = passXs(pass);
+      return (Math.min(...xs) + Math.max(...xs)) / 2;
+    });
+    const threshold = (Math.min(...centers) + Math.max(...centers)) / 2;
+    const parts = centers.map((center) => (center < threshold ? 'left' : 'right'));
+    expect(compress(parts)).toHaveLength(2);
+
+    for (const part of ['left', 'right'] as const) {
+      const spans = operation.malePasses
+        .filter((_, index) => parts[index] === part)
+        .map((pass) => {
+          const xs = passXs(pass);
+          return Math.max(...xs) - Math.min(...xs);
+        });
+      expect(spans).toHaveLength(4);
+      expect(spans[0]).toBeLessThan(spans[2] ?? Number.NEGATIVE_INFINITY);
+    }
   });
 });

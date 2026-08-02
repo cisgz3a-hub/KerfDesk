@@ -29,6 +29,11 @@ export type CutSegment = {
   // closed segment, the last point equals the first by construction.
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
+  /** Estimator-only 3D edge geometry for a two-point CNC segment. */
+  readonly plannerMotion?: {
+    readonly distanceMm: number;
+    readonly direction: Vec3;
+  };
 };
 
 export type FillSegment = CutSegment & {
@@ -117,7 +122,7 @@ export type RasterRowProviderOrder = 'ascending-y' | 'descending-y';
 // motion printer: retract to safeZMm → rapid XY → plunge at plungeMmPerMin →
 // feed. Pass shapes:
 //   - contour: one XY polyline at one constant Z depth (profiles, pockets,
-//     engraves, v-carve rings)
+//     engraves, V-carve flat-core clearing routes)
 //   - path3d:  per-vertex XYZ motion (relief finishing, ramp entries,
 //     imported .nc toolpaths)
 //   - arc:     one XY circular arc at one constant Z depth (native G2/G3 when
@@ -237,6 +242,7 @@ export type CncGroup = {
   readonly requestedDepthMm?: number;
   readonly depthPerPassMm?: number;
   readonly vResolutionMm?: number;
+  readonly vCarveFlatDepthEnabled?: boolean;
   readonly rampEntryDeg?: number;
   // Set only on tiled derivatives of a ramped job. Clipping can change the
   // entry geometry, so rampEntryDeg remains requested provenance rather than
@@ -263,6 +269,28 @@ export type CncGroup = {
   readonly parkYMm?: number;
   readonly passes: ReadonlyArray<CncPass>;
 };
+
+/** Deepest positive stock depth reached by the exact compiled pass geometry. */
+export function cncGroupMaximumDepthMm(group: CncGroup): number {
+  let deepestZ = 0;
+  for (const pass of group.passes) {
+    switch (pass.kind) {
+      case 'contour':
+      case 'arc':
+        deepestZ = Math.min(deepestZ, pass.zMm);
+        break;
+      case 'path3d':
+        for (const point of pass.points) deepestZ = Math.min(deepestZ, point.z);
+        break;
+      case 'helical-contour':
+        deepestZ = Math.min(deepestZ, pass.startZMm, pass.zMm);
+        break;
+      default:
+        assertNever(pass, 'CncPass');
+    }
+  }
+  return Math.max(0, -deepestZ);
+}
 
 export type Group = CutGroup | FillGroup | RasterGroup | CncGroup;
 

@@ -181,6 +181,7 @@ function CncLayersTable(props: {
       <tbody>
         {props.layers.map((layer) => {
           const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+          const effective = props.effectiveOperations.find((entry) => entry.layerId === layer.id);
           return (
             <Fragment key={layer.id}>
               <tr>
@@ -192,6 +193,9 @@ function CncLayersTable(props: {
                   settings={settings}
                   maxFeedMmPerMin={maxFeed}
                   spindleMaxRpm={machine.params.spindleMaxRpm}
+                  {...(effective?.cncActualMaxDepthMm === undefined
+                    ? {}
+                    : { actualVCarveDepthMm: effective.cncActualMaxDepthMm })}
                   onCommit={(next) => setLayerParam(layer.id, { cnc: next })}
                 />
                 <td style={tableCellStyle}>{operationArtworkCount(objects, layer)}</td>

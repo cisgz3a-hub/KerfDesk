@@ -259,17 +259,19 @@ function VCarveSection(props: {
   return (
     <>
       <VCarveFields layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
-      <VClearToolSelect
-        layer={props.layer}
-        settings={props.settings}
-        onCommit={props.onCommit}
-        onCommitSettings={props.onCommitSettings}
-      />
+      {(props.settings.vCarveFlatDepthEnabled ?? true) ? (
+        <VClearToolSelect
+          layer={props.layer}
+          settings={props.settings}
+          onCommit={props.onCommit}
+          onCommitSettings={props.onCommitSettings}
+        />
+      ) : null}
     </>
   );
 }
 
-// H.3 V-carve options: ring detail + a live warning when THIS LAYER's bit is
+// H.3 V-carve options: medial sampling detail + a live warning when THIS LAYER's bit is
 // not a v-bit. Wrong-kind selection remains advisory-only and keeps its legacy
 // fallback geometry; an actual V-bit with invalid angle is the separate exact
 // compile-integrity refusal. Read the layer tool so overrides are represented.
@@ -293,7 +295,7 @@ function VCarveFields(props: {
         min={0}
         max={5}
         step={0.05}
-        title="V-carve ring spacing. 0 = automatic (bit diameter ÷ 8). Smaller = crisper walls, longer job."
+        title="V-carve boundary sampling and flat-core clearing pitch. 0 = automatic. Smaller = finer geometry and longer compile/job time."
         onCommit={(vResolutionMm) => props.onCommit({ vResolutionMm })}
       />
       {!activeToolIsVBit ? (

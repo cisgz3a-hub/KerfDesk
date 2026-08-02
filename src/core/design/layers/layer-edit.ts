@@ -17,6 +17,7 @@ export type DesignLayerPatch = {
   readonly color?: string;
   readonly cutType?: DesignCutType;
   readonly depthMm?: number;
+  readonly vCarveFlatDepthEnabled?: boolean;
   readonly toolId?: string | null;
   readonly vClearToolId?: string | null;
 };
@@ -69,8 +70,28 @@ function patchedLayer(current: DesignLayer, patch: DesignLayerPatch): DesignLaye
     color: patch.color ?? current.color,
     cutType: patch.cutType ?? current.cutType,
     depthMm: depthOk ? patch.depthMm : current.depthMm,
+    ...patchedVCarveFlatDepth(current, patch),
     ...(toolId === undefined ? {} : { toolId }),
     ...(vClearToolId === undefined ? {} : { vClearToolId }),
+  };
+}
+
+function patchedVCarveFlatDepth(
+  current: DesignLayer,
+  patch: DesignLayerPatch,
+): Pick<DesignLayer, 'vCarveFlatDepthEnabled'> | Record<string, never> {
+  const entersVCarve = patch.cutType === 'v-carve' && current.cutType !== 'v-carve';
+  if (
+    patch.vCarveFlatDepthEnabled === undefined &&
+    current.vCarveFlatDepthEnabled === undefined &&
+    !entersVCarve
+  ) {
+    return {};
+  }
+  return {
+    vCarveFlatDepthEnabled:
+      patch.vCarveFlatDepthEnabled ??
+      (entersVCarve ? false : (current.vCarveFlatDepthEnabled ?? true)),
   };
 }
 

@@ -81,9 +81,7 @@ export function runCncPreflight(
   for (const issue of findCncVCarveEntryIssues(project.scene, project.device, config)) {
     issues.push({
       code: 'cnc-vcarve-entry-fallback',
-      message:
-        `Layer ${issue.layerId}: ${issue.reason} CurveDesk used the legacy stepped-plunge ` +
-        'entry. Adjust Ramp entry or disable it.',
+      message: `Layer ${issue.layerId}: ${issue.reason} Set Ramp entry to 0 to remove this notice.`,
     });
   }
   for (const issue of findCncRestPocketIssues(project.scene, project.device, config)) {

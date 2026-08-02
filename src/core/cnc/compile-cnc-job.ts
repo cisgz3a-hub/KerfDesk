@@ -29,7 +29,7 @@ import {
   capFeed,
   capSpindle,
   contourPassFromPolyline,
-  depthMajorPasses,
+  sourceRegionMajorDepthPasses,
   isProfileCutType,
   resolveRetractBetweenPasses,
   type CncGroupCompileOptions,
@@ -39,8 +39,8 @@ import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { pocketToolpathsForSettings, resolveRestPocketOperation } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
-import { planHelicalPocketPasses } from './helical-entry';
-import { finishingProfilePasses, profileFinishAllowanceMm } from './finish-allowance';
+import { helicalPocketPassesBySourceRegion } from './cnc-helical-pocket-passes';
+import { profileFinishAllowanceMm, profilePassesWithFinishAllowance } from './finish-allowance';
 import { compileStraightInlayGroups } from './inlay-pair-operation';
 import {
   DEFAULT_LINE_ART_CONTOURS,
@@ -103,7 +103,7 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
       profileGroups.push(tagArtworkGroup(inlayGroups.male, priorityObjectId));
       continue;
     }
-    // H.7 two-stage v-carve clearance runs before the v-bit ladder.
+    // H.7 two-stage V-carve clearance runs before the V-bit medial finish.
     const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
     if (clearance !== null) clearingGroups.push(tagArtworkGroup(clearance, priorityObjectId));
     const roughing = restPocketRoughingGroupForLayer(layer, settings, polylines, device, config);
@@ -161,7 +161,11 @@ function restPocketRoughingGroupForLayer(
   const operation = resolveRestPocketOperation(polylines, settings, config);
   if (operation.kind !== 'ok') return null;
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
-  let passes: ReadonlyArray<CncPass> = depthMajorPasses(operation.roughToolpaths, depths);
+  let passes: ReadonlyArray<CncPass> = sourceRegionMajorDepthPasses(
+    polylines,
+    operation.roughToolpaths,
+    depths,
+  );
   if (settings.rampEntryDeg !== undefined) passes = applyRampEntry(passes, settings.rampEntryDeg);
   const primaryTool = layerCncTool(config, settings);
   return cncGroupForPasses(layer, settings, operation.roughTool, passes, device, config, {
@@ -204,8 +208,8 @@ function cncGroupForPasses(
   };
 }
 
-// The two-stage v-carve's clearing group (H.7): pocket the flat floors
-// with the layer's clearing bit before the v-bit ladder runs.
+// The two-stage V-carve's clearing group (H.7): pocket an explicitly enabled
+// flat floor with the layer's clearing bit before the V-bit medial finish.
 export function vcarveClearanceGroupForLayer(
   layer: Layer,
   settings: CncLayerSettings,
@@ -213,7 +217,13 @@ export function vcarveClearanceGroupForLayer(
   device: DeviceProfile,
   config: CncMachineConfig,
 ): CncGroup | null {
-  if (settings.cutType !== 'v-carve' || settings.vClearToolId === undefined) return null;
+  if (
+    settings.cutType !== 'v-carve' ||
+    !(settings.vCarveFlatDepthEnabled ?? true) ||
+    settings.vClearToolId === undefined
+  ) {
+    return null;
+  }
   const clearTool = config.tools.find((tool) => tool.id === settings.vClearToolId);
   if (clearTool === undefined || clearTool.kind !== 'end-mill') return null;
   const vBit = layerCncTool(config, settings);
@@ -232,7 +242,7 @@ export function vcarveClearanceGroupForLayer(
     layer,
     clearingSettings,
     clearTool,
-    depthMajorPasses(toolpaths, depths),
+    sourceRegionMajorDepthPasses(polylines, toolpaths, depths),
     device,
     config,
     { layerPrimaryTool: vBit, includeRampEntry: false, retractBetweenPasses: false },
@@ -267,33 +277,23 @@ function passesForLayer(
       : enforceCutDirection(raw, settings.cutDirection, settings.cutType, handedness);
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
   if (toolpaths.length === 0 || depths.length === 0) return [];
-  const helicalPasses = helicalPocketPasses(settings, toolpaths, depths);
+  const helicalPasses = helicalPocketPassesBySourceRegion(settings, polylines, toolpaths, depths);
   if (helicalPasses !== null) return helicalPasses;
-  const roughing =
-    settings.cutType === 'pocket'
-      ? depthMajorPasses(toolpaths, depths)
-      : contourMajorPasses(
-          toolpaths,
-          depths,
-          settings,
-          tool.diameterMm,
-          manualTabCentersForToolpaths(toolpaths, sourceContours),
-        );
-  // One full-depth finishing pass at the true contour, appended after roughing.
+  const manualTabCenters = manualTabCentersForToolpaths(toolpaths, sourceContours);
   const passes =
     allowanceMm > 0
-      ? [
-          ...roughing,
-          ...finishingProfilePasses(
-            contours,
-            settings,
-            tool.diameterMm,
-            toolpaths,
-            handedness,
-            sourceContours,
-          ),
-        ]
-      : roughing;
+      ? profilePassesWithFinishAllowance(
+          contours,
+          settings,
+          tool.diameterMm,
+          toolpaths,
+          handedness,
+          sourceContours,
+          (part) => contourMajorPasses(part, depths, settings, tool.diameterMm, manualTabCenters),
+        )
+      : settings.cutType === 'pocket'
+        ? sourceRegionMajorDepthPasses(polylines, toolpaths, depths)
+        : contourMajorPasses(toolpaths, depths, settings, tool.diameterMm, manualTabCenters);
   // H.9 (opt-in): plunges become along-path ramps at the configured angle.
   return settings.rampEntryDeg === undefined
     ? passes
@@ -319,17 +319,6 @@ function lineArtContoursForLayer(
     toolDiameterMm,
     lineArtPairableSet(sourceContours),
   );
-}
-
-function helicalPocketPasses(
-  settings: CncLayerSettings,
-  toolpaths: ReadonlyArray<Polyline>,
-  depths: ReadonlyArray<number>,
-): ReadonlyArray<CncPass> | null {
-  if (settings.cutType !== 'pocket' || settings.helixEntry === undefined) return null;
-  if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') return [];
-  const plan = planHelicalPocketPasses(toolpaths, depths, settings.helixEntry);
-  return plan.ok ? plan.passes : [];
 }
 
 export function xyToolpathsForCutType(

@@ -9,15 +9,8 @@
 // formatting: comments stripped, blank lines skipped, trailing-whitespace
 // tolerated. This means they can validate G-code from external tools too, not
 // just GrblStrategy's output.
-import {
-  asGcodeLines,
-  isArcMotion,
-  isClockwiseArc,
-  isGcodeCommand,
-  isGcodeMotionCommand,
-  parseGcodeWord,
-  stripGcodeComment,
-} from './gcode-words';
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
+import { asGcodeLines, isGcodeCommand, parseGcodeWord, stripGcodeComment } from './gcode-words';
 import { arcAabb } from './arc-bounds';
 
 export type Issue = {
@@ -56,15 +49,18 @@ export function findLaserOnTravelIssues(gcode: string | ReadonlyArray<string>): 
   const issues: Issue[] = [];
   let lastEffective = '';
   let stickyS: number | null = null;
+  let motion: GcodeMotionMode | null = 0;
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];
     if (raw === undefined) continue;
     const stripped = stripGcodeComment(raw);
     if (stripped === '') continue;
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
     const sVal = parseGcodeWord(stripped, 'S');
     if (sVal !== null) stickyS = sVal;
     if (isGcodeCommand(stripped, 'M107')) stickyS = 0;
-    if (isGcodeCommand(stripped, 'G0')) {
+    if (scanned.isMotion && motion === 0) {
       const okInline = sVal === 0;
       const okPriorOff =
         isGcodeCommand(lastEffective, 'M5') || isGcodeCommand(lastEffective, 'M107');
@@ -103,12 +99,15 @@ export function findOutOfBoundsCoords(
   // endpoint). GRBL programs start at the current machine position; for the
   // emitted-text scan we track from 0,0 like the rest of the bounds contract.
   let pos = { x: 0, y: 0 };
+  let motion: GcodeMotionMode | null = 0;
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];
     if (raw === undefined) continue;
     const stripped = stripGcodeComment(raw);
-    if (!isGcodeMotionCommand(stripped)) continue;
-    pos = scanMotionLineBounds(issues, stripped, pos, offset, limits, i + 1, raw);
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || motion === null) continue;
+    pos = scanMotionLineBounds(issues, stripped, motion, pos, offset, limits, i + 1, raw);
   }
   return issues;
 }
@@ -118,6 +117,7 @@ export function findOutOfBoundsCoords(
 function scanMotionLineBounds(
   issues: Issue[],
   stripped: string,
+  motion: GcodeMotionMode,
   pos: { x: number; y: number },
   offset: { x: number; y: number },
   limits: { minX: number; minY: number; maxX: number; maxY: number },
@@ -128,8 +128,19 @@ function scanMotionLineBounds(
   const y = parseGcodeWord(stripped, 'Y');
   appendAxisBoundsIssue(issues, 'X', x, offset.x, limits.minX, limits.maxX, lineNumber, line);
   appendAxisBoundsIssue(issues, 'Y', y, offset.y, limits.minY, limits.maxY, lineNumber, line);
-  if (isArcMotion(stripped)) {
-    appendArcBoundsIssue(issues, stripped, pos, x, y, offset, limits, lineNumber, line);
+  if (motion === 2 || motion === 3) {
+    appendArcBoundsIssue(
+      issues,
+      stripped,
+      motion === 2,
+      pos,
+      x,
+      y,
+      offset,
+      limits,
+      lineNumber,
+      line,
+    );
   }
   return { x: x ?? pos.x, y: y ?? pos.y };
 }
@@ -141,6 +152,7 @@ function scanMotionLineBounds(
 function appendArcBoundsIssue(
   issues: Issue[],
   stripped: string,
+  isClockwise: boolean,
   start: { x: number; y: number },
   endX: number | null,
   endY: number | null,
@@ -153,7 +165,7 @@ function appendArcBoundsIssue(
   const jWord = parseGcodeWord(stripped, 'J');
   if (iWord === null || jWord === null) return;
   const end = { x: endX ?? start.x, y: endY ?? start.y };
-  const box = arcAabb(start, end, iWord, jWord, isClockwiseArc(stripped));
+  const box = arcAabb(start, end, iWord, jWord, isClockwise);
   const parts: string[] = [];
   if (box.minX + offset.x < limits.minX) parts.push(`X ${box.minX + offset.x}`);
   else if (box.maxX + offset.x > limits.maxX) parts.push(`X ${box.maxX + offset.x}`);
@@ -191,9 +203,12 @@ export function expectedS(powerPercent: number, maxPowerS: number): number {
 function collectG1WordValues(gcode: string, word: 'S' | 'F'): readonly number[] {
   const lines = gcode.split('\n');
   const out: number[] = [];
+  let motion: GcodeMotionMode | null = 0;
   for (const raw of lines) {
     const stripped = stripGcodeComment(raw);
-    if (!isGcodeCommand(stripped, 'G1')) continue;
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || motion !== 1) continue;
     const value = parseGcodeWord(stripped, word);
     if (value !== null) out.push(value);
   }

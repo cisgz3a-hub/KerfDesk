@@ -87,6 +87,7 @@ const VEE_SETTINGS: Partial<CncLayerSettings> = {
   depthMm: 3,
   depthPerPassMm: 3,
   vResolutionMm: 0.25,
+  vCarveFlatDepthEnabled: true,
 };
 
 const TWO_BIT_SCENE: Scene = {

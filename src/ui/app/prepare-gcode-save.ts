@@ -1,4 +1,5 @@
 import type { PreflightIssue } from '../../core/preflight';
+import type { CompiledVCarveLayerDepth } from '../laser/cnc-compiled-depth-warnings';
 import type { ResolvedJobPlacement } from '../job-placement';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { SaveGcodeCtx } from './file-actions';
@@ -15,6 +16,7 @@ export type PreparedGcodeSave =
       readonly kind: 'ready';
       readonly gcode: string;
       readonly advisories: ReadonlyArray<PreflightIssue>;
+      readonly cncVCarveDepths: ReadonlyArray<CompiledVCarveLayerDepth>;
     };
 
 /**
@@ -37,7 +39,12 @@ export async function prepareGcodeSave(
     showFailure(blocking);
     return { kind: 'failed' };
   }
-  return { kind: 'ready', gcode: emission.gcode, advisories };
+  return {
+    kind: 'ready',
+    gcode: emission.gcode,
+    advisories,
+    cncVCarveDepths: emission.cncVCarveDepths,
+  };
 }
 
 function showFailure(issues: ReadonlyArray<PreflightIssue>): void {

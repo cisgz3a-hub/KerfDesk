@@ -137,20 +137,20 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 
 ### Phase H — v0.8 "Router" [Built (G1–G8, then H.13–H.14 / ADR-111–112); hardware passes CLAIMED]
 
-Full professional CNC/router mode — LaserForge's own feature surface, not an Easel clone. Builds on the CNC MVP from commit `032d476` (mode toggle, profile/pocket/engrave CAM, depth passes, tabs, spindle/Z-aware GRBL, preflight). Scope-gated by ADR-098: all parsers clean-room, clipper2-ts the only geometry dependency, hardware verification on the 4040 via the standing air-cut protocol. UI separation between laser and CNC modes is governed by ADR-101 (gate-and-hide); the 3D relief viewer's three.js dependency by ADR-102 (UI-only override of ADR-098 §2). Sub-phases (each = individually reviewed diffs; branch shippable after every one). Status column: Built = code + tests landed, hardware pass still CLAIMED (pending real-machine verification):
+Full professional CNC/router mode — LaserForge's own feature surface, not an Easel clone. Builds on the CNC MVP from commit `032d476` (mode toggle, profile/pocket/engrave CAM, depth passes, tabs, spindle/Z-aware GRBL, preflight). Scope-gated by ADR-098: all parsers remain clean-room; clipper2-ts remains the Boolean/offset kernel, with ADR-284's exact-pinned Delaunator exception limited to V-carve medial-topology candidates; hardware verification on the 4040 follows the standing air-cut protocol. UI separation between laser and CNC modes is governed by ADR-101 (gate-and-hide); the 3D relief viewer's three.js dependency by ADR-102 (UI-only override of ADR-098 §2). Sub-phases (each = individually reviewed diffs; branch shippable after every one). Status column: Built = code + tests landed, hardware pass still CLAIMED (pending real-machine verification):
 
 | Sub-phase | Delivers | Status |
 |---|---|---|
 | H.0 | Governance: ADR-098, this table, F-CNC flows, verification checklist | Done |
 | H.1 | `CncPass` contour/path3d union (tidy-first) + plunged-rapid invariant | Built |
 | H.2 | Toolpath simulation: stock XY model, Z-aware steps, material-removal grid, depth-shaded preview | Built |
-| H.3 | True V-carving: clipper2 inward offset ladder, `tipAngleDeg` depth law, flat-bottom fallback | Built |
+| H.3 | True V-carving: certified vector-medial paths, `tipAngleDeg` boundary-distance depth law, explicit flat-depth mode, cone-footprint clearing | Built; hardware CLAIMED |
 | H.4 | Clean-room STL import → deterministic max-Z heightmap, `relief` SceneObject, canvas preview | Built |
 | H.5 | Relief roughing: heightmap dilation + marching squares → existing pocket engine | Built |
 | H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults | Built |
 | H.7 | Tool + feeds/speeds libraries (material-library pattern), multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |
 | H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover | Built |
-| H.9 | Motion polish: ramp entry (including emission-accurate V-carve contour ramps — ADR-278), climb/conventional, entry-point rotation, parking parity (helical entry deferred; arc/line profile leads shipped — ADR-250) | Built; hardware CLAIMED |
+| H.9 | Motion polish: contour ramp entry for constant-depth operations; V-carve follows its certified variable-depth medial profile and reports any stored ramp request as advisory provenance; climb/conventional, entry-point rotation, parking parity (helical entry deferred; arc/line profile leads shipped — ADR-250) | Built; hardware CLAIMED |
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
 | H.11 | Market-parity build-out (ADR-103): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator, machine-aware G-code banner | Built (G1–G8) |
 | H.12 | Easel-parity pack (ADR-105): persistent live 3D pane, pocket raster fill (offset/raster-X/raster-Y), bundled local design library | Built |

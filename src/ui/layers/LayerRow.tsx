@@ -81,6 +81,9 @@ export function LayerRow(props: {
 function operationSummary(layer: Layer, machineKind: 'laser' | 'cnc'): string {
   if (machineKind === 'cnc') {
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    if (settings.cutType === 'v-carve' && settings.vCarveFlatDepthEnabled === false) {
+      return `${cutTypeLabel(settings.cutType)} · flowing geometry depth`;
+    }
     return `${cutTypeLabel(settings.cutType)} · ${format(settings.depthMm)} mm deep`;
   }
   const mode = layer.mode === 'fill' ? 'Fill' : layer.mode === 'image' ? 'Image' : 'Line';

@@ -67,6 +67,7 @@ function vCarveScene(): Scene {
         cnc: {
           ...DEFAULT_CNC_LAYER_SETTINGS,
           cutType: 'v-carve',
+          vCarveFlatDepthEnabled: true,
           toolId: V_BIT.id,
           depthMm: 1.191,
           depthPerPassMm: 0.5,

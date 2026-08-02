@@ -3,7 +3,7 @@
 // can represent, so the operator learns at design time
 // rather than at Job Review. Text only — informs, never gates (rule 7).
 //
-// The check compiles the layer's v-carve ladder, so it runs 300 ms after the
+// The check compiles the layer's V-carve medial plan, so it runs 300 ms after the
 // scene or settings settle (the panel's F-A7 debounce cadence) instead of on
 // every store commit; dragging artwork re-arms the timer and the compile
 // happens once at rest.
@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 // Deep imports: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json pins it at 67) and may only shrink.
 import { collectLayerPolylines } from '../../core/cnc/collect-cnc-contours';
-import { vcarveLadderPasses } from '../../core/cnc/vcarve-ladder';
+import { vcarveMedialPasses } from '../../core/cnc/vcarve-medial';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 
@@ -40,9 +40,10 @@ export function CncThinDetailNote(props: {
         return;
       }
       setIsThinResidual(
-        vcarveLadderPasses(polylines, {
+        vcarveMedialPasses(polylines, {
           tool: layerCncTool(machine, settings),
-          maxDepthMm: settings.depthMm,
+          maxDepthMm:
+            (settings.vCarveFlatDepthEnabled ?? true) ? settings.depthMm : Number.POSITIVE_INFINITY,
           depthPerPassMm: settings.depthPerPassMm,
           resolutionMm: settings.vResolutionMm,
           ...(settings.vCarveRampEntryDeg === undefined

@@ -45,7 +45,11 @@ describe('DesignLayerSettings', () => {
     act(() => {
       root?.render(
         <DesignLayerSettings
-          layer={{ ...DEFAULT_DESIGN_LAYER, cutType: 'v-carve' }}
+          layer={{
+            ...DEFAULT_DESIGN_LAYER,
+            cutType: 'v-carve',
+            vCarveFlatDepthEnabled: true,
+          }}
           tools={tools}
           activeTool={tools[4]!}
           stockThicknessMm={12}
@@ -81,6 +85,7 @@ describe('DesignLayerSettings', () => {
           layer={{
             ...DEFAULT_DESIGN_LAYER,
             cutType: 'v-carve',
+            vCarveFlatDepthEnabled: true,
             vClearToolId: 'ball',
           }}
           tools={tools}
@@ -115,7 +120,12 @@ describe('DesignLayerSettings', () => {
     act(() => {
       root?.render(
         <DesignLayerSettings
-          layer={{ ...DEFAULT_DESIGN_LAYER, cutType: 'v-carve', toolId: 'v90' }}
+          layer={{
+            ...DEFAULT_DESIGN_LAYER,
+            cutType: 'v-carve',
+            toolId: 'v90',
+            vCarveFlatDepthEnabled: true,
+          }}
           tools={tools}
           activeTool={tools[4]!}
           stockThicknessMm={12}
@@ -138,5 +148,40 @@ describe('DesignLayerSettings', () => {
       variant: 'warning',
       message: expect.stringMatching(/secondary.*feed.*plunge.*RPM.*depth\/pass.*verify/i),
     });
+  });
+
+  it('shows the Flat control but hides floor-only controls for flowing V-carve', () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    const onPatch = vi.fn();
+    act(() => {
+      root?.render(
+        <DesignLayerSettings
+          layer={{ ...DEFAULT_DESIGN_LAYER, cutType: 'v-carve' }}
+          tools={tools}
+          activeTool={tools[4]!}
+          stockThicknessMm={12}
+          onPatch={onPatch}
+        />,
+      );
+    });
+
+    const flat = host.querySelector(
+      `input[aria-label="Flat depth for ${DEFAULT_DESIGN_LAYER.name}"]`,
+    );
+    expect(flat).toBeInstanceOf(HTMLInputElement);
+    expect((flat as HTMLInputElement).checked).toBe(false);
+    expect(host.textContent).not.toContain('Floor');
+    expect(
+      [...host.querySelectorAll('select')].some((select) =>
+        select.title.startsWith('Two-stage v-carve'),
+      ),
+    ).toBe(false);
+
+    act(() => {
+      (flat as HTMLInputElement).click();
+    });
+    expect(onPatch).toHaveBeenCalledWith({ vCarveFlatDepthEnabled: true });
   });
 });

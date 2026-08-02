@@ -24,6 +24,14 @@ type OrderedContour = {
 };
 
 export function orderInnerFirst(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> {
+  return groupInnerFirstByPart(polylines).flat();
+}
+
+/** Keep each source part as its own inner-first bucket so callers can append
+ * finishing motion before the next part is allowed to start. */
+export function groupInnerFirstByPart(
+  polylines: ReadonlyArray<Polyline>,
+): ReadonlyArray<ReadonlyArray<Polyline>> {
   const closedPolylines = polylines.filter(
     (polyline) => polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS,
   );
@@ -47,7 +55,7 @@ export function orderInnerFirst(polylines: ReadonlyArray<Polyline>): ReadonlyArr
   }
   return [...parts.entries()]
     .sort(([a], [b]) => a - b)
-    .flatMap(([, part]) =>
+    .map(([, part]) =>
       part
         .sort((a, b) => b.depth - a.depth || a.index - b.index)
         .map((contour) => contour.polyline),

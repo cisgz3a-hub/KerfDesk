@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { scanGcodeWords } from '../gcode';
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import { cncGrblStrategy } from '../output';
 import type { CncGroup, CncPass, Job } from './job';
 import { buildToolpath } from './toolpath';
@@ -154,16 +156,23 @@ type ParsedMoves = {
 function parseEmittedMoves(gcode: string): ParsedMoves {
   const cutXy: string[] = [];
   const plungeZ: string[] = [];
+  let motion: GcodeMotionMode | null = 0;
   for (const raw of gcode.split('\n')) {
     const line = raw.replace(/;.*$/, '').trim();
-    if (!/^G1\b/.test(line)) continue;
-    const x = /\bX(-?\d+(?:\.\d+)?)/.exec(line)?.[1];
-    const y = /\bY(-?\d+(?:\.\d+)?)/.exec(line)?.[1];
-    const z = /\bZ(-?\d+(?:\.\d+)?)/.exec(line)?.[1];
+    const scanned = scanModalMotionLine(line, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || motion !== 1) continue;
+    const words = scanGcodeWords(line);
+    const value = (letter: string): number | undefined => {
+      return words.find((word) => word.letter === letter)?.value;
+    };
+    const x = value('X');
+    const y = value('Y');
+    const z = value('Z');
     if (x !== undefined || y !== undefined) {
-      cutXy.push(`${x ?? ''},${y ?? ''}`);
+      cutXy.push(`${x === undefined ? '' : fmt(x)},${y === undefined ? '' : fmt(y)}`);
     } else if (z !== undefined) {
-      plungeZ.push(z);
+      plungeZ.push(fmt(z));
     }
   }
   return { cutXy, plungeZ };

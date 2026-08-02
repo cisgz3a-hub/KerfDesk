@@ -56,6 +56,17 @@ describe('detectCncThroughCutTabWarnings', () => {
     expect(warnings[0]).toContain('1.65 mm past the bottom');
   });
 
+  it('leaves V-carve spoilboard depth to exact compiled-pass warnings', () => {
+    const cnc = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'v-carve' as const,
+      depthMm: DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm + 20,
+      vCarveFlatDepthEnabled: false,
+    };
+
+    expect(detectCncThroughCutTabWarnings(cncProjectWithLayerCnc(cnc))).toEqual([]);
+  });
+
   it('warns about spoilboard overcut on a tabbed profile, not the free-part case', () => {
     const cnc = {
       ...DEFAULT_CNC_LAYER_SETTINGS,

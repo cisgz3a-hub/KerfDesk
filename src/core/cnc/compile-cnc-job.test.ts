@@ -187,7 +187,12 @@ describe('compileCncJob', () => {
     const scene = sceneWith(
       [
         cncLayer('profile', '#ff0000', { cutType: 'profile-outside' }),
-        cncLayer('vcarve', '#00ff00', { cutType: 'v-carve', depthMm: 2, vResolutionMm: 0.5 }),
+        cncLayer('vcarve', '#00ff00', {
+          cutType: 'v-carve',
+          depthMm: 2,
+          vCarveFlatDepthEnabled: true,
+          vResolutionMm: 0.5,
+        }),
       ],
       [squareObject('O1', '#ff0000', 40), squareObject('O2', '#00ff00', 20)],
     );
@@ -199,9 +204,8 @@ describe('compileCncJob', () => {
     expect(first.cutType).toBe('v-carve');
     expect(second.cutType).toBe('profile-outside');
     expect(first.passes.length).toBeGreaterThan(0);
-    // Every v-carve depth stays within the configured max — δ rings as
-    // constant-Z contours, corner/thin detail rings as per-vertex path3d
-    // (ADR-282 Amendment 2).
+    // This fixture explicitly requests a 2 mm flat-depth cap. Every point on
+    // the certified medial profile must stay within that requested maximum.
     for (const pass of first.passes) {
       const deepest =
         pass.kind === 'path3d'

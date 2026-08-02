@@ -6,6 +6,7 @@
 
 import { pointInPolygon } from '../geometry';
 import type { Polyline } from '../scene';
+import { isClosedFiniteContour, strictContourContainmentDepth } from './strict-contour-nesting';
 
 export type OrderedVCarvePolyline = {
   readonly step: number;
@@ -19,6 +20,27 @@ type SourceRegion = {
 };
 
 export type VCarveRegionLayout = ReadonlyArray<SourceRegion>;
+
+/** Rank an interior witness by the original filled-root order (ADR-270). */
+export function vcarveSourceRegionRank(
+  witness: { readonly x: number; readonly y: number } | undefined,
+  originalContours: ReadonlyArray<Polyline>,
+): number {
+  return vcarveSourceRegionRankFromLayout(witness, buildVCarveSourceRegionLayout(originalContours));
+}
+
+export function buildVCarveSourceRegionLayout(
+  originalContours: ReadonlyArray<Polyline>,
+): VCarveRegionLayout {
+  return strictlyNestedSourceRegions(originalContours);
+}
+
+export function vcarveSourceRegionRankFromLayout(
+  witness: { readonly x: number; readonly y: number } | undefined,
+  sourceLayout: VCarveRegionLayout,
+): number {
+  return sourceRankFor(witness, sourceLayout);
+}
 
 /**
  * Return every ladder contour exactly once, annotated with the original ladder
@@ -108,6 +130,7 @@ function flattenLadder(rings: ReadonlyArray<ReadonlyArray<Polyline>>): OrderedVC
 
 function nestedSourceRegions(sourceContours: ReadonlyArray<Polyline>): SourceRegion[] {
   return sourceContours.flatMap((contour, index) => {
+    if (!isClosedFiniteContour(contour)) return [];
     const probe = contour.points[0];
     if (probe === undefined) return [];
     const containmentDepth = sourceContours.reduce((depth, candidate, candidateIndex) => {
@@ -130,11 +153,8 @@ function nestedSourceRegions(sourceContours: ReadonlyArray<Polyline>): SourceReg
 // classify a source path as a hole/island for provenance ranking.
 function strictlyNestedSourceRegions(sourceContours: ReadonlyArray<Polyline>): SourceRegion[] {
   return sourceContours.flatMap((contour, index) => {
-    const containmentDepth = sourceContours.reduce(
-      (depth, candidate, candidateIndex) =>
-        candidateIndex !== index && strictlyContains(candidate, contour) ? depth + 1 : depth,
-      0,
-    );
+    if (!isClosedFiniteContour(contour)) return [];
+    const containmentDepth = strictContourContainmentDepth(contour, index, sourceContours);
     return containmentDepth % 2 === 0 ? [{ contour, containmentDepth, sourceIndex: index }] : [];
   });
 }
@@ -172,92 +192,6 @@ function sourceRankFor(
     }
   }
   return rank;
-}
-
-function strictlyContains(outer: Polyline, inner: Polyline): boolean {
-  const probe = inner.points[0];
-  if (probe === undefined || !boundsContain(outer, inner) || boundariesIntersect(outer, inner)) {
-    return false;
-  }
-  return pointInPolygon(probe, outer.points);
-}
-
-type Bounds = {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-};
-
-function boundsContain(outer: Polyline, inner: Polyline): boolean {
-  const a = polylineBounds(outer);
-  const b = polylineBounds(inner);
-  return a.minX <= b.minX && a.minY <= b.minY && a.maxX >= b.maxX && a.maxY >= b.maxY;
-}
-
-function polylineBounds(polyline: Polyline): Bounds {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of polyline.points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
-}
-
-function boundariesIntersect(a: Polyline, b: Polyline): boolean {
-  const aCount = distinctClosedPointCount(a);
-  const bCount = distinctClosedPointCount(b);
-  for (let ai = 0; ai < aCount; ai += 1) {
-    const a0 = a.points[ai];
-    const a1 = a.points[(ai + 1) % aCount];
-    if (a0 === undefined || a1 === undefined) continue;
-    for (let bi = 0; bi < bCount; bi += 1) {
-      const b0 = b.points[bi];
-      const b1 = b.points[(bi + 1) % bCount];
-      if (b0 !== undefined && b1 !== undefined && segmentsIntersect(a0, a1, b0, b1)) return true;
-    }
-  }
-  return false;
-}
-
-function distinctClosedPointCount(polyline: Polyline): number {
-  const first = polyline.points[0];
-  const last = polyline.points.at(-1);
-  return first !== undefined && last !== undefined && first.x === last.x && first.y === last.y
-    ? polyline.points.length - 1
-    : polyline.points.length;
-}
-
-type Point = { readonly x: number; readonly y: number };
-
-function segmentsIntersect(a: Point, b: Point, c: Point, d: Point): boolean {
-  const abC = cross(a, b, c);
-  const abD = cross(a, b, d);
-  const cdA = cross(c, d, a);
-  const cdB = cross(c, d, b);
-  if (abC === 0 && onSegment(a, b, c)) return true;
-  if (abD === 0 && onSegment(a, b, d)) return true;
-  if (cdA === 0 && onSegment(c, d, a)) return true;
-  if (cdB === 0 && onSegment(c, d, b)) return true;
-  return abC > 0 !== abD > 0 && cdA > 0 !== cdB > 0;
-}
-
-function cross(a: Point, b: Point, point: Point): number {
-  return (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
-}
-
-function onSegment(a: Point, b: Point, point: Point): boolean {
-  return (
-    point.x >= Math.min(a.x, b.x) &&
-    point.x <= Math.max(a.x, b.x) &&
-    point.y >= Math.min(a.y, b.y) &&
-    point.y <= Math.max(a.y, b.y)
-  );
 }
 
 function innermostContainingRegion(

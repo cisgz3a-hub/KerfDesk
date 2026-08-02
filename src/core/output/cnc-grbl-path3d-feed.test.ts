@@ -10,12 +10,21 @@
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { scanGcodeWords } from '../gcode';
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import type { CncGroup } from '../job';
 import { cncGrblStrategy } from './cnc-grbl-strategy';
 
 const dev = DEFAULT_DEVICE_PROFILE;
 const CUTTING_FEED = 1000;
 const PLUNGE_FEED = 300;
+
+type FeedState = {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly feed: number;
+};
 
 function path3dGroup(
   points: ReadonlyArray<{ x: number; y: number; z: number }>,
@@ -47,31 +56,38 @@ function path3dGroup(
 // assertion measures what the controller will actually do.
 function descentRates(gcode: string): ReadonlyArray<number> {
   const rates: number[] = [];
-  let x = 0;
-  let y = 0;
-  let z = 0;
-  let feed = 0;
+  let state: FeedState = { x: 0, y: 0, z: 0, feed: 0 };
+  let motion: GcodeMotionMode | null = 0;
   for (const line of gcode.split('\n')) {
-    const move = /^G([01])\b/.exec(line);
-    if (move === null) continue;
-    const word = (axis: string): number | undefined => {
-      const found = new RegExp(`${axis}(-?\\d+(?:\\.\\d+)?)`).exec(line);
-      return found?.[1] === undefined ? undefined : Number(found[1]);
-    };
-    feed = word('F') ?? feed;
-    const nx = word('X') ?? x;
-    const ny = word('Y') ?? y;
-    const nz = word('Z') ?? z;
-    const dz = Math.abs(nz - z);
-    const length3d = Math.hypot(nx - x, ny - y, dz);
-    if (move[1] === '1' && dz > 0 && length3d > 0 && feed > 0) {
-      rates.push((feed * dz) / length3d);
-    }
-    x = nx;
-    y = ny;
-    z = nz;
+    const scanned = scanModalMotionLine(line, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || (motion !== 0 && motion !== 1)) continue;
+    const next = nextFeedState(line, state);
+    const rate = descentRate(state, next, motion);
+    if (rate !== null) rates.push(rate);
+    state = next;
   }
   return rates;
+}
+
+function nextFeedState(line: string, state: FeedState): FeedState {
+  const words = scanGcodeWords(line);
+  const value = (letter: string): number | undefined => {
+    return words.find((word) => word.letter === letter)?.value;
+  };
+  return {
+    x: value('X') ?? state.x,
+    y: value('Y') ?? state.y,
+    z: value('Z') ?? state.z,
+    feed: value('F') ?? state.feed,
+  };
+}
+
+function descentRate(state: FeedState, next: FeedState, motion: GcodeMotionMode): number | null {
+  if (motion !== 1 || next.z >= state.z || !(next.feed > 0)) return null;
+  const dz = state.z - next.z;
+  const length3d = Math.hypot(next.x - state.x, next.y - state.y, dz);
+  return length3d > 0 ? (next.feed * dz) / length3d : null;
 }
 
 describe('path3d lateral feed selection', () => {
@@ -96,11 +112,11 @@ describe('path3d lateral feed selection', () => {
       dev,
     );
 
-    expect(gcode).toContain('G1 X20.000 Y10.000 Z-1.000 F1000');
+    expect(gcode).toContain('G1X20.000Y10.000Z-1.000F1000');
     // len3d = hypot(10, 1) = 10.0499, so the cap 300*10.0499/1 = 3014 mm/min
     // exceeds the cutting feed: a shallow descent is not slowed at all.
-    expect(gcode).toContain('G1 X30.000 Y10.000 Z-2.000');
-    expect(gcode).not.toContain('Z-2.000 F300');
+    expect(gcode).toContain('X30.000Y10.000Z-2.000');
+    expect(gcode).not.toContain('Z-2.000F300');
   });
 
   it('slows a steep z-rate-capped descent to the configured plunge rate', () => {
@@ -120,7 +136,26 @@ describe('path3d lateral feed selection', () => {
     );
 
     // len3d = hypot(1, 2) = 2.23606; floor(300 * 2.23606 / 2) = 335.
-    expect(gcode).toContain('G1 X11.000 Y10.000 Z-3.000 F335');
+    expect(gcode).toContain('G1X11.000Y10.000Z-3.000F335');
+  });
+
+  it('keeps the cutting feed while a z-rate-capped profile rises', () => {
+    const gcode = cncGrblStrategy.emit(
+      {
+        groups: [
+          path3dGroup(
+            [
+              { x: 10, y: 10, z: -3 },
+              { x: 11, y: 10, z: -1 },
+            ],
+            'z-rate-capped',
+          ),
+        ],
+      },
+      dev,
+    );
+
+    expect(gcode).toContain('G1X11.000Y10.000Z-1.000F1000');
   });
 
   it('never emits a descent faster than the plunge rate, at any slope', () => {

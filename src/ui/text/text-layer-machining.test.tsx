@@ -94,7 +94,12 @@ describe('text layer machining workflow', () => {
       expect(textOperation.cnc).toMatchObject({ cutType: 'v-carve' });
 
       useStore.getState().setLayerParam(textOperation.id, {
-        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...textOperation.cnc, depthMm: 0.75 },
+        cnc: {
+          ...DEFAULT_CNC_LAYER_SETTINGS,
+          ...textOperation.cnc,
+          depthMm: 0.75,
+          vCarveFlatDepthEnabled: true,
+        },
       });
       project = useStore.getState().project;
       expect(
@@ -102,6 +107,7 @@ describe('text layer machining workflow', () => {
       ).toMatchObject({
         cutType: 'v-carve',
         depthMm: 0.75,
+        vCarveFlatDepthEnabled: true,
       });
 
       const loaded = roundTrip(project);
@@ -110,6 +116,7 @@ describe('text layer machining workflow', () => {
       ).toMatchObject({
         cutType: 'v-carve',
         depthMm: 0.75,
+        vCarveFlatDepthEnabled: true,
       });
 
       const groups = cncGroups(project, machine);

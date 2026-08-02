@@ -1,4 +1,8 @@
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../../io/gcode';
+import {
+  compiledVCarveLayerDepths,
+  type CompiledVCarveLayerDepth,
+} from './cnc-compiled-depth-warnings';
 
 const ROTARY_RASTER_REFUSAL_CODE = 'rotary-raster-unsupported';
 
@@ -23,6 +27,7 @@ export type SaveOutputEmission =
       readonly kind: 'emitted';
       readonly gcode: string;
       readonly preflight: ReturnType<typeof emitPreparedGcode>['preflight'];
+      readonly cncVCarveDepths: ReadonlyArray<CompiledVCarveLayerDepth>;
     };
 
 /**
@@ -47,5 +52,5 @@ export function emitSavePreparedOutput(
   if (isRotaryRasterRefusal) {
     return { kind: 'emission-refused', ...emitted, gcode: '' };
   }
-  return { kind: 'emitted', ...emitted };
+  return { kind: 'emitted', ...emitted, cncVCarveDepths: compiledVCarveLayerDepths(prepared.job) };
 }

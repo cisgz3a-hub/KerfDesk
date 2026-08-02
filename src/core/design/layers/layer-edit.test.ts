@@ -71,6 +71,20 @@ describe('addDesignLayer', () => {
 });
 
 describe('patchDesignLayer', () => {
+  it('starts a newly selected V-carve in flowing-depth mode', () => {
+    const base = twoLayerSketch();
+    const sketch: Sketch = {
+      ...base,
+      layers: (base.layers ?? []).map((layer) => {
+        const { vCarveFlatDepthEnabled: _legacyMissing, ...withoutFlatMode } = layer;
+        return withoutFlatMode;
+      }),
+    };
+    const patched = patchDesignLayer(sketch, 'design-layer-2', { cutType: 'v-carve' });
+    const layer = sketchLayers(patched).find((candidate) => candidate.id === 'design-layer-2');
+    expect(layer?.vCarveFlatDepthEnabled).toBe(false);
+  });
+
   it('patches settings and ignores non-positive depths field-wise', () => {
     const sketch = twoLayerSketch();
     const patched = patchDesignLayer(sketch, 'design-layer-2', {

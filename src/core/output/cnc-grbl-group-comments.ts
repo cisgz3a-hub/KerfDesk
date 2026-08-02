@@ -1,5 +1,6 @@
 import { sanitizeGcodeCommentValue } from '../gcode-comments';
 import type { CncGroup, CncPath3dPass } from '../job';
+import { cncGroupMaximumDepthMm } from '../job/job';
 import { fmt, fmtFeed } from './cnc-grbl-emit-head';
 
 const LABEL_BYTES = 48;
@@ -28,6 +29,7 @@ export function appendCncGroupComments(lines: string[], group: CncGroup): void {
     const resolution = group.vResolutionMm === 0 ? 'auto' : fmt(group.vResolutionMm);
     lines.push(`; cnc v-resolution-mm: ${resolution}`);
   }
+  appendVCarveComments(lines, group);
   appendEntryComments(lines, group);
   lines.push(
     `; cnc motion: feed-mm-min: ${fmtFeed(group.feedMmPerMin)}; ` +
@@ -37,17 +39,30 @@ export function appendCncGroupComments(lines: string[], group: CncGroup): void {
   appendFeedSourceComments(lines, group);
 }
 
+function appendVCarveComments(lines: string[], group: CncGroup): void {
+  if (group.cutType !== 'v-carve') return;
+  if (group.vCarveFlatDepthEnabled !== undefined) {
+    lines.push(
+      `; cnc v-carve-depth: ${group.vCarveFlatDepthEnabled ? 'flat-floor' : 'flowing-width'}`,
+    );
+  }
+  lines.push(`; cnc v-carve-actual-max-depth-mm: ${fmt(cncGroupMaximumDepthMm(group))}`);
+}
+
 function appendEntryComments(lines: string[], group: CncGroup): void {
   if (group.rampEntryDeg === undefined) return;
   const entryPaths = group.passes.filter(
     (pass): pass is CncPath3dPass => pass.kind === 'path3d' && pass.entryRamp === true,
   );
   const strategy =
-    group.cutType === 'v-carve' && entryPaths.length === 0
-      ? 'stepped-plunge-fallback'
-      : 'contour-ramp';
+    group.cutType === 'v-carve' && entryPaths.length === 0 ? 'medial-profile' : 'contour-ramp';
   const angleLabel = group.rampEntryTiled ? 'requested-max-angle-deg' : 'max-angle-deg';
   lines.push(`; cnc entry: ${strategy}; ${angleLabel}: ${fmt(group.rampEntryDeg)}`);
+  if (strategy === 'medial-profile') {
+    lines.push(
+      '; cnc entry-advisory: requested max angle is not applied to the variable-depth path',
+    );
+  }
   if (group.rampEntryTiled) {
     lines.push('; cnc entry-advisory: tiled output does not retain the max-angle guarantee');
   }

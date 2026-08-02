@@ -63,7 +63,7 @@ const SECONDARY_REFERENCE_CASES = [
   {
     field: 'vClearToolId',
     role: 'V-carve clearing',
-    activePatch: { cutType: 'v-carve' },
+    activePatch: { cutType: 'v-carve', vCarveFlatDepthEnabled: true },
     dormantPatch: { cutType: 'engrave' },
     relief: false,
   },

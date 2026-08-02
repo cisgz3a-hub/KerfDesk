@@ -62,6 +62,7 @@ import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
 import { startControllerPolicy } from './start-job-controller-policy';
 import type { PreparedJobMetrics } from './prepared-job-metrics';
 import { controllerIdentityWarnings } from './controller-identity-warnings';
+import { detectCompiledVCarveDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 
 export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
@@ -291,9 +292,7 @@ function finalizeStartPreparation({
     allowRotaryRaster,
   });
   const emitSplit = partitionEmitPreflight(preflight);
-  if (emitSplit.blocking.length > 0) {
-    return { ok: false, messages: emitSplit.blocking };
-  }
+  if (emitSplit.blocking.length > 0) return { ok: false, messages: emitSplit.blocking };
   const programIssue = preparedProgramIntegrityIssue(
     gcode,
     project.device.rxBufferBytes,
@@ -318,6 +317,7 @@ function finalizeStartPreparation({
       ...(largeJobWarning === null ? [] : [largeJobWarning]),
       ...(largeRasterWarning === null ? [] : [largeRasterWarning]),
       ...compiledWorkAdvisories(prepared.job),
+      ...detectCompiledVCarveDepthWarningsForJob(prepared.project, prepared.job),
       ...demotedPolicyWarnings(project, machine),
       ...advisoryWarnings,
       ...emitSplit.warnings,

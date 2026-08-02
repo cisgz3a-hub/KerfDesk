@@ -60,7 +60,7 @@ export function CncLayerFields(props: {
       <Row label="Cut type">
         <select
           value={settings.cutType}
-          onChange={(e) => commit({ cutType: e.target.value as CncCutType })}
+          onChange={(e) => commit(cutTypePatch(settings, e.target.value as CncCutType))}
           aria-label={`Cut type for ${layer.color}`}
           title="How this layer's shapes are machined: outline (with bit-radius offset), pocket, or engrave."
           style={selectStyle}
@@ -106,6 +106,15 @@ export function CncLayerFields(props: {
   );
 }
 
+function cutTypePatch(settings: CncLayerSettings, cutType: CncCutType): Partial<CncLayerSettings> {
+  return {
+    cutType,
+    ...(cutType === 'v-carve' && settings.cutType !== 'v-carve'
+      ? { vCarveFlatDepthEnabled: false }
+      : {}),
+  };
+}
+
 // Cut depth + a one-click stock-depth action. Calling exact stock thickness a
 // "through cut" over-promises: real stock varies, while any spoilboard overcut
 // must be a measured operator choice rather than a hidden extra depth.
@@ -115,6 +124,41 @@ function CutDepthField(props: {
   readonly stockThicknessMm: number;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
+  const isVCarve = props.settings.cutType === 'v-carve';
+  const flatDepthEnabled = props.settings.vCarveFlatDepthEnabled ?? true;
+  if (isVCarve) {
+    return (
+      <>
+        <Row label="Flat depth">
+          <input
+            type="checkbox"
+            checked={flatDepthEnabled}
+            onChange={(event) => props.onCommit({ vCarveFlatDepthEnabled: event.target.checked })}
+            aria-label={`Flat depth for ${props.layer.color}`}
+            title="Limit the V-carve to a flat floor. Wide areas then require additional clearing paths. Leave off for an ordinary flowing-depth V-carve."
+          />
+        </Row>
+        {flatDepthEnabled ? (
+          <NumberField
+            layer={props.layer}
+            label="Floor depth"
+            unit="mm"
+            value={props.settings.depthMm}
+            min={0.05}
+            max={200}
+            step={0.5}
+            title="Maximum V-carve depth. Areas wider than the V-bit reaches at this depth are cleared as a flat core."
+            onCommit={(depthMm) => props.onCommit({ depthMm })}
+          />
+        ) : (
+          <p role="note" style={plainVCarveNoteStyle}>
+            Depth follows stroke width and the selected V-bit angle. Extra clearing lines appear
+            only where the artwork is wider than the bit can physically cut.
+          </p>
+        )}
+      </>
+    );
+  }
   return (
     <>
       <NumberField
@@ -152,4 +196,10 @@ const throughButtonStyle: React.CSSProperties = {
   width: '100%',
   fontSize: 11,
   padding: '4px 8px',
+};
+
+const plainVCarveNoteStyle: React.CSSProperties = {
+  fontSize: 11,
+  margin: '2px 0 6px 0',
+  color: 'var(--lf-text-dim)',
 };
