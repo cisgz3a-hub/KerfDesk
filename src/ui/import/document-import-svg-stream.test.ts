@@ -72,20 +72,27 @@ describe('parseDocumentImportSource SVG streaming', () => {
     });
   });
 
-  it('leaves non-SVG document imports on their existing text parser', async () => {
+  it('leaves material-library imports on their existing text parser', async () => {
     const text = vi.fn(async () => '{"schemaVersion":null}');
     const blob = {
       size: 22,
       text,
       stream: vi.fn(() => {
-        throw new Error('project import must not enter the SVG stream parser');
+        throw new Error('material import must not enter the SVG stream parser');
       }),
     } as unknown as Blob;
     const onParsing = vi.fn();
 
-    const response = await parseDocumentImportSource({ id: 6, kind: 'project', blob }, onParsing);
+    const response = await parseDocumentImportSource(
+      { id: 6, kind: 'material-library', blob },
+      onParsing,
+    );
 
-    expect(response).toMatchObject({ id: 6, kind: 'project', result: { kind: 'invalid' } });
+    expect(response).toMatchObject({
+      id: 6,
+      kind: 'material-library',
+      result: { kind: 'invalid' },
+    });
     expect(text).toHaveBeenCalledTimes(1);
     expect(blob.stream).not.toHaveBeenCalled();
     expect(onParsing).toHaveBeenCalledTimes(1);
