@@ -11,9 +11,17 @@
 // Small test-sized images can fall back inline; large images report a
 // recoverable error instead of pinning the main thread.
 //
-// One worker is reused while it is healthy and idle. A new trace supersedes an
-// unfinished trace by retiring its worker: synchronous tracing code cannot
-// process a cooperative cancellation message until the obsolete work returns.
+// One worker is reused while it is healthy. A new trace supersedes an
+// unfinished trace by rejecting its pending promise but KEEPS the worker
+// alive: synchronous tracing code cannot process a cooperative cancellation
+// message, so the stale job runs to completion inside the worker and its late
+// response is dropped by request id (handleWorkerMessage ignores unknown ids).
+// Tradeoff: the stale synchronous trace briefly occupies the worker and the
+// new request queues behind it — still far cheaper than terminating and
+// paying a cold worker spawn (plus the full unbundled ~85-module graph reload
+// in Vite dev) for every 50-500ms preview trace during slider/preset tuning.
+// Terminate is reserved for the fatal paths: worker runtime error, postMessage
+// failure, and the 30s hung-worker timeout.
 
 import type { Bounds, ColoredPath } from '../../core/scene';
 import {
@@ -128,13 +136,20 @@ function retireWorker(): void {
   }
 }
 
-function rejectAllPendingAndRetireWorker(error: Error): void {
+// Reject every in-flight caller without touching the worker. Each pending's
+// reject wrapper clears its own 30s timer, so a superseded request can never
+// later terminate a worker that is busy with the request that replaced it.
+function rejectAllPending(error: Error): void {
   const pendings = Array.from(pendingByRequestId.values());
   pendingByRequestId.clear();
-  retireWorker();
   for (const pending of pendings) {
     pending.reject(error);
   }
+}
+
+function rejectAllPendingAndRetireWorker(error: Error): void {
+  retireWorker();
+  rejectAllPending(error);
 }
 
 // Trace via the worker if available, otherwise through the bounded
@@ -147,7 +162,11 @@ function rejectAllPendingAndRetireWorker(error: Error): void {
 // error-toast after a bounded inline path could have succeeded.
 export async function traceImage(image: RawImageData, options: TraceOptions): Promise<TraceResult> {
   if (pendingByRequestId.size > 0) {
-    rejectAllPendingAndRetireWorker(new TraceRequestSupersededError());
+    // Supersede WITHOUT terminating: the stale job keeps the worker busy for
+    // a moment and this request queues behind it, which is still far cheaper
+    // than a cold worker restart per trace (see module header for the full
+    // tradeoff). Its late response is dropped by id in handleWorkerMessage.
+    rejectAllPending(new TraceRequestSupersededError());
   }
   const worker = ensureWorker();
   if (worker === null) {
