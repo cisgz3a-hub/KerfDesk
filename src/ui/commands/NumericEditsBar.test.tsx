@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProject, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
@@ -39,6 +40,29 @@ describe('NumericEditsBar', () => {
     expect((editsGroup as HTMLElement).style.overflowX).toBe('auto');
     expect((editsGroup as HTMLElement).style.minWidth).toBe('0');
     expect(toolbar?.querySelector('[aria-label="Live machine controls"]')).toBeNull();
+  });
+
+  // The box mirrors the scene. A commit the store refuses or normalizes leaves
+  // the mirrored value unchanged, so re-seeding only on a value CHANGE left the
+  // field advertising a size the selection never took.
+  it('snaps a refused edit back to the value the scene actually holds', async () => {
+    installProject();
+    const container = await render(<NumericEditsBar />);
+    const width = input(container, 'Selection width');
+    expect(width.value).toBe('20');
+
+    await act(async () => {
+      setInputValue(width, '0');
+      Simulate.change(width);
+    });
+    await act(async () => Simulate.blur(width));
+
+    // A zero width is refused by the store; the field must not keep claiming 0.
+    expect(useStore.getState().project.scene.objects[0]?.bounds).toMatchObject({
+      minX: 0,
+      maxX: 20,
+    });
+    expect(input(container, 'Selection width').value).toBe('20');
   });
 
   it('renders disabled numeric fields when nothing is selected', async () => {

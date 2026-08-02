@@ -1,4 +1,39 @@
+import { useState } from 'react';
 import type { ArtworkRunOrderRowModel } from './artwork-run-order-view-model';
+
+// Uncontrolled so typing is never fought mid-edit, re-seeded from its key. The
+// attempt counter is in that key so the box re-seeds on every blur, not only
+// when the position changes: a move the store refuses (blank, 0, or a number
+// that clamps to the order it already has) left the typed text standing over a
+// row still at its old run number.
+function RunPositionInput(props: {
+  readonly rowKey: string;
+  readonly position: number;
+  readonly name: string;
+  readonly onMove: (position: number) => void;
+}): JSX.Element {
+  const [moveAttempt, setMoveAttempt] = useState(0);
+  return (
+    <input
+      key={`${props.rowKey}:${props.position}:${moveAttempt}`}
+      type="number"
+      min={1}
+      step={1}
+      defaultValue={props.position}
+      aria-label={`Run position for ${props.name}`}
+      title="Enter the exact run number"
+      style={positionInputStyle}
+      onBlur={(event) => {
+        const typed = Number(event.currentTarget.value);
+        setMoveAttempt((value) => value + 1);
+        props.onMove(typed);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+      }}
+    />
+  );
+}
 
 export function ArtworkRunOrderRow(props: {
   readonly row: ArtworkRunOrderRowModel;
@@ -23,19 +58,11 @@ export function ArtworkRunOrderRow(props: {
       <div style={headingStyle}>
         <label style={positionLabelStyle} onClick={stopPropagation}>
           <span>Run</span>
-          <input
-            key={`${props.row.key}:${props.row.position}`}
-            type="number"
-            min={1}
-            step={1}
-            defaultValue={props.row.position}
-            aria-label={`Run position for ${props.row.name}`}
-            title="Enter the exact run number"
-            style={positionInputStyle}
-            onBlur={(event) => props.onMove(Number(event.currentTarget.value))}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') event.currentTarget.blur();
-            }}
+          <RunPositionInput
+            rowKey={props.row.key}
+            position={props.row.position}
+            name={props.row.name}
+            onMove={props.onMove}
           />
         </label>
         <div style={identityStyle}>
