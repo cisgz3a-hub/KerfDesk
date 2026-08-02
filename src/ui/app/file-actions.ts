@@ -114,6 +114,14 @@ function optionalSettingsCapability(
   return settingsCapability === undefined ? {} : { settingsCapability };
 }
 
+// exactOptionalPropertyTypes: an explicit `undefined` is not assignable to an
+// optional field, so the key is omitted instead of passed through.
+function optionalActiveWcs(
+  activeWcs: ActiveWorkCoordinateSystem | null | undefined,
+): Pick<SaveGcodeCtx, 'activeWcs'> | Record<never, never> {
+  return activeWcs === undefined ? {} : { activeWcs };
+}
+
 export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   // H.10: tiling-enabled CNC projects export one file per tile instead
   // (whole-job bed bounds don't apply; each tile preflights individually).
@@ -127,6 +135,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
         ? {}
         : { controllerSettings: ctx.controllerSettings }),
       ...optionalSettingsCapability(ctx.settingsCapability),
+      ...optionalActiveWcs(ctx.activeWcs),
       pushToast: ctx.pushToast,
     })
   ) {

@@ -6,7 +6,9 @@
 // tiling — and each tile's G-code preflights individually instead.
 
 import { tileJobs, type TiledJobsResult } from '../../core/cnc/tile-jobs';
+import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
+import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
 import type { OutputScope, Project } from '../../core/scene';
@@ -31,6 +33,9 @@ export type SaveTiledGcodeCtx = {
   // ADR-228). null/undefined = nothing to prove.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly settingsCapability?: ReadinessSettingsCapability;
+  // The controller's active WCS, for the same G54-mismatch advisory the
+  // single-file Save makes. undefined/null = nothing to compare against.
+  readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -70,6 +75,7 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   )) {
     ctx.pushToast(advisory, 'warning');
   }
+  pushMachineJobWarnings(ctx, prepared.project);
   pushTiledAdvisories(ctx, tiled);
   const saved = await saveTileFiles(ctx, files);
   ctx.pushToast(
@@ -80,6 +86,22 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   );
   pushAdvisoryToasts(ctx.pushToast, prepared.advisories, emitted.advisories);
   return true;
+}
+
+// The machine-job advisory set (stock footprint, tabs, feeds, raster, and the
+// v-carve offset-ladder family) is the same information whether the job is
+// tiled or not, and tiling is CNC-only — so skipping it here silenced every CNC
+// advisory on exactly the machine class they exist for. Reported against the
+// PREPARED project, the scoped artifact the tiles were emitted from, so "Cut
+// selected graphics" cannot warn about operations no tile contains.
+function pushMachineJobWarnings(ctx: SaveTiledGcodeCtx, project: Project): void {
+  for (const warning of detectMachineJobWarnings(
+    project,
+    ctx.controllerSettings ?? null,
+    ctx.activeWcs ?? null,
+  )) {
+    ctx.pushToast(warning, 'warning');
+  }
 }
 
 function pushTiledAdvisories(

@@ -67,7 +67,8 @@ const AUTO_RESOLUTION_TOOL_FRACTION = 8;
 // Backstop against degenerate inputs (huge region + microscopic δ).
 const MAX_VCARVE_RINGS = 8192;
 const THIN_DETAIL_RAMP_FALLBACK =
-  'V-carve ramp entry cannot preserve the variable-depth thin-detail profile.';
+  'V-carve ramp entry applies to the ring ladder; the thin-detail passes keep their ' +
+  'stepped entry so their variable-depth profile survives.';
 
 export type VCarveOptions = {
   readonly tool: CncTool;
@@ -298,19 +299,32 @@ function passesForRings(
   );
   if (!firstPlan.ok) return { ...legacy, entryIssue: firstPlan.reason };
   // ADR-278's ramp planner descends to one constant depth per ring. A detail
-  // ring instead carries the true boundary depth at every vertex. Replacing
-  // that profile with one pitch depth under-cuts its junction, so preserve the
-  // complete stepped plan and use ADR-278's existing advisory-only fallback.
-  if (rings.some((ring) => ring.kind === 'detail')) {
-    return { ...legacy, entryIssue: THIN_DETAIL_RAMP_FALLBACK };
-  }
-  const passes: CncPass[] = [...firstPlan.passes];
-  for (const ring of rings.slice(1)) {
+  // ring instead carries the true boundary depth at every vertex, and replacing
+  // that profile with one pitch depth would under-cut its junction — so detail
+  // rings keep their stepped blended plan. The δ rings around them are ordinary
+  // constant-depth contours and still ramp exactly as configured: dropping the
+  // ramp for the whole layer (ADR-282 Amendment 5) punished every glyph with a
+  // thin stroke, which for script lettering is all of them.
+  const passes: CncPass[] = [];
+  let detailDepthLimited = false;
+  let hasDetailRing = false;
+  for (const ring of rings) {
+    if (ring.kind === 'detail') {
+      const detail = detailPassesForRing(ring.polyline, depthPerPassMm, blend);
+      passes.push(...detail.passes);
+      detailDepthLimited = detailDepthLimited || detail.depthLimited;
+      hasDetailRing = true;
+      continue;
+    }
     const plan = planVCarveRampEntry(ring.polyline, ring.depthMm, depthPerPassMm, rampAngleDeg);
     if (!plan.ok) return { ...legacy, entryIssue: plan.reason };
     passes.push(...plan.passes);
   }
-  return { passes, entryIssue: null, detailDepthLimited: legacy.detailDepthLimited };
+  return {
+    passes,
+    entryIssue: hasDetailRing ? THIN_DETAIL_RAMP_FALLBACK : null,
+    detailDepthLimited,
+  };
 }
 
 function legacyPassesForRings(
@@ -360,9 +374,10 @@ function detailPassesForRing(
       points: points.map((point) => ({ x: point.x, y: point.y, z: Math.max(point.z, levelZ) })),
       closed: true,
       // These are cutting profiles, not entry ramps, but every lateral segment
-      // can descend. Use the total plunge feed so its Z component cannot exceed
-      // the operator's configured plunge rate.
-      lateralFeed: 'plunge' as const,
+      // can descend. Cap each segment's feed so its Z component cannot exceed
+      // the operator's configured plunge rate — the flat majority of the
+      // profile keeps the cutting feed instead of crawling at the plunge rate.
+      lateralFeed: 'z-rate-capped' as const,
     })),
     depthLimited: !profile.toleranceMet,
   };

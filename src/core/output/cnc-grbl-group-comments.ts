@@ -54,6 +54,16 @@ function appendEntryComments(lines: string[], group: CncGroup): void {
   if (entryPaths.some((pass) => (pass.points[0]?.z ?? 0) < 0)) {
     lines.push('; cnc entry-advisory: tiled ramp starts below stock top');
   }
+  // A v-carve layer can ramp its constant-depth ring ladder while its
+  // variable-depth thin-detail passes keep stepped entry (ADR-282 Amendment 5).
+  // Without this line the strategy above would claim the whole layer ramped.
+  if (entryPaths.length > 0 && hasSteppedDetail(group)) {
+    lines.push('; cnc entry-advisory: thin-detail passes use stepped entry');
+  }
+}
+
+function hasSteppedDetail(group: CncGroup): boolean {
+  return group.passes.some((pass) => pass.kind === 'path3d' && pass.entryRamp !== true);
 }
 
 function toolGeometryComment(group: CncGroup): string {
