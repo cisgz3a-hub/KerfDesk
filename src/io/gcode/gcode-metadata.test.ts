@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { EMITTER_REVISION, gcodeMetadataHeader, type GcodeMetadata } from './gcode-metadata';
 
 const META: GcodeMetadata = {
