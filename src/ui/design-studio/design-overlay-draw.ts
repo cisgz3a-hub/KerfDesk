@@ -27,12 +27,14 @@ import { paintAnnotation } from './design-annotation-draw';
 import { annotationFor } from './design-measure-annotation';
 import { paintSnapMarker } from './design-snap-marker-draw';
 import { formatFieldValue, type EntityField } from './design-field-format';
+import { pointSequencePreviewPolylines, type DesignPointSequence } from './design-point-sequence';
 import type { DesignMarquee, DesignView } from './design-session';
 import { mmToPx } from './design-view';
 
 export type DesignOverlayPaint = {
   readonly view: DesignView;
   readonly draft: DesignDraft | null;
+  readonly pointSequence: DesignPointSequence | null;
   readonly marquee: DesignMarquee | null;
   // The entity the inspector is showing, plus the field being touched. Together
   // they produce the dimension call-out drawn over the shape.
@@ -56,9 +58,33 @@ export function paintDesignOverlay(ctx: CanvasRenderingContext2D, paint: DesignO
   ctx.clearRect(0, 0, paint.widthPx, paint.heightPx);
   if (paint.marquee !== null) paintMarquee(ctx, paint.view, paint.marquee);
   if (paint.draft !== null) paintDraft(ctx, paint.view, paint.draft);
+  if (paint.pointSequence !== null) paintPointSequence(ctx, paint.view, paint.pointSequence);
   paintMeasurement(ctx, paint);
   // Drawn last so the snap glyph is never hidden behind a draft or a dimension.
   if (paint.snap !== null) paintSnapMarker(ctx, paint.view, paint.snap);
+}
+
+function paintPointSequence(
+  ctx: CanvasRenderingContext2D,
+  view: DesignView,
+  sequence: DesignPointSequence,
+): void {
+  ctx.strokeStyle = canvasTheme.selection;
+  ctx.lineWidth = DRAFT_LINE_WIDTH_PX;
+  ctx.setLineDash([]);
+  for (const polyline of pointSequencePreviewPolylines(sequence)) {
+    const first = polyline.points[0];
+    if (first === undefined) continue;
+    const start = mmToPx(view, first);
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    for (const point of polyline.points.slice(1)) {
+      const at = mmToPx(view, point);
+      ctx.lineTo(at.x, at.y);
+    }
+    if (polyline.closed) ctx.closePath();
+    ctx.stroke();
+  }
 }
 
 // Drawn last so a dimension call-out is never hidden behind a draft.

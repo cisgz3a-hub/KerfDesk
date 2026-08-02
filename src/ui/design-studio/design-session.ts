@@ -22,6 +22,7 @@ import type { DesignDraft } from './design-draft';
 import type { SnapTarget } from '../../core/design/snap';
 import type { MeasurementKey } from './design-entity-fields';
 import type { DesignToolKind } from './design-tool';
+import type { DesignPointSequence } from './design-point-sequence';
 
 export type DesignView = {
   readonly pxPerMm: number;
@@ -59,6 +60,9 @@ export type DesignSession = {
   // In-progress gesture. Deliberately OUTSIDE history: a draft is not a state
   // worth undoing, only the entity it commits to is.
   readonly draft: DesignDraft | null;
+  // Click-driven Polyline state. Like a draft, it stays outside history until
+  // completion turns the confirmed points into one entity and one undo step.
+  readonly pointSequence: DesignPointSequence | null;
   readonly marquee: DesignMarquee | null;
   // A live move gesture. `beforeSketch` is the state to undo back to, so the whole
   // drag collapses into one history step on release.
@@ -109,6 +113,7 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     view: null,
     cursorMm: null,
     draft: null,
+    pointSequence: null,
     marquee: null,
     move: null,
     resize: null,

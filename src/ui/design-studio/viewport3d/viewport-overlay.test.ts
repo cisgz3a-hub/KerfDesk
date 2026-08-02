@@ -88,4 +88,43 @@ describe('buildViewportOverlay', () => {
     expect(overlay.snapLocal).not.toBeNull();
     expect(overlay.snapLocal?.x).toBeCloseTo(110 - 100 - 100, 5);
   });
+
+  it('renders a live Polyline sequence in the shared selection overlay', () => {
+    const overlay = buildViewportOverlay({
+      sketch: { entities: [] },
+      selectedIds: new Set(),
+      draft: null,
+      pointSequence: {
+        kind: 'path',
+        points: [
+          { x: 110, y: 55 },
+          { x: 130, y: 55 },
+        ],
+        pointerMm: { x: 130, y: 75 },
+      },
+      snapMm: null,
+      frame: FRAME,
+    });
+    const preview = overlay.buckets.find((bucket) => bucket.color === canvasTheme.selection);
+    expect(preview?.positions).toHaveLength(12);
+  });
+
+  it('renders the sampled Arc preview through the same overlay geometry', () => {
+    const overlay = buildViewportOverlay({
+      sketch: { entities: [] },
+      selectedIds: new Set(),
+      draft: null,
+      pointSequence: {
+        kind: 'arc',
+        centerMm: { x: 110, y: 55 },
+        startMm: { x: 130, y: 55 },
+        pointerMm: { x: 110, y: 75 },
+      },
+      snapMm: null,
+      frame: FRAME,
+    });
+    const preview = overlay.buckets.find((bucket) => bucket.color === canvasTheme.selection);
+    expect(preview?.positions.length).toBeGreaterThan(12);
+    expect((preview?.positions.length ?? 1) % 6).toBe(0);
+  });
 });

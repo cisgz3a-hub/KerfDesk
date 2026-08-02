@@ -302,7 +302,7 @@ byte-identical for unchanged input. Design + research:
 | DS-0 | Governance: ADR-272, this entry, `F-DS` flows in WORKFLOW.md | Done |
 | DS-1 | Pure `src/core/design/` sketch model, entity geometry, bounds | Built |
 | DS-2 | Overlay shell: host + lazy chunk + session store + local undo + Esc ladder + two-rail palette + status bar + canvas with bed/grid/geometry paint, rAF coalescing, cursor-anchored zoom | Built |
-| DS-3 | Drawing tools: Line/Rect/Circle drag gestures with Shift/Alt modifiers, second canvas layer for the live draft + dimension label, click/marquee selection, grid snap, ortho | Built |
+| DS-3 | Drawing tools: Line/Rect/Circle drag gestures with Shift/Alt modifiers; Polyline/Arc point sequences with phase guidance and shared 2D/3D preview; click/marquee selection, grid/object snap, ortho | Built |
 | DS-3b | Floating precision inspector: per-shape editable dimensions, derived measurements (area / perimeter / circumference / chord / arc length), and a draughting-style dimension call-out drawn on the shape while a field is touched | Built |
 | DS-3c | Typed numeric entry during a draw gesture, per-tool options bar | Planned |
 | DS-4 | Object-snap engine (`core/design/snap/`): endpoint / midpoint / centre / quadrant / intersection / on-edge, ranked so geometry always beats the grid, each with its own on-canvas glyph and a status-bar readout | Built |

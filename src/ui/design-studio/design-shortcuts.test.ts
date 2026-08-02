@@ -62,6 +62,19 @@ describe('tool shortcuts', () => {
     expect(session().tool).toBe('fillet');
   });
 
+  it('keeps an in-progress Polyline when P re-arms the same tool', () => {
+    store().setTool('path');
+    store().setPointSequence({
+      kind: 'path',
+      points: [{ x: 10, y: 10 }],
+      pointerMm: { x: 20, y: 10 },
+    });
+    press({ key: 'p' });
+    const sequence = session().pointSequence;
+    expect(sequence?.kind).toBe('path');
+    expect(sequence?.kind === 'path' ? sequence.points : null).toEqual([{ x: 10, y: 10 }]);
+  });
+
   // Offset and Polygon own 'o' and 'g' in the tool table so the letters are reserved,
   // but neither is built yet, so neither rail button nor keypress may arm them —
   // otherwise a stray key selects a tool with no button and nothing happens.
@@ -140,6 +153,33 @@ describe('undo and redo chords', () => {
 });
 
 describe('Escape is a ladder, not a close', () => {
+  it('rung 1 discards a live Polyline without consuming history', () => {
+    store().setTool('path');
+    store().setPointSequence({
+      kind: 'path',
+      points: [{ x: 10, y: 10 }],
+      pointerMm: { x: 20, y: 20 },
+    });
+    press({ key: 'Escape' });
+    expect(session().pointSequence).toBeNull();
+    expect(session().tool).toBe('path');
+    expect(session().history.past).toHaveLength(0);
+  });
+
+  it('rung 1 also discards a partial Arc while leaving Arc armed', () => {
+    store().setTool('arc');
+    store().setPointSequence({
+      kind: 'arc',
+      centerMm: { x: 10, y: 10 },
+      startMm: { x: 20, y: 10 },
+      pointerMm: { x: 10, y: 20 },
+    });
+    press({ key: 'Escape' });
+    expect(session().pointSequence).toBeNull();
+    expect(session().tool).toBe('arc');
+    expect(session().history.past).toHaveLength(0);
+  });
+
   it('rung 1 discards the live draft and keeps the Studio open', () => {
     store().setTool('line');
     store().setDraft({

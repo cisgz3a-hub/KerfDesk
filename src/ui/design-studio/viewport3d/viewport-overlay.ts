@@ -13,6 +13,7 @@ import { localFromScene } from '../../cnc-viewer3d/viewer3d-picking';
 import { canvasTheme } from '../../theme/canvas-theme';
 import { draftToEntity, type DesignDraft } from '../design-draft';
 import { resizeHandles, selectionBounds } from '../design-handles';
+import { pointSequencePreviewPolylines, type DesignPointSequence } from '../design-point-sequence';
 
 // Floats the sketch just above the stock top so lines never z-fight the
 // carved surface. Small enough to read as "on" the material.
@@ -51,6 +52,7 @@ export type ViewportOverlayInput = {
   readonly sketch: Sketch;
   readonly selectedIds: ReadonlySet<string>;
   readonly draft: DesignDraft | null;
+  readonly pointSequence?: DesignPointSequence | null;
   readonly snapMm: Vec2 | null;
   readonly frame: OverlayFrame;
 };
@@ -76,6 +78,9 @@ export function buildViewportOverlay(input: ViewportOverlayInput): ViewportOverl
 
   const draftEntity = input.draft === null ? null : draftToEntity(input.draft, 'draft-preview');
   if (draftEntity !== null) push(canvasTheme.selection, false, draftEntityPolylines(draftEntity));
+  if (input.pointSequence != null) {
+    push(canvasTheme.selection, false, pointSequencePreviewPolylines(input.pointSequence));
+  }
 
   const buckets = [...segments.entries()]
     .filter(([, bucket]) => bucket.points.length > 0)
