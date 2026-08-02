@@ -10,19 +10,33 @@
 // the operator decides whether to run it after checking the preview.
 
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
-// (scripts/index-export-baseline.json pins it at 67) and may only shrink, so
-// the diagnostic cannot be added to it.
-import { findCncOffsetLadderDiagnostics } from '../../core/cnc/cnc-offset-ladder-diagnostics';
-import type { Project } from '../../core/scene';
+// (scripts/index-export-baseline.json pins it at 67) and may only shrink.
+import {
+  findCncOffsetLadderDiagnostics,
+  type CncOffsetLadderDiagnostic,
+} from '../../core/cnc/cnc-offset-ladder-diagnostics';
+import { assertNever, type Project } from '../../core/scene';
 
 export function detectCncOffsetLadderWarnings(project: Project): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
   return findCncOffsetLadderDiagnostics(project.scene, project.device, machine).map((diagnostic) =>
-    diagnostic.kind === 'pass-limit'
-      ? restPocketPassLimitWarning(layerNameFor(project, diagnostic.layerId))
-      : offsetLadderWarning(layerNameFor(project, diagnostic.layerId)),
+    ladderWarningFor(project, diagnostic),
   );
+}
+
+function ladderWarningFor(project: Project, diagnostic: CncOffsetLadderDiagnostic): string {
+  const layerName = layerNameFor(project, diagnostic.layerId);
+  switch (diagnostic.kind) {
+    case 'pass-limit':
+      return passLimitWarning(layerName);
+    case 'geometry-failed':
+      return offsetLadderWarning(layerName);
+    case 'thin-detail-dropped':
+      return thinDetailDroppedWarning(layerName);
+    default:
+      return assertNever(diagnostic.kind, 'CncOffsetLadderDiagnostic kind');
+  }
 }
 
 function layerNameFor(project: Project, layerId: string): string {
@@ -40,11 +54,24 @@ function offsetLadderWarning(layerName: string): string {
   );
 }
 
-function restPocketPassLimitWarning(layerName: string): string {
+// Covers every ladder that runs out of PLAN rather than interior: a ring
+// budget, a depth-clamp footprint finer than emitted coordinate precision, or
+// a variable-depth detail profile whose requested tolerance cannot be emitted.
+function passLimitWarning(layerName: string): string {
   return (
-    `Rest machining on layer "${layerName}" reached its 4096-ring planning limit while usable ` +
-    'interior remained, so the finishing-bit pass is incomplete and can leave stock standing. ' +
-    'The generated passes still cut. Check the preview before running, and use a larger bit or ' +
-    'larger stepover, or simplify/split the pocket.'
+    `Toolpath planning on layer "${layerName}" hit its ring limits or emitted-profile ` +
+    'precision limit while usable interior or requested detail remained, so the layer can ' +
+    'clear less material or cut a shallower detail profile than the shape asks for. The ' +
+    'generated passes still cut. Check the preview before running; for fine V-carve detail, ' +
+    'a wider-angle bit or thicker artwork improves representability.'
+  );
+}
+
+function thinDetailDroppedWarning(layerName: string): string {
+  return (
+    `V-carve on layer "${layerName}": some artwork is finer than the generated detail path ` +
+    'can represent at these settings and stays uncut. Everything else still cuts. To carve those ' +
+    'details, thicken them, enlarge the design, or use a wider-stroke font, then confirm the ' +
+    'result in the preview.'
   );
 }

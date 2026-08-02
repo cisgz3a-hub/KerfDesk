@@ -212,7 +212,7 @@ function moveKind(step: ToolpathStep): Move3dKind {
 function movePoints(step: ToolpathStep): ReadonlyArray<Vec3> {
   switch (step.kind) {
     case 'cut':
-      return spanAlongPolyline(step.polyline, step.z);
+      return cutPoints(step);
     case 'travel':
       return spanAlongPolyline([step.from, step.to], step.z);
     case 'plunge':
@@ -225,11 +225,26 @@ function movePoints(step: ToolpathStep): ReadonlyArray<Vec3> {
   }
 }
 
+function cutPoints(step: Extract<ToolpathStep, { readonly kind: 'cut' }>): ReadonlyArray<Vec3> {
+  if (
+    step.zs !== undefined &&
+    step.zs.length === step.polyline.length &&
+    step.zs.every(Number.isFinite)
+  ) {
+    return step.polyline.map((point, index) => ({
+      x: point.x,
+      y: point.y,
+      z: step.zs?.[index] ?? DEFAULT_Z_MM,
+    }));
+  }
+  return spanAlongPolyline(step.polyline, step.z);
+}
+
 // Distributes a step's Z span along its polyline by cumulative chord length, so
 // a lead-in ramp descends smoothly instead of stepping at one vertex. Where the
-// span is flat — which is every ordinary contour pass — this is exact. Where it
-// is not, it is an even ramp: the model records only the span's endpoints, so
-// the true per-vertex Z of a ramp or drill peck is not recoverable here.
+// span is flat — which is every ordinary contour pass — this is exact. For a
+// cut without a complete finite `zs` correspondence, this remains the documented
+// fallback; exact path3d cuts take the per-vertex branch above.
 function spanAlongPolyline(
   polyline: ReadonlyArray<PlanarPoint>,
   z: ZSpan | undefined,

@@ -1,0 +1,317 @@
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
+import { buildToolpath } from '../job';
+import { computeRemovalGrid, kernelForTool } from '../sim';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
+  createLayer,
+  type CncMachineConfig,
+  type CncTool,
+  type ImportedSvg,
+  type Polyline,
+  type Scene,
+  type Vec2,
+} from '../scene';
+import { cncGrblStrategy } from '../output';
+import { compileCncJob } from './compile-cnc-job';
+import { THIN_DETAIL_RESOLUTION_MM } from './vcarve-thin-detail';
+
+// Perceptual verification (ADR-025 pattern) for ADR-281: V-carve artwork
+// THINNER than the ring pitch through the REAL pipeline (compileCncJob →
+// buildToolpath → removal grid) against the ANALYTIC groove
+// z(x, y) = −min(distToBoundary, maxDepth) at tan(45°) = 1. Before ADR-281
+// these fixtures produced NO cutting at all inside the thin strokes — the
+// screenshot bug: a script word carved only in sections.
+
+const VBIT_90: CncTool = {
+  id: 'v90',
+  name: '90° v-bit',
+  kind: 'v-bit',
+  diameterMm: 6,
+  tipAngleDeg: 90,
+};
+
+// Auto resolution for the 6 mm bit is 0.75 mm, so anything narrower than
+// 1.5 mm vanishes from the δ ladder — exactly the reported failure mode.
+const AT = 50;
+const MAX_DEPTH = 2;
+const CELL = 0.05;
+const STROKE_W = 0.6;
+
+function scene(
+  polyline: Polyline,
+  bounds: ImportedSvg['bounds'],
+  cnc?: Partial<Scene['layers'][number]['cnc'] & object>,
+): Scene {
+  const object: ImportedSvg = {
+    kind: 'imported-svg',
+    id: 'O1',
+    source: 'O1.svg',
+    bounds,
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#ff0000', polylines: [polyline] }],
+  };
+  return {
+    objects: [object],
+    layers: [
+      {
+        ...createLayer({ id: 'L1', color: '#ff0000' }),
+        cnc: {
+          ...DEFAULT_CNC_LAYER_SETTINGS,
+          cutType: 'v-carve',
+          depthMm: MAX_DEPTH,
+          depthPerPassMm: MAX_DEPTH,
+          vResolutionMm: 0, // auto — the setting the bug was reported with
+          ...cnc,
+        },
+      },
+    ],
+  };
+}
+
+function vbitConfig(): CncMachineConfig {
+  return { ...DEFAULT_CNC_MACHINE_CONFIG, tools: [VBIT_90], toolId: VBIT_90.id };
+}
+
+function expectGrid(result: ReturnType<typeof computeRemovalGrid>) {
+  if (result.kind === 'error') throw new Error(result.reason);
+  return result.grid;
+}
+
+function machinePolygon(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+  return points.map((point) => toMachineCoords(point, DEFAULT_DEVICE_PROFILE));
+}
+
+function distToSegment(p: Vec2, a: Vec2, b: Vec2): number {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const lengthSq = abx * abx + aby * aby;
+  const t =
+    lengthSq === 0
+      ? 0
+      : Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / lengthSq));
+  return Math.hypot(p.x - (a.x + t * abx), p.y - (a.y + t * aby));
+}
+
+function distToBoundary(p: Vec2, polygon: ReadonlyArray<Vec2>): number {
+  let min = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < polygon.length; i += 1) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+    if (a === undefined || b === undefined) continue;
+    min = Math.min(min, distToSegment(p, a, b));
+  }
+  return min;
+}
+
+function removalGridFor(sceneValue: Scene, bboxMachine: ReadonlyArray<Vec2>) {
+  const xs = bboxMachine.map((point) => point.x);
+  const ys = bboxMachine.map((point) => point.y);
+  const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
+  const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
+  const job = compileCncJob(sceneValue, DEFAULT_DEVICE_PROFILE, vbitConfig());
+  const toolpath = buildToolpath(job);
+  return expectGrid(
+    computeRemovalGrid(
+      toolpath,
+      {
+        originX: minX - 2,
+        originY: minY - 2,
+        widthMm: maxX - minX + 4,
+        heightMm: maxY - minY + 4,
+        mmPerCell: CELL,
+      },
+      kernelForTool(VBIT_90, CELL),
+    ),
+  );
+}
+
+describe('v-carve thin artwork — perceptual (ADR-281)', () => {
+  it('a stroke narrower than 2·δ is carved to its analytic shallow groove, not dropped', () => {
+    const points: ReadonlyArray<Vec2> = [
+      { x: AT, y: AT },
+      { x: AT + 8, y: AT },
+      { x: AT + 8, y: AT + STROKE_W },
+      { x: AT, y: AT + STROKE_W },
+    ];
+    const polygon = machinePolygon(points);
+    const grid = removalGridFor(
+      scene({ closed: true, points }, { minX: AT, minY: AT, maxX: AT + 8, maxY: AT + STROKE_W }),
+      polygon,
+    );
+
+    const xs = polygon.map((point) => point.x);
+    const ys = polygon.map((point) => point.y);
+    const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
+    const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
+    const tolerance = THIN_DETAIL_RESOLUTION_MM + 2 * CELL;
+    let insideCells = 0;
+    let cutInside = 0;
+    let maxError = 0;
+    let errorSum = 0;
+    for (let cy = 0; cy < grid.heightCells; cy += 1) {
+      for (let cx = 0; cx < grid.widthCells; cx += 1) {
+        const x = grid.originX + (cx + 0.5) * grid.mmPerCell;
+        const y = grid.originY + (cy + 0.5) * grid.mmPerCell;
+        if (x < minX || x > maxX || y < minY || y > maxY) continue;
+        const cellDepth = grid.depth[cy * grid.widthCells + cx] ?? 0;
+        const analytic = -Math.min(distToBoundary({ x, y }, polygon), MAX_DEPTH);
+        insideCells += 1;
+        if (cellDepth < 0) cutInside += 1;
+        const error = Math.abs(cellDepth - analytic);
+        maxError = Math.max(maxError, error);
+        errorSum += error;
+      }
+    }
+    expect(insideCells).toBeGreaterThan(0);
+    // Before ADR-281 this was 0.0: the whole stroke was silently dropped.
+    expect(cutInside / insideCells).toBeGreaterThanOrEqual(0.9);
+    expect(maxError).toBeLessThanOrEqual(tolerance);
+    expect(errorSum / insideCells).toBeLessThanOrEqual(tolerance / 2);
+  });
+
+  it('a glyph with a thick body and a thin tail carves the tail too (the "Drive" bug)', () => {
+    // 6×6 body with a 0.6×6 tail off its right edge — the shape of a script
+    // letter with a thin connector.
+    const points: ReadonlyArray<Vec2> = [
+      { x: AT, y: AT },
+      { x: AT + 6, y: AT },
+      { x: AT + 6, y: AT + 2.7 },
+      { x: AT + 12, y: AT + 2.7 },
+      { x: AT + 12, y: AT + 2.7 + STROKE_W },
+      { x: AT + 6, y: AT + 2.7 + STROKE_W },
+      { x: AT + 6, y: AT + 6 },
+      { x: AT, y: AT + 6 },
+    ];
+    const polygon = machinePolygon(points);
+    const grid = removalGridFor(
+      scene({ closed: true, points }, { minX: AT, minY: AT, maxX: AT + 12, maxY: AT + 6 }),
+      polygon,
+    );
+
+    // The tail's interior INCLUDING the junction zone (the ADR-281 junction
+    // blend carves true-boundary depths right up to the hand-off; only the
+    // near-zero-depth long edges and one cell against the body stay out).
+    const tailA = toMachineCoords({ x: AT + 6 + 0.05, y: AT + 2.7 + 0.15 }, DEFAULT_DEVICE_PROFILE);
+    const tailB = toMachineCoords(
+      { x: AT + 12 - 0.15, y: AT + 2.7 + STROKE_W - 0.15 },
+      DEFAULT_DEVICE_PROFILE,
+    );
+    const [tailMinX, tailMaxX] = [Math.min(tailA.x, tailB.x), Math.max(tailA.x, tailB.x)];
+    const [tailMinY, tailMaxY] = [Math.min(tailA.y, tailB.y), Math.max(tailA.y, tailB.y)];
+    const tolerance = THIN_DETAIL_RESOLUTION_MM + 2 * CELL;
+    let tailCells = 0;
+    let tailCut = 0;
+    let tailMaxError = 0;
+    for (let cy = 0; cy < grid.heightCells; cy += 1) {
+      for (let cx = 0; cx < grid.widthCells; cx += 1) {
+        const x = grid.originX + (cx + 0.5) * grid.mmPerCell;
+        const y = grid.originY + (cy + 0.5) * grid.mmPerCell;
+        if (x < tailMinX || x > tailMaxX || y < tailMinY || y > tailMaxY) continue;
+        const cellDepth = grid.depth[cy * grid.widthCells + cx] ?? 0;
+        const analytic = -Math.min(distToBoundary({ x, y }, polygon), MAX_DEPTH);
+        tailCells += 1;
+        if (cellDepth < 0) tailCut += 1;
+        tailMaxError = Math.max(tailMaxError, Math.abs(cellDepth - analytic));
+      }
+    }
+    expect(tailCells).toBeGreaterThan(0);
+    // Before ADR-281: 0.0 — the connector never received a single cut.
+    expect(tailCut / tailCells).toBeGreaterThanOrEqual(0.9);
+    expect(tailMaxError).toBeLessThanOrEqual(tolerance);
+  });
+
+  it('a depth-clamped carve still covers the floor (the #575 revert probe)', () => {
+    // 2×2 mm square, Detail 0.5 mm, max depth 0.05 mm: a clamped ring's
+    // footprint is only maxDepth·tan(45°) = 0.05 mm wide, so 0.5 mm ring
+    // spacing left ~89 % of the floor untouched while reporting nothing —
+    // the defect #575 measured (683/6400 cells). Ring pitch must tighten to
+    // 2·maxDepth·tan(θ/2) so adjacent footprints overlap.
+    const clampDepth = 0.05;
+    const points: ReadonlyArray<Vec2> = [
+      { x: AT, y: AT },
+      { x: AT + 2, y: AT },
+      { x: AT + 2, y: AT + 2 },
+      { x: AT, y: AT + 2 },
+    ];
+    const polygon = machinePolygon(points);
+    const job = compileCncJob(
+      scene(
+        { closed: true, points },
+        { minX: AT, minY: AT, maxX: AT + 2, maxY: AT + 2 },
+        { depthMm: clampDepth, depthPerPassMm: clampDepth, vResolutionMm: 0.5 },
+      ),
+      DEFAULT_DEVICE_PROFILE,
+      vbitConfig(),
+    );
+    const toolpath = buildToolpath(job);
+    const xs = polygon.map((point) => point.x);
+    const ys = polygon.map((point) => point.y);
+    const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
+    const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
+    const cell = 0.02;
+    const grid = expectGrid(
+      computeRemovalGrid(
+        toolpath,
+        {
+          originX: minX - 1,
+          originY: minY - 1,
+          widthMm: maxX - minX + 2,
+          heightMm: maxY - minY + 2,
+          mmPerCell: cell,
+        },
+        kernelForTool(VBIT_90, cell),
+      ),
+    );
+    // #584's critique of the first probe: an in-shape percentage cannot
+    // separate "full floor coverage" from "interior stripes remain", because
+    // the near-edge band (analytic depth below one clamp footprint radius,
+    // clampDepth·tan(45°) = 0.05 mm, plus a cell of discretization) is
+    // legitimately below the ring pitch's reach. Count that band separately
+    // and require the INTERIOR to be covered outright.
+    const edgeBandMm = clampDepth + cell;
+    let interiorCells = 0;
+    let interiorCut = 0;
+    let deepestCut = 0;
+    for (let cy = 0; cy < grid.heightCells; cy += 1) {
+      for (let cx = 0; cx < grid.widthCells; cx += 1) {
+        const x = grid.originX + (cx + 0.5) * grid.mmPerCell;
+        const y = grid.originY + (cy + 0.5) * grid.mmPerCell;
+        if (x < minX || x > maxX || y < minY || y > maxY) continue;
+        const cellDepth = grid.depth[cy * grid.widthCells + cx] ?? 0;
+        deepestCut = Math.min(deepestCut, cellDepth);
+        const edgeDist = Math.min(x - minX, maxX - x, y - minY, maxY - y);
+        if (edgeDist < edgeBandMm) continue;
+        interiorCells += 1;
+        if (cellDepth < 0) interiorCut += 1;
+      }
+    }
+    expect(interiorCells).toBeGreaterThan(0);
+    // #575 measured ~11 % total coverage here; the interior must now be cut
+    // essentially everywhere — stripes would fail this outright.
+    expect(interiorCut / interiorCells).toBeGreaterThanOrEqual(0.99);
+    // The clamp is still honoured — nothing cuts deeper than requested.
+    expect(deepestCut).toBeGreaterThanOrEqual(-clampDepth - 1e-9);
+    // Removal-grid computation over a contended CI worker pool can exceed the
+    // 5 s default; the sibling perceptual suites carry the same allowance.
+  }, 60000);
+
+  it('emits deterministic G-code for the thin-stroke job (snapshot)', () => {
+    const points: ReadonlyArray<Vec2> = [
+      { x: AT, y: AT },
+      { x: AT + 8, y: AT },
+      { x: AT + 8, y: AT + STROKE_W },
+      { x: AT, y: AT + STROKE_W },
+    ];
+    const job = compileCncJob(
+      scene({ closed: true, points }, { minX: AT, minY: AT, maxX: AT + 8, maxY: AT + STROKE_W }),
+      DEFAULT_DEVICE_PROFILE,
+      vbitConfig(),
+    );
+    const gcode = cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+    expect(gcode.length).toBeGreaterThan(0);
+    expect(gcode).toMatchSnapshot();
+  });
+});

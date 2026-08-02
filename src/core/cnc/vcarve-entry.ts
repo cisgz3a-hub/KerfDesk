@@ -71,6 +71,7 @@ export function planVCarveRampEntry(
     points: spiralPoints(ring, segmentCapacityQuanta, targetDepthQuanta, revolutions),
     closed: false,
     lateralFeed: 'plunge',
+    entryRamp: true,
   };
   const cleanup: CncContourPass = {
     kind: 'contour',

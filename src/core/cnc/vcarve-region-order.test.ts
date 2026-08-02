@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Polyline } from '../scene';
-import { vcarveRegionOrder } from './vcarve-region-order';
+import {
+  buildVCarveRegionLayout,
+  vcarveRegionBuckets,
+  vcarveRegionBucketsWithLayout,
+  vcarveRegionOrder,
+} from './vcarve-region-order';
 
 function square(minX: number, minY: number, size: number): Polyline {
   return {
@@ -10,6 +15,18 @@ function square(minX: number, minY: number, size: number): Polyline {
       { x: minX + size, y: minY },
       { x: minX + size, y: minY + size },
       { x: minX, y: minY + size },
+    ],
+  };
+}
+
+function rectangle(minX: number, minY: number, width: number, height: number): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: minX, y: minY },
+      { x: minX + width, y: minY },
+      { x: minX + width, y: minY + height },
+      { x: minX, y: minY + height },
     ],
   };
 }
@@ -117,6 +134,106 @@ describe('vcarveRegionOrder', () => {
       { step: 0, polyline: firstOuter },
       { step: 1, polyline: secondOuter },
       { step: 1, polyline: secondHole },
+    ]);
+  });
+});
+
+// ADR-281: the ladder zips δ-ring buckets with thin-detail buckets by index,
+// so bucket layout must depend only on the source contours.
+describe('vcarveRegionBuckets', () => {
+  it('returns no buckets for an empty ring set', () => {
+    expect(vcarveRegionBuckets([square(0, 0, 8)], [])).toEqual([]);
+  });
+
+  it('single region: one bucket in raw ladder order', () => {
+    const ring0 = square(1, 1, 6);
+    const ring1 = square(2, 2, 4);
+    expect(vcarveRegionBuckets([square(0, 0, 8)], [[ring0], [ring1]])).toEqual([
+      [
+        { step: 0, polyline: ring0 },
+        { step: 1, polyline: ring1 },
+      ],
+    ]);
+  });
+
+  it('two ring sets bucketed against the same sources align by region index', () => {
+    const left = square(0, 0, 8);
+    const right = square(20, 0, 8);
+    const leftRing = square(1, 1, 6);
+    const rightRing = square(21, 1, 6);
+    const rightDetail = square(22, 2, 4);
+
+    const coarse = vcarveRegionBuckets([left, right], [[rightRing, leftRing]]);
+    const detail = vcarveRegionBuckets([left, right], [[rightDetail]]);
+
+    // Buckets: [left, right, unassigned] in both calls.
+    expect(coarse).toEqual([
+      [{ step: 0, polyline: leftRing }],
+      [{ step: 0, polyline: rightRing }],
+      [],
+    ]);
+    expect(detail).toEqual([[], [{ step: 0, polyline: rightDetail }], []]);
+  });
+
+  it('flattening the buckets reproduces vcarveRegionOrder exactly', () => {
+    const source = [square(0, 0, 8), square(20, 0, 8)];
+    const rings = [[square(21, 1, 6), square(1, 1, 6)], [square(2, 2, 4)]];
+    expect(vcarveRegionBuckets(source, rings).flat()).toEqual(vcarveRegionOrder(source, rings));
+  });
+
+  it('uses strict source nesting so a partial overlap cannot masquerade as a hole', () => {
+    const rightFirst = rectangle(5, 2, 10, 6);
+    const leftSecond = rectangle(0, 0, 10, 10);
+    const leftRoot = square(0.5, 0.5, 4);
+    const rightRoot = rectangle(10.5, 2.5, 4, 5);
+    const leftRing = square(1, 1, 3);
+    const rightRing = rectangle(11, 3, 3, 4);
+    const rings = [[leftRing, rightRing]];
+    const layout = buildVCarveRegionLayout([leftRoot, rightRoot], [rightFirst, leftSecond], rings);
+
+    expect(vcarveRegionBucketsWithLayout(layout, rings).flat()).toEqual([
+      { step: 0, polyline: rightRing },
+      { step: 0, polyline: leftRing },
+    ]);
+  });
+
+  it('ranks a nested island by original source order while keeping its hole with the outer', () => {
+    const outer = square(0, 0, 30);
+    const hole = square(5, 5, 20);
+    const island = square(10, 10, 10);
+    const outerRing = square(1, 1, 28);
+    const expandedHoleRing = square(4, 4, 22);
+    const islandRing = square(11, 11, 8);
+    const rings = [[outerRing, islandRing, expandedHoleRing]];
+    const layout = buildVCarveRegionLayout([outer, hole, island], [island, outer, hole], rings);
+
+    expect(vcarveRegionBucketsWithLayout(layout, rings).flat()).toEqual([
+      { step: 0, polyline: islandRing },
+      { step: 0, polyline: outerRing },
+      { step: 0, polyline: expandedHoleRing },
+    ]);
+  });
+
+  it('uses one shared layout when coarse and detail stages emit different regions', () => {
+    const left = square(0, 0, 8);
+    const right = square(20, 0, 8);
+    const leftCoarse = square(1, 1, 6);
+    const rightDetail = square(22, 2, 4);
+    const layout = buildVCarveRegionLayout(
+      [left, right],
+      [left, right],
+      [[leftCoarse], [rightDetail]],
+    );
+
+    expect(vcarveRegionBucketsWithLayout(layout, [[leftCoarse]])).toEqual([
+      [{ step: 0, polyline: leftCoarse }],
+      [],
+      [],
+    ]);
+    expect(vcarveRegionBucketsWithLayout(layout, [[rightDetail]])).toEqual([
+      [],
+      [{ step: 0, polyline: rightDetail }],
+      [],
     ]);
   });
 });

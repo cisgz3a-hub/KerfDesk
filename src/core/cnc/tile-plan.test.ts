@@ -154,6 +154,7 @@ describe('tileJobs clipping', () => {
                   { x: 200, y: 40, z: -4 },
                 ],
                 lateralFeed: 'plunge',
+                entryRamp: true,
               },
             ]),
             cutType: 'v-carve',
@@ -201,6 +202,7 @@ describe('tileJobs clipping', () => {
                   { x: 50, y: 40, z: -1 },
                 ],
                 lateralFeed: 'plunge',
+                entryRamp: true,
               },
             ]),
             cutType: 'v-carve',
@@ -218,6 +220,7 @@ describe('tileJobs clipping', () => {
     if (group?.kind !== 'cnc') throw new Error('group missing');
     const pass = group.passes[0];
     expect(pass?.kind === 'path3d' ? pass.lateralFeed : undefined).toBe('plunge');
+    expect(pass?.kind === 'path3d' ? pass.entryRamp : undefined).toBe(true);
   });
 
   it('does not add a ramp advisory to an ordinary tiled contour', () => {

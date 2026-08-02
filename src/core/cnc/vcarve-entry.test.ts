@@ -37,7 +37,12 @@ describe('planVCarveRampEntry', () => {
     expect(plan.revolutions).toBe(4);
     expect(plan.passes).toHaveLength(2);
     const [ramp, cleanup] = plan.passes;
-    expect(ramp).toMatchObject({ kind: 'path3d', lateralFeed: 'plunge', closed: false });
+    expect(ramp).toMatchObject({
+      kind: 'path3d',
+      lateralFeed: 'plunge',
+      entryRamp: true,
+      closed: false,
+    });
     expect(cleanup).toMatchObject({ kind: 'contour', zMm: -2, closed: true });
     if (ramp?.kind !== 'path3d' || cleanup?.kind !== 'contour') return;
     expect(ramp.points[0]?.z).toBe(0);
