@@ -95,7 +95,7 @@ export function runCncPreflight(
   for (const issue of findCncAdaptivePocketIssues(project.scene, project.device, config)) {
     issues.push({
       code: 'cnc-adaptive-clearing-invalid',
-      message: `Layer ${issue.layerId}: ${issue.reason} Adjust Optimal load or choose another fill method.`,
+      message: `Layer ${issue.layerId}: ${issue.reason} Adjust Radial engagement or choose another fill method.`,
     });
   }
   for (const issue of findCncInlayIssues(project.scene, project.device, config)) {

@@ -23,7 +23,7 @@ describe('verifyAdaptivePocket', () => {
     expect(result).toMatchObject({ ok: true });
     if (!result.ok) return;
     expect(result.coverageRatio).toBeGreaterThanOrEqual(0.985);
-    expect(result.maxMeasuredLoadMm).toBeLessThanOrEqual(0.5 + result.gridMm * Math.SQRT2);
+    expect(result.maxSimulatedEngagementMm).toBeLessThanOrEqual(0.5 + result.gridMm * Math.SQRT2);
   });
 
   it('rejects an unverified full-slot path', () => {
@@ -51,7 +51,7 @@ describe('verifyAdaptivePocket', () => {
     const result = verifyAdaptivePocket(contours, 4, unsafe);
     expect(result).toMatchObject({
       ok: false,
-      reason: 'Adaptive verification measured radial engagement above the optimal load.',
+      reason: 'Adaptive verification simulated radial engagement above the configured limit.',
     });
   });
 
@@ -63,7 +63,7 @@ describe('verifyAdaptivePocket', () => {
     expect(first).toMatchObject({ ok: true });
     if (first.ok) {
       expect(first.coverageRatio).toBeGreaterThanOrEqual(0.985);
-      expect(first.maxMeasuredLoadMm).toBeLessThanOrEqual(0.5 + first.gridMm * Math.SQRT2);
+      expect(first.maxSimulatedEngagementMm).toBeLessThanOrEqual(0.5 + first.gridMm * Math.SQRT2);
     }
   });
 

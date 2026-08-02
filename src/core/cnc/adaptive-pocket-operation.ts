@@ -19,6 +19,7 @@ export type AdaptivePocketOperation =
 const DEFAULT_LOAD_RATIO = 0.1;
 const HELIX_ANGLE_DEG = 3;
 
+/** Legacy API/schema name for a compile-time geometric engagement limit. */
 export function adaptiveOptimalLoadMm(settings: CncLayerSettings, toolDiameterMm: number): number {
   return settings.adaptiveOptimalLoadMm ?? toolDiameterMm * DEFAULT_LOAD_RATIO;
 }

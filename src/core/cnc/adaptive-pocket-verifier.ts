@@ -7,14 +7,14 @@ export type AdaptivePocketVerification =
       readonly ok: true;
       readonly coverageRatio: number;
       readonly gridMm: number;
-      readonly maxMeasuredLoadMm: number;
+      readonly maxSimulatedEngagementMm: number;
     }
   | {
       readonly ok: false;
       readonly reason: string;
       readonly coverageRatio?: number;
       readonly gridMm?: number;
-      readonly maxMeasuredLoadMm?: number;
+      readonly maxSimulatedEngagementMm?: number;
     };
 
 const MAX_GRID_CELLS = 1_000_000;
@@ -42,7 +42,7 @@ export function verifyAdaptivePocket(
   const grid = gridResult.grid;
   const initialStock = countOccupied(grid.occupied);
   if (initialStock === 0) return { ok: false, reason: 'Adaptive verification found no stock.' };
-  let maxMeasuredLoadMm = 0;
+  let maxSimulatedEngagementMm = 0;
   for (const sequence of plan.sequences) {
     const entryEnd = clearEntrySweep(
       grid,
@@ -54,14 +54,14 @@ export function verifyAdaptivePocket(
     for (const ring of sequence.rings) {
       const first = ring.points[0];
       if (first === undefined) continue;
-      const connectorLoad = cutSegment(grid, previous, first, toolDiameterMm / 2);
-      maxMeasuredLoadMm = Math.max(maxMeasuredLoadMm, connectorLoad);
+      const connectorEngagement = cutSegment(grid, previous, first, toolDiameterMm / 2);
+      maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, connectorEngagement);
       for (let index = 1; index < ring.points.length; index += 1) {
         const start = ring.points[index - 1];
         const end = ring.points[index];
         if (start !== undefined && end !== undefined) {
-          const segmentLoad = cutSegment(grid, start, end, toolDiameterMm / 2);
-          maxMeasuredLoadMm = Math.max(maxMeasuredLoadMm, segmentLoad);
+          const segmentEngagement = cutSegment(grid, start, end, toolDiameterMm / 2);
+          maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, segmentEngagement);
         }
       }
       previous = ring.points[ring.points.length - 1] ?? first;
@@ -69,24 +69,24 @@ export function verifyAdaptivePocket(
   }
   for (const sequence of plan.sequences)
     clearFinishRings(grid, sequence.finishRings, toolDiameterMm / 2);
-  return verificationResult(grid, initialStock, maxMeasuredLoadMm, plan.optimalLoadMm);
+  return verificationResult(grid, initialStock, maxSimulatedEngagementMm, plan.optimalLoadMm);
 }
 
 function verificationResult(
   grid: Grid,
   initialStock: number,
-  maxMeasuredLoadMm: number,
-  optimalLoadMm: number,
+  maxSimulatedEngagementMm: number,
+  engagementLimitMm: number,
 ): AdaptivePocketVerification {
   const coverageRatio = (initialStock - countOccupied(grid.occupied)) / initialStock;
   const toleranceMm = grid.cellMm * Math.SQRT2;
-  if (maxMeasuredLoadMm > optimalLoadMm + toleranceMm) {
+  if (maxSimulatedEngagementMm > engagementLimitMm + toleranceMm) {
     return {
       ok: false,
-      reason: 'Adaptive verification measured radial engagement above the optimal load.',
+      reason: 'Adaptive verification simulated radial engagement above the configured limit.',
       coverageRatio,
       gridMm: grid.cellMm,
-      maxMeasuredLoadMm,
+      maxSimulatedEngagementMm,
     };
   }
   if (coverageRatio < COVERAGE_TARGET) {
@@ -95,10 +95,10 @@ function verificationResult(
       reason: 'Adaptive verification found reachable stock left behind.',
       coverageRatio,
       gridMm: grid.cellMm,
-      maxMeasuredLoadMm,
+      maxSimulatedEngagementMm,
     };
   }
-  return { ok: true, coverageRatio, gridMm: grid.cellMm, maxMeasuredLoadMm };
+  return { ok: true, coverageRatio, gridMm: grid.cellMm, maxSimulatedEngagementMm };
 }
 
 type GridResult =
@@ -165,7 +165,7 @@ function cutSegment(grid: Grid, start: Vec2, end: Vec2, toolRadiusMm: number): n
   for (let index = 0; index <= samples; index += 1) {
     const t = index / samples;
     const center = { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };
-    maximum = Math.max(maximum, measuredLoad(grid, center, toolRadiusMm));
+    maximum = Math.max(maximum, simulatedRadialEngagement(grid, center, toolRadiusMm));
     clearDisk(grid, center, toolRadiusMm);
   }
   return maximum;
@@ -200,7 +200,7 @@ function cutSegmentWithoutMeasurement(
   }
 }
 
-function measuredLoad(grid: Grid, center: Vec2, toolRadiusMm: number): number {
+function simulatedRadialEngagement(grid: Grid, center: Vec2, toolRadiusMm: number): number {
   const contact = new Uint8Array(CONTACT_BINS);
   const cellHalfDiagonalMm = (grid.cellMm * Math.SQRT2) / 2;
   const radialBandMm = cellHalfDiagonalMm * 1.1;

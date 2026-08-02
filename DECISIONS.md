@@ -7329,6 +7329,16 @@ boundaries. Large pockets and island geometry can be rejected even when an ordin
 would compile; that fail-closed behavior is intentional until a scalable, island-aware verifier is
 adopted. The planner, verifier, persistence, preflight, preview, and emitted arcs remain release-gated.
 
+### Amendment (2026-08-02) — “load” means simulated geometric engagement
+
+The persisted `adaptiveOptimalLoadMm` name remains for project compatibility, but it is a
+compile-time radial-engagement limit applied to the planned geometry. The verifier samples a bounded
+2D stock grid; it does not read cutting force, spindle current, axis load, or encoder feedback, and
+the runtime does not alter feed in response to load. Operator-facing controls therefore say
+**Radial engagement** and state this boundary directly; verifier result names use **simulated
+engagement** rather than **measured load**. No toolpath, feed, G-code, controller, or transport
+behavior changes in this amendment.
+
 ---
 
 ## ADR-155 - Straight inlays compile as one radius-matched linked pair
