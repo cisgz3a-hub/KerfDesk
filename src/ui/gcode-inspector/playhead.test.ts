@@ -87,4 +87,85 @@ describe('secondsAtLine', () => {
     const { model: built, segTimeEndSec } = timed(PROGRAM);
     expect(secondsAtLine(built, segTimeEndSec, 0)).toBeNull();
   });
+
+  // secondsAtLine binary-searches segLine, which is only sound because the
+  // single-pass builder emits segments in source order. These pin both the
+  // precondition and the equivalence with the scan it replaced.
+  describe('against a linear scan over generated programs', () => {
+    it('keeps segLine non-decreasing, the precondition for the search', () => {
+      for (let seed = 1; seed <= GENERATED_PROGRAMS; seed += 1) {
+        const built = model(randomProgram(seed));
+        for (let index = 1; index < built.segmentCount; index += 1) {
+          expect(built.segLine[index] ?? 0).toBeGreaterThanOrEqual(built.segLine[index - 1] ?? 0);
+        }
+      }
+    });
+
+    it('answers every line exactly as the linear scan did', () => {
+      for (let seed = 1; seed <= GENERATED_PROGRAMS; seed += 1) {
+        const built = model(randomProgram(seed));
+        const time = buildProgramTime(built, LIMITS);
+        for (let line = -1; line <= built.lineCount; line += 1) {
+          expect(secondsAtLine(built, time.segTimeEndSec, line), `seed ${seed} line ${line}`).toBe(
+            linearSecondsAtLine(built, time.segTimeEndSec, line),
+          );
+        }
+      }
+    });
+  });
 });
+
+const GENERATED_PROGRAMS = 24;
+const PROGRAM_LINES = 40;
+// Numerical Recipes' LCG: seeded so a failure is reproducible from its seed.
+const LCG_MULTIPLIER = 1664525;
+const LCG_INCREMENT = 1013904223;
+const LCG_MODULUS = 0x100000000;
+
+/** The scan secondsAtLine used before it binary-searched: first segment whose
+ * source line matches, else null. */
+function linearSecondsAtLine(
+  built: GcodeRenderModel,
+  segTimeEndSec: Float32Array,
+  line: number,
+): number | null {
+  for (let index = 0; index < built.segmentCount; index += 1) {
+    if (built.segLine[index] !== line) continue;
+    return index === 0 ? 0 : (segTimeEndSec[index - 1] ?? 0);
+  }
+  return null;
+}
+
+// A mix of motionless lines, single-segment moves and arcs (many segments for
+// one line), so the generated segLine arrays have runs, gaps and repeats.
+function randomProgram(seed: number): string {
+  const random = lcg(seed);
+  const lines: string[] = ['G21 G90', 'M3 S400'];
+  let x = 0;
+  let y = 0;
+  for (let index = 0; index < PROGRAM_LINES; index += 1) {
+    const roll = random();
+    if (roll < 0.25) {
+      lines.push(roll < 0.125 ? '(setup note)' : `M3 S${Math.round(random() * 1000)}`);
+      continue;
+    }
+    const nextX = Math.round(random() * 100);
+    const nextY = Math.round(random() * 100);
+    if (roll < 0.4 && (nextX !== x || nextY !== y)) {
+      lines.push(`G2 X${nextX} Y${nextY} I${Math.max(1, Math.abs(nextX - x))} J0`);
+    } else {
+      lines.push(`${roll < 0.7 ? 'G1' : 'G0'} X${nextX} Y${nextY} F600`);
+    }
+    x = nextX;
+    y = nextY;
+  }
+  return lines.join('\n');
+}
+
+function lcg(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * LCG_MULTIPLIER + LCG_INCREMENT) >>> 0;
+    return state / LCG_MODULUS;
+  };
+}
