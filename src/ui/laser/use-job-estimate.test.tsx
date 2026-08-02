@@ -10,7 +10,9 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import type { StatusReport } from '../../core/controllers/grbl';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import type * as PreparationWorkerClient from '../workspace/preparation-worker-client';
 import { PreparationSupersededError } from '../workspace/preparation-worker-client';
 import type { LiveJobEstimate } from './live-job-estimate';
@@ -60,9 +62,14 @@ function lineProject(): Project {
 }
 
 const probe: { current: LiveJobEstimate | null } = { current: null };
+// Every distinct estimate identity the hook has handed out. A settle is the
+// only way that identity changes, so its growth counts recomputes.
+const settles: LiveJobEstimate[] = [];
 
 function Probe(): null {
-  probe.current = useJobEstimate();
+  const estimate = useJobEstimate();
+  if (settles[settles.length - 1] !== estimate) settles.push(estimate);
+  probe.current = estimate;
   return null;
 }
 
@@ -105,15 +112,36 @@ function overBudgetRasterProject(): Project {
   };
 }
 
+// A connected controller polls `?` at this cadence and stores the parsed
+// report, so anything keyed on the report's identity re-keys this often.
+const STATUS_POLL_INTERVAL_MS = 100;
+const STATUS_POLLS_PER_SETTLE = 10;
+
+function idleReportAtX(x: number): StatusReport {
+  // wco null + no custom origin is the disconnected-origin case that sends
+  // User Origin through the resolveExportJobPlacement fallback.
+  return {
+    state: 'Idle',
+    subState: null,
+    mPos: { x, y: 0, z: 0 },
+    wPos: null,
+    feed: 0,
+    spindle: 0,
+    wco: null,
+  };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   probe.current = null;
+  settles.length = 0;
   workerMocks.prepareLargeJobOffThread.mockReset();
   workerMocks.prepareLargeJobOffThread.mockReturnValue(null);
 });
 
 afterEach(() => {
   useStore.getState().newProject();
+  useLaserStore.setState({ statusReport: null });
   vi.useRealTimers();
 });
 
@@ -217,6 +245,36 @@ describe('useJobEstimate debounce (H16)', () => {
         jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
       }),
     );
+
+    await unmount();
+  });
+
+  it('settles while a connected controller polls and the resolved placement is unchanged', async () => {
+    useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
+    useLaserStore.setState({ statusReport: idleReportAtX(0) });
+    const unmount = await renderProbe();
+    expect(probe.current?.kind).toBe('empty');
+    const settlesBeforeEdit = settles.length;
+
+    await act(async () => {
+      useStore.setState({ project: lineProject() });
+    });
+
+    // Ten polls spanning four debounce windows. Each stores a FRESH report
+    // object, but the resolved User Origin placement is byte-identical across
+    // all of them, so the debounce must not re-arm: tracking the placement's
+    // per-call jobOrigin object by reference starved the estimate forever on
+    // any connected machine.
+    for (let poll = 1; poll <= STATUS_POLLS_PER_SETTLE; poll += 1) {
+      await act(async () => {
+        useLaserStore.setState({ statusReport: idleReportAtX(poll) });
+        vi.advanceTimersByTime(STATUS_POLL_INTERVAL_MS);
+      });
+    }
+
+    expect(probe.current?.kind).toBe('estimated');
+    // Exactly one recompute for the edit — polls must not add their own.
+    expect(settles.length - settlesBeforeEdit).toBe(1);
 
     await unmount();
   });

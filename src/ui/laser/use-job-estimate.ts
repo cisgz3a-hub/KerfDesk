@@ -21,7 +21,11 @@ import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
-import { resolveExportJobPlacement, resolveJobPlacement } from '../job-placement';
+import {
+  resolveExportJobPlacement,
+  resolveJobPlacement,
+  type ResolvedJobPlacement,
+} from '../job-placement';
 import {
   isPreparationSuperseded,
   prepareLargeJobOffThread,
@@ -52,7 +56,7 @@ export function useJobEstimate(): LiveJobEstimate {
   const secondRegistrationPoint = usePrintCutSessionStore((state) => state.second);
   const resolvedPlacement = useEstimatePlacement(jobPlacement);
   const placementKey = useMemo(() => JSON.stringify(resolvedPlacement), [resolvedPlacement]);
-  const jobOrigin = resolvedPlacement.ok ? resolvedPlacement.jobOrigin : undefined;
+  const jobOrigin = useHeldJobOrigin(resolvedPlacement, placementKey);
   const registrationKey = JSON.stringify({
     positionEpoch,
     firstRegistrationPoint,
@@ -95,6 +99,31 @@ function useEstimatePlacement(jobPlacement: ReturnType<typeof useStore.getState>
       reportInches,
     });
   }, [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches]);
+}
+
+// A connected controller stores a freshly parsed status report on every poll,
+// so useEstimatePlacement re-resolves each time and every resolver in
+// job-placement.ts returns a NEW jobOrigin literal — even when the resolved
+// placement is byte-identical. useSettledEstimate's debounce effect tracks
+// jobOrigin BY REFERENCE, so that churn cancelled and re-armed the 250 ms timer
+// once per poll: on a connected machine the estimate could never settle. Hold
+// the resolved jobOrigin until its semantic key changes so identity follows
+// meaning. The worker cache keys on the jobOrigin VALUE
+// (preparation-worker-client.requestKey), so preview and estimate still share
+// a single preparation entry.
+function useHeldJobOrigin(
+  placement: ResolvedJobPlacement,
+  placementKey: string,
+): JobOriginPlacement | undefined {
+  const held = useRef({ key: placementKey, jobOrigin: jobOriginOf(placement) });
+  if (held.current.key !== placementKey) {
+    held.current = { key: placementKey, jobOrigin: jobOriginOf(placement) };
+  }
+  return held.current.jobOrigin;
+}
+
+function jobOriginOf(placement: ResolvedJobPlacement): JobOriginPlacement | undefined {
+  return placement.ok ? placement.jobOrigin : undefined;
 }
 
 function useSettledEstimate({
