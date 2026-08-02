@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import {
+  isPreparationSuperseded,
+  PreparationSupersededError,
   prepareLargeJobOffThread,
   resetPreparationWorkerForTests,
   SUPERSEDE_QUIET_WINDOW_MS,
@@ -213,6 +215,43 @@ describe('prepareLargeJobOffThread', () => {
       ...okResult,
     } as PreparationWorkerResponse);
     await expect(latest).resolves.toBeDefined();
+  });
+
+  it('marks an internally coalesced same-project supersede as superseded, not failed', async () => {
+    const project = createProject();
+    const active = prepareLargeJobOffThread(project);
+    if (active === null) throw new Error('expected a worker request');
+    const held = prepareLargeJobOffThread(project, {
+      jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+    });
+    if (held === null) throw new Error('expected a worker request');
+    const latest = prepareLargeJobOffThread(project, {
+      jobOrigin: { startFrom: 'user-origin', anchor: 'center' },
+    });
+    if (latest === null) throw new Error('expected a worker request');
+    const error = await held.catch((err: unknown) => err);
+    expect(isPreparationSuperseded(error)).toBe(true);
+    expect(error instanceof PreparationSupersededError ? error.reason : null).toBe('newer-request');
+  });
+
+  it('marks a different-project supersede as superseded — the scene changed, nothing failed', async () => {
+    const first = prepareLargeJobOffThread(createProject());
+    if (first === null) throw new Error('expected a worker request');
+    const second = prepareLargeJobOffThread(createProject());
+    if (second === null) throw new Error('expected a worker request');
+    const error = await first.catch((err: unknown) => err);
+    expect(isPreparationSuperseded(error)).toBe(true);
+    expect(error instanceof PreparationSupersededError ? error.reason : null).toBe('newer-project');
+  });
+
+  it('does NOT mark a real worker failure as superseded', async () => {
+    const promise = prepareLargeJobOffThread(createProject());
+    if (promise === null) throw new Error('expected a worker request');
+    const worker = lastWorker();
+    worker.respond({ id: worker.posted[0]?.id ?? -1, kind: 'error', message: 'compile exploded' });
+    const error = await promise.catch((err: unknown) => err);
+    expect(isPreparationSuperseded(error)).toBe(false);
+    expect(error).toBeInstanceOf(Error);
   });
 
   it('re-requests after a rejection instead of returning the failed promise', async () => {

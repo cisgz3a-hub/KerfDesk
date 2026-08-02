@@ -11,6 +11,11 @@
 //     newer same-project request rejects the held (never-started) ones —
 //     current-position placement re-keys on every head move, and posting
 //     every key would queue unbounded minutes-long computes.
+//   - Both supersedes reject with PreparationSupersededError, NOT a plain
+//     Error: superseding is this client's own scheduling decision, so callers
+//     must ignore it and keep showing what they had. Only a real failure
+//     (worker crash, compile error, unavailable worker) rejects with a plain
+//     Error and is allowed to reach the operator as a failure.
 //   - A request for a DIFFERENT project while work is in flight terminates
 //     the worker (a compute cannot be interrupted cooperatively) and rejects
 //     every stale promise; callers treat rejection as "stale, ignore". The
@@ -38,9 +43,38 @@ export type { LargeJobPreparation, LargeJobPreparationOptions } from './large-jo
 // window — re-armed by further supersedes — so a burst costs ONE restart.
 export const SUPERSEDE_QUIET_WINDOW_MS = 1500;
 
-const SUPERSEDED_BY_NEWER_PROJECT_MESSAGE = 'superseded by a newer project';
-const SUPERSEDED_BY_NEWER_REQUEST_MESSAGE = 'superseded by a newer request';
 const WORKER_UNAVAILABLE_MESSAGE = 'preparation worker unavailable';
+
+/** Why this client dropped a request in favour of a newer one. */
+export type PreparationSupersedeReason = 'newer-project' | 'newer-request';
+
+const SUPERSEDE_MESSAGES: Record<PreparationSupersedeReason, string> = {
+  'newer-project': 'superseded by a newer project',
+  'newer-request': 'superseded by a newer request',
+};
+
+/**
+ * Rejection reason for a request this client itself replaced. It is a
+ * scheduling outcome, never a failure: nothing broke, and the operator did
+ * nothing to fix. Consumers MUST treat it as "stale, ignore" — rendering it
+ * as an error pinned a false "Background estimate failed" badge for the whole
+ * of a jog, because current-position placement re-keys on every head move and
+ * every re-key supersedes the request held for the previous one.
+ */
+export class PreparationSupersededError extends Error {
+  override readonly name = 'PreparationSupersededError';
+  readonly reason: PreparationSupersedeReason;
+
+  constructor(reason: PreparationSupersedeReason) {
+    super(SUPERSEDE_MESSAGES[reason]);
+    this.reason = reason;
+  }
+}
+
+/** True for a request this client superseded; false for every real failure. */
+export function isPreparationSuperseded(error: unknown): boolean {
+  return error instanceof PreparationSupersededError;
+}
 
 type QueuedRequest = {
   readonly project: Project;
@@ -78,7 +112,7 @@ export function prepareLargeJobOffThread(
     // Same project, new options key: held requests were superseded by this
     // one. Only the active compute keeps running — stopping it would kill
     // the worker, and its settled result stays cached anyway.
-    rejectQueuedRequests(SUPERSEDED_BY_NEWER_REQUEST_MESSAGE);
+    rejectQueuedRequests(new PreparationSupersededError('newer-request'));
   }
   if (ensureWorker() === null) return null;
   const promise = new Promise<LargeJobPreparation>((resolve, reject) => {
@@ -117,7 +151,7 @@ function hasWorkForOtherProject(project: Project): boolean {
 // The operator moved on to a different scene: everything in flight for the
 // old one is stale, and the worker may be mid-compute on it.
 function supersedeForNewProject(): void {
-  rejectQueuedRequests(SUPERSEDED_BY_NEWER_PROJECT_MESSAGE);
+  rejectQueuedRequests(new PreparationSupersededError('newer-project'));
   if (activeRequest !== null) {
     const stale = activeRequest;
     activeRequest = null;
@@ -126,7 +160,7 @@ function supersedeForNewProject(): void {
     // the quiet window instead of serializing in front of the next dispatch.
     retireWorker();
     ensureWorker();
-    stale.reject(new Error(SUPERSEDED_BY_NEWER_PROJECT_MESSAGE));
+    stale.reject(new PreparationSupersededError('newer-project'));
   }
   armQuietWindow();
 }
@@ -176,7 +210,7 @@ function dispatchNextRequest(): void {
   if (worker === null) {
     // Worker construction succeeded at request time but fails now (only seen
     // when the environment tears Worker down): nothing can settle these.
-    rejectQueuedRequests(WORKER_UNAVAILABLE_MESSAGE);
+    rejectQueuedRequests(new Error(WORKER_UNAVAILABLE_MESSAGE));
     return;
   }
   queuedRequests = queuedRequests.slice(1);
@@ -194,15 +228,15 @@ function dispatchNextRequest(): void {
     activeRequest = null;
     retireWorker();
     active.reject(err instanceof Error ? err : new Error(String(err)));
-    rejectQueuedRequests(WORKER_UNAVAILABLE_MESSAGE);
+    rejectQueuedRequests(new Error(WORKER_UNAVAILABLE_MESSAGE));
   }
 }
 
-function rejectQueuedRequests(message: string): void {
+function rejectQueuedRequests(error: Error): void {
   const stale = queuedRequests;
   queuedRequests = [];
   for (const queued of stale) {
-    queued.reject(new Error(message));
+    queued.reject(error);
   }
 }
 
@@ -214,8 +248,11 @@ function rejectAllPendingAndRetireWorker(message: string): void {
   const stale = activeRequest;
   activeRequest = null;
   retireWorker();
-  if (stale !== null) stale.reject(new Error(message));
-  rejectQueuedRequests(message);
+  // A plain Error on purpose: these paths are real failures (worker crash,
+  // teardown), which consumers must surface rather than silently ignore.
+  const error = new Error(message);
+  if (stale !== null) stale.reject(error);
+  rejectQueuedRequests(error);
 }
 
 function retireWorker(): void {

@@ -11,12 +11,20 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { useStore } from '../state';
+import type * as PreparationWorkerClient from '../workspace/preparation-worker-client';
+import { PreparationSupersededError } from '../workspace/preparation-worker-client';
 import type { LiveJobEstimate } from './live-job-estimate';
 import { JOB_ESTIMATE_DEBOUNCE_MS, useJobEstimate } from './use-job-estimate';
 
 const workerMocks = vi.hoisted(() => ({ prepareLargeJobOffThread: vi.fn() }));
 
-vi.mock('../workspace/preparation-worker-client', () => workerMocks);
+// Only dispatch is stubbed: the supersede error type and its guard must be the
+// REAL ones, or the hook's "ignore an internal supersede" branch would be
+// tested against a lookalike that instanceof can never match.
+vi.mock('../workspace/preparation-worker-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof PreparationWorkerClient>()),
+  prepareLargeJobOffThread: workerMocks.prepareLargeJobOffThread,
+}));
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -246,6 +254,43 @@ describe('useJobEstimate debounce (H16)', () => {
 
     await unmount();
   });
+
+  it.each([['newer-request'], ['newer-project']] as const)(
+    'keeps the previous estimate when the background request is superseded (%s)',
+    async (reason) => {
+      // Rejected on demand, not up front, so the paused badge is observed
+      // BEFORE the supersede lands — that is the value the fix must preserve.
+      let supersede: () => void = () => undefined;
+      workerMocks.prepareLargeJobOffThread.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          supersede = () => reject(new PreparationSupersededError(reason));
+        }),
+      );
+      const unmount = await renderProbe();
+
+      await act(async () => {
+        useStore.setState({ project: overBudgetRasterProject() });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+      });
+      const paused = probe.current;
+      expect(paused?.kind).toBe('too-large');
+
+      await act(async () => {
+        supersede();
+        await Promise.resolve();
+      });
+
+      // A supersede is this client's own coalescing decision — while jogging
+      // with Preview open it fires inside every debounce window, so rendering
+      // it as a failure pinned "ETA unavailable" for the whole jog.
+      expect(probe.current).toBe(paused);
+      expect(probe.current?.kind).not.toBe('preparation-failed');
+
+      await unmount();
+    },
+  );
 
   it('reports a worker failure instead of leaving the estimate paused forever', async () => {
     workerMocks.prepareLargeJobOffThread.mockRejectedValue(new Error('worker crashed'));

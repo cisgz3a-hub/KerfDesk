@@ -22,7 +22,10 @@ import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { resolveExportJobPlacement, resolveJobPlacement } from '../job-placement';
-import { prepareLargeJobOffThread } from '../workspace/preparation-worker-client';
+import {
+  isPreparationSuperseded,
+  prepareLargeJobOffThread,
+} from '../workspace/preparation-worker-client';
 import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
@@ -231,7 +234,13 @@ function followUpWithWorkerEstimate(
       if (!args.isFollowUpStale()) args.settleAt(prepared.estimate);
     },
     (error: unknown) => {
-      if (args.isFollowUpStale()) return;
+      // A supersede means the client replaced this request with a newer one —
+      // its own coalescing decision, not a failure. Keep the badge as it was:
+      // isFollowUpStale() only advances when the debounce FIRES, so during a
+      // jog (current-position placement re-keys per head move) this rejection
+      // lands inside the debounce window and used to pin a false
+      // "Background estimate failed" for as long as the head kept moving.
+      if (isPreparationSuperseded(error) || args.isFollowUpStale()) return;
       args.settleAt({
         kind: 'preparation-failed',
         message: `Background estimate failed: ${
