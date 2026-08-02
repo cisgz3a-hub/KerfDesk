@@ -231,7 +231,7 @@ function StarFields(props: {
  * the shape's own limits (a corner radius cannot exceed half its shorter side)
  * hold no matter how the object is scaled.
  */
-function ShapeNumberField(props: {
+type ShapeNumberFieldProps = {
   readonly label: string;
   readonly ariaLabel: string;
   readonly unit?: string;
@@ -243,7 +243,16 @@ function ShapeNumberField(props: {
   readonly step: number;
   readonly integer?: boolean;
   readonly commit: (value: number) => void;
-}): JSX.Element {
+};
+
+function ShapeNumberField(props: ShapeNumberFieldProps): JSX.Element {
+  // A scale change remounts the input so cleanup cancels any pending commit
+  // parsed under the old display mapping. The new instance also starts with
+  // the correctly scaled draft; ordinary typing never changes the key.
+  return <ShapeNumberInput key={props.scale ?? UNSCALED} {...props} />;
+}
+
+function ShapeNumberInput(props: ShapeNumberFieldProps): JSX.Element {
   const scale = props.scale ?? UNSCALED;
   const debounced = useDebouncedCommit<number>({
     value: props.value,
