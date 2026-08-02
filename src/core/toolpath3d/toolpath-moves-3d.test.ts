@@ -89,6 +89,54 @@ describe('toolpathMoves3d', () => {
     expect(moves[0]?.points.map((p) => p.z)).toEqual([0, -0.2, -2]);
   });
 
+  it('preserves an exact non-monotone per-vertex Z profile', () => {
+    const moves = toolpathMoves3d(
+      toolpath([
+        {
+          kind: 'cut',
+          color: '#000',
+          polyline: [
+            { x: 0, y: 0 },
+            { x: 2, y: 0 },
+            { x: 2, y: 2 },
+            { x: 0, y: 0 },
+          ],
+          length: 6.8,
+          z: { from: 0, to: 0 },
+          zs: [0, -1, -0.25, 0],
+        },
+      ]),
+    );
+
+    expect(moves[0]?.points).toEqual([
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 0, z: -1 },
+      { x: 2, y: 2, z: -0.25 },
+      { x: 0, y: 0, z: 0 },
+    ]);
+  });
+
+  it('keeps the endpoint-span fallback when slicing loses the zs correspondence', () => {
+    const moves = toolpathMoves3d(
+      toolpath([
+        {
+          kind: 'cut',
+          color: '#000',
+          polyline: [
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+            { x: 10, y: 0 },
+          ],
+          length: 10,
+          z: { from: 0, to: -2 },
+          zs: [0, -1],
+        },
+      ]),
+    );
+
+    expect(moves[0]?.points.map((point) => point.z)).toEqual([0, -0.2, -2]);
+  });
+
   it('treats travel without an explicit motion as rapid', () => {
     const moves = toolpathMoves3d(
       toolpath([{ kind: 'travel', from: { x: 0, y: 0 }, to: { x: 5, y: 0 }, length: 5 }]),

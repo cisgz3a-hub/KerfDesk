@@ -138,17 +138,21 @@ describe('two-stage V-carve effective floor depth', () => {
       expect(deepestZ(vcarve)).toBeCloseTo(-3, 9);
       expect(deepestEmittedZ(cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE))).toBeCloseTo(-3, 9);
 
+      const contourDepths = vcarve.passes.flatMap((pass) =>
+        pass.kind === 'contour' ? [pass.zMm] : [],
+      );
+      const detailPasses = vcarve.passes.filter((pass) => pass.kind === 'path3d');
+      expect(Math.min(...contourDepths)).toBeCloseTo(-3, 9);
+      expect(detailPasses.length).toBeGreaterThan(0);
+      expect(
+        detailPasses.every((pass) => pass.lateralFeed === 'plunge' && pass.entryRamp === undefined),
+      ).toBe(true);
+
+      const gcode = cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
       if (rampAngleDeg === undefined) {
-        expect(vcarve.passes.every((pass) => pass.kind === 'contour')).toBe(true);
+        expect(gcode).not.toContain('; cnc entry:');
       } else {
-        const rampDepths = vcarve.passes.flatMap((pass) =>
-          pass.kind === 'path3d' ? pass.points.map((point) => point.z) : [],
-        );
-        const contourDepths = vcarve.passes.flatMap((pass) =>
-          pass.kind === 'contour' ? [pass.zMm] : [],
-        );
-        expect(Math.min(...rampDepths)).toBeCloseTo(-3, 9);
-        expect(Math.min(...contourDepths)).toBeCloseTo(-3, 9);
+        expect(gcode).toContain('; cnc entry: stepped-plunge-fallback; max-angle-deg: 3.000');
       }
     },
   );

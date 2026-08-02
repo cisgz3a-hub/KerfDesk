@@ -22,6 +22,11 @@ export type OffsetLadder = {
   // because the region ran out of interior: the toolpath is truncated and
   // material the ladder should have cleared is still standing.
   readonly offsetFailed: boolean;
+  // True when the ladder ran out of BUDGET (maxSteps) while the last step
+  // still produced contours: interior remains that no ring visited. Silent
+  // before the #584 audit made the case reachable from valid UI settings —
+  // callers report it as a pass-limit advisory, never a refusal (rule 7).
+  readonly capped: boolean;
 };
 
 export type InsetContours = {
@@ -42,11 +47,11 @@ export function buildOffsetLadder(
   const rings: Array<ReadonlyArray<Polyline>> = [];
   for (let step = 0; step < maxSteps; step += 1) {
     const offset = offsetClosedPolylinesForKerfChecked(contours, -insetMmForStep(step));
-    if (offset.kind === 'error') return { rings, offsetFailed: true };
-    if (offset.value.length === 0) return { rings, offsetFailed: false };
+    if (offset.kind === 'error') return { rings, offsetFailed: true, capped: false };
+    if (offset.value.length === 0) return { rings, offsetFailed: false, capped: false };
     rings.push(offset.value);
   }
-  return { rings, offsetFailed: false };
+  return { rings, offsetFailed: false, capped: rings.length === maxSteps && maxSteps > 0 };
 }
 
 /**

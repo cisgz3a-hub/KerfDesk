@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
+import { pointInPolygon } from '../geometry';
 import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
@@ -25,15 +26,42 @@ function square(at: number, size: number): Polyline {
   };
 }
 
+function rectangle(minX: number, minY: number, width: number, height: number): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: minX, y: minY },
+      { x: minX + width, y: minY },
+      { x: minX + width, y: minY + height },
+      { x: minX, y: minY + height },
+    ],
+  };
+}
+
+// δ rings stay constant-Z contours; detail rings are path3d since the
+// junction blend (ADR-282 Amendment 2) — helpers read both.
+function passXy(
+  pass: ReturnType<typeof vcarvePasses>[number],
+): ReadonlyArray<{ readonly x: number; readonly y: number }> {
+  if (pass.kind === 'contour') return pass.polyline;
+  if (pass.kind === 'path3d') return pass.points;
+  return [];
+}
+
 function contourDepths(passes: ReturnType<typeof vcarvePasses>): number[] {
-  return passes.map((pass) => (pass.kind === 'contour' ? pass.zMm : Number.NaN));
+  return passes.map((pass) => {
+    if (pass.kind === 'contour') return pass.zMm;
+    if (pass.kind === 'path3d') return Math.min(...pass.points.map((point) => point.z));
+    return Number.NaN;
+  });
 }
 
 function contourRegionOrder(passes: ReturnType<typeof vcarvePasses>): string {
   return passes
     .map((pass) => {
-      if (pass.kind !== 'contour') return '?';
-      return Math.max(...pass.polyline.map((point) => point.x)) < 10 ? 'L' : 'R';
+      const xy = passXy(pass);
+      if (xy.length === 0) return '?';
+      return Math.max(...xy.map((point) => point.x)) < 10 ? 'L' : 'R';
     })
     .join('');
 }
@@ -51,9 +79,11 @@ describe('vcarvePasses', () => {
       depthPerPassMm: 10,
       resolutionMm: 0.5,
     });
-    const depths = [...new Set(contourDepths(passes))].sort((a, b) => b - a);
-    expect(depths[0]).toBeCloseTo(-0.5, 9);
-    expect(depths[1]).toBeCloseTo(-1.0, 9);
+    const depths = contourDepths(passes);
+    // Rings 1 and 2 of the δ ladder (corner-detail passes from ADR-282 may
+    // sit shallower — they follow the same law at the fine pitch).
+    expect(depths.some((z) => Math.abs(z + 0.5) < 1e-9)).toBe(true);
+    expect(depths.some((z) => Math.abs(z + 1.0) < 1e-9)).toBe(true);
     // The 6 mm 90° bit's cutting flank ends at (6/2)/tan(45°) = 3 mm — the
     // ladder must stop there, not at the 20 mm square's 10 mm medial axis.
     const deepest = Math.min(...depths);
@@ -108,7 +138,9 @@ describe('vcarvePasses', () => {
       tool: VBIT_90,
       maxDepthMm: 1,
       depthPerPassMm: 0.25,
-      resolutionMm: 0.5,
+      // At this pitch the square has no representable corner-wedge detail, so
+      // this fixture isolates the successful constant-depth ramp path.
+      resolutionMm: 0.25,
       rampAngleDeg: 3,
     });
     expect(passes.length).toBeGreaterThan(0);
@@ -187,32 +219,67 @@ describe('vcarvePasses', () => {
     expect(contourRegionOrder(passes)).toMatch(/^L+R+$/);
   });
 
+  it('keeps partial-overlap roots inside even-odd fill and in original source order', () => {
+    const rightFirst = rectangle(5, 2, 10, 6);
+    const leftSecond = rectangle(0, 0, 10, 10);
+    const sources = [rightFirst, leftSecond];
+    const passes = vcarvePasses(sources, {
+      tool: VBIT_90,
+      maxDepthMm: 2,
+      depthPerPassMm: 2,
+      resolutionMm: 0.5,
+    });
+    const order = passes
+      .map((pass) => {
+        const probe = passXy(pass)[0];
+        if (probe === undefined) return '?';
+        const inRight = pointInPolygon(probe, rightFirst.points);
+        const inLeft = pointInPolygon(probe, leftSecond.points);
+        return inRight && !inLeft ? 'R' : inLeft && !inRight ? 'L' : '?';
+      })
+      .join('');
+
+    expect(order).toMatch(/^R+L+$/);
+    for (const pass of passes) {
+      for (const point of passXy(pass)) {
+        const containingSources = sources.filter((source) =>
+          pointInPolygon(point, source.points),
+        ).length;
+        expect(containingSources % 2).toBe(1);
+      }
+    }
+  });
+
   it('reorders without losing or duplicating any contour/depth pass', () => {
     const contours = [square(0, 8), square(20, 8)];
     const resolutionMm = 0.5;
     const maxDepthMm = 1;
     const depthPerPassMm = 0.4;
-    const ladder = buildOffsetLadder(contours, 64, (step) => (step + 1) * resolutionMm);
-    const expected = ladder.rings
-      .flatMap((ring, step) => {
-        const ringDepthMm = Math.min((step + 1) * resolutionMm, maxDepthMm);
+    const ringKeys = (
+      rings: ReadonlyArray<ReadonlyArray<Polyline>>,
+      pitchMm: number,
+    ): ReadonlyArray<string> =>
+      rings.flatMap((ring, step) => {
+        const ringDepthMm = Math.min((step + 1) * pitchMm, maxDepthMm);
         return ring.flatMap((polyline) =>
           zPassDepths(ringDepthMm, depthPerPassMm).map((zMm) =>
             passKey(zMm, closeRing(polyline).points),
           ),
         );
-      })
-      .sort();
+      });
+    const ladder = buildOffsetLadder(contours, 64, (step) => (step + 1) * resolutionMm);
+    // Detail rings became per-vertex path3d passes with the junction blend;
+    // their completeness is pinned by the thin-detail suites. This test pins
+    // that the region reorder loses/duplicates no δ ring (all contour passes
+    // are δ rings).
+    const expected = [...ringKeys(ladder.rings, resolutionMm)].sort();
     const actual = vcarvePasses(contours, {
       tool: VBIT_90,
       maxDepthMm,
       depthPerPassMm,
       resolutionMm,
     })
-      .map((pass) => {
-        if (pass.kind !== 'contour') throw new Error('expected contour pass');
-        return passKey(pass.zMm, pass.polyline);
-      })
+      .flatMap((pass) => (pass.kind === 'contour' ? [passKey(pass.zMm, pass.polyline)] : []))
       .sort();
 
     expect(actual).toEqual(expected);

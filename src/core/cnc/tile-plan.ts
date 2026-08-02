@@ -91,7 +91,7 @@ function hasClippedEntryRamp(tiles: ReadonlyArray<TiledJob>): boolean {
         group.kind === 'cnc' &&
         group.passes.some(
           (pass) =>
-            pass.kind === 'path3d' && pass.lateralFeed === 'plunge' && (pass.points[0]?.z ?? 0) < 0,
+            pass.kind === 'path3d' && pass.entryRamp === true && (pass.points[0]?.z ?? 0) < 0,
         ),
     ),
   );
@@ -138,12 +138,7 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
       }
     } else if (pass.kind === 'path3d') {
       for (const piece of clipPointsToRect([...pass.points], tile.rect, pass.closed)) {
-        passes.push({
-          kind: 'path3d',
-          closed: false,
-          points: piece,
-          ...(pass.lateralFeed === undefined ? {} : { lateralFeed: pass.lateralFeed }),
-        });
+        passes.push(clippedPath3dPass(pass, piece));
       }
     } else if (pass.kind === 'helical-contour') {
       for (const piece of clipPointsToRect(helicalXyzPoints(pass), tile.rect, false)) {
@@ -170,10 +165,23 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
   };
 }
 
+function clippedPath3dPass(
+  pass: Extract<CncPass, { readonly kind: 'path3d' }>,
+  points: ReadonlyArray<Xyz>,
+): Extract<CncPass, { readonly kind: 'path3d' }> {
+  return {
+    kind: 'path3d',
+    closed: false,
+    points,
+    ...(pass.lateralFeed === undefined ? {} : { lateralFeed: pass.lateralFeed }),
+    ...(pass.entryRamp === undefined ? {} : { entryRamp: pass.entryRamp }),
+  };
+}
+
 function hasEntryRamp(group: CncGroup): boolean {
   return (
     group.rampEntryDeg !== undefined &&
-    group.passes.some((pass) => pass.kind === 'path3d' && pass.lateralFeed === 'plunge')
+    group.passes.some((pass) => pass.kind === 'path3d' && pass.entryRamp === true)
   );
 }
 

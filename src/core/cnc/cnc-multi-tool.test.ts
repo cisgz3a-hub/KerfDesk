@@ -183,7 +183,11 @@ describe('compileCncJob multi-tool', () => {
     expect(vcarve?.layerPrimaryToolId).toBe('vb-60');
     expect(vcarve).toMatchObject({ rampEntryDeg: 3 });
     const gcode = cncGrblStrategy.emit(job, DEVICE);
-    expect(gcode.match(/; cnc entry: contour-ramp/g)).toHaveLength(1);
+    // Thin-detail rings carry a variable-depth profile that the constant-depth
+    // contour-ramp planner cannot preserve. The requested angle remains in
+    // provenance, but emission deliberately falls back to stepped entry.
+    expect(gcode.match(/; cnc entry: stepped-plunge-fallback/g)).toHaveLength(1);
+    expect(gcode).not.toContain('; cnc entry: contour-ramp');
   });
 
   it('a shape too narrow for a flat floor produces no clearance stage', () => {

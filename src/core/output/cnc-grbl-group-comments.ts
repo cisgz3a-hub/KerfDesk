@@ -40,7 +40,7 @@ export function appendCncGroupComments(lines: string[], group: CncGroup): void {
 function appendEntryComments(lines: string[], group: CncGroup): void {
   if (group.rampEntryDeg === undefined) return;
   const entryPaths = group.passes.filter(
-    (pass): pass is CncPath3dPass => pass.kind === 'path3d' && pass.lateralFeed === 'plunge',
+    (pass): pass is CncPath3dPass => pass.kind === 'path3d' && pass.entryRamp === true,
   );
   const strategy =
     group.cutType === 'v-carve' && entryPaths.length === 0

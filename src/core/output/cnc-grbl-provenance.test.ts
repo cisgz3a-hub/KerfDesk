@@ -113,6 +113,30 @@ describe('CNC G-code provenance comments', () => {
     );
     expect(fallback).toContain('; cnc entry: stepped-plunge-fallback; max-angle-deg: 3.000');
 
+    const detailFallback = cncGrblStrategy.emit(
+      {
+        groups: [
+          group({
+            cutType: 'v-carve',
+            rampEntryDeg: 3,
+            passes: [
+              {
+                kind: 'path3d',
+                closed: true,
+                lateralFeed: 'plunge',
+                points: [
+                  { x: 10, y: 10, z: -0.1 },
+                  { x: 20, y: 10, z: -0.2 },
+                ],
+              },
+            ],
+          }),
+        ],
+      },
+      DEFAULT_DEVICE_PROFILE,
+    );
+    expect(detailFallback).toContain('; cnc entry: stepped-plunge-fallback; max-angle-deg: 3.000');
+
     const clipped = cncGrblStrategy.emit(
       {
         groups: [
@@ -125,6 +149,7 @@ describe('CNC G-code provenance comments', () => {
                 kind: 'path3d',
                 closed: false,
                 lateralFeed: 'plunge',
+                entryRamp: true,
                 points: [
                   { x: 10, y: 10, z: -0.25 },
                   { x: 20, y: 10, z: -0.5 },

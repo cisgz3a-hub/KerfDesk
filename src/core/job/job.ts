@@ -141,6 +141,11 @@ export type CncPath3dPass = {
   // opt-in so relief, tabs, imported paths, and existing ramps retain their
   // established feed semantics.
   readonly lateralFeed?: 'plunge';
+  // Provenance marker for an actual along-contour entry ramp. Feed selection
+  // alone cannot identify one: variable-depth V-carve detail also uses the
+  // plunge feed so no descending XYZ segment outruns the configured plunge.
+  // Tiling and G-code comments preserve this marker without changing motion.
+  readonly entryRamp?: true;
 };
 
 export type CncArcPass = {
