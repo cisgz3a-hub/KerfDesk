@@ -33,6 +33,12 @@ export type TraceWorkerRequest = {
 };
 
 export type TraceWorkerResponse =
+  // Sent before any tracing work for this id begins. The worker dispatches
+  // queued messages one at a time, so this ack marks the moment the request
+  // stops waiting and starts computing — the client restarts its hung-worker
+  // budget here so queue time behind an uncancellable superseded trace is
+  // never charged to a healthy request.
+  | { readonly id: number; readonly kind: 'started' }
   | {
       readonly id: number;
       readonly kind: 'ok';
@@ -45,6 +51,14 @@ export type TraceWorkerResponse =
 
 self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
   const { id, image, options } = e.data;
+  // Ack before any tracing work. Message events are dispatched one at a time
+  // and the trace that follows never yields the worker's event loop back, so
+  // reaching this line IS the start of this request's compute — which is what
+  // the client's hung-worker budget must measure. Without it a request that
+  // queued behind a superseded (uncancellable) trace was killed for the
+  // backlog's latency, terminating a healthy worker mid-preview.
+  const startedAck: TraceWorkerResponse = { id, kind: 'started' };
+  self.postMessage(startedAck);
   void (async (): Promise<void> => {
     try {
       const paths = await traceImageToColoredPaths(image, options);
