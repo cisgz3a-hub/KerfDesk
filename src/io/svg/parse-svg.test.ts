@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseSvg, SVG_IMPORT_LIMITS } from './parse-svg';
+import { parseSvg, parseSvgDocument, SVG_IMPORT_LIMITS } from './parse-svg';
 
 const args = (svgText: string) => ({ svgText, id: 'O1', source: 'test.svg' });
+
+const NO_STRIPPED = { scripts: 0, foreignObjects: 0, externalLinks: 0, dataUris: 0 };
 
 describe('parseSvg — curve flatness respects physical scale (audit C2)', () => {
   const CURVE_D = 'M2 12 C2 4 22 4 22 12';
@@ -284,5 +286,35 @@ describe('parseSvg — denial-of-service guards', () => {
 </svg>`),
       ),
     ).toThrow(/coordinates/);
+  });
+});
+
+describe('parseSvg — <use> resolution cost', () => {
+  it('resolves every <use> from the id index instead of getElementById', () => {
+    // linkedom (the DOM the import worker runs on) keeps no id table, so each
+    // getElementById walks the whole document: U references over N nodes cost
+    // O(U·N). Resolution must not reach for the document at all.
+    const uses = Array.from(
+      { length: 4 },
+      (_, index) => `<use href="#tile" x="${index * 10}" y="0"/>`,
+    ).join('');
+    const doc = new DOMParser().parseFromString(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10">
+  <defs><rect id="tile" x="0" y="0" width="5" height="5" fill="blue"/></defs>
+  ${uses}
+</svg>`,
+      'image/svg+xml',
+    );
+    const lookups: string[] = [];
+    const nativeLookup = doc.getElementById.bind(doc);
+    doc.getElementById = (id: string) => {
+      lookups.push(id);
+      return nativeLookup(id);
+    };
+
+    const result = parseSvgDocument(doc, { id: 'O1', source: 'test.svg' }, NO_STRIPPED);
+
+    expect(result.object?.paths[0]?.polylines).toHaveLength(4);
+    expect(lookups).toEqual([]);
   });
 });

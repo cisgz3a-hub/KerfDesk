@@ -200,6 +200,19 @@ export function createDxfEntityCollector(
   };
 }
 
+// Section detection without collection, for callers that must know where a
+// section begins — the streaming metadata pass stops at ENTITIES, and the entity
+// pass reports metadata sections that (non-conformantly) follow it.
+export function createDxfSectionNameScanner(
+  onSection: (name: string) => void,
+): (tag: DxfTag) => void {
+  return createSectionRouter(
+    onSection,
+    () => undefined,
+    () => undefined,
+  ).pushTag;
+}
+
 function createSectionRouter(
   onStart: (section: string) => void,
   onTag: (section: string, tag: DxfTag) => void,

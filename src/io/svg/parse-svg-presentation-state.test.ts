@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseSvg } from './parse-svg';
+import { parseSvg, parseSvgDocument } from './parse-svg';
 
 const args = (svgText: string) => ({ svgText, id: 'O1', source: 'test.svg' });
+
+const NO_STRIPPED = { scripts: 0, foreignObjects: 0, externalLinks: 0, dataUris: 0 };
 
 describe('parseSvg presentation state', () => {
   it('imports fill-only geometry using its fill color', () => {
@@ -102,5 +104,30 @@ describe('parseSvg presentation state', () => {
     expect(result.object?.paths).toHaveLength(1);
     expect(points?.[0]).toEqual({ x: 10, y: 20 });
     expect(points?.[1]).toEqual({ x: 15, y: 20 });
+  });
+
+  it('reads and parses the style attribute once per element', () => {
+    // Presentation state resolves eight properties; each one used to re-read and
+    // re-split the whole style attribute, so a styled element paid for eight
+    // full parses of the same string.
+    const doc = new DOMParser().parseFromString(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+  <line x1="0" y1="0" x2="1" y2="0" style="stroke: #ff0000; fill: none"/>
+</svg>`,
+      'image/svg+xml',
+    );
+    const line = doc.querySelector('line');
+    if (line === null) throw new Error('fixture has no <line>');
+    const styleReads = { count: 0 };
+    const nativeGetAttribute = line.getAttribute.bind(line);
+    line.getAttribute = (name: string) => {
+      if (name === 'style') styleReads.count += 1;
+      return nativeGetAttribute(name);
+    };
+
+    const result = parseSvgDocument(doc, { id: 'O1', source: 'test.svg' }, NO_STRIPPED);
+
+    expect(result.object?.paths[0]?.color).toBe('#ff0000');
+    expect(styleReads.count).toBe(1);
   });
 });
