@@ -12,16 +12,24 @@
 // floor at δ spacing (the two-stage clearing-tool variant arrives with
 // multi-tool jobs, H.7b).
 //
-// Each disconnected filled region is completed shallow → deep (outside-in)
-// before travelling to the next region. Every contour keeps its original
-// ladder step. With no entry angle it retains the legacy zPassDepths stepped
-// plunges. An explicitly qualified angle instead produces continuous multi-lap
-// contour descent plus one full-depth cleanup lap. If that requested plan is
-// not representable, Job Review names the issue and output retains the legacy
-// stepped entry instead of dropping the layer.
+// Because rings vanish wherever the region is narrower than 2δ, artwork
+// finer than the ring pitch — thin script strokes, serif tips — would
+// otherwise silently drop out of the carve. A second, fine-pitched ladder
+// over exactly that uncovered material (vcarve-thin-detail.ts, ADR-281)
+// carves those slivers to their shallow centerline groove instead.
+//
+// Each disconnected filled region is completed shallow → deep (outside-in),
+// then its thin-detail rings, before travelling to the next region. Every
+// contour keeps its original ladder step. With no entry angle it retains the
+// legacy zPassDepths stepped plunges. An explicitly qualified angle instead
+// produces continuous multi-lap contour descent plus one full-depth cleanup
+// lap. If that requested plan is not representable, Job Review names the
+// issue and output retains the legacy stepped entry instead of dropping the
+// layer.
 //
 // Pure and deterministic: source-region order, then k ascending and offset
-// engine order within a region, no clock, no random.
+// engine order within a region (δ rings before detail rings), no clock, no
+// random.
 
 import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncPass } from '../job';
@@ -29,12 +37,26 @@ import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
 import { hasFinitePoints } from './profile-paths';
 import { vcarveIncludedAngleDeg } from './vcarve-angle';
-import { vcarveEffectiveDepthMm } from './vcarve-depth';
+import {
+  detailPath3dPoints,
+  sourceBoundarySegments,
+  type BoundarySegment,
+  type DetailDepthLaw,
+} from './vcarve-detail-depth';
+import { orderDetailBySliver } from './vcarve-detail-order';
 import { planVCarveRampEntry } from './vcarve-entry';
-import { vcarveRegionOrder } from './vcarve-region-order';
+import { vcarveRegionBuckets, type OrderedVCarvePolyline } from './vcarve-region-order';
+import {
+  THIN_DETAIL_RESOLUTION_MM,
+  vcarveThinDetailRings,
+  type ThinDetailRings,
+} from './vcarve-thin-detail';
 
 const MIN_CLOSED_POINTS = 3;
 const MIN_RESOLUTION_MM = 0.1;
+// Two clipper quanta (OFFSET_PRECISION_DECIMALS = 3 → 0.001 mm grid): the
+// finest ring pitch whose successive insets stay distinct after rounding.
+const MIN_COVERAGE_PITCH_MM = 0.002;
 const AUTO_RESOLUTION_TOOL_FRACTION = 8;
 // Backstop against degenerate inputs (huge region + microscopic δ).
 const MAX_VCARVE_RINGS = 8192;
@@ -58,11 +80,31 @@ export type VCarveLadder = {
   // A configured ramp that could not be planned and therefore used the legacy
   // stepped entry. Reported to Job Review, never a refusal (rule 7).
   readonly entryIssue: string | null;
+  // True when some artwork is thinner than even the fine detail pitch can
+  // carve (< 2 × THIN_DETAIL_RESOLUTION_MM wide): that material stays uncut.
+  // Also Job Review material, never a refusal (rule 7).
+  readonly thinResidual: boolean;
+  // True when planning could not visit all interior at valid settings: a
+  // ladder hit its ring budget, or the depth-clamp footprint demands a pitch
+  // finer than the coverage floor (a 1° bit at 0.05 mm depth needs
+  // 0.00087 mm rings — below the 0.001 mm emission grid, #584). Reported as
+  // the pass-limit advisory, never a refusal (rule 7).
+  readonly passLimited: boolean;
 };
 
 type VCarveRing = {
+  // δ ladder rings keep their pitch depth; detail rings carry the junction
+  // blend on the stepped path (per-vertex depths, ADR-281 Amendment 2).
+  readonly kind: 'ring' | 'detail';
   readonly polyline: Polyline;
   readonly depthMm: number;
+};
+
+// The layer's true boundary, flattened once, plus the depth law — what a
+// detail vertex measures its groove against.
+type DetailBlend = {
+  readonly segments: ReadonlyArray<BoundarySegment>;
+  readonly law: DetailDepthLaw;
 };
 
 export function vcarvePasses(
@@ -79,28 +121,87 @@ export function vcarveLadderPasses(
   options: VCarveOptions,
 ): VCarveLadder {
   const tipAngleDeg = vcarveIncludedAngleDeg(options.tool);
-  if (tipAngleDeg === null) return { passes: [], offsetFailed: false, entryIssue: null };
+  if (tipAngleDeg === null) return NO_LADDER;
   const contours = polylines.filter(
     (polyline) =>
       polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
   );
-  const delta = vcarveResolutionMm(options.resolutionMm, options.tool.diameterMm);
+  const requestedDeltaMm = vcarveResolutionMm(options.resolutionMm, options.tool.diameterMm);
   const tanHalf = Math.tan((tipAngleDeg / 2) * (Math.PI / 180));
-  const maxDepth = vcarveEffectiveDepthMm(options.tool, options.maxDepthMm);
-  if (maxDepth === null) return { passes: [], offsetFailed: false, entryIssue: null };
-  if (contours.length === 0 || !(maxDepth > 0)) {
-    return { passes: [], offsetFailed: false, entryIssue: null };
-  }
+  // The bit's cutting flank ends where the cone reaches the full diameter:
+  // (D/2)/tan(θ/2). Deeper "V" cuts do not physically exist — the shank
+  // would rub and the modeled groove width past the diameter would be a lie
+  // (VCarve's flat-depth limit applies the same cap).
+  const coneHeightMm =
+    Number.isFinite(options.tool.diameterMm) && options.tool.diameterMm > 0
+      ? options.tool.diameterMm / 2 / tanHalf
+      : Number.POSITIVE_INFINITY;
+  const maxDepth = Math.min(options.maxDepthMm, coneHeightMm);
+  if (contours.length === 0 || !(maxDepth > 0)) return NO_LADDER;
+  // A depth-clamped ring cuts a footprint of only maxDepth·tan(θ/2) radius, so
+  // rings spaced wider than twice that leave untouched stripes between them —
+  // the defect the #575 revert measured (10.7 % floor coverage at a 0.05 mm
+  // max depth). The configured Detail is a MAXIMUM spacing; the clamp physics
+  // may demand finer. Same law at the fine pitch. Ring counts stay bounded by
+  // MAX_VCARVE_RINGS / MAX_THIN_DETAIL_RINGS as before.
+  // One clamp-footprint RADIUS, not diameter: ring-to-ring spacing grows to
+  // pitch·√2 across mitered corners (up to 2× at the miter-limit bevel), so
+  // rings spaced a full diameter apart leave uncut seams along diagonals —
+  // the probe measured 4 % interior stripes at 2·r spacing. r spacing keeps
+  // adjacent footprints overlapping in every offset direction.
+  const footprintPitchMm = maxDepth * tanHalf;
+  // Coverage floor (#584): successive insets must stay distinct on clipper's
+  // 1 µm grid, so the pitch never drops below two quanta. A footprint finer
+  // than the floor (a 1° bit at 0.05 mm depth: 0.00087 mm) cannot achieve
+  // full floor coverage on the emission grid at any ring count — planning is
+  // pass-limited and Job Review says so instead of silently capping.
+  const delta = Math.max(Math.min(requestedDeltaMm, footprintPitchMm), MIN_COVERAGE_PITCH_MM);
+  const finePitchMm = Math.max(
+    Math.min(THIN_DETAIL_RESOLUTION_MM, footprintPitchMm),
+    MIN_COVERAGE_PITCH_MM,
+  );
+  const pitchDegraded = footprintPitchMm < MIN_COVERAGE_PITCH_MM;
 
   // Ring k (1-based in the depth law above) is ladder step k - 1.
   const ladder = buildOffsetLadder(contours, MAX_VCARVE_RINGS, (step) => (step + 1) * delta);
-  const rings = vcarveRegionOrder(contours, ladder.rings).map(({ step, polyline }) => ({
-    polyline,
-    depthMm: Math.min(((step + 1) * delta) / tanHalf, maxDepth),
-  }));
-  const entry = passesForRings(rings, options.depthPerPassMm, options.rampAngleDeg);
-  return { ...entry, offsetFailed: ladder.offsetFailed };
+  // A failed ladder's coverage is unknowable — a detail pass against it would
+  // re-carve everything at fine pitch. offsetFailed already reports the gap.
+  const detail = ladder.offsetFailed
+    ? NO_DETAIL
+    : vcarveThinDetailRings(contours, ladder.rings[0] ?? [], delta, finePitchMm);
+  const rings = zipRegionRings(contours, ladder.rings, detail, {
+    deltaMm: delta,
+    finePitchMm,
+    tanHalf,
+    maxDepthMm: maxDepth,
+  });
+  const blend: DetailBlend = {
+    segments: sourceBoundarySegments(contours),
+    law: { tanHalf, maxDepthMm: maxDepth },
+  };
+  const entry = passesForRings(rings, options.depthPerPassMm, options.rampAngleDeg, blend);
+  return {
+    ...entry,
+    offsetFailed: ladder.offsetFailed || detail.offsetFailed,
+    thinResidual: detail.residualThin,
+    passLimited: pitchDegraded || ladder.capped || detail.capped,
+  };
 }
+
+const NO_LADDER: VCarveLadder = {
+  passes: [],
+  offsetFailed: false,
+  entryIssue: null,
+  thinResidual: false,
+  passLimited: false,
+};
+const NO_DETAIL = {
+  rings: [],
+  offsetFailed: false,
+  residualThin: false,
+  capped: false,
+  sliverRoots: [],
+} as const;
 
 // Ring spacing: explicit setting wins; 0 = auto at toolDiameter/8 with a
 // 0.1 mm floor so tiny engraving bits don't explode the ring count.
@@ -111,13 +212,63 @@ export function vcarveResolutionMm(settingMm: number, toolDiameterMm: number): n
   return Math.max(MIN_RESOLUTION_MM, toolDiameterMm / AUTO_RESOLUTION_TOOL_FRACTION);
 }
 
+// The δ rings and detail rings count steps in different pitches; this maps
+// both through the shared depth law, region-zipped so a region finishes its
+// rings, then its detail, before the cutter travels on (ADR-270, ADR-281).
+type RingDepthClamp = {
+  readonly deltaMm: number;
+  readonly finePitchMm: number;
+  readonly tanHalf: number;
+  readonly maxDepthMm: number;
+};
+
+function zipRegionRings(
+  contours: ReadonlyArray<Polyline>,
+  coarseRings: ReadonlyArray<ReadonlyArray<Polyline>>,
+  detail: ThinDetailRings,
+  clamp: RingDepthClamp,
+): ReadonlyArray<VCarveRing> {
+  const coarse = vcarveRegionBuckets(contours, coarseRings);
+  const fine = vcarveRegionBuckets(contours, detail.rings);
+  const rings: VCarveRing[] = [];
+  for (let bucket = 0; bucket < Math.max(coarse.length, fine.length); bucket += 1) {
+    rings.push(
+      ...ringsForBucket(coarse[bucket] ?? [], clamp.deltaMm, clamp, 'ring'),
+      ...ringsForBucket(
+        orderDetailBySliver(fine[bucket] ?? [], detail.sliverRoots),
+        clamp.finePitchMm,
+        clamp,
+        'detail',
+      ),
+    );
+  }
+  return rings;
+}
+
+function ringsForBucket(
+  entries: ReadonlyArray<OrderedVCarvePolyline>,
+  pitchMm: number,
+  clamp: RingDepthClamp,
+  kind: VCarveRing['kind'],
+): ReadonlyArray<VCarveRing> {
+  return entries.map(({ step, polyline }) => ({
+    kind,
+    polyline,
+    depthMm: Math.min(((step + 1) * pitchMm) / clamp.tanHalf, clamp.maxDepthMm),
+  }));
+}
+
 function passesForRings(
   rings: ReadonlyArray<VCarveRing>,
   depthPerPassMm: number,
   rampAngleDeg: number | undefined,
+  blend: DetailBlend,
 ): Pick<VCarveLadder, 'passes' | 'entryIssue'> {
-  const legacyPasses = legacyPassesForRings(rings, depthPerPassMm);
+  const legacyPasses = legacyPassesForRings(rings, depthPerPassMm, blend);
   if (rampAngleDeg === undefined) return { passes: legacyPasses, entryIssue: null };
+  // The ramp planner descends to one constant depth per ring (ADR-278), so a
+  // ramp-configured layer keeps pitch-depth detail rings; the junction blend
+  // applies to the stepped path.
   const passes: CncPass[] = [];
   for (const ring of rings) {
     const plan = planVCarveRampEntry(ring.polyline, ring.depthMm, depthPerPassMm, rampAngleDeg);
@@ -130,15 +281,38 @@ function passesForRings(
 function legacyPassesForRings(
   rings: ReadonlyArray<VCarveRing>,
   depthPerPassMm: number,
+  blend: DetailBlend,
 ): ReadonlyArray<CncPass> {
-  return rings.flatMap(({ polyline, depthMm }) =>
-    zPassDepths(depthMm, depthPerPassMm).map((zMm) => ({
-      kind: 'contour' as const,
-      zMm,
-      polyline: ringClosure(polyline),
-      closed: true,
-    })),
+  return rings.flatMap((ring) =>
+    ring.kind === 'detail'
+      ? detailPassesForRing(ring.polyline, depthPerPassMm, blend)
+      : zPassDepths(ring.depthMm, depthPerPassMm).map((zMm) => ({
+          kind: 'contour' as const,
+          zMm,
+          polyline: ringClosure(ring.polyline),
+          closed: true,
+        })),
   );
+}
+
+// The junction blend (ADR-281 Amendment 2): a detail ring's vertices carry
+// the true-boundary groove depth, split through depthPerPassMm on the
+// deepest vertex so plunge-load limits still hold. Shallower levels clamp
+// each vertex to the level floor; the final level is the exact profile.
+function detailPassesForRing(
+  polyline: Polyline,
+  depthPerPassMm: number,
+  blend: DetailBlend,
+): ReadonlyArray<CncPass> {
+  const points = detailPath3dPoints(polyline, blend.segments, blend.law);
+  let deepest = 0;
+  for (const point of points) deepest = Math.min(deepest, point.z);
+  if (deepest >= 0) return [];
+  return zPassDepths(-deepest, depthPerPassMm).map((levelZ) => ({
+    kind: 'path3d' as const,
+    points: points.map((point) => ({ x: point.x, y: point.y, z: Math.max(point.z, levelZ) })),
+    closed: true,
+  }));
 }
 
 // Job convention: a closed pass's polyline ends where it starts (the offset

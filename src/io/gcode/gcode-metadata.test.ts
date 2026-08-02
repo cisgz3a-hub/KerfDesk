@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { EMITTER_REVISION, gcodeMetadataHeader, type GcodeMetadata } from './gcode-metadata';
 
 const META: GcodeMetadata = {
@@ -11,7 +11,7 @@ const META: GcodeMetadata = {
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('adr-280-vcarve-effective-depth-secondary-settings-v2');
+    expect(EMITTER_REVISION).toBe('adr-281-vcarve-junction-blend-v4');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

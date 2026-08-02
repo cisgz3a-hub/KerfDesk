@@ -14696,3 +14696,323 @@ rail are NOT migrated - follow-up work, same primitives. Screen-reader contracts
 (every aria-label kept; the narrow-rail select shrink contract in `CncSetupPanel.layout.test.tsx`
 still holds). Perceptual verification: before/after screenshots at the 300 px rail width. No G-code,
 state, or behavior changes.
+
+## ADR-281 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The V-carve ring ladder (ADR-098) inward-offsets the source at pitch δ (auto = diameter/8,
+floor 0.1 mm). Any sub-region narrower than 2δ vanishes before the first ring exists, so with
+the default 3.175 mm 90° bit anything under ~0.79 mm silently dropped from the carve while the
+rest of the glyph cut — the toolpath looked finished. Field case (2026-08-01): a script-font
+"Drive" V-carve cut only in sections; the thin connectors and stroke tails never received a
+single cut, and the operator read the gaps as a broken bit.
+
+Every surveyed reference tool carves thin strokes shallow instead of dropping them: Vectric
+V-Carve computes depth purely from local vector width and tool angle (docs.vectric.com V12
+VCarve Toolpath Creator); Carbide Create v8's perimeter engine and Easel Pro's fill v-carve do
+the same (carbide3d.com/blog/create-v8, Easel article 360012848873 — "carve deeper on thicker
+parts … and shallower in thinner areas"); F-Engrave cuts depth = inscribed-circle radius /
+tan(θ/2) and drops only features below its explicit "V-Carve Loop Accuracy"
+(scorchworks.com/Fengrave/f-engrave_calculations.htm, change log v1.30). Dropping thin regions
+is straight-bit behavior — Easel forums tell users to escape it by switching to a v-bit. The
+drop was a fidelity bug against the whole reference field, not a design choice.
+
+### Decision
+
+1. Coverage law: the material the δ ladder actually reaches is its first ring grown back out
+   by δ with round joins — the bit's cone footprint is a disc — i.e. the morphological opening
+   of the source. Everything the opening misses is "thin detail": strokes narrower than 2δ and
+   the sharp-corner wedges the miter limit bevels away (a disc cannot reach a mitered corner
+   tip).
+2. A new stage, `src/core/cnc/vcarve-thin-detail.ts`, computes
+   uncovered = source − (ring₁ ⊕ (δ + 0.002 mm rounding slack)) and walks a second offset
+   ladder over exactly those slivers at the fixed fine pitch `THIN_DETAIL_RESOLUTION_MM`
+   = 0.05 mm (half the ladder's 0.1 mm floor). Same depth law (inset / tan(θ/2)), same
+   maxDepth and cone-height clamps, same per-pass splitting. Always on; deliberately not a
+   setting — it is a fidelity floor, not a speed/quality trade.
+3. Ordering: `vcarveRegionBuckets` (vcarve-region-order.ts) keeps the ADR-270 region grouping
+   per bucket, and the ladder zips δ-ring buckets with detail buckets so a region finishes its
+   rings, then its detail, before the cutter travels on. Wide-only artwork produces no slivers
+   and byte-identical G-code.
+4. Depth reference caveat: detail depths measure the inset from the SLIVER boundary. Along a
+   stroke's sides that is the artwork edge (exact); across the artificial junction where a
+   sliver meets ladder-covered material the groove is under-cut for about one δ of travel —
+   always shallower than true, never a gouge. Accepted for v1 and documented in the module
+   header.
+5. Residual reporting: a visible sliver (≥ 0.01 mm² area floor) that even the fine pitch
+   cannot ring sets `thinResidual` on the ladder result; a new advisory diagnostic kind
+   `'thin-detail-dropped'` renders a layer-named Job Review / Save warning naming the 0.1 mm
+   limit and the remedy. Advisory only — informs, never refuses (rule 7). Engine failures in
+   the new stage fold into the existing `offsetFailed` advisory, and a failed δ ladder skips
+   the detail stage entirely (its coverage is unknowable — detail against it would re-carve
+   everything at fine pitch).
+6. New geometry leaves, both deep-imported because the geometry barrel sits at its 20-export
+   cap and the cnc barrel is ratcheted: `polygon-difference.ts`
+   (`differenceClosedPolylinesChecked`, raw-Polyline even-odd difference with the
+   engine-failure/empty distinction) and `offsetClosedPolylinesWithRoundJoinsChecked` in
+   kerf-offset.ts.
+7. Interaction with ADR-278 (opt-in contour ramp entry): detail rings are ordinary
+   `VCarveRing`s and flow through the same shared entry planner. With no ramp configured the
+   legacy stepped entry applies to both ring kinds; with a ramp configured, a detail ring the
+   planner cannot represent falls the layer back to the legacy stepped entry with ADR-278's
+   existing advisory — the same degradation ADR-278 defined.
+
+### Consequences
+
+- Script and lettering V-carve jobs cut the full word: thin strokes get the shallow centerline
+  groove their width asks for, matching Vectric / F-Engrave semantics. The removal-grid depth
+  field inside a 0.6 mm stroke now tracks the analytic groove within 0.15 mm.
+- Sharp convex corners gain shallow corner-wedge detail passes (closer to true V-carve
+  corners). Square-fixture outputs gain a few −0.05 mm passes where δ ≥ ~0.5 mm, so some
+  structure-pinned v-carve tests changed once; the existing single-square perceptual G-code
+  snapshot is byte-identical (δ = 0.25 leaves corner wedges below the fine pitch).
+- Compile cost per v-carve layer: one round offset, one boolean difference, and at most
+  ~δ/0.05 fine insets over sliver geometry only, ring-capped at 8192 like the main ladder.
+
+### Verification
+
+- `vcarve-thin-detail.test.ts`: thin band → centerline rings bounded by half-width; partial
+  collapse rescues only the tail; hairline artwork sets residualThin; rounding dust does not;
+  deterministic across runs.
+- `vcarve-ladder.test.ts`: a 0.5 mm stroke that previously produced zero passes now carves
+  (test was red before the fix); detail passes respect maxDepth; region-major order holds
+  across mixed thick/thin regions; 100-seed property — detail passes never cut deeper than the
+  band half-width; the reorder-completeness reconstruction now includes detail rings.
+- `polygon-difference.test.ts`: covering/partial/empty clips and even-odd annulus semantics.
+- `vcarve-thin-perceptual.test.ts` (ADR-025 pattern): REAL pipeline (compileCncJob →
+  buildToolpath → removal grid) against the analytic groove — ≥ 90 % coverage and ≤ 0.15 mm
+  depth error inside a 0.6 mm stroke and inside the thin tail of a thick-body glyph; both were
+  0 % coverage before this ADR. Deterministic G-code snapshot pinned.
+- `cnc-offset-ladder-warnings.test.ts`: the thin-detail advisory is layer-named, mentions the
+  0.1 mm limit, and remains a plain string (no refusal channel).
+- Visual artifact: a script-word fixture (thick glyph + 0.55 mm sine flourish + 0.7 mm dot,
+  the user's 3.175 mm 90° bit, auto resolution) rendered through the removal grid reaches
+  99.7 % coverage with the detail grooves tracking the analytic field.
+- NOT verified: a physical cut (no hardware available), and the junction under-cut blend is
+  bounded analytically but has not been rendered on hardware.
+
+## ADR-281 Amendment - coverage law corrected after the #575 revert (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+PR #575 reverted the first landing of this decision (#572, `597422d7`) after an independent
+exact-head review reproduced five defects. Each is answered here; the stage re-lands with the
+corrections and with the #577 refinements (sliver-major detail ordering, exact residual, layer
+panel note) folded in.
+
+### Findings and corrections
+
+1. **Depth-clamp coverage (real defect).** A ring clamped to maxDepth cuts a surface footprint
+   of only maxDepth·tan(θ/2) radius; the ladder's δ spacing and the detail stage's coverage
+   claim both assumed the unclamped footprint (inset-sized), so a 2×2 mm square at Detail
+   0.5 mm and max depth 0.05 mm carved ~11 % of its floor while reporting nothing. Corrected:
+   ring pitch is now min(configured Detail, 2·maxDepth·tan(θ/2)) and the fine pitch is
+   min(0.05 mm, the same bound), so adjacent footprints always overlap. The configured Detail
+   is a MAXIMUM spacing; clamp physics may demand finer. The #575 probe is a pinned perceptual
+   regression test (coverage ≥ 85 %, clamp still honoured; it measured 13.8 % before the fix).
+2. **Tapering-tail residual (real defect in #572).** Fixed by the exact-residual computation
+   from #577 (sliver minus its fine first ring grown by the pitch), folded into this landing.
+3. **Difference precision (real sloppiness).** `differenceD` was called without a precision
+   argument (clipper defaults to 2 decimals) while the coverage-slack comment claimed a
+   3-decimal grid. Corrected: explicit `DIFFERENCE_PRECISION_DECIMALS = 3`, matching
+   kerf-offset's `OFFSET_PRECISION_DECIMALS`.
+4. **Byte-identity overclaim.** Decision 3's "wide-only artwork produces byte-identical
+   G-code" was false for sharp-cornered wide shapes where δ ≥ ~0.4 mm: corner-wedge detail
+   passes change those outputs (19 → 23 passes on the reviewer's fixture). The accurate
+   statement: wide artwork without rescued corner wedges is byte-identical; sharp corners
+   gain shallow wedge passes by design (the disc cannot reach a mitered corner tip).
+5. **Emitter revision (process).** Output shaping changed without a revision bump. Corrected:
+   `EMITTER_REVISION` is now `adr-279-vcarve-thin-detail-v2`.
+
+### Consequences
+
+- Heavily depth-clamped v-carves emit more rings than the configured Detail implies — that is
+  the physical price of full floor coverage at the requested depth; counts remain bounded by
+  the existing 8192-ring backstops. Unclamped carves (2·maxDepth·tan(θ/2) ≥ Detail) are
+  unchanged by the pitch law.
+- The pre-existing "shallow flat-floor sampling" limitation #575 names is thereby corrected
+  for the ladder itself, not merely patched in the detail stage.
+
+### Verification
+
+- `vcarve-thin-perceptual.test.ts` pins the #575 probe (2×2 mm, Detail 0.5, max depth
+  0.05 mm): coverage ≥ 85 % and no cut deeper than the clamp.
+- The full v-carve battery (ladder, thin-detail, region-order, both perceptual suites,
+  polygon-difference, gcode-metadata, advisory warnings) passes on the re-land head.
+- NOT verified: physical cutting; the junction under-cut blend remains as documented in the
+  base decision.
+
+## ADR-281 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
+
+**Date:** 2026-08-02
+**Status:** Accepted
+
+### Context
+
+The base decision documented its one accepted approximation: detail depths measured the inset
+from the SLIVER boundary, so across the artificial junction cut-line — where a sliver meets
+ladder-covered material — the groove was under-cut for about one δ of travel. On script
+lettering those under-cuts render as dark seams wherever a stroke's width crosses the
+2δ threshold (the maintainer's "Safe" screenshot). Prerequisite: the removal-grid simulator
+had to become vertex-exact for path3d passes first (landed separately as the sim fix), or the
+blend could not be honestly verified — its endpoint-span lerp stamped a closed variable-Z
+ring as no cut at all.
+
+### Decision
+
+1. On the stepped (default) path, a thin-detail ring is emitted as a `path3d` pass whose
+   vertices carry z = −min(distToSourceBoundary / tan(θ/2), maxDepth) — the analytic groove
+   law — computed against the layer's flattened source contours
+   (`src/core/cnc/vcarve-detail-depth.ts`). Depth-per-pass still applies: levels split on the
+   deepest vertex, shallower levels clamp each vertex to the level floor, the final level is
+   the exact profile.
+2. Clipper rings keep vertices only at corners, and a straight ring edge crossing the
+   junction would lerp shallow corner depths across the deep middle; segments subdivide
+   adaptively (midpoint recursion) until the linear G1 interpolation tracks the depth law
+   within 0.02 mm, floored at the 0.05 mm fine pitch — boundary-parallel sides stay two
+   vertices, junction crossings gain vertices at the depth knee.
+3. Ramp-configured layers (ADR-278 opt-in) keep constant pitch-depth detail rings: the ramp
+   planner descends to one depth per ring by design. The blend applies to the stepped path.
+4. δ rings are untouched (constant-Z contours, byte-identical); `EMITTER_REVISION` bumps to
+   `adr-279-vcarve-junction-blend-v3` because detail output shaping changed.
+
+### Consequences
+
+- The junction under-cut seam is gone: the thin-tail perceptual window now starts 0.05 mm
+  from the cut-line (previously excluded a full δ + 0.5 mm) and holds the same ≤ 0.15 mm
+  error bound; before the blend that window measured 0.225 mm.
+- Detail passes emit G1 XYZ moves; the thin-stroke G-code snapshot changed once
+  (acknowledged), and pass counts for detail rings can differ where the true profile is
+  deeper than the pitch depth.
+- Compile cost adds an exact point-to-segment distance query per detail vertex (plus
+  refinement probes) against the layer's source segments — bounded by adaptive subdivision;
+  a spatial index remains an optimization if very large lettering layers ever need it.
+
+### Verification
+
+- `vcarve-thin-perceptual.test.ts`: the Drive-tail case asserts coverage and depth accuracy
+  INSIDE the junction zone (0.05 mm margin) — red at 0.225 mm error before the blend, green
+  after; band and #575 clamp probes unchanged and green.
+- `vcarve-ladder.test.ts` and siblings updated to read both pass kinds; the δ-ring reorder
+  completeness check is pinned on contour passes, detail completeness on the thin-detail
+  suites. 49 tests green across the five v-carve suites.
+- The sim fix's non-monotone-valley and closed variable-Z ring tests are the instrument-side
+  guarantee this blend is measured against.
+- NOT verified: physical cutting; ramp-configured layers intentionally retain the pre-blend
+  seam (documented above); the 3D viewer still shades path3d by endpoint span.
+
+## ADR-281 Amendment 3 - coverage floor and honest pass limits after the #584 revert (2026-08-02)
+
+**Date:** 2026-08-02
+**Status:** Accepted
+
+### Context
+
+PR #584 reverted the #581 re-land with a fail-closed blocker: a valid 1 degree V-bit at
+0.05 mm detail depth drives the Amendment 1 pitch law to 0.00087 mm rings — below clipper's
+0.001 mm grid — so the 8192-ring budget exhausted silently ~7.1 mm in, leaving an ~85.7 mm
+core unvisited with neither offsetFailed nor thinResidual raised. It also noted the 2 mm probe
+tolerated 14.24 % uncut in-shape cells and therefore could not distinguish full floor coverage
+from interior stripes. All four findings verified and answered here; this Amendment lands with
+the junction blend (Amendment 2). The decision also renumbered from ADR-281 to ADR-281: #578
+claimed ADR-281 for offline imposition while this decision was off main.
+
+### Findings and corrections
+
+1. **Coverage floor.** Ring pitch now floors at MIN_COVERAGE_PITCH_MM = 0.002 (two clipper
+   quanta, so successive insets stay distinct after rounding). A clamp footprint finer than
+   the floor cannot achieve full coverage on the emission grid at any ring count — that state
+   sets the new `passLimited` flag instead of silently capping.
+2. **Honest budgets.** `buildOffsetLadder` now reports `capped` when maxSteps exhausts with
+   the last step still producing contours — previously indistinguishable from a finished
+   region (the audit's silent-truncation trap, made UI-reachable by the pitch law). The
+   v-carve ladder folds coarse-capped, fine-capped, and floor-degraded into
+   `VCarveLadder.passLimited`, surfaced through the existing `pass-limit` Job Review advisory
+   (message generalized beyond rest machining; informs, never refuses — rule 7).
+3. **Pitch bound corrected to one footprint RADIUS.** The tightened probe exposed a second
+   coverage gap in Amendment 1's own law: ring-to-ring spacing grows to pitch·√2 across
+   mitered corners (up to 2× at the miter-limit bevel), so diameter-spaced rings leave seams
+   along diagonals (measured: 4 % interior stripes). Pitch is now
+   min(Detail, maxDepth·tan(θ/2)), one footprint radius, flooring as above.
+4. **Probe strengthened.** The #575 probe now separates the sub-footprint edge band (analytic
+   depth below clampDepth·tan(θ/2) + one cell — legitimately below any ring's reach) from the
+   interior, and requires ≥ 99 % interior coverage outright, which stripes fail. The clamp
+   bound (nothing deeper than requested) is unchanged. A 1 degree regression test pins
+   `passLimited` with all depths inside the clamp, and the advisory suite pins the layer-named
+   pass-limit warning for the same configuration.
+
+### Consequences
+
+- Depth-clamped floors get 2× the rings of the Amendment 1 law — the price of seam-free
+  coverage across mitered corners; unclamped carves are unchanged (their footprint radius
+  already exceeds the configured Detail).
+- Degenerate-but-valid configurations (ultra-narrow bits at shallow depths) now carve what
+  the grid can express and TELL the operator planning was pass-limited, rather than
+  pretending completeness.
+- The pass-limit advisory text now covers rest machining, v-carve budgets, and the coverage
+  floor with one layer-named message that names remedies.
+
+### Verification
+
+- `vcarve-ladder.test.ts`: the exact #584 configuration (1 degree bit, 0.05 mm depth) —
+  `passLimited` true, passes present, every depth within the clamp.
+- `offset-ladder.test.ts`: budget exhaustion with interior remaining reports `capped` without
+  `offsetFailed`.
+- `cnc-offset-ladder-warnings.test.ts`: the same configuration produces the layer-named
+  pass-limit advisory as a plain string (no refusal channel).
+- `vcarve-thin-perceptual.test.ts`: interior coverage ≥ 99 % on the #575 probe under the
+  radius-pitch law (95.95 % under the diameter law — the diagonal seams), clamp honoured.
+- NOT verified: physical cutting; ring-count growth on very large clamped floors is bounded
+  by the budgets and reported when hit, not eliminated.
+
+## ADR-281 Amendment 4 - motion-safe descents, ramp parity, viewer parity (#592, 2026-08-02)
+
+**Date:** 2026-08-02
+**Status:** Accepted
+
+### Context
+
+PR #592 reverted the third landing with three blockers: (1) blend path3d descents rode the
+cut feed, driving the Z axis at ~707 mm/min against a 300 mm/min plunge limit on steep
+segments — axis protection rates are per axis; (2) a configured ADR-278 ramp bypassed the
+blend, restoring the 0.225 mm junction seam; (3) the 3D viewer drew variable-depth rings from
+the endpoint Z span, so the drawn line disagreed with the vertex-exact removal mesh. All
+three verified real and fixed here. The decision also renumbered ADR-280 → ADR-281: #591
+claimed 280 (cone-limited floor depth) while this was off main.
+
+### Corrections
+
+1. **Emitter Z-rate cap** (`cnc-grbl-strategy.ts`): every sloped path3d segment's feed caps
+   at plunge·L3d/|dz| so the Z-axis rate never exceeds the configured plunge feed; flat
+   segments keep the full lateral feed and modal F handles the transitions. Computed on the
+   emitted 3-decimal coordinates — the cap matches exactly what the controller executes.
+   Existing ramp/entry fixtures are unclamped by construction (shallow slopes); a steep
+   1 mm-lateral/10 mm-dive segment pins F301 vs the naive F1000.
+2. **Blend under ramp** (`vcarve-ladder.ts`): δ rings ramp, detail rings keep the per-vertex
+   blend — the planner protects deep plunges, which detail rings do not have, and the
+   emitter cap bounds their entries. Enabling the ramp no longer re-opens the seam.
+3. **Viewer parity** (`toolpath-moves-3d.ts`): the drawn cut line now uses the step's
+   per-vertex `zs` when present (span lerp remains the fallback), so the line dips with the
+   groove exactly as the removal mesh does. Line COLOR stays per-kind; the unused
+   `moveDepthRange` hook remains available for a depth-colored ramp later.
+4. `EMITTER_REVISION` bumps to `adr-281-vcarve-junction-blend-v4` (output shaping changed:
+   per-segment feed words).
+
+### Verification
+
+- Failing-first for each blocker: F301 cap (was F1000 on the steep segment), blend-under-ramp
+  (constant-depth rings before), viewer valley (flat 0-line before; per-vertex [0, −2, 0]
+  after). Ramp pair-walk updated to skip interleaved detail passes and still enforce strict
+  ramp/cleanup pairing.
+- Emit ≡ emitWithPassSpans byte identity holds (shared appendPass); pass-span property suite
+  green.
+- NOT verified: physical cutting; the estimator still prices path3d Z travel at zero
+  (pre-existing, now conservative against the slower clamped reality); toolpath line color is
+  still flat per kind.

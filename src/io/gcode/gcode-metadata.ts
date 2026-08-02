@@ -1,4 +1,4 @@
-// gcode-metadata — optional provenance header prepended to EXPORTED G-code so a
+﻿// gcode-metadata — optional provenance header prepended to EXPORTED G-code so a
 // saved file records which build + emitter produced it. A stale export that
 // predates a safety fix (e.g. ADR-035's gap-rapid split) is then obvious at a
 // glance, and a controller transcript can be matched back to a source build.
@@ -28,10 +28,10 @@ export type GcodeMetadata = {
  * 4040 Fill entry geometry, ADR-236's controlled seeks/scan-quality policy,
  * ADR-238's generic Scan Line entry/exit runway geometry, ADR-270's
  * region-major V-carve traversal, ADR-273's incident-grade CNC provenance,
- * ADR-278's contour ramp, and ADR-280's shared cone-limited V-carve floor
- * depth, plus ADR-273's secondary-cutter settings provenance.
+ * ADR-278's contour ramp, and ADR-281's shared cone-limited V-carve floor
+ * depth.
  */
-export const EMITTER_REVISION = 'adr-280-vcarve-effective-depth-secondary-settings-v2';
+export const EMITTER_REVISION = 'adr-281-vcarve-junction-blend-v4';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
