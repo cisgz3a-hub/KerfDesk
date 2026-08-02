@@ -14,6 +14,7 @@ import {
 import type { DeviceProfile } from '../../core/devices';
 import { layerCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
 import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
+import { MANUAL_FEEDS_LABEL } from '../common/cnc-material-vocabulary';
 import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
@@ -77,7 +78,7 @@ export function CncMaterialRow(props: {
           {starterDisplay === null ? null : (
             <option value={SAVED_MACHINE_STARTER}>{starterDisplay.optionLabel}</option>
           )}
-          <option value={CUSTOM}>Manual — verify feeds</option>
+          <option value={CUSTOM}>{MANUAL_FEEDS_LABEL}</option>
           <CncMaterialOptions />
         </select>
       </Row>

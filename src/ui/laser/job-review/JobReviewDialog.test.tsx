@@ -7,6 +7,7 @@ import {
   DEFAULT_CNC_MACHINE_CONFIG,
   EMPTY_SCENE,
 } from '../../../core/scene';
+import { MANUAL_FEEDS_LABEL } from '../../common/cnc-material-vocabulary';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
 import type { JobReviewModel } from './job-review-model';
@@ -213,7 +214,8 @@ describe('JobReviewDialog', () => {
     expect(host.textContent).toContain('CNC setup confirmation');
     expect(host.textContent).toContain('CNC attestation prompt body.');
     expect(host.textContent).toContain('Material & stock');
-    expect(host.textContent).toContain('Custom (manual feeds)');
+    // One name for the no-recipe state across the rail and this report.
+    expect(host.textContent).toContain(MANUAL_FEEDS_LABEL);
     expect(host.textContent).toContain('400 × 400 × 6.4 mm');
     expect(host.textContent).toContain('Stock');
     expect(host.textContent).toContain('Safe Z');
