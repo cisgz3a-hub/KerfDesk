@@ -8,6 +8,7 @@ import {
   type MachineConfig,
 } from '../../core/scene';
 import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
+import { MANUAL_FEEDS_LABEL } from '../common/cnc-material-vocabulary';
 import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { useStore } from '../state';
 
@@ -39,7 +40,7 @@ export function CncProjectMaterialPicker(props: {
           title="Choose stock, review what will change, then apply. Changing this menu alone never rewrites layer settings."
           style={selectStyle}
         >
-          <option value={CUSTOM}>Custom (manual feeds)</option>
+          <option value={CUSTOM}>{MANUAL_FEEDS_LABEL}</option>
           <CncMaterialOptions />
         </select>
       </div>
