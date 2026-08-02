@@ -33,6 +33,10 @@ export async function parseDocumentImportSource(
     return { id: request.id, kind: request.kind, result: deserializeProjectValue(raw) };
   }
 
+  if (request.kind === 'material-library' && typeof request.blob.stream === 'function') {
+    return parseStreamedMaterialLibrary(request, onParsing);
+  }
+
   if (request.kind === 'svg' && typeof request.blob.stream === 'function') {
     const document = await readSvgDocumentFromBlob(request.blob);
     onParsing();
@@ -45,10 +49,7 @@ export async function parseDocumentImportSource(
       }),
     };
   }
-  if (
-    (request.kind === 'lightburn-project' || request.kind === 'lightburn-clb') &&
-    typeof request.blob.stream === 'function'
-  ) {
+  if (isLightBurnDocumentRequest(request) && typeof request.blob.stream === 'function') {
     return parseLightBurnDocumentSource(request, onParsing);
   }
 
@@ -57,10 +58,42 @@ export async function parseDocumentImportSource(
   return parseDocumentImportText(request, text);
 }
 
+async function parseStreamedMaterialLibrary(
+  request: Extract<DocumentImportWorkerRequest, { readonly kind: 'material-library' }>,
+  onParsing: () => void,
+): Promise<DocumentImportWorkerResponse> {
+  const [{ readJsonValueFromBlob, StreamedJsonSyntaxError }, { deserializeMaterialLibraryValue }] =
+    await Promise.all([import('../../io/json'), import('../../io/material-library/stream')]);
+  let raw: unknown;
+  try {
+    raw = await readJsonValueFromBlob(request.blob);
+  } catch (error) {
+    if (!(error instanceof StreamedJsonSyntaxError)) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      id: request.id,
+      kind: request.kind,
+      result: { kind: 'invalid', reason: `not valid JSON: ${message}` },
+    };
+  }
+  onParsing();
+  return {
+    id: request.id,
+    kind: request.kind,
+    result: deserializeMaterialLibraryValue(raw),
+  };
+}
+
 type LightBurnDocumentRequest = Extract<
   DocumentImportWorkerRequest,
   { readonly kind: 'lightburn-project' | 'lightburn-clb' }
 >;
+
+function isLightBurnDocumentRequest(
+  request: DocumentImportWorkerRequest,
+): request is LightBurnDocumentRequest {
+  return request.kind === 'lightburn-project' || request.kind === 'lightburn-clb';
+}
 
 async function parseLightBurnDocumentSource(
   request: LightBurnDocumentRequest,
