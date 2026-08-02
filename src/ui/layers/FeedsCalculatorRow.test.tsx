@@ -56,6 +56,43 @@ describe('FeedsCalculatorRow', () => {
   // Audit 1.20: the panel opened on hardcoded 'plywood-mdf' / 2 flutes whatever
   // the layer's own recipe said, so it previewed - and on Apply committed -
   // another material's numbers under this layer's name.
+  // The seed was fixed at mount, so a material or bit change from another
+  // surface left the picker — and therefore Apply — on the old material.
+  it('follows the layer’s recipe when the material changes while it stays mounted', async () => {
+    install4040Cnc();
+    const onCommitSettings = vi.fn();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const renderWith = async (settings: CncLayerSettings): Promise<void> => {
+      await act(async () =>
+        root.render(
+          <FeedsCalculatorRow
+            layer={LAYER}
+            settings={settings}
+            onCommitSettings={onCommitSettings}
+          />,
+        ),
+      );
+    };
+    try {
+      await renderWith({
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        feedSource: { kind: 'material-recipe', materialKey: 'hardwood', fluteCount: 3 },
+      });
+      await renderWith({
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        feedSource: { kind: 'material-recipe', materialKey: 'acrylic', fluteCount: 1 },
+      });
+      await apply(host);
+      const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
+      expect(next.feedSource).toMatchObject({ kind: 'material-recipe', materialKey: 'acrylic' });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('opens on the layer’s own material recipe rather than the chart default', async () => {
     install4040Cnc();
     const onCommitSettings = vi.fn();

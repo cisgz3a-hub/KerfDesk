@@ -18,6 +18,7 @@ import { controllerReadinessAdvisories } from '../app/controller-readiness-advis
 import { usePlatform } from '../app/platform-context';
 import { partitionSavePreflight } from '../app/save-preflight-policy';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
+import { useSourceTrackedState } from '../common/use-source-tracked-state';
 import { RailSection } from '../kit';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
@@ -34,8 +35,12 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const settingsCapability = useLaserStore((s) => s.capabilities.settings);
   const { machine } = props;
-  const [widthMm, setWidthMm] = useState(machine.stock.widthMm);
-  const [heightMm, setHeightMm] = useState(machine.stock.heightMm);
+  // The facing area prefills from the stock footprint and must FOLLOW it: a
+  // plain useState seed froze at mount, so changing stock size (or opening
+  // another project) left this panel saving a program for the old area.
+  const stockKey = `${machine.stock.widthMm}x${machine.stock.heightMm}`;
+  const [widthMm, setWidthMm] = useSourceTrackedState(machine.stock.widthMm, stockKey);
+  const [heightMm, setHeightMm] = useSourceTrackedState(machine.stock.heightMm, stockKey);
   const [stepoverPct, setStepoverPct] = useState(SURFACING_DEFAULT_STEPOVER_PCT);
   const [totalDepthMm, setTotalDepthMm] = useState(SURFACING_DEFAULT_TOTAL_DEPTH_MM);
 
