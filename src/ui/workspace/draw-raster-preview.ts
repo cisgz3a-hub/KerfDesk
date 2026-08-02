@@ -151,18 +151,23 @@ function schedulePreviewCanvasBuild(
   if (isBuildInFlight(obj, key)) return;
   const scheduleBuild = options.scheduleBuild ?? scheduleRasterPreviewBuild;
   if (obj.imageAsset === undefined) {
+    let ownBuild: PendingPreviewBuild | undefined;
     let completedSynchronously = false;
     const cancel = scheduleBuild(() => {
-      clearPendingBuild(obj, key);
+      clearPendingBuild(obj, key, ownBuild);
       const canvas = buildPreviewCanvas(obj, layer, device, maskObject);
       storePreviewCanvas(obj, key, canvas);
       if (canvas !== null) options.onRasterPreviewReady?.();
       completedSynchronously = true;
     });
-    if (!completedSynchronously) setPendingBuild(obj, key, cancel);
+    if (!completedSynchronously) ownBuild = setPendingBuild(obj, key, cancel);
     return;
   }
   let cancelled = false;
+  // Assigned once the scheduler hands back its cancel handle. The promise chain
+  // below only settles in a later microtask, so the entry is always registered
+  // by the time the chain reads it.
+  let ownBuild: PendingPreviewBuild | undefined = undefined;
   const controller = new AbortController();
   const cancel = scheduleBuild(() => {
     void hydratePagedRasterImage(obj, previewAssetRepository, controller.signal)
@@ -175,9 +180,12 @@ function schedulePreviewCanvasBuild(
       .catch((error: unknown) => {
         if (!cancelled) console.error('Raster preview asset hydration failed.', error);
       })
-      .finally(() => clearPendingBuild(obj, key));
+      // Cancelling only aborts the hydration; this chain still settles. By then
+      // an Image Studio Apply may have registered a replacement under the same
+      // (id, key), so the entry cleared has to be this build's own.
+      .finally(() => clearPendingBuild(obj, key, ownBuild));
   });
-  setPendingBuild(obj, key, () => {
+  ownBuild = setPendingBuild(obj, key, () => {
     cancelled = true;
     controller.abort();
     cancel();
@@ -190,20 +198,30 @@ function isBuildInFlight(obj: RasterImage, key: string): boolean {
   if (pending === undefined) return false;
   if (sameRasterContent(pending.content, obj)) return true;
   pending.cancel();
-  clearPendingBuild(obj, key);
+  clearPendingBuild(obj, key, pending);
   return false;
 }
 
-function setPendingBuild(obj: RasterImage, key: string, cancel: () => void): void {
+function setPendingBuild(obj: RasterImage, key: string, cancel: () => void): PendingPreviewBuild {
   const pending: PendingPreviewBuild = { content: rasterContentToken(obj), cancel };
   const builds = pendingPreviewBuilds.get(obj.id);
   if (builds === undefined) pendingPreviewBuilds.set(obj.id, new Map([[key, pending]]));
   else builds.set(key, pending);
+  return pending;
 }
 
-function clearPendingBuild(obj: RasterImage, key: string): void {
+// `build` is the entry this caller registered, and is the ownership token: a
+// build that no longer owns (obj.id, key) has been superseded and must leave the
+// replacement's entry alone, or the replacement stops being cancellable and is
+// re-scheduled as a duplicate. `undefined` means the caller never registered
+// one, so there is nothing of its own to clear.
+function clearPendingBuild(
+  obj: RasterImage,
+  key: string,
+  build: PendingPreviewBuild | undefined,
+): void {
   const builds = pendingPreviewBuilds.get(obj.id);
-  if (builds === undefined) return;
+  if (builds === undefined || build === undefined || builds.get(key) !== build) return;
   builds.delete(key);
   if (builds.size === 0) pendingPreviewBuilds.delete(obj.id);
 }

@@ -12,7 +12,22 @@ import type { ViewTransform } from './view-transform';
 
 const VIEW: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 };
 
+// Hydration is the only asynchronous step in a paged raster's preview build, so
+// holding it open is how a superseded build stays unsettled until its
+// replacement has registered under the same key.
+const hydrationResolvers = vi.hoisted((): Array<() => void> => []);
+
+vi.mock('../import/paged-raster-hydration', () => ({
+  hydratePagedRasterImage: (image: RasterImage): Promise<RasterImage> =>
+    new Promise<RasterImage>((resolve) => {
+      hydrationResolvers.push(() => {
+        resolve(image);
+      });
+    }),
+}));
+
 afterEach(() => {
+  hydrationResolvers.length = 0;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -140,6 +155,41 @@ describe('drawRasterPreview canvas cache', () => {
   });
 });
 
+// An Image Studio Apply keeps the object id and the settings key while replacing
+// the pixels, so it cancels the running build and registers a replacement under
+// the exact same (id, key). The cancelled build's promise chain still settles
+// afterwards, and clearing the map entry it finds -- rather than its own -- lost
+// the replacement: a live build then looked "not in flight", so a redraw
+// scheduled a duplicate hydration and the prune sweep could no longer abort it.
+describe('drawRasterPreview superseded build bookkeeping', () => {
+  it('keeps the replacement build in flight after the superseded build settles', async () => {
+    const scheduler = trackingScheduler();
+    const before = pagedRaster('R-supersede-inflight', 'luma-before-apply');
+    const after = pagedRaster('R-supersede-inflight', 'luma-after-apply');
+
+    drawRasterPreviewWith(projectForRaster(before), scheduler.schedule);
+    drawRasterPreviewWith(projectForRaster(after), scheduler.schedule);
+    await settleHydration(0);
+    drawRasterPreviewWith(projectForRaster(after), scheduler.schedule);
+
+    expect(scheduler.cancels).toHaveLength(2);
+  });
+
+  it('still cancels the replacement build when its raster leaves the scene', async () => {
+    const scheduler = trackingScheduler();
+    const before = pagedRaster('R-supersede-prune', 'luma-before-apply');
+    const after = pagedRaster('R-supersede-prune', 'luma-after-apply');
+
+    drawRasterPreviewWith(projectForRaster(before), scheduler.schedule);
+    drawRasterPreviewWith(projectForRaster(after), scheduler.schedule);
+    await settleHydration(0);
+    drawRasterPreviewWith(emptyProject(), scheduler.schedule);
+
+    expect(scheduler.cancels[0]).toHaveBeenCalledOnce();
+    expect(scheduler.cancels[1]).toHaveBeenCalledOnce();
+  });
+});
+
 class FakeImageData {
   readonly data: Uint8ClampedArray;
   readonly width: number;
@@ -212,6 +262,61 @@ function countingScheduler(): {
 function runImmediately(work: () => void): () => void {
   work();
   return () => undefined;
+}
+
+// One `vi.fn` cancel per scheduled build, so an assertion can name which build
+// was cancelled instead of only counting cancellations.
+function trackingScheduler(): {
+  readonly schedule: RasterPreviewBuildScheduler;
+  readonly cancels: ReadonlyArray<() => void>;
+} {
+  const cancels: Array<() => void> = [];
+  return {
+    schedule: (work) => {
+      const cancel = vi.fn((): void => undefined);
+      cancels.push(cancel);
+      work();
+      return cancel;
+    },
+    cancels,
+  };
+}
+
+async function settleHydration(index: number): Promise<void> {
+  const resolve = hydrationResolvers[index];
+  if (resolve === undefined) throw new Error(`no hydration pending at ${index}`);
+  resolve();
+  // A macrotask boundary drains every microtask of the then/catch/finally chain.
+  await new Promise<void>((done) => {
+    setTimeout(done, 0);
+  });
+}
+
+/** A raster whose pixels live in IndexedDB, i.e. one whose build is async. */
+function pagedRaster(id: string, lumaAssetId: string): RasterImage {
+  return {
+    ...burnRaster('data:image/png;base64,paged-raster'),
+    id,
+    imageAsset: {
+      schemaVersion: 1,
+      repository: 'curvedesk-import-assets-v1',
+      sourceAssetId: `${lumaAssetId}-source`,
+      lumaAssetId,
+      sourceMimeType: 'image/png',
+      sourceByteLength: 4,
+      lumaByteLength: 4,
+      naturalWidth: 2,
+      naturalHeight: 2,
+      sampledWidth: 2,
+      sampledHeight: 2,
+      thumbnail: {
+        mimeType: 'image/bmp',
+        dataUrl: 'data:image/bmp;base64,paged-thumb',
+        width: 2,
+        height: 2,
+      },
+    },
+  };
 }
 
 function noOpContext(): CanvasRenderingContext2D {
