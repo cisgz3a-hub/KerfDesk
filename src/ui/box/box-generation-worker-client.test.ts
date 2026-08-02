@@ -35,7 +35,7 @@ describe('startBoxGeneration', () => {
   it('returns null when Worker support is unavailable', async () => {
     vi.unstubAllGlobals();
     const client = await loadClient();
-    expect(client.startBoxGeneration(1, SPEC)).toBeNull();
+    expect(client.startBoxGeneration(SPEC)).toBeNull();
   });
 
   it('returns null when the module worker cannot be constructed', async () => {
@@ -44,59 +44,81 @@ describe('startBoxGeneration', () => {
     }
     vi.stubGlobal('Worker', BrokenWorker);
     const client = await loadClient();
-    expect(client.startBoxGeneration(1, SPEC)).toBeNull();
+    expect(client.startBoxGeneration(SPEC)).toBeNull();
   });
 
   it('posts one typed request and resolves the matching result without retiring the worker', async () => {
     const client = await loadClient();
-    const task = requiredTask(client, 7);
+    const task = requiredTask(client);
     const worker = currentWorker();
-    expect(worker.posted).toEqual([{ kind: 'generate', id: 7, spec: SPEC }]);
+    expect(worker.posted).toEqual([{ kind: 'generate', id: task.id, spec: SPEC }]);
 
-    worker.respond(resultFor(7));
+    worker.respond(resultFor(task.id));
 
     await expect(task.promise).resolves.toEqual({ result: GENERATED, metrics: null });
     expect(worker.isTerminated).toBe(false);
   });
 
+  // Callers cannot be trusted to supply unique ids: the box dialog is
+  // conditionally mounted, so its own counter restarts on every reopen while
+  // this module and its warm worker survive.
+  it('mints its own monotonic ids so a reused caller counter cannot collide', async () => {
+    const client = await loadClient();
+    const first = requiredTask(client);
+    first.cancel();
+    const second = requiredTask(client);
+    const third = requiredTask(client);
+    const settled = recordSettlements({ second: second.promise, third: third.promise });
+
+    expect(second.id).toBeGreaterThan(first.id);
+    expect(third.id).toBeGreaterThan(second.id);
+
+    // The cancelled generation still finishes inside the worker; its late
+    // response must not settle either request minted after it.
+    currentWorker().respond(resultFor(first.id));
+    await expect(first.promise).rejects.toBeInstanceOf(client.BoxGenerationCancelledError);
+    expect(settled).toEqual([]);
+  });
+
   it('reuses one warm worker across requests instead of reloading the module graph', async () => {
     const client = await loadClient();
-    const first = requiredTask(client, 1);
-    currentWorker().respond(resultFor(1));
+    const first = requiredTask(client);
+    currentWorker().respond(resultFor(first.id));
     await first.promise;
 
-    const second = requiredTask(client, 2);
-    currentWorker().respond(resultFor(2));
+    const second = requiredTask(client);
+    currentWorker().respond(resultFor(second.id));
     await expect(second.promise).resolves.toEqual({ result: GENERATED, metrics: null });
 
     expect(FakeWorker.instances).toHaveLength(1);
-    expect(currentWorker().posted.map((request) => request.id)).toEqual([1, 2]);
+    expect(currentWorker().posted.map((request) => request.id)).toEqual([first.id, second.id]);
   });
 
   it('drops a cancelled id and keeps the worker serving the next request', async () => {
     const client = await loadClient();
-    const cancelled = requiredTask(client, 1);
+    const cancelled = requiredTask(client);
     const worker = currentWorker();
     cancelled.cancel();
     cancelled.cancel();
-    worker.respond(resultFor(1));
+    worker.respond(resultFor(cancelled.id));
 
     await expect(cancelled.promise).rejects.toBeInstanceOf(client.BoxGenerationCancelledError);
     expect(worker.isTerminated).toBe(false);
 
-    const next = requiredTask(client, 2);
-    worker.respond(resultFor(2));
+    const next = requiredTask(client);
+    worker.respond(resultFor(next.id));
     await expect(next.promise).resolves.toEqual({ result: GENERATED, metrics: null });
     expect(FakeWorker.instances).toHaveLength(1);
   });
 
   it('ignores responses whose id is no longer tracked', async () => {
     const client = await loadClient();
-    const task = requiredTask(client, 2);
+    const task = requiredTask(client);
+    const untracked = task.id + 1;
     const worker = currentWorker();
-    worker.respond(resultFor(3));
-    worker.respond({ kind: 'fatal', id: 3, message: 'superseded geometry failed' });
-    worker.respond(resultFor(2));
+    worker.respond(resultFor(untracked));
+    worker.respond({ kind: 'fatal', id: untracked, message: 'superseded geometry failed' });
+    worker.respond(resultFor(task.id));
 
     await expect(task.promise).resolves.toEqual({ result: GENERATED, metrics: null });
     expect(worker.isTerminated).toBe(false);
@@ -104,8 +126,8 @@ describe('startBoxGeneration', () => {
 
   it('rejects a fatal response for its own id without retiring the worker', async () => {
     const client = await loadClient();
-    const task = requiredTask(client, 3);
-    currentWorker().respond({ kind: 'fatal', id: 3, message: 'geometry failed' });
+    const task = requiredTask(client);
+    currentWorker().respond({ kind: 'fatal', id: task.id, message: 'geometry failed' });
 
     await expect(task.promise).rejects.toThrow('geometry failed');
     expect(currentWorker().isTerminated).toBe(false);
@@ -113,13 +135,13 @@ describe('startBoxGeneration', () => {
 
   it('retires the worker on runtime and deserialization failures and respawns next request', async () => {
     const client = await loadClient();
-    const runtime = requiredTask(client, 4);
+    const runtime = requiredTask(client);
     const runtimeWorker = currentWorker();
     runtimeWorker.onerror?.();
     await expect(runtime.promise).rejects.toThrow('worker errored');
     expect(runtimeWorker.isTerminated).toBe(true);
 
-    const message = requiredTask(client, 5);
+    const message = requiredTask(client);
     expect(FakeWorker.instances).toHaveLength(2);
     currentWorker().onmessageerror?.();
     await expect(message.promise).rejects.toThrow('could not be read');
@@ -134,7 +156,7 @@ describe('startBoxGeneration', () => {
     }
     vi.stubGlobal('Worker', ThrowingWorker);
     const client = await loadClient();
-    const task = requiredTask(client, 6);
+    const task = requiredTask(client);
 
     await expect(task.promise).rejects.toThrow('clone failed');
     expect(currentWorker().isTerminated).toBe(true);
@@ -152,10 +174,23 @@ function resultFor(id: number): BoxGenerationWorkerResponse {
   return { kind: 'result', id, result: GENERATED, metrics: null };
 }
 
-function requiredTask(client: BoxGenerationClient, id: number): BoxGenerationTask {
-  const task = client.startBoxGeneration(id, SPEC);
+function requiredTask(client: BoxGenerationClient): BoxGenerationTask {
+  const task = client.startBoxGeneration(SPEC);
   if (task === null) throw new Error('task missing');
   return task;
+}
+
+// Names every task promise that settles, so a request wrongly answered by a
+// stale response shows up by name instead of as a silent pass.
+function recordSettlements(tasks: Record<string, Promise<unknown>>): ReadonlyArray<string> {
+  const settled: string[] = [];
+  for (const [name, promise] of Object.entries(tasks)) {
+    void promise.then(
+      () => settled.push(name),
+      () => settled.push(name),
+    );
+  }
+  return settled;
 }
 
 function currentWorker(): FakeWorker {

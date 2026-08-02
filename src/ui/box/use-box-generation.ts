@@ -55,11 +55,6 @@ export type BoxGenerationState =
       readonly estimate: BoxWorkEstimate;
     };
 
-type ActiveRequest = {
-  readonly id: number;
-  readonly task: BoxGenerationTask;
-};
-
 type SynchronousFallbackState = Extract<BoxGenerationState, { readonly kind: 'ready' | 'failed' }>;
 
 type SynchronousFallbackCache = {
@@ -77,7 +72,7 @@ type DispatchInput = {
 };
 
 type DispatchTargets = {
-  readonly active: React.MutableRefObject<ActiveRequest | null>;
+  readonly active: React.MutableRefObject<BoxGenerationTask | null>;
   readonly fallbackCache: React.MutableRefObject<SynchronousFallbackCache | null>;
   readonly setState: React.Dispatch<React.SetStateAction<BoxGenerationState>>;
 };
@@ -92,8 +87,10 @@ export function useBoxGeneration(spec: BoxSpec | null): {
 } {
   const [state, setState] = useState<BoxGenerationState>({ kind: 'idle' });
   const [retryToken, setRetryToken] = useState(0);
+  // Identifies the request to the status UI only. It restarts whenever the
+  // dialog remounts, so it must never be used to route worker responses.
   const nextRequestId = useRef(0);
-  const active = useRef<ActiveRequest | null>(null);
+  const active = useRef<BoxGenerationTask | null>(null);
   const synchronousFallbackCache = useRef<SynchronousFallbackCache | null>(null);
   const heldDispatch = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasSupersededLiveWork = useRef(false);
@@ -115,9 +112,13 @@ export function useBoxGeneration(spec: BoxSpec | null): {
     // request is held: the preview on screen no longer matches the form.
     setState({ kind: 'pending', requestId, specKey, estimate });
     const input: DispatchInput = { requestId, specKey, spec: requestedSpec, estimate, retryToken };
+    const targets = { active, fallbackCache: synchronousFallbackCache, setState };
+    // The client mints the worker request id when the request is actually
+    // posted, which the quiet window can defer past this effect body.
+    let dispatchedId: number | null = null;
     const dispatch = (): void => {
       heldDispatch.current = null;
-      dispatchRequest(input, { active, fallbackCache: synchronousFallbackCache, setState });
+      dispatchedId = dispatchRequest(input, targets);
     };
     const isImmediate = isImmediateDispatch({
       isRetry: lastRetryToken.current !== retryToken,
@@ -132,7 +133,7 @@ export function useBoxGeneration(spec: BoxSpec | null): {
       // re-arm the quiet window instead of dispatching straight away.
       if (heldDispatch.current !== null) hasSupersededLiveWork.current = true;
       clearHeldDispatch(heldDispatch);
-      cancelMatchingRequest(active, requestId, hasSupersededLiveWork);
+      cancelMatchingRequest(active, dispatchedId, hasSupersededLiveWork);
     };
   }, [retryToken, specKey]);
 
@@ -142,7 +143,7 @@ export function useBoxGeneration(spec: BoxSpec | null): {
     clearHeldDispatch(heldDispatch);
     const current = active.current;
     active.current = null;
-    current?.task.cancel();
+    current?.cancel();
     setState((value) => (value.kind === 'pending' ? { ...value, kind: 'cancelled' } : value));
   }, []);
   const retry = useCallback((): void => setRetryToken((value) => value + 1), []);
@@ -157,14 +158,17 @@ function clearHeldDispatch(heldDispatch: HeldDispatchRef): void {
   heldDispatch.current = null;
 }
 
-function dispatchRequest(input: DispatchInput, targets: DispatchTargets): void {
-  const task = startBoxGeneration(input.requestId, input.spec);
+// Returns the worker request id this dispatch owns, or null when no worker was
+// available and the spec was generated on the main thread instead.
+function dispatchRequest(input: DispatchInput, targets: DispatchTargets): number | null {
+  const task = startBoxGeneration(input.spec);
   if (task === null) {
     targets.setState(applySynchronousFallback(input, targets.fallbackCache));
-    return;
+    return null;
   }
-  targets.active.current = { id: input.requestId, task };
+  targets.active.current = task;
   settleRequest(task, input, targets.active, targets.setState);
+  return task.id;
 }
 
 function applySynchronousFallback(
@@ -183,13 +187,13 @@ function applySynchronousFallback(
 function settleRequest(
   task: BoxGenerationTask,
   input: DispatchInput,
-  active: React.MutableRefObject<ActiveRequest | null>,
+  active: React.MutableRefObject<BoxGenerationTask | null>,
   setState: React.Dispatch<React.SetStateAction<BoxGenerationState>>,
 ): void {
   const { requestId, specKey, spec, estimate } = input;
   void task.promise
     .then(({ result, metrics }) => {
-      if (!ownsRequest(active, requestId)) return;
+      if (!ownsRequest(active, task.id)) return;
       active.current = null;
       if (result.kind === 'generated' && metrics !== null) {
         setState({
@@ -216,7 +220,7 @@ function settleRequest(
       });
     })
     .catch((error: unknown) => {
-      if (error instanceof BoxGenerationCancelledError || !ownsRequest(active, requestId)) return;
+      if (error instanceof BoxGenerationCancelledError || !ownsRequest(active, task.id)) return;
       active.current = null;
       setState({
         kind: 'failed',
@@ -320,20 +324,22 @@ function failureFromResult(
 }
 
 function ownsRequest(
-  active: React.MutableRefObject<ActiveRequest | null>,
+  active: React.MutableRefObject<BoxGenerationTask | null>,
   requestId: number,
 ): boolean {
   return active.current?.id === requestId;
 }
 
+// A null id means this effect never reached the worker — a still-held dispatch
+// or a synchronous fallback — so there is nothing of its own to cancel.
 function cancelMatchingRequest(
-  active: React.MutableRefObject<ActiveRequest | null>,
-  requestId: number,
+  active: React.MutableRefObject<BoxGenerationTask | null>,
+  requestId: number | null,
   hasSupersededLiveWork: React.MutableRefObject<boolean>,
 ): void {
-  if (!ownsRequest(active, requestId)) return;
+  if (requestId === null || !ownsRequest(active, requestId)) return;
   const current = active.current;
   active.current = null;
-  current?.task.cancel();
+  current?.cancel();
   hasSupersededLiveWork.current = true;
 }

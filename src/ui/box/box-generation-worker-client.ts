@@ -9,7 +9,12 @@
 // Cancel and supersede therefore drop the id instead of terminating: the box
 // generator runs synchronously inside the worker and cannot be interrupted, so
 // a stale generation runs to completion either way and its late response is
-// dropped by id in handleWorkerMessage. Terminate is reserved for the fatal
+// dropped by id in handleWorkerMessage. Request ids are minted here rather than
+// supplied by callers precisely because that dropping is id-based: the box
+// dialog is conditionally mounted, so a component-scoped counter restarts on
+// every reopen and would re-mint the id of a cancelled generation that is still
+// running inside the shared worker — whose late response would then resolve the
+// new request with the old spec's panels. Terminate is reserved for the fatal
 // paths where the worker or its channel can no longer be trusted — runtime
 // error, undeserializable response, and a failed postMessage — after which the
 // next request spawns a fresh worker rather than poisoning the session.
@@ -30,6 +35,8 @@ export class BoxGenerationCancelledError extends Error {
 }
 
 export type BoxGenerationTask = {
+  /** Protocol id this generation was posted under. Unique for the session. */
+  readonly id: number;
   readonly promise: Promise<BoxGenerationWorkerResult>;
   readonly cancel: () => void;
 };
@@ -48,15 +55,19 @@ const WORKER_ERROR_MESSAGE = 'Background box generation worker errored.';
 const MESSAGE_ERROR_MESSAGE = 'Background box generation response could not be read.';
 
 let workerInstance: Worker | null = null;
+let nextRequestId = 0;
 const pendingByRequestId = new Map<number, PendingRequest>();
 
-export function startBoxGeneration(id: number, spec: BoxSpec): BoxGenerationTask | null {
+/**
+ * Post one box generation to the shared worker. The returned task carries the
+ * id the request was posted under so callers can track ownership of the reply.
+ */
+export function startBoxGeneration(spec: BoxSpec): BoxGenerationTask | null {
   const worker = ensureWorker();
   if (worker === null) return null;
+  nextRequestId += 1;
+  const id = nextRequestId;
   const promise = new Promise<BoxGenerationWorkerResult>((resolve, reject) => {
-    // Two live requests can only share an id if a caller reused one; settle the
-    // older promise rather than leaving it pending forever behind the new entry.
-    pendingByRequestId.get(id)?.reject(new BoxGenerationCancelledError());
     pendingByRequestId.set(id, { resolve, reject });
     const request: BoxGenerationWorkerRequest = { kind: 'generate', id, spec };
     try {
@@ -65,7 +76,7 @@ export function startBoxGeneration(id: number, spec: BoxSpec): BoxGenerationTask
       failAllAndRetire(error instanceof Error ? error.message : String(error));
     }
   });
-  return { promise, cancel: () => cancelRequest(id) };
+  return { id, promise, cancel: () => cancelRequest(id) };
 }
 
 function cancelRequest(id: number): void {
