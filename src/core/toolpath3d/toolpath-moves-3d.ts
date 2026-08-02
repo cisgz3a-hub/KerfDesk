@@ -212,7 +212,7 @@ function moveKind(step: ToolpathStep): Move3dKind {
 function movePoints(step: ToolpathStep): ReadonlyArray<Vec3> {
   switch (step.kind) {
     case 'cut':
-      return spanAlongPolyline(step.polyline, step.z);
+      return vertexZPoints(step) ?? spanAlongPolyline(step.polyline, step.z);
     case 'travel':
       return spanAlongPolyline([step.from, step.to], step.z);
     case 'plunge':
@@ -225,11 +225,21 @@ function movePoints(step: ToolpathStep): ReadonlyArray<Vec3> {
   }
 }
 
+// A path3d step carries its true profile in per-vertex zs; drawing from it
+// keeps the toolpath line and the removal-grid mesh in agreement for
+// variable-depth passes (#592 blocker 3). The span lerp below remains the
+// fallback for steps without a usable profile — contours, laser cuts, and
+// sliced partials whose truncated polyline lost the zs correspondence.
+function vertexZPoints(step: Extract<ToolpathStep, { kind: 'cut' }>): ReadonlyArray<Vec3> | null {
+  const zs = step.zs;
+  if (zs === undefined || zs.length !== step.polyline.length) return null;
+  return step.polyline.map((point, index) => ({ x: point.x, y: point.y, z: zs[index] ?? 0 }));
+}
+
 // Distributes a step's Z span along its polyline by cumulative chord length, so
 // a lead-in ramp descends smoothly instead of stepping at one vertex. Where the
 // span is flat — which is every ordinary contour pass — this is exact. Where it
-// is not, it is an even ramp: the model records only the span's endpoints, so
-// the true per-vertex Z of a ramp or drill peck is not recoverable here.
+// is not, it is an even ramp between the recorded endpoints.
 function spanAlongPolyline(
   polyline: ReadonlyArray<PlanarPoint>,
   z: ZSpan | undefined,

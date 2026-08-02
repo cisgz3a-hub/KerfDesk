@@ -46,6 +46,29 @@ function toolpath(steps: Toolpath['steps'], totalLength = 0): Toolpath {
 }
 
 describe('toolpathMoves3d', () => {
+  it('renders a path3d cut at its per-vertex depths, not an endpoint ramp', () => {
+    // A valley whose endpoints sit at the surface: the endpoint span is 0 → 0,
+    // which the old lerp drew as a flat line at Z 0 while the machine dived to
+    // −2 — the drawn line and the carved mesh disagreed (#592 blocker 3).
+    const moves = toolpathMoves3d(
+      toolpath([
+        {
+          kind: 'cut',
+          color: '#000',
+          polyline: [
+            { x: 0, y: 0 },
+            { x: 10, y: 0 },
+            { x: 20, y: 0 },
+          ],
+          length: 20.2,
+          z: { from: 0, to: 0 },
+          zs: [0, -2, 0],
+        },
+      ]),
+    );
+    expect(moves[0]?.points.map((point) => point.z)).toEqual([0, -2, 0]);
+  });
+
   it('holds a flat contour pass at one depth', () => {
     const moves = toolpathMoves3d(
       toolpath([

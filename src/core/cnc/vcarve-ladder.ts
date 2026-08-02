@@ -266,11 +266,18 @@ function passesForRings(
 ): Pick<VCarveLadder, 'passes' | 'entryIssue'> {
   const legacyPasses = legacyPassesForRings(rings, depthPerPassMm, blend);
   if (rampAngleDeg === undefined) return { passes: legacyPasses, entryIssue: null };
-  // The ramp planner descends to one constant depth per ring (ADR-278), so a
-  // ramp-configured layer keeps pitch-depth detail rings; the junction blend
-  // applies to the stepped path.
+  // The ramp planner protects DEEP plunges by descending along the contour to
+  // one depth per ring (ADR-278). Detail rings are shallow and carry the
+  // junction blend's per-vertex profile, which the planner cannot express —
+  // and the emitter's Z-rate cap keeps their entries inside the plunge limit.
+  // So under a ramp, δ rings ramp and detail rings keep the blend (#592
+  // blocker 2: enabling the ramp no longer brings the seam back).
   const passes: CncPass[] = [];
   for (const ring of rings) {
+    if (ring.kind === 'detail') {
+      passes.push(...detailPassesForRing(ring.polyline, depthPerPassMm, blend));
+      continue;
+    }
     const plan = planVCarveRampEntry(ring.polyline, ring.depthMm, depthPerPassMm, rampAngleDeg);
     if (!plan.ok) return { passes: legacyPasses, entryIssue: plan.reason };
     passes.push(...plan.passes);

@@ -417,8 +417,12 @@ function appendPath3dCutMoves(
     const z = fmt(point.z);
     if (x === head.x && y === head.y && z === head.z) continue; // zero-length at emit precision
     // Pure-vertical segments ride the plunge feed, never the XY cutting feed;
-    // the selected lateral feed is re-issued on the next lateral move.
-    const wantFeed = x === head.x && y === head.y ? plunge : lateralFeed;
+    // the selected lateral feed is re-issued on the next lateral move. Sloped
+    // segments cap so the Z-axis rate never exceeds the plunge feed (#592).
+    const wantFeed =
+      x === head.x && y === head.y
+        ? plunge
+        : slopedSegmentFeed(head, { x, y, z }, lateralFeed, plunge);
     const feedWord = modalFeed === wantFeed ? '' : ` F${wantFeed}`;
     modalFeed = wantFeed;
     lines.push(`G1 X${x} Y${y} Z${z}${feedWord}`);
@@ -426,6 +430,27 @@ function appendPath3dCutMoves(
     head.y = y;
     head.z = z;
   }
+}
+
+// A steep XYZ segment moves Z at feed·|dz|/L3d: a 1000 mm/min cut feed on a
+// near-vertical descent drives the Z axis at ~700 mm/min against a 300 mm/min
+// plunge limit (#592 blocker 1 — machine-protection rates are per axis). Cap
+// the segment feed so its Z component never exceeds the plunge feed; flat
+// segments keep the full lateral feed. Coordinates arrive as the emitted
+// 3-decimal strings, so the cap is computed on exactly what the controller
+// will execute.
+function slopedSegmentFeed(
+  head: { readonly x: string | null; readonly y: string | null; readonly z: string | null },
+  next: { readonly x: string; readonly y: string; readonly z: string },
+  lateralFeed: number,
+  plunge: number,
+): number {
+  // No established position (head not set yet) — nothing to slope against.
+  if (head.x === null || head.y === null || head.z === null) return lateralFeed;
+  const dz = Math.abs(Number(next.z) - Number(head.z));
+  if (dz === 0 || !Number.isFinite(dz)) return lateralFeed;
+  const motionMm = Math.hypot(Number(next.x) - Number(head.x), Number(next.y) - Number(head.y), dz);
+  return Math.min(lateralFeed, Math.max(1, Math.round((plunge * motionMm) / dz)));
 }
 
 function appendCutMoves(lines: string[], head: Head, pass: CncContourPass, feed: number): void {

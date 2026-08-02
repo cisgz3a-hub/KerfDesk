@@ -129,15 +129,53 @@ describe('vcarvePasses', () => {
       rampAngleDeg: 3,
     });
     expect(passes.length).toBeGreaterThan(0);
-    expect(passes.length % 2).toBe(0);
-    for (let index = 0; index < passes.length; index += 2) {
-      const ramp = passes[index];
-      const cleanup = passes[index + 1];
+    // Corner-wedge DETAIL rings keep the junction blend under a ramp (#592
+    // blocker 2): they emit as path3d without lateralFeed and interleave with
+    // the δ rings' ramp/cleanup pairs, which must still walk in strict pairs.
+    const rampAndCleanup = passes.filter(
+      (pass) => !(pass.kind === 'path3d' && pass.lateralFeed === undefined),
+    );
+    expect(rampAndCleanup.length).toBeGreaterThan(0);
+    expect(rampAndCleanup.length % 2).toBe(0);
+    for (let index = 0; index < rampAndCleanup.length; index += 2) {
+      const ramp = rampAndCleanup[index];
+      const cleanup = rampAndCleanup[index + 1];
       expect(ramp).toMatchObject({ kind: 'path3d', lateralFeed: 'plunge' });
       expect(cleanup).toMatchObject({ kind: 'contour', closed: true });
       if (ramp?.kind !== 'path3d' || cleanup?.kind !== 'contour') continue;
       expect(ramp.points[0]?.z).toBe(0);
       expect(ramp.points.at(-1)?.z).toBeCloseTo(cleanup.zMm, 9);
+    }
+  });
+
+  it('keeps the junction blend on detail rings when a ramp is configured (#592)', () => {
+    // A thin band is pure detail: with a ramp configured its rings must STILL
+    // carry the per-vertex blend profile instead of reverting to constant
+    // pitch depths — enabling the ramp must not bring the seam back.
+    const thin: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 0.5 },
+        { x: 0, y: 0.5 },
+      ],
+    };
+    const passes = vcarvePasses([thin], {
+      tool: VBIT_90,
+      maxDepthMm: 2,
+      depthPerPassMm: 2,
+      resolutionMm: 0.5,
+      rampAngleDeg: 3,
+    });
+    const blended = passes.filter(
+      (pass) => pass.kind === 'path3d' && pass.lateralFeed === undefined,
+    );
+    expect(blended.length).toBeGreaterThan(0);
+    for (const pass of blended) {
+      if (pass.kind !== 'path3d') continue;
+      const distinctZ = new Set(pass.points.map((point) => point.z));
+      expect(distinctZ.size).toBeGreaterThan(1);
     }
   });
 

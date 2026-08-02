@@ -345,6 +345,30 @@ describe('cncGrblStrategy', () => {
       expect(gcode).toContain('G1 X30.000 Y10.000 Z-1.500 F1000\nG1 X30.000 Y30.000 Z-2.500');
     });
 
+    it('caps a steep XYZ segment so its Z rate never exceeds the plunge feed (#592)', () => {
+      // 1 mm lateral while diving 10 mm: at the 1000 mm/min cut feed the Z
+      // axis would move at 1000·10/√101 ≈ 995 mm/min against a 300 mm/min
+      // plunge limit. The segment feed caps at 300·√101/10 ≈ 301.5 → F301;
+      // the flat segment after it restores the full cut feed.
+      const steep = group({
+        passes: [
+          {
+            kind: 'path3d',
+            points: [
+              { x: 10, y: 10, z: 0 },
+              { x: 11, y: 10, z: -10 },
+              { x: 20, y: 10, z: -10 },
+            ],
+            closed: false,
+          },
+        ],
+      });
+      const gcode = cncGrblStrategy.emit({ groups: [steep] }, dev);
+      expect(gcode).toContain('G1 X11.000 Y10.000 Z-10.000 F301');
+      expect(gcode).not.toContain('G1 X11.000 Y10.000 Z-10.000 F1000');
+      expect(gcode).toContain('G1 X20.000 Y10.000 Z-10.000 F1000');
+    });
+
     it('uses plunge feed for lateral XYZ entry paths that request it', () => {
       const entry = group({
         passes: [
