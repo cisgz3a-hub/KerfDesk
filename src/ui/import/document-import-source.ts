@@ -49,10 +49,7 @@ export async function parseDocumentImportSource(
       }),
     };
   }
-  if (
-    (request.kind === 'lightburn-project' || request.kind === 'lightburn-clb') &&
-    typeof request.blob.stream === 'function'
-  ) {
+  if (isLightBurnDocumentRequest(request) && typeof request.blob.stream === 'function') {
     return parseLightBurnDocumentSource(request, onParsing);
   }
 
@@ -91,6 +88,12 @@ type LightBurnDocumentRequest = Extract<
   DocumentImportWorkerRequest,
   { readonly kind: 'lightburn-project' | 'lightburn-clb' }
 >;
+
+function isLightBurnDocumentRequest(
+  request: DocumentImportWorkerRequest,
+): request is LightBurnDocumentRequest {
+  return request.kind === 'lightburn-project' || request.kind === 'lightburn-clb';
+}
 
 async function parseLightBurnDocumentSource(
   request: LightBurnDocumentRequest,
