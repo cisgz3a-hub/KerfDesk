@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { maskCirclePoints, maskShape } from './mask-shape';
 
@@ -44,5 +45,30 @@ describe('maskShape', () => {
 
   it('gives a point-less contour the documented empty box', () => {
     expect(maskShape('M1', []).bounds).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
+  });
+
+  // The fixed cases above pin the origin-seed regression; this pins the
+  // invariant itself over arbitrary point sets, including ones far from the
+  // origin where a reintroduced 0-seed would silently widen the box.
+  it('reports the tightest box containing every point, wherever they sit', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            x: fc.double({ min: -1e6, max: 1e6, noNaN: true }),
+            y: fc.double({ min: -1e6, max: 1e6, noNaN: true }),
+          }),
+          { minLength: 1, maxLength: 50 },
+        ),
+        (points) => {
+          const { bounds } = maskShape('M1', points);
+
+          expect(bounds.minX).toBe(Math.min(...points.map((point) => point.x)));
+          expect(bounds.minY).toBe(Math.min(...points.map((point) => point.y)));
+          expect(bounds.maxX).toBe(Math.max(...points.map((point) => point.x)));
+          expect(bounds.maxY).toBe(Math.max(...points.map((point) => point.y)));
+        },
+      ),
+    );
   });
 });

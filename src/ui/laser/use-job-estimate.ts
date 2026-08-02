@@ -115,11 +115,12 @@ function useHeldJobOrigin(
   placement: ResolvedJobPlacement,
   placementKey: string,
 ): JobOriginPlacement | undefined {
-  const held = useRef({ key: placementKey, jobOrigin: jobOriginOf(placement) });
-  if (held.current.key !== placementKey) {
-    held.current = { key: placementKey, jobOrigin: jobOriginOf(placement) };
-  }
-  return held.current.jobOrigin;
+  // Keyed on placementKey alone, which IS JSON.stringify(placement): holding by
+  // semantic key is the whole point, so depending on the per-poll-fresh
+  // placement identity would defeat it. Memo rather than a render-time ref
+  // write, so a render React discards leaves nothing behind.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => jobOriginOf(placement), [placementKey]);
 }
 
 function jobOriginOf(placement: ResolvedJobPlacement): JobOriginPlacement | undefined {
