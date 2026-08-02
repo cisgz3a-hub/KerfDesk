@@ -10,6 +10,7 @@ import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
 import { layerCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
 import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
+import { useSourceTrackedState } from '../common/use-source-tracked-state';
 import { RailSection } from '../kit';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
@@ -27,12 +28,17 @@ export function FeedsCalculatorRow(props: {
   // material's numbers under this layer's name.
   const recipe = props.settings.feedSource;
   const tool = machine?.kind === 'cnc' ? layerCncTool(machine, props.settings) : null;
-  const [material, setMaterial] = useState<ChiploadMaterial>(
-    // materialKey is a plain string on the wire, so a foreign or stale .lf2 can
-    // carry a key the chipload chart no longer has.
+  // Follows the layer's own recipe. A plain useState seed froze the picker at
+  // mount, so changing the material (or the bit, which recalculates the
+  // recipe) left this panel previewing AND applying another material's feeds
+  // under this layer's name — the exact failure the header warns about.
+  // materialKey is a plain string on the wire, so a foreign or stale .lf2 can
+  // carry a key the chipload chart no longer has.
+  const [material, setMaterial] = useSourceTrackedState<ChiploadMaterial>(
     recipe?.kind === 'material-recipe' && isChiploadMaterialKey(recipe.materialKey)
       ? recipe.materialKey
       : 'plywood-mdf',
+    fluteContextKey(tool, props.settings),
   );
   const [flutes, setFlutes] = useFluteSelection(tool, props.settings);
   if (machine?.kind !== 'cnc' || tool === null) return null;

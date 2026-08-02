@@ -93,6 +93,44 @@ async function clickSave(
   });
 }
 
+describe('SurfacingPanel stock tracking', () => {
+  // The panel prefills the facing area from the stock footprint. Seeded once
+  // with useState, it kept the mount-time numbers after the operator changed
+  // stock size (or opened another project) and silently faced the wrong area.
+  it('re-prefills the facing area when the stock footprint changes', async () => {
+    const { platform } = mockPlatform();
+    const machine = DEFAULT_CNC_MACHINE_CONFIG;
+    useStore.setState({ project: { ...createProject(DEFAULT_DEVICE_PROFILE), machine } });
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    const created = createRoot(host);
+    root = created;
+    const renderWith = async (stockMachine: typeof machine): Promise<void> => {
+      await act(async () =>
+        created.render(
+          <PlatformProvider adapter={platform}>
+            <SurfacingPanel machine={stockMachine} />
+          </PlatformProvider>,
+        ),
+      );
+    };
+    await renderWith(machine);
+    const widthInput = (): HTMLInputElement => {
+      const found = host?.querySelector('input[aria-label="Surfacing width"]');
+      if (!(found instanceof HTMLInputElement)) throw new Error('Width input missing');
+      return found;
+    };
+    expect(widthInput().value).toBe(String(machine.stock.widthMm));
+
+    const widerStock = {
+      ...machine,
+      stock: { ...machine.stock, widthMm: machine.stock.widthMm + 200 },
+    };
+    await renderWith(widerStock);
+    expect(widthInput().value).toBe(String(widerStock.stock.widthMm));
+  });
+});
+
 describe('SurfacingPanel save path', () => {
   it('writes a preflighted provenance file with safe-Z before M3 and capped feeds', async () => {
     const { platform, write, pickFileForSave } = mockPlatform();

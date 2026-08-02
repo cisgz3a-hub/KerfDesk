@@ -3,9 +3,9 @@
 // square joinery seats into routed slots; a laser kerf has no such limit.
 // The bit diameter prefills from the machine's active bit.
 
-import { useState } from 'react';
 import { activeCncTool } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
+import { useSourceTrackedState } from '../common/use-source-tracked-state';
 import { selectionCanWeld } from '../commands/selection-command-state';
 import { useStore } from '../state';
 
@@ -17,15 +17,22 @@ export function DogboneRow(): JSX.Element | null {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const dogboneSelection = useStore((s) => s.dogboneSelection);
-  const [bitOverrideMm, setBitOverrideMm] = useState<number | null>(null);
   const machine = project.machine;
-  if (machine?.kind !== 'cnc') return null;
+  const cncMachine = machine?.kind === 'cnc' ? machine : null;
+  const activeTool = cncMachine === null ? null : activeCncTool(cncMachine);
+  // Prefills from the active bit and keeps following it: a typed override used
+  // to pin forever, so switching the machine's bit left this row sizing
+  // overcuts to the previous cutter.
+  const [bitMm, setBitMm] = useSourceTrackedState(
+    activeTool?.diameterMm ?? MIN_BIT_MM,
+    activeTool?.id ?? 'no-tool',
+  );
+  if (cncMachine === null) return null;
   const selectedIds = [
     ...(selectedObjectId === null ? [] : [selectedObjectId]),
     ...additionalSelectedIds,
   ];
   if (!selectionCanWeld(project, selectedIds)) return null;
-  const bitMm = bitOverrideMm ?? activeCncTool(machine).diameterMm;
   return (
     <section aria-label="Dogbone corners" style={sectionStyle}>
       <span style={labelStyle}>Dogbone</span>
@@ -37,7 +44,7 @@ export function DogboneRow(): JSX.Element | null {
           max={MAX_BIT_MM}
           step={0.01}
           value={bitMm}
-          onCommit={setBitOverrideMm}
+          onCommit={setBitMm}
           style={inputStyle}
         />
         <span style={unitStyle}>mm</span>
