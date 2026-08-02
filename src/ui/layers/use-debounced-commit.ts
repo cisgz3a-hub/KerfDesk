@@ -18,6 +18,14 @@ export type UseDebouncedCommitArgs<T> = {
   readonly parse: (input: string) => T;
   readonly format?: (value: T) => string;
   readonly debounceMs?: number;
+  // Extra reconciliation trigger for fields whose DISPLAY depends on more
+  // than `value`: a shape field shows spec × transform scale, so a toolbar
+  // resize changes what the box should read while `value` (the spec) stays
+  // put. Without re-reconciling, the stale draft is written back on blur —
+  // silently undoing the resize. Pass the extra display input (e.g. the
+  // scale) here; leave unset for fields whose display is a pure function of
+  // `value`.
+  readonly reconcileKey?: unknown;
 };
 
 export type DebouncedCommit = {
@@ -67,15 +75,17 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   }
 
   // Reconcile when the store changes the canonical value out from under us
-  // (e.g. undo / external setLayerParam from a different surface). We only
-  // overwrite the local draft when the parsed draft doesn't already match —
-  // otherwise the user's in-flight typing would be wiped mid-keystroke.
+  // (e.g. undo / external setLayerParam from a different surface), or when
+  // reconcileKey reports the display mapping itself moved (toolbar resize
+  // rescaling a shape field). We only overwrite the local draft when the
+  // parsed draft doesn't already match — otherwise the user's in-flight
+  // typing would be wiped mid-keystroke.
   useEffect(() => {
     debouncerRef.current?.acknowledge(value);
     if (parseRef.current(draftRef.current) !== value) {
       setDraft(formatRef.current(value));
     }
-  }, [value]);
+  }, [value, args.reconcileKey]);
 
   // Clean up the pending timer on unmount so we don't commit after the
   // component is gone (avoids ghost writes during route changes).
