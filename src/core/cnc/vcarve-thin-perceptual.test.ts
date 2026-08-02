@@ -18,10 +18,10 @@ import { cncGrblStrategy } from '../output';
 import { compileCncJob } from './compile-cnc-job';
 import { THIN_DETAIL_RESOLUTION_MM } from './vcarve-thin-detail';
 
-// Perceptual verification (ADR-025 pattern) for ADR-281: V-carve artwork
+// Perceptual verification (ADR-025 pattern) for ADR-282: V-carve artwork
 // THINNER than the ring pitch through the REAL pipeline (compileCncJob →
 // buildToolpath → removal grid) against the ANALYTIC groove
-// z(x, y) = −min(distToBoundary, maxDepth) at tan(45°) = 1. Before ADR-281
+// z(x, y) = −min(distToBoundary, maxDepth) at tan(45°) = 1. Before ADR-282
 // these fixtures produced NO cutting at all inside the thin strokes — the
 // screenshot bug: a script word carved only in sections.
 
@@ -128,7 +128,7 @@ function removalGridFor(sceneValue: Scene, bboxMachine: ReadonlyArray<Vec2>) {
   );
 }
 
-describe('v-carve thin artwork — perceptual (ADR-281)', () => {
+describe('v-carve thin artwork — perceptual (ADR-282)', () => {
   it('a stroke narrower than 2·δ is carved to its analytic shallow groove, not dropped', () => {
     const points: ReadonlyArray<Vec2> = [
       { x: AT, y: AT },
@@ -166,7 +166,7 @@ describe('v-carve thin artwork — perceptual (ADR-281)', () => {
       }
     }
     expect(insideCells).toBeGreaterThan(0);
-    // Before ADR-281 this was 0.0: the whole stroke was silently dropped.
+    // Before ADR-282 this was 0.0: the whole stroke was silently dropped.
     expect(cutInside / insideCells).toBeGreaterThanOrEqual(0.9);
     expect(maxError).toBeLessThanOrEqual(tolerance);
     expect(errorSum / insideCells).toBeLessThanOrEqual(tolerance / 2);
@@ -191,7 +191,7 @@ describe('v-carve thin artwork — perceptual (ADR-281)', () => {
       polygon,
     );
 
-    // The tail's interior INCLUDING the junction zone (the ADR-281 junction
+    // The tail's interior INCLUDING the junction zone (the ADR-282 junction
     // blend carves true-boundary depths right up to the hand-off; only the
     // near-zero-depth long edges and one cell against the body stay out).
     const tailA = toMachineCoords({ x: AT + 6 + 0.05, y: AT + 2.7 + 0.15 }, DEFAULT_DEVICE_PROFILE);
@@ -218,7 +218,7 @@ describe('v-carve thin artwork — perceptual (ADR-281)', () => {
       }
     }
     expect(tailCells).toBeGreaterThan(0);
-    // Before ADR-281: 0.0 — the connector never received a single cut.
+    // Before ADR-282: 0.0 — the connector never received a single cut.
     expect(tailCut / tailCells).toBeGreaterThanOrEqual(0.9);
     expect(tailMaxError).toBeLessThanOrEqual(tolerance);
   });

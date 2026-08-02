@@ -14697,7 +14697,7 @@ rail are NOT migrated - follow-up work, same primitives. Screen-reader contracts
 still holds). Perceptual verification: before/after screenshots at the 300 px rail width. No G-code,
 state, or behavior changes.
 
-## ADR-281 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
+## ADR-282 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
 
 **Date:** 2026-08-01
 **Status:** Accepted
@@ -14795,7 +14795,7 @@ drop was a fidelity bug against the whole reference field, not a design choice.
 - NOT verified: a physical cut (no hardware available), and the junction under-cut blend is
   bounded analytically but has not been rendered on hardware.
 
-## ADR-281 Amendment - coverage law corrected after the #575 revert (2026-08-01)
+## ADR-282 Amendment - coverage law corrected after the #575 revert (2026-08-01)
 
 **Date:** 2026-08-01
 **Status:** Accepted
@@ -14849,7 +14849,7 @@ panel note) folded in.
 - NOT verified: physical cutting; the junction under-cut blend remains as documented in the
   base decision.
 
-## ADR-281 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
+## ADR-282 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
 
 **Date:** 2026-08-02
 **Status:** Accepted
@@ -14908,7 +14908,7 @@ ring as no cut at all.
 - NOT verified: physical cutting; ramp-configured layers intentionally retain the pre-blend
   seam (documented above); the 3D viewer still shades path3d by endpoint span.
 
-## ADR-281 Amendment 3 - coverage floor and honest pass limits after the #584 revert (2026-08-02)
+## ADR-282 Amendment 3 - coverage floor and honest pass limits after the #584 revert (2026-08-02)
 
 **Date:** 2026-08-02
 **Status:** Accepted
@@ -14921,8 +14921,8 @@ PR #584 reverted the #581 re-land with a fail-closed blocker: a valid 1 degree V
 core unvisited with neither offsetFailed nor thinResidual raised. It also noted the 2 mm probe
 tolerated 14.24 % uncut in-shape cells and therefore could not distinguish full floor coverage
 from interior stripes. All four findings verified and answered here; this Amendment lands with
-the junction blend (Amendment 2). The decision also renumbered from ADR-281 to ADR-281: #578
-claimed ADR-281 for offline imposition while this decision was off main.
+the junction blend (Amendment 2). The decision also renumbered from ADR-282 to ADR-282: #578
+claimed ADR-282 for offline imposition while this decision was off main.
 
 ### Findings and corrections
 
@@ -14972,7 +14972,7 @@ claimed ADR-281 for offline imposition while this decision was off main.
 - NOT verified: physical cutting; ring-count growth on very large clamped floors is bounded
   by the budgets and reported when hit, not eliminated.
 
-## ADR-281 Amendment 4 - motion-safe descents, ramp parity, viewer parity (#592, 2026-08-02)
+## ADR-282 Amendment 4 - motion-safe descents, ramp parity, viewer parity (#592, 2026-08-02)
 
 **Date:** 2026-08-02
 **Status:** Accepted
@@ -14984,7 +14984,7 @@ cut feed, driving the Z axis at ~707 mm/min against a 300 mm/min plunge limit on
 segments — axis protection rates are per axis; (2) a configured ADR-278 ramp bypassed the
 blend, restoring the 0.225 mm junction seam; (3) the 3D viewer drew variable-depth rings from
 the endpoint Z span, so the drawn line disagreed with the vertex-exact removal mesh. All
-three verified real and fixed here. The decision also renumbered ADR-280 → ADR-281: #591
+three verified real and fixed here. The decision also renumbered ADR-280 → ADR-282: #591
 claimed 280 (cone-limited floor depth) while this was off main.
 
 ### Corrections

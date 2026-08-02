@@ -1,4 +1,4 @@
-// detailPath3dPoints — per-vertex depths for thin-detail rings (ADR-281
+// detailPath3dPoints — per-vertex depths for thin-detail rings (ADR-282
 // junction blend).
 //
 // A detail ring's pitch-based depth measures its inset from the SLIVER

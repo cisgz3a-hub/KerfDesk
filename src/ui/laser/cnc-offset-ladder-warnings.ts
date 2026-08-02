@@ -19,7 +19,7 @@ import {
 import { THIN_DETAIL_RESOLUTION_MM } from '../../core/cnc/vcarve-thin-detail';
 import { assertNever, type Project } from '../../core/scene';
 
-// The narrowest groove the fine detail stage can carve (ADR-281).
+// The narrowest groove the fine detail stage can carve (ADR-282).
 const MIN_CARVEABLE_DETAIL_MM = 2 * THIN_DETAIL_RESOLUTION_MM;
 
 export function detectCncOffsetLadderWarnings(project: Project): ReadonlyArray<string> {

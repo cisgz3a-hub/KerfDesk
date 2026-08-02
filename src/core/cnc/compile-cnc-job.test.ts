@@ -201,7 +201,7 @@ describe('compileCncJob', () => {
     expect(first.passes.length).toBeGreaterThan(0);
     // Every v-carve depth stays within the configured max — δ rings as
     // constant-Z contours, corner/thin detail rings as per-vertex path3d
-    // (ADR-281 Amendment 2).
+    // (ADR-282 Amendment 2).
     for (const pass of first.passes) {
       const deepest =
         pass.kind === 'path3d'

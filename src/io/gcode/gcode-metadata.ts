@@ -29,10 +29,10 @@ export type GcodeMetadata = {
  * ADR-238's generic Scan Line entry/exit runway geometry, ADR-270's
  * region-major V-carve traversal, ADR-273's incident-grade CNC provenance,
  * ADR-278's contour ramp, ADR-280's shared cone-limited V-carve floor depth
- * plus ADR-273's secondary-cutter settings provenance, and ADR-281's
+ * plus ADR-273's secondary-cutter settings provenance, and ADR-282's
  * thin-detail stage with the junction blend.
  */
-export const EMITTER_REVISION = 'adr-281-vcarve-junction-blend-v4';
+export const EMITTER_REVISION = 'adr-282-vcarve-junction-blend-v4';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

@@ -139,7 +139,7 @@ describe('two-stage V-carve effective floor depth', () => {
       expect(deepestEmittedZ(cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE))).toBeCloseTo(-3, 9);
 
       if (rampAngleDeg === undefined) {
-        // δ rings are stepped contours; the only path3d passes are ADR-281
+        // δ rings are stepped contours; the only path3d passes are ADR-282
         // detail-blend rings (corner wedges), which carry no lateralFeed.
         expect(
           vcarve.passes.every(
