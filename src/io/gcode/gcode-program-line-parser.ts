@@ -13,6 +13,7 @@ import {
   applySharedGCode,
   arcSweepAngle,
   ijArcCenter,
+  PROGRAM_PARSE_REASON,
   rArcGeometry,
   resolveAxisTarget,
   scanGcodeWords,
@@ -105,11 +106,14 @@ export function createGcodeProgramLineParser(): GcodeProgramLineParser {
   const finish = (): ParseGcodeProgramResult => {
     if (terminalError !== null) return { kind: 'error', reason: terminalError };
     if (recognizedWords === 0) {
-      const at =
-        firstJunkLine === null
-          ? ''
-          : ` (first line ${firstJunkLine.line}: "${firstJunkLine.text.slice(0, 32)}")`;
-      return { kind: 'error', reason: `This does not look like G-code${at}.` };
+      // No junk line means every line parsed cleanly as a comment, blank or
+      // marker: a well-formed program that simply commands nothing, which is
+      // a different fault from unreadable input and has a different fix.
+      if (firstJunkLine === null) {
+        return { kind: 'error', reason: PROGRAM_PARSE_REASON.noMotion };
+      }
+      const at = `First unreadable line ${firstJunkLine.line}: "${firstJunkLine.text.slice(0, 32)}".`;
+      return { kind: 'error', reason: `${PROGRAM_PARSE_REASON.notGcode} ${at}` };
     }
     return {
       kind: 'ok',

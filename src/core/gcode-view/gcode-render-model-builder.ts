@@ -8,6 +8,7 @@ import {
   ARC_EPSILON,
   arcSweepAngle,
   ijArcCenter,
+  PROGRAM_PARSE_REASON,
   rArcGeometry,
   scanGcodeWords,
   stripInlineComments,
@@ -68,11 +69,14 @@ export function createGcodeRenderModelBuilder(
   };
   const categories = createLineCategoryBuilder();
   let lineCount = 0;
+  let junkLines = 0;
   let terminalResult: BuildRenderModelResult | null = null;
 
   const pushLine = (raw: string): void => {
     if (terminalResult !== null) return;
-    categories.push(processLine(context, raw, lineCount));
+    const category = processLine(context, raw, lineCount);
+    categories.push(category);
+    if (category === LINE_CATEGORY.junk) junkLines += 1;
     lineCount += 1;
     const segmentCount = context.segments.count();
     if (options.maxSegments !== undefined && segmentCount > options.maxSegments) {
@@ -90,7 +94,14 @@ export function createGcodeRenderModelBuilder(
   const finish = (): BuildRenderModelResult => {
     if (terminalResult !== null) return terminalResult;
     if (context.recognizedWords === 0) {
-      return { kind: 'error', reason: 'This does not look like G-code.' };
+      // A junk line means the input was never a program. Without one, every
+      // line parsed cleanly as a comment/blank/marker and the program is
+      // simply empty — a distinction the operator has to be told, because the
+      // two have opposite fixes.
+      return {
+        kind: 'error',
+        reason: junkLines === 0 ? PROGRAM_PARSE_REASON.noMotion : PROGRAM_PARSE_REASON.notGcode,
+      };
     }
     const finished = context.segments.finish();
     const renderPressure =
