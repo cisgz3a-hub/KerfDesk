@@ -12,6 +12,7 @@ import { DEFAULT_OUTPUT_SCOPE_SETTINGS, useStore } from './store';
 export function resetStore(): void {
   useStore.setState({
     project: createProject(),
+    projectDocumentEpoch: 0,
     selectedObjectId: null,
     selectedPathNode: null,
     selectedPathNodes: [],

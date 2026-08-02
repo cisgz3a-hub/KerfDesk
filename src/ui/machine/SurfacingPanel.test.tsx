@@ -129,6 +129,40 @@ describe('SurfacingPanel stock tracking', () => {
     await renderWith(widerStock);
     expect(widthInput().value).toBe(String(widerStock.stock.widthMm));
   });
+
+  it('drops a manual area override when an equal-footprint project replaces the document', async () => {
+    const { platform } = mockPlatform();
+    const machine = DEFAULT_CNC_MACHINE_CONFIG;
+    useStore.getState().setProject({ ...createProject(DEFAULT_DEVICE_PROFILE), machine });
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    await act(async () =>
+      root?.render(
+        <PlatformProvider adapter={platform}>
+          <SurfacingPanel machine={machine} />
+        </PlatformProvider>,
+      ),
+    );
+    const input = host.querySelector('input[aria-label="Surfacing width"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('Width input missing');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    if (setter === undefined) throw new Error('Native input value setter missing');
+    await act(async () => {
+      setter.call(input, '777');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+    expect(input.value).toBe('777');
+
+    await act(async () => {
+      useStore.getState().setProject({
+        ...createProject({ ...DEFAULT_DEVICE_PROFILE, profileId: 'replacement-project-device' }),
+        machine: { ...machine, stock: { ...machine.stock } },
+      });
+    });
+    expect(input.value).toBe(String(machine.stock.widthMm));
+  });
 });
 
 describe('SurfacingPanel save path', () => {

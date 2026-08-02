@@ -7,6 +7,19 @@ beforeEach(() => resetStore());
 afterEach(() => resetStore());
 
 describe('project lifecycle machine capability', () => {
+  it('advances document identity on Open and New without following ordinary edits', () => {
+    expect(useStore.getState().projectDocumentEpoch).toBe(0);
+    useStore.setState((state) => ({
+      project: { ...state.project, notes: 'ordinary edit' },
+    }));
+    expect(useStore.getState().projectDocumentEpoch).toBe(0);
+
+    useStore.getState().setProject(createProject());
+    expect(useStore.getState().projectDocumentEpoch).toBe(1);
+    useStore.getState().newProject();
+    expect(useStore.getState().projectDocumentEpoch).toBe(2);
+  });
+
   it('keeps a CNC-only profile in CNC mode after New Project', () => {
     const device = {
       ...useStore.getState().project.device,

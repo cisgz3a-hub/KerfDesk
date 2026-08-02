@@ -23,6 +23,7 @@ export function projectActions(
       set((state) => ({
         ...initialState(resolution.project),
         ...retainedApplicationState(state),
+        projectDocumentEpoch: state.projectDocumentEpoch + 1,
         cachedCncMachine: resolution.cachedCncMachine,
         dirty: resolution.loadResult.kind === 'capability-repaired',
       }));
@@ -43,6 +44,7 @@ export function projectActions(
           // Machine profiles and libraries are app-level. New resets the job,
           // but keeps the configured hardware contract and reusable libraries.
           ...retainedApplicationState(state),
+          projectDocumentEpoch: state.projectDocumentEpoch + 1,
         };
       }),
   };
