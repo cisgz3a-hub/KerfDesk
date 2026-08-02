@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import { deserializeProject, deserializeProjectValue, serializeProject } from '../../io/project';
-import { parseDocumentImportSource } from './document-import-source';
+import {
+  parseDocumentImportSource,
+  PROJECT_NATIVE_JSON_PARSE_MAX_BYTES,
+} from './document-import-source';
 
 describe('parseDocumentImportSource native-project streaming', () => {
   it('uses Blob.stream without retaining a whole decoded source string', async () => {
@@ -13,7 +16,9 @@ describe('parseDocumentImportSource native-project streaming', () => {
       throw new Error('whole Blob.text() is forbidden for production native-project parsing');
     });
     const stream = vi.fn(() => chunkedUtf8Stream(projectText, [1, 7, 31, 127]));
-    const blob = { size: projectText.length, text, stream } as unknown as Blob;
+    // At or above the streaming point the tokenizer stays in charge, whatever
+    // the fixture's real byte length is.
+    const blob = { size: PROJECT_NATIVE_JSON_PARSE_MAX_BYTES, text, stream } as unknown as Blob;
     const onParsing = vi.fn();
 
     const response = await parseDocumentImportSource({ id: 41, kind: 'project', blob }, onParsing);
@@ -34,7 +39,7 @@ describe('parseDocumentImportSource native-project streaming', () => {
       throw new Error('malformed production input must not use Blob.text()');
     });
     const blob = {
-      size: malformed.length,
+      size: PROJECT_NATIVE_JSON_PARSE_MAX_BYTES,
       text,
       stream: () => chunkedUtf8Stream(malformed, [1, 13, 27]),
     } as unknown as Blob;
@@ -55,7 +60,7 @@ describe('parseDocumentImportSource native-project streaming', () => {
     const text = vi.fn(async () => serializeProject(createProject()));
     let pull = 0;
     const blob = {
-      size: 100,
+      size: PROJECT_NATIVE_JSON_PARSE_MAX_BYTES,
       text,
       stream: () =>
         new ReadableStream<Uint8Array>({
@@ -106,7 +111,7 @@ describe('parseDocumentImportSource native-project streaming', () => {
   ])('preserves project notes code units for %s', async (_label, notes) => {
     const projectText = serializeProject({ ...createProject(), notes });
     const blob = {
-      size: projectText.length,
+      size: PROJECT_NATIVE_JSON_PARSE_MAX_BYTES,
       text: vi.fn(async () => {
         throw new Error('string-fidelity cases must use the stream path');
       }),
