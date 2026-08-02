@@ -32,7 +32,15 @@ export function importLightBurnProject(
   if (/<!DOCTYPE|<!ENTITY/i.test(xmlText)) {
     return { ok: false, reason: 'Active XML declarations are not allowed.' };
   }
-  const document = parseXml(xmlText);
+  return importLightBurnProjectDocument(parseXml(xmlText), sourceName);
+}
+
+export function importLightBurnProjectDocument(
+  document: Document,
+  sourceName: string,
+): LbrnImportResult {
+  if (!/\.lbrn2?$/i.test(sourceName))
+    return { ok: false, reason: 'Expected a .lbrn or .lbrn2 project.' };
   const root = document.documentElement;
   if (
     root === null ||

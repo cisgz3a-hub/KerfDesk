@@ -926,3 +926,93 @@ main; fresh GitHub checks remain required on the corrected draft head.
   pressure behavior, or equivalent behavior for native project, LightBurn, or material imports.
 - No hardware, controller, firmware, setting, Frame, Start, deployment, or merge action is part of
   this repair.
+
+## Corrective audit 7 - incremental production LightBurn XML source
+
+**Status:** corrected and re-verified after independent exact-diff audit on current main; final
+audit approval and fresh draft-PR checks pending.
+
+### Finding
+
+- The production document worker called `Blob.text()` before both LightBurn project and CLB
+  parsing. This retained a complete decoded XML source string while the worker also built the
+  output-scaled `linkedom` document and imported result.
+- The already-merged SVG route had an incremental UTF-8/SAX document builder, but it was
+  SVG-specific. Native-project and material-library JSON still use their established whole-text
+  parsers and are not part of this XML-family repair.
+
+### Repair
+
+- LightBurn project and CLB requests now consume `Blob.stream()` through an incremental UTF-8
+  decoder and `saxes`, construct the worker `linkedom` document from SAX events, and pass that
+  document directly to the established project or library importer.
+- The SVG reader and raw-tag compatibility scanner were moved into shared XML modules without
+  changing the SVG production API. The raw-tag fallback still preserves the established
+  `linkedom` attribute semantics for literal whitespace and character references.
+- Main advanced during verification with SVG scanner repair #585. The shared scanner now uses that
+  corrected implementation byte-for-byte, including astral-name handling, SAX-matched DTD states,
+  and its fail-open `null` result when raw replay cannot be paired safely. The generic XML reader
+  also verifies the raw tag name before replay and otherwise uses the already-validated SAX values;
+  scanner drift cannot newly refuse a valid SVG or LightBurn document.
+- Active `DOCTYPE`/`ENTITY` declarations are detected across chunk boundaries, but their existing
+  refusal is applied only after well-formedness validation so malformed-input error ordering stays
+  identical to the text path.
+- Environments without `Blob.stream()` keep the established valid text parser. An active stream
+  failure is propagated without a whole-text retry, partial-result substitution, or new refusal.
+  Worker-constructor fallback, FIFO, cancellation, and progress phase names are unchanged. For the
+  streamed route, `reading` now covers incremental decode plus DOM construction and `parsing`
+  begins before the existing importer pass; malformed or active-declaration failures can therefore
+  finish without a `parsing` phase.
+
+### Test-first verification
+
+- Red: the first two production-source regressions failed because both project and CLB requests
+  invoked a `Blob.text()` spy that throws.
+- Green final focused compatibility suite: 12 files / 88 tests. The 17-case direct suite proves
+  project and CLB streaming, ten checked-in external-corpus parity cases, no-stream fallback,
+  multibyte UTF-8 chunk boundaries, active declarations split across chunks, established
+  extension/declaration precedence, malformed XML without text retry, and propagation after a
+  partial stream failure. Existing SVG streaming plus #585's astral-name, SAX-parity, and
+  8,000-mutant scanner coverage remain green after the shared-module extraction.
+- Green full unit corpus on main `38187ff1`: 1,500 files / 9,299 tests passed, with 14 files / 22
+  tests skipped. The branch was then rebased over path-disjoint CNC-only main commit `a2a1faad`;
+  final-base focused/static/build checks and exact-head GitHub CI cover the published boundary.
+- Green final-base static and repository checks: renderer and E2E TypeScript, full renderer and
+  Electron ESLint, full Prettier, ADR numbering, license, release-integrity 14/14, raw file-size,
+  soft-size report, export ratchet, `git diff --check`, and web/Electron production builds.
+- Green final real Chrome: a measured 24 MiB `.lbrn2` fixture made from bounded 4 KiB XML comments
+  plus one rectangle imported through `document-import-worker` in 8.5 seconds, produced one
+  object/layer, and advanced the reset UI heartbeat before scene commit. No hardware operation was
+  exercised.
+- A compatibility regression was caught during implementation: active declarations were initially
+  reported before malformed XML. The final builder closes the SAX parser first; the corrected
+  malformed-declaration reproduction and the full focused suite pass.
+
+### Independent audit corrections
+
+- The frozen-diff review found a validation-precedence mismatch for a well-formed active
+  declaration sent as a project request with a non-LightBurn filename. The streamed path returned
+  the active-declaration reason before reaching the importer, while the established text path
+  returned the extension reason first. A direct parity test failed 1/17 before repair. The active
+  declaration handler now preserves the established extension result for that case without reading
+  or retaining the whole source string.
+- The review also found that the new shared XML directory lacked its module barrel, leaving three
+  production cross-module imports on deep paths. `src/io/xml/index.ts` now exposes the narrow
+  reader, errors, options, and scanner API; SVG and UI production imports use that boundary.
+- The review narrowed the progress claim: protocol phases remain the same, but streamed decode and
+  DOM construction are `reading`, while `parsing` begins only for the importer pass. The repair and
+  remaining-boundary text now states that timing explicitly.
+
+### Remaining boundary
+
+- The normal production LightBurn worker no longer materializes a whole decoded source string.
+  The original `Blob`, XML DOM, imported scene graph or material result, and transfer result still
+  scale with source/output content. A single enormous XML token can itself be large.
+- The 24 MiB bounded-token browser fixture verifies this route only. It does not establish a
+  greater-than-200 MiB contract, constant total memory, unlimited import, save/autosave/recovery,
+  storage-pressure, or ready-orphan behavior.
+- Native-project and material-library JSON remain whole-text routes. Worker-unavailable or
+  stream-unavailable environments retain the disclosed synchronous/text fallbacks so valid files
+  are not newly refused.
+- No PNG/lifecycle, Trace, Image Editor, hardware, controller, firmware, setting, Frame, Start,
+  deployment, or merge action is part of this repair.

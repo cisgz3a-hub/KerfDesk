@@ -32,7 +32,13 @@ export function importLightBurnClb(
 ): ClbImportResult {
   if (/<!DOCTYPE|<!ENTITY/i.test(xmlText))
     return { ok: false, reason: 'CLB active XML declarations are not allowed.' };
-  const document = parseXml(xmlText);
+  return importLightBurnClbDocument(parseXml(xmlText), sourceName);
+}
+
+export function importLightBurnClbDocument(
+  document: Document,
+  sourceName: string,
+): ClbImportResult {
   if (document.querySelector('parsererror') !== null || document.documentElement === null)
     return { ok: false, reason: 'CLB file is not valid XML.' };
   if (xmlDepth(document.documentElement) > MAX_XML_DEPTH)
