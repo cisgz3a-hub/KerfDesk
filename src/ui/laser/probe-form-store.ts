@@ -31,7 +31,7 @@ export const DEFAULT_CORNER_PROBE_GEOMETRY: CornerProbeGeometryDraft = {
   sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
 };
 
-export type ProbeFormState = {
+export type ProbeFormDraft = {
   readonly mode: ProbeMode;
   readonly corner: ProbeCorner;
   readonly zParams: ZProbeParams;
@@ -40,26 +40,69 @@ export type ProbeFormState = {
   /** Identity of the bit the override was typed against, so a bit change releases it. */
   readonly bitDiameterToolId: string | null;
   readonly cornerGeometry: CornerProbeGeometryDraft;
-  readonly setMode: (mode: ProbeMode) => void;
-  readonly setCorner: (corner: ProbeCorner) => void;
-  readonly setZParams: (params: ZProbeParams) => void;
-  readonly setBitDiameterMm: (value: number, toolId: string) => void;
-  readonly setCornerGeometry: (value: CornerProbeGeometryDraft) => void;
 };
 
-export const useProbeFormStore = create<ProbeFormState>((set) => ({
+export const DEFAULT_PROBE_FORM_DRAFT: ProbeFormDraft = {
   mode: 'z',
   corner: 'front-left',
   zParams: DEFAULT_Z_PROBE_PARAMS,
   bitDiameterMm: null,
   bitDiameterToolId: null,
   cornerGeometry: DEFAULT_CORNER_PROBE_GEOMETRY,
-  setMode: (mode) => set({ mode }),
-  setCorner: (corner) => set({ corner }),
-  setZParams: (zParams) => set({ zParams }),
-  setBitDiameterMm: (bitDiameterMm, bitDiameterToolId) => set({ bitDiameterMm, bitDiameterToolId }),
-  setCornerGeometry: (cornerGeometry) => set({ cornerGeometry }),
+};
+
+export type ProbeFormState = {
+  readonly draftsByContext: Readonly<Record<string, ProbeFormDraft>>;
+  readonly setMode: (contextKey: string, mode: ProbeMode) => void;
+  readonly setCorner: (contextKey: string, corner: ProbeCorner) => void;
+  readonly setZParams: (contextKey: string, params: ZProbeParams) => void;
+  readonly setBitDiameterMm: (contextKey: string, value: number, toolId: string) => void;
+  readonly setCornerGeometry: (contextKey: string, value: CornerProbeGeometryDraft) => void;
+};
+
+type ProbeFormPatch = Partial<ProbeFormDraft>;
+type ProbeFormSetter = (
+  update: (state: ProbeFormState) => Pick<ProbeFormState, 'draftsByContext'>,
+) => void;
+
+export const useProbeFormStore = create<ProbeFormState>((set) => ({
+  draftsByContext: {},
+  setMode: (contextKey, mode) => updateProbeFormDraft(set, contextKey, { mode }),
+  setCorner: (contextKey, corner) => updateProbeFormDraft(set, contextKey, { corner }),
+  setZParams: (contextKey, zParams) => updateProbeFormDraft(set, contextKey, { zParams }),
+  setBitDiameterMm: (contextKey, bitDiameterMm, bitDiameterToolId) =>
+    updateProbeFormDraft(set, contextKey, { bitDiameterMm, bitDiameterToolId }),
+  setCornerGeometry: (contextKey, cornerGeometry) =>
+    updateProbeFormDraft(set, contextKey, { cornerGeometry }),
 }));
+
+export function probeFormContextKey(
+  projectDocumentEpoch: number,
+  probeSetupEpoch: number,
+  controllerSessionEpoch: number,
+): string {
+  return `${projectDocumentEpoch}:${probeSetupEpoch}:${controllerSessionEpoch}`;
+}
+
+export function probeFormForContext(
+  state: Pick<ProbeFormState, 'draftsByContext'>,
+  contextKey: string,
+): ProbeFormDraft {
+  return state.draftsByContext[contextKey] ?? DEFAULT_PROBE_FORM_DRAFT;
+}
+
+function updateProbeFormDraft(
+  set: ProbeFormSetter,
+  contextKey: string,
+  patch: ProbeFormPatch,
+): void {
+  set((state) => ({
+    draftsByContext: {
+      ...state.draftsByContext,
+      [contextKey]: { ...probeFormForContext(state, contextKey), ...patch },
+    },
+  }));
+}
 
 /**
  * The diameter the probe should actually use. An override applies only while
@@ -67,7 +110,7 @@ export const useProbeFormStore = create<ProbeFormState>((set) => ({
  * machine, instead of silently probing with the previous cutter's diameter.
  */
 export function effectiveProbeBitDiameterMm(
-  form: Pick<ProbeFormState, 'bitDiameterMm' | 'bitDiameterToolId'>,
+  form: Pick<ProbeFormDraft, 'bitDiameterMm' | 'bitDiameterToolId'>,
   activeToolId: string,
   activeToolDiameterMm: number,
 ): number {

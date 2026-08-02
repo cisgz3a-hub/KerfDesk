@@ -15,7 +15,13 @@ import {
   type CornerProbeGeometryDraft,
 } from './CornerProbeGeometryFields';
 import { ProbeNumberField } from './ProbeNumberField';
-import { effectiveProbeBitDiameterMm, useProbeFormStore, type ProbeMode } from './probe-form-store';
+import {
+  effectiveProbeBitDiameterMm,
+  probeFormContextKey,
+  probeFormForContext,
+  useProbeFormStore,
+  type ProbeMode,
+} from './probe-form-store';
 
 type ProbeFieldsProps = {
   readonly mode: ProbeMode;
@@ -38,26 +44,24 @@ const CORNERS: ReadonlyArray<{ readonly value: ProbeCorner; readonly label: stri
 ];
 
 export function ProbeControls(): JSX.Element | null {
-  const machine = useStore((s) => s.project.machine);
+  const project = useStore((s) => s.project);
+  const contextKey = useProbeFormContextKey();
+  const machine = project.machine;
   const probingSupported = useLaserStore((s) => s.capabilities.probing);
   const connection = useLaserStore((s) => s.connection);
   const statusReport = useLaserStore((s) => s.statusReport);
   const probeBusy = useLaserStore((s) => s.probeBusy);
   const probe = useLaserStore((s) => s.probe);
   const pushToast = useToastStore((s) => s.pushToast);
-  // One shared form across all three mounts (rail, wizard step, ProbePanel):
-  // per-component state meant plate geometry dialled in one was invisible to
-  // the other, which then probed with defaults.
-  const mode = useProbeFormStore((s) => s.mode);
+  // Every mount in the same document/profile/controller session shares one
+  // draft. Open/New, a committed profile switch, or a new controller session
+  // selects a fresh draft, so plate geometry from a different physical setup
+  // cannot silently become this Run's input.
+  const form = useProbeFormStore((s) => probeFormForContext(s, contextKey));
   const setMode = useProbeFormStore((s) => s.setMode);
-  const corner = useProbeFormStore((s) => s.corner);
   const setCorner = useProbeFormStore((s) => s.setCorner);
-  const zParams = useProbeFormStore((s) => s.zParams);
   const setZParams = useProbeFormStore((s) => s.setZParams);
-  const bitDiameterMm = useProbeFormStore((s) => s.bitDiameterMm);
-  const bitDiameterToolId = useProbeFormStore((s) => s.bitDiameterToolId);
   const setBitDiameterMm = useProbeFormStore((s) => s.setBitDiameterMm);
-  const cornerGeometry = useProbeFormStore((s) => s.cornerGeometry);
   const setCornerGeometry = useProbeFormStore((s) => s.setCornerGeometry);
   if (machine?.kind !== 'cnc') return null;
   if (!probingSupported) {
@@ -77,11 +81,11 @@ export function ProbeControls(): JSX.Element | null {
   // active; swapping bits re-follows the machine rather than probing with the
   // previous cutter's diameter.
   const effectiveBitDiameter = effectiveProbeBitDiameterMm(
-    { bitDiameterMm, bitDiameterToolId },
+    form,
     effectiveTool.id,
     effectiveTool.diameterMm,
   );
-  const toolSupported = mode !== 'corner' || effectiveTool.kind === 'end-mill';
+  const toolSupported = form.mode !== 'corner' || effectiveTool.kind === 'end-mill';
   const readiness = probeControlReadiness({
     isConnected: connection.kind === 'connected',
     isIdle: statusReport?.state === 'Idle',
@@ -91,12 +95,12 @@ export function ProbeControls(): JSX.Element | null {
 
   const run = (): void => {
     const request = buildProbeRequest({
-      mode,
-      zParams,
+      mode: form.mode,
+      zParams: form.zParams,
       bitDiameterMm: effectiveBitDiameter,
       toolKind: effectiveTool.kind,
-      corner,
-      cornerGeometry,
+      corner: form.corner,
+      cornerGeometry: form.cornerGeometry,
     });
     void probe(request).then((result) => {
       const described = describeProbeResult(result);
@@ -107,25 +111,33 @@ export function ProbeControls(): JSX.Element | null {
   return (
     <>
       <p style={hintStyle}>
-        {probeHint(mode)}
+        {probeHint(form.mode)}
         {' Spindle must be off.'}
       </p>
       <ProbeFields
-        mode={mode}
-        corner={corner}
-        zParams={zParams}
+        key={contextKey}
+        mode={form.mode}
+        corner={form.corner}
+        zParams={form.zParams}
         bitDiameterMm={effectiveBitDiameter}
-        cornerGeometry={cornerGeometry}
-        onMode={setMode}
-        onCorner={setCorner}
-        onZParams={setZParams}
-        onBitDiameter={(value) => setBitDiameterMm(value, effectiveTool.id)}
-        onCornerGeometry={setCornerGeometry}
+        cornerGeometry={form.cornerGeometry}
+        onMode={(value) => setMode(contextKey, value)}
+        onCorner={(value) => setCorner(contextKey, value)}
+        onZParams={(value) => setZParams(contextKey, value)}
+        onBitDiameter={(value) => setBitDiameterMm(contextKey, value, effectiveTool.id)}
+        onCornerGeometry={(value) => setCornerGeometry(contextKey, value)}
       />
       <button type="button" onClick={run} disabled={!readiness.ready} title={readiness.title}>
         {probeButtonLabel(probeBusy)}
       </button>
     </>
+  );
+}
+
+function useProbeFormContextKey(): string {
+  const controllerSessionEpoch = useLaserStore((s) => s.controllerSessionEpoch);
+  return useStore((s) =>
+    probeFormContextKey(s.projectDocumentEpoch, s.probeSetupEpoch, controllerSessionEpoch),
   );
 }
 

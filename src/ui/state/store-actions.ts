@@ -82,6 +82,7 @@ export function sceneActions(
       set((s) => {
         return {
           project: projectAfterDeviceProfileChange(s.project, profile, s.cncLiveCaps),
+          probeSetupEpoch: s.probeSetupEpoch + 1,
           jobPlacement: jobPlacementAfterProfileSelection(
             s.jobPlacement,
             s.project.device,
@@ -147,6 +148,7 @@ function replacementMachineSetupState(
       nextProfile,
     ),
     cachedCncMachine: nextCachedCnc,
+    probeSetupEpoch: state.probeSetupEpoch + 1,
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,
@@ -210,6 +212,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
         if (prev === undefined) return s;
         return {
           project: prev,
+          probeSetupEpoch: probeSetupEpochAfterHistoryRestore(s, prev),
           undoStack: s.undoStack.slice(0, -1),
           redoStack: [...s.redoStack, s.project].slice(-HISTORY_DEPTH),
           // Keep the selection whose ids still resolve to a live object in the
@@ -228,6 +231,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
         if (next === undefined) return s;
         return {
           project: next,
+          probeSetupEpoch: probeSetupEpochAfterHistoryRestore(s, next),
           redoStack: s.redoStack.slice(0, -1),
           undoStack: [...s.undoStack, s.project].slice(-HISTORY_DEPTH),
           // Symmetric with undo: keep the selection that still resolves in the
@@ -240,6 +244,12 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
         };
       }),
   };
+}
+
+function probeSetupEpochAfterHistoryRestore(state: AppState, restored: Project): number {
+  return state.project.machine === restored.machine && state.project.device === restored.device
+    ? state.probeSetupEpoch
+    : state.probeSetupEpoch + 1;
 }
 
 export function viewActions(

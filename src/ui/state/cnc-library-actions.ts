@@ -49,8 +49,17 @@ export type CncLibraryActions = {
   readonly deleteCncMachineProfile: (profileId: string) => void;
 };
 
-export const CNC_LIBRARY_STATE_DEFAULTS: { cncLibrary: CncLibrary } = {
+export type CncLibraryState = {
+  readonly cncLibrary: CncLibrary;
+  /** Session identity for the committed machine/probe setup. */
+  readonly probeSetupEpoch: number;
+};
+
+export type CncLibrarySlice = CncLibraryState & CncLibraryActions;
+
+export const CNC_LIBRARY_STATE_DEFAULTS: CncLibraryState = {
   cncLibrary: EMPTY_CNC_LIBRARY,
+  probeSetupEpoch: 0,
 };
 
 export function cncLibraryActions(set: Setter): CncLibraryActions {
@@ -246,6 +255,7 @@ function machineProfileActions(
         });
         return {
           project: { ...s.project, scene, device, machine },
+          probeSetupEpoch: s.probeSetupEpoch + 1,
           undoStack: pushUndo(s.project, s.undoStack),
           redoStack: [],
           dirty: true,

@@ -41,9 +41,8 @@ import { externalGcodeActions, type ExternalGcodePreview } from './external-gcod
 import {
   CNC_LIBRARY_STATE_DEFAULTS,
   cncLibraryActions,
-  type CncLibraryActions,
+  type CncLibrarySlice,
 } from './cnc-library-actions';
-import type { CncLibrary } from './cnc-library-persistence';
 import {
   cncLiveCapsActions,
   type CncLiveCapsActions,
@@ -180,7 +179,7 @@ export type AppState = ObjectPropertiesActions &
   ReturnType<typeof currentSavedLibrariesState> &
   SavedLibrariesActions &
   MaterialPresetActions &
-  CncLibraryActions &
+  CncLibrarySlice &
   CncLiveCapsState &
   CncLiveCapsActions &
   MachineActions &
@@ -203,9 +202,6 @@ export type AppState = ObjectPropertiesActions &
     // operates on the primary selection. Move + Delete are multi-aware.
     readonly additionalSelectedIds: ReadonlySet<string>;
     readonly previewMode: boolean;
-    // App-level CNC library (H.7): custom bits, feed presets, machine
-    // profiles. Restored/persisted by use-cnc-library-persistence.
-    readonly cncLibrary: CncLibrary;
     // External .nc program shown in the simulator instead of the compiled
     // job (H.6b); cleared when Preview exits. Session-only, never persisted.
     readonly externalGcodePreview: ExternalGcodePreview | null;
@@ -373,6 +369,7 @@ function initialState(
   AppState,
   | 'project'
   | 'projectDocumentEpoch'
+  | 'probeSetupEpoch'
   | 'cachedCncMachine'
   | 'cncLiveCaps'
   | 'selectedObjectId'

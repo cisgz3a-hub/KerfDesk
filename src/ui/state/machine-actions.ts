@@ -40,6 +40,7 @@ type MachineState = {
   readonly jobPlacement: JobPlacementSettings;
   readonly cachedCncMachine: CncMachineConfig | null;
   readonly cncLiveCaps: CncMachineStarterLiveCaps | null;
+  readonly probeSetupEpoch: number;
   // App-level custom bits (H.7) merge into every CNC session's tool list.
   readonly cncLibrary: CncLibrary;
 };
@@ -259,6 +260,7 @@ function cncMachineSetupStatePatch(
   };
   return {
     project,
+    probeSetupEpoch: state.probeSetupEpoch + 1,
     jobPlacement:
       patch.deviceProfile === undefined
         ? jobPlacementAfterDeviceChange(state.jobPlacement, state.project.device, deviceWithCnc)
