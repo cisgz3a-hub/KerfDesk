@@ -27,10 +27,30 @@ export type SaveOutputPreparationRequest = {
 export type OutputPreparationRequest = StartOutputPreparationRequest | SaveOutputPreparationRequest;
 
 /**
- * One-shot worker response. Save callers must branch on `result.kind` because
- * `preparation-failed` and `emission-refused` carry no writable G-code.
+ * Worker response for one preparation. Save callers must branch on
+ * `result.kind` because `preparation-failed` and `emission-refused` carry no
+ * writable G-code.
  */
 export type OutputPreparationResponse =
   | { readonly kind: 'start'; readonly result: StartJobPreparation }
   | { readonly kind: 'save'; readonly result: SaveOutputEmission }
   | { readonly kind: 'error'; readonly message: string };
+
+/**
+ * One request addressed to the shared preparation worker. The worker serves
+ * many Start and Save preparations over its lifetime, and Start's handoff
+ * consistency requires the streamed program to be the exact one that was
+ * reviewed — so the id travels with the request and comes back on its
+ * response. The request is carried unmodified in its own field: the worker
+ * reads nothing but `request`, so no correlation field can reach the compile.
+ */
+export type OutputPreparationEnvelope = {
+  readonly requestId: number;
+  readonly request: OutputPreparationRequest;
+};
+
+/** Worker reply, correlated to its originating request by `requestId`. */
+export type OutputPreparationResult = {
+  readonly requestId: number;
+  readonly response: OutputPreparationResponse;
+};

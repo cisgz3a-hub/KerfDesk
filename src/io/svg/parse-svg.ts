@@ -25,6 +25,7 @@ import {
   translateSvgMatrix,
 } from './svg-transform-attribute';
 import { elementToSubPaths } from './shape-to-polylines';
+import { createSvgIdResolver, type SvgIdResolver } from './svg-id-resolver';
 import { linearScaleMagnitude } from './transform-scale';
 import {
   assertSvgImportPoints,
@@ -135,12 +136,20 @@ const INITIAL_PRESENTATION_STATE: PresentationState = {
 
 type PathBucket = { readonly polylines: Polyline[]; readonly curves: CurveSubpath[] };
 
+// Everything the walk carries besides the element and its inherited state.
+// Bundled so the id resolver reaches <use> expansion without pushing the
+// recursive walkers past the project's parameter-count limit.
+type WalkContext = {
+  readonly byColor: Map<string, PathBucket>;
+  readonly counts: { text: number; image: number };
+  readonly budget: SvgImportBudget;
+  readonly resolveId: SvgIdResolver;
+};
+
 function walkGeometry(
   svgEl: Element,
-  byColor: Map<string, PathBucket>,
-  counts: { text: number; image: number },
+  context: WalkContext,
   unitScale: { readonly scaleX: number; readonly scaleY: number },
-  budget: SvgImportBudget,
 ): void {
   // The unit scale seeds the transform stack root so every element's
   // geometry lands in mm (H9), composing with element/group transforms.
@@ -149,7 +158,7 @@ function walkGeometry(
     transform: { a: unitScale.scaleX, b: 0, c: 0, d: unitScale.scaleY, e: 0, f: 0 },
   });
   for (const child of Array.from(svgEl.children)) {
-    walkElement(child, rootState, byColor, counts, budget, 0);
+    walkElement(child, rootState, context, 0);
   }
 }
 
@@ -162,43 +171,38 @@ const MAX_WALK_DEPTH = 256;
 function walkElement(
   el: Element,
   parent: PresentationState,
-  byColor: Map<string, PathBucket>,
-  counts: { text: number; image: number },
-  budget: SvgImportBudget,
+  context: WalkContext,
   depth: number,
 ): void {
   if (depth > MAX_WALK_DEPTH) return;
   const state = presentationStateFor(el, parent);
   const tag = el.tagName.toLowerCase();
   if (tag === 'text' || tag === 'tspan') {
-    counts.text += 1;
+    context.counts.text += 1;
   } else if (tag === 'image') {
-    counts.image += 1;
+    context.counts.image += 1;
   } else if (tag === 'defs' || tag === 'symbol') {
     return;
   } else if (tag === 'use' && !state.hidden) {
-    appendUseGeometry(el, state, byColor, counts, budget, depth);
+    appendUseGeometry(el, state, context, depth);
   } else if (!state.hidden) {
-    appendElementGeometry(el, state, byColor, budget);
+    appendElementGeometry(el, state, context);
   }
 
   for (const child of Array.from(el.children)) {
-    walkElement(child, state, byColor, counts, budget, depth + 1);
+    walkElement(child, state, context, depth + 1);
   }
 }
 
 function appendUseGeometry(
   el: Element,
   state: PresentationState,
-  byColor: Map<string, PathBucket>,
-  counts: { text: number; image: number },
-  budget: SvgImportBudget,
+  context: WalkContext,
   depth: number,
 ): void {
   const href = el.getAttribute('href') ?? el.getAttribute('xlink:href');
   if (href === null || !href.startsWith('#') || href.length <= 1) return;
-  const owner = el.ownerDocument;
-  const referenced = owner.getElementById(href.slice(1));
+  const referenced = context.resolveId(href.slice(1));
   if (referenced === null || referenced === el) return;
   const placedState = {
     ...state,
@@ -208,18 +212,13 @@ function appendUseGeometry(
     ),
   };
   if (isDefinitionContainer(referenced)) {
-    walkReferencedDefinition(referenced, placedState, byColor, counts, budget, depth + 1);
+    walkReferencedDefinition(referenced, placedState, context, depth + 1);
     return;
   }
-  walkElement(referenced, placedState, byColor, counts, budget, depth + 1);
+  walkElement(referenced, placedState, context, depth + 1);
 }
 
-function appendElementGeometry(
-  el: Element,
-  state: PresentationState,
-  byColor: Map<string, PathBucket>,
-  budget: SvgImportBudget,
-): void {
+function appendElementGeometry(el: Element, state: PresentationState, context: WalkContext): void {
   // Flatten curves/arcs to a scene-mm tolerance, not user-units, by dividing
   // the mm chord tolerance by this transform's distance stretch (audit C2).
   const t = state.transform;
@@ -229,9 +228,9 @@ function appendElementGeometry(
   const fillColor = state.fillOpacity > 0 ? normalizeColor(state.fill) : '';
   const color = strokeColor !== '' ? strokeColor : fillColor;
   if (color === '') return;
-  const bucket = byColor.get(color) ?? { polylines: [], curves: [] };
+  const bucket = context.byColor.get(color) ?? { polylines: [], curves: [] };
   for (const sub of subs) {
-    reserveSvgPolyline(color, sub.points.length, budget);
+    reserveSvgPolyline(color, sub.points.length, context.budget);
     const points = sub.points.map((p) => applySvgMatrix(state.transform, p));
     assertSvgImportPoints(points);
     const polyline = {
@@ -245,7 +244,7 @@ function appendElementGeometry(
         : transformSvgCurveSubpath(sub.curve, state.transform),
     );
   }
-  byColor.set(color, bucket);
+  context.byColor.set(color, bucket);
 }
 
 function isDefinitionContainer(el: Element): boolean {
@@ -256,29 +255,31 @@ function isDefinitionContainer(el: Element): boolean {
 function walkReferencedDefinition(
   el: Element,
   parent: PresentationState,
-  byColor: Map<string, PathBucket>,
-  counts: { text: number; image: number },
-  budget: SvgImportBudget,
+  context: WalkContext,
   depth: number,
 ): void {
   const state = presentationStateFor(el, parent);
   for (const child of Array.from(el.children)) {
-    walkElement(child, state, byColor, counts, budget, depth + 1);
+    walkElement(child, state, context, depth + 1);
   }
 }
 
 function presentationStateFor(el: Element, parent: PresentationState): PresentationState {
-  const stroke = presentationValue(el, 'stroke') ?? parent.stroke;
-  const fill = presentationValue(el, 'fill') ?? parent.fill;
-  const visibility = presentationValue(el, 'visibility') ?? parent.visibility;
-  const display = presentationValue(el, 'display');
-  const opacity = parent.opacity * parseOpacity(presentationValue(el, 'opacity'));
+  // Parsed once and passed down: each of the eight lookups below used to re-read
+  // and re-split the whole style attribute for the same element.
+  const styles = styleMap(el.getAttribute('style'));
+  const stroke = presentationValue(el, styles, 'stroke') ?? parent.stroke;
+  const fill = presentationValue(el, styles, 'fill') ?? parent.fill;
+  const visibility = presentationValue(el, styles, 'visibility') ?? parent.visibility;
+  const display = presentationValue(el, styles, 'display');
+  const opacity = parent.opacity * parseOpacity(presentationValue(el, styles, 'opacity'));
   const strokeOpacity =
-    parent.strokeOpacity * parseOpacity(presentationValue(el, 'stroke-opacity'));
-  const fillOpacity = parent.fillOpacity * parseOpacity(presentationValue(el, 'fill-opacity'));
+    parent.strokeOpacity * parseOpacity(presentationValue(el, styles, 'stroke-opacity'));
+  const fillOpacity =
+    parent.fillOpacity * parseOpacity(presentationValue(el, styles, 'fill-opacity'));
   const transform = multiplySvgMatrix(
     parent.transform,
-    parseSvgTransform(presentationValue(el, 'transform')),
+    parseSvgTransform(presentationValue(el, styles, 'transform')),
   );
   const normalizedVisibility = visibility?.trim().toLowerCase();
   const hidden =
@@ -307,8 +308,12 @@ function numAttr(el: Element, name: string, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function presentationValue(el: Element, name: string): string | null {
-  const styleValue = styleMap(el.getAttribute('style')).get(name);
+function presentationValue(
+  el: Element,
+  styles: ReadonlyMap<string, string>,
+  name: string,
+): string | null {
+  const styleValue = styles.get(name);
   if (styleValue !== undefined) return styleValue;
   return el.getAttribute(name);
 }
@@ -365,7 +370,11 @@ export function parseSvgDocument(
   const byColor = new Map<string, PathBucket>();
   const counts = { text: 0, image: 0 };
   const budget = createSvgImportBudget();
-  walkGeometry(svgEl, byColor, counts, unitScale, budget);
+  walkGeometry(
+    svgEl,
+    { byColor, counts, budget, resolveId: createSvgIdResolver(svgEl) },
+    unitScale,
+  );
 
   const paths: ColoredPath[] = [...byColor.entries()].map(([color, bucket]) => ({
     color,

@@ -2,6 +2,7 @@
 // (ADR-255 stage 4). Presentational: every number comes from the pure
 // readout helpers, and the traversal toggle uses LightBurn's exact wording.
 
+import { useMemo } from 'react';
 import type { ProgramTimeModel } from '../../core/gcode-time';
 import type { GcodeRenderModel, ProgramFinding } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
@@ -31,6 +32,16 @@ export function InspectorSidebar(props: {
   readonly onTravelVisibleChange: (visible: boolean) => void;
   readonly onLocateLine: (line: number) => void;
 }): JSX.Element {
+  // Playback re-renders this column every animation frame, and both of these
+  // scan every segment (statsRows through countFeedLimited + timeSplit,
+  // lensLegend through the per-kind counts). Neither can change while only
+  // the playhead moves, so they are derived per PROGRAM, not per frame.
+  // droRows stays inline: it reads one segment and is O(1).
+  const stats = useMemo(() => statsRows(props.model, props.time), [props.model, props.time]);
+  const legend = useMemo(
+    () => lensLegend(props.model, props.time, props.lens, props.theme),
+    [props.model, props.time, props.lens, props.theme],
+  );
   return (
     <aside style={sidebarStyle} aria-label="Program readouts">
       <Section title="Position">
@@ -50,7 +61,7 @@ export function InspectorSidebar(props: {
             </option>
           ))}
         </select>
-        <Legend legend={lensLegend(props.model, props.time, props.lens, props.theme)} />
+        <Legend legend={legend} />
         <label style={toggleStyle}>
           <input
             type="checkbox"
@@ -71,7 +82,7 @@ export function InspectorSidebar(props: {
         </label>
       </Section>
       <Section title="Program">
-        <ReadoutGrid rows={statsRows(props.model, props.time)} />
+        <ReadoutGrid rows={stats} />
       </Section>
       <InspectorHealthPanel findings={props.findings} onLocate={props.onLocateLine} />
     </aside>

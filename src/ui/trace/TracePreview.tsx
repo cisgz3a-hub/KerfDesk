@@ -6,7 +6,7 @@
    material, ADR-047 exception): its dark-on-light status text and the
    purple trace markers are file-local literals, not chrome tokens. */
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { normalizeTraceBoundary, type TraceBoundary } from '../../core/trace';
 import type { TracePreviewState } from './use-trace-preview';
@@ -174,8 +174,28 @@ function TracePointsOverlay(props: {
   readonly state: Extract<TracePreviewState, { readonly kind: 'ready' }>;
 }): JSX.Element {
   const { state } = props;
-  const points = state.paths.flatMap((path) =>
-    path.polylines.flatMap((polyline) => polyline.points),
+  // Memoized on the paths identity: the preview frame re-renders on every
+  // mousemove during a boundary drag, and rebuilding one <circle> element per
+  // sampled point (thousands on a busy trace) made React re-reconcile the
+  // whole overlay per pointer event. Cached element identities let React bail
+  // out of that reconciliation. Rendering ALL points stays deliberate —
+  // decimating or capping them would be a visible behavior change.
+  const circles = useMemo(
+    () =>
+      state.paths
+        .flatMap((path) => path.polylines.flatMap((polyline) => polyline.points))
+        .map((point, index) => (
+          <circle
+            key={`${index}:${point.x}:${point.y}`}
+            cx={point.x}
+            cy={point.y}
+            r={POINT_RADIUS_PX}
+            fill={POINT_FILL_COLOR}
+            stroke={POINT_STROKE_COLOR}
+            strokeWidth={POINT_STROKE_WIDTH_PX}
+          />
+        )),
+    [state.paths],
   );
   return (
     <svg
@@ -186,17 +206,7 @@ function TracePointsOverlay(props: {
       height="100%"
       preserveAspectRatio="xMidYMid meet"
     >
-      {points.map((point, index) => (
-        <circle
-          key={`${index}:${point.x}:${point.y}`}
-          cx={point.x}
-          cy={point.y}
-          r={POINT_RADIUS_PX}
-          fill={POINT_FILL_COLOR}
-          stroke={POINT_STROKE_COLOR}
-          strokeWidth={POINT_STROKE_WIDTH_PX}
-        />
-      ))}
+      {circles}
     </svg>
   );
 }

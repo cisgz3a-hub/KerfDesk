@@ -27,6 +27,8 @@ import { AccessoryResetControls } from './AccessoryResetControls';
 import { IslandFillRecoveryAction } from './IslandFillRecoveryAction';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 import { StartFromLineControl } from './StartFromLineControl';
+import { useExecutionSignatureAppState } from './use-execution-signature-app-state';
+import { useFramedRunLaserState } from './use-framed-run-laser-state';
 import { useFrameAction } from './use-frame-action';
 import { useJobEstimate } from './use-job-estimate';
 import { NoHomingPositionGuide } from './NoHomingPositionGuide';
@@ -152,10 +154,12 @@ function useSetupRowModel(props: { readonly disabled: boolean; readonly streamin
   const onFrame = useFrameAction();
   const onAutofocus = useAutofocusAction();
   // A permit can become stale from an artwork, scope, placement, controller,
-  // or rotary-policy change. Subscribe to the owning stores so the status text
-  // changes immediately; Start repeats the same comparison at handoff.
-  const app = useStore();
-  const laser = useLaserStore();
+  // or rotary-policy change. Subscribe to exactly the fields that comparison
+  // reads so the status text changes immediately without the whole rail
+  // re-rendering per mousemove and per controller ack; Start repeats the same
+  // comparison at handoff.
+  const app = useExecutionSignatureAppState();
+  const laser = useFramedRunLaserState();
   // The resolved rotary-raster policy is part of the framed environment but
   // lives outside the app store, so subscribe explicitly for immediate expiry.
   useExperimentalLaserFeatures((s) => s.features.rotaryRaster);

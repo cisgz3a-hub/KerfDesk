@@ -7,6 +7,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../scene';
+import { isInsideRowCrossings, maskRowCrossings, type MaskContours } from './mask-scanline';
 
 const WHITE_LUMA_BYTE = 255;
 const MIN_MASK_POINTS = 3;
@@ -50,7 +51,51 @@ export function createImageMaskPixelTest(
   if (maskObject?.id !== image.imageMaskId) return null;
   const contours = closedMaskContours(maskObject);
   if (contours.length === 0) return null;
-  return (x, y) => pointInEvenOdd(pixelCenterInScene(image, x, y, width, height), contours);
+  return createRowScanlineTest(image, contours, width, height);
+}
+
+// Every pixel on a scan line shares one crossing list, and both callers walk a
+// row's pixels together, so caching the current row turns the mask test from
+// O(pixels x contourPoints) into O(rows x contourPoints + pixels x log
+// crossings). A row that is not a scene-space scan line keeps the exact
+// per-pixel test.
+function createRowScanlineTest(
+  image: RasterImage,
+  contours: MaskContours,
+  width: number,
+  height: number,
+): (x: number, y: number) => boolean {
+  let cachedRow: number | null = null;
+  let cachedCrossings: Float64Array | null = null;
+  return (x, y) => {
+    if (cachedRow !== y) {
+      cachedRow = y;
+      cachedCrossings = horizontalRowCrossings(image, contours, y, width, height);
+    }
+    const point = pixelCenterInScene(image, x, y, width, height);
+    return cachedCrossings === null
+      ? pointInEvenOdd(point, contours)
+      : isInsideRowCrossings(cachedCrossings, point.x);
+  };
+}
+
+// A pixel row lies on ONE scene-space scan line only when the object transform
+// contributes no rotation to its scene y. Every step from pixel x to scene y is
+// monotonic in x — and IEEE rounding is monotonic too — so equal scene y at
+// both ends of the row proves every pixel between them shares that y, which
+// also covers the 1e-16 sine dust Math.sin leaves at 180 and 360 degrees.
+// Rotated rows (and any NaN transform, which fails the equality) return null.
+function horizontalRowCrossings(
+  image: RasterImage,
+  contours: MaskContours,
+  y: number,
+  width: number,
+  height: number,
+): Float64Array | null {
+  const firstY = pixelCenterInScene(image, 0, y, width, height).y;
+  const lastY = pixelCenterInScene(image, width - 1, y, width, height).y;
+  if (firstY !== lastY) return null;
+  return maskRowCrossings(contours, firstY);
 }
 
 export function hasClosedImageMaskGeometry(object: SceneObject): boolean {
@@ -96,7 +141,7 @@ function pixelCenterInScene(
   return applyTransform(local, image.transform);
 }
 
-function pointInEvenOdd(point: Vec2, contours: ReadonlyArray<ReadonlyArray<Vec2>>): boolean {
+function pointInEvenOdd(point: Vec2, contours: MaskContours): boolean {
   let inside = false;
   for (const contour of contours) {
     for (let i = 0; i < contour.length; i += 1) {

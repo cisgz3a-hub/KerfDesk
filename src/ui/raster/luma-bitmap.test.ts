@@ -5,7 +5,39 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { VectorRaster } from '../../core/raster';
-import { lumaToBase64, lumaToBitmap, lumaToRgba } from './luma-bitmap';
+import { LUMA_BINARY_CHUNK_BYTES, lumaToBase64, lumaToBitmap, lumaToRgba } from './luma-bitmap';
+
+// Linear congruential generator (Numerical Recipes constants) so every
+// "random" buffer below is reproducible from its seed — a mismatch reported
+// by CI can be replayed byte-for-byte.
+const LCG_MULTIPLIER = 1664525;
+const LCG_INCREMENT = 1013904223;
+const LCG_MODULUS = 2 ** 32;
+const BYTE_VALUES = 256;
+const RANDOM_CASE_SEEDS = [11, 29, 83, 157, 911];
+// Prime stride so each random case lands at a different phase relative to the
+// chunk boundary rather than repeating the same alignment.
+const RANDOM_LENGTH_STRIDE = 7919;
+
+function seededBytes(length: number, seed: number): Uint8Array {
+  const bytes = new Uint8Array(length);
+  let state = seed;
+  for (let i = 0; i < length; i += 1) {
+    state = (state * LCG_MULTIPLIER + LCG_INCREMENT) % LCG_MODULUS;
+    bytes[i] = state % BYTE_VALUES;
+  }
+  return bytes;
+}
+
+// The pre-fix algorithm, kept as the oracle: one String.fromCharCode call and
+// one string append per byte. The chunked encoder must be byte-identical to it.
+function lumaToBase64PerChar(luma: Uint8Array): string {
+  let bin = '';
+  for (const v of luma) {
+    bin += String.fromCharCode(v);
+  }
+  return btoa(bin);
+}
 
 function raster(luma: ReadonlyArray<number>, width: number, height: number): VectorRaster {
   return { luma: new Uint8Array(luma), width, height };
@@ -44,6 +76,37 @@ describe('lumaToBase64', () => {
 
   it('encodes an empty buffer as an empty string', () => {
     expect(lumaToBase64(new Uint8Array(0))).toBe('');
+  });
+});
+
+describe('lumaToBase64 chunked encoding', () => {
+  // A full-bed 8.4M-pixel convert-to-bitmap runs this encoder on the React
+  // thread whenever the worker is unavailable, so the cost must scale with
+  // chunks, not with pixels: one fromCharCode call per chunk, not per byte.
+  it('calls String.fromCharCode once per chunk rather than once per byte', () => {
+    const length = LUMA_BINARY_CHUNK_BYTES * 2 + 5;
+    const fromCharCode = vi.spyOn(String, 'fromCharCode');
+
+    lumaToBase64(seededBytes(length, RANDOM_CASE_SEEDS[0] ?? 1));
+
+    expect(fromCharCode).toHaveBeenCalledTimes(Math.ceil(length / LUMA_BINARY_CHUNK_BYTES));
+  });
+
+  it.each([
+    0,
+    1,
+    LUMA_BINARY_CHUNK_BYTES - 1,
+    LUMA_BINARY_CHUNK_BYTES,
+    LUMA_BINARY_CHUNK_BYTES + 1,
+    LUMA_BINARY_CHUNK_BYTES * 2 + 7,
+  ])('matches the per-char encoder byte-for-byte at %i bytes', (length) => {
+    const bytes = seededBytes(length, length + 1);
+    expect(lumaToBase64(bytes)).toBe(lumaToBase64PerChar(bytes));
+  });
+
+  it.each(RANDOM_CASE_SEEDS)('matches the per-char encoder on random bytes (seed %i)', (seed) => {
+    const bytes = seededBytes(seed * RANDOM_LENGTH_STRIDE, seed);
+    expect(lumaToBase64(bytes)).toBe(lumaToBase64PerChar(bytes));
   });
 });
 

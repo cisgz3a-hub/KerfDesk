@@ -6,6 +6,8 @@
 // system, but separate windows keep separate slots so one dirty project
 // cannot overwrite or clear another.
 //
+// The interval that drives this on a timer lives in ./autosave-loop.
+//
 // Boundaries:
 //   * localStorage only - works web + Electron renderer; roughly 5 MB cap.
 //   * Pauses during live streaming so the render loop owns the CPU.
@@ -126,8 +128,26 @@ function readAutosaveAtKey(storageKey: string): AutosaveSnapshot | null {
   return { project: result.project, savedAt: record.savedAt, storageKey };
 }
 
+// How many times the recovery slot has been emptied. Clearing is the one event
+// a background writer cannot see for itself: it can remember what it wrote, but
+// not that a manual save then dropped it. Verifying by re-reading the slot would
+// pull a possibly hundreds-of-megabyte record back out of localStorage on every
+// tick, which is exactly the cost such a memo exists to avoid — a counter says
+// the same thing for free.
+let autosaveClearCount = 0;
+
+// Monotonic stamp of the slot's clear history: a memo about the slot's contents
+// is only still true if it was taken at the current generation.
+export function autosaveSlotGeneration(): number {
+  return autosaveClearCount;
+}
+
 export function clearAutosave(target: AutosaveScope | AutosaveSnapshot = {}): void {
   if (typeof localStorage === 'undefined') return;
+  // Bump for any clear, including one aimed at another window session's key:
+  // over-reporting costs a memoizing writer one redundant write, while
+  // under-reporting leaves the slot empty and the operator's work unprotected.
+  autosaveClearCount += 1;
   const keys = 'storageKey' in target ? [target.storageKey] : keysForClearScope(target);
   for (const storageKey of keys) {
     try {
@@ -137,30 +157,6 @@ export function clearAutosave(target: AutosaveScope | AutosaveSnapshot = {}): vo
       /* ignore */
     }
   }
-}
-
-export type AutosaveSnapshotFn = () => {
-  readonly project: Project;
-  readonly dirty: boolean;
-  readonly isStreaming: boolean;
-};
-
-// Starts a setInterval-driven autosave loop. Returns the stop function;
-// callers (the React hook) clear on unmount. The interval is configurable
-// for tests; production wiring passes AUTOSAVE_INTERVAL_MS.
-export function startAutosaveLoop(
-  getSnapshot: AutosaveSnapshotFn,
-  intervalMs: number = AUTOSAVE_INTERVAL_MS,
-  onWriteFailure?: (failure: AutosaveWriteFailure) => void,
-): () => void {
-  const handle = setInterval(() => {
-    const snap = getSnapshot();
-    if (!snap.dirty) return;
-    if (snap.isStreaming) return;
-    const result = writeAutosave(snap.project);
-    if (result.kind !== 'ok') onWriteFailure?.(result);
-  }, intervalMs);
-  return () => clearInterval(handle);
 }
 
 function isAutosaveRecord(v: unknown): v is AutosaveRecord {

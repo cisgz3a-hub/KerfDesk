@@ -25,18 +25,16 @@ import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster
 // to a fresh instance leaked an open connection on every preview cache miss.
 const previewAssetRepository = new IndexedDbPagedAssetRepository();
 import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
-import { drawBitmapAtTransform, rasterDisplayDataUrl } from './draw-raster';
+import { drawBitmapAtTransform } from './draw-raster';
+import {
+  lookupPreviewCanvas,
+  rasterContentToken,
+  retainPreviewCanvases,
+  sameRasterContent,
+  storePreviewCanvas,
+  type RasterContentToken,
+} from './raster-preview-cache';
 import type { ViewTransform } from './view-transform';
-
-type PreviewCanvasCacheEntry = {
-  readonly sourceKey: string;
-  readonly canvas: HTMLCanvasElement | null;
-};
-
-type PendingPreviewBuild = {
-  readonly sourceKey: string;
-  readonly cancel: () => void;
-};
 
 export type RasterPreviewBuildScheduler = (work: () => void) => () => void;
 
@@ -45,8 +43,17 @@ type DrawRasterPreviewOptions = {
   readonly scheduleBuild?: RasterPreviewBuildScheduler;
 };
 
-const previewCanvasCache = new Map<string, PreviewCanvasCacheEntry>();
-const pendingPreviewBuilds = new Map<string, PendingPreviewBuild>();
+type PendingPreviewBuild = {
+  // The content the build was started for, so an Image Studio Apply under the
+  // same object id cancels it instead of being mistaken for it.
+  readonly content: RasterContentToken;
+  readonly cancel: () => void;
+};
+
+// In-flight builds are keyed by scene-object id like the canvas cache: a moved
+// raster is a new object running the same build, and cancelling it would abort
+// and restart its paged-asset hydration on every frame of the drag.
+const pendingPreviewBuilds = new Map<string, Map<string, PendingPreviewBuild>>();
 
 export function drawRasterPreview(
   ctx: CanvasRenderingContext2D,
@@ -54,7 +61,9 @@ export function drawRasterPreview(
   view: ViewTransform,
   options: DrawRasterPreviewOptions = {},
 ): void {
-  pruneRasterPreviewCache(liveRasterPreviewDataUrls(project));
+  const liveRasterIds = livePreviewRasterIds(project);
+  retainPreviewCanvases(liveRasterIds);
+  pruneRasterPreviewBuilds(liveRasterIds);
   for (const layer of project.scene.layers) {
     for (const operationLayer of outputOperationLayers(layer)) {
       if (operationLayer.mode !== 'image') continue;
@@ -75,14 +84,12 @@ export function drawRasterPreview(
   }
 }
 
-export function pruneRasterPreviewCache(liveSourceKeys: ReadonlySet<string>): void {
-  for (const [key, entry] of previewCanvasCache) {
-    if (!liveSourceKeys.has(entry.sourceKey)) previewCanvasCache.delete(key);
-  }
-  for (const [key, pending] of pendingPreviewBuilds) {
-    if (liveSourceKeys.has(pending.sourceKey)) continue;
-    pending.cancel();
-    pendingPreviewBuilds.delete(key);
+/** Aborts scheduled builds for rasters that are no longer previewed. */
+function pruneRasterPreviewBuilds(liveRasterIds: ReadonlySet<string>): void {
+  for (const [id, builds] of pendingPreviewBuilds) {
+    if (liveRasterIds.has(id)) continue;
+    for (const pending of builds.values()) pending.cancel();
+    pendingPreviewBuilds.delete(id);
   }
 }
 
@@ -112,61 +119,111 @@ function previewCanvasFor(
 ): HTMLCanvasElement | null {
   const { pixelWidth, pixelHeight } = obj;
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
+  const key = previewSettingsKey(obj, layer, device, maskObject);
+  const cached = lookupPreviewCanvas(obj, key);
+  if (cached.kind === 'hit') return cached.canvas;
+  schedulePreviewCanvasBuild(key, obj, layer, device, maskObject, options);
+  // A synchronous scheduler fills the cache before returning; an asynchronous
+  // one leaves this frame without a preview and repaints when it lands.
+  const built = lookupPreviewCanvas(obj, key);
+  return built.kind === 'hit' ? built.canvas : null;
+}
+
+/** Everything about the burn that the raster's own pixels do not already fix. */
+function previewSettingsKey(
+  obj: RasterImage,
+  layer: Layer,
+  device: DeviceProfile,
+  maskObject: SceneObject | null,
+): string {
   const { width, height } = processedRasterDimensions(obj, layer);
-  const sourceKey = rasterPreviewSourceKey(obj);
-  const key = `${sourceKey}|${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${width}x${height}|${maskCacheKey(maskObject)}`;
-  const cached = previewCanvasCache.get(key);
-  if (cached !== undefined) return cached.canvas;
-  schedulePreviewCanvasBuild(key, sourceKey, obj, layer, device, maskObject, options);
-  return previewCanvasCache.get(key)?.canvas ?? null;
+  return `${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${width}x${height}|${maskCacheKey(maskObject)}`;
 }
 
 function schedulePreviewCanvasBuild(
   key: string,
-  sourceKey: string,
   obj: RasterImage,
   layer: Layer,
   device: DeviceProfile,
   maskObject: SceneObject | null,
   options: DrawRasterPreviewOptions,
 ): void {
-  if (pendingPreviewBuilds.has(key)) return;
+  if (isBuildInFlight(obj, key)) return;
   const scheduleBuild = options.scheduleBuild ?? scheduleRasterPreviewBuild;
   if (obj.imageAsset === undefined) {
+    let ownBuild: PendingPreviewBuild | undefined;
     let completedSynchronously = false;
     const cancel = scheduleBuild(() => {
-      pendingPreviewBuilds.delete(key);
+      clearPendingBuild(obj, key, ownBuild);
       const canvas = buildPreviewCanvas(obj, layer, device, maskObject);
-      previewCanvasCache.set(key, { sourceKey, canvas });
+      storePreviewCanvas(obj, key, canvas);
       if (canvas !== null) options.onRasterPreviewReady?.();
       completedSynchronously = true;
     });
-    if (!completedSynchronously) pendingPreviewBuilds.set(key, { sourceKey, cancel });
+    if (!completedSynchronously) ownBuild = setPendingBuild(obj, key, cancel);
     return;
   }
   let cancelled = false;
+  // Assigned once the scheduler hands back its cancel handle. The promise chain
+  // below only settles in a later microtask, so the entry is always registered
+  // by the time the chain reads it.
+  let ownBuild: PendingPreviewBuild | undefined = undefined;
   const controller = new AbortController();
   const cancel = scheduleBuild(() => {
     void hydratePagedRasterImage(obj, previewAssetRepository, controller.signal)
       .then((hydrated) => {
         if (cancelled) return;
         const canvas = buildPreviewCanvas(hydrated, layer, device, maskObject);
-        previewCanvasCache.set(key, { sourceKey, canvas });
+        storePreviewCanvas(obj, key, canvas);
         if (canvas !== null) options.onRasterPreviewReady?.();
       })
       .catch((error: unknown) => {
         if (!cancelled) console.error('Raster preview asset hydration failed.', error);
       })
-      .finally(() => pendingPreviewBuilds.delete(key));
+      // Cancelling only aborts the hydration; this chain still settles. By then
+      // an Image Studio Apply may have registered a replacement under the same
+      // (id, key), so the entry cleared has to be this build's own.
+      .finally(() => clearPendingBuild(obj, key, ownBuild));
   });
-  pendingPreviewBuilds.set(key, {
-    sourceKey,
-    cancel: () => {
-      cancelled = true;
-      controller.abort();
-      cancel();
-    },
+  ownBuild = setPendingBuild(obj, key, () => {
+    cancelled = true;
+    controller.abort();
+    cancel();
   });
+}
+
+/** True when the identical build is already running for this raster's pixels. */
+function isBuildInFlight(obj: RasterImage, key: string): boolean {
+  const pending = pendingPreviewBuilds.get(obj.id)?.get(key);
+  if (pending === undefined) return false;
+  if (sameRasterContent(pending.content, obj)) return true;
+  pending.cancel();
+  clearPendingBuild(obj, key, pending);
+  return false;
+}
+
+function setPendingBuild(obj: RasterImage, key: string, cancel: () => void): PendingPreviewBuild {
+  const pending: PendingPreviewBuild = { content: rasterContentToken(obj), cancel };
+  const builds = pendingPreviewBuilds.get(obj.id);
+  if (builds === undefined) pendingPreviewBuilds.set(obj.id, new Map([[key, pending]]));
+  else builds.set(key, pending);
+  return pending;
+}
+
+// `build` is the entry this caller registered, and is the ownership token: a
+// build that no longer owns (obj.id, key) has been superseded and must leave the
+// replacement's entry alone, or the replacement stops being cancellable and is
+// re-scheduled as a duplicate. `undefined` means the caller never registered
+// one, so there is nothing of its own to clear.
+function clearPendingBuild(
+  obj: RasterImage,
+  key: string,
+  build: PendingPreviewBuild | undefined,
+): void {
+  const builds = pendingPreviewBuilds.get(obj.id);
+  if (builds === undefined || build === undefined || builds.get(key) !== build) return;
+  builds.delete(key);
+  if (builds.size === 0) pendingPreviewBuilds.delete(obj.id);
 }
 
 function buildPreviewCanvas(
@@ -213,7 +270,7 @@ function adjustmentKey(obj: RasterImage): string {
   return `${obj.brightness ?? 0}:${obj.contrast ?? 0}:${obj.gamma ?? 1}`;
 }
 
-function liveRasterPreviewDataUrls(project: Project): Set<string> {
+function livePreviewRasterIds(project: Project): Set<string> {
   const imageOperations = project.scene.layers
     .flatMap((layer) => outputOperationLayers(layer))
     .filter((layer) => layer.mode === 'image');
@@ -222,14 +279,8 @@ function liveRasterPreviewDataUrls(project: Project): Set<string> {
     if (obj.kind !== 'raster-image') continue;
     if (obj.role === 'trace-source') continue;
     if (imageOperations.some((operation) => sceneObjectUsesOperation(obj, operation))) {
-      live.add(rasterPreviewSourceKey(obj));
+      live.add(obj.id);
     }
   }
   return live;
-}
-
-function rasterPreviewSourceKey(obj: RasterImage): string {
-  return obj.imageAsset === undefined
-    ? `${rasterDisplayDataUrl(obj)}|${obj.lumaBase64 ?? ''}`
-    : `paged:${obj.imageAsset.lumaAssetId}:${obj.imageAsset.lumaByteLength}`;
 }

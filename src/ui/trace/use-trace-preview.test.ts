@@ -1,3 +1,5 @@
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./use-trace-worker-client', () => ({
@@ -6,10 +8,28 @@ vi.mock('./use-trace-worker-client', () => ({
     error instanceof Error && error.name === 'TraceRequestSupersededError',
 }));
 
+vi.mock('./image-loader', async (importOriginal) => ({
+  ...(await importOriginal<typeof imageLoaderModule>()),
+  loadImageAsRawData: vi.fn(),
+}));
+
+vi.mock('./raw-image-transparency', () => ({
+  rawImageHasTransparency: vi.fn(() => false),
+}));
+
 import type { ColoredPath } from '../../core/scene';
 import type { RawImageData, TraceOptions, TraceBoundary } from '../../core/trace';
+// Type-only namespace import: erased at runtime, so it is safe to reference
+// from the hoisted vi.mock factory above.
+import type * as imageLoaderModule from './image-loader';
+import { loadImageAsRawData } from './image-loader';
+import { rawImageHasTransparency } from './raw-image-transparency';
 import { traceImageWithFallback } from './use-trace-worker-client';
-import { runTrace } from './use-trace-preview';
+import { runTrace, useTracePreview } from './use-trace-preview';
+
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const img: RawImageData = { width: 2, height: 2, data: new Uint8ClampedArray(16) };
 const options: TraceOptions = {
@@ -44,6 +64,8 @@ const traceResult = {
 
 afterEach(() => {
   vi.mocked(traceImageWithFallback).mockReset();
+  vi.mocked(loadImageAsRawData).mockReset();
+  vi.mocked(rawImageHasTransparency).mockClear();
 });
 
 describe('runTrace stale-result guard (P2-A)', () => {
@@ -290,6 +312,34 @@ describe('runTrace stale-result guard (P2-A)', () => {
     expect(setState).not.toHaveBeenCalled();
   });
 
+  it('scans the decoded image for transparency once, not on every options change', async () => {
+    vi.mocked(loadImageAsRawData).mockResolvedValue(img);
+    vi.mocked(traceImageWithFallback).mockResolvedValue(traceResult);
+    const file = new File(['image'], 'logo.png', { type: 'image/png' });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const render = (nextOptions: TraceOptions): Promise<void> =>
+      act(async () => {
+        root.render(createElement(HookProbe, { file, options: nextOptions }));
+      });
+
+    try {
+      await render(options);
+      expect(rawImageHasTransparency).toHaveBeenCalledTimes(1);
+
+      // Two option nudges (a slider drag) must NOT re-run the full-pixel
+      // alpha scan: transparency is invariant per decoded image, and the
+      // scan used to run synchronously AHEAD of the trace debounce.
+      await render({ ...options, pathOmit: 4 });
+      await render({ ...options, pathOmit: 2 });
+      expect(rawImageHasTransparency).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('reaches the enhance path: preview reflects the region-patched full trace', async () => {
     // 20x20 opaque raster so the boxed region + its 2x supersample stay under
     // the upscale budget and the enhance merge runs end-to-end.
@@ -373,3 +423,10 @@ describe('runTrace stale-result guard (P2-A)', () => {
     expect(previewPolylines).toHaveLength(2);
   });
 });
+
+// Minimal host component: the transparency-caching test needs the hook's real
+// effect lifecycle (decode effect vs debounced options effect), not runTrace.
+function HookProbe(props: { readonly file: File | null; readonly options: TraceOptions }): null {
+  useTracePreview(props.file, props.options);
+  return null;
+}

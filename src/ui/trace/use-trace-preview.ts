@@ -28,6 +28,7 @@ import {
 } from '../../core/trace';
 import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
 import type { PreparedTrace, TracePreparationRequest } from './prepared-trace';
+import { rawImageHasTransparency } from './raw-image-transparency';
 import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
 import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 import { isTraceRequestSuperseded } from './use-trace-worker-client';
@@ -52,6 +53,15 @@ export type TracePreviewState =
 // that a normal click feels instant.
 const DEBOUNCE_MS = 300;
 
+// A decoded preview raster paired with its alpha-scan verdict. The verdict is
+// computed once per decode: transparency is invariant per image, and
+// re-scanning every pixel (~4M at the preview cap) synchronously on each
+// options change — ahead of the trace debounce — stalled slider dragging.
+type DecodedPreviewImage = {
+  readonly img: RawImageData;
+  readonly hasTransparency: boolean;
+};
+
 export function useTracePreview(
   file: File | null,
   options: TraceOptions,
@@ -60,7 +70,7 @@ export function useTracePreview(
   sourceGrid?: TraceGrid,
 ): TracePreviewState {
   const [state, setState] = useState<TracePreviewState>({ kind: 'idle' });
-  const decodedRef = useRef<RawImageData | null>(null);
+  const decodedRef = useRef<DecodedPreviewImage | null>(null);
   // Monotonic token. Each effect run captures its token; on completion
   // it bails if the latest token has advanced — stops slow traces
   // from clobbering a newer "ready" result.
@@ -90,7 +100,7 @@ export function useTracePreview(
       .then((img) => {
         if (tokenRef.current !== myToken) return;
         const sourceHasTransparency = rawImageHasTransparency(img);
-        decodedRef.current = img;
+        decodedRef.current = { img, hasTransparency: sourceHasTransparency };
         setState({ kind: 'tracing', sourceHasTransparency });
         // Read options through the ref so the latest preset wins even
         // if the user changed it between picking the file and decode
@@ -124,16 +134,17 @@ export function useTracePreview(
   }, [file, optionsRef, boundaryRef, boundaryModeRef, sourceGridRef]);
 
   useEffect(() => {
-    const img = decodedRef.current;
-    if (img === null || file === null) return undefined;
+    const decoded = decodedRef.current;
+    if (decoded === null || file === null) return undefined;
     tokenRef.current += 1;
     const myToken = tokenRef.current;
-    const sourceHasTransparency = rawImageHasTransparency(img);
+    // Decode-time verdict — never re-scan the pixels on an options nudge.
+    const sourceHasTransparency = decoded.hasTransparency;
     setState({ kind: 'tracing', sourceHasTransparency });
     const timer = window.setTimeout(() => {
       if (tokenRef.current !== myToken) return;
       startPreviewTrace({
-        img,
+        img: decoded.img,
         file,
         options,
         boundary: boundary ?? null,
@@ -225,11 +236,4 @@ export function runTrace(args: {
       });
     }
   })();
-}
-
-function rawImageHasTransparency(image: RawImageData): boolean {
-  for (let i = 3; i < image.data.length; i += 4) {
-    if ((image.data[i] ?? 255) < 255) return true;
-  }
-  return false;
 }

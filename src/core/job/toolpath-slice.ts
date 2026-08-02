@@ -3,6 +3,7 @@
 // from toolpath.ts (Phase H.2 refactor).
 
 import type { Vec2 } from '../scene';
+import { stepIndexAtLength, toolpathCumulativeLengths } from './toolpath-cumulative-lengths';
 import { dist, lerp } from './toolpath-math';
 import type { SlicedToolpath, Toolpath, ToolpathStep } from './toolpath-types';
 
@@ -12,20 +13,18 @@ export function sliceToolpath(toolpath: Toolpath, cut: number): SlicedToolpath {
     return { whole: toolpath.steps, partial: null, head: last };
   }
   if (cut <= 0) return { whole: [], partial: null, head: firstHead(toolpath.steps) };
-  let remaining = cut;
-  const whole: ToolpathStep[] = [];
-  for (const step of toolpath.steps) {
-    if (remaining >= step.length) {
-      whole.push(step);
-      remaining -= step.length;
-      continue;
-    }
-    // remaining < step.length — partial step
-    const partial = truncateStep(step, remaining);
-    return { whole, partial, head: headOf(partial) };
-  }
+  // Binary search over memoized prefix sums instead of re-walking every step:
+  // the scrubber slices once per animation frame, so the old linear walk cost
+  // O(steps) per frame on routes that can carry a million steps.
+  const cumulative = toolpathCumulativeLengths(toolpath.steps);
+  const index = stepIndexAtLength(cumulative, cut);
+  const whole = toolpath.steps.slice(0, index);
+  const step = toolpath.steps[index];
   // Exact match on the last step — equivalent to "render all".
-  return { whole, partial: null, head: lastHead(toolpath.steps) };
+  if (step === undefined) return { whole, partial: null, head: lastHead(toolpath.steps) };
+  const consumed = index === 0 ? 0 : (cumulative[index - 1] ?? 0);
+  const partial = truncateStep(step, cut - consumed);
+  return { whole, partial, head: headOf(partial) };
 }
 
 function truncateStep(step: ToolpathStep, length: number): ToolpathStep {

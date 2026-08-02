@@ -15,7 +15,7 @@ import type { KerfOutputParity } from './editor-kerf-output-parity';
 import { createSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
 import type { KerfCheckWorkerHandle } from './kerf-check-worker-client';
-import type { KerfCheckWorkerRequest } from './kerf-check-worker-protocol';
+import type { KerfCheckWorkerPayload } from './kerf-check-worker-protocol';
 import { useKerfCheck } from './use-kerf-check';
 
 const workerMocks = vi.hoisted(() => ({
@@ -114,16 +114,16 @@ function resolvedWorker(value: KerfOutputParity | null): KerfCheckWorkerHandle {
   return { result: Promise.resolve(value), cancel: vi.fn() };
 }
 
-function firstWorkerRequest(): KerfCheckWorkerRequest {
+function firstWorkerPayload(): KerfCheckWorkerPayload {
   const request = workerMocks.startKerfCheckWorker.mock.calls[0]?.[0] as
-    | KerfCheckWorkerRequest
+    | KerfCheckWorkerPayload
     | undefined;
   if (request === undefined) throw new Error('Expected one kerf worker request.');
   return request;
 }
 
 function expectTargetScopedRequest(
-  request: KerfCheckWorkerRequest,
+  request: KerfCheckWorkerPayload,
   sourceData: Uint8ClampedArray,
 ): void {
   expect(request.object.id).toBe('R1');
@@ -183,7 +183,7 @@ describe('useKerfCheck', () => {
       await vi.advanceTimersByTimeAsync(1);
     });
     expect(workerMocks.startKerfCheckWorker).toHaveBeenCalledTimes(1);
-    expectTargetScopedRequest(firstWorkerRequest(), source.data);
+    expectTargetScopedRequest(firstWorkerPayload(), source.data);
     expect(source.data.byteLength).toBe(SIZE_PX * SIZE_PX * 4);
     expect(host?.textContent).toBe('7');
   });

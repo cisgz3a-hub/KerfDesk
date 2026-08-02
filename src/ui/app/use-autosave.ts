@@ -23,9 +23,9 @@ import {
   AUTOSAVE_INTERVAL_MS,
   clearAutosave,
   readAutosave,
-  startAutosaveLoop,
   writeAutosave,
 } from '../state/autosave';
+import { startAutosaveLoop } from '../state/autosave-loop';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';

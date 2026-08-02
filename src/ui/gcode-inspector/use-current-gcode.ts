@@ -53,11 +53,19 @@ export function useCurrentGcode(active: boolean): {
   }, [platform]);
 
   // Compile when the view first becomes visible, and never while hidden.
+  //
+  // Deliberately NOT keyed on the project: with `project` in the dependency
+  // list every store commit re-ran a full emit + reparse + render-model
+  // rebuild while the view was open, which is exactly the per-keystroke cost
+  // the header contract rules out. The project is read from the store here
+  // (and again inside refresh) so the freshest value is used without
+  // subscribing the effect to it — the stale flag plus Refresh drive every
+  // later compile.
   useEffect(() => {
     if (!active) return;
-    if (compiledFor.current === project) return;
+    if (compiledFor.current === useStore.getState().project) return;
     refresh();
-  }, [active, project, refresh]);
+  }, [active, refresh]);
 
   return { state, stale: state.kind === 'ready' && compiledFor.current !== project, refresh };
 }

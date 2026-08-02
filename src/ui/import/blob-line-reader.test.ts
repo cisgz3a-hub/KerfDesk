@@ -15,7 +15,9 @@ describe('incremental UTF-8 line reader', () => {
     const bytes = new TextEncoder().encode(text);
     const actual: string[] = [];
 
-    const stats = await readUtf8ChunkLines(chunks(bytes, 3), (line) => actual.push(line));
+    const stats = await readUtf8ChunkLines(chunks(bytes, 3), (line) => {
+      actual.push(line);
+    });
 
     expect(actual).toEqual([...iterateLines(text)]);
     expect(stats.bytesRead).toBe(bytes.byteLength);
@@ -40,10 +42,64 @@ describe('incremental UTF-8 line reader', () => {
     // method used by browsers and keeps this test on the production stream path.
     const blob = new NodeBlob(['G21\nG1 X1\n']) as unknown as Blob;
 
-    const stats = await readBlobLines(blob, (line) => lines.push(line), progress);
+    const stats = await readBlobLines(
+      blob,
+      (line) => {
+        lines.push(line);
+      },
+      progress,
+    );
 
     expect(lines).toEqual(['G21', 'G1 X1', '']);
     expect(stats.bytesRead).toBe(blob.size);
+    expect(stats.completion).toBe('complete');
     expect(progress).toHaveBeenLastCalledWith({ bytesRead: blob.size, totalBytes: blob.size });
+  });
+
+  it('delivers no further lines once the consumer signals stop', async () => {
+    const bytes = new TextEncoder().encode('a\nb\nc\nd\n');
+    const delivered: string[] = [];
+
+    const stats = await readUtf8ChunkLines(chunks(bytes, 2), (line, control) => {
+      delivered.push(line);
+      if (line === 'b') control.stop();
+    });
+
+    // Neither the rest of the chunk that carried 'b' nor the trailing empty
+    // line survives the stop.
+    expect(delivered).toEqual(['a', 'b']);
+    expect(stats.lineCount).toBe(2);
+    expect(stats.completion).toBe('stopped');
+  });
+
+  it('cancels the underlying blob stream when the consumer stops', async () => {
+    const cancel = vi.fn();
+    let pulls = 0;
+    const bytes = new TextEncoder().encode('a\nb\nc\nd\n');
+    // The reader touches only size and stream; this double deliberately omits
+    // unrelated Blob methods so cancellation is observable.
+    const blob = {
+      size: bytes.byteLength,
+      stream: () =>
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (pulls >= bytes.byteLength) {
+              controller.close();
+              return;
+            }
+            controller.enqueue(bytes.slice(pulls, pulls + 1));
+            pulls += 1;
+          },
+          cancel,
+        }),
+    } as Blob;
+
+    const stats = await readBlobLines(blob, (line, control) => {
+      if (line === 'a') control.stop();
+    });
+
+    expect(stats.completion).toBe('stopped');
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(pulls).toBeLessThan(bytes.byteLength);
   });
 });

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useStore } from '../state';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
@@ -10,6 +9,7 @@ import {
 } from '../state/recovery';
 import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
+import { useExecutionSignatureAppState } from './use-execution-signature-app-state';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
 import { runCompletedJobAgainFlow } from './start-job-flow';
 
@@ -28,7 +28,7 @@ type Props = {
 export function RunAgainControl(props: Props): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
   const snapshot = useRecoveryRepositorySnapshot(repository);
-  const app = useStore();
+  const app = useExecutionSignatureAppState();
   const receipt = snapshot.lastCompletedReceipt;
   const [starting, setStarting] = useState(false);
 

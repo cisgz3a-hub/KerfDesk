@@ -18,6 +18,7 @@ import {
 } from './gcode-command-actions';
 import { connectOptionsForDevice } from './connect-options';
 import { railPanelCommandContext } from './command-context-helpers';
+import { useCommandStoreState } from './use-command-store-state';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
@@ -52,8 +53,7 @@ export type { CommandShellCallbacks } from './app-command-context-types';
 
 export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<AppCommand> {
   const platform = usePlatform();
-  const app = useStore();
-  const laser = useLaserStore();
+  const { app, laser } = useCommandStoreState();
   const pushToast = useToastStore((s) => s.pushToast);
   const openTextDialog = useUiStore((s) => s.openTextDialog);
   const openImageDialog = useUiStore((s) => s.openImageDialog);
@@ -113,7 +113,7 @@ function appCommandContext(
     selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
   const activeStreamer = isActiveStreamerStatus(laser.streamer?.status);
   return {
-    ...fileCommandContext(callbacks, platform, app, laser, pushToast),
+    ...fileCommandContext(callbacks, platform, app, pushToast),
     ...editCommandContext(app, dialogs),
     ...toolCommandContext(callbacks, app, platform, dialogs, pushToast, selection),
     ...arrangeCommandContext(app, callbacks),
@@ -202,7 +202,6 @@ function fileCommandContext(
   callbacks: CommandShellCallbacks,
   platform: ReturnType<typeof usePlatform>,
   app: ReturnType<typeof useStore.getState>,
-  laser: ReturnType<typeof useLaserStore.getState>,
   pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
 ): Pick<
   AppCommandContext,
@@ -218,25 +217,30 @@ function fileCommandContext(
   | 'openGcodePreview'
   | 'inspectCurrentGcode'
 > {
-  const gcodeDeps: GcodeActionDeps = {
+  // Save and the Inspector compile from the stores as they stand at CLICK
+  // time, not from the render that built this context. Reading them here is
+  // what lets the command surface skip the status-poll and mousemove
+  // re-renders that used to be the only thing keeping a captured snapshot
+  // current (use-command-store-state).
+  const gcodeDeps = (): GcodeActionDeps => ({
     platform,
-    app,
-    laser,
+    app: useStore.getState(),
+    laser: useLaserStore.getState(),
     pushToast,
     openInspector: callbacks.requestGcodeInspector,
-  };
+  });
   return {
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
     openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
-    saveProject: () => saveProject(platform, app, pushToast, false),
-    saveProjectAs: () => saveProject(platform, app, pushToast, true),
+    saveProject: () => saveProject(platform, useStore.getState(), pushToast, false),
+    saveProjectAs: () => saveProject(platform, useStore.getState(), pushToast, true),
     importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
     importDxf: () => void handleImportDxf(platform, app.importSvgObject, pushToast),
     importImage: callbacks.requestImportImage,
-    saveGcode: saveGcodeAction(gcodeDeps),
-    openGcodePreview: openGcodeInspectorAction(gcodeDeps),
-    inspectCurrentGcode: inspectCurrentGcodeAction(gcodeDeps),
+    saveGcode: () => saveGcodeAction(gcodeDeps())(),
+    openGcodePreview: () => openGcodeInspectorAction(gcodeDeps())(),
+    inspectCurrentGcode: () => inspectCurrentGcodeAction(gcodeDeps())(),
   };
 }
 

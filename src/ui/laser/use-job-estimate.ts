@@ -10,8 +10,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JobOriginPlacement } from '../../core/job';
-import type { Project } from '../../core/scene';
-import { currentOutputScope, useStore } from '../state';
+import type { OutputScope, Project } from '../../core/scene';
+import { useOutputScope, useStore } from '../state';
 import {
   estimateLiveJob,
   estimateLiveJobSnapshot,
@@ -21,8 +21,15 @@ import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
-import { resolveJobPlacement } from '../job-placement';
-import { prepareLargeJobOffThread } from '../workspace/preparation-worker-client';
+import {
+  resolveExportJobPlacement,
+  resolveJobPlacement,
+  type ResolvedJobPlacement,
+} from '../job-placement';
+import {
+  isPreparationSuperseded,
+  prepareLargeJobOffThread,
+} from '../workspace/preparation-worker-client';
 import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
@@ -37,15 +44,19 @@ type Settled = {
 
 export function useJobEstimate(): LiveJobEstimate {
   const project = useStore((s) => s.project);
-  const outputScope = useStore((s) => currentOutputScope(s));
+  // useOutputScope, not currentOutputScope(s): the raw selector returns a
+  // fresh object per store update, so any unrelated change (a hover writing
+  // cursorMm) re-rendered this hook and re-armed the debounce effect below,
+  // starving the recompute while the mouse moved.
+  const outputScope = useOutputScope();
   const jobPlacement = useStore((s) => s.jobPlacement);
-  const outputScopeKey = JSON.stringify(outputScope);
+  const outputScopeKey = useMemo(() => JSON.stringify(outputScope), [outputScope]);
   const positionEpoch = useLaserStore((state) => state.trustedPositionEpoch ?? 0);
   const firstRegistrationPoint = usePrintCutSessionStore((state) => state.first);
   const secondRegistrationPoint = usePrintCutSessionStore((state) => state.second);
   const resolvedPlacement = useEstimatePlacement(jobPlacement);
-  const placementKey = JSON.stringify(resolvedPlacement);
-  const jobOrigin = resolvedPlacement.ok ? resolvedPlacement.jobOrigin : undefined;
+  const placementKey = useMemo(() => JSON.stringify(resolvedPlacement), [resolvedPlacement]);
+  const jobOrigin = useHeldJobOrigin(resolvedPlacement, placementKey);
   const registrationKey = JSON.stringify({
     positionEpoch,
     firstRegistrationPoint,
@@ -72,16 +83,48 @@ function useEstimatePlacement(jobPlacement: ReturnType<typeof useStore.getState>
   const workOriginActive = useLaserStore((state) => state.workOriginActive);
   const wcoCache = useLaserStore((state) => state.wcoCache);
   const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
-  return useMemo(
-    () =>
-      resolveJobPlacement(jobPlacement, {
-        statusReport,
-        workOriginActive,
-        wcoCache,
-        reportInches,
-      }),
-    [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches],
-  );
+  return useMemo(() => {
+    // Estimate and preview must resolve placement identically: the worker
+    // client caches by jobOrigin, so a divergent resolution here made the
+    // SAME over-budget project prepare twice, serially. User Origin falls
+    // back to its work-zero-relative export placement when the live
+    // resolution fails (disconnected / origin unset) — the same rule
+    // usePreviewPlacement in use-preview-toolpath.ts applies.
+    const resolvePlacement =
+      jobPlacement.startFrom === 'user-origin' ? resolveExportJobPlacement : resolveJobPlacement;
+    return resolvePlacement(jobPlacement, {
+      statusReport,
+      workOriginActive,
+      wcoCache,
+      reportInches,
+    });
+  }, [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches]);
+}
+
+// A connected controller stores a freshly parsed status report on every poll,
+// so useEstimatePlacement re-resolves each time and every resolver in
+// job-placement.ts returns a NEW jobOrigin literal — even when the resolved
+// placement is byte-identical. useSettledEstimate's debounce effect tracks
+// jobOrigin BY REFERENCE, so that churn cancelled and re-armed the 250 ms timer
+// once per poll: on a connected machine the estimate could never settle. Hold
+// the resolved jobOrigin until its semantic key changes so identity follows
+// meaning. The worker cache keys on the jobOrigin VALUE
+// (preparation-worker-client.requestKey), so preview and estimate still share
+// a single preparation entry.
+function useHeldJobOrigin(
+  placement: ResolvedJobPlacement,
+  placementKey: string,
+): JobOriginPlacement | undefined {
+  // Keyed on placementKey alone, which IS JSON.stringify(placement): holding by
+  // semantic key is the whole point, so depending on the per-poll-fresh
+  // placement identity would defeat it. Memo rather than a render-time ref
+  // write, so a render React discards leaves nothing behind.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => jobOriginOf(placement), [placementKey]);
+}
+
+function jobOriginOf(placement: ResolvedJobPlacement): JobOriginPlacement | undefined {
+  return placement.ok ? placement.jobOrigin : undefined;
 }
 
 function useSettledEstimate({
@@ -94,7 +137,7 @@ function useSettledEstimate({
   initiallyAsync,
 }: {
   readonly project: Project;
-  readonly outputScope: ReturnType<typeof currentOutputScope>;
+  readonly outputScope: OutputScope;
   readonly outputScopeKey: string;
   readonly registrationKey: string;
   readonly placementKey: string;
@@ -172,7 +215,7 @@ function hasVariableText(project: Project): boolean {
 
 type RecomputeEstimateArgs = {
   readonly project: Project;
-  readonly outputScope: ReturnType<typeof currentOutputScope>;
+  readonly outputScope: OutputScope;
   readonly jobOrigin: JobOriginPlacement | undefined;
   readonly isCancelled: () => boolean;
   readonly isFollowUpStale: () => boolean;
@@ -221,7 +264,13 @@ function followUpWithWorkerEstimate(
       if (!args.isFollowUpStale()) args.settleAt(prepared.estimate);
     },
     (error: unknown) => {
-      if (args.isFollowUpStale()) return;
+      // A supersede means the client replaced this request with a newer one —
+      // its own coalescing decision, not a failure. Keep the badge as it was:
+      // isFollowUpStale() only advances when the debounce FIRES, so during a
+      // jog (current-position placement re-keys per head move) this rejection
+      // lands inside the debounce window and used to pin a false
+      // "Background estimate failed" for as long as the head kept moving.
+      if (isPreparationSuperseded(error) || args.isFollowUpStale()) return;
       args.settleAt({
         kind: 'preparation-failed',
         message: `Background estimate failed: ${

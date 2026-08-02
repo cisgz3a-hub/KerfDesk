@@ -6,6 +6,8 @@ import { createProject } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
+import type * as PreparationWorkerClient from './preparation-worker-client';
+import { PreparationSupersededError } from './preparation-worker-client';
 import { usePreviewToolpath, type PreviewBuildScheduler } from './use-preview-toolpath';
 import type { PreviewIssue } from './preview-status';
 
@@ -31,7 +33,13 @@ const workerMocks = vi.hoisted(() => ({
   prepareLargeJobOffThread: vi.fn(),
 }));
 
-vi.mock('./preparation-worker-client', () => workerMocks);
+// Only dispatch is stubbed: the supersede error type and its guard must be the
+// REAL ones, or the hook's "ignore an internal supersede" branch would be
+// tested against a lookalike that instanceof can never match.
+vi.mock('./preparation-worker-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof PreparationWorkerClient>()),
+  prepareLargeJobOffThread: workerMocks.prepareLargeJobOffThread,
+}));
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -210,6 +218,35 @@ describe('usePreviewToolpath', () => {
 
     expect(probe.current).toBe(pausedToolpath);
   });
+
+  it.each([['newer-request'], ['newer-project']] as const)(
+    'keeps the preparing banner when the background request is superseded (%s)',
+    async (reason) => {
+      let scheduled: (() => void) | null = null;
+      const scheduleBuild: PreviewBuildScheduler = (work) => {
+        scheduled = work;
+        return () => undefined;
+      };
+      previewMocks.buildPreviewToolpath.mockReturnValue({
+        totalLength: 0,
+        steps: [],
+        previewIssue: { kind: 'too-complex' as const },
+      });
+      workerMocks.prepareLargeJobOffThread.mockRejectedValue(
+        new PreparationSupersededError(reason),
+      );
+
+      await renderHarness(true, scheduleBuild);
+      await act(async () => scheduled?.());
+      await act(async () => Promise.resolve());
+
+      // Superseding is the client coalescing its own queue, not a failure:
+      // a newer preparation is already queued, so the canvas keeps waiting.
+      expect(
+        (probe.current as { readonly previewIssue?: PreviewIssue } | null)?.previewIssue,
+      ).toEqual({ kind: 'preparing-large-job' });
+    },
+  );
 
   it('surfaces a worker rejection and retry guidance instead of spinning forever', async () => {
     let scheduled: (() => void) | null = null;
