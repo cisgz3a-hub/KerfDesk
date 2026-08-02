@@ -15043,7 +15043,7 @@ rail are NOT migrated - follow-up work, same primitives. Screen-reader contracts
 still holds). Perceptual verification: before/after screenshots at the 300 px rail width. No G-code,
 state, or behavior changes.
 
-## ADR-282 - Page-backed rasters are a large-file representation, not the default (2026-08-01)
+## ADR-283 - Page-backed rasters are a large-file representation, not the default (2026-08-01)
 
 **Date:** 2026-08-01
 **Status:** Accepted

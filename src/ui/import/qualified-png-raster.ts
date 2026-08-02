@@ -16,7 +16,7 @@ export type QualifiedPngDecodeOptions = {
   readonly onProgress?: (progress: PngImportWorkerProgress) => void;
 };
 
-// Page-backing point (ADR-282).
+// Page-backing point (ADR-283).
 //
 // A page-backed raster stores its bytes in origin-scoped IndexedDB and puts only
 // asset ids in the `.lf2`, so such a file is NOT self-contained: it does not open
@@ -31,7 +31,7 @@ export type QualifiedPngDecodeOptions = {
 // The value deliberately coincides with LARGE_IMPORT_ADVISORY_BYTES: page-backing
 // starts exactly where the operator is already told the import will be slow, so
 // the format change never happens silently. The two are separate constants
-// because this one is a persistence-schema boundary governed by ADR-282, while
+// because this one is a persistence-schema boundary governed by ADR-283, while
 // the advisory is a UX judgement that may move on its own.
 export const PAGED_PNG_MIN_BYTES = 25 * 1024 * 1024;
 

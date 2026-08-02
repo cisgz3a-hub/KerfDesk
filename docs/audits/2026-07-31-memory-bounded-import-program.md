@@ -312,7 +312,7 @@ luma staging manifest behind before taking the legacy fallback.
   encoded on the UI thread, with staged pages deleted after those compatibility fields were built.
   A later slice removed those compatibility fields: a page-backed object now carries asset ids and a
   thumbnail instead of bytes, so its saved `.lf2` is NOT self-contained. See the ownership slice
-  below and ADR-282, which confines page-backing to PNGs over 25 MiB so sub-threshold imports keep
+  below and ADR-283, which confines page-backing to PNGs over 25 MiB so sub-threshold imports keep
   the embedded, portable representation described here.
 
 **Failing-first evidence:**
@@ -884,7 +884,7 @@ autosave portability, and recovery portability remain outside this follow-up. No
 compile refusal, silent truncation, hardware/controller/settings, Start, or Frame behavior was
 added.
 
-## Follow-up — page-backing confined to large files (ADR-282, 2026-08-01)
+## Follow-up — page-backing confined to large files (ADR-283, 2026-08-01)
 
 **Status:** Fixed for sub-threshold imports. Portability above the threshold remains open.
 

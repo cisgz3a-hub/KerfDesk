@@ -22,7 +22,7 @@ const PNG_BASE64 = readFileSync(
 ).toString('base64');
 const UNQUALIFIED_PNG_BASE64 = grayscaleTracePngBase64();
 
-// Page-backing starts above PAGED_PNG_MIN_BYTES (25 MiB, ADR-282), so the
+// Page-backing starts above PAGED_PNG_MIN_BYTES (25 MiB, ADR-283), so the
 // page-backed route can only be exercised by a fixture larger than that. The
 // image stays 1024x1024 — the sampled luma and 256-edge thumbnail assertions
 // below describe the decoded image, not the file — and the file is padded to
