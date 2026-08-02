@@ -2,8 +2,10 @@ import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ManualBoxGenerationWorker as FakeWorker } from '../../__fixtures__/box/manual-box-generation-worker';
 import { generateBox, type BoxPanel, type BoxSpec } from '../../core/box';
 import { BoxGeneratorDialog } from './BoxGeneratorDialog';
+import { BOX_GENERATION_QUIET_WINDOW_MS } from './box-generation-quiet-window';
 import { BOX_LARGE_DESIGN_POINT_ADVISORY_THRESHOLD } from './box-preview-responsiveness';
 import type {
   BoxGenerationWorkerRequest,
@@ -26,37 +28,14 @@ const DEFAULT_SPEC: BoxSpec = {
   dividersYCount: 0,
 };
 
+const QUIET_WINDOW_TEST_MARGIN_MS = 30;
+
 const SYNCHRONOUS_FALLBACK_WARNING =
   'Background generation was unavailable, so this preview was generated synchronously. Complex designs may temporarily make the app unresponsive.';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
-
-class FakeWorker {
-  static instances: FakeWorker[] = [];
-  onmessage: ((event: MessageEvent<BoxGenerationWorkerResponse>) => void) | null = null;
-  onerror: (() => void) | null = null;
-  onmessageerror: (() => void) | null = null;
-  readonly posted: BoxGenerationWorkerRequest[] = [];
-  isTerminated = false;
-
-  constructor() {
-    FakeWorker.instances.push(this);
-  }
-
-  postMessage(request: BoxGenerationWorkerRequest): void {
-    this.posted.push(request);
-  }
-
-  terminate(): void {
-    this.isTerminated = true;
-  }
-
-  respond(response: BoxGenerationWorkerResponse = responseFor(this)): void {
-    this.onmessage?.({ data: response } as MessageEvent<BoxGenerationWorkerResponse>);
-  }
-}
 
 class FakePath2D {
   readonly moveTo = vi.fn();
@@ -77,6 +56,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // The client keeps one worker warm in module scope, so it outlives the React
+  // tree. Retire it through its own fatal path or the next test inherits it.
+  for (const worker of FakeWorker.instances) worker.onerror?.();
   vi.unstubAllGlobals();
   localStorage.clear();
   document.body.innerHTML = '';
@@ -114,28 +96,34 @@ describe('BoxGeneratorDialog background generation', () => {
     }
   });
 
-  it('terminates obsolete work, ignores its late result, and labels cached geometry stale', async () => {
+  it('coalesces a typing burst on one warm worker and ignores the superseded result', async () => {
     const rendered = await renderDialog();
     try {
-      const first = currentWorker();
-      await respond(first);
+      const worker = currentWorker();
+      await respond(worker);
+      // Nothing is in flight, so this edit dispatches without waiting.
       await setInput(rendered.host, 'Width', '70');
-      const second = currentWorker();
-      const staleHandler = second.onmessage;
+      expect(worker.posted).toHaveLength(2);
+      const superseded = requestAt(worker, 1);
+      await setInput(rendered.host, 'Width', '75');
       await setInput(rendered.host, 'Width', '80');
-      const third = currentWorker();
-      expect(second.isTerminated).toBe(true);
-      expect(third).not.toBe(second);
-      expect(third.posted[0]?.id).toBeGreaterThan(second.posted[0]?.id ?? 0);
+      expect(worker.posted).toHaveLength(2);
       expect(rendered.host.textContent).toContain(
         'Showing last generated preview while current values generate',
       );
       expect(generateButton(rendered.host).disabled).toBe(true);
 
-      await act(async () => staleHandler?.({ data: responseFor(second) } as MessageEvent));
+      await settleQuietWindow();
+      expect(FakeWorker.instances).toHaveLength(1);
+      expect(worker.posted).toHaveLength(3);
+      expect(requestAt(worker, 2).spec.widthMm).toBe(80);
+
+      await act(async () =>
+        worker.respond(boxGenerationRuntime.runBoxGenerationRequest(superseded)),
+      );
       expect(generateButton(rendered.host).disabled).toBe(true);
 
-      await respond(third);
+      await respond(worker);
       expect(generateButton(rendered.host).disabled).toBe(false);
       expect(rendered.host.textContent).toContain('Current · Outer 86 × 46 × 36 mm');
     } finally {
@@ -143,20 +131,21 @@ describe('BoxGeneratorDialog background generation', () => {
     }
   });
 
-  it('cancels active preview work and retries on a fresh worker', async () => {
+  it('cancels active preview work and retries immediately on the warm worker', async () => {
     const rendered = await renderDialog();
     try {
-      const first = currentWorker();
+      const worker = currentWorker();
       await click(button(rendered.host, 'Cancel preview generation'));
-      expect(first.isTerminated).toBe(true);
+      expect(worker.isTerminated).toBe(false);
       expect(rendered.host.textContent).toContain('Preview generation cancelled');
       expect(rendered.host.textContent).not.toContain(SYNCHRONOUS_FALLBACK_WARNING);
       expect(generateButton(rendered.host).disabled).toBe(true);
       expect(FakeWorker.instances).toHaveLength(1);
 
       await click(button(rendered.host, 'Retry preview generation'));
-      expect(FakeWorker.instances).toHaveLength(2);
-      expect(currentWorker().posted[0]?.id).toBeGreaterThan(first.posted[0]?.id ?? 0);
+      expect(FakeWorker.instances).toHaveLength(1);
+      expect(worker.posted).toHaveLength(2);
+      expect(requestAt(worker, 1).id).toBeGreaterThan(requestAt(worker, 0).id);
     } finally {
       await unmount(rendered);
     }
@@ -167,7 +156,7 @@ describe('BoxGeneratorDialog background generation', () => {
     try {
       const worker = currentWorker();
       await setInput(rendered.host, 'Width', '');
-      expect(worker.isTerminated).toBe(true);
+      expect(worker.isTerminated).toBe(false);
       expect(FakeWorker.instances).toHaveLength(1);
       expect(rendered.host.textContent).toContain('Width: Enter a value');
       expect(generateButton(rendered.host).disabled).toBe(true);
@@ -181,7 +170,7 @@ describe('BoxGeneratorDialog background generation', () => {
     try {
       const worker = currentWorker();
       await setInput(rendered.host, 'Width', '0');
-      expect(worker.isTerminated).toBe(true);
+      expect(worker.isTerminated).toBe(false);
       expect(FakeWorker.instances).toHaveLength(1);
       expect(rendered.host.textContent).toContain('Width: Must be greater than 0');
       expect(generateButton(rendered.host).disabled).toBe(true);
@@ -191,7 +180,7 @@ describe('BoxGeneratorDialog background generation', () => {
   });
 
   it.each(['Cancel', 'Escape'] as const)(
-    'terminates pending work before dialog %s closes without insertion',
+    'drops pending work before dialog %s closes without insertion',
     async (action) => {
       const rendered = await renderDialog();
       const worker = currentWorker();
@@ -204,18 +193,18 @@ describe('BoxGeneratorDialog background generation', () => {
             ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
         );
       }
-      expect(worker.isTerminated).toBe(true);
+      expect(worker.isTerminated).toBe(false);
       expect(rendered.onCancel).toHaveBeenCalledTimes(1);
       expect(rendered.onGenerate).not.toHaveBeenCalled();
       await unmount(rendered);
     },
   );
 
-  it('terminates pending work on unmount without firing dialog callbacks', async () => {
+  it('drops pending work on unmount without firing dialog callbacks', async () => {
     const rendered = await renderDialog();
     const worker = currentWorker();
     await unmount(rendered);
-    expect(worker.isTerminated).toBe(true);
+    expect(worker.isTerminated).toBe(false);
     expect(rendered.onCancel).not.toHaveBeenCalled();
     expect(rendered.onGenerate).not.toHaveBeenCalled();
   });
@@ -328,6 +317,7 @@ describe('BoxGeneratorDialog background generation', () => {
     try {
       await setInput(rendered.host, 'Finger width', '3');
       await setInput(rendered.host, 'Width', '5000');
+      await settleQuietWindow();
       const worker = currentWorker();
       const response = responseFor(worker);
       if (response.kind !== 'result' || response.metrics === null) {
@@ -373,10 +363,24 @@ async function renderDialog(strictMode = false): Promise<RenderedDialog> {
   return { host, root, onGenerate, onCancel };
 }
 
-function responseFor(worker: FakeWorker): BoxGenerationWorkerResponse {
-  const request = worker.posted[0];
+function requestAt(worker: FakeWorker, index: number): BoxGenerationWorkerRequest {
+  const request = worker.posted.at(index);
   if (request === undefined) throw new Error('request missing');
-  return boxGenerationRuntime.runBoxGenerationRequest(request);
+  return request;
+}
+
+function responseFor(worker: FakeWorker): BoxGenerationWorkerResponse {
+  return boxGenerationRuntime.runBoxGenerationRequest(requestAt(worker, -1));
+}
+
+// Edits that supersede live work wait out the coalescing window before the
+// client dispatches them; step past it with real timers.
+async function settleQuietWindow(): Promise<void> {
+  await act(async () => {
+    await new Promise<void>((resolve) =>
+      setTimeout(() => resolve(), BOX_GENERATION_QUIET_WINDOW_MS + QUIET_WINDOW_TEST_MARGIN_MS),
+    );
+  });
 }
 
 async function respond(worker: FakeWorker, response = responseFor(worker)): Promise<void> {
