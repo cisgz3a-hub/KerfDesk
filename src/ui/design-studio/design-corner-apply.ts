@@ -55,6 +55,7 @@ function applyToRect(
     // typeable in the inspector.
     const limit = Math.min(entity.widthMm, entity.heightMm) / 2;
     if (sizeMm > limit) return null;
+    if (sizeMm === entity.cornerRadiusMm) return sketch;
     return replaceEntity(sketch, { ...entity, cornerRadiusMm: sizeMm });
   }
   return chamferAllRectCorners(sketch, entity, sizeMm);
