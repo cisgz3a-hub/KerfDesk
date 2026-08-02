@@ -12,8 +12,11 @@
 // MPos with a stale WCO jumps the head by a whole work offset for a frame)
 // and normalises inch reporting.
 
+import { useStoreWithEqualityFn } from 'zustand/traditional';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { useLaserStore } from '../state/laser-store';
+
+type LaserState = ReturnType<typeof useLaserStore.getState>;
 
 export type LiveMachine = {
   /** Work-coordinate position, or null when the controller has not said. */
@@ -30,19 +33,47 @@ export type LiveMachine = {
 
 const ACTIVE_STREAM_STATUSES: ReadonlySet<string> = new Set(['streaming', 'paused', 'tool-change']);
 
+/**
+ * Subscribed by VALUE, not by object identity. The 250 ms poll replaces
+ * `statusReport` on every tick even when the controller repeated itself, and
+ * the streamer object is replaced on every ack during a burn; watching those
+ * objects re-rendered the whole Inspector view four times a second at idle
+ * and once per acknowledged line under load.
+ */
 export function useLiveMachine(): LiveMachine {
-  const statusReport = useLaserStore((store) => store.statusReport);
-  const streamer = useLaserStore((store) => store.streamer);
-  const wcoCache = useLaserStore((store) => store.wcoCache);
-  const workOriginActive = useLaserStore((store) => store.workOriginActive);
-  const reportInches = useLaserStore((store) => store.controllerSettings?.reportInches === true);
-  const streaming = streamer !== null && ACTIVE_STREAM_STATUSES.has(streamer.status);
+  return useStoreWithEqualityFn(useLaserStore, selectLiveMachine, liveMachineEqual);
+}
+
+function selectLiveMachine(store: LaserState): LiveMachine {
+  const { statusReport, streamer, wcoCache, workOriginActive } = store;
+  const reportInches = store.controllerSettings?.reportInches === true;
   return {
     point: reportedWorkPositionMm({ statusReport, wcoCache, workOriginActive }, reportInches),
-    streaming,
+    streaming: streamer !== null && ACTIVE_STREAM_STATUSES.has(streamer.status),
     progress: streamer === null ? null : { completed: streamer.completed, total: streamer.total },
     feed: statusReport?.feed ?? null,
     spindle: statusReport?.spindle ?? null,
     state: statusReport?.state ?? null,
   };
+}
+
+function liveMachineEqual(a: LiveMachine, b: LiveMachine): boolean {
+  return (
+    a.streaming === b.streaming &&
+    a.state === b.state &&
+    a.feed === b.feed &&
+    a.spindle === b.spindle &&
+    progressEqual(a.progress, b.progress) &&
+    pointEqual(a.point, b.point)
+  );
+}
+
+function progressEqual(a: LiveMachine['progress'], b: LiveMachine['progress']): boolean {
+  if (a === null || b === null) return a === b;
+  return a.completed === b.completed && a.total === b.total;
+}
+
+function pointEqual(a: LiveMachine['point'], b: LiveMachine['point']): boolean {
+  if (a === null || b === null) return a === b;
+  return a.x === b.x && a.y === b.y && a.z === b.z;
 }
