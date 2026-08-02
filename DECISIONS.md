@@ -4409,6 +4409,14 @@ Log the result in AUDIT.md; only then may a row flip CLAIMED → VERIFIED.
 - Maintenance burden: if CNC-attributable regressions in laser mode exceed
   ~1 per sub-phase, revisit the shared-UI decision.
 
+### Amendment - missing primary-bit disclosure (2026-08-02)
+
+Legacy and imported CNC layers may retain an explicit primary-bit id that is no longer present in
+the machine library. The established compiler compatibility rule still resolves that id to the
+active machine bit, but Start and Save G-code now carry a nonblocking warning naming the missing id,
+the actual fallback bit, and the cutter-dependent values to verify. This removes a silent tool
+substitution without adding a refusal, rewriting the project, or changing emitted bytes.
+
 ## ADR-101 — CNC/laser UI separation policy: gate-and-hide
 
 **Status:** Accepted; amended by ADR-255 (Open G-code / Inspect G-code becomes mode-independent)
