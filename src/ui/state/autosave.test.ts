@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
-import { clearAutosave, readAutosave, startAutosaveLoop, writeAutosave } from './autosave';
+import { clearAutosave, readAutosave, writeAutosave } from './autosave';
 
 const KEY = 'lf2:autosave:v1';
 
@@ -91,69 +91,8 @@ describe('clearAutosave', () => {
   });
 });
 
-describe('startAutosaveLoop', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  it('writes when dirty and not streaming, on each interval tick', () => {
-    const project = createProject();
-    const stop = startAutosaveLoop(() => ({ project, dirty: true, isStreaming: false }), 100);
-    expect(readAutosave()).toBeNull(); // no tick yet
-    vi.advanceTimersByTime(100);
-    expect(readAutosave()).not.toBeNull();
-    stop();
-  });
-
-  it('reports write failures so the UI can warn that recovery is unavailable', () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new DOMException('storage full', 'QuotaExceededError');
-    });
-    const project = createProject();
-    const onWriteFailure = vi.fn();
-    const stop = startAutosaveLoop(
-      () => ({ project, dirty: true, isStreaming: false }),
-      100,
-      onWriteFailure,
-    );
-
-    vi.advanceTimersByTime(100);
-
-    expect(onWriteFailure).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'failed', reason: 'quota' }),
-    );
-    stop();
-  });
-
-  it('skips writes when the project is not dirty', () => {
-    const project = createProject();
-    const stop = startAutosaveLoop(() => ({ project, dirty: false, isStreaming: false }), 100);
-    vi.advanceTimersByTime(500);
-    expect(readAutosave()).toBeNull();
-    stop();
-  });
-
-  it('skips writes during streaming (do not perturb the render loop)', () => {
-    const project = createProject();
-    const stop = startAutosaveLoop(() => ({ project, dirty: true, isStreaming: true }), 100);
-    vi.advanceTimersByTime(500);
-    expect(readAutosave()).toBeNull();
-    stop();
-  });
-
-  it('stop function cancels future writes', () => {
-    let dirty = true;
-    const project = createProject();
-    const stop = startAutosaveLoop(() => ({ project, dirty, isStreaming: false }), 100);
-    vi.advanceTimersByTime(100);
-    expect(readAutosave()).not.toBeNull();
-    clearAutosave();
-    stop();
-    // Even with dirty true, no more writes after stop.
-    dirty = true;
-    vi.advanceTimersByTime(1000);
-    expect(readAutosave()).toBeNull();
-  });
-});
+// The startAutosaveLoop suite moved to the co-located ./autosave-loop.test.ts
+// when the interval moved to ./autosave-loop.ts.
 
 describe('writeAutosave called synchronously (beforeunload path)', () => {
   // The hook test path lives in use-autosave; here we just verify

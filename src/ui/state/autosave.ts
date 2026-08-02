@@ -6,6 +6,8 @@
 // system, but separate windows keep separate slots so one dirty project
 // cannot overwrite or clear another.
 //
+// The interval that drives this on a timer lives in ./autosave-loop.
+//
 // Boundaries:
 //   * localStorage only - works web + Electron renderer; roughly 5 MB cap.
 //   * Pauses during live streaming so the render loop owns the CPU.
@@ -137,30 +139,6 @@ export function clearAutosave(target: AutosaveScope | AutosaveSnapshot = {}): vo
       /* ignore */
     }
   }
-}
-
-export type AutosaveSnapshotFn = () => {
-  readonly project: Project;
-  readonly dirty: boolean;
-  readonly isStreaming: boolean;
-};
-
-// Starts a setInterval-driven autosave loop. Returns the stop function;
-// callers (the React hook) clear on unmount. The interval is configurable
-// for tests; production wiring passes AUTOSAVE_INTERVAL_MS.
-export function startAutosaveLoop(
-  getSnapshot: AutosaveSnapshotFn,
-  intervalMs: number = AUTOSAVE_INTERVAL_MS,
-  onWriteFailure?: (failure: AutosaveWriteFailure) => void,
-): () => void {
-  const handle = setInterval(() => {
-    const snap = getSnapshot();
-    if (!snap.dirty) return;
-    if (snap.isStreaming) return;
-    const result = writeAutosave(snap.project);
-    if (result.kind !== 'ok') onWriteFailure?.(result);
-  }, intervalMs);
-  return () => clearInterval(handle);
 }
 
 function isAutosaveRecord(v: unknown): v is AutosaveRecord {
