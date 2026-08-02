@@ -222,6 +222,10 @@ function contentFor(
   return {
     mesh: steppedSurfaceMesh(display),
     stockThicknessMm,
+    // The DOWNSAMPLED grid, not `grid`: the surface shader marches this to
+    // shadow and occlude itself, so it has to be the field the mesh was
+    // actually built from or the shading lands beside the groove it describes.
+    heightfield: display,
     ...(materialKey === undefined ? {} : { materialKey }),
     // Downsampling keeps the grid's min corner, so the full-resolution origin
     // is still the right offset for the path.
