@@ -33,6 +33,7 @@ import {
   sceneWithoutDormantCncSecondaryToolReferences,
 } from './cnc-tool-references';
 import { pushUndo } from './scene-mutations';
+import { nextProbeSetupState } from './probe-setup-history-identity';
 import type { AppState } from './store';
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -254,8 +255,7 @@ function machineProfileActions(
           activeToolChanged: activeCncToolFeedIdentityChanged(previousMachine, machine),
         });
         return {
-          project: { ...s.project, scene, device, machine },
-          probeSetupEpoch: s.probeSetupEpoch + 1,
+          ...nextProbeSetupState({ ...s.project, scene, device, machine }, s.probeSetupEpoch),
           undoStack: pushUndo(s.project, s.undoStack),
           redoStack: [],
           dirty: true,

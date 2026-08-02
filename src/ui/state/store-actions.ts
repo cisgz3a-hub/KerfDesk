@@ -22,6 +22,10 @@ import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
 import type { AppState, OutputScopeSettings } from './store';
 import { cncMachineWithCustomTools } from './machine-actions';
 import { projectAfterDeviceProfileChange, sceneAfterMachineSetup } from './cnc-machine-setup-scene';
+import {
+  nextProbeSetupState,
+  projectsShareProbeSetupIdentity,
+} from './probe-setup-history-identity';
 
 type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -81,8 +85,10 @@ export function sceneActions(
     replaceDeviceProfile: (profile) =>
       set((s) => {
         return {
-          project: projectAfterDeviceProfileChange(s.project, profile, s.cncLiveCaps),
-          probeSetupEpoch: s.probeSetupEpoch + 1,
+          ...nextProbeSetupState(
+            projectAfterDeviceProfileChange(s.project, profile, s.cncLiveCaps),
+            s.probeSetupEpoch,
+          ),
           jobPlacement: jobPlacementAfterProfileSelection(
             s.jobPlacement,
             s.project.device,
@@ -131,24 +137,26 @@ function replacementMachineSetupState(
     state.cncLiveCaps,
   );
   return {
-    project: {
-      ...state.project,
-      scene,
-      device: nextProfile,
-      machine: nextMachine,
-      workspace: {
-        ...state.project.workspace,
-        width: nextProfile.bedWidth,
-        height: nextProfile.bedHeight,
+    ...nextProbeSetupState(
+      {
+        ...state.project,
+        scene,
+        device: nextProfile,
+        machine: nextMachine,
+        workspace: {
+          ...state.project.workspace,
+          width: nextProfile.bedWidth,
+          height: nextProfile.bedHeight,
+        },
       },
-    },
+      state.probeSetupEpoch,
+    ),
     jobPlacement: jobPlacementAfterProfileSelection(
       state.jobPlacement,
       state.project.device,
       nextProfile,
     ),
     cachedCncMachine: nextCachedCnc,
-    probeSetupEpoch: state.probeSetupEpoch + 1,
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,
@@ -247,7 +255,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
 }
 
 function probeSetupEpochAfterHistoryRestore(state: AppState, restored: Project): number {
-  return state.project.machine === restored.machine && state.project.device === restored.device
+  return projectsShareProbeSetupIdentity(state.project, restored)
     ? state.probeSetupEpoch
     : state.probeSetupEpoch + 1;
 }

@@ -31,6 +31,7 @@ import { projectWithStockMaterial } from './cnc-project-material';
 import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
 import { refreshAutomaticCncFeeds, seedCncModeSwitchLayers } from './cnc-auto-seeding';
 import { pushUndo } from './scene-mutations';
+import { nextProbeSetupState } from './probe-setup-history-identity';
 
 type MachineState = {
   readonly project: Project;
@@ -259,8 +260,7 @@ function cncMachineSetupStatePatch(
     machine: nextMachine,
   };
   return {
-    project,
-    probeSetupEpoch: state.probeSetupEpoch + 1,
+    ...nextProbeSetupState(project, state.probeSetupEpoch),
     jobPlacement:
       patch.deviceProfile === undefined
         ? jobPlacementAfterDeviceChange(state.jobPlacement, state.project.device, deviceWithCnc)
