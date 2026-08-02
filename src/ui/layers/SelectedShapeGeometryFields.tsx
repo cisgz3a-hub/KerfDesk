@@ -1,4 +1,4 @@
-import type { ShapeObject } from '../../core/scene';
+import { selectionMetrics, type ShapeObject } from '../../core/scene';
 import type { ParametricShapeSpec } from '../../core/shapes';
 import { Field } from '../kit';
 import { useDebouncedCommit } from './use-debounced-commit';
@@ -9,19 +9,54 @@ export function SelectedShapeGeometryFields(props: {
 }): JSX.Element | null {
   const spec = props.object.spec;
   const scale = specScale(props.object.transform);
-  switch (spec.kind) {
-    case 'rect':
-      return <RectangleFields spec={spec} setSpec={props.setSpec} scale={scale} />;
-    case 'ellipse':
-      return <EllipseFields spec={spec} setSpec={props.setSpec} scale={scale} />;
-    case 'polygon':
-      return <PolygonFields spec={spec} setSpec={props.setSpec} scale={scale} />;
-    case 'star':
-      return <StarFields spec={spec} setSpec={props.setSpec} scale={scale} />;
-    case 'polyline':
-      return null;
-  }
+  const fields = ((): JSX.Element | null => {
+    switch (spec.kind) {
+      case 'rect':
+        return <RectangleFields spec={spec} setSpec={props.setSpec} scale={scale} />;
+      case 'ellipse':
+        return <EllipseFields spec={spec} setSpec={props.setSpec} scale={scale} />;
+      case 'polygon':
+        return <PolygonFields spec={spec} setSpec={props.setSpec} scale={scale} />;
+      case 'star':
+        return <StarFields spec={spec} setSpec={props.setSpec} scale={scale} />;
+      case 'polyline':
+        return null;
+    }
+  })();
+  if (fields === null) return null;
+  return (
+    <>
+      {fields}
+      <RotatedFootprintNote object={props.object} />
+    </>
+  );
 }
+
+// Width/Height above are the shape's OWN size (the LightBurn Shape Properties
+// convention) while the toolbar reports the rotated footprint's axis-aligned
+// bounds. For a rotated shape both are true and DIFFERENT — a 40×20 rectangle
+// at 45° occupies 42.4×42.4 on the bed. Naming the second quantity, computed
+// by the same selectionMetrics the toolbar uses, keeps the two surfaces from
+// looking contradictory.
+function RotatedFootprintNote(props: { readonly object: ShapeObject }): JSX.Element | null {
+  const rotationDeg = props.object.transform.rotationDeg % 360;
+  if (rotationDeg === 0) return null;
+  const metrics = selectionMetrics([props.object]);
+  if (metrics === null) return null;
+  return (
+    <p role="note" style={footprintNoteStyle}>
+      Rotated footprint on the bed: {formatShapeValue(metrics.width)} ×{' '}
+      {formatShapeValue(metrics.height)} mm. Width and height above are the shape&apos;s own,
+      unrotated size — the toolbar shows this footprint.
+    </p>
+  );
+}
+
+const footprintNoteStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
+  margin: '4px 0 6px 0',
+};
 
 type SetSpec = (spec: ParametricShapeSpec) => void;
 
@@ -213,6 +248,10 @@ function ShapeNumberField(props: {
   const debounced = useDebouncedCommit<number>({
     value: props.value,
     commit: props.commit,
+    // The box shows spec × scale; a toolbar resize changes the scale while
+    // the spec stays put, so the scale must re-trigger reconciliation or the
+    // stale draft would be committed back on blur (undoing the resize).
+    reconcileKey: scale,
     parse: (input) => clampFieldValue(Number(input) / scale, props),
     // Display-only rounding: a drag-resized shape stores a long float
     // (e.g. 35.107387681635146) that overflowed the box. Show a clean value

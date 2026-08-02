@@ -30,6 +30,45 @@ describe('SelectedShapeGeometryFields', () => {
     }
   });
 
+  it('keeps a toolbar resize when the field is blurred untouched', async () => {
+    // Audit finding: a toolbar resize scales the TRANSFORM, not the spec. The
+    // field kept showing the pre-resize size, and blurring it wrote that
+    // stale size back — silently undoing the live resize.
+    const ellipse = createEllipse({
+      id: 'ellipse-resize',
+      color: '#ff0000',
+      spec: { widthMm: 40, heightMm: 10 },
+    });
+    const view = await renderShape(ellipse);
+    try {
+      await act(async () => {
+        useStore.setState((s) => ({
+          project: {
+            ...s.project,
+            scene: {
+              ...s.project.scene,
+              objects: s.project.scene.objects.map((object) =>
+                object.id === 'ellipse-resize' && object.kind === 'shape'
+                  ? { ...object, transform: { ...object.transform, scaleX: 2 } }
+                  : object,
+              ),
+            },
+          },
+        }));
+      });
+      const input = view.host.querySelector('input[aria-label="Ellipse width"]');
+      if (!(input instanceof HTMLInputElement)) throw new Error('Ellipse width input missing');
+      // The field reports bed millimetres, so it must follow the resize…
+      expect(input.value).toBe('80');
+      // …and blurring the untouched field must not rewrite the spec.
+      await act(async () => Simulate.blur(input));
+      expect(selectedShape().spec).toMatchObject({ widthMm: 40 });
+      expect(Math.abs(selectedShape().transform.scaleX)).toBe(2);
+    } finally {
+      await view.dispose();
+    }
+  });
+
   it('rounds a long-float dimension for display but keeps the stored value exact', async () => {
     // A drag-resized shape stores a long float that overflowed the input box.
     const ellipse = createEllipse({
@@ -44,6 +83,42 @@ describe('SelectedShapeGeometryFields', () => {
       expect(input.value).toBe('35.107');
       // Display rounds; the underlying spec keeps full precision until edited.
       expect(selectedShape().spec).toMatchObject({ heightMm: 35.107387681635146 });
+    } finally {
+      await view.dispose();
+    }
+  });
+
+  it('names the rotated footprint so the panel and toolbar stop looking contradictory', async () => {
+    // Audit finding: the panel shows the shape's own (unrotated) size while
+    // the toolbar shows the rotated axis-aligned bounds — both correct, both
+    // unlabeled. A rotated shape now carries a note with the toolbar's exact
+    // footprint numbers; an unrotated shape shows no note.
+    const ellipse = createEllipse({
+      id: 'ellipse-rotated',
+      color: '#ff0000',
+      spec: { widthMm: 40, heightMm: 20 },
+    });
+    const view = await renderShape(ellipse);
+    try {
+      expect(view.host.querySelector('[role="note"]')).toBeNull();
+      await act(async () => {
+        useStore.setState((s) => ({
+          project: {
+            ...s.project,
+            scene: {
+              ...s.project.scene,
+              objects: s.project.scene.objects.map((object) =>
+                object.id === 'ellipse-rotated' && object.kind === 'shape'
+                  ? { ...object, transform: { ...object.transform, rotationDeg: 45 } }
+                  : object,
+              ),
+            },
+          },
+        }));
+      });
+      const note = view.host.querySelector('[role="note"]');
+      expect(note).not.toBeNull();
+      expect(note?.textContent).toContain('Rotated footprint');
     } finally {
       await view.dispose();
     }
