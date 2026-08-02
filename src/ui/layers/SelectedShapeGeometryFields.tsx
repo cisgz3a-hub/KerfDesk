@@ -196,7 +196,7 @@ function StarFields(props: {
  * the shape's own limits (a corner radius cannot exceed half its shorter side)
  * hold no matter how the object is scaled.
  */
-function ShapeNumberField(props: {
+type ShapeNumberFieldProps = {
   readonly label: string;
   readonly ariaLabel: string;
   readonly unit?: string;
@@ -208,7 +208,19 @@ function ShapeNumberField(props: {
   readonly step: number;
   readonly integer?: boolean;
   readonly commit: (value: number) => void;
-}): JSX.Element {
+};
+
+function ShapeNumberField(props: ShapeNumberFieldProps): JSX.Element {
+  // Remount the input when a canvas resize rescales the object: the visible
+  // text is spec × scale, but the debounced-commit hook reconciles its draft
+  // only when the committed (spec-unit) value changes — a drag-resize changes
+  // the SCALE and not the spec, so without this key the box froze at the
+  // pre-drag number until the selection changed. Typing never changes the
+  // scale, so in-flight edits are never remounted away.
+  return <ShapeNumberInput key={props.scale ?? UNSCALED} {...props} />;
+}
+
+function ShapeNumberInput(props: ShapeNumberFieldProps): JSX.Element {
   const scale = props.scale ?? UNSCALED;
   const debounced = useDebouncedCommit<number>({
     value: props.value,

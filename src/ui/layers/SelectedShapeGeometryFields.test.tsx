@@ -30,6 +30,39 @@ describe('SelectedShapeGeometryFields', () => {
     }
   });
 
+  it('refreshes the displayed size after a canvas resize scales the transform', async () => {
+    // A canvas drag-resize scales `transform` and never rewrites the spec, so
+    // the field's committed value (spec units) is unchanged — only the bed-mm
+    // display quantity moves. The stale-display bug froze the box at the
+    // pre-drag number until the selection changed.
+    const ellipse = createEllipse({
+      id: 'ellipse-scaled',
+      color: '#ff0000',
+      spec: { widthMm: 20, heightMm: 10 },
+    });
+    const view = await renderShape(ellipse);
+    try {
+      const input = (): HTMLInputElement => {
+        const found = view.host.querySelector('input[aria-label="Ellipse width"]');
+        if (!(found instanceof HTMLInputElement)) throw new Error('Ellipse width input missing');
+        return found;
+      };
+      expect(input().value).toBe('20');
+      const object = useStore.getState().project.scene.objects[0];
+      if (object === undefined) throw new Error('ellipse missing');
+      await act(async () =>
+        useStore
+          .getState()
+          .applySelectionTransforms([
+            { id: 'ellipse-scaled', transform: { ...object.transform, scaleX: 2 } },
+          ]),
+      );
+      expect(input().value).toBe('40');
+    } finally {
+      await view.dispose();
+    }
+  });
+
   it('rounds a long-float dimension for display but keeps the stored value exact', async () => {
     // A drag-resized shape stores a long float that overflowed the input box.
     const ellipse = createEllipse({
