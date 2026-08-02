@@ -378,8 +378,11 @@ body {
    buttons, inputs, and selects pick up the chrome look without per-file class
    wiring. Only paint properties live here — component code keeps layout
    (width/flex) inline, so a caller's inline width still wins. Buttons that
-   already carry a class (.lf-btn…) are excluded and keep their variant look. */
-.lf-pane-form button:not([class]) {
+   already carry a class (.lf-btn…) are excluded and keep their variant look.
+   Dialogs render inside the rail's DOM subtree, so every rail selector also
+   excludes .lf-dialog descendants; visually fixed overlays are not a CSS
+   scope boundary. :where keeps that exclusion from increasing specificity. */
+.lf-pane-form button:not([class]):not(:where(.lf-dialog *)) {
   font: inherit;
   font-size: var(--lf-text-sm);
   color: var(--lf-text);
@@ -393,20 +396,21 @@ body {
     background-color 80ms,
     border-color 80ms;
 }
-.lf-pane-form button:not([class]):hover:not(:disabled) {
+.lf-pane-form button:not([class]):not(:where(.lf-dialog *)):hover:not(:disabled) {
   background: #e5eaf0;
   border-color: var(--lf-border-strong);
 }
-.lf-pane-form button:not([class]):active:not(:disabled) {
+.lf-pane-form button:not([class]):not(:where(.lf-dialog *)):active:not(:disabled) {
   background: var(--lf-bg-2);
 }
-.lf-pane-form button:not([class]):disabled {
+.lf-pane-form button:not([class]):not(:where(.lf-dialog *)):disabled {
   color: var(--lf-text-faint);
   cursor: default;
 }
 
-.lf-pane-form select,
-.lf-pane-form input:not([type='checkbox']):not([type='radio']):not([type='color']) {
+.lf-pane-form select:not(:where(.lf-dialog *)),
+.lf-pane-form
+  input:not([type='checkbox']):not([type='radio']):not([type='color']):not(:where(.lf-dialog *)) {
   font: inherit;
   font-size: var(--lf-text-sm);
   color: var(--lf-text);
@@ -419,23 +423,39 @@ body {
   color-scheme: light;
 }
 /* Closed selects ellipsize long options instead of running under the arrow. */
-.lf-pane-form select {
+.lf-pane-form select:not(:where(.lf-dialog *)) {
   text-overflow: ellipsis;
 }
-.lf-pane-form select:hover:not(:disabled),
-.lf-pane-form input:not([type='checkbox']):not([type='radio']):hover:not(:disabled) {
+.lf-pane-form select:not(:where(.lf-dialog *)):hover:not(:disabled),
+.lf-pane-form
+  input:not([type='checkbox']):not([type='radio']):not([type='color']):not(
+    :where(.lf-dialog *)
+  ):hover:not(:disabled) {
   border-color: var(--lf-border-strong);
 }
-.lf-pane-form select:focus,
-.lf-pane-form input:not([type='checkbox']):not([type='radio']):focus {
+.lf-pane-form select:not(:where(.lf-dialog *)):focus,
+.lf-pane-form
+  input:not([type='checkbox']):not([type='radio']):not([type='color']):not(
+    :where(.lf-dialog *)
+  ):focus {
   border-color: var(--lf-accent);
-  outline: none;
 }
-.lf-pane-form select:disabled,
-.lf-pane-form input:disabled {
+/* Shared .lf-input/.lf-select controls carry a legacy :focus outline reset
+   with more specificity than the global keyboard ring. Reassert the ring for
+   rail controls only; nested dialogs keep their established dialog styling. */
+.lf-pane-form select:not(:where(.lf-dialog *)):focus-visible,
+.lf-pane-form
+  input:not([type='checkbox']):not([type='radio']):not([type='color']):not(
+    :where(.lf-dialog *)
+  ):focus-visible {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+.lf-pane-form select:not(:where(.lf-dialog *)):disabled,
+.lf-pane-form input:not(:where(.lf-dialog *)):disabled {
   color: var(--lf-text-faint);
 }
-.lf-pane-form input[type='checkbox'] {
+.lf-pane-form input[type='checkbox']:not(:where(.lf-dialog *)) {
   accent-color: var(--lf-accent);
   color-scheme: light;
 }
@@ -495,7 +515,7 @@ body {
 /* The rail's own label column. Scoped to .lf-pane-form on purpose: the shared
    .lf-field-label--sm width belongs to the dialogs that use kit/Field's default
    and must not move when the rail's grammar changes. */
-.lf-pane-form .lf-field-label--sm {
+.lf-pane-form .lf-field-label--sm:not(:where(.lf-dialog *)) {
   width: 100px;
 }
 

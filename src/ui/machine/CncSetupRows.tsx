@@ -52,11 +52,24 @@ export function NumberPairRow(props: {
 }): JSX.Element {
   return (
     <Row label={`${props.label} (${props.unit})`}>
-      <span style={unitStyle}>{props.prefixes[0]}</span>
-      <SetupNumberInput spec={props.first} compact />
-      <span style={unitStyle}>{props.prefixes[1]}</span>
-      <SetupNumberInput spec={props.second} compact />
+      <SetupNumberPair prefix={props.prefixes[0]} spec={props.first} />
+      <SetupNumberPair prefix={props.prefixes[1]} spec={props.second} />
     </Row>
+  );
+}
+
+// Keep each prefix attached to its input when the rail narrows. The value
+// column may wrap the two groups onto separate lines, but it cannot strand an
+// X/Y/W/H prefix at the end of the previous line.
+function SetupNumberPair(props: {
+  readonly prefix: string;
+  readonly spec: SetupNumberSpec;
+}): JSX.Element {
+  return (
+    <span style={pairValueStyle}>
+      <span style={unitStyle}>{props.prefix}</span>
+      <SetupNumberInput spec={props.spec} compact />
+    </span>
   );
 }
 
@@ -119,12 +132,18 @@ const inputStyle: React.CSSProperties = {
   width: 84,
   boxSizing: 'border-box',
 };
-// Paired inputs share the value column: the 48px basis fits two inputs plus
-// their X/Y prefixes on the 300px rail's ~127px column, growing evenly with
-// spare width; anything narrower wraps instead of crushing.
+// Paired prefix/input groups share the value column. A group grows with spare
+// width and wraps as a whole when the rail is too narrow for both groups.
+const pairValueStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  flex: '1 1 75px',
+  minWidth: 75,
+};
 const pairInputStyle: React.CSSProperties = {
-  flex: '1 1 48px',
-  minWidth: 48,
+  flex: '1 1 64px',
+  minWidth: 64,
   boxSizing: 'border-box',
 };
 export const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
