@@ -119,6 +119,14 @@ describe('applyCornerOp — rectangles', () => {
     expect(edited.widthMm).toBe(100);
   });
 
+  it('returns the original sketch when the same fillet is already applied', () => {
+    const rounded: Sketch = { entities: [{ ...rect, cornerRadiusMm: 12 }] };
+    const roundedPick = pickCorner(rounded, { x: 0, y: 0 }, 4);
+    if (roundedPick === null) throw new Error('expected a pick');
+
+    expect(applyCornerOp(rounded, roundedPick, 'fillet', 12)).toBe(rounded);
+  });
+
   it('refuses a radius larger than half the shorter side', () => {
     if (pick === null) throw new Error('expected a pick');
     // The shorter side is 60, so the limit is 30.

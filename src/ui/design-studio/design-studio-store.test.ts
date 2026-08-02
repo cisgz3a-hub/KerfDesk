@@ -152,3 +152,30 @@ describe('marquee selection', () => {
     expect(session().history.past).toHaveLength(before);
   });
 });
+
+describe('corner operations', () => {
+  it('does not add an undo step when the same rectangle fillet is reapplied', () => {
+    store().openStudio();
+    store().setFilletRadiusMm(7);
+    store().setSketch({
+      entities: [
+        {
+          kind: 'rect',
+          id: 'rounded',
+          origin: { x: 0, y: 0 },
+          widthMm: 100,
+          heightMm: 60,
+          cornerRadiusMm: 7,
+        },
+      ],
+    });
+    const before = session().history;
+    const beforeDirty = session().dirtySinceApply;
+
+    store().applyCorner({ kind: 'rect', entityId: 'rounded', atMm: { x: 0, y: 0 } }, 'fillet');
+
+    expect(session().history).toBe(before);
+    expect(session().history.past).toHaveLength(before.past.length);
+    expect(session().dirtySinceApply).toBe(beforeDirty);
+  });
+});
