@@ -36,8 +36,8 @@ import { normalizeClosedPolylinesEvenOddChecked } from '../geometry/polygon-diff
 import type { CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
-import { hasFinitePoints } from './profile-paths';
 import { vcarveIncludedAngleDeg } from './vcarve-angle';
+import { isVCarvableContour } from './vcarve-carvable-contours';
 import {
   detailPath3dPlan,
   sourceBoundarySegments,
@@ -58,7 +58,6 @@ import {
   type ThinDetailRings,
 } from './vcarve-thin-detail';
 
-const MIN_CLOSED_POINTS = 3;
 const MIN_RESOLUTION_MM = 0.1;
 // Two clipper quanta (OFFSET_PRECISION_DECIMALS = 3 → 0.001 mm grid): the
 // finest ring pitch whose successive insets stay distinct after rounding.
@@ -198,10 +197,7 @@ export function vcarveLadderPasses(
 }
 
 function validVCarveContours(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> {
-  return polylines.filter(
-    (polyline) =>
-      polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
-  );
+  return polylines.filter(isVCarvableContour);
 }
 
 const NO_LADDER: VCarveLadder = {
