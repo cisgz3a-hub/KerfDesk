@@ -10,6 +10,7 @@ import { evaluateRasterBudget } from '../../core/raster';
 import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
 import { rgbaToPngBlob } from '../raster/luma-bitmap';
 import type { ToastVariant } from '../state/toast-store';
+import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
 
 const FORBIDDEN_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
 
@@ -56,7 +57,8 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
   }
   if (target === null) return;
   try {
-    const bitmap = buildProcessedRasterBitmap(selected, layer, ctx.project.device, {
+    const preparationImage = await hydratePagedRasterImage(selected);
+    const bitmap = buildProcessedRasterBitmap(preparationImage, layer, ctx.project.device, {
       maskObject: imageMaskObjectFor(ctx.project, selected),
     });
     if (bitmap.kind === 'too-large') {

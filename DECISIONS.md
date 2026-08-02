@@ -15042,3 +15042,76 @@ rail are NOT migrated - follow-up work, same primitives. Screen-reader contracts
 (every aria-label kept; the narrow-rail select shrink contract in `CncSetupPanel.layout.test.tsx`
 still holds). Perceptual verification: before/after screenshots at the 300 px rail width. No G-code,
 state, or behavior changes.
+
+## ADR-283 - Page-backed rasters are a large-file representation, not the default (2026-08-01)
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+### Context
+
+The memory-bounded import program (ADR-269 line) added a page-backed raster representation: a
+qualified PNG is streamed into origin-scoped IndexedDB pages, and the scene object keeps asset ids,
+metadata, and a bounded thumbnail instead of pixels. That is what makes a 200 MiB PNG importable
+without exhausting renderer memory.
+
+It was applied to every qualified PNG. `tryDecodeQualifiedPng` gated only on file type, and the
+compatibility fallback fires on bit depth, colour type, and interlacing — never on size. A 20 KB
+logo took the same route as the 200 MiB fixture.
+
+That silently changed the native file contract. Before the program, `RasterImage.dataUrl` was a
+required field and the comment above it read "dataUrl carries PNG bytes embedded in the .lf2 file".
+`serializeProject` is plain JSON over the scene, and neither `prepareProjectForPersistence` nor
+`prepareProjectForAutosave` embeds or registers page-backed bytes. So after the program, saving a
+project containing any PNG produced a `.lf2` whose pixels live only in this browser's IndexedDB for
+this origin. Such a file does not open on another machine, in another browser or profile, or after
+storage eviction; hydration fails with "Page-backed raster luma asset is unavailable."
+
+Nothing in the product asked for that trade on small files. It also blocked page garbage collection:
+because a saved file or autosave slot is an unenumerable external owner, `PagedRasterAssetLifecycle`
+had to stop deleting on absence and now retains ready pages indefinitely.
+
+### Decision
+
+1. **Page-backing is selected by size, not by format alone.** `shouldPageBackPng` is the single
+   predicate: a PNG is page-backed only above `PAGED_PNG_MIN_BYTES`. At or below it, the import
+   keeps the pre-existing embedded representation — `dataUrl` plus `lumaBase64` — and the saved
+   project stays self-contained and portable.
+2. **The threshold is 25 MiB, deliberately equal to `LARGE_IMPORT_ADVISORY_BYTES`.** Page-backing
+   begins exactly where the operator is already told the import will be slow, so the representation
+   never changes without the operator being told the file is large. They are separate constants: this
+   one is a persistence-schema boundary governed by this ADR, the advisory is a UX judgement.
+3. **The import action makes one routing decision.** `importImageFile` computes `shouldPageBackPng`
+   once and uses it for both the storage route and whether worker-progress toasts are installed, so
+   the progress surface cannot describe a worker the import never reaches. `tryDecodeQualifiedPng`
+   re-checks the same predicate, so no other caller can page-back a small file.
+4. **This is a size policy, never a refusal.** Both routes import. Nothing is blocked, capped, or
+   rewritten, and no Start, Frame, Save, or export surface gains a guard. Rule 7 / ADR-228 stand:
+   a completed Frame remains the sole Start guard.
+5. **Portability above the threshold remains unsolved.** A page-backed `.lf2` is still not
+   self-contained. This ADR shrinks the exposure to files the operator has been told are large; it
+   does not claim large page-backed projects are portable, and it does not authorize ready-page
+   garbage collection.
+
+### Consequences
+
+- Importing an ordinary PNG restores the pre-program behaviour end to end: embedded bytes, portable
+  `.lf2`, no IndexedDB dependency, no worker-progress toasts.
+- The portability regression is confined to PNGs over 25 MiB, where the previous embedded path was
+  the memory problem the paged route exists to solve. For those files the operator gains large-file
+  import and loses file portability; that trade is now explicit rather than silent.
+- Page retention still leaks for page-backed assets. Collection stays blocked until persistence
+  either embeds the pages or durably registers every external owner. Confining page-backing to large
+  files reduces how often that leak is reachable but does not remove it.
+- Below the threshold the import holds the whole image in memory, exactly as before this program.
+  That is the accepted cost of a portable file at those sizes.
+
+### Verification
+
+- `qualified-png-raster.test.ts` characterizes the threshold: sub-threshold PNGs stay embedded and
+  never reach `importPngOffThread`, above-threshold PNGs page back, and a large non-PNG never does.
+  The sub-threshold test was observed failing against the type-only gate before the fix.
+- `import-image-action.test.ts` proves a sub-threshold import yields `dataUrl` + `lumaBase64`, no
+  `imageAsset`, and no worker-progress toast; the existing paged-route tests continue to pass.
+- NOT verified: portability of a page-backed `.lf2` across machines, ready-page collection, worker
+  or operating-system peak memory, and any hardware behaviour. No machine was involved.

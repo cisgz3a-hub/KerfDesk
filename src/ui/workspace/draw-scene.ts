@@ -35,7 +35,7 @@ import {
 } from './display-polylines';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import { drawCncRemoval } from './draw-cnc-removal';
-import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
+import { drawRasterImage, pruneRasterImageCaches, rasterDisplayDataUrl } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawCncStock } from './draw-stock';
 import { drawReliefObject } from './draw-relief';
@@ -230,7 +230,7 @@ function stockMaterialKey(project: Project): ChiploadMaterial | undefined {
 function liveRasterDataUrls(project: Project): Set<string> {
   const live = new Set<string>();
   for (const obj of project.scene.objects) {
-    if (obj.kind === 'raster-image') live.add(obj.dataUrl);
+    if (obj.kind === 'raster-image') live.add(rasterDisplayDataUrl(obj));
   }
   return live;
 }

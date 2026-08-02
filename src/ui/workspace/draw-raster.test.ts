@@ -152,4 +152,39 @@ describe('drawRasterImage bitmap decode redraw', () => {
 
     expect(onBitmapReady).toHaveBeenCalledTimes(1);
   });
+
+  it('loads the bounded page-backed thumbnail instead of an original data URL', () => {
+    const images = installPendingImage();
+
+    drawRasterImage(
+      {} as CanvasRenderingContext2D,
+      {
+        imageAsset: {
+          schemaVersion: 1,
+          repository: 'curvedesk-import-assets-v1',
+          sourceAssetId: 'source-pages',
+          lumaAssetId: 'luma-pages',
+          sourceMimeType: 'image/png',
+          sourceByteLength: 300_000_000,
+          lumaByteLength: 2,
+          naturalWidth: 2,
+          naturalHeight: 1,
+          sampledWidth: 2,
+          sampledHeight: 1,
+          thumbnail: {
+            mimeType: 'image/bmp',
+            dataUrl: 'data:image/bmp;base64,bounded-thumbnail',
+            width: 2,
+            height: 1,
+          },
+        },
+        bounds: { minX: 0, minY: 0, maxX: 10, maxY: 5 },
+        transform: IDENTITY_TRANSFORM,
+      },
+      { scale: 1, offsetX: 0, offsetY: 0 },
+    );
+
+    expect(images).toHaveLength(1);
+    expect(images[0]?.src).toBe('data:image/bmp;base64,bounded-thumbnail');
+  });
 });

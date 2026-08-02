@@ -10,6 +10,10 @@ import { emitSavePreparedOutput, type SaveOutputEmission } from '../laser/save-o
 import { renderVariableText } from '../text/render-variable-text';
 import { buildGcodeMetadata } from './build-info';
 import type { SaveGcodeCtx } from './file-actions';
+import {
+  hydratePagedRasterProject,
+  projectHasPagedRasterAssets,
+} from '../import/paged-raster-hydration';
 
 /**
  * Builds the ordinary Save output and preserves preparation failure in the
@@ -42,7 +46,10 @@ export async function emitSaveGcode(
       }
     }
   }
-  const prepared = await prepareOutputSnapshot(ctx.project, {
+  const preparationProject = projectHasPagedRasterAssets(ctx.project)
+    ? await hydratePagedRasterProject(ctx.project)
+    : ctx.project;
+  const prepared = await prepareOutputSnapshot(preparationProject, {
     clock: () => new Date(),
     renderVariableText,
     ...(registration === undefined ? {} : { registration }),

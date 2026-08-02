@@ -7,13 +7,17 @@ import type {
   OutputPreparationResponse,
   StartOutputPreparationRequest,
 } from './output-preparation-protocol';
+import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 
-export function prepareOutputRequest(request: OutputPreparationRequest): OutputPreparationResponse {
+export async function prepareOutputRequest(
+  request: OutputPreparationRequest,
+): Promise<OutputPreparationResponse> {
+  const project = await hydratePagedRasterProject(request.project);
   if (request.kind === 'save') {
-    const prepared = prepareOutput(request.project, request.options);
+    const prepared = prepareOutput(project, request.options);
     return { kind: 'save', result: emitSavePreparedOutput(prepared, request.options) };
   }
-  return { kind: 'start', result: prepareStartOutput(request) };
+  return { kind: 'start', result: prepareStartOutput({ ...request, project }) };
 }
 
 function prepareStartOutput(request: StartOutputPreparationRequest) {

@@ -30,6 +30,10 @@ import {
   type PreparedOutput,
   type PrepareOutputSnapshotOptions,
 } from '../../io/gcode';
+import {
+  hydratePagedRasterProject,
+  projectHasPagedRasterAssets,
+} from '../import/paged-raster-hydration';
 import { buildDisplayPolylines } from './display-polylines';
 import { strideForSegmentBudget } from './draw-complexity';
 import { strokePolylinesBatched } from './draw-vector-strokes';
@@ -174,6 +178,12 @@ export function previewPreparationIssue(
     return { kind: 'preparation-failed', messages: scoped.messages };
   }
   const complexityScene = scoped === null ? project.scene : scoped.scene;
+  // A page-backed raster keeps its pixels in IndexedDB, so no synchronous
+  // caller can prepare it at all — this is a capability fact, not a size
+  // judgement. Callers that can await hydrate first and reach here embedded.
+  if (projectHasPagedRasterAssets({ ...project, scene: complexityScene })) {
+    return { kind: 'too-complex' };
+  }
   if (scenePreparationTooComplex(complexityScene)) return { kind: 'too-complex' };
   if (rasterPreparationTooComplex({ ...project, scene: complexityScene })) {
     return { kind: 'too-complex' };
@@ -206,10 +216,14 @@ export async function buildPreviewToolpathSnapshot(
     'clock' | 'renderVariableText' | 'jobOrigin' | 'outputScope' | 'registration'
   >,
 ): Promise<PreviewToolpath> {
-  const issue = previewPreparationIssue(project, options);
+  // Hydrate before the gates: this path can await, so a page-backed project
+  // becomes an ordinary embedded one and is judged on the same geometry the
+  // synchronous callers see (hydration fills pixels, never dimensions).
+  const hydrated = await hydratePagedRasterProject(project);
+  const issue = previewPreparationIssue(hydrated, options);
   if (issue !== null) return emptyPreviewToolpath(issue);
-  const prepared = await prepareOutputSnapshot(project, options);
-  return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
+  const prepared = await prepareOutputSnapshot(hydrated, options);
+  return buildPreviewToolpathFromPrepared(hydrated, prepared, options.jobOrigin, {
     executablePlan: true,
   });
 }

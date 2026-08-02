@@ -38,6 +38,45 @@ describe('preview preparation failures', () => {
     expect(previewIssueFor(toolpath)).toBeNull();
     expect(previewRouteSource(toolpath)).toBe('legacy-toolpath');
   });
+
+  it('defers page-backed raster preview to asynchronous worker preparation', () => {
+    const project = hugeRasterProject();
+    const raster = project.scene.objects[0];
+    if (raster?.kind !== 'raster-image') throw new Error('missing raster');
+    const { dataUrl: _dataUrl, ...pageFields } = raster;
+    const toolpath = buildPreviewToolpath({
+      ...project,
+      scene: {
+        ...project.scene,
+        objects: [
+          {
+            ...pageFields,
+            imageAsset: {
+              schemaVersion: 1,
+              repository: 'curvedesk-import-assets-v1',
+              sourceAssetId: 'source-pages',
+              lumaAssetId: 'luma-pages',
+              sourceMimeType: 'image/png',
+              sourceByteLength: 300_000_000,
+              lumaByteLength: 16,
+              naturalWidth: 4,
+              naturalHeight: 4,
+              sampledWidth: 4,
+              sampledHeight: 4,
+              thumbnail: {
+                mimeType: 'image/bmp',
+                dataUrl: 'data:image/bmp;base64,thumbnail',
+                width: 4,
+                height: 4,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(previewIssueFor(toolpath)).toEqual({ kind: 'too-complex' });
+  });
 });
 
 function hugeRasterProject(): Project {

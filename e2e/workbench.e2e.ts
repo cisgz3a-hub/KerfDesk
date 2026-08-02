@@ -1,7 +1,9 @@
 import { expect, test as baseTest, type Page } from '@playwright/test';
 import { test as kerfDeskTest, type KerfDeskFixture } from './fixtures/kerfdesk-test';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { grayscaleTracePngBase64, writeQualifiedPngFixture } from './fixtures/png-fixture';
 
 const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect x="5" y="5" width="30" height="20" fill="none" stroke="#ff0000"/></svg>';
@@ -18,6 +20,16 @@ const PNG_BASE64 = readFileSync(
     'arch-house-langebaan-source.png',
   ),
 ).toString('base64');
+const UNQUALIFIED_PNG_BASE64 = grayscaleTracePngBase64();
+
+// Page-backing starts above PAGED_PNG_MIN_BYTES (25 MiB, ADR-283), so the
+// page-backed route can only be exercised by a fixture larger than that. The
+// image stays 1024x1024 — the sampled luma and 256-edge thumbnail assertions
+// below describe the decoded image, not the file — and the file is padded to
+// size with an ancillary chunk rather than pixels, so it writes in well under a
+// second. Below this size the import embeds its bytes and the file stays portable.
+const PAGE_BACKED_FIXTURE_BYTES = 26 * 1024 * 1024;
+const PAGE_BACKED_FIXTURE_EDGE = 1024;
 
 baseTest(
   'assembled workbench is keyboard navigable and canvas-first at 1024px',
@@ -314,15 +326,189 @@ kerfDeskTest(
   },
 );
 
-baseTest('synthetic bitmap reaches Trace preview and commits a traced object', async ({ page }) => {
-  await installFileSystemMocks(page);
+baseTest(
+  'qualified PNG stays page-backed through canvas preview and G-code Save',
+  async ({ page }) => {
+    baseTest.setTimeout(120_000);
+    const workerUrls: string[] = [];
+    page.on('worker', (worker) => workerUrls.push(worker.url()));
+    await page.addInitScript(() => {
+      const originalStream = Blob.prototype.stream;
+      Blob.prototype.stream = function stream() {
+        const state = window as Window & { __e2eBlobStreamCalls?: number };
+        state.__e2eBlobStreamCalls = (state.__e2eBlobStreamCalls ?? 0) + 1;
+        return originalStream.call(this);
+      };
+      const originalArrayBuffer = Blob.prototype.arrayBuffer;
+      Blob.prototype.arrayBuffer = function arrayBuffer() {
+        if (this instanceof File) {
+          const state = window as Window & { __e2eFileArrayBufferCalls?: number };
+          state.__e2eFileArrayBufferCalls = (state.__e2eFileArrayBufferCalls ?? 0) + 1;
+        }
+        return originalArrayBuffer.call(this);
+      };
+      const src = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+      Object.defineProperty(HTMLImageElement.prototype, 'src', {
+        configurable: true,
+        ...(src?.get === undefined ? {} : { get: src.get }),
+        set(value: string) {
+          const state = window as Window & { __e2eRasterImageSources?: string[] };
+          state.__e2eRasterImageSources ??= [];
+          state.__e2eRasterImageSources.push(value);
+          src?.set?.call(this, value);
+        },
+      });
+    });
+    await installFileSystemMocks(page);
+    // Installed after the mocks so it wins: the page-backed route needs a real
+    // on-disk file above the threshold, which an inlined base64 fixture cannot
+    // carry. Save still uses the mocked showSaveFilePicker above.
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'showOpenFilePicker', {
+        configurable: true,
+        value: () =>
+          new Promise((resolve, reject) => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.addEventListener(
+              'change',
+              () => {
+                const file = input.files?.[0];
+                if (file === undefined) {
+                  reject(new DOMException('No file selected', 'AbortError'));
+                  return;
+                }
+                resolve([{ kind: 'file', name: file.name, getFile: async () => file }]);
+              },
+              { once: true },
+            );
+            input.click();
+          }),
+      });
+    });
+    const fixtureDirectory = mkdtempSync(join(tmpdir(), 'curvedesk-workbench-png-'));
+    const fixturePath = join(fixtureDirectory, 'qualified-page-backed.png');
+    writeQualifiedPngFixture(
+      fixturePath,
+      PAGE_BACKED_FIXTURE_BYTES,
+      PAGE_BACKED_FIXTURE_EDGE,
+      PAGE_BACKED_FIXTURE_EDGE,
+    );
+    try {
+      await runPageBackedImport(page, fixturePath, workerUrls);
+    } finally {
+      rmSync(fixtureDirectory, { recursive: true, force: true });
+    }
+  },
+);
+
+async function runPageBackedImport(
+  page: Page,
+  fixturePath: string,
+  workerUrls: readonly string[],
+): Promise<void> {
+  await page.goto('/');
+  {
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Import Image...' }).click();
+    await (await chooser).setFiles(fixturePath);
+    await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible({ timeout: 60_000 });
+    expect(workerUrls.some((url) => url.includes('png-import-worker'))).toBe(true);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as Window & { __e2eBlobStreamCalls?: number }).__e2eBlobStreamCalls ?? 0,
+        ),
+      )
+      .toBeGreaterThan(0);
+    const retained = await page.evaluate(async () => {
+      const statePath = '/src/ui/state/index.ts';
+      const state = (await import(/* @vite-ignore */ statePath)) as {
+        useStore?: { getState(): { project: { scene: { objects: unknown[] } } } };
+      };
+      const object = state.useStore?.getState().project.scene.objects[0] as
+        | {
+            dataUrl?: string;
+            lumaBase64?: string;
+            imageAsset?: {
+              sourceByteLength: number;
+              lumaByteLength: number;
+              thumbnail: { dataUrl: string; width: number; height: number };
+            };
+          }
+        | undefined;
+      const imageSources =
+        (window as Window & { __e2eRasterImageSources?: string[] }).__e2eRasterImageSources ?? [];
+      const fileArrayBufferCalls =
+        (window as Window & { __e2eFileArrayBufferCalls?: number }).__e2eFileArrayBufferCalls ?? 0;
+      const decodedThumbnail =
+        object?.imageAsset === undefined
+          ? null
+          : await new Promise<{ width: number; height: number }>((resolve, reject) => {
+              const image = new Image();
+              image.onload = () =>
+                resolve({ width: image.naturalWidth, height: image.naturalHeight });
+              image.onerror = () => reject(new Error('bounded PNG thumbnail did not decode'));
+              image.src = object.imageAsset?.thumbnail.dataUrl ?? '';
+            });
+      return { object, imageSources, decodedThumbnail, fileArrayBufferCalls };
+    });
+    expect(retained.object).not.toHaveProperty('dataUrl');
+    expect(retained.object).not.toHaveProperty('lumaBase64');
+    expect(retained.fileArrayBufferCalls).toBe(0);
+    expect(retained.object?.imageAsset).toMatchObject({
+      sourceByteLength: PAGE_BACKED_FIXTURE_BYTES,
+      lumaByteLength: PAGE_BACKED_FIXTURE_EDGE * PAGE_BACKED_FIXTURE_EDGE,
+      thumbnail: { width: 256, height: 256 },
+    });
+    expect(
+      retained.object?.imageAsset?.thumbnail.dataUrl.startsWith('data:image/bmp;base64,'),
+    ).toBe(true);
+    expect(retained.object?.imageAsset?.thumbnail.dataUrl.length).toBeLessThan(300_000);
+    expect(retained.decodedThumbnail).toEqual({ width: 256, height: 256 });
+    expect(
+      retained.imageSources.some((source) => source.startsWith('data:image/bmp;base64,')),
+    ).toBe(true);
+
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    await expect(page.getByRole('group', { name: 'Preview options' })).toBeVisible();
+    await expect
+      .poll(() => workerUrls.some((url) => url.includes('preparation-worker')))
+      .toBe(true);
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+
+    await page.evaluate(async () => {
+      const statePath = '/src/ui/state/index.ts';
+      const state = (await import(/* @vite-ignore */ statePath)) as {
+        useStore?: {
+          getState(): { jobPlacement: Record<string, unknown> };
+          setState(next: { jobPlacement: Record<string, unknown> }): void;
+        };
+      };
+      const store = state.useStore;
+      if (store === undefined) throw new Error('application store is unavailable');
+      store.setState({
+        jobPlacement: { ...store.getState().jobPlacement, startFrom: 'absolute' },
+      });
+    });
+    await page.getByRole('button', { name: 'Save G-code...' }).click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as Window & { __e2eSaved?: string }).__e2eSaved ?? ''),
+      )
+      .toMatch(/S[1-9]\d*/);
+    expect(workerUrls.some((url) => url.includes('output-preparation-worker'))).toBe(true);
+  }
+}
+
+baseTest('unqualified bitmap legacy fallback still reaches Trace and commits', async ({ page }) => {
+  await installFileSystemMocks(page, UNQUALIFIED_PNG_BASE64);
   await page.goto('/');
   await page.getByRole('button', { name: 'Import Image...' }).click();
   const trace = page.getByRole('button', { name: 'Trace Image...' });
   await expect(trace).toBeEnabled();
   await trace.click();
   await expect(page.getByRole('dialog', { name: 'Trace image' })).toBeVisible();
-  await expect(page.getByLabel('Trace preset')).toHaveValue('Line Art');
   await expect(page.getByRole('button', { name: 'Trace', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Trace', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Trace image' })).toHaveCount(0);
@@ -475,7 +661,7 @@ async function confirmStartReview(page: Page): Promise<void> {
     .click();
 }
 
-async function installFileSystemMocks(page: Page): Promise<void> {
+async function installFileSystemMocks(page: Page, pngBase64 = PNG_BASE64): Promise<void> {
   await page.addInitScript(
     ({ svg, pngBase64 }) => {
       const bytes = Uint8Array.from(atob(pngBase64), (char) => char.charCodeAt(0));
@@ -512,7 +698,7 @@ async function installFileSystemMocks(page: Page): Promise<void> {
           }),
         }) as FileSystemFileHandle;
     },
-    { svg: SVG, pngBase64: PNG_BASE64 },
+    { svg: SVG, pngBase64 },
   );
 }
 

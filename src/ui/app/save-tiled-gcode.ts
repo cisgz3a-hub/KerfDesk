@@ -15,6 +15,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
 import { emitTileFiles, pushAdvisoryToasts, type TileFile } from './tile-emission';
 import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
+import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
 
@@ -39,8 +40,9 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   const machine = ctx.project.machine;
   if (machine?.kind !== 'cnc' || machine.tiling === undefined) return false;
 
+  const preparationProject = await hydratePagedRasterProject(ctx.project);
   const prepared = prepareOutput(
-    ctx.project,
+    preparationProject,
     ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope },
   );
   if (!prepared.ok) {

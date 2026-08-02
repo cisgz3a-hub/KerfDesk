@@ -17,17 +17,24 @@ import {
   type RasterImage,
   type SceneObject,
 } from '../../core/scene';
+import { IndexedDbPagedAssetRepository } from '../import/paged-asset-indexeddb';
 import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
-import { drawBitmapAtTransform } from './draw-raster';
+
+// One shared reader for every preview hydration. Each repository instance
+// caches its own IDBDatabase and never closes it, so letting hydration default
+// to a fresh instance leaked an open connection on every preview cache miss.
+const previewAssetRepository = new IndexedDbPagedAssetRepository();
+import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
+import { drawBitmapAtTransform, rasterDisplayDataUrl } from './draw-raster';
 import type { ViewTransform } from './view-transform';
 
 type PreviewCanvasCacheEntry = {
-  readonly dataUrl: string;
+  readonly sourceKey: string;
   readonly canvas: HTMLCanvasElement | null;
 };
 
 type PendingPreviewBuild = {
-  readonly dataUrl: string;
+  readonly sourceKey: string;
   readonly cancel: () => void;
 };
 
@@ -68,12 +75,12 @@ export function drawRasterPreview(
   }
 }
 
-export function pruneRasterPreviewCache(liveDataUrls: ReadonlySet<string>): void {
+export function pruneRasterPreviewCache(liveSourceKeys: ReadonlySet<string>): void {
   for (const [key, entry] of previewCanvasCache) {
-    if (!liveDataUrls.has(entry.dataUrl)) previewCanvasCache.delete(key);
+    if (!liveSourceKeys.has(entry.sourceKey)) previewCanvasCache.delete(key);
   }
   for (const [key, pending] of pendingPreviewBuilds) {
-    if (liveDataUrls.has(pending.dataUrl)) continue;
+    if (liveSourceKeys.has(pending.sourceKey)) continue;
     pending.cancel();
     pendingPreviewBuilds.delete(key);
   }
@@ -106,15 +113,17 @@ function previewCanvasFor(
   const { pixelWidth, pixelHeight } = obj;
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
   const { width, height } = processedRasterDimensions(obj, layer);
-  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${width}x${height}|${maskCacheKey(maskObject)}`;
+  const sourceKey = rasterPreviewSourceKey(obj);
+  const key = `${sourceKey}|${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${width}x${height}|${maskCacheKey(maskObject)}`;
   const cached = previewCanvasCache.get(key);
   if (cached !== undefined) return cached.canvas;
-  schedulePreviewCanvasBuild(key, obj, layer, device, maskObject, options);
+  schedulePreviewCanvasBuild(key, sourceKey, obj, layer, device, maskObject, options);
   return previewCanvasCache.get(key)?.canvas ?? null;
 }
 
 function schedulePreviewCanvasBuild(
   key: string,
+  sourceKey: string,
   obj: RasterImage,
   layer: Layer,
   device: DeviceProfile,
@@ -123,16 +132,41 @@ function schedulePreviewCanvasBuild(
 ): void {
   if (pendingPreviewBuilds.has(key)) return;
   const scheduleBuild = options.scheduleBuild ?? scheduleRasterPreviewBuild;
-  let completedSynchronously = false;
+  if (obj.imageAsset === undefined) {
+    let completedSynchronously = false;
+    const cancel = scheduleBuild(() => {
+      pendingPreviewBuilds.delete(key);
+      const canvas = buildPreviewCanvas(obj, layer, device, maskObject);
+      previewCanvasCache.set(key, { sourceKey, canvas });
+      if (canvas !== null) options.onRasterPreviewReady?.();
+      completedSynchronously = true;
+    });
+    if (!completedSynchronously) pendingPreviewBuilds.set(key, { sourceKey, cancel });
+    return;
+  }
+  let cancelled = false;
+  const controller = new AbortController();
   const cancel = scheduleBuild(() => {
-    pendingPreviewBuilds.delete(key);
-    const canvas = buildPreviewCanvas(obj, layer, device, maskObject);
-    previewCanvasCache.set(key, { dataUrl: obj.dataUrl, canvas });
-    if (canvas !== null) options.onRasterPreviewReady?.();
-    completedSynchronously = true;
+    void hydratePagedRasterImage(obj, previewAssetRepository, controller.signal)
+      .then((hydrated) => {
+        if (cancelled) return;
+        const canvas = buildPreviewCanvas(hydrated, layer, device, maskObject);
+        previewCanvasCache.set(key, { sourceKey, canvas });
+        if (canvas !== null) options.onRasterPreviewReady?.();
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) console.error('Raster preview asset hydration failed.', error);
+      })
+      .finally(() => pendingPreviewBuilds.delete(key));
   });
-  if (completedSynchronously) return;
-  pendingPreviewBuilds.set(key, { dataUrl: obj.dataUrl, cancel });
+  pendingPreviewBuilds.set(key, {
+    sourceKey,
+    cancel: () => {
+      cancelled = true;
+      controller.abort();
+      cancel();
+    },
+  });
 }
 
 function buildPreviewCanvas(
@@ -188,8 +222,14 @@ function liveRasterPreviewDataUrls(project: Project): Set<string> {
     if (obj.kind !== 'raster-image') continue;
     if (obj.role === 'trace-source') continue;
     if (imageOperations.some((operation) => sceneObjectUsesOperation(obj, operation))) {
-      live.add(obj.dataUrl);
+      live.add(rasterPreviewSourceKey(obj));
     }
   }
   return live;
+}
+
+function rasterPreviewSourceKey(obj: RasterImage): string {
+  return obj.imageAsset === undefined
+    ? `${rasterDisplayDataUrl(obj)}|${obj.lumaBase64 ?? ''}`
+    : `paged:${obj.imageAsset.lumaAssetId}:${obj.imageAsset.lumaByteLength}`;
 }

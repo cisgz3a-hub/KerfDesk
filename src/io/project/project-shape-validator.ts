@@ -5,7 +5,7 @@ import { validateCurveSubpaths } from './project-curve-shape-validator';
 import { validateObjectOperationOverride } from './project-operation-override-validator';
 import { validateOptimization } from './project-optimization-validator';
 import { validateProjectVariables, validateVariableTemplate } from './project-variable-validator';
-import { validateRasterLumaBase64 } from './project-raster-luma-validator';
+import { validateRasterSourceContract } from './project-paged-raster-validator';
 import { validatePrintAndCutTargets } from './project-print-and-cut-validator';
 import { validatePathText } from './project-path-text-validator';
 import { validateEmbeddedFonts } from './project-embedded-font-validator';
@@ -250,7 +250,6 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
     optionalString(obj, `${path}.traceSourceId`),
-    requireString(obj, `${path}.dataUrl`),
     requirePositiveInteger(obj, `${path}.pixelWidth`),
     requirePositiveInteger(obj, `${path}.pixelHeight`),
     optionalPercent(obj, `${path}.powerScale`),
@@ -265,7 +264,6 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     optionalNumber(obj, `${path}.contrast`),
     optionalNumber(obj, `${path}.gamma`),
     optionalString(obj, `${path}.imageMaskId`),
-    optionalString(obj, `${path}.lumaBase64`),
     optionalLiteral(obj, `${path}.role`, ['trace-source']),
   ]);
   if (fieldError !== null) return fieldError;
@@ -285,15 +283,8 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
   ) {
     return `invalid \`${path}\`: pixelWidth*pixelHeight exceeds ${MAX_RASTER_SOURCE_PIXELS}`;
   }
-  const lumaBase64 = obj['lumaBase64'];
-  if (
-    typeof pixelWidth === 'number' &&
-    typeof pixelHeight === 'number' &&
-    typeof lumaBase64 === 'string'
-  ) {
-    return validateRasterLumaBase64(lumaBase64, pixelWidth * pixelHeight, path);
-  }
-  return null;
+  if (typeof pixelWidth !== 'number' || typeof pixelHeight !== 'number') return null;
+  return validateRasterSourceContract(obj, path, pixelWidth, pixelHeight);
 }
 
 function validateShapeObject(obj: Record<string, unknown>, path: string): string | null {

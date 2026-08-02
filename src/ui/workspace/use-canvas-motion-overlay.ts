@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutputSnapshot } from '../../io/gcode';
+import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import {
   resolveJobPlacement,
   type JobPlacementSettings,
@@ -166,7 +167,8 @@ export async function buildIdleCanvasMotionPlan(
     input.placementSettings,
     registration,
   );
-  const prepared = await prepareOutputSnapshot(input.project, {
+  const preparationProject = await hydratePagedRasterProject(input.project);
+  const prepared = await prepareOutputSnapshot(preparationProject, {
     clock: () => new Date(),
     renderVariableText,
     ...(registration === undefined ? {} : { registration }),

@@ -259,6 +259,26 @@ export const DITHER_ALGORITHMS = [
 
 export type DitherAlgorithm = (typeof DITHER_ALGORITHMS)[number];
 
+type PagedRasterImageAsset = {
+  readonly schemaVersion: 1;
+  readonly repository: 'curvedesk-import-assets-v1';
+  readonly sourceAssetId: string;
+  readonly lumaAssetId: string;
+  readonly sourceMimeType: string;
+  readonly sourceByteLength: number;
+  readonly lumaByteLength: number;
+  readonly naturalWidth: number;
+  readonly naturalHeight: number;
+  readonly sampledWidth: number;
+  readonly sampledHeight: number;
+  readonly thumbnail: {
+    readonly mimeType: 'image/bmp';
+    readonly dataUrl: string;
+    readonly width: number;
+    readonly height: number;
+  };
+};
+
 export type RasterImage = ObjectPowerScale & {
   readonly kind: 'raster-image';
   readonly id: string;
@@ -266,7 +286,8 @@ export type RasterImage = ObjectPowerScale & {
   // Original bitmap retained for Re-trace Original. Rasterized trace results
   // carry this just like vector traces do; ordinary imported photos omit it.
   readonly traceSourceId?: string;
-  readonly dataUrl: string; // 'data:image/png;base64,...'
+  readonly dataUrl?: string; // Embedded source for legacy/unqualified imports.
+  readonly imageAsset?: PagedRasterImageAsset; // Qualified PNG source + luma page references.
   readonly pixelWidth: number;
   readonly pixelHeight: number;
   readonly bounds: Bounds;

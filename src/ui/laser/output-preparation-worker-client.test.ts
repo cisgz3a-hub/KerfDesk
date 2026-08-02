@@ -76,6 +76,51 @@ describe('output preparation worker client', () => {
     expect(outputPreparationShouldRunOffThread(cnc)).toBe(true);
   });
 
+  it('routes page-backed raster output off the UI thread regardless of sampled size', () => {
+    const project = createProject();
+    expect(
+      outputPreparationShouldRunOffThread({
+        ...project,
+        scene: {
+          ...project.scene,
+          objects: [
+            {
+              kind: 'raster-image',
+              id: 'paged',
+              source: 'large.png',
+              color: '#808080',
+              imageAsset: {
+                schemaVersion: 1,
+                repository: 'curvedesk-import-assets-v1',
+                sourceAssetId: 'source-pages',
+                lumaAssetId: 'luma-pages',
+                sourceMimeType: 'image/png',
+                sourceByteLength: 300_000_000,
+                lumaByteLength: 1,
+                naturalWidth: 1,
+                naturalHeight: 1,
+                sampledWidth: 1,
+                sampledHeight: 1,
+                thumbnail: {
+                  mimeType: 'image/bmp',
+                  dataUrl: 'data:image/bmp;base64,thumbnail',
+                  width: 1,
+                  height: 1,
+                },
+              },
+              pixelWidth: 1,
+              pixelHeight: 1,
+              dither: 'threshold',
+              linesPerMm: 1,
+              bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+              transform: IDENTITY_TRANSFORM,
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
   it('returns null without Worker support', () => {
     vi.unstubAllGlobals();
     expect(

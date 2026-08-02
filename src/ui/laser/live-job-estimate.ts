@@ -24,6 +24,10 @@ import {
   type VariableTextRenderer,
 } from '../../io/gcode';
 import type { SimilarityTransform } from '../../core/registration';
+import {
+  hydratePagedRasterProject,
+  projectHasPagedRasterAssets,
+} from '../import/paged-raster-hydration';
 
 export { countOutputVectorSegments };
 export const LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET = PREPARATION_RAW_VECTOR_SEGMENT_BUDGET;
@@ -62,6 +66,7 @@ export function estimateLiveJob(
   if (rasterPreparationTooComplex(outputProject)) {
     return { kind: 'too-large' };
   }
+  if (projectHasPagedRasterAssets(outputProject)) return { kind: 'too-large' };
 
   // Same prepared job as Save / Start / Preview, so ETA times the path the
   // machine runs.
@@ -93,7 +98,8 @@ export async function estimateLiveJobSnapshot(
   if (rasterPreparationTooComplex(outputProject)) {
     return { kind: 'too-large' };
   }
-  const prepared = await prepareOutputSnapshot(project, {
+  const hydrated = await hydratePagedRasterProject(project);
+  const prepared = await prepareOutputSnapshot(hydrated, {
     outputScope,
     clock,
     renderVariableText,

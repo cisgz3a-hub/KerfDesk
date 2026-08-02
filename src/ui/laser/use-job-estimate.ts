@@ -23,6 +23,7 @@ import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { resolveJobPlacement } from '../job-placement';
 import { prepareLargeJobOffThread } from '../workspace/preparation-worker-client';
+import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -51,7 +52,10 @@ export function useJobEstimate(): LiveJobEstimate {
     secondRegistrationPoint,
   });
   const initialRegistration = currentPrintCutOutputRegistration(project);
-  const initiallyAsync = hasVariableText(project) || initialRegistration !== undefined;
+  const initiallyAsync =
+    hasVariableText(project) ||
+    initialRegistration !== undefined ||
+    projectHasPagedRasterAssets(project);
   return useSettledEstimate({
     project,
     outputScope,
@@ -178,7 +182,8 @@ type RecomputeEstimateArgs = {
 function recomputeEstimate(args: RecomputeEstimateArgs): void {
   const { project, outputScope, jobOrigin } = args;
   const registration = currentPrintCutOutputRegistration(project);
-  const usesSnapshot = hasVariableText(project) || registration !== undefined;
+  const usesSnapshot =
+    hasVariableText(project) || registration !== undefined || projectHasPagedRasterAssets(project);
   const estimate = usesSnapshot
     ? estimateLiveJobSnapshot(
         project,

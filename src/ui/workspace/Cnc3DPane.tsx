@@ -4,15 +4,15 @@
 // stays snappy) and renders the stock + cut heightfield through the ADR-102
 // three.js scene. UI-only; the compile path is the same one Preview uses.
 
-import { useCallback, useDeferredValue, useMemo, useState } from 'react';
-import type { OutputScope, Project } from '../../core/scene';
+import { useCallback, useDeferredValue, useState } from 'react';
+import type { Project } from '../../core/scene';
 import { liveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
 import { useOutputScope, useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { Cnc3DFullPage } from './Cnc3DFullPage';
 import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
-import { computeDesignSceneSource } from './design-scene-source';
 import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
+import { useDesignSceneSource } from './use-design-scene-source';
 import { useCncCanvasFocus } from './use-cnc-canvas-focus';
 import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { useCncPaneWidth } from './use-cnc-pane-width';
@@ -64,21 +64,6 @@ export function Cnc3DPane(): JSX.Element | null {
 
 function stockThicknessMm(project: Project): number {
   return project.machine?.kind === 'cnc' ? project.machine.stock.thicknessMm : 0;
-}
-
-// Design-time scene source (design-scene-source.ts): removal grid, 3D moves,
-// and bit silhouette from ONE prepared output, with each tool section stamped
-// by its own bit's kernel (H.7). Memoized against the deferred project so
-// typing stays snappy and hover stays value-stable (PRF-01).
-function useDesignSceneSource(
-  project: Project,
-  outputScope: OutputScope,
-  collapsed: boolean,
-): DesignSceneSource | null {
-  return useMemo(
-    () => (collapsed ? null : computeDesignSceneSource(project, outputScope)),
-    [project, outputScope, collapsed],
-  );
 }
 
 function PaneScene(props: {
