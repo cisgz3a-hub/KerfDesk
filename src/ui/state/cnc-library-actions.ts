@@ -33,6 +33,7 @@ import {
   sceneWithoutDormantCncSecondaryToolReferences,
 } from './cnc-tool-references';
 import { pushUndo } from './scene-mutations';
+import { nextProbeSetupState } from './probe-setup-history-identity';
 import type { AppState } from './store';
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -49,8 +50,17 @@ export type CncLibraryActions = {
   readonly deleteCncMachineProfile: (profileId: string) => void;
 };
 
-export const CNC_LIBRARY_STATE_DEFAULTS: { cncLibrary: CncLibrary } = {
+export type CncLibraryState = {
+  readonly cncLibrary: CncLibrary;
+  /** Session identity for the committed machine/probe setup. */
+  readonly probeSetupEpoch: number;
+};
+
+export type CncLibrarySlice = CncLibraryState & CncLibraryActions;
+
+export const CNC_LIBRARY_STATE_DEFAULTS: CncLibraryState = {
   cncLibrary: EMPTY_CNC_LIBRARY,
+  probeSetupEpoch: 0,
 };
 
 export function cncLibraryActions(set: Setter): CncLibraryActions {
@@ -245,7 +255,7 @@ function machineProfileActions(
           activeToolChanged: activeCncToolFeedIdentityChanged(previousMachine, machine),
         });
         return {
-          project: { ...s.project, scene, device, machine },
+          ...nextProbeSetupState({ ...s.project, scene, device, machine }, s.probeSetupEpoch),
           undoStack: pushUndo(s.project, s.undoStack),
           redoStack: [],
           dirty: true,

@@ -31,6 +31,7 @@ import { projectWithStockMaterial } from './cnc-project-material';
 import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
 import { refreshAutomaticCncFeeds, seedCncModeSwitchLayers } from './cnc-auto-seeding';
 import { pushUndo } from './scene-mutations';
+import { nextProbeSetupState } from './probe-setup-history-identity';
 
 type MachineState = {
   readonly project: Project;
@@ -40,6 +41,7 @@ type MachineState = {
   readonly jobPlacement: JobPlacementSettings;
   readonly cachedCncMachine: CncMachineConfig | null;
   readonly cncLiveCaps: CncMachineStarterLiveCaps | null;
+  readonly probeSetupEpoch: number;
   // App-level custom bits (H.7) merge into every CNC session's tool list.
   readonly cncLibrary: CncLibrary;
 };
@@ -258,7 +260,7 @@ function cncMachineSetupStatePatch(
     machine: nextMachine,
   };
   return {
-    project,
+    ...nextProbeSetupState(project, state.probeSetupEpoch),
     jobPlacement:
       patch.deviceProfile === undefined
         ? jobPlacementAfterDeviceChange(state.jobPlacement, state.project.device, deviceWithCnc)
