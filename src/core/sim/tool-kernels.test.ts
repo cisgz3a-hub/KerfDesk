@@ -3,6 +3,20 @@ import type { CncTool } from '../scene';
 import { kernelForTool } from './tool-kernels';
 
 const CELL = 0.2;
+const CONE_DZ_PRECISION_DIGITS = 9;
+
+// depth = (width / 2) / tan(included / 2). PreciseBits publish the inverse,
+// width = 2 x depth x tan(half-angle), so these multipliers are exact
+// cotangents written out independently of the implementation. 90° is kept but
+// cannot stand alone: cot 45° = 1 collapses the law to dz = d, which an
+// included-angle and a side-angle reading satisfy equally. The others separate
+// them — under the side-angle reading 60° would give cot 60° = 0.577, not 1.732.
+const ENGRAVING_CONE_CASES: ReadonlyArray<readonly [number, number]> = [
+  [30, 2 + Math.sqrt(3)], // cot 15°
+  [60, Math.sqrt(3)], // cot 30°
+  [90, 1], // cot 45°
+  [120, 1 / Math.sqrt(3)], // cot 60°
+];
 
 function tool(kind: CncTool['kind'], diameterMm: number, tipAngleDeg?: number): CncTool {
   return {
@@ -45,12 +59,24 @@ describe('kernelForTool', () => {
   // for the depth law, and the UI labels them by included angle. Modelling
   // dz = 0 here made the removal grid simulate a flat-bottomed trench the full
   // width of the shank while the emitted G-code cut a cone.
-  it('engraving bit: dz follows the included-angle cone, not a flat bottom', () => {
-    const kernel = kernelForTool(tool('engraving', 6.35, 90), CELL);
+  it.each(ENGRAVING_CONE_CASES)(
+    'engraving bit at %i° included: dz is d x %f, not a flat bottom',
+    (includedAngleDeg, cotHalfAngle) => {
+      const kernel = kernelForTool(tool('engraving', 6.35, includedAngleDeg), CELL);
+      expect(kernel.offsets.length).toBeGreaterThan(0);
+      for (const o of kernel.offsets) {
+        const dMm = Math.hypot(o.dx, o.dy) * CELL;
+        expect(o.dz).toBeCloseTo(dMm * cotHalfAngle, CONE_DZ_PRECISION_DIGITS);
+      }
+    },
+  );
+
+  it('engraving with no stored angle falls back to the 60° cone', () => {
+    const kernel = kernelForTool(tool('engraving', 6.35), CELL);
     expect(kernel.offsets.length).toBeGreaterThan(0);
     for (const o of kernel.offsets) {
       const dMm = Math.hypot(o.dx, o.dy) * CELL;
-      expect(o.dz).toBeCloseTo(dMm, 9);
+      expect(o.dz).toBeCloseTo(dMm * Math.sqrt(3), CONE_DZ_PRECISION_DIGITS);
     }
   });
 
