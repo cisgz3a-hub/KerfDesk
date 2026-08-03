@@ -23,9 +23,13 @@ export function AddCncBitForm(): JSX.Element {
   const [kind, setKind] = useState<CncToolKind>('end-mill');
   const [diameter, setDiameter] = useState('');
   const [tipAngle, setTipAngle] = useState('');
+  const [tipDiameter, setTipDiameter] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const needsAngle = kind === 'v-bit' || kind === 'engraving';
-  const error = bitFormError({ name, diameter, tipAngle, needsAngle });
+  // Only an engraving bit has a flat land at the tip; a v-bit comes to a point
+  // by definition, which is the physical difference between the two kinds.
+  const needsTipDiameter = kind === 'engraving';
+  const error = bitFormError({ name, diameter, tipAngle, tipDiameter, needsAngle });
 
   const handleAdd = (): void => {
     setHasSubmitted(true);
@@ -35,10 +39,16 @@ export function AddCncBitForm(): JSX.Element {
       kind,
       diameterMm: Number(diameter),
       ...(needsAngle ? { tipAngleDeg: Number(tipAngle) } : {}),
+      // Blank stays absent: the simulator reads that as a true point, matching
+      // how every tool behaved before the field existed.
+      ...(needsTipDiameter && tipDiameter.trim() !== ''
+        ? { tipDiameterMm: Number(tipDiameter) }
+        : {}),
     });
     setName('');
     setDiameter('');
     setTipAngle('');
+    setTipDiameter('');
     setHasSubmitted(false);
   };
 
@@ -49,7 +59,9 @@ export function AddCncBitForm(): JSX.Element {
         kind={kind}
         diameter={diameter}
         tipAngle={tipAngle}
+        tipDiameter={tipDiameter}
         needsAngle={needsAngle}
+        needsTipDiameter={needsTipDiameter}
         onNameChange={setName}
         onKindChange={(value) => {
           setKind(value);
@@ -57,6 +69,7 @@ export function AddCncBitForm(): JSX.Element {
         }}
         onDiameterChange={setDiameter}
         onTipAngleChange={setTipAngle}
+        onTipDiameterChange={setTipDiameter}
       />
       <button type="button" onClick={handleAdd} aria-label="Add bit" title="Add the custom bit.">
         Add
@@ -75,11 +88,14 @@ type BitFieldsProps = {
   readonly kind: CncToolKind;
   readonly diameter: string;
   readonly tipAngle: string;
+  readonly tipDiameter: string;
   readonly needsAngle: boolean;
+  readonly needsTipDiameter: boolean;
   readonly onNameChange: (value: string) => void;
   readonly onKindChange: (value: CncToolKind) => void;
   readonly onDiameterChange: (value: string) => void;
   readonly onTipAngleChange: (value: string) => void;
+  readonly onTipDiameterChange: (value: string) => void;
 };
 
 function BitFields(props: BitFieldsProps): JSX.Element {
@@ -133,6 +149,20 @@ function BitFields(props: BitFieldsProps): JSX.Element {
           style={numberInputStyle}
         />
       ) : null}
+      {props.needsTipDiameter ? (
+        <input
+          type="number"
+          value={props.tipDiameter}
+          onChange={(event) => props.onTipDiameterChange(event.target.value)}
+          min={0}
+          max={props.diameter === '' ? undefined : Number(props.diameter)}
+          step={0.05}
+          placeholder="Tip flat mm"
+          aria-label="New bit tip flat diameter (mm)"
+          title="Width of the flat land at the very tip. Leave blank for a bit that comes to a point."
+          style={numberInputStyle}
+        />
+      ) : null}
     </>
   );
 }
@@ -141,6 +171,7 @@ function bitFormError(input: {
   readonly name: string;
   readonly diameter: string;
   readonly tipAngle: string;
+  readonly tipDiameter: string;
   readonly needsAngle: boolean;
 }): string | null {
   if (input.name.trim() === '') return 'Enter a bit name.';
@@ -156,6 +187,17 @@ function bitFormError(input: {
   const tipAngleDeg = Number(input.tipAngle);
   if (input.needsAngle && (input.tipAngle.trim() === '' || !isValidCncTipAngleDeg(tipAngleDeg))) {
     return `Enter the actual included angle from ${MIN_CNC_TIP_ANGLE_DEG} to ${MAX_CNC_TIP_ANGLE_DEG} degrees.`;
+  }
+  return tipDiameterError(input.tipDiameter, diameterMm);
+}
+
+// Blank is valid — it means the bit comes to a point. A land at or past the
+// cutter diameter is not a cone at all, so the cone law would have no flank.
+function tipDiameterError(tipDiameter: string, diameterMm: number): string | null {
+  if (tipDiameter.trim() === '') return null;
+  const tipDiameterMm = Number(tipDiameter);
+  if (!Number.isFinite(tipDiameterMm) || tipDiameterMm < 0 || tipDiameterMm >= diameterMm) {
+    return `Enter a tip flat from 0 to under the ${diameterMm} mm cutter diameter, or leave it blank for a pointed bit.`;
   }
   return null;
 }

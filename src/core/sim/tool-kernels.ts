@@ -5,7 +5,8 @@
 //
 //   end-mill              flat:      dz = 0 across the radius
 //   ball-nose             sphere:    dz = r − sqrt(r² − d²)
-//   v-bit / engraving     cone:      dz = d / tan(θ/2)
+//   v-bit                 cone:      dz = d / tan(θ/2)
+//   engraving   truncated cone:      dz = max(0, (d − tipRadius) / tan(θ/2))
 //
 // The SAME kernels serve the H.2 simulator (stamping), H.5 roughing dilation,
 // and H.8 finishing (max-plus tip surface) — built once, deliberately.
@@ -18,11 +19,11 @@
 // and PreciseBits both specify conical engraving cutters by INCLUDED angle,
 // which is the same quantity tipAngleDeg already carries for a V-bit.
 //
-// Neither shape models the small flat at a real cutter's tip (0.12–0.76 mm on
-// 2L Inc's catalog), so a cone still overstates how fine the point is. That
-// error is bounded by the tip radius; the flat model's error was the whole
-// cone height. Modelling the tip flat needs a tip-diameter field the CncTool
-// type does not have yet.
+// A plain cone still overstated how fine the point is, because a real cutter
+// has a small flat at its tip (0.12–0.76 mm on 2L Inc's catalog). CncTool now
+// carries tipDiameterMm, so an engraving bit is modelled as the TRUNCATED cone
+// it actually is. An absent value means a true point, which is both the legacy
+// behaviour and correct for a V-bit, so saved projects are unchanged.
 
 import { assertNever, type CncTool } from '../scene';
 
@@ -73,12 +74,24 @@ export function cuttingSurfaceDz(tool: CncTool, dMm: number, radiusMm: number): 
   switch (tool.kind) {
     case 'end-mill':
       return 0;
+    case 'engraving': {
+      // A conical engraving bit is a TRUNCATED cone: a flat land of
+      // tipDiameterMm, then conical flanks at the included angle. It was
+      // modelled here as a flat disc across the FULL diameter, which
+      // contradicted the CAM — vcarve-angle.ts plans an engraving bit as a cone
+      // (falling back to 60° when the angle is unknown, the same value as
+      // FALLBACK_V_TIP_ANGLE_DEG). The preview therefore showed a flat bottom
+      // while the machine cut a V. Same law as a v-bit, offset by the tip land.
+      const tipAngleDeg = tool.tipAngleDeg ?? FALLBACK_V_TIP_ANGLE_DEG;
+      const halfAngleRad = (Math.max(1, tipAngleDeg) / 2) * (Math.PI / 180);
+      const tipRadiusMm = Math.max(0, (tool.tipDiameterMm ?? 0) / 2);
+      return Math.max(0, (dMm - tipRadiusMm) / Math.tan(halfAngleRad));
+    }
     case 'ball-nose': {
       const inside = Math.max(0, radiusMm * radiusMm - dMm * dMm);
       return radiusMm - Math.sqrt(inside);
     }
-    case 'v-bit':
-    case 'engraving': {
+    case 'v-bit': {
       const tipAngleDeg = tool.tipAngleDeg ?? FALLBACK_V_TIP_ANGLE_DEG;
       const halfAngleRad = (Math.max(1, tipAngleDeg) / 2) * (Math.PI / 180);
       return dMm / Math.tan(halfAngleRad);

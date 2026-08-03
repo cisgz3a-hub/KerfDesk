@@ -11,6 +11,11 @@ export type CncTool = {
   readonly diameterMm: number;
   // v-bit / engraving tools only: included angle.
   readonly tipAngleDeg?: number;
+  // Engraving tools only: the flat land at the very tip. A conical engraving
+  // bit is a TRUNCATED cone — flat for this diameter, then conical flanks at
+  // tipAngleDeg — unlike a v-bit, which comes to a point. Absent or 0 means a
+  // true point, which is how legacy hand-entered tools behave.
+  readonly tipDiameterMm?: number;
   // Descriptive taxonomy, deliberately separate from the load-bearing kind.
   // Unknown future families remain safe because CAM never branches on this.
   readonly family?: string;
