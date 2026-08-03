@@ -16,7 +16,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
-import { CncVCarveOpenPathNote } from './CncVCarveOpenPathNote';
+import { CncOpenPathNote } from './CncOpenPathNote';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -72,7 +72,7 @@ async function renderNote(
   const root = createRoot(host);
   await act(async () =>
     root.render(
-      <CncVCarveOpenPathNote layer={layer} settings={layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS} />,
+      <CncOpenPathNote layer={layer} settings={layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS} />,
     ),
   );
   return { host, root };
@@ -96,7 +96,7 @@ afterEach(() => {
   resetStore();
 });
 
-describe('CncVCarveOpenPathNote', () => {
+describe('CncOpenPathNote', () => {
   it('warns when every shape on a V-carve layer is an open path', async () => {
     vi.useFakeTimers();
     install([stroke(false)]);
@@ -115,13 +115,34 @@ describe('CncVCarveOpenPathNote', () => {
     expect(await settledText()).toBe('');
   });
 
-  it('stays silent for non-v-carve cut types, which cut open paths fine', async () => {
-    vi.useFakeTimers();
-    const engraveLayer: Layer = {
-      ...createLayer({ id: 'L1', color: COLOR }),
-      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'engrave' },
-    };
-    install([stroke(false)], engraveLayer);
-    expect(await settledText(engraveLayer)).toBe('');
-  });
+  // Pocket and Drill emit zero motion from open contours exactly as V-carve
+  // does (core/cnc/closed-contour-cut-types.test.ts measures all three against
+  // the compiler), so the operator has to be told there too.
+  it.each(['pocket', 'drill'] as const)(
+    'warns on a %s layer of open paths, which also compiles to nothing',
+    async (cutType) => {
+      vi.useFakeTimers();
+      const layer: Layer = {
+        ...createLayer({ id: 'L1', color: COLOR }),
+        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType },
+      };
+      install([stroke(false)], layer);
+      expect(await settledText(layer)).toContain(NOTE_TEXT);
+    },
+  );
+
+  // The profile and engrave families DO emit from open paths, so warning there
+  // would be telling the operator something untrue.
+  it.each(['engrave', 'profile-on-path', 'profile-inside'] as const)(
+    'stays silent on a %s layer, which cuts open paths fine',
+    async (cutType) => {
+      vi.useFakeTimers();
+      const layer: Layer = {
+        ...createLayer({ id: 'L1', color: COLOR }),
+        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType },
+      };
+      install([stroke(false)], layer);
+      expect(await settledText(layer)).toBe('');
+    },
+  );
 });

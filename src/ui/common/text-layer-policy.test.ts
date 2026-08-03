@@ -1,17 +1,41 @@
-import { describe, expect, it } from 'vitest';
-import { isTextCutTypeCompatible } from './text-layer-policy';
+// defaultCncTextCutType only picks the cut type a NEW text object starts on.
+// It never restricts what the operator may choose afterwards — steering a
+// default is not a guard, and every cut type stays selectable for every layer
+// (rule 7). The advisory that tells an operator when open strokes will produce
+// no toolpath lives in CncOpenPathNote, keyed on measured compiler behaviour
+// rather than on the font.
 
-describe('CNC single-line text machining policy', () => {
-  it('keeps open stroke fonts on path-following operations', () => {
-    expect(isTextCutTypeCompatible('ems-decorous-script', 'engrave')).toBe(true);
-    expect(isTextCutTypeCompatible('ems-decorous-script', 'profile-on-path')).toBe(true);
-    expect(isTextCutTypeCompatible('ems-decorous-script', 'v-carve')).toBe(false);
-    expect(isTextCutTypeCompatible('ems-decorous-script', 'pocket')).toBe(false);
-    expect(isTextCutTypeCompatible('ems-decorous-script', 'profile-inside')).toBe(false);
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_CNC_MACHINE_CONFIG, type CncTool, type MachineConfig } from '../../core/scene';
+import { defaultCncTextCutType } from './text-layer-policy';
+
+const VBIT: CncTool = {
+  id: 'v90',
+  name: '90° v-bit',
+  kind: 'v-bit',
+  diameterMm: 6,
+  tipAngleDeg: 90,
+};
+const END_MILL: CncTool = { id: 'em3', name: '3 mm end mill', kind: 'end-mill', diameterMm: 3 };
+
+function cncMachine(tool: CncTool): MachineConfig {
+  return { ...DEFAULT_CNC_MACHINE_CONFIG, tools: [tool], toolId: tool.id };
+}
+
+describe('defaultCncTextCutType', () => {
+  it('starts outline fonts on V-carve when a v-bit is loaded', () => {
+    expect(defaultCncTextCutType(cncMachine(VBIT), 'roboto-regular')).toBe('v-carve');
   });
 
-  it('does not restrict ordinary outline fonts', () => {
-    expect(isTextCutTypeCompatible('roboto-regular', 'v-carve')).toBe(true);
-    expect(isTextCutTypeCompatible('roboto-regular', 'pocket')).toBe(true);
+  it('starts single-line fonts on engrave, which follows their open strokes', () => {
+    expect(defaultCncTextCutType(cncMachine(VBIT), 'ems-decorous-script')).toBe('engrave');
+  });
+
+  it('does not default to V-carve without a v-bit', () => {
+    expect(defaultCncTextCutType(cncMachine(END_MILL), 'roboto-regular')).toBe('engrave');
+  });
+
+  it('falls back to engrave when there is no CNC machine', () => {
+    expect(defaultCncTextCutType(undefined, 'roboto-regular')).toBe('engrave');
   });
 });

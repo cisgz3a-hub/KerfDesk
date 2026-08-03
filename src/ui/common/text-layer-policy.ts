@@ -11,8 +11,3 @@ export function defaultCncTextCutType(
     ? 'v-carve'
     : 'engrave';
 }
-
-export function isTextCutTypeCompatible(fontKey: string, cutType: CncCutType): boolean {
-  if (findFontEntry(fontKey)?.geometry !== 'single-line') return true;
-  return cutType === 'engrave' || cutType === 'profile-on-path';
-}
