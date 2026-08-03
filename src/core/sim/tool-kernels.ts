@@ -3,9 +3,10 @@
 // vertical clearance of the cutting surface at that horizontal distance
 // (dz ≥ 0 above the tool tip):
 //
-//   end-mill / engraving  flat:      dz = 0 across the radius
+//   end-mill              flat:      dz = 0 across the radius
 //   ball-nose             sphere:    dz = r − sqrt(r² − d²)
 //   v-bit                 cone:      dz = d / tan(θ/2)
+//   engraving   truncated cone:      dz = max(0, (d − tipRadius) / tan(θ/2))
 //
 // The SAME kernels serve the H.2 simulator (stamping), H.5 roughing dilation,
 // and H.8 finishing (max-plus tip surface) — built once, deliberately.
@@ -64,8 +65,20 @@ export function kernelForTool(tool: CncTool, mmPerCell: number): ToolKernel {
 export function cuttingSurfaceDz(tool: CncTool, dMm: number, radiusMm: number): number {
   switch (tool.kind) {
     case 'end-mill':
-    case 'engraving':
       return 0;
+    case 'engraving': {
+      // A conical engraving bit is a TRUNCATED cone: a flat land of
+      // tipDiameterMm, then conical flanks at the included angle. It was
+      // modelled here as a flat disc across the FULL diameter, which
+      // contradicted the CAM — vcarve-angle.ts plans an engraving bit as a cone
+      // (falling back to 60° when the angle is unknown, the same value as
+      // FALLBACK_V_TIP_ANGLE_DEG). The preview therefore showed a flat bottom
+      // while the machine cut a V. Same law as a v-bit, offset by the tip land.
+      const tipAngleDeg = tool.tipAngleDeg ?? FALLBACK_V_TIP_ANGLE_DEG;
+      const halfAngleRad = (Math.max(1, tipAngleDeg) / 2) * (Math.PI / 180);
+      const tipRadiusMm = Math.max(0, (tool.tipDiameterMm ?? 0) / 2);
+      return Math.max(0, (dMm - tipRadiusMm) / Math.tan(halfAngleRad));
+    }
     case 'ball-nose': {
       const inside = Math.max(0, radiusMm * radiusMm - dMm * dMm);
       return radiusMm - Math.sqrt(inside);

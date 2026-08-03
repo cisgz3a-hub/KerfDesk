@@ -190,14 +190,15 @@ describe('CncBitPreviewToast', () => {
     expect(container.querySelector('canvas')?.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('does not present legacy engraving geometry as a modeled cutting envelope', async () => {
+  // An engraving bit with a valid included angle is now a modelable truncated
+  // cone; only one whose angle is unknown has nothing truthful to draw.
+  it('does not present an angle-less engraving bit as a modeled cutting envelope', async () => {
     const createScene = vi.fn(async () => ({ kind: 'ok', handle: { dispose: vi.fn() } }) as const);
     const engravingTool: CncTool = {
-      id: 'eng-15',
-      name: '15 degree engraving bit',
+      id: 'eng-legacy',
+      name: 'legacy engraving bit',
       kind: 'engraving',
       diameterMm: 3.175,
-      tipAngleDeg: 15,
     };
     const container = await renderToast({
       tool: engravingTool,
@@ -207,7 +208,7 @@ describe('CncBitPreviewToast', () => {
 
     expect(createScene).not.toHaveBeenCalled();
     expect(container.textContent).toContain('3D preview unavailable');
-    expect(container.textContent).toContain('no engraving shape was modeled');
+    expect(container.textContent).toContain('no engraving cone was modeled');
     expect(container.textContent).toContain('Verify the cutter profile');
     expect(container.textContent).toContain('No cutting envelope or display stub was rendered');
     expect(container.textContent).not.toContain('vertical stub is a display aid');

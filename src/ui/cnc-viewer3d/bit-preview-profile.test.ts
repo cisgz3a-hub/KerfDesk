@@ -65,15 +65,51 @@ describe('bitPreviewProfile', () => {
     },
   );
 
-  it('refuses to present the legacy flat engraving kernel as truthful tip geometry', () => {
+  // An engraving bit is a truncated cone. Once CncTool could carry the tip land
+  // (tipDiameterMm) the envelope became modelable, so the refusal narrowed from
+  // "every engraving bit" to "one whose included angle is unknown".
+  it('models an engraving bit that carries a valid included angle', () => {
+    const profile = bitPreviewProfile({
+      id: 'engraver',
+      name: '15 degree engraving bit',
+      kind: 'engraving',
+      diameterMm: 3.175,
+      tipAngleDeg: 15,
+    });
+    expect(profile.length).toBeGreaterThan(0);
+  });
+
+  it('models the flat tip land as a truncated cone', () => {
+    const pointed = bitPreviewProfile({
+      id: 'pointed',
+      name: 'pointed engraver',
+      kind: 'engraving',
+      diameterMm: 3.175,
+      tipAngleDeg: 30,
+    });
+    const truncated = bitPreviewProfile({
+      id: 'truncated',
+      name: 'flat-tip engraver',
+      kind: 'engraving',
+      diameterMm: 3.175,
+      tipAngleDeg: 30,
+      tipDiameterMm: 0.4,
+    });
+    // The land lowers the flank: at any radius inside it the cutter is still at
+    // its tip height, so the truncated profile never rises above the pointed one.
+    const highest = (points: ReadonlyArray<{ readonly heightMm: number }>): number =>
+      points.reduce((peak, point) => Math.max(peak, point.heightMm), 0);
+    expect(highest(truncated)).toBeLessThan(highest(pointed));
+  });
+
+  it('still refuses an engraving bit whose included angle is unknown', () => {
     expect(() =>
       bitPreviewProfile({
         id: 'engraver',
-        name: '15 degree engraving bit',
+        name: 'legacy engraving bit',
         kind: 'engraving',
         diameterMm: 3.175,
-        tipAngleDeg: 15,
       }),
-    ).toThrow(/legacy engraving.*no engraving shape was modeled/i);
+    ).toThrow(/included angle.*no engraving cone was modeled/i);
   });
 });
