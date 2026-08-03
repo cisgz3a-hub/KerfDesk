@@ -1,9 +1,9 @@
 import type { MachineBounds, NoGoZone } from '../devices';
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import { arcIntersectsRect } from '../invariants/arc-rect-intersection';
-import { asGcodeLines, isArcMotion, isClockwiseArc } from '../invariants/gcode-words';
+import { asGcodeLines } from '../invariants/gcode-words';
 import {
   isGcodeCommand,
-  isGcodeMotionCommand,
   parseGcodeWord,
   stripGcodeComment,
   type MotionBoundsOffset,
@@ -63,14 +63,18 @@ export function findNoGoZoneCollisions(
   const collisions: NoGoZoneCollision[] = [];
   let current: Point | null = options.initialMachinePosition ?? null;
   let absolute = true;
+  let motion: GcodeMotionMode | null = 0;
 
   for (const [index, raw] of asGcodeLines(gcode).entries()) {
     const stripped = stripComment(raw);
     if (stripped === '') continue;
     absolute = absoluteModeAfterLine(stripped, absolute);
-    const next = nextPoint(stripped, current, absolute, offset);
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || motion === null) continue;
+    const next = nextPoint(stripped, current, absolute, offset, motion);
     if (next === null) continue;
-    appendCollision(collisions, current, next, stripped, activeZones, index + 1);
+    appendCollision(collisions, current, next, stripped, motion, activeZones, index + 1);
     current = next;
   }
 
@@ -82,12 +86,12 @@ function nextPoint(
   current: Point | null,
   absolute: boolean,
   offset: MotionBoundsOffset,
+  motion: GcodeMotionMode,
 ): Point | null {
-  if (!isGcodeMotionCommand(line)) return null;
   const axes = parseAxes(line);
   if (axes.x === null && axes.y === null) {
     const completeArc =
-      isArcMotion(line) && parseGcodeWord(line, 'I') !== null && parseGcodeWord(line, 'J') !== null;
+      isArcMode(motion) && parseGcodeWord(line, 'I') !== null && parseGcodeWord(line, 'J') !== null;
     return completeArc ? current : null;
   }
   const base = current ?? offset;
@@ -105,20 +109,33 @@ function appendCollision(
   current: Point | null,
   next: Point,
   line: string,
+  motion: GcodeMotionMode,
   activeZones: ReadonlyArray<ActiveZone>,
   lineNumber: number,
 ): void {
   if (current === null) return;
-  const hit = activeZones.find(({ rect }) => motionIntersectsRect(current, next, line, rect));
+  const hit = activeZones.find(({ rect }) =>
+    motionIntersectsRect(current, next, line, motion, rect),
+  );
   if (hit !== undefined) collisions.push({ lineNumber, zone: hit.zone });
 }
 
-function motionIntersectsRect(current: Point, next: Point, line: string, rect: Rect): boolean {
-  if (!isArcMotion(line)) return segmentIntersectsRect(current, next, rect);
+function motionIntersectsRect(
+  current: Point,
+  next: Point,
+  line: string,
+  motion: GcodeMotionMode,
+  rect: Rect,
+): boolean {
+  if (!isArcMode(motion)) return segmentIntersectsRect(current, next, rect);
   const i = parseGcodeWord(line, 'I');
   const j = parseGcodeWord(line, 'J');
   if (i === null || j === null) return segmentIntersectsRect(current, next, rect);
-  return arcIntersectsRect(current, next, i, j, isClockwiseArc(line), rect);
+  return arcIntersectsRect(current, next, i, j, motion === 2, rect);
+}
+
+function isArcMode(motion: GcodeMotionMode): boolean {
+  return motion === 2 || motion === 3;
 }
 
 function parseAxes(line: string): Axes {

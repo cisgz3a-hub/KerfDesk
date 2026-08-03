@@ -53,6 +53,7 @@
   "dependencies": {
     "@tabler/icons": "3.43.0",
     "clipper2-ts": "2.0.1-17",
+    "delaunator": "5.1.0",
     "dompurify": "^3.4.12",
     "electron-updater": "^6.8.9",
     "imagetracerjs": "^1.2.6",

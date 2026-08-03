@@ -1,5 +1,6 @@
 import type { CncPass } from '../job';
 import type { CncCutType, CncLayerSettings, CncTool, Polyline, Vec2 } from '../scene';
+import { vcarveRegionBuckets } from './vcarve-region-order';
 
 export type CncGroupCompileOptions = {
   readonly layerPrimaryTool?: CncTool;
@@ -27,6 +28,27 @@ export function depthMajorPasses(
     }
   }
   return passes;
+}
+
+/** Group derived toolpaths by their original filled region, then clear every
+ * depth of one region before travelling to the next. */
+export function sourceRegionMajorDepthPasses(
+  sourceContours: ReadonlyArray<Polyline>,
+  toolpaths: ReadonlyArray<Polyline>,
+  depths: ReadonlyArray<number>,
+): CncPass[] {
+  return sourceRegionToolpathBuckets(sourceContours, toolpaths).flatMap((bucket) =>
+    depthMajorPasses(bucket, depths),
+  );
+}
+
+export function sourceRegionToolpathBuckets(
+  sourceContours: ReadonlyArray<Polyline>,
+  toolpaths: ReadonlyArray<Polyline>,
+): ReadonlyArray<ReadonlyArray<Polyline>> {
+  return vcarveRegionBuckets(sourceContours, [toolpaths])
+    .map((bucket) => bucket.map(({ polyline }) => polyline))
+    .filter((bucket) => bucket.length > 0);
 }
 
 export function isProfileCutType(cutType: CncCutType): boolean {

@@ -1,5 +1,5 @@
-// detectCncOffsetLadderWarnings — CNC-mode advisory: a layer whose inward-
-// offset ladder (pocket rings, v-carve rings, relief waterlines) was cut short
+// detectCncOffsetLadderWarnings — CNC-mode advisory: a layer whose bounded
+// planner (pocket rings, V-carve medial/floor routes, relief waterlines) was cut short
 // because the geometry engine FAILED, not because the region ran out of
 // interior. The layer still cuts, but it stops early: material the operator
 // expects to be gone is still standing, and a later pass meets stock it
@@ -47,23 +47,24 @@ function layerNameFor(project: Project, layerId: string): string {
 function offsetLadderWarning(layerName: string): string {
   return (
     `Toolpaths on layer "${layerName}" could not be fully generated: the geometry engine failed ` +
-    'partway through the inward-offset ladder, so this layer clears less material than the shape ' +
+    'partway through bounded toolpath planning, so this layer clears less material than the shape ' +
     'asks for and can leave a full-depth core or an uncut wall. The passes it did generate still ' +
-    'cut. Check the preview before running, and try a slightly larger stepover, a smaller bit, or ' +
-    'a simpler shape.'
+    'cut. Check the preview before running, and try simplifying or enlarging the shape or choosing ' +
+    'another compatible cutter.'
   );
 }
 
-// Covers every ladder that runs out of PLAN rather than interior: a ring
-// budget, a depth-clamp footprint finer than emitted coordinate precision, or
-// a variable-depth detail profile whose requested tolerance cannot be emitted.
+// Covers every planner that runs out of PLAN rather than interior: an offset
+// ring or medial-sample budget, or a variable-depth profile whose requested
+// tolerance cannot be emitted.
 function passLimitWarning(layerName: string): string {
   return (
-    `Toolpath planning on layer "${layerName}" hit its ring limits or emitted-profile ` +
+    `Toolpath planning on layer "${layerName}" hit its route/ring limits or emitted-profile ` +
     'precision limit while usable interior or requested detail remained, so the layer can ' +
     'clear less material or cut a shallower detail profile than the shape asks for. The ' +
     'generated passes still cut. Check the preview before running; for fine V-carve detail, ' +
-    'a wider-angle bit or thicker artwork improves representability.'
+    'a wider-included-angle (more-obtuse) bit, thicker artwork, or a larger design improves Z ' +
+    'representability.'
   );
 }
 

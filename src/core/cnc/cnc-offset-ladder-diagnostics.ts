@@ -17,8 +17,8 @@
 // therefore every byte of emitted G-code, untouched.
 //
 // Covered: pocket (ring and raster, with the layer's bit and any rest-machining
-// roughing bit), v-carve (the ring ladder plus the two-stage clearing pocket)
-// and relief roughing. Adaptive pocketing uses a different engine with no
+// roughing bit), V-carve (the certified medial planner plus any flat-core or
+// two-stage clearing pocket), and relief roughing. Adaptive pocketing uses a
 // offset ladder. Inlay pairs are NOT covered — their female pocket needs the
 // full linked plan to reproduce.
 
@@ -38,7 +38,7 @@ import { reliefOffsetLadderFailed } from './compile-cnc-relief';
 import { pocketRasterToolpaths, pocketRingToolpaths } from './pocket-paths';
 import { vcarveClearancePocket } from './vcarve-clearance';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
-import { vcarveLadderPasses } from './vcarve-ladder';
+import { vcarveMedialPasses } from './vcarve-medial';
 
 export function findCncOffsetLadderFailures(
   scene: Scene,
@@ -103,7 +103,9 @@ function vectorLadderDiagnosticKinds(
   if (settings.cutType === 'pocket') {
     return pocketLadderFailed(polylines, settings, config, tool) ? ['geometry-failed'] : [];
   }
-  if (settings.cutType === 'v-carve') return vcarveLadderKinds(polylines, settings, config, tool);
+  if (settings.cutType === 'v-carve') {
+    return vcarveDiagnosticKinds(polylines, settings, config, tool);
+  }
   // Profile, engrave, drill and inlay reach the emitter without walking an
   // offset ladder. Deliberately not an exhaustive match — a diagnostic should
   // report nothing for a cut type it does not know, not fail to compile.
@@ -152,15 +154,16 @@ function pocketStrategyFailed(
   return pocketRingToolpaths(polylines, toolDiameterMm, settings.stepoverPercent).offsetFailed;
 }
 
-function vcarveLadderKinds(
+function vcarveDiagnosticKinds(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   config: CncMachineConfig,
   tool: CncTool,
 ): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
-  const ladder = vcarveLadderPasses(polylines, {
+  const plan = vcarveMedialPasses(polylines, {
     tool,
-    maxDepthMm: settings.depthMm,
+    maxDepthMm:
+      (settings.vCarveFlatDepthEnabled ?? true) ? settings.depthMm : Number.POSITIVE_INFINITY,
     depthPerPassMm: settings.depthPerPassMm,
     resolutionMm: settings.vResolutionMm,
     ...(settings.vCarveRampEntryDeg === undefined
@@ -168,15 +171,15 @@ function vcarveLadderKinds(
       : { rampAngleDeg: settings.vCarveRampEntryDeg }),
   });
   const kinds: Array<CncOffsetLadderDiagnostic['kind']> = [];
-  if (ladder.offsetFailed || vcarveClearanceFailed(polylines, settings, config, tool)) {
+  if (plan.offsetFailed || vcarveClearanceFailed(polylines, settings, config, tool)) {
     kinds.push('geometry-failed');
   }
-  // Artwork finer than even the detail pitch (ADR-282) stays uncut — worth a
-  // Job Review note on lettering jobs, and never a refusal (rule 7).
-  if (ladder.thinResidual) kinds.push('thin-detail-dropped');
-  // Ring budget or coverage-floor pitch exhausted at valid settings (#584):
-  // interior remains unvisited; advisory only, same rule.
-  if (ladder.passLimited) kinds.push('pass-limit');
+  // Artwork finer than certified medial sampling can represent stays uncut;
+  // that is a Job Review advisory, never a refusal under the frame-only rule.
+  if (plan.thinResidual) kinds.push('thin-detail-dropped');
+  // A medial sample budget or flat-core route budget can leave detail
+  // unresolved; it remains advisory-only under the same rule.
+  if (plan.passLimited) kinds.push('pass-limit');
   return kinds;
 }
 
@@ -186,6 +189,7 @@ function vcarveClearanceFailed(
   config: CncMachineConfig,
   tool: CncTool,
 ): boolean {
+  if (!(settings.vCarveFlatDepthEnabled ?? true)) return false;
   const clearTool = toolById(config, settings.vClearToolId);
   if (clearTool === null) return false;
   const effectiveDepthMm = vcarveEffectiveDepthMm(tool, settings.depthMm);

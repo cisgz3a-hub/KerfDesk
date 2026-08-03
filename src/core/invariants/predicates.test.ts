@@ -69,8 +69,15 @@ describe('findOutOfBoundsCoords', () => {
     expect(issues[0]?.reason).toMatch(/Y out of bed/);
   });
 
+  it('checks compact inherited motion against the bed', () => {
+    const issues = findOutOfBoundsCoords('G1X1Y1\nX401Y2', bed);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.lineNumber).toBe(2);
+  });
+
   it('ignores non-motion lines', () => {
     expect(findOutOfBoundsCoords('M5\nG21\nG90', bed)).toEqual([]);
+    expect(findOutOfBoundsCoords('G1X1Y1\nG10L20P1X401Y0\nG92X500Y0', bed)).toEqual([]);
   });
 
   // GCO-07: a G2/G3 arc can bow past a bed edge while both endpoints are inside.
@@ -128,5 +135,9 @@ describe('collectG1FValues', () => {
 
   it('ignores comment lines carrying feed-like text', () => {
     expect(collectG1FValues('G0 X0 Y0 S0\n; feed 2500 mm/min\nG1 X1 Y1 F1200 S0')).toEqual([1200]);
+  });
+
+  it('collects feeds from compact inherited motion', () => {
+    expect(collectG1FValues('G1X1Y1F1000\nX2Y2F900')).toEqual([1000, 900]);
   });
 });

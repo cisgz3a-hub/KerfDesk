@@ -22,7 +22,11 @@ export function blockingCncSecondaryToolReferences(
   for (const layer of scene.layers) {
     const settings = layer.cnc;
     if (settings === undefined) continue;
-    if (settings.vClearToolId === toolId && settings.cutType === 'v-carve') {
+    if (
+      settings.vClearToolId === toolId &&
+      settings.cutType === 'v-carve' &&
+      (settings.vCarveFlatDepthEnabled ?? true)
+    ) {
       references.push(reference(layer, 'V-carve clearing'));
     }
     if (
@@ -61,7 +65,10 @@ function withoutDormantReferences(
   toolId: string,
 ): CncLayerSettings {
   let next = settings;
-  if (next.vClearToolId === toolId && next.cutType !== 'v-carve') {
+  if (
+    next.vClearToolId === toolId &&
+    (next.cutType !== 'v-carve' || !(next.vCarveFlatDepthEnabled ?? true))
+  ) {
     const { vClearToolId: _removed, ...rest } = next;
     next = rest;
   }

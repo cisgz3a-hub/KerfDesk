@@ -2566,24 +2566,35 @@ F-CNC19 tiling.
 
 #### Success
 1. With a v-bit active in Material & Bit, the user sets a layer's cut type
-   to **V-carve (angled bit)**. Cut depth becomes the MAX depth (wide
-   regions clamp to it and cut a flat floor); a **Detail** field controls
-   ring spacing (0 = auto, bit diameter ÷ 8).
-2. Compile produces an inward offset ladder: rings at inset d cut at
-   z = −min(d / tan(θ/2), effective depth), where effective depth is the
-   shallower of the requested maximum and the V-bit cone height
-   `(diameter / 2) / tan(θ/2)`. Sharp corners reach their full depth via the
-   vanishing offset (medial axis); holes are respected.
-3. When a flat clearing end mill is selected, its floor boundary and Z passes
-   use that same effective depth. It cannot cut a floor below the V walls.
-4. The preview's removal shading shows the V-groove deepening toward shape
-   centers; the emitted G-code passes both motion and depth invariants.
-5. V-carve groups run BEFORE profile cuts (they never free the part).
-6. Advanced → Entry offers an optional maximum contour-ramp angle. With an
-   exact manufacturer-qualified angle, each ring descends from stock top over
-   as many complete laps as both that angle and depth-per-pass require, at the
-   plunge feed, then makes one level cleanup lap at cutting feed. 0 leaves the
-   legacy stepped-plunge program unchanged.
+   to **V-carve (angled bit)**. New operations default to flowing depth:
+   **Flat depth** is off, and groove depth follows artwork width plus the
+   selected bit's included angle and cutting diameter. **Detail** controls the
+   vector boundary-sampling target (0 = automatic) and any necessary
+   flat-core clearing pitch.
+2. Compile normalizes each closed filled region, builds sampled Delaunay
+   medial-topology candidates, and accepts only finite nodes and complete XY
+   chords certified inside that exact normalized region. Delaunay is not an
+   authority for cut containment. The final XYZ path is certified against the
+   original normalized boundary and the 0.001 mm emitted coordinate grid.
+3. On the medial path, boundary distance d cuts at
+   `z = −min(d / tan(θ/2), effective depth)`. The changing Z is intentional:
+   it is how one V-bit makes a narrow groove shallow and a wide groove deep.
+   Depth per pass limits each finishing level without replacing that profile.
+4. **Flat depth** exposes **Floor depth**. When enabled, the same medial finish
+   is capped at the shallower of that floor and the modeled V-bit cone height;
+   inward floor-clearing routes exist only in the remaining mathematical flat
+   core. A region wider than the selected bit's finite cone footprint likewise
+   needs floor-clearing motion even in flowing-depth mode.
+5. A selected flat clearing end mill is active only when **Flat depth** is on.
+   Its floor boundary and Z passes use the same effective depth and cannot cut
+   below the V walls.
+6. Each connected medial graph is emitted as one deterministic tool-down edge
+   walk per depth level. Branches can be retraced and disconnected regions
+   need separate entries, but the compiler no longer machines the whole
+   V-shaped surface as a stack of global offset rings.
+7. The preview's removal shading shows the V-groove deepening toward shape
+   centers; V-carve groups run before profile cuts because they never free the
+   part.
 
 #### Error — active bit is not a v-bit
 1. The layer panel and pre-Frame Job Review show "V-carve requires a v-bit."
@@ -2594,38 +2605,49 @@ F-CNC19 tiling.
    cannot produce the requested V-carve depth math. Save and Start stop before
    compilation and tell the operator to edit or replace the bit; no silent
    60-degree fallback is permitted.
-3. The optional flat-floor clearing bit must be a flat end mill. An older
+3. While **Flat depth** is on, the optional flat-floor clearing bit must be a flat end mill. An older
    project that assigned a ball-nose or engraving cutter keeps that selection
    visible as a disabled diagnostic choice instead of silently changing it. If
    the selected geometry would emit a clearing pocket, prepared output refuses
    it and names the incompatible cutter; the direct compiler also omits the
    clearing group. A contour with no flat floor adds no refusal because that
    clearing stage contributes no motion.
-4. A missing configured clearing bit follows the same compile-integrity rule:
+4. While **Flat depth** is on, a missing configured clearing bit follows the same compile-integrity rule:
    it remains visible as an unavailable choice, prepared output refuses it only
    when a flat-floor stage can contribute, and direct compile omits that stage.
-5. ADR-280 does not widen either clearing-bit refusal. The eligibility probe
+5. Turning **Flat depth** off makes the clearing-bit selection inactive; it
+   neither emits a second tool section nor participates in preflight. ADR-280
+   does not widen either clearing-bit refusal. The eligibility probe
    retains its established requested-depth footprint, while valid executable
    clearing motion uses the cone-limited effective depth. A case that did not
    refuse before ADR-280 still does not refuse; direct compile omits an invalid
-   secondary stage and the complete V-bit ladder remains available.
+   secondary stage and the complete V-bit medial plan remains available.
 
 #### Empty
 1. Open paths and layers with no closed shapes compile to no passes; the
    layer is skipped.
 
-#### Edge — region narrower than the ring spacing / depth clamp
-1. Regions too narrow for even one ring at δ produce no rings there —
-   the groove simply ends (no gouge, no error).
-2. depthMm larger than the shape supports: the ladder stops where offsets
-   vanish. Depth per pass caps each legacy plunge or, for a ramped V-carve,
-   the descent per complete ring lap.
-3. A configured ramp that is invalid or has no usable closed contour at
-   emitted precision retains the complete legacy stepped-plunge V-carve group
-   and raises a Job Review advisory. G-code provenance names the fallback.
-4. A requested depth beyond the V-bit cone height stops at the cone height.
-   The optional clearing end mill uses the same floor inset and final Z, both
-   with legacy stepped entry and with an accepted contour ramp.
+#### Edge — fine detail, branches, physical cone limit, and stored ramp requests
+1. A feature finer than the bounded medial sampling can certify remains uncut
+   and raises an advisory; it never authorizes a gouging shortcut or a new
+   Frame/Start guard.
+2. Branched medial graphs require an edge-cover walk, so some already-cut
+   branches are retraced. Disconnected letters, counters, dots, or filled
+   islands require distinct safe-Z entries; “one medial line” does not mean
+   one entry for an entire disconnected design or one G-code block.
+3. With **Flat depth** off, the generic stored depth value does not cap the
+   groove. With it on, the requested floor is capped again at the selected
+   V-bit cone height. Depth per pass limits vertical engagement in both modes.
+4. A finite cutting diameter cannot span artwork wider than the bit's cone.
+   That unreachable core is the legitimate reason for repeated flat-floor
+   clearing lines; use a larger V-bit or narrower artwork to avoid them.
+5. A stored V-carve ramp angle is retained as requested provenance, but the
+   certified variable-depth medial profile governs motion and Job Review says
+   that the requested angle was not applied. Output remains available.
+6. A project saved before `vCarveFlatDepthEnabled` existed keeps its historical
+   requested depth cap and opens with **Flat depth** enabled. Turning the switch
+   off is the explicit migration to ordinary flowing depth; CurveDesk does not
+   silently reinterpret the old project.
 
 ### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
 
@@ -3053,11 +3075,12 @@ and lifts the command's CNC-only gate.)*
    keeps material RIGHT of travel — outside profiles run CW,
    inside/pocket run CCW) and rotates entry points to the midpoint of
    the longest segment so witness marks land on a flat span.
-3. A ramp angle > 0 turns plunges into descents ALONG the toolpath at
-   that angle; closed loops re-cut the ramped span level afterwards.
-   V-carve uses its dedicated full-contour strategy: every ring starts at
-   stock top, descends over one or more complete laps, and then cuts one level
-   cleanup lap. It does not use the ordinary short-path vertical fallback.
+3. For profile, pocket, and engrave, a ramp angle > 0 turns plunges into
+   descents ALONG the toolpath at that angle; closed loops re-cut the ramped
+   span level afterwards. V-carve is different: its changing Z is the cutting
+   profile itself, so the certified medial path governs and any stored V-carve
+   ramp request is reported as advisory provenance rather than being layered
+   onto that profile.
 4. Offset pockets can instead enable **Helical entry**. Each ring retracts,
    relocates, and descends through a native tangent helix that ends at the
    contour start. Raster pockets, islands, disconnected pockets, and a minimum
@@ -3066,18 +3089,19 @@ and lifts the command's CNC-only gate.)*
 
 #### Advisory — invalid or unrepresentable V-carve entry
 1. Ordinary profile/pocket/engrave ramp angles retain their [0.5°, 45°]
-   behavior. A V-carve uses the separate `vCarveRampEntryDeg` opt-in, so a
-   generic ramp retained from an older cut type cannot activate it. Its stored
-   maximum is never raised: it must be finite, greater than 0, and less than
-   90°. An entry that cannot be represented at emitted precision uses the
-   complete legacy stepped entry and names that fallback in Job Review and
-   G-code provenance; it does not refuse output.
+   behavior. A V-carve uses the separate `vCarveRampEntryDeg` stored request,
+   so a generic ramp retained from an older cut type cannot activate it. The
+   requested value is preserved in Job Review and G-code provenance, while
+   the medial variable-depth profile governs actual motion. This is advisory
+   and does not refuse output.
 2. Direction only applies where a material side exists (engraves/open paths
    are left alone).
 
 #### Empty
-1. Defaults (no direction, 0 ramp) keep output byte-identical to
-   pre-H.9.
+1. For profile, pocket, and engrave, defaults (no direction, 0 ramp) keep
+   their pre-H.9 motion unchanged. ADR-285 intentionally replaces V-carve's
+   earlier ring output, so this byte-identity statement does not apply to
+   V-carve.
 
 #### Edge — path shorter than the ramp
 1. The descent finishes at the path end (the ramp consumed the whole
@@ -3107,15 +3131,13 @@ and lifts the command's CNC-only gate.)*
    outcome and writes nothing; increase tile size or reduce overlap.
 
 #### Advisory — tiled V-carve entry semantics
-1. Every tiled V-carve ramp warns that the entered angle is requested
-   provenance, not a re-verified emitted maximum, because per-tile derivation
-   can create new segment endpoints. Export remains available.
-2. If clipping makes a plunge-fed V-carve ramp piece begin below stock top,
-   that tile starts with a direct plunge at the configured plunge feed. Tiled
-   export remains available, but CurveDesk raises a separate warning toast and
-   writes an inert G-code provenance comment. Keep the contour inside one tile
-   when the exact cutter cannot plunge or requires a guaranteed maximum ramp
-   angle.
+1. ADR-285 V-carve paths carry no contour-ramp claim. A stored Ramp entry
+   angle remains requested provenance and is not applied, in tiled or ordinary
+   output. The same informational notice remains available.
+2. Clipping can split one source region into several tile-local path pieces.
+   Each piece receives its own safe-Z entry at the configured plunge feed and
+   keeps the interpolated certified XYZ profile. Tiled output therefore cannot
+   promise one tool-down episode for a region that crosses tile boundaries.
 
 #### Edge — requested overlap leaves no positive tile step
 1. Planning uses one disclosed effective overlap that leaves a positive
@@ -5382,12 +5404,16 @@ the edge it sits on, and a midpoint over the same edge.
    new layer becomes active immediately.
 2. New shapes land on the ACTIVE layer; the 2D canvas strokes each shape in its
    layer's color so the drawing, the panel, and the 3D view tell one story.
-3. Click a row to make it active. The row reads back the layer's cut type,
-   depth, bit, and shape count.
+3. Click a row to make it active. The row reads back the layer's cut type, bit,
+   shape count, and either its fixed depth or **flowing depth** for an ordinary
+   V-carve.
 4. The active layer's settings edit below the list: name, cut type
-   (profile outside/inside/on-path, pocket, engrave, v-carve, drill), depth
-   (with a **Through** helper that sets the stock thickness), the bit, and —
-   for v-carve — an optional clearing bit for flat floors.
+   (profile outside/inside/on-path, pocket, engrave, v-carve, drill), the bit,
+   and the operation-specific depth controls. Fixed-depth operations show depth
+   with a **Through** helper that sets the stock thickness. V-carve instead shows
+   a **Flat depth** switch: off follows the geometry-derived medial depth; on
+   exposes the flat-floor depth and optional clearing bit. V-carve does not
+   show the fixed-depth operations' **Through** shortcut.
 5. Select shapes and press **Assign** to move them onto the active layer.
 6. Layer edits ride the sketch history: Ctrl+Z walks them like drawing steps.
 

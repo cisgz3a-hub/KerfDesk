@@ -253,7 +253,7 @@ describe('runCncPreflight', () => {
     );
   });
 
-  it('reports when an unplannable V-carve ramp uses the legacy stepped entry', () => {
+  it('reports when the certified V-carve profile supersedes a stored ramp request', () => {
     const base = projectWithCnc({ cutType: 'v-carve', vCarveRampEntryDeg: Number.NaN });
     const project: Project = {
       ...base,
@@ -263,7 +263,7 @@ describe('runCncPreflight', () => {
     expect(result.issues).toContainEqual(
       expect.objectContaining({
         code: 'cnc-vcarve-entry-fallback',
-        message: expect.stringContaining('legacy stepped-plunge entry'),
+        message: expect.stringContaining('certified variable-depth profile'),
       }),
     );
   });

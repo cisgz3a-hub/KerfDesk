@@ -23,6 +23,11 @@ const layer = (patch: Partial<DesignLayer>): DesignLayer => ({
   ...patch,
 });
 
+function withoutFlatDepthFlag(value: DesignLayer): DesignLayer {
+  const { vCarveFlatDepthEnabled: _legacyAbsent, ...legacy } = value;
+  return legacy;
+}
+
 const rect = (
   id: string,
   layerId: string,
@@ -86,6 +91,29 @@ describe('designCarveHeightmap', () => {
     expect(centre).toBeLessThanOrEqual(nearEdge);
     expect(depthAtMm(map, 4, 10)).toBe(0);
   });
+
+  it.each([
+    { label: 'flowing', flatDepth: false, expectedDepthMm: 6.35 / 2 },
+    { label: 'explicit flat', flatDepth: true, expectedDepthMm: 1 },
+    { label: 'legacy absent flat', flatDepth: undefined, expectedDepthMm: 1 },
+  ])(
+    'previews $label V-carve depth with the same cap semantics as G-code',
+    ({ flatDepth, expectedDepthMm }) => {
+      const configured = layer({
+        id: 'L',
+        cutType: 'v-carve',
+        depthMm: 1,
+        toolId: 'vb',
+        ...(flatDepth === undefined ? {} : { vCarveFlatDepthEnabled: flatDepth }),
+      });
+      const carve = flatDepth === undefined ? withoutFlatDepthFlag(configured) : configured;
+      const map = designCarveHeightmap(
+        input({ entities: [rect('r', 'L', 5, 5, 10)], layers: [carve] }),
+      );
+
+      expect(depthAtMm(map, 10, 10)).toBeCloseTo(-expectedDepthMm, 1);
+    },
+  );
 
   it('clamps a too-deep profile slot to a through cut at stock thickness', () => {
     const through = layer({ id: 'L', cutType: 'profile-on-path', depthMm: 99, toolId: 'em' });

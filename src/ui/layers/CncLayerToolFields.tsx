@@ -223,12 +223,12 @@ export function MotionPolishRows(props: {
         ariaLabel={`Ramp entry angle for ${props.layer.color}`}
         title={
           isVCarve
-            ? "Maximum multi-lap contour-ramp angle. Use only the exact cutter manufacturer's approved angle; 0 keeps legacy stepped plunges."
+            ? "Requested maximum entry angle. The certified medial depth profile may supersede it; Job Review reports that explicitly. Use only the cutter manufacturer's approved angle. 0 = profile-controlled entry."
             : 'Descend into cuts along the path at this angle instead of plunging straight down. 0 = plunge (default).'
         }
         style={rampInputStyle}
       />
-      <span style={rampUnitStyle}>° ramp</span>
+      <span style={rampUnitStyle}>{isVCarve ? '° requested' : '° ramp'}</span>
     </Row>
   );
 }

@@ -10,6 +10,9 @@
 // proves it on the final text so a regression anywhere upstream still blocks
 // the file write.
 
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
+import { parseGcodeWord } from './gcode-words';
+
 export type CncMotionIssue = {
   readonly lineNumber: number; // 1-based
   readonly reason: string;
@@ -24,16 +27,17 @@ export function findPlungedTravelIssues(
   const safeZ = Math.max(0, options.safeZMm);
   const issues: CncMotionIssue[] = [];
   let modalZ: number | null = null;
+  let motion: GcodeMotionMode | null = 0;
   const lines = gcode.split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const stripped = stripComment(lines[i] ?? '');
     if (stripped.length === 0) continue;
-    const isRapid = /^G0\b/.test(stripped);
-    const isFeedMove = /^G1\b/.test(stripped);
-    if (!isRapid && !isFeedMove) continue;
-    const z = parseAxis(stripped, 'Z');
-    const hasXy = parseAxis(stripped, 'X') !== null || parseAxis(stripped, 'Y') !== null;
-    if (isRapid) {
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || (motion !== 0 && motion !== 1)) continue;
+    const z = parseGcodeWord(stripped, 'Z');
+    const hasXy = parseGcodeWord(stripped, 'X') !== null || parseGcodeWord(stripped, 'Y') !== null;
+    if (motion === 0) {
       appendRapidIssues(issues, i + 1, hasXy, z, modalZ, safeZ);
     }
     if (z !== null) modalZ = z;
@@ -52,11 +56,14 @@ export function findSpindleStartClearanceIssues(
   const safeZ = Math.max(0, options.safeZMm);
   const issues: CncMotionIssue[] = [];
   let modalZ: number | null = null;
+  let motion: GcodeMotionMode | null = 0;
   const lines = gcode.split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const stripped = stripComment(lines[i] ?? '');
-    if (/^G[0123]\b/i.test(stripped)) {
-      const z = parseAxis(stripped, 'Z');
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
+    if (scanned.isMotion) {
+      const z = parseGcodeWord(stripped, 'Z');
       if (z !== null) modalZ = z;
       continue;
     }
@@ -111,9 +118,4 @@ function stripComment(line: string): string {
   const semicolon = line.indexOf(';');
   const noSemi = semicolon === -1 ? line : line.slice(0, semicolon);
   return noSemi.replace(/\([^)]*\)/g, '').trim();
-}
-
-function parseAxis(line: string, axis: 'X' | 'Y' | 'Z'): number | null {
-  const match = new RegExp(String.raw`\b${axis}(-?\d+(?:\.\d+)?)`, 'i').exec(line);
-  return match?.[1] === undefined ? null : Number.parseFloat(match[1]);
 }

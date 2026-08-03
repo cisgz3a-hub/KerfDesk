@@ -81,13 +81,19 @@ describe('output preparation worker client', () => {
     const worker = latestWorker();
     worker.respond({
       kind: 'save',
-      result: { kind: 'emitted', gcode: 'G21\n', preflight: { ok: true, issues: [] } },
+      result: {
+        kind: 'emitted',
+        gcode: 'G21\n',
+        preflight: { ok: true, issues: [] },
+        cncVCarveDepths: [{ layerId: 'flowing-v-layer', depthMm: 5.499 }],
+      },
     });
 
     await expect(pending).resolves.toEqual({
       kind: 'emitted',
       gcode: 'G21\n',
       preflight: { ok: true, issues: [] },
+      cncVCarveDepths: [{ layerId: 'flowing-v-layer', depthMm: 5.499 }],
     });
     expect(worker.terminated).toBe(false);
   });
@@ -176,7 +182,7 @@ describe('output preparation worker client', () => {
 function emittedSave(gcode: string): OutputPreparationResponse {
   return {
     kind: 'save',
-    result: { kind: 'emitted', gcode, preflight: { ok: true, issues: [] } },
+    result: { kind: 'emitted', gcode, preflight: { ok: true, issues: [] }, cncVCarveDepths: [] },
   };
 }
 

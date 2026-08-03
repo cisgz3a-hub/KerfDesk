@@ -29,8 +29,8 @@ beforeEach(() => {
 const SECONDARY_REFERENCE_CASES = [
   {
     field: 'vClearToolId',
-    activePatch: { cutType: 'v-carve' },
-    dormantPatch: { cutType: 'engrave' },
+    activePatch: { cutType: 'v-carve', vCarveFlatDepthEnabled: true },
+    dormantPatch: { cutType: 'v-carve', vCarveFlatDepthEnabled: false },
     relief: false,
   },
   {

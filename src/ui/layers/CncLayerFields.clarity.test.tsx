@@ -83,4 +83,51 @@ describe('CNC layer clarity', () => {
       view.host.remove();
     }
   });
+
+  it('defaults new V-carves to flowing depth and makes a flat floor explicit', async () => {
+    const layer: Layer = {
+      ...LAYER,
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' },
+    };
+    installCnc(layer);
+    const view = await renderFields(layer);
+    try {
+      const flatDepth = view.host.querySelector<HTMLInputElement>(
+        `input[aria-label="Flat depth for ${layer.color}"]`,
+      );
+      expect(flatDepth).not.toBeNull();
+      expect(flatDepth?.checked).toBe(false);
+      expect(view.host.textContent).not.toContain('Floor depth');
+      expect(view.host.textContent).toContain('Depth follows stroke width');
+
+      await act(async () => flatDepth?.click());
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.vCarveFlatDepthEnabled).toBe(true);
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
+
+  it('enters V-carve in flowing-depth mode instead of inheriting a hidden legacy floor', async () => {
+    installCnc();
+    const view = await renderFields();
+    try {
+      const cutType = view.host.querySelector<HTMLSelectElement>(
+        `select[aria-label="Cut type for ${LAYER.color}"]`,
+      );
+      expect(cutType).not.toBeNull();
+      await act(async () => {
+        if (cutType === null) return;
+        cutType.value = 'v-carve';
+        cutType.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      expect(useStore.getState().project.scene.layers[0]?.cnc).toMatchObject({
+        cutType: 'v-carve',
+        vCarveFlatDepthEnabled: false,
+      });
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
 });

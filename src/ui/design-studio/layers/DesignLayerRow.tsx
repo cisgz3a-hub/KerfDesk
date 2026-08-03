@@ -24,7 +24,7 @@ export function DesignLayerRow(props: {
   readonly onRemove: () => void;
 }): JSX.Element {
   const { layer } = props;
-  const summary = `${DESIGN_CUT_TYPE_LABELS[layer.cutType]} · ${layer.depthMm} mm · ${props.tool.name}`;
+  const summary = designLayerCutSummary(layer, props.tool);
   return (
     <div style={{ ...rowStyle, ...(props.isActive ? activeStyle : null) }}>
       <button
@@ -85,6 +85,14 @@ export function DesignLayerRow(props: {
       </button>
     </div>
   );
+}
+
+export function designLayerCutSummary(layer: DesignLayer, tool: CncTool): string {
+  const depth =
+    layer.cutType === 'v-carve' && layer.vCarveFlatDepthEnabled === false
+      ? 'flowing depth'
+      : `${layer.depthMm} mm${layer.cutType === 'v-carve' ? ' max' : ''}`;
+  return `${DESIGN_CUT_TYPE_LABELS[layer.cutType]} · ${depth} · ${tool.name}`;
 }
 
 const rowStyle: React.CSSProperties = {

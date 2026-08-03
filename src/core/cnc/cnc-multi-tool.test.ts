@@ -157,12 +157,13 @@ describe('compileCncJob multi-tool', () => {
     expect(drill.passes[0]?.kind).toBe('path3d');
   });
 
-  it('two-stage v-carve emits a clearance pocket with the clearing bit before the ladder', () => {
+  it('two-stage v-carve emits a clearance pocket with the clearing bit before the medial route', () => {
     const scene = sceneOf(
       [squareObject('A', '#111111', 10, 60)],
       [
         layerWith('#111111', {
           cutType: 'v-carve',
+          vCarveFlatDepthEnabled: true,
           toolId: 'vb-60',
           vClearToolId: 'em-3175',
           depthMm: 3,
@@ -183,12 +184,14 @@ describe('compileCncJob multi-tool', () => {
     expect(vcarve?.layerPrimaryToolId).toBe('vb-60');
     expect(vcarve).toMatchObject({ rampEntryDeg: 3 });
     const gcode = cncGrblStrategy.emit(job, DEVICE);
-    // The constant-depth ring ladder ramps as requested (ADR-282 Amendment 5).
-    // Thin-detail rings carry a variable-depth profile the contour-ramp planner
-    // cannot preserve, so those passes alone keep stepped entry — and the
-    // provenance says so rather than claiming the whole layer ramped.
-    expect(gcode.match(/; cnc entry: contour-ramp/g)).toHaveLength(1);
-    expect(gcode).toContain('; cnc entry-advisory: thin-detail passes use stepped entry');
+    // A medial route carries a variable-depth profile that the old
+    // constant-depth contour-ramp planner cannot preserve. The requested
+    // angle remains provenance plus an explicit emitted advisory.
+    expect(gcode.match(/; cnc entry: medial-profile/g)).toHaveLength(1);
+    expect(gcode).toContain(
+      '; cnc entry-advisory: requested max angle is not applied to the variable-depth path',
+    );
+    expect(gcode).not.toContain('; cnc entry: contour-ramp');
     expect(gcode).not.toContain('; cnc entry: stepped-plunge-fallback');
   });
 
@@ -200,6 +203,7 @@ describe('compileCncJob multi-tool', () => {
       [
         layerWith('#111111', {
           cutType: 'v-carve',
+          vCarveFlatDepthEnabled: true,
           toolId: 'vb-60',
           vClearToolId: 'em-3175',
           depthMm: 3,
@@ -221,6 +225,7 @@ describe('compileCncJob multi-tool', () => {
       [
         layerWith('#111111', {
           cutType: 'v-carve',
+          vCarveFlatDepthEnabled: true,
           toolId: 'vb-60',
           vClearToolId: clearToolId,
           depthMm: 3,

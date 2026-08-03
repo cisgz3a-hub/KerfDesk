@@ -10,6 +10,7 @@ type CncGroupProvenance = Pick<
   | 'requestedDepthMm'
   | 'depthPerPassMm'
   | 'vResolutionMm'
+  | 'vCarveFlatDepthEnabled'
   | 'rampEntryDeg'
   | 'feedSource'
 >;
@@ -48,13 +49,16 @@ function depthProvenance(
   settings: CncLayerSettings,
   options: CncGroupProvenanceOptions,
 ): CncGroupProvenance {
-  const includeRequestedDepth = options.includeRequestedDepth ?? true;
+  const flatDepthEnabled = settings.vCarveFlatDepthEnabled ?? true;
+  const includeRequestedDepth =
+    options.includeRequestedDepth ?? (settings.cutType !== 'v-carve' || flatDepthEnabled);
   const includeDepthPerPass = options.includeDepthPerPass ?? true;
   const includeVResolution = options.includeVResolution ?? settings.cutType === 'v-carve';
   return {
     ...(includeRequestedDepth ? { requestedDepthMm: settings.depthMm } : {}),
     ...(includeDepthPerPass ? { depthPerPassMm: settings.depthPerPassMm } : {}),
     ...(includeVResolution ? { vResolutionMm: settings.vResolutionMm } : {}),
+    ...(settings.cutType === 'v-carve' ? { vCarveFlatDepthEnabled: flatDepthEnabled } : {}),
   };
 }
 

@@ -7,6 +7,8 @@
 
 import type { Vec2 } from '../scene';
 
+export type BlockDirection = Vec2 & { readonly z?: number };
+
 export type BlockKind = 'cut' | 'travel';
 export type BlockMotion = 'rapid' | 'feed';
 
@@ -22,7 +24,7 @@ export type Block = {
   readonly feedMatchedLaserMotion?: boolean;
   // Unit direction vector. Travels with zero length are filtered out
   // before block creation so this is always defined for real blocks.
-  readonly direction: Vec2;
+  readonly direction: BlockDirection;
 };
 
 export function blockMotion(block: Block): BlockMotion {

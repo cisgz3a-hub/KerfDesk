@@ -68,6 +68,11 @@ function squareScene(): Scene {
         cnc: {
           ...DEFAULT_CNC_LAYER_SETTINGS,
           cutType: 'v-carve',
+          // This file's subject is the DEPTH-CLAMPED floor, so the flat cap is
+          // explicit: with it off (the ADR-285 default) depthMm stops being a
+          // cap and the bit carves to its full cone, which is a different
+          // invariant measured by the medial depth-law probes.
+          vCarveFlatDepthEnabled: true,
           depthMm: MAX_DEPTH_MM,
           depthPerPassMm: MAX_DEPTH_MM,
           vResolutionMm: 0, // auto: diameter/8 = 0.75 mm
@@ -129,6 +134,7 @@ describe('v-carve floor DEPTH, not just coverage', () => {
 
     const ringPitchMm = vcarveResolutionMm(0, VBIT_90.diameterMm);
     let worstUnderCutMm = 0;
+    let worstOverCutMm = 0;
     let interiorCells = 0;
     let interiorCut = 0;
     for (let cy = 0; cy < grid.heightCells; cy += 1) {
@@ -139,6 +145,7 @@ describe('v-carve floor DEPTH, not just coverage', () => {
         const analyticMm = Math.min(distToBoundary({ x, y }, polygon), MAX_DEPTH_MM);
         const cutMm = -(grid.depth[cy * grid.widthCells + cx] ?? 0);
         worstUnderCutMm = Math.max(worstUnderCutMm, analyticMm - cutMm);
+        worstOverCutMm = Math.max(worstOverCutMm, cutMm - analyticMm);
         // The near-edge band is legitimately shallower than one cell can show.
         if (analyticMm < GRID_SLACK_MM) continue;
         interiorCells += 1;
@@ -156,5 +163,10 @@ describe('v-carve floor DEPTH, not just coverage', () => {
     // requested depth. Tightening it needs a clearing tool, not a finer ladder.
     expect(worstUnderCutMm).toBeLessThanOrEqual(ringPitchMm + GRID_SLACK_MM);
     expect(worstUnderCutMm).toBeGreaterThan(0);
+    // The gouging direction, which nothing measured before: an undercut-only
+    // bound is equally satisfied by a floor cut arbitrarily too DEEP. Under an
+    // explicit flat cap the emitted floor must not dive past the analytic
+    // groove by more than grid discretization.
+    expect(worstOverCutMm).toBeLessThanOrEqual(GRID_SLACK_MM);
   }, 120000);
 });

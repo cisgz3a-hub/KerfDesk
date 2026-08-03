@@ -6,6 +6,10 @@ import {
   type AdaptivePocketSequence,
 } from './adaptive-pocket';
 import { verifyAdaptivePocket, type AdaptivePocketVerification } from './adaptive-pocket-verifier';
+import {
+  buildVCarveSourceRegionLayout,
+  vcarveSourceRegionRankFromLayout,
+} from './vcarve-region-order';
 
 export type AdaptivePocketOperation =
   | { readonly kind: 'not-requested' }
@@ -50,13 +54,23 @@ export function resolveAdaptivePocketOperation(
 export function adaptivePocketPasses(
   operation: Extract<AdaptivePocketOperation, { readonly kind: 'ok' }>,
   depths: ReadonlyArray<number>,
+  sourceContours: ReadonlyArray<Polyline> = [],
 ): ReadonlyArray<CncPass> {
   const passes: CncPass[] = [];
-  for (let depthIndex = 0; depthIndex < depths.length; depthIndex += 1) {
-    const zMm = depths[depthIndex];
-    if (zMm === undefined) continue;
-    const startZMm = depthIndex === 0 ? 0 : (depths[depthIndex - 1] ?? 0);
-    for (const sequence of operation.plan.sequences) {
+  const sourceLayout = buildVCarveSourceRegionLayout(sourceContours);
+  const sequences = operation.plan.sequences
+    .map((sequence, sourceIndex) => ({
+      sequence,
+      sourceIndex,
+      rank: vcarveSourceRegionRankFromLayout(sequence.entryCenter, sourceLayout),
+    }))
+    .sort((a, b) => a.rank - b.rank || a.sourceIndex - b.sourceIndex)
+    .map(({ sequence }) => sequence);
+  for (const sequence of sequences) {
+    for (let depthIndex = 0; depthIndex < depths.length; depthIndex += 1) {
+      const zMm = depths[depthIndex];
+      if (zMm === undefined) continue;
+      const startZMm = depthIndex === 0 ? 0 : (depths[depthIndex - 1] ?? 0);
       const roughing = roughingPass(sequence, startZMm, zMm);
       if (roughing !== null) passes.push(roughing);
       for (const ring of sequence.finishRings) {
@@ -75,7 +89,7 @@ export function adaptivePocketPassesForSettings(
 ): ReadonlyArray<CncPass> | null {
   const operation = resolveAdaptivePocketOperation(contours, settings, tool);
   if (operation.kind === 'not-requested') return null;
-  return operation.kind === 'ok' ? adaptivePocketPasses(operation, depths) : [];
+  return operation.kind === 'ok' ? adaptivePocketPasses(operation, depths, contours) : [];
 }
 
 function roughingPass(

@@ -20,9 +20,13 @@ export type DesignLayer = {
   // Lowercase 6-digit presentation color, carried onto the scene operation.
   readonly color: string;
   readonly cutType: DesignCutType;
-  // Total cut depth below stock top (positive). For v-carve this is the MAX
-  // depth; at or past stock thickness the carve preview reads it as through.
+  // Total cut depth below stock top (positive). For V-carve this is the MAX
+  // only when the legacy/explicit flat-depth mode is enabled; flowing mode is
+  // bounded by the selected cone geometry instead.
   readonly depthMm: number;
+  // Mirrors CncLayerSettings: absent is a legacy flat-depth layer; new layers
+  // explicitly default to ordinary flowing-depth V-carving.
+  readonly vCarveFlatDepthEnabled?: boolean;
   // The bit this layer cuts with. Absent = the machine's active bit, exactly
   // like CncLayerSettings.toolId (H.7 multi-tool).
   readonly toolId?: string;
@@ -65,6 +69,7 @@ export const DEFAULT_DESIGN_LAYER: DesignLayer = {
   color: DESIGN_LAYER_COLORS[0],
   cutType: 'profile-on-path',
   depthMm: 1,
+  vCarveFlatDepthEnabled: false,
 };
 
 /** Color for the layer at `index`, cycling the palette past its end. */
@@ -94,5 +99,6 @@ export function createDesignLayer(id: string, ordinal: number): DesignLayer {
     color: designLayerColor(ordinal),
     cutType: DEFAULT_DESIGN_LAYER.cutType,
     depthMm: DEFAULT_DESIGN_LAYER.depthMm + safe * DESIGN_LAYER_DEPTH_STEP_MM,
+    vCarveFlatDepthEnabled: false,
   };
 }

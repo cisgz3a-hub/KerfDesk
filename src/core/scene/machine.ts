@@ -116,6 +116,11 @@ export type CncLayerSettings = {
   // across a historical cut-type change cannot silently activate new V-bit
   // motion after a project upgrade.
   readonly vCarveRampEntryDeg?: number;
+  // Ordinary V-carve follows the vector medial path to the depth required by
+  // local stroke width. Opting into a flat depth restores a deliberate depth
+  // clamp plus the multiple clearing paths that a wide flat core requires.
+  // Absent is legacy and compiles as enabled; new layers persist false.
+  readonly vCarveFlatDepthEnabled?: boolean;
   // Pocket-only native G2/G3 descent. Diameter values describe the tool-center
   // circle; the pocket toolpath is already inset by the cutter radius.
   readonly helixEntry?: CncHelixEntrySettings;
@@ -124,12 +129,12 @@ export type CncLayerSettings = {
   readonly pocketRoughToolId?: string;
   // Enforce climb or conventional cutting on profile/pocket toolpaths.
   readonly cutDirection?: CncCutDirection;
-  // Total cut depth below stock top (positive). For v-carve this is the MAX
-  // depth: wide regions clamp to it and cut a flat floor.
+  // Total cut depth below stock top (positive). For V-carve this becomes the
+  // flat-floor depth only when vCarveFlatDepthEnabled is on.
   readonly depthMm: number;
   readonly depthPerPassMm: number; // max material removed per Z pass (positive)
-  // V-carve ring spacing (mm). 0 = auto (tool diameter / 8, floor 0.1 mm).
-  // Smaller = finer walls, more rings, longer job.
+  // V-carve boundary sampling / flat-core pitch (mm). 0 = automatic.
+  // Smaller = finer medial topology and floor clearing, longer compile/job.
   readonly vResolutionMm: number;
   // Straight-sided inlay automation. depthMm cuts the male insert profile;
   // the linked female pocket uses inlayPocketDepthMm.
@@ -271,6 +276,7 @@ export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   // bottom is an explicit operator edit, where the no-tabs warning still fires.
   depthMm: 1,
   depthPerPassMm: 1.5,
+  vCarveFlatDepthEnabled: false,
   vResolutionMm: 0,
   feedMmPerMin: 1000,
   plungeMmPerMin: 300,

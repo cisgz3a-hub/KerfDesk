@@ -302,7 +302,7 @@ describe('vcarvePasses — thin detail (ADR-282)', () => {
     }
   });
 
-  it('reports when acute-bit detail cannot meet the emitted 0.02 mm depth tolerance', () => {
+  it('certifies constant-clearance acute-bit detail at emitted precision', () => {
     const acute: CncTool = {
       id: 'v5',
       name: '5° engraver',
@@ -316,10 +316,10 @@ describe('vcarvePasses — thin detail (ADR-282)', () => {
       depthPerPassMm: 2,
       resolutionMm: 0.5,
     });
-    // The coarse pitch remains representable; this advisory comes from the
-    // per-vertex profile's 0.001 mm XYZ emission limit instead.
+    // The coarse pitch is representable, and one boundary segment certifies
+    // the constant-clearance center span across its full emitted chord.
     expect(2 * Math.tan((2.5 * Math.PI) / 180)).toBeGreaterThan(0.002);
-    expect(ladder.passLimited).toBe(true);
+    expect(ladder.passLimited).toBe(false);
     const profiles = ladder.passes.filter((pass) => pass.kind === 'path3d');
     expect(profiles.length).toBeGreaterThan(0);
     expect(profiles.flatMap((pass) => pass.points).length).toBeLessThan(5_000);
@@ -337,6 +337,10 @@ describe('vcarvePasses — thin detail (ADR-282)', () => {
       expect(z).toBeGreaterThanOrEqual(-2);
       expect(z).toBeLessThan(0);
     }
+    expect(Math.min(...passDepths(ladder.passes))).toBeCloseTo(
+      -0.05 / Math.tan((2.5 * Math.PI) / 180),
+      2,
+    );
   });
 
   it('property: detail passes never cut deeper than the band half-width (100 seeds)', () => {

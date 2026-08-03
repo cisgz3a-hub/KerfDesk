@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLayer,
   createProject,
+  DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
   EMPTY_SCENE,
   type Layer,
@@ -117,6 +118,33 @@ describe('JobReviewLayersTable', () => {
     expect(cnc?.feedMmPerMin).toBe(777);
     expect(cnc?.depthMm).toBe(1);
     expect(cnc?.cutType).toBe('profile-on-path');
+  });
+
+  it('shows compiled actual depth instead of an inert cut-depth editor for flowing V-carve', async () => {
+    const base = createLayer({ id: 'script', color: '#000000' });
+    const layer: Layer = {
+      ...base,
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'v-carve',
+        vCarveFlatDepthEnabled: false,
+      },
+    };
+    seedLayers([layer], 'cnc');
+    await render('cnc', [
+      {
+        layerId: 'script',
+        summaries: ['Actual max depth 3.175 mm'],
+        cncActualMaxDepthMm: 3.175,
+      },
+    ]);
+
+    expect(host.querySelector(`input[aria-label="Cut depth mm for ${layer.name}"]`)).toBeNull();
+    const actual = host.querySelector(
+      `output[aria-label="Actual compiled max depth mm for ${layer.name}"]`,
+    );
+    expect(actual?.textContent).toBe('3.175 mm actual');
+    expect(numberInput(`Depth per pass mm for ${layer.name}`)).toBeInstanceOf(HTMLInputElement);
   });
 
   it('states plainly when nothing has Output enabled', async () => {

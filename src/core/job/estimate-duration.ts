@@ -27,7 +27,9 @@ import {
   cncPassEntryDepthMm,
   cncPassXyPoints,
   type CncGroup,
+  type CncPath3dPass,
   type CutGroup,
+  type CutSegment,
   type Group,
   type Job,
 } from './job';
@@ -79,9 +81,10 @@ function timingScale(value: number | undefined): number {
   return isEstimateTimeScale(value) ? value : 1;
 }
 
-// The XY planner knows nothing about Z. CNC groups estimate as cut groups at
-// the XY feed, plus an analytic term for plunges (at plunge feed) and
-// retracts (approximated at the machine's max feed) per pass.
+// Ordinary CNC paths retain the legacy XY planner plus analytic entry/retract
+// terms. Z-rate-capped V-carve paths additionally carry each emitted XYZ edge
+// into the planner so their 3D length, junction angle, and capped feed agree
+// with the generated program.
 function jobWithCncAsCutGroups(job: Job): Job {
   let changed = false;
   const groups: Group[] = [];
@@ -97,22 +100,77 @@ function jobWithCncAsCutGroups(job: Job): Job {
 }
 
 function cncAsCutGroups(group: CncGroup): ReadonlyArray<CutGroup> {
+  const hasZRateCappedPath = group.passes.some(
+    (pass) => pass.kind === 'path3d' && pass.lateralFeed === 'z-rate-capped',
+  );
   const hasPlungeFedPath = group.passes.some(
     (pass) => pass.kind === 'path3d' && pass.lateralFeed === 'plunge',
   );
-  if (!hasPlungeFedPath) return [cncAsCutGroup(group, group.passes, group.feedMmPerMin)];
-  return group.passes.map((pass) =>
-    cncAsCutGroup(
-      group,
-      [pass],
-      pass.kind === 'path3d' && pass.lateralFeed === 'plunge'
-        ? group.plungeMmPerMin
-        : group.feedMmPerMin,
-    ),
-  );
+  if (!hasPlungeFedPath && !hasZRateCappedPath) {
+    return [cncAsCutGroup(group, group.passes, group.feedMmPerMin)];
+  }
+  return group.passes.flatMap((pass) => {
+    if (pass.kind === 'path3d' && pass.lateralFeed === 'z-rate-capped') {
+      return zRateCappedPathAsCutGroups(group, pass);
+    }
+    return [
+      cncAsCutGroup(
+        group,
+        [pass],
+        pass.kind === 'path3d' && pass.lateralFeed === 'plunge'
+          ? group.plungeMmPerMin
+          : group.feedMmPerMin,
+      ),
+    ];
+  });
 }
 
-function cncAsCutGroup(group: CncGroup, passes: CncGroup['passes'], speed: number): CutGroup {
+function zRateCappedPathAsCutGroups(group: CncGroup, pass: CncPath3dPass): ReadonlyArray<CutGroup> {
+  if (pass.points.length < 2) return [cncAsCutGroup(group, [pass], group.feedMmPerMin)];
+  const groups: CutGroup[] = [];
+  for (let index = 1; index < pass.points.length; index += 1) {
+    const from = pass.points[index - 1];
+    const to = pass.points[index];
+    if (from === undefined || to === undefined) continue;
+    groups.push(
+      cncAsCutGroup(
+        group,
+        [{ ...pass, points: [from, to], closed: false }],
+        zRateCappedSegmentFeed(group, from, to),
+        plannerMotion(from, to),
+      ),
+    );
+  }
+  return groups;
+}
+
+function zRateCappedSegmentFeed(
+  group: CncGroup,
+  from: CncPath3dPass['points'][number],
+  to: CncPath3dPass['points'][number],
+): number {
+  // Match the emitter's same-XY rule: a pure vertical in-cut move uses plunge
+  // feed in either direction, while a lateral rise keeps cutting feed.
+  if (to.x === from.x && to.y === from.y && to.z !== from.z) {
+    return group.plungeMmPerMin;
+  }
+  const descentMm = from.z - to.z;
+  if (!(descentMm > 0) || !Number.isFinite(descentMm)) return group.feedMmPerMin;
+  const length3d = Math.hypot(to.x - from.x, to.y - from.y, descentMm);
+  if (!(length3d > 0) || !Number.isFinite(length3d)) return group.feedMmPerMin;
+  const plungeLimitedFeed = Math.max(
+    1,
+    Math.floor((Math.max(1, group.plungeMmPerMin) * length3d) / descentMm),
+  );
+  return Math.min(group.feedMmPerMin, plungeLimitedFeed);
+}
+
+function cncAsCutGroup(
+  group: CncGroup,
+  passes: CncGroup['passes'],
+  speed: number,
+  motion?: NonNullable<CutSegment['plannerMotion']>,
+): CutGroup {
   return {
     kind: 'cut',
     layerId: group.layerId,
@@ -121,12 +179,28 @@ function cncAsCutGroup(group: CncGroup, passes: CncGroup['passes'], speed: numbe
     speed,
     passes: 1,
     airAssist: false,
-    // path3d passes project to XY here; their Z travel is approximated by the
-    // plunge term below (exact 3D length arrives with the H.2 simulator).
-    segments: passes.map((pass) => ({
+    segments: passes.map((pass, index) => ({
       polyline: cncPassXyPoints(pass),
       closed: pass.closed,
+      ...(index === 0 && motion !== undefined ? { plannerMotion: motion } : {}),
     })),
+  };
+}
+
+function plannerMotion(
+  from: CncPath3dPass['points'][number],
+  to: CncPath3dPass['points'][number],
+): NonNullable<CutSegment['plannerMotion']> {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const distanceMm = Math.hypot(dx, dy, dz);
+  return {
+    distanceMm,
+    direction:
+      distanceMm > 0
+        ? { x: dx / distanceMm, y: dy / distanceMm, z: dz / distanceMm }
+        : { x: 0, y: 0, z: 0 },
   };
 }
 

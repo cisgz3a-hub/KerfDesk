@@ -77,7 +77,7 @@ afterEach(() => {
 });
 
 describe('CncThinDetailNote', () => {
-  it('notes hairline artwork once the scene settles (300 ms debounce)', async () => {
+  it('stays silent when the medial planner can carve a hairline', async () => {
     vi.useFakeTimers();
     install([artwork(0.06)]);
     const view = await renderNote();
@@ -86,15 +86,15 @@ describe('CncThinDetailNote', () => {
       await act(async () => {
         vi.advanceTimersByTime(350);
       });
-      expect(view.host.textContent).toContain('finer than the generated detail path');
-      expect(view.host.querySelector('[role="note"]')).not.toBeNull();
+      expect(view.host.textContent).toBe('');
+      expect(view.host.querySelector('[role="note"]')).toBeNull();
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();
     }
   });
 
-  it('discloses sub-pitch square tips even when the stroke body is carved', async () => {
+  it('stays silent when the medial corner path preserves square tips', async () => {
     vi.useFakeTimers();
     install([artwork(0.5)]);
     const view = await renderNote();
@@ -102,7 +102,23 @@ describe('CncThinDetailNote', () => {
       await act(async () => {
         vi.advanceTimersByTime(350);
       });
+      expect(view.host.textContent).toBe('');
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
+
+  it('notes artwork too small for safe 0.001 mm emitted coordinates', async () => {
+    vi.useFakeTimers();
+    install([artwork(0.001)]);
+    const view = await renderNote();
+    try {
+      await act(async () => {
+        vi.advanceTimersByTime(350);
+      });
       expect(view.host.textContent).toContain('finer than the generated detail path');
+      expect(view.host.querySelector('[role="note"]')).not.toBeNull();
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();

@@ -157,4 +157,17 @@ describe('detailPath3dPoints', () => {
     expect(plan.toleranceMet).toBe(true);
     expectInterpolationWithinTolerance(emitted, segments, law);
   });
+
+  it('does not certify an unsampled boundary-distance peak between quarter probes', () => {
+    const segments: ReadonlyArray<BoundarySegment> = [
+      { ax: 0, ay: 0.99, bx: 0.9, by: 0.99 },
+      { ax: 1.1, ay: 0.99, bx: 10, by: 0.99 },
+    ];
+    const law = { tanHalf: 1, maxDepthMm: 2 };
+    const plan = detailPath3dPlan(ringEdge(10), segments, law);
+
+    expect(plan.toleranceMet).toBe(true);
+    expect(plan.points.length).toBeGreaterThan(2);
+    expectInterpolationWithinTolerance(plan.points, segments, law);
+  });
 });

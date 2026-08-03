@@ -34,6 +34,33 @@ describe('artwork run order view model', () => {
       ['Pocket', 2, [1]],
     ]);
   });
+
+  it('labels flowing V-carve depth without presenting the ignored depth setting', () => {
+    const base = projectWithJobs('cnc');
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        layers: base.scene.layers.map((layer, index) =>
+          index !== 0
+            ? layer
+            : {
+                ...layer,
+                cnc: {
+                  ...(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS),
+                  cutType: 'v-carve' as const,
+                  depthMm: 1,
+                  vCarveFlatDepthEnabled: false,
+                },
+              },
+        ),
+      },
+    };
+
+    const summary = artworkRunOrderRows(project)[0]?.settingsSummary ?? '';
+    expect(summary).toContain('flowing geometry depth');
+    expect(summary).not.toContain('· 1 mm ·');
+  });
 });
 
 function projectWithJobs(machine: 'laser' | 'cnc'): Project {

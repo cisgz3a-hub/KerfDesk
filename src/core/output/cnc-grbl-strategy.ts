@@ -403,7 +403,8 @@ function appendPath3dPass(
   appendPath3dCutMoves(lines, head, pass, feed, plunge);
 }
 
-// The feed for one emitted XYZ segment. A move's Z speed is feed·|dz|/length3d,
+// The feed for one emitted XYZ segment. A descending move's Z speed is
+// feed·drop/length3d,
 // so honouring the operator's plunge rate on a sloped move needs only enough
 // reduction to bring that component down — the flat segments of a
 // variable-depth profile keep the full cutting feed. Computed on the FORMATTED
@@ -420,16 +421,19 @@ function path3dSegmentFeed(
   if (mode === 'plunge') return plunge;
   if (mode !== 'z-rate-capped') return feed;
   if (head.x === null || head.y === null || head.z === null) return plunge;
-  const dz = Math.abs(Number(next.z) - Number(head.z));
+  const zDelta = Number(next.z) - Number(head.z);
+  const descentMm = Math.max(0, -zDelta);
+  if (!(descentMm > 0) || !Number.isFinite(descentMm)) return feed;
+  const dz = Math.abs(zDelta);
   const length3d = Math.hypot(Number(next.x) - Number(head.x), Number(next.y) - Number(head.y), dz);
-  if (!(dz > 0) || !(length3d > 0) || !Number.isFinite(dz) || !Number.isFinite(length3d)) {
+  if (!(length3d > 0) || !Number.isFinite(length3d)) {
     return feed;
   }
-  // floor, never round: rounding up would emit a rate fractionally above the
-  // configured plunge rate, which is the defect this cap exists to prevent.
+  // Floor, never round: rounding up could emit a rate fractionally above the
+  // configured plunge rate, which is the defect this cap prevents.
   return Math.min(
     feed,
-    Math.max(MIN_SEGMENT_FEED_MM_PER_MIN, Math.floor((plunge * length3d) / dz)),
+    Math.max(MIN_SEGMENT_FEED_MM_PER_MIN, Math.floor((plunge * length3d) / descentMm)),
   );
 }
 
@@ -441,6 +445,8 @@ function appendPath3dCutMoves(
   plunge: number,
 ): void {
   let modalFeed: number | null = null;
+  const isCompact = pass.lateralFeed === 'z-rate-capped';
+  let motionWord = 'G1';
   for (let i = 1; i < pass.points.length; i += 1) {
     const point = pass.points[i];
     if (point === undefined) continue;
@@ -450,9 +456,13 @@ function appendPath3dCutMoves(
     if (x === head.x && y === head.y && z === head.z) continue; // zero-length at emit precision
     // The selected lateral feed is re-issued on the next lateral move.
     const wantFeed = path3dSegmentFeed(head, { x, y, z }, pass.lateralFeed, feed, plunge);
-    const feedWord = modalFeed === wantFeed ? '' : ` F${wantFeed}`;
+    const feedWord = modalFeed === wantFeed ? '' : `${isCompact ? '' : ' '}F${wantFeed}`;
     modalFeed = wantFeed;
-    lines.push(`G1 X${x} Y${y} Z${z}${feedWord}`);
+    // GRBL keeps G1 modal and its scanner does not require whitespace. The
+    // compact continuation blocks leave dense V-carve curves more serial headroom.
+    const coordinates = isCompact ? `X${x}Y${y}Z${z}` : `X${x} Y${y} Z${z}`;
+    lines.push(`${isCompact ? motionWord : 'G1 '}${coordinates}${feedWord}`);
+    if (isCompact) motionWord = '';
     head.x = x;
     head.y = y;
     head.z = z;

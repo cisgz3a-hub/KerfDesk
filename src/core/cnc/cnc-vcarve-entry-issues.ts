@@ -6,7 +6,7 @@ import {
   type Scene,
 } from '../scene';
 import { collectLayerPolylines } from './compile-cnc-job';
-import { vcarveLadderPasses } from './vcarve-ladder';
+import { vcarveMedialPasses } from './vcarve-medial';
 
 export type CncVCarveEntryIssue = {
   readonly layerId: string;
@@ -25,9 +25,10 @@ export function findCncVCarveEntryIssues(
     if (settings.cutType !== 'v-carve' || settings.vCarveRampEntryDeg === undefined) continue;
     const polylines = collectLayerPolylines(scene.objects, layer, device);
     if (polylines.length === 0) continue;
-    const ladder = vcarveLadderPasses(polylines, {
+    const ladder = vcarveMedialPasses(polylines, {
       tool: layerCncTool(config, settings),
-      maxDepthMm: settings.depthMm,
+      maxDepthMm:
+        (settings.vCarveFlatDepthEnabled ?? true) ? settings.depthMm : Number.POSITIVE_INFINITY,
       depthPerPassMm: settings.depthPerPassMm,
       resolutionMm: settings.vResolutionMm,
       rampAngleDeg: settings.vCarveRampEntryDeg,

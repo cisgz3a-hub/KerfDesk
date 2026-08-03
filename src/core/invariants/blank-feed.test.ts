@@ -18,6 +18,24 @@ describe('findLongBlankFeedMoves', () => {
     expect(findLongBlankFeedMoves(gcode, { thresholdMm: 5 })).toHaveLength(1);
   });
 
+  // A compact block inherits G1 from the previous line, so the scan has to
+  // resolve modal motion rather than require a leading G word on every line.
+  it('flags a blank feed carried by a compact coordinate-only continuation', () => {
+    const gcode = ['G1X0.000Y0.000F1500S0', 'X20.000Y0.000'].join('\n');
+
+    const issues = findLongBlankFeedMoves(gcode, { thresholdMm: 5 });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.lineNumber).toBe(2);
+    expect(issues[0]?.distanceMm).toBeCloseTo(20, 3);
+  });
+
+  it('does not inherit motion into a coordinate-setting block', () => {
+    const gcode = ['G1 X0.000 Y0.000 S0', 'G10 L20 P1 X20.000 Y0.000'].join('\n');
+
+    expect(findLongBlankFeedMoves(gcode, { thresholdMm: 5 })).toEqual([]);
+  });
+
   it('parses lowercase commands and external numeric word forms', () => {
     const gcode = ['g1 x.5 y0 s+0', 'g1 x1.0e1 y0'].join('\n');
 

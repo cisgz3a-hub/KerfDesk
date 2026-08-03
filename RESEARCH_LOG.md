@@ -49,6 +49,45 @@ Each entry here corresponds to a `package.json` dependency. New rows are added w
   - Bundle impact: ~80 KB minified, ~25 KB gzipped. Acceptable against the 1 MB budget.
   - Test corpus of crafted-malicious SVGs lives at `src/__fixtures__/svg/malicious/`.
 
+### Delaunator
+
+- **Version:** 5.1.0, exact pin; transitive `robust-predicates` 3.0.3
+- **License:** ISC for Delaunator; Unlicense for `robust-predicates`. Both were verified from
+  the installed packages' actual `LICENSE` files and are in ADR-017's reviewed set.
+- **Source:**
+  - https://github.com/mapbox/delaunator
+  - https://github.com/mourner/robust-predicates
+- **Decision affected:** ADR-285; used only by `src/core/cnc/vcarve-medial-axis.ts` to build
+  vector medial-axis topology candidates for flowing V-carve toolpaths.
+- **Evaluated:** 2026-08-02 (Codex session)
+- **Confidence:** high for the pinned dependency and bounded topology role; CurveDesk's exact
+  containment, chord, depth, and emitted-profile checks remain authoritative.
+- **Re-verify by:** 2027-02-02
+- **Justification:** ADR-285 needs deterministic vector Delaunay adjacency for source-boundary
+  samples. The package supplies that narrow topology primitive without adding I/O, platform code,
+  global state, or a competing application abstraction.
+- **Alternatives considered:**
+  - CurveDesk's raster centerline pipeline under `src/core/trace/centerline/` was rejected for this
+    CNC slice: it deliberately quantizes geometry to a pixel field and does not supply the vector
+    boundary-clearance candidates required by the conical depth law.
+  - A hand-written Delaunay triangulator was rejected because it would duplicate robust geometric
+    predicates and create a larger degeneracy/maintenance surface in safety-relevant CAM code.
+  - `d3-delaunay@6.0.4` was rejected because npm metadata confirms it already depends on
+    `delaunator@5`; adopting its larger Voronoi/search API would not remove this dependency.
+- **Notes:**
+  - npm records 5.1.0 as released 2026-03-23. The repository was not archived and had pushes in
+    June 2026. Issue #94 received a collaborator response the next day; issue #91 received a
+    repository-member response. This meets ADR-017's current-maintenance and visible-response bar.
+  - The installed ESM source is a pure in-memory module. CurveDesk imports it from `core/`; focused
+    browser-compatible builds, typecheck, and tests require no platform patch.
+  - A standalone browser bundle measured with the workspace's esbuild 0.28.1 was 8,572 bytes
+    minified / 3,357 bytes gzip including `robust-predicates`, below the 1 MB compressed budget.
+  - `pnpm audit --prod --json` reported zero known vulnerabilities at evaluation time (0 low,
+    moderate, high, or critical).
+  - Upstream issues #91 and #94 reproduce on 5.1.0. They are retained as application regressions;
+    Delaunator output is never accepted without CurveDesk's exact region/chord checks.
+  - `public/third-party-notices.txt` carries the verbatim ISC and Unlicense notices.
+
 ### React + React DOM
 
 - **Version:** ^18.3.0 (resolved: 18.3.1)
@@ -814,6 +853,12 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
 - Re-evaluate only if a reversal trigger in ADR-094 fires (e.g. the
   clean-room DXF parser cannot reach usable real-world compatibility).
 
+**Superseded 2026-08-02 by ADR-285 for V-carve topology only:** the parser
+mandate remains, but `delaunator@5.1.0` and its locked
+`robust-predicates@3.0.3` closure are now the documented narrow runtime
+geometry exception. Clipper remains the Boolean/offset authority; the old
+V-carve inward-offset ladder is no longer the ordinary V-carve planner.
+
 ### three — adopted for the 3D relief viewer (2026-07-03, ADR-102)
 
 - **Version:** ^0.180.0 (pinned caret; see package.json)
@@ -1355,6 +1400,12 @@ PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worke
   tile begins with a direct plunge. See ADR-278 and
   `docs/audits/2026-08-01-cnc-vcarve-ramp-entry-acceptance.md`.
 
+**Superseded 2026-08-02 by ADR-285:** this entry remains the historical cutter-entry
+research. The medial V-carve planner does not apply the stored contour-ramp angle;
+it preserves the request as provenance and follows the certified variable-depth
+profile at plunge feed. The legacy stepped-ladder and tiled-ramp behaviors described
+above are no longer current output behavior.
+
 ---
 
 ## Offline production workflow references - 2026-08-01
@@ -1382,3 +1433,90 @@ PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worke
   documents sample-based batch-fill limitations; Autodesk distinguishes motion animation from stock
   verification and documents STL among mesh-export formats. CurveDesk keeps its offline,
   deterministic, frame-first, and hardware-qualification boundaries.
+
+---
+
+## CNC cutter geometry, V-carve topology, and whole-region ordering - 2026-08-02
+
+- **Question:** Why did the supplied script lettering lift, plunge, revisit letters, and change Z;
+  what G-code geometry is correct for every cutter family CurveDesk currently exposes?
+- **Artifact examined:** `C:\Users\Asus\Downloads\untitled  gemors.gcode`, SHA-256
+  `020F538234439DA7437160A4106814CA78B4C1642047566EC6CC3E69A1EFE524`.
+  It contains 2,374 lines, 68 declared cutting passes, 68 tool-down episodes, 69 rapid XY moves
+  including final park, and 1,322 simultaneous XYZ blocks. It is absolute metric straight-line
+  G-code with finite coordinates and no rapid below safe Z. Thirty-one variable-XYZ detail
+  episodes contain 1,211 Z-changing blocks, 1,158 changing by under 0.01 mm. This proves CAM
+  fragmentation and stream pressure; it does not prove the cause of physical lost position.
+- **V-carve geometry:** Vectric says the V-bit is driven to variable depth so the cutter fills the
+  selected vectors and that wider areas are cut deeper. Autodesk's Engrave operation likewise uses
+  a tapered tool to machine between closed contours. Therefore changing Z is required for ordinary
+  outline-font V-carving. A constant-Z pass is a Trace/centerline engraving operation, not the same
+  result. Sources (accessed 2026-08-02):
+  - https://docs.vectric.com/docs/V12.0/VCarveDesktop/ENU/Help/form/VCarve%20Toolpath%20Creator/
+  - https://help.autodesk.com/cloudhelp/2020/ENU/INVCAM/files/GUID-8BCA11B9-E694-41C7-8F79-A00A00BA939B.htm
+  - https://help.autodesk.com/view/fusion360/ENU/?contextId=MFG-REF-2D-TRACE-CMD
+- **Profile and pocket:** Vectric's profile operation offsets the cutter on, inside, or outside the
+  selected vector; pocketing clears the interior by offset or raster passes and can use multiple
+  Z levels. Autodesk's 2D Pocket documents pocket-boundary clearing and depth passes. These models
+  require the effective cutting radius of a flat cylindrical tool; applying the same nominal-radius
+  compensation to a ball, V, or tapered cutter is not equivalent geometry. Sources:
+  - https://docs.vectric.com/docs/V12.5/VCarveDesktop/ENU/Help/form/uiProfileMachineForm/index.html
+  - https://docs.vectric.com/docs/V12.5/Aspire/ENU/Help/form/uiPocketMachineForm/index.html
+  - https://help.autodesk.com/view/fusion360/ENU/?contextId=MFG-REF-2D-POCKET-CMD
+- **Single-line engraving:** Vectric Quick Engraving and Autodesk Trace follow selected vectors;
+  depth and actual groove width depend on the engraving cutter's tip geometry. CurveDesk's current
+  `engrave` operation is this constant-depth line-following class. It is not Autodesk's closed-profile
+  tapered Engrave and should be described as Trace/single-line engraving in future UI work. Source:
+  - https://docs.vectric.com/docs/V12.5/Aspire/ENU/Help/form/Quick%20Engrave/index.html
+- **Drilling:** Vectric documents peck drilling as repeated plunges with retracts to clear chips.
+  Stock GRBL does not implement canned drilling cycles, so explicit `G0`/`G1` pecks are the correct
+  dialect. CurveDesk has a drill operation but no drill cutter kind; selectable non-drill tools are
+  therefore not evidence of physically correct drilling geometry. Sources:
+  - https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/Drilling%20Toolpath/
+  - https://github.com/gnea/grbl#readme
+  - https://github.com/gnea/grbl/blob/master/doc/markdown/commands.md
+- **3D relief:** Vectric separates roughing from finishing; roughing removes stock in Z-levels, while
+  finishing follows the 3D surface. Autodesk Adaptive is a roughing strategy and Scallop/Parallel
+  are surface-finishing strategies. A full-radius ball nose needs a spherical contact-height law;
+  a point V-bit needs a conical law; a flat end mill needs a planar/cylindrical law. These are
+  different toolpath geometries even though all emit ordinary motion blocks. Sources:
+  - https://docs.vectric.com/docs/V12.5/VCarveDesktop/ENU/Help/form/Rough%20Machining%20Toolpath/index.html
+  - https://docs.vectric.com/docs/V12.5/Aspire/ENU/Help/form/Finish%20Machining%20Toolpath/index.html
+  - https://help.autodesk.com/cloudhelp/ENU/Fusion-CAM/files/3D-ADAPTIVE-STEPS.htm
+  - https://help.autodesk.com/cloudhelp/ENU/Fusion-CAM/files/3D-SCALLOP-STEPS.htm
+- **Surfacing and inlay:** Facing/surfacing is a constant-Z clearing pattern for a flat-bottom cutter.
+  CurveDesk's straight inlay is correctly an end-mill pocket plus offset male profile; it is not a
+  tapered V-inlay and must not be described as one. Autodesk describes Face as clearing flat areas
+  and its tutorial selects a flat end mill; Vectric's straight inlay uses radius-compensated pocket
+  and outside-profile toolpaths with the same cutter for both halves. Sources:
+  - https://help.autodesk.com/view/fusion360/ENU/?contextId=MFG-REF-2D-FACE-CMD
+  - https://help.autodesk.com/view/fusion360/ENU/?guid=GUID37C34B9A-5C6A-41A5-AE95-25C10D806DFA
+  - https://docs.vectric.com/docs/V12.5/Aspire/ENU/Help/form/Create%20Inlay%20Toolpath/index.html
+- **G-code language:** NIST RS274/NGC and the official GRBL documents confirm that tool geometry is
+  not encoded by a special “V-bit G-code” dialect. CAM computes coordinates, compensation, Z,
+  feeds, and pass order, then the controller receives the same motion vocabulary. Sources:
+  - https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=823374
+  - https://github.com/gnea/grbl/blob/master/doc/markdown/interface.md
+- **Ordering decision:** within one tool section, complete every required pass and depth for one
+  source filled region before the next. Profiles already follow part-major order and drilling
+  completes one hole's pecks. Pocket, helical pocket, rest-pocket, adaptive pocket, V-clearance,
+  and female straight-inlay clearing were changed from whole-layer depth-major to source-region
+  major. Multi-tool jobs remain tool-major to avoid repeated tool changes.
+- **Medial dependency:** `delaunator@5.1.0` (ISC) and locked `robust-predicates@3.0.3`
+  (Unlicense) were evaluated under ADR-017. Delaunator provides topology candidates only; exact
+  CurveDesk region/chord and emitted-depth checks are authoritative. Upstream reports #91 and #94
+  reproduce on 5.1.0 and are retained as application regressions:
+  - https://github.com/mapbox/delaunator/issues/91
+  - https://github.com/mapbox/delaunator/issues/94
+- **Ball-nose V-carve boundary:** Vectric allows Ball Nose tools in its V-Carve operation. CurveDesk
+  currently has no spherical V-carve depth/contact law; selecting a ball nose reaches the historical
+  non-V-bit 60-degree cone compatibility fallback. That output is not ball-nose V-carve geometry and
+  remains explicitly unsupported pending a separate spherical planner. Source:
+  - https://docs.vectric.com/docs/V12.0/VCarveDesktop/ENU/Help/form/VCarve%20Toolpath%20Creator/
+- **Outcome:** adopt ADR-285. Ordinary V-carve becomes a certified variable-depth medial route;
+  flat depth is explicit; source-region-major ordering replaces cross-letter hopping in all affected
+  2D clearing operations. Unsupported cutter/operation combinations remain audit findings for
+  separate geometry slices and may be disclosed as Job Review warnings, never new guards.
+- **Confidence boundary:** high for source behavior, exact artifact structure, mathematical depth,
+  deterministic output, and software tests. No hardware air-cut or material cut was performed;
+  physical tracking, loads, bit truth, and finish remain unverified.

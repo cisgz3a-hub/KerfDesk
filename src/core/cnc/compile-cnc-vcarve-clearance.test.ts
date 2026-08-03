@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import type { CncGroup, CncPass } from '../job';
+import type { CncGroup } from '../job';
 import { cncGrblStrategy } from '../output';
 import {
   createLayer,
@@ -12,6 +12,7 @@ import {
   type CncTool,
   type ImportedSvg,
   type Layer,
+  type Polyline,
   type Scene,
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
@@ -37,6 +38,18 @@ const MACHINE: CncMachineConfig = {
   tools: [V_BIT, CLEAR_TOOL],
 };
 
+function square(minX: number, minY: number, sizeMm: number): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: minX, y: minY },
+      { x: minX + sizeMm, y: minY },
+      { x: minX + sizeMm, y: minY + sizeMm },
+      { x: minX, y: minY + sizeMm },
+    ],
+  };
+}
+
 function squareObject(sizeMm: number): ImportedSvg {
   return {
     kind: 'imported-svg',
@@ -47,28 +60,40 @@ function squareObject(sizeMm: number): ImportedSvg {
     paths: [
       {
         color: '#2563eb',
-        polylines: [
-          {
-            closed: true,
-            points: [
-              { x: 10, y: 10 },
-              { x: 10 + sizeMm, y: 10 },
-              { x: 10 + sizeMm, y: 10 + sizeMm },
-              { x: 10, y: 10 + sizeMm },
-            ],
-          },
-        ],
+        polylines: [square(10, 10, sizeMm)],
       },
     ],
   };
 }
 
-function compileTwoStageVCarve(sizeMm: number, settings: Partial<CncLayerSettings> = {}) {
+function twoRegionSquareObject(sizeMm: number): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id: 'two-squares',
+    source: 'two-squares.svg',
+    bounds: { minX: 10, minY: 10, maxX: 70 + sizeMm, maxY: 10 + sizeMm },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#2563eb',
+        // Source order is intentionally opposite geometric X order.
+        polylines: [square(70, 10, sizeMm), square(10, 10, sizeMm)],
+      },
+    ],
+  };
+}
+
+function compileTwoStageVCarve(
+  sizeMm: number,
+  settings: Partial<CncLayerSettings> = {},
+  object: ImportedSvg = squareObject(sizeMm),
+) {
   const layer: Layer = {
     ...createLayer({ id: 'v-carve', color: '#2563eb' }),
     cnc: {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       cutType: 'v-carve',
+      vCarveFlatDepthEnabled: true,
       toolId: V_BIT.id,
       vClearToolId: CLEAR_TOOL.id,
       depthMm: 10,
@@ -77,8 +102,12 @@ function compileTwoStageVCarve(sizeMm: number, settings: Partial<CncLayerSetting
       ...settings,
     },
   };
-  const scene: Scene = { objects: [squareObject(sizeMm)], layers: [layer] };
+  const scene: Scene = { objects: [object], layers: [layer] };
   return compileCncJob(scene, DEFAULT_DEVICE_PROFILE, MACHINE);
+}
+
+function compress<T>(values: ReadonlyArray<T>): ReadonlyArray<T> {
+  return values.filter((value, index) => index === 0 || value !== values[index - 1]);
 }
 
 function requiredGroup(
@@ -110,6 +139,26 @@ function deepestEmittedZ(gcode: string): number {
 }
 
 describe('two-stage V-carve effective floor depth', () => {
+  it('clears every depth of the first source region before starting the second', () => {
+    const job = compileTwoStageVCarve(40, { depthMm: 3 }, twoRegionSquareObject(40));
+    const clearance = requiredGroup(job, 'pocket');
+    const sequence = clearance.passes.map((pass) => {
+      if (pass.kind !== 'contour') throw new Error('expected a contour pass');
+      const minX = Math.min(...pass.polyline.map((point) => point.x));
+      const source = minX > 50 ? 'first' : 'second';
+      return `${source}:${pass.zMm}`;
+    });
+
+    expect(compress(sequence)).toEqual([
+      'first:-1',
+      'first:-2',
+      'first:-3',
+      'second:-1',
+      'second:-2',
+      'second:-3',
+    ]);
+  });
+
   it.each([undefined, 3] as const)(
     'keeps the effective flat-floor region on a 20 mm shape with ramp angle %s',
     (rampAngleDeg) => {
@@ -138,17 +187,11 @@ describe('two-stage V-carve effective floor depth', () => {
       expect(deepestZ(vcarve)).toBeCloseTo(-3, 9);
       expect(deepestEmittedZ(cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE))).toBeCloseTo(-3, 9);
 
-      const contourDepths = vcarve.passes.flatMap((pass) =>
-        pass.kind === 'contour' ? [pass.zMm] : [],
-      );
-      // With a ramp angle the ladder's constant-depth rings become path3d entry
-      // ramps too, so the detail passes are the path3d ones that are NOT ramps.
-      const detailPasses = vcarve.passes.filter(
-        (pass): pass is Extract<CncPass, { readonly kind: 'path3d' }> =>
-          pass.kind === 'path3d' && pass.entryRamp !== true,
-      );
-      expect(Math.min(...contourDepths)).toBeCloseTo(-3, 9);
-      expect(detailPasses.length).toBeGreaterThan(0);
+      const detailPasses = vcarve.passes.filter((pass) => pass.kind === 'path3d');
+      expect(detailPasses).toHaveLength(vcarve.passes.length);
+      expect(
+        Math.min(...detailPasses.flatMap((pass) => pass.points.map(({ z }) => z))),
+      ).toBeCloseTo(-3, 9);
       expect(
         detailPasses.every(
           (pass) => pass.lateralFeed === 'z-rate-capped' && pass.entryRamp === undefined,
@@ -159,8 +202,7 @@ describe('two-stage V-carve effective floor depth', () => {
       if (rampAngleDeg === undefined) {
         expect(gcode).not.toContain('; cnc entry:');
       } else {
-        expect(gcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 3.000');
-        expect(gcode).toContain('; cnc entry-advisory: thin-detail passes use stepped entry');
+        expect(gcode).toContain('; cnc entry: medial-profile; max-angle-deg: 3.000');
       }
     },
   );

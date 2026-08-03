@@ -11,6 +11,7 @@ import {
   toasts,
 } from '../../__fixtures__/file-actions';
 import { rotaryRasterSaveProject } from '../../__fixtures__/rotary-raster-save-project';
+import { flowingVCarveProject } from '../../__fixtures__/flowing-vcarve-project';
 import { createProject } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
@@ -249,6 +250,27 @@ describe('file actions contextual failure handling', () => {
 
     expect(
       toast.messages.some((m) => m.variant === 'warning' && m.message.includes('uncalibrated')),
+    ).toBe(true);
+  });
+
+  it('shows the actual compiled flowing V-carve depth after a successful save', async () => {
+    const target: SaveTarget = { displayName: 'flowing-v.gcode', write: async () => undefined };
+    const toast = toasts();
+
+    await handleSaveGcode({
+      platform: mockPlatform({ save: async () => target }),
+      project: flowingVCarveProject(),
+      savedName: null,
+      pushToast: toast.pushToast,
+    });
+
+    expect(
+      toast.messages.some(
+        ({ message, variant }) =>
+          variant === 'warning' &&
+          message.includes('actual compiled V-carve depth') &&
+          message.includes('into the spoilboard'),
+      ),
     ).toBe(true);
   });
 

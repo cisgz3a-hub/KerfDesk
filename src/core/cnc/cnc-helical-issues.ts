@@ -6,6 +6,7 @@ import {
   type Scene,
 } from '../scene';
 import { collectLayerPolylines } from './compile-cnc-job';
+import { sourceRegionToolpathBuckets } from './compile-cnc-helpers';
 import { pocketToolpathsForSettings } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
 import { planHelicalPocketPasses } from './helical-entry';
@@ -38,8 +39,13 @@ export function findCncHelicalEntryIssues(
     const toolpaths = pocketToolpathsForSettings(polylines, settings, tool.diameterMm);
     const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
     if (toolpaths.length === 0 || depths.length === 0) continue;
-    const plan = planHelicalPocketPasses(toolpaths, depths, settings.helixEntry);
-    if (!plan.ok) issues.push({ layerId: layer.id, reason: plan.reason });
+    for (const bucket of sourceRegionToolpathBuckets(polylines, toolpaths)) {
+      const plan = planHelicalPocketPasses(bucket, depths, settings.helixEntry);
+      if (!plan.ok) {
+        issues.push({ layerId: layer.id, reason: plan.reason });
+        break;
+      }
+    }
   }
   return issues;
 }

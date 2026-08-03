@@ -41,4 +41,16 @@ describe('findPlungedTravelIssues', () => {
     const gcode = ['; header', 'G0 Z3.810', 'G1 Z-3.000 F250 ; plunge', 'G1 X4 Y4 F800'].join('\n');
     expect(findPlungedTravelIssues(gcode, SAFE)).toHaveLength(0);
   });
+
+  it('tracks compact coordinate-only motion after an explicit modal word', () => {
+    const gcode = [
+      'G0Z3.810',
+      'G0X10.000Y10.000',
+      'G1Z-1.000F300',
+      'X20.000Y10.000Z-2.000F1000',
+      'G0Z3.810',
+      'X0.000Y0.000',
+    ].join('\n');
+    expect(findPlungedTravelIssues(gcode, SAFE)).toEqual([]);
+  });
 });

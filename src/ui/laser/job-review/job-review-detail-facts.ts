@@ -3,7 +3,7 @@
 // CNC strategy settings, and the material each operation is bound to. The
 // table renders these as a muted detail line under each row.
 
-import { CHIPLOAD_MATERIALS, zPassDepths } from '../../../core/cnc';
+import { CHIPLOAD_MATERIALS, isProfileCutType, zPassDepths } from '../../../core/cnc';
 import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
 import type { CncLayerSettings, Layer, LayerOperationSettings } from '../../../core/scene';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
@@ -68,23 +68,64 @@ export function cncOperationDetail(settings: CncLayerSettings): string {
   // than re-deriving it: zPassDepths carries an epsilon and a per-pass clamp,
   // and a bare Math.ceil disagreed with the emitter on imperial depths
   // (19.05 / 1.5875 floats to 12.000000000000002, showing 13 for 12 passes).
-  const passes = zPassDepths(settings.depthMm, settings.depthPerPassMm).length;
   return [
-    `${passes} ${passes === 1 ? 'pass' : 'passes'}`,
-    `stepover ${settings.stepoverPercent}%`,
-    ...(settings.cutDirection === undefined || !DIRECTED_CUT_TYPES.has(settings.cutType)
-      ? []
-      : [settings.cutDirection]),
-    cncTabsPart(settings),
+    ...cncDepthParts(settings),
+    ...cncStepoverPart(settings),
+    ...cncDirectionPart(settings),
+    ...cncProfileTabsPart(settings),
     ...cncEntryPart(settings),
-    ...(settings.finishAllowanceMm !== undefined && settings.finishAllowanceMm > 0
-      ? [`finish allowance ${formatMm(settings.finishAllowanceMm)} mm`]
-      : []),
-    ...(settings.pocketStrategy !== undefined && settings.pocketStrategy !== 'offset'
-      ? [`${settings.pocketStrategy} pocket`]
-      : []),
+    ...cncVCarveClearPart(settings),
+    ...cncFinishAllowancePart(settings),
+    ...cncPocketStrategyPart(settings),
     feedSourcePart(settings),
   ].join(SEPARATOR);
+}
+
+function cncStepoverPart(settings: CncLayerSettings): ReadonlyArray<string> {
+  return settings.cutType === 'v-carve' ? [] : [`stepover ${settings.stepoverPercent}%`];
+}
+
+function cncDirectionPart(settings: CncLayerSettings): ReadonlyArray<string> {
+  return settings.cutDirection === undefined || !DIRECTED_CUT_TYPES.has(settings.cutType)
+    ? []
+    : [settings.cutDirection];
+}
+
+function cncProfileTabsPart(settings: CncLayerSettings): ReadonlyArray<string> {
+  return isProfileCutType(settings.cutType) ? [cncTabsPart(settings)] : [];
+}
+
+function cncVCarveClearPart(settings: CncLayerSettings): ReadonlyArray<string> {
+  const active =
+    settings.cutType === 'v-carve' &&
+    (settings.vCarveFlatDepthEnabled ?? true) &&
+    settings.vClearToolId !== undefined;
+  return active ? [`clear stepover ${settings.stepoverPercent}%`] : [];
+}
+
+function cncFinishAllowancePart(settings: CncLayerSettings): ReadonlyArray<string> {
+  const allowance = settings.finishAllowanceMm;
+  return allowance !== undefined && allowance > 0
+    ? [`finish allowance ${formatMm(allowance)} mm`]
+    : [];
+}
+
+function cncPocketStrategyPart(settings: CncLayerSettings): ReadonlyArray<string> {
+  const strategy = settings.pocketStrategy;
+  return strategy !== undefined && strategy !== 'offset' ? [`${strategy} pocket`] : [];
+}
+
+function cncDepthParts(settings: CncLayerSettings): ReadonlyArray<string> {
+  if (settings.cutType === 'v-carve') {
+    return (settings.vCarveFlatDepthEnabled ?? true)
+      ? [
+          `requested flat floor ${formatMm(settings.depthMm)} mm`,
+          `max stepdown ${formatMm(settings.depthPerPassMm)} mm`,
+        ]
+      : ['flowing V-depth', `max stepdown ${formatMm(settings.depthPerPassMm)} mm`];
+  }
+  const passes = zPassDepths(settings.depthMm, settings.depthPerPassMm).length;
+  return [`${passes} ${passes === 1 ? 'pass' : 'passes'}`];
 }
 
 /** Display name for a layer's linked material preset; null = no binding. */
@@ -126,7 +167,11 @@ function cncTabsPart(settings: CncLayerSettings): string {
 function cncEntryPart(settings: CncLayerSettings): ReadonlyArray<string> {
   const rampEntryDeg =
     settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg;
-  if (rampEntryDeg !== undefined) return [`ramp entry ${rampEntryDeg}°`];
+  if (rampEntryDeg !== undefined) {
+    return settings.cutType === 'v-carve'
+      ? [`requested entry ${rampEntryDeg}° (medial depth profile governs)`]
+      : [`ramp entry ${rampEntryDeg}°`];
+  }
   if (settings.cutType === 'v-carve') return [];
   if (settings.helixEntry !== undefined) return ['helix entry'];
   return [];

@@ -12,7 +12,10 @@ export function junctionVelocity(prev: Block, next: Block, accel: number, jd: nu
   // powered G1 span exactly as the emitted continuous sweep does.
   if (blockMotion(prev) !== blockMotion(next) && !isContinuousFeedMatchedLaserJunction(prev, next))
     return 0;
-  const cosTheta = prev.direction.x * next.direction.x + prev.direction.y * next.direction.y;
+  const cosTheta =
+    prev.direction.x * next.direction.x +
+    prev.direction.y * next.direction.y +
+    (prev.direction.z ?? 0) * (next.direction.z ?? 0);
   // Clamp to handle float noise just outside [-1, 1].
   const clamped = Math.min(1, Math.max(-1, cosTheta));
   // Sonny Jeon's junction-deviation half-angle. θ is the DEVIATION angle

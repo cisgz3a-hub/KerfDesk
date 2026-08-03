@@ -91,7 +91,11 @@ function settingsSummary(project: Project, layers: ReadonlyArray<Layer>): string
     .map((layer) => {
       const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
       const tool = layerCncTool(machine, settings);
-      return `${cutTypeLabel(settings.cutType)} · ${tool.name} · ${formatNumber(settings.depthMm)} mm · ${formatNumber(settings.feedMmPerMin)} mm/min`;
+      const depth =
+        settings.cutType === 'v-carve' && settings.vCarveFlatDepthEnabled === false
+          ? 'flowing geometry depth'
+          : `${formatNumber(settings.depthMm)} mm`;
+      return `${cutTypeLabel(settings.cutType)} · ${tool.name} · ${depth} · ${formatNumber(settings.feedMmPerMin)} mm/min`;
     })
     .join(' | ');
 }

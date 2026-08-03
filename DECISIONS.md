@@ -13524,7 +13524,7 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
 ## ADR-270 - V-carve ladders complete one filled region before moving to the next (2026-07-31)
 
 **Date:** 2026-07-31
-**Status:** Accepted
+**Status:** Partially superseded by ADR-285; source-region-major ordering remains, the offset-ladder motion is historical
 
 ### Context
 
@@ -14466,7 +14466,12 @@ object sharing a layer with text is enough to expose every glyph on that layer.
 ## ADR-278 - V-carve entry uses an opt-in emission-accurate contour ramp (2026-08-01)
 
 **Date:** 2026-08-01
-**Status:** Accepted
+**Status:** Partially superseded by ADR-285; the stored request and provenance remain, but the contour-ramp output is historical
+
+ADR-285 replaced the offset-ring V-carve planner and this contour-ramp mechanism. The stored
+`vCarveRampEntryDeg` value remains project provenance, but it is not applied to the certified
+variable-depth medial path. This supersession does not change ordinary profile, pocket, or engrave
+ramp behavior.
 
 ### Context
 
@@ -14694,7 +14699,11 @@ physical coordinate loss.
 ## ADR-282 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
 
 **Date:** 2026-08-01
-**Status:** Accepted
+**Status:** Superseded by ADR-285; retained as the historical thin-detail ladder decision
+
+ADR-285 replaces the complete ADR-282 coarse/fine offset-ladder mechanism and all amendments with
+one certified medial route plus explicit flat-core clearing. The observations that thin strokes
+must not be silently dropped and that emitted XYZ must stay conservative remain requirements.
 
 ### Context
 
@@ -14789,7 +14798,7 @@ drop was a fidelity bug against the whole reference field, not a design choice.
 ## ADR-282 Amendment 1 - coverage law corrected after the #575 revert (2026-08-01)
 
 **Date:** 2026-08-01
-**Status:** Accepted
+**Status:** Superseded by ADR-285; retained as historical coverage-correction evidence
 
 ### Context
 
@@ -14842,7 +14851,7 @@ panel note) folded in.
 ## ADR-282 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
 
 **Date:** 2026-08-02
-**Status:** Accepted
+**Status:** Superseded by ADR-285; retained as historical emitted-depth evidence
 
 ### Context
 
@@ -14905,7 +14914,7 @@ ring as no cut at all.
 ## ADR-282 Amendment 3 - coverage floor and honest pass limits after the #584 revert (2026-08-02)
 
 **Date:** 2026-08-02
-**Status:** Accepted
+**Status:** Superseded by ADR-285; retained as historical coverage-budget evidence
 
 ### Context
 
@@ -14969,7 +14978,7 @@ imposition and ADR-280 belongs to the shared cone-limited floor-depth correction
 ## ADR-282 Amendment 4 - safe thin-detail re-land after the #592 review (2026-08-02)
 
 **Date:** 2026-08-02
-**Status:** Accepted
+**Status:** Superseded by ADR-285; retained as historical safe-ladder evidence
 
 ### Context
 
@@ -15267,3 +15276,115 @@ sign where the pane showed a flat brown plate.
 - NOT verified: no perceptual check inside the running app, no screenshot of the pane, and no
   hardware. The shading was verified perceptually only in the standalone preview this was ported
   from, against the same program's G-code.
+
+## ADR-285 - Vector-medial V-carving and source-region-major CNC sequencing (2026-08-02)
+
+**Date:** 2026-08-02
+**Status:** Accepted; software verification in progress, hardware qualification pending
+
+### Context
+
+The supplied `untitled  gemors.gcode` exposed two different facts that had been conflated. A true
+V-carve is a three-axis toolpath: the V-bit must rise in narrow parts of a filled stroke and descend
+in wider parts. Vectric and Autodesk both describe this flowing variable-depth behavior. A
+constant-Z line instead produces a constant-width trace and cannot fill an ordinary outline font.
+
+The defect was CurveDesk's construction of that depth field. ADR-098's global inward-offset ladder
+and ADR-282's secondary fine ladder swept the V-shaped surface as nested rings, producing 68
+tool-down episodes for the five-letter `Drive` fixture and revisiting different letters between
+passes. The fine XYZ blocks were also shorter than their 115200-baud transmission time in many
+16-block windows. The supplied file itself was valid absolute, finite, straight-line GRBL; it did
+not prove physical missed steps, but it did prove avoidable re-entry, hopping, and stream pressure.
+
+The same ordering defect survived in several constant-depth operations: pocket, rest-pocket,
+adaptive pocket, V-clearance, and the female side of a straight inlay were depth-major across the
+whole layer. That meant depth 1 of every letter, then depth 2 of every letter. The operator's
+required contract is instead to finish one source region at every required depth before travelling
+to the next, while retaining tool-major sections for real multi-tool jobs.
+
+### Decision
+
+1. **Ordinary V-carve uses a certified vector medial route, not a surface ring ladder.** Closed
+   source contours are normalized with the existing Clipper even-odd kernel. Delaunay
+   triangulation supplies medial-topology candidates only. Every accepted node must be finite and
+   inside the normalized region; every accepted dual edge and connector must pass exact full-chord
+   containment against the original normalized boundary. Triangulation is never cutting authority.
+2. **Depth follows cutter geometry.** At an emitted XY position whose distance to the nearest
+   normalized boundary is `d`, a V-bit with included angle `theta` uses
+   `z = -min(d / tan(theta / 2), modeled cone depth, optional flat-depth cap)`. The final path is
+   conservatively certified on CurveDesk's 0.001 mm emitted XYZ grid. Depth-per-pass limits
+   engagement by emitting successively deeper versions of the same profile; it does not flatten
+   the profile.
+3. **A flat floor is explicit.** New V-carve operations set `vCarveFlatDepthEnabled: false`.
+   Projects with the field absent retain their earlier flat-depth intent, and the UI exposes the
+   choice. Repeated clearing lines exist only for the mathematical core left by an explicit depth
+   cap or by the selected V-bit's finite cutting diameter. Flat-core circuits are joined into the
+   same certified medial route when an in-region connector exists.
+4. **Source-region completion is the ordering contract.** V-carve plans are ranked by original
+   source-contour order. Every depth level and reachable flat-core detour for one filled region is
+   emitted before the next region. Disconnected components still require safe-Z entries; adjacent
+   components from the same source glyph retain source order. Pocket, helical pocket, rest-pocket,
+   adaptive pocket, V-clearance, and female straight-inlay clearing adopt the same
+   source-region-major order. Multi-tool jobs remain tool-major, so the contract applies within
+   each tool section and does not create repeated tool-change prompts.
+5. **Routing and refinement are bounded and deterministic.** Medial edge cover is iterative, not
+   recursive. Boundary sampling is capped at 4,096 samples per normalized region, scales lower when
+   original segment count would exceed the exact sample-segment work budget, and preserves stable
+   source order when reduced. Bounds are accumulated iteratively, so a high-vertex contour cannot
+   overflow the JavaScript argument stack before budgeting. Sharp-corner probes and emitted-grid
+   depth refinement are bounded. Exhausting a representation budget sets the existing Job Review
+   advisory; it never blocks Frame or Start and never authorizes a chord or depth that fails
+   containment.
+6. **Composite variable-XYZ V-carve motion uses component-capped feed.** Flat and rising lateral
+   cuts use the configured cutting feed. A descending segment is reduced only enough that its Z
+   component does not exceed the configured plunge feed; a pure vertical move uses plunge feed.
+   Only these `z-rate-capped` profiles omit optional whitespace and repeated modal `G1` words. The
+   exact `Drive` and recovered `Safe` fixtures must give every complete 16-block cutting window at
+   least its own transmission time at GRBL's documented 115200-baud serial rate. A stored ADR-278
+   V-carve ramp request is preserved as provenance and disclosed as not applied; layering a separate
+   contour ramp onto the variable-depth profile is not valid.
+7. **The computed result is disclosed.** G-code provenance and Job Review show the compiled maximum
+   V-carve depth. This is an informational fact, not a refusal or new Start gate.
+8. **Delaunator is a narrow ADR-098 dependency exception.** `delaunator@5.1.0` is exact-pinned and
+   its `robust-predicates@3.0.3` closure is integrity-locked. Their ISC and Unlicense terms satisfy
+   ADR-017. Both use module-scope scratch storage; this synchronous, callback-free call path is the
+   documented narrow exception. Application regressions cover upstream degeneracy reports #91 and
+   #94, while CurveDesk's own exact validation remains authoritative.
+9. **The GRBL dialect does not change by bit.** All CNC operations continue to emit the same
+   absolute metric `G0`/`G1`/supported-arc vocabulary. The cutter and operation change the planned
+   XY compensation, Z law, engagement, and pass order—not the meaning of the G-code words.
+
+### Consequences
+
+- The exact `Drive` reproduction emits six source-ordered tool-down paths—`D`, `r`, `i` stem,
+  `i` dot, `v`, `e`—instead of 68 ladder entries. A branched medial graph may retrace an already-cut
+  branch; that is the graph-theoretic cost of one safe tool-down edge-cover walk, not another
+  surface-clearing ring.
+- Variable depth remains visible in preview and G-code because it is required for an outline-font
+  V-carve. Operators who want one constant-depth stroke must use Trace/Engrave with centerline
+  artwork or a single-line font; ordinary outline text contains two boundaries and is not a
+  centerline.
+- Region-major constant-depth operations can repeat depth changes inside one letter before moving
+  on. They do not eliminate required stepdowns, safe retracts between disconnected regions, or
+  intentional tool-major grouping.
+- The current four-kind tool model does not yet represent every real cutter shape. In particular,
+  drills, flat-tipped engraving cutters, bullnose cutters, and tapered end mills require additional
+  schema and operation-specific geometry work. This ADR does not claim those unsupported shapes
+  are qualified.
+- No source test, simulator, or G-code inspection proves that a physical controller or machine
+  maintains position under cutting load. Hardware air-cut and wood qualification remain pending.
+
+### Verification
+
+- Exact bundled-font `Drive` compile: deterministic absolute output, six actual rapid-to-cut
+  entries, source order pinned, no non-finite coordinates, no plunged rapid, and non-negative
+  115200-baud planner-window margin.
+- Medial geometry: simple region, hole, concave chord, long thin iterative route, 0.001 mm emitted
+  depth conservatism, acute V-bit point pressure, 4,097- and 150,000-segment sampling caps, and
+  Delaunator #91/#94 fixtures.
+- Ordering: two separated pocket regions complete all required depth levels in source order;
+  focused helical, adaptive, V-clearance, rest-pocket, straight-inlay, and multi-tool suites retain
+  their owning invariants.
+- Dependency: license, advisory, frozen-store, generated-notice, and web-bundle checks.
+- NOT verified: physical air-cut, material cut, spindle load, chip evacuation, surface finish,
+  bit-tip truth, machine rigidity, serial-driver latency, or physical lost steps.

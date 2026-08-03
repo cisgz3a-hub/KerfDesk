@@ -132,18 +132,32 @@ export function CncRowCells(props: {
   readonly settings: CncLayerSettings;
   readonly maxFeedMmPerMin: number;
   readonly spindleMaxRpm: number;
+  readonly actualVCarveDepthMm?: number;
   readonly onCommit: (next: CncLayerSettings) => void;
 }): JSX.Element {
   const { settings } = props;
   return (
     <>
-      <ReviewNumberCell
-        label={`Cut depth mm for ${props.ariaContext}`}
-        value={settings.depthMm}
-        min={MIN_CNC_DEPTH_MM}
-        step="any"
-        onCommit={(depthMm) => props.onCommit({ ...settings, depthMm })}
-      />
+      {settings.cutType === 'v-carve' && settings.vCarveFlatDepthEnabled === false ? (
+        <td style={tableCellStyle}>
+          <output
+            aria-label={`Actual compiled max depth mm for ${props.ariaContext}`}
+            title="Flowing V-carve depth is calculated from the artwork width and selected bit"
+          >
+            {props.actualVCarveDepthMm === undefined
+              ? 'Pending'
+              : formatDepth(props.actualVCarveDepthMm)}
+          </output>
+        </td>
+      ) : (
+        <ReviewNumberCell
+          label={`Cut depth mm for ${props.ariaContext}`}
+          value={settings.depthMm}
+          min={MIN_CNC_DEPTH_MM}
+          step="any"
+          onCommit={(depthMm) => props.onCommit({ ...settings, depthMm })}
+        />
+      )}
       <ReviewNumberCell
         label={`Depth per pass mm for ${props.ariaContext}`}
         value={settings.depthPerPassMm}
@@ -181,4 +195,8 @@ export function CncRowCells(props: {
       />
     </>
   );
+}
+
+function formatDepth(value: number): string {
+  return `${value.toLocaleString('en-US', { maximumFractionDigits: 3 })} mm actual`;
 }

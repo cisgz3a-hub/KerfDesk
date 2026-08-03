@@ -154,6 +154,8 @@ describe('detectCncOffsetLadderWarnings', () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain(LAYER_NAME);
     expect(warnings[0]).toContain('could not be fully generated');
+    expect(warnings[0]).toContain('bounded toolpath planning');
+    expect(warnings[0]).not.toContain('inward-offset ladder');
     // The operator needs to know the generated passes still cut, or they will
     // assume the whole layer is lost and re-cut work that was fine.
     expect(warnings[0]).toContain('still');
@@ -198,10 +200,10 @@ describe('detectCncOffsetLadderWarnings', () => {
     expect(warnings[0]).toContain('still cut');
   });
 
-  it('notes a v-carve whose clamp footprint is finer than the coverage floor (#584)', () => {
-    // A valid 1° V-bit at 0.05 mm depth wants 0.00087 mm rings — below the
-    // 0.001 mm emission grid. Planning is pass-limited and must SAY so
-    // instead of silently capping; still advisory only (rule 7).
+  it('notes a capped narrow-angle V-carve whose depth profile exceeds emitted precision', () => {
+    // A valid 1° V-bit capped at 0.05 mm needs a depth transition finer than
+    // the 0.001 mm emitted coordinate grid. Planning must SAY so instead of
+    // silently claiming that tolerance; still advisory only (rule 7).
     restOperation.mockReturnValue({ kind: 'not-requested' });
     offsetChecked.mockReset();
     offsetChecked.mockReturnValue({ kind: 'ok', value: [] });
@@ -225,6 +227,7 @@ describe('detectCncOffsetLadderWarnings', () => {
             cutType: 'v-carve' as const,
             depthMm: 0.05,
             depthPerPassMm: 0.05,
+            vCarveFlatDepthEnabled: true,
           },
         })),
       },
@@ -234,23 +237,53 @@ describe('detectCncOffsetLadderWarnings', () => {
 
     expect(warnings.some((warning) => warning.includes('ring limits'))).toBe(true);
     expect(warnings.some((warning) => warning.includes(LAYER_NAME))).toBe(true);
+    expect(warnings.some((warning) => warning.includes('more-obtuse'))).toBe(true);
+    expect(warnings.every((warning) => !warning.includes('less-obtuse'))).toBe(true);
     for (const warning of warnings) expect(typeof warning).toBe('string');
   });
 
-  it('notes v-carve artwork finer than the detail pitch — advisory, layer-named (ADR-282)', () => {
-    // Every inset — coarse δ and fine detail alike — finds no interior, so
-    // the layer's visible artwork is below even the detail pitch and partly
-    // stays uncut. That is Job Review information, never a refusal.
+  it('notes V-carve artwork finer than safe emitted coordinates', () => {
+    // The 0.001 mm-wide feature cannot retain a positive conservative depth
+    // after the 0.001 mm output-grid safety margin. That is Job Review
+    // information, never a refusal.
     restOperation.mockReturnValue({ kind: 'not-requested' });
     offsetChecked.mockReset();
     offsetChecked.mockReturnValue({ kind: 'ok', value: [] });
 
-    const warnings = detectCncOffsetLadderWarnings(vcarveProject());
+    const tiny: SceneObject = {
+      ...square,
+      id: 'tiny',
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 0.001 },
+      paths: [
+        {
+          color: COLOR,
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 0, y: 0 },
+                { x: 20, y: 0 },
+                { x: 20, y: 0.001 },
+                { x: 0, y: 0.001 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const project = vcarveProject();
+    const warnings = detectCncOffsetLadderWarnings({
+      ...project,
+      scene: { ...project.scene, objects: [tiny] },
+    });
 
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain(LAYER_NAME);
-    expect(warnings[0]).toContain('finer than the generated detail path');
-    expect(warnings[0]).toContain('still cuts');
+    expect(warnings).toHaveLength(2);
+    expect(warnings.every((warning) => warning.includes(LAYER_NAME))).toBe(true);
+    expect(
+      warnings.some((warning) => warning.includes('finer than the generated detail path')),
+    ).toBe(true);
+    expect(warnings.some((warning) => warning.includes('route/ring limits'))).toBe(true);
+    expect(warnings.every((warning) => warning.includes('still cut'))).toBe(true);
   });
 
   it('returns nothing for a laser project', () => {

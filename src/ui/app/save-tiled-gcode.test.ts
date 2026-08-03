@@ -2,6 +2,7 @@
 // filter tiled exports exactly like the single-file path (audit finding #29).
 
 import { describe, expect, it, vi } from 'vitest';
+import { flowingVCarveProject } from '../../__fixtures__/flowing-vcarve-project';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -136,6 +137,35 @@ describe('handleSaveTiledGcode', () => {
     expect(messages.filter((m) => m.includes('Controlled laser-off seek feed'))).toHaveLength(1);
   });
 
+  it('shows the actual compiled flowing V-carve depth after a successful tiled save', async () => {
+    const base = flowingVCarveProject();
+    const machine = base.machine;
+    if (machine?.kind !== 'cnc') throw new Error('expected CNC project');
+    const written: string[] = [];
+    const messages: Array<{ readonly message: string; readonly variant?: string }> = [];
+
+    await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project: {
+        ...base,
+        machine: { ...machine, tiling: DEFAULT_CNC_TILING },
+      },
+      savedName: 'flowing-v',
+      pushToast: (message, variant) =>
+        messages.push(variant === undefined ? { message } : { message, variant }),
+    });
+
+    expect(written.length).toBeGreaterThan(0);
+    expect(
+      messages.some(
+        ({ message, variant }) =>
+          variant === 'warning' &&
+          message.includes('actual compiled V-carve depth') &&
+          message.includes('into the spoilboard'),
+      ),
+    ).toBe(true);
+  });
+
   // Rule 7 / ADR-228, the LAST refusal on this path: emitTileFiles refused the
   // whole set on `!preflight.ok`, and runCncPreflight reports heuristic policy
   // codes (cnc-settings-invalid, no-go-zone-collision, plunged-travel) next to
@@ -212,7 +242,7 @@ describe('handleSaveTiledGcode', () => {
     expect(maxX(written.join('\n'))).toBeGreaterThan(55);
   });
 
-  it('writes tiles and discloses the thin-detail ramp fallback before clipping', async () => {
+  it('writes tiles and discloses that a requested ramp is superseded by the medial profile', async () => {
     const base = tiledCncProject();
     const machine = base.machine;
     if (machine?.kind !== 'cnc') throw new Error('expected CNC project');
@@ -257,19 +287,12 @@ describe('handleSaveTiledGcode', () => {
     expect(handled).toBe(true);
     expect(written.length).toBeGreaterThan(0);
     expect(toasts).toEqual(
-      expect.arrayContaining([expect.stringContaining('thin-detail passes keep their')]),
+      expect.arrayContaining([expect.stringContaining('certified variable-depth profile')]),
     );
-    // The ring ladder really does ramp now (ADR-282 Amendment 5), so tiling's
-    // "the angle is requested provenance, not a re-verified emitted maximum"
-    // advisory is the honest report for a tiled ramp.
-    expect(toasts.join('\n')).toContain('not a re-verified emitted maximum');
-    // A ramp that crosses a tile boundary leaves the clipped tile starting
-    // below stock top — the pre-existing hazard of tiling ANY ramped layer,
-    // which this layer now reaches because its ladder ramps. Disclosed, not
-    // refused (rule 7); keeping a contour inside one tile avoids it.
-    expect(toasts.join('\n')).toContain('begins with a direct plunge');
-    expect(written.join('\n')).toContain('requested-max-angle-deg: 3.000');
-  });
+    expect(toasts.join('\n')).not.toContain('not a re-verified emitted maximum');
+    expect(toasts.join('\n')).not.toContain('direct plunge');
+    expect(written.join('\n')).toContain('; cnc entry: medial-profile; max-angle-deg: 3.000');
+  }, 15_000);
 
   it('prepends provenance, machine assumptions, and tile identity to every file', async () => {
     const written: string[] = [];

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
-import { buildToolpath } from '../job';
+import { scanGcodeWords } from '../gcode';
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
+import { buildToolpath, cncPassXyPoints } from '../job';
 import { computeRemovalGrid, kernelForTool } from '../sim';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -14,6 +16,7 @@ import {
 } from '../scene';
 import { cncGrblStrategy } from '../output';
 import { compileCncJob } from './compile-cnc-job';
+import { findCncVCarveEntryIssues } from './cnc-vcarve-entry-issues';
 
 // Perceptual verification (ADR-025 pattern): V-carve a 10 mm square with a
 // 90° bit through the REAL pipeline (compileCncJob → buildToolpath → removal
@@ -28,6 +31,19 @@ const VBIT_90: CncTool = {
   diameterMm: 6,
   tipAngleDeg: 90,
 };
+
+function xyzCutLines(gcode: string): ReadonlyArray<string> {
+  const lines: string[] = [];
+  let motion: GcodeMotionMode | null = 0;
+  for (const line of gcode.split('\n')) {
+    const scanned = scanModalMotionLine(line, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || motion !== 1) continue;
+    const letters = new Set(scanGcodeWords(line).map((word) => word.letter));
+    if (letters.has('X') && letters.has('Y') && letters.has('Z')) lines.push(line);
+  }
+  return lines;
+}
 
 const SIZE = 10;
 const AT = 50;
@@ -74,6 +90,7 @@ function vcarveScene(): Scene {
         cnc: {
           ...DEFAULT_CNC_LAYER_SETTINGS,
           cutType: 'v-carve',
+          vCarveFlatDepthEnabled: true,
           depthMm: MAX_DEPTH,
           depthPerPassMm: MAX_DEPTH,
           vResolutionMm: RESOLUTION,
@@ -177,7 +194,7 @@ describe('v-carve — perceptual (analytic pyramid field)', () => {
     expect(gcode).toMatchSnapshot();
   });
 
-  it('emits opt-in V-carve descent as plunge-fed XYZ ramps plus cut-feed cleanup laps', () => {
+  it('reports an opt-in entry angle when the certified variable-depth profile supersedes it', () => {
     const device = DEFAULT_DEVICE_PROFILE;
     const scene = vcarveScene();
     const layer = scene.layers[0];
@@ -190,11 +207,23 @@ describe('v-carve — perceptual (analytic pyramid field)', () => {
     const group = job.groups[0];
     if (group?.kind !== 'cnc') throw new Error('expected CNC group');
     expect(group.passes.some((pass) => pass.kind === 'path3d')).toBe(true);
+    expect(group.passes.some((pass) => pass.kind === 'path3d' && pass.entryRamp === true)).toBe(
+      false,
+    );
 
-    const lines = cncGrblStrategy.emit(job, device).split('\n');
-    expect(lines.some((line) => /^G1 Z-/.test(line))).toBe(false);
-    expect(lines.some((line) => /^G1 X.* Y.* Z-.* F300$/.test(line))).toBe(true);
-    expect(lines.some((line) => /^G1 X.* Y.* F1000$/.test(line))).toBe(true);
+    expect(findCncVCarveEntryIssues(rampedScene, device, vbitConfig())).toEqual([
+      {
+        layerId: 'L1',
+        reason: expect.stringContaining('certified variable-depth profile'),
+      },
+    ]);
+
+    const gcode = cncGrblStrategy.emit(job, device);
+    const lines = gcode.split('\n');
+    const xyzLines = xyzCutLines(gcode);
+    expect(xyzLines.length).toBeGreaterThan(0);
+    expect(lines.some((line) => / F300$/.test(line))).toBe(true);
+    expect(xyzLines.some((line) => /F1000$/.test(line))).toBe(true);
   });
 
   it('does not reinterpret a persisted generic ramp as V-carve opt-in', () => {
@@ -219,8 +248,8 @@ describe('v-carve — perceptual (analytic pyramid field)', () => {
     if (group?.kind !== 'cnc') throw new Error('expected CNC group');
     const passOrder = group.passes
       .map((pass) => {
-        if (pass.kind !== 'contour') throw new Error('expected contour pass');
-        return Math.max(...pass.polyline.map((point) => point.x)) < AT + 20 ? 'L' : 'R';
+        const points = cncPassXyPoints(pass);
+        return Math.max(...points.map((point) => point.x)) < AT + 20 ? 'L' : 'R';
       })
       .join('');
     expect(passOrder).toMatch(/^L+R+$/);

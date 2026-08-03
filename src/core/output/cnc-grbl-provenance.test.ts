@@ -106,12 +106,15 @@ describe('CNC G-code provenance comments', () => {
     }
   });
 
-  it('discloses V-carve fallback and a tiled entry that starts below stock top', () => {
+  it('discloses a medial V-carve entry profile and a tiled entry that starts below stock top', () => {
     const fallback = cncGrblStrategy.emit(
       { groups: [group({ cutType: 'v-carve', rampEntryDeg: 3 })] },
       DEFAULT_DEVICE_PROFILE,
     );
-    expect(fallback).toContain('; cnc entry: stepped-plunge-fallback; max-angle-deg: 3.000');
+    expect(fallback).toContain('; cnc entry: medial-profile; max-angle-deg: 3.000');
+    expect(fallback).toContain(
+      '; cnc entry-advisory: requested max angle is not applied to the variable-depth path',
+    );
 
     const detailFallback = cncGrblStrategy.emit(
       {
@@ -135,7 +138,8 @@ describe('CNC G-code provenance comments', () => {
       },
       DEFAULT_DEVICE_PROFILE,
     );
-    expect(detailFallback).toContain('; cnc entry: stepped-plunge-fallback; max-angle-deg: 3.000');
+    expect(detailFallback).toContain('; cnc entry: medial-profile; max-angle-deg: 3.000');
+    expect(detailFallback).toContain('; cnc v-carve-actual-max-depth-mm: 0.200');
 
     const clipped = cncGrblStrategy.emit(
       {

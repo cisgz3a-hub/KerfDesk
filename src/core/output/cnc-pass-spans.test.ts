@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { scanGcodeWords } from '../gcode';
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import type { CncGroup, CncPass, Job } from '../job';
 import { cncGrblStrategy, emitCncJobWithPassSpans } from './cnc-grbl-strategy';
 import type { CncPassSpan } from './cnc-pass-spans';
@@ -60,6 +62,19 @@ function spanIsInside(span: CncPassSpan, gcode: string): boolean {
   return span.firstRawLine >= 1 && span.lastRawLine < gcode.split('\n').length;
 }
 
+function lateralFeedMotionLines(gcode: string): ReadonlyArray<number> {
+  const lineNumbers: number[] = [];
+  let motion: GcodeMotionMode | null = 0;
+  for (const [index, line] of gcode.split('\n').entries()) {
+    const scanned = scanModalMotionLine(line, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || motion !== 1) continue;
+    const letters = new Set(scanGcodeWords(line).map((word) => word.letter));
+    if (letters.has('X') || letters.has('Y')) lineNumbers.push(index + 1);
+  }
+  return lineNumbers;
+}
+
 describe('emitCncJobWithPassSpans', () => {
   it('emits byte-identical G-code to the ordinary strategy (100 seeds)', () => {
     fc.assert(
@@ -96,15 +111,41 @@ describe('emitCncJobWithPassSpans', () => {
     fc.assert(
       fc.property(jobArb, (job) => {
         const { gcode, spans } = emitCncJobWithPassSpans(job, DEFAULT_DEVICE_PROFILE);
-        const lines = gcode.split('\n');
-        for (let raw = 1; raw <= lines.length; raw += 1) {
-          if (!(lines[raw - 1] ?? '').startsWith('G1 X')) continue;
+        for (const raw of lateralFeedMotionLines(gcode)) {
           const covered = spans.some((span) => raw >= span.firstRawLine && raw <= span.lastRawLine);
           expect(covered).toBe(true);
         }
       }),
       { numRuns: 100 },
     );
+  });
+
+  it('covers compact coordinate-only path3d continuations', () => {
+    const job: Job = {
+      groups: [
+        testGroup([
+          {
+            kind: 'path3d',
+            points: [
+              { x: 0, y: 0, z: -1 },
+              { x: 10, y: 0, z: -1 },
+              { x: 20, y: 0, z: -1 },
+            ],
+            closed: false,
+            lateralFeed: 'z-rate-capped',
+          },
+        ]),
+      ],
+    };
+    const { gcode, spans } = emitCncJobWithPassSpans(job, DEFAULT_DEVICE_PROFILE);
+    const lines = gcode.split('\n');
+    const continuation = lines.findIndex((line) => /^X20\.000Y0\.000Z-1\.000/.test(line)) + 1;
+    const span = spans[0];
+
+    expect(continuation).toBeGreaterThan(0);
+    expect(span).toBeDefined();
+    expect(continuation).toBeGreaterThanOrEqual(span?.firstRawLine ?? Number.NaN);
+    expect(continuation).toBeLessThanOrEqual(span?.lastRawLine ?? Number.NaN);
   });
 
   it('maps spans to job group indices and pass indices', () => {

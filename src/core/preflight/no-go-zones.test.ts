@@ -208,6 +208,16 @@ describe('findNoGoZoneCollisions motion path coverage', () => {
     expect(collisions).toEqual([{ lineNumber: 1, zone }]);
   });
 
+  it('checks a compact coordinate-only continuation of modal motion', () => {
+    const collisions = findNoGoZoneCollisions(
+      ['G0X0Y0', 'G1X10Y30F1000', 'X50Y30'].join('\n'),
+      [zone],
+      bed,
+    );
+
+    expect(collisions).toEqual([{ lineNumber: 3, zone }]);
+  });
+
   it('checks an arc sweep instead of only its endpoint chord', () => {
     const arcZone = { ...zone, x: 4, y: 4, width: 2, height: 2 };
     const collisions = findNoGoZoneCollisions(

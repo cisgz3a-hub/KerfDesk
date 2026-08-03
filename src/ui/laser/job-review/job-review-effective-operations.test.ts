@@ -73,4 +73,38 @@ describe('buildEffectiveOperationReview', () => {
       },
     ]);
   });
+
+  it('reports the actual compiled maximum depth for a flowing V-carve', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'cnc',
+          layerId: 'script',
+          color: '#000000',
+          cutType: 'v-carve',
+          toolName: '90 degree V-bit',
+          toolDiameterMm: 3.175,
+          feedMmPerMin: 600,
+          plungeMmPerMin: 250,
+          spindleRpm: 12_000,
+          spindleSpinupSec: 2,
+          safeZMm: 5,
+          passes: [
+            {
+              kind: 'path3d',
+              closed: false,
+              points: [
+                { x: 0, y: 0, z: 0 },
+                { x: 1, y: 0, z: -3.798 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const review = buildEffectiveOperationReview(job)[0];
+    expect(review?.summaries[0]).toContain('Actual max depth 3.798 mm');
+    expect(review?.cncActualMaxDepthMm).toBe(3.798);
+  });
 });
