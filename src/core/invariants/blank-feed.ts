@@ -18,14 +18,9 @@
 // Tracks modal X/Y/S exactly as the controller would. Pure-core: no clock, no
 // random, no I/O.
 
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import type { Issue } from './predicates';
-import {
-  asGcodeLines,
-  isGcodeCommand,
-  isGcodeMotionCommand,
-  parseGcodeWord,
-  stripGcodeComment,
-} from './gcode-words';
+import { asGcodeLines, parseGcodeWord, stripGcodeComment } from './gcode-words';
 
 export type BlankFeedIssue = Issue & { readonly distanceMm: number };
 
@@ -49,6 +44,9 @@ export function findLongBlankFeedMoves(
   // null until the first S word is seen — a move before any S is not provably
   // "blank", so it is never flagged.
   let stickyS: number | null = null;
+  // Motion is modal: a compact coordinate-only block inherits G0-G3 from the
+  // previous one, so requiring a leading G word would skip it entirely.
+  let motion: GcodeMotionMode | null = 0;
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];
     if (raw === undefined) continue;
@@ -56,7 +54,9 @@ export function findLongBlankFeedMoves(
     if (stripped === '') continue;
     const sVal = parseGcodeWord(stripped, 'S');
     if (sVal !== null) stickyS = sVal;
-    if (!isGcodeMotionCommand(stripped)) continue;
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion) continue;
     const fromX = x;
     const fromY = y;
     const nx = parseGcodeWord(stripped, 'X');
@@ -65,7 +65,7 @@ export function findLongBlankFeedMoves(
     if (ny !== null) y = ny;
     // Only a G1 (cutting feed) with the laser off is a blank feed. G0 rapids are
     // owned by the laser-on-travel invariant and are the right way to cross gaps.
-    if (!isGcodeCommand(stripped, 'G1')) continue;
+    if (motion !== 1) continue;
     if (stickyS !== 0) continue;
     const distanceMm = Math.hypot(x - fromX, y - fromY);
     if (distanceMm - threshold > DISTANCE_QUANTIZATION_TOLERANCE_MM) {
