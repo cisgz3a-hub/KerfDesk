@@ -182,7 +182,7 @@ describe('output preparation worker client', () => {
 function emittedSave(gcode: string): OutputPreparationResponse {
   return {
     kind: 'save',
-    result: { kind: 'emitted', gcode, preflight: { ok: true, issues: [] } },
+    result: { kind: 'emitted', gcode, preflight: { ok: true, issues: [] }, cncVCarveDepths: [] },
   };
 }
 
