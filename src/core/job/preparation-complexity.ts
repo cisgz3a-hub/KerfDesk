@@ -19,12 +19,19 @@ import {
   type Transform,
   type Vec2,
 } from '../scene';
+import { sceneHasVCarveOutputLayer } from './vcarve-preparation-complexity';
 
 export const PREPARATION_RAW_VECTOR_SEGMENT_BUDGET = 100_000;
 export const PREPARATION_COMPILED_SEGMENT_BUDGET = 20_000;
 
 const MIN_FILL_ESTIMATE_HATCH_SPACING_MM = 0.05;
 
+// Deliberately NOT V-carve-aware, unlike its output-preparation sibling below.
+// computeDesignSceneSource shares this predicate and treats any verdict here as
+// "render nothing" rather than "prepare elsewhere", so folding the amplifying
+// cut type in would blank the carve pane instead of moving its work. The 2D
+// preview gets that term from ui/workspace/vcarve-preparation-routing.ts, which
+// is applied at the one call site that has an off-thread fallback.
 export function scenePreparationTooComplex(scene: Scene): boolean {
   return (
     countOutputVectorSegments(scene) > PREPARATION_RAW_VECTOR_SEGMENT_BUDGET ||
@@ -114,6 +121,10 @@ function laserFillPreparationWorkUnits(scene: Scene): number {
 }
 
 function cncVectorPreparationWorkUnits(scene: Scene): number {
+  // Segments times depth passes describes profile and pocket, which trace the
+  // artwork once per pass. V-carve is not proportional to its input at all, so
+  // it books the whole budget rather than being counted.
+  if (sceneHasVCarveOutputLayer(scene)) return PREPARATION_RAW_VECTOR_SEGMENT_BUDGET;
   let count = 0;
   for (const layer of scene.layers) {
     if (!layer.output) continue;
