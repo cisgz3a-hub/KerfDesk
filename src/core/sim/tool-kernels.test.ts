@@ -39,6 +39,27 @@ describe('kernelForTool', () => {
     }
   });
 
+  // A conical engraving bit is a cone, not a flat end mill. 2L Inc and
+  // PreciseBits both specify these cutters by INCLUDED angle, and the rest of
+  // the tree already treats them as angled — vcarveIncludedAngleDeg cones them
+  // for the depth law, and the UI labels them by included angle. Modelling
+  // dz = 0 here made the removal grid simulate a flat-bottomed trench the full
+  // width of the shank while the emitted G-code cut a cone.
+  it('engraving bit: dz follows the included-angle cone, not a flat bottom', () => {
+    const kernel = kernelForTool(tool('engraving', 6.35, 90), CELL);
+    expect(kernel.offsets.length).toBeGreaterThan(0);
+    for (const o of kernel.offsets) {
+      const dMm = Math.hypot(o.dx, o.dy) * CELL;
+      expect(o.dz).toBeCloseTo(dMm, 9);
+    }
+  });
+
+  it('engraving and v-bit of identical geometry carve an identical shape', () => {
+    const engraving = kernelForTool(tool('engraving', 3.175, 15), CELL);
+    const vBit = kernelForTool(tool('v-bit', 3.175, 15), CELL);
+    expect(engraving.offsets).toEqual(vBit.offsets);
+  });
+
   it('footprint never exceeds the tool radius', () => {
     const kernel = kernelForTool(tool('end-mill', 2), CELL);
     for (const o of kernel.offsets) {
