@@ -6,18 +6,15 @@
 
 import { useCallback, useDeferredValue, useState } from 'react';
 import type { Project } from '../../core/scene';
-import { liveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
 import { useOutputScope, useStore } from '../state';
-import { useUiStore } from '../state/ui-store';
+import { WoodView } from '../wood-viewer';
 import { Cnc3DFullPage } from './Cnc3DFullPage';
 import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
-import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
+import type { DesignSceneSource } from './use-cnc-3d-scene';
 import { useDesignSceneSource } from './use-design-scene-source';
 import { useCncCanvasFocus } from './use-cnc-canvas-focus';
-import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { useCncPaneWidth } from './use-cnc-pane-width';
 
-const CANVAS_WIDTH_PX = 244;
 const CANVAS_HEIGHT_PX = 240;
 
 export function Cnc3DPane(): JSX.Element | null {
@@ -66,36 +63,24 @@ function stockThicknessMm(project: Project): number {
   return project.machine?.kind === 'cnc' ? project.machine.stock.thicknessMm : 0;
 }
 
+// ADR-285: the pane now hosts the ported standalone preview verbatim. The
+// toolpath overlay, scrubber playback, X-ray, section plane, depth probe and
+// live-run tracking were deliberately removed with the old scene — the
+// reference page has none of them, and an identical port was the requirement.
 function PaneScene(props: {
   readonly source: DesignSceneSource | null;
   readonly stockThicknessMm: number;
 }): JSX.Element | null {
   const { source, stockThicknessMm } = props;
-  // Same scrubber the 2D preview uses, so the two views cannot disagree about
-  // where in the program the operator is looking.
-  const scrubberT = useUiStore((s) => s.scrubberT);
-  // While a job streams, the controller — not the scrubber — says where the
-  // bit is and how much of the route has actually been cut.
-  const live = liveViewerState(
-    useCanvasMotionOverlay(
-      useStore((s) => s.project),
-      false,
-    )?.run ?? null,
-  );
   const [isFullPage, setIsFullPage] = useState(false);
   const closeFullPage = useCallback(() => setIsFullPage(false), []);
-  const { canvasRef, state } = useCnc3dScene(source, stockThicknessMm, scrubberT, live);
-
   if (source === null) return null;
+  // The artwork-scoped fine grid when there is one: a stock-wide grid gives a
+  // V-groove about one cell, which is what made the carve read as blocks.
+  const grid = source.detailGrid ?? source.grid;
   return (
     <>
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_WIDTH_PX}
-        height={CANVAS_HEIGHT_PX}
-        aria-label="Live 3D cut result"
-        style={canvasStyle}
-      />
+      <WoodView grid={grid} stockThicknessMm={stockThicknessMm} heightPx={CANVAS_HEIGHT_PX} />
       <button
         type="button"
         onClick={() => setIsFullPage(true)}
@@ -108,18 +93,10 @@ function PaneScene(props: {
         <Cnc3DFullPage
           source={source}
           stockThicknessMm={stockThicknessMm}
-          scrubberT={scrubberT}
-          live={live}
           onClose={closeFullPage}
         />
       )}
-      {state === 'failed' ? (
-        <p style={hintStyle} role="alert">
-          3D view unavailable in this browser.
-        </p>
-      ) : (
-        <p style={hintStyle}>Drag to orbit, scroll to zoom. Updates as you edit.</p>
-      )}
+      <p style={hintStyle}>Drag to orbit, scroll to zoom. Updates as you edit.</p>
     </>
   );
 }
@@ -166,12 +143,6 @@ const collapsedHeaderStyle: React.CSSProperties = {
   minHeight: 0,
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
-const canvasStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%', // fill the resizable pane; the ResizeObserver re-fits the buffer
-  height: CANVAS_HEIGHT_PX,
-  borderRadius: 4,
-};
 const fullPageButtonStyle: React.CSSProperties = {
   width: '100%',
   padding: '4px 8px',

@@ -61,11 +61,12 @@ async function buildReliefScene(
       },
     );
     if (heightmap.kind === 'error') return { kind: 'no-webgl', reason: heightmap.reason };
-    return await createReliefThreeScene(
-      canvas,
-      reliefSurfaceMesh(heightmap.heightmap),
+    // No `heightfield`: a relief heightmap is not a RemovalGrid, so the carved
+    // -timber shading does not apply here.
+    return await createReliefThreeScene(canvas, {
+      mesh: reliefSurfaceMesh(heightmap.heightmap),
       stockThicknessMm,
-    );
+    });
   } catch (err) {
     return {
       kind: 'no-webgl',

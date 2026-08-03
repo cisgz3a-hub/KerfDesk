@@ -26,7 +26,11 @@ export function Cut3DPreviewDialog(props: {
         const display = downsampleRemovalGrid(grid, DISPLAY_CELLS_ACROSS);
         // RemovalGrid is structurally a Heightmap (cells + depth field), so
         // the relief mesh builder consumes it directly.
-        return await createReliefThreeScene(canvas, reliefSurfaceMesh(display), stockThicknessMm);
+        return await createReliefThreeScene(canvas, {
+          mesh: reliefSurfaceMesh(display),
+          stockThicknessMm,
+          heightfield: display,
+        });
       } catch (err) {
         return {
           kind: 'no-webgl' as const,

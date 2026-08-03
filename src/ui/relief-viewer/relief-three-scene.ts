@@ -23,6 +23,7 @@ import { createSceneHandle, type SceneHandle } from './relief-scene-handle';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
 import {
   buildViewerContent,
+  type ViewerContentInput,
   type ViewerSurfaceMesh,
   type ViewerToolpathOverlay,
 } from '../cnc-viewer3d';
@@ -44,12 +45,15 @@ const CAMERA_FAR_MM = 10_000;
 const ORBIT_RADIUS_FACTOR = 1.6;
 const THICKNESS_FRAMING_FACTOR = 4;
 
+// Takes the whole ViewerContentInput rather than picking fields off it. The
+// previous signature rebuilt the input from three positional arguments, which
+// silently dropped every field it did not name — `materialKey` (so stock
+// appearance only applied after the first edit) and, later, `heightfield`.
 export async function createReliefThreeScene(
   canvas: HTMLCanvasElement,
-  mesh: ViewerSurfaceMesh,
-  stockThicknessMm: number,
-  toolpath?: ViewerToolpathOverlay,
+  input: ViewerContentInput,
 ): Promise<ReliefSceneResult> {
+  const { mesh, stockThicknessMm } = input;
   const three = await import('three');
   const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
 
@@ -78,11 +82,7 @@ export async function createReliefThreeScene(
   const render = (): void => renderer.render(scene, camera);
   controls.addEventListener('change', render);
 
-  const content = await buildViewerContent(three, {
-    mesh,
-    stockThicknessMm,
-    ...(toolpath === undefined ? {} : { toolpath }),
-  });
+  const content = await buildViewerContent(three, input);
   scene.add(content.object);
   render();
 
