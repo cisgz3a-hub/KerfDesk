@@ -10,6 +10,9 @@ import {
   type JobOriginPlacement,
 } from '../../core/job';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
+// Deep import for the same reason as its sibling above: core/job's barrel is a
+// CI-ratcheted over-cap legacy barrel and may only shrink.
+import { sceneHasVCarveOutputLayer } from '../../core/job/vcarve-preparation-complexity';
 import type { JobDurationBreakdown } from '../../core/job/estimate-duration';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -57,6 +60,15 @@ export function estimateLiveJob(
   // Cheap pre-counts gate compile so huge traces/fills/rasters cannot freeze
   // the ETA. These pause the estimate only — Start/Save/Frame still prepare
   // (ADR-241/ADR-243).
+  //
+  // V-carve first, because it is the only check here that does not read a
+  // size: the counters measure the INPUT, and a V-carve layer's cost lives in
+  // the dense variable-depth route it amplifies that input into (~1.5 s for
+  // 0.5% of the budget). Without it the ETA compiled V-carve on the main
+  // thread the moment the cut type was selected.
+  if (sceneHasVCarveOutputLayer(outputProject.scene)) {
+    return { kind: 'too-large' };
+  }
   if (countOutputVectorSegments(outputProject.scene) > LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
@@ -89,6 +101,12 @@ export async function estimateLiveJobSnapshot(
   if (!scoped.ok) return { kind: 'empty' };
   const outputProject =
     scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
+  // Same V-carve term as the synchronous estimate above: prepareOutputSnapshot
+  // still runs its compile on this thread, so the amplifying cut type has to
+  // pause the estimate here too.
+  if (sceneHasVCarveOutputLayer(outputProject.scene)) {
+    return { kind: 'too-large' };
+  }
   if (countOutputVectorSegments(outputProject.scene) > LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
