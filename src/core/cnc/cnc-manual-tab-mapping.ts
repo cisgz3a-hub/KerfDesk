@@ -9,6 +9,11 @@ export type CollectedCncContour = {
   // Which family produced this contour. Absent on legacy fixtures and direct
   // cncGroupForLayer callers, which keep the pre-provenance behavior.
   readonly sourceKind?: CncContourSourceKind;
+  // Which scene object produced it. A V-carve layer resolves one text object's
+  // own glyphs with non-zero fill before pooling (ADR-286), and that needs
+  // object identity, not just the family. Absent on the same legacy callers,
+  // which then get no grouping.
+  readonly objectId?: string;
   readonly manualTabPoints?: ReadonlyArray<Vec2>;
 };
 
