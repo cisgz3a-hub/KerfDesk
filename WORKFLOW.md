@@ -1680,10 +1680,14 @@ or traced image) with at least one closed polyline.
   handles them automatically. Hatch lines stop at the inner contour and
   resume on the other side — the hole stays unburned. No special UI;
   no per-shape configuration.
-- *Self-intersecting polygons* (some script-font glyphs): even-odd rule
-  keeps the fill visually correct even when the underlying path crosses
-  itself. Result may differ from a non-zero fill convention but matches
-  what the SVG renderer in any browser would show.
+- *Overlapping or self-intersecting glyphs* (connected script faces):
+  resolved with the **non-zero** rule, which is how fonts are authored —
+  OpenType defines a glyph's interior by a non-zero winding number, and
+  SVG's `fill-rule` defaults to `nonzero`, so this is also what a browser
+  shows. Overlapping letters therefore fill as one solid word rather than
+  cancelling at each join. A Fill layer carrying text takes this rule
+  layer-wide (`core/job/fill-rule.ts`); a V-carve layer applies it per text
+  object and still pools even-odd between objects (ADR-286).
 - *Tiny shapes* (cap height < ~2× hatchSpacing): produce only 1–2 hatch
   lines, which engraves as a near-line. Acceptable; no minimum-size
   guard. The user can lower `hatchSpacingMm` or switch to Line mode.

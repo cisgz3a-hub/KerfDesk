@@ -30,9 +30,10 @@ export type GcodeMetadata = {
  * region-major V-carve traversal, ADR-273's incident-grade CNC provenance,
  * ADR-278's contour ramp, ADR-280's shared cone-limited V-carve floor depth,
  * ADR-273's secondary-cutter settings provenance, ADR-282's thin-detail
- * rescue stage, and ADR-285's certified vector-medial V-carve planner.
+ * rescue stage, ADR-285's certified vector-medial V-carve planner, and
+ * ADR-286's non-zero resolution of a text object's own glyphs.
  */
-export const EMITTER_REVISION = 'adr-284-vcarve-medial-safe-v1';
+export const EMITTER_REVISION = 'adr-286-vcarve-text-glyph-union';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

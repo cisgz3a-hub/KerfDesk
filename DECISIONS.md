@@ -15388,3 +15388,90 @@ to the next, while retaining tool-major sections for real multi-tool jobs.
 - Dependency: license, advisory, frozen-store, generated-notice, and web-bundle checks.
 - NOT verified: physical air-cut, material cut, spindle load, chip evacuation, surface finish,
   bit-tip truth, machine rigidity, serial-driver latency, or physical lost steps.
+
+## ADR-286 - A text object's own glyphs resolve non-zero before a V-carve layer pools (2026-08-03)
+
+**Date:** 2026-08-03
+**Status:** Accepted; software-verified through the removal grid, hardware qualification pending
+
+### Context
+
+Connected-script faces are built from glyphs that overlap. Pacifico and Dancing Script join one
+letter to the next by running the outlines through each other; the overlap is the join. Font
+formats assume this. OpenType defines a glyph's interior as any point with a non-zero winding
+number, Apple's TrueType reference states that intersecting contours fill black-over-black, and the
+`glyf` table carries OVERLAP_SIMPLE / OVERLAP_COMPOUND flags precisely because overlap is normal.
+SVG's `fill-rule` initial value is `nonzero`, and opentype.js emits no `fill-rule` attribute at all,
+so a browser renders these merged.
+
+CurveDesk pooled every contour on a V-carve layer and resolved the pool even-odd
+(`normalizeClosedPolylineTreeEvenOddChecked`, ADR-285; previously the ADR-282 ladder). Read
+even-odd, each overlap lens cancels: two joined glyphs become the symmetric difference, so the
+planner sees two disjoint regions separated by an uncarved bar and the join carves as a raised
+bridge of untouched material. Nothing downstream recovers it — the lens is outside the normalized
+region, and every route and floor pass is derived from that region.
+
+Even-odd was never chosen for fidelity. ADR-282 Amendment 4 §1 adopted it to stop a raw
+self-intersecting contour inverting an inward offset, and to keep ADR-270 region identity; the
+convention itself was inherited from the containment-parity re-orientation in kerf-offset.ts, which
+predates recoverable history and no ADR decides. No ADR anywhere weighed even-odd against non-zero
+for text.
+
+The reference applications disagree with the old output. Vectric's manual states that "Script style
+fonts that are based on overlapping characters can be VCarved or Engraved without having to first
+convert the characters to curves." LightBurn's raw same-layer fill does behave even-odd, but
+LightBurn ships a per-text **Welded** option documented for exactly this case ("when characters
+touch or overlap, as is common with script fonts"); CurveDesk has no such toggle, so the operator
+had no in-product answer. CurveDesk's own laser fill already promotes a text-bearing layer to
+non-zero (`core/job/fill-rule.ts`), so the two engines disagreed with each other.
+
+### Decision
+
+1. A V-carve layer resolves each **text object's own** contours with a non-zero union before the
+   layer's contours are pooled. `mergeTextObjectContours` (core/cnc/vcarve-text-union.ts) groups by
+   producing object and unions each text group with `normalizeClosedPolylinesNonZeroChecked`.
+2. Scope is one object, deliberately. Pooling ACROSS objects stays even-odd: two overlapping text
+   objects still knock out, and an imported SVG that means even-odd is never rewritten because it
+   shares a layer with text. This is narrower than the laser's layer-wide promotion; the two are
+   reconciled on the case that matters (a script word carves solid) and deliberately not on
+   cross-object knockout, which remains a usable design technique on the CNC.
+3. Glyph counters survive by winding, not by scoping: a counter is wound opposite its outer contour,
+   so a non-zero union keeps it as a hole. Layer-wide non-zero would preserve counters equally; the
+   per-object scope is chosen for zero collateral effect on other objects, not for counters.
+4. **OPEN contours are never merged.** Clipper has no open-ring concept and `pathDToPolyline`
+   returns `closed: true` for everything, so unioning a single-line font's strokes would manufacture
+   a filled region from centrelines and plunge the V-bit across the letterform's hull. Open contours
+   pass through untouched and remain uncarvable, which is what `validClosedSource` and the
+   all-open-paths note both depend on. Contours whose producing object is unknown (legacy fixtures,
+   direct `cncGroupForLayer` callers) pass through for the same reason.
+5. The rule is applied in exactly one place, `layerPolylinesFromContours`, so the compiler, the H.7
+   clearing stage and the design-time notes cannot disagree about where the material is.
+6. A union failure yields that group's original contours. The planner then reads them exactly as it
+   did before this rule existed; there is no new advisory and no refusal of any kind (rule 7).
+7. `CollectedCncContour` gains an optional `objectId`. It is compile-time only and is not persisted.
+
+### Consequences
+
+- Script text on a V-carve layer carves its joins. Non-overlapping faces are unaffected: with no
+  overlap the two fill rules are identical.
+- Ordinary text with two or more contours now makes a round trip through clipper's 1 µm rounding
+  grid, so its emitted vertices may differ from before even where the filled region does not.
+  `EMITTER_REVISION` advances to `adr-286-vcarve-text-glyph-union` accordingly.
+- Within one text object, merged regions are returned in clipper's canonical order rather than glyph
+  order, so region traversal within that object may not follow reading order. Order BETWEEN objects
+  is unchanged, which is what ADR-270 reads as the region-order authority.
+- Rule 7 is untouched: nothing is blocked, gated, capped or refused, and no advisory was promoted
+  into a block.
+- NOT verified: no hardware cut and no rendered carve compared against artwork by eye. The evidence
+  is a simulated removal grid through the real compiler.
+
+## ADR-270 Amendment 1 - the pooled fill rule is even-odd BETWEEN objects (2026-08-03)
+
+**Date:** 2026-08-03
+**Status:** Accepted
+
+ADR-270's Decision text describes region identity and hole nesting "under the even-odd fill rule"
+and derives roots from even containment depth. ADR-286 narrows where that reading begins: a text
+object's own glyphs are resolved non-zero FIRST, and the even-odd pooling then applies to the
+resulting regions. Region identity, hole nesting, containment parity and source-region order are
+otherwise unchanged, and every non-text contour still enters the pool exactly as ADR-270 describes.

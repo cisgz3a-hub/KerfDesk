@@ -75,11 +75,31 @@ export function differenceClosedPolylinesChecked(
 export function normalizeClosedPolylinesEvenOddChecked(
   contours: ReadonlyArray<Polyline>,
 ): Result<ReadonlyArray<Polyline>, VectorOpError> {
+  return normalizeClosedPolylines(contours, FillRule.EvenOdd);
+}
+
+/**
+ * The same normalization read with non-zero fill: overlapping same-wound
+ * contours merge into one region instead of cancelling, while an
+ * opposite-wound inner contour stays a hole. This is the rule font outlines
+ * are authored under — OpenType defines a glyph's interior by a non-zero
+ * winding number — so it is what resolves one text object's own glyphs before
+ * a V-carve layer pools its contours (ADR-286). Pooling ACROSS objects, and
+ * every other caller, stays even-odd.
+ */
+export function normalizeClosedPolylinesNonZeroChecked(
+  contours: ReadonlyArray<Polyline>,
+): Result<ReadonlyArray<Polyline>, VectorOpError> {
+  return normalizeClosedPolylines(contours, FillRule.NonZero);
+}
+
+function normalizeClosedPolylines(
+  contours: ReadonlyArray<Polyline>,
+  fillRule: FillRule,
+): Result<ReadonlyArray<Polyline>, VectorOpError> {
   const paths = contours.map(polylineToPathD).filter((path) => path.length >= MIN_CLOSED_POINTS);
   if (paths.length === 0) return ok([]);
-  const normalized = tryVectorOp(() =>
-    unionD(paths, [], FillRule.EvenOdd, DIFFERENCE_PRECISION_DECIMALS),
-  );
+  const normalized = tryVectorOp(() => unionD(paths, [], fillRule, DIFFERENCE_PRECISION_DECIMALS));
   if (normalized.kind === 'error') return normalized;
   return ok(
     normalized.value.map((path) =>

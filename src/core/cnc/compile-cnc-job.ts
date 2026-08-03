@@ -55,7 +55,7 @@ import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
-import { collectLayerContours } from './collect-cnc-contours';
+import { collectLayerContours, layerPolylinesFromContours } from './collect-cnc-contours';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
 import { cncGroupProvenance } from './cnc-group-provenance';
 
@@ -73,7 +73,7 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
       ),
     );
     const contours = collectLayerContours(sourceObjects, layer, device);
-    const polylines = contours.map((contour) => contour.polyline);
+    const polylines = layerPolylinesFromContours(layer, contours);
     if (polylines.length === 0) continue;
     const inlayGroups = compileStraightInlayGroups(
       polylines,
