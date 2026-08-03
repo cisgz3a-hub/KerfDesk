@@ -13,7 +13,28 @@ export function emittedChordIsSafe(
 ): boolean {
   const radiusA = depthA * tanHalf;
   const radiusB = depthB * tanHalf;
-  return segments.every((segment) => radiusChordClearsSegment(a, b, radiusA, radiusB, segment));
+  // The cone radius varies linearly from radiusA to radiusB, so the swept
+  // region cannot extend past the chord's bounding box grown by the larger of
+  // the two. A segment outside that box is unreachable and therefore always
+  // clears, which makes this rejection exact rather than approximate.
+  //
+  // It matters because this is the compaction inner loop: profile compaction
+  // tests up to MAX_COMPACTION_SPAN_POINTS candidate spans per point, and each
+  // one previously ran the quadratic clearance solve against every boundary
+  // segment in the region. A single carved letter spent seconds here.
+  const reach = Math.max(radiusA, radiusB);
+  const minX = Math.min(a.x, b.x) - reach;
+  const maxX = Math.max(a.x, b.x) + reach;
+  const minY = Math.min(a.y, b.y) - reach;
+  const maxY = Math.max(a.y, b.y) + reach;
+  for (const segment of segments) {
+    if (Math.min(segment.ax, segment.bx) > maxX) continue;
+    if (Math.max(segment.ax, segment.bx) < minX) continue;
+    if (Math.min(segment.ay, segment.by) > maxY) continue;
+    if (Math.max(segment.ay, segment.by) < minY) continue;
+    if (!radiusChordClearsSegment(a, b, radiusA, radiusB, segment)) return false;
+  }
+  return true;
 }
 
 function radiusChordClearsSegment(

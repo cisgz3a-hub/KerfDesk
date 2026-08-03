@@ -62,9 +62,37 @@ export function pointInOrOnVCarveRegion(
   region: VCarveMedialRegion,
   segments: ReadonlyArray<VCarveBoundarySegment> = vcarveBoundarySegments(region),
 ): boolean {
+  if (pointInVCarveRegion(point, region)) return true;
+  // A segment whose bounding box is further than the tolerance from the point
+  // cannot be within the tolerance of it, so the exact distance is only worth
+  // computing for the few segments that survive this test. Same verdict, far
+  // less work: this predicate runs twice per chord, and the route builder tests
+  // O(V^2) chords against O(V) segments.
+  for (const segment of segments) {
+    if (boxMissesBox(segment, point.x, point.y, point.x, point.y, GEOMETRY_EPSILON_MM)) continue;
+    if (pointToVCarveSegmentDistance(point, segment) <= GEOMETRY_EPSILON_MM) return true;
+  }
+  return false;
+}
+
+/**
+ * True when the segment's axis-aligned bounding box, grown by `slack`, cannot
+ * touch the query box. A pure rejection filter — anything it discards was
+ * already impossible, so callers keep their exact results.
+ */
+function boxMissesBox(
+  segment: VCarveBoundarySegment,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+  slack: number,
+): boolean {
   return (
-    pointInVCarveRegion(point, region) ||
-    segments.some((segment) => pointToVCarveSegmentDistance(point, segment) <= GEOMETRY_EPSILON_MM)
+    Math.min(segment.a.x, segment.b.x) > maxX + slack ||
+    Math.max(segment.a.x, segment.b.x) < minX - slack ||
+    Math.min(segment.a.y, segment.b.y) > maxY + slack ||
+    Math.max(segment.a.y, segment.b.y) < minY - slack
   );
 }
 
@@ -82,7 +110,17 @@ export function vcarveChordInsideRegion(
   if (!pointInOrOnVCarveRegion(to, region, segments)) return false;
   if (samePoint(from, to)) return true;
 
+  // Two segments whose bounding boxes do not overlap cannot intersect, so this
+  // filter changes no verdict. It matters because the chords the route builder
+  // tests are short next to the region's whole boundary, and without it every
+  // one of O(V^2) chord tests paid an exact intersection against all O(V)
+  // segments — the cost that made a single carved letter take seconds.
+  const chordMinX = Math.min(from.x, to.x);
+  const chordMaxX = Math.max(from.x, to.x);
+  const chordMinY = Math.min(from.y, to.y);
+  const chordMaxY = Math.max(from.y, to.y);
   for (const boundary of segments) {
+    if (boxMissesBox(boundary, chordMinX, chordMinY, chordMaxX, chordMaxY, 0)) continue;
     const intersection = segmentIntersectionParameters(from, to, boundary.a, boundary.b);
     if (intersection.kind === 'overlap') return false;
     if (
