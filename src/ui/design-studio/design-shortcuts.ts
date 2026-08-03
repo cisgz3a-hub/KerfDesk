@@ -115,8 +115,8 @@ function handleViewToggle(
   event.preventDefault();
 }
 
-// Five rungs, smallest retreat first: discard the live draft, then the live
-// marquee, then the selection, then return to Select, and only then close. Esc
+// Six rungs, smallest retreat first: discard the live click sequence, then the
+// live draft, marquee, selection, tool, and finally close. Esc
 // never destroys more than the operator expected — and unlike the main
 // workspace's draw tool, an abandoned draft here is genuinely discarded rather
 // than committed on the following pointer-up.
@@ -124,6 +124,10 @@ function handleEscapeLadder(): void {
   const store = useDesignStudioStore.getState();
   const session = store.session;
   if (session === null) return;
+  if (session.pointSequence !== null) {
+    store.setPointSequence(null);
+    return;
+  }
   if (session.draft !== null) {
     store.setDraft(null);
     return;

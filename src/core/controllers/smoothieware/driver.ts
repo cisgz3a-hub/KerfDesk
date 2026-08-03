@@ -1,11 +1,11 @@
 // Smoothieware ControllerDriver (ADR-096 kickoff). GRBL-flavored realtime
-// control (`?` status, `!` hold, `~` resume, Ctrl-X abort) with Marlin-style
-// gaps: no $J jog, no $$ settings, no $X/$SLP. Halt recovery is M999. The
-// laser power scale is fractional (S 0–1.0 by default) — handled by the
-// smoothieware output strategy, not the driver.
+// status (`?`) and Ctrl-X abort with Marlin-style gaps: no $J jog, no $$
+// settings, no $X/$SLP. Halt recovery is M999. The laser power scale is
+// fractional (S 0–1.0 by default) — handled by the smoothieware output
+// strategy, not the driver.
 
 import type { ControllerDriver } from '../controller-driver';
-import { RT_HOLD, RT_RESUME, RT_SOFT_RESET, RT_STATUS } from '../grbl/commands';
+import { RT_SOFT_RESET, RT_STATUS } from '../grbl/commands';
 import {
   buildSmoothieFrameLines,
   buildSmoothieJogCommand,
@@ -31,7 +31,7 @@ export const smoothiewareDriver: ControllerDriver = {
     transport: 'serial',
     jog: 'gcode-relative',
     jogCancel: false,
-    realtimePause: true,
+    realtimePause: false,
     softStop: true,
     statusQuery: 'realtime-report',
     settings: 'none',
@@ -48,9 +48,13 @@ export const smoothiewareDriver: ControllerDriver = {
   },
   realtime: {
     statusQuery: RT_STATUS,
-    hold: RT_HOLD,
+    // Smoothieware handles !/~ only on its USB CDC transport and only when
+    // enable_feed_hold is configured. CurveDesk has no session-bound evidence
+    // for either prerequisite, so the generic driver must not claim these bytes
+    // as controller realtime commands.
+    hold: null,
     safetyDoor: null,
-    resume: RT_RESUME,
+    resume: null,
     softReset: RT_SOFT_RESET,
     jogCancel: null,
   },

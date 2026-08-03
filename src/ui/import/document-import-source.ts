@@ -10,11 +10,27 @@ import type {
   DocumentImportWorkerResponse,
 } from './document-import-worker-protocol';
 
+// Streaming-tokenizer point for .lf2 project JSON.
+//
+// The incremental tokenizer (src/io/json) walks the file one character at a
+// time through a JS state machine so a very large project never exists as one
+// decoded string. Native JSON.parse needs the whole text in memory first but
+// runs entirely in engine code. Below this size the memory the streaming path
+// saves is not worth paying per-character JS dispatch on every ordinary file
+// open, so decode once and use the same deserializeProject path the no-stream
+// compatibility branch already takes.
+//
+// The value matches the other 25 MiB import boundaries in the tree
+// (PAGED_PNG_MIN_BYTES, LARGE_IMPORT_ADVISORY_BYTES) but stays its own
+// constant: this one is a parser-selection tradeoff, not a persistence-schema
+// boundary or a UX advisory, and may move independently of them.
+export const PROJECT_NATIVE_JSON_PARSE_MAX_BYTES = 25 * 1024 * 1024;
+
 export async function parseDocumentImportSource(
   request: DocumentImportWorkerRequest,
   onParsing: () => void,
 ): Promise<DocumentImportWorkerResponse> {
-  if (request.kind === 'project' && typeof request.blob.stream === 'function') {
+  if (request.kind === 'project' && shouldStreamProjectJson(request.blob)) {
     const [{ readJsonValueFromBlob, StreamedJsonSyntaxError }, { deserializeProjectValue }] =
       await Promise.all([import('../../io/json'), import('../../io/project')]);
     let raw: unknown;
@@ -55,6 +71,14 @@ export async function parseDocumentImportSource(
   const text = await request.blob.text();
   onParsing();
   return parseDocumentImportText(request, text);
+}
+
+/**
+ * True when a project blob is big enough that holding its whole decoded text in
+ * memory is the real cost, which is the case the incremental tokenizer exists for.
+ */
+function shouldStreamProjectJson(blob: Blob): boolean {
+  return typeof blob.stream === 'function' && blob.size >= PROJECT_NATIVE_JSON_PARSE_MAX_BYTES;
 }
 
 type LightBurnDocumentRequest = Extract<

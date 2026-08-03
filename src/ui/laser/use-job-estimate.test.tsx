@@ -10,13 +10,23 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import type { StatusReport } from '../../core/controllers/grbl';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
+import type * as PreparationWorkerClient from '../workspace/preparation-worker-client';
+import { PreparationSupersededError } from '../workspace/preparation-worker-client';
 import type { LiveJobEstimate } from './live-job-estimate';
 import { JOB_ESTIMATE_DEBOUNCE_MS, useJobEstimate } from './use-job-estimate';
 
 const workerMocks = vi.hoisted(() => ({ prepareLargeJobOffThread: vi.fn() }));
 
-vi.mock('../workspace/preparation-worker-client', () => workerMocks);
+// Only dispatch is stubbed: the supersede error type and its guard must be the
+// REAL ones, or the hook's "ignore an internal supersede" branch would be
+// tested against a lookalike that instanceof can never match.
+vi.mock('../workspace/preparation-worker-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof PreparationWorkerClient>()),
+  prepareLargeJobOffThread: workerMocks.prepareLargeJobOffThread,
+}));
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -52,9 +62,14 @@ function lineProject(): Project {
 }
 
 const probe: { current: LiveJobEstimate | null } = { current: null };
+// Every distinct estimate identity the hook has handed out. A settle is the
+// only way that identity changes, so its growth counts recomputes.
+const settles: LiveJobEstimate[] = [];
 
 function Probe(): null {
-  probe.current = useJobEstimate();
+  const estimate = useJobEstimate();
+  if (settles[settles.length - 1] !== estimate) settles.push(estimate);
+  probe.current = estimate;
   return null;
 }
 
@@ -97,15 +112,36 @@ function overBudgetRasterProject(): Project {
   };
 }
 
+// A connected controller polls `?` at this cadence and stores the parsed
+// report, so anything keyed on the report's identity re-keys this often.
+const STATUS_POLL_INTERVAL_MS = 100;
+const STATUS_POLLS_PER_SETTLE = 10;
+
+function idleReportAtX(x: number): StatusReport {
+  // wco null + no custom origin is the disconnected-origin case that sends
+  // User Origin through the resolveExportJobPlacement fallback.
+  return {
+    state: 'Idle',
+    subState: null,
+    mPos: { x, y: 0, z: 0 },
+    wPos: null,
+    feed: 0,
+    spindle: 0,
+    wco: null,
+  };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   probe.current = null;
+  settles.length = 0;
   workerMocks.prepareLargeJobOffThread.mockReset();
   workerMocks.prepareLargeJobOffThread.mockReturnValue(null);
 });
 
 afterEach(() => {
   useStore.getState().newProject();
+  useLaserStore.setState({ statusReport: null });
   vi.useRealTimers();
 });
 
@@ -160,6 +196,89 @@ describe('useJobEstimate debounce (H16)', () => {
     await unmount();
   });
 
+  it('does not reset the estimate debounce on an unrelated store update', async () => {
+    useStore.setState({ project: lineProject() });
+    const unmount = await renderProbe();
+    const initial = probe.current;
+
+    await act(async () => {
+      useStore.setState({ project: { ...useStore.getState().project } });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS / 2);
+    });
+    // A hover writes cursorMm — unrelated to the estimate. Subscribing via
+    // currentOutputScope(s) returned a fresh object per store update, which
+    // re-armed the debounce on every such update and starved the recompute.
+    await act(async () => {
+      useStore.getState().setCursorMm({ x: 5, y: 5 });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS / 2 + 1);
+    });
+
+    // The full window elapsed since the edit: the hover must not have reset it.
+    expect(probe.current).not.toBe(initial);
+    expect(probe.current?.kind).toBe('estimated');
+
+    await unmount();
+  });
+
+  it('resolves User Origin placement with the export fallback so the worker key matches the preview', async () => {
+    workerMocks.prepareLargeJobOffThread.mockReturnValue(new Promise(() => undefined));
+    useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
+    const unmount = await renderProbe();
+
+    await act(async () => {
+      useStore.setState({ project: overBudgetRasterProject() });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+    });
+
+    // Disconnected machine: live resolution fails, but the preview keys its
+    // worker request on the export fallback placement — the estimate must
+    // pass the SAME jobOrigin or the project prepares twice, serially.
+    expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+      }),
+    );
+
+    await unmount();
+  });
+
+  it('settles while a connected controller polls and the resolved placement is unchanged', async () => {
+    useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
+    useLaserStore.setState({ statusReport: idleReportAtX(0) });
+    const unmount = await renderProbe();
+    expect(probe.current?.kind).toBe('empty');
+    const settlesBeforeEdit = settles.length;
+
+    await act(async () => {
+      useStore.setState({ project: lineProject() });
+    });
+
+    // Ten polls spanning four debounce windows. Each stores a FRESH report
+    // object, but the resolved User Origin placement is byte-identical across
+    // all of them, so the debounce must not re-arm: tracking the placement's
+    // per-call jobOrigin object by reference starved the estimate forever on
+    // any connected machine.
+    for (let poll = 1; poll <= STATUS_POLLS_PER_SETTLE; poll += 1) {
+      await act(async () => {
+        useLaserStore.setState({ statusReport: idleReportAtX(poll) });
+        vi.advanceTimersByTime(STATUS_POLL_INTERVAL_MS);
+      });
+    }
+
+    expect(probe.current?.kind).toBe('estimated');
+    // Exactly one recompute for the edit — polls must not add their own.
+    expect(settles.length - settlesBeforeEdit).toBe(1);
+
+    await unmount();
+  });
+
   it('replaces a too-large estimate with the worker result (ADR-244)', async () => {
     let resolveWorker: (value: { toolpath: unknown; estimate: LiveJobEstimate }) => void = () =>
       undefined;
@@ -193,6 +312,43 @@ describe('useJobEstimate debounce (H16)', () => {
 
     await unmount();
   });
+
+  it.each([['newer-request'], ['newer-project']] as const)(
+    'keeps the previous estimate when the background request is superseded (%s)',
+    async (reason) => {
+      // Rejected on demand, not up front, so the paused badge is observed
+      // BEFORE the supersede lands — that is the value the fix must preserve.
+      let supersede: () => void = () => undefined;
+      workerMocks.prepareLargeJobOffThread.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          supersede = () => reject(new PreparationSupersededError(reason));
+        }),
+      );
+      const unmount = await renderProbe();
+
+      await act(async () => {
+        useStore.setState({ project: overBudgetRasterProject() });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+      });
+      const paused = probe.current;
+      expect(paused?.kind).toBe('too-large');
+
+      await act(async () => {
+        supersede();
+        await Promise.resolve();
+      });
+
+      // A supersede is this client's own coalescing decision — while jogging
+      // with Preview open it fires inside every debounce window, so rendering
+      // it as a failure pinned "ETA unavailable" for the whole jog.
+      expect(probe.current).toBe(paused);
+      expect(probe.current?.kind).not.toBe('preparation-failed');
+
+      await unmount();
+    },
+  );
 
   it('reports a worker failure instead of leaving the estimate paused forever', async () => {
     workerMocks.prepareLargeJobOffThread.mockRejectedValue(new Error('worker crashed'));

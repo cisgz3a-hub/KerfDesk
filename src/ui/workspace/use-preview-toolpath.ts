@@ -12,7 +12,7 @@ import {
 import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { buildPreviewToolpath, buildPreviewToolpathSnapshot } from './draw-preview';
-import { prepareLargeJobOffThread } from './preparation-worker-client';
+import { isPreparationSuperseded, prepareLargeJobOffThread } from './preparation-worker-client';
 import { mapToolpathToScene } from './preview-scene-frame';
 import type { PreviewToolpath } from './preview-status';
 import { renderVariableText } from '../text/render-variable-text';
@@ -148,7 +148,9 @@ function hasVariableText(project: Project): boolean {
 // Over-budget scenes pause the synchronous preview; the ADR-244 worker
 // prepares the real toolpath in the background and fills the canvas in when
 // done. A real worker failure becomes an explicit retryable preview issue;
-// superseded work is ignored through the cancellation generation.
+// superseded work is ignored — through the cancellation flag when the effect
+// re-ran, and through PreparationSupersededError when the client coalesced
+// the request without this effect being torn down.
 function settleBuiltToolpath(args: {
   readonly built: PreviewToolpath;
   readonly project: Project;
@@ -172,7 +174,10 @@ function settleBuiltToolpath(args: {
       if (!args.isCancelled()) setToolpath(prepared.toolpath);
     },
     (error: unknown) => {
-      if (args.isCancelled()) return;
+      // Superseded means a newer preparation already replaced this one, so the
+      // canvas keeps waiting on that one instead of reporting a failure the
+      // operator can neither act on nor have caused.
+      if (isPreparationSuperseded(error) || args.isCancelled()) return;
       const message = error instanceof Error ? error.message : String(error);
       setToolpath({
         ...built,

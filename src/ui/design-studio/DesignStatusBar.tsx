@@ -9,6 +9,7 @@
 // Everything here informs. Nothing here refuses (rule 7).
 
 import { formatDisplayMillimetres } from '../format-display-millimetres';
+import { designPointSequenceHint } from './design-point-sequence-hint';
 import { snapKindLabel } from './design-snap';
 import { DESIGN_TOOL_BY_KIND } from './design-tool';
 import { useDesignStudioStore } from './design-studio-store';
@@ -37,7 +38,9 @@ export function DesignStatusBar(): JSX.Element | null {
       <span style={countStyle}>{entityCount === 1 ? '1 entity' : `${entityCount} entities`}</span>
       <span style={hintStyle}>
         {tool.planned === true ? `${tool.label} — not built yet. ` : ''}
-        {tool.hint}
+        {session.pointSequence === null
+          ? tool.hint
+          : designPointSequenceHint(session.pointSequence)}
       </span>
       {trimmed > 0 ? (
         <span style={countStyle} title="Older undo steps were dropped to bound memory.">

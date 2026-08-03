@@ -80,17 +80,34 @@ function indexInCumulative(cumulative: Float32Array, count: number, value: numbe
 }
 
 /** Seconds at which a source line's first move begins — the time-domain
- * jump target for click-to-locate. Null when the line emits no motion. */
+ * jump target for click-to-locate. Null when the line emits no motion.
+ *
+ * Binary search, not a scan: segLine is non-decreasing because the render
+ * model is built in one pass over the source, so a click on a line near the
+ * end of a large program no longer walks every segment before it. */
 export function secondsAtLine(
   model: GcodeRenderModel,
   segTimeEndSec: Float32Array,
   line: number,
 ): number | null {
-  for (let index = 0; index < model.segmentCount; index += 1) {
-    if (model.segLine[index] !== line) continue;
-    return index === 0 ? 0 : (segTimeEndSec[index - 1] ?? 0);
+  const index = firstSegmentAtOrAfterLine(model.segLine, model.segmentCount, line);
+  // The search lands on the first segment at or past the line; a modal or
+  // comment line emits nothing, so only an exact match is that line's motion.
+  if (index >= model.segmentCount || model.segLine[index] !== line) return null;
+  return index === 0 ? 0 : (segTimeEndSec[index - 1] ?? 0);
+}
+
+// Lower bound over the non-decreasing source-line column: `count` when every
+// segment belongs to an earlier line.
+function firstSegmentAtOrAfterLine(segLine: Uint32Array, count: number, line: number): number {
+  let low = 0;
+  let high = count;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if ((segLine[mid] ?? 0) < line) low = mid + 1;
+    else high = mid;
   }
-  return null;
+  return low;
 }
 
 function interpolateSegment(

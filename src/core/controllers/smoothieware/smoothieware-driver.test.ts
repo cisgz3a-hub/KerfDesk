@@ -82,18 +82,18 @@ describe('prepareSmoothieConsoleCommand', () => {
 });
 
 describe('smoothiewareDriver', () => {
-  it('keeps GRBL realtime bytes but drops $-vocabulary and jog protocol', () => {
+  it('does not advertise feed hold without transport and configuration proof', () => {
     expect(smoothiewareDriver.realtime).toEqual({
       statusQuery: '?',
-      hold: '!',
-      resume: '~',
+      hold: null,
+      resume: null,
       safetyDoor: null,
       softReset: '\x18',
       jogCancel: null,
     });
     expect(smoothiewareDriver.capabilities).toMatchObject({
       jog: 'gcode-relative',
-      realtimePause: true,
+      realtimePause: false,
       softStop: true,
       statusQuery: 'realtime-report',
       settings: 'none',

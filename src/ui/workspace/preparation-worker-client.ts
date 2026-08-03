@@ -6,11 +6,23 @@
 //
 //   - One request per (project identity, options): the preview and estimate
 //     consumers share an in-flight preparation via the WeakMap cache.
-//     Requests for the SAME project with different options queue on the
-//     worker sequentially.
+//   - ONE request is posted to the worker at a time. Further requests for the
+//     SAME project are held here until the active compute settles, and a
+//     newer same-project request rejects the held (never-started) ones —
+//     current-position placement re-keys on every head move, and posting
+//     every key would queue unbounded minutes-long computes.
+//   - Both supersedes reject with PreparationSupersededError, NOT a plain
+//     Error: superseding is this client's own scheduling decision, so callers
+//     must ignore it and keep showing what they had. Only a real failure
+//     (worker crash, compile error, unavailable worker) rejects with a plain
+//     Error and is allowed to reach the operator as a failure.
 //   - A request for a DIFFERENT project while work is in flight terminates
 //     the worker (a compute cannot be interrupted cooperatively) and rejects
-//     every stale promise; callers treat rejection as "stale, ignore".
+//     every stale promise; callers treat rejection as "stale, ignore". The
+//     replacement worker spawns immediately so its spawn + module-graph load
+//     overlaps the supersede quiet window, and dispatch waits until the
+//     window elapses after the LAST supersede so a burst of edits costs one
+//     restart (and one structured clone of the Project), not one per edit.
 //   - No watchdog timeout on purpose: a 50M-pixel prepare legitimately runs
 //     minutes. Staleness is handled by supersede, crashes by onerror.
 //   - Environments without Worker (vitest/jsdom) get null: callers keep the
@@ -25,21 +37,66 @@ import type {
 
 export type { LargeJobPreparation, LargeJobPreparationOptions } from './large-job-preparation';
 
-type Pending = {
+// An over-budget prepare legitimately runs minutes; restarting it on every
+// edit of a rapid burst means it never finishes (and structured-clones the
+// whole Project per edit). After a supersede, dispatch waits out this quiet
+// window — re-armed by further supersedes — so a burst costs ONE restart.
+export const SUPERSEDE_QUIET_WINDOW_MS = 1500;
+
+const WORKER_UNAVAILABLE_MESSAGE = 'preparation worker unavailable';
+
+/** Why this client dropped a request in favour of a newer one. */
+export type PreparationSupersedeReason = 'newer-project' | 'newer-request';
+
+const SUPERSEDE_MESSAGES: Record<PreparationSupersedeReason, string> = {
+  'newer-project': 'superseded by a newer project',
+  'newer-request': 'superseded by a newer request',
+};
+
+/**
+ * Rejection reason for a request this client itself replaced. It is a
+ * scheduling outcome, never a failure: nothing broke, and the operator did
+ * nothing to fix. Consumers MUST treat it as "stale, ignore" — rendering it
+ * as an error pinned a false "Background estimate failed" badge for the whole
+ * of a jog, because current-position placement re-keys on every head move and
+ * every re-key supersedes the request held for the previous one.
+ */
+export class PreparationSupersededError extends Error {
+  override readonly name = 'PreparationSupersededError';
+  readonly reason: PreparationSupersedeReason;
+
+  constructor(reason: PreparationSupersedeReason) {
+    super(SUPERSEDE_MESSAGES[reason]);
+    this.reason = reason;
+  }
+}
+
+/** True for a request this client superseded; false for every real failure. */
+export function isPreparationSuperseded(error: unknown): boolean {
+  return error instanceof PreparationSupersededError;
+}
+
+type QueuedRequest = {
   readonly project: Project;
+  readonly options: LargeJobPreparationOptions;
   readonly resolve: (result: LargeJobPreparation) => void;
   readonly reject: (err: Error) => void;
 };
 
+type ActiveRequest = QueuedRequest & { readonly id: number };
+
 let workerInstance: Worker | null = null;
 let nextRequestId = 0;
-const pendingByRequestId = new Map<number, Pending>();
+let activeRequest: ActiveRequest | null = null;
+let queuedRequests: ReadonlyArray<QueuedRequest> = [];
+let quietWindowTimer: ReturnType<typeof setTimeout> | null = null;
 const settledByProject = new WeakMap<Project, Map<string, Promise<LargeJobPreparation>>>();
 
 /**
  * Prepare a large job off the main thread. Returns null when workers are
  * unavailable; otherwise a promise for the preview toolpath + estimate that
- * rejects if a newer project supersedes it.
+ * rejects if a newer project (or a newer request for the same project)
+ * supersedes it.
  */
 export function prepareLargeJobOffThread(
   project: Project,
@@ -49,16 +106,21 @@ export function prepareLargeJobOffThread(
   const perProject = cacheFor(project);
   const cached = perProject.get(key);
   if (cached !== undefined) return cached;
-  // The operator moved on to a different scene: everything queued for the
-  // old one is stale, and the worker may be mid-compute on it.
-  if (hasPendingForOtherProject(project)) {
-    rejectAllPendingAndRetireWorker('superseded by a newer project');
+  if (hasWorkForOtherProject(project)) {
+    supersedeForNewProject();
+  } else {
+    // Same project, new options key: held requests were superseded by this
+    // one. Only the active compute keeps running — stopping it would kill
+    // the worker, and its settled result stays cached anyway.
+    rejectQueuedRequests(new PreparationSupersededError('newer-request'));
   }
-  const worker = ensureWorker();
-  if (worker === null) return null;
-  const promise = requestPreparation(worker, project, options);
+  if (ensureWorker() === null) return null;
+  const promise = new Promise<LargeJobPreparation>((resolve, reject) => {
+    queuedRequests = [...queuedRequests, { project, options, resolve, reject }];
+  });
   perProject.set(key, promise);
   promise.catch(() => perProject.delete(key));
+  dispatchNextRequest();
   return promise;
 }
 
@@ -81,11 +143,34 @@ function cacheFor(project: Project): Map<string, Promise<LargeJobPreparation>> {
   return created;
 }
 
-function hasPendingForOtherProject(project: Project): boolean {
-  for (const pending of pendingByRequestId.values()) {
-    if (pending.project !== project) return true;
+function hasWorkForOtherProject(project: Project): boolean {
+  if (activeRequest !== null && activeRequest.project !== project) return true;
+  return queuedRequests.some((queued) => queued.project !== project);
+}
+
+// The operator moved on to a different scene: everything in flight for the
+// old one is stale, and the worker may be mid-compute on it.
+function supersedeForNewProject(): void {
+  rejectQueuedRequests(new PreparationSupersededError('newer-project'));
+  if (activeRequest !== null) {
+    const stale = activeRequest;
+    activeRequest = null;
+    // Terminating is the only way to stop the mid-compute worker; respawn
+    // immediately so the replacement's spawn + module-graph load overlaps
+    // the quiet window instead of serializing in front of the next dispatch.
+    retireWorker();
+    ensureWorker();
+    stale.reject(new PreparationSupersededError('newer-project'));
   }
-  return false;
+  armQuietWindow();
+}
+
+function armQuietWindow(): void {
+  if (quietWindowTimer !== null) clearTimeout(quietWindowTimer);
+  quietWindowTimer = setTimeout(() => {
+    quietWindowTimer = null;
+    dispatchNextRequest();
+  }, SUPERSEDE_QUIET_WINDOW_MS);
 }
 
 function ensureWorker(): Worker | null {
@@ -106,43 +191,68 @@ function ensureWorker(): Worker | null {
 }
 
 function handleWorkerMessage(e: MessageEvent<PreparationWorkerResponse>): void {
-  const pending = pendingByRequestId.get(e.data.id);
-  if (pending === undefined) return;
-  pendingByRequestId.delete(e.data.id);
+  if (activeRequest === null || activeRequest.id !== e.data.id) return;
+  const settled = activeRequest;
+  activeRequest = null;
   if (e.data.kind === 'ok') {
-    pending.resolve({ toolpath: e.data.toolpath, estimate: e.data.estimate });
-    return;
+    settled.resolve({ toolpath: e.data.toolpath, estimate: e.data.estimate });
+  } else {
+    settled.reject(new Error(e.data.message));
   }
-  pending.reject(new Error(e.data.message));
+  dispatchNextRequest();
 }
 
-function requestPreparation(
-  worker: Worker,
-  project: Project,
-  options: LargeJobPreparationOptions,
-): Promise<LargeJobPreparation> {
-  return new Promise<LargeJobPreparation>((resolve, reject) => {
-    nextRequestId += 1;
-    const id = nextRequestId;
-    pendingByRequestId.set(id, { project, resolve, reject });
-    const request: PreparationWorkerRequest = { id, project, ...options };
-    try {
-      worker.postMessage(request);
-    } catch (err) {
-      pendingByRequestId.delete(id);
-      retireWorker();
-      reject(err instanceof Error ? err : new Error(String(err)));
-    }
-  });
+function dispatchNextRequest(): void {
+  if (activeRequest !== null || quietWindowTimer !== null) return;
+  const next = queuedRequests[0];
+  if (next === undefined) return;
+  const worker = ensureWorker();
+  if (worker === null) {
+    // Worker construction succeeded at request time but fails now (only seen
+    // when the environment tears Worker down): nothing can settle these.
+    rejectQueuedRequests(new Error(WORKER_UNAVAILABLE_MESSAGE));
+    return;
+  }
+  queuedRequests = queuedRequests.slice(1);
+  nextRequestId += 1;
+  const active: ActiveRequest = { ...next, id: nextRequestId };
+  activeRequest = active;
+  const request: PreparationWorkerRequest = {
+    id: active.id,
+    project: active.project,
+    ...active.options,
+  };
+  try {
+    worker.postMessage(request);
+  } catch (err) {
+    activeRequest = null;
+    retireWorker();
+    active.reject(err instanceof Error ? err : new Error(String(err)));
+    rejectQueuedRequests(new Error(WORKER_UNAVAILABLE_MESSAGE));
+  }
+}
+
+function rejectQueuedRequests(error: Error): void {
+  const stale = queuedRequests;
+  queuedRequests = [];
+  for (const queued of stale) {
+    queued.reject(error);
+  }
 }
 
 function rejectAllPendingAndRetireWorker(message: string): void {
-  const pendings = Array.from(pendingByRequestId.values());
-  pendingByRequestId.clear();
-  retireWorker();
-  for (const pending of pendings) {
-    pending.reject(new Error(message));
+  if (quietWindowTimer !== null) {
+    clearTimeout(quietWindowTimer);
+    quietWindowTimer = null;
   }
+  const stale = activeRequest;
+  activeRequest = null;
+  retireWorker();
+  // A plain Error on purpose: these paths are real failures (worker crash,
+  // teardown), which consumers must surface rather than silently ignore.
+  const error = new Error(message);
+  if (stale !== null) stale.reject(error);
+  rejectQueuedRequests(error);
 }
 
 function retireWorker(): void {

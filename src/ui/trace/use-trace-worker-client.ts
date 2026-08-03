@@ -11,9 +11,24 @@
 // Small test-sized images can fall back inline; large images report a
 // recoverable error instead of pinning the main thread.
 //
-// One worker is reused while it is healthy and idle. A new trace supersedes an
-// unfinished trace by retiring its worker: synchronous tracing code cannot
-// process a cooperative cancellation message until the obsolete work returns.
+// One worker is reused while it is healthy. A new trace supersedes an
+// unfinished trace by rejecting its pending promise but KEEPS the worker
+// alive: synchronous tracing code cannot process a cooperative cancellation
+// message, so the stale job runs to completion inside the worker and its late
+// response is dropped by request id (handleWorkerMessage ignores unknown ids).
+// Tradeoff: the stale synchronous trace briefly occupies the worker and the
+// new request queues behind it — still far cheaper than terminating and
+// paying a cold worker spawn (plus the full unbundled ~85-module graph reload
+// in Vite dev) for every 50-500ms preview trace during slider/preset tuning.
+// Terminate is reserved for the fatal paths: worker runtime error, postMessage
+// failure, and the 30s hung-worker timeout.
+//
+// Because that backlog is real, the worker acks kind:'started' when a request
+// reaches the head of its message queue and the client restarts the 30s budget
+// on that ack. The budget therefore bounds the worker's COMPUTE time for the
+// request instead of compute-plus-backlog — a 4MP preview raster queued behind
+// a superseded trace used to blow the budget and terminate a healthy worker.
+// A worker that never acks is still bounded by the timer armed at post time.
 
 import type { Bounds, ColoredPath } from '../../core/scene';
 import {
@@ -51,6 +66,16 @@ export function isTraceRequestSuperseded(error: unknown): boolean {
 type Pending = {
   readonly resolve: (result: TraceResult) => void;
   readonly reject: (err: Error) => void;
+  // Restart this request's hung-worker budget. Called on the worker's
+  // 'started' ack, i.e. the moment the request stops queueing and starts
+  // computing.
+  readonly restartWatchdog: () => void;
+};
+
+// Clears / restarts the single timer that bounds one in-flight request.
+type Watchdog = {
+  readonly clear: () => void;
+  readonly restart: () => void;
 };
 
 let workerInstance: Worker | null = null;
@@ -102,6 +127,13 @@ function ensureWorker(): Worker | null {
 function handleWorkerMessage(e: MessageEvent<TraceWorkerResponse>): void {
   const pending = pendingByRequestId.get(e.data.id);
   if (pending === undefined) return;
+  if (e.data.kind === 'started') {
+    // The worker has dequeued this request and is about to trace it. Restart
+    // the budget so the time it spent waiting behind a superseded trace (which
+    // the worker has no way to cancel) is not charged to this request.
+    pending.restartWatchdog();
+    return;
+  }
   pendingByRequestId.delete(e.data.id);
   if (e.data.kind === 'ok') {
     pending.resolve({
@@ -128,13 +160,20 @@ function retireWorker(): void {
   }
 }
 
-function rejectAllPendingAndRetireWorker(error: Error): void {
+// Reject every in-flight caller without touching the worker. Each pending's
+// reject wrapper clears its own 30s timer, so a superseded request can never
+// later terminate a worker that is busy with the request that replaced it.
+function rejectAllPending(error: Error): void {
   const pendings = Array.from(pendingByRequestId.values());
   pendingByRequestId.clear();
-  retireWorker();
   for (const pending of pendings) {
     pending.reject(error);
   }
+}
+
+function rejectAllPendingAndRetireWorker(error: Error): void {
+  retireWorker();
+  rejectAllPending(error);
 }
 
 // Trace via the worker if available, otherwise through the bounded
@@ -147,7 +186,11 @@ function rejectAllPendingAndRetireWorker(error: Error): void {
 // error-toast after a bounded inline path could have succeeded.
 export async function traceImage(image: RawImageData, options: TraceOptions): Promise<TraceResult> {
   if (pendingByRequestId.size > 0) {
-    rejectAllPendingAndRetireWorker(new TraceRequestSupersededError());
+    // Supersede WITHOUT terminating: the stale job keeps the worker busy for
+    // a moment and this request queues behind it, which is still far cheaper
+    // than a cold worker restart per trace (see module header for the full
+    // tradeoff). Its late response is dropped by id in handleWorkerMessage.
+    rejectAllPending(new TraceRequestSupersededError());
   }
   const worker = ensureWorker();
   if (worker === null) {
@@ -190,6 +233,32 @@ async function traceInline(image: RawImageData, options: TraceOptions): Promise<
   };
 }
 
+// Bound one request. The budget is armed at post time so a worker that never
+// speaks again (an old chunk with no 'started' ack, or one that dies before
+// dequeuing) is still caught, and RESTARTED — not extended — when the worker
+// acks that this request reached the head of its queue. Restarting is what
+// makes the 30s measure compute rather than compute-plus-backlog: since
+// supersede no longer terminates, an uncancellable stale trace can hold the
+// worker for tens of seconds before the newest request is even looked at.
+function armWatchdog(id: number): Watchdog {
+  const fire = (): void => {
+    // On timeout: terminate the shared worker and reject every pending caller.
+    // A timed-out worker cannot answer sibling requests already queued to it.
+    if (!pendingByRequestId.has(id)) return;
+    rejectAllPendingAndRetireWorker(new Error('Trace worker timed out'));
+  };
+  let timer = setTimeout(fire, TRACE_WORKER_TIMEOUT_MS);
+  return {
+    clear: () => {
+      clearTimeout(timer);
+    },
+    restart: () => {
+      clearTimeout(timer);
+      timer = setTimeout(fire, TRACE_WORKER_TIMEOUT_MS);
+    },
+  };
+}
+
 function traceInWorker(
   worker: Worker,
   image: RawImageData,
@@ -198,21 +267,17 @@ function traceInWorker(
   return new Promise<TraceResult>((resolve, reject) => {
     nextRequestId += 1;
     const id = nextRequestId;
-    // On timeout: terminate the shared worker and reject every pending caller.
-    // A timed-out worker cannot answer sibling requests already queued to it.
-    const timer = setTimeout(() => {
-      if (!pendingByRequestId.has(id)) return;
-      rejectAllPendingAndRetireWorker(new Error('Trace worker timed out'));
-    }, TRACE_WORKER_TIMEOUT_MS);
+    const watchdog = armWatchdog(id);
     pendingByRequestId.set(id, {
       resolve: (result) => {
-        clearTimeout(timer);
+        watchdog.clear();
         resolve(result);
       },
       reject: (err) => {
-        clearTimeout(timer);
+        watchdog.clear();
         reject(err);
       },
+      restartWatchdog: watchdog.restart,
     });
     // Keep the decoded source alive for subsequent preview changes, but move a
     // dedicated copy into the worker. Supplying its buffer as a transferable

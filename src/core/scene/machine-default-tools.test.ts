@@ -60,4 +60,27 @@ describe('DEFAULT_CNC_TOOLS', () => {
       catalogId: 'v90-hobby-025',
     });
   });
+
+  // The gap an operator hit in practice: holding a 1/8" 90° V-bit, the smallest
+  // 90° entry was a 6.35 mm cutter. Picking it doubles the depth the clamp
+  // allows ((D/2)/tan45 = D/2) and doubles the auto ring pitch (D/8), so the
+  // app plans against a cone the bit does not have.
+  it('offers a 1/8"-class cutter at 90 and 60 degrees', () => {
+    const eighthInchVBits = DEFAULT_CNC_TOOLS.filter(
+      (tool) => tool.kind === 'v-bit' && tool.diameterMm <= 3.175,
+    );
+    const angles = eighthInchVBits.map((tool) => tool.tipAngleDeg);
+
+    expect(angles).toContain(90);
+    expect(angles).toContain(60);
+  });
+
+  it('names the cut diameter on every angle-driven tool', () => {
+    // A bare "90° V-bit" cannot be matched against the bit in hand, and the
+    // diameter it hides is load-bearing for depth and pitch.
+    for (const tool of DEFAULT_CNC_TOOLS) {
+      if (!ANGLE_REQUIRED_KINDS.has(tool.kind)) continue;
+      expect(tool.name).toContain('cut');
+    }
+  });
 });

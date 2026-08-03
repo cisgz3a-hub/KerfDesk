@@ -13524,7 +13524,7 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
 ## ADR-270 - V-carve ladders complete one filled region before moving to the next (2026-07-31)
 
 **Date:** 2026-07-31
-**Status:** Partially superseded by ADR-284; source-region-major ordering remains, the offset-ladder motion is historical
+**Status:** Partially superseded by ADR-285; source-region-major ordering remains, the offset-ladder motion is historical
 
 ### Context
 
@@ -14466,9 +14466,9 @@ object sharing a layer with text is enough to expose every glyph on that layer.
 ## ADR-278 - V-carve entry uses an opt-in emission-accurate contour ramp (2026-08-01)
 
 **Date:** 2026-08-01
-**Status:** Partially superseded by ADR-284; the stored request and provenance remain, but the contour-ramp output is historical
+**Status:** Partially superseded by ADR-285; the stored request and provenance remain, but the contour-ramp output is historical
 
-ADR-284 replaced the offset-ring V-carve planner and this contour-ramp mechanism. The stored
+ADR-285 replaced the offset-ring V-carve planner and this contour-ramp mechanism. The stored
 `vCarveRampEntryDeg` value remains project provenance, but it is not applied to the certified
 variable-depth medial path. This supersession does not change ordinary profile, pocket, or engrave
 ramp behavior.
@@ -14699,9 +14699,9 @@ physical coordinate loss.
 ## ADR-282 - V-carve carves sub-resolution artwork with a fine detail stage (2026-08-01)
 
 **Date:** 2026-08-01
-**Status:** Superseded by ADR-284; retained as the historical thin-detail ladder decision
+**Status:** Superseded by ADR-285; retained as the historical thin-detail ladder decision
 
-ADR-284 replaces the complete ADR-282 coarse/fine offset-ladder mechanism and all amendments with
+ADR-285 replaces the complete ADR-282 coarse/fine offset-ladder mechanism and all amendments with
 one certified medial route plus explicit flat-core clearing. The observations that thin strokes
 must not be silently dropped and that emitted XYZ must stay conservative remain requirements.
 
@@ -14798,7 +14798,7 @@ drop was a fidelity bug against the whole reference field, not a design choice.
 ## ADR-282 Amendment 1 - coverage law corrected after the #575 revert (2026-08-01)
 
 **Date:** 2026-08-01
-**Status:** Superseded by ADR-284; retained as historical coverage-correction evidence
+**Status:** Superseded by ADR-285; retained as historical coverage-correction evidence
 
 ### Context
 
@@ -14851,7 +14851,7 @@ panel note) folded in.
 ## ADR-282 Amendment 2 - detail rings carry true-boundary depths (the junction blend, 2026-08-02)
 
 **Date:** 2026-08-02
-**Status:** Superseded by ADR-284; retained as historical emitted-depth evidence
+**Status:** Superseded by ADR-285; retained as historical emitted-depth evidence
 
 ### Context
 
@@ -14914,7 +14914,7 @@ ring as no cut at all.
 ## ADR-282 Amendment 3 - coverage floor and honest pass limits after the #584 revert (2026-08-02)
 
 **Date:** 2026-08-02
-**Status:** Superseded by ADR-284; retained as historical coverage-budget evidence
+**Status:** Superseded by ADR-285; retained as historical coverage-budget evidence
 
 ### Context
 
@@ -14978,7 +14978,7 @@ imposition and ADR-280 belongs to the shared cone-limited floor-depth correction
 ## ADR-282 Amendment 4 - safe thin-detail re-land after the #592 review (2026-08-02)
 
 **Date:** 2026-08-02
-**Status:** Superseded by ADR-284; retained as historical safe-ladder evidence
+**Status:** Superseded by ADR-285; retained as historical safe-ladder evidence
 
 ### Context
 
@@ -15209,7 +15209,75 @@ on sloped detail segments. The Z rate is bounded by the operator's own setting b
 construction and by test, but surface finish at feed on a descending cut is a
 machine-and-material question this project cannot settle without a spindle.
 
-## ADR-284 - Vector-medial V-carving and source-region-major CNC sequencing (2026-08-02)
+## ADR-284 - The carved surface is shaded as timber, by injecting into MeshStandardMaterial (2026-08-03)
+
+**Date:** 2026-08-03
+**Status:** Accepted
+
+### Context
+
+The CNC 3D result pane already simulates the cut correctly: `computeRemovalGrid` stamps the tool
+kernel into a depth field and `steppedSurfaceMesh` turns that field into a mesh whose pocket walls
+stay vertical (ADR-261). What it did not do was make the result *legible as a cut in wood*. The
+surface carried a per-vertex colour ramp from the stock top to full depth, lit by one key and one
+fill light and nothing else. A V-carved groove 3 mm wide is read almost entirely from how it
+shadows and occludes itself, and neither of those existed: the pane's lights cast no shadow maps,
+so a 6 mm groove and a 1 mm scratch differed only by tint.
+
+The operator's own comparison was direct — a standalone WebGL preview of the same program, shaded
+as timber with marched shadows and ambient occlusion, showed the lettering as an obviously carved
+sign where the pane showed a flat brown plate.
+
+### Decision
+
+1. The machined surface for **timber stock** is shaded by a procedural wood material. Non-timber
+   stock (acrylic, aluminium) and any caller that does not supply the grid keep the existing
+   depth-ramped vertex colours unchanged.
+2. That material is built by **injecting into `MeshStandardMaterial` via `onBeforeCompile`**, not by
+   replacing it with a `ShaderMaterial`. The scene's lights, tone mapping and `ColorManagement` keep
+   working, and the fallback needs no branch in the scene code.
+3. Grain is a property of the **log**, not of the surface: rings are cylinders about an axis running
+   along X below the stock, so a groove reveals the ring structure underneath. This is what
+   distinguishes a carve from lettering printed on a board.
+4. Self-shadowing and ambient occlusion **march the removal grid**, uploaded as an R16F depth
+   texture, rather than using shadow maps. The grid is already computed, it is registered with the
+   mesh by construction, and shadow maps would need the scene to grow light frusta it does not have.
+5. The texture must be the **same grid the mesh was built from** — the pane downsamples to 300 cells
+   across before meshing, so the full-resolution grid would shade a groove that sits elsewhere.
+6. Every three.js chunk replacement is **checked**, and the material degrades to plain PBR when one
+   is missing. GLSL lives in its own module because ESLint's `max-lines` counts template-literal
+   lines.
+7. This amends ADR-102 §2 and ADR-261 §1 only in that the sanctioned three.js homes may now contain
+   GLSL source. The viewport stays display-only; nothing here feeds emission.
+
+### Consequences
+
+- The pane gains grain, self-shadowing, ambient occlusion, and lighter freshly-cut faces. Depth now
+  reads from occlusion rather than from tint, which is why the vertex-colour ramp is dropped for
+  timber.
+- First GLSL in the tree. It is unlinted — there is no shader tooling — so its correctness rests on
+  the injection tests and on looking at the output.
+- Coupling to three.js internal chunk names is real and deliberate. `WOOD_REQUIRED_CHUNKS` is
+  asserted against the installed `ShaderLib`, so a three upgrade that renames a chunk fails a test
+  rather than silently blanking the pane.
+- Fragment cost rises by ~54 texture taps per pixel (24 shadow, 30 occlusion). The pane canvas is
+  244x240, so this is not measurable there; the full-page view is the case to watch.
+
+### Verification
+
+- `viewer3d-wood-material.test.ts` (8 tests) drives `onBeforeCompile` with the REAL
+  `three.ShaderLib.standard` source: it asserts the injection lands, that the grid is published as
+  positive millimetres (the grid stores z <= 0), that the shader is sized to the mesh rather than to
+  the cell count, and that removing ANY required chunk leaves the surface renderable with the grain
+  dropped and no uniforms set.
+- `wood-grain-appearance.test.ts` pins that timber families are grained, acrylic and aluminium are
+  not, "Custom" keeps a grain, and every ring frequency is high enough to put more than one growth
+  ring across a board.
+- NOT verified: no perceptual check inside the running app, no screenshot of the pane, and no
+  hardware. The shading was verified perceptually only in the standalone preview this was ported
+  from, against the same program's G-code.
+
+## ADR-285 - Vector-medial V-carving and source-region-major CNC sequencing (2026-08-02)
 
 **Date:** 2026-08-02
 **Status:** Accepted; software verification in progress, hardware qualification pending

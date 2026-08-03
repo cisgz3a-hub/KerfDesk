@@ -66,6 +66,7 @@ export function DesignCanvas(): JSX.Element {
         onPointerMove={pointer.onPointerMove}
         onPointerUp={pointer.onPointerUp}
         onPointerLeave={pointer.onPointerLeave}
+        onDoubleClick={pointer.onDoubleClick}
         onWheel={handleWheel}
       />
       <ShapeInspector />
@@ -168,6 +169,7 @@ function useLayerPaint(
       paintDesignOverlay(overlayCtx, {
         view: session.view,
         draft: session.draft,
+        pointSequence: session.pointSequence,
         marquee: session.marquee,
         measuredEntity: measured.entity,
         measuredField: measured.field,

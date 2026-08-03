@@ -69,7 +69,7 @@ function squareScene(): Scene {
           ...DEFAULT_CNC_LAYER_SETTINGS,
           cutType: 'v-carve',
           // This file's subject is the DEPTH-CLAMPED floor, so the flat cap is
-          // explicit: with it off (the ADR-284 default) depthMm stops being a
+          // explicit: with it off (the ADR-285 default) depthMm stops being a
           // cap and the bit carves to its full cone, which is a different
           // invariant measured by the medial depth-law probes.
           vCarveFlatDepthEnabled: true,

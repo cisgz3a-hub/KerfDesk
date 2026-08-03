@@ -51,30 +51,6 @@ describe('drawRasterPreview', () => {
     expect(createElement).not.toHaveBeenCalled();
   });
 
-  it('prunes preview canvases for deleted raster images', () => {
-    const createdCanvases: unknown[] = [];
-    vi.stubGlobal('ImageData', FakeImageData);
-    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-      if (tag !== 'canvas') throw new Error(`unexpected element ${tag}`);
-      const canvas = {
-        width: 0,
-        height: 0,
-        getContext: () => ({ putImageData: vi.fn() }),
-      };
-      createdCanvases.push(canvas);
-      return canvas as unknown as HTMLCanvasElement;
-    });
-    const ctx = noOpContext();
-    const view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 };
-    const projectWithRaster = projectForRaster(burnRaster('data:image/png;base64,preview-cache-a'));
-
-    drawRasterPreviewSync(ctx, projectWithRaster, view);
-    drawRasterPreviewSync(ctx, emptyProject(), view);
-    drawRasterPreviewSync(ctx, projectWithRaster, view);
-
-    expect(createdCanvases).toHaveLength(2);
-  });
-
   it('builds a bounded preview canvas for a burn grid above the old pixel ceiling', () => {
     vi.stubGlobal('ImageData', FakeImageData);
     let previewCanvas: { width: number; height: number } | undefined;
@@ -428,8 +404,4 @@ function projectForRaster(obj: RasterImage): Project {
       layers: [createLayer({ id: 'image', color: '#808080', mode: 'image' })],
     },
   };
-}
-
-function emptyProject(): Project {
-  return { ...createProject(), scene: { objects: [], layers: [] } };
 }

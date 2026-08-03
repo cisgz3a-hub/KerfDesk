@@ -19,6 +19,12 @@ import {
   RESIZE_HANDLE_GRAB_PX,
 } from './design-handles';
 import { hitTestSketch, HIT_RADIUS_PX } from './design-hit-test';
+import {
+  finishPointToolDoubleClick,
+  handlePointToolClick,
+  truthfulPointToolSnap,
+  updatePointToolPointer,
+} from './design-point-pointer';
 import { useDesignStudioStore } from './design-studio-store';
 import { applyOrthoMm, snapPointMm } from './design-snap';
 import type { DesignSurface } from './design-surface';
@@ -28,6 +34,7 @@ export type DesignPointerHandlers = {
   readonly onPointerMove: (event: React.PointerEvent<HTMLCanvasElement>) => void;
   readonly onPointerUp: (event: React.PointerEvent<HTMLCanvasElement>) => void;
   readonly onPointerLeave: () => void;
+  readonly onDoubleClick: (event: React.MouseEvent<HTMLCanvasElement>) => void;
 };
 
 export function useDesignPointer(
@@ -41,11 +48,16 @@ export function useDesignPointer(
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
+      if (event.button !== 0) return;
       const at = pointMm(event);
       const store = useDesignStudioStore.getState();
       const session = store.session;
       if (at === null || session === null) return;
       capturePointer(event.currentTarget, event.pointerId);
+      if (session.tool === 'path' || session.tool === 'arc') {
+        handlePointToolClick(at, session, surface.pxPerMm(), newEntityId);
+        return;
+      }
       if (isDraftTool(session.tool)) {
         store.setDraft({
           tool: session.tool,
@@ -65,7 +77,7 @@ export function useDesignPointer(
       if (session.tool === 'select' && beginResizeAt(at, pxPerMm)) return;
       if (session.tool === 'select') beginSelectOrMove(at, event, pxPerMm);
     },
-    [pointMm, surface],
+    [newEntityId, pointMm, surface],
   );
 
   const onPointerMove = useCallback(
@@ -75,13 +87,18 @@ export function useDesignPointer(
       const session = store.session;
       if (at === null || session === null) return;
       store.setCursorMm(at);
+      if (session.pointSequence !== null) {
+        updatePointToolPointer(at, session, surface.pxPerMm());
+        return;
+      }
       advanceGesture(at, event);
     },
-    [pointMm],
+    [pointMm, surface],
   );
 
   const onPointerUp = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
+      if (event.button !== 0) return;
       const store = useDesignStudioStore.getState();
       const session = store.session;
       if (session === null) return;
@@ -97,7 +114,21 @@ export function useDesignPointer(
     store.setActiveSnap(null);
   }, []);
 
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerLeave };
+  const onDoubleClick = usePointSequenceDoubleClick(newEntityId);
+
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onDoubleClick };
+}
+
+function usePointSequenceDoubleClick(
+  newEntityId: () => string,
+): (event: React.MouseEvent<HTMLCanvasElement>) => void {
+  return useCallback(
+    (event) => {
+      if (event.button !== 0) return;
+      if (finishPointToolDoubleClick(newEntityId)) event.preventDefault();
+    },
+    [newEntityId],
+  );
 }
 
 // Resolves the pointer to a millimetre point, applying object snap first and the
@@ -113,18 +144,22 @@ function resolvePointerMm(
   const session = store.session;
   const raw = surface.toMm(event);
   if (session === null || raw === null) return null;
-  const resolved = snapPointMm({
-    sketch: session.history.present,
-    rawMm: raw,
-    pxPerMm: surface.pxPerMm(),
-    snapEnabled: session.snapEnabled,
-    gridMm: session.gridMm,
-    // While dragging, the moving shapes must not be snap targets: they follow
-    // the cursor, so snapping to them makes the pointer chase geometry that is
-    // chasing the pointer — worst on a circle, whose centre and quadrants are
-    // all live targets travelling with it.
-    ...(session.move === null ? {} : { excludeEntityIds: session.move.ids }),
-  });
+  const resolved = truthfulPointToolSnap(
+    session,
+    snapPointMm({
+      sketch: session.history.present,
+      rawMm: raw,
+      pxPerMm: surface.pxPerMm(),
+      snapEnabled: session.snapEnabled,
+      gridMm: session.gridMm,
+      // While dragging, the moving shapes must not be snap targets: they follow
+      // the cursor, so snapping to them makes the pointer chase geometry that is
+      // chasing the pointer — worst on a circle, whose centre and quadrants are
+      // all live targets travelling with it.
+      ...(session.move === null ? {} : { excludeEntityIds: session.move.ids }),
+    }),
+    raw,
+  );
   store.setActiveSnap(resolved.target);
   return resolved.pointMm;
 }

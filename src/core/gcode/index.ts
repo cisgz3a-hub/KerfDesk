@@ -28,3 +28,4 @@ export {
   GCODE_COORDINATE_DECIMAL_PLACES,
   hasGcodeXyMotionAtEmitPrecision,
 } from './coordinate-format';
+export { PROGRAM_PARSE_REASON } from './program-parse-reason';

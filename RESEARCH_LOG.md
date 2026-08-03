@@ -57,13 +57,13 @@ Each entry here corresponds to a `package.json` dependency. New rows are added w
 - **Source:**
   - https://github.com/mapbox/delaunator
   - https://github.com/mourner/robust-predicates
-- **Decision affected:** ADR-284; used only by `src/core/cnc/vcarve-medial-axis.ts` to build
+- **Decision affected:** ADR-285; used only by `src/core/cnc/vcarve-medial-axis.ts` to build
   vector medial-axis topology candidates for flowing V-carve toolpaths.
 - **Evaluated:** 2026-08-02 (Codex session)
 - **Confidence:** high for the pinned dependency and bounded topology role; CurveDesk's exact
   containment, chord, depth, and emitted-profile checks remain authoritative.
 - **Re-verify by:** 2027-02-02
-- **Justification:** ADR-284 needs deterministic vector Delaunay adjacency for source-boundary
+- **Justification:** ADR-285 needs deterministic vector Delaunay adjacency for source-boundary
   samples. The package supplies that narrow topology primitive without adding I/O, platform code,
   global state, or a competing application abstraction.
 - **Alternatives considered:**
@@ -853,7 +853,7 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
 - Re-evaluate only if a reversal trigger in ADR-094 fires (e.g. the
   clean-room DXF parser cannot reach usable real-world compatibility).
 
-**Superseded 2026-08-02 by ADR-284 for V-carve topology only:** the parser
+**Superseded 2026-08-02 by ADR-285 for V-carve topology only:** the parser
 mandate remains, but `delaunator@5.1.0` and its locked
 `robust-predicates@3.0.3` closure are now the documented narrow runtime
 geometry exception. Clipper remains the Boolean/offset authority; the old
@@ -1400,7 +1400,7 @@ PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worke
   tile begins with a direct plunge. See ADR-278 and
   `docs/audits/2026-08-01-cnc-vcarve-ramp-entry-acceptance.md`.
 
-**Superseded 2026-08-02 by ADR-284:** this entry remains the historical cutter-entry
+**Superseded 2026-08-02 by ADR-285:** this entry remains the historical cutter-entry
 research. The medial V-carve planner does not apply the stored contour-ramp angle;
 it preserves the request as provenance and follows the certified variable-depth
 profile at plunge feed. The legacy stepped-ladder and tiled-ramp behaviors described
@@ -1513,7 +1513,7 @@ above are no longer current output behavior.
   non-V-bit 60-degree cone compatibility fallback. That output is not ball-nose V-carve geometry and
   remains explicitly unsupported pending a separate spherical planner. Source:
   - https://docs.vectric.com/docs/V12.0/VCarveDesktop/ENU/Help/form/VCarve%20Toolpath%20Creator/
-- **Outcome:** adopt ADR-284. Ordinary V-carve becomes a certified variable-depth medial route;
+- **Outcome:** adopt ADR-285. Ordinary V-carve becomes a certified variable-depth medial route;
   flat depth is explicit; source-region-major ordering replaces cross-letter hopping in all affected
   2D clearing operations. Unsupported cutter/operation combinations remain audit findings for
   separate geometry slices and may be disclosed as Job Review warnings, never new guards.

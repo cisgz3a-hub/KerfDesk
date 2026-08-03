@@ -1,126 +1,62 @@
+// Transport behaviour of the shared preparation worker: one reused instance,
+// responses matched to their own request id, and terminate reserved for fatal
+// failures. Which projects route off-thread at all is covered by
+// output-preparation-worker-client-routing.test.ts.
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createProject } from '../../core/scene';
 import {
-  createLayer,
-  createProject,
-  DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_CNC_MACHINE_CONFIG,
-  IDENTITY_TRANSFORM,
-  type Project,
-  type SceneObject,
-} from '../../core/scene';
-import {
-  outputPreparationShouldRunOffThread,
   prepareSaveOutputOffThread,
+  resetOutputPreparationWorkerForTests,
 } from './output-preparation-worker-client';
 import type {
-  OutputPreparationRequest,
+  OutputPreparationEnvelope,
   OutputPreparationResponse,
+  OutputPreparationResult,
 } from './output-preparation-protocol';
 
 const PREPARATION_FAILURE_MESSAGE = 'The output snapshot could not be prepared.';
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
-  onmessage: ((event: MessageEvent<OutputPreparationResponse>) => void) | null = null;
+  onmessage: ((event: MessageEvent<OutputPreparationResult>) => void) | null = null;
   onerror: (() => void) | null = null;
-  posted: OutputPreparationRequest[] = [];
+  posted: OutputPreparationEnvelope[] = [];
   terminated = false;
 
   constructor() {
     FakeWorker.instances.push(this);
   }
 
-  postMessage(request: OutputPreparationRequest): void {
-    this.posted.push(request);
+  postMessage(envelope: OutputPreparationEnvelope): void {
+    this.posted.push(envelope);
   }
 
   terminate(): void {
     this.terminated = true;
   }
 
-  respond(response: OutputPreparationResponse): void {
-    this.onmessage?.({ data: response } as MessageEvent<OutputPreparationResponse>);
+  /** Answers the nth posted envelope (default: the most recent one). */
+  respond(response: OutputPreparationResponse, postedIndex = this.posted.length - 1): void {
+    const envelope = this.posted[postedIndex];
+    if (envelope === undefined) throw new Error('nothing posted to respond to');
+    this.onmessage?.({
+      data: { requestId: envelope.requestId, response },
+    } as MessageEvent<OutputPreparationResult>);
   }
 }
 
-beforeEach(() => vi.stubGlobal('Worker', FakeWorker));
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => {
+  resetOutputPreparationWorkerForTests();
+  FakeWorker.instances = [];
+  vi.stubGlobal('Worker', FakeWorker);
+});
+afterEach(() => {
+  resetOutputPreparationWorkerForTests();
+  vi.unstubAllGlobals();
+});
 
 describe('output preparation worker client', () => {
-  it('routes pass-amplified vector output off the UI thread', () => {
-    expect(outputPreparationShouldRunOffThread(vectorProject({ passes: 100_000 }))).toBe(true);
-  });
-
-  it('routes depth-amplified CNC output off the UI thread', () => {
-    const project = vectorProject({ passes: 1 });
-    const layer = project.scene.layers[0];
-    if (layer === undefined) throw new Error('layer missing');
-    const cnc: Project = {
-      ...project,
-      machine: DEFAULT_CNC_MACHINE_CONFIG,
-      scene: {
-        ...project.scene,
-        layers: [
-          {
-            ...layer,
-            cnc: {
-              ...DEFAULT_CNC_LAYER_SETTINGS,
-              depthMm: 100_000,
-              depthPerPassMm: 1,
-            },
-          },
-        ],
-      },
-    };
-
-    expect(outputPreparationShouldRunOffThread(cnc)).toBe(true);
-  });
-
-  it('routes page-backed raster output off the UI thread regardless of sampled size', () => {
-    const project = createProject();
-    expect(
-      outputPreparationShouldRunOffThread({
-        ...project,
-        scene: {
-          ...project.scene,
-          objects: [
-            {
-              kind: 'raster-image',
-              id: 'paged',
-              source: 'large.png',
-              color: '#808080',
-              imageAsset: {
-                schemaVersion: 1,
-                repository: 'curvedesk-import-assets-v1',
-                sourceAssetId: 'source-pages',
-                lumaAssetId: 'luma-pages',
-                sourceMimeType: 'image/png',
-                sourceByteLength: 300_000_000,
-                lumaByteLength: 1,
-                naturalWidth: 1,
-                naturalHeight: 1,
-                sampledWidth: 1,
-                sampledHeight: 1,
-                thumbnail: {
-                  mimeType: 'image/bmp',
-                  dataUrl: 'data:image/bmp;base64,thumbnail',
-                  width: 1,
-                  height: 1,
-                },
-              },
-              pixelWidth: 1,
-              pixelHeight: 1,
-              dither: 'threshold',
-              linesPerMm: 1,
-              bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
-              transform: IDENTITY_TRANSFORM,
-            },
-          ],
-        },
-      }),
-    ).toBe(true);
-  });
-
   it('returns null without Worker support', () => {
     vi.unstubAllGlobals();
     expect(
@@ -128,15 +64,21 @@ describe('output preparation worker client', () => {
     ).toBeNull();
   });
 
-  it('resolves a Save result and terminates the one-shot worker', async () => {
+  it('reuses one worker across preparations instead of spawning per request', async () => {
+    await settledSave('G21\n');
+    await settledSave('G90\n');
+
+    expect(FakeWorker.instances).toHaveLength(1);
+  });
+
+  it('resolves a Save result and keeps the shared worker alive', async () => {
     const pending = prepareSaveOutputOffThread({
       kind: 'save',
       project: createProject(),
       options: {},
     });
     if (pending === null) throw new Error('worker unavailable');
-    const worker = FakeWorker.instances.at(-1);
-    if (worker === undefined) throw new Error('worker missing');
+    const worker = latestWorker();
     worker.respond({
       kind: 'save',
       result: {
@@ -153,18 +95,17 @@ describe('output preparation worker client', () => {
       preflight: { ok: true, issues: [] },
       cncVCarveDepths: [{ layerId: 'flowing-v-layer', depthMm: 5.499 }],
     });
-    expect(worker.terminated).toBe(true);
+    expect(worker.terminated).toBe(false);
   });
 
-  it('preserves a failed Save result and terminates the one-shot worker', async () => {
+  it('preserves a failed Save result and keeps the shared worker alive', async () => {
     const pending = prepareSaveOutputOffThread({
       kind: 'save',
       project: createProject(),
       options: {},
     });
     if (pending === null) throw new Error('worker unavailable');
-    const worker = FakeWorker.instances.at(-1);
-    if (worker === undefined) throw new Error('worker missing');
+    const worker = latestWorker();
     worker.respond({
       kind: 'save',
       result: {
@@ -195,40 +136,69 @@ describe('output preparation worker client', () => {
         ],
       },
     });
-    expect(worker.terminated).toBe(true);
+    expect(worker.terminated).toBe(false);
+  });
+
+  it('delivers each response to its own request when two are in flight', async () => {
+    const first = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    const second = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    if (first === null || second === null) throw new Error('worker unavailable');
+    const worker = latestWorker();
+    // Answer out of order: correlation must come from the id, not arrival order.
+    worker.respond(emittedSave('SECOND\n'), 1);
+    worker.respond(emittedSave('FIRST\n'), 0);
+
+    await expect(first).resolves.toMatchObject({ gcode: 'FIRST\n' });
+    await expect(second).resolves.toMatchObject({ gcode: 'SECOND\n' });
+    expect(FakeWorker.instances).toHaveLength(1);
+  });
+
+  it('retires the worker on a fatal error so the next request gets a fresh one', async () => {
+    const pending = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    if (pending === null) throw new Error('worker unavailable');
+    const failed = latestWorker();
+    failed.onerror?.();
+
+    await expect(pending).rejects.toThrow('Background output preparation worker errored.');
+    expect(failed.terminated).toBe(true);
+
+    await settledSave('G21\n');
+    expect(FakeWorker.instances).toHaveLength(2);
   });
 });
 
-function vectorProject(options: { readonly passes: number }): Project {
-  const project = createProject();
-  const color = '#000000';
-  const object: SceneObject = {
-    kind: 'shape',
-    id: 'shape',
-    color,
-    spec: { kind: 'rect', widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
-    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
-    transform: IDENTITY_TRANSFORM,
-    paths: [
-      {
-        color,
-        polylines: [
-          {
-            closed: false,
-            points: [
-              { x: 0, y: 0 },
-              { x: 1, y: 0 },
-            ],
-          },
-        ],
-      },
-    ],
-  };
+function emittedSave(gcode: string): OutputPreparationResponse {
   return {
-    ...project,
-    scene: {
-      objects: [object],
-      layers: [{ ...createLayer({ id: 'line', color }), passes: options.passes }],
-    },
+    kind: 'save',
+    result: { kind: 'emitted', gcode, preflight: { ok: true, issues: [] } },
   };
+}
+
+function latestWorker(): FakeWorker {
+  const worker = FakeWorker.instances.at(-1);
+  if (worker === undefined) throw new Error('worker missing');
+  return worker;
+}
+
+async function settledSave(gcode: string): Promise<void> {
+  const pending = prepareSaveOutputOffThread({
+    kind: 'save',
+    project: createProject(),
+    options: {},
+  });
+  if (pending === null) throw new Error('worker unavailable');
+  latestWorker().respond(emittedSave(gcode));
+  await pending;
 }

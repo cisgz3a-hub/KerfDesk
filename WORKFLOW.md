@@ -3099,7 +3099,7 @@ and lifts the command's CNC-only gate.)*
 
 #### Empty
 1. For profile, pocket, and engrave, defaults (no direction, 0 ramp) keep
-   their pre-H.9 motion unchanged. ADR-284 intentionally replaces V-carve's
+   their pre-H.9 motion unchanged. ADR-285 intentionally replaces V-carve's
    earlier ring output, so this byte-identity statement does not apply to
    V-carve.
 
@@ -3131,7 +3131,7 @@ and lifts the command's CNC-only gate.)*
    outcome and writes nothing; increase tile size or reduce overlap.
 
 #### Advisory — tiled V-carve entry semantics
-1. ADR-284 V-carve paths carry no contour-ramp claim. A stored Ramp entry
+1. ADR-285 V-carve paths carry no contour-ramp claim. A stored Ramp entry
    angle remains requested provenance and is not applied, in tiled or ordinary
    output. The same informational notice remains available.
 2. Clipping can split one source region into several tile-local path pieces.
@@ -5157,7 +5157,7 @@ dropped so the inspector never reads a vanished shape.
 1. The oldest steps are evicted and the status bar reports "N older steps
    trimmed". The drawing is unaffected; this informs and never blocks.
 
-### F-DS5. Draw a shape (DS-3)
+### F-DS5a. Draw a drag shape (DS-3)
 
 1. Arm Rectangle (R), Circle (C), or Line (L) in the Create rail.
 2. Press on the canvas and drag. The live shape and its dimension label follow
@@ -5191,6 +5191,57 @@ is selected so it can be acted on immediately.
 1. Esc discards the draft outright and the following pointer-up does NOT commit
    it. (The main workspace draw tool has the opposite behaviour today - see the
    defects noted in the research document.)
+
+### F-DS5b. Draw a Polyline or Arc (DS-3)
+
+1. Arm **Polyline** (P) or **Arc** (A) in the Create rail. Only the left button
+   adds geometry; middle and right remain navigation buttons in the 3D surface.
+2. For a Polyline, click each corner. The overlay joins every confirmed corner
+   to the live target and the status bar says what can happen next. Double-click
+   with at least two corners to finish open and return to Select, or - after
+   three corners - click within eight screen pixels of the first corner to close
+   exactly on it. A distinct object snap near the first corner wins rather than
+   being reinterpreted as closure.
+3. For an Arc, click the centre, click the start point to fix the radius, then
+   click the end direction. The preview and committed entity use the same fixed
+   radius and positive sweep. An object snap is announced for the end only when
+   it lies on that radius; otherwise the target is projected onto the radius and
+   the status coordinates report the projected endpoint.
+4. Grid/object snap and Ortho apply on every phase. Exact object snaps beat
+   Ortho. The completed entity lands on the active design layer and adds one
+   Studio undo step; intermediate clicks add none.
+
+#### Success
+
+The phase-specific hint advances after each click, both the 2D and 3D surfaces
+show the same live geometry, and completion adds exactly one selected entity.
+An ordinary close/end leaves its tool armed for repeated drawing. A completion
+double-click deselects and returns to Select.
+
+#### Error - a point cannot define geometry yet
+
+1. A repeated Polyline corner, a zero-radius Arc start, or an Arc end at its
+   start angle commits nothing and consumes no undo step. The sequence stays
+   visible and its phase hint continues to name the next valid action. A
+   double-click with only one Polyline corner explicitly cancels and returns to
+   Select.
+
+#### Empty - a sequence is in progress
+
+1. Confirmed Polyline corners, or an Arc centre/start, live outside history.
+   Until completion the entity count and Apply geometry are unchanged.
+
+#### Edge - cancel, close tolerance, and camera navigation
+
+1. Esc cancels only the unfinished sequence and leaves its tool armed;
+   subsequent Esc presses continue the normal selection/tool ladder.
+   Re-pressing the active tool shortcut preserves the sequence.
+2. Polyline closure previews the exact final edge, so commit never jumps by the
+   screen-pixel close tolerance. Middle/right navigation cannot add a point.
+3. A browser double-click emits two clicks before its double-click event. The
+   second Polyline click is discarded even if it drifted a few pixels; an Arc
+   or closed Polyline completed by the first click cannot leave the second click
+   behind as a new sequence.
 
 ### F-DS6. Select geometry (DS-3)
 
