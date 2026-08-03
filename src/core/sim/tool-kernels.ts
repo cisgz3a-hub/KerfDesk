@@ -3,12 +3,26 @@
 // vertical clearance of the cutting surface at that horizontal distance
 // (dz ≥ 0 above the tool tip):
 //
-//   end-mill / engraving  flat:      dz = 0 across the radius
+//   end-mill              flat:      dz = 0 across the radius
 //   ball-nose             sphere:    dz = r − sqrt(r² − d²)
-//   v-bit                 cone:      dz = d / tan(θ/2)
+//   v-bit / engraving     cone:      dz = d / tan(θ/2)
 //
 // The SAME kernels serve the H.2 simulator (stamping), H.5 roughing dilation,
 // and H.8 finishing (max-plus tip surface) — built once, deliberately.
+//
+// Engraving bits cone with the V-bits. They were previously grouped with the
+// flat end mills, which made the removal grid, the roughing dilation and the
+// finishing tip surface all model a flat-bottomed trench the full width of the
+// cutter, while vcarve-depth.ts drove Z down a cone via vcarveIncludedAngleDeg
+// — one bit, two geometries, and the preview disagreed with the carve. 2L Inc
+// and PreciseBits both specify conical engraving cutters by INCLUDED angle,
+// which is the same quantity tipAngleDeg already carries for a V-bit.
+//
+// Neither shape models the small flat at a real cutter's tip (0.12–0.76 mm on
+// 2L Inc's catalog), so a cone still overstates how fine the point is. That
+// error is bounded by the tip radius; the flat model's error was the whole
+// cone height. Modelling the tip flat needs a tip-diameter field the CncTool
+// type does not have yet.
 
 import { assertNever, type CncTool } from '../scene';
 
@@ -58,13 +72,13 @@ export function kernelForTool(tool: CncTool, mmPerCell: number): ToolKernel {
 export function cuttingSurfaceDz(tool: CncTool, dMm: number, radiusMm: number): number {
   switch (tool.kind) {
     case 'end-mill':
-    case 'engraving':
       return 0;
     case 'ball-nose': {
       const inside = Math.max(0, radiusMm * radiusMm - dMm * dMm);
       return radiusMm - Math.sqrt(inside);
     }
-    case 'v-bit': {
+    case 'v-bit':
+    case 'engraving': {
       const tipAngleDeg = tool.tipAngleDeg ?? FALLBACK_V_TIP_ANGLE_DEG;
       const halfAngleRad = (Math.max(1, tipAngleDeg) / 2) * (Math.PI / 180);
       return dMm / Math.tan(halfAngleRad);
