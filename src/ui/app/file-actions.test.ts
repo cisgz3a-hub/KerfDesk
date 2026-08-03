@@ -384,7 +384,10 @@ describe('handleSaveGcode preparation failures', () => {
         },
       });
 
-      expect(pickFileForSave).not.toHaveBeenCalled();
+      // The picker now runs before emission so it keeps the transient user
+      // activation showSaveFilePicker requires; a failed preparation therefore
+      // leaves the picked file untouched rather than never opening a dialog.
+      // No bytes and no export advancement is the guarantee that matters.
       expect(write).not.toHaveBeenCalled();
       expect(advanceVariablesAfter).not.toHaveBeenCalled();
       expect(notifications.some((toast) => toast.variant === 'success')).toBe(false);
@@ -399,7 +402,7 @@ describe('handleSaveGcode rotary raster emission', () => {
     vi.restoreAllMocks();
   });
 
-  it('stops before picker, write, advancement, and success when Labs permission is absent', async () => {
+  it('stops before write, advancement, and success when Labs permission is absent', async () => {
     const project = rotaryRasterSaveProject();
     const write = vi.fn<SaveTarget['write']>();
     const target: SaveTarget = { displayName: SAVE_TARGET_NAME, write };
@@ -416,7 +419,8 @@ describe('handleSaveGcode rotary raster emission', () => {
       advanceVariablesAfter,
     });
 
-    expect(pickFileForSave).not.toHaveBeenCalled();
+    // Picker-before-emission (transient user activation): the refusal still
+    // writes nothing and advances nothing, it just no longer precedes the dialog.
     expect(write).not.toHaveBeenCalled();
     expect(advanceVariablesAfter).not.toHaveBeenCalled();
     expect(pushToast).not.toHaveBeenCalledWith(expect.any(String), 'success');
