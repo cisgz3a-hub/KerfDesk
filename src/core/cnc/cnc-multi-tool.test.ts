@@ -13,6 +13,7 @@ import {
   IDENTITY_TRANSFORM,
   layerCncTool,
   type CncLayerSettings,
+  type CncMachineConfig,
   type ImportedSvg,
   type Layer,
   type Scene,
@@ -218,7 +219,7 @@ describe('compileCncJob multi-tool', () => {
   it.each([
     ['missing', 'missing-clear'],
     ['ball-nose', 'bn-3175'],
-    ['engraving', 'eng-15'],
+    ['engraving', 'legacy-engraving'],
   ] as const)('does not compile a V-carve clearance group with a %s cutter', (_, clearToolId) => {
     const scene = sceneOf(
       [squareObject('A', '#111111', 10, 60)],
@@ -233,7 +234,23 @@ describe('compileCncJob multi-tool', () => {
       ],
     );
 
-    const cnc = compileCncJob(scene, DEVICE, MACHINE).groups.filter(
+    // The shipped 'eng-15' starter was dropped, so the engraving row supplies
+    // its own cutter — otherwise it would pass as a MISSING tool rather than a
+    // wrong-kind one, silently duplicating the first row.
+    const machine: CncMachineConfig = {
+      ...MACHINE,
+      tools: [
+        ...MACHINE.tools,
+        {
+          id: 'legacy-engraving',
+          name: 'Legacy engraving bit',
+          kind: 'engraving',
+          diameterMm: 3.175,
+          tipAngleDeg: 30,
+        },
+      ],
+    };
+    const cnc = compileCncJob(scene, DEVICE, machine).groups.filter(
       (group) => group.kind === 'cnc',
     );
     expect(cnc).toHaveLength(1);
