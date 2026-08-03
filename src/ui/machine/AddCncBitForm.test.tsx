@@ -117,3 +117,81 @@ describe('AddCncBitForm', () => {
     }
   });
 });
+
+// The tip flat is what makes an engraving bit a TRUNCATED cone rather than a
+// pointed one. Without it the simulator can only model a sharp point, which is
+// the wrong silhouette for most real engravers.
+const TIP_FLAT_LABEL = '[aria-label="New bit tip flat diameter (mm)"]';
+
+describe('AddCncBitForm — engraving tip flat', () => {
+  it('offers the tip flat for an engraving bit only', async () => {
+    const { host, root } = await renderForm();
+    try {
+      expect(host.querySelector(TIP_FLAT_LABEL)).toBeNull();
+      await selectKind(host, 'v-bit');
+      expect(host.querySelector(TIP_FLAT_LABEL)).toBeNull();
+      await selectKind(host, 'engraving');
+      expect(host.querySelector(TIP_FLAT_LABEL)).toBeInstanceOf(HTMLInputElement);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('saves the entered tip flat on the custom tool', async () => {
+    const { host, root } = await renderForm();
+    try {
+      await selectKind(host, 'engraving');
+      await setInput(host, 'New bit name', '30 deg engraver');
+      await setInput(host, 'New bit diameter (mm)', '3.175');
+      await setInput(host, 'New bit included angle (deg)', '30');
+      await setInput(host, 'New bit tip flat diameter (mm)', '0.2');
+      await add(host);
+
+      expect(useStore.getState().cncLibrary.customTools[0]).toMatchObject({
+        kind: 'engraving',
+        tipAngleDeg: 30,
+        tipDiameterMm: 0.2,
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('leaves the tip flat absent when blank, so the bit stays a true point', async () => {
+    const { host, root } = await renderForm();
+    try {
+      await selectKind(host, 'engraving');
+      await setInput(host, 'New bit name', 'pointed engraver');
+      await setInput(host, 'New bit diameter (mm)', '3.175');
+      await setInput(host, 'New bit included angle (deg)', '60');
+      await add(host);
+
+      const saved = useStore.getState().cncLibrary.customTools[0];
+      expect(saved).toMatchObject({ kind: 'engraving', tipAngleDeg: 60 });
+      expect(saved !== undefined && 'tipDiameterMm' in saved).toBe(false);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('refuses a tip flat that reaches the cutter diameter', async () => {
+    const { host, root } = await renderForm();
+    try {
+      await selectKind(host, 'engraving');
+      await setInput(host, 'New bit name', 'bad engraver');
+      await setInput(host, 'New bit diameter (mm)', '3.175');
+      await setInput(host, 'New bit included angle (deg)', '30');
+      await setInput(host, 'New bit tip flat diameter (mm)', '3.175');
+      await add(host);
+
+      expect(useStore.getState().cncLibrary.customTools).toHaveLength(0);
+      expect(host.querySelector('[role="alert"]')?.textContent).toContain('tip flat');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+});

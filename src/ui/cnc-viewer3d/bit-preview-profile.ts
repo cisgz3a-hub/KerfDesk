@@ -16,7 +16,14 @@ export function bitPreviewProfile(tool: CncTool): ReadonlyArray<ToolProfilePoint
 
 export function bitPreviewGeometryIssue(tool: CncTool): string | null {
   if (tool.kind === 'engraving') {
-    return 'Legacy engraving tools do not store enough tip geometry for a truthful 3D cutting envelope; no engraving shape was modeled.';
+    // An engraving bit is a truncated cone: the included angle gives the flank,
+    // and tipDiameterMm the flat land at the tip (absent = a true point, like a
+    // v-bit). Before that field existed there was genuinely nothing truthful to
+    // model, so every engraving bit was refused. Now only a missing angle is,
+    // and the simulator's own cuttingSurfaceDz draws the rest.
+    return isValidCncTipAngleDeg(tool.tipAngleDeg)
+      ? null
+      : 'A valid 1–179° included angle is required; no engraving cone was modeled.';
   }
   return tool.kind === 'v-bit' && !isValidCncTipAngleDeg(tool.tipAngleDeg)
     ? 'A valid 1–179° included angle is required; no V-bit cone was modeled.'
