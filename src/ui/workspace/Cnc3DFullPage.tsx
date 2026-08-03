@@ -1,101 +1,49 @@
 // Cnc3DFullPage — the 3D result at full window size.
 //
 // The docked pane is ~244px wide, which is enough to confirm a carve but not
-// enough to inspect one. This is the same scene, the same source, and the same
-// scrubber — only the viewport is bigger. It gets its own useCnc3dScene (and so
-// its own renderer) rather than moving the pane's canvas, because relocating a
-// live WebGL context across the DOM loses the operator's orbit.
+// enough to inspect one. Same source, same renderer, bigger viewport. It builds
+// its own WoodView (and so its own WebGL context) rather than moving the pane's
+// canvas, because relocating a live context across the DOM loses the orbit.
+//
+// ADR-285: the Result/Path/X-ray toolbar, the section slider, Save PNG and the
+// depth readout went with the old three.js scene. The ported reference page has
+// none of them, and an identical port was the requirement.
 //
 // Portalled to document.body so no pane's overflow or stacking context can clip
 // it. Escape closes; the pane behind is left mounted and untouched.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { LiveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
-import { Viewer3DReadout } from '../cnc-viewer3d/Viewer3DReadout';
-import { Viewer3DToolbar } from '../cnc-viewer3d/Viewer3DToolbar';
-import {
-  DEFAULT_DISPLAY_MODE,
-  type Viewer3DDisplayMode,
-} from '../cnc-viewer3d/viewer3d-display-mode';
-import { SECTION_DISABLED_FRACTION } from '../cnc-viewer3d/viewer3d-clipping';
-import { DEFAULT_SCREENSHOT_SCALE, screenshotFileName } from '../cnc-viewer3d/viewer3d-screenshot';
-import { useCnc3dScene, type DesignSceneSource, type SurfaceReading } from './use-cnc-3d-scene';
+import { WoodView } from '../wood-viewer';
+import type { DesignSceneSource } from './use-cnc-3d-scene';
 
 const CLOSE_KEY = 'Escape';
+const FULL_PAGE_CANVAS_HEIGHT_PX = 720;
 
 export function Cnc3DFullPage(props: {
   readonly source: DesignSceneSource;
   readonly stockThicknessMm: number;
-  readonly scrubberT: number;
-  readonly live: LiveViewerState | null;
   readonly onClose: () => void;
 }): JSX.Element {
-  const { source, stockThicknessMm, scrubberT, live, onClose } = props;
-  const { canvasRef, state, controls } = useCnc3dScene(source, stockThicknessMm, scrubberT, live);
-  const [mode, setMode] = useState<Viewer3DDisplayMode>(DEFAULT_DISPLAY_MODE);
-  const [sectionFraction, setSectionFraction] = useState(SECTION_DISABLED_FRACTION);
-  const [reading, setReading] = useState<SurfaceReading | null>(null);
+  const { source, stockThicknessMm, onClose } = props;
   useCloseOnEscape(onClose);
-
-  // Pushed on every change AND on every state change: the controls no-op until
-  // the WebGL context exists, so a mode picked while it was still loading has
-  // to be re-applied once it is ready.
-  useEffect(() => {
-    controls.setDisplayMode(mode);
-    controls.setSectionFraction(sectionFraction);
-  }, [controls, mode, sectionFraction, state]);
-
-  const handleSavePng = useCallback(() => {
-    const dataUrl = controls.capturePng(DEFAULT_SCREENSHOT_SCALE);
-    if (dataUrl === null) return;
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    // The Project model carries no name, so the filename falls back to the
-    // module's own prefix rather than inventing a field to read.
-    link.download = screenshotFileName('', new Date().toISOString());
-    link.click();
-  }, [controls]);
-
-  const handlePointerMove = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      const bounds = event.currentTarget.getBoundingClientRect();
-      setReading(controls.probeAt(event.clientX - bounds.left, event.clientY - bounds.top));
-    },
-    [controls],
-  );
+  const grid = source.detailGrid ?? source.grid;
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="3D result, full page" style={overlayStyle}>
       <div style={barStyle}>
         <span style={titleStyle}>3D result</span>
-        <span style={hintStyle}>
-          {state === 'failed'
-            ? '3D view unavailable in this browser.'
-            : 'Drag to move, right-drag to orbit, scroll to zoom.'}
-        </span>
+        <span style={hintStyle}>Drag to orbit, scroll to zoom.</span>
         <button type="button" onClick={onClose} style={closeStyle} title="Close (Esc)">
           Close
         </button>
       </div>
-      <div style={toolbarRowStyle}>
-        <Viewer3DToolbar
-          mode={mode}
-          onModeChange={setMode}
-          sectionFraction={sectionFraction}
-          onSectionChange={setSectionFraction}
-          onSavePng={handleSavePng}
+      <div style={bodyStyle}>
+        <WoodView
+          grid={grid}
+          stockThicknessMm={stockThicknessMm}
+          heightPx={FULL_PAGE_CANVAS_HEIGHT_PX}
         />
-      </div>
-      <canvas
-        ref={canvasRef}
-        aria-label="Live 3D cut result"
-        style={canvasStyle}
-        onPointerMove={handlePointerMove}
-        onPointerLeave={() => setReading(null)}
-      />
-      <div style={readoutRowStyle}>
-        <Viewer3DReadout reading={reading} />
       </div>
     </div>,
     document.body,
@@ -132,15 +80,11 @@ const barStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
-const toolbarRowStyle: React.CSSProperties = { padding: '0 12px 8px', flexShrink: 0 };
-const readoutRowStyle: React.CSSProperties = { padding: '6px 12px', flexShrink: 0 };
 const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', flex: 1 };
 const closeStyle: React.CSSProperties = { padding: '4px 12px', cursor: 'pointer' };
-// The canvas fills what's left; the hook's ResizeObserver re-fits the drawing
-// buffer to whatever the layout gives it.
-const canvasStyle: React.CSSProperties = {
-  display: 'block',
+const bodyStyle: React.CSSProperties = {
   flex: 1,
-  width: '100%',
   minHeight: 0,
+  overflow: 'auto',
+  padding: '0 12px 12px',
 };

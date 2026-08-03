@@ -10,6 +10,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChiploadMaterial } from '../../core/cnc';
 import { steppedSurfaceMesh } from '../../core/heightfield';
+import { reliefSurfaceMesh } from '../../core/relief';
+import { woodGrainFor } from '../theme/wood-grain-appearance';
 import {
   downsampleRemovalGrid,
   probeRemovalGrid,
@@ -28,6 +30,10 @@ import {
 // Display resolution for the pane's surface mesh. The stepped builder emits
 // several times the vertex count of a smooth grid, so the downsample matters.
 const PANE_DISPLAY_CELLS_ACROSS = 300;
+// Vertex budget for the timber surface. The smooth builder emits about one
+// vertex per cell, so this is ~810k verts at worst — heavy but well inside
+// what a desktop GPU draws on demand, and the fine detail rides the texture.
+const PANE_SHADED_MESH_CELLS_ACROSS = 900;
 
 export type Cnc3dSceneState = 'loading' | 'ready' | 'failed';
 
@@ -35,6 +41,11 @@ export type Cnc3dSceneState = 'loading' | 'ready' | 'failed';
 // carved it. Both are in scene frame (ADR-261 §2).
 export type DesignSceneSource = {
   readonly grid: RemovalGrid;
+  // The carved region re-simulated at high resolution, for shading only. The
+  // stock-wide grid gives a V-groove about one cell, which is why the carve
+  // read as a staircase of blocks; this one restores the detail without
+  // meshing the whole stock finely.
+  readonly detailGrid?: RemovalGrid;
   // The job's stock material, so the carve is shaded as the stock the operator
   // actually loaded rather than as generic timber.
   readonly materialKey?: ChiploadMaterial;
@@ -116,7 +127,7 @@ export function useCnc3dScene(
     }
 
     setState('loading');
-    void createReliefThreeScene(canvas, content.mesh, stockThicknessMm, content.toolpath)
+    void createReliefThreeScene(canvas, content)
       .then((outcome) => {
         if (cancelled) {
           if (outcome.kind === 'ok') outcome.handle.dispose();
@@ -214,14 +225,45 @@ function contentFor(
   source: DesignSceneSource,
   stockThicknessMm: number,
 ): Parameters<ReliefSceneHandle['updateContent']>[0] {
-  const { grid, moves, toolProfile, materialKey } = source;
+  const { grid, detailGrid, moves, toolProfile, materialKey } = source;
+  // Timber gets the SMOOTH builder at full simulation resolution. The stepped
+  // builder authors a vertical wall per cell, which is right for an end mill's
+  // pocket and reads as a voxel staircase on a V-groove; downsampling to 300
+  // cells then made each of those steps over a millimetre wide. The smooth
+  // mesh also emits roughly one vertex per cell instead of several, so full
+  // resolution here costs less than the stepped mesh did at 300.
+  const grain = woodGrainFor(materialKey);
   const display = downsampleRemovalGrid(grid, PANE_DISPLAY_CELLS_ACROSS);
+  // Mesh resolution and SHADING resolution are deliberately different. The
+  // grid is now fine enough to resolve a 0.8 mm groove, but meshing it whole
+  // would be millions of vertices; the shader reads normals, occlusion and
+  // shadow from the full-resolution depth texture instead, so a decimated mesh
+  // still shades crisply. This is how the standalone preview reached its
+  // detail: a moderate mesh under a fine heightmap.
+  const surface =
+    grain === null
+      ? steppedSurfaceMesh(display)
+      : reliefSurfaceMesh(downsampleRemovalGrid(grid, PANE_SHADED_MESH_CELLS_ACROSS));
   // Initial cutter placement only; the scrub effect repositions it from there
   // without rebuilding anything.
   const toolAt = pointAtArcLength(moves, Number.POSITIVE_INFINITY);
   return {
-    mesh: steppedSurfaceMesh(display),
+    mesh: surface,
     stockThicknessMm,
+    // Must be the grid the mesh was built from — the shader marches it to
+    // shadow and occlude itself, and a different extent would land the shading
+    // beside the groove it describes.
+    // Shading reads the FINE regional grid when there is one; the mesh keeps
+    // the stock-wide grid so the board still spans the stock.
+    heightfield: grain === null ? display : (detailGrid ?? grid),
+    ...(grain === null || detailGrid === undefined
+      ? {}
+      : {
+          heightfieldOffsetMm: {
+            x: detailGrid.originX - grid.originX,
+            y: detailGrid.originY - grid.originY,
+          },
+        }),
     ...(materialKey === undefined ? {} : { materialKey }),
     // Downsampling keeps the grid's min corner, so the full-resolution origin
     // is still the right offset for the path.

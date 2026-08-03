@@ -10,13 +10,15 @@
 // together, so a rebuild cannot leak.
 
 import type * as ThreeNamespace from 'three';
-import type { BufferGeometry, Object3D } from 'three';
+import type { BufferGeometry, Mesh, MeshStandardMaterial, Object3D } from 'three';
 import type { ChiploadMaterial } from '../../core/cnc';
 import type { ReliefSurfaceMesh } from '../../core/relief';
-import type { ToolProfilePoint } from '../../core/sim';
+import type { RemovalGrid, ToolProfilePoint } from '../../core/sim';
 import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
 import { materialAppearance, type MaterialAppearance } from '../theme/material-appearance';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
+import { woodGrainFor } from '../theme/wood-grain-appearance';
+import { createCarvedWoodMaterial } from './viewer3d-wood-material';
 import { displayModeFlags, type Viewer3DDisplayMode } from './viewer3d-display-mode';
 import { localFromScene } from './viewer3d-picking';
 import { buildStageFurniture } from './viewer3d-stage';
@@ -49,6 +51,13 @@ export type ViewerContentInput = {
   readonly mesh: ViewerSurfaceMesh;
   readonly stockThicknessMm: number;
   readonly toolpath?: ViewerToolpathOverlay;
+  // The grid `mesh` was built from. Present only for the CNC pane, which is
+  // the one surface whose shader marches it for self-shadowing and ambient
+  // occlusion (ADR-284). Absent = the original depth-ramped vertex colours.
+  readonly heightfield?: RemovalGrid;
+  // Where `heightfield`'s min corner sits relative to the mesh's, in mm.
+  // Non-zero when the shading grid covers only the carved region.
+  readonly heightfieldOffsetMm?: { readonly x: number; readonly y: number };
   // The job's stock material. Absent = "Custom", which keeps the original
   // wood palette so nothing changes for an unconfigured job.
   readonly materialKey?: ChiploadMaterial;
@@ -90,27 +99,11 @@ export async function buildViewerContent(
   group.name = 'content';
   const disposers: Array<() => void> = [];
 
-  const geometry = buildSurfaceGeometry(three, mesh);
-  // Shade by depth so carved areas read darker. A single flat tint leaves a
-  // pocket floor almost the same value as the stock top, so the shape has to
-  // be inferred from lighting alone — which is why it was hard to see.
-  applyDepthColors(three, geometry, stockThicknessMm, appearance);
-  const surfaceMaterial = new three.MeshStandardMaterial({
-    vertexColors: true,
-    side: three.DoubleSide,
-    flatShading: false,
-    // Per material: timber is matte and specular highlights read as features,
-    // whereas acrylic without gloss and aluminium without metalness both just
-    // look like painted wood.
-    roughness: appearance.roughness,
-    metalness: appearance.metalness,
-  });
-  const surfaceMesh = new three.Mesh(geometry, surfaceMaterial);
+  const surface = buildSurface(three, input, appearance);
+  const surfaceMesh = surface.mesh;
+  const surfaceMaterial = surface.material;
   group.add(surfaceMesh);
-  disposers.push(() => {
-    geometry.dispose();
-    surfaceMaterial.dispose();
-  });
+  disposers.push(surface.dispose);
 
   addStockOutline(three, group, mesh, stockThicknessMm, disposers);
 
@@ -178,6 +171,65 @@ export async function buildViewerContent(
 }
 
 // Builds the carved-surface geometry in the viewport's shared frame.
+type SurfaceHandle = {
+  readonly mesh: Mesh;
+  readonly material: MeshStandardMaterial;
+  readonly dispose: () => void;
+};
+
+// Timber stock whose grid came through gets the carved-wood shader; everything
+// else — acrylic, aluminium, or any caller that did not pass the grid — keeps
+// the depth-ramped vertex colours the pane shipped with.
+function buildSurface(
+  three: ThreeModule,
+  input: ViewerContentInput,
+  appearance: MaterialAppearance,
+): SurfaceHandle {
+  const { mesh, stockThicknessMm, heightfield, heightfieldOffsetMm, materialKey } = input;
+  const geometry = buildSurfaceGeometry(three, mesh);
+  const grain = woodGrainFor(materialKey);
+  if (heightfield !== undefined && grain !== null) {
+    const wood = createCarvedWoodMaterial(three, {
+      appearance,
+      grain,
+      grid: heightfield,
+      widthMm: mesh.widthMm,
+      heightMm: mesh.heightMm,
+      ...(heightfieldOffsetMm === undefined ? {} : { gridOffsetMm: heightfieldOffsetMm }),
+    });
+    return {
+      mesh: new three.Mesh(geometry, wood.material),
+      material: wood.material,
+      dispose: () => {
+        geometry.dispose();
+        wood.dispose();
+      },
+    };
+  }
+  // Shade by depth so carved areas read darker. A single flat tint leaves a
+  // pocket floor almost the same value as the stock top, so the shape has to
+  // be inferred from lighting alone — which is why it was hard to see.
+  applyDepthColors(three, geometry, stockThicknessMm, appearance);
+  const material = new three.MeshStandardMaterial({
+    vertexColors: true,
+    side: three.DoubleSide,
+    flatShading: false,
+    // Per material: timber is matte and specular highlights read as features,
+    // whereas acrylic without gloss and aluminium without metalness both just
+    // look like painted wood.
+    roughness: appearance.roughness,
+    metalness: appearance.metalness,
+  });
+  return {
+    mesh: new three.Mesh(geometry, material),
+    material,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
 function buildSurfaceGeometry(three: ThreeModule, mesh: ViewerSurfaceMesh): BufferGeometry {
   const geometry = new three.BufferGeometry();
   geometry.setAttribute('position', new three.BufferAttribute(mesh.positions.slice(), 3));

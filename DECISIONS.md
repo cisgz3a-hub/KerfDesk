@@ -15150,3 +15150,137 @@ had to stop deleting on absence and now retains ready pages indefinitely.
   `imageAsset`, and no worker-progress toast; the existing paged-route tests continue to pass.
 - NOT verified: portability of a page-backed `.lf2` across machines, ready-page collection, worker
   or operating-system peak memory, and any hardware behaviour. No machine was involved.
+
+## ADR-284 - The carved surface is shaded as timber, by injecting into MeshStandardMaterial (2026-08-03)
+
+**Date:** 2026-08-03
+**Status:** Accepted
+
+### Context
+
+The CNC 3D result pane already simulates the cut correctly: `computeRemovalGrid` stamps the tool
+kernel into a depth field and `steppedSurfaceMesh` turns that field into a mesh whose pocket walls
+stay vertical (ADR-261). What it did not do was make the result *legible as a cut in wood*. The
+surface carried a per-vertex colour ramp from the stock top to full depth, lit by one key and one
+fill light and nothing else. A V-carved groove 3 mm wide is read almost entirely from how it
+shadows and occludes itself, and neither of those existed: the pane's lights cast no shadow maps,
+so a 6 mm groove and a 1 mm scratch differed only by tint.
+
+The operator's own comparison was direct — a standalone WebGL preview of the same program, shaded
+as timber with marched shadows and ambient occlusion, showed the lettering as an obviously carved
+sign where the pane showed a flat brown plate.
+
+### Decision
+
+1. The machined surface for **timber stock** is shaded by a procedural wood material. Non-timber
+   stock (acrylic, aluminium) and any caller that does not supply the grid keep the existing
+   depth-ramped vertex colours unchanged.
+2. That material is built by **injecting into `MeshStandardMaterial` via `onBeforeCompile`**, not by
+   replacing it with a `ShaderMaterial`. The scene's lights, tone mapping and `ColorManagement` keep
+   working, and the fallback needs no branch in the scene code.
+3. Grain is a property of the **log**, not of the surface: rings are cylinders about an axis running
+   along X below the stock, so a groove reveals the ring structure underneath. This is what
+   distinguishes a carve from lettering printed on a board.
+4. Self-shadowing and ambient occlusion **march the removal grid**, uploaded as an R16F depth
+   texture, rather than using shadow maps. The grid is already computed, it is registered with the
+   mesh by construction, and shadow maps would need the scene to grow light frusta it does not have.
+5. The texture must be the **same grid the mesh was built from** — the pane downsamples to 300 cells
+   across before meshing, so the full-resolution grid would shade a groove that sits elsewhere.
+6. Every three.js chunk replacement is **checked**, and the material degrades to plain PBR when one
+   is missing. GLSL lives in its own module because ESLint's `max-lines` counts template-literal
+   lines.
+7. This amends ADR-102 §2 and ADR-261 §1 only in that the sanctioned three.js homes may now contain
+   GLSL source. The viewport stays display-only; nothing here feeds emission.
+
+### Consequences
+
+- The pane gains grain, self-shadowing, ambient occlusion, and lighter freshly-cut faces. Depth now
+  reads from occlusion rather than from tint, which is why the vertex-colour ramp is dropped for
+  timber.
+- First GLSL in the tree. It is unlinted — there is no shader tooling — so its correctness rests on
+  the injection tests and on looking at the output.
+- Coupling to three.js internal chunk names is real and deliberate. `WOOD_REQUIRED_CHUNKS` is
+  asserted against the installed `ShaderLib`, so a three upgrade that renames a chunk fails a test
+  rather than silently blanking the pane.
+- Fragment cost rises by ~54 texture taps per pixel (24 shadow, 30 occlusion). The pane canvas is
+  244x240, so this is not measurable there; the full-page view is the case to watch.
+
+### Verification
+
+- `viewer3d-wood-material.test.ts` (8 tests) drives `onBeforeCompile` with the REAL
+  `three.ShaderLib.standard` source: it asserts the injection lands, that the grid is published as
+  positive millimetres (the grid stores z <= 0), that the shader is sized to the mesh rather than to
+  the cell count, and that removing ANY required chunk leaves the surface renderable with the grain
+  dropped and no uniforms set.
+- `wood-grain-appearance.test.ts` pins that timber families are grained, acrylic and aluminium are
+  not, "Custom" keeps a grain, and every ring frequency is high enough to put more than one growth
+  ring across a board.
+- NOT verified: no perceptual check inside the running app, no screenshot of the pane, and no
+  hardware. The shading was verified perceptually only in the standalone preview this was ported
+  from, against the same program's G-code.
+
+## ADR-285 - The CNC 3D result pane is the standalone carve preview, ported verbatim (2026-08-03)
+
+**Date:** 2026-08-03
+**Status:** Accepted
+
+### Context
+
+ADR-284 shaded the existing three.js surface as timber. Over several rounds it did not reach the
+reference the maintainer was comparing against — a standalone WebGL page (`wood-view.html`) that
+renders the same job as convincing carved wood. Each attempt closed one gap and exposed another:
+grain aliasing into moire stripes, a stock-wide grid giving a 0.80 mm V-groove exactly ONE cell, a
+stepped mesh turning the flanks into a staircase.
+
+The measurement that settled it: the reference page grids the ARTWORK plus a 6 mm margin at 12
+cells/mm, so a groove gets ~9.6 cells. The pane grids the whole 400 mm stock at 500 cells/axis, so
+the same groove gets 1. The page was never doing anything the pane could reach by re-lighting;
+it was working from ten times the data over a tenth of the area.
+
+The maintainer's instruction was explicit: copy the page verbatim, replace the scene, and delete
+the features that stand in the way.
+
+### Decision
+
+1. `src/ui/wood-viewer/` **is** the reference page: raw WebGL2, its own context, programs, camera,
+   lights and tone mapping. It imports no three.js. Layering the page's look onto the existing
+   scene was tried and rejected — the lighting rig is part of the result.
+2. The CNC 3D pane and its full-page view render it. **Deleted with the old scene: the toolpath
+   overlay, scrubber playback, X-ray, the section plane, Save PNG, the click-to-probe depth
+   readout, and live-run tracking.** The page has none of them; an identical port was the
+   requirement. This is a deliberate capability loss, authorised in chat.
+3. The pane simulates a second, ARTWORK-SCOPED grid at `DEFAULT_CELL_MM` for shading
+   (`detailGrid`), keeping the stock-wide grid for the board and the depth probe. Scoped to the
+   carve rather than the bed, this costs no more cells than the stock-wide grid already did.
+4. Depth reaches the shader as an R16F texture with `UNPACK_ALIGNMENT = 1`; at the default 4 an odd
+   cell width shears every row.
+5. Groove interiors pass through a grey-scale morphological CLOSING before shading
+   (`closeDepthField`), applied ONLY to cells enclosed by cut stock on all four sides.
+6. This does not amend ADR-102 or ADR-261, which govern three.js. Those still bind the relief and
+   bit-preview dialogs. It adds a second, three-free renderer alongside them.
+
+### Consequences
+
+- The pane looks like the reference page and gains its controls: four species, four groove fills,
+  four camera presets, a light slider.
+- Four capabilities are gone. Anyone who needs X-ray, section, scrub or probe must use a different
+  surface or restore them on this renderer.
+- `src/ui/cnc-viewer3d/` still exists for the other dialogs, but the wood material added by
+  ADR-284 is no longer reached by the pane and is now dead weight.
+- The closing in §5 is a COSMETIC REPAIR IN THE VIEWER. It hides an unexplained defect: the
+  stamper leaves isolated uncut cells inside a groove. A constant-Z groove was verified smooth;
+  the `path3d` branch (per-vertex `zs`, which is what a v-carve actually emits) was NOT tested and
+  is the open suspect. The G-code, the toolpath and the probe's grid are untouched by the closing.
+
+### Verification
+
+- `wood-view-flatten.test.ts` pins the closing in both directions: an enclosed spike is filled, the
+  floor keeps its cut depth, no cell is ever reported shallower than it was cut, and uncut stock is
+  left alone. The last two were added after the first implementation grew the groove at its rim —
+  reporting material removed that the cutter never touched.
+- A probe through the real `computeRemovalGrid` printed a clean linear V cross section, proving the
+  ridges were not ladder scallops; `toHalfFloat` was measured accurate to 0.002 mm over 0-6 mm.
+- Full suite green: 9715 passed. Typecheck, ESLint and Prettier clean.
+- NOT verified: no automated coverage of `wood-view-scene.ts` (it needs a WebGL context), no
+  perceptual regression test, and no hardware. The port's appearance was confirmed by the
+  maintainer looking at it, which is the only check that exists for it.
