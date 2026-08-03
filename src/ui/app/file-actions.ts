@@ -170,11 +170,6 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     await handleSaveRd(ctx, placement);
     return;
   }
-  // prepareGcodeSave owns factual non-writable preparation/emission outcomes
-  // plus the Rule 7 / ADR-228 blocking-vs-advisory split for emitted output.
-  // Advisory findings remain available for post-save toasts.
-  const prepared = await prepareGcodeSave(ctx, placement);
-  if (prepared.kind === 'failed') return;
   // Rule 7 / ADR-228: stated HERE, where the deleted confirm stood, rather than
   // with the post-save advisories. The confirm was raised on every save
   // ATTEMPT, so reporting it only after a successful write would tell the
@@ -186,6 +181,15 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   )) {
     ctx.pushToast(advisory, 'warning');
   }
+  // The picker is opened BEFORE the program is emitted because
+  // showSaveFilePicker requires transient user activation, and that activation
+  // expires while an await runs (Chromium: ~5 s). Emitting first made every job
+  // whose compile outran the window impossible to save at all, failing with
+  // "Must be handling a user gesture to show a file picker" — a V-carve text
+  // layer measures ~13.7 s. Cost of this order: a compile that then fails
+  // leaves the file the picker already created at zero bytes. Nothing is
+  // written to it, and an empty file the operator can delete is recoverable
+  // where a save that cannot open a dialog at all is not.
   let target: SaveTarget | null;
   try {
     target = await ctx.platform.pickFileForSave({
@@ -197,6 +201,11 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     return;
   }
   if (target === null) return;
+  // prepareGcodeSave owns factual non-writable preparation/emission outcomes
+  // plus the Rule 7 / ADR-228 blocking-vs-advisory split for emitted output.
+  // Advisory findings remain available for post-save toasts.
+  const prepared = await prepareGcodeSave(ctx, placement);
+  if (prepared.kind === 'failed') return;
   try {
     await target.write(prepared.gcode);
     advanceExportVariables(ctx);

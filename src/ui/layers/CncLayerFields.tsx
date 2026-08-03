@@ -22,7 +22,6 @@ import { useStore } from '../state';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
 import { CncCoreCutFields, CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
 import { CncLineArtContoursField } from './CncLineArtContoursField';
-import { CncThinDetailNote } from './CncThinDetailNote';
 import { CncOpenPathNote } from './CncOpenPathNote';
 import { CncRetractPassesField } from './CncRetractPassesField';
 import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
@@ -75,7 +74,17 @@ export function CncLayerFields(props: {
       </Row>
       <CncLineArtContoursField layer={layer} settings={settings} onCommit={commit} />
       <CncOpenPathNote layer={layer} settings={settings} />
-      <CncThinDetailNote layer={layer} settings={settings} />
+      {/*
+        CncThinDetailNote is deliberately not rendered here. It ran the whole
+        V-carve ladder on the main thread from a React effect keyed on the
+        layer's settings, so selecting the V-carve cut type blocked the UI for
+        as long as a compile takes — measured at 13.7 s for 120 thin contours at
+        3 mm depth. Nothing is lost by leaving it out: the ladder already
+        reports thinResidual and passLimited to Job Review, which is the warning
+        surface the operator confirms (rule 7). Restore it once the check runs
+        on the preparation worker instead of the render thread. CncOpenPathNote
+        above stays: it only flattens contours, it never builds the ladder.
+      */}
       <LayerBitSelect
         layer={layer}
         settings={settings}
