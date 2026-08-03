@@ -34,7 +34,7 @@ import {
   type RemovalGridResult,
   type RemovalGridSpec,
 } from './removal-grid';
-import { kernelForTool, type ToolKernel } from './tool-kernels';
+import { cuttingSurfaceDz, kernelForTool, type ToolKernel } from './tool-kernels';
 
 export type ComputeRemovalOptions = {
   // Only stamp the first `uptoLengthMm` of the toolpath — the scrubber's
@@ -274,14 +274,35 @@ function stampSegment(
   return false;
 }
 
+// Measures the cutting surface from the tool's REAL position, not from the
+// centre of the cell it lands in.
+//
+// `kernel.offsets` carries a height precomputed from a whole-cell distance, so
+// using it here quietly moved the bit to the nearest cell centre before
+// cutting. On a 30 degree v-bit at 0.2 mm cells that is up to
+// 0.1 / tan(15 deg) = 0.373 mm of depth error, and because the error is locked
+// to the cell lattice it survives as a regular field of uncut spikes standing
+// inside a groove — visible the moment the grid is fine enough to resolve a
+// groove at all. The offsets stay as they are for roughing and finishing,
+// which dilate on the lattice and want exactly that model.
+//
+// One extra ring of cells is scanned because a tip anywhere inside the centre
+// cell can reach a cell whose centre sits just past the lattice radius.
 function stampTip(grid: RemovalGrid, kernel: ToolKernel, x: number, y: number, tipZ: number): void {
   const { cx, cy } = gridCellOfPoint(grid, x, y);
-  for (const offset of kernel.offsets) {
-    const index = gridCellIndex(grid, cx + offset.dx, cy + offset.dy);
-    if (index === null) continue;
-    const surfaceZ = tipZ + offset.dz;
-    if (surfaceZ >= 0) continue;
-    const current = grid.depth[index] ?? 0;
-    if (surfaceZ < current) grid.depth[index] = surfaceZ;
+  const reach = kernel.radiusCells + 1;
+  for (let dy = -reach; dy <= reach; dy += 1) {
+    for (let dx = -reach; dx <= reach; dx += 1) {
+      const index = gridCellIndex(grid, cx + dx, cy + dy);
+      if (index === null) continue;
+      const cellX = grid.originX + (cx + dx + 0.5) * grid.mmPerCell;
+      const cellY = grid.originY + (cy + dy + 0.5) * grid.mmPerCell;
+      const dMm = Math.hypot(cellX - x, cellY - y);
+      if (dMm > kernel.radiusMm) continue;
+      const surfaceZ = tipZ + cuttingSurfaceDz(kernel.tool, dMm, kernel.radiusMm);
+      if (surfaceZ >= 0) continue;
+      const current = grid.depth[index] ?? 0;
+      if (surfaceZ < current) grid.depth[index] = surfaceZ;
+    }
   }
 }

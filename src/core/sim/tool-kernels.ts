@@ -21,6 +21,12 @@ export type ToolKernelOffset = {
 export type ToolKernel = {
   readonly radiusCells: number;
   readonly offsets: ReadonlyArray<ToolKernelOffset>;
+  // The tool and its radius travel with the kernel so a stamper can measure the
+  // cutting surface from the tool's REAL position rather than from the lattice
+  // distance baked into `offsets`. Roughing dilation and finishing still read
+  // `offsets`, for which whole-cell distances are the right model.
+  readonly tool: CncTool;
+  readonly radiusMm: number;
 };
 
 // V-bits with a missing/degenerate angle fall back to this so the cone stays
@@ -38,7 +44,7 @@ export function kernelForTool(tool: CncTool, mmPerCell: number): ToolKernel {
       offsets.push({ dx, dy, dz: cuttingSurfaceDz(tool, dMm, radiusMm) });
     }
   }
-  return { radiusCells, offsets };
+  return { radiusCells, offsets, tool, radiusMm };
 }
 
 /**
