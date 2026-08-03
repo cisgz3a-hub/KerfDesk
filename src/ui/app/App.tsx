@@ -16,7 +16,7 @@ import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
 import { DesignStudioHost } from '../design-studio';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
-import { Cnc3DPane, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
+import { RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
@@ -63,7 +63,15 @@ export function App(): JSX.Element {
       <main style={mainStyle}>
         <ToolStrip />
         <CanvasArea />
-        <Cnc3DPane />
+        {/*
+          The 3D result pane is deliberately not mounted (maintainer, 2026-08-03).
+          It rebuilt the carve grid from the whole project, which costs seconds
+          once a layer is V-carve, and mounting it at all was enough to freeze
+          the app. Unmounting is the only thing that reliably stops that work:
+          the hook cannot run if the component never renders. Cnc3DPane and its
+          worker stay in the tree, exported and tested, so this is a one-line
+          restore once the underlying cost is understood.
+        */}
         <WorkspaceSidePanels />
       </main>
       <LiveMotionBar />
