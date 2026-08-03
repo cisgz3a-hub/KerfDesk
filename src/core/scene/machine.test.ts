@@ -8,6 +8,11 @@ import {
   type CncToolKind,
 } from './machine';
 
+// Append-only, with one deliberate exception: 'eng-15' was removed after its
+// 3.175 mm turned out to be a shank diameter recorded as a cutting diameter,
+// which implied a 12.06 mm cone. Removal is safe because saved projects carry
+// their own tools array and only fall back to DEFAULT_CNC_TOOLS when they have
+// none. Removing any other shipped id still needs that same justification.
 const STABLE_DEFAULT_TOOL_IDS = [
   'em-3175',
   'em-1588',
@@ -26,7 +31,6 @@ const STABLE_DEFAULT_TOOL_IDS = [
   'vb-45',
   'vb-60',
   'vb-90',
-  'eng-15',
 ] as const;
 
 const ANGLED_TOOL_KINDS = new Set<CncToolKind>(['v-bit', 'engraving']);

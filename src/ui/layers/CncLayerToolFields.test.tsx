@@ -391,7 +391,6 @@ describe('VClearToolSelect', () => {
       const optionValues = [...host.querySelectorAll('option')].map((option) => option.value);
       expect(optionValues).toContain('em-3175');
       expect(optionValues).not.toContain('bn-3175');
-      expect(optionValues).not.toContain('eng-15');
       expect(optionValues).not.toContain('vb-60');
     } finally {
       await act(async () => root.unmount());
@@ -415,7 +414,6 @@ describe('VClearToolSelect', () => {
       expect(invalid?.textContent).toContain('choose a flat end mill');
       expect(invalid?.textContent).toContain('3.175 mm, Ball nose');
       expect(host.querySelector('option[value="bn-1588"]')).toBeNull();
-      expect(host.querySelector('option[value="eng-15"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();

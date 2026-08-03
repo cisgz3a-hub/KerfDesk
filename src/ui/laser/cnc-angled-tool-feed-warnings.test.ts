@@ -6,11 +6,23 @@ import {
   createProject,
   validateOutputScope,
   type CncLayerSettings,
+  type CncTool,
   type Project,
 } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings';
 import { detectMachineJobWarnings } from './machine-job-warnings';
+
+// The shipped 'eng-15' starter was dropped (shank diameter recorded as a
+// cutting diameter). Angled-tool coverage still needs an engraving cutter, so
+// the fixture machine supplies one the operator could have entered themselves.
+const LEGACY_ENGRAVING_TOOL: CncTool = {
+  id: 'legacy-engraving',
+  name: 'Legacy engraving bit — 30° included',
+  kind: 'engraving',
+  diameterMm: 3.175,
+  tipAngleDeg: 30,
+};
 
 function cncProject(
   settings: CncLayerSettings,
@@ -28,7 +40,10 @@ function cncProject(
   });
   return {
     ...createProject(),
-    machine: DEFAULT_CNC_MACHINE_CONFIG,
+    machine: {
+      ...DEFAULT_CNC_MACHINE_CONFIG,
+      tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, LEGACY_ENGRAVING_TOOL],
+    },
     scene: { objects: options.used === false ? [] : [object], layers: [layer] },
   };
 }
@@ -49,7 +64,7 @@ function materialSettings(toolId: string): CncLayerSettings {
 describe('detectCncAngledToolFeedWarnings', () => {
   it.each([
     ['vb-90', '90° V-bit — 12.7 mm (1/2") cut', '12.7 mm', '90°'],
-    ['eng-15', '15° engraving bit — 3.175 mm (1/8") cut', '3.175 mm', '15°'],
+    ['legacy-engraving', 'Legacy engraving bit — 30° included', '3.175 mm', '30°'],
   ])('warns for output material-recipe angled tool %s', (toolId, name, diameter, angle) => {
     const [warning, ...rest] = detectCncAngledToolFeedWarnings(
       cncProject(materialSettings(toolId)),

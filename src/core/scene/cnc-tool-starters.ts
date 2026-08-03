@@ -110,14 +110,17 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     tipAngleDeg: 90,
     family: 'v-groove',
   },
-  {
-    id: 'eng-15',
-    name: '15° engraving bit — 3.175 mm (1/8") cut',
-    kind: 'engraving',
-    diameterMm: 3.175,
-    tipAngleDeg: 15,
-    family: 'engraving',
-  },
+  // 'eng-15' was removed here: it declared 3.175 mm as CUTTING diameter, but
+  // every commercial 15°-class engraving cutter lists 3.175 mm as the SHANK
+  // (2L Inc, PreciseBits, EnPoint and HUHAO all pair a 1/8" shank with a
+  // 0.1-0.6 mm tip). Read as a cutting diameter it implied a 12.06 mm cone
+  // (r / tan 7.5°), so the depth law would drive a fine engraver far past its
+  // real cutting length. The true cutting diameter of the bit this entry meant
+  // to describe is not known, and inventing one is worse than shipping no
+  // starter, so it is gone. The 'engraving' KIND stays supported: saved
+  // projects carry their own tools array (deserialize-project.ts), and
+  // AddCncBitForm still creates engraving bits from the operator's own
+  // measurements.
   {
     id: 'vb-90-6350-hobby',
     name: '90° V-bit — 6.35 mm (1/4") cut, 3.175 mm (1/8") shank',

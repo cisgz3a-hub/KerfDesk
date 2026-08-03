@@ -22,6 +22,16 @@ const ANGLELESS_V_BIT: CncTool = {
   kind: 'v-bit',
   diameterMm: 3,
 };
+// The shipped 'eng-15' starter was dropped (shank diameter recorded as a
+// cutting diameter), but the engraving KIND is still user-creatable, so this
+// case keeps its coverage with a locally defined cutter.
+const LEGACY_ENGRAVING_TOOL: CncTool = {
+  id: 'legacy-engraving',
+  name: 'Legacy engraving bit',
+  kind: 'engraving',
+  diameterMm: 3.175,
+  tipAngleDeg: 30,
+};
 
 function anglelessMachine(
   patch: Partial<CncTool> = {},
@@ -158,7 +168,7 @@ describe('invalid CNC tool geometry preflight', () => {
 
   it.each([
     ['ball-nose', 'bn-3175'],
-    ['engraving', 'eng-15'],
+    ['engraving', LEGACY_ENGRAVING_TOOL.id],
   ] as const)(
     'refuses a contributing V-carve flat-floor stage assigned to a %s cutter',
     (kind, clearToolId) => {
@@ -167,16 +177,14 @@ describe('invalid CNC tool geometry preflight', () => {
         vCarveFlatDepthEnabled: true,
         vClearToolId: clearToolId,
       });
-      const clearTool = DEFAULT_CNC_MACHINE_CONFIG.tools.find((tool) => tool.id === clearToolId);
-      if (clearTool === undefined) throw new Error('expected starter clearing tool');
+      const machine: CncMachineConfig = {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, LEGACY_ENGRAVING_TOOL],
+      };
+      const clearTool = machine.tools.find((tool) => tool.id === clearToolId);
+      if (clearTool === undefined) throw new Error('expected clearing tool');
 
-      expect(
-        preflight(
-          [layer],
-          [rectangle('wide-v-carve', VCARVE_COLOR, 60)],
-          DEFAULT_CNC_MACHINE_CONFIG,
-        ),
-      ).toEqual({
+      expect(preflight([layer], [rectangle('wide-v-carve', VCARVE_COLOR, 60)], machine)).toEqual({
         ok: false,
         issues: [
           {
