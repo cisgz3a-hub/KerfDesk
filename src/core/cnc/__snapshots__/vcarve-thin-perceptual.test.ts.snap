@@ -10,7 +10,7 @@ G0 Z3.810
 M3 S12000
 G4 P3.000
 ; cnc layer-id: L1
-; cnc operation: v-carve; passes: 5
+; cnc operation: v-carve; passes: 6
 ; cnc tool-id: v90
 ; cnc tool-name: 90° v-bit
 ; cnc tool: v-bit; diameter-mm: 6.000; angle-deg: 90.000
@@ -19,6 +19,12 @@ G4 P3.000
 ; cnc motion: feed-mm-min: 1000; plunge-mm-min: 300
 ; cnc spindle-rpm: 12000
 ; cnc feed-source: manual
+G0 X57.701 Y349.699
+G1 Z-0.298 F300
+G1 X50.299 Y349.699 F1000
+G1 X57.701 Y349.701
+G1 X57.701 Y349.699
+G0 Z3.810
 G0 X57.950 Y349.450
 G1 Z-0.049 F300
 G1 X50.050 Y349.450 Z-0.049 F300

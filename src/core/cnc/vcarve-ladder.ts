@@ -31,13 +31,14 @@
 // engine order within a region (δ rings before detail rings), no clock, no
 // random.
 
-import { buildOffsetLadder } from '../geometry/offset-ladder';
+import { buildOffsetLadder, type OffsetLadder } from '../geometry/offset-ladder';
 import { normalizeClosedPolylinesEvenOddChecked } from '../geometry/polygon-difference';
 import type { CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
-import { hasFinitePoints } from './profile-paths';
 import { vcarveIncludedAngleDeg } from './vcarve-angle';
+import { vcarveAxisTail, type AxisTail } from './vcarve-axis-tail';
+import { isVCarvableContour } from './vcarve-carvable-contours';
 import {
   detailPath3dPlan,
   sourceBoundarySegments,
@@ -58,7 +59,6 @@ import {
   type ThinDetailRings,
 } from './vcarve-thin-detail';
 
-const MIN_CLOSED_POINTS = 3;
 const MIN_RESOLUTION_MM = 0.1;
 // Two clipper quanta (OFFSET_PRECISION_DECIMALS = 3 → 0.001 mm grid): the
 // finest ring pitch whose successive insets stay distinct after rounding.
@@ -102,8 +102,9 @@ export type VCarveLadder = {
 
 type VCarveRing = {
   // δ ladder rings keep their pitch depth; detail rings carry the junction
-  // blend on the stepped path (per-vertex depths, ADR-282 Amendment 2).
-  readonly kind: 'ring' | 'detail';
+  // blend on the stepped path (per-vertex depths, ADR-282 Amendment 2); axis
+  // rings are the medial-axis tail and always plunge (see passesForRings).
+  readonly kind: 'ring' | 'detail' | 'axis';
   readonly polyline: Polyline;
   readonly depthMm: number;
 };
@@ -171,12 +172,18 @@ export function vcarveLadderPasses(
 
   // Ring k (1-based in the depth law above) is ladder step k - 1.
   const ladder = buildOffsetLadder(contours, MAX_VCARVE_RINGS, (step) => (step + 1) * delta);
+  const coarse = coarseLadderWithAxisTail(contours, ladder, delta, {
+    tanHalf,
+    maxDepthMm: maxDepth,
+  });
   // A failed ladder's coverage is unknowable — a detail pass against it would
   // re-carve everything at fine pitch. offsetFailed already reports the gap.
   const detail = ladder.offsetFailed
     ? NO_DETAIL
     : vcarveThinDetailRings(contours, ladder.rings[0] ?? [], delta, finePitchMm);
-  const rings = zipRegionRings(sourceContours, contours, ladder.rings, detail, {
+  const rings = zipRegionRings(sourceContours, contours, coarse.rings, detail, {
+    coarseInsetsMm: coarse.insetsMm,
+    axisFromStep: coarse.axisFromStep,
     deltaMm: delta,
     finePitchMm,
     tanHalf,
@@ -190,17 +197,83 @@ export function vcarveLadderPasses(
   const { detailDepthLimited, ...entryResult } = entry;
   return {
     ...entryResult,
-    offsetFailed: ladder.offsetFailed || detail.offsetFailed,
+    ...ladderAdvisories(ladder, detail, {
+      tailFailed: coarse.tailFailed,
+      pitchDegraded,
+      detailDepthLimited,
+    }),
+  };
+}
+
+// Job Review's V-carve advisories, rolled up from every stage that can leave
+// the carve short of the artwork. All advisory, never refusals (rule 7).
+function ladderAdvisories(
+  ladder: OffsetLadder,
+  detail: ThinDetailRings,
+  stage: {
+    readonly tailFailed: boolean;
+    readonly pitchDegraded: boolean;
+    readonly detailDepthLimited: boolean;
+  },
+): Pick<VCarveLadder, 'offsetFailed' | 'thinResidual' | 'passLimited'> {
+  return {
+    offsetFailed: ladder.offsetFailed || detail.offsetFailed || stage.tailFailed,
     thinResidual: detail.residualThin,
-    passLimited: pitchDegraded || ladder.capped || detail.capped || detailDepthLimited,
+    passLimited: stage.pitchDegraded || ladder.capped || detail.capped || stage.detailDepthLimited,
   };
 }
 
 function validVCarveContours(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> {
-  return polylines.filter(
-    (polyline) =>
-      polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
-  );
+  return polylines.filter(isVCarvableContour);
+}
+
+type CoarseLadder = {
+  readonly rings: ReadonlyArray<ReadonlyArray<Polyline>>;
+  // Inset of each ring by step index — the uniform δ prefix, then the tail.
+  readonly insetsMm: ReadonlyArray<number>;
+  // First step index belonging to the medial-axis tail; steps below it are δ
+  // ladder rings. Equal to the ring count when there is no tail.
+  readonly axisFromStep: number;
+  readonly tailFailed: boolean;
+};
+
+// The δ ladder stops at the first inset that yields nothing, so its deepest
+// ring sits up to δ short of the medial axis and leaves a standing ridge down
+// the centre of every stroke. Bisect that last bracket onto the axis
+// (vcarve-axis-tail.ts) and append the result. Skipped when the ladder ended
+// for any other reason: a failed offset makes the bracket meaningless, and a
+// capped ladder never reached an empty inset at all.
+//
+// The tail extends the SAME ring array, so a step stays an index into it and
+// the region layout needs no notion of a non-uniform pitch. Only the depth law
+// reads the inset, and it reads it per ring rather than per step.
+function coarseLadderWithAxisTail(
+  contours: ReadonlyArray<Polyline>,
+  ladder: OffsetLadder,
+  deltaMm: number,
+  law: DetailDepthLaw,
+): CoarseLadder {
+  const lastInsetMm = ladder.rings.length * deltaMm;
+  // Once the groove bottoms out on maxDepth the ridge cannot exist: every
+  // remaining ring cuts the same floor, and a clamped ring's cone footprint
+  // (maxDepth·tan(θ/2) radius, never narrower than δ by construction) already
+  // sweeps the axis. A tail ring there would only repeat the floor for an extra
+  // lap. The ridge is reachable only while the depth still tracks the wall, so
+  // that is the only case worth bisecting.
+  const isDepthClamped = lastInsetMm / law.tanHalf >= law.maxDepthMm;
+  const tail =
+    ladder.offsetFailed || ladder.capped || isDepthClamped
+      ? NO_TAIL
+      : vcarveAxisTail(contours, lastInsetMm, lastInsetMm + deltaMm);
+  return {
+    rings: [...ladder.rings, ...tail.rings.map((ring) => ring.polylines)],
+    insetsMm: [
+      ...ladder.rings.map((_ring, step) => (step + 1) * deltaMm),
+      ...tail.rings.map((ring) => ring.insetMm),
+    ],
+    axisFromStep: ladder.rings.length,
+    tailFailed: tail.offsetFailed,
+  };
 }
 
 const NO_LADDER: VCarveLadder = {
@@ -210,6 +283,7 @@ const NO_LADDER: VCarveLadder = {
   thinResidual: false,
   passLimited: false,
 };
+const NO_TAIL: AxisTail = { rings: [], offsetFailed: false };
 const NO_DETAIL = {
   rings: [],
   offsetFailed: false,
@@ -231,6 +305,11 @@ export function vcarveResolutionMm(settingMm: number, toolDiameterMm: number): n
 // both through the shared depth law, region-zipped so a region finishes its
 // rings, then its detail, before the cutter travels on (ADR-270, ADR-282).
 type RingDepthClamp = {
+  // Inset of each coarse ring by step index. The δ rings are the uniform
+  // prefix; the medial-axis tail appends off-grid insets after them.
+  readonly coarseInsetsMm: ReadonlyArray<number>;
+  // First coarse step belonging to the medial-axis tail.
+  readonly axisFromStep: number;
   readonly deltaMm: number;
   readonly finePitchMm: number;
   readonly tanHalf: number;
@@ -253,10 +332,15 @@ function zipRegionRings(
   const rings: VCarveRing[] = [];
   for (let bucket = 0; bucket < Math.max(coarse.length, fine.length); bucket += 1) {
     rings.push(
-      ...ringsForBucket(coarse[bucket] ?? [], clamp.deltaMm, clamp, 'ring'),
+      ...ringsForBucket(
+        coarse[bucket] ?? [],
+        (step) => clamp.coarseInsetsMm[step] ?? (step + 1) * clamp.deltaMm,
+        clamp,
+        'ring',
+      ),
       ...ringsForBucket(
         orderDetailBySliver(fine[bucket] ?? [], detail.sliverRoots),
-        clamp.finePitchMm,
+        (step) => (step + 1) * clamp.finePitchMm,
         clamp,
         'detail',
       ),
@@ -267,14 +351,14 @@ function zipRegionRings(
 
 function ringsForBucket(
   entries: ReadonlyArray<OrderedVCarvePolyline>,
-  pitchMm: number,
+  insetMmForStep: (step: number) => number,
   clamp: RingDepthClamp,
   kind: VCarveRing['kind'],
 ): ReadonlyArray<VCarveRing> {
   return entries.map(({ step, polyline }) => ({
-    kind,
+    kind: kind === 'ring' && step >= clamp.axisFromStep ? ('axis' as const) : kind,
     polyline,
-    depthMm: Math.min(((step + 1) * pitchMm) / clamp.tanHalf, clamp.maxDepthMm),
+    depthMm: Math.min(insetMmForStep(step) / clamp.tanHalf, clamp.maxDepthMm),
   }));
 }
 
@@ -286,7 +370,9 @@ function passesForRings(
 ): Pick<VCarveLadder, 'passes' | 'entryIssue'> & { readonly detailDepthLimited: boolean } {
   const legacy = legacyPassesForRings(rings, depthPerPassMm, blend);
   if (rampAngleDeg === undefined) return { ...legacy, entryIssue: null };
-  const firstRing = rings[0];
+  // Axis rings never ramp (see below), so the ramp request is validated against
+  // the first ring that actually would.
+  const firstRing = rings.find((ring) => ring.kind !== 'axis');
   if (firstRing === undefined) return { ...legacy, entryIssue: null };
   // Let the canonical planner validate the requested ramp before choosing a
   // detail-specific fallback, so invalid input keeps its exact ADR-278 reason.
@@ -304,8 +390,20 @@ function passesForRings(
   if (rings.some((ring) => ring.kind === 'detail')) {
     return { ...legacy, entryIssue: THIN_DETAIL_RAMP_FALLBACK };
   }
-  const passes: CncPass[] = [...firstPlan.passes];
-  for (const ring of rings.slice(1)) {
+  const passes: CncPass[] = [];
+  for (const ring of rings) {
+    // The medial-axis ring is a closed loop at the bottom of the groove, often
+    // only micrometres of inset wide. There is no room to ramp along it and
+    // nothing to ramp into: the reference behaviour ramps the CLEARANCE tool's
+    // plunges, not the V-bit's carving passes (Vectric V-Carve, "Ramp Plunge
+    // Moves" under Flat Area Clearance). A pointed bit is centre-cutting at the
+    // tip, so it plunges by design. Skipping the planner here keeps every other
+    // ring's ramp instead of collapsing the whole job to legacy entry over a
+    // ring that was never meant to ramp.
+    if (ring.kind === 'axis') {
+      passes.push(...steppedContourPasses(ring, depthPerPassMm));
+      continue;
+    }
     const plan = planVCarveRampEntry(ring.polyline, ring.depthMm, depthPerPassMm, rampAngleDeg);
     if (!plan.ok) return { ...legacy, entryIssue: plan.reason };
     passes.push(...plan.passes);
@@ -327,16 +425,20 @@ function legacyPassesForRings(
       detailDepthLimited = detailDepthLimited || detail.depthLimited;
       continue;
     }
-    passes.push(
-      ...zPassDepths(ring.depthMm, depthPerPassMm).map((zMm) => ({
-        kind: 'contour' as const,
-        zMm,
-        polyline: ringClosure(ring.polyline),
-        closed: true,
-      })),
-    );
+    passes.push(...steppedContourPasses(ring, depthPerPassMm));
   }
   return { passes, detailDepthLimited };
+}
+
+// The legacy entry: one closed contour per depth level, each reached by a
+// straight plunge at the ring's own start point.
+function steppedContourPasses(ring: VCarveRing, depthPerPassMm: number): ReadonlyArray<CncPass> {
+  return zPassDepths(ring.depthMm, depthPerPassMm).map((zMm) => ({
+    kind: 'contour' as const,
+    zMm,
+    polyline: ringClosure(ring.polyline),
+    closed: true,
+  }));
 }
 
 // The junction blend (ADR-282 Amendment 2): a detail ring's vertices carry
