@@ -191,6 +191,7 @@ function WorkspacePreviewOverlays(props: {
         <Cut3DPreviewDialog
           grid={grid}
           mesh={cut3DSurface.kind === 'ready' ? cut3DSurface.mesh : null}
+          {...(cut3DSurface.kind === 'ready' ? { surfaceRevision: cut3DSurface.revision } : {})}
           {...(cut3DSurface.kind === 'unavailable'
             ? { unavailableReason: cut3DSurface.reason }
             : {})}

@@ -8,7 +8,7 @@
 import { useMemo } from 'react';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { RemovalGrid } from '../../core/sim';
-import { createReliefThreeScene } from './relief-three-scene';
+import { createCut3DOffscreenCoordinator } from './cut3d-offscreen-worker-client';
 import { Viewer3DDialogShell } from './Viewer3DDialogShell';
 
 // Display mesh arrays and smooth normals arrive from the bounded worker; this
@@ -16,6 +16,7 @@ import { Viewer3DDialogShell } from './Viewer3DDialogShell';
 export function Cut3DPreviewDialog(props: {
   readonly grid: RemovalGrid;
   readonly mesh: ReliefSurfaceMeshWithNormals | null;
+  readonly surfaceRevision?: number;
   readonly unavailableReason?: string;
   readonly stockThicknessMm: number;
   readonly onClose: () => void;
@@ -23,18 +24,7 @@ export function Cut3DPreviewDialog(props: {
   const { grid, mesh, stockThicknessMm } = props;
   const buildScene = useMemo(
     () =>
-      mesh === null
-        ? null
-        : async (canvas: HTMLCanvasElement) => {
-            try {
-              return await createReliefThreeScene(canvas, mesh, stockThicknessMm);
-            } catch (err) {
-              return {
-                kind: 'no-webgl' as const,
-                reason: err instanceof Error ? err.message : 'The 3D renderer failed to start.',
-              };
-            }
-          },
+      mesh === null ? null : createCut3DOffscreenCoordinator(mesh, stockThicknessMm).buildScene,
     [mesh, stockThicknessMm],
   );
   const widthMm = grid.widthCells * grid.mmPerCell;
@@ -46,6 +36,7 @@ export function Cut3DPreviewDialog(props: {
       title={`Cut preview — ${widthMm.toFixed(0)} × ${heightMm.toFixed(0)} mm stock`}
       onClose={props.onClose}
       buildScene={buildScene}
+      {...(props.surfaceRevision === undefined ? {} : { canvasKey: props.surfaceRevision })}
       {...(props.unavailableReason === undefined
         ? {}
         : { preparationFailure: props.unavailableReason })}

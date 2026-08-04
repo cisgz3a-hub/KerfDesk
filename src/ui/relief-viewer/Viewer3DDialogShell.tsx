@@ -4,21 +4,17 @@
 // Extracted from Relief3DViewerDialog when the H.11 cut preview became the
 // second consumer.
 
-import { useEffect, useRef, useState } from 'react';
-import type { ReliefSceneResult } from './relief-three-scene';
+import { useRef } from 'react';
+import {
+  useViewerDialogScene,
+  type ViewerDialogSceneBuilder,
+  type ViewerDialogState,
+} from './use-viewer-dialog-scene';
+
+export type { ViewerDialogSceneBuilder, ViewerDialogSceneResult } from './use-viewer-dialog-scene';
 
 export const VIEWER_CANVAS_WIDTH_PX = 720;
 export const VIEWER_CANVAS_HEIGHT_PX = 480;
-
-type ViewerState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'ready' }
-  | { readonly kind: 'failed'; readonly reason: string };
-
-type SceneState = {
-  readonly buildScene: ((canvas: HTMLCanvasElement) => Promise<ReliefSceneResult>) | null;
-  readonly value: ViewerState;
-};
 
 export function Viewer3DDialogShell(props: {
   readonly ariaLabel: string;
@@ -27,42 +23,17 @@ export function Viewer3DDialogShell(props: {
   readonly onClose: () => void;
   // Must be referentially stable (useCallback) — it is the effect dependency.
   // Null means a background preparation task has not produced its mesh yet.
-  readonly buildScene: ((canvas: HTMLCanvasElement) => Promise<ReliefSceneResult>) | null;
+  readonly buildScene: ViewerDialogSceneBuilder | null;
   readonly preparationFailure?: string;
+  // A transferred canvas cannot be transferred again. Incrementing this
+  // remounts a fresh element when background preparation yields a new mesh.
+  readonly canvasKey?: number;
 }): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [state, setState] = useState<SceneState>({
-    buildScene: null,
-    value: { kind: 'loading' },
-  });
   const { buildScene } = props;
+  const state = useViewerDialogScene(buildScene, canvasRef);
 
-  useEffect(() => {
-    if (buildScene === null) return;
-    const canvas = canvasRef.current;
-    if (canvas === null) return;
-    let handle: { readonly dispose: () => void } | null = null;
-    let cancelled = false;
-    setState({ buildScene, value: { kind: 'loading' } });
-    void buildScene(canvas).then((outcome) => {
-      if (cancelled) {
-        if (outcome.kind === 'ok') outcome.handle.dispose();
-        return;
-      }
-      if (outcome.kind === 'ok') {
-        handle = outcome.handle;
-        setState({ buildScene, value: { kind: 'ready' } });
-      } else {
-        setState({ buildScene, value: { kind: 'failed', reason: outcome.reason } });
-      }
-    });
-    return () => {
-      cancelled = true;
-      handle?.dispose();
-    };
-  }, [buildScene]);
-
-  const visibleState: ViewerState =
+  const visibleState: ViewerDialogState =
     buildScene === null
       ? props.preparationFailure === undefined
         ? { kind: 'loading' }
@@ -81,6 +52,7 @@ export function Viewer3DDialogShell(props: {
           </button>
         </div>
         <canvas
+          key={props.canvasKey}
           ref={canvasRef}
           width={VIEWER_CANVAS_WIDTH_PX}
           height={VIEWER_CANVAS_HEIGHT_PX}

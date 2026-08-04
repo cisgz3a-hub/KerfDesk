@@ -15647,8 +15647,28 @@ would recreate the freeze this decision exists to remove.
     failed entries are removed, and an edit supplies a new Project identity. It therefore cannot
     reuse a region plan across distinct job requests or edits. Caching on object id, mutable object
     identity or the final whole-program fingerprint can return stale toolpaths, so a future planner
-    cache requires exact-byte equivalence, mutation/invalidation and retained-byte tests before it
-    can join this architecture.
+     cache requires exact-byte equivalence, mutation/invalidation and retained-byte tests before it
+     can join this architecture.
+11. **Explicit Cut 3D presentation also stays off the UI thread.** Its prepared surface, Three.js
+    import, renderer, lighting, scene construction and every subsequent frame live in one dedicated
+    module Worker. The UI transfers a DOM canvas exactly once with `transferControlToOffscreen`,
+    transfers the surface arrays in the same initialization message, and proxies only bounded pointer,
+    wheel, resize and device-pixel-ratio inputs. A remount or replacement surface creates a fresh DOM
+    canvas; an already-transferred canvas is never transferred again. StrictMode effect replay leases
+    the same in-flight session through one microtask so it cannot duplicate the transfer. Controls and
+    resize each allow one in-flight presentation request and coalesce bounded pending input. Close,
+    replacement, Worker error, decoding failure or WebGL context loss disposes the scene and terminates
+    the Worker. Unsupported OffscreenCanvas/Worker support reports the existing recoverable 3D
+    unavailable state and never imports Three.js or renders synchronously in the main realm.
+
+    This contract follows the HTML `transferControlToOffscreen()` one-transfer preconditions, the
+    official Three.js worker example's transferred canvas plus main-realm size/input proxy, and the
+    worker-capable WebGL context-loss API:
+    https://html.spec.whatwg.org/multipage/canvas.html#dom-canvas-transfercontroltooffscreen,
+    https://threejs.org/manual/en/offscreencanvas.html,
+    https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/isContextLost. The pinned
+    Electron 42.3.0 runtime embeds Chromium 148, as recorded by Electron's release manifest:
+    https://releases.electronjs.org/release/v42.3.0.
 
 ### Consequences
 
@@ -15666,11 +15686,12 @@ would recreate the freeze this decision exists to remove.
 - Tiled Save and the current-canvas G-code viewer share the same output Worker and broker rather than
   doing their expensive post-compile work on the browser thread. Viewer edits cancel stale work and
   leave an explicit refreshable state.
-- Cut 3D no longer downsamples a million-cell removal grid, builds its mesh or accumulates smooth
-  normals in the dialog effect. Those pure arrays come from a lazy broker task; the main thread keeps
-  only the Three.js/WebGL presentation boundary and a loading or recoverable-unavailable surface.
-  Ownership transfer across the two internal Worker hops prevents the prepared surface from being
-  synchronously copied before that presentation boundary.
+- Cut 3D no longer downsamples a million-cell removal grid, builds its mesh, accumulates smooth
+  normals, imports Three.js or builds/renders a WebGL scene in the dialog effect. Pure arrays come from
+  a lazy broker task and transfer into the dedicated render Worker. The main thread keeps only the DOM
+  dialog, a fresh transferable canvas, bounded input/resize proxying and the existing loading or
+  recoverable-unavailable state. Ownership transfer across every Worker hop prevents a synchronous
+  surface copy before rendering.
 - Independent planner results are rebuilt between jobs. Exact Preview/estimate preparation reuse is
   limited to four recent identity-and-options matches; this preserves its existing sharing without
   treating an unchanged-looking object as proof that a region plan remains valid.
@@ -15722,6 +15743,19 @@ would recreate the freeze this decision exists to remove.
   added at both hops, the unchanged local regression measured 269.2 ms normally and 632.3 ms under a
   controlled four-times CPU slowdown; the latter's maximum Long Task was 486.0 ms. The one-second
   ceiling remains unchanged, and a green exact-head hosted rerun remains required before release.
+- The next exact-head hosted Chrome run on `c167ef9a8a73cfc337fe588c82ac06c3d99d4fd0`
+  again passed 66 of 67 interactions but measured a 2,811.7 ms Cut 3D initial-open heartbeat gap.
+  Trace inspection placed the gap between the visible loading dialog and scene readiness. A controlled
+  four-times CPU run then isolated about 1,190.7 ms in the first Three.js module parse/evaluation,
+  while surface preparation remained about 293 ms in its Worker. Moving the complete Three.js/WebGL
+  presentation boundary into the dedicated OffscreenCanvas Worker retained the one-second ceiling.
+  On the current local real-Chromium head, the expanded two-test A/B passed twice and exercised render
+  readiness, camera controls, resize/DPR, late Worker error, close-during-start, fresh-canvas remount,
+  unsupported state and absence of a main-realm Three.js resource. The measured run reported maximum
+  heartbeat gaps of 20.9 ms for initial Cut 3D open, 146.4 ms for controls/resize, 109.8 ms for Preview
+  preparation, 157.1 ms with the retired pane absent and 243.5 ms in its controlled diagnostic mount.
+  Maximum Long Tasks were respectively 0.0, 130.0, 102.0, 129.0 and 231.0 ms. A green exact-head hosted
+  rerun remains required before merge.
 - A controlled E2E-only mount distinguishes the retired always-mounted `Cnc3DPane` from those explicit
   surfaces without restoring it in production. With the pane absent, the complex fixture completed
   its idle plan with a 118.8 ms maximum heartbeat gap and 100.0 ms maximum Long Task. Mounting the real

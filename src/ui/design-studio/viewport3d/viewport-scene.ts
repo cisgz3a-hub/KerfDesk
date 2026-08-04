@@ -76,7 +76,7 @@ export async function createDesignViewportScene(
   const camera = new three.PerspectiveCamera(CAMERA_FOV_DEG, 1, CAMERA_NEAR_MM, CAMERA_FAR_MM);
   camera.up.set(0, 0, 1);
 
-  const lighting = applySceneLighting(three, renderer, scene, frame);
+  const lighting = applySceneLighting(three, renderer, scene, frame, window.devicePixelRatio);
   const stage = buildStageFurniture(three, frame, frame.thicknessMm);
   scene.add(stage.object);
 

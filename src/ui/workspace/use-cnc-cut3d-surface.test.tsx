@@ -66,7 +66,7 @@ describe('useCncCut3DSurface', () => {
     expect(observed.kind).toBe('loading');
     expect(workerMocks.prepare).toHaveBeenCalledWith(GRID);
     await act(async () => finish?.(MESH));
-    expect(observed).toEqual({ kind: 'ready', mesh: MESH });
+    expect(observed).toEqual({ kind: 'ready', mesh: MESH, revision: 1 });
   });
 
   it('cancels a closing dialog and suppresses its delayed completion', async () => {

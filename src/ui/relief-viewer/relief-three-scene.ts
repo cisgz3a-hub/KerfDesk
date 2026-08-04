@@ -68,7 +68,7 @@ export async function createReliefThreeScene(
   renderer.setClearColor(viewer3dTheme.color.background);
 
   const scene = new three.Scene();
-  const lighting = applySceneLighting(three, renderer, scene, mesh);
+  const lighting = applySceneLighting(three, renderer, scene, mesh, window.devicePixelRatio);
 
   const camera = framedCamera(three, width / height, mesh, stockThicknessMm);
   const controls = new OrbitControls(camera, canvas);

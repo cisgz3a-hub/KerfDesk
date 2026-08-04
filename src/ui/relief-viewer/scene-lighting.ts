@@ -42,9 +42,10 @@ export function applySceneLighting(
   renderer: WebGLRenderer,
   scene: Scene,
   envelopeMm: { readonly widthMm: number; readonly heightMm: number },
+  pixelRatio: number,
 ): SceneLightingHandle {
   const { lighting } = viewer3dTheme;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, viewer3dTheme.maxPixelRatio));
+  renderer.setPixelRatio(Math.min(pixelRatio, viewer3dTheme.maxPixelRatio));
   renderer.toneMapping = three.NeutralToneMapping;
   renderer.toneMappingExposure = lighting.toneMappingExposure;
 

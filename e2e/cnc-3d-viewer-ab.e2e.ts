@@ -6,6 +6,14 @@ import {
   stopResponsivenessProbe,
 } from './fixtures/browser-responsiveness';
 import { clearCanvasProject, installMixedCanvasProject } from './fixtures/mixed-canvas-project';
+import {
+  assertNoMainRealmThreeImport,
+  assertUnsupportedCut3D,
+  cancelThenRemountCut3D,
+  exerciseCut3DControlsAndResize,
+  injectCut3DLateError,
+  openReadyCut3D,
+} from './fixtures/cut3d-offscreen-browser';
 
 const POST_COMPLETION_WINDOW_MS = 750;
 
@@ -76,20 +84,15 @@ test('mixed-operation Preview and Cut 3D complete without a delayed UI stall', a
   await expect(
     page.getByRole('group', { name: 'Preview route controls and statistics' }),
   ).toBeVisible({ timeout: 60_000 });
-  const openCut3D = page.getByRole('button', { name: 'Open 3D cut preview' });
-  await expect(openCut3D).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('button', { name: 'Open 3D cut preview' })).toBeVisible({
+    timeout: 60_000,
+  });
   await page.waitForTimeout(POST_COMPLETION_WINDOW_MS);
   const preview = await stopResponsivenessProbe(page);
   assertResponsivePhase(testInfo, 'mixed-operation Preview preparation', preview);
 
   await startResponsivenessProbe(page);
-  await openCut3D.click();
-  const cut3D = page.getByRole('dialog', { name: 'Cut 3D preview' });
-  await expect(cut3D).toBeVisible();
-  await expect(cut3D.getByLabel('Cut 3D preview surface')).toBeVisible();
-  await expect(
-    cut3D.getByText('Drag to orbit, scroll to zoom. Depth is true to scale.'),
-  ).toBeVisible({ timeout: 60_000 });
+  const cut3D = await openReadyCut3D(page);
   await page.waitForTimeout(POST_COMPLETION_WINDOW_MS);
   const cut3DOpen = await stopResponsivenessProbe(page);
   assertResponsivePhase(testInfo, 'Cut 3D initial open', cut3DOpen);
@@ -97,7 +100,12 @@ test('mixed-operation Preview and Cut 3D complete without a delayed UI stall', a
   expect(workerUrls.some((url) => url.includes('/workspace/preparation-worker'))).toBe(true);
   expect(workerUrls.some((url) => url.includes('cnc-removal-grid-worker'))).toBe(true);
   expect(workerUrls.some((url) => url.includes('canvas-compilation-worker'))).toBe(true);
-  await cut3D.getByRole('button', { name: 'Close' }).click();
+  expect(workerUrls.some((url) => url.includes('cut3d-offscreen-worker'))).toBe(true);
+  await assertNoMainRealmThreeImport(page);
+  await exerciseCut3DControlsAndResize(page, cut3D, testInfo);
+  await injectCut3DLateError(cut3D);
+  await cancelThenRemountCut3D(page, cut3D.canvas);
+  await assertUnsupportedCut3D(page, workerUrls);
 });
 
 async function mountRetiredPaneForTest(page: Page): Promise<void> {

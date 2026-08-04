@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { RemovalGrid } from '../../core/sim';
 import {
@@ -10,7 +10,11 @@ import {
 export type CncCut3DSurfaceState =
   | { readonly kind: 'idle' }
   | { readonly kind: 'loading' }
-  | { readonly kind: 'ready'; readonly mesh: ReliefSurfaceMeshWithNormals }
+  | {
+      readonly kind: 'ready';
+      readonly mesh: ReliefSurfaceMeshWithNormals;
+      readonly revision: number;
+    }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
 type StoredState = {
@@ -27,6 +31,7 @@ export function useCncCut3DSurface(
   active: boolean,
 ): CncCut3DSurfaceState {
   const [stored, setStored] = useState<StoredState | null>(null);
+  const nextRevision = useRef(0);
 
   useEffect(() => {
     if (!active || grid === null) {
@@ -45,7 +50,10 @@ export function useCncCut3DSurface(
     }
     void pending.then(
       (mesh) => {
-        if (!cancelled) setStored({ grid, value: { kind: 'ready', mesh } });
+        if (!cancelled) {
+          nextRevision.current += 1;
+          setStored({ grid, value: { kind: 'ready', mesh, revision: nextRevision.current } });
+        }
       },
       (error: unknown) => {
         if (cancelled || isCncRemovalGridSuperseded(error)) return;
