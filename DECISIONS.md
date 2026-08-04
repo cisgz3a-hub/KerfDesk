@@ -15768,3 +15768,111 @@ would recreate the freeze this decision exists to remove.
   qualification; the test harness restores local storage and unmounts after its A/B.
 - NOT verified: physical air-cut, material cut, controller throughput, perceptual preview fidelity or
   measured browser responsiveness or GPU behavior on production hardware.
+
+## ADR-289 - Relief XY scale is resolved before physical cutter geometry (2026-08-05)
+
+**Date:** 2026-08-05
+**Status:** Accepted; sampled-grid software geometry verified, continuous sweep and hardware qualification pending
+
+### Context
+
+Relief roughing and finishing previously rasterized the embedded mesh in object-local millimetres,
+applied the physical cutter kernel, allowance, cell size, stepover, and finishing-row spacing in
+that local metric, and only then applied the object's full XY transform to cutter-center points.
+That changes the modeled cutter with the artwork: uniform scale changes its effective physical
+diameter and every spacing, while nonuniform scale maps a circular footprint to an ellipse.
+Shrinking a relief can therefore shrink its modeled safety envelope and permit unexpected material
+removal; enlarging it can under-clear and leave larger-than-requested spacing.
+
+The geometry law is independent of implementation. CGAL defines planar dilation/offset as a
+Minkowski sum with a disc. From the definition, a linear map `T` obeys
+`T(P ⊕ B) = T(P) ⊕ T(B)`. Applying nonuniform `T` after dilation therefore uses the transformed
+disc `T(B)`, not the unchanged circular physical cutter `B`. CurveDesk's max-plus heightmap has the
+same requirement: SciPy's technical definition makes the structuring element part of the dilation
+metric. NIST's RS274 reference likewise distinguishes the programmed material edge from the actual
+tool-center path determined by the cutter radius.
+
+### Decision
+
+1. **Resolve positive XY scale before relief sampling.** `meshToHeightmap` accepts positive target
+   X/Y scale factors. It rasterizes the scaled physical width and height into square machine-mm
+   cells before any cutter geometry is applied.
+2. **Plan all physical quantities in that metric.** Roughing and finishing kernels, the 0.5 mm
+   allowance, depth-level regions, ring stepover, and finishing-row requests consume the scaled
+   heightmap. A finishing grid refines to its row-spacing request when needed, and its integer row
+   stride rounds down rather than exceeding that request. The selected cutter stays circular in
+   physical XY under nonuniform object scale.
+3. **Place completed paths with an isometry.** The original transform is factored into positive
+   scale magnitudes and a residual transform whose non-zero axis scales are only `+1` or `-1`.
+   Axis signs, explicit mirrors, rotation, translation, device-origin conversion, and Z semantics
+   remain after planning. A property test proves the factorization equals the original transform.
+4. **Preserve degenerate compatibility and integrity handling.** Saved-project validation already
+   requires finite bounded scale, and interactive handles clamp away from zero. A legacy or
+   hand-built zero-scale axis retains its prior collapsed-axis mapping; this repair adds no compile
+   refusal. That zero-axis path plans a full-dimensional cutter path before collapsing its centers,
+   so it is compatibility-only and has no physical cutter-envelope qualification. Non-finite
+   residual output remains subject to the existing compile-integrity checks.
+5. **Frame remains the only ordinary Start guard.** CNC Frame and Start continue to use bounds from
+   the compiled job. Equivalent physical reliefs now yield identical passes and identical Frame
+   bounds signatures. No warning, refusal, confirmation, or new guard is added.
+6. **Advance output provenance.** Transformed relief G-code can change, so `EMITTER_REVISION`
+   advances to `adr-289-relief-machine-space-envelope`. Pass/group order remains deterministic;
+   identity-scale finishing geometry may also gain rows because integer stride now rounds down.
+7. **Qualification is explicitly sampled, not continuous.** Max-plus dilation proves the discrete
+   tool envelope only at the finishing grid's emitted sample vertices. Roughing contour vertices
+   come from dual-grid marching-squares midpoints and offset rings, so even their pointwise cutter
+   envelope is not certified by this change. Straight XYZ chords, triangle features below raster
+   resolution, heightmap edge behavior, cap-coarsened finishing grids, holder/shank collision, true
+   surface-distance scallop on steep slopes, and the continuously swept physical cutter are also
+   not certified. Those limits remain informational; they do not create a new Start gate or support
+   a claim of material-cut perfection.
+
+### Consequences
+
+- Uniformly scaled reliefs now match an equivalent relief authored directly at the same physical
+  size. Nonuniformly scaled reliefs use square physical cells and the real circular cutter envelope
+  instead of a post-scaled elliptical model.
+- Down-scaling no longer down-scales cutter protection, allowance, or spacing. Up-scaling can
+  legitimately allocate more heightmap cells and take longer; the four-million-cell cap
+  monotonically coarsens resolution in the final physical metric and rechecks the actual
+  ceil-rounded dimensions. If that cap coarsens a finishing cell past the requested row spacing,
+  the planar scallop request is not qualified for that map.
+- Mirror, negative scale, rotation, translation, deterministic pass order, tool-section order,
+  G-code coordinate conversion, and Frame/Start permit semantics are unchanged.
+- No automated artifact establishes controller tracking under load, cutter runout, stock setup,
+  material behavior, surface finish, or safe real-machine operation. Hardware air-cut and material
+  qualification remain pending.
+
+### Verification
+
+- Exact pre-repair current-main fixtures fail for both uniform and nonuniform transformed reliefs;
+  the repaired compiler makes their roughing passes, finishing passes, and Frame bounds signatures
+  byte-for-structure identical to analytically equivalent physical meshes.
+- An analytic pyramid heightmap under `scaleX=0.5`, `scaleY=2` equals the same surface represented
+  by a four-times-taller mesh in an identity transform, including the sampled depth array.
+- A 200-case helper property proves the algebra across generated positive, negative, zero,
+  uniform, nonuniform, mirrored, rotated, and translated transforms. Deterministic compiler
+  fixtures separately cover uniform/nonuniform physical equivalence, negative scale with explicit
+  mirrors/rotation/translation/device origin, zero-axis compatibility, and repeat output.
+- Exact 4,000,000 x 0.04 mm and subnormal-by-`1e308` anisotropic fixtures, plus a 500-case
+  transformed-aspect property suite, prove that automatic coarsening never refines the request and
+  its exact downstream one-cell-minimum dimensions never allocate above four million cells.
+- Planar ball-nose fixtures, including the supported 0.1 mm cutter with a 0.005 mm scallop, prove
+  the sampled row gap and its analytic cusp do not exceed the request when the heightmap cap has
+  not coarsened the grid past it.
+- NOT verified: continuous swept-volume containment, subcell features, exact relief-boundary
+  containment, true along-surface scallop height, holder/shank collisions, controller execution,
+  air-cut, material cut, physical load, or finish quality.
+
+### References
+
+- NIST RS274/NGC Interpreter, cutter-radius compensation and tool-center paths:
+  https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=823374
+- CGAL 2D Minkowski Sums, dilation/offset as a sum with a physical disc:
+  https://doc.cgal.org/latest/Minkowski_sum_2/group__PkgMinkowskiSum2Ref.html
+- SciPy grayscale dilation, non-flat structuring-element definition:
+  https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.grey_dilation.html
+- W3C CSS Transforms, ordered axis scaling and affine matrix composition:
+  https://www.w3.org/TR/css-transforms-1/
+- Autodesk projection milling, XY-plane stepover versus true surface scallop:
+  https://help.autodesk.com/cloudhelp/2024/ENU/FCAM/files/GUID-B04CF897-44A8-4434-B2CB-AC229160BAB2.htm

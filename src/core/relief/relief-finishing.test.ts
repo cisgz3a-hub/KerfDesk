@@ -5,6 +5,12 @@ import type { Heightmap } from './heightmap';
 import { reliefFinishingPasses, scallopRowSpacingMm } from './relief-finishing';
 
 const BALL_NOSE: CncTool = { id: 'bn', name: 'ball', kind: 'ball-nose', diameterMm: 3.175 };
+const SMALL_BALL_NOSE: CncTool = {
+  id: 'bn-small',
+  name: 'small ball',
+  kind: 'ball-nose',
+  diameterMm: 0.1,
+};
 const END_MILL: CncTool = { id: 'em', name: 'flat', kind: 'end-mill', diameterMm: 3.175 };
 
 function flatMap(depthMm: number, widthCells = 20, heightCells = 20, mmPerCell = 0.5): Heightmap {
@@ -55,6 +61,15 @@ describe('scallopRowSpacingMm', () => {
   it('flat bits step a fixed diameter fraction', () => {
     expect(scallopRowSpacingMm(END_MILL, 0.025)).toBeCloseTo(3.175 * 0.4, 9);
   });
+
+  it('does not floor a supported small ball nose above its selected scallop', () => {
+    const radius = SMALL_BALL_NOSE.diameterMm / 2;
+    const scallop = 0.005;
+    const expected = 2 * Math.sqrt(scallop * (2 * radius - scallop));
+
+    expect(expected).toBeLessThan(0.05);
+    expect(scallopRowSpacingMm(SMALL_BALL_NOSE, scallop)).toBeCloseTo(expected, 12);
+  });
 });
 
 describe('reliefFinishingPasses', () => {
@@ -62,7 +77,7 @@ describe('reliefFinishingPasses', () => {
   // so the last rowStep-1 rows were never emitted and kept their roughing
   // allowance as a ridge along the far edge.
   it('emits the far-Y row when the scallop stride steps over it', () => {
-    // END_MILL spacing 1.27 mm at 0.5 mm/cell -> rowStep 3; rows 0,3..18 stop
+    // END_MILL spacing 1.27 mm at 0.5 mm/cell -> rowStep 2; rows 0,2..18 stop
     // short of the final row 19.
     const map = flatMap(-3, 20, 20, 0.5);
     const passes = reliefFinishingPasses(map, {
@@ -78,7 +93,7 @@ describe('reliefFinishingPasses', () => {
   });
 
   it('does not duplicate the final row when the stride lands on it', () => {
-    // 19 cells: rows 0,3..18 land exactly on the far row, so nothing is added.
+    // 19 cells: rows 0,2..18 land exactly on the far row, so nothing is added.
     const passes = reliefFinishingPasses(flatMap(-3, 20, 19, 0.5), {
       tool: END_MILL,
       kernel: kernelForTool(END_MILL, 0.5),
@@ -144,5 +159,28 @@ describe('reliefFinishingPasses', () => {
       scallopMm: 0.005,
     });
     expect(fine.length).toBeGreaterThan(coarse.length);
+  });
+
+  it('never rounds sampled row spacing above the ball-nose planar scallop target', () => {
+    const scallopMm = 0.025;
+    const map = flatMap(-1, 20, 20, 3.175 / 10);
+    const passes = reliefFinishingPasses(map, {
+      tool: BALL_NOSE,
+      kernel: kernelForTool(BALL_NOSE, map.mmPerCell),
+      scallopMm,
+    });
+    const rowYs = passes.map((pass) => {
+      if (pass.kind !== 'path3d' || pass.points[0] === undefined) {
+        throw new Error('path3d row expected');
+      }
+      return pass.points[0].y;
+    });
+    const gaps = rowYs.slice(1).map((y, index) => y - (rowYs[index] ?? y));
+    const maxGap = Math.max(...gaps);
+    const radius = BALL_NOSE.diameterMm / 2;
+    const planarCusp = radius - Math.sqrt(radius * radius - (maxGap * maxGap) / 4);
+
+    expect(maxGap).toBeLessThanOrEqual(scallopRowSpacingMm(BALL_NOSE, scallopMm));
+    expect(planarCusp).toBeLessThanOrEqual(scallopMm);
   });
 });

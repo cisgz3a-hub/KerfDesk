@@ -33,6 +33,12 @@ function rampMesh(): TriangleMesh {
   return { positions: Float32Array.from(tris.flat()) };
 }
 
+function stretchMeshY(mesh: TriangleMesh, factor: number): TriangleMesh {
+  const positions = Float32Array.from(mesh.positions);
+  for (let i = 1; i < positions.length; i += 3) positions[i] = (positions[i] ?? 0) * factor;
+  return { positions };
+}
+
 describe('meshToHeightmap', () => {
   it('matches the analytic pyramid within a cell-slope bound', () => {
     const result = meshToHeightmap(pyramidMesh(), {
@@ -98,6 +104,26 @@ describe('meshToHeightmap', () => {
     }
   });
 
+  it('rasterizes nonuniform target scaling in square physical-mm cells', () => {
+    const scaled = meshToHeightmap(pyramidMesh(), {
+      targetWidthMm: 20,
+      reliefDepthMm: 5,
+      mmPerCell: 0.5,
+      targetScaleX: 0.5,
+      targetScaleY: 2,
+    });
+    const samePhysicalSurface = meshToHeightmap(stretchMeshY(pyramidMesh(), 4), {
+      targetWidthMm: 10,
+      reliefDepthMm: 5,
+      mmPerCell: 0.5,
+    });
+    if (scaled.kind !== 'ok' || samePhysicalSurface.kind !== 'ok') throw new Error('expected ok');
+
+    expect(scaled.widthMm).toBe(10);
+    expect(scaled.heightMm).toBe(40);
+    expect(scaled.heightmap).toEqual(samePhysicalSurface.heightmap);
+  });
+
   it("empty cells: 'floor' carves the background away, 'top' leaves it", () => {
     // A tiny triangle in the corner of a wide target leaves most cells empty.
     const tiny: TriangleMesh = {
@@ -136,6 +162,19 @@ describe('meshToHeightmap', () => {
     expect(result).toEqual({
       kind: 'error',
       reason: 'Target width and relief depth must be finite positive numbers.',
+    });
+  });
+
+  it('rejects non-positive target scale', () => {
+    expect(
+      meshToHeightmap(pyramidMesh(), {
+        targetWidthMm: 20,
+        reliefDepthMm: 5,
+        targetScaleX: 0,
+      }),
+    ).toEqual({
+      kind: 'error',
+      reason: 'Target XY scale must be finite and positive.',
     });
   });
 });
