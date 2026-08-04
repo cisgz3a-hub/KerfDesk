@@ -1,22 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StatusQueryCapability } from '../../core/controllers';
+import { sceneHasVCarveOutputLayer } from '../../core/job/vcarve-preparation-complexity';
 import type { OutputScope, Project } from '../../core/scene';
-import { prepareOutputSnapshot } from '../../io/gcode';
-import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import {
   resolveJobPlacement,
   type JobPlacementSettings,
   type ResolvedJobPlacement,
 } from '../job-placement';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
-import { renderVariableText } from '../text/render-variable-text';
 import { useOutputScope } from '../state';
-import {
-  buildCanvasMarkerPlan,
-  canvasPlanRetentionKey,
-  type CanvasMotionPlan,
-  type LiveCanvasRun,
-} from '../state/canvas-motion-plan';
+import { type CanvasMotionPlan, type LiveCanvasRun } from '../state/canvas-motion-plan';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -24,6 +17,15 @@ import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
+import {
+  buildIdleCanvasMotionPlanFromRequest,
+  type IdleCanvasMotionPlanRequest,
+} from './idle-canvas-motion-plan';
+import {
+  cancelIdleCanvasMotionPlanOffThread,
+  isIdleCanvasMotionSuperseded,
+  prepareIdleCanvasMotionPlanOffThread,
+} from './idle-canvas-motion-worker-client';
 
 export function useCanvasMotionOverlay(
   project: Project,
@@ -127,15 +129,36 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): IdlePlanSelection | null
       return;
     }
     let cancelled = false;
+    let workerStarted = false;
     const timer = window.setTimeout(() => {
-      void buildIdleCanvasMotionPlan(requestInput, requestInput.placement).then((plan) => {
-        if (cancelled || request !== requestRef.current) return;
-        setIdleState(plan === null ? null : idlePlanState(plan, requestInput));
-      });
+      const buildRequest = idleCanvasMotionPlanRequest(requestInput, requestInput.placement);
+      const isVCarve = sceneHasVCarveOutputLayer(requestInput.project.scene);
+      const offThread = isVCarve ? prepareIdleCanvasMotionPlanOffThread(buildRequest) : null;
+      if (isVCarve && offThread === null) {
+        // Never turn Worker unavailability into a multi-second browser-thread
+        // V-carve compile merely to draw idle markers. Preview, Job Review,
+        // Frame, Start, Save, and emitted output keep their own full paths.
+        setIdleState(null);
+        return;
+      }
+      workerStarted = offThread !== null;
+      const pending = offThread ?? buildIdleCanvasMotionPlanFromRequest(buildRequest);
+      void pending.then(
+        (plan) => {
+          if (cancelled || request !== requestRef.current) return;
+          setIdleState(plan === null ? null : idlePlanState(plan, requestInput));
+        },
+        (error: unknown) => {
+          if (cancelled || request !== requestRef.current) return;
+          if (isIdleCanvasMotionSuperseded(error)) return;
+          setIdleState(null);
+        },
+      );
     }, IDLE_CANVAS_PLAN_DELAY_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      if (workerStarted) cancelIdleCanvasMotionPlanOffThread();
     };
   }, [
     input.previewMode,
@@ -159,32 +182,24 @@ export async function buildIdleCanvasMotionPlan(
   input: IdlePlanInput,
   resolved: ResolvedJobPlacement,
 ): Promise<CanvasMotionPlan | null> {
-  const jobOrigin = resolved.ok ? resolved.jobOrigin : undefined;
+  return buildIdleCanvasMotionPlanFromRequest(idleCanvasMotionPlanRequest(input, resolved));
+}
+
+function idleCanvasMotionPlanRequest(
+  input: IdlePlanInput,
+  resolved: ResolvedJobPlacement,
+): IdleCanvasMotionPlanRequest {
   const registration = currentPrintCutOutputRegistration(input.project);
-  const retentionKey = canvasPlanRetentionKey(
-    input.project,
-    input.outputScope,
-    input.placementSettings,
-    registration,
-  );
-  const preparationProject = await hydratePagedRasterProject(input.project);
-  const prepared = await prepareOutputSnapshot(preparationProject, {
-    clock: () => new Date(),
-    renderVariableText,
-    ...(registration === undefined ? {} : { registration }),
-    ...(jobOrigin === undefined ? {} : { jobOrigin }),
+  return {
+    project: input.project,
     outputScope: input.outputScope,
-  });
-  if (!prepared.ok) return null;
-  return buildCanvasMarkerPlan({
-    prepared,
+    placementSettings: input.placementSettings,
+    resolvedPlacement: resolved,
+    ...(registration === undefined ? {} : { registration }),
     machine: input.laser,
     statusQuery: statusQueryFor(input.project, input.laser),
     reportInches: input.laser.controllerSettings?.reportInches === true,
-    ...(jobOrigin === undefined ? {} : { jobOrigin }),
-    relativeView: !resolved.ok,
-    retentionKey,
-  });
+  };
 }
 
 function shouldClearIdlePlan(input: IdlePlanInput): boolean {
