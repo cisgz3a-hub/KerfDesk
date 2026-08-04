@@ -20,6 +20,7 @@ export function recoveryArtifactPreparedOutput(
       outputScope: artifact.outputScope,
       ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
       allowRotaryRaster: true,
+      sourceGeometryChecks: 'compiled-evidence-only',
     }).gcode;
     for (const step of artifact.laserResumeChain ?? []) {
       const resumed = buildLaserResumeProgram(gcode, step.fromLine);

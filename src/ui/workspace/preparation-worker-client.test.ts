@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import {
   isPreparationSuperseded,
+  MAX_SETTLED_PREPARATIONS,
   PreparationSupersededError,
   prepareLargeJobOffThread,
   resetPreparationWorkerForTests,
@@ -9,6 +10,7 @@ import {
   type LargeJobPreparation,
 } from './preparation-worker-client';
 import type { PreparationWorkerResponse } from './preparation-worker-protocol';
+import { isCanvasCompilationBridgeConnection } from './canvas-compilation-worker-protocol';
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
@@ -16,13 +18,18 @@ class FakeWorker {
   onerror: (() => void) | null = null;
   posted: Array<{ id: number }> = [];
   terminated = false;
+  bridgeConnected = false;
 
   constructor() {
     FakeWorker.instances.push(this);
   }
 
-  postMessage(data: { id: number }): void {
-    this.posted.push(data);
+  postMessage(data: unknown): void {
+    if (isCanvasCompilationBridgeConnection(data)) {
+      this.bridgeConnected = true;
+      return;
+    }
+    this.posted.push(data as { id: number });
   }
 
   terminate(): void {
@@ -66,6 +73,7 @@ describe('prepareLargeJobOffThread', () => {
     const promise = prepareLargeJobOffThread(createProject());
     if (promise === null) throw new Error('expected a worker request');
     const worker = lastWorker();
+    expect(worker.bridgeConnected).toBe(true);
     const id = worker.posted[0]?.id ?? -1;
     worker.respond({ id, kind: 'ok', ...okResult } as PreparationWorkerResponse);
     const prepared: LargeJobPreparation = await promise;
@@ -79,6 +87,38 @@ describe('prepareLargeJobOffThread', () => {
     const second = prepareLargeJobOffThread(project);
     expect(second).toBe(first);
     expect(lastWorker().posted).toHaveLength(1);
+  });
+
+  it('bounds exact settled preparation reuse with a global least-recently-used limit', async () => {
+    const project = createProject();
+    const anchors = ['front-left', 'front-center', 'front-right', 'center-left', 'center'] as const;
+    expect(anchors).toHaveLength(MAX_SETTLED_PREPARATIONS + 1);
+    let first: Promise<LargeJobPreparation> | null = null;
+
+    for (const anchor of anchors) {
+      const pending = prepareLargeJobOffThread(project, {
+        jobOrigin: { startFrom: 'user-origin', anchor },
+      });
+      if (pending === null) throw new Error('expected a worker request');
+      first ??= pending;
+      const worker = lastWorker();
+      const id = worker.posted.at(-1)?.id ?? -1;
+      worker.respond({ id, kind: 'ok', ...okResult } as PreparationWorkerResponse);
+      await expect(pending).resolves.toBeDefined();
+    }
+
+    const evicted = prepareLargeJobOffThread(project, {
+      jobOrigin: { startFrom: 'user-origin', anchor: anchors[0] },
+    });
+    if (evicted === null) throw new Error('expected an evicted request to run again');
+    expect(evicted).not.toBe(first);
+    const worker = lastWorker();
+    worker.respond({
+      id: worker.posted.at(-1)?.id ?? -1,
+      kind: 'ok',
+      ...okResult,
+    } as PreparationWorkerResponse);
+    await expect(evicted).resolves.toBeDefined();
   });
 
   it('holds a same-project request with different options until the active compute settles', async () => {

@@ -1,4 +1,5 @@
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../../io/gcode';
+import type { PreflightResult } from '../../core/preflight';
 import {
   compiledVCarveLayerDepths,
   type CompiledVCarveLayerDepth,
@@ -14,6 +15,12 @@ const ROTARY_RASTER_REFUSAL_CODE = 'rotary-raster-unsupported';
  */
 export type SaveOutputEmission =
   | {
+      readonly kind: 'preparation-unavailable';
+      readonly gcode: '';
+      readonly message: string;
+      readonly preflight: PreflightResult;
+    }
+  | {
       readonly kind: 'preparation-failed';
       readonly gcode: '';
       readonly preflight: Extract<PreparedOutput, { readonly ok: false }>['preflight'];
@@ -28,6 +35,7 @@ export type SaveOutputEmission =
       readonly gcode: string;
       readonly preflight: ReturnType<typeof emitPreparedGcode>['preflight'];
       readonly cncVCarveDepths: ReadonlyArray<CompiledVCarveLayerDepth>;
+      readonly machineWarnings?: ReadonlyArray<string>;
     };
 
 /**
@@ -37,6 +45,7 @@ export type SaveOutputEmission =
 export function emitSavePreparedOutput(
   prepared: PreparedOutput,
   options: EmitGcodeOptions,
+  machineWarnings: ReadonlyArray<string> = [],
 ): SaveOutputEmission {
   if (!prepared.ok) {
     return {
@@ -52,5 +61,19 @@ export function emitSavePreparedOutput(
   if (isRotaryRasterRefusal) {
     return { kind: 'emission-refused', ...emitted, gcode: '' };
   }
-  return { kind: 'emitted', ...emitted, cncVCarveDepths: compiledVCarveLayerDepths(prepared.job) };
+  return {
+    kind: 'emitted',
+    ...emitted,
+    cncVCarveDepths: compiledVCarveLayerDepths(prepared.job),
+    machineWarnings,
+  };
+}
+
+export function unavailableSaveOutput(message: string): SaveOutputEmission {
+  return {
+    kind: 'preparation-unavailable',
+    gcode: '',
+    message,
+    preflight: { ok: false, issues: [] },
+  };
 }

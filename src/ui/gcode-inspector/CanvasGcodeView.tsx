@@ -47,12 +47,8 @@ function Body(props: {
   readonly inspection: InspectionState;
   readonly state: CurrentGcode;
 }): JSX.Element {
-  if (props.state.kind === 'compiling') {
-    return <p style={messageStyle}>Compiling G-code…</p>;
-  }
-  if (props.state.kind === 'empty') {
-    return <p style={messageStyle}>This design produces no G-code yet. Add artwork to see it.</p>;
-  }
+  const stateMessage = currentGcodeMessage(props.state);
+  if (stateMessage !== null) return <p style={messageStyle}>{stateMessage}</p>;
   if (props.inspection.kind === 'idle') {
     return <p style={messageStyle}>Switch to G-code to compile this design.</p>;
   }
@@ -77,6 +73,31 @@ function Body(props: {
       <InspectorView model={props.inspection.result.parsed.model} variant="preview" />
     </>
   );
+}
+
+function currentGcodeMessage(state: CurrentGcode): string | null {
+  if (state.kind === 'compiling') return compilationProgressMessage(state.progress);
+  if (state.kind === 'empty') {
+    return 'This design produces no G-code yet. Add artwork to see it.';
+  }
+  if (state.kind === 'stale' || state.kind === 'unavailable') return state.reason;
+  return null;
+}
+
+function compilationProgressMessage(
+  progress: Extract<CurrentGcode, { readonly kind: 'compiling' }>['progress'],
+): string {
+  if (progress === undefined) return 'Waiting for the background G-code compiler…';
+  const phase =
+    progress.phase === 'normalizing'
+      ? 'Normalizing operations'
+      : progress.phase === 'planning'
+        ? 'Planning toolpaths'
+        : progress.phase === 'merging'
+          ? 'Merging ordered regions'
+          : 'Finalizing G-code';
+  if (progress.total === 0) return `${phase}…`;
+  return `${phase} — ${progress.completed} of ${progress.total} regions complete, ${progress.active} active, ${progress.queued} queued.`;
 }
 
 const wrapStyle: React.CSSProperties = {

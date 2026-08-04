@@ -17,6 +17,7 @@ export type PreparedGcodeSave =
       readonly gcode: string;
       readonly advisories: ReadonlyArray<PreflightIssue>;
       readonly cncVCarveDepths: ReadonlyArray<CompiledVCarveLayerDepth>;
+      readonly machineWarnings: ReadonlyArray<string>;
     };
 
 /**
@@ -28,6 +29,10 @@ export async function prepareGcodeSave(
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
 ): Promise<PreparedGcodeSave> {
   const emission = await emitSaveGcode(ctx, placement);
+  if (emission.kind === 'preparation-unavailable') {
+    jobAwareAlert(`Cannot save G-code:\n\n• ${emission.message}`);
+    return { kind: 'failed' };
+  }
   // Preserve both factual no-program boundaries instead of widening the
   // global preflight-code set: neither result contains writable bytes.
   if (emission.kind !== 'emitted') {
@@ -44,6 +49,7 @@ export async function prepareGcodeSave(
     gcode: emission.gcode,
     advisories,
     cncVCarveDepths: emission.cncVCarveDepths,
+    machineWarnings: emission.machineWarnings ?? [],
   };
 }
 

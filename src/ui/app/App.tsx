@@ -65,12 +65,12 @@ export function App(): JSX.Element {
         <CanvasArea />
         {/*
           The 3D result pane is deliberately not mounted (maintainer, 2026-08-03).
-          It rebuilt the carve grid from the whole project, which costs seconds
-          once a layer is V-carve, and mounting it at all was enough to freeze
-          the app. Unmounting is the only thing that reliably stops that work:
-          the hook cannot run if the component never renders. Cnc3DPane and its
-          worker stay in the tree, exported and tested, so this is a one-line
-          restore once the underlying cost is understood.
+          It is a separate, continuously updating design-scene consumer rather
+          than either explicit G-code 3D surface or Preview's Cut 3D dialog. Its
+          whole-project preparation is off-thread now, and a test-only A/B mount
+          stays responsive, but a permanent WebGL/render workload has not passed
+          perceptual, GPU or production-hardware qualification. Keep Cnc3DPane
+          available for controlled tests without restoring its production mount.
         */}
         <WorkspaceSidePanels />
       </main>
@@ -99,12 +99,14 @@ function CanvasArea(): JSX.Element {
   const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
   return (
     <div style={canvasAreaStyle}>
-      <Workspace />
+      {/* G-code owns the canvas, so Workspace is unmounted rather than merely
+          covered. Its cleanup cancels idle motion/preview workers and makes a
+          late heavy result incapable of committing or drawing underneath. */}
+      {showGcode ? <CanvasGcodeView active /> : <Workspace />}
       <WorkspaceCameraOverlay />
       <RegistrationJigPanel />
       <CameraPanel />
       <BoardCapturePanel />
-      {showGcode ? <CanvasGcodeView active /> : null}
       <div style={canvasSwitchStyle}>
         <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />
       </div>

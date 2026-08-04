@@ -7,6 +7,7 @@
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { Project } from '../../core/scene';
+import type { PreparedOutput } from '../../io/gcode';
 import { detectActiveWcsMismatchWarnings } from './active-wcs-warnings';
 import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings';
 import { detectCncDefaultFeedWarnings } from './cnc-default-feed-warnings';
@@ -27,6 +28,8 @@ export function detectMachineJobWarnings(
   project: Project,
   controllerSettings: ControllerSettingsSnapshot | null = null,
   activeWcs: ActiveWorkCoordinateSystem | null = null,
+  prepared?: Extract<PreparedOutput, { readonly ok: true }>,
+  sourceGeometryChecks: 'full' | 'compiled-evidence-only' = 'full',
 ): ReadonlyArray<string> {
   // Machine-agnostic: both laser and CNC pin G54 in emission, so a non-G54
   // active WCS mismatches either job's placement (C6). Defaults to null so
@@ -34,18 +37,18 @@ export function detectMachineJobWarnings(
   const machineWarnings =
     project.machine?.kind === 'cnc'
       ? [
-          ...detectCncStockWarnings(project),
+          ...detectCncStockWarnings(project, prepared),
           ...detectCncThroughCutTabWarnings(project),
-          ...detectCncFullTabCoverageWarnings(project),
+          ...detectCncFullTabCoverageWarnings(project, prepared?.job),
           ...detectCncDefaultFeedWarnings(project),
           ...detectCncAngledToolFeedWarnings(project),
           ...detectCncMachineLimitWarnings(project, controllerSettings),
           ...detectCncMissingPrimaryToolWarnings(project),
           ...detectCncRasterWarnings(project),
-          ...detectCncOffsetLadderWarnings(project),
+          ...detectCncOffsetLadderWarnings(project, prepared?.job, sourceGeometryChecks),
         ]
       : [
-          ...detectJobIntentWarnings(project),
+          ...detectJobIntentWarnings(project, prepared?.job),
           ...detectLaserMachineLimitWarnings(project, controllerSettings),
         ];
   return [...detectActiveWcsMismatchWarnings(activeWcs), ...machineWarnings];

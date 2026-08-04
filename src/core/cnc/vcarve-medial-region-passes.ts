@@ -10,7 +10,7 @@ import {
 } from './vcarve-detail-depth';
 import type { VCarveOptions } from './vcarve-ladder';
 import { vcarveEmittedProfileCovers, vcarveRoutePrecisionMet } from './vcarve-emitted-profile';
-import type { VCarveMedialRegionPlan } from './vcarve-medial-region-plan';
+import type { VCarveMedialRegionGeometryPlan } from './vcarve-medial-region-plan';
 
 const MEDIAL_Z_TOLERANCE_MM = 0.05;
 // Ten microns is the emitted CAM-footprint tolerance. It is checked against
@@ -27,7 +27,7 @@ export type VCarveRegionPassPlan = {
 };
 
 export function passesForVCarveMedialRegion(
-  plan: VCarveMedialRegionPlan,
+  plan: VCarveMedialRegionGeometryPlan,
   law: DetailDepthLaw,
   options: Pick<VCarveOptions, 'depthPerPassMm'>,
 ): VCarveRegionPassPlan {
@@ -50,7 +50,7 @@ export function passesForVCarveMedialRegion(
 function passesForRoute(
   route: Polyline,
   referenceRoute: Polyline,
-  plan: VCarveMedialRegionPlan,
+  plan: VCarveMedialRegionGeometryPlan,
   depthSegments: ReturnType<typeof sourceBoundarySegments>,
   law: DetailDepthLaw,
   options: Pick<VCarveOptions, 'depthPerPassMm'>,
@@ -101,7 +101,7 @@ function passesForRoute(
 
 function dotPasses(
   point: Vec2 | undefined,
-  plan: VCarveMedialRegionPlan,
+  plan: VCarveMedialRegionGeometryPlan,
   law: DetailDepthLaw,
   depthPerPassMm: number,
 ): ReadonlyArray<CncPass> {

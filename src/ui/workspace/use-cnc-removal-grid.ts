@@ -1,16 +1,26 @@
-// useCncRemovalGrid — memoizes the CNC preview's removal grid
-// (computeCncRemovalGrid) across renders.
-//
-// The scrub position quantizes into buckets so dragging the slider reuses
-// memoized grids instead of recomputing per pixel of mouse movement.
+// Cancellable background removal-grid preparation for the CNC preview. Grid
+// stamping can take seconds after toolpath preparation, so no render/effect in
+// the browser realm calls computeCncRemovalGrid directly.
 
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import type { Toolpath } from '../../core/job';
-import type { Project } from '../../core/scene';
+import type { CncMachineConfig, Project } from '../../core/scene';
 import type { RemovalGrid } from '../../core/sim';
-import { computeCncRemovalGrid } from './cnc-removal-grid';
+import {
+  cancelCncRemovalGridOffThread,
+  isCncRemovalGridSuperseded,
+  prepareCncRemovalGridOffThread,
+} from './cnc-removal-grid-worker-client';
 
 const SCRUB_BUCKETS = 120;
+
+type RemovalGridState = {
+  readonly device: Project['device'];
+  readonly machine: CncMachineConfig;
+  readonly toolpath: Toolpath;
+  readonly scrubFraction: number;
+  readonly grid: RemovalGrid | null;
+};
 
 export function useCncRemovalGrid(
   project: Project,
@@ -22,10 +32,48 @@ export function useCncRemovalGrid(
   const cncMachine = machine?.kind === 'cnc' ? machine : null;
   const device = project.device;
   const quantT = Math.ceil(Math.max(0, Math.min(1, scrubberT)) * SCRUB_BUCKETS) / SCRUB_BUCKETS;
+  const [state, setState] = useState<RemovalGridState | null>(null);
 
-  return useMemo(() => {
-    if (!previewMode || cncMachine === null || toolpath === null) return null;
-    if (toolpath.totalLength <= 0) return null;
-    return computeCncRemovalGrid(device, cncMachine, toolpath, quantT);
+  useEffect(() => {
+    if (!previewMode || cncMachine === null || toolpath === null || toolpath.totalLength <= 0) {
+      setState(null);
+      return;
+    }
+    let cancelled = false;
+    const pending = prepareCncRemovalGridOffThread({
+      device,
+      machine: cncMachine,
+      toolpath,
+      scrubFraction: quantT,
+    });
+    if (pending === null) {
+      setState(null);
+      return;
+    }
+    void pending.then(
+      (grid) => {
+        if (cancelled) return;
+        setState({ device, machine: cncMachine, toolpath, scrubFraction: quantT, grid });
+      },
+      (error: unknown) => {
+        if (cancelled || isCncRemovalGridSuperseded(error)) return;
+        setState(null);
+      },
+    );
+    return () => {
+      cancelled = true;
+      cancelCncRemovalGridOffThread();
+    };
   }, [previewMode, cncMachine, device, toolpath, quantT]);
+
+  if (
+    state === null ||
+    state.device !== device ||
+    state.machine !== cncMachine ||
+    state.toolpath !== toolpath ||
+    state.scrubFraction !== quantT
+  ) {
+    return null;
+  }
+  return state.grid;
 }

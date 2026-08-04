@@ -99,7 +99,12 @@ function hasClippedEntryRamp(tiles: ReadonlyArray<TiledJob>): boolean {
 
 /** Add a one-based row and column suffix to a tiled CNC output filename. */
 export function tileFileName(baseName: string, tile: CncTile): string {
-  return `${baseName}_tile-r${tile.row + 1}-c${tile.col + 1}`;
+  return tileFileNameForIndex(baseName, tile.row, tile.col);
+}
+
+/** Name a tile before its compiled rectangle is available (for web pickers). */
+export function tileFileNameForIndex(baseName: string, row: number, col: number): string {
+  return `${baseName}_tile-r${row + 1}-c${col + 1}`;
 }
 
 function cncJobBounds(job: Job): CncTile['rect'] | null {

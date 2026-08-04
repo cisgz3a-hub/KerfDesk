@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { prepareOutputRequestForTest } from '../../__fixtures__/output-preparation-request';
 import { computeJobMotionBounds, type JobBounds } from '../../core/job';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
@@ -10,14 +11,22 @@ import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useToastStore } from '../state/toast-store';
 import { idleControllerStatusForFrameTest } from './framed-run-testing';
 import type { ReviewedStartBundle } from './job-review';
+import type * as OutputWorkerModule from './output-preparation-worker-client';
 import { runFrameNow } from './use-frame-action';
 
 const reviewHarness = vi.hoisted(() => ({
   runJobReviewGate: vi.fn(),
 }));
+const outputWorkerMocks = vi.hoisted(() => ({
+  prepareStart: vi.fn<typeof OutputWorkerModule.prepareStartOutputOffThread>(),
+}));
 
 vi.mock('./job-review', () => ({
   runJobReviewGate: reviewHarness.runJobReviewGate,
+}));
+vi.mock('./output-preparation-worker-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof OutputWorkerModule>()),
+  prepareStartOutputOffThread: outputWorkerMocks.prepareStart,
 }));
 
 type ReviewGateArgs = {
@@ -92,6 +101,14 @@ function completeFrame(candidate: FramedRunCandidate): void {
 }
 
 beforeEach(() => {
+  outputWorkerMocks.prepareStart.mockReset().mockImplementation((request, onProgress) =>
+    prepareOutputRequestForTest(request, onProgress === undefined ? {} : { onProgress }).then(
+      (response) => {
+        if (response.kind !== 'start') throw new Error('Start test adapter returned no job.');
+        return response.result;
+      },
+    ),
+  );
   installVectorProject();
   useCameraStore.setState({
     placementActive: false,

@@ -3,13 +3,17 @@
 // the pane can mark it stale the moment the drawing moves on — an honest
 // label instead of a silently outdated surface.
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Sketch } from '../../../core/design';
 import type { RemovalGrid } from '../../../core/sim';
 import { useStore } from '../../state';
+import {
+  isDesignSceneSuperseded,
+  simulateDesignCarveOffThread,
+} from '../../workspace/design-scene-worker-client';
 import { useDesignStudioStore } from '../design-studio-store';
 import type { DesignCarveSource } from './design-carve-source';
-import { simulateDesignCarve } from './design-simulate';
+import { routeDesignCarveSimulation, type DesignSimulateResult } from './design-simulate';
 
 export type DesignSimulate =
   | { readonly kind: 'idle' }
@@ -24,6 +28,7 @@ export type DesignSimulateHandle = {
 
 export function useDesignSimulate(source: DesignCarveSource | null): DesignSimulateHandle {
   const [simulate, setSimulate] = useState<DesignSimulate>({ kind: 'idle' });
+  const latestRun = useRef(0);
   const sketch = useDesignStudioStore((state) =>
     state.session === null ? null : state.session.history.present,
   );
@@ -34,15 +39,48 @@ export function useDesignSimulate(source: DesignCarveSource | null): DesignSimul
     const current = useDesignStudioStore.getState().session?.history.present ?? null;
     const project = useStore.getState().project;
     if (current === null || source === null) return;
+    const runId = latestRun.current + 1;
+    latestRun.current = runId;
     const ids = current.entities.map(() => crypto.randomUUID());
-    const outcome = simulateDesignCarve(project, current, ids, source);
-    if (outcome.kind === 'ok') {
-      setSimulate({ kind: 'ok', grid: outcome.grid, forSketch: current });
+    const route = routeDesignCarveSimulation(
+      project,
+      current,
+      ids,
+      source,
+      simulateDesignCarveOffThread,
+    );
+    if (route.kind === 'immediate') {
+      publishDesignSimulation(setSimulate, current, route.result);
       return;
     }
-    setSimulate({ kind: outcome.kind, reason: outcome.reason, forSketch: current });
+    void route.pending
+      .then((outcome) => {
+        if (latestRun.current !== runId) return;
+        publishDesignSimulation(setSimulate, current, outcome);
+      })
+      .catch((error: unknown) => {
+        if (latestRun.current !== runId) return;
+        publishDesignSimulation(setSimulate, current, {
+          kind: 'failed',
+          reason: isDesignSceneSuperseded(error)
+            ? 'Bit simulation was superseded by newer canvas work. Try Simulate again.'
+            : 'Background bit simulation failed. Reopen CurveDesk and try again.',
+        });
+      });
   }, [source]);
 
   const isStale = simulate.kind !== 'idle' && sketch !== null && simulate.forSketch !== sketch;
   return { simulate, isStale, run };
+}
+
+function publishDesignSimulation(
+  publish: (next: DesignSimulate) => void,
+  sketch: Sketch,
+  outcome: DesignSimulateResult,
+): void {
+  if (outcome.kind === 'ok') {
+    publish({ kind: 'ok', grid: outcome.grid, forSketch: sketch });
+    return;
+  }
+  publish({ kind: outcome.kind, reason: outcome.reason, forSketch: sketch });
 }

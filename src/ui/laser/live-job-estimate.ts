@@ -1,5 +1,4 @@
 import {
-  countEstimatedFillSegments,
   countOutputVectorSegments,
   estimateJobDuration,
   formatDuration,
@@ -9,10 +8,6 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
-import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
-// Deep import for the same reason as its sibling above: core/job's barrel is a
-// CI-ratcheted over-cap legacy barrel and may only shrink.
-import { sceneHasVCarveOutputLayer } from '../../core/job/vcarve-preparation-complexity';
 import type { JobDurationBreakdown } from '../../core/job/estimate-duration';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -27,10 +22,8 @@ import {
   type VariableTextRenderer,
 } from '../../io/gcode';
 import type { SimilarityTransform } from '../../core/registration';
-import {
-  hydratePagedRasterProject,
-  projectHasPagedRasterAssets,
-} from '../import/paged-raster-hydration';
+import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
+import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 
 export { countOutputVectorSegments };
 export const LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET = PREPARATION_RAW_VECTOR_SEGMENT_BUDGET;
@@ -66,19 +59,7 @@ export function estimateLiveJob(
   // the dense variable-depth route it amplifies that input into (~1.5 s for
   // 0.5% of the budget). Without it the ETA compiled V-carve on the main
   // thread the moment the cut type was selected.
-  if (sceneHasVCarveOutputLayer(outputProject.scene)) {
-    return { kind: 'too-large' };
-  }
-  if (countOutputVectorSegments(outputProject.scene) > LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET) {
-    return { kind: 'too-large' };
-  }
-  if (countEstimatedFillSegments(outputProject.scene) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
-    return { kind: 'too-large' };
-  }
-  if (rasterPreparationTooComplex(outputProject)) {
-    return { kind: 'too-large' };
-  }
-  if (projectHasPagedRasterAssets(outputProject)) return { kind: 'too-large' };
+  if (costlyCanvasPreparation(outputProject)) return { kind: 'too-large' };
 
   // Same prepared job as Save / Start / Preview, so ETA times the path the
   // machine runs.
@@ -104,18 +85,7 @@ export async function estimateLiveJobSnapshot(
   // Same V-carve term as the synchronous estimate above: prepareOutputSnapshot
   // still runs its compile on this thread, so the amplifying cut type has to
   // pause the estimate here too.
-  if (sceneHasVCarveOutputLayer(outputProject.scene)) {
-    return { kind: 'too-large' };
-  }
-  if (countOutputVectorSegments(outputProject.scene) > LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET) {
-    return { kind: 'too-large' };
-  }
-  if (countEstimatedFillSegments(outputProject.scene) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
-    return { kind: 'too-large' };
-  }
-  if (rasterPreparationTooComplex(outputProject)) {
-    return { kind: 'too-large' };
-  }
+  if (costlyCanvasPreparation(outputProject)) return { kind: 'too-large' };
   const hydrated = await hydratePagedRasterProject(project);
   const prepared = await prepareOutputSnapshot(hydrated, {
     outputScope,

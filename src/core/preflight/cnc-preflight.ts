@@ -21,6 +21,7 @@ import {
 import { findCncVCarveEntryIssues } from '../cnc/vcarve-entry-diagnostics';
 import { isVCarveToolCompatible } from '../cnc/vcarve-tool-compatibility';
 import { machineBoundsForDevice } from '../devices';
+import type { Job } from '../job';
 import {
   findNonFiniteCoords,
   findPlungedTravelIssues,
@@ -37,6 +38,10 @@ export type CncPreflightOptions = {
   readonly motionOffset?: MotionBoundsOffset | undefined;
   readonly initialMachinePosition?: { readonly x: number; readonly y: number } | undefined;
   readonly coordinateMode?: 'machine' | 'relative-origin';
+  readonly compiledJob?: Job;
+  /** Exact archived programs already carry their compiled Job. Requalification
+   * keeps byte/invariant checks but must not rebuild source geometry. */
+  readonly sourceGeometryChecks?: 'full' | 'compiled-evidence-only';
 };
 
 const MAX_REPORTED_ISSUES = 5;
@@ -57,14 +62,39 @@ export function runCncPreflight(
     });
   }
   appendCncMachineIssues(config, issues);
-  issues.push(...findInvalidCncToolGeometry(project.scene, config, project.device));
   for (const layer of outputLayers) {
     appendCncLayerIssues(layer, project.device.maxFeed, config, issues);
   }
+  appendSourceGeometryIssues(project, config, options, issues);
+  issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));
+  appendNonFiniteCoordIssues(gcode, issues);
+  appendNoGoZoneIssues(project, gcode, options, issues);
+  appendPlungedTravelIssues(gcode, config, issues);
+
+  appendEmptyOutputIssue(gcode, issues);
+  return { ok: issues.length === 0, issues };
+}
+
+function appendSourceGeometryIssues(
+  project: Project,
+  config: CncMachineConfig,
+  options: CncPreflightOptions,
+  issues: PreflightIssue[],
+): void {
+  if (options.sourceGeometryChecks === 'compiled-evidence-only') {
+    appendVCarveEntryIssues(project, config, options.compiledJob, issues);
+    return;
+  }
+  issues.push(...findInvalidCncToolGeometry(project.scene, config, project.device));
   // A layer with shapes but zero toolpaths would be SILENTLY omitted from
   // the job (bit too wide for the geometry, or open shapes on a closed-only
   // cut type) — the customer finds out after the cut.
-  for (const layerId of findDroppedCncLayers(project.scene, project.device, config)) {
+  for (const layerId of findDroppedCncLayers(
+    project.scene,
+    project.device,
+    config,
+    options.compiledJob,
+  )) {
     issues.push({
       code: 'cnc-layer-empty',
       message:
@@ -79,12 +109,7 @@ export function runCncPreflight(
       message: `Layer ${issue.layerId}: ${issue.reason} Adjust Helical entry or disable it.`,
     });
   }
-  for (const issue of findCncVCarveEntryIssues(project.scene, project.device, config)) {
-    issues.push({
-      code: 'cnc-vcarve-entry-fallback',
-      message: `Layer ${issue.layerId}: ${issue.reason} Set Ramp entry to 0 to remove this notice.`,
-    });
-  }
+  appendVCarveEntryIssues(project, config, options.compiledJob, issues);
   for (const issue of findCncRestPocketIssues(project.scene, project.device, config)) {
     issues.push({
       code: 'cnc-rest-machining-invalid',
@@ -103,21 +128,36 @@ export function runCncPreflight(
       message: `Layer ${issue.layerId}: ${issue.reason} Adjust the inlay settings or choose another bit.`,
     });
   }
-  issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));
-  appendNonFiniteCoordIssues(gcode, issues);
-  appendNoGoZoneIssues(project, gcode, options, issues);
-  appendPlungedTravelIssues(gcode, config, issues);
+}
 
-  if (!/\bG1\b/.test(gcode)) {
+function appendVCarveEntryIssues(
+  project: Project,
+  config: CncMachineConfig,
+  compiledJob: Job | undefined,
+  issues: PreflightIssue[],
+): void {
+  for (const issue of findCncVCarveEntryIssues(
+    project.scene,
+    project.device,
+    config,
+    compiledJob,
+  )) {
     issues.push({
-      code: 'empty-output',
-      message:
-        'No CNC toolpaths were generated. The most common cause: the bit is too wide to fit ' +
-        'the shapes (pockets and inside profiles need the bit to fit within the geometry). ' +
-        'Choose a smaller bit, a different cut type, or check that shapes are closed.',
+      code: 'cnc-vcarve-entry-fallback',
+      message: `Layer ${issue.layerId}: ${issue.reason} Set Ramp entry to 0 to remove this notice.`,
     });
   }
-  return { ok: issues.length === 0, issues };
+}
+
+function appendEmptyOutputIssue(gcode: string, issues: PreflightIssue[]): void {
+  if (/\bG1\b/.test(gcode)) return;
+  issues.push({
+    code: 'empty-output',
+    message:
+      'No CNC toolpaths were generated. The most common cause: the bit is too wide to fit ' +
+      'the shapes (pockets and inside profiles need the bit to fit within the geometry). ' +
+      'Choose a smaller bit, a different cut type, or check that shapes are closed.',
+  });
 }
 
 function appendCncMachineIssues(config: CncMachineConfig, issues: PreflightIssue[]): void {

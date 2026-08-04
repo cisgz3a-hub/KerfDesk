@@ -12,7 +12,6 @@ import { machineBoundsForDevice, type DeviceProfile } from '../devices';
 import { artworkOperationRuns } from '../artwork-order';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
-  assertNever,
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
@@ -22,48 +21,109 @@ import {
   type Scene,
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
-import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
-import { tabRampedPoints } from './cnc-tab-ramp';
+import type { CncCompilationSidecar } from '../job/job';
 import { coolantFields } from './coolant-fields';
 import {
   capFeed,
   capSpindle,
-  contourPassFromPolyline,
   sourceRegionMajorDepthPasses,
   isProfileCutType,
   resolveRetractBetweenPasses,
   type CncGroupCompileOptions,
 } from './compile-cnc-helpers';
-import { orderInnerFirst } from './profile-ordering';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
-import { pocketToolpathsForSettings, resolveRestPocketOperation } from './cnc-rest-operation';
+import { resolveRestPocketOperation } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
-import { helicalPocketPassesBySourceRegion } from './cnc-helical-pocket-passes';
-import { profileFinishAllowanceMm, profilePassesWithFinishAllowance } from './finish-allowance';
 import { compileStraightInlayGroups } from './inlay-pair-operation';
-import {
-  DEFAULT_LINE_ART_CONTOURS,
-  lineArtPairableSet,
-  lineArtSelectionApplies,
-  selectLineArtContours,
-} from './line-art-contours';
-import { machineFrameHandedness, type FrameHandedness } from './machine-frame-handedness';
-import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
+import { machineFrameHandedness } from './machine-frame-handedness';
+import { applyRampEntry, parkFields } from './motion-polish';
 import { applyProfileLeadPasses } from './profile-lead-passes';
-import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
-import { specializedPassesForLayer } from './compile-cnc-special-passes';
 import { collectLayerContours, layerPolylinesFromContours } from './collect-cnc-contours';
-import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
+import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 import { cncGroupProvenance } from './cnc-group-provenance';
+import {
+  prepareCncCompilationArtifact,
+  resolveCncCompilationArtifact,
+  runCncCompilationTask,
+  type CncCompilationEvidence,
+  type CncCompilationIdentity,
+  type CncCompilationRejectionReason,
+  type CncCompilationTaskResult,
+  type PreparedCncCompilationArtifact,
+} from './cnc-compilation-artifact';
+import type { VCarveLadder } from './vcarve-ladder';
+import { passesForCncLayer } from './compile-cnc-layer-passes';
+
+export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
 
 export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
+  if (!hasVCarveOperation(scene)) return compileCncSnapshot(scene, device, config, []);
+  const identity = { jobId: 'synchronous', compilationId: 'synchronous' };
+  const artifact = prepareCncCompilationArtifact(identity, scene, device, config);
+  const results = artifact.tasks.map(
+    (task): CncCompilationTaskResult => ({
+      jobId: identity.compilationId,
+      taskId: task.taskId,
+      result: runCncCompilationTask(task.payload),
+    }),
+  );
+  const finalized = finalizeCncCompilationArtifact(artifact, results);
+  if (finalized.kind === 'rejected') {
+    throw new Error(`Synchronous CNC compilation rejected: ${finalized.reason}`);
+  }
+  return finalized.job;
+}
+
+export type FinalizedCncCompilation =
+  | { readonly kind: 'rejected'; readonly reason: CncCompilationRejectionReason }
+  | {
+      readonly kind: 'compiled';
+      readonly job: Job;
+      readonly evidence: CncCompilationEvidence;
+    };
+
+export function finalizeCncCompilationArtifact(
+  artifact: PreparedCncCompilationArtifact,
+  results: ReadonlyArray<CncCompilationTaskResult>,
+): FinalizedCncCompilation {
+  const resolved = resolveCncCompilationArtifact(artifact, results);
+  if (resolved.kind === 'rejected') return resolved;
+  return {
+    kind: 'compiled',
+    job: compileCncSnapshot(
+      resolved.scene,
+      resolved.device,
+      resolved.config,
+      resolved.evidence.vcarveLayers,
+    ),
+    evidence: resolved.evidence,
+  };
+}
+
+export function prepareBoundCncCompilation(
+  identity: CncCompilationIdentity,
+  scene: Scene,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+): PreparedCncCompilationArtifact {
+  return prepareCncCompilationArtifact(identity, scene, device, config);
+}
+
+function compileCncSnapshot(
+  scene: Scene,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+  vcarveLayers: CncCompilationEvidence['vcarveLayers'],
+): Job {
   const clearingGroups: CncGroup[] = [];
   const profileGroups: CncGroup[] = [];
   const sourceObjects = scene.objects;
-  for (const { layer, priorityObjectId } of artworkOperationRuns(scene)) {
+  for (const [operationIndex, { layer, priorityObjectId }] of artworkOperationRuns(
+    scene,
+  ).entries()) {
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
     // H.5/H.8: relief objects rough (and optionally finish, with their own
     // bit) as clearing groups — neither ever frees a part.
@@ -108,7 +168,21 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
     if (clearance !== null) clearingGroups.push(tagArtworkGroup(clearance, priorityObjectId));
     const roughing = restPocketRoughingGroupForLayer(layer, settings, polylines, device, config);
     if (roughing !== null) clearingGroups.push(tagArtworkGroup(roughing, priorityObjectId));
-    const group = cncGroupForLayer(layer, settings, polylines, device, config, contours);
+    const group = cncGroupForLayerResolved(
+      layer,
+      settings,
+      polylines,
+      device,
+      config,
+      contours,
+      vcarveLadderForOperation(
+        vcarveLayers,
+        operationIndex,
+        layer.id,
+        priorityObjectId,
+        settings.cutType === 'v-carve',
+      ),
+    );
     if (group === null) continue;
     if (isProfileCutType(settings.cutType)) {
       profileGroups.push(tagArtworkGroup(group, priorityObjectId));
@@ -118,7 +192,50 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   }
   // H.7 multi-tool: contiguous per-bit sections (one change per bit),
   // profile-carrying sections last so freed parts are never re-machined.
-  return { groups: orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]) };
+  const groups = orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]);
+  const cncCompilation = cncCompilationSidecar(vcarveLayers);
+  return cncCompilation === undefined ? { groups } : { groups, cncCompilation };
+}
+
+function hasVCarveOperation(scene: Scene): boolean {
+  return artworkOperationRuns(scene).some(
+    ({ layer }) => (layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS).cutType === 'v-carve',
+  );
+}
+
+function vcarveLadderForOperation(
+  layers: CncCompilationEvidence['vcarveLayers'],
+  operationIndex: number,
+  layerId: string,
+  priorityObjectId: string,
+  required: boolean,
+): VCarveLadder | undefined {
+  const evidence = layers.find((candidate) => candidate.operationIndex === operationIndex);
+  if (evidence === undefined) {
+    if (required)
+      throw new Error(`Missing bound V-carve evidence for operation ${operationIndex}.`);
+    return undefined;
+  }
+  if (evidence.layerId !== layerId || evidence.priorityObjectId !== priorityObjectId) {
+    throw new Error(`Bound V-carve evidence does not match operation ${operationIndex}.`);
+  }
+  return evidence.ladder;
+}
+
+function cncCompilationSidecar(
+  layers: CncCompilationEvidence['vcarveLayers'],
+): CncCompilationSidecar | undefined {
+  if (layers.length === 0) return undefined;
+  return {
+    vcarveOperations: layers.map(({ operationIndex, layerId, ladder }) => ({
+      operationIndex,
+      layerId,
+      entryIssue: ladder.entryIssue,
+      offsetFailed: ladder.offsetFailed,
+      thinResidual: ladder.thinResidual,
+      passLimited: ladder.passLimited,
+    })),
+  };
 }
 
 function tagArtworkGroup(group: CncGroup, sourceObjectId: string): CncGroup {
@@ -135,11 +252,31 @@ export function cncGroupForLayer(
   config: CncMachineConfig,
   sourceContours?: ReadonlyArray<CollectedCncContour>,
 ): CncGroup | null {
+  return cncGroupForLayerResolved(layer, settings, polylines, device, config, sourceContours);
+}
+
+function cncGroupForLayerResolved(
+  layer: Layer,
+  settings: CncLayerSettings,
+  polylines: ReadonlyArray<Polyline>,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+  sourceContours?: ReadonlyArray<CollectedCncContour>,
+  vcarveLadder?: VCarveLadder,
+): CncGroup | null {
   const tool = layerCncTool(config, settings);
   // Cut direction is a physical rule applied to machine numbers, and
   // front-right / rear-left mirror the frame — see machine-frame-handedness.
   const handedness = machineFrameHandedness(device.origin);
-  const passes = passesForLayer(polylines, settings, tool, config, handedness, sourceContours);
+  const passes = passesForCncLayer(
+    polylines,
+    settings,
+    tool,
+    config,
+    handedness,
+    sourceContours,
+    vcarveLadder,
+  );
   // ADR-250: bake profile lead-in/out into closed profile passes (default-on
   // for profile-outside/inside; a no-op for other cut types and shape 'none').
   const led = applyProfileLeadPasses(
@@ -247,196 +384,4 @@ export function vcarveClearanceGroupForLayer(
     config,
     { layerPrimaryTool: vBit, includeRampEntry: false, retractBetweenPasses: false },
   );
-}
-
-function passesForLayer(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  tool: CncTool,
-  config: CncMachineConfig,
-  handedness: FrameHandedness,
-  sourceContours: ReadonlyArray<CollectedCncContour> = [],
-): ReadonlyArray<CncPass> {
-  const specialized = specializedPassesForLayer(polylines, settings, tool);
-  if (specialized !== null) return specialized;
-  const contours = lineArtContoursForLayer(polylines, settings, tool.diameterMm, sourceContours);
-  // Finish allowance: roughing toolpaths stay `allowanceMm` proud of the wall
-  // (0 for every non-profile cut and for profile cuts without an allowance, so
-  // the offset — and therefore the output — is byte-identical to before).
-  const allowanceMm = profileFinishAllowanceMm(settings);
-  const restOperation = resolveRestPocketOperation(polylines, settings, config);
-  if (restOperation.kind === 'error') return [];
-  const raw =
-    restOperation.kind === 'ok'
-      ? restOperation.restToolpaths
-      : xyToolpathsForCutType(contours, settings, tool.diameterMm, allowanceMm);
-  // H.9 (opt-in): climb/conventional enforcement + mid-segment entry points.
-  const toolpaths =
-    settings.cutDirection === undefined
-      ? raw
-      : enforceCutDirection(raw, settings.cutDirection, settings.cutType, handedness);
-  const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
-  if (toolpaths.length === 0 || depths.length === 0) return [];
-  const helicalPasses = helicalPocketPassesBySourceRegion(settings, polylines, toolpaths, depths);
-  if (helicalPasses !== null) return helicalPasses;
-  const manualTabCenters = manualTabCentersForToolpaths(toolpaths, sourceContours);
-  const passes =
-    allowanceMm > 0
-      ? profilePassesWithFinishAllowance(
-          contours,
-          settings,
-          tool.diameterMm,
-          toolpaths,
-          handedness,
-          sourceContours,
-          (part) => contourMajorPasses(part, depths, settings, tool.diameterMm, manualTabCenters),
-        )
-      : settings.cutType === 'pocket'
-        ? sourceRegionMajorDepthPasses(polylines, toolpaths, depths)
-        : contourMajorPasses(toolpaths, depths, settings, tool.diameterMm, manualTabCenters);
-  // H.9 (opt-in): plunges become along-path ramps at the configured angle.
-  return settings.rampEntryDeg === undefined
-    ? passes
-    : applyRampEntry(passes, settings.rampEntryDeg);
-}
-
-// ADR-218: pick which edge of a traced double-line ring is machined BEFORE
-// any offsetting, so the surviving contour offsets as a lone shape. Only
-// edge-following cut types select; pocket reaches passesForLayer too but its
-// toolpaths come from resolveRestPocketOperation / pocketToolpathsForSettings
-// on the unfiltered contours (a ring's band needs both edges). Pairing is
-// provenance-scoped (ADR-277): text and shape contours never pair.
-function lineArtContoursForLayer(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  toolDiameterMm: number,
-  sourceContours: ReadonlyArray<CollectedCncContour> = [],
-): ReadonlyArray<Polyline> {
-  if (!lineArtSelectionApplies(settings.cutType)) return polylines;
-  return selectLineArtContours(
-    polylines,
-    settings.lineArtContours ?? DEFAULT_LINE_ART_CONTOURS,
-    toolDiameterMm,
-    lineArtPairableSet(sourceContours),
-  );
-}
-
-export function xyToolpathsForCutType(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  toolDiameterMm: number,
-  allowanceMm: number,
-): ReadonlyArray<Polyline> {
-  switch (settings.cutType) {
-    case 'profile-outside':
-      return orderInnerFirst(
-        profileToolpathPolylines(polylines, 'outside', toolDiameterMm, allowanceMm),
-      );
-    case 'profile-inside':
-      return orderInnerFirst(
-        profileToolpathPolylines(polylines, 'inside', toolDiameterMm, allowanceMm),
-      );
-    case 'profile-on-path':
-      return orderInnerFirst(profileToolpathPolylines(polylines, 'on-path', toolDiameterMm));
-    case 'pocket':
-      return pocketToolpathsForSettings(polylines, settings, toolDiameterMm);
-    case 'engrave':
-      // Same non-finite guard as every other cut type: a NaN vertex would
-      // otherwise survive to the emitter as a literal "G1 XNaN" that the
-      // digit-based preflight word parser cannot see.
-      return polylines.filter(
-        (polyline) => polyline.points.length >= 2 && hasFinitePoints(polyline),
-      );
-    case 'v-carve':
-    case 'inlay-pair':
-    case 'drill':
-      // Handled by their dedicated branches upstream — unreachable here.
-      return [];
-    case 'relief-rough':
-    case 'relief-finish':
-      // Compile-time-only cut types (produced by compile-cnc-relief from
-      // relief objects) — a layer can never carry them.
-      return [];
-    default:
-      return assertNever(settings.cutType, 'CncCutType');
-  }
-}
-
-// Complete each contour to full depth before moving to the next (fewer
-// re-entries per shape; matches how Easel carves profiles). Tab splitting
-// applies to the deep passes of closed profile contours only.
-function contourMajorPasses(
-  toolpaths: ReadonlyArray<Polyline>,
-  depths: ReadonlyArray<number>,
-  settings: CncLayerSettings,
-  toolDiameterMm: number,
-  manualTabCenters: ReadonlyMap<Polyline, ReadonlyArray<number>> = new Map(),
-): CncPass[] {
-  const wantsTabs = settings.tabsEnabled && isProfileCutType(settings.cutType);
-  // Tabbed loops need a full-loop pass at EXACTLY the tab top: otherwise tab
-  // height quantizes up to the pass grid, and a single-pass through-cut
-  // never cuts the tab windows at all (full-stock-thickness "tabs").
-  const tabbedDepths = wantsTabs ? depthsWithTabTopPass(depths, settings) : depths;
-  const passes: CncPass[] = [];
-  for (const toolpath of toolpaths) {
-    const ladder = wantsTabs && toolpath.closed ? tabbedDepths : depths;
-    for (const zMm of ladder) {
-      const needsTabs =
-        wantsTabs && toolpath.closed && passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
-      if (needsTabs) {
-        appendTabbedPasses(
-          passes,
-          toolpath,
-          zMm,
-          settings,
-          toolDiameterMm,
-          manualTabCenters.get(toolpath),
-        );
-      } else {
-        passes.push(contourPassFromPolyline(toolpath, zMm));
-      }
-    }
-  }
-  return passes;
-}
-
-function depthsWithTabTopPass(
-  depths: ReadonlyArray<number>,
-  settings: CncLayerSettings,
-): ReadonlyArray<number> {
-  const tabTop = tabTopZMm(settings.depthMm, settings.tabHeightMm);
-  // Degenerate tab heights (0, or >= depth) leave the ladder untouched.
-  if (tabTop >= -1e-9 || tabTop <= -settings.depthMm + 1e-9) return depths;
-  if (depths.some((z) => Math.abs(z - tabTop) <= 1e-9)) return depths;
-  return [...depths, tabTop].sort((a, b) => b - a);
-}
-
-// ADR-258: a tabbed deep pass stays ONE continuous path that rises to the tab top
-// across each window, instead of splitting into pieces that each replunge at full
-// depth. When the rise cannot be built (open/degenerate loop, zero window) the
-// ordinary contour pass is kept, which is the same fallback the split model used.
-function appendTabbedPasses(
-  passes: CncPass[],
-  toolpath: Polyline,
-  zMm: number,
-  settings: CncLayerSettings,
-  toolDiameterMm: number,
-  manualCenters?: ReadonlyArray<number>,
-): void {
-  const points = tabRampedPoints(
-    toolpath,
-    zMm,
-    tabTopZMm(settings.depthMm, settings.tabHeightMm),
-    {
-      tabWidthMm: settings.tabWidthMm,
-      tabsPerShape: settings.tabsPerShape,
-      toolDiameterMm,
-    },
-    manualCenters,
-  );
-  if (points === null || points.length < 2) {
-    passes.push(contourPassFromPolyline(toolpath, zMm));
-    return;
-  }
-  passes.push({ kind: 'path3d', points, closed: false });
 }

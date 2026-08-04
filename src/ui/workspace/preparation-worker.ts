@@ -9,24 +9,56 @@
 
 /// <reference lib="webworker" />
 
-import { prepareLargeJob } from './large-job-preparation';
+import { prepareOutputAsync } from '../../io/gcode/prepare-output-async';
+import { prepareOutputSnapshot } from '../../io/gcode';
+import {
+  acceptCanvasCompilationBridgeConnection,
+  runCanvasCompilationTasks,
+} from './canvas-compilation-worker-pool';
+import { largeJobPreparationFromPrepared, prepareLargeJobAsync } from './large-job-preparation';
 import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
 } from './preparation-worker-protocol';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
+import { renderVariableText } from '../text/render-variable-text';
 
 self.onmessage = async (e: MessageEvent<PreparationWorkerRequest>): Promise<void> => {
-  const { id, project, jobOrigin, outputScope } = e.data;
+  if (acceptCanvasCompilationBridgeConnection(e.data)) return;
+  const { id, project, jobOrigin, outputScope, snapshot } = e.data;
   try {
     const options = {
       ...(jobOrigin === undefined ? {} : { jobOrigin }),
       ...(outputScope === undefined ? {} : { outputScope }),
     };
+    const hydrated = await hydratePagedRasterProject(project);
+    const prepare = (nextProject: typeof hydrated, nextOptions: typeof options) =>
+      prepareOutputAsync(nextProject, nextOptions, {
+        jobId: `preview:${id}`,
+        runCncTasks: runCanvasCompilationTasks,
+        onProgress: (progress) => {
+          const update: PreparationWorkerResponse = { id, kind: 'progress', progress };
+          self.postMessage(update);
+        },
+      });
+    const preparation =
+      snapshot === undefined
+        ? await prepareLargeJobAsync(hydrated, options, prepare)
+        : largeJobPreparationFromPrepared(
+            hydrated,
+            await prepareOutputSnapshot(hydrated, {
+              ...options,
+              ...snapshot,
+              clock: () => new Date(),
+              renderVariableText,
+              prepare,
+            }),
+            options,
+          );
     const response: PreparationWorkerResponse = {
       id,
       kind: 'ok',
-      ...prepareLargeJob(await hydratePagedRasterProject(project), options),
+      ...preparation,
     };
     self.postMessage(response);
   } catch (err) {

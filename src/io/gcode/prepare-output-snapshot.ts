@@ -31,11 +31,20 @@ export type PrepareOutputSnapshotOptions = PrepareOutputOptions & {
   readonly serialValue?: number;
   readonly renderVariableText: VariableTextRenderer;
   readonly registration?: SimilarityTransform | null;
+  /** Worker-owned compile seam. Heavy callers pass prepareOutputAsync here;
+   * browser-thread callers retain the synchronous core fast path. */
+  readonly prepare?: (
+    project: Project,
+    options: PrepareOutputOptions,
+  ) => PreparedOutput | Promise<PreparedOutput>;
 };
 
 export type PreparedOutputSnapshot = PreparedOutput & {
   readonly evaluationContext: VariableEvaluationContext;
 };
+
+export const PRINT_CUT_REGISTRATION_INVALID_MESSAGE =
+  'Print-and-Cut registration is not valid. Capture both machine points again.';
 
 const rendererCaches = new WeakMap<
   VariableTextRenderer,
@@ -66,7 +75,7 @@ function validateRegistrationOptions(
   if (options.registration === null) {
     return snapshotFailure(
       'print-and-cut-registration-invalid',
-      'Print-and-Cut registration is not valid. Capture both machine points again.',
+      PRINT_CUT_REGISTRATION_INVALID_MESSAGE,
     );
   }
   return null;
@@ -87,7 +96,10 @@ async function prepareSnapshot(
     options.registration === undefined || options.registration === null
       ? evaluated.project
       : applySimilarityProject(evaluated.project, options.registration);
-  const prepared = prepareOutput(registeredProject, outputOptions(options));
+  const prepared = await (options.prepare ?? prepareOutput)(
+    registeredProject,
+    outputOptions(options),
+  );
   return { ...prepared, evaluationContext };
 }
 
@@ -100,9 +112,10 @@ async function materializeVariableText(
   context: VariableEvaluationContext,
   renderer: VariableTextRenderer,
 ): Promise<MaterializedProject> {
-  const objects = await Promise.all(
-    project.scene.objects.map((object) => materializeObject(object, project, context, renderer)),
-  );
+  const objects: MaterializedObject[] = [];
+  for (const object of project.scene.objects) {
+    objects.push(await materializeObject(object, project, context, renderer));
+  }
   const failed = objects.find((result) => !result.ok);
   if (failed !== undefined && !failed.ok) return variableFailure(failed.message);
   return {

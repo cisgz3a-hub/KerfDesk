@@ -3,13 +3,24 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPlatform } from '../../__fixtures__/file-actions';
 import { PlatformProvider } from '../app/platform-context';
+import type {
+  InspectCurrentGcodeOptions,
+  InspectCurrentGcodeResult,
+} from '../app/inspect-current-gcode-action';
 import { useStore } from '../state';
 import { useCurrentGcode, type CurrentGcode } from './use-current-gcode';
 
+type InspectCurrentGcodeMock = (
+  ctx: unknown,
+  openInspector: (programName: string, text: string) => void,
+  options?: InspectCurrentGcodeOptions,
+) => Promise<InspectCurrentGcodeResult>;
+
 const inspectMocks = vi.hoisted(() => ({
-  handleInspectCurrentGcode: vi.fn(
+  handleInspectCurrentGcode: vi.fn<InspectCurrentGcodeMock>(
     async (_ctx: unknown, openInspector: (programName: string, text: string) => void) => {
       openInspector('untitled (current canvas)', 'G21 G90\nG1 X10 F600\n');
+      return { kind: 'ready' as const };
     },
   ),
 }));
@@ -74,7 +85,13 @@ function compileCount(): number {
 
 beforeEach(() => {
   useStore.getState().newProject();
-  inspectMocks.handleInspectCurrentGcode.mockClear();
+  inspectMocks.handleInspectCurrentGcode.mockReset();
+  inspectMocks.handleInspectCurrentGcode.mockImplementation(
+    async (_ctx: unknown, openInspector: (programName: string, text: string) => void) => {
+      openInspector('untitled (current canvas)', 'G21 G90\nG1 X10 F600\n');
+      return { kind: 'ready' as const };
+    },
+  );
   latest = null;
 });
 
@@ -134,5 +151,70 @@ describe('useCurrentGcode', () => {
 
     expect(compileCount()).toBe(2);
     expect(latest?.stale).toBe(false);
+  });
+
+  it('cancels stale background compilation when the design changes', async () => {
+    let observedSignal: AbortSignal | undefined;
+    inspectMocks.handleInspectCurrentGcode.mockImplementation(
+      async (
+        _ctx: unknown,
+        _openInspector: (programName: string, text: string) => void,
+        options?: InspectCurrentGcodeOptions,
+      ) => {
+        observedSignal = options?.signal;
+        await new Promise<void>((resolve) =>
+          options?.signal?.addEventListener('abort', () => resolve()),
+        );
+        return { kind: 'cancelled' as const };
+      },
+    );
+    await mount(true);
+    expect(latest?.state.kind).toBe('compiling');
+
+    await commitAnEdit();
+
+    expect(observedSignal?.aborted).toBe(true);
+    expect(latest?.state.kind).toBe('stale');
+    expect(latest?.stale).toBe(true);
+    expect(compileCount()).toBe(1);
+  });
+
+  it('surfaces background compiler progress and unavailable state', async () => {
+    let finish:
+      | ((value: { readonly kind: 'unavailable'; readonly message: string }) => void)
+      | null = null;
+    inspectMocks.handleInspectCurrentGcode.mockImplementation(
+      async (
+        _ctx: unknown,
+        _openInspector: (programName: string, text: string) => void,
+        options?: InspectCurrentGcodeOptions,
+      ) => {
+        options?.onProgress?.({
+          phase: 'planning',
+          mode: 'parallel',
+          completed: 2,
+          active: 2,
+          queued: 3,
+          total: 7,
+        });
+        return await new Promise((resolve) => {
+          finish = resolve;
+        });
+      },
+    );
+    await mount(true);
+    expect(latest?.state).toMatchObject({
+      kind: 'compiling',
+      progress: { phase: 'planning', completed: 2, total: 7 },
+    });
+
+    await act(async () =>
+      finish?.({ kind: 'unavailable', message: 'Worker capacity unavailable.' }),
+    );
+
+    expect(latest?.state).toEqual({
+      kind: 'unavailable',
+      reason: 'Worker capacity unavailable.',
+    });
   });
 });

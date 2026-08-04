@@ -8,13 +8,20 @@
 // intentionally not modeled here — this is a heads-up, not a gate.
 
 import { compileCncJob } from '../../core/cnc';
-import { computeJobBounds } from '../../core/job';
+import { computeJobBounds, type JobBounds } from '../../core/job';
 import type { Project } from '../../core/scene';
+import type { PreparedOutput } from '../../io/gcode';
 
-export function detectCncStockWarnings(project: Project): ReadonlyArray<string> {
+export function detectCncStockWarnings(
+  project: Project,
+  prepared?: Extract<PreparedOutput, { readonly ok: true }>,
+): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
-  const bounds = computeJobBounds(compileCncJob(project.scene, project.device, machine));
+  const bounds =
+    prepared === undefined
+      ? computeJobBounds(compileCncJob(project.scene, project.device, machine))
+      : unplacedPreparedBounds(prepared);
   if (bounds === null) return [];
 
   const stock = machine.stock;
@@ -32,4 +39,18 @@ export function detectCncStockWarnings(project: Project): ReadonlyArray<string> 
       `${stock.widthMm} × ${stock.heightMm} mm stock at (${minX}, ${minY}). ` +
       'The bit will cut air or your clamps/spoilboard — check the stock size and position.',
   ];
+}
+
+function unplacedPreparedBounds(
+  prepared: Extract<PreparedOutput, { readonly ok: true }>,
+): JobBounds | null {
+  const bounds = computeJobBounds(prepared.job);
+  if (bounds === null) return null;
+  const offset = prepared.jobOriginOffset;
+  return {
+    minX: bounds.minX - offset.x,
+    minY: bounds.minY - offset.y,
+    maxX: bounds.maxX - offset.x,
+    maxY: bounds.maxY - offset.y,
+  };
 }

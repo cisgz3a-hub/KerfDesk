@@ -4,9 +4,15 @@ import { trustedMotionOffsetForPreflight, type ResolvedJobPlacement } from '../j
 import {
   outputPreparationShouldRunOffThread,
   prepareSaveOutputOffThread,
+  BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE,
 } from '../laser/output-preparation-worker-client';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
-import { emitSavePreparedOutput, type SaveOutputEmission } from '../laser/save-output-emission';
+import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
+import {
+  emitSavePreparedOutput,
+  unavailableSaveOutput,
+  type SaveOutputEmission,
+} from '../laser/save-output-emission';
 import { renderVariableText } from '../text/render-variable-text';
 import { buildGcodeMetadata } from './build-info';
 import type { SaveGcodeCtx } from './file-actions';
@@ -22,30 +28,82 @@ import {
 export async function emitSaveGcode(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
+  execution: {
+    readonly signal?: AbortSignal;
+    readonly onProgress?: Parameters<typeof prepareSaveOutputOffThread>[1];
+  } = {},
 ): Promise<SaveOutputEmission> {
-  const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
   const registration = currentPrintCutOutputRegistration(ctx.project);
-  const options: EmitGcodeOptions = {
+  const options = saveGcodeOptions(ctx, placement);
+  const useSnapshot = registration !== undefined || hasVariableText(ctx.project);
+  if (useSnapshot || outputPreparationShouldRunOffThread(ctx.project, ctx.outputScope)) {
+    return prepareSaveInBackground(ctx, options, registration, useSnapshot, execution);
+  }
+  return prepareSaveDirect(ctx, options, registration);
+}
+
+function saveGcodeOptions(
+  ctx: SaveGcodeCtx,
+  placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
+): EmitGcodeOptions {
+  const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
+  return {
     metadata: buildGcodeMetadata(),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
     ...(ctx.allowRotaryRaster === true ? { allowRotaryRaster: true } : {}),
   };
-  if (
-    registration === undefined &&
-    !hasVariableText(ctx.project) &&
-    outputPreparationShouldRunOffThread(ctx.project, ctx.outputScope)
-  ) {
-    const background = prepareSaveOutputOffThread({ kind: 'save', project: ctx.project, options });
-    if (background !== null) {
-      try {
-        return await background;
-      } catch (error) {
-        console.warn('Background Save preparation failed; retrying on the main thread.', error);
-      }
-    }
+}
+
+async function prepareSaveInBackground(
+  ctx: SaveGcodeCtx,
+  options: EmitGcodeOptions,
+  registration: ReturnType<typeof currentPrintCutOutputRegistration>,
+  useSnapshot: boolean,
+  execution: {
+    readonly signal?: AbortSignal;
+    readonly onProgress?: Parameters<typeof prepareSaveOutputOffThread>[1];
+  },
+): Promise<SaveOutputEmission> {
+  const background = prepareSaveOutputOffThread(
+    {
+      kind: 'save',
+      project: ctx.project,
+      options,
+      ...(ctx.controllerSettings === undefined
+        ? {}
+        : { controllerSettings: ctx.controllerSettings }),
+      ...(ctx.activeWcs === undefined ? {} : { activeWcs: ctx.activeWcs }),
+      ...(useSnapshot
+        ? {
+            snapshot: {
+              evaluatedAtIso: new Date().toISOString(),
+              ...(registration === undefined ? {} : { registration }),
+            },
+          }
+        : {}),
+    },
+    execution.onProgress,
+    execution.signal,
+  );
+  if (background === null) {
+    return unavailableSaveOutput(BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE);
   }
+  try {
+    return await background;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    console.warn('Background Save preparation failed.', error);
+    return unavailableSaveOutput(BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE);
+  }
+}
+
+async function prepareSaveDirect(
+  ctx: SaveGcodeCtx,
+  options: EmitGcodeOptions,
+  registration: ReturnType<typeof currentPrintCutOutputRegistration>,
+): Promise<SaveOutputEmission> {
   const preparationProject = projectHasPagedRasterAssets(ctx.project)
     ? await hydratePagedRasterProject(ctx.project)
     : ctx.project;
@@ -55,7 +113,15 @@ export async function emitSaveGcode(
     ...(registration === undefined ? {} : { registration }),
     ...options,
   });
-  return emitSavePreparedOutput(prepared, options);
+  const machineWarnings = prepared.ok
+    ? detectMachineJobWarnings(
+        prepared.project,
+        ctx.controllerSettings ?? null,
+        ctx.activeWcs ?? null,
+        prepared,
+      )
+    : [];
+  return emitSavePreparedOutput(prepared, options, machineWarnings);
 }
 
 function hasVariableText(project: Project): boolean {

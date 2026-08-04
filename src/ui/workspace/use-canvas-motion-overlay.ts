@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StatusQueryCapability } from '../../core/controllers';
-import { sceneHasVCarveOutputLayer } from '../../core/job/vcarve-preparation-complexity';
 import type { OutputScope, Project } from '../../core/scene';
 import {
   resolveJobPlacement,
@@ -16,7 +15,9 @@ import { isActiveJob } from '../state/laser-store-helpers';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';
+import { useCanvasViewStore } from '../state/canvas-view-store';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
+import { costlyCanvasPreparation } from './canvas-preparation-policy';
 import {
   buildIdleCanvasMotionPlanFromRequest,
   type IdleCanvasMotionPlanRequest,
@@ -45,6 +46,7 @@ export function useCanvasMotionOverlay(
   const firstRegistration = usePrintCutSessionStore((state) => state.first);
   const secondRegistration = usePrintCutSessionStore((state) => state.second);
   const showStartMarkers = useUiStore((state) => state.showCanvasStartMarkers);
+  const canvasCovered = useCanvasViewStore((state) => state.showGcode);
   const placement = useMemo(
     () => resolveJobPlacement(placementSettings, laser),
     [placementSettings, laser],
@@ -65,6 +67,7 @@ export function useCanvasMotionOverlay(
     machineRevision,
     interactionActive,
     laser,
+    canvasCovered,
   });
 
   const currentIdlePlan = idlePlan?.current === true ? idlePlan.plan : null;
@@ -75,7 +78,7 @@ export function useCanvasMotionOverlay(
   );
   useClearStaleTerminalRun(liveRun, staleTerminalRun);
 
-  if (previewMode) return null;
+  if (previewMode || canvasCovered) return null;
   if (liveRun !== null && !staleTerminalRun) {
     return { plan: liveRun.plan, run: liveRun, showStartMarkers };
   }
@@ -94,6 +97,7 @@ type IdlePlanInput = {
   readonly machineRevision: string;
   readonly interactionActive: boolean;
   readonly laser: ReturnType<typeof canvasMachineSnapshot>;
+  readonly canvasCovered: boolean;
 };
 
 type IdlePlanState = {
@@ -132,9 +136,14 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): IdlePlanSelection | null
     let workerStarted = false;
     const timer = window.setTimeout(() => {
       const buildRequest = idleCanvasMotionPlanRequest(requestInput, requestInput.placement);
-      const isVCarve = sceneHasVCarveOutputLayer(requestInput.project.scene);
-      const offThread = isVCarve ? prepareIdleCanvasMotionPlanOffThread(buildRequest) : null;
-      if (isVCarve && offThread === null) {
+      const requiresBackground =
+        buildRequest.registration !== undefined ||
+        hasVariableText(requestInput.project) ||
+        costlyCanvasPreparation(requestInput.project, requestInput.outputScope);
+      const offThread = requiresBackground
+        ? prepareIdleCanvasMotionPlanOffThread(buildRequest)
+        : null;
+      if (requiresBackground && offThread === null) {
         // Never turn Worker unavailability into a multi-second browser-thread
         // V-carve compile merely to draw idle markers. Preview, Job Review,
         // Frame, Start, Save, and emitted output keep their own full paths.
@@ -172,10 +181,17 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): IdlePlanSelection | null
     input.machineRevision,
     input.interactionActive,
     input.laser,
+    input.canvasCovered,
   ]);
   if (shouldClearIdlePlan(input) || isActiveCanvasLifecycleOrNull(input.liveRun)) return null;
   if (idleState === null || !idleStateCanRemainVisible(idleState, input)) return null;
   return { plan: idleState.plan, current: idleStateMatches(idleState, input) };
+}
+
+function hasVariableText(project: Project): boolean {
+  return project.scene.objects.some(
+    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
+  );
 }
 
 export async function buildIdleCanvasMotionPlan(
@@ -203,7 +219,7 @@ function idleCanvasMotionPlanRequest(
 }
 
 function shouldClearIdlePlan(input: IdlePlanInput): boolean {
-  return input.previewMode || input.project.scene.objects.length === 0;
+  return input.previewMode || input.canvasCovered || input.project.scene.objects.length === 0;
 }
 
 function shouldDeferIdlePlan(input: IdlePlanInput): boolean {

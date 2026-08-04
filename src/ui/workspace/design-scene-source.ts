@@ -22,7 +22,7 @@ import {
   type RemovalGridSpec,
 } from '../../core/sim';
 import { toolpathMoves3d } from '../../core/toolpath3d';
-import { prepareOutput } from '../../io/gcode';
+import { prepareOutput, type PreparedOutput } from '../../io/gcode';
 import { buildPreviewToolpathFromPrepared, previewPreparationIssue } from './draw-preview';
 import { toolpathToolsByToolKey } from './toolpath-tools';
 import type { DesignSceneSource } from './use-cnc-3d-scene';
@@ -48,6 +48,16 @@ export function computeDesignSceneSource(
   // prepare on the main thread (ADR-241/ADR-243).
   if (previewPreparationIssue(project, { outputScope }) !== null) return null;
   const prepared = prepareOutput(project, { outputScope });
+  return computeDesignSceneSourceFromPrepared(project, prepared);
+}
+
+/** Build display-only 3D data from the exact prepared output shared with other consumers. */
+export function computeDesignSceneSourceFromPrepared(
+  project: Project,
+  prepared: PreparedOutput,
+): DesignSceneSource | null {
+  const machine = project.machine;
+  if (machine === undefined || machine.kind !== 'cnc') return null;
   if (!prepared.ok) return null;
   // buildPreviewToolpathFromPrepared maps the prepared job into scene frame,
   // which is the frame the grid below is stamped in — so the moves and the

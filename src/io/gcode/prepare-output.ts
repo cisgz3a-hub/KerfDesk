@@ -58,22 +58,53 @@ export type PreparedOutput =
     }
   | { readonly ok: false; readonly preflight: PreflightResult };
 
+export type PreparedOutputInput =
+  | { readonly ok: false; readonly prepared: PreparedOutput }
+  | {
+      readonly ok: true;
+      readonly sourceProject: Project;
+      readonly project: Project;
+      readonly outputScope: OutputScope;
+      readonly options: PrepareOutputOptions;
+      readonly advisories: ReadonlyArray<PreflightIssue>;
+    };
+
 const ZERO_OFFSET: Vec2 = { x: 0, y: 0 };
 
 export function prepareOutput(
   project: Project,
   options: PrepareOutputOptions = {},
 ): PreparedOutput {
+  const input = prepareOutputInput(project, options);
+  if (!input.ok) return input.prepared;
+  try {
+    return completePreparedOutput(input, compileForMachine(input.project));
+  } catch (error) {
+    if (isProgramMaterializationRangeError(error)) {
+      return { ok: false, preflight: programMaterializationFailure() };
+    }
+    throw error;
+  }
+}
+
+/** Ordered, synchronous preparation phases that must precede any parallel work. */
+export function prepareOutputInput(
+  project: Project,
+  options: PrepareOutputOptions = {},
+): PreparedOutputInput {
   const scoped = validateOutputScope(project.scene, options.outputScope ?? DEFAULT_OUTPUT_SCOPE);
   if (!scoped.ok) {
     return {
       ok: false,
-      preflight: {
+      prepared: {
         ok: false,
-        issues: scoped.messages.map((message) => ({
-          code: 'selected-output-empty',
-          message,
-        })),
+        preflight: {
+          ok: false,
+          issues: scoped.messages.map((message) => ({
+            code: 'selected-output-empty',
+            message,
+          })),
+        },
       },
     };
   }
@@ -97,34 +128,54 @@ export function prepareOutput(
   const blocking = preEmit.issues.filter((issue) =>
     COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code),
   );
-  if (blocking.length > 0) return { ok: false, preflight: { ok: false, issues: blocking } };
+  if (blocking.length > 0) {
+    return {
+      ok: false,
+      prepared: { ok: false, preflight: { ok: false, issues: blocking } },
+    };
+  }
   const advisories = preEmit.issues.filter(
     (issue) => !COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code),
   );
-  try {
-    const compiled = compileForMachine(outputProject);
-    const outputScope = options.outputScope ?? DEFAULT_OUTPUT_SCOPE;
-    const offset = options.jobOrigin
-      ? resolveJobOriginOffset(project, compiled, options.jobOrigin, outputScope)
-      : ZERO_OFFSET;
-    const placed = applyJobOriginOffset(compiled, offset);
-    // Optimization preserves cut geometry/settings while reordering and possibly
-    // reversing paths. Joining formerly separated paths can also change planner
-    // junction timing, not only travel distance. Doing it HERE means the preview
-    // and duration estimate use the exact order the machine will run.
-    return {
-      ok: true,
-      project: outputProject,
-      job: optimizePaths(placed, project.optimization, project.device.scanningOffsets),
-      jobOriginOffset: offset,
-      advisories,
-    };
-  } catch (error) {
-    if (isProgramMaterializationRangeError(error)) {
-      return { ok: false, preflight: programMaterializationFailure() };
-    }
-    throw error;
-  }
+  return {
+    ok: true,
+    sourceProject: project,
+    project: outputProject,
+    outputScope: options.outputScope ?? DEFAULT_OUTPUT_SCOPE,
+    options,
+    advisories,
+  };
+}
+
+/** Ordered final merge boundary shared by synchronous and worker-backed compilers. */
+export function completePreparedOutput(
+  input: Extract<PreparedOutputInput, { readonly ok: true }>,
+  compiled: Job,
+): Extract<PreparedOutput, { readonly ok: true }> {
+  const offset = input.options.jobOrigin
+    ? resolveJobOriginOffset(
+        input.sourceProject,
+        compiled,
+        input.options.jobOrigin,
+        input.outputScope,
+      )
+    : ZERO_OFFSET;
+  const placed = applyJobOriginOffset(compiled, offset);
+  // Optimization preserves cut geometry/settings while reordering and possibly
+  // reversing paths. Joining formerly separated paths can also change planner
+  // junction timing, not only travel distance. Doing it HERE means the preview
+  // and duration estimate use the exact order the machine will run.
+  return {
+    ok: true,
+    project: input.project,
+    job: optimizePaths(
+      placed,
+      input.sourceProject.optimization,
+      input.sourceProject.device.scanningOffsets,
+    ),
+    jobOriginOffset: offset,
+    advisories: input.advisories,
+  };
 }
 
 // One compile entry per machine kind: the project's machine choice routes to

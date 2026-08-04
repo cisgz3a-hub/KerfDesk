@@ -1,9 +1,10 @@
 // design-simulate — the honest tier of the carve preview (ADR-272
 // Amendment 1 clause 4): compile the designed layers through the REAL
 // pipeline, then stamp every step with the bit that made it, so the result
-// shows per-bit cutter shapes. Synchronous by design: it runs on an explicit
-// click, and a designed sketch is orders of magnitude smaller than an
-// imported scene.
+// shows per-bit cutter shapes. Cheap designs run synchronously on the explicit
+// Simulate click. Operations whose planners amplify small input (for example
+// pocket and V-carve) are prepared and stamped in the shared design worker;
+// neither phase may freeze the canvas thread.
 //
 // Display-only (ADR-261 §3): a failed simulate reports why and gates nothing.
 
@@ -11,11 +12,12 @@ import type { Sketch } from '../../../core/design';
 import type { Toolpath } from '../../../core/job';
 import { createProject, type CncTool, type Project } from '../../../core/scene';
 import { computeRemovalGrid, kernelForTool, type RemovalGrid } from '../../../core/sim';
-import { prepareOutput } from '../../../io/gcode';
+import { prepareOutput, type PreparedOutput } from '../../../io/gcode';
 import {
   applyCarveSettingsToOperations,
   applyDesignSketch,
 } from '../../state/design-apply-mutation';
+import { costlyCanvasPreparation } from '../../workspace/canvas-preparation-policy';
 import { buildPreviewToolpathFromPrepared } from '../../workspace/draw-preview';
 import type { DesignCarveSource } from './design-carve-source';
 
@@ -26,22 +28,65 @@ export type DesignSimulateResult =
 
 const TARGET_CELLS_PER_AXIS = 300;
 
+export type DesignSimulationStage =
+  | { readonly kind: 'ready'; readonly project: Project }
+  | { readonly kind: 'result'; readonly result: DesignSimulateResult };
+
+export type DesignSimulationRoute =
+  | { readonly kind: 'immediate'; readonly result: DesignSimulateResult }
+  | { readonly kind: 'background'; readonly pending: Promise<DesignSimulateResult> };
+
+export type StartBackgroundDesignSimulation = (
+  project: Project,
+  source: DesignCarveSource,
+) => Promise<DesignSimulateResult> | null;
+
+export function routeDesignCarveSimulation(
+  project: Project,
+  sketch: Sketch,
+  ids: ReadonlyArray<string>,
+  source: DesignCarveSource,
+  startBackground: StartBackgroundDesignSimulation,
+): DesignSimulationRoute {
+  const staged = stageDesignCarveSimulation(project, sketch, ids);
+  if (staged.kind === 'result') return { kind: 'immediate', result: staged.result };
+  if (!costlyCanvasPreparation(staged.project)) {
+    return {
+      kind: 'immediate',
+      result: simulateStagedDesignCarveDirect(staged.project, source),
+    };
+  }
+  const pending = startBackground(staged.project, source);
+  return pending === null
+    ? {
+        kind: 'immediate',
+        result: {
+          kind: 'failed',
+          reason:
+            'Background bit simulation is unavailable. Reopen CurveDesk or enable worker support, then try again.',
+        },
+      }
+    : { kind: 'background', pending };
+}
+
 /**
  * Simulates the sketch's layers as a real job against a scratch scene built
  * from the live project's machine and device. `ids` are caller-minted object
  * ids, one per entity (pure core may not generate identity).
  */
-export function simulateDesignCarve(
+export function stageDesignCarveSimulation(
   project: Project,
   sketch: Sketch,
   ids: ReadonlyArray<string>,
-  source: DesignCarveSource,
-): DesignSimulateResult {
+): DesignSimulationStage {
   if (project.machine === undefined || project.machine.kind !== 'cnc') {
     return {
-      kind: 'failed',
-      reason:
-        'Bit simulation needs a CNC machine profile — the design preview above still applies.',
+      kind: 'result',
+      result: {
+        kind: 'failed',
+        reason:
+          'Bit simulation needs a CNC machine profile — the design preview above still applies.',
+      },
     };
   }
   const scratch: Project = {
@@ -51,10 +96,31 @@ export function simulateDesignCarve(
   };
   const applied = applyDesignSketch({ project: scratch, undoStack: [] }, sketch, ids);
   if (applied === null)
-    return { kind: 'empty', reason: 'Nothing to simulate — the sketch has no output geometry.' };
+    return {
+      kind: 'result',
+      result: {
+        kind: 'empty',
+        reason: 'Nothing to simulate — the sketch has no output geometry.',
+      },
+    };
   const staged = applyCarveSettingsToOperations(applied, applied.carveOperations);
+  return { kind: 'ready', project: staged.project };
+}
 
-  const prepared = prepareOutput(staged.project, {});
+/** Direct path used only after the shared cost classifier selected cheap work. */
+export function simulateStagedDesignCarveDirect(
+  project: Project,
+  source: DesignCarveSource,
+): DesignSimulateResult {
+  return completeDesignCarveSimulation(project, source, prepareOutput(project, {}));
+}
+
+/** Shared completion used by both the cheap direct path and the design worker. */
+export function completeDesignCarveSimulation(
+  project: Project,
+  source: DesignCarveSource,
+  prepared: PreparedOutput,
+): DesignSimulateResult {
   if (!prepared.ok) {
     const first = prepared.preflight.issues[0]?.message ?? 'preparation failed';
     return { kind: 'failed', reason: first };
@@ -70,7 +136,7 @@ export function simulateDesignCarve(
     mmPerCell,
   };
 
-  const toolpath = buildPreviewToolpathFromPrepared(staged.project, prepared);
+  const toolpath = buildPreviewToolpathFromPrepared(project, prepared);
   if (toolpath.totalLength <= 0) {
     return { kind: 'empty', reason: 'The job produced no cutting moves.' };
   }

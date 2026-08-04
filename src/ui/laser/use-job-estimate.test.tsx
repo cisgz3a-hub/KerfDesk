@@ -12,13 +12,18 @@ import {
 } from '../../core/scene';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { useStore } from '../state';
+import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { useLaserStore } from '../state/laser-store';
+import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import type * as PreparationWorkerClient from '../workspace/preparation-worker-client';
 import { PreparationSupersededError } from '../workspace/preparation-worker-client';
+import { PRINT_CUT_REGISTRATION_INVALID_MESSAGE } from '../../io/gcode/prepare-output-snapshot';
 import type { LiveJobEstimate } from './live-job-estimate';
+import type * as LiveJobEstimateModule from './live-job-estimate';
 import { JOB_ESTIMATE_DEBOUNCE_MS, useJobEstimate } from './use-job-estimate';
 
 const workerMocks = vi.hoisted(() => ({ prepareLargeJobOffThread: vi.fn() }));
+const estimateMocks = vi.hoisted(() => ({ estimateLiveJob: vi.fn() }));
 
 // Only dispatch is stubbed: the supersede error type and its guard must be the
 // REAL ones, or the hook's "ignore an internal supersede" branch would be
@@ -27,6 +32,12 @@ vi.mock('../workspace/preparation-worker-client', async (importOriginal) => ({
   ...(await importOriginal<typeof PreparationWorkerClient>()),
   prepareLargeJobOffThread: workerMocks.prepareLargeJobOffThread,
 }));
+
+vi.mock('./live-job-estimate', async (importOriginal) => {
+  const actual = await importOriginal<typeof LiveJobEstimateModule>();
+  estimateMocks.estimateLiveJob.mockImplementation(actual.estimateLiveJob);
+  return { ...actual, estimateLiveJob: estimateMocks.estimateLiveJob };
+});
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -137,11 +148,16 @@ beforeEach(() => {
   settles.length = 0;
   workerMocks.prepareLargeJobOffThread.mockReset();
   workerMocks.prepareLargeJobOffThread.mockReturnValue(null);
+  estimateMocks.estimateLiveJob.mockClear();
+  useExperimentalLaserFeatures.getState().resetFeatures();
+  usePrintCutSessionStore.getState().clear();
 });
 
 afterEach(() => {
   useStore.getState().newProject();
-  useLaserStore.setState({ statusReport: null });
+  useLaserStore.setState({ statusReport: null, trustedPositionEpoch: 0 });
+  useExperimentalLaserFeatures.getState().resetFeatures();
+  usePrintCutSessionStore.getState().clear();
   vi.useRealTimers();
 });
 
@@ -309,6 +325,66 @@ describe('useJobEstimate debounce (H16)', () => {
       });
     });
     expect(probe.current?.kind).toBe('estimated');
+
+    await unmount();
+  });
+
+  it('surfaces invalid Print-and-Cut trust without waiting on background compilation', async () => {
+    useExperimentalLaserFeatures.getState().setFeature('printAndCut', true);
+    useLaserStore.setState({ trustedPositionEpoch: 4 });
+    usePrintCutSessionStore.getState().capture('first', { x: 20, y: 20 }, 3);
+    usePrintCutSessionStore.getState().capture('second', { x: 120, y: 20 }, 3);
+    useStore.setState({
+      project: {
+        ...lineProject(),
+        printAndCutTargets: { first: { x: 0, y: 0 }, second: { x: 100, y: 0 } },
+      },
+    });
+    const unmount = await renderProbe();
+
+    expect(probe.current).toEqual({
+      kind: 'preparation-failed',
+      message: PRINT_CUT_REGISTRATION_INVALID_MESSAGE,
+    });
+    expect(estimateMocks.estimateLiveJob).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+    });
+
+    expect(probe.current).toEqual({
+      kind: 'preparation-failed',
+      message: PRINT_CUT_REGISTRATION_INVALID_MESSAGE,
+    });
+    expect(workerMocks.prepareLargeJobOffThread).not.toHaveBeenCalled();
+    expect(estimateMocks.estimateLiveJob).not.toHaveBeenCalled();
+
+    await unmount();
+  });
+
+  it('never compiles a valid Print-and-Cut snapshot synchronously on mount', async () => {
+    useExperimentalLaserFeatures.getState().setFeature('printAndCut', true);
+    useLaserStore.setState({ trustedPositionEpoch: 3 });
+    usePrintCutSessionStore.getState().capture('first', { x: 20, y: 20 }, 3);
+    usePrintCutSessionStore.getState().capture('second', { x: 120, y: 20 }, 3);
+    useStore.setState({
+      project: {
+        ...lineProject(),
+        printAndCutTargets: { first: { x: 0, y: 0 }, second: { x: 100, y: 0 } },
+      },
+    });
+    workerMocks.prepareLargeJobOffThread.mockReturnValue(new Promise(() => undefined));
+    const unmount = await renderProbe();
+
+    expect(probe.current).toEqual({ kind: 'too-large' });
+    expect(estimateMocks.estimateLiveJob).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+    });
+
+    expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledTimes(1);
+    expect(estimateMocks.estimateLiveJob).not.toHaveBeenCalled();
 
     await unmount();
   });

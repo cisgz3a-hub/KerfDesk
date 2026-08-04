@@ -12,13 +12,21 @@
 import type { OutputScope, Project } from '../../core/scene';
 import type {
   DesignSceneWorkerRequest,
+  DesignSceneWorkerRequestPayload,
   DesignSceneWorkerResponse,
+  DesignSceneWorkerSuccessResponse,
 } from './design-scene-worker-protocol';
+import type { DesignCarveSource } from '../design-studio/preview3d/design-carve-source';
+import type { DesignSimulateResult } from '../design-studio/preview3d/design-simulate';
 import type { DesignSceneSource } from './use-cnc-3d-scene';
+import {
+  connectCanvasCompilationMainBridge,
+  retireCanvasCompilationMainBridge,
+} from './canvas-compilation-main-bridge';
 
 type Pending = {
   readonly id: number;
-  readonly resolve: (source: DesignSceneSource | null) => void;
+  readonly resolve: (response: DesignSceneWorkerSuccessResponse) => void;
   readonly reject: (error: Error) => void;
 };
 
@@ -46,46 +54,101 @@ export function computeDesignSceneSourceOffThread(
   project: Project,
   outputScope: OutputScope,
 ): Promise<DesignSceneSource | null> | null {
-  const worker = ensureWorker();
-  if (worker === null) return null;
-  // Only the newest grid matters. Retiring the previous request here means a
-  // burst of bit changes settles to one delivered result even though the worker
-  // finishes each in turn.
-  pending?.reject(new DesignSceneSupersededError());
-  const id = nextRequestId;
-  nextRequestId += 1;
-  const promise = new Promise<DesignSceneSource | null>((resolve, reject) => {
-    pending = { id, resolve, reject };
+  const response = runWorker({ kind: 'scene', project, outputScope });
+  if (response === null) return null;
+  return response.then((result) => {
+    if (result.kind !== 'scene') throw new Error('Design worker returned no scene.');
+    return result.source;
   });
-  const request: DesignSceneWorkerRequest = { id, project, outputScope };
-  worker.postMessage(request);
-  return promise;
+}
+
+/** Runs both costly preparation and removal-grid stamping in the shared design worker. */
+export function simulateDesignCarveOffThread(
+  project: Project,
+  source: DesignCarveSource,
+): Promise<DesignSimulateResult> | null {
+  const response = runWorker({ kind: 'simulation', project, source });
+  if (response === null) return null;
+  return response.then((result) => {
+    if (result.kind !== 'simulation') throw new Error('Design worker returned no simulation.');
+    return result.result;
+  });
+}
+
+/** Latest-run-wins cancellation shared by the pane and explicit bit simulation. */
+export function cancelDesignSceneWorkerRequest(): void {
+  if (pending === null) return;
+  pending.reject(new DesignSceneSupersededError());
+  pending = null;
+  retireWorker();
 }
 
 export function resetDesignSceneWorkerForTests(): void {
-  pending?.reject(new DesignSceneSupersededError());
-  pending = null;
-  workerInstance?.terminate();
-  workerInstance = null;
+  cancelDesignSceneWorkerRequest();
+  retireWorker();
   nextRequestId = 1;
+}
+
+function runWorker(
+  payload: DesignSceneWorkerRequestPayload,
+): Promise<DesignSceneWorkerSuccessResponse> | null {
+  // Only the newest grid matters. Retiring the previous request here means a
+  // burst of edits or Simulate clicks cannot retain or enqueue stale work.
+  cancelDesignSceneWorkerRequest();
+  const worker = ensureWorker();
+  if (worker === null) return null;
+  const id = nextRequestId;
+  nextRequestId += 1;
+  let active!: Pending;
+  const promise = new Promise<DesignSceneWorkerSuccessResponse>((resolve, reject) => {
+    active = { id, resolve, reject };
+    pending = active;
+  });
+  const request: DesignSceneWorkerRequest = { ...payload, id };
+  try {
+    worker.postMessage(request);
+  } catch (error) {
+    if (pending === active) pending = null;
+    retireWorker();
+    active.reject(error instanceof Error ? error : new Error(String(error)));
+  }
+  return promise;
 }
 
 function ensureWorker(): Worker | null {
   if (workerInstance !== null) return workerInstance;
   if (typeof Worker === 'undefined') return null;
-  workerInstance = new Worker(new URL('./design-scene-worker.ts', import.meta.url), {
-    type: 'module',
-  });
+  try {
+    const created = new Worker(new URL('./design-scene-worker.ts', import.meta.url), {
+      type: 'module',
+    });
+    connectCanvasCompilationMainBridge(created);
+    workerInstance = created;
+  } catch {
+    return null;
+  }
   workerInstance.onmessage = handleMessage;
   workerInstance.onerror = (): void => {
     // A dead worker must not strand the pane forever: fail the in-flight
     // request and drop the instance so the next build starts a fresh one.
     pending?.reject(new Error('design scene worker errored'));
     pending = null;
-    workerInstance?.terminate();
-    workerInstance = null;
+    retireWorker();
+  };
+  workerInstance.onmessageerror = (): void => {
+    pending?.reject(new Error('design scene worker response was not cloneable'));
+    pending = null;
+    retireWorker();
   };
   return workerInstance;
+}
+
+function retireWorker(): void {
+  if (workerInstance === null) return;
+  const retired = workerInstance;
+  workerInstance = null;
+  retireCanvasCompilationMainBridge(retired);
+  retired.terminate();
 }
 
 function handleMessage(e: MessageEvent<DesignSceneWorkerResponse>): void {
@@ -97,5 +160,5 @@ function handleMessage(e: MessageEvent<DesignSceneWorkerResponse>): void {
     active.reject(new Error(response.message));
     return;
   }
-  active.resolve(response.source);
+  active.resolve(response);
 }

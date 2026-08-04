@@ -12,12 +12,10 @@ import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
   findCncSecondaryToolFeedIssues,
   runCncPreflight,
-  type PreflightIssue,
 } from '../../core/preflight';
+import type { Job } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { gcodeMetadataHeader } from '../../io/gcode';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
-import type { ToastVariant } from '../state/toast-store';
 import { buildGcodeMetadata } from './build-info';
 import {
   compiledVCarveLayerDepths,
@@ -28,10 +26,18 @@ export type TileFile = { readonly name: string; readonly gcode: string };
 type ReadyTiledJobs = Extract<ReturnType<typeof tileJobs>, { readonly kind: 'ready' }>;
 
 // The tile set plus every policy finding raised while emitting it.
-export type TileEmission = {
-  readonly files: ReadonlyArray<TileFile>;
-  readonly advisories: ReadonlyArray<string>;
-};
+export type TileEmission =
+  | {
+      readonly kind: 'ready';
+      readonly files: ReadonlyArray<TileFile>;
+      readonly advisories: ReadonlyArray<string>;
+    }
+  | {
+      readonly kind: 'failed';
+      readonly row: number;
+      readonly col: number;
+      readonly messages: ReadonlyArray<string>;
+    };
 
 // Every tile must clear COMPILE INTEGRITY before any file is written (the
 // no-partial-output invariant applies to the whole tile set). null = a tile
@@ -48,21 +54,24 @@ export function emitTileFiles(
   machine: Extract<Project['machine'], { kind: 'cnc' }>,
   tiles: ReadyTiledJobs['tiles'],
   savedName: string | null,
-): TileEmission | null {
+  compiledJob: Job,
+): TileEmission {
   const emitted: TileFile[] = [];
   const advisories = new Set<string>();
   for (const { tile, job } of tiles) {
     const body = cncGrblStrategy.emit(job, project.device);
-    const preflight = runCncPreflight(project, machine, body);
+    // Reuse the scoped whole-job evidence so per-tile diagnostics never
+    // re-enter V-carve planning once per tile.
+    const preflight = runCncPreflight(project, machine, body, { compiledJob });
     const issues = [...preflight.issues, ...findCncSecondaryToolFeedIssues(job)];
     const blocking = issues.filter((issue) => COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code));
     if (blocking.length > 0) {
-      const lines = blocking.map((issue) => `• ${issue.message}`).join('\n');
-      jobAwareAlert(
-        `Tile r${tile.row + 1}-c${tile.col + 1} failed preflight:\n\n${lines}\n\n` +
-          'No files were written.',
-      );
-      return null;
+      return {
+        kind: 'failed',
+        row: tile.row,
+        col: tile.col,
+        messages: blocking.map((issue) => issue.message),
+      };
     }
     for (const issue of issues) advisories.add(issue.message);
     for (const warning of detectCompiledVCarveDepthWarnings(
@@ -84,22 +93,7 @@ export function emitTileFiles(
       gcode: `${header}; tile: row ${tile.row + 1}, column ${tile.col + 1}\n${body}`,
     });
   }
-  return { files: emitted, advisories: [...advisories] };
-}
-
-// Rule 7 / ADR-228: neither a pre-emit nor a per-tile policy finding refuses
-// the tiled export, so surface both rather than trading a refusal for silence.
-// Deduped by message and reported once for the SET — an out-of-range setting
-// repeats on every tile, and N identical toasts would bury the rest.
-export function pushAdvisoryToasts(
-  pushToast: (message: string, variant?: ToastVariant) => void,
-  preEmit: ReadonlyArray<PreflightIssue> | undefined,
-  perTile: ReadonlyArray<string>,
-): void {
-  const messages = new Set<string>([...(preEmit ?? []).map((issue) => issue.message), ...perTile]);
-  for (const message of messages) {
-    pushToast(message, 'warning');
-  }
+  return { kind: 'ready', files: emitted, advisories: [...advisories] };
 }
 
 function baseName(savedName: string | null): string {

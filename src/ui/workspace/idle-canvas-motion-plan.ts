@@ -6,7 +6,7 @@ import type { StatusQueryCapability } from '../../core/controllers';
 import type { JobOriginPlacement } from '../../core/job';
 import type { SimilarityTransform } from '../../core/registration';
 import type { OutputScope, Project } from '../../core/scene';
-import { prepareOutputSnapshot } from '../../io/gcode';
+import { prepareOutputSnapshot, type PrepareOutputSnapshotOptions } from '../../io/gcode';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import type { JobPlacementSettings, ResolvedJobPlacement } from '../job-placement';
 import type { MachineStartSnapshot } from '../laser/start-job-readiness';
@@ -30,6 +30,7 @@ export type IdleCanvasMotionPlanRequest = {
 
 export async function buildIdleCanvasMotionPlanFromRequest(
   request: IdleCanvasMotionPlanRequest,
+  prepare?: PrepareOutputSnapshotOptions['prepare'],
 ): Promise<CanvasMotionPlan | null> {
   const jobOrigin: JobOriginPlacement | undefined = request.resolvedPlacement.ok
     ? request.resolvedPlacement.jobOrigin
@@ -47,6 +48,7 @@ export async function buildIdleCanvasMotionPlanFromRequest(
     ...(request.registration === undefined ? {} : { registration: request.registration }),
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
     outputScope: request.outputScope,
+    ...(prepare === undefined ? {} : { prepare }),
   });
   if (!prepared.ok) return null;
   return buildCanvasMarkerPlan({

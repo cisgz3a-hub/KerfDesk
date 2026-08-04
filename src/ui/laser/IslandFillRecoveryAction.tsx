@@ -1,8 +1,15 @@
 import { useMemo } from 'react';
 import { analyzeFillHeatRisk, compileJob, islandFillMotionPolicyForDevice } from '../../core/job';
-import { validateOutputScope, type OutputScope, type Project } from '../../core/scene';
+import {
+  outputOperationLayers,
+  sceneObjectUsesOperation,
+  validateOutputScope,
+  type OutputScope,
+  type Project,
+} from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 
 export function IslandFillRecoveryAction({
   streaming,
@@ -58,11 +65,15 @@ export function IslandFillRecoveryAction({
 }
 
 function hasMachineIslandFillRisk(project: Project, outputScope: OutputScope): boolean {
-  if (!hasPotentialSensitiveIslandFillRisk(project)) return false;
   const scoped = validateOutputScope(project.scene, outputScope);
   if (!scoped.ok) return false;
   const scopedProject =
     scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
+  if (!hasPotentialSensitiveIslandFillRisk(scopedProject)) return false;
+  // Island Fill itself is classified as costly. Keep the recovery action
+  // visible from the cheap, conservative predicate instead of either running
+  // its exact sweep analysis during render or hiding an existing safety aid.
+  if (costlyCanvasPreparation(scopedProject)) return true;
   const job = compileJob(scopedProject.scene, scopedProject.device);
   const heatRisk = analyzeFillHeatRisk(job, scopedProject.device.scanningOffsets);
   return (
@@ -75,11 +86,15 @@ function hasMachineIslandFillRisk(project: Project, outputScope: OutputScope): b
 }
 
 function hasPotentialSensitiveIslandFillRisk(project: Project): boolean {
-  return (
-    islandFillMotionPolicyForDevice(project.device) === 'sensitive' &&
-    project.scene.layers.some(
-      (layer) => layer.output && layer.mode === 'fill' && layer.fillStyle === 'island',
-    )
+  if (islandFillMotionPolicyForDevice(project.device) !== 'sensitive') return false;
+  const operations = project.scene.layers.flatMap(outputOperationLayers);
+  return project.scene.objects.some((object) =>
+    operations.some((layer) => {
+      if (!sceneObjectUsesOperation(object, layer)) return false;
+      const settings =
+        object.operationOverride === undefined ? layer : { ...layer, ...object.operationOverride };
+      return settings.mode === 'fill' && settings.fillStyle === 'island';
+    }),
   );
 }
 

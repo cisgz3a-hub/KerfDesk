@@ -1,23 +1,25 @@
-// handleSaveTiledGcode — the H.10 per-tile export path (F-CNC19). When the
-// CNC machine has tiling enabled, Save G-code splits the compiled job into
-// the indexed tile grid and saves ONE FILE PER TILE (sequential save
-// dialogs, suggested names carry the r/c index). The whole-job bed-bounds
-// preflight is deliberately skipped — an oversized job is the point of
-// tiling — and each tile's G-code preflights individually instead.
+// handleSaveTiledGcode — the H.10 per-tile export path (F-CNC19). Costly
+// preparation, tiling, per-tile preflight, and emission all run in the shared
+// output Worker; the UI realm is limited to warnings and sequential pickers.
 
-import { tileJobs, type TiledJobsResult } from '../../core/cnc/tile-jobs';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
+import { tileFileNameForIndex } from '../../core/cnc/tile-plan';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
-import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
-import { prepareOutput } from '../../io/gcode';
-import type { PlatformAdapter } from '../../platform/types';
 import type { OutputScope, Project } from '../../core/scene';
+import { prepareOutput } from '../../io/gcode';
+import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
+import {
+  BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE,
+  prepareTiledOutputOffThread,
+} from '../laser/output-preparation-worker-client';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
+import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
-import { emitTileFiles, pushAdvisoryToasts, type TileFile } from './tile-emission';
+import type { TileFile } from './tile-emission';
+import { finalizeTiledOutput, type TiledOutputPreparation } from './tiled-output-preparation';
 import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
-import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
 
@@ -25,49 +27,58 @@ export type SaveTiledGcodeCtx = {
   readonly platform: PlatformAdapter;
   readonly project: Project;
   readonly savedName: string | null;
-  // "Cut selected graphics" applies to tiled exports too — ignoring it would
-  // silently tile the whole scene.
   readonly outputScope?: OutputScope;
-  // The connected controller's live $$ snapshot, for the same $30/$32 readiness
-  // REPORT the single-file Save makes (GCO-02, demoted from a gate by rule 7 /
-  // ADR-228). null/undefined = nothing to prove.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly settingsCapability?: ReadinessSettingsCapability;
-  // The controller's active WCS, for the same G54-mismatch advisory the
-  // single-file Save makes. undefined/null = nothing to compare against.
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
-// Returns true when the tiled path handled the save (tiling enabled),
-// false when the caller should run the normal single-file flow.
+// Returns true when the tiled path handled the save (tiling enabled), false
+// when the caller should run the ordinary single-file flow.
 export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<boolean> {
   const machine = ctx.project.machine;
   if (machine?.kind !== 'cnc' || machine.tiling === undefined) return false;
+  return saveConfiguredTiledGcode(ctx);
+}
 
-  const preparationProject = await hydratePagedRasterProject(ctx.project);
-  const prepared = prepareOutput(
-    preparationProject,
-    ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope },
-  );
-  if (!prepared.ok) {
-    const lines = prepared.preflight.issues.map((issue) => `• ${issue.message}`).join('\n');
+async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
+  const options = ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope };
+  const costly = costlyCanvasPreparation(ctx.project, options.outputScope);
+  // Web file pickers consume transient user activation. Acquire the first
+  // destination before a costly Worker await; subsequent per-tile pickers are
+  // opened from the user's interaction with the preceding picker.
+  const firstTarget = costly
+    ? await pickTileTarget(ctx, suggestedFirstTileName(ctx.savedName))
+    : undefined;
+  if (firstTarget === null) return true;
+  const preparation = await prepareTiledOutput(ctx, options);
+  if (preparation === null) {
+    jobAwareAlert(`Cannot export tiles:\n\n• ${BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE}`);
+    return true;
+  }
+  if (preparation.kind === 'preparation-failed') {
+    const lines = preparation.messages.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot export tiles:\n\n${lines}`);
     return true;
   }
-  const tiled = readyTiledJobs(tileJobs(prepared.job, machine.tiling), ctx);
-  if (tiled === null) return true;
-  // Per-tile preflight must inspect the same selected artifact that produced
-  // prepared.job; rescanning the original scene can overblock on unselected
-  // operations that are absent from every tile.
-  const emitted = emitTileFiles(prepared.project, machine, tiled.tiles, ctx.savedName);
-  if (emitted === null) return true;
-  const files = emitted.files;
-  // Rule 7 / ADR-228: a disagreeing $30/$32 is the same hazard whether the job
-  // is tiled or not, so it is stated ONCE for the whole set. Reported here,
-  // where the deleted confirm stood — the confirm fired before any tile was
-  // written, so reporting only after a successful run would say less than the
-  // refusal did when the operator cancels part-way through the pickers.
+  if (preparation.kind === 'empty') {
+    ctx.pushToast('Nothing to tile — the compiled job is empty.', 'warning');
+    return true;
+  }
+  if (preparation.kind === 'work-budget-exceeded') {
+    jobAwareAlert(tiledSaveWorkBudgetMessage(preparation.grid));
+    return true;
+  }
+  if (preparation.kind === 'tile-preflight-failed') {
+    const lines = preparation.messages.map((message) => `• ${message}`).join('\n');
+    jobAwareAlert(
+      `Tile r${preparation.row + 1}-c${preparation.col + 1} failed preflight:\n\n${lines}\n\n` +
+        'No files were written.',
+    );
+    return true;
+  }
+
   for (const advisory of controllerReadinessAdvisories(
     ctx.project,
     ctx.controllerSettings,
@@ -75,88 +86,110 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   )) {
     ctx.pushToast(advisory, 'warning');
   }
-  pushMachineJobWarnings(ctx, prepared.project);
-  pushTiledAdvisories(ctx, tiled);
-  const saved = await saveTileFiles(ctx, files);
+  pushWarnings(ctx, preparation.machineWarnings);
+  pushWarnings(ctx, preparation.tileAdvisories);
+  const saved = await saveTileFiles(ctx, preparation.files, firstTarget);
   ctx.pushToast(
-    saved === files.length
+    saved === preparation.files.length
       ? `Saved all ${saved} tile files. Cut them in index order, re-registering the stock between tiles.`
-      : `Saved ${saved} of ${files.length} tile files.`,
-    saved === files.length ? 'success' : 'warning',
+      : `Saved ${saved} of ${preparation.files.length} tile files.`,
+    saved === preparation.files.length ? 'success' : 'warning',
   );
-  pushAdvisoryToasts(ctx.pushToast, prepared.advisories, emitted.advisories);
+  pushWarnings(
+    ctx,
+    [...preparation.preparationAdvisories, ...preparation.emissionAdvisories],
+    true,
+  );
   return true;
 }
 
-// The machine-job advisory set (stock footprint, tabs, feeds, raster, and the
-// v-carve offset-ladder family) is the same information whether the job is
-// tiled or not, and tiling is CNC-only — so skipping it here silenced every CNC
-// advisory on exactly the machine class they exist for. Reported against the
-// PREPARED project, the scoped artifact the tiles were emitted from, so "Cut
-// selected graphics" cannot warn about operations no tile contains.
-function pushMachineJobWarnings(ctx: SaveTiledGcodeCtx, project: Project): void {
-  for (const warning of detectMachineJobWarnings(
-    project,
+async function prepareTiledOutput(
+  ctx: SaveTiledGcodeCtx,
+  options: { readonly outputScope?: OutputScope },
+): Promise<TiledOutputPreparation | null> {
+  if (costlyCanvasPreparation(ctx.project, options.outputScope)) {
+    const background = prepareTiledOutputOffThread({
+      kind: 'tiles',
+      project: ctx.project,
+      options,
+      savedName: ctx.savedName,
+      ...(ctx.controllerSettings === undefined
+        ? {}
+        : { controllerSettings: ctx.controllerSettings }),
+      ...(ctx.activeWcs === undefined ? {} : { activeWcs: ctx.activeWcs }),
+    });
+    if (background === null) return null;
+    try {
+      return await background;
+    } catch {
+      return null;
+    }
+  }
+  const hydrated = await hydratePagedRasterProject(ctx.project);
+  return finalizeTiledOutput(
+    prepareOutput(hydrated, options),
+    ctx.savedName,
     ctx.controllerSettings ?? null,
     ctx.activeWcs ?? null,
-  )) {
+  );
+}
+
+function pushWarnings(
+  ctx: SaveTiledGcodeCtx,
+  warnings: ReadonlyArray<string>,
+  dedupe = false,
+): void {
+  for (const warning of dedupe ? new Set(warnings) : warnings) {
     ctx.pushToast(warning, 'warning');
   }
 }
 
-function pushTiledAdvisories(
-  ctx: SaveTiledGcodeCtx,
-  tiled: Extract<TiledJobsResult, { readonly kind: 'ready' }>,
-): void {
-  for (const advisory of tiled.advisories ?? []) ctx.pushToast(advisory, 'warning');
-}
-
-function readyTiledJobs(
-  tiled: TiledJobsResult,
-  ctx: SaveTiledGcodeCtx,
-): Extract<TiledJobsResult, { readonly kind: 'ready' }> | null {
-  if (tiled.kind === 'empty') {
-    ctx.pushToast('Nothing to tile — the compiled job is empty.', 'warning');
-    return null;
-  }
-  if (tiled.kind === 'work-budget-exceeded') {
-    jobAwareAlert(tiledSaveWorkBudgetMessage(tiled.grid));
-    return null;
-  }
-  return tiled;
-}
-
-// Sequential save dialogs; a cancel stops the remaining tiles.
+// Sequential save dialogs; cancelling a picker stops only the remaining files.
 async function saveTileFiles(
   ctx: SaveTiledGcodeCtx,
   files: ReadonlyArray<TileFile>,
+  firstTarget?: SaveTarget,
 ): Promise<number> {
   let saved = 0;
-  for (const file of files) {
-    let target;
-    try {
-      target = await ctx.platform.pickFileForSave({
-        suggestedName: `${file.name}.nc`,
-        extensions: GCODE_EXTENSIONS,
-      });
-    } catch (err) {
-      ctx.pushToast(
-        `Could not save tile: ${err instanceof Error ? err.message : String(err)}`,
-        'error',
-      );
-      return saved;
-    }
+  for (const [index, file] of files.entries()) {
+    const target =
+      index === 0 && firstTarget !== undefined
+        ? firstTarget
+        : await pickTileTarget(ctx, `${file.name}.nc`);
     if (target === null) return saved;
     try {
       await target.write(file.gcode);
       saved += 1;
-    } catch (err) {
+    } catch (error) {
       ctx.pushToast(
-        `Could not write ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+        `Could not write ${file.name}: ${error instanceof Error ? error.message : String(error)}`,
         'error',
       );
       return saved;
     }
   }
   return saved;
+}
+
+async function pickTileTarget(
+  ctx: SaveTiledGcodeCtx,
+  suggestedName: string,
+): Promise<SaveTarget | null> {
+  try {
+    return await ctx.platform.pickFileForSave({
+      suggestedName,
+      extensions: GCODE_EXTENSIONS,
+    });
+  } catch (error) {
+    ctx.pushToast(
+      `Could not save tile: ${error instanceof Error ? error.message : String(error)}`,
+      'error',
+    );
+    return null;
+  }
+}
+
+function suggestedFirstTileName(savedName: string | null): string {
+  const base = (savedName ?? 'job').replace(/\.(lf2|gcode|nc)$/i, '');
+  return `${tileFileNameForIndex(base, 0, 0)}.nc`;
 }

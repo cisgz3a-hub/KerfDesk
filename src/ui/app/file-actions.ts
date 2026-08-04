@@ -39,7 +39,6 @@ import {
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
-import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { importSourceSizeAdvisory } from './import-size-advisory';
 import { prepareGcodeSave } from './prepare-gcode-save';
 import { detectCompiledVCarveDepthWarnings } from '../laser/cnc-compiled-depth-warnings';
@@ -210,7 +209,12 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     await target.write(prepared.gcode);
     advanceExportVariables(ctx);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
-    pushPostSaveAdvisories(ctx, prepared.advisories, prepared.cncVCarveDepths);
+    pushPostSaveAdvisories(
+      ctx,
+      prepared.advisories,
+      prepared.cncVCarveDepths,
+      prepared.machineWarnings,
+    );
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }
@@ -230,16 +234,13 @@ function pushPostSaveAdvisories(
   ctx: SaveGcodeCtx,
   preflightAdvisories: ReadonlyArray<PreflightIssue>,
   cncVCarveDepths: Parameters<typeof detectCompiledVCarveDepthWarnings>[0],
+  machineWarnings: ReadonlyArray<string>,
 ): void {
   for (const advisory of preflightAdvisories) {
     ctx.pushToast(advisory.message, 'warning');
   }
   const warningProject = outputScopedWarningProject(ctx);
-  for (const warning of detectMachineJobWarnings(
-    warningProject,
-    ctx.controllerSettings,
-    ctx.activeWcs ?? null,
-  )) {
+  for (const warning of machineWarnings) {
     ctx.pushToast(warning, 'warning');
   }
   if (warningProject.machine?.kind === 'cnc') {

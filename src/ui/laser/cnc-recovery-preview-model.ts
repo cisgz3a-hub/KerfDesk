@@ -18,6 +18,7 @@ import { cncSupervisedRecoveryRunwayProfile } from '../../core/recovery/cnc-supe
 import type { Project } from '../../core/scene';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import type { RecoveryCapsule } from '../state/recovery';
+import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 import {
   exactEvidenceChecks,
   legacyEvidenceChecks,
@@ -171,6 +172,13 @@ function buildLegacyPreview(
   }
   if (checkpoint.machineKind !== 'cnc' || project.machine?.kind !== 'cnc') {
     return unavailable(base, 'Open the original CNC project for this legacy record.', parameters);
+  }
+  if (costlyCanvasPreparation(project, checkpoint.outputScope)) {
+    return unavailable(
+      base,
+      'This legacy recovery preview requires background compilation, which is unavailable in the legacy flow.',
+      parameters,
+    );
   }
   const prepared = prepareOutput(project, {
     outputScope: checkpoint.outputScope,

@@ -17,24 +17,44 @@
 /// <reference lib="webworker" />
 
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
-import { computeDesignSceneSource } from './design-scene-source';
+import { prepareOutputAsync } from '../../io/gcode/prepare-output-async';
+import {
+  acceptCanvasCompilationBridgeConnection,
+  runCanvasCompilationTasks,
+} from './canvas-compilation-worker-pool';
+import { completeDesignCarveSimulation } from '../design-studio/preview3d/design-simulate';
+import { computeDesignSceneSourceFromPrepared } from './design-scene-source';
 import type {
   DesignSceneWorkerRequest,
   DesignSceneWorkerResponse,
 } from './design-scene-worker-protocol';
 
 self.onmessage = async (e: MessageEvent<DesignSceneWorkerRequest>): Promise<void> => {
-  const { id, project, outputScope } = e.data;
+  if (acceptCanvasCompilationBridgeConnection(e.data)) return;
+  const request = e.data;
+  const { id, project } = request;
   try {
     // Hydrate here for the same reason the 2D path does: a page-backed raster
     // keeps its pixels in IndexedDB, and computeDesignSceneSource is
     // synchronous so it cannot fetch them itself.
     const hydrated = await hydratePagedRasterProject(project);
-    const response: DesignSceneWorkerResponse = {
-      id,
-      kind: 'ok',
-      source: computeDesignSceneSource(hydrated, outputScope),
-    };
+    const options = request.kind === 'scene' ? { outputScope: request.outputScope } : {};
+    const prepared = await prepareOutputAsync(hydrated, options, {
+      jobId: `design-${request.kind}:${id}`,
+      runCncTasks: runCanvasCompilationTasks,
+    });
+    const response: DesignSceneWorkerResponse =
+      request.kind === 'scene'
+        ? {
+            id,
+            kind: 'scene',
+            source: computeDesignSceneSourceFromPrepared(hydrated, prepared),
+          }
+        : {
+            id,
+            kind: 'simulation',
+            result: completeDesignCarveSimulation(hydrated, request.source, prepared),
+          };
     self.postMessage(response);
   } catch (err) {
     const response: DesignSceneWorkerResponse = {

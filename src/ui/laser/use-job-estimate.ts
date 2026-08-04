@@ -12,12 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
 import { useOutputScope, useStore } from '../state';
-import {
-  estimateLiveJob,
-  estimateLiveJobSnapshot,
-  type LiveJobEstimate,
-} from './live-job-estimate';
-import { renderVariableText } from '../text/render-variable-text';
+import { estimateLiveJob, type LiveJobEstimate } from './live-job-estimate';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
@@ -31,6 +26,7 @@ import {
   prepareLargeJobOffThread,
 } from '../workspace/preparation-worker-client';
 import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
+import { PRINT_CUT_REGISTRATION_INVALID_MESSAGE } from '../../io/gcode/prepare-output-snapshot';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -74,6 +70,7 @@ export function useJobEstimate(): LiveJobEstimate {
     registrationKey,
     placementKey,
     jobOrigin,
+    initialRegistration,
     initiallyAsync,
   });
 }
@@ -134,6 +131,7 @@ function useSettledEstimate({
   registrationKey,
   placementKey,
   jobOrigin,
+  initialRegistration,
   initiallyAsync,
 }: {
   readonly project: Project;
@@ -142,15 +140,19 @@ function useSettledEstimate({
   readonly registrationKey: string;
   readonly placementKey: string;
   readonly jobOrigin: JobOriginPlacement | undefined;
+  readonly initialRegistration: ReturnType<typeof currentPrintCutOutputRegistration>;
   readonly initiallyAsync: boolean;
 }): LiveJobEstimate {
-  // Compute the first badge synchronously, then debounce later mutations.
+  // Compute only cheap jobs on mount. Snapshot-backed jobs need variable-text,
+  // paged-asset, or Print-and-Cut materialization and therefore begin paused
+  // (or with the already-known registration failure) until the background
+  // preparation settles.
   const [settled, setSettled] = useState<Settled>(() => ({
     project: initiallyAsync ? null : project,
     outputScopeKey,
     registrationKey,
     placementKey,
-    estimate: estimateLiveJob(project, outputScope, jobOrigin),
+    estimate: initialEstimate(project, outputScope, jobOrigin, initialRegistration, initiallyAsync),
   }));
   // The ADR-244 worker follow-up must survive the settle-triggered effect
   // cleanup (settling changes the deps and re-runs the effect), so it is
@@ -207,6 +209,18 @@ function useSettledEstimate({
   return settled.estimate;
 }
 
+function initialEstimate(
+  project: Project,
+  outputScope: OutputScope,
+  jobOrigin: JobOriginPlacement | undefined,
+  registration: ReturnType<typeof currentPrintCutOutputRegistration>,
+  asyncSnapshot: boolean,
+): LiveJobEstimate {
+  if (registration === null) return invalidPrintCutEstimate();
+  if (asyncSnapshot) return { kind: 'too-large' };
+  return estimateLiveJob(project, outputScope, jobOrigin);
+}
+
 function hasVariableText(project: Project): boolean {
   return project.scene.objects.some(
     (object) => object.kind === 'text' && object.variableTemplate !== undefined,
@@ -227,16 +241,13 @@ function recomputeEstimate(args: RecomputeEstimateArgs): void {
   const registration = currentPrintCutOutputRegistration(project);
   const usesSnapshot =
     hasVariableText(project) || registration !== undefined || projectHasPagedRasterAssets(project);
-  const estimate = usesSnapshot
-    ? estimateLiveJobSnapshot(
-        project,
-        outputScope,
-        () => new Date(),
-        renderVariableText,
-        registration,
-        jobOrigin,
-      )
-    : Promise.resolve(estimateLiveJob(project, outputScope, jobOrigin));
+  const estimate = Promise.resolve<LiveJobEstimate>(
+    registration === null
+      ? invalidPrintCutEstimate()
+      : usesSnapshot
+        ? { kind: 'too-large' }
+        : estimateLiveJob(project, outputScope, jobOrigin),
+  );
   void estimate.then((value) => {
     if (args.isCancelled()) return;
     args.settleAt(value);
@@ -244,19 +255,33 @@ function recomputeEstimate(args: RecomputeEstimateArgs): void {
   });
 }
 
+function invalidPrintCutEstimate(): LiveJobEstimate {
+  return {
+    kind: 'preparation-failed',
+    message: PRINT_CUT_REGISTRATION_INVALID_MESSAGE,
+  };
+}
+
 // Over-budget scenes pause the synchronous estimate; the ADR-244 worker
 // prepares the real one in the background (shared with the preview via the
-// client's single-flight cache). Variable-text / registration projects stay
-// paused: their snapshot pipeline cannot cross the worker boundary.
+// client's single-flight cache), including variable-text/registration snapshots.
 function followUpWithWorkerEstimate(
   args: RecomputeEstimateArgs,
   value: LiveJobEstimate,
   usesSnapshot: boolean,
 ): void {
-  if (value.kind !== 'too-large' || usesSnapshot) return;
+  if (value.kind !== 'too-large') return;
+  const registration = currentPrintCutOutputRegistration(args.project);
   const offThread = prepareLargeJobOffThread(args.project, {
     outputScope: args.outputScope,
     ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
+    ...(usesSnapshot
+      ? {
+          snapshot: {
+            ...(registration === undefined ? {} : { registration }),
+          },
+        }
+      : {}),
   });
   if (offThread === null) return;
   offThread.then(

@@ -13,7 +13,6 @@ import { machineKindOf, type MachineKind, type Project } from '../../../core/sce
 import type { CncToolPlanEntry } from '../../state/cnc-tool-plan';
 import type { LaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
 import { cncSetupAttestationPrompt } from '../cnc-setup-acknowledgement';
-import { detectJobIntentWarnings } from '../job-intent-warnings';
 import {
   LASER_MODE_UNVERIFIED_START_PROMPT,
   laserModeStartAcknowledgementRequired,
@@ -73,13 +72,11 @@ export function buildJobReviewModel(args: {
   return {
     machineKind,
     stats: buildStatTiles(args.prepared, machineKind, args.project.device.scanningOffsets),
-    // prepared.warnings already carries controller/readiness/WCS/override
-    // warnings; the intent set (raster upsample, trace-as-vector, fill heat)
-    // was previously only a transient toast, so it joins the review here.
+    // prepared.warnings already carries controller/readiness/WCS/override and
+    // intent warnings from the exact outer-worker preparation.
     // The M7 check runs against the exact prepared program, not the settings.
     warnings: dedupe([
       ...args.prepared.warnings,
-      ...detectJobIntentWarnings(args.project),
       ...detectM7AirAssistWarnings(
         args.prepared.gcode,
         args.laserModeStartSnapshot.controllerBuildInfo,
