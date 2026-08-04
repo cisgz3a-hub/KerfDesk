@@ -15585,8 +15585,9 @@ would recreate the freeze this decision exists to remove.
    response, the caller reports a recoverable unavailable result. It never calls the synchronous
    compiler or removal-grid simulator on the browser/canvas thread.
 3. **One main-realm broker owns the global planner limit.** Every outer Worker receives a dedicated
-   `MessagePort` connected to one singleton broker. The broker owns two parallel planner slots and at
-   most one globally serialized fallback planner, so the application can run no more than three
+   `MessagePort` connected to one singleton broker. The broker owns two parallel planner slots when
+   browser hardware concurrency is unavailable or below four, and three slots otherwise. At most one
+   globally serialized fallback planner may coexist, so the application can run no more than four
    region planners at once. It admits at most five outer sources and four active jobs; each source
    admits one planner request. One task at a time occupies each slot, and additional work remains in
    deterministic input order with no per-task Worker or Promise fanout.
@@ -15656,7 +15657,9 @@ would recreate the freeze this decision exists to remove.
 - V-carve gains parallel region planning while retaining serial normalization and deterministic
   source ordering. Every nonempty region set, including one-region V-carve, enters the global broker
   so it cannot create an unbounded planner lane; cheap projects with no independent tasks remain in
-  their already-selected execution context.
+  their already-selected execution context. On a browser reporting at least four hardware threads,
+  a healthy 31-region V-carve has eleven dispatch waves instead of sixteen while the fourth Worker
+  position remains reserved for serial recovery.
 - Tiled Save and the current-canvas G-code viewer share the same output Worker and broker rather than
   doing their expensive post-compile work on the browser thread. Viewer edits cancel stale work and
   leave an explicit refreshable state.
@@ -15680,7 +15683,8 @@ would recreate the freeze this decision exists to remove.
   operations and compares equal plans, emissions and recovery fingerprints.
 - Prepared-output fixtures compare serial and parallel placement/optimization, emitted bytes,
   preflight and recovery fingerprints.
-- Scheduler fixtures cover the two-worker ceiling, one dedicated serial fallback lane, fair bounded
+- Scheduler fixtures cover fixed two-worker dispatch, the adaptive two-or-three production selector,
+  the four-Worker healthy-plus-recovery ceiling, one dedicated serial fallback lane, fair bounded
   dispatch, cancellation, progress, identity mismatch, clone/runtime failure, full-generation
   fallback, terminal disposal and an unavailable result when the serial Worker cannot be created.
 - UI routing fixtures replace the synchronous compiler with a spy and cover unavailable, constructor,
@@ -15692,23 +15696,25 @@ would recreate the freeze this decision exists to remove.
   dispatch, close/edit cancellation, no synchronous unavailable fallback and Worker normals equal to
   Three's former post-reflection result. Browser interaction fixtures keep a 10 ms main-thread
   heartbeat and Long Tasks observer running through real Worker and scene completion and a 750 ms
-  delayed-delivery window. On the local headless Chrome run, the eight-drawing/six-operation fixture measured
-  maximum heartbeat gaps of 226.8 ms for initial G-code 3D, 37.1 ms for Refresh, 58.9 ms for the
-  explicit Inspector, 36.7 ms for Preview preparation and 200.2 ms for Cut 3D opening. The direct
-  one-million-cell removal-grid stress measured a 546.4 ms Worker compute with an 80.4 ms maximum UI
-  gap. All remained below the one-second regression ceiling; observed Long Tasks topped out at
-  216.0 ms on initial G-code 3D and 109.0 ms on Cut 3D.
+  delayed-delivery window. On the exact local headless Chrome head, the eight-drawing/six-operation,
+  31-region fixture selected three planner Workers on 20 reported hardware threads. Three repeated
+  runs compiled its initial G-code 3D program in 2,264-2,373 ms with a 162.8 ms worst maximum
+  heartbeat gap. Refresh measured at most 40.2 ms, the explicit Inspector 51.4 ms, Preview
+  preparation 48.7 ms and Cut 3D opening 107.8 ms.
+  The direct one-million-cell removal-grid stress measured a 503.1 ms Worker compute with an 88.3 ms
+  maximum UI gap. All remained below the one-second regression ceiling; observed Long Tasks topped
+  out at 112.0 ms on initial G-code 3D and 90.0 ms on Cut 3D.
 - A resource-constrained GitHub Chrome run exposed the presentation boundary the first regression did
   not wait long enough to observe: the retired pane measured a 1,875.6 ms heartbeat gap and explicit
   Cut 3D measured 4,876.7 ms while `downsampleRemovalGrid`, `reliefSurfaceMesh` and Three normal
   accumulation still ran in the dialog effect. After the lazy surface task and a scene-ready wait,
-  the focused local rerun measured a 118.0 ms maximum heartbeat gap and 99.0 ms maximum Long Task for
+  the exact-head local rerun measured a 107.8 ms maximum heartbeat gap and 90.0 ms maximum Long Task for
   Cut 3D. The one-second ceiling was retained; the failed evidence was fixed rather than waived.
 - A controlled E2E-only mount distinguishes the retired always-mounted `Cnc3DPane` from those explicit
   surfaces without restoring it in production. With the pane absent, the complex fixture completed
-  its idle plan with a 124.8 ms maximum heartbeat gap and 113.0 ms maximum Long Task. Mounting the real
+  its idle plan with a 118.8 ms maximum heartbeat gap and 100.0 ms maximum Long Task. Mounting the real
   pane then exercised `design-scene-worker`, the shared planner broker, completed its carve source and
-  left the delayed window at a 211.6 ms maximum gap and 199.0 ms maximum Long Task. This establishes
+  left the delayed window at a 200.0 ms maximum gap and 190.0 ms maximum Long Task. This establishes
   the old pane as a distinct whole-project plus WebGL workload; source inspection separately identifies
   hidden Workspace idle-overlay acceptance and Preview's synchronous removal grid as independent UI-
   thread risks addressed by this change. A current-tree A/B does not prove historical released-build

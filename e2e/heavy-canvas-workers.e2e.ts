@@ -21,6 +21,7 @@ test('G-code canvas ownership cancels hidden idle planning without a delayed UI 
   });
   await installMixedCanvasProject(page);
   await idleWorkerStarted;
+  const compilationStartedAt = Date.now();
   await showGcodeCanvas(page);
 
   await expect(page.getByLabel('G-code canvas view')).toBeVisible();
@@ -30,6 +31,7 @@ test('G-code canvas ownership cancels hidden idle planning without a delayed UI 
     timeout: 60_000,
   });
   await expect(page.getByLabel('Playback', { exact: true })).toBeVisible({ timeout: 60_000 });
+  const initialCompileElapsedMs = Date.now() - compilationStartedAt;
   // Leave a delivery window after the real output worker has completed. A
   // stale idle reply used to commit and draw under this covering view here.
   await page.waitForTimeout(750);
@@ -37,6 +39,31 @@ test('G-code canvas ownership cancels hidden idle planning without a delayed UI 
   await expect(page.locator('[aria-label$=" workspace"]')).toHaveCount(0);
   await expect(page.getByTestId('canvas-motion-layer')).toHaveCount(0);
   const initialOpen = await stopResponsivenessProbe(page);
+  const plannerCapacity = await page.evaluate(async () => {
+    const modulePath = '/src/ui/workspace/canvas-compilation-main-bridge.ts';
+    const loaded: unknown = await import(/* @vite-ignore */ modulePath);
+    const bridge = loaded as {
+      readonly canvasCompilationParallelWorkerCount: (threads: number | undefined) => number;
+    };
+    return {
+      hardwareConcurrency: navigator.hardwareConcurrency,
+      parallelLanes: bridge.canvasCompilationParallelWorkerCount(navigator.hardwareConcurrency),
+    };
+  });
+  const plannerWorkers = workerUrls.filter((url) =>
+    url.includes('canvas-compilation-worker'),
+  ).length;
+  testInfo.annotations.push({
+    type: 'measurement',
+    description:
+      `31-region V-carve: compileMs=${initialCompileElapsedMs}; ` +
+      `hardwareThreads=${plannerCapacity.hardwareConcurrency}; ` +
+      `parallelLanes=${plannerCapacity.parallelLanes}; plannerWorkersCreated=${plannerWorkers}`,
+  });
+  // Creation count is diagnostic, not a concurrency gauge: cancellation may
+  // retire an idle generation and make the output job create replacements.
+  // Deterministic scheduler tests own the live-slot cap.
+  expect(plannerWorkers).toBeGreaterThanOrEqual(plannerCapacity.parallelLanes);
   assertResponsivePhase(testInfo, 'G-code canvas initial open', initialOpen);
 
   await startResponsivenessProbe(page);

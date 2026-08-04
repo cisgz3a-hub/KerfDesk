@@ -82,15 +82,24 @@ function scriptObject(id: string, content: string, x: number, y: number): SceneO
     operationIds: [operation.id],
     bounds: { minX: x, minY: y, maxX: x + 34, maxY: y + 16 },
     transform: IDENTITY_TRANSFORM,
-    // Pre-rendered closed glyph regions keep the fixture independent of font
-    // I/O while exercising the same multi-region V-carve boundary.
+    // Thirty pre-rendered closed glyph regions across the two script objects
+    // plus the badge reproduce the reported 31-region V-carve scheduler load
+    // without making the fixture depend on font I/O.
     paths: [
       {
         color: operation.color,
-        polylines: [rectangle(x, y, 14, 14), rectangle(x + 12, y + 2, 20, 10)],
+        polylines: scriptRegions(x, y),
       },
     ],
   };
+}
+
+function scriptRegions(x: number, y: number): ReadonlyArray<Polyline> {
+  return Array.from({ length: 15 }, (_, index) => {
+    const column = index % 5;
+    const row = Math.floor(index / 5);
+    return rectangle(x + column * 6.2, y + row * 4.5, 3.6, 3);
+  });
 }
 
 function vectorObject(

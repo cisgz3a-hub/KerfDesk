@@ -8,7 +8,9 @@ import {
   type CanvasCompilationTaskResult,
 } from './canvas-compilation-worker-protocol';
 
-const PARALLEL_WORKER_COUNT = 2;
+const DEFAULT_PARALLEL_WORKER_COUNT = 2;
+const CAPABLE_DEVICE_PARALLEL_WORKER_COUNT = 3;
+const MIN_HARDWARE_CONCURRENCY_FOR_CAPABLE_DEVICE = 4;
 const OUTER_WORKER_LIMIT = 5;
 const ACTIVE_JOB_LIMIT = 4;
 
@@ -70,13 +72,31 @@ export function resetCanvasCompilationMainBridgeForTests(): void {
   sharedBridge = null;
 }
 
+/**
+ * Leave one logical processor available to the browser on a four-thread device.
+ * The broker's dedicated serial recovery Worker may coexist with these slots,
+ * so three healthy lanes also preserves the architecture-wide four-Worker cap.
+ */
+export function canvasCompilationParallelWorkerCount(
+  hardwareConcurrency: number | undefined,
+): number {
+  if (typeof hardwareConcurrency !== 'number' || !Number.isFinite(hardwareConcurrency)) {
+    return DEFAULT_PARALLEL_WORKER_COUNT;
+  }
+  return Math.trunc(hardwareConcurrency) >= MIN_HARDWARE_CONCURRENCY_FOR_CAPABLE_DEVICE
+    ? CAPABLE_DEVICE_PARALLEL_WORKER_COUNT
+    : DEFAULT_PARALLEL_WORKER_COUNT;
+}
+
 function bridge(): BoundedCompilationMainBridge<
   CanvasCompilationTaskPayload,
   CanvasCompilationTaskResult
 > {
   if (sharedBridge !== null) return sharedBridge;
   sharedBridge = new BoundedCompilationMainBridge({
-    concurrency: PARALLEL_WORKER_COUNT,
+    concurrency: canvasCompilationParallelWorkerCount(
+      typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency,
+    ),
     maxSources: OUTER_WORKER_LIMIT,
     maxActiveJobs: ACTIVE_JOB_LIMIT,
     createWorker: createCanvasCompilationWorker,

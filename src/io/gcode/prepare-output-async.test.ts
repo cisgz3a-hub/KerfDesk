@@ -148,9 +148,9 @@ describe('prepareOutputAsync deterministic equivalence', () => {
 
     expect(project.scene.objects).toHaveLength(8);
     expect(project.scene.layers).toHaveLength(6);
-    // The ordered global compiler discovers one independent V-carve task per
-    // V-carve drawing; the remaining five operations stay in ordered phases.
-    expect(regionTasks).toBeGreaterThanOrEqual(3);
+    // The reported slow viewer shape is pinned at 31 independent regions;
+    // the remaining operations stay in their ordered global phases.
+    expect(regionTasks).toBe(31);
     expect(progress.at(-1)).toBe(regionTasks);
     expect(parallel).toEqual(serial);
     const serialEmission = emitPreparedGcode(serial);

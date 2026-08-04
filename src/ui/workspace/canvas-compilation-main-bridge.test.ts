@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  canvasCompilationParallelWorkerCount,
   connectCanvasCompilationMainBridge,
   resetCanvasCompilationMainBridgeForTests,
 } from './canvas-compilation-main-bridge';
@@ -22,6 +23,19 @@ afterEach(() => {
 });
 
 describe('canvas compilation main bridge connection admission', () => {
+  it.each([
+    [undefined, 2],
+    [Number.NaN, 2],
+    [Number.POSITIVE_INFINITY, 2],
+    [1, 2],
+    [3.9, 2],
+    [4, 3],
+    [16, 3],
+  ] as const)('selects %s hardware threads as %s bounded parallel lanes', (threads, expected) => {
+    expect(canvasCompilationParallelWorkerCount(threads)).toBe(expected);
+    expect(canvasCompilationParallelWorkerCount(threads) + 1).toBeLessThanOrEqual(4);
+  });
+
   it('admits the five production outer sources and terminates a sixth', () => {
     const admitted = Array.from({ length: 5 }, () => new FakeOuterWorker());
     for (const worker of admitted) connectCanvasCompilationMainBridge(worker);
