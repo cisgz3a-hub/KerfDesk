@@ -15,24 +15,35 @@ type ViewerState =
   | { readonly kind: 'ready' }
   | { readonly kind: 'failed'; readonly reason: string };
 
+type SceneState = {
+  readonly buildScene: ((canvas: HTMLCanvasElement) => Promise<ReliefSceneResult>) | null;
+  readonly value: ViewerState;
+};
+
 export function Viewer3DDialogShell(props: {
   readonly ariaLabel: string;
   readonly canvasAriaLabel: string;
   readonly title: string;
   readonly onClose: () => void;
   // Must be referentially stable (useCallback) — it is the effect dependency.
-  readonly buildScene: (canvas: HTMLCanvasElement) => Promise<ReliefSceneResult>;
+  // Null means a background preparation task has not produced its mesh yet.
+  readonly buildScene: ((canvas: HTMLCanvasElement) => Promise<ReliefSceneResult>) | null;
+  readonly preparationFailure?: string;
 }): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [state, setState] = useState<ViewerState>({ kind: 'loading' });
+  const [state, setState] = useState<SceneState>({
+    buildScene: null,
+    value: { kind: 'loading' },
+  });
   const { buildScene } = props;
 
   useEffect(() => {
+    if (buildScene === null) return;
     const canvas = canvasRef.current;
     if (canvas === null) return;
     let handle: { readonly dispose: () => void } | null = null;
     let cancelled = false;
-    setState({ kind: 'loading' });
+    setState({ buildScene, value: { kind: 'loading' } });
     void buildScene(canvas).then((outcome) => {
       if (cancelled) {
         if (outcome.kind === 'ok') outcome.handle.dispose();
@@ -40,9 +51,9 @@ export function Viewer3DDialogShell(props: {
       }
       if (outcome.kind === 'ok') {
         handle = outcome.handle;
-        setState({ kind: 'ready' });
+        setState({ buildScene, value: { kind: 'ready' } });
       } else {
-        setState({ kind: 'failed', reason: outcome.reason });
+        setState({ buildScene, value: { kind: 'failed', reason: outcome.reason } });
       }
     });
     return () => {
@@ -50,6 +61,15 @@ export function Viewer3DDialogShell(props: {
       handle?.dispose();
     };
   }, [buildScene]);
+
+  const visibleState: ViewerState =
+    buildScene === null
+      ? props.preparationFailure === undefined
+        ? { kind: 'loading' }
+        : { kind: 'failed', reason: props.preparationFailure }
+      : state.buildScene === buildScene
+        ? state.value
+        : { kind: 'loading' };
 
   return (
     <div role="dialog" aria-label={props.ariaLabel} style={backdropStyle}>
@@ -67,13 +87,13 @@ export function Viewer3DDialogShell(props: {
           aria-label={props.canvasAriaLabel}
           style={canvasStyle}
         />
-        {state.kind === 'loading' ? <p style={hintStyle}>Building the 3D surface…</p> : null}
-        {state.kind === 'failed' ? (
+        {visibleState.kind === 'loading' ? <p style={hintStyle}>Building the 3D surface…</p> : null}
+        {visibleState.kind === 'failed' ? (
           <p style={hintStyle} role="alert">
-            3D view unavailable: {state.reason}
+            3D view unavailable: {visibleState.reason}
           </p>
         ) : null}
-        {state.kind === 'ready' ? (
+        {visibleState.kind === 'ready' ? (
           <p style={hintStyle}>Drag to orbit, scroll to zoom. Depth is true to scale.</p>
         ) : null}
       </div>

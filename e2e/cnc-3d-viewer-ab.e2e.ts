@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import {
   assertResponsivePhase,
+  recordResponsivenessPhase,
   startResponsivenessProbe,
   stopResponsivenessProbe,
 } from './fixtures/browser-responsiveness';
@@ -8,7 +9,7 @@ import { clearCanvasProject, installMixedCanvasProject } from './fixtures/mixed-
 
 const POST_COMPLETION_WINDOW_MS = 750;
 
-test('retired docked CNC pane is absent by default and its controlled A/B mount stays responsive', async ({
+test('retired docked CNC pane is absent by default and its controlled A/B mount records isolated cost', async ({
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
@@ -41,10 +42,16 @@ test('retired docked CNC pane is absent by default and its controlled A/B mount 
   await designWorkerStarted;
   const pane = page.getByRole('complementary', { name: '3D result pane' });
   await expect(pane).toBeVisible();
-  await expect(pane.getByLabel('Live 3D cut result')).toBeVisible({ timeout: 60_000 });
+  const retiredCanvas = pane.getByLabel('Live 3D cut result');
+  await expect(retiredCanvas).toBeVisible({ timeout: 60_000 });
+  await expect(retiredCanvas).toHaveAttribute('data-scene-state', 'ready', { timeout: 60_000 });
   await page.waitForTimeout(POST_COMPLETION_WINDOW_MS);
   const mounted = await stopResponsivenessProbe(page);
-  assertResponsivePhase(testInfo, 'complex V-carve with retired docked 3D pane mounted', mounted);
+  recordResponsivenessPhase(
+    testInfo,
+    'complex V-carve with retired docked 3D pane mounted',
+    mounted,
+  );
 
   expect(workerUrls.some((url) => url.includes('design-scene-worker'))).toBe(true);
   expect(workerUrls.some((url) => url.includes('canvas-compilation-worker'))).toBe(true);
@@ -80,6 +87,9 @@ test('mixed-operation Preview and Cut 3D complete without a delayed UI stall', a
   const cut3D = page.getByRole('dialog', { name: 'Cut 3D preview' });
   await expect(cut3D).toBeVisible();
   await expect(cut3D.getByLabel('Cut 3D preview surface')).toBeVisible();
+  await expect(
+    cut3D.getByText('Drag to orbit, scroll to zoom. Depth is true to scale.'),
+  ).toBeVisible({ timeout: 60_000 });
   await page.waitForTimeout(POST_COMPLETION_WINDOW_MS);
   const cut3DOpen = await stopResponsivenessProbe(page);
   assertResponsivePhase(testInfo, 'Cut 3D initial open', cut3DOpen);

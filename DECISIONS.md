@@ -15592,9 +15592,11 @@ would recreate the freeze this decision exists to remove.
    deterministic input order with no per-task Worker or Promise fanout.
 4. **The task protocol is reusable.** Task payloads are a discriminated union named for canvas
    compilation, not V-carve. `cnc-vcarve-region` plans independently normalized regions;
-   `cnc-removal-grid` derives a bounded preview-only grid from an already completed toolpath and can
-   neither affect G-code nor enter its merge. Neither is a scheduler special case. A future costly
-   operation may join only after its own independence and deterministic merge boundary are proved.
+   `cnc-removal-grid` derives a bounded preview-only grid from an already completed toolpath; and
+   `cnc-cut3d-surface` lazily downsamples that completed grid and authors the exact smooth mesh normals
+   the explicit Cut 3D renderer needs. None can affect G-code or enter its merge, and none is a
+   scheduler special case. A future costly operation may join only after its own independence and
+   deterministic merge boundary are proved.
    Normalization or any global ordering phase may not be moved into a task merely to create more
    parallelism.
 5. **Compilation identity is explicit.** An outer job supplies a caller-owned job identity; each
@@ -15620,8 +15622,10 @@ would recreate the freeze this decision exists to remove.
    it recompiles only when opened or refreshed, not after every edit. When G-code 3D owns the canvas,
    Workspace unmounts and its idle planner is also explicitly cancelled; a late planner reply cannot
    be accepted or drawn under the covering view. Leaving Preview terminates removal-grid work and a
-   late grid cannot publish. Progress reports phase, mode, completed, active, queued and total counts
-   and cannot affect compilation lifecycle.
+   late grid cannot publish. Cut 3D starts its surface task only after the operator opens the dialog;
+   closing it or replacing its grid terminates stale work, while Worker absence leaves the dialog
+   cancellable with an explicit unavailable result. Progress reports phase, mode, completed, active,
+   queued and total counts and cannot affect compilation lifecycle.
 9. **Frame and output semantics do not change.** This ADR adds no guard and no machine command.
    Frame remains the only Start guard. Job Review remains the warning surface. Exact compiled
    diagnostics are reused so the UI does not invoke another expensive planner, but warning content,
@@ -15656,6 +15660,9 @@ would recreate the freeze this decision exists to remove.
 - Tiled Save and the current-canvas G-code viewer share the same output Worker and broker rather than
   doing their expensive post-compile work on the browser thread. Viewer edits cancel stale work and
   leave an explicit refreshable state.
+- Cut 3D no longer downsamples a million-cell removal grid, builds its mesh or accumulates smooth
+  normals in the dialog effect. Those pure arrays come from a lazy broker task; the main thread keeps
+  only the Three.js/WebGL presentation boundary and a loading or recoverable-unavailable surface.
 - Independent planner results are rebuilt between jobs. Exact Preview/estimate preparation reuse is
   limited to four recent identity-and-options matches; this preserves its existing sharing without
   treating an unchanged-looking object as proof that a region plan remains valid.
@@ -15681,14 +15688,22 @@ would recreate the freeze this decision exists to remove.
   Viewer fixtures cover progress, edit-time cancellation, stale-result suppression and unavailable
   state. Tiled fixtures cover exact prepared-job reuse, conservative warnings and no UI-side fallback.
   Removal-grid fixtures cover shared-broker routing, Worker-unavailable behavior, supersede-by-
-  termination and delayed-result suppression. Browser interaction fixtures keep a 10 ms main-thread
-  heartbeat and Long Tasks observer running through real worker completion and a 750 ms delayed-
-  delivery window. On the local headless Chrome run, the eight-drawing/six-operation fixture measured
+  termination and delayed-result suppression. Cut 3D fixtures additionally prove lazy surface
+  dispatch, close/edit cancellation, no synchronous unavailable fallback and Worker normals equal to
+  Three's former post-reflection result. Browser interaction fixtures keep a 10 ms main-thread
+  heartbeat and Long Tasks observer running through real Worker and scene completion and a 750 ms
+  delayed-delivery window. On the local headless Chrome run, the eight-drawing/six-operation fixture measured
   maximum heartbeat gaps of 226.8 ms for initial G-code 3D, 37.1 ms for Refresh, 58.9 ms for the
   explicit Inspector, 36.7 ms for Preview preparation and 200.2 ms for Cut 3D opening. The direct
   one-million-cell removal-grid stress measured a 546.4 ms Worker compute with an 80.4 ms maximum UI
   gap. All remained below the one-second regression ceiling; observed Long Tasks topped out at
   216.0 ms on initial G-code 3D and 109.0 ms on Cut 3D.
+- A resource-constrained GitHub Chrome run exposed the presentation boundary the first regression did
+  not wait long enough to observe: the retired pane measured a 1,875.6 ms heartbeat gap and explicit
+  Cut 3D measured 4,876.7 ms while `downsampleRemovalGrid`, `reliefSurfaceMesh` and Three normal
+  accumulation still ran in the dialog effect. After the lazy surface task and a scene-ready wait,
+  the focused local rerun measured a 118.0 ms maximum heartbeat gap and 99.0 ms maximum Long Task for
+  Cut 3D. The one-second ceiling was retained; the failed evidence was fixed rather than waived.
 - A controlled E2E-only mount distinguishes the retired always-mounted `Cnc3DPane` from those explicit
   surfaces without restoring it in production. With the pane absent, the complex fixture completed
   its idle plan with a 124.8 ms maximum heartbeat gap and 113.0 ms maximum Long Task. Mounting the real

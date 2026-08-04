@@ -101,11 +101,7 @@ export function assertResponsivePhase(
   phase: string,
   measurement: ResponsivenessMeasurement,
 ): void {
-  testInfo.annotations.push({
-    type: 'measurement',
-    description: `${phase}: ${formatMeasurement(measurement)}`,
-  });
-  expect(measurement.ticks, `${phase} heartbeat ticks`).toBeGreaterThan(10);
+  recordResponsivenessPhase(testInfo, phase, measurement);
   expect(measurement.maxGapMs, `${phase} maximum heartbeat gap`).toBeLessThan(
     MAX_ACCEPTABLE_MAIN_THREAD_GAP_MS,
   );
@@ -114,6 +110,19 @@ export function assertResponsivePhase(
       MAX_ACCEPTABLE_MAIN_THREAD_GAP_MS,
     );
   }
+}
+
+/** Records diagnostic A/B phases that are intentionally absent from production. */
+export function recordResponsivenessPhase(
+  testInfo: TestInfo,
+  phase: string,
+  measurement: ResponsivenessMeasurement,
+): void {
+  testInfo.annotations.push({
+    type: 'measurement',
+    description: `${phase}: ${formatMeasurement(measurement)}`,
+  });
+  expect(measurement.ticks, `${phase} heartbeat ticks`).toBeGreaterThan(10);
 }
 
 function formatMeasurement(measurement: ResponsivenessMeasurement): string {

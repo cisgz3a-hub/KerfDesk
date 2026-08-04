@@ -94,6 +94,8 @@ function PaneScene(props: {
         width={CANVAS_WIDTH_PX}
         height={CANVAS_HEIGHT_PX}
         aria-label="Live 3D cut result"
+        aria-busy={state === 'loading'}
+        data-scene-state={state}
         style={canvasStyle}
       />
       <button

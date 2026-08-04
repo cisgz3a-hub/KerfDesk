@@ -33,6 +33,7 @@ import { Cut3DPreviewDialog } from '../relief-viewer';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewPlayback } from './use-preview-playback';
 import { usePreviewToolpath } from './use-preview-toolpath';
+import { useCncCut3DSurface } from './use-cnc-cut3d-surface';
 import { useCncRemovalGrid } from './use-cnc-removal-grid';
 import type { RemovalGrid } from '../../core/sim';
 import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
@@ -171,6 +172,7 @@ function WorkspacePreviewOverlays(props: {
   readonly cncRemovalGrid: RemovalGrid | null;
 }): JSX.Element | null {
   const [cut3DOpen, setCut3DOpen] = useState(false);
+  const cut3DSurface = useCncCut3DSurface(props.cncRemovalGrid, cut3DOpen);
   if (!props.previewMode || props.toolpath === null) return null;
   const grid = props.cncRemovalGrid;
   const machine = props.project.machine;
@@ -188,6 +190,10 @@ function WorkspacePreviewOverlays(props: {
       {cut3DOpen && grid !== null ? (
         <Cut3DPreviewDialog
           grid={grid}
+          mesh={cut3DSurface.kind === 'ready' ? cut3DSurface.mesh : null}
+          {...(cut3DSurface.kind === 'unavailable'
+            ? { unavailableReason: cut3DSurface.reason }
+            : {})}
           stockThicknessMm={stockThicknessMm}
           onClose={() => setCut3DOpen(false)}
         />

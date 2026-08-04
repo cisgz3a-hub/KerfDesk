@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import { DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type { RemovalGrid } from '../../core/sim';
 import { isCanvasCompilationBridgeConnection } from './canvas-compilation-worker-protocol';
 import {
+  prepareCncCut3DSurfaceOffThread,
   prepareCncRemovalGridOffThread,
   resetCncRemovalGridWorkerForTests,
 } from './cnc-removal-grid-worker-client';
@@ -34,11 +36,19 @@ class FakeWorker {
     this.terminated = true;
   }
 
-  respond(grid: RemovalGrid | null): void {
+  respondGrid(grid: RemovalGrid | null): void {
     const request = this.posted.at(-1);
     if (request === undefined) throw new Error('removal-grid request missing');
     this.onmessage?.({
-      data: { id: request.id, kind: 'ok', grid },
+      data: { id: request.id, kind: 'grid', grid },
+    } as MessageEvent<CncRemovalGridWorkerResponse>);
+  }
+
+  respondSurface(surface: ReliefSurfaceMeshWithNormals): void {
+    const request = this.posted.at(-1);
+    if (request === undefined) throw new Error('surface request missing');
+    this.onmessage?.({
+      data: { id: request.id, kind: 'surface', surface },
     } as MessageEvent<CncRemovalGridWorkerResponse>);
   }
 }
@@ -50,6 +60,13 @@ const GRID: RemovalGrid = {
   originX: 0,
   originY: 0,
   depth: new Float32Array([-1]),
+};
+const SURFACE: ReliefSurfaceMeshWithNormals = {
+  positions: new Float32Array([0, 0, -1]),
+  normals: new Float32Array([0, 0, 1]),
+  indices: new Uint32Array(),
+  widthMm: 1,
+  heightMm: 1,
 };
 
 beforeEach(() => {
@@ -67,6 +84,7 @@ describe('CNC removal-grid worker client', () => {
   it('returns null rather than computing on the UI thread without Worker support', () => {
     vi.unstubAllGlobals();
     expect(prepareCncRemovalGridOffThread(request())).toBeNull();
+    expect(prepareCncCut3DSurfaceOffThread(GRID)).toBeNull();
   });
 
   it('terminates stale work and starts the replacement on a fresh outer worker', async () => {
@@ -83,12 +101,24 @@ describe('CNC removal-grid worker client', () => {
     const replacement = FakeWorker.instances[1];
     if (replacement === undefined) throw new Error('replacement worker missing');
     expect(replacement.posted).toHaveLength(1);
-    replacement.respond(GRID);
+    replacement.respondGrid(GRID);
     await expect(second).resolves.toBe(GRID);
+  });
+
+  it('uses the same latest-only background lane for lazy Cut 3D surface preparation', async () => {
+    const result = prepareCncCut3DSurfaceOffThread(GRID);
+    const worker = FakeWorker.instances[0];
+    if (result === null || worker === undefined) throw new Error('surface worker unavailable');
+    expect(worker.posted).toEqual([{ id: 1, kind: 'surface', grid: GRID }]);
+    worker.respondSurface(SURFACE);
+    await expect(result).resolves.toBe(SURFACE);
   });
 });
 
-function request(): Omit<CncRemovalGridWorkerRequest, 'id'> {
+function request(): Omit<
+  Extract<CncRemovalGridWorkerRequest, { readonly kind: 'grid' }>,
+  'id' | 'kind'
+> {
   return {
     device: DEFAULT_DEVICE_PROFILE,
     machine: DEFAULT_CNC_MACHINE_CONFIG,

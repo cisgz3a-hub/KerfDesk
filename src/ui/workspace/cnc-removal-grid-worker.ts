@@ -18,25 +18,32 @@ async function prepare(request: CncRemovalGridWorkerRequest): Promise<void> {
   let response: CncRemovalGridWorkerResponse;
   try {
     const results = await runCanvasCompilationWork({
-      jobId: `removal-grid:${request.id}`,
+      jobId: `cnc-${request.kind}:${request.id}`,
       tasks: [
         {
-          taskId: 'grid',
-          payload: {
-            kind: 'cnc-removal-grid',
-            device: request.device,
-            machine: request.machine,
-            toolpath: request.toolpath,
-            scrubFraction: request.scrubFraction,
-          },
+          taskId: request.kind,
+          payload:
+            request.kind === 'grid'
+              ? {
+                  kind: 'cnc-removal-grid',
+                  device: request.device,
+                  machine: request.machine,
+                  toolpath: request.toolpath,
+                  scrubFraction: request.scrubFraction,
+                }
+              : { kind: 'cnc-cut3d-surface', grid: request.grid },
         },
       ],
     });
     const result = results[0];
-    if (results.length !== 1 || result?.kind !== 'cnc-removal-grid') {
-      throw new Error('Removal-grid worker returned an unbound result.');
+    if (results.length !== 1) throw new Error('CNC preview worker returned an unbound result.');
+    if (request.kind === 'grid' && result?.kind === 'cnc-removal-grid') {
+      response = { id: request.id, kind: 'grid', grid: result.output };
+    } else if (request.kind === 'surface' && result?.kind === 'cnc-cut3d-surface') {
+      response = { id: request.id, kind: 'surface', surface: result.output };
+    } else {
+      throw new Error('CNC preview worker returned a mismatched result.');
     }
-    response = { id: request.id, kind: 'ok', grid: result.output };
   } catch (error) {
     response = {
       id: request.id,
@@ -44,5 +51,17 @@ async function prepare(request: CncRemovalGridWorkerRequest): Promise<void> {
       message: error instanceof Error ? error.message : String(error),
     };
   }
-  self.postMessage(response);
+  self.postMessage(response, responseTransfers(response));
+}
+
+function responseTransfers(response: CncRemovalGridWorkerResponse): Transferable[] {
+  if (response.kind === 'grid') return response.grid === null ? [] : [response.grid.depth.buffer];
+  if (response.kind === 'surface') {
+    return [
+      response.surface.positions.buffer,
+      response.surface.indices.buffer,
+      response.surface.normals.buffer,
+    ];
+  }
+  return [];
 }
