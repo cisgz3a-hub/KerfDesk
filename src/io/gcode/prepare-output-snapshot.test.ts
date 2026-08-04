@@ -86,6 +86,38 @@ describe('prepareOutputSnapshot', () => {
     expect(renderer).toHaveBeenCalledTimes(1);
   });
 
+  it('materializes many variable objects in source order with bounded concurrency', async () => {
+    const first = variableProject();
+    const template = first.scene.objects[0];
+    if (template?.kind !== 'text') throw new Error('variable text fixture is missing');
+    const project: Project = {
+      ...first,
+      scene: addObject(first.scene, { ...template, id: 'T2' }),
+    };
+    let active = 0;
+    let maximumActive = 0;
+    const order: string[] = [];
+    const boundedRenderer: VariableTextRenderer = async ({ text, content }) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      order.push(text.id);
+      await Promise.resolve();
+      active -= 1;
+      return {
+        bounds: { minX: 0, minY: 0, maxX: content.length, maxY: 1 },
+        paths: [],
+      };
+    };
+
+    await prepareOutputSnapshot(project, {
+      clock: () => NOW,
+      renderVariableText: boundedRenderer,
+    });
+
+    expect(maximumActive).toBe(1);
+    expect(order).toEqual(['T1', 'T2']);
+  });
+
   it('returns a typed preflight failure instead of stale fallback geometry', async () => {
     const project = variableProject();
     const { csv: _csv, ...variables } = project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;

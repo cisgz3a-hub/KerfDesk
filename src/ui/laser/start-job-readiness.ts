@@ -22,6 +22,7 @@ import {
   prepareOutput,
   prepareOutputSnapshot,
   type PreparedOutput,
+  type PrepareOutputSnapshotOptions,
   type VariableTextRenderer,
 } from '../../io/gcode';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
@@ -38,7 +39,6 @@ import {
 import type { HomingState } from '../state/laser-store';
 import type { SessionObservationStamp } from '../state/laser-controller-observation';
 import { cncWorkZeroToolStartIssue } from './cnc-start-advisories';
-import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
 import { canvasPlanRetentionKey, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import {
@@ -63,13 +63,14 @@ import { startControllerPolicy } from './start-job-controller-policy';
 import type { PreparedJobMetrics } from './prepared-job-metrics';
 import { controllerIdentityWarnings } from './controller-identity-warnings';
 import { detectCompiledVCarveDepthWarningsForJob } from './cnc-compiled-depth-warnings';
+import { findMachineStartIssues, prepareStartInput } from './start-job-input';
+
+export { STATUS_ALARM_START_MESSAGE } from './start-job-input';
 
 export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
-export const STATUS_ALARM_START_MESSAGE =
-  'Controller reports Alarm. Home ($H) if the machine has homing switches, or Unlock ($X) only after confirming the head is safe.';
 
 export type StartJobPreparation =
   | {
@@ -158,17 +159,17 @@ export function prepareStartJob(
   allowRotaryRaster?: boolean,
   requireFrame = true,
 ): StartJobPreparation {
-  const effectivePlacement = placementForResolvedOrigin(jobPlacement, resolvedJobOrigin);
-  const gateIssues = findMachineStartIssues(machine);
-  if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
-
-  const machineWithReportUnits = withControllerReportUnits(machine, controllerSettings);
-  const placement = resolveStartPlacement(jobPlacement, machineWithReportUnits, resolvedJobOrigin);
-  if (!placement.ok) return { ok: false, messages: placement.messages };
-  const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
+  const input = prepareStartInput(
+    project,
+    controllerSettings,
+    machine,
+    jobPlacement,
+    resolvedJobOrigin,
+  );
+  if (!input.ok) return input.result;
   const inspected = inspectPreparedStart(
     prepareOutput(project, {
-      ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+      ...(input.placement.jobOrigin === undefined ? {} : { jobOrigin: input.placement.jobOrigin }),
       outputScope,
     }),
     machine,
@@ -178,15 +179,16 @@ export function prepareStartJob(
     project,
     controllerSettings,
     machine,
-    machineWithReportUnits,
+    machineWithReportUnits: input.machineWithReportUnits,
     outputScope,
     allowRotaryRaster: allowRotaryRaster === true,
     requireFrame,
-    placement,
-    motionOffset,
+    placement: input.placement,
+    motionOffset: input.motionOffset,
     inspected,
-    canvasPlanKey: canvasPlanRetentionKey(project, outputScope, effectivePlacement),
+    canvasPlanKey: canvasPlanRetentionKey(project, outputScope, input.effectivePlacement),
     printCutRegistrationActive: false,
+    sourceGeometryChecks: 'full',
   });
 }
 
@@ -202,6 +204,7 @@ export async function prepareStartJobSnapshot(
     readonly renderVariableText: VariableTextRenderer;
     readonly registration?: SimilarityTransform | null;
     readonly resolvedJobOrigin?: JobOriginPlacement;
+    readonly prepare?: PrepareOutputSnapshotOptions['prepare'];
     /** Frame preparation compiles the exact candidate before a permit exists. */
     readonly requireFrame?: boolean;
   },
@@ -227,6 +230,7 @@ export async function prepareStartJobSnapshot(
       ...registrationOption(options.registration),
       ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
       outputScope,
+      ...(options.prepare === undefined ? {} : { prepare: options.prepare }),
     }),
     machine,
   );
@@ -249,6 +253,7 @@ export async function prepareStartJobSnapshot(
       options.registration,
     ),
     printCutRegistrationActive: options.registration !== undefined,
+    sourceGeometryChecks: 'full',
   });
 }
 
@@ -267,88 +272,90 @@ type FinalizeStartPreparationOptions = {
   readonly inspected: SuccessfulPreparedStartInspection;
   readonly canvasPlanKey: string;
   readonly printCutRegistrationActive: boolean;
+  readonly sourceGeometryChecks: 'full' | 'compiled-evidence-only';
 };
 
-function finalizeStartPreparation({
-  project,
-  controllerSettings,
-  machine,
-  machineWithReportUnits,
-  outputScope,
-  allowRotaryRaster,
-  requireFrame,
-  placement,
-  motionOffset,
-  inspected,
-  canvasPlanKey,
-  printCutRegistrationActive,
-}: FinalizeStartPreparationOptions): StartJobPreparation {
-  const { prepared, toolPlan, advisoryWarnings } = inspected;
+export function finalizeStartPreparation(
+  options: FinalizeStartPreparationOptions,
+): StartJobPreparation {
+  const { prepared, toolPlan, advisoryWarnings } = options.inspected;
   const { gcode, preflight } = emitPreparedGcode(prepared, {
-    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
-    outputScope,
-    ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
-    ...initialMachinePositionOption(machineWithReportUnits),
-    allowRotaryRaster,
+    ...(options.placement.jobOrigin === undefined
+      ? {}
+      : { jobOrigin: options.placement.jobOrigin }),
+    outputScope: options.outputScope,
+    ...(options.motionOffset === undefined ? {} : { preflightMotionOffset: options.motionOffset }),
+    ...initialMachinePositionOption(options.machineWithReportUnits),
+    allowRotaryRaster: options.allowRotaryRaster,
+    sourceGeometryChecks: options.sourceGeometryChecks,
   });
   const emitSplit = partitionEmitPreflight(preflight);
   if (emitSplit.blocking.length > 0) return { ok: false, messages: emitSplit.blocking };
   const programIssue = preparedProgramIntegrityIssue(
     gcode,
-    project.device.rxBufferBytes,
+    options.project.device.rxBufferBytes,
     preflight,
   );
   if (programIssue !== null) return { ok: false, messages: programIssue };
-  if (requireFrame) {
-    const verifiedFrameIssue = requiredFrameIssueFromPrepared({ prepared, machine });
+  if (options.requireFrame) {
+    const verifiedFrameIssue = requiredFrameIssueFromPrepared({
+      prepared,
+      machine: options.machine,
+    });
     if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
   }
 
-  const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
-  const controllerPolicy = startControllerPolicy(controller, gcode, machine);
+  const controller = runControllerReadiness(
+    options.project,
+    options.controllerSettings,
+    readinessMode(options.machine),
+  );
+  const controllerPolicy = startControllerPolicy(controller, gcode, options.machine);
   // Scoped scene/project, so a small selected-output slice of a huge design
   // does not warn as a large job (ADR-241/ADR-243).
   const largeJobWarning = largeJobPreparationWarning(prepared.project.scene);
   const largeRasterWarning = largeRasterPreparationWarning(prepared.project);
   const warnings = collectStartWarnings(
     prepared.project,
-    controllerSettings,
+    options.controllerSettings,
     [
       ...(largeJobWarning === null ? [] : [largeJobWarning]),
       ...(largeRasterWarning === null ? [] : [largeRasterWarning]),
       ...compiledWorkAdvisories(prepared.job),
       ...detectCompiledVCarveDepthWarningsForJob(prepared.project, prepared.job),
-      ...demotedPolicyWarnings(project, machine),
+      ...demotedPolicyWarnings(options.project, options.machine),
       ...advisoryWarnings,
       ...emitSplit.warnings,
       ...collectPrintCutFrameWarnings(
         prepared.project,
-        printCutRegistrationActive,
-        placement.jobOrigin,
+        options.printCutRegistrationActive,
+        options.placement.jobOrigin,
       ),
-      ...(machine.activeControllerKind === undefined
+      ...(options.machine.activeControllerKind === undefined
         ? []
         : controllerIdentityWarnings(
-            project.device.controllerKind ?? 'grbl-v1.1',
-            machine.activeControllerKind,
-            machine.detectedControllerKind ?? null,
+            options.project.device.controllerKind ?? 'grbl-v1.1',
+            options.machine.activeControllerKind,
+            options.machine.detectedControllerKind ?? null,
           )),
       ...controllerPolicy.advisories,
       ...controller.warnings.map((issue) => issue.message),
     ],
-    machine.ovCache,
-    machine.activeWcs,
+    options.machine.ovCache,
+    options.machine.activeWcs,
+    prepared,
+    options.sourceGeometryChecks,
   );
   return okPreparation(
     gcode,
     warnings,
-    placement.jobOrigin,
+    options.placement.jobOrigin,
     toolPlan,
     prepared,
-    machine,
-    motionOffset,
-    controllerReportsInches(controllerSettings),
-    canvasPlanKey,
+    options.machine,
+    options.motionOffset,
+    controllerReportsInches(options.controllerSettings),
+    options.canvasPlanKey,
   );
 }
 
@@ -398,7 +405,7 @@ type PreparedStartInspection =
     }
   | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 
-function inspectPreparedStart(
+export function inspectPreparedStart(
   prepared: PreparedOutput,
   machine: MachineStartSnapshot,
 ): PreparedStartInspection {
@@ -414,33 +421,4 @@ function inspectPreparedStart(
   );
   if (toolIssue !== null) advisoryWarnings.push(toolIssue);
   return { ok: true, prepared, toolPlan, advisoryWarnings };
-}
-
-function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<string> {
-  const issues: string[] = [];
-  if (machine.hasActiveStreamer) {
-    issues.push('A job is already active. Request ABORT or finish it before starting another.');
-  }
-  if (machine.motionOperationActive === true) {
-    issues.push('A jog or frame operation is active. Wait for it to finish before starting.');
-  }
-  if (machine.controllerOperationActive === true) {
-    issues.push('A controller operation is active. Wait for it to finish before starting.');
-  }
-  if (machine.autofocusBusy === true) {
-    issues.push('Auto-focus is running. Wait for it to finish before starting a job.');
-  }
-  if (machine.alarmCode !== null) {
-    issues.push(ALARM_ACTIVE_START_MESSAGE);
-  }
-  if (machine.statusReport === null) {
-    issues.push(
-      'Controller status is not known yet. Wait for an Idle status report before starting.',
-    );
-  } else if (machine.statusReport.state === 'Alarm' && machine.alarmCode === null) {
-    issues.push(STATUS_ALARM_START_MESSAGE);
-  } else if (machine.statusReport.state !== 'Idle') {
-    issues.push(machineNotIdleStartMessage(machine.statusReport.state));
-  }
-  return issues;
 }

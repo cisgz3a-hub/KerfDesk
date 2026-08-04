@@ -1,6 +1,5 @@
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { effectiveScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
-import { analyzeFillHeatRisk, compileJob, type FillHeatRiskSummary } from '../../core/job';
 import { LAYER_DEFAULTS, type Layer, type Project } from '../../core/scene';
 import { layerFromSubLayer } from '../../core/scene';
 import { useStore } from '../state';
@@ -16,6 +15,11 @@ import {
   stackStyle,
 } from './MachineSetupStyles';
 import { MeasuredScanOffsetApply } from './MeasuredScanOffsetApply';
+import {
+  machineSetupFillHeatRisk,
+  machineSetupFillHeatRiskWarning,
+  type MachineSetupFillHeatRisk,
+} from './machine-setup-fill-heat-risk';
 
 export function RasterDiagnosticsPanel(): JSX.Element {
   const project = useStore((s) => s.project);
@@ -124,10 +128,7 @@ function buildRasterDiagnostics(
   const sMax = settingSummary(rows, 30, lastSettingsReadAt);
   const laserMode = settingSummary(rows, 32, lastSettingsReadAt);
   const scanOffsetStatus = effectiveScanOffsetCalibrationStatus(project.device);
-  const fillHeatRisk = analyzeFillHeatRisk(
-    compileJob(project.scene, project.device),
-    project.device.scanningOffsets,
-  );
+  const fillHeatRisk = machineSetupFillHeatRisk(project, fillLayers);
   const warnings = rasterWarnings({
     project,
     bidirectionalLayers,
@@ -203,7 +204,7 @@ function rasterWarnings(args: {
   readonly lowOverscanLayers: ReadonlyArray<Layer>;
   readonly defaultRecipeLayers: ReadonlyArray<Layer>;
   readonly defaultLineIntervalLayers: ReadonlyArray<Layer>;
-  readonly fillHeatRisk: FillHeatRiskSummary;
+  readonly fillHeatRisk: MachineSetupFillHeatRisk;
   readonly laserMode: SettingDiagnostic;
   readonly sMax: SettingDiagnostic;
 }): ReadonlyArray<string> {
@@ -211,7 +212,7 @@ function rasterWarnings(args: {
   if (args.lowOverscanLayers.length > 0) {
     warnings.push('Low overscan layers may leave the head accelerating during burn moves.');
   }
-  const fillHeatWarning = fillHeatRiskWarning(args.fillHeatRisk);
+  const fillHeatWarning = machineSetupFillHeatRiskWarning(args.fillHeatRisk);
   if (fillHeatWarning !== null) warnings.push(fillHeatWarning);
   if (args.defaultRecipeLayers.length > 0) {
     warnings.push('Run Material Test on scrap before production.');
@@ -235,23 +236,13 @@ function rasterWarnings(args: {
   return warnings;
 }
 
-function fillHeatRiskWarning(fillHeatRisk: FillHeatRiskSummary): string | null {
-  if (fillHeatRisk.islandNoRunwayShortSweepCount > 0) {
-    return `Island Fill has ${fillHeatRisk.islandNoRunwayShortSweepCount} short sweep(s) with no acceleration runway. Increase fill overscan or use Scanline Fill if those small islands look darker than the rest.`;
-  }
-  if (fillHeatRisk.islandPartialRunwaySweepCount > 0) {
-    return `Island Fill has ${fillHeatRisk.islandPartialRunwaySweepCount} short sweep(s) that need partial acceleration runway. KerfDesk will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.`;
-  }
-  return null;
-}
-
 function diagnosticChecks(args: {
   readonly project: Project;
   readonly bidirectionalLayers: ReadonlyArray<Layer>;
   readonly lowOverscanLayers: ReadonlyArray<Layer>;
   readonly defaultRecipeLayers: ReadonlyArray<Layer>;
   readonly defaultLineIntervalLayers: ReadonlyArray<Layer>;
-  readonly fillHeatRisk: FillHeatRiskSummary;
+  readonly fillHeatRisk: MachineSetupFillHeatRisk;
   readonly laserMode: SettingDiagnostic;
   readonly sMax: SettingDiagnostic;
 }): ReadonlyArray<DiagnosticCheck> {
@@ -297,7 +288,22 @@ function controllerLaserModeCheck(laserMode: SettingDiagnostic): DiagnosticCheck
   };
 }
 
-function islandFillHeatCheck(fillHeatRisk: FillHeatRiskSummary): DiagnosticCheck {
+function islandFillHeatCheck(fillHeatRisk: MachineSetupFillHeatRisk): DiagnosticCheck {
+  if (fillHeatRisk === 'background') {
+    return {
+      label: 'Island Fill heat margin',
+      status: 'check',
+      detail:
+        'Detailed sweep analysis is deferred to the background preparation shown in Job Review.',
+    };
+  }
+  if (fillHeatRisk === 'no-island') {
+    return {
+      label: 'Island Fill heat margin',
+      status: 'ok',
+      detail: 'No active Island Fill layers were found.',
+    };
+  }
   const riskyCount =
     fillHeatRisk.islandNoRunwayShortSweepCount + fillHeatRisk.islandPartialRunwaySweepCount;
   return {

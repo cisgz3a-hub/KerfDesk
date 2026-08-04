@@ -9,8 +9,27 @@ import {
   DEFAULT_CNC_TILING,
 } from '../../core/scene';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
+import { prepareOutput } from '../../io/gcode';
+import type { TiledOutputPreparationRequest } from '../laser/output-preparation-protocol';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { capturingPlatform, tiledCncProject } from './save-tiled-gcode-testing';
+import { finalizeTiledOutput } from './tiled-output-preparation';
+
+// These are tiled-output semantic tests, not Worker transport tests. Costly
+// fixtures receive the same finalized result the production Worker returns;
+// save-tiled-gcode-background.test.ts separately proves there is no UI fallback.
+vi.mock('../laser/output-preparation-worker-client', () => ({
+  BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE: 'Background compilation unavailable.',
+  prepareTiledOutputOffThread: (request: TiledOutputPreparationRequest) =>
+    Promise.resolve(
+      finalizeTiledOutput(
+        prepareOutput(request.project, request.options),
+        request.savedName,
+        request.controllerSettings ?? null,
+        request.activeWcs ?? null,
+      ),
+    ),
+}));
 
 // Cutter compensation shifts exact coordinates, so assert on X ranges:
 // O1 motion stays under ~35 mm; O2 motion reaches past ~55 mm.

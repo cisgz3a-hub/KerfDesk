@@ -18,12 +18,18 @@ import {
 import type { ExecutionArtifactV1 } from '../state/recovery';
 import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
-import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness';
+import {
+  prepareStartJob,
+  prepareStartJobSnapshot,
+  type StartJobPreparation,
+} from './start-job-readiness';
+import { prepareStartJobFromPrepared } from './start-job-readiness-prepared';
 import { recoveryArtifactPreparedOutput } from './recovery-artifact-binding';
 import { resolveRotaryRasterAllowed } from './start-job-external-environment';
 import {
   outputPreparationShouldRunOffThread,
   prepareStartOutputOffThread,
+  BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE,
 } from './output-preparation-worker-client';
 
 export type PreparedRecoverySource = {
@@ -45,40 +51,32 @@ export async function prepareCurrentStartJob(
   allowRotaryRaster = resolveRotaryRasterAllowed(app.project),
   resolvedJobOrigin?: JobOriginPlacement,
   requireFrame = true,
-) {
+): Promise<StartJobPreparation> {
   const { project, jobPlacement } = app;
   const registration = currentPrintCutOutputRegistration(project);
   const machine = machineSnapshot(project, laser, camera);
-  if (
-    registration === undefined &&
-    !hasVariableText(project) &&
-    outputPreparationShouldRunOffThread(project, currentOutputScope(app))
-  ) {
-    const background = prepareStartOutputOffThread({
-      kind: 'start',
+  const useSnapshot = registration !== undefined || hasVariableText(project);
+  const outputScope = currentOutputScope(app);
+  if (useSnapshot || outputPreparationShouldRunOffThread(project, outputScope)) {
+    return prepareCurrentStartInBackground({
       project,
-      controllerSettings: laser.controllerSettings,
+      laser,
       machine,
       jobPlacement,
-      outputScope: currentOutputScope(app),
+      outputScope,
       ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
       allowRotaryRaster,
       requireFrame,
+      registration,
+      useSnapshot,
     });
-    if (background !== null) {
-      try {
-        return await background;
-      } catch (error) {
-        console.warn('Background Start preparation failed; retrying on the main thread.', error);
-      }
-    }
   }
   return prepareStartJobSnapshot(
     project,
     laser.controllerSettings,
     machine,
     jobPlacement,
-    currentOutputScope(app),
+    outputScope,
     allowRotaryRaster,
     {
       clock: () => new Date(),
@@ -88,6 +86,48 @@ export async function prepareCurrentStartJob(
       requireFrame,
     },
   );
+}
+
+async function prepareCurrentStartInBackground(args: {
+  readonly project: Project;
+  readonly laser: ReturnType<typeof useLaserStore.getState>;
+  readonly machine: ReturnType<typeof machineSnapshot>;
+  readonly jobPlacement: JobPlacementSettings;
+  readonly outputScope: OutputScope;
+  readonly resolvedJobOrigin?: JobOriginPlacement;
+  readonly allowRotaryRaster: boolean;
+  readonly requireFrame: boolean;
+  readonly registration: ReturnType<typeof currentPrintCutOutputRegistration>;
+  readonly useSnapshot: boolean;
+}): Promise<StartJobPreparation> {
+  const background = prepareStartOutputOffThread({
+    kind: 'start',
+    project: args.project,
+    controllerSettings: args.laser.controllerSettings,
+    machine: args.machine,
+    jobPlacement: args.jobPlacement,
+    outputScope: args.outputScope,
+    ...(args.resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin: args.resolvedJobOrigin }),
+    allowRotaryRaster: args.allowRotaryRaster,
+    requireFrame: args.requireFrame,
+    ...(args.useSnapshot
+      ? {
+          snapshot: {
+            evaluatedAtIso: new Date().toISOString(),
+            ...(args.registration === undefined ? {} : { registration: args.registration }),
+          },
+        }
+      : {}),
+  });
+  if (background === null) {
+    return { ok: false, messages: [BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE] };
+  }
+  try {
+    return await background;
+  } catch (error) {
+    console.warn('Background Start preparation failed.', error);
+    return { ok: false, messages: [BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE] };
+  }
 }
 
 function hasVariableText(project: Project): boolean {
@@ -124,13 +164,6 @@ export function prepareArchivedRecoverySource(
     );
     return null;
   }
-  const checked = prepareRecoveryProjectSource(
-    artifact.prepared.project,
-    jobPlacementForArchivedArtifact(artifact),
-    artifact.outputScope,
-    artifact.jobOrigin,
-  );
-  if (checked === null) return null;
   const recoveredPrepared = recoveryArtifactPreparedOutput(artifact);
   if (recoveredPrepared === null) {
     jobAwareAlert(
@@ -138,13 +171,34 @@ export function prepareArchivedRecoverySource(
     );
     return null;
   }
+  const project = artifact.prepared.project;
+  const qualified = prepareStartJobFromPrepared(
+    project,
+    recoveredPrepared,
+    laser.controllerSettings,
+    machineSnapshot(project, laser, useCameraStore.getState()),
+    jobPlacementForArchivedArtifact(artifact),
+    artifact.outputScope,
+    artifact.jobOrigin,
+    resolveRotaryRasterAllowed(project),
+  );
+  if (!qualified.ok) {
+    const lines = qualified.messages.map((message) => `• ${message}`).join('\n');
+    jobAwareAlert(`Cannot resume job:\n\n${lines}`);
+    return null;
+  }
   return {
-    ...checked,
-    project: artifact.prepared.project,
+    project,
     gcode: artifact.gcode,
     prepared: recoveredPrepared,
     canvasPlan: artifact.canvasPlan,
+    warnings: qualified.warnings,
+    laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     laserResumeChain: artifact.laserResumeChain ?? [],
+    ...(qualified.preflightMotionOffset === undefined
+      ? {}
+      : { preflightMotionOffset: qualified.preflightMotionOffset }),
+    ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
   };
 }
 
@@ -169,6 +223,12 @@ function prepareRecoveryProjectSource(
   outputScope: OutputScope,
   resolvedJobOrigin?: JobOriginPlacement,
 ): PreparedRecoverySource | null {
+  if (outputPreparationShouldRunOffThread(project, outputScope)) {
+    jobAwareAlert(
+      'Cannot resume job:\n\nBackground recovery compilation is not available in this flow. Reopen the project and use Frame, then Start, to prepare the job without blocking the canvas.',
+    );
+    return null;
+  }
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
   const prepared = prepareStartJob(

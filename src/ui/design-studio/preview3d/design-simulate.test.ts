@@ -15,7 +15,11 @@ import {
   type Project,
 } from '../../../core/scene';
 import { designCarveSource } from './design-carve-source';
-import { simulateDesignCarve } from './design-simulate';
+import {
+  simulateStagedDesignCarveDirect,
+  stageDesignCarveSimulation,
+  type DesignSimulateResult,
+} from './design-simulate';
 
 const CNC_PROJECT: Project = {
   ...createProject(),
@@ -78,7 +82,7 @@ const ids = (sketch: Sketch): ReadonlyArray<string> =>
 describe('simulateDesignCarve', () => {
   it('carves a two-bit design with each section stamped by its own bit', () => {
     const source = designCarveSource(CNC_PROJECT);
-    const outcome = simulateDesignCarve(CNC_PROJECT, TWO_BIT_SKETCH, ids(TWO_BIT_SKETCH), source);
+    const outcome = simulateForTest(CNC_PROJECT, TWO_BIT_SKETCH, source);
     expect(outcome.kind).toBe('ok');
     if (outcome.kind !== 'ok') return;
     const depths = [...outcome.grid.depth];
@@ -96,7 +100,7 @@ describe('simulateDesignCarve', () => {
   it('reports a laser project as unsimulatable, without throwing', () => {
     const laser = createProject();
     const source = designCarveSource(laser);
-    const outcome = simulateDesignCarve(laser, TWO_BIT_SKETCH, ids(TWO_BIT_SKETCH), source);
+    const outcome = simulateForTest(laser, TWO_BIT_SKETCH, source);
     expect(outcome.kind).toBe('failed');
     if (outcome.kind === 'failed') expect(outcome.reason).toContain('CNC machine profile');
   });
@@ -107,7 +111,18 @@ describe('simulateDesignCarve', () => {
       layers: TWO_BIT_LAYERS,
     };
     const source = designCarveSource(CNC_PROJECT);
-    const outcome = simulateDesignCarve(CNC_PROJECT, guides, ids(guides), source);
+    const outcome = simulateForTest(CNC_PROJECT, guides, source);
     expect(outcome.kind).toBe('empty');
   });
 });
+
+function simulateForTest(
+  project: Project,
+  sketch: Sketch,
+  source: ReturnType<typeof designCarveSource>,
+): DesignSimulateResult {
+  const staged = stageDesignCarveSimulation(project, sketch, ids(sketch));
+  return staged.kind === 'result'
+    ? staged.result
+    : simulateStagedDesignCarveDirect(staged.project, source);
+}

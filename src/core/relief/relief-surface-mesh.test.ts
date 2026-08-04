@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import * as three from 'three';
 import type { Heightmap } from './heightmap';
-import { reliefSurfaceMesh } from './relief-surface-mesh';
+import { reliefSurfaceMesh, reliefSurfaceMeshWithNormals } from './relief-surface-mesh';
 
 function heightmap(widthCells: number, heightCells: number, depths: number[]): Heightmap {
   return {
@@ -44,5 +45,33 @@ describe('reliefSurfaceMesh', () => {
     const mesh = reliefSurfaceMesh(heightmap(3, 1, [0, -1, 0]));
     expect(mesh.positions).toHaveLength(9);
     expect(mesh.indices).toHaveLength(0);
+  });
+
+  it('authors the same normals Three previously computed after the viewer reflection', () => {
+    const map = heightmap(3, 3, [0, -1, 0, -2, -3, -1, 0, -1, 0]);
+    const plain = reliefSurfaceMesh(map);
+    const expected = new three.BufferGeometry();
+    expected.setAttribute('position', new three.BufferAttribute(plain.positions.slice(), 3));
+    expected.setIndex(new three.BufferAttribute(plain.indices.slice(), 1));
+    expected.scale(1, -1, 1);
+    expected.translate(-plain.widthMm / 2, plain.heightMm / 2, 0);
+    expected.computeVertexNormals();
+
+    const prepared = reliefSurfaceMeshWithNormals(map);
+    const actual = new three.BufferGeometry();
+    actual.setAttribute('position', new three.BufferAttribute(prepared.positions.slice(), 3));
+    actual.setIndex(new three.BufferAttribute(prepared.indices.slice(), 1));
+    actual.setAttribute('normal', new three.BufferAttribute(prepared.normals.slice(), 3));
+    actual.scale(1, -1, 1);
+    actual.translate(-prepared.widthMm / 2, prepared.heightMm / 2, 0);
+
+    const expectedNormals = expected.getAttribute('normal').array;
+    const actualNormals = actual.getAttribute('normal').array;
+    expect(actualNormals).toHaveLength(expectedNormals.length);
+    for (let index = 0; index < expectedNormals.length; index += 1) {
+      expect(actualNormals[index]).toBeCloseTo(expectedNormals[index] ?? 0, 6);
+    }
+    expected.dispose();
+    actual.dispose();
   });
 });

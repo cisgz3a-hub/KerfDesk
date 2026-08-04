@@ -22,7 +22,11 @@ import {
   type Project,
 } from '../../core/scene';
 import { probeRemovalGrid, type RemovalGrid } from '../../core/sim';
-import { computeDesignSceneSource } from './design-scene-source';
+import { prepareOutput } from '../../io/gcode';
+import {
+  computeDesignSceneSource,
+  computeDesignSceneSourceFromPrepared,
+} from './design-scene-source';
 
 function squareObject(
   id: string,
@@ -119,7 +123,7 @@ const TWO_BIT_PROJECT: Project = {
 
 describe('computeDesignSceneSource', () => {
   it('stamps each tool section of a two-bit job with its own bit kernel', () => {
-    const source = computeDesignSceneSource(TWO_BIT_PROJECT, DEFAULT_OUTPUT_SCOPE);
+    const source = preparedDesignSceneSource(TWO_BIT_PROJECT);
     expect(source).not.toBeNull();
     if (source === null) return;
     const { grid } = source;
@@ -164,7 +168,7 @@ describe('computeDesignSceneSource', () => {
         layers: [layerWith('#dc2626', VEE_SETTINGS)],
       },
     };
-    const source = computeDesignSceneSource(project, DEFAULT_OUTPUT_SCOPE);
+    const source = preparedDesignSceneSource(project);
     expect(source).not.toBeNull();
     if (source === null) return;
     // Single section — stamped from the same toolpath the moves draw, with
@@ -182,4 +186,13 @@ describe('computeDesignSceneSource', () => {
   it('returns null for a laser project', () => {
     expect(computeDesignSceneSource(createProject(), DEFAULT_OUTPUT_SCOPE)).toBeNull();
   });
+
+  it('keeps costly V-carve out of the synchronous canvas fallback', () => {
+    expect(computeDesignSceneSource(TWO_BIT_PROJECT, DEFAULT_OUTPUT_SCOPE)).toBeNull();
+  });
 });
+
+function preparedDesignSceneSource(project: Project) {
+  const prepared = prepareOutput(project, { outputScope: DEFAULT_OUTPUT_SCOPE });
+  return computeDesignSceneSourceFromPrepared(project, prepared);
+}

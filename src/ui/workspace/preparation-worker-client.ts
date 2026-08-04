@@ -4,8 +4,9 @@
 // prepares the same project off-thread so both surfaces still fill in,
 // seconds-to-minutes later, without blocking a frame.
 //
-//   - One request per (project identity, options): the preview and estimate
-//     consumers share an in-flight preparation via the WeakMap cache.
+//   - One request per exact (project identity, options): the preview and
+//     estimate consumers share in-flight work and up to four recently settled
+//     preparations. The global settled-result LRU bounds retained geometry.
 //   - ONE request is posted to the worker at a time. Further requests for the
 //     SAME project are held here until the active compute settles, and a
 //     newer same-project request rejects the held (never-started) ones —
@@ -29,11 +30,16 @@
 //     paused fallback behavior.
 
 import type { Project } from '../../core/scene';
+import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type { LargeJobPreparation, LargeJobPreparationOptions } from './large-job-preparation';
 import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
 } from './preparation-worker-protocol';
+import {
+  connectCanvasCompilationMainBridge,
+  retireCanvasCompilationMainBridge,
+} from './canvas-compilation-main-bridge';
 
 export type { LargeJobPreparation, LargeJobPreparationOptions } from './large-job-preparation';
 
@@ -42,6 +48,11 @@ export type { LargeJobPreparation, LargeJobPreparationOptions } from './large-jo
 // whole Project per edit). After a supersede, dispatch waits out this quiet
 // window — re-armed by further supersedes — so a burst costs ONE restart.
 export const SUPERSEDE_QUIET_WINDOW_MS = 1500;
+
+// Exact outer-preparation reuse is intentionally small and global. This is
+// not a per-operation planner cache: an immutable Project replacement after
+// any edit has a different identity and cannot hit an older entry.
+export const MAX_SETTLED_PREPARATIONS = 4;
 
 const WORKER_UNAVAILABLE_MESSAGE = 'preparation worker unavailable';
 
@@ -81,6 +92,7 @@ type QueuedRequest = {
   readonly options: LargeJobPreparationOptions;
   readonly resolve: (result: LargeJobPreparation) => void;
   readonly reject: (err: Error) => void;
+  readonly onProgress?: (progress: OutputCompilationProgress) => void;
 };
 
 type ActiveRequest = QueuedRequest & { readonly id: number };
@@ -91,6 +103,11 @@ let activeRequest: ActiveRequest | null = null;
 let queuedRequests: ReadonlyArray<QueuedRequest> = [];
 let quietWindowTimer: ReturnType<typeof setTimeout> | null = null;
 const settledByProject = new WeakMap<Project, Map<string, Promise<LargeJobPreparation>>>();
+const settledLru: Array<{
+  readonly project: Project;
+  readonly key: string;
+  readonly promise: Promise<LargeJobPreparation>;
+}> = [];
 
 /**
  * Prepare a large job off the main thread. Returns null when workers are
@@ -101,11 +118,15 @@ const settledByProject = new WeakMap<Project, Map<string, Promise<LargeJobPrepar
 export function prepareLargeJobOffThread(
   project: Project,
   options: LargeJobPreparationOptions = {},
+  onProgress?: (progress: OutputCompilationProgress) => void,
 ): Promise<LargeJobPreparation> | null {
   const key = requestKey(options);
   const perProject = cacheFor(project);
   const cached = perProject.get(key);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    refreshSettledEntry(project, key, cached);
+    return cached;
+  }
   if (hasWorkForOtherProject(project)) {
     supersedeForNewProject();
   } else {
@@ -116,22 +137,38 @@ export function prepareLargeJobOffThread(
   }
   if (ensureWorker() === null) return null;
   const promise = new Promise<LargeJobPreparation>((resolve, reject) => {
-    queuedRequests = [...queuedRequests, { project, options, resolve, reject }];
+    queuedRequests = [
+      ...queuedRequests,
+      {
+        project,
+        options,
+        resolve,
+        reject,
+        ...(onProgress === undefined ? {} : { onProgress }),
+      },
+    ];
   });
   perProject.set(key, promise);
-  promise.catch(() => perProject.delete(key));
+  void promise.then(
+    () => rememberSettledEntry(project, key, promise),
+    () => {
+      if (perProject.get(key) === promise) perProject.delete(key);
+    },
+  );
   dispatchNextRequest();
   return promise;
 }
 
 export function resetPreparationWorkerForTests(): void {
   rejectAllPendingAndRetireWorker('preparation worker reset');
+  clearSettledEntries();
 }
 
 function requestKey(options: LargeJobPreparationOptions): string {
   return JSON.stringify({
     jobOrigin: options.jobOrigin ?? null,
     outputScope: options.outputScope ?? null,
+    snapshot: options.snapshot ?? null,
   });
 }
 
@@ -141,6 +178,53 @@ function cacheFor(project: Project): Map<string, Promise<LargeJobPreparation>> {
   const created = new Map<string, Promise<LargeJobPreparation>>();
   settledByProject.set(project, created);
   return created;
+}
+
+function rememberSettledEntry(
+  project: Project,
+  key: string,
+  promise: Promise<LargeJobPreparation>,
+): void {
+  removeSettledEntry(project, key, promise);
+  settledLru.push({ project, key, promise });
+  while (settledLru.length > MAX_SETTLED_PREPARATIONS) {
+    const evicted = settledLru.shift();
+    if (evicted === undefined) break;
+    const cache = settledByProject.get(evicted.project);
+    if (cache?.get(evicted.key) === evicted.promise) cache.delete(evicted.key);
+  }
+}
+
+function refreshSettledEntry(
+  project: Project,
+  key: string,
+  promise: Promise<LargeJobPreparation>,
+): void {
+  const index = settledLru.findIndex(
+    (entry) => entry.project === project && entry.key === key && entry.promise === promise,
+  );
+  if (index < 0) return;
+  const [entry] = settledLru.splice(index, 1);
+  if (entry !== undefined) settledLru.push(entry);
+}
+
+function removeSettledEntry(
+  project: Project,
+  key: string,
+  promise: Promise<LargeJobPreparation>,
+): void {
+  const index = settledLru.findIndex(
+    (entry) => entry.project === project && entry.key === key && entry.promise === promise,
+  );
+  if (index >= 0) settledLru.splice(index, 1);
+}
+
+function clearSettledEntries(): void {
+  for (const entry of settledLru) {
+    const cache = settledByProject.get(entry.project);
+    if (cache?.get(entry.key) === entry.promise) cache.delete(entry.key);
+  }
+  settledLru.length = 0;
 }
 
 function hasWorkForOtherProject(project: Project): boolean {
@@ -177,14 +261,19 @@ function ensureWorker(): Worker | null {
   if (workerInstance !== null) return workerInstance;
   if (typeof Worker === 'undefined') return null;
   try {
-    workerInstance = new Worker(new URL('./preparation-worker.ts', import.meta.url), {
+    const created = new Worker(new URL('./preparation-worker.ts', import.meta.url), {
       type: 'module',
     });
-    workerInstance.onmessage = handleWorkerMessage;
-    workerInstance.onerror = (): void => {
+    connectCanvasCompilationMainBridge(created);
+    created.onmessage = handleWorkerMessage;
+    created.onerror = (): void => {
       rejectAllPendingAndRetireWorker('preparation worker errored');
     };
-    return workerInstance;
+    created.onmessageerror = (): void => {
+      rejectAllPendingAndRetireWorker('preparation worker response was not cloneable');
+    };
+    workerInstance = created;
+    return created;
   } catch {
     return null;
   }
@@ -192,6 +281,14 @@ function ensureWorker(): Worker | null {
 
 function handleWorkerMessage(e: MessageEvent<PreparationWorkerResponse>): void {
   if (activeRequest === null || activeRequest.id !== e.data.id) return;
+  if (e.data.kind === 'progress') {
+    try {
+      activeRequest.onProgress?.(e.data.progress);
+    } catch {
+      // Progress is observational and cannot own request lifecycle.
+    }
+    return;
+  }
   const settled = activeRequest;
   activeRequest = null;
   if (e.data.kind === 'ok') {
@@ -257,6 +354,8 @@ function rejectAllPendingAndRetireWorker(message: string): void {
 
 function retireWorker(): void {
   if (workerInstance === null) return;
-  workerInstance.terminate();
+  const retired = workerInstance;
   workerInstance = null;
+  retireCanvasCompilationMainBridge(retired);
+  retired.terminate();
 }

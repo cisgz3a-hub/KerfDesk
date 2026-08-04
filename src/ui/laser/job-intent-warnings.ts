@@ -4,6 +4,7 @@ import {
   compileJob,
   isSensitiveIslandFillPolicy,
   rasterBoundsInMachineCoords,
+  type Job,
 } from '../../core/job';
 import { shouldAdvise4040FillPolicySelection } from '../../core/job/fill-runway-policy';
 import { pixelExtentForMm } from '../../core/raster';
@@ -26,8 +27,11 @@ const OVERSCAN_ZERO_DISABLES_4040_FILL_RUNWAY_WARNING =
 const GENERIC_SCAN_LINE_4040_POLICY_WARNING = (deviceName: string): string =>
   `Generic Scan Line feed-matched entry and exit runways are active. The Neotronics-qualified 4040 fill policy is not selected because ${deviceName} is selected. KerfDesk cannot identify a Neotronics 4040 from bed size or controller settings. If this is that machine, open Machine Setup, choose Neotronics 4040 Max / LT-4LDS-V2, review it, and Save before this Scanline Fill.`;
 
-export function detectJobIntentWarnings(project: Project): ReadonlyArray<string> {
-  const job = compileJob(project.scene, project.device);
+export function detectJobIntentWarnings(
+  project: Project,
+  compiledJob?: Job,
+): ReadonlyArray<string> {
+  const job = compiledJob ?? compileJob(project.scene, project.device);
   const warnings = [
     ...detectUncalibratedJobWarnings(job, project.scene.layers),
     ...compileDiagnosticWarnings(job),

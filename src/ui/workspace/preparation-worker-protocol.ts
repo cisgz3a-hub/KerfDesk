@@ -5,16 +5,19 @@
 
 import type { JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
-import type { LargeJobPreparation } from './large-job-preparation';
+import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
+import type { LargeJobPreparation, LargeJobPreparationOptions } from './large-job-preparation';
 
 export type PreparationWorkerRequest = {
   readonly id: number;
   readonly project: Project;
   readonly jobOrigin?: JobOriginPlacement;
   readonly outputScope?: OutputScope;
+  readonly snapshot?: LargeJobPreparationOptions['snapshot'];
 };
 
 export type PreparationWorkerResponse =
+  | { readonly id: number; readonly kind: 'progress'; readonly progress: OutputCompilationProgress }
   | ({
       readonly id: number;
       readonly kind: 'ok';

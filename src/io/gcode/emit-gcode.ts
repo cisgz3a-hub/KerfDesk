@@ -49,6 +49,9 @@ export type EmitGcodeOptions = {
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly preflightInitialMachinePosition?: PreflightOptions['initialMachinePosition'];
   readonly allowRotaryRaster?: boolean;
+  /** Exact archived recovery may verify compiled evidence and emitted bytes,
+   * but must never rebuild source-geometry planners in the browser realm. */
+  readonly sourceGeometryChecks?: 'full' | 'compiled-evidence-only';
   // When set, a provenance comment header (build/commit/emitter) is prepended to
   // the returned G-code. Preflight runs on the motion body only, so the header
   // never affects the verdict, and callers that need deterministic, header-free
@@ -195,6 +198,10 @@ function runEmitPreflight(
       motionOffset: options.preflightMotionOffset,
       initialMachinePosition: options.preflightInitialMachinePosition,
       coordinateMode,
+      compiledJob: rotaryStage.job,
+      ...(options.sourceGeometryChecks === undefined
+        ? {}
+        : { sourceGeometryChecks: options.sourceGeometryChecks }),
     });
   }
   return runPreflight(project, body, {

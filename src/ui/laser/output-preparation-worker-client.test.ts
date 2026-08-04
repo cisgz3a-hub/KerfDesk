@@ -1,6 +1,6 @@
 // Transport behaviour of the shared preparation worker: one reused instance,
-// responses matched to their own request id, and terminate reserved for fatal
-// failures. Which projects route off-thread at all is covered by
+// responses matched to their own request id, and active aborts replaced on a
+// fresh Worker. Which projects route off-thread at all is covered by
 // output-preparation-worker-client-routing.test.ts.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,6 +14,7 @@ import type {
   OutputPreparationResponse,
   OutputPreparationResult,
 } from './output-preparation-protocol';
+import { isCanvasCompilationBridgeConnection } from '../workspace/canvas-compilation-worker-protocol';
 
 const PREPARATION_FAILURE_MESSAGE = 'The output snapshot could not be prepared.';
 
@@ -23,13 +24,18 @@ class FakeWorker {
   onerror: (() => void) | null = null;
   posted: OutputPreparationEnvelope[] = [];
   terminated = false;
+  bridgeConnected = false;
 
   constructor() {
     FakeWorker.instances.push(this);
   }
 
-  postMessage(envelope: OutputPreparationEnvelope): void {
-    this.posted.push(envelope);
+  postMessage(envelope: unknown): void {
+    if (isCanvasCompilationBridgeConnection(envelope)) {
+      this.bridgeConnected = true;
+      return;
+    }
+    this.posted.push(envelope as OutputPreparationEnvelope);
   }
 
   terminate(): void {
@@ -79,6 +85,7 @@ describe('output preparation worker client', () => {
     });
     if (pending === null) throw new Error('worker unavailable');
     const worker = latestWorker();
+    expect(worker.bridgeConnected).toBe(true);
     worker.respond({
       kind: 'save',
       result: {
@@ -139,7 +146,7 @@ describe('output preparation worker client', () => {
     expect(worker.terminated).toBe(false);
   });
 
-  it('delivers each response to its own request when two are in flight', async () => {
+  it('holds a second request until the active outer-worker preparation settles', async () => {
     const first = prepareSaveOutputOffThread({
       kind: 'save',
       project: createProject(),
@@ -152,13 +159,116 @@ describe('output preparation worker client', () => {
     });
     if (first === null || second === null) throw new Error('worker unavailable');
     const worker = latestWorker();
-    // Answer out of order: correlation must come from the id, not arrival order.
-    worker.respond(emittedSave('SECOND\n'), 1);
+    expect(worker.posted).toHaveLength(1);
     worker.respond(emittedSave('FIRST\n'), 0);
-
     await expect(first).resolves.toMatchObject({ gcode: 'FIRST\n' });
+    expect(worker.posted).toHaveLength(2);
+    worker.respond(emittedSave('SECOND\n'), 1);
     await expect(second).resolves.toMatchObject({ gcode: 'SECOND\n' });
     expect(FakeWorker.instances).toHaveLength(1);
+  });
+
+  it('terminates an active outer worker and dispatches the queued request on a fresh worker', async () => {
+    const controller = new AbortController();
+    const first = prepareSaveOutputOffThread(
+      { kind: 'save', project: createProject(), options: {} },
+      undefined,
+      controller.signal,
+    );
+    const second = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    if (first === null || second === null) throw new Error('worker unavailable');
+    const worker = latestWorker();
+
+    controller.abort();
+
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    expect(worker.terminated).toBe(true);
+    expect(worker.posted).toHaveLength(1);
+    expect(FakeWorker.instances).toHaveLength(2);
+    const replacement = latestWorker();
+    expect(replacement).not.toBe(worker);
+    expect(replacement.posted).toHaveLength(1);
+    replacement.respond(emittedSave('SECOND\n'));
+    await expect(second).resolves.toMatchObject({ gcode: 'SECOND\n' });
+  });
+
+  it('removes a cancelled queued request without posting it to the worker', async () => {
+    const first = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    const controller = new AbortController();
+    const queued = prepareSaveOutputOffThread(
+      { kind: 'save', project: createProject(), options: {} },
+      undefined,
+      controller.signal,
+    );
+    if (first === null || queued === null) throw new Error('worker unavailable');
+    controller.abort();
+
+    await expect(queued).rejects.toMatchObject({ name: 'AbortError' });
+    const worker = latestWorker();
+    expect(worker.posted).toHaveLength(1);
+    worker.respond(emittedSave('FIRST\n'), 0);
+    await expect(first).resolves.toMatchObject({ gcode: 'FIRST\n' });
+    expect(worker.posted).toHaveLength(1);
+  });
+
+  it('keeps the caller-bound snapshot timestamp unchanged while queued', async () => {
+    const first = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    const second = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+      snapshot: { evaluatedAtIso: '2026-08-04T01:02:03.000Z' },
+    });
+    if (first === null || second === null) throw new Error('worker unavailable');
+    const worker = latestWorker();
+    worker.respond(emittedSave('FIRST\n'), 0);
+    await first;
+    const queuedEnvelope = worker.posted[1];
+    if (queuedEnvelope?.kind !== 'prepare') throw new Error('queued request missing');
+    expect(queuedEnvelope.request).toMatchObject({
+      kind: 'save',
+      snapshot: { evaluatedAtIso: '2026-08-04T01:02:03.000Z' },
+    });
+    worker.respond(emittedSave('SECOND\n'), 1);
+    await second;
+  });
+
+  it('rejects a third request instead of growing the outer-worker queue', async () => {
+    const first = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    const second = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    const third = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    if (first === null || second === null || third === null) throw new Error('worker unavailable');
+
+    await expect(third).rejects.toThrow('queue is full');
+    const worker = latestWorker();
+    worker.respond(emittedSave('FIRST\n'));
+    await expect(first).resolves.toMatchObject({ gcode: 'FIRST\n' });
+    worker.respond(emittedSave('SECOND\n'));
+    await expect(second).resolves.toMatchObject({ gcode: 'SECOND\n' });
   });
 
   it('retires the worker on a fatal error so the next request gets a fresh one', async () => {

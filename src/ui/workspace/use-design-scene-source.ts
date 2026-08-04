@@ -19,6 +19,7 @@ import {
   isDesignSceneSuperseded,
 } from './design-scene-worker-client';
 import type { DesignSceneSource } from './use-cnc-3d-scene';
+import { costlyCanvasPreparation } from './canvas-preparation-policy';
 
 // Matches the layers panel's F-A7 advisory cadence: long enough that dragging a
 // slider or stepping through bits builds once at rest, short enough that the
@@ -63,6 +64,12 @@ export function useDesignSceneSource(
             if (cancelled || isDesignSceneSuperseded(err)) return;
             setSource(null);
           });
+        return;
+      }
+      if (costlyCanvasPreparation(project, outputScope)) {
+        // Display-only pane: retain no stale source when the required worker
+        // is unavailable. Never move a costly compile onto the UI thread.
+        setSource(null);
         return;
       }
       // No Worker (vitest/jsdom): keep the previous on-thread behaviour, page

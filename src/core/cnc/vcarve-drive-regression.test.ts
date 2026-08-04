@@ -15,7 +15,12 @@ import {
   type Scene,
 } from '../scene';
 import { textToPolylines } from '../text';
-import { compileCncJob } from './compile-cnc-job';
+import {
+  compileCncJob,
+  finalizeCncCompilationArtifact,
+  prepareBoundCncCompilation,
+} from './compile-cnc-job';
+import { runCncCompilationTask } from './cnc-compilation-artifact';
 import {
   gcodeCuttingEntryCount,
   gcodeXyzFeedBlockCount,
@@ -109,7 +114,7 @@ async function compileDrive() {
     ],
   };
   const job = compileCncJob(scene, DEFAULT_DEVICE_PROFILE, DRIVE_MACHINE);
-  return { rendered, job, gcode: cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE) };
+  return { rendered, scene, job, gcode: cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE) };
 }
 
 function driveCncGroup(compilation: DriveCompilation) {
@@ -129,6 +134,99 @@ function path3dMinX(pass: ReturnType<typeof driveCncGroup>['passes'][number]): n
 const DRIVE_COMPILATIONS = Promise.all([compileDrive(), compileDrive()]);
 
 describe('Dancing Script Drive V-carve regression', () => {
+  it(
+    'keeps mixed-operation, two-object Drive output exact after out-of-order region work',
+    async () => {
+      const [fixture] = await DRIVE_COMPILATIONS;
+      const first = fixture.scene.objects[0];
+      if (first?.kind !== 'imported-svg') throw new Error('Drive fixture object is missing');
+      const firstVcarveLayer = fixture.scene.layers[0];
+      if (firstVcarveLayer === undefined) throw new Error('Drive fixture operation is missing');
+      const profileColor = '#2563eb';
+      const secondVcarveOperationId = 'drive-vcarve-second';
+      const mixed: Scene = {
+        objects: [
+          { ...first, operationIds: [DRIVE_LAYER_ID] },
+          {
+            ...first,
+            id: 'drive-text-second',
+            operationIds: [secondVcarveOperationId],
+            transform: { ...first.transform, x: first.transform.x + 70 },
+          },
+          {
+            kind: 'imported-svg',
+            id: 'profile-box',
+            source: 'mixed-operation-box',
+            bounds: { minX: 20, minY: 20, maxX: 35, maxY: 35 },
+            transform: IDENTITY_TRANSFORM,
+            paths: [
+              {
+                color: profileColor,
+                polylines: [
+                  {
+                    closed: true,
+                    points: [
+                      { x: 20, y: 20 },
+                      { x: 35, y: 20 },
+                      { x: 35, y: 35 },
+                      { x: 20, y: 35 },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        layers: [
+          ...fixture.scene.layers,
+          {
+            ...firstVcarveLayer,
+            id: secondVcarveOperationId,
+          },
+          {
+            ...createLayer({ id: 'profile-operation', color: profileColor }),
+            cnc: {
+              ...DEFAULT_CNC_LAYER_SETTINGS,
+              cutType: 'profile-on-path',
+              toolId: DRIVE_TOOL_ID,
+              depthMm: 1,
+              depthPerPassMm: 0.5,
+            },
+          },
+        ],
+      };
+      const artifact = prepareBoundCncCompilation(
+        { jobId: 'drive-mixed', compilationId: 'drive-mixed-parallel' },
+        mixed,
+        DEFAULT_DEVICE_PROFILE,
+        DRIVE_MACHINE,
+      );
+      const results = artifact.tasks
+        .map((task) => ({
+          jobId: artifact.identity.compilationId,
+          taskId: task.taskId,
+          result: runCncCompilationTask(task.payload),
+        }))
+        .reverse();
+      const parallel = finalizeCncCompilationArtifact(artifact, results);
+      expect(parallel.kind).toBe('compiled');
+      if (parallel.kind !== 'compiled') throw new Error(parallel.reason);
+      const serial = compileCncJob(mixed, DEFAULT_DEVICE_PROFILE, DRIVE_MACHINE);
+
+      expect(parallel.job).toEqual(serial);
+      expect(cncGrblStrategy.emit(parallel.job, DEFAULT_DEVICE_PROFILE)).toBe(
+        cncGrblStrategy.emit(serial, DEFAULT_DEVICE_PROFILE),
+      );
+      expect(
+        parallel.job.groups.some(
+          (group) => group.kind === 'cnc' && group.cutType === 'profile-on-path',
+        ),
+      ).toBe(true);
+      expect(parallel.job.cncCompilation?.vcarveOperations).toHaveLength(2);
+    },
+    DRIVE_FIXTURE_TIMEOUT_MS,
+  );
+
   it(
     'pins the exact real-font geometry and deterministic safe absolute output',
     async () => {

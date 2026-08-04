@@ -16,14 +16,11 @@ import {
 import {
   buildToolpath,
   EMPTY_JOB,
-  scenePreparationTooComplex,
   sliceToolpath,
   type JobOriginPlacement,
   type Toolpath,
   type ToolpathStep,
 } from '../../core/job';
-import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
-import { cncVCarvePreparationTooComplex } from './vcarve-preparation-routing';
 import { resolveGrblDialect } from '../../core/devices';
 import {
   prepareOutput,
@@ -31,10 +28,8 @@ import {
   type PreparedOutput,
   type PrepareOutputSnapshotOptions,
 } from '../../io/gcode';
-import {
-  hydratePagedRasterProject,
-  projectHasPagedRasterAssets,
-} from '../import/paged-raster-hydration';
+import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
+import { costlyCanvasPreparation } from './canvas-preparation-policy';
 import { buildDisplayPolylines } from './display-polylines';
 import { strideForSegmentBudget } from './draw-complexity';
 import { strokePolylinesBatched } from './draw-vector-strokes';
@@ -157,14 +152,6 @@ export function buildPreviewToolpath(
   // unbounded off-thread instead.
   const issue = previewPreparationIssue(project, options);
   if (issue !== null) return emptyPreviewToolpath(issue);
-  // Deliberately here and not in previewPreparationIssue: this is the only
-  // caller with an off-thread fallback. computeDesignSceneSource shares those
-  // gates but treats an issue as "render nothing", so gating V-carve there
-  // would blank the 3D carve pane instead of moving its work. That pane still
-  // prepares synchronously — see the note in vcarve-preparation-routing.ts.
-  if (cncVCarvePreparationTooComplex(project)) {
-    return emptyPreviewToolpath({ kind: 'too-complex' });
-  }
   return buildPreviewToolpathUnbounded(project, options);
 }
 
@@ -186,17 +173,7 @@ export function previewPreparationIssue(
   if (scoped !== null && !scoped.ok) {
     return { kind: 'preparation-failed', messages: scoped.messages };
   }
-  const complexityScene = scoped === null ? project.scene : scoped.scene;
-  // A page-backed raster keeps its pixels in IndexedDB, so no synchronous
-  // caller can prepare it at all — this is a capability fact, not a size
-  // judgement. Callers that can await hydrate first and reach here embedded.
-  if (projectHasPagedRasterAssets({ ...project, scene: complexityScene })) {
-    return { kind: 'too-complex' };
-  }
-  if (scenePreparationTooComplex(complexityScene)) return { kind: 'too-complex' };
-  if (rasterPreparationTooComplex({ ...project, scene: complexityScene })) {
-    return { kind: 'too-complex' };
-  }
+  if (costlyCanvasPreparation(project, options.outputScope)) return { kind: 'too-complex' };
   return null;
 }
 

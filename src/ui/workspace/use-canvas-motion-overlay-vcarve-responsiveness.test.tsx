@@ -15,6 +15,8 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
+import { useCanvasViewStore } from '../state/canvas-view-store';
+import type { CanvasMotionOverlay } from './draw-canvas-motion';
 import type * as IdlePlanModule from './idle-canvas-motion-plan';
 import type * as IdleWorkerClient from './idle-canvas-motion-worker-client';
 
@@ -46,6 +48,7 @@ import { IDLE_CANVAS_PLAN_DELAY_MS, useCanvasMotionOverlay } from './use-canvas-
 
 let host: HTMLDivElement;
 let root: Root | null;
+let observedOverlay: CanvasMotionOverlay | null = null;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -56,6 +59,8 @@ beforeEach(() => {
   workerMocks.prepareIdleCanvasMotionPlanOffThread.mockReset();
   workerMocks.prepareIdleCanvasMotionPlanOffThread.mockReturnValue(null);
   workerMocks.cancelIdleCanvasMotionPlanOffThread.mockReset();
+  useCanvasViewStore.setState({ showGcode: false });
+  observedOverlay = null;
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -65,6 +70,7 @@ afterEach(async () => {
   if (root !== null) await act(async () => root?.unmount());
   host.remove();
   vi.useRealTimers();
+  useCanvasViewStore.setState({ showGcode: false });
 });
 
 describe('idle canvas V-carve responsiveness', () => {
@@ -115,6 +121,24 @@ describe('idle canvas V-carve responsiveness', () => {
     expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).not.toHaveBeenCalled();
     expect(planMocks.buildIdleCanvasMotionPlanFromRequest).toHaveBeenCalledTimes(1);
   });
+
+  it('cancels and suppresses a delayed idle plan while G-code owns the canvas', async () => {
+    let finish: ((plan: CanvasMotionOverlay['plan']) => void) | null = null;
+    workerMocks.prepareIdleCanvasMotionPlanOffThread.mockReturnValueOnce(
+      new Promise<CanvasMotionOverlay['plan']>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    await render(complexScriptProject());
+    await settleIdleDelay();
+    expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledOnce();
+
+    await act(async () => useCanvasViewStore.getState().setShowGcode(true));
+    expect(workerMocks.cancelIdleCanvasMotionPlanOffThread).toHaveBeenCalledOnce();
+    await act(async () => finish?.({} as CanvasMotionOverlay['plan']));
+
+    expect(observedOverlay).toBeNull();
+  });
 });
 
 async function render(project: Project): Promise<void> {
@@ -127,7 +151,7 @@ async function settleIdleDelay(): Promise<void> {
 }
 
 function Harness(props: { readonly project: Project }): JSX.Element | null {
-  useCanvasMotionOverlay(props.project, false);
+  observedOverlay = useCanvasMotionOverlay(props.project, false);
   return null;
 }
 

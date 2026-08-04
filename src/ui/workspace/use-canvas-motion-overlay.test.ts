@@ -67,6 +67,7 @@ describe('idle canvas motion plan', () => {
         registrationKey: '',
         machineRevision: 'test-machine',
         interactionActive: false,
+        canvasCovered: false,
         laser,
       },
       placement,

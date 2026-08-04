@@ -321,9 +321,25 @@ export type JobDiagnostic =
       readonly actualPixels: number;
     };
 
+/** Complete compile evidence for one scheduled V-carve operation. */
+export type CncVCarveCompilationEvidence = {
+  readonly operationIndex: number;
+  readonly layerId: string;
+  readonly entryIssue: string | null;
+  readonly offsetFailed: boolean;
+  readonly thinResidual: boolean;
+  readonly passLimited: boolean;
+};
+
+/** Structured-clone-safe CNC evidence retained with the exact compiled Job. */
+export type CncCompilationSidecar = {
+  readonly vcarveOperations: ReadonlyArray<CncVCarveCompilationEvidence>;
+};
+
 export type Job = {
   readonly groups: ReadonlyArray<Group>;
   readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
+  readonly cncCompilation?: CncCompilationSidecar;
 };
 
 export const EMPTY_JOB: Job = { groups: [] };

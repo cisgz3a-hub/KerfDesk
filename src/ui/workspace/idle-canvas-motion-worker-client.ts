@@ -8,6 +8,10 @@ import type {
   IdleCanvasMotionWorkerRequest,
   IdleCanvasMotionWorkerResponse,
 } from './idle-canvas-motion-worker-protocol';
+import {
+  connectCanvasCompilationMainBridge,
+  retireCanvasCompilationMainBridge,
+} from './canvas-compilation-main-bridge';
 
 type Pending = {
   readonly id: number;
@@ -71,6 +75,7 @@ function ensureWorker(): Worker | null {
     const created = new Worker(new URL('./idle-canvas-motion-worker.ts', import.meta.url), {
       type: 'module',
     });
+    connectCanvasCompilationMainBridge(created);
     created.onmessage = (event: MessageEvent<IdleCanvasMotionWorkerResponse>): void => {
       if (workerInstance !== created) return;
       handleMessage(event.data);
@@ -113,6 +118,9 @@ function supersedePending(): void {
 }
 
 function retireWorker(): void {
-  workerInstance?.terminate();
+  if (workerInstance === null) return;
+  const retired = workerInstance;
   workerInstance = null;
+  retireCanvasCompilationMainBridge(retired);
+  retired.terminate();
 }

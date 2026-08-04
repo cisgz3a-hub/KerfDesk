@@ -16,14 +16,48 @@ import {
   type CncOffsetLadderDiagnostic,
 } from '../../core/cnc/cnc-offset-ladder-diagnostics';
 import { assertNever, type Project } from '../../core/scene';
+import type { Job } from '../../core/job';
 
-export function detectCncOffsetLadderWarnings(project: Project): ReadonlyArray<string> {
+export function detectCncOffsetLadderWarnings(
+  project: Project,
+  compiledJob?: Job,
+  sourceGeometryChecks: 'full' | 'compiled-evidence-only' = 'full',
+): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
-  return findCncOffsetLadderDiagnostics(project.scene, project.device, machine).map((diagnostic) =>
-    ladderWarningFor(project, diagnostic),
-  );
+  const diagnostics =
+    sourceGeometryChecks === 'compiled-evidence-only'
+      ? compiledVCarveDiagnostics(compiledJob)
+      : findCncOffsetLadderDiagnostics(project.scene, project.device, machine, compiledJob);
+  return diagnostics.map((diagnostic) => ladderWarningFor(project, diagnostic));
 }
+
+function compiledVCarveDiagnostics(job: Job | undefined): ReadonlyArray<CncOffsetLadderDiagnostic> {
+  const diagnostics: CncOffsetLadderDiagnostic[] = [];
+  const byLayer = new Map<string, number>();
+  for (const evidence of job?.cncCompilation?.vcarveOperations ?? []) {
+    const mask =
+      Number(evidence.offsetFailed) |
+      (Number(evidence.thinResidual) << 1) |
+      (Number(evidence.passLimited) << 2);
+    byLayer.set(evidence.layerId, (byLayer.get(evidence.layerId) ?? 0) | mask);
+  }
+  for (const [layerId, mask] of byLayer) {
+    for (const diagnostic of COMPILED_VCARVE_DIAGNOSTICS) {
+      if ((mask & diagnostic.bit) !== 0) diagnostics.push({ layerId, kind: diagnostic.kind });
+    }
+  }
+  return diagnostics;
+}
+
+const COMPILED_VCARVE_DIAGNOSTICS = [
+  { bit: 1, kind: 'geometry-failed' },
+  { bit: 2, kind: 'thin-detail-dropped' },
+  { bit: 4, kind: 'pass-limit' },
+] as const satisfies ReadonlyArray<{
+  readonly bit: number;
+  readonly kind: CncOffsetLadderDiagnostic['kind'];
+}>;
 
 function ladderWarningFor(project: Project, diagnostic: CncOffsetLadderDiagnostic): string {
   const layerName = layerNameFor(project, diagnostic.layerId);

@@ -1,4 +1,4 @@
-import type { Polyline } from '../scene';
+import type { Polyline, Vec2 } from '../scene';
 import { computeVCarveMedialAxis, type VCarveMedialAxisPlan } from './vcarve-medial-axis';
 import { joinVCarveFloorDetours } from './vcarve-medial-detours';
 import { vcarveFlatCoreRoutes } from './vcarve-medial-floor';
@@ -15,17 +15,25 @@ import { vcarveTipReachability } from './vcarve-tip-reachability';
 
 const MEDIAL_SIMPLIFY_TOLERANCE_MM = 0.003;
 
-export type VCarveMedialRegionPlan = {
+export type VCarveMedialRegionGeometryPlan = {
   readonly region: VCarveMedialRegion;
   readonly segments: ReadonlyArray<VCarveBoundarySegment>;
   readonly axis: VCarveMedialAxisPlan;
   readonly routes: ReadonlyArray<Polyline>;
   readonly referenceRoutes: ReadonlyArray<Polyline>;
-  readonly sourceRank: number;
   readonly normalizedIndex: number;
   readonly offsetFailed: boolean;
   readonly passLimited: boolean;
   readonly thinResidual: boolean;
+};
+
+export type VCarveMedialRegionPlan = VCarveMedialRegionGeometryPlan & {
+  readonly sourceRank: number;
+};
+
+export type UnrankedVCarveMedialRegionPlan = {
+  readonly plan: VCarveMedialRegionGeometryPlan;
+  readonly witness: Vec2 | undefined;
 };
 
 /** Keep an independent reference per candidate, or emit the reference set unchanged. */
@@ -48,6 +56,23 @@ export function planVCarveMedialRegion(
     readonly resolutionMm: number;
   },
 ): VCarveMedialRegionPlan {
+  const unranked = planUnrankedVCarveMedialRegion(region, normalizedIndex, options);
+  return {
+    ...unranked.plan,
+    sourceRank: vcarveSourceRegionRankFromLayout(unranked.witness, sourceLayout),
+  };
+}
+
+/** Region-local work that does not need the global source-order layout. */
+export function planUnrankedVCarveMedialRegion(
+  region: VCarveMedialRegion,
+  normalizedIndex: number,
+  options: {
+    readonly law: DetailDepthLaw;
+    readonly floorPitchMm: number;
+    readonly resolutionMm: number;
+  },
+): UnrankedVCarveMedialRegionPlan {
   const segments = vcarveBoundarySegments(region);
   const tipReachability = vcarveTipReachability(region.loops, options.law.tipRadiusMm);
   const radiusCapMm = radialEnvelopeFootprintMm(options.law, options.law.maxDepthMm);
@@ -74,16 +99,18 @@ export function planVCarveMedialRegion(
   const pairedRoutes = pairVCarveMedialRoutes(routes, referenceRoutes);
   const witness = axis.graph.nodes[0] ?? floor.routes[0]?.points[0];
   return {
-    region,
-    segments,
-    axis,
-    ...pairedRoutes,
-    sourceRank: vcarveSourceRegionRankFromLayout(witness, sourceLayout),
-    normalizedIndex,
-    offsetFailed: floor.offsetFailed || axis.failed || tipReachability.offsetFailed,
-    passLimited: floor.capped || axis.budgetLimited,
-    thinResidual:
-      tipReachability.residualThin || axis.graph.nodes.length === 0 || medialRoutes.length === 0,
+    witness,
+    plan: {
+      region,
+      segments,
+      axis,
+      ...pairedRoutes,
+      normalizedIndex,
+      offsetFailed: floor.offsetFailed || axis.failed || tipReachability.offsetFailed,
+      passLimited: floor.capped || axis.budgetLimited,
+      thinResidual:
+        tipReachability.residualThin || axis.graph.nodes.length === 0 || medialRoutes.length === 0,
+    },
   };
 }
 

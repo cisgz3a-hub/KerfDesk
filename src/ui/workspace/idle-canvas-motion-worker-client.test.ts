@@ -7,6 +7,7 @@ import {
   prepareIdleCanvasMotionPlanOffThread,
   resetIdleCanvasMotionWorkerForTests,
 } from './idle-canvas-motion-worker-client';
+import { isCanvasCompilationBridgeConnection } from './canvas-compilation-worker-protocol';
 
 type Posted = { readonly id: number };
 
@@ -17,13 +18,18 @@ class FakeWorker {
   public onmessageerror: (() => void) | null = null;
   public readonly posted: Posted[] = [];
   public terminated = false;
+  public bridgeConnected = false;
 
   constructor() {
     FakeWorker.instances.push(this);
   }
 
-  postMessage(message: Posted): void {
-    this.posted.push(message);
+  postMessage(message: unknown): void {
+    if (isCanvasCompilationBridgeConnection(message)) {
+      this.bridgeConnected = true;
+      return;
+    }
+    this.posted.push(message as Posted);
   }
 
   terminate(): void {
@@ -70,6 +76,7 @@ describe('idle canvas motion worker client', () => {
     const first = prepareIdleCanvasMotionPlanOffThread(REQUEST);
     expect(first).not.toBeNull();
     const firstWorker = FakeWorker.instances[0];
+    expect(firstWorker?.bridgeConnected).toBe(true);
 
     const second = prepareIdleCanvasMotionPlanOffThread({
       ...REQUEST,

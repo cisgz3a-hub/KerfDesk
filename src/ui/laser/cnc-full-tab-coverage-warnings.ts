@@ -18,18 +18,22 @@
 // their bridges, the advisory just stays quiet.
 
 import { compileCncJob, isProfileCutType, passNeedsTabs, tabTopZMm } from '../../core/cnc';
+import type { Job } from '../../core/job';
 import { DEFAULT_CNC_LAYER_SETTINGS, type Layer, type Project } from '../../core/scene';
 
 const Z_EPS = 1e-9;
 
-export function detectCncFullTabCoverageWarnings(project: Project): ReadonlyArray<string> {
+export function detectCncFullTabCoverageWarnings(
+  project: Project,
+  compiledJob?: Job,
+): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
 
   const candidates = project.scene.layers.filter(layerRequestsDeepTabbedProfile);
   if (candidates.length === 0) return [];
 
-  const job = compileCncJob(project.scene, project.device, machine);
+  const job = compiledJob ?? compileCncJob(project.scene, project.device, machine);
   const warnings: string[] = [];
   for (const layer of candidates) {
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;

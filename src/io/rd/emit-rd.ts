@@ -5,7 +5,7 @@ import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
 import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
 import type { PreflightIssue } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
-import { prepareOutput } from '../gcode';
+import { prepareOutput, type PreparedOutput } from '../gcode';
 
 export type EmitRdOptions = {
   readonly jobOrigin?: JobOriginPlacement;
@@ -29,6 +29,11 @@ export function emitRdFile(project: Project, options: EmitRdOptions = {}): EmitR
     ...(options.jobOrigin ? { jobOrigin: options.jobOrigin } : {}),
     ...(options.outputScope ? { outputScope: options.outputScope } : {}),
   });
+  return emitPreparedRdFile(prepared);
+}
+
+/** Encodes a previously prepared output without compiling the project again. */
+export function emitPreparedRdFile(prepared: PreparedOutput): EmitRdResult {
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }

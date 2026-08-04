@@ -60,12 +60,9 @@ export function artworkRunOrderRows(project: Project): ReadonlyArray<ArtworkRunO
   });
 }
 
-// Step numbers are a convenience label, and this runs inside the panel's render
-// memo keyed on the whole project — so every commit recompiles the job before
-// React can paint. A V-carve layer makes that compile cost seconds (measured:
-// 13.7 s for 120 thin contours at 3 mm depth), which froze the app the moment
-// the cut type was selected. No label is worth blocking the UI for, so the
-// V-carve case reports no steps until the compile moves off the render thread.
+// This render-path helper preserves main's existing V-carve exception until
+// the panel can consume a prepared Job. Do not expand that omission to every
+// operation the generic canvas policy routes through background preparation.
 function hasVCarveLayer(project: Project): boolean {
   return project.scene.layers.some((layer) => layer.cnc?.cutType === 'v-carve');
 }

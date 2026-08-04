@@ -23,6 +23,8 @@
 // full linked plan to reproduce.
 
 import type { DeviceProfile } from '../devices';
+import type { Job } from '../job';
+import type { CncVCarveCompilationEvidence } from '../job/job';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
@@ -62,6 +64,7 @@ export function findCncOffsetLadderDiagnostics(
   scene: Scene,
   device: DeviceProfile,
   config: CncMachineConfig,
+  compiledJob?: Job,
 ): ReadonlyArray<CncOffsetLadderDiagnostic> {
   const diagnostics: CncOffsetLadderDiagnostic[] = [];
   for (const layer of scene.layers) {
@@ -75,7 +78,14 @@ export function findCncOffsetLadderDiagnostics(
       continue;
     }
     const vectorKinds =
-      polylines.length > 0 ? vectorLadderDiagnosticKinds(polylines, settings, config) : [];
+      polylines.length > 0
+        ? vectorLadderDiagnosticKinds(
+            polylines,
+            settings,
+            config,
+            compiledVCarveEvidence(compiledJob, layer.id),
+          )
+        : [];
     // A layer can carry both relief objects and vector shapes; either ladder
     // failing makes the layer's output incomplete.
     if (
@@ -98,18 +108,55 @@ function vectorLadderDiagnosticKinds(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   config: CncMachineConfig,
+  vcarveEvidence?: ReadonlyArray<CncVCarveCompilationEvidence> | null,
 ): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
   const tool = layerCncTool(config, settings);
   if (settings.cutType === 'pocket') {
     return pocketLadderFailed(polylines, settings, config, tool) ? ['geometry-failed'] : [];
   }
   if (settings.cutType === 'v-carve') {
+    // A compiled job with no matching sidecar evidence is a legacy exact
+    // artifact. Omit this advisory rather than planning on the browser thread.
+    if (vcarveEvidence === null) return [];
+    if (vcarveEvidence !== undefined) {
+      return compiledVCarveDiagnosticKinds(polylines, settings, config, tool, vcarveEvidence);
+    }
     return vcarveDiagnosticKinds(polylines, settings, config, tool);
   }
   // Profile, engrave, drill and inlay reach the emitter without walking an
   // offset ladder. Deliberately not an exhaustive match — a diagnostic should
   // report nothing for a cut type it does not know, not fail to compile.
   return [];
+}
+
+function compiledVCarveEvidence(
+  job: Job | undefined,
+  layerId: string,
+): ReadonlyArray<CncVCarveCompilationEvidence> | null | undefined {
+  if (job === undefined) return undefined;
+  const sidecar = job.cncCompilation;
+  if (sidecar === undefined) return null;
+  const evidence = sidecar.vcarveOperations.filter((entry) => entry.layerId === layerId);
+  return evidence.length === 0 ? null : evidence;
+}
+
+function compiledVCarveDiagnosticKinds(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+  tool: CncTool,
+  evidence: ReadonlyArray<CncVCarveCompilationEvidence>,
+): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
+  const kinds: Array<CncOffsetLadderDiagnostic['kind']> = [];
+  if (
+    evidence.some((entry) => entry.offsetFailed) ||
+    vcarveClearanceFailed(polylines, settings, config, tool)
+  ) {
+    kinds.push('geometry-failed');
+  }
+  if (evidence.some((entry) => entry.thinResidual)) kinds.push('thin-detail-dropped');
+  if (evidence.some((entry) => entry.passLimited)) kinds.push('pass-limit');
+  return kinds;
 }
 
 function pocketLadderFailed(

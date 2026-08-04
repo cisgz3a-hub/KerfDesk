@@ -43,6 +43,7 @@ describe('canvas motion overlay performance budgets', () => {
         registrationKey: '',
         machineRevision: 'performance-fixture',
         interactionActive: false,
+        canvasCovered: false,
         laser,
       },
       placement,

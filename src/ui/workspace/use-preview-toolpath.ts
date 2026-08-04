@@ -2,8 +2,8 @@
 // entering Preview can paint first and cancel stale builds before they start.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildToolpath, EMPTY_JOB, type JobOriginPlacement } from '../../core/job';
-import type { OutputScope, Project } from '../../core/scene';
+import { buildToolpath, EMPTY_JOB } from '../../core/job';
+import type { Project } from '../../core/scene';
 import {
   resolveExportJobPlacement,
   resolveJobPlacement,
@@ -11,11 +11,14 @@ import {
 } from '../job-placement';
 import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import { buildPreviewToolpath, buildPreviewToolpathSnapshot } from './draw-preview';
-import { isPreparationSuperseded, prepareLargeJobOffThread } from './preparation-worker-client';
+import { buildPreviewToolpath } from './draw-preview';
+import {
+  isPreparationSuperseded,
+  prepareLargeJobOffThread,
+  type LargeJobPreparationOptions,
+} from './preparation-worker-client';
 import { mapToolpathToScene } from './preview-scene-frame';
 import type { PreviewToolpath } from './preview-status';
-import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 
@@ -58,46 +61,13 @@ export function usePreviewToolpath(
     // new build resolves so a genuine rebuild doesn't blank the preview.
     let cancelled = false;
     const cancelScheduledBuild = scheduleBuild(() => {
-      if (cancelled) return;
-      if (externalGcodePreview !== null) {
-        setToolpath(mapToolpathToScene(externalGcodePreview.toolpath, ZERO_OFFSET, project.device));
-        return;
-      }
-      const resolved = placementRef.current;
-      if (!resolved.ok) {
-        setToolpath({
-          ...buildToolpath(EMPTY_JOB),
-          previewIssue: { kind: 'placement-unavailable', messages: resolved.messages },
-        });
-        return;
-      }
-      const options = {
-        ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
+      runScheduledPreviewBuild({
+        project,
+        externalGcodePreview,
+        placement: placementRef.current,
         outputScope,
-      };
-      const registration = currentPrintCutOutputRegistration(project);
-      // The worker prepares plain projects only: variable text and print-cut
-      // registration need the snapshot pipeline's clock/renderer, which
-      // cannot cross the worker boundary.
-      const needsSnapshot = hasVariableText(project) || registration !== undefined;
-      const next = needsSnapshot
-        ? buildPreviewToolpathSnapshot(project, {
-            ...options,
-            clock: () => new Date(),
-            renderVariableText,
-            ...(registration === undefined ? {} : { registration }),
-          })
-        : Promise.resolve(buildPreviewToolpath(project, options));
-      void next.then((built) => {
-        if (cancelled) return;
-        settleBuiltToolpath({
-          built,
-          project,
-          options,
-          canPrepareOffThread: !needsSnapshot,
-          isCancelled: () => cancelled,
-          setToolpath,
-        });
+        isCancelled: () => cancelled,
+        setToolpath,
       });
     });
     return () => {
@@ -117,6 +87,58 @@ export function usePreviewToolpath(
   ]);
 
   return toolpath;
+}
+
+function runScheduledPreviewBuild(args: {
+  readonly project: Project;
+  readonly externalGcodePreview: ReturnType<typeof useStore.getState>['externalGcodePreview'];
+  readonly placement: ReturnType<typeof usePreviewPlacement>;
+  readonly outputScope: NonNullable<LargeJobPreparationOptions['outputScope']>;
+  readonly isCancelled: () => boolean;
+  readonly setToolpath: (toolpath: PreviewToolpath | null) => void;
+}): void {
+  if (args.isCancelled()) return;
+  if (args.externalGcodePreview !== null) {
+    args.setToolpath(
+      mapToolpathToScene(args.externalGcodePreview.toolpath, ZERO_OFFSET, args.project.device),
+    );
+    return;
+  }
+  const resolved = args.placement;
+  if (!resolved.ok) {
+    args.setToolpath({
+      ...buildToolpath(EMPTY_JOB),
+      previewIssue: { kind: 'placement-unavailable', messages: resolved.messages },
+    });
+    return;
+  }
+  const options: LargeJobPreparationOptions = {
+    ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
+    outputScope: args.outputScope,
+  };
+  const registration = currentPrintCutOutputRegistration(args.project);
+  const needsSnapshot = hasVariableText(args.project) || registration !== undefined;
+  const backgroundOptions: LargeJobPreparationOptions = {
+    ...options,
+    ...(needsSnapshot
+      ? { snapshot: { ...(registration === undefined ? {} : { registration }) } }
+      : {}),
+  };
+  const next = Promise.resolve(
+    needsSnapshot
+      ? { ...buildToolpath(EMPTY_JOB), previewIssue: { kind: 'too-complex' as const } }
+      : buildPreviewToolpath(args.project, options),
+  );
+  void next.then((built) => {
+    if (args.isCancelled()) return;
+    settleBuiltToolpath({
+      built,
+      project: args.project,
+      options: backgroundOptions,
+      isCancelled: args.isCancelled,
+      setToolpath: args.setToolpath,
+    });
+  });
 }
 
 function usePreviewPlacement(jobPlacement: JobPlacementSettings) {
@@ -154,14 +176,13 @@ function hasVariableText(project: Project): boolean {
 function settleBuiltToolpath(args: {
   readonly built: PreviewToolpath;
   readonly project: Project;
-  readonly options: { readonly jobOrigin?: JobOriginPlacement; readonly outputScope?: OutputScope };
-  readonly canPrepareOffThread: boolean;
+  readonly options: LargeJobPreparationOptions;
   readonly isCancelled: () => boolean;
   readonly setToolpath: (toolpath: PreviewToolpath) => void;
 }): void {
   const { built, setToolpath } = args;
   const offThread =
-    built.previewIssue?.kind === 'too-complex' && args.canPrepareOffThread
+    built.previewIssue?.kind === 'too-complex'
       ? prepareLargeJobOffThread(args.project, args.options)
       : null;
   if (offThread === null) {

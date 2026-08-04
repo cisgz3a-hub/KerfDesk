@@ -15,49 +15,53 @@
 // freshly spawned one would. Each response is delivered only to the pending
 // request whose id it carries; an id that is no longer pending is dropped.
 //
-// Requests are posted the instant they arrive — never queued or held back —
-// because Start and Save are operator actions that must not be delayed. The
-// worker thread runs them one at a time on its own event loop.
+// One request enters the outer worker while at most one more is held by this
+// client. Region-local tasks then share the bounded, fair subworker pool;
+// undispatched tasks stay coordinator-side.
 //
 // No watchdog timeout, on purpose: this path only runs for over-budget jobs,
-// where a legitimate preparation can take minutes. Terminate is reserved for
-// the fatal paths (worker runtime error, postMessage failure); every pending
-// caller then rejects and falls back to main-thread preparation.
+// where a legitimate preparation can take minutes. A fatal failure rejects
+// every pending caller. Aborting active synchronous outer-worker work retires
+// that Worker and dispatches queued work on a fresh one; queued aborts are
+// removed without a restart. Costly callers surface a retryable unavailable
+// result and never retry compilation on the main thread.
 
-import { outputVectorPreparationTooComplex } from '../../core/job/preparation-complexity';
-import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
-import { validateOutputScope, type OutputScope, type Project } from '../../core/scene';
+import type { OutputScope, Project } from '../../core/scene';
 import type { StartJobPreparation } from './start-job-readiness';
 import type {
   OutputPreparationEnvelope,
   OutputPreparationRequest,
   OutputPreparationResponse,
   OutputPreparationResult,
+  PrepareOnlyOutputPreparationRequest,
+  RdOutputPreparationRequest,
   SaveOutputPreparationRequest,
   StartOutputPreparationRequest,
+  TiledOutputPreparationRequest,
 } from './output-preparation-protocol';
+import type { PreparedOutput } from '../../io/gcode';
 import type { SaveOutputEmission } from './save-output-emission';
-import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
+import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
+import type { EmitRdResult } from '../../io/rd';
+import type { TiledOutputPreparation } from '../app/tiled-output-preparation';
+import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
+import {
+  connectCanvasCompilationMainBridge,
+  retireCanvasCompilationMainBridge,
+} from '../workspace/canvas-compilation-main-bridge';
 
 export function outputPreparationShouldRunOffThread(
   project: Project,
   outputScope?: OutputScope,
 ): boolean {
-  const scoped = outputScope === undefined ? null : validateOutputScope(project.scene, outputScope);
-  if (scoped !== null && !scoped.ok) return false;
-  const scene = scoped === null ? project.scene : scoped.scene;
-  const scopedProject = scene === project.scene ? project : { ...project, scene };
-  return (
-    projectHasPagedRasterAssets(scopedProject) ||
-    outputVectorPreparationTooComplex(scopedProject) ||
-    rasterPreparationTooComplex(scopedProject)
-  );
+  return costlyCanvasPreparation(project, outputScope);
 }
 
 export function prepareStartOutputOffThread(
   request: StartOutputPreparationRequest,
+  onProgress?: (progress: OutputCompilationProgress) => void,
 ): Promise<StartJobPreparation> | null {
-  const pending = runWorker(request);
+  const pending = runWorker(request, onProgress);
   if (pending === null) return null;
   return pending.then((response) => {
     if (response.kind !== 'start') throw new Error('Background Start preparation returned no job.');
@@ -72,11 +76,59 @@ export function prepareStartOutputOffThread(
  */
 export function prepareSaveOutputOffThread(
   request: SaveOutputPreparationRequest,
+  onProgress?: (progress: OutputCompilationProgress) => void,
+  signal?: AbortSignal,
 ): Promise<SaveOutputEmission> | null {
-  const pending = runWorker(request);
+  const pending = runWorker(request, onProgress, signal);
   if (pending === null) return null;
   return pending.then((response) => {
     if (response.kind !== 'save') throw new Error('Background Save preparation returned no file.');
+    return response.result;
+  });
+}
+
+export function prepareOutputOffThread(
+  request: PrepareOnlyOutputPreparationRequest,
+  onProgress?: (progress: OutputCompilationProgress) => void,
+): Promise<{
+  readonly prepared: PreparedOutput;
+  readonly machineWarnings: ReadonlyArray<string>;
+}> | null {
+  const pending = runWorker(request, onProgress);
+  if (pending === null) return null;
+  return pending.then((response) => {
+    if (response.kind !== 'prepared') {
+      throw new Error('Background preparation returned no prepared output.');
+    }
+    return { prepared: response.result, machineWarnings: response.machineWarnings };
+  });
+}
+
+export function prepareRdOutputOffThread(
+  request: RdOutputPreparationRequest,
+  onProgress?: (progress: OutputCompilationProgress) => void,
+): Promise<EmitRdResult> | null {
+  const pending = runWorker(request, onProgress);
+  if (pending === null) return null;
+  return pending.then((response) => {
+    if (response.kind !== 'rd') {
+      throw new Error('Background Ruida preparation returned no controller file.');
+    }
+    return response.result;
+  });
+}
+
+export function prepareTiledOutputOffThread(
+  request: TiledOutputPreparationRequest,
+  onProgress?: (progress: OutputCompilationProgress) => void,
+  signal?: AbortSignal,
+): Promise<TiledOutputPreparation> | null {
+  const pending = runWorker(request, onProgress, signal);
+  if (pending === null) return null;
+  return pending.then((response) => {
+    if (response.kind !== 'tiles') {
+      throw new Error('Background tiled preparation returned no tile files.');
+    }
     return response.result;
   });
 }
@@ -89,71 +141,175 @@ export function resetOutputPreparationWorkerForTests(): void {
 type PreparedResponse = Exclude<OutputPreparationResponse, { readonly kind: 'error' }>;
 
 type PendingRequest = {
+  readonly envelope: OutputPreparationEnvelope;
   readonly resolve: (response: PreparedResponse) => void;
   readonly reject: (error: Error) => void;
+  readonly onProgress?: (progress: OutputCompilationProgress) => void;
+  readonly detachAbort: (() => void) | null;
 };
 
 const WORKER_ERROR_MESSAGE = 'Background output preparation worker errored.';
 const WORKER_RESET_MESSAGE = 'Background output preparation worker reset.';
+const MAX_QUEUED_REQUESTS = 1;
+export const BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE =
+  'Background compilation is unavailable. Reopen CurveDesk or enable worker support, then try again.';
 
 let workerInstance: Worker | null = null;
 let nextRequestId = 0;
 const pendingByRequestId = new Map<number, PendingRequest>();
+let activeRequestId: number | null = null;
+let queuedRequestIds: ReadonlyArray<number> = [];
 
-function runWorker(request: OutputPreparationRequest): Promise<PreparedResponse> | null {
+function runWorker(
+  request: OutputPreparationRequest,
+  onProgress?: (progress: OutputCompilationProgress) => void,
+  signal?: AbortSignal,
+): Promise<PreparedResponse> | null {
+  if (signal?.aborted === true) return Promise.reject(outputPreparationAbortError());
   const worker = ensureWorker();
   if (worker === null) return null;
   return new Promise<PreparedResponse>((resolve, reject) => {
     nextRequestId += 1;
     const requestId = nextRequestId;
-    pendingByRequestId.set(requestId, { resolve, reject });
-    const envelope: OutputPreparationEnvelope = { requestId, request };
-    try {
-      worker.postMessage(envelope);
-    } catch (error) {
-      // The channel is dead for everyone, not just this caller.
-      rejectAllPendingAndRetireWorker(error instanceof Error ? error : new Error(String(error)));
+    const envelope: OutputPreparationEnvelope = { kind: 'prepare', requestId, request };
+    const abort = (): void => abortRequest(requestId);
+    pendingByRequestId.set(requestId, {
+      envelope,
+      resolve,
+      reject,
+      ...(onProgress === undefined ? {} : { onProgress }),
+      detachAbort: signal === undefined ? null : () => signal.removeEventListener('abort', abort),
+    });
+    signal?.addEventListener('abort', abort, { once: true });
+    if (activeRequestId === null) {
+      dispatchRequest(worker, requestId);
+    } else if (queuedRequestIds.length < MAX_QUEUED_REQUESTS) {
+      queuedRequestIds = [...queuedRequestIds, requestId];
+    } else {
+      takePending(requestId);
+      reject(new Error('Background output preparation queue is full.'));
     }
   });
+}
+
+function dispatchRequest(worker: Worker, requestId: number): void {
+  const pending = pendingByRequestId.get(requestId);
+  if (pending === undefined) return;
+  activeRequestId = requestId;
+  try {
+    worker.postMessage(pending.envelope);
+  } catch (error) {
+    rejectAllPendingAndRetireWorker(error instanceof Error ? error : new Error(String(error)));
+  }
 }
 
 function ensureWorker(): Worker | null {
   if (workerInstance !== null) return workerInstance;
   if (typeof Worker === 'undefined') return null;
   try {
-    workerInstance = new Worker(new URL('./output-preparation-worker.ts', import.meta.url), {
+    const created = new Worker(new URL('./output-preparation-worker.ts', import.meta.url), {
       type: 'module',
     });
-    workerInstance.onmessage = handleWorkerMessage;
-    workerInstance.onerror = (): void => {
+    connectCanvasCompilationMainBridge(created);
+    created.onmessage = handleWorkerMessage;
+    created.onerror = (): void => {
       rejectAllPendingAndRetireWorker(new Error(WORKER_ERROR_MESSAGE));
     };
-    return workerInstance;
+    created.onmessageerror = (): void => {
+      rejectAllPendingAndRetireWorker(
+        new Error('Background output preparation response was not cloneable.'),
+      );
+    };
+    workerInstance = created;
+    return created;
   } catch {
     return null;
   }
 }
 
 function handleWorkerMessage(event: MessageEvent<OutputPreparationResult>): void {
-  const { requestId, response } = event.data;
+  const { requestId } = event.data;
   const pending = pendingByRequestId.get(requestId);
   // No longer pending: the request was already settled by a retired worker.
   // Dropping it keeps a stale program from ever reaching a caller.
   if (pending === undefined) return;
-  pendingByRequestId.delete(requestId);
+  if ('progress' in event.data) {
+    try {
+      pending.onProgress?.(event.data.progress);
+    } catch {
+      // Progress is observational and cannot settle output preparation.
+    }
+    return;
+  }
+  const { response } = event.data;
+  takePending(requestId);
+  if (activeRequestId === requestId) activeRequestId = null;
   if (response.kind === 'error') pending.reject(new Error(response.message));
   else pending.resolve(response);
+  dispatchNextRequest();
+}
+
+function abortRequest(requestId: number): void {
+  const pending = takePending(requestId);
+  if (pending === null) return;
+  pending.reject(outputPreparationAbortError());
+  if (activeRequestId === requestId) {
+    activeRequestId = null;
+    // Generic costly phases (pocket/fill/raster/global normalization) are
+    // synchronous inside the outer Worker, so a cancel message cannot run
+    // until stale work has already finished. Termination is the cancellation
+    // boundary: detaching its broker port aborts any assigned planner tasks,
+    // and the queued request starts on a fresh outer Worker immediately.
+    retireWorker();
+    dispatchNextRequest();
+    return;
+  }
+  queuedRequestIds = queuedRequestIds.filter((id) => id !== requestId);
+}
+
+function takePending(requestId: number): PendingRequest | null {
+  const pending = pendingByRequestId.get(requestId);
+  if (pending === undefined) return null;
+  pendingByRequestId.delete(requestId);
+  pending.detachAbort?.();
+  return pending;
+}
+
+function dispatchNextRequest(): void {
+  if (activeRequestId !== null) return;
+  const requestId = queuedRequestIds[0];
+  if (requestId === undefined) return;
+  queuedRequestIds = queuedRequestIds.slice(1);
+  const worker = ensureWorker();
+  if (worker === null) {
+    rejectAllPendingAndRetireWorker(new Error(WORKER_ERROR_MESSAGE));
+    return;
+  }
+  dispatchRequest(worker, requestId);
 }
 
 function retireWorker(): void {
   if (workerInstance === null) return;
-  workerInstance.terminate();
+  const retired = workerInstance;
   workerInstance = null;
+  retireCanvasCompilationMainBridge(retired);
+  retired.terminate();
 }
 
 function rejectAllPendingAndRetireWorker(error: Error): void {
   retireWorker();
+  activeRequestId = null;
+  queuedRequestIds = [];
   const pending = Array.from(pendingByRequestId.values());
   pendingByRequestId.clear();
-  for (const request of pending) request.reject(error);
+  for (const request of pending) {
+    request.detachAbort?.();
+    request.reject(error);
+  }
+}
+
+function outputPreparationAbortError(): Error {
+  const error = new Error('Background output preparation cancelled.');
+  error.name = 'AbortError';
+  return error;
 }

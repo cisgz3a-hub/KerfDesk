@@ -15544,3 +15544,227 @@ pointed cutter without operator-visible evidence.
   motion through the truncated simulator kernel with source-containment and analytic-depth checks.
 - Provenance tests pin compiled group metadata, G-code tool comments, UI geometry identity, and the
   emitter revision. Full software gates do not imply hardware qualification.
+
+## ADR-288 - Costly canvas preparation uses one globally bounded deterministic worker broker (2026-08-04)
+
+**Date:** 2026-08-04
+**Status:** Accepted; software verification required before release, hardware qualification pending
+
+### Context
+
+The browser previously compiled some output-derived canvas state synchronously. V-carve exposed the
+failure most clearly: a small outline can expand into expensive normalization, medial-axis planning,
+route validation and emitted depth passes, freezing the canvas even though its raw segment count is
+small. Pocket rings, inlay clearing, relief planning, offset or island fill, repeated passes, raster
+work and runtime-expanded variable text can amplify in the same way. A V-carve-only exception would
+leave the underlying responsiveness defect in every other consumer and operation.
+
+Parallelizing the whole compiler is not safe. Source discovery, normalization, artwork and operation
+order, tool-section order, travel optimization, origin placement, warning evidence, G-code emission,
+fingerprinting and final preflight define one ordered program. Only work units whose inputs are
+already independently normalized can complete out of order without changing those semantics. The
+first such unit is one normalized V-carve region.
+
+Browser Workers are separate global scopes. A pool instantiated independently inside every Preview,
+Start, Save, design or idle worker would multiply the worker limit and memory footprint. A failed
+planner also cannot be allowed to move the same heavy computation back onto the canvas thread; that
+would recreate the freeze this decision exists to remove.
+
+### Decision
+
+1. **Classification is shared and informational.** One canvas-preparation policy classifies costly
+   operations and resolved work amplification. Cheap work remains direct because message cloning and
+   scheduling cost more than the work itself. Classification only selects an execution context; it
+   never changes output, adds a warning, refuses Frame or creates a Start guard.
+2. **Every costly consumer uses an outer Worker.** Start, Save, tiled Save, the current-canvas G-code
+   viewer, Preview, estimate, design-scene, idle-canvas and CNC removal-grid preparation perform
+   costly global compiler or simulation phases in a non-UI Worker. Variable-text and registration
+   snapshots route there before runtime materialization can enlarge their geometry, and their
+   evaluation timestamp is captured by the caller before queuing so queue delay cannot change
+   emitted bytes. If that Worker or its bridge cannot be created, crashes, or returns an uncloneable
+   response, the caller reports a recoverable unavailable result. It never calls the synchronous
+   compiler or removal-grid simulator on the browser/canvas thread.
+3. **One main-realm broker owns the global planner limit.** Every outer Worker receives a dedicated
+   `MessagePort` connected to one singleton broker. The broker owns two parallel planner slots when
+   browser hardware concurrency is unavailable or below four, and three slots otherwise. At most one
+   globally serialized fallback planner may coexist, so the application can run no more than four
+   region planners at once. It admits at most five outer sources and four active jobs; each source
+   admits one planner request. One task at a time occupies each slot, and additional work remains in
+   deterministic input order with no per-task Worker or Promise fanout.
+4. **The task protocol is reusable.** Task payloads are a discriminated union named for canvas
+   compilation, not V-carve. `cnc-vcarve-region` plans independently normalized regions;
+   `cnc-removal-grid` derives a bounded preview-only grid from an already completed toolpath; and
+   `cnc-cut3d-surface` lazily downsamples that completed grid and authors the exact smooth mesh normals
+   the explicit Cut 3D renderer needs. None can affect G-code or enter its merge, and none is a
+   scheduler special case. A future costly operation may join only after its own independence and
+   deterministic merge boundary are proved.
+   Large grid and surface typed arrays transfer ownership at every result boundary: child Worker to
+   main-realm broker, broker to outer Worker, and outer Worker to UI. They are never copied as
+   intermediate structured-clone payloads or retained by a realm after it hands the result onward.
+   Normalization or any global ordering phase may not be moved into a task merely to create more
+   parallelism.
+5. **Compilation identity is explicit.** An outer job supplies a caller-owned job identity; each
+   immutable CNC artifact supplies a compilation identity; each task has a stable operation and
+   normalized-region binding. Results with a stale job, unknown or duplicate task, mismatched
+   binding, wrong region, or incomplete generation are discarded. No partial generation is merged.
+6. **Failure restarts a generation only inside the broker.** A planner construction, post, runtime,
+   decoding or clone failure cancels the affected parallel generation. The broker may rerun its
+   complete task set through the one dedicated serial planner Worker. If that lane is unavailable
+   or its result fails identity/integrity validation, the outer Worker reports failure and the UI
+   receives a recoverable unavailable result. Neither the outer Worker nor the browser thread starts
+   an unaccounted planner lane. Cancellation remains cancellation and never silently restarts work.
+7. **Merge and output remain ordered.** Global discovery and normalization run once in the outer
+   Worker. Region results are stored by task identity, ranked by the original source-region layout,
+   and merged only when complete. Ordinary CNC operations, tool ordering, travel optimization,
+   placement, diagnostics, emission, fingerprints and safety preflight then run in their established
+   order. Single-worker and parallel preparation must produce equal Jobs, diagnostics, G-code bytes
+   and fingerprints.
+8. **Back-pressure, progress and stale-work cancellation are part of the contract.** Superseded work
+   is aborted and its port or outer Worker retired. Source and active-job admission is fixed; clients
+   coalesce or reject work beyond their one-request queue rather than spawning more workers. The
+   G-code viewer aborts its exact request when the design changes and never publishes a stale reply;
+   it recompiles only when opened or refreshed, not after every edit. When G-code 3D owns the canvas,
+   Workspace unmounts and its idle planner is also explicitly cancelled; a late planner reply cannot
+   be accepted or drawn under the covering view. Leaving Preview terminates removal-grid work and a
+   late grid cannot publish. Cut 3D starts its surface task only after the operator opens the dialog;
+   closing it or replacing its grid terminates stale work, while Worker absence leaves the dialog
+   cancellable with an explicit unavailable result. Progress reports phase, mode, completed, active,
+   queued and total counts and cannot affect compilation lifecycle.
+9. **Frame and output semantics do not change.** This ADR adds no guard and no machine command.
+   Frame remains the only Start guard. Job Review remains the warning surface. Exact compiled
+   diagnostics are reused so the UI does not invoke another expensive planner, but warning content,
+   emitted bytes and final compile-integrity/safety validation remain authoritative. Tiled output
+   performs tiling, each tile's preflight and all tile emission in the output Worker from the same
+   exact prepared Job. Costly Island Fill diagnostics and recovery controls stay conservatively
+   visible while their exact background result is pending; scheduling never turns a warning or
+   recovery action into a hidden or blocking state.
+10. **No cross-project or per-operation planner-result cache is accepted yet.** Reusing an
+    independent result across edits requires a canonical fingerprint that binds normalized geometry,
+    object and operation identity, every tool/machine parameter that affects planning, the compiler
+    revision and its source-order context. The current tree has no such fingerprint. The existing
+    Preview/estimate client only coalesces the exact immutable Project identity plus preparation
+    options; its settled-result reuse is a global least-recently-used set capped at four entries,
+    failed entries are removed, and an edit supplies a new Project identity. It therefore cannot
+    reuse a region plan across distinct job requests or edits. Caching on object id, mutable object
+    identity or the final whole-program fingerprint can return stale toolpaths, so a future planner
+     cache requires exact-byte equivalence, mutation/invalidation and retained-byte tests before it
+     can join this architecture.
+11. **Explicit Cut 3D presentation also stays off the UI thread.** Its prepared surface, Three.js
+    import, renderer, lighting, scene construction and every subsequent frame live in one dedicated
+    module Worker. The UI transfers a DOM canvas exactly once with `transferControlToOffscreen`,
+    transfers the surface arrays in the same initialization message, and proxies only bounded pointer,
+    wheel, resize and device-pixel-ratio inputs. A remount or replacement surface creates a fresh DOM
+    canvas; an already-transferred canvas is never transferred again. StrictMode effect replay leases
+    the same in-flight session through one microtask so it cannot duplicate the transfer. Controls and
+    resize each allow one in-flight presentation request and coalesce bounded pending input. Close,
+    replacement, Worker error, decoding failure or WebGL context loss disposes the scene and terminates
+    the Worker. Unsupported OffscreenCanvas/Worker support reports the existing recoverable 3D
+    unavailable state and never imports Three.js or renders synchronously in the main realm.
+
+    This contract follows the HTML `transferControlToOffscreen()` one-transfer preconditions, the
+    official Three.js worker example's transferred canvas plus main-realm size/input proxy, and the
+    worker-capable WebGL context-loss API:
+    https://html.spec.whatwg.org/multipage/canvas.html#dom-canvas-transfercontroltooffscreen,
+    https://threejs.org/manual/en/offscreencanvas.html,
+    https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/isContextLost. The pinned
+    Electron 42.3.0 runtime embeds Chromium 148, as recorded by Electron's release manifest:
+    https://releases.electronjs.org/release/v42.3.0.
+
+### Consequences
+
+- Several output-derived canvas paths now complete asynchronously or show a recoverable unavailable
+  state when their required Worker infrastructure is absent. They do not freeze the UI by falling
+  through to synchronous heavy work.
+- Planner concurrency is global rather than per feature. A busy Preview can apply back-pressure to a
+  simultaneous Save instead of multiplying CPU and retained task payloads.
+- V-carve gains parallel region planning while retaining serial normalization and deterministic
+  source ordering. Every nonempty region set, including one-region V-carve, enters the global broker
+  so it cannot create an unbounded planner lane; cheap projects with no independent tasks remain in
+  their already-selected execution context. On a browser reporting at least four hardware threads,
+  a healthy 31-region V-carve has eleven dispatch waves instead of sixteen while the fourth Worker
+  position remains reserved for serial recovery.
+- Tiled Save and the current-canvas G-code viewer share the same output Worker and broker rather than
+  doing their expensive post-compile work on the browser thread. Viewer edits cancel stale work and
+  leave an explicit refreshable state.
+- Cut 3D no longer downsamples a million-cell removal grid, builds its mesh, accumulates smooth
+  normals, imports Three.js or builds/renders a WebGL scene in the dialog effect. Pure arrays come from
+  a lazy broker task and transfer into the dedicated render Worker. The main thread keeps only the DOM
+  dialog, a fresh transferable canvas, bounded input/resize proxying and the existing loading or
+  recoverable-unavailable state. Ownership transfer across every Worker hop prevents a synchronous
+  surface copy before rendering.
+- Independent planner results are rebuilt between jobs. Exact Preview/estimate preparation reuse is
+  limited to four recent identity-and-options matches; this preserves its existing sharing without
+  treating an unchanged-looking object as proof that a region plan remains valid.
+- The synchronous compiler remains the deterministic oracle and supports non-browser tests and other
+  non-UI contexts. Calling it for costly work from a browser interaction is no longer an allowed
+  fallback.
+- Hardware motion is unchanged. Software equivalence cannot prove controller timing, physical
+  position, spindle load, workholding or cut quality; those remain hardware-only qualification.
+
+### Verification
+
+- Real Dancing Script multi-object and multi-operation fixtures compare serial compilation with
+  reversed/out-of-order region completion, including equal Job structure and G-code bytes. A second
+  current-viewer fixture covers eight drawings across six V-carve, pocket, engrave and profile
+  operations and compares equal plans, emissions and recovery fingerprints.
+- Prepared-output fixtures compare serial and parallel placement/optimization, emitted bytes,
+  preflight and recovery fingerprints.
+- Scheduler fixtures cover fixed two-worker dispatch, the adaptive two-or-three production selector,
+  the four-Worker healthy-plus-recovery ceiling, one dedicated serial fallback lane, fair bounded
+  dispatch, cancellation, progress, identity mismatch, clone/runtime failure, full-generation
+  fallback, terminal disposal and an unavailable result when the serial Worker cannot be created.
+- UI routing fixtures replace the synchronous compiler with a spy and cover unavailable, constructor,
+  post, runtime and message-decoding failures for costly work, plus direct execution for cheap work.
+  Viewer fixtures cover progress, edit-time cancellation, stale-result suppression and unavailable
+  state. Tiled fixtures cover exact prepared-job reuse, conservative warnings and no UI-side fallback.
+  Removal-grid fixtures cover shared-broker routing, Worker-unavailable behavior, supersede-by-
+  termination and delayed-result suppression. Cut 3D fixtures additionally prove lazy surface
+  dispatch, close/edit cancellation, no synchronous unavailable fallback and Worker normals equal to
+  Three's former post-reflection result. Browser interaction fixtures keep a 10 ms main-thread
+  heartbeat and Long Tasks observer running through real Worker and scene completion and a 750 ms
+  delayed-delivery window. On the exact local headless Chrome head, the eight-drawing/six-operation,
+  31-region fixture selected three planner Workers on 20 reported hardware threads. Three repeated
+  runs compiled its initial G-code 3D program in 2,264-2,373 ms with a 162.8 ms worst maximum
+  heartbeat gap. Refresh measured at most 40.2 ms, the explicit Inspector 51.4 ms, Preview
+  preparation 48.7 ms and Cut 3D opening 107.8 ms.
+  The direct one-million-cell removal-grid stress measured a 503.1 ms Worker compute with an 88.3 ms
+  maximum UI gap. All remained below the one-second regression ceiling; observed Long Tasks topped
+  out at 112.0 ms on initial G-code 3D and 90.0 ms on Cut 3D.
+- A resource-constrained GitHub Chrome run exposed the presentation boundary the first regression did
+  not wait long enough to observe: the retired pane measured a 1,875.6 ms heartbeat gap and explicit
+  Cut 3D measured 4,876.7 ms while `downsampleRemovalGrid`, `reliefSurfaceMesh` and Three normal
+  accumulation still ran in the dialog effect. After the lazy surface task and a scene-ready wait,
+  the exact-head local rerun measured a 107.8 ms maximum heartbeat gap and 90.0 ms maximum Long Task for
+  Cut 3D. The one-second ceiling was retained; the failed evidence was fixed rather than waived.
+- A second resource-constrained Chrome run passed 66 of 67 interactions but measured a 3,200.8 ms
+  Cut 3D heartbeat gap while its maximum reported Long Task was only 147.0 ms. Its trace placed the
+  gap after the dialog appeared and before scene readiness. Source inspection then found structured-
+  clone copies at the child-to-broker and broker-to-outer result boundaries. With ownership transfer
+  added at both hops, the unchanged local regression measured 269.2 ms normally and 632.3 ms under a
+  controlled four-times CPU slowdown; the latter's maximum Long Task was 486.0 ms. The one-second
+  ceiling remains unchanged, and a green exact-head hosted rerun remains required before release.
+- The next exact-head hosted Chrome run on `c167ef9a8a73cfc337fe588c82ac06c3d99d4fd0`
+  again passed 66 of 67 interactions but measured a 2,811.7 ms Cut 3D initial-open heartbeat gap.
+  Trace inspection placed the gap between the visible loading dialog and scene readiness. A controlled
+  four-times CPU run then isolated about 1,190.7 ms in the first Three.js module parse/evaluation,
+  while surface preparation remained about 293 ms in its Worker. Moving the complete Three.js/WebGL
+  presentation boundary into the dedicated OffscreenCanvas Worker retained the one-second ceiling.
+  On the current local real-Chromium head, the expanded two-test A/B passed twice and exercised render
+  readiness, camera controls, resize/DPR, late Worker error, close-during-start, fresh-canvas remount,
+  unsupported state and absence of a main-realm Three.js resource. The measured run reported maximum
+  heartbeat gaps of 20.9 ms for initial Cut 3D open, 146.4 ms for controls/resize, 109.8 ms for Preview
+  preparation, 157.1 ms with the retired pane absent and 243.5 ms in its controlled diagnostic mount.
+  Maximum Long Tasks were respectively 0.0, 130.0, 102.0, 129.0 and 231.0 ms. A green exact-head hosted
+  rerun remains required before merge.
+- A controlled E2E-only mount distinguishes the retired always-mounted `Cnc3DPane` from those explicit
+  surfaces without restoring it in production. With the pane absent, the complex fixture completed
+  its idle plan with a 118.8 ms maximum heartbeat gap and 100.0 ms maximum Long Task. Mounting the real
+  pane then exercised `design-scene-worker`, the shared planner broker, completed its carve source and
+  left the delayed window at a 200.0 ms maximum gap and 190.0 ms maximum Long Task. This establishes
+  the old pane as a distinct whole-project plus WebGL workload; source inspection separately identifies
+  hidden Workspace idle-overlay acceptance and Preview's synchronous removal grid as independent UI-
+  thread risks addressed by this change. A current-tree A/B does not prove historical released-build
+  causality. The production pane remains unmounted pending perceptual, GPU and real-hardware browser
+  qualification; the test harness restores local storage and unmounts after its A/B.
+- NOT verified: physical air-cut, material cut, controller throughput, perceptual preview fidelity or
+  measured browser responsiveness or GPU behavior on production hardware.

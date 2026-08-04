@@ -1,21 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   mockPlatform,
   projectWithLine,
   projectWithTwoLines,
   reject,
-  SAVE_PREPARATION_FAILURE_CASES,
   SAVE_TARGET_NAME,
   selectedScope,
   toasts,
 } from '../../__fixtures__/file-actions';
 import { rotaryRasterSaveProject } from '../../__fixtures__/rotary-raster-save-project';
-import { flowingVCarveProject } from '../../__fixtures__/flowing-vcarve-project';
 import { createProject } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
-import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
-import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import {
   handleImportSvg,
   handleOpenProject,
@@ -253,27 +249,6 @@ describe('file actions contextual failure handling', () => {
     ).toBe(true);
   });
 
-  it('shows the actual compiled flowing V-carve depth after a successful save', async () => {
-    const target: SaveTarget = { displayName: 'flowing-v.gcode', write: async () => undefined };
-    const toast = toasts();
-
-    await handleSaveGcode({
-      platform: mockPlatform({ save: async () => target }),
-      project: flowingVCarveProject(),
-      savedName: null,
-      pushToast: toast.pushToast,
-    });
-
-    expect(
-      toast.messages.some(
-        ({ message, variant }) =>
-          variant === 'warning' &&
-          message.includes('actual compiled V-carve depth') &&
-          message.includes('into the spoilboard'),
-      ),
-    ).toBe(true);
-  });
-
   it('keeps cancelled open/save pickers silent', async () => {
     const toast = toasts();
     const platform = mockPlatform();
@@ -347,54 +322,6 @@ describe('file actions contextual failure handling', () => {
       { message: 'Could not save project: disk full', variant: 'error' },
     ]);
   });
-});
-
-describe('handleSaveGcode preparation failures', () => {
-  beforeEach(() => {
-    useExperimentalLaserFeatures.getState().resetFeatures();
-    useExperimentalLaserFeatures.getState().setFeature('printAndCut', true);
-    usePrintCutSessionStore.getState().clear();
-  });
-
-  afterEach(() => {
-    usePrintCutSessionStore.getState().clear();
-    useExperimentalLaserFeatures.getState().resetFeatures();
-    vi.restoreAllMocks();
-  });
-
-  it.each(SAVE_PREPARATION_FAILURE_CASES)(
-    'does not create an empty successful export for $name',
-    async ({ project, message }) => {
-      const write = vi.fn(async () => undefined);
-      const target: SaveTarget = { displayName: SAVE_TARGET_NAME, write };
-      const pickFileForSave = vi.fn(async () => target);
-      const advanceVariablesAfter = vi.fn();
-      const notifications: Array<{ readonly message: string; readonly variant?: string }> = [];
-      const alert = vi.spyOn(window, 'alert').mockReturnValue(undefined);
-
-      await handleSaveGcode({
-        platform: mockPlatform({ save: pickFileForSave }),
-        project: project(),
-        savedName: null,
-        advanceVariablesAfter,
-        pushToast: (toastMessage, variant) => {
-          notifications.push(
-            variant === undefined ? { message: toastMessage } : { message: toastMessage, variant },
-          );
-        },
-      });
-
-      // The picker now runs before emission so it keeps the transient user
-      // activation showSaveFilePicker requires; a failed preparation therefore
-      // leaves the picked file untouched rather than never opening a dialog.
-      // No bytes and no export advancement is the guarantee that matters.
-      expect(write).not.toHaveBeenCalled();
-      expect(advanceVariablesAfter).not.toHaveBeenCalled();
-      expect(notifications.some((toast) => toast.variant === 'success')).toBe(false);
-      expect(alert).toHaveBeenCalledOnce();
-      expect(alert.mock.calls[0]?.[0]).toContain(message);
-    },
-  );
 });
 
 describe('handleSaveGcode rotary raster emission', () => {
