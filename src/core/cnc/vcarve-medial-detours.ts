@@ -1,21 +1,14 @@
 import type { Polyline, Vec2 } from '../scene';
 import {
   distinctLoopPoints,
-  vcarveChordInsideRegion,
   type VCarveBoundarySegment,
   type VCarveMedialRegion,
 } from './vcarve-medial-region';
+import { nearestVCarveRouteLink, type VCarveRouteLink } from './vcarve-medial-detour-link';
 
 export type VCarveJoinedRoutes = {
   readonly routes: ReadonlyArray<Polyline>;
   readonly unlinkedFloorRoutes: ReadonlyArray<Polyline>;
-};
-
-type RouteLink = {
-  readonly routeIndex: number;
-  readonly routePointIndex: number;
-  readonly floorPointIndex: number;
-  readonly distanceMm: number;
 };
 
 /**
@@ -37,7 +30,7 @@ export function joinVCarveFloorDetours(
   const unlinkedFloorRoutes: Polyline[] = [];
   for (const floorRoute of floorRoutes) {
     const floorPoints = distinctLoopPoints(floorRoute.points);
-    const link = nearestRouteLink(routes, floorPoints, region, segments);
+    const link = nearestVCarveRouteLink(routes, floorPoints, region, segments);
     if (link === null) {
       unlinkedFloorRoutes.push(floorRoute);
       continue;
@@ -52,30 +45,10 @@ export function joinVCarveFloorDetours(
   return { routes, unlinkedFloorRoutes };
 }
 
-function nearestRouteLink(
-  routes: ReadonlyArray<Polyline>,
-  floorPoints: ReadonlyArray<Vec2>,
-  region: VCarveMedialRegion,
-  segments: ReadonlyArray<VCarveBoundarySegment>,
-): RouteLink | null {
-  let best: RouteLink | null = null;
-  routes.forEach((route, routeIndex) => {
-    route.points.forEach((routePoint, routePointIndex) => {
-      floorPoints.forEach((floorPoint, floorPointIndex) => {
-        const distanceMm = Math.hypot(floorPoint.x - routePoint.x, floorPoint.y - routePoint.y);
-        if (best !== null && distanceMm >= best.distanceMm) return;
-        if (!vcarveChordInsideRegion(routePoint, floorPoint, region, segments)) return;
-        best = { routeIndex, routePointIndex, floorPointIndex, distanceMm };
-      });
-    });
-  });
-  return best;
-}
-
 function insertFloorDetour(
   route: Polyline,
   floorPoints: ReadonlyArray<Vec2>,
-  link: RouteLink,
+  link: VCarveRouteLink,
 ): Polyline {
   const anchor = route.points[link.routePointIndex];
   const floor = floorPoints[link.floorPointIndex];
