@@ -2,8 +2,8 @@
 // flat-depth region is wider than the V-bit can reach at that depth, the
 // medial plan has a flat core, and a V-tip is the wrong bit for bulk floor
 // clearing. This stage pockets exactly that core with a flat clearing bit:
-// the region boundary is the inward offset at maxDepth · tan(angle / 2), and
-// the pocket engine fills it at the clearing bit's stepover. The V-bit's
+// the region boundary is the inward offset at the requested-depth radial
+// envelope footprint. The pocket engine fills it at the clearing bit's stepover. The V-bit's
 // medial and flat-core routes still cover the whole shape with a small
 // overlap into the cleared floor.
 
@@ -12,6 +12,7 @@ import type { CncTool, Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
 import { pocketRingToolpaths, type PocketToolpaths } from './pocket-paths';
 import { vcarveIncludedAngleDeg } from './vcarve-angle';
+import { conicalRadialEnvelope, radialEnvelopeFootprintMm } from './radial-envelope';
 
 const MIN_CLOSED_POINTS = 3;
 
@@ -64,12 +65,18 @@ function vcarveClearanceFloor(
   const tipAngleDeg = vcarveIncludedAngleDeg(options.vBit);
   if (tipAngleDeg === null) return NO_FLOOR;
   if (!(options.maxDepthMm > 0)) return NO_FLOOR;
+  const envelope = conicalRadialEnvelope(options.vBit, tipAngleDeg);
+  if (envelope === null) return NO_FLOOR;
   const contours = polylines.filter(
     (polyline) =>
       polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
   );
   if (contours.length === 0) return NO_FLOOR;
-  const clampInsetMm = options.maxDepthMm * Math.tan((tipAngleDeg * Math.PI) / 360);
+  // Keep the historical over-cone behavior: a requested depth past the flank
+  // does not activate a secondary clearing stage or widen its existing
+  // preflight refusal scope. The medial planner independently caps executable
+  // V-carve depth at the physical flank height.
+  const clampInsetMm = radialEnvelopeFootprintMm(envelope, options.maxDepthMm);
   // The flat-floor region: everything deeper than the clamp inset. Narrow
   // shapes offset away entirely — clipper returns nothing and there is no
   // clearance stage.

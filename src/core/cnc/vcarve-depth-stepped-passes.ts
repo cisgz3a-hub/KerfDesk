@@ -4,10 +4,10 @@ import type { BoundarySegment } from './vcarve-detail-geometry';
 import { zPassDepths } from './depth-passes';
 import { compactVCarveEmittedProfile } from './vcarve-emitted-profile-compaction';
 import { vcarveEmittedProfileCovers } from './vcarve-emitted-profile';
+import type { RadialEnvelope } from './radial-envelope';
 
-type DepthSteppedOptions = {
+type DepthSteppedOptions = RadialEnvelope & {
   readonly depthPerPassMm: number;
-  readonly tanHalf: number;
   readonly compactionToleranceMm: number;
   readonly sweepToleranceMm: number;
 };
@@ -43,7 +43,7 @@ function certifiedLevel(
   const compact = compactVCarveEmittedProfile(
     candidateLevel,
     segments,
-    options.tanHalf,
+    options,
     options.compactionToleranceMm,
   );
   if (covers(referenceLevel, compact, options)) return compact;
@@ -51,7 +51,7 @@ function certifiedLevel(
   const compactReference = compactVCarveEmittedProfile(
     referenceLevel,
     segments,
-    options.tanHalf,
+    options,
     options.compactionToleranceMm,
   );
   return covers(referenceLevel, compactReference, options) ? compactReference : referenceLevel;
@@ -62,12 +62,7 @@ function covers(
   candidate: ReadonlyArray<Vec3>,
   options: DepthSteppedOptions,
 ): boolean {
-  return vcarveEmittedProfileCovers(
-    reference,
-    candidate,
-    options.tanHalf,
-    options.sweepToleranceMm,
-  );
+  return vcarveEmittedProfileCovers(reference, candidate, options, options.sweepToleranceMm);
 }
 
 function pointsAtLevel(points: ReadonlyArray<Vec3>, levelZ: number): ReadonlyArray<Vec3> {

@@ -1,5 +1,6 @@
 import type { Vec2 } from '../scene';
 import type { BoundarySegment } from './vcarve-detail-geometry';
+import { radialEnvelopeSweepRadiiMm, type RadialEnvelope } from './radial-envelope';
 
 const QUADRATIC_EPSILON_MM2 = 1e-14;
 
@@ -9,11 +10,10 @@ export function emittedChordIsSafe(
   depthA: number,
   depthB: number,
   segments: ReadonlyArray<BoundarySegment>,
-  tanHalf: number,
+  envelope: RadialEnvelope,
 ): boolean {
-  const radiusA = depthA * tanHalf;
-  const radiusB = depthB * tanHalf;
-  // The cone radius varies linearly from radiusA to radiusB, so the swept
+  const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(envelope, depthA, depthB);
+  // The envelope radius varies linearly from radiusA to radiusB, so the swept
   // region cannot extend past the chord's bounding box grown by the larger of
   // the two. A segment outside that box is unreachable and therefore always
   // clears, which makes this rejection exact rather than approximate.

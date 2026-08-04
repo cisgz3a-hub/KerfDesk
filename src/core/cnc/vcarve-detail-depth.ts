@@ -11,6 +11,7 @@ import {
   type BoundarySegment,
 } from './vcarve-detail-geometry';
 import { validDepthInputs, validDepthTolerance, type DetailDepthLaw } from './vcarve-detail-input';
+import { radialEnvelopeDepthMm, radialEnvelopeSweepRadiiMm } from './radial-envelope';
 
 export type { BoundarySegment } from './vcarve-detail-geometry';
 export type { DetailDepthLaw } from './vcarve-detail-input';
@@ -135,7 +136,7 @@ function plannedLeaf(
   };
   return {
     leaf,
-    safe: emittedChordIsSafe(a, b, leaf.depthA, leaf.depthB, segments, law.tanHalf),
+    safe: emittedChordIsSafe(a, b, leaf.depthA, leaf.depthB, segments, law),
   };
 }
 
@@ -151,7 +152,7 @@ function conservativeLeaf(
   for (const segment of segments) {
     clearanceMm = Math.min(clearanceMm, segmentToSegmentDistance(a, b, segment));
   }
-  const boundaryDepthMm = clearanceMm / law.tanHalf;
+  const boundaryDepthMm = radialEnvelopeDepthMm(law, clearanceMm);
   const depth = quantizeDepth(
     Math.min(boundaryDepthMm, law.maxDepthMm),
     boundaryDepthMm > law.maxDepthMm + 1e-9,
@@ -168,8 +169,12 @@ function depthQualityMet(
   const a = emittedPoint(leaf.a);
   const b = emittedPoint(leaf.b);
   if (Math.min(leaf.depthA, leaf.depthB) + toleranceMm >= law.maxDepthMm) return true;
-  const radiusA = (leaf.depthA + toleranceMm) * law.tanHalf;
-  const radiusB = (leaf.depthB + toleranceMm) * law.tanHalf;
+  if (!(leaf.depthA > 0) && !(leaf.depthB > 0)) return true;
+  const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(
+    law,
+    leaf.depthA + toleranceMm,
+    leaf.depthB + toleranceMm,
+  );
   // Distance to one closed segment is convex along this chord, while the
   // allowed radius interpolates linearly. If one boundary segment is within
   // the allowed radius at both endpoints, convexity certifies the whole span.
@@ -190,7 +195,7 @@ function emittedSafeDepth(
   for (const segment of segments) {
     distanceMm = Math.min(distanceMm, pointToSegmentDistance(point.x, point.y, segment));
   }
-  const boundaryDepthMm = distanceMm / law.tanHalf;
+  const boundaryDepthMm = radialEnvelopeDepthMm(law, distanceMm);
   return quantizeDepth(
     Math.min(boundaryDepthMm, law.maxDepthMm),
     boundaryDepthMm > law.maxDepthMm + 1e-9,

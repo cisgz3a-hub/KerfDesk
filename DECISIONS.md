@@ -15475,3 +15475,72 @@ and derives roots from even containment depth. ADR-286 narrows where that readin
 object's own glyphs are resolved non-zero FIRST, and the even-odd pooling then applies to the
 resulting regions. Region identity, hole nesting, containment parity and source-region order are
 otherwise unchanged, and every non-text contour still enters the pool exactly as ADR-270 describes.
+
+## ADR-287 - Flat-tip engraving V-carve uses one truncated-cone radial envelope (2026-08-04)
+
+**Date:** 2026-08-04
+**Status:** Accepted; software-verified through emitted G-code and removal simulation, hardware qualification pending
+
+### Context
+
+The removal simulator already modeled an engraving cutter with `tipDiameterMm` as a truncated cone,
+but production V-carve CAM still used the ideal pointed law. For a flat-tip radius `r0`, CAM derived
+depth as `d / tan(alpha)`, capped the flank at `R / tan(alpha)`, and certified every chord and
+coverage capsule with radius `h * tan(alpha)`. The same tool therefore previewed a flat land while
+G-code descended too far and could overreach narrow artwork. Tool-library and project
+deserialization also dropped `tipDiameterMm`, while compiled provenance and G-code comments omitted
+it. A saved physical cutter could consequently change geometry or become indistinguishable from a
+pointed cutter without operator-visible evidence.
+
+### Decision
+
+1. Pointed V-bits and conical engraving bits share one plain-data radial envelope with included-angle
+   slope, tip radius, and outer radius. A V-bit always has `r0 = 0`. An engraving bit uses half its
+   valid stored tip-flat diameter; absent or explicit zero retains the legacy pointed behavior.
+2. The envelope owns all forward and inverse geometry: `r(h) = r0 + h * tan(alpha)`,
+   `h(d) = 0` for `d <= r0` and `(d - r0) / tan(alpha)` otherwise, and flank cap
+   `(R - r0) / tan(alpha)`. Production medial planning, flat-core and clearing boundaries, emitted
+   depth refinement, chord containment, profile coverage, compaction, and precision certificates
+   consume that envelope rather than reconstructing a point cone.
+3. A zero-to-zero XYZ span removes no negative material. A mixed zero-to-positive span uses `r0` at
+   its zero endpoint and the affine envelope thereafter. This distinction is required both by the
+   simulator's surface semantics and by the no-gouge chord proof.
+4. Simulator kernels, the displayed cutter profile, and Design Studio's direct heightmap preview use
+   the same inverse envelope. The honest compile-to-simulator path remains the final removal check.
+5. Source material unreachable by a positive flat tip is detected as the residual of the source
+   after a tip-radius opening. It follows the existing `thin-detail-dropped` route into Job Review
+   and Save warnings. Generated portions still cut; the warning never refuses Frame or Start. A
+   valid angled engraving cutter is no longer mislabeled as an incompatible V-carve cutter. Frame
+   remains the sole ordinary Start guard.
+6. Valid engraving tip diameter survives custom-library, saved-machine-profile, and project
+   round trips. Compiled CNC groups and emitted tool comments carry it, geometry labels and effective
+   tool comparisons distinguish it, and the emitter revision advances to
+   `adr-287-flat-tip-vcarve-envelope`. Entry UI rejects invalid tip data; read boundaries preserve
+   an explicit finite malformed value as invalid so it cannot silently become a supported point.
+7. This decision does not add ball-nose V-carve, broad cutter-family inference, a new compile guard,
+   or hardware qualification. ADR-285's unsupported-flat-tip consequence is superseded only for the
+   modeled engraving geometry defined here.
+
+### Consequences
+
+- Pointed V-bit motion and toolpath snapshots remain stable; the emitter metadata revision advances
+  for the new provenance contract. A flat-tip engraving cutter now cuts shallower by
+  `r0 / tan(alpha)`, reaches full radius at the shorter flank cap, and produces a larger flat core at
+  the same requested depth.
+- Features at or below the tip radius stay uncut and are disclosed. A wider connected region may
+  continue cutting while its inaccessible tail or sharp residual is reported.
+- Project and G-code artifacts preserve enough geometry to distinguish a flat-tip cutter from a
+  pointed one. Existing projects without the field keep their original pointed semantics.
+- No automated evidence proves physical runout, actual catalog tip size, machine rigidity, or cut
+  finish. Those remain hardware-only qualification.
+
+### Verification
+
+- Unit tests pin the radial forward/inverse/cap laws, zero-span versus mixed-span radii, pointed
+  parity, and below/at/above-tip emitted depth.
+- Project and library round trips pin valid, zero, invalid, full-width, and wrong-kind tip data.
+- Real compiler tests compare pointed V-bit, pointed engraving, and flat-tip engraving passes;
+  verify a mixed wide body plus sub-tip tail still emits while Job Review warns; and stamp compiled
+  motion through the truncated simulator kernel with source-containment and analytic-depth checks.
+- Provenance tests pin compiled group metadata, G-code tool comments, UI geometry identity, and the
+  emitter revision. Full software gates do not imply hardware qualification.

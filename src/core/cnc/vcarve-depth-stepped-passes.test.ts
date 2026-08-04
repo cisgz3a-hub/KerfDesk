@@ -5,6 +5,11 @@ import { certifiedVCarveDepthSteppedPasses } from './vcarve-depth-stepped-passes
 import { vcarveEmittedProfileCovers } from './vcarve-emitted-profile';
 
 const TAN_HALF = 1;
+const POINT_ENVELOPE = {
+  tanHalf: TAN_HALF,
+  tipRadiusMm: 0,
+  outerRadiusMm: Number.POSITIVE_INFINITY,
+} as const;
 const SWEEP_TOLERANCE_MM = 0.01;
 const DISTANT_BOUNDARY: ReadonlyArray<BoundarySegment> = [{ ax: -10, ay: -10, bx: 10, by: -10 }];
 
@@ -22,7 +27,7 @@ describe('certifiedVCarveDepthSteppedPasses', () => {
       DISTANT_BOUNDARY,
       {
         depthPerPassMm: 1,
-        tanHalf: TAN_HALF,
+        ...POINT_ENVELOPE,
         compactionToleranceMm: 0.005,
         sweepToleranceMm: SWEEP_TOLERANCE_MM,
       },
@@ -36,7 +41,7 @@ describe('certifiedVCarveDepthSteppedPasses', () => {
       const levelZ = Math.min(...pass.points.map((point) => point.z));
       const referenceLevel = reference.map((point) => ({ ...point, z: Math.max(point.z, levelZ) }));
       expect(
-        vcarveEmittedProfileCovers(referenceLevel, pass.points, TAN_HALF, SWEEP_TOLERANCE_MM),
+        vcarveEmittedProfileCovers(referenceLevel, pass.points, POINT_ENVELOPE, SWEEP_TOLERANCE_MM),
       ).toBe(true);
     }
   });

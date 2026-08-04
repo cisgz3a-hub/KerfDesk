@@ -50,4 +50,27 @@ describe('vcarveClearanceToolpaths', () => {
       }).length,
     ).toBeGreaterThan(0);
   });
+
+  it('moves the flat-core boundary outward by the engraving tip radius', () => {
+    const clearingTool: CncTool = { ...CLEAR_TOOL, diameterMm: 0.2 };
+    const point: CncTool = {
+      id: 'point',
+      name: '90 degree pointed engraver',
+      kind: 'engraving',
+      diameterMm: 2,
+      tipAngleDeg: 90,
+    };
+    const flat: CncTool = { ...point, id: 'flat', tipDiameterMm: 0.4 };
+    const toolpathsFor = (vBit: CncTool) =>
+      vcarveClearanceToolpaths([SQUARE], {
+        vBit,
+        clearTool: clearingTool,
+        maxDepthMm: 0.5,
+        stepoverPercent: 40,
+      });
+    const minimumX = (paths: ReadonlyArray<Polyline>) =>
+      Math.min(...paths.flatMap((path) => path.points.map((pointValue) => pointValue.x)));
+
+    expect(minimumX(toolpathsFor(flat)) - minimumX(toolpathsFor(point))).toBeCloseTo(0.2, 3);
+  });
 });

@@ -10,6 +10,7 @@ import {
   mappedVCarveProfileCapsuleIndex,
   type VCarveProfileDistanceIndex,
 } from './vcarve-profile-distance-index';
+import { radialEnvelopeSweepRadiiMm, type RadialEnvelope } from './radial-envelope';
 
 const MAX_REFERENCE_SUBDIVISION_DEPTH = 12;
 const MAX_COVERAGE_CAPSULE_CHECKS = 250_000;
@@ -27,11 +28,11 @@ type CoverageWork = { remaining: number };
 export function vcarveEmittedProfileCovers(
   reference: ReadonlyArray<Vec3>,
   candidate: ReadonlyArray<Vec3>,
-  tanHalf: number,
+  envelope: RadialEnvelope,
   toleranceMm: number,
 ): boolean {
   if (reference.length < 2 || candidate.length < 2) return reference.length === candidate.length;
-  const capsules = buildVCarveEmittedCapsules(candidate, tanHalf, toleranceMm);
+  const capsules = buildVCarveEmittedCapsules(candidate, envelope, toleranceMm);
   const referenceDistance = buildVCarveProfileDistanceIndex(reference);
   const candidateDistance = buildVCarveProfileDistanceIndex(candidate);
   const work: CoverageWork = { remaining: MAX_COVERAGE_CAPSULE_CHECKS };
@@ -50,7 +51,7 @@ export function vcarveEmittedProfileCovers(
       capsules,
       referenceDistance,
       candidateDistance,
-      tanHalf,
+      envelope,
       toleranceMm,
       capsuleHint,
       work,
@@ -69,7 +70,7 @@ function referenceChordCovered(
   capsules: ReadonlyArray<VCarveEmittedCapsule>,
   referenceDistance: VCarveProfileDistanceIndex,
   candidateDistance: VCarveProfileDistanceIndex,
-  tanHalf: number,
+  envelope: RadialEnvelope,
   toleranceMm: number,
   initialHint: number,
   work: CoverageWork,
@@ -92,7 +93,7 @@ function referenceChordCovered(
       capsules,
       referenceDistance,
       candidateDistance,
-      tanHalf,
+      envelope,
       toleranceMm,
       hint,
       work,
@@ -107,7 +108,7 @@ function referenceChordCovered(
         span.a,
         span.b,
         capsules,
-        tanHalf,
+        envelope,
         toleranceMm,
         work,
       );
@@ -144,7 +145,7 @@ function matchingCapsule(
   capsules: ReadonlyArray<VCarveEmittedCapsule>,
   referenceDistance: VCarveProfileDistanceIndex,
   candidateDistance: VCarveProfileDistanceIndex,
-  tanHalf: number,
+  envelope: RadialEnvelope,
   toleranceMm: number,
   hint: number,
   work: CoverageWork,
@@ -155,7 +156,7 @@ function matchingCapsule(
     candidateDistance,
   );
   for (const center of mapped === hint ? [mapped] : [mapped, hint]) {
-    const match = matchingCapsuleNear(a, b, capsules, tanHalf, toleranceMm, center, work);
+    const match = matchingCapsuleNear(a, b, capsules, envelope, toleranceMm, center, work);
     if (match !== null) return match;
   }
   return null;
@@ -165,7 +166,7 @@ function matchingCapsuleNear(
   a: Vec3,
   b: Vec3,
   capsules: ReadonlyArray<VCarveEmittedCapsule>,
-  tanHalf: number,
+  envelope: RadialEnvelope,
   toleranceMm: number,
   center: number,
   work: CoverageWork,
@@ -176,7 +177,7 @@ function matchingCapsuleNear(
     work.remaining -= 1;
     if (work.remaining < 0) return null;
     const capsule = capsules[index];
-    if (capsule !== undefined && vcarveCapsuleContainsChord(capsule, a, b, tanHalf, toleranceMm)) {
+    if (capsule !== undefined && vcarveCapsuleContainsChord(capsule, a, b, envelope, toleranceMm)) {
       return index;
     }
   }
@@ -191,22 +192,23 @@ function matchingCapsuleByBounds(
   a: Vec3,
   b: Vec3,
   capsules: ReadonlyArray<VCarveEmittedCapsule>,
-  tanHalf: number,
+  envelope: RadialEnvelope,
   toleranceMm: number,
   work: CoverageWork,
 ): number | null {
+  const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(envelope, -a.z, -b.z);
   for (let index = 0; index < capsules.length; index += 1) {
     const capsule = capsules[index];
     if (
       capsule === undefined ||
-      !vcarveDiskFitsCapsuleBounds(a, capsule, tanHalf) ||
-      !vcarveDiskFitsCapsuleBounds(b, capsule, tanHalf)
+      !vcarveDiskFitsCapsuleBounds(a, radiusA, capsule) ||
+      !vcarveDiskFitsCapsuleBounds(b, radiusB, capsule)
     ) {
       continue;
     }
     work.remaining -= 1;
     if (work.remaining < 0) return null;
-    if (vcarveCapsuleContainsChord(capsule, a, b, tanHalf, toleranceMm)) return index;
+    if (vcarveCapsuleContainsChord(capsule, a, b, envelope, toleranceMm)) return index;
   }
   return null;
 }

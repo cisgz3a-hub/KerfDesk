@@ -5,6 +5,8 @@ import {
   createLayer,
   createProject,
   DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  type CncTool,
   type Layer,
 } from '../../core/scene';
 import { useStore } from '../state';
@@ -29,6 +31,20 @@ function installCnc(layer: Layer = LAYER): void {
     project: { ...createProject(), scene: { objects: [], layers: [layer] } },
   });
   useStore.getState().setMachineKind('cnc');
+}
+
+function installCncWithTool(layer: Layer, tool: CncTool): void {
+  installCnc(layer);
+  useStore.setState((state) => ({
+    project: {
+      ...state.project,
+      machine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, tool],
+        toolId: tool.id,
+      },
+    },
+  }));
 }
 
 async function renderFields(
@@ -78,6 +94,52 @@ describe('CNC layer clarity', () => {
         view.host.querySelector(`input[aria-label="Detail for ${layer.color}"]`),
       ).not.toBeNull();
       expect(view.host.querySelector('input[aria-label="Show advanced cut settings"]')).toBeNull();
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
+
+  it('does not mislabel a modeled flat-tip engraving cutter as incompatible', async () => {
+    const layer: Layer = {
+      ...LAYER,
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' },
+    };
+    installCncWithTool(layer, {
+      id: 'flat-engraver',
+      name: '90 degree flat engraver',
+      kind: 'engraving',
+      diameterMm: 2,
+      tipAngleDeg: 90,
+      tipDiameterMm: 0.4,
+    });
+    const view = await renderFields(layer);
+    try {
+      expect(view.host.querySelector('[role="alert"]')).toBeNull();
+      expect(view.host.textContent).not.toContain('V-carve needs');
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
+
+  it('keeps the layer alert for an engraving cutter without modeled geometry', async () => {
+    const layer: Layer = {
+      ...LAYER,
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' },
+    };
+    installCncWithTool(layer, {
+      id: 'unmodeled-engraver',
+      name: 'Unmodeled engraver',
+      kind: 'engraving',
+      diameterMm: 2,
+      tipDiameterMm: 0.4,
+    });
+    const view = await renderFields(layer);
+    try {
+      expect(view.host.querySelector('[role="alert"]')?.textContent).toContain(
+        'V-carve needs a V-bit or modeled angled engraving bit',
+      );
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();

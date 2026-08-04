@@ -5,6 +5,11 @@ import { compactVCarveEmittedProfile } from './vcarve-emitted-profile-compaction
 import { vcarveEmittedProfileCovers } from './vcarve-emitted-profile';
 
 const TAN_HALF = 1;
+const POINT_ENVELOPE = {
+  tanHalf: TAN_HALF,
+  tipRadiusMm: 0,
+  outerRadiusMm: Number.POSITIVE_INFINITY,
+} as const;
 const TOLERANCE_MM = 0.01;
 const DISTANT_BOUNDARY: ReadonlyArray<BoundarySegment> = [{ ax: -10, ay: -10, bx: 10, by: -10 }];
 
@@ -16,10 +21,15 @@ describe('compactVCarveEmittedProfile', () => {
       z: -0.05,
     }));
 
-    const compact = compactVCarveEmittedProfile(points, DISTANT_BOUNDARY, TAN_HALF, TOLERANCE_MM);
+    const compact = compactVCarveEmittedProfile(
+      points,
+      DISTANT_BOUNDARY,
+      POINT_ENVELOPE,
+      TOLERANCE_MM,
+    );
 
     expect(compact).toEqual([points[0], points.at(-1)]);
-    expect(vcarveEmittedProfileCovers(points, compact, TAN_HALF, TOLERANCE_MM)).toBe(true);
+    expect(vcarveEmittedProfileCovers(points, compact, POINT_ENVELOPE, TOLERANCE_MM)).toBe(true);
   });
 
   it('retains an excursion that one chord cannot cover', () => {
@@ -29,7 +39,12 @@ describe('compactVCarveEmittedProfile', () => {
       { x: 0.1, y: 0, z: -0.05 },
     ];
 
-    const compact = compactVCarveEmittedProfile(points, DISTANT_BOUNDARY, TAN_HALF, TOLERANCE_MM);
+    const compact = compactVCarveEmittedProfile(
+      points,
+      DISTANT_BOUNDARY,
+      POINT_ENVELOPE,
+      TOLERANCE_MM,
+    );
 
     expect(compact).toEqual(points);
   });

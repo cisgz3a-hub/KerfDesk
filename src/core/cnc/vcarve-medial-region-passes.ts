@@ -75,7 +75,7 @@ function passesForRoute(
   const candidateCovered = vcarveEmittedProfileCovers(
     referenceProfile.points,
     profile.points,
-    law.tanHalf,
+    law,
     MEDIAL_SWEEP_TOLERANCE_MM,
   );
   const selected = candidateCovered ? profile : referenceProfile;
@@ -87,6 +87,8 @@ function passesForRoute(
     {
       depthPerPassMm: options.depthPerPassMm,
       tanHalf: law.tanHalf,
+      tipRadiusMm: law.tipRadiusMm,
+      outerRadiusMm: law.outerRadiusMm,
       compactionToleranceMm: MEDIAL_COMPACTION_TOLERANCE_MM,
       sweepToleranceMm: MEDIAL_SWEEP_TOLERANCE_MM,
     },

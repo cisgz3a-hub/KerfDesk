@@ -26,6 +26,8 @@
 // behaviour and correct for a V-bit, so saved projects are unchanged.
 
 import { assertNever, type CncTool } from '../scene';
+import { vcarveIncludedAngleDeg } from '../cnc/vcarve-angle';
+import { conicalRadialEnvelope, radialEnvelopeHeightMm } from '../cnc/radial-envelope';
 
 export type ToolKernelOffset = {
   readonly dx: number; // cells
@@ -82,21 +84,25 @@ export function cuttingSurfaceDz(tool: CncTool, dMm: number, radiusMm: number): 
       // (falling back to 60° when the angle is unknown, the same value as
       // FALLBACK_V_TIP_ANGLE_DEG). The preview therefore showed a flat bottom
       // while the machine cut a V. Same law as a v-bit, offset by the tip land.
-      const tipAngleDeg = tool.tipAngleDeg ?? FALLBACK_V_TIP_ANGLE_DEG;
-      const halfAngleRad = (Math.max(1, tipAngleDeg) / 2) * (Math.PI / 180);
-      const tipRadiusMm = Math.max(0, (tool.tipDiameterMm ?? 0) / 2);
-      return Math.max(0, (dMm - tipRadiusMm) / Math.tan(halfAngleRad));
+      return conicalSurfaceDz(tool, dMm);
     }
     case 'ball-nose': {
       const inside = Math.max(0, radiusMm * radiusMm - dMm * dMm);
       return radiusMm - Math.sqrt(inside);
     }
     case 'v-bit': {
-      const tipAngleDeg = tool.tipAngleDeg ?? FALLBACK_V_TIP_ANGLE_DEG;
-      const halfAngleRad = (Math.max(1, tipAngleDeg) / 2) * (Math.PI / 180);
-      return dMm / Math.tan(halfAngleRad);
+      return conicalSurfaceDz(tool, dMm);
     }
     default:
       return assertNever(tool.kind, 'CncToolKind');
   }
+}
+
+function conicalSurfaceDz(tool: CncTool, radiusMm: number): number {
+  const includedAngleDeg = vcarveIncludedAngleDeg(tool) ?? FALLBACK_V_TIP_ANGLE_DEG;
+  const envelope = conicalRadialEnvelope(tool, includedAngleDeg);
+  // Invalid explicit flat-tip metadata is not silently reinterpreted as a
+  // point. Persistence rejects it; raw in-memory data previews conservatively
+  // as a full flat land until the tool is corrected.
+  return envelope === null ? 0 : radialEnvelopeHeightMm(envelope, radiusMm);
 }

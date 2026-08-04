@@ -72,7 +72,7 @@ function thinDetailDroppedWarning(layerName: string): string {
   return (
     `V-carve on layer "${layerName}": some artwork is finer than the generated detail path ` +
     'can represent at these settings and stays uncut. Everything else still cuts. To carve those ' +
-    'details, thicken them, enlarge the design, or use a wider-stroke font, then confirm the ' +
-    'result in the preview.'
+    'details, thicken them, enlarge the design, use a wider-stroke font, or choose a compatible ' +
+    'cutter with a smaller tip flat, then confirm the result in the preview.'
   );
 }

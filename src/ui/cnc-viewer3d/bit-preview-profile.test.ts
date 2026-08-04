@@ -102,6 +102,22 @@ describe('bitPreviewProfile', () => {
     expect(highest(truncated)).toBeLessThan(highest(pointed));
   });
 
+  it.each([-0.1, 3.175, 4, Number.NaN])(
+    'refuses an invalid engraving tip flat instead of claiming a CAM match: %s',
+    (tipDiameterMm) => {
+      expect(() =>
+        bitPreviewProfile({
+          id: 'invalid-flat',
+          name: 'invalid flat-tip engraver',
+          kind: 'engraving',
+          diameterMm: 3.175,
+          tipAngleDeg: 30,
+          tipDiameterMm,
+        }),
+      ).toThrow(/tip flat.*no engraving cone was modeled/i);
+    },
+  );
+
   it('still refuses an engraving bit whose included angle is unknown', () => {
     expect(() =>
       bitPreviewProfile({

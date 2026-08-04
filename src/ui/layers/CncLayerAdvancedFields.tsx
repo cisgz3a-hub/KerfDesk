@@ -7,6 +7,7 @@
 // from CncLayerFields to keep that file under the size cap and so the
 // specialist controls remain grouped under one always-visible heading.
 
+import { isVCarveToolCompatible } from '../../core/cnc/vcarve-tool-compatibility';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { CncFinishAllowanceField } from './CncFinishAllowanceField';
@@ -271,19 +272,19 @@ function VCarveSection(props: {
   );
 }
 
-// H.3 V-carve options: medial sampling detail + a live warning when THIS LAYER's bit is
-// not a v-bit. Wrong-kind selection remains advisory-only and keeps its legacy
-// fallback geometry; an actual V-bit with invalid angle is the separate exact
-// compile-integrity refusal. Read the layer tool so overrides are represented.
+// H.3 V-carve options: medial sampling detail + a live warning when THIS LAYER's bit lacks a
+// supported conical envelope. Wrong-kind selection remains advisory-only and keeps its legacy
+// fallback geometry; an actual V-bit with invalid angle is the separate exact compile-integrity
+// refusal. Read the layer tool so overrides are represented.
 function VCarveFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
-  const activeToolIsVBit = useStore(
+  const activeToolIsCompatible = useStore(
     (s) =>
       s.project.machine?.kind === 'cnc' &&
-      layerCncTool(s.project.machine, props.settings).kind === 'v-bit',
+      isVCarveToolCompatible(layerCncTool(s.project.machine, props.settings)),
   );
   return (
     <>
@@ -298,10 +299,10 @@ function VCarveFields(props: {
         title="V-carve boundary sampling and flat-core clearing pitch. 0 = automatic. Smaller = finer geometry and longer compile/job time."
         onCommit={(vResolutionMm) => props.onCommit({ vResolutionMm })}
       />
-      {!activeToolIsVBit ? (
+      {!activeToolIsCompatible ? (
         <div style={vbitWarningStyle} role="alert">
-          V-carve needs a V-bit — pick one in Material &amp; Bit. Output remains available for
-          compatibility, but a wrong-kind selection may use legacy 60° fallback geometry.
+          V-carve needs a V-bit or modeled angled engraving bit — pick one in Material &amp; Bit.
+          Unsupported selections may use legacy 60° fallback geometry where compatible.
         </div>
       ) : null}
     </>

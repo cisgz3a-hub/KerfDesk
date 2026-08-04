@@ -1,8 +1,8 @@
 import type { Vec2 } from '../scene';
 import type { BoundarySegment } from './vcarve-detail-geometry';
+import type { RadialEnvelope } from './radial-envelope';
 
-export type DetailDepthLaw = {
-  readonly tanHalf: number;
+export type DetailDepthLaw = RadialEnvelope & {
   readonly maxDepthMm: number;
 };
 
@@ -16,6 +16,9 @@ export function validDepthInputs(
     segments.length > 0 &&
     law.tanHalf > 0 &&
     Number.isFinite(law.tanHalf) &&
+    law.tipRadiusMm >= 0 &&
+    Number.isFinite(law.tipRadiusMm) &&
+    law.outerRadiusMm > law.tipRadiusMm &&
     law.maxDepthMm > 0 &&
     Number.isFinite(law.maxDepthMm)
   );

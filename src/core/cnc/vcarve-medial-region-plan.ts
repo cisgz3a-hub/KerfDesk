@@ -9,6 +9,9 @@ import {
 } from './vcarve-medial-region';
 import { vcarveMedialRoutes } from './vcarve-medial-route';
 import { vcarveSourceRegionRankFromLayout, type VCarveRegionLayout } from './vcarve-region-order';
+import { radialEnvelopeFootprintMm } from './radial-envelope';
+import type { DetailDepthLaw } from './vcarve-detail-input';
+import { vcarveTipReachability } from './vcarve-tip-reachability';
 
 const MEDIAL_SIMPLIFY_TOLERANCE_MM = 0.003;
 
@@ -40,18 +43,15 @@ export function planVCarveMedialRegion(
   sourceLayout: VCarveRegionLayout,
   normalizedIndex: number,
   options: {
-    readonly maxDepthMm: number;
-    readonly tanHalf: number;
+    readonly law: DetailDepthLaw;
     readonly floorPitchMm: number;
     readonly resolutionMm: number;
   },
 ): VCarveMedialRegionPlan {
   const segments = vcarveBoundarySegments(region);
-  const floor = vcarveFlatCoreRoutes(
-    region.loops,
-    options.maxDepthMm * options.tanHalf,
-    options.floorPitchMm,
-  );
+  const tipReachability = vcarveTipReachability(region.loops, options.law.tipRadiusMm);
+  const radiusCapMm = radialEnvelopeFootprintMm(options.law, options.law.maxDepthMm);
+  const floor = vcarveFlatCoreRoutes(region.loops, radiusCapMm, options.floorPitchMm);
   const axis = computeVCarveMedialAxis(region, options.resolutionMm);
   const medialRoutes = vcarveMedialRoutes(
     axis.graph,
@@ -59,7 +59,7 @@ export function planVCarveMedialRegion(
     segments,
     MEDIAL_SIMPLIFY_TOLERANCE_MM,
     MEDIAL_SIMPLIFY_TOLERANCE_MM,
-    options.maxDepthMm * options.tanHalf,
+    radiusCapMm,
   );
   const referenceMedialRoutes = vcarveMedialRoutes(axis.graph, region, segments, 0);
   const joined = joinVCarveFloorDetours(medialRoutes, floor.routes, region, segments);
@@ -80,9 +80,10 @@ export function planVCarveMedialRegion(
     ...pairedRoutes,
     sourceRank: vcarveSourceRegionRankFromLayout(witness, sourceLayout),
     normalizedIndex,
-    offsetFailed: floor.offsetFailed || axis.failed,
+    offsetFailed: floor.offsetFailed || axis.failed || tipReachability.offsetFailed,
     passLimited: floor.capped || axis.budgetLimited,
-    thinResidual: axis.graph.nodes.length === 0 || medialRoutes.length === 0,
+    thinResidual:
+      tipReachability.residualThin || axis.graph.nodes.length === 0 || medialRoutes.length === 0,
   };
 }
 

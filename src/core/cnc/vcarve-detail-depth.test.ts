@@ -3,9 +3,12 @@ import type { Polyline } from '../scene';
 import {
   detailPath3dPlan,
   detailPath3dPoints,
+  emittedChordIsSafe,
+  vcarveEmittedDepthAtPoint,
   type BoundarySegment,
   type DetailDepthLaw,
 } from './vcarve-detail-depth';
+import { radialEnvelopeDepthMm } from './radial-envelope';
 
 const Z_TOLERANCE_MM = 0.02;
 
@@ -48,7 +51,11 @@ function analyticZ(
         : Math.max(0, Math.min(1, ((x - segment.ax) * dx + (y - segment.ay) * dy) / lengthSq));
     distance = Math.min(distance, Math.hypot(x - (segment.ax + t * dx), y - (segment.ay + t * dy)));
   }
-  return -Math.min(distance / law.tanHalf, law.maxDepthMm);
+  return -Math.min(radialEnvelopeDepthMm(law, distance), law.maxDepthMm);
+}
+
+function pointLaw(tanHalf: number, maxDepthMm: number): DetailDepthLaw {
+  return { tanHalf, tipRadiusMm: 0, outerRadiusMm: Number.POSITIVE_INFINITY, maxDepthMm };
 }
 
 function expectInterpolationWithinTolerance(
@@ -94,7 +101,7 @@ function expectNoGouge(
 describe('detailPath3dPoints', () => {
   it('finds multiple hidden boundary-distance minima along one ring edge', () => {
     const segments = [baseline(10), shortBoundary(2.5, 0.98), shortBoundary(7.5, 0.98)];
-    const law = { tanHalf: 1, maxDepthMm: 2 };
+    const law = pointLaw(1, 2);
     const plan = detailPath3dPlan(ringEdge(10), segments, law);
     expect(plan.toleranceMet).toBe(true);
     expect(plan.points.length).toBeLessThan(2_000);
@@ -105,7 +112,7 @@ describe('detailPath3dPoints', () => {
 
   it('refines a narrow-angle depth knee inside the former 0.05 mm stop span', () => {
     const segments = [baseline(0.04), shortBoundary(0.01, 0.9999, 0.0001)];
-    const law = { tanHalf: Math.tan((0.5 * Math.PI) / 180), maxDepthMm: 0.05 };
+    const law = pointLaw(Math.tan((0.5 * Math.PI) / 180), 0.05);
     const plan = detailPath3dPlan(ringEdge(0.04), segments, law);
     expect(plan.toleranceMet).toBe(false);
     expect(plan.points.length).toBeLessThan(200);
@@ -122,7 +129,7 @@ describe('detailPath3dPoints', () => {
 
   it('keeps the tolerance on a span longer than the former recursion budget', () => {
     const segments = [baseline(100), pointBoundary(50, 0.9)];
-    const law = { tanHalf: 1, maxDepthMm: 2 };
+    const law = pointLaw(1, 2);
     const points = detailPath3dPoints(ringEdge(100), segments, law);
     expect(points.length).toBeLessThan(700);
     expect(points.some((point) => point.x === 50 && point.z > -0.1)).toBe(true);
@@ -138,7 +145,7 @@ describe('detailPath3dPoints', () => {
       ],
     };
     const segments = [pointBoundary(0, 1)];
-    const law = { tanHalf: 1, maxDepthMm: 2 };
+    const law = pointLaw(1, 2);
     const plan = detailPath3dPlan(edge, segments, law);
     expect(plan.toleranceMet).toBe(true);
     expectInterpolationWithinTolerance(plan.points, segments, law);
@@ -146,7 +153,7 @@ describe('detailPath3dPoints', () => {
 
   it('keeps the no-gouge and undercut bounds after 0.001 mm XYZ formatting', () => {
     const segments = [baseline(10), shortBoundary(2.5, 0.98), shortBoundary(7.5, 0.98)];
-    const law = { tanHalf: 1, maxDepthMm: 2 };
+    const law = pointLaw(1, 2);
     const plan = detailPath3dPlan(ringEdge(10), segments, law);
     expect(plan.points.length).toBeLessThan(2_000);
     const emitted = plan.points.map((point) => ({
@@ -163,11 +170,40 @@ describe('detailPath3dPoints', () => {
       { ax: 0, ay: 0.99, bx: 0.9, by: 0.99 },
       { ax: 1.1, ay: 0.99, bx: 10, by: 0.99 },
     ];
-    const law = { tanHalf: 1, maxDepthMm: 2 };
+    const law = pointLaw(1, 2);
     const plan = detailPath3dPlan(ringEdge(10), segments, law);
 
     expect(plan.toleranceMet).toBe(true);
     expect(plan.points.length).toBeGreaterThan(2);
     expectInterpolationWithinTolerance(plan.points, segments, law);
+  });
+
+  it.each([
+    ['below', 0.19, 0],
+    ['at', 0.2, 0],
+    ['above', 0.21, 0.009],
+  ] as const)('maps %s-tip clearance to a conservative emitted depth', (_label, y, expected) => {
+    const law: DetailDepthLaw = {
+      tanHalf: 1,
+      tipRadiusMm: 0.2,
+      outerRadiusMm: 1,
+      maxDepthMm: 0.8,
+    };
+    expect(vcarveEmittedDepthAtPoint({ x: 1, y }, [baseline(2)], law)).toBeCloseTo(expected, 12);
+  });
+
+  it('uses the physical tip radius on a mixed zero-to-cut chord but not a zero-depth span', () => {
+    const law: DetailDepthLaw = {
+      tanHalf: 1,
+      tipRadiusMm: 0.2,
+      outerRadiusMm: 1,
+      maxDepthMm: 0.8,
+    };
+    const nearbyPoint: BoundarySegment = { ax: 0, ay: 0.15, bx: 0, by: 0.15 };
+
+    expect(emittedChordIsSafe({ x: 0, y: 0 }, { x: 1, y: 0 }, 0, 0, [nearbyPoint], law)).toBe(true);
+    expect(emittedChordIsSafe({ x: 0, y: 0 }, { x: 1, y: 0 }, 0, 0.1, [nearbyPoint], law)).toBe(
+      false,
+    );
   });
 });

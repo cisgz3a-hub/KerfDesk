@@ -233,6 +233,7 @@ export type CncGroup = {
   // legacy archives and hand-built Job fixtures remain readable.
   readonly toolKind?: CncToolKind;
   readonly toolTipAngleDeg?: number;
+  readonly toolTipDiameterMm?: number;
   readonly toolFluteCount?: number;
   // Current primary cutter for the layer that owns the shared
   // feed/plunge/RPM/depth-per-pass settings. This differs from toolId for

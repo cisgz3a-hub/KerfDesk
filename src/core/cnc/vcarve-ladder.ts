@@ -184,7 +184,14 @@ export function vcarveLadderPasses(
   });
   const blend: DetailBlend = {
     segments: sourceBoundarySegments(contours),
-    law: { tanHalf, maxDepthMm: maxDepth },
+    // The retained offset-ladder oracle is pointed-only; production V-carve
+    // compilation routes through vcarveMedialPasses and its full envelope.
+    law: {
+      tanHalf,
+      tipRadiusMm: 0,
+      outerRadiusMm: Number.POSITIVE_INFINITY,
+      maxDepthMm: maxDepth,
+    },
   };
   const entry = passesForRings(rings, options.depthPerPassMm, options.rampAngleDeg, blend);
   const { detailDepthLimited, ...entryResult } = entry;

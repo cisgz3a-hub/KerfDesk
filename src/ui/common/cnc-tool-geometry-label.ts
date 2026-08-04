@@ -1,4 +1,5 @@
 import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
+import { isValidCncTipDiameterMm } from '../../core/cnc-tip-diameter';
 import type { CncTool, CncToolKind } from '../../core/scene';
 
 const TOOL_KIND_LABELS: Readonly<Record<CncToolKind, string>> = {
@@ -14,8 +15,16 @@ export function cncToolGeometryLabel(tool: CncTool): string {
     return `${tool.diameterMm} mm, ${kind}`;
   }
   const angle = tool.tipAngleDeg;
-  if (!isValidCncTipAngleDeg(angle)) {
-    return `${tool.diameterMm} mm, included angle missing, ${kind}`;
-  }
-  return `${tool.diameterMm} mm, ${angle}° ${kind}`;
+  const geometry = !isValidCncTipAngleDeg(angle)
+    ? `${tool.diameterMm} mm, included angle missing, ${kind}`
+    : `${tool.diameterMm} mm, ${angle}° ${kind}`;
+  return tool.kind === 'engraving' ? `${geometry}, ${engravingTipLabel(tool)}` : geometry;
+}
+
+function engravingTipLabel(tool: CncTool): string {
+  const tipDiameterMm = tool.tipDiameterMm;
+  if (tipDiameterMm === undefined || tipDiameterMm === 0) return 'pointed tip';
+  return isValidCncTipDiameterMm(tipDiameterMm, tool.diameterMm)
+    ? `${tipDiameterMm} mm tip flat`
+    : 'invalid tip flat';
 }

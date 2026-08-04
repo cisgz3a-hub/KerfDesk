@@ -2454,8 +2454,9 @@ F-CNC19 tiling.
    spin-up dwell, safe-Z discipline, per-layer comment headers, M5 + park
    postamble.
 4. Each CNC operation's short comment block records the selected tool id/name,
-   stored kind/diameter/angle/flute count, applicable requested depth and depth/pass, V-carve
-   resolution where relevant, effective feed/plunge/RPM, and automatic feed
+   stored kind/diameter/angle/tip-flat diameter/flute count, applicable
+   requested depth and depth/pass, V-carve resolution where relevant,
+   effective feed/plunge/RPM, and automatic feed
    source. A secondary-cutter group also records the layer's current primary
    cutter; it does not claim which cutter historically produced manual or starter values. Dynamic
    labels are flattened into one inert comment line. Export
@@ -2569,8 +2570,8 @@ F-CNC19 tiling.
 ### F-CNC6. V-carve a layer — Phase H.3
 
 #### Success
-1. With a v-bit active in Material & Bit, the user sets a layer's cut type
-   to **V-carve (angled bit)**. New operations default to flowing depth:
+1. With a V-bit or angled engraving bit active in Material & Bit, the user sets
+   a layer's cut type to **V-carve (angled bit)**. New operations default to flowing depth:
    **Flat depth** is off, and groove depth follows artwork width plus the
    selected bit's included angle and cutting diameter. **Detail** controls the
    vector boundary-sampling target (0 = automatic) and any necessary
@@ -2580,10 +2581,13 @@ F-CNC19 tiling.
    chords certified inside that exact normalized region. Delaunay is not an
    authority for cut containment. The final XYZ path is certified against the
    original normalized boundary and the 0.001 mm emitted coordinate grid.
-3. On the medial path, boundary distance d cuts at
-   `z = −min(d / tan(θ/2), effective depth)`. The changing Z is intentional:
-   it is how one V-bit makes a narrow groove shallow and a wide groove deep.
-   Depth per pass limits each finishing level without replacing that profile.
+3. One monotone radial envelope owns CAM and preview geometry. For included
+   half-angle `alpha`, tip radius `r0`, and boundary clearance `d`, footprint
+   radius is `r(h) = r0 + h * tan(alpha)` and depth is zero when `d <= r0`,
+   otherwise `min((d - r0) / tan(alpha), effective depth)`. A pointed V-bit or
+   pointed engraving bit has `r0 = 0`; a flat-tip engraving bit uses half its
+   stored tip-flat diameter. Depth per pass limits each finishing level without
+   replacing that profile.
 4. **Flat depth** exposes **Floor depth**. When enabled, the same medial finish
    is capped at the shallower of that floor and the modeled V-bit cone height;
    inward floor-clearing routes exist only in the remaining mathematical flat
@@ -2600,11 +2604,12 @@ F-CNC19 tiling.
    centers; V-carve groups run before profile cuts because they never free the
    part.
 
-#### Error — active bit is not a v-bit
-1. The layer panel and pre-Frame Job Review show "V-carve requires a v-bit."
+#### Error — active bit is not a compatible angled cutter
+1. The layer panel and pre-Frame Job Review ask for a V-bit or angled
+   engraving bit.
    It is an ordinary Save/Frame/Start warning, not a gate. Output remains
    available for compatibility and can use the legacy 60-degree wrong-kind
-   fallback, so the operator is told to select the actual V-bit.
+   fallback, so the operator is told to select a compatible angled cutter.
 2. A selected V-bit with a missing, non-finite, or out-of-range included angle
    cannot produce the requested V-carve depth math. Save and Start stop before
    compilation and tell the operator to edit or replace the bit; no silent
@@ -2632,9 +2637,11 @@ F-CNC19 tiling.
    layer is skipped.
 
 #### Edge — fine detail, branches, physical cone limit, and stored ramp requests
-1. A feature finer than the bounded medial sampling can certify remains uncut
-   and raises an advisory; it never authorizes a gouging shortcut or a new
-   Frame/Start guard.
+1. A feature finer than the bounded medial sampling can certify, or whose
+   clearance is at or below a flat engraving tip's radius, remains uncut and
+   raises the existing Job Review advisory. A mixed wide body still cuts while
+   an attached sub-tip tail is disclosed; neither case authorizes a gouging
+   shortcut or a new Frame/Start guard.
 2. Branched medial graphs require an edge-cover walk, so some already-cut
    branches are retraced. Disconnected letters, counters, dots, or filled
    islands require distinct safe-Z entries; “one medial line” does not mean
@@ -2772,10 +2779,10 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. Material & Bit → Manage bits lists every bit (starters + custom),
    grouped by cutter family. The manual add form takes name, kind (end
-   mill / ball nose / v-bit / engraving), diameter, and included angle
-   (v/engraving only). Diameter and angle start blank and return to blank
-   after each successful Add so a prior cutter's geometry cannot be reused
-   accidentally.
+   mill / ball nose / v-bit / engraving), diameter, included angle
+   (v/engraving only), and optional engraving tip-flat diameter. Geometry
+   fields start blank and return to blank after each successful Add so a prior
+   cutter's geometry cannot be reused accidentally.
 2. Add from bit catalog searches 88 modeled envelopes and 72 reference-only
    family entries (160 entries total). A generic flat or full-radius-ball
    template is an operator-matched nominal diameter envelope whose gross
@@ -2796,9 +2803,9 @@ and lifts the command's CNC-only gate.)*
    projects. Existing project copies win an ID or catalog-identity match, so
    opening a project never replaces its saved ID or metadata with a library
    alias.
-4. Catalog family, optional evidenced shank/flute metadata, and stable catalog
-   identity survive both app-library persistence and `.lf2` project
-   round-trips. Generic non-O-flute envelopes carry no trusted flute count and
+4. Catalog family, optional evidenced shank/flute metadata, engraving tip-flat
+   diameter, and stable catalog identity survive both app-library persistence
+   and `.lf2` project round-trips. Generic non-O-flute envelopes carry no trusted flute count and
    make no automatic-feed claim. An explicit single/double O-flute family
    count becomes the default for material-feed calculations; the operator can
    still override it in the Feeds calculator.
@@ -2811,15 +2818,16 @@ and lifts the command's CNC-only gate.)*
    have no Delete button.
 6. Every list row shows the canonical stored diameter and, for an angled
    cutter, the stored included angle independently of the operator-entered
-   name.
+   name. Engraving rows also identify a pointed tip or the stored tip-flat
+   diameter.
 7. Choosing an Active bit briefly shows a dismissible **Modeled cutting
-   envelope** preview. For an end mill, full-radius ball, or valid point V-bit,
+   envelope** preview. For an end mill, full-radius ball, valid point V-bit, or
+   engraving bit with a valid included angle and optional valid tip flat,
    it uses the same profile as removal simulation, reports a catalog shank
    diameter as metadata only when known, and states that flutes, coating,
-   cutting length, and the shank transition are not modeled. A legacy engraving
-   tool does not store enough tip geometry for a truthful 3D cutting envelope,
-   so it receives a readable no-shape fallback rather than the simulator's flat
-   approximation. A V-bit without a valid included angle likewise receives a
+   cutting length, and the shank transition are not modeled. An engraving bit
+   with no stored tip flat is deliberately a true point for legacy compatibility.
+   An angled cutter without a valid included angle receives a
    readable fallback instead of an invented cone.
    If WebGL or scene initialization is unavailable, the bit name and geometry
    notice remain readable. A later render exception or WebGL context loss
@@ -2833,6 +2841,10 @@ and lifts the command's CNC-only gate.)*
    Add button does nothing until the fields are sane.
 2. V-bit and engraving-bit angles must be finite values from 1 through 179
    degrees. An invalid Add shows an inline reason and stores no tool.
+3. An engraving tip flat is optional. When entered, it must be finite,
+   non-negative, and smaller than the cutter diameter. Entry stores no invalid
+   tool. A finite malformed value from hand-edited or stale persisted data stays
+   explicitly invalid on read rather than becoming a supported pointed cutter.
 
 #### Empty
 1. No custom bits: the list shows only starters; nothing is deletable.

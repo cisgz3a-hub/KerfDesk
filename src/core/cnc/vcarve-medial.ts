@@ -1,4 +1,5 @@
 import { normalizeClosedPolylineTreeEvenOddChecked } from '../geometry/polygon-difference';
+import { isValidCncTipDiameterMm } from '../cnc-tip-diameter';
 import type { CncPass } from '../job';
 import type { Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
@@ -6,6 +7,7 @@ import { vcarveIncludedAngleDeg } from './vcarve-angle';
 import { EMIT_COORDINATE_QUANTUM_MM } from './vcarve-detail-geometry';
 import type { DetailDepthLaw } from './vcarve-detail-depth';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
+import { conicalRadialEnvelope, radialEnvelopeRemovalRadiusMm } from './radial-envelope';
 import { orderVCarveMedialRegionPlans, planVCarveMedialRegion } from './vcarve-medial-region-plan';
 import { passesForVCarveMedialRegion } from './vcarve-medial-region-passes';
 import { vcarveMedialRegionsFromTree } from './vcarve-medial-region';
@@ -28,7 +30,11 @@ export function vcarveMedialPasses(
   options: VCarveOptions,
 ): VCarveLadder {
   const geometry = vcarveGeometry(options);
-  if (geometry === null) return NO_MEDIAL_PLAN;
+  if (geometry === null) {
+    return invalidExplicitTip(options.tool)
+      ? { ...NO_MEDIAL_PLAN, thinResidual: true }
+      : NO_MEDIAL_PLAN;
+  }
   const source = validClosedSource(polylines);
   const normalized = normalizeClosedPolylineTreeEvenOddChecked(source);
   if (normalized.kind === 'error') return { ...NO_MEDIAL_PLAN, offsetFailed: true };
@@ -40,8 +46,7 @@ export function vcarveMedialPasses(
   const plans = orderVCarveMedialRegionPlans(
     regions.map((region, normalizedIndex) =>
       planVCarveMedialRegion(region, sourceLayout, normalizedIndex, {
-        maxDepthMm: geometry.maxDepthMm,
-        tanHalf: geometry.tanHalf,
+        law: geometry,
         floorPitchMm: floor.pitchMm,
         resolutionMm: options.resolutionMm,
       }),
@@ -76,29 +81,34 @@ function validClosedSource(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Po
   );
 }
 
-function vcarveGeometry(
-  options: VCarveOptions,
-): { readonly tanHalf: number; readonly maxDepthMm: number } | null {
+function vcarveGeometry(options: VCarveOptions): DetailDepthLaw | null {
   const tipAngleDeg = vcarveIncludedAngleDeg(options.tool);
   if (tipAngleDeg === null) return null;
-  const tanHalf = Math.tan((tipAngleDeg * Math.PI) / 360);
+  const envelope = conicalRadialEnvelope(options.tool, tipAngleDeg);
   const maxDepthMm = vcarveEffectiveDepthMm(options.tool, options.maxDepthMm);
-  if (!(tanHalf > 0) || maxDepthMm === null || !(maxDepthMm > 0) || !Number.isFinite(maxDepthMm)) {
+  if (
+    envelope === null ||
+    maxDepthMm === null ||
+    !(maxDepthMm > 0) ||
+    !Number.isFinite(maxDepthMm)
+  ) {
     return null;
   }
-  return { tanHalf, maxDepthMm };
+  return { ...envelope, maxDepthMm };
 }
 
 function floorSpacing(
   resolutionMm: number,
-  geometry: { readonly tanHalf: number; readonly maxDepthMm: number },
+  geometry: DetailDepthLaw,
 ): { readonly pitchMm: number; readonly unrepresentable: boolean } {
   // A path exactly on the flat-core boundary is rounded one Z quantum
   // shallower to remain conservative. Reserve that lost cone radius plus a
   // full XY quantum so adjacent emitted sweeps overlap instead of merely
   // touching in ideal, unrounded geometry.
-  const emittedRadiusMm =
-    Math.max(0, geometry.maxDepthMm - EMIT_COORDINATE_QUANTUM_MM) * geometry.tanHalf;
+  const emittedRadiusMm = radialEnvelopeRemovalRadiusMm(
+    geometry,
+    Math.max(0, geometry.maxDepthMm - EMIT_COORDINATE_QUANTUM_MM),
+  );
   const footprintDiameterMm = Math.max(0, 2 * emittedRadiusMm - 2 * EMIT_COORDINATE_QUANTUM_MM);
   const requestedPitchMm = Math.min(
     0.25,
@@ -118,3 +128,11 @@ const NO_MEDIAL_PLAN: VCarveLadder = {
   thinResidual: false,
   passLimited: false,
 };
+
+function invalidExplicitTip(tool: VCarveOptions['tool']): boolean {
+  return (
+    tool.kind === 'engraving' &&
+    tool.tipDiameterMm !== undefined &&
+    !isValidCncTipDiameterMm(tool.tipDiameterMm, tool.diameterMm)
+  );
+}
