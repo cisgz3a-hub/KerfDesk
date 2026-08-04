@@ -3,6 +3,7 @@ import type { BoundedCompilationBridgePort } from './bounded-compilation-bridge-
 import type { BoundedCompilationWorkerLike } from './bounded-compilation-worker-pool';
 import {
   CANVAS_COMPILATION_BRIDGE_CONNECTION,
+  canvasCompilationResultTransferables,
   type CanvasCompilationBridgeConnection,
   type CanvasCompilationTaskPayload,
   type CanvasCompilationTaskResult,
@@ -100,6 +101,7 @@ function bridge(): BoundedCompilationMainBridge<
     maxSources: OUTER_WORKER_LIMIT,
     maxActiveJobs: ACTIVE_JOB_LIMIT,
     createWorker: createCanvasCompilationWorker,
+    resultTransferables: canvasCompilationResultTransferables,
   });
   return sharedBridge;
 }

@@ -15598,6 +15598,9 @@ would recreate the freeze this decision exists to remove.
    the explicit Cut 3D renderer needs. None can affect G-code or enter its merge, and none is a
    scheduler special case. A future costly operation may join only after its own independence and
    deterministic merge boundary are proved.
+   Large grid and surface typed arrays transfer ownership at every result boundary: child Worker to
+   main-realm broker, broker to outer Worker, and outer Worker to UI. They are never copied as
+   intermediate structured-clone payloads or retained by a realm after it hands the result onward.
    Normalization or any global ordering phase may not be moved into a task merely to create more
    parallelism.
 5. **Compilation identity is explicit.** An outer job supplies a caller-owned job identity; each
@@ -15666,6 +15669,8 @@ would recreate the freeze this decision exists to remove.
 - Cut 3D no longer downsamples a million-cell removal grid, builds its mesh or accumulates smooth
   normals in the dialog effect. Those pure arrays come from a lazy broker task; the main thread keeps
   only the Three.js/WebGL presentation boundary and a loading or recoverable-unavailable surface.
+  Ownership transfer across the two internal Worker hops prevents the prepared surface from being
+  synchronously copied before that presentation boundary.
 - Independent planner results are rebuilt between jobs. Exact Preview/estimate preparation reuse is
   limited to four recent identity-and-options matches; this preserves its existing sharing without
   treating an unchanged-looking object as proof that a region plan remains valid.
@@ -15710,6 +15715,13 @@ would recreate the freeze this decision exists to remove.
   accumulation still ran in the dialog effect. After the lazy surface task and a scene-ready wait,
   the exact-head local rerun measured a 107.8 ms maximum heartbeat gap and 90.0 ms maximum Long Task for
   Cut 3D. The one-second ceiling was retained; the failed evidence was fixed rather than waived.
+- A second resource-constrained Chrome run passed 66 of 67 interactions but measured a 3,200.8 ms
+  Cut 3D heartbeat gap while its maximum reported Long Task was only 147.0 ms. Its trace placed the
+  gap after the dialog appeared and before scene readiness. Source inspection then found structured-
+  clone copies at the child-to-broker and broker-to-outer result boundaries. With ownership transfer
+  added at both hops, the unchanged local regression measured 269.2 ms normally and 632.3 ms under a
+  controlled four-times CPU slowdown; the latter's maximum Long Task was 486.0 ms. The one-second
+  ceiling remains unchanged, and a green exact-head hosted rerun remains required before release.
 - A controlled E2E-only mount distinguishes the retired always-mounted `Cnc3DPane` from those explicit
   surfaces without restoring it in production. With the pane absent, the complex fixture completed
   its idle plan with a 118.8 ms maximum heartbeat gap and 100.0 ms maximum Long Task. Mounting the real

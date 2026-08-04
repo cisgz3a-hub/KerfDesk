@@ -9,7 +9,7 @@ export const BOUNDED_COMPILATION_BRIDGE_CHANNEL = 'bounded-compilation-bridge-v1
 export interface BoundedCompilationBridgePort {
   onmessage: ((event: { readonly data: unknown }) => void) | null;
   onmessageerror: ((event: unknown) => void) | null;
-  postMessage(message: unknown): void;
+  postMessage(message: unknown, transfer?: Transferable[]): void;
   start?(): void;
   close?(): void;
 }

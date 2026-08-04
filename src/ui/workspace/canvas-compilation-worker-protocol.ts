@@ -43,6 +43,23 @@ export type CanvasCompilationTaskResult =
   | { readonly kind: 'cnc-removal-grid'; readonly output: RemovalGrid | null }
   | { readonly kind: 'cnc-cut3d-surface'; readonly output: ReliefSurfaceMeshWithNormals };
 
+/** Ownership transfers for clone-safe task results that carry large typed arrays. */
+export function canvasCompilationResultTransferables(
+  result: CanvasCompilationTaskResult,
+): Transferable[] {
+  if (result.kind === 'cnc-removal-grid') {
+    return result.output === null ? [] : [result.output.depth.buffer];
+  }
+  if (result.kind === 'cnc-cut3d-surface') {
+    return [
+      result.output.positions.buffer,
+      result.output.indices.buffer,
+      result.output.normals.buffer,
+    ];
+  }
+  return [];
+}
+
 export type CanvasCompilationWorkerRequest =
   BoundedCompilationWorkerRequest<CanvasCompilationTaskPayload>;
 export type CanvasCompilationWorkerResponse =

@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import {
+  canvasCompilationResultTransferables,
   executeCanvasCompilationTask,
   type CanvasCompilationWorkerRequest,
   type CanvasCompilationWorkerResponse,
@@ -26,5 +27,8 @@ self.onmessage = (event: MessageEvent<CanvasCompilationWorkerRequest>): void => 
       message: error instanceof Error ? error.message : String(error),
     };
   }
-  self.postMessage(response);
+  self.postMessage(
+    response,
+    response.kind === 'ok' ? canvasCompilationResultTransferables(response.result) : [],
+  );
 };

@@ -4,6 +4,7 @@ import {
   connectCanvasCompilationMainBridge,
   resetCanvasCompilationMainBridgeForTests,
 } from './canvas-compilation-main-bridge';
+import { canvasCompilationResultTransferables } from './canvas-compilation-worker-protocol';
 
 class FakeOuterWorker {
   terminated = false;
@@ -23,6 +24,33 @@ afterEach(() => {
 });
 
 describe('canvas compilation main bridge connection admission', () => {
+  it('transfers ownership of grid and Cut 3D surface arrays between worker realms', () => {
+    const depth = new Float32Array(4);
+    const positions = new Float32Array(12);
+    const indices = new Uint32Array(6);
+    const normals = new Float32Array(12);
+
+    expect(
+      canvasCompilationResultTransferables({
+        kind: 'cnc-removal-grid',
+        output: {
+          widthCells: 2,
+          heightCells: 2,
+          mmPerCell: 1,
+          originX: 0,
+          originY: 0,
+          depth,
+        },
+      }),
+    ).toEqual([depth.buffer]);
+    expect(
+      canvasCompilationResultTransferables({
+        kind: 'cnc-cut3d-surface',
+        output: { positions, indices, normals, widthMm: 2, heightMm: 2 },
+      }),
+    ).toEqual([positions.buffer, indices.buffer, normals.buffer]);
+  });
+
   it.each([
     [undefined, 2],
     [Number.NaN, 2],

@@ -24,11 +24,12 @@ type SourceState = {
   detached: boolean;
 };
 
-export type BoundedCompilationMainBridgeOptions<TPayload> = {
+export type BoundedCompilationMainBridgeOptions<TPayload, TResult> = {
   readonly concurrency: number;
   readonly maxSources: number;
   readonly maxActiveJobs: number;
   readonly createWorker: () => BoundedCompilationWorkerLike<TPayload>;
+  readonly resultTransferables?: (result: TResult) => ReadonlyArray<Transferable>;
 };
 
 /** Main-realm coordinator. CPU work runs only in its bounded child Workers. */
@@ -37,15 +38,17 @@ export class BoundedCompilationMainBridge<TPayload, TResult> {
   private readonly serial: BoundedCompilationSerialWorker<TPayload, TResult>;
   private readonly maxSources: number;
   private readonly maxActiveJobs: number;
+  private readonly resultTransferables: (result: TResult) => ReadonlyArray<Transferable>;
   private readonly sources = new Set<SourceState>();
   private nextSourceId = 0;
   private disposed = false;
 
-  constructor(options: BoundedCompilationMainBridgeOptions<TPayload>) {
+  constructor(options: BoundedCompilationMainBridgeOptions<TPayload, TResult>) {
     this.pool = new BoundedCompilationWorkerPool(options);
     this.serial = new BoundedCompilationSerialWorker(options.createWorker);
     this.maxSources = positiveLimit(options.maxSources, 'bridge source limit');
     this.maxActiveJobs = positiveLimit(options.maxActiveJobs, 'bridge active-job limit');
+    this.resultTransferables = options.resultTransferables ?? (() => []);
   }
 
   attach(port: BoundedCompilationBridgePort): () => void {
@@ -147,14 +150,25 @@ export class BoundedCompilationMainBridge<TPayload, TResult> {
     active: ActiveRequest,
     results: ReadonlyArray<TResult>,
   ): void {
+    let transfer: Transferable[];
+    try {
+      transfer = results.flatMap((result) => this.resultTransferables(result));
+    } catch (error) {
+      this.reject(source, active, asError(error));
+      return;
+    }
     if (!this.takeActive(source, active)) return;
-    this.send(source, {
-      channel: BOUNDED_COMPILATION_BRIDGE_CHANNEL,
-      kind: 'result',
-      requestId: active.requestId,
-      jobId: active.externalJobId,
-      results,
-    });
+    this.send(
+      source,
+      {
+        channel: BOUNDED_COMPILATION_BRIDGE_CHANNEL,
+        kind: 'result',
+        requestId: active.requestId,
+        jobId: active.externalJobId,
+        results,
+      },
+      transfer,
+    );
   }
 
   private reject(source: SourceState, active: ActiveRequest, error: Error): void {
@@ -184,10 +198,14 @@ export class BoundedCompilationMainBridge<TPayload, TResult> {
     });
   }
 
-  private send(source: SourceState, response: BoundedCompilationBridgeResponse<TResult>): void {
+  private send(
+    source: SourceState,
+    response: BoundedCompilationBridgeResponse<TResult>,
+    transfer: Transferable[] = [],
+  ): void {
     if (source.detached) return;
     try {
-      source.port.postMessage(response);
+      source.port.postMessage(response, transfer);
     } catch (error) {
       this.failSource(source, `compilation bridge response failed: ${asError(error).message}`);
     }
