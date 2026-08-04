@@ -85,7 +85,11 @@ function toolGeometryComment(group: CncGroup): string {
   const kind = group.toolKind === undefined ? '' : `${group.toolKind}; `;
   const angle =
     group.toolTipAngleDeg === undefined ? '' : `; angle-deg: ${fmt(group.toolTipAngleDeg)}`;
-  return `; cnc tool: ${kind}diameter-mm: ${fmt(group.toolDiameterMm)}${angle}`;
+  const tipDiameter =
+    group.toolTipDiameterMm === undefined
+      ? ''
+      : `; tip-diameter-mm: ${fmt(group.toolTipDiameterMm)}`;
+  return `; cnc tool: ${kind}diameter-mm: ${fmt(group.toolDiameterMm)}${angle}${tipDiameter}`;
 }
 
 function depthComment(group: CncGroup): string | null {

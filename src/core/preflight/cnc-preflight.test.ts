@@ -327,12 +327,14 @@ describe('runCncPreflight', () => {
     expect(result.issues.some((issue) => issue.message.includes('spindle RPM must be'))).toBe(true);
   });
 
-  it('flags v-carve when the active bit is not a v-bit (H.3)', () => {
+  it('flags V-carve when the active bit is not conical (H.3)', () => {
     // Default config's active tool is the 1/8 in end mill.
     const result = runCncPreflight(projectWithCnc({ cutType: 'v-carve' }), config, GOOD_GCODE);
-    expect(result.issues.some((issue) => issue.message.includes('V-carve requires a v-bit'))).toBe(
-      true,
-    );
+    expect(
+      result.issues.some((issue) =>
+        issue.message.includes('V-carve requires a V-bit or angled engraving bit'),
+      ),
+    ).toBe(true);
     expect(result.ok).toBe(false);
   });
 

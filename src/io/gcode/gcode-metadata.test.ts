@@ -11,7 +11,7 @@ const META: GcodeMetadata = {
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('adr-286-vcarve-text-glyph-union');
+    expect(EMITTER_REVISION).toBe('adr-287-flat-tip-vcarve-envelope');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

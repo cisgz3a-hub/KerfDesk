@@ -9,13 +9,19 @@
 //   drill    a bit-diameter hole at each circle centre
 
 import { profileToolpathPolylines, type ProfileSide } from '../cnc';
+import { vcarveIncludedAngleDeg } from '../cnc/vcarve-angle';
+import {
+  conicalRadialEnvelope,
+  radialEnvelopeDepthMm,
+  radialEnvelopeMaxDepthMm,
+} from '../cnc/radial-envelope';
 import { entityToPolylines } from '../design';
 import type { DesignLayer } from '../design/layers';
 import type { CncTool, Polyline } from '../scene';
 import type { SketchEntity } from '../design';
 import {
   carveLayerTool,
-  vBitHalfAngleRad,
+  FALLBACK_V_TIP_ANGLE_DEG,
   type CarveGrid,
   type DesignCarveInput,
 } from './carve-input';
@@ -77,10 +83,10 @@ function applyVCarve(
 ): void {
   const mask = rasterizeEvenOdd(polylines, grid);
   const distance = insideDistanceMm(mask, grid);
-  const halfAngle = vBitHalfAngleRad(tool);
-  const slope = Math.tan(halfAngle);
-  const coneHeightMm = slope > 0 ? tool.diameterMm / 2 / slope : depthMm;
-  const maxCut = Math.min(depthMm, coneHeightMm);
+  const includedAngleDeg = vcarveIncludedAngleDeg(tool) ?? FALLBACK_V_TIP_ANGLE_DEG;
+  const envelope = conicalRadialEnvelope(tool, includedAngleDeg);
+  if (envelope === null) return;
+  const maxCut = Math.min(depthMm, radialEnvelopeMaxDepthMm(envelope));
   // The chamfer transform measures to the nearest outside cell CENTER; the true
   // region boundary lies half a cell closer, so recenter before applying the
   // groove law or every wall previews half a cell too deep.
@@ -88,7 +94,7 @@ function applyVCarve(
   for (let index = 0; index < depth.length; index += 1) {
     if (mask[index] !== 1) continue;
     const dist = Math.max(0, (distance[index] ?? 0) - boundaryBiasMm);
-    const cut = -Math.min(slope > 0 ? dist / slope : maxCut, maxCut);
+    const cut = -Math.min(radialEnvelopeDepthMm(envelope, dist), maxCut);
     const current = depth[index] ?? 0;
     if (cut < current) depth[index] = cut;
   }

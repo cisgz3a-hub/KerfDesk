@@ -15,6 +15,7 @@ import {
 } from './vcarve-medial-region';
 import { vcarveMedialRoutes } from './vcarve-medial-route';
 import { vcarveMedialPasses } from './vcarve-medial';
+import { radialEnvelopeDepthMm } from './radial-envelope';
 
 const TEST_RESOLUTION_MM = 0.25;
 const SIMPLIFY_TOLERANCE_MM = 0.02;
@@ -71,7 +72,16 @@ function analyticZ(
       Math.hypot(point.x - (segment.ax + t * dx), point.y - (segment.ay + t * dy)),
     );
   }
-  return -Math.min(distanceMm / law.tanHalf, law.maxDepthMm);
+  return -Math.min(radialEnvelopeDepthMm(law, distanceMm), law.maxDepthMm);
+}
+
+function pointLaw(maxDepthMm: number): DetailDepthLaw {
+  return {
+    tanHalf: 1,
+    tipRadiusMm: 0,
+    outerRadiusMm: Number.POSITIVE_INFINITY,
+    maxDepthMm,
+  };
 }
 
 function expectRoundedProfileIsConservative(
@@ -139,10 +149,11 @@ describe('V-carve emitted depth law', () => {
       expect(deepestMm).toBeGreaterThanOrEqual(widthMm / 2 - 0.003);
       const cornerRadiusMm = (Math.SQRT2 / (1 + Math.SQRT2)) * widthMm;
       expect(deepestMm).toBeLessThanOrEqual(cornerRadiusMm + 0.002);
-      expectRoundedProfileIsConservative(pass.points, sourceBoundarySegments(contours), {
-        tanHalf: 1,
-        maxDepthMm: 3,
-      });
+      expectRoundedProfileIsConservative(
+        pass.points,
+        sourceBoundarySegments(contours),
+        pointLaw(3),
+      );
     },
     CONCURRENT_TEST_TIMEOUT_MS,
   );
@@ -151,7 +162,7 @@ describe('V-carve emitted depth law', () => {
     const region = onlyRegion([rectangle(0, 0, 12, 4)]);
     const exactSegments = vcarveBoundarySegments(region);
     const depthSegments = sourceBoundarySegments(region.loops);
-    const law = { tanHalf: 1, maxDepthMm: 3 };
+    const law = pointLaw(3);
     const axis = computeVCarveMedialAxis(region, TEST_RESOLUTION_MM);
     const routes = vcarveMedialRoutes(axis.graph, region, exactSegments, SIMPLIFY_TOLERANCE_MM);
 

@@ -31,9 +31,10 @@ export type GcodeMetadata = {
  * ADR-278's contour ramp, ADR-280's shared cone-limited V-carve floor depth,
  * ADR-273's secondary-cutter settings provenance, ADR-282's thin-detail
  * rescue stage, ADR-285's certified vector-medial V-carve planner, and
- * ADR-286's non-zero resolution of a text object's own glyphs.
+ * ADR-286's non-zero resolution of a text object's own glyphs, and ADR-287's
+ * flat-tip V-carve radial envelope.
  */
-export const EMITTER_REVISION = 'adr-286-vcarve-text-glyph-union';
+export const EMITTER_REVISION = 'adr-287-flat-tip-vcarve-envelope';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

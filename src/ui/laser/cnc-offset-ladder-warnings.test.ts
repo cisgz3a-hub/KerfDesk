@@ -200,6 +200,34 @@ describe('detectCncOffsetLadderWarnings', () => {
     expect(warnings[0]).toContain('still cut');
   });
 
+  it('reaches Job Review when a flat engraving tip cannot reach artwork detail', () => {
+    restOperation.mockReturnValue({ kind: 'not-requested' });
+    offsetChecked.mockReset();
+    offsetChecked.mockReturnValue({ kind: 'ok', value: [] });
+    const flatEngraver: CncTool = {
+      id: 'flat-engraver',
+      name: '90 degree flat engraver',
+      kind: 'engraving',
+      diameterMm: 2,
+      tipAngleDeg: 90,
+      tipDiameterMm: 0.4,
+    };
+    const project = vcarveProject();
+    const warnings = detectMachineJobWarnings({
+      ...project,
+      machine: { ...DEFAULT_CNC_MACHINE_CONFIG, tools: [flatEngraver], toolId: flatEngraver.id },
+    });
+
+    expect(
+      warnings.some(
+        (warning) =>
+          warning.includes(LAYER_NAME) &&
+          warning.includes('finer than the generated detail path') &&
+          warning.includes('stays uncut'),
+      ),
+    ).toBe(true);
+  });
+
   it('notes a capped narrow-angle V-carve whose depth profile exceeds emitted precision', () => {
     // A valid 1° V-bit capped at 0.05 mm needs a depth transition finer than
     // the 0.001 mm emitted coordinate grid. Planning must SAY so instead of

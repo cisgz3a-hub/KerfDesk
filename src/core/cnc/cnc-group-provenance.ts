@@ -1,10 +1,12 @@
 import type { CncGroup } from '../job';
+import { isValidCncTipDiameterMm } from '../cnc-tip-diameter';
 import type { CncLayerSettings, CncTool } from '../scene';
 
 type CncGroupProvenance = Pick<
   CncGroup,
   | 'toolKind'
   | 'toolTipAngleDeg'
+  | 'toolTipDiameterMm'
   | 'toolFluteCount'
   | 'layerPrimaryToolId'
   | 'requestedDepthMm'
@@ -40,6 +42,9 @@ function toolProvenance(tool: CncTool, layerPrimaryTool: CncTool): CncGroupProve
   return {
     toolKind: tool.kind,
     ...(tool.tipAngleDeg === undefined ? {} : { toolTipAngleDeg: tool.tipAngleDeg }),
+    ...(tool.kind === 'engraving' && isValidCncTipDiameterMm(tool.tipDiameterMm, tool.diameterMm)
+      ? { toolTipDiameterMm: tool.tipDiameterMm }
+      : {}),
     ...(tool.fluteCount === undefined ? {} : { toolFluteCount: tool.fluteCount }),
     layerPrimaryToolId: layerPrimaryTool.id,
   };

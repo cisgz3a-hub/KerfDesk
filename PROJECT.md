@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 282. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 287. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -144,11 +144,11 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.0 | Governance: ADR-098, this table, F-CNC flows, verification checklist | Done |
 | H.1 | `CncPass` contour/path3d union (tidy-first) + plunged-rapid invariant | Built |
 | H.2 | Toolpath simulation: stock XY model, Z-aware steps, material-removal grid, depth-shaded preview | Built |
-| H.3 | True V-carving: certified vector-medial paths, `tipAngleDeg` boundary-distance depth law, explicit flat-depth mode, cone-footprint clearing | Built; hardware CLAIMED |
+| H.3 | True V-carving: certified vector-medial paths, shared pointed/truncated conical radial envelope, explicit flat-depth mode, envelope-footprint clearing | Built; hardware CLAIMED |
 | H.4 | Clean-room STL import → deterministic max-Z heightmap, `relief` SceneObject, canvas preview | Built |
 | H.5 | Relief roughing: heightmap dilation + marching squares → existing pocket engine | Built |
 | H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults | Built |
-| H.7 | Tool + feeds/speeds libraries (material-library pattern), multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |
+| H.7 | Tool + feeds/speeds libraries, including persisted engraving tip-flat geometry; multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |
 | H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover | Built |
 | H.9 | Motion polish: contour ramp entry for constant-depth operations; V-carve follows its certified variable-depth medial profile and reports any stored ramp request as advisory provenance; climb/conventional, entry-point rotation, parking parity (helical entry deferred; arc/line profile leads shipped — ADR-250) | Built; hardware CLAIMED |
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |

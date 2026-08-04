@@ -72,6 +72,7 @@ function sameCncTool(left: CncTool, right: CncTool): boolean {
     left.kind === right.kind &&
     left.diameterMm === right.diameterMm &&
     left.tipAngleDeg === right.tipAngleDeg &&
+    (left.tipDiameterMm ?? 0) === (right.tipDiameterMm ?? 0) &&
     left.fluteCount === right.fluteCount
   );
 }

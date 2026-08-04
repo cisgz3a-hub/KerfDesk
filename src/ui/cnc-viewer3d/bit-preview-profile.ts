@@ -5,6 +5,7 @@
 // metadata instead of inventing that transition.
 
 import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
+import { isValidCncTipDiameterMm } from '../../core/cnc-tip-diameter';
 import type { CncTool } from '../../core/scene';
 import { toolProfile, type ToolProfilePoint } from '../../core/sim';
 
@@ -21,9 +22,16 @@ export function bitPreviewGeometryIssue(tool: CncTool): string | null {
     // v-bit). Before that field existed there was genuinely nothing truthful to
     // model, so every engraving bit was refused. Now only a missing angle is,
     // and the simulator's own cuttingSurfaceDz draws the rest.
-    return isValidCncTipAngleDeg(tool.tipAngleDeg)
-      ? null
-      : 'A valid 1–179° included angle is required; no engraving cone was modeled.';
+    if (!isValidCncTipAngleDeg(tool.tipAngleDeg)) {
+      return 'A valid 1–179° included angle is required; no engraving cone was modeled.';
+    }
+    if (
+      tool.tipDiameterMm !== undefined &&
+      !isValidCncTipDiameterMm(tool.tipDiameterMm, tool.diameterMm)
+    ) {
+      return `The engraving tip flat must be from 0 to under ${tool.diameterMm} mm; no engraving cone was modeled.`;
+    }
+    return null;
   }
   return tool.kind === 'v-bit' && !isValidCncTipAngleDeg(tool.tipAngleDeg)
     ? 'A valid 1–179° included angle is required; no V-bit cone was modeled.'

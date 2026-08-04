@@ -19,6 +19,7 @@ import {
   findDroppedCncLayers,
 } from '../cnc';
 import { findCncVCarveEntryIssues } from '../cnc/vcarve-entry-diagnostics';
+import { isVCarveToolCompatible } from '../cnc/vcarve-tool-compatibility';
 import { machineBoundsForDevice } from '../devices';
 import {
   findNonFiniteCoords,
@@ -161,12 +162,12 @@ function appendCncLayerIssues(
   // mill would gouge full-width trenches at the commanded depths. H.7: the
   // layer's own bit (falling back to the machine bit) is what matters.
   const layerTool = layerCncTool(config, settings);
-  if (settings.cutType === 'v-carve' && layerTool.kind !== 'v-bit') {
+  if (settings.cutType === 'v-carve' && !isVCarveToolCompatible(layerTool)) {
     issues.push({
       code: 'cnc-settings-invalid',
       message:
-        `Layer ${layer.id}: V-carve requires a v-bit; the layer's bit ` +
-        `("${layerTool.name}") is not one. Pick a v-bit in Material & Bit.`,
+        `Layer ${layer.id}: V-carve requires a V-bit or angled engraving bit; the layer's bit ` +
+        `("${layerTool.name}") is not one. Pick a compatible bit in Material & Bit.`,
     });
   }
 }

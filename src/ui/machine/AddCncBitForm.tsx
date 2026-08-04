@@ -4,6 +4,7 @@ import {
   MIN_CNC_TIP_ANGLE_DEG,
   isValidCncTipAngleDeg,
 } from '../../core/cnc-tip-angle';
+import { isValidCncTipDiameterMm } from '../../core/cnc-tip-diameter';
 import type { CncToolKind } from '../../core/scene';
 import { useStore } from '../state';
 
@@ -196,7 +197,7 @@ function bitFormError(input: {
 function tipDiameterError(tipDiameter: string, diameterMm: number): string | null {
   if (tipDiameter.trim() === '') return null;
   const tipDiameterMm = Number(tipDiameter);
-  if (!Number.isFinite(tipDiameterMm) || tipDiameterMm < 0 || tipDiameterMm >= diameterMm) {
+  if (!isValidCncTipDiameterMm(tipDiameterMm, diameterMm)) {
     return `Enter a tip flat from 0 to under the ${diameterMm} mm cutter diameter, or leave it blank for a pointed bit.`;
   }
   return null;

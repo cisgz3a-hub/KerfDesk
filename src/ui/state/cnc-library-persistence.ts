@@ -146,6 +146,7 @@ function parseToolCore(record: Record<string, unknown>): CncTool | null {
 function parseToolMetadata(record: Record<string, unknown>): Partial<CncTool> {
   const metadata: {
     tipAngleDeg?: number;
+    tipDiameterMm?: number;
     family?: string;
     shankDiameterMm?: number;
     fluteCount?: number;
@@ -155,6 +156,15 @@ function parseToolMetadata(record: Record<string, unknown>): Partial<CncTool> {
   const catalogId = boundedString(record['catalogId']);
   if (isValidCncTipAngleDeg(record['tipAngleDeg'])) {
     metadata.tipAngleDeg = record['tipAngleDeg'];
+  }
+  // Preserve explicit finite malformed data so restore cannot reinterpret the
+  // cutter as a supported point. Entry UI still prevents creating such tools.
+  if (
+    record['kind'] === 'engraving' &&
+    typeof record['tipDiameterMm'] === 'number' &&
+    Number.isFinite(record['tipDiameterMm'])
+  ) {
+    metadata.tipDiameterMm = record['tipDiameterMm'];
   }
   if (family !== null) metadata.family = family;
   if (isPositive(record['shankDiameterMm'])) {

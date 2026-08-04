@@ -15,6 +15,14 @@ const V_BIT: CncTool = {
   diameterMm: 6.35,
   tipAngleDeg: 90,
 };
+const FLAT_ENGRAVER: CncTool = {
+  id: 'flat-engraver',
+  name: '90deg 0.4mm-tip engraver',
+  kind: 'engraving',
+  diameterMm: 2,
+  tipAngleDeg: 90,
+  tipDiameterMm: 0.4,
+};
 
 const CELL_MM = 0.5;
 
@@ -112,6 +120,29 @@ describe('designCarveHeightmap', () => {
       );
 
       expect(depthAtMm(map, 10, 10)).toBeCloseTo(-expectedDepthMm, 1);
+    },
+  );
+
+  it.each([
+    ['below', 0.3, false],
+    ['at', 0.4, false],
+    ['above', 0.6, true],
+  ] as const)(
+    'previews a feature $label the flat-tip diameter without inventing a point',
+    (_label, sizeMm, shouldCut) => {
+      const carve = layer({ id: 'L', cutType: 'v-carve', depthMm: 1, toolId: 'flat-engraver' });
+      const sketch: Sketch = {
+        entities: [rect('r', 'L', 0.2, 0.2, sizeMm)],
+        layers: [carve],
+      };
+      const map = designCarveHeightmap({
+        sketch,
+        stock: { widthMm: 1, heightMm: 1, thicknessMm: 1, originX: 0, originY: 0 },
+        mmPerCell: 0.05,
+        tools: [FLAT_ENGRAVER],
+        activeTool: FLAT_ENGRAVER,
+      });
+      expect(map.depth.some((value) => value < 0)).toBe(shouldCut);
     },
   );
 

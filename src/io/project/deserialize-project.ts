@@ -262,6 +262,11 @@ function normalizeCncToolMetadata(tool: Record<string, unknown>): Record<string,
   if (isValidCncTipAngleDeg(tool['tipAngleDeg'])) {
     metadata['tipAngleDeg'] = tool['tipAngleDeg'];
   }
+  // Keep an explicit finite malformed flat visible. Dropping the field would
+  // silently turn the saved cutter into the supported pointed law on reload.
+  if (tool['kind'] === 'engraving' && isFiniteNumber(tool['tipDiameterMm'])) {
+    metadata['tipDiameterMm'] = tool['tipDiameterMm'];
+  }
   if (family !== null) metadata['family'] = family;
   if (isFiniteNumber(tool['shankDiameterMm']) && tool['shankDiameterMm'] > 0) {
     metadata['shankDiameterMm'] = tool['shankDiameterMm'];

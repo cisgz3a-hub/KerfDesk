@@ -19,6 +19,26 @@ describe('vcarveEffectiveDepthMm', () => {
     expect(vcarveEffectiveDepthMm(tool(), 2)).toBe(2);
   });
 
+  it('subtracts the engraving tip radius from the available conical flank', () => {
+    const flatTip = tool({
+      kind: 'engraving',
+      diameterMm: 2,
+      tipAngleDeg: 90,
+      tipDiameterMm: 0.4,
+    });
+    expect(vcarveEffectiveDepthMm(flatTip, 10)).toBeCloseTo(0.8, 12);
+    expect(vcarveEffectiveDepthMm({ ...flatTip, tipDiameterMm: 0 }, 10)).toBeCloseTo(1, 12);
+  });
+
+  it('does not reinterpret an impossible explicit engraving tip as a point', () => {
+    expect(
+      vcarveEffectiveDepthMm(
+        tool({ kind: 'engraving', diameterMm: 2, tipAngleDeg: 90, tipDiameterMm: 2 }),
+        1,
+      ),
+    ).toBeNull();
+  });
+
   it.each([undefined, 0.5, 179.5, Number.NaN])(
     'does not resolve invalid actual V-bit angle geometry: %s',
     (tipAngleDeg) => {

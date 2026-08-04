@@ -1,4 +1,5 @@
 import type { Vec3 } from '../geometry/vec3';
+import { radialEnvelopeSweepRadiiMm, type RadialEnvelope } from './radial-envelope';
 
 const QUADRATIC_EPSILON_MM2 = 1e-14;
 
@@ -14,7 +15,7 @@ export type VCarveEmittedCapsule = {
 /** Build expanded swept-cone capsules for an emitted V-carve profile. */
 export function buildVCarveEmittedCapsules(
   points: ReadonlyArray<Vec3>,
-  tanHalf: number,
+  envelope: RadialEnvelope,
   toleranceMm: number,
 ): ReadonlyArray<VCarveEmittedCapsule> {
   const capsules: VCarveEmittedCapsule[] = [];
@@ -22,7 +23,8 @@ export function buildVCarveEmittedCapsules(
     const a = points[index - 1];
     const b = points[index];
     if (a === undefined || b === undefined) continue;
-    const radius = Math.max(-a.z * tanHalf, -b.z * tanHalf, 0) + toleranceMm;
+    const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(envelope, -a.z, -b.z);
+    const radius = Math.max(radiusA, radiusB) + toleranceMm;
     capsules.push({
       a,
       b,
@@ -40,28 +42,49 @@ export function vcarveCapsuleContainsChord(
   capsule: VCarveEmittedCapsule,
   a: Vec3,
   b: Vec3,
-  tanHalf: number,
+  envelope: RadialEnvelope,
   toleranceMm: number,
 ): boolean {
+  const [referenceRadiusA, referenceRadiusB] = radialEnvelopeSweepRadiiMm(envelope, -a.z, -b.z);
+  const [capsuleRadiusA, capsuleRadiusB] = radialEnvelopeSweepRadiiMm(
+    envelope,
+    -capsule.a.z,
+    -capsule.b.z,
+  );
   if (
-    !vcarveDiskFitsCapsuleBounds(a, capsule, tanHalf) ||
-    !vcarveDiskFitsCapsuleBounds(b, capsule, tanHalf)
+    !vcarveDiskFitsCapsuleBounds(a, referenceRadiusA, capsule) ||
+    !vcarveDiskFitsCapsuleBounds(b, referenceRadiusB, capsule)
   ) {
     return false;
   }
   return (
-    diskContainedInChord(a, capsule.a, capsule.b, tanHalf, toleranceMm) &&
-    diskContainedInChord(b, capsule.a, capsule.b, tanHalf, toleranceMm)
+    diskContainedInChord(
+      a,
+      referenceRadiusA,
+      capsule.a,
+      capsule.b,
+      capsuleRadiusA,
+      capsuleRadiusB,
+      toleranceMm,
+    ) &&
+    diskContainedInChord(
+      b,
+      referenceRadiusB,
+      capsule.a,
+      capsule.b,
+      capsuleRadiusA,
+      capsuleRadiusB,
+      toleranceMm,
+    )
   );
 }
 
 /** Cheaply test whether a reference disk fits an emitted capsule's bounds. */
 export function vcarveDiskFitsCapsuleBounds(
   point: Vec3,
+  radius: number,
   capsule: VCarveEmittedCapsule,
-  tanHalf: number,
 ): boolean {
-  const radius = Math.max(0, -point.z * tanHalf);
   return (
     point.x - radius >= capsule.minX &&
     point.x + radius <= capsule.maxX &&
@@ -72,16 +95,16 @@ export function vcarveDiskFitsCapsuleBounds(
 
 function diskContainedInChord(
   point: Vec3,
+  pointRadius: number,
   a: Vec3,
   b: Vec3,
-  tanHalf: number,
+  radiusA: number,
+  radiusB: number,
   toleranceMm: number,
 ): boolean {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const radiusA = Math.max(0, -a.z * tanHalf);
-  const radiusDelta = Math.max(0, -b.z * tanHalf) - radiusA;
-  const pointRadius = Math.max(0, -point.z * tanHalf);
+  const radiusDelta = radiusB - radiusA;
   const marginAtZero = radiusA + toleranceMm - pointRadius;
   const interval = nonnegativeLinearInterval(marginAtZero, radiusDelta);
   if (interval === null) return false;
