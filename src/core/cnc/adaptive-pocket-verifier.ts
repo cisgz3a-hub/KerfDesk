@@ -1,6 +1,9 @@
-import { pointInPolygon } from '../geometry';
 import type { Polyline, Vec2 } from '../scene';
 import type { AdaptivePocketPlan } from './adaptive-pocket';
+import {
+  createAdaptivePocketStockGrid,
+  type AdaptivePocketGrid as Grid,
+} from './adaptive-pocket-verification-grid';
 
 export type AdaptivePocketVerification =
   | {
@@ -17,19 +20,8 @@ export type AdaptivePocketVerification =
       readonly maxSimulatedEngagementMm?: number;
     };
 
-const MAX_GRID_CELLS = 1_000_000;
-const MIN_GRID_MM = 0.05;
 const COVERAGE_TARGET = 0.985;
 const CONTACT_BINS = 180;
-
-type Grid = {
-  readonly cellMm: number;
-  readonly height: number;
-  readonly minX: number;
-  readonly minY: number;
-  readonly occupied: Uint8Array;
-  readonly width: number;
-};
 
 export function verifyAdaptivePocket(
   contours: ReadonlyArray<Polyline>,
@@ -37,7 +29,7 @@ export function verifyAdaptivePocket(
   plan: AdaptivePocketPlan,
 ): AdaptivePocketVerification {
   if (!plan.ok) return { ok: false, reason: plan.reason };
-  const gridResult = createStockGrid(contours, toolDiameterMm, plan.optimalLoadMm);
+  const gridResult = createAdaptivePocketStockGrid(contours, toolDiameterMm, plan);
   if (!gridResult.ok) return gridResult;
   const grid = gridResult.grid;
   const initialStock = countOccupied(grid.occupied);
@@ -99,43 +91,6 @@ function verificationResult(
     };
   }
   return { ok: true, coverageRatio, gridMm: grid.cellMm, maxSimulatedEngagementMm };
-}
-
-type GridResult =
-  | { readonly ok: true; readonly grid: Grid }
-  | { readonly ok: false; readonly reason: string };
-
-function createStockGrid(
-  contours: ReadonlyArray<Polyline>,
-  toolDiameterMm: number,
-  optimalLoadMm: number,
-): GridResult {
-  const bounds = contourBounds(contours);
-  if (bounds === null) return { ok: false, reason: 'Adaptive verification has no pocket bounds.' };
-  const cellMm = Math.max(MIN_GRID_MM, Math.min(optimalLoadMm / 2, toolDiameterMm / 16, 0.25));
-  const width = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) / cellMm));
-  const height = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) / cellMm));
-  if (width * height > MAX_GRID_CELLS) {
-    return {
-      ok: false,
-      reason: 'Adaptive verification grid is too large; split the pocket into smaller operations.',
-    };
-  }
-  const grid: Grid = {
-    cellMm,
-    height,
-    minX: bounds.minX,
-    minY: bounds.minY,
-    occupied: new Uint8Array(width * height),
-    width,
-  };
-  for (let row = 0; row < height; row += 1) {
-    for (let col = 0; col < width; col += 1) {
-      if (pointInContours(cellCenter(grid, col, row), contours))
-        grid.occupied[row * width + col] = 1;
-    }
-  }
-  return { ok: true, grid };
 }
 
 function clearEntrySweep(
@@ -269,30 +224,6 @@ function visitDiskCells(
 
 function cellCenter(grid: Grid, col: number, row: number): Vec2 {
   return { x: grid.minX + (col + 0.5) * grid.cellMm, y: grid.minY + (row + 0.5) * grid.cellMm };
-}
-
-function contourBounds(
-  contours: ReadonlyArray<Polyline>,
-): { minX: number; minY: number; maxX: number; maxY: number } | null {
-  let bounds: { minX: number; minY: number; maxX: number; maxY: number } | null = null;
-  for (const contour of contours) {
-    for (const point of contour.points) {
-      if (bounds === null) bounds = { minX: point.x, minY: point.y, maxX: point.x, maxY: point.y };
-      else {
-        bounds.minX = Math.min(bounds.minX, point.x);
-        bounds.minY = Math.min(bounds.minY, point.y);
-        bounds.maxX = Math.max(bounds.maxX, point.x);
-        bounds.maxY = Math.max(bounds.maxY, point.y);
-      }
-    }
-  }
-  return bounds;
-}
-
-function pointInContours(point: Vec2, contours: ReadonlyArray<Polyline>): boolean {
-  let inside = false;
-  for (const contour of contours) if (pointInPolygon(point, contour.points)) inside = !inside;
-  return inside;
 }
 
 function countOccupied(cells: Uint8Array): number {
