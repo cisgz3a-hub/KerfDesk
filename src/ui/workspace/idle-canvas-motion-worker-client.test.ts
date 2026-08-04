@@ -14,6 +14,7 @@ class FakeWorker {
   static instances: FakeWorker[] = [];
   public onmessage: ((event: MessageEvent) => void) | null = null;
   public onerror: (() => void) | null = null;
+  public onmessageerror: (() => void) | null = null;
   public readonly posted: Posted[] = [];
   public terminated = false;
 
@@ -31,6 +32,10 @@ class FakeWorker {
 
   reply(id: number): void {
     this.onmessage?.({ data: { id, kind: 'ok', plan: null } } as MessageEvent);
+  }
+
+  failToCloneResponse(): void {
+    this.onmessageerror?.();
   }
 }
 
@@ -82,5 +87,16 @@ describe('idle canvas motion worker client', () => {
     const newestId = newestWorker?.posted[0]?.id ?? -1;
     newestWorker?.reply(newestId);
     await expect(second).resolves.toBeNull();
+  });
+
+  it('rejects and retires a worker whose response cannot be cloned', async () => {
+    vi.stubGlobal('Worker', FakeWorker as unknown as typeof Worker);
+    const pending = prepareIdleCanvasMotionPlanOffThread(REQUEST);
+    const worker = FakeWorker.instances[0];
+
+    worker?.failToCloneResponse();
+
+    await expect(pending).rejects.toThrow('response was not cloneable');
+    expect(worker?.terminated).toBe(true);
   });
 });

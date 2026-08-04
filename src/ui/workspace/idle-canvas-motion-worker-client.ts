@@ -82,6 +82,13 @@ function ensureWorker(): Worker | null {
       retireWorker();
       active?.reject(new Error('idle canvas motion worker errored'));
     };
+    created.onmessageerror = (): void => {
+      if (workerInstance !== created) return;
+      const active = pending;
+      pending = null;
+      retireWorker();
+      active?.reject(new Error('idle canvas motion worker response was not cloneable'));
+    };
     workerInstance = created;
     return created;
   } catch {
