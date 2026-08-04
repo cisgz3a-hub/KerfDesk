@@ -1,9 +1,10 @@
-// Max-plus heightmap dilation (Phase H.5, ADR-098): the SAFE tool-center
-// height field. A tool tip at (x, y) may descend to
+// Max-plus heightmap dilation (Phase H.5, ADR-098/ADR-289): the sampled
+// tool-center height field. At a grid point, a tool tip may descend to
 //   dilated(x, y) = max over kernel offsets of (h(x+dx, y+dy) − dz)
-// without cutting below the target surface anywhere under its footprint
+// without cutting below the sampled target values under its discrete kernel
 // (dz is the cutting surface's clearance above the tip at that offset —
-// core/sim/tool-kernels). Adding a finishing allowance lifts the whole
+// core/sim/tool-kernels). Continuous sweep remains outside this proof. Adding
+// a finishing allowance lifts the whole
 // roughing target so H.8's ball-nose pass has material to finish.
 //
 // Out-of-bounds neighbors are ignored (treated as bottomless), so the field

@@ -32,18 +32,39 @@ export function heightmapCellSize(
   const requestedError = validateFinitePositive('Heightmap cell size', requested);
   if (requestedError !== null) return requestedError;
   const safe = Math.max(1e-3, requested);
-  const cells = Math.ceil(widthMm / safe) * Math.ceil(heightMm / safe);
-  if (Number.isFinite(cells) && cells <= MAX_HEIGHTMAP_CELLS) {
+  if (heightmapFits(widthMm, heightMm, safe)) {
     return { kind: 'ok', mmPerCell: safe };
   }
-  const area = widthMm * heightMm;
-  if (!Number.isFinite(area)) {
-    return { kind: 'error', reason: 'Heightmap dimensions exceed numeric limits.' };
+
+  // A square-root area estimate is insufficient for highly anisotropic maps:
+  // ceil(width / cell) * ceil(height / cell) can remain above the cap, and the
+  // estimate can even be smaller than the requested cell size. Keep the
+  // requested size as the unsafe lower bound and bisect logarithmically toward
+  // a known-safe one-cell-per-axis upper bound. This is deterministic across
+  // the full finite-positive input range and can only coarsen resolution.
+  let lower = safe;
+  let upper = Math.max(widthMm, heightMm, safe);
+  for (let iteration = 0; iteration < 64; iteration += 1) {
+    const midpoint = Math.exp((Math.log(lower) + Math.log(upper)) / 2);
+    if (!(midpoint > lower && midpoint < upper)) break;
+    if (heightmapFits(widthMm, heightMm, midpoint)) {
+      upper = midpoint;
+    } else {
+      lower = midpoint;
+    }
   }
-  const mmPerCell = Math.sqrt(area / MAX_HEIGHTMAP_CELLS);
-  return Number.isFinite(mmPerCell) && mmPerCell > 0
-    ? { kind: 'ok', mmPerCell }
-    : { kind: 'error', reason: 'Heightmap dimensions exceed numeric limits.' };
+  return { kind: 'ok', mmPerCell: upper };
+}
+
+function heightmapFits(widthMm: number, heightMm: number, mmPerCell: number): boolean {
+  // Match meshToHeightmap's allocation law exactly. A subnormal dimension can
+  // underflow to zero after division, but downstream still allocates one cell.
+  const widthCells = Math.max(1, Math.ceil(widthMm / mmPerCell));
+  if (!Number.isFinite(widthCells) || widthCells > MAX_HEIGHTMAP_CELLS) return false;
+  const heightCells = Math.max(1, Math.ceil(heightMm / mmPerCell));
+  return (
+    Number.isFinite(heightCells) && heightCells <= Math.floor(MAX_HEIGHTMAP_CELLS / widthCells)
+  );
 }
 
 export function heightmapDepthAt(map: Heightmap, cx: number, cy: number): number {

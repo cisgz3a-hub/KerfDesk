@@ -3,15 +3,20 @@
 // by design: the main compiler dispatches, this file owns the relief branch.
 //
 // Per relief on the layer: rebuild the heightmap from the embedded mesh
-// (coarsened to tool-diameter/8 cells — roughing tolerance, keeps compile
-// fast), generate waterline roughing passes in heightmap-local mm, then map
-// every vertex through the object transform and the device origin — exactly
-// how vector paths reach machine coordinates, so rotation/scale/mirror are
-// honored.
+// (coarsened to tool-diameter/8 cells for roughing), apply XY scale before
+// physical cutter dilation and spacing, then map every vertex through only
+// the residual mirror/rotation/translation and the device origin. Cutter
+// geometry therefore stays in machine millimetres under uniform and
+// nonuniform object scale.
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
-import { DEFAULT_RELIEF_SCALLOP_MM, meshToHeightmap, reliefFinishingPasses } from '../relief';
+import {
+  DEFAULT_RELIEF_SCALLOP_MM,
+  meshToHeightmap,
+  reliefFinishingPasses,
+  scallopRowSpacingMm,
+} from '../relief';
 import { cachedFloat32Array } from '../util';
 // Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink, so the ladder
@@ -32,6 +37,7 @@ import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
 import { cncGroupProvenance } from './cnc-group-provenance';
 import { parkFields } from './motion-polish';
+import { reliefMachineSpaceTransform } from './relief-machine-space';
 
 const MIN_FEED_MM_PER_MIN = 1;
 const MIN_ROUGHING_CELL_MM = 0.2;
@@ -102,7 +108,7 @@ function reliefGroup(
 
 // The H.8 finishing skim: its own heightmap at the finishing bit's (finer)
 // resolution, serpentine max-plus tip-surface rows, mapped through the
-// object transform + device origin exactly like roughing.
+// machine-space residual transform + device origin exactly like roughing.
 function reliefFinishingGroup(
   reliefs: ReadonlyArray<ReliefObject>,
   layer: Layer,
@@ -114,17 +120,21 @@ function reliefFinishingGroup(
   const finishTool = config.tools.find((tool) => tool.id === settings.reliefFinishToolId);
   if (finishTool === undefined) return null;
   const scallopMm = settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM;
+  const rowSpacingMm = scallopRowSpacingMm(finishTool, scallopMm);
   const passes: CncPass[] = [];
   for (const relief of reliefs) {
+    const machineSpace = reliefMachineSpaceTransform(relief.transform);
     const heightmap = meshToHeightmap(
       { positions: cachedFloat32Array(relief, relief.meshPositions) },
       {
         targetWidthMm: relief.targetWidthMm,
         reliefDepthMm: relief.reliefDepthMm,
         emptyCells: relief.emptyCells,
-        mmPerCell: Math.max(
-          MIN_FINISHING_CELL_MM,
-          finishTool.diameterMm / FINISHING_CELL_TOOL_FRACTION,
+        targetScaleX: machineSpace.targetScaleX,
+        targetScaleY: machineSpace.targetScaleY,
+        mmPerCell: Math.min(
+          rowSpacingMm,
+          Math.max(MIN_FINISHING_CELL_MM, finishTool.diameterMm / FINISHING_CELL_TOOL_FRACTION),
         ),
       },
     );
@@ -139,7 +149,7 @@ function reliefFinishingGroup(
       passes.push({
         ...pass,
         points: pass.points.map((p) => ({
-          ...toMachineCoords(applyTransform(p, relief.transform), device),
+          ...toMachineCoords(applyTransform(p, machineSpace.residualTransform), device),
           z: p.z,
         })),
       });
@@ -177,12 +187,15 @@ function reliefLadderFor(
   settings: CncLayerSettings,
   tool: CncTool,
 ): ReliefRoughingLadder {
+  const machineSpace = reliefMachineSpaceTransform(relief.transform);
   const heightmap = meshToHeightmap(
     { positions: cachedFloat32Array(relief, relief.meshPositions) },
     {
       targetWidthMm: relief.targetWidthMm,
       reliefDepthMm: relief.reliefDepthMm,
       emptyCells: relief.emptyCells,
+      targetScaleX: machineSpace.targetScaleX,
+      targetScaleY: machineSpace.targetScaleY,
       mmPerCell: Math.max(MIN_ROUGHING_CELL_MM, tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION),
     },
   );
@@ -219,12 +232,13 @@ function appendReliefPasses(
   device: DeviceProfile,
   tool: CncTool,
 ): void {
+  const residualTransform = reliefMachineSpaceTransform(relief.transform).residualTransform;
   for (const pass of reliefLadderFor(relief, settings, tool).passes) {
     if (pass.kind !== 'contour') continue;
     passes.push({
       ...pass,
       polyline: pass.polyline.map((p) =>
-        toMachineCoords(applyTransform(p, relief.transform), device),
+        toMachineCoords(applyTransform(p, residualTransform), device),
       ),
     });
   }

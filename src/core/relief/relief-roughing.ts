@@ -1,6 +1,6 @@
 // reliefRoughingPasses — waterline roughing of a heightmap (Phase H.5,
-// ADR-098). For each Z level from zPassDepths, cells whose dilated (safe
-// tool-center) target lies at or below the level form the region the tool
+// ADR-098/ADR-289). For each Z level from zPassDepths, cells whose dilated
+// sampled tool-center target lies at or below the level form the region the tool
 // must clear at that level; marching squares turns the region into closed
 // contours, and concentric inward rings at the stepover spacing fill it.
 //
@@ -8,10 +8,10 @@
 // region boundary directly — no additional tool-radius inset (deliberate
 // deviation from pocketToolpathRings, which would double-count the radius).
 //
-// Output passes are contour passes in HEIGHTMAP-LOCAL mm (origin at the
-// heightmap's min corner, y down); the compiler maps them through the
-// object transform and the device origin. Depth-major: every ring of one
-// level before the next level down. Pure and deterministic.
+// Output passes are contour passes in heightmap physical mm (origin at the
+// heightmap's min corner, y down). The compiler has already folded object XY
+// scale into that grid, so only its residual isometry and device origin remain.
+// Depth-major: every ring of one level before the next. Pure and deterministic.
 
 import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncContourPass, CncPass } from '../job';
@@ -117,10 +117,11 @@ function appendLevelRings(
 ): boolean {
   const usable = contours.filter((c) => c.points.length >= MIN_RING_POINTS);
   if (usable.length === 0) return false;
-  // Ring 0 = the region boundary itself (tool-center-safe by construction);
-  // deeper rings shrink inward by the stepover until they vanish. Step 0's
-  // inset is 0, which the offset engine returns unchanged, so ring 0 is still
-  // exactly `usable`.
+  // Ring 0 = the dual-grid region boundary. Its vertices are marching-squares
+  // edge midpoints rather than evaluated dilation samples, so pointwise cutter
+  // clearance is outside the sampled-grid proof (ADR-289). Deeper rings shrink
+  // inward by the stepover until they vanish. Step 0's inset is 0, which the
+  // offset engine returns unchanged, so ring 0 is still exactly `usable`.
   const ladder = buildOffsetLadder(usable, MAX_RINGS_PER_LEVEL, (step) => step * stepMm);
   for (const ring of ladder.rings) {
     for (const polyline of ring) {

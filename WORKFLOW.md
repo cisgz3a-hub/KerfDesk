@@ -2508,20 +2508,23 @@ F-CNC19 tiling.
 
 #### Success
 1. A relief object on an output-enabled layer compiles to waterline
-   roughing: the heightmap is dilated by the active bit's footprint plus a
-   0.5 mm finishing allowance (gouge-free by construction), sliced into Z
-   levels by the layer's depth-per-pass, and each level's region fills
-   with concentric rings at the layer's stepover.
+   roughing: object XY scale is first rasterized into square physical-mm
+   heightmap cells, then the map is dilated by the active bit's footprint
+   plus a 0.5 mm finishing allowance, sliced into Z levels by the layer's
+   depth-per-pass, and each level's region fills with concentric rings at
+   the layer's physical stepover.
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
-3. Emitted G-code passes the plunged-travel invariant; the object transform
-   (move/scale/rotate) is honored.
+3. Emitted G-code passes the plunged-travel invariant; scale is resolved
+   before cutter geometry, then mirror/rotate/move placement is honored.
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
    there — fine detail is left for the H.8 finishing pass (and the
-   preview shows it uncut). Nothing gouges.
+   preview shows it uncut). This is a sampled-grid region result; roughing's
+   dual-grid/offset vertices, continuous sweep, and subcell detail retain
+   ADR-289's qualification boundary.
 
 #### Empty
 1. A flat mesh or a zero-depth relief compiles to no passes; the layer
@@ -2531,8 +2534,9 @@ F-CNC19 tiling.
 1. If the 0.5 mm allowance meets or exceeds the relief depth, only the
    shallowest levels produce regions (possibly none) — correct: there is
    nothing to rough without cutting into finishing stock.
-2. Roughing samples the heightmap at bit-diameter/8 cells (0.2 mm floor),
-   so compile stays fast even for large meshes.
+2. Roughing samples the physical heightmap at bit-diameter/8 cells (0.2 mm
+   floor), so compile stays bounded; the four-million-cell cap coarsens in
+   the final scaled metric for very large meshes.
 
 ### F-CNC7. Import an STL relief — Phase H.4
 
@@ -3057,13 +3061,17 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. A relief layer's "Finish with" select names the finishing bit; the
-   scallop field sets the ridge-height target. Compile then emits the
+   scallop field requests a planar-grid ridge-height target. Compile then emits the
    roughing group AND a finishing group cut with that bit (an M0 change
    separates them when the bits differ).
-2. Finishing rides the max-plus tip surface — the bit tip can never cut
-   below the target anywhere under its footprint — in serpentine rows
-   spaced 2·sqrt(c·(2r−c)) for a ball nose (flat bits step 40% of
-   diameter).
+2. Finishing rides the sampled max-plus tip surface in serpentine rows. A
+   ball nose requests 2·sqrt(c·(2r−c)) physical-XY spacing (flat bits request
+   40% of diameter); the grid refines when needed and its whole-row stride
+   rounds down so it does not overshoot that request. This qualifies finishing
+   sample vertices and planar cusp only when the four-million-cell cap has not
+   coarsened one cell past the request. It is not a continuous swept-volume or
+   true along-surface scallop proof; roughing contour vertices are also outside
+   the pointwise sampled-envelope qualification (ADR-289).
 3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
    pass); finishing consumes it down to the true surface.
 
@@ -3078,7 +3086,12 @@ and lifts the command's CNC-only gate.)*
 
 #### Edge — flat reliefs / tiny scallop
 1. A flat surface skims at exactly its depth; scallop clamps to
-   [0.001 mm, bit radius] and row spacing floors at 0.05 mm.
+   [0.001 mm, bit radius]. Ball-nose spacing follows that clamped analytic
+   request; flat-tool row spacing retains its 0.05 mm floor.
+2. Uniform and nonuniform object scale are resolved before sampling, cutter
+   dilation, and row spacing. Mirror/rotation/translation are residual
+   isometries. Subcell peaks, edge overhang, straight XYZ chords between
+   samples, and holder/shank clearance remain unqualified (ADR-289).
 
 ### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
 

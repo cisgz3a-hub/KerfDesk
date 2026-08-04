@@ -1,6 +1,7 @@
 // meshToHeightmap — sample a triangle mesh into a carveable heightmap
-// (Phase H.4, ADR-098). The mesh's XY bounds scale uniformly to the target
-// width (height follows the aspect ratio); its Z range normalizes to
+// (Phase H.4, ADR-098/ADR-289). The mesh's XY bounds first map to the target
+// width (height follows the aspect ratio), then optional positive axis scales
+// place that surface in square physical-mm cells. Its Z range normalizes to
 // [−reliefDepthMm, 0] with the mesh's highest point at the stock top.
 // Cells no triangle covers are the relief "background": 'floor' (default)
 // carves them away to −reliefDepthMm so the model stands proud; 'top'
@@ -18,6 +19,9 @@ export type MeshHeightmapOptions = {
   readonly reliefDepthMm: number;
   readonly mmPerCell?: number;
   readonly emptyCells?: 'floor' | 'top';
+  /** Positive XY scale applied before rasterization into square physical-mm cells. */
+  readonly targetScaleX?: number;
+  readonly targetScaleY?: number;
 };
 
 export type MeshHeightmapResult =
@@ -45,20 +49,9 @@ export function meshToHeightmap(
   if (!Number.isFinite(xExtent) || !Number.isFinite(yExtent)) {
     return { kind: 'error', reason: 'Mesh bounds must be finite.' };
   }
-  if (
-    !Number.isFinite(options.targetWidthMm) ||
-    !Number.isFinite(options.reliefDepthMm) ||
-    options.targetWidthMm <= 0 ||
-    options.reliefDepthMm <= 0
-  ) {
-    return {
-      kind: 'error',
-      reason: 'Target width and relief depth must be finite positive numbers.',
-    };
-  }
-
-  const widthMm = options.targetWidthMm;
-  const heightMm = (yExtent / xExtent) * widthMm;
+  const targetMetrics = targetSize(options, yExtent / xExtent);
+  if (targetMetrics.kind === 'error') return targetMetrics;
+  const { widthMm, heightMm } = targetMetrics;
   const size = heightmapCellSize(widthMm, heightMm, options.mmPerCell ?? DEFAULT_HEIGHTMAP_CELL_MM);
   if (size.kind === 'error') return size;
   const { mmPerCell } = size;
@@ -78,6 +71,33 @@ export function meshToHeightmap(
     widthMm,
     heightMm,
   };
+}
+
+type TargetSizeResult =
+  | { readonly kind: 'ok'; readonly widthMm: number; readonly heightMm: number }
+  | { readonly kind: 'error'; readonly reason: string };
+
+function targetSize(options: MeshHeightmapOptions, aspect: number): TargetSizeResult {
+  if (!positiveFinite(options.targetWidthMm) || !positiveFinite(options.reliefDepthMm)) {
+    return {
+      kind: 'error',
+      reason: 'Target width and relief depth must be finite positive numbers.',
+    };
+  }
+  const targetScaleX = options.targetScaleX ?? 1;
+  const targetScaleY = options.targetScaleY ?? 1;
+  if (!positiveFinite(targetScaleX) || !positiveFinite(targetScaleY)) {
+    return { kind: 'error', reason: 'Target XY scale must be finite and positive.' };
+  }
+  return {
+    kind: 'ok',
+    widthMm: options.targetWidthMm * targetScaleX,
+    heightMm: aspect * options.targetWidthMm * targetScaleY,
+  };
+}
+
+function positiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }
 
 function rasterizeMesh(

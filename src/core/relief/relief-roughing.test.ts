@@ -83,7 +83,7 @@ describe('reliefRoughingPasses', () => {
     }
   });
 
-  it('never gouges: every pass vertex stays at or above the dilated target', () => {
+  it('bounds nearest-cell depth discrepancy for dual-grid contour vertices', () => {
     const result = heightmapOf(pyramidRelief());
     if (result.kind !== 'ok') throw new Error(result.reason);
     const map = result.heightmap;
@@ -114,7 +114,8 @@ describe('reliefRoughingPasses', () => {
         const { cx, cy } = gridCellOfPoint(grid, p.x, p.y);
         if (cx < 0 || cy < 0 || cx >= map.widthCells || cy >= map.heightCells) continue;
         const target = dilated[cy * map.widthCells + cx] ?? 0;
-        // Half-cell slack: contour vertices sit on cell boundaries.
+        // A full-cell tolerance records this compatibility bound; it is not a
+        // pointwise cutter-envelope proof because vertices lie between samples.
         if (pass.zMm < target - map.mmPerCell - 1e-6) violations += 1;
       }
     }
