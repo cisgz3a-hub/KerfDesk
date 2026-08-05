@@ -8,6 +8,7 @@ import { installConnectedScriptCompilationProject } from './fixtures/connected-s
 import { showGcodeCanvas } from './fixtures/mixed-canvas-project';
 
 const POST_COMPLETION_WINDOW_MS = 750;
+const IDLE_WORKER_START_TIMEOUT_MS = 10_000;
 const READINESS_TIMEOUT_MS = 90_000;
 const TEST_TIMEOUT_MS = 180_000;
 
@@ -18,7 +19,16 @@ test('real multi-artwork Dancing Script compiles off-thread into responsive G-co
   const workerUrls: string[] = [];
   page.on('worker', (worker) => workerUrls.push(worker.url()));
   await page.goto('/');
+
+  // Wait for the background canvas planner to own the installed project before
+  // G-code takes ownership and cancels it. This keeps the measured transition
+  // deterministic and matches the established heavy-canvas coverage.
+  const idleWorkerStarted = page.waitForEvent('worker', {
+    predicate: (worker) => worker.url().includes('idle-canvas-motion-worker'),
+    timeout: IDLE_WORKER_START_TIMEOUT_MS,
+  });
   await installConnectedScriptCompilationProject(page);
+  await idleWorkerStarted;
 
   // Font parsing and fixture construction are setup, not G-code compilation.
   await startResponsivenessProbe(page);
