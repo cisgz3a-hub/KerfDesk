@@ -41,6 +41,11 @@ test('real multi-artwork Dancing Script compiles off-thread into responsive G-co
     type: 'measurement',
     description: `4-artwork Dancing Script G-code 3D: compileMs=${compileElapsedMs}`,
   });
+  const hardwareConcurrency = await page.evaluate(() => navigator.hardwareConcurrency);
+  console.info(
+    'connected-script G-code 3D responsiveness',
+    JSON.stringify({ compileElapsedMs, hardwareConcurrency, initialOpen, workerUrls }),
+  );
   assertResponsivePhase(testInfo, 'connected-script G-code 3D initial open', initialOpen);
 
   await startResponsivenessProbe(page);
@@ -54,6 +59,10 @@ test('real multi-artwork Dancing Script compiles off-thread into responsive G-co
   });
   await page.waitForTimeout(POST_COMPLETION_WINDOW_MS);
   const inspectorOpen = await stopResponsivenessProbe(page);
+  console.info(
+    'connected-script G-code Inspector responsiveness',
+    JSON.stringify({ inspectorOpen }),
+  );
   assertResponsivePhase(testInfo, 'connected-script G-code Inspector open', inspectorOpen);
   await inspector.getByRole('button', { name: 'Close' }).click();
 
