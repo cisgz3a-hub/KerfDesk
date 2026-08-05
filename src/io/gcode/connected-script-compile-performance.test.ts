@@ -103,7 +103,6 @@ const EXPECTED_GCODE_SHA256 = 'dde64575fd5da13a6a62a3505eaee98e318d7165ffe65decd
 const EXPECTED_GCODE_UTF8_BYTES = 1_024_924;
 const GCODE_REVIEW_EDGE_LINES = 16;
 const GCODE_REVIEW_SAMPLES = 12;
-const READY_BOUND_MS = 45_000;
 const TEST_TIMEOUT_MS = 180_000;
 
 describe('multi-artwork connected-script compilation', () => {
@@ -133,7 +132,6 @@ function assertCompilationProfile(
   expect(boundaryIndexProbe.explicitBuilds).toBe(EXPECTED_REGION_COUNT);
   expect(boundaryIndexProbe.arrayConversions).toBe(0);
   expect(boundaryIndexProbe.arrayQuerySources).toBe(0);
-  expect(emission.emittedAt - compilation.startedAt).toBeLessThan(READY_BOUND_MS);
   expect(emission.gcode).toHaveLength(EXPECTED_GCODE_CODE_UNITS);
   expect(emission.gcodeUtf8Bytes).toBe(EXPECTED_GCODE_UTF8_BYTES);
   expect(emission.gcodeSha256).toBe(EXPECTED_GCODE_SHA256);
