@@ -13,14 +13,18 @@ import {
   type LensLegend,
 } from './lenses';
 
-export function InspectorLensControl(props: {
+type InspectorLensControlProps = {
   readonly model: GcodeRenderModel;
   readonly time: ProgramTimeModel;
   readonly theme: Viewer3dTheme;
   readonly lens: LensId;
   readonly onLensChange: (lens: LensId) => void;
+  /** Sidebar fills the readout column; overlay adds compact positioned chrome. */
   readonly variant: 'sidebar' | 'overlay';
-}): JSX.Element {
+};
+
+/** Shared colour selector and accessible legend for both G-code 3D surfaces. */
+export function InspectorLensControl(props: InspectorLensControlProps): JSX.Element {
   const legend = useMemo(
     () => lensLegend(props.model, props.time, props.lens, props.theme),
     [props.model, props.time, props.lens, props.theme],
@@ -30,7 +34,10 @@ export function InspectorLensControl(props: {
       {props.variant === 'overlay' ? <strong style={titleStyle}>Colour by</strong> : null}
       <select
         value={props.lens}
-        onChange={(event) => props.onLensChange(event.currentTarget.value as LensId)}
+        onChange={(event) => {
+          const nextLens = LENS_IDS.find((id) => id === event.currentTarget.value);
+          if (nextLens !== undefined) props.onLensChange(nextLens);
+        }}
         title="Choose what the toolpath colours mean"
         aria-label="Colour lens"
         style={selectStyle}

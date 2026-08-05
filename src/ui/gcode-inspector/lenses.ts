@@ -11,9 +11,12 @@ import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
 import { cssHexColor, rgbTriple, type Viewer3dTheme } from '../viewer3d';
 import { buildDepthLensScale, DEPTH_RAMP_DEEP, DEPTH_RAMP_SHALLOW, type Rgb } from './depth-lens';
 
+/** Stable lens identifiers in the order presented by both viewer controls. */
 export const LENS_IDS = ['depth', 'tool', 'kind', 'feed', 'power', 'planner'] as const;
+/** A supported semantic colour mode for G-code 3D segments. */
 export type LensId = (typeof LENS_IDS)[number];
 
+/** Initial colour mode for every newly opened G-code 3D view. */
 export const DEFAULT_LENS_ID: LensId = 'depth';
 
 export const LENS_LABEL: Readonly<Record<LensId, string>> = {

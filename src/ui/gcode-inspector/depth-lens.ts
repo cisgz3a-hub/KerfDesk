@@ -3,8 +3,10 @@
 
 import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
 
+/** Normalized red, green, and blue channels in renderer order. */
 export type Rgb = readonly [number, number, number];
 
+/** Ordered machining-depth bounds and the colour lookup derived from them. */
 export type DepthLensScale = {
   readonly shallowMm: number;
   readonly deepMm: number;
@@ -15,7 +17,9 @@ export type DepthLensScale = {
 // One calm sequential blue scale: shallow passes are lighter and deeper
 // passes are darker. Every channel changes in one direction, so adjacent
 // depths stay adjacent shades rather than becoming unrelated colours.
+/** Light endpoint used for the shallowest machining depth. */
 export const DEPTH_RAMP_SHALLOW: Rgb = [0.68, 0.82, 0.96];
+/** Dark endpoint used for the deepest machining depth. */
 export const DEPTH_RAMP_DEEP: Rgb = [0.18, 0.45, 0.78];
 
 const DEPTH_LEVEL_ROUND = 1000;

@@ -1,11 +1,14 @@
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createRoot } from 'react-dom/client';
+import { describe, expect, it, vi } from 'vitest';
 import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
 import { buildGcodeRenderModel } from '../../core/gcode-view';
 import { resolveViewer3dTheme } from '../viewer3d';
 import { InspectorLensControl } from './InspectorLensControl';
 
+// React 18 reads this test-only flag when act() drives our direct createRoot
+// harness. This repository has no shared React DOM test setup, so DOM tests
+// intentionally declare it at their boundary.
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -26,59 +29,80 @@ const PROGRAM = [
   'G1 X20 F600',
 ].join('\n');
 
-let host: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-afterEach(() => {
-  act(() => root?.unmount());
-  host?.remove();
-  host = null;
-  root = null;
-});
-
 describe('InspectorLensControl', () => {
   it('explains the ordered depth/pass scale with exact endpoints', () => {
-    render('depth');
-    const text = host?.textContent ?? '';
-    expect(text).toContain('2 depth levels');
-    expect(text).toContain('Shallow -1.00 mm');
-    expect(text).toContain('Deep -2.00 mm');
-    expect(host?.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain(
-      'light to dark',
-    );
+    const view = render('depth');
+    try {
+      const text = view.host.textContent ?? '';
+      expect(text).toContain('2 depth levels');
+      expect(text).toContain('Shallow -1.00 mm');
+      expect(text).toContain('Deep -2.00 mm');
+      expect(view.host.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain(
+        'light to dark',
+      );
+    } finally {
+      view.cleanup();
+    }
   });
 
   it('offers and reports the single tool-colour override', () => {
-    render('tool');
-    const select = host?.querySelector<HTMLSelectElement>('[aria-label="Colour lens"]');
-    expect(select?.value).toBe('tool');
-    expect(host?.textContent ?? '').toContain('Toolpath');
-    expect(host?.textContent ?? '').toContain('Traversal');
+    const view = render('tool');
+    try {
+      const select = view.host.querySelector<HTMLSelectElement>('[aria-label="Colour lens"]');
+      expect(select?.value).toBe('tool');
+      expect(view.host.textContent ?? '').toContain('Toolpath');
+      expect(view.host.textContent ?? '').toContain('Traversal');
+    } finally {
+      view.cleanup();
+    }
   });
 
   it('reports an accessible lens change', () => {
     const onLensChange = vi.fn();
-    render('depth', onLensChange);
-    const select = host?.querySelector<HTMLSelectElement>('[aria-label="Colour lens"]');
-    act(() => {
-      if (select === null || select === undefined) return;
-      select.value = 'tool';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    expect(onLensChange).toHaveBeenCalledWith('tool');
+    const view = render('depth', onLensChange);
+    try {
+      const select = view.host.querySelector<HTMLSelectElement>('[aria-label="Colour lens"]');
+      act(() => {
+        if (select === null) return;
+        select.value = 'tool';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      expect(onLensChange).toHaveBeenCalledWith('tool');
+    } finally {
+      view.cleanup();
+    }
+  });
+
+  it('ignores an unrecognized DOM lens value', () => {
+    const onLensChange = vi.fn();
+    const view = render('depth', onLensChange);
+    try {
+      const select = view.host.querySelector<HTMLSelectElement>('[aria-label="Colour lens"]');
+      act(() => {
+        if (select === null) return;
+        select.value = 'unknown';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      expect(onLensChange).not.toHaveBeenCalled();
+    } finally {
+      view.cleanup();
+    }
   });
 });
 
-function render(lens: 'depth' | 'tool', onLensChange = vi.fn()): void {
+function render(
+  lens: 'depth' | 'tool',
+  onLensChange = vi.fn(),
+): { readonly host: HTMLDivElement; readonly cleanup: () => void } {
   const parsed = buildGcodeRenderModel(PROGRAM);
   if (parsed.kind !== 'ok') throw new Error(parsed.reason);
   const model = parsed.model;
   const time = buildProgramTime(model, LIMITS);
-  host = document.createElement('div');
+  const host = document.createElement('div');
   document.body.appendChild(host);
-  root = createRoot(host);
+  const root = createRoot(host);
   act(() => {
-    root?.render(
+    root.render(
       <InspectorLensControl
         model={model}
         time={time}
@@ -89,4 +113,11 @@ function render(lens: 'depth' | 'tool', onLensChange = vi.fn()): void {
       />,
     );
   });
+  return {
+    host,
+    cleanup: () => {
+      act(() => root.unmount());
+      host.remove();
+    },
+  };
 }
