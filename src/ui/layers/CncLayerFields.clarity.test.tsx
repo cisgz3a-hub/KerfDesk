@@ -171,8 +171,18 @@ describe('CNC layer clarity', () => {
   });
 
   it('enters V-carve in flowing-depth mode instead of inheriting a hidden legacy floor', async () => {
-    installCnc();
-    const view = await renderFields();
+    const engraveLayer: Layer = {
+      ...LAYER,
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'engrave',
+        depthMm: 0.1,
+        depthPerPassMm: 0.4,
+        vCarveFlatDepthEnabled: true,
+      },
+    };
+    installCnc(engraveLayer);
+    const view = await renderFields(engraveLayer);
     try {
       const cutType = view.host.querySelector<HTMLSelectElement>(
         `select[aria-label="Cut type for ${LAYER.color}"]`,
@@ -185,8 +195,24 @@ describe('CNC layer clarity', () => {
       });
       expect(useStore.getState().project.scene.layers[0]?.cnc).toMatchObject({
         cutType: 'v-carve',
+        depthMm: 0.1,
+        depthPerPassMm: 0.4,
         vCarveFlatDepthEnabled: false,
       });
+      const converted = useStore.getState().project.scene.layers[0];
+      if (converted === undefined) throw new Error('converted operation missing');
+      await act(async () => view.root.render(<CncLayerFields layer={converted} />));
+      expect(
+        view.host.querySelector(`input[aria-label="Cut depth for ${converted.color}"]`),
+      ).toBeNull();
+      expect(
+        view.host.querySelector(`input[aria-label="Floor depth for ${converted.color}"]`),
+      ).toBeNull();
+      expect(
+        view.host.querySelector<HTMLInputElement>(
+          `input[aria-label="Depth per pass for ${converted.color}"]`,
+        )?.value,
+      ).toBe('0.4');
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();

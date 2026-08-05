@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fingerprintGcode } from '../../core/recovery';
 import { mixedCanvasCompilationProject } from '../../__fixtures__/mixed-canvas-compilation-project';
+import { flowingVCarveProject } from '../../__fixtures__/flowing-vcarve-project';
 import {
   createLayer,
   createProject,
@@ -112,6 +113,69 @@ function mixedProject(): Project {
 }
 
 describe('prepareOutputAsync deterministic equivalence', () => {
+  it('keeps flowing V-carve worker output independent of dormant fixed depth', async () => {
+    const withDormantDepth = (depthMm: number): Project => {
+      const project = flowingVCarveProject();
+      return {
+        ...project,
+        scene: {
+          ...project.scene,
+          layers: project.scene.layers.map((layer) => ({
+            ...layer,
+            cnc: { ...(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS), depthMm },
+          })),
+        },
+      };
+    };
+    const prepare = async (project: Project, jobId: string) => {
+      let taskCount = 0;
+      const prepared = await prepareOutputAsync(
+        project,
+        {},
+        {
+          jobId,
+          runCncTasks: async ({ jobId: activeJobId, tasks }) => {
+            taskCount += tasks.length;
+            return tasks.map((task) => ({
+              jobId: activeJobId,
+              taskId: task.taskId,
+              result: runCncCompilationTask(task.payload),
+            }));
+          },
+        },
+      );
+      return { prepared, taskCount };
+    };
+
+    const shallow = await prepare(withDormantDepth(0.1), 'flowing-depth-shallow');
+    const deep = await prepare(withDormantDepth(5), 'flowing-depth-deep');
+
+    expect(shallow.taskCount).toBeGreaterThan(0);
+    expect(deep.taskCount).toBe(shallow.taskCount);
+    if (!deep.prepared.ok || !shallow.prepared.ok) {
+      throw new Error('flowing V-carve did not prepare');
+    }
+    expect(deep.prepared.job).toEqual(shallow.prepared.job);
+    const shallowEmission = emitPreparedGcode(shallow.prepared);
+    const deepEmission = emitPreparedGcode(deep.prepared);
+    expect(deepEmission).toEqual(shallowEmission);
+    expect(fingerprintGcode(deepEmission.gcode)).toEqual(fingerprintGcode(shallowEmission.gcode));
+    expect(shallowEmission.gcode).toContain('; cnc v-carve-depth: flowing-width');
+    const group = shallow.prepared.job.groups.find(
+      (candidate) => candidate.kind === 'cnc' && candidate.cutType === 'v-carve',
+    );
+    if (group?.kind !== 'cnc') throw new Error('flowing V-carve group missing');
+    expect(group.requestedDepthMm).toBeUndefined();
+    const actualDepthMm = Math.max(
+      ...group.passes.flatMap((pass) => {
+        if (pass.kind === 'path3d') return pass.points.map((point) => -point.z);
+        if (pass.kind === 'contour' || pass.kind === 'helical-contour') return [-pass.zMm];
+        return [];
+      }),
+    );
+    expect(actualDepthMm).toBeGreaterThan(0.1);
+  });
+
   it('keeps the mixed eight-drawing, six-operation viewer plan and bytes exact', async () => {
     const project = mixedCanvasCompilationProject();
     const serial = prepareOutput(project);
