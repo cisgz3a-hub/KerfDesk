@@ -78,6 +78,10 @@ describe('GcodeInspectorDialog', () => {
     const text = container?.textContent ?? '';
     expect(text).toContain('part.nc');
     expect(text).toContain('2 shown segments');
+    expect(container?.querySelector<HTMLSelectElement>('[aria-label="Colour lens"]')?.value).toBe(
+      'depth',
+    );
+    expect(text).toContain('Depth / pass');
     expect(text).not.toContain('Open in 2D simulator');
   }, 15_000);
 

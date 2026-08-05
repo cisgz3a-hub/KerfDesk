@@ -9,15 +9,17 @@
 import type { ProgramTimeModel } from '../../core/gcode-time';
 import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
 import { cssHexColor, rgbTriple, type Viewer3dTheme } from '../viewer3d';
+import { buildDepthLensScale, DEPTH_RAMP_DEEP, DEPTH_RAMP_SHALLOW, type Rgb } from './depth-lens';
 
-export const LENS_IDS = ['kind', 'depth', 'feed', 'power', 'planner'] as const;
+export const LENS_IDS = ['depth', 'tool', 'kind', 'feed', 'power', 'planner'] as const;
 export type LensId = (typeof LENS_IDS)[number];
 
-export type Rgb = readonly [number, number, number];
+export const DEFAULT_LENS_ID: LensId = 'depth';
 
 export const LENS_LABEL: Readonly<Record<LensId, string>> = {
   kind: 'Move kind',
-  depth: 'Depth (Z)',
+  depth: 'Depth / pass',
+  tool: 'Tool colour (single)',
   feed: 'Feed rate',
   power: 'Power (S)',
   planner: 'Reached feed',
@@ -31,7 +33,14 @@ export type LegendSwatch = {
 
 export type LensLegend =
   | { readonly kind: 'swatches'; readonly entries: ReadonlyArray<LegendSwatch> }
-  | { readonly kind: 'ramp'; readonly from: string; readonly to: string; readonly note: string }
+  | {
+      readonly kind: 'ramp';
+      readonly from: string;
+      readonly to: string;
+      readonly note: string;
+      readonly fromColor: string;
+      readonly toColor: string;
+    }
   | { readonly kind: 'note'; readonly note: string };
 
 // Cool → warm. Deliberately not red-green: red already means traversal here,
@@ -53,6 +62,14 @@ export function lensColorFn(
   theme: Viewer3dTheme,
 ): (segmentIndex: number) => Rgb {
   if (lens === 'kind') return kindColorFn(model, theme);
+  if (lens === 'tool') return toolColorFn(model, theme);
+  if (lens === 'depth') {
+    const scale = buildDepthLensScale(model);
+    const fallback = rgbTriple(theme.cut);
+    const travel = rgbTriple(theme.travel);
+    const solidColor = scale === null ? () => fallback : scale.colorOf;
+    return (index) => (model.segKind[index] === SEG_KIND.travel ? travel : solidColor(index));
+  }
   if (lens === 'planner') {
     return (index) => (time.segFeedLimited[index] === 1 ? LIMITED_RGB : REACHED_RGB);
   }
@@ -68,6 +85,8 @@ export function lensLegend(
   theme: Viewer3dTheme,
 ): LensLegend {
   if (lens === 'kind') return { kind: 'swatches', entries: kindSwatches(model, theme) };
+  if (lens === 'tool') return { kind: 'swatches', entries: toolSwatches(model, theme) };
+  if (lens === 'depth') return depthLegend(model);
   if (lens === 'planner') return { kind: 'swatches', entries: plannerSwatches(model, time) };
   const range = spanOf(lensValues(model, lens));
   if (range === null) return { kind: 'note', note: `No ${LENS_LABEL[lens].toLowerCase()} data` };
@@ -76,6 +95,8 @@ export function lensLegend(
     from: formatValue(range.min, lens),
     to: formatValue(range.max, lens),
     note: LENS_LABEL[lens],
+    fromColor: rgbCss(RAMP_LOW),
+    toColor: rgbCss(RAMP_HIGH),
   };
 }
 
@@ -90,21 +111,15 @@ function kindColorFn(model: GcodeRenderModel, theme: Viewer3dTheme): (segmentInd
   return (index) => byKind.get(model.segKind[index] ?? SEG_KIND.cut) ?? fallback;
 }
 
-function lensValues(model: GcodeRenderModel, lens: LensId): Float32Array {
-  if (lens === 'feed') return model.segFeed;
-  if (lens === 'power') return model.segPower;
-  return depthValues(model);
+function toolColorFn(model: GcodeRenderModel, theme: Viewer3dTheme): (segmentIndex: number) => Rgb {
+  const tool = rgbTriple(theme.cut);
+  const travel = rgbTriple(theme.travel);
+  return (index) => (model.segKind[index] === SEG_KIND.travel ? travel : tool);
 }
 
-// Depth reads the deeper of the move's two ends, so a plunge colours by where
-// it ends up rather than where it started.
-function depthValues(model: GcodeRenderModel): Float32Array {
-  const values = new Float32Array(model.segmentCount);
-  for (let index = 0; index < model.segmentCount; index += 1) {
-    const base = index * 6;
-    values[index] = Math.min(model.positions[base + 2] ?? 0, model.positions[base + 5] ?? 0);
-  }
-  return values;
+function lensValues(model: GcodeRenderModel, lens: 'feed' | 'power'): Float32Array {
+  if (lens === 'feed') return model.segFeed;
+  return model.segPower;
 }
 
 function spanOf(values: Float32Array): Range | null {
@@ -154,6 +169,31 @@ function kindSwatches(model: GcodeRenderModel, theme: Viewer3dTheme): ReadonlyAr
   ];
 }
 
+function toolSwatches(model: GcodeRenderModel, theme: Viewer3dTheme): ReadonlyArray<LegendSwatch> {
+  let travel = 0;
+  for (let index = 0; index < model.segmentCount; index += 1) {
+    if (model.segKind[index] === SEG_KIND.travel) travel += 1;
+  }
+  return [
+    { label: 'Toolpath', color: cssHexColor(theme.cut), count: model.segmentCount - travel },
+    { label: 'Traversal', color: cssHexColor(theme.travel), count: travel },
+  ];
+}
+
+function depthLegend(model: GcodeRenderModel): LensLegend {
+  const scale = buildDepthLensScale(model);
+  if (scale === null) return { kind: 'note', note: 'No cutting depth data' };
+  const levelWord = scale.levelCount === 1 ? 'level' : 'levels';
+  return {
+    kind: 'ramp',
+    from: `Shallow ${formatDepth(scale.shallowMm)}`,
+    to: `Deep ${formatDepth(scale.deepMm)}`,
+    note: `${scale.levelCount} depth ${levelWord}, light to dark`,
+    fromColor: rgbCss(DEPTH_RAMP_SHALLOW),
+    toColor: rgbCss(DEPTH_RAMP_DEEP),
+  };
+}
+
 function plannerSwatches(
   model: GcodeRenderModel,
   time: ProgramTimeModel,
@@ -173,12 +213,11 @@ export function rgbCss(rgb: Rgb): string {
   return `rgb(${channel(rgb[0])}, ${channel(rgb[1])}, ${channel(rgb[2])})`;
 }
 
-export function rampCss(): { readonly from: string; readonly to: string } {
-  return { from: rgbCss(RAMP_LOW), to: rgbCss(RAMP_HIGH) };
-}
-
-function formatValue(value: number, lens: LensId): string {
-  if (lens === 'depth') return `${value.toFixed(2)} mm`;
+function formatValue(value: number, lens: 'feed' | 'power'): string {
   if (lens === 'feed') return `${Math.round(value)} mm/min`;
   return `${Math.round(value)}`;
+}
+
+function formatDepth(value: number): string {
+  return `${value.toFixed(2)} mm`;
 }

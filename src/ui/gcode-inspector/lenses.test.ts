@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
 import { buildGcodeRenderModel, SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
-import { LENS_IDS, lensColorFn, lensLegend, rgbCss } from './lenses';
+import { DEFAULT_LENS_ID, LENS_IDS, lensColorFn, lensLegend, rgbCss } from './lenses';
 
 const THEME: Viewer3dTheme = {
   background: 0x000000,
@@ -44,6 +44,11 @@ function built(text = PROGRAM): {
 }
 
 describe('lensColorFn', () => {
+  it('defaults new 3D views to the depth/pass lens', () => {
+    expect(DEFAULT_LENS_ID).toBe('depth');
+    expect(LENS_IDS[0]).toBe(DEFAULT_LENS_ID);
+  });
+
   it('returns a finite rgb triple for every lens and every segment', () => {
     const { model, time } = built();
     for (const lens of LENS_IDS) {
@@ -69,6 +74,21 @@ describe('lensColorFn', () => {
     expect(rgbCss(colorOf(cut))).toBe('rgb(79, 163, 255)');
   });
 
+  it('preserves a single tool-colour override for every solid move', () => {
+    const { model, time } = built();
+    const colorOf = lensColorFn(model, time, 'tool', THEME);
+    for (const kind of [SEG_KIND.cut, SEG_KIND.plunge, SEG_KIND.retract]) {
+      expect(rgbCss(colorOf(firstOfKind(model, kind)))).toBe('rgb(79, 163, 255)');
+    }
+    expect(rgbCss(colorOf(firstOfKind(model, SEG_KIND.travel)))).toBe('rgb(204, 68, 68)');
+  });
+
+  it('keeps traversal recessive red in the default depth/pass lens', () => {
+    const { model, time } = built();
+    const colorOf = lensColorFn(model, time, 'depth', THEME);
+    expect(rgbCss(colorOf(firstOfKind(model, SEG_KIND.travel)))).toBe('rgb(204, 68, 68)');
+  });
+
   it('separates the extremes on a ramp lens', () => {
     const { model, time } = built();
     const colorOf = lensColorFn(model, time, 'depth', THEME);
@@ -92,6 +112,7 @@ describe('lensLegend', () => {
   it('describes swatches for kind and planner, a ramp for value lenses', () => {
     const { model, time } = built();
     expect(lensLegend(model, time, 'kind', THEME).kind).toBe('swatches');
+    expect(lensLegend(model, time, 'tool', THEME).kind).toBe('swatches');
     expect(lensLegend(model, time, 'planner', THEME).kind).toBe('swatches');
     for (const lens of ['depth', 'feed', 'power'] as const) {
       expect(lensLegend(model, time, lens, THEME).kind).toBe('ramp');
@@ -101,7 +122,9 @@ describe('lensLegend', () => {
   it('labels the ramp ends with real values and units', () => {
     const { model, time } = built();
     const depth = lensLegend(model, time, 'depth', THEME);
-    expect(depth.kind === 'ramp' ? depth.from : '').toContain('-3.00 mm');
+    expect(depth.kind === 'ramp' ? depth.from : '').toContain('Shallow -1.00 mm');
+    expect(depth.kind === 'ramp' ? depth.to : '').toContain('Deep -3.00 mm');
+    expect(depth.kind === 'ramp' ? depth.note : '').toContain('2 depth levels');
     const feed = lensLegend(model, time, 'feed', THEME);
     expect(feed.kind === 'ramp' ? feed.to : '').toContain('800 mm/min');
   });
@@ -112,6 +135,14 @@ describe('lensLegend', () => {
     if (legend.kind !== 'swatches') throw new Error('expected swatches');
     const total = legend.entries.reduce((sum, entry) => sum + entry.count, 0);
     expect(total).toBe(model.segmentCount);
+  });
+
+  it('counts tool-colour solids separately from traversal', () => {
+    const { model, time } = built();
+    const legend = lensLegend(model, time, 'tool', THEME);
+    if (legend.kind !== 'swatches') throw new Error('expected swatches');
+    expect(legend.entries.map((entry) => entry.label)).toEqual(['Toolpath', 'Traversal']);
+    expect(legend.entries.reduce((sum, entry) => sum + entry.count, 0)).toBe(model.segmentCount);
   });
 
   it('falls back to a note when a lens has no data', () => {

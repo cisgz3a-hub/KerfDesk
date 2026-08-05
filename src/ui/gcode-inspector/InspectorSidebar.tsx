@@ -7,15 +7,9 @@ import type { ProgramTimeModel } from '../../core/gcode-time';
 import type { GcodeRenderModel, ProgramFinding } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
 import { InspectorHealthPanel } from './InspectorHealthPanel';
+import { InspectorLensControl } from './InspectorLensControl';
 import { droRows, statsRows, type Readout } from './inspector-readouts';
-import {
-  LENS_IDS,
-  LENS_LABEL,
-  lensLegend,
-  rampCss,
-  type LegendSwatch,
-  type LensId,
-} from './lenses';
+import type { LensId } from './lenses';
 import type { PlayheadState } from './playhead';
 
 export function InspectorSidebar(props: {
@@ -32,36 +26,24 @@ export function InspectorSidebar(props: {
   readonly onTravelVisibleChange: (visible: boolean) => void;
   readonly onLocateLine: (line: number) => void;
 }): JSX.Element {
-  // Playback re-renders this column every animation frame, and both of these
-  // scan every segment (statsRows through countFeedLimited + timeSplit,
-  // lensLegend through the per-kind counts). Neither can change while only
-  // the playhead moves, so they are derived per PROGRAM, not per frame.
-  // droRows stays inline: it reads one segment and is O(1).
+  // Playback re-renders this column every animation frame. statsRows scans
+  // every segment, so derive it per PROGRAM, not per frame. The lens control
+  // applies the same memo boundary to its legend; droRows reads one segment.
   const stats = useMemo(() => statsRows(props.model, props.time), [props.model, props.time]);
-  const legend = useMemo(
-    () => lensLegend(props.model, props.time, props.lens, props.theme),
-    [props.model, props.time, props.lens, props.theme],
-  );
   return (
     <aside style={sidebarStyle} aria-label="Program readouts">
       <Section title="Position">
         <ReadoutGrid rows={droRows(props.model, props.playhead)} />
       </Section>
       <Section title="Colour by">
-        <select
-          value={props.lens}
-          onChange={(event) => props.onLensChange(event.currentTarget.value as LensId)}
-          title="Choose what the toolpath colours mean"
-          aria-label="Colour lens"
-          style={lensSelectStyle}
-        >
-          {LENS_IDS.map((id) => (
-            <option key={id} value={id}>
-              {LENS_LABEL[id]}
-            </option>
-          ))}
-        </select>
-        <Legend legend={legend} />
+        <InspectorLensControl
+          model={props.model}
+          time={props.time}
+          theme={props.theme}
+          lens={props.lens}
+          onLensChange={props.onLensChange}
+          variant="sidebar"
+        />
         <label style={toggleStyle}>
           <input
             type="checkbox"
@@ -114,45 +96,6 @@ function ReadoutGrid(props: { readonly rows: ReadonlyArray<Readout> }): JSX.Elem
   );
 }
 
-function Legend(props: { readonly legend: ReturnType<typeof lensLegend> }): JSX.Element {
-  if (props.legend.kind === 'note') {
-    return <p style={legendNoteStyle}>{props.legend.note}</p>;
-  }
-  if (props.legend.kind === 'ramp') {
-    const ramp = rampCss();
-    return (
-      <div style={rampWrapStyle}>
-        <div
-          style={{
-            ...rampBarStyle,
-            backgroundImage: `linear-gradient(to right, ${ramp.from}, ${ramp.to})`,
-          }}
-          aria-hidden="true"
-        />
-        <div style={rampScaleStyle}>
-          <span>{props.legend.from}</span>
-          <span>{props.legend.to}</span>
-        </div>
-      </div>
-    );
-  }
-  return <SwatchList entries={props.legend.entries} />;
-}
-
-function SwatchList(props: { readonly entries: ReadonlyArray<LegendSwatch> }): JSX.Element {
-  return (
-    <ul style={legendStyle}>
-      {props.entries.map((entry) => (
-        <li key={entry.label} style={legendItemStyle}>
-          <span style={{ ...swatchStyle, background: entry.color }} aria-hidden="true" />
-          <span>{entry.label}</span>
-          <span style={legendCountStyle}>{entry.count}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 const sidebarStyle: React.CSSProperties = {
   width: 250,
   flexShrink: 0,
@@ -186,56 +129,6 @@ const valueStyle: React.CSSProperties = {
   margin: 0,
   fontVariantNumeric: 'tabular-nums',
   textAlign: 'right',
-};
-
-const legendStyle: React.CSSProperties = {
-  listStyle: 'none',
-  margin: '0 0 8px',
-  padding: 0,
-  display: 'grid',
-  gap: 3,
-};
-
-const legendItemStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-};
-
-const swatchStyle: React.CSSProperties = {
-  width: 12,
-  height: 3,
-  borderRadius: 2,
-  display: 'inline-block',
-};
-
-const legendCountStyle: React.CSSProperties = {
-  marginLeft: 'auto',
-  color: 'var(--lf-text-muted)',
-  fontVariantNumeric: 'tabular-nums',
-};
-
-const lensSelectStyle: React.CSSProperties = { width: '100%', marginBottom: 6 };
-
-const legendNoteStyle: React.CSSProperties = {
-  margin: '0 0 8px',
-  color: 'var(--lf-text-muted)',
-};
-
-const rampWrapStyle: React.CSSProperties = { marginBottom: 8 };
-
-const rampBarStyle: React.CSSProperties = {
-  height: 8,
-  borderRadius: 2,
-  border: '1px solid var(--lf-border)',
-};
-
-const rampScaleStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  color: 'var(--lf-text-muted)',
-  fontVariantNumeric: 'tabular-nums',
-  marginTop: 2,
 };
 
 const toggleStyle: React.CSSProperties = {
