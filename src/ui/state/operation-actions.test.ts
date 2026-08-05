@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { operationIdsForObject } from '../../core/scene';
+import { DEFAULT_CNC_LAYER_SETTINGS, operationIdsForObject } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -54,6 +54,98 @@ describe('artwork operation actions', () => {
     expect(ids[0]).toEqual([firstOperationId]);
     expect(ids[1]).toHaveLength(1);
     expect(ids[1]).not.toEqual(ids[0]);
+  });
+
+  it('sets one CNC depth across independent operations as one undoable mutation', () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('Box', ['#000000']));
+    const [firstId, secondId] = useStore
+      .getState()
+      .project.scene.layers.map((operation) => operation.id);
+    if (firstId === undefined || secondId === undefined) throw new Error('operations missing');
+    useStore.getState().setLayerParam(firstId, {
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'engrave',
+        depthMm: 1,
+        depthPerPassMm: 0.4,
+        feedMmPerMin: 700,
+      },
+    });
+    useStore.getState().setLayerParam(secondId, {
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'profile-inside',
+        depthMm: 2,
+        depthPerPassMm: 0.8,
+        feedMmPerMin: 900,
+      },
+    });
+    useStore.setState({ undoStack: [], redoStack: [], dirty: false });
+    const bindingsBefore = useStore
+      .getState()
+      .project.scene.objects.map((object) =>
+        operationIdsForObject(object, useStore.getState().project.scene.layers),
+      );
+
+    useStore.getState().setCncDepthForOperations([firstId, secondId, firstId], 3.25);
+
+    let state = useStore.getState();
+    expect(
+      state.project.scene.layers.map((operation) => ({
+        cutType: operation.cnc?.cutType,
+        depthMm: operation.cnc?.depthMm,
+        depthPerPassMm: operation.cnc?.depthPerPassMm,
+        feedMmPerMin: operation.cnc?.feedMmPerMin,
+      })),
+    ).toEqual([
+      { cutType: 'engrave', depthMm: 3.25, depthPerPassMm: 0.4, feedMmPerMin: 700 },
+      { cutType: 'profile-inside', depthMm: 3.25, depthPerPassMm: 0.8, feedMmPerMin: 900 },
+    ]);
+    expect(
+      state.project.scene.objects.map((object) =>
+        operationIdsForObject(object, state.project.scene.layers),
+      ),
+    ).toEqual(bindingsBefore);
+    expect(state.undoStack).toHaveLength(1);
+    expect(state.redoStack).toHaveLength(0);
+    expect(state.dirty).toBe(true);
+
+    state.undo();
+    state = useStore.getState();
+    expect(state.project.scene.layers.map((operation) => operation.cnc?.depthMm)).toEqual([1, 2]);
+    expect(state.redoStack).toHaveLength(1);
+
+    state.redo();
+    expect(
+      useStore.getState().project.scene.layers.map((operation) => operation.cnc?.depthMm),
+    ).toEqual([3.25, 3.25]);
+  });
+
+  it('does not partially bulk-edit incompatible fixed and V-carve depths', () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().importSvgObject(svgObj('Fixed', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('Flowing', ['#000000']));
+    const [fixedId, flowingId] = useStore
+      .getState()
+      .project.scene.layers.map((operation) => operation.id);
+    if (fixedId === undefined || flowingId === undefined) throw new Error('operations missing');
+    useStore.getState().setLayerParam(flowingId, {
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'v-carve',
+        depthMm: 0.1,
+        vCarveFlatDepthEnabled: false,
+      },
+    });
+    useStore.setState({ undoStack: [], redoStack: [], dirty: false });
+    const before = useStore.getState().project;
+
+    useStore.getState().setCncDepthForOperations([fixedId, flowingId], 4);
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toHaveLength(0);
   });
 
   it('adds a second first-class operation to selected artwork', () => {

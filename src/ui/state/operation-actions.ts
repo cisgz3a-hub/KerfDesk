@@ -4,6 +4,7 @@ import {
   artworkOperationName,
   bindSceneObjectToOperations,
   createArtworkOperation,
+  DEFAULT_CNC_LAYER_SETTINGS,
   nextOperationColor,
   primaryOperationForObject,
   replaceSceneObjectOperationBinding,
@@ -40,7 +41,19 @@ export type OperationActions = {
   readonly addOperationForSelection: () => void;
   readonly addOperationForObjects: (objectIds: ReadonlyArray<string>) => void;
   readonly renameOperation: (operationId: string, name: string) => void;
+  readonly setCncDepthForOperations: (operationIds: ReadonlyArray<string>, depthMm: number) => void;
 };
+
+export const CNC_BULK_DEPTH_MIN_MM = 0.05;
+export const CNC_BULK_DEPTH_MAX_MM = 200;
+
+export type CncFixedDepthRole = 'cut' | 'insert';
+
+export function cncFixedDepthRole(operation: Layer): CncFixedDepthRole | null {
+  const cutType = (operation.cnc ?? DEFAULT_CNC_LAYER_SETTINGS).cutType;
+  if (cutType === 'v-carve') return null;
+  return cutType === 'inlay-pair' ? 'insert' : 'cut';
+}
 
 export function operationActions(set: OperationSet): OperationActions {
   return {
@@ -71,7 +84,50 @@ export function operationActions(set: OperationSet): OperationActions {
           ? mutation(state, { ...state.project, scene: { ...state.project.scene, layers } })
           : {};
       }),
+    setCncDepthForOperations: (operationIds, depthMm) =>
+      set((state) => setCncDepthForOperations(state, operationIds, depthMm)),
   };
+}
+
+function setCncDepthForOperations(
+  state: OperationActionState,
+  operationIds: ReadonlyArray<string>,
+  depthMm: number,
+): OperationMutation | Record<string, never> {
+  if (state.project.machine?.kind !== 'cnc') return {};
+  if (
+    !Number.isFinite(depthMm) ||
+    depthMm < CNC_BULK_DEPTH_MIN_MM ||
+    depthMm > CNC_BULK_DEPTH_MAX_MM
+  ) {
+    return {};
+  }
+  const ids = [...new Set(operationIds)];
+  if (ids.length === 0) return {};
+  const targets = ids.flatMap(
+    (id) => state.project.scene.layers.find((operation) => operation.id === id) ?? [],
+  );
+  if (targets.length !== ids.length) return {};
+  const firstTarget = targets[0];
+  if (firstTarget === undefined) return {};
+  const role = cncFixedDepthRole(firstTarget);
+  if (role === null || targets.some((operation) => cncFixedDepthRole(operation) !== role)) {
+    return {};
+  }
+  const targetIds = new Set(ids);
+  let changed = false;
+  const layers = state.project.scene.layers.map((operation) => {
+    if (!targetIds.has(operation.id)) return operation;
+    const cnc = operation.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    if (cnc.depthMm === depthMm) return operation;
+    changed = true;
+    return { ...operation, cnc: { ...cnc, depthMm } };
+  });
+  if (!changed) return {};
+  return mutation(state, {
+    ...state.project,
+    scene: { ...state.project.scene, layers },
+  });
 }
 
 function rebindObjects(

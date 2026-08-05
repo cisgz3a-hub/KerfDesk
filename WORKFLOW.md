@@ -290,6 +290,13 @@ Identical to F-A3 except:
 - When selected artworks use different operations, the inspector says `Multiple operations` and
   offers **Use one operation**. Choosing an operation rebinds the whole selection without grouping
   or changing geometry.
+- In CNC mode, independent vector operations that share one fixed-depth meaning also expose an
+  enabled **Cut depth** (or inlay **Insert depth**) field. Equal values display normally; differing
+  values display `Mixed`, and typing one value changes only `depthMm` on each unique operation as
+  one undoable project edit. Operation bindings, bit, feed, plunge, Depth per pass, and every other
+  per-operation setting remain separate. A selection containing V-carve, relief/raster artwork, or
+  both Cut and Insert meanings shows the reason bulk depth is unavailable instead of a disabled or
+  partially applied control; **Use one operation** remains an explicit alternative.
 - **Add operation** binds a second ordinary operation to the selected artwork. It appears in the
   same ordered list and can be renamed, reordered, shown/hidden, or output-enabled like any other.
 - Artwork intentionally sharing one operation compiles as one machining unit so fill holes,
@@ -2651,8 +2658,11 @@ F-CNC19 tiling.
    islands require distinct safe-Z entries; “one medial line” does not mean
    one entry for an entire disconnected design or one G-code block.
 3. With **Flat depth** off, the generic stored depth value does not cap the
-   groove. With it on, the requested floor is capped again at the selected
-   V-bit cone height. Depth per pass limits vertical engagement in both modes.
+   groove. Switching from a fixed-depth operation such as Engrave turns Flat
+   depth off; the former depth remains stored for switching back but is dormant
+   and omitted from flowing-depth output provenance. With Flat depth on, the
+   requested floor is capped again at the selected V-bit cone height. Depth per
+   pass limits vertical engagement in both modes.
 4. A finite cutting diameter cannot span artwork wider than the bit's cone.
    That unreachable core is the legitimate reason for repeated flat-floor
    clearing lines; use a larger V-bit or narrower artwork to avoid them.
