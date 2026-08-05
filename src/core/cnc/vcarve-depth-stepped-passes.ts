@@ -1,6 +1,6 @@
 import type { Vec3 } from '../geometry/vec3';
 import type { CncPass } from '../job';
-import type { BoundarySegment } from './vcarve-detail-geometry';
+import type { VCarveBoundarySegmentSource } from './vcarve-boundary-segment-index';
 import { zPassDepths } from './depth-passes';
 import { compactVCarveEmittedProfile } from './vcarve-emitted-profile-compaction';
 import { vcarveEmittedProfileCovers } from './vcarve-emitted-profile';
@@ -17,7 +17,7 @@ export function certifiedVCarveDepthSteppedPasses(
   candidate: ReadonlyArray<Vec3>,
   reference: ReadonlyArray<Vec3>,
   closed: boolean,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   options: DepthSteppedOptions,
 ): ReadonlyArray<CncPass> {
   let deepest = 0;
@@ -35,7 +35,7 @@ function certifiedLevel(
   candidate: ReadonlyArray<Vec3>,
   reference: ReadonlyArray<Vec3>,
   levelZ: number,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   options: DepthSteppedOptions,
 ): ReadonlyArray<Vec3> {
   const candidateLevel = pointsAtLevel(candidate, levelZ);
