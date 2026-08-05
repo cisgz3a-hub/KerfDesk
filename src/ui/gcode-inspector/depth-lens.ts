@@ -41,7 +41,13 @@ type DepthRange = {
 
 function machiningDepthRange(model: GcodeRenderModel): DepthRange | null {
   const cutRange = rangeForKind(model, SEG_KIND.cut);
-  return cutRange ?? rangeForKind(model, SEG_KIND.plunge);
+  const plungeRange = rangeForKind(model, SEG_KIND.plunge);
+  if (cutRange === null) return plungeRange;
+  if (plungeRange === null) return cutRange;
+  return {
+    shallowMm: Math.max(cutRange.shallowMm, plungeRange.shallowMm),
+    deepMm: Math.min(cutRange.deepMm, plungeRange.deepMm),
+  };
 }
 
 function rangeForKind(model: GcodeRenderModel, targetKind: number): DepthRange | null {
