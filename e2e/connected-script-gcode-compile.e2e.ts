@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import {
   assertResponsivePhase,
+  rollResponsivenessProbe,
   startResponsivenessProbe,
   stopResponsivenessProbe,
 } from './fixtures/browser-responsiveness';
@@ -35,28 +36,37 @@ test('real multi-artwork Dancing Script compiles off-thread into responsive G-co
   const compilationStartedAt = Date.now();
   await showGcodeCanvas(page);
   await expect(page.getByLabel('G-code canvas view')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled({
-    timeout: READINESS_TIMEOUT_MS,
-  });
-  await expect(page.getByLabel('Playback', { exact: true })).toBeVisible({
+  const refreshButton = page.getByTitle("Recompile this project's G-code");
+  await expect(refreshButton).toBeDisabled({ timeout: READINESS_TIMEOUT_MS });
+  await expect(refreshButton).toBeEnabled({
     timeout: READINESS_TIMEOUT_MS,
   });
   const compileElapsedMs = Date.now() - compilationStartedAt;
+  const compilation = await rollResponsivenessProbe(page);
+  testInfo.annotations.push({
+    type: 'measurement',
+    description: `4-artwork Dancing Script G-code compile: compileMs=${compileElapsedMs}`,
+  });
+  const hardwareConcurrency = await page.evaluate(() => navigator.hardwareConcurrency);
+  console.info(
+    'connected-script G-code compilation responsiveness',
+    JSON.stringify({ compileElapsedMs, hardwareConcurrency, compilation, workerUrls }),
+  );
+  assertResponsivePhase(testInfo, 'connected-script G-code compilation', compilation);
+
+  await expect(page.getByLabel('Playback', { exact: true })).toBeVisible({
+    timeout: READINESS_TIMEOUT_MS,
+  });
 
   // Include the delayed delivery window that previously distinguished worker
   // completion from actual browser responsiveness.
   await page.waitForTimeout(POST_COMPLETION_WINDOW_MS);
-  const initialOpen = await stopResponsivenessProbe(page);
-  testInfo.annotations.push({
-    type: 'measurement',
-    description: `4-artwork Dancing Script G-code 3D: compileMs=${compileElapsedMs}`,
-  });
-  const hardwareConcurrency = await page.evaluate(() => navigator.hardwareConcurrency);
+  const previewReadiness = await stopResponsivenessProbe(page);
   console.info(
-    'connected-script G-code 3D responsiveness',
-    JSON.stringify({ compileElapsedMs, hardwareConcurrency, initialOpen, workerUrls }),
+    'connected-script G-code 3D preview responsiveness',
+    JSON.stringify({ previewReadiness, workerUrls }),
   );
-  assertResponsivePhase(testInfo, 'connected-script G-code 3D initial open', initialOpen);
+  assertResponsivePhase(testInfo, 'connected-script G-code 3D preview readiness', previewReadiness);
 
   await startResponsivenessProbe(page);
   await runMenuCommand(page, 'File', 'Inspect G-code (3D)...');
