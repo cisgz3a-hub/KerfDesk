@@ -1,5 +1,6 @@
 import type { Vec3 } from '../geometry/vec3';
 import type { CncPass } from '../job';
+import type { VCarveBoundaryIndex } from './vcarve-boundary-index';
 import type { BoundarySegment } from './vcarve-detail-geometry';
 import { zPassDepths } from './depth-passes';
 import { compactVCarveEmittedProfile } from './vcarve-emitted-profile-compaction';
@@ -10,6 +11,7 @@ type DepthSteppedOptions = RadialEnvelope & {
   readonly depthPerPassMm: number;
   readonly compactionToleranceMm: number;
   readonly sweepToleranceMm: number;
+  readonly boundaryIndex?: VCarveBoundaryIndex;
 };
 
 /** Build and independently certify every emitted depth level. */
@@ -45,6 +47,7 @@ function certifiedLevel(
     segments,
     options,
     options.compactionToleranceMm,
+    options.boundaryIndex,
   );
   if (covers(referenceLevel, compact, options)) return compact;
   if (covers(referenceLevel, candidateLevel, options)) return candidateLevel;
@@ -53,6 +56,7 @@ function certifiedLevel(
     segments,
     options,
     options.compactionToleranceMm,
+    options.boundaryIndex,
   );
   return covers(referenceLevel, compactReference, options) ? compactReference : referenceLevel;
 }

@@ -1,7 +1,8 @@
 import type { Vec3 } from '../geometry/vec3';
+import type { VCarveBoundaryIndex } from './vcarve-boundary-index';
 import type { BoundarySegment } from './vcarve-detail-geometry';
 import { emittedChordIsSafe } from './vcarve-detail-depth';
-import { vcarveEmittedProfileCovers } from './vcarve-emitted-profile';
+import { vcarveEmittedChordCoversProfileSpan } from './vcarve-emitted-chord-coverage';
 import type { RadialEnvelope } from './radial-envelope';
 
 const MAX_COMPACTION_SPAN_POINTS = 32;
@@ -12,6 +13,7 @@ export function compactVCarveEmittedProfile(
   segments: ReadonlyArray<BoundarySegment>,
   envelope: RadialEnvelope,
   toleranceMm: number,
+  boundaryIndex?: VCarveBoundaryIndex,
 ): ReadonlyArray<Vec3> {
   if (points.length < 3) return points;
   const compact: Vec3[] = [];
@@ -26,7 +28,7 @@ export function compactVCarveEmittedProfile(
       const b = points[end];
       if (
         b !== undefined &&
-        spanCanCompact(points, start, end, a, b, segments, envelope, toleranceMm)
+        spanCanCompact(points, start, end, a, b, segments, envelope, toleranceMm, boundaryIndex)
       ) {
         chosenEnd = end;
         break;
@@ -48,9 +50,20 @@ function spanCanCompact(
   segments: ReadonlyArray<BoundarySegment>,
   envelope: RadialEnvelope,
   toleranceMm: number,
+  boundaryIndex?: VCarveBoundaryIndex,
 ): boolean {
-  if (!emittedChordIsSafe(a, b, Math.max(0, -a.z), Math.max(0, -b.z), segments, envelope)) {
+  if (
+    !emittedChordIsSafe(
+      a,
+      b,
+      Math.max(0, -a.z),
+      Math.max(0, -b.z),
+      segments,
+      envelope,
+      boundaryIndex,
+    )
+  ) {
     return false;
   }
-  return vcarveEmittedProfileCovers(points.slice(start, end + 1), [a, b], envelope, toleranceMm);
+  return vcarveEmittedChordCoversProfileSpan(points, start, end, a, b, envelope, toleranceMm);
 }

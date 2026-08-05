@@ -8,6 +8,7 @@ import {
   type BoundarySegment,
   type DetailDepthLaw,
 } from './vcarve-detail-depth';
+import { buildVCarveBoundaryIndex } from './vcarve-boundary-index';
 import { radialEnvelopeDepthMm } from './radial-envelope';
 
 const Z_TOLERANCE_MM = 0.02;
@@ -205,5 +206,30 @@ describe('detailPath3dPoints', () => {
     expect(emittedChordIsSafe({ x: 0, y: 0 }, { x: 1, y: 0 }, 0, 0.1, [nearbyPoint], law)).toBe(
       false,
     );
+  });
+
+  it('keeps the indexed quality-epsilon annulus equal to the serial certificate', () => {
+    const edge: Polyline = {
+      closed: false,
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+      ],
+    };
+    const segments: ReadonlyArray<BoundarySegment> = [
+      { ax: 0, ay: 0.500_500_000_000_5, bx: 1, by: 0.500_500_000_000_5 },
+    ];
+    const law = pointLaw(1, 2);
+    const serial = detailPath3dPlan(edge, segments, law, 0.0005);
+    const indexed = detailPath3dPlan(
+      edge,
+      segments,
+      law,
+      0.0005,
+      buildVCarveBoundaryIndex(segments),
+    );
+
+    expect(serial.points).toHaveLength(2);
+    expect(indexed).toEqual(serial);
   });
 });

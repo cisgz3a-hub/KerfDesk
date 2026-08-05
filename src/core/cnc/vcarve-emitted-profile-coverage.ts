@@ -12,8 +12,8 @@ import {
 } from './vcarve-profile-distance-index';
 import { radialEnvelopeSweepRadiiMm, type RadialEnvelope } from './radial-envelope';
 
-const MAX_REFERENCE_SUBDIVISION_DEPTH = 12;
-const MAX_COVERAGE_CAPSULE_CHECKS = 250_000;
+export const MAX_REFERENCE_SUBDIVISION_DEPTH = 12;
+export const MAX_COVERAGE_CAPSULE_CHECKS = 250_000;
 const MAX_DISTANCE_INDEX_RADIUS = 8;
 
 type CoverageWork = { remaining: number };

@@ -15402,6 +15402,69 @@ to the next, while retaining tool-major sections for real multi-tool jobs.
 - NOT verified: physical air-cut, material cut, spindle load, chip evacuation, surface finish,
   bit-tip truth, machine rigidity, serial-driver latency, or physical lost steps.
 
+## ADR-285 Amendment 1 - exact indexed boundary queries for large V-carves (2026-08-05)
+
+**Date:** 2026-08-05
+**Status:** Accepted; exact software equivalence verified, hardware qualification pending
+
+### Context
+
+ADR-285's emitted-profile certification intentionally uses the normalized boundary as cutting
+authority. On connected-script text, one normalized region can contain hundreds of boundary
+segments and tens of thousands of emitted profile points. Profiling a real Dancing Script and
+Pacifico multi-object project found that medial-axis construction was no longer the dominant cost:
+repeated exact nearest-boundary, swept-chord, precision, and compaction certificates consumed most
+of the remaining region-planning time. Region-level Workers keep that work off the UI thread but do
+not reduce the cost inside one large connected region.
+
+### Decision
+
+1. **Index, but do not approximate, one normalized boundary.** Each region builds one immutable,
+   stable AABB tree over the same source `BoundarySegment` records. Nearest-distance traversal uses
+   a conservative point-to-box lower bound and evaluates the existing exact point-to-segment
+   function in visited leaves. Swept-chord and depth-quality queries use bounding boxes only to
+   reject segments that cannot reach the existing exact predicate.
+2. **Keep the serial implementation as the oracle and fallback.** Callers without an index, empty
+   boundaries, non-finite query data, or non-finite boundary data retain the previous serial scan.
+   Leaf ties retain source order; no tolerance, sampling budget, depth law, quantization, route,
+   containment predicate, or pass order changes.
+3. **Specialize the one-chord compaction certificate without changing its proof.** Compaction
+   always compares a reference span with one candidate chord. That case directly builds the same
+   emitted capsule and runs the same exact capsule-containment predicate with the same subdivision
+   depth and global work limit, avoiding temporary slices and general multi-chord distance indexes.
+4. **Preserve all external contracts.** Region discovery and deterministic merge remain ordered;
+   heavy canvas compilation remains in the bounded Worker architecture from ADR-288. Emitted G-code,
+   fingerprints, Frame bounds, Job Review, and Start semantics do not change. No new guard or
+   synchronous UI-thread fallback is introduced.
+
+### Consequences
+
+- Large connected regions still have real geometry-dependent cost, but exact certification no longer
+  rescans every remote boundary segment for every local query.
+- The immutable per-region index adds bounded linear memory and deterministic tree-build work. Small
+  regions may not become faster; ordinary low-cost operations still use their existing direct paths.
+- Browser responsiveness remains a separate invariant from compile wall-clock time. This amendment
+  improves measured planning time but does not replace the ADR-288 Worker boundary.
+
+### Verification
+
+- Three 300-case generated properties compare indexed nearest distance, AABB-filtered visitation,
+  and swept-chord safety with the unchanged serial implementations.
+- A 500-case generated property compares the one-chord specialization with the general emitted-
+  profile coverage certificate for every compaction-sized span.
+- A real eight-drawing, six-operation fixture uses bundled Dancing Script and Pacifico outlines.
+  Serial and reversed region completion produce equal prepared plans, equal fingerprints, and the
+  same 367,243 emitted G-code bytes. On the measured development host, its serial compile fell from
+  7,015.4 ms to 4,438.7 ms and its warm reversed completion fell from 6,901.2 ms to 3,548.7 ms.
+- The existing connected-script readiness fixture fell from 21,474 ms to 12,060 ms, while its
+  Pacifico deterministic-containment case fell from 8,937 ms to 5,820 ms on the same host. These are
+  development measurements, not production latency guarantees.
+- A real-browser G-code 3D regression reaches ready with the same eight-drawing fixture, observes
+  both output-preparation and canvas-compilation Workers, and retains the unchanged one-second UI
+  heartbeat ceiling.
+- NOT verified: controller execution, air-cut, material cut, physical containment, spindle load,
+  cut quality, or a fixed latency on other CPUs.
+
 ## ADR-286 - A text object's own glyphs resolve non-zero before a V-carve layer pools (2026-08-03)
 
 **Date:** 2026-08-03

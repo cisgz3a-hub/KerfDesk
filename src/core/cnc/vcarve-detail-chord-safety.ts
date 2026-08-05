@@ -1,5 +1,10 @@
 import type { Vec2 } from '../scene';
 import type { BoundarySegment } from './vcarve-detail-geometry';
+import {
+  everyIndexedVCarveBoundarySegmentInBox,
+  type VCarveBoundaryIndex,
+  type VCarveBoundaryQueryBox,
+} from './vcarve-boundary-index';
 import { radialEnvelopeSweepRadiiMm, type RadialEnvelope } from './radial-envelope';
 
 const QUADRATIC_EPSILON_MM2 = 1e-14;
@@ -11,6 +16,7 @@ export function emittedChordIsSafe(
   depthB: number,
   segments: ReadonlyArray<BoundarySegment>,
   envelope: RadialEnvelope,
+  boundaryIndex?: VCarveBoundaryIndex,
 ): boolean {
   const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(envelope, depthA, depthB);
   // The envelope radius varies linearly from radiusA to radiusB, so the swept
@@ -23,15 +29,33 @@ export function emittedChordIsSafe(
   // one previously ran the quadratic clearance solve against every boundary
   // segment in the region. A single carved letter spent seconds here.
   const reach = Math.max(radiusA, radiusB);
-  const minX = Math.min(a.x, b.x) - reach;
-  const maxX = Math.max(a.x, b.x) + reach;
-  const minY = Math.min(a.y, b.y) - reach;
-  const maxY = Math.max(a.y, b.y) + reach;
+  const box = {
+    minX: Math.min(a.x, b.x) - reach,
+    maxX: Math.max(a.x, b.x) + reach,
+    minY: Math.min(a.y, b.y) - reach,
+    maxY: Math.max(a.y, b.y) + reach,
+  };
+  if (boundaryIndex !== undefined) {
+    return everyIndexedVCarveBoundarySegmentInBox(boundaryIndex, box, (segment) =>
+      radiusChordClearsSegment(a, b, radiusA, radiusB, segment),
+    );
+  }
+  return bruteForceChordClearance(a, b, radiusA, radiusB, segments, box);
+}
+
+function bruteForceChordClearance(
+  a: Vec2,
+  b: Vec2,
+  radiusA: number,
+  radiusB: number,
+  segments: ReadonlyArray<BoundarySegment>,
+  box: VCarveBoundaryQueryBox,
+): boolean {
   for (const segment of segments) {
-    if (Math.min(segment.ax, segment.bx) > maxX) continue;
-    if (Math.max(segment.ax, segment.bx) < minX) continue;
-    if (Math.min(segment.ay, segment.by) > maxY) continue;
-    if (Math.max(segment.ay, segment.by) < minY) continue;
+    if (Math.min(segment.ax, segment.bx) > box.maxX) continue;
+    if (Math.max(segment.ax, segment.bx) < box.minX) continue;
+    if (Math.min(segment.ay, segment.by) > box.maxY) continue;
+    if (Math.max(segment.ay, segment.by) < box.minY) continue;
     if (!radiusChordClearsSegment(a, b, radiusA, radiusB, segment)) return false;
   }
   return true;

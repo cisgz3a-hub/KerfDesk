@@ -11,6 +11,7 @@ import {
 import type { VCarveOptions } from './vcarve-ladder';
 import { vcarveEmittedProfileCovers, vcarveRoutePrecisionMet } from './vcarve-emitted-profile';
 import type { VCarveMedialRegionGeometryPlan } from './vcarve-medial-region-plan';
+import { buildVCarveBoundaryIndex } from './vcarve-boundary-index';
 
 const MEDIAL_Z_TOLERANCE_MM = 0.05;
 // Ten microns is the emitted CAM-footprint tolerance. It is checked against
@@ -33,13 +34,22 @@ export function passesForVCarveMedialRegion(
 ): VCarveRegionPassPlan {
   const passes: CncPass[] = [];
   const depthSegments = sourceBoundarySegments(plan.region.loops);
+  const boundaryIndex = buildVCarveBoundaryIndex(depthSegments);
   let toleranceMet = true;
   let thinResidual = plan.thinResidual;
   for (let index = 0; index < plan.routes.length; index += 1) {
     const route = plan.routes[index];
     const referenceRoute = plan.referenceRoutes[index] ?? route;
     if (route === undefined || referenceRoute === undefined) continue;
-    const routePlan = passesForRoute(route, referenceRoute, plan, depthSegments, law, options);
+    const routePlan = passesForRoute(
+      route,
+      referenceRoute,
+      plan,
+      depthSegments,
+      boundaryIndex,
+      law,
+      options,
+    );
     passes.push(...routePlan.passes);
     toleranceMet = toleranceMet && routePlan.toleranceMet;
     thinResidual = thinResidual || routePlan.passes.length === 0;
@@ -52,6 +62,7 @@ function passesForRoute(
   referenceRoute: Polyline,
   plan: VCarveMedialRegionGeometryPlan,
   depthSegments: ReturnType<typeof sourceBoundarySegments>,
+  boundaryIndex: ReturnType<typeof buildVCarveBoundaryIndex>,
   law: DetailDepthLaw,
   options: Pick<VCarveOptions, 'depthPerPassMm'>,
 ): { readonly passes: ReadonlyArray<CncPass>; readonly toleranceMet: boolean } {
@@ -60,6 +71,7 @@ function passesForRoute(
     depthSegments,
     law,
     MEDIAL_SWEEP_TOLERANCE_MM,
+    boundaryIndex,
   );
   if (route.points.length === 1) {
     return {
@@ -70,8 +82,14 @@ function passesForRoute(
   const zToleranceMm = precisionMet
     ? Math.min(MEDIAL_Z_TOLERANCE_MM, MEDIAL_SWEEP_TOLERANCE_MM / law.tanHalf)
     : MEDIAL_Z_TOLERANCE_MM;
-  const profile = detailPath3dPlan(route, depthSegments, law, zToleranceMm);
-  const referenceProfile = detailPath3dPlan(referenceRoute, depthSegments, law, zToleranceMm);
+  const profile = detailPath3dPlan(route, depthSegments, law, zToleranceMm, boundaryIndex);
+  const referenceProfile = detailPath3dPlan(
+    referenceRoute,
+    depthSegments,
+    law,
+    zToleranceMm,
+    boundaryIndex,
+  );
   const candidateCovered = vcarveEmittedProfileCovers(
     referenceProfile.points,
     profile.points,
@@ -91,6 +109,7 @@ function passesForRoute(
       outerRadiusMm: law.outerRadiusMm,
       compactionToleranceMm: MEDIAL_COMPACTION_TOLERANCE_MM,
       sweepToleranceMm: MEDIAL_SWEEP_TOLERANCE_MM,
+      boundaryIndex,
     },
   );
   return {

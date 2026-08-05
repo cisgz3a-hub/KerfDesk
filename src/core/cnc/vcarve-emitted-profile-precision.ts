@@ -1,5 +1,9 @@
 import type { Vec2 } from '../scene';
 import {
+  minimumIndexedVCarveBoundaryDistance,
+  type VCarveBoundaryIndex,
+} from './vcarve-boundary-index';
+import {
   EMIT_COORDINATE_QUANTUM_MM,
   emittedPoint,
   pointToSegmentDistance,
@@ -18,15 +22,16 @@ export function vcarveRoutePrecisionMet(
   segments: ReadonlyArray<BoundarySegment>,
   law: DetailDepthLaw,
   sweepToleranceMm: number,
+  boundaryIndex?: VCarveBoundaryIndex,
 ): boolean {
   const radiusCapMm = radialEnvelopeFootprintMm(law, law.maxDepthMm);
   return points.every((rawPoint) => {
     const point = emittedPoint(rawPoint);
-    let clearanceMm = Number.POSITIVE_INFINITY;
-    for (const segment of segments) {
-      clearanceMm = Math.min(clearanceMm, pointToSegmentDistance(point.x, point.y, segment));
-    }
-    const emittedDepthMm = vcarveEmittedDepthAtPoint(point, segments, law);
+    const clearanceMm =
+      boundaryIndex === undefined
+        ? minimumBoundaryDistance(point, segments)
+        : minimumIndexedVCarveBoundaryDistance(boundaryIndex, point.x, point.y);
+    const emittedDepthMm = vcarveEmittedDepthAtPoint(point, segments, law, boundaryIndex);
     // Preserve the exact pointed-bit arithmetic that owns existing emitted
     // profile compaction and snapshots. The flat-tip branch needs the inverse
     // law so sub-tip clearance has a zero target rather than a phantom disk.
@@ -40,6 +45,14 @@ export function vcarveRoutePrecisionMet(
         : radialEnvelopeRemovalRadiusMm(law, emittedDepthMm);
     return exactRadiusMm - emittedRadiusMm <= sweepToleranceMm + EMIT_COORDINATE_QUANTUM_MM * 1e-9;
   });
+}
+
+function minimumBoundaryDistance(point: Vec2, segments: ReadonlyArray<BoundarySegment>): number {
+  let minimum = Number.POSITIVE_INFINITY;
+  for (const segment of segments) {
+    minimum = Math.min(minimum, pointToSegmentDistance(point.x, point.y, segment));
+  }
+  return minimum;
 }
 
 function exactFlatTipRadiusMm(
