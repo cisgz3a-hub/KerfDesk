@@ -14,12 +14,13 @@ import {
   type Viewer3dSceneHandle,
 } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
+import { InspectorLensControl } from './InspectorLensControl';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import type { GcodeSourceLineIndex } from './gcode-source-line-index';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
 import { InspectorViewControls } from './InspectorViewControls';
-import { lensColorFn, type LensId } from './lenses';
+import { DEFAULT_LENS_ID, lensColorFn, type LensId } from './lenses';
 import { playheadAtTime, secondsAtLine } from './playhead';
 import { useInspectorPlayback } from './use-inspector-playback';
 import { useLiveMachine, type LiveMachine } from './use-live-machine';
@@ -58,7 +59,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
   const full = (props.variant ?? 'full') === 'full';
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [travelVisible, setTravelVisible] = useState(true);
-  const [lens, setLens] = useState<LensId>('kind');
+  const [lens, setLens] = useState<LensId>(DEFAULT_LENS_ID);
   const [arrowsVisible, setArrowsVisible] = useState(false);
   const [sourceVisible, setSourceVisible] = useState(true);
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
@@ -97,7 +98,11 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           handleRef={handleRef}
           state={state}
           reason={reason}
-        />
+        >
+          {full ? null : (
+            <PreviewLens model={model} time={time} theme={theme} lens={lens} onChange={setLens} />
+          )}
+        </Viewport>
         <InspectorTimeline playback={playback} totalRouteMm={time.motionSeconds} />
       </div>
       {props.variant !== 'preview' && sourceVisible ? (
@@ -130,6 +135,25 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
         />
       ) : null}
     </div>
+  );
+}
+
+function PreviewLens(props: {
+  readonly model: GcodeRenderModel;
+  readonly time: ReturnType<typeof buildProgramTime>;
+  readonly theme: ReturnType<typeof resolveViewer3dTheme>;
+  readonly lens: LensId;
+  readonly onChange: (lens: LensId) => void;
+}): JSX.Element {
+  return (
+    <InspectorLensControl
+      model={props.model}
+      time={props.time}
+      theme={props.theme}
+      lens={props.lens}
+      onLensChange={props.onChange}
+      variant="overlay"
+    />
   );
 }
 
@@ -186,6 +210,7 @@ function Viewport(props: {
   readonly handleRef: React.RefObject<Viewer3dSceneHandle | null>;
   readonly state: string;
   readonly reason: string;
+  readonly children?: React.ReactNode;
 }): JSX.Element {
   return (
     <div style={viewportStyle}>
@@ -198,6 +223,7 @@ function Viewport(props: {
           if (url !== undefined) downloadPng(url);
         }}
       />
+      {props.children}
       {props.state === 'no-webgl' ? (
         <p style={messageStyle}>
           3D view unavailable: {props.reason} The program parsed — readouts are live.

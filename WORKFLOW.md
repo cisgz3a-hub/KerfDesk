@@ -5007,6 +5007,12 @@ validation must be supervised without cutting load.
 4. Program Health lists findings (severity info / notice / warning, count,
    first line, click-to-jump). The panel header states: "Findings inform.
    Nothing here blocks Frame, Start, or export."
+5. A new view starts in **Depth / pass** colour mode. A concise legend names
+   the programmed depth-level count and exact shallow/deep Z endpoints; one
+   calm light-to-dark scale makes adjacent passes adjacent shades. **Tool
+   colour (single)** remains available from **Colour by** when the operator
+   wants the earlier uniform toolpath treatment. The choice is view-local and
+   never changes G-code, simulation, Frame, Start, or project data.
 
 #### Success — G-code as a main-canvas view
 

@@ -12281,6 +12281,19 @@ text itself (the read side).
   (dev-browser render + screenshots; jsdom cannot see WebGL, so no green
   suite is ever claimed as visual proof).
 
+### Amendment - depth/pass is the default colour lens (2026-08-05)
+
+- A new G-code 3D view opens in **Depth / pass** mode. Machining depths use one
+  deterministic sequential blue scale: shallow is lighter, deep is darker,
+  and nearby passes remain nearby shades. Safe-height traversal is excluded
+  from the scale range and keeps the established recessive red treatment.
+- Both the full Inspector and the main-canvas G-code view show the exact
+  shallow/deep endpoints and programmed depth-level count. **Tool colour
+  (single)** remains selectable, as do the existing move-kind and data lenses.
+- Lens switching rewrites only the existing vertex-colour buffer. It does not
+  rebuild geometry, parse again, persist into the project, change emitted
+  G-code, or affect simulation, Frame, Start, worker routing, or streaming.
+
 ## ADR-256 - 4040 starter feeds revised and CNC cut type defaults to On path
 
 **Date:** 2026-07-25
