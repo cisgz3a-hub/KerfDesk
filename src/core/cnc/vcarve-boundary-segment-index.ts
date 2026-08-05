@@ -45,6 +45,7 @@ export function buildVCarveBoundarySegmentIndex(
   return { kind: 'vcarve-boundary-segment-index', segments, root };
 }
 
+/** Normalize a segment source into an index while preserving existing indexes. */
 export function asVCarveBoundarySegmentIndex(
   source: VCarveBoundarySegmentSource,
 ): VCarveBoundarySegmentIndex {

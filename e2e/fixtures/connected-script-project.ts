@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 
+/** Installs the real script fixture into the browser store with G-code hidden. */
 export async function installConnectedScriptCompilationProject(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const fixturePath = '/src/__fixtures__/connected-script-compilation-project.ts';

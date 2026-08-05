@@ -7,28 +7,35 @@ import {
 import { installConnectedScriptCompilationProject } from './fixtures/connected-script-project';
 import { showGcodeCanvas } from './fixtures/mixed-canvas-project';
 
+const POST_COMPLETION_WINDOW_MS = 750;
+const READINESS_TIMEOUT_MS = 90_000;
+const TEST_TIMEOUT_MS = 180_000;
+
 test('real multi-artwork Dancing Script compiles off-thread into responsive G-code 3D', async ({
   page,
 }, testInfo) => {
-  test.setTimeout(180_000);
+  test.setTimeout(TEST_TIMEOUT_MS);
   const workerUrls: string[] = [];
   page.on('worker', (worker) => workerUrls.push(worker.url()));
   await page.goto('/');
-  await startResponsivenessProbe(page);
   await installConnectedScriptCompilationProject(page);
 
+  // Font parsing and fixture construction are setup, not G-code compilation.
+  await startResponsivenessProbe(page);
   const compilationStartedAt = Date.now();
   await showGcodeCanvas(page);
   await expect(page.getByLabel('G-code canvas view')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled({
-    timeout: 90_000,
+    timeout: READINESS_TIMEOUT_MS,
   });
-  await expect(page.getByLabel('Playback', { exact: true })).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByLabel('Playback', { exact: true })).toBeVisible({
+    timeout: READINESS_TIMEOUT_MS,
+  });
   const compileElapsedMs = Date.now() - compilationStartedAt;
 
   // Include the delayed delivery window that previously distinguished worker
   // completion from actual browser responsiveness.
-  await page.waitForTimeout(750);
+  await page.waitForTimeout(POST_COMPLETION_WINDOW_MS);
   const initialOpen = await stopResponsivenessProbe(page);
   testInfo.annotations.push({
     type: 'measurement',
@@ -39,9 +46,13 @@ test('real multi-artwork Dancing Script compiles off-thread into responsive G-co
   await startResponsivenessProbe(page);
   await runMenuCommand(page, 'File', 'Inspect G-code (3D)...');
   const inspector = page.getByRole('dialog', { name: /G-code Inspector: .*current canvas/ });
-  await expect(inspector.getByLabel('Program health')).toBeVisible({ timeout: 90_000 });
-  await expect(inspector.getByLabel('Playback', { exact: true })).toBeVisible({ timeout: 90_000 });
-  await page.waitForTimeout(750);
+  await expect(inspector.getByLabel('Program health')).toBeVisible({
+    timeout: READINESS_TIMEOUT_MS,
+  });
+  await expect(inspector.getByLabel('Playback', { exact: true })).toBeVisible({
+    timeout: READINESS_TIMEOUT_MS,
+  });
+  await page.waitForTimeout(POST_COMPLETION_WINDOW_MS);
   const inspectorOpen = await stopResponsivenessProbe(page);
   assertResponsivePhase(testInfo, 'connected-script G-code Inspector open', inspectorOpen);
   await inspector.getByRole('button', { name: 'Close' }).click();

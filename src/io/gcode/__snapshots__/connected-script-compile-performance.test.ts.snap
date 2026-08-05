@@ -1,0 +1,95 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`multi-artwork connected-script compilation > stays byte-exact and measurable 1`] = `
+{
+  "codeUnitCount": 1024912,
+  "head": [
+    "G21",
+    "G90",
+    "G54",
+    "G94",
+    "G17",
+    "G0 Z3.810",
+    "M3 S12000",
+    "G4 P3.000",
+    "; cnc layer-id: connected-script-0",
+    "; cnc operation: v-carve; passes: 8",
+    "; cnc tool-id: vb-60",
+    "; cnc tool-name: 60° V-bit — 6.35 mm (1/4") cut",
+    "; cnc tool: v-bit; diameter-mm: 6.350; angle-deg: 60.000",
+    "; cnc depth: per-pass-mm: 1.500",
+    "; cnc v-resolution-mm: auto",
+    "; cnc v-carve-depth: flowing-width",
+  ],
+  "lineCount": 41937,
+  "samples": [
+    {
+      "line": "G21",
+      "lineIndex": 0,
+    },
+    {
+      "line": "X135.020Y360.616Z-1.500",
+      "lineIndex": 3812,
+    },
+    {
+      "line": "X46.659Y350.541Z-1.439",
+      "lineIndex": 7625,
+    },
+    {
+      "line": "X134.393Y378.671Z-0.944",
+      "lineIndex": 11437,
+    },
+    {
+      "line": "X172.627Y351.086Z-0.752",
+      "lineIndex": 15249,
+    },
+    {
+      "line": "X226.314Y355.710Z-2.648",
+      "lineIndex": 19062,
+    },
+    {
+      "line": "X27.071Y310.363Z-3.011F363",
+      "lineIndex": 22874,
+    },
+    {
+      "line": "X104.628Y306.857Z-1.899F383",
+      "lineIndex": 26687,
+    },
+    {
+      "line": "X121.819Y308.015Z-0.689",
+      "lineIndex": 30499,
+    },
+    {
+      "line": "X185.444Y309.585Z-0.724",
+      "lineIndex": 34311,
+    },
+    {
+      "line": "X244.329Y309.934Z-2.380",
+      "lineIndex": 38124,
+    },
+    {
+      "line": "",
+      "lineIndex": 41936,
+    },
+  ],
+  "tail": [
+    "X223.688Y325.294Z-2.591F963",
+    "X223.485Y325.182Z-2.642F1000",
+    "X223.406Y325.146Z-2.649",
+    "X223.285Y325.083Z-2.643",
+    "X223.656Y324.141Z-0.899",
+    "X223.285Y325.083Z-2.643F346",
+    "X223.110Y325.010Z-2.607F1000",
+    "X222.896Y324.929Z-2.501",
+    "X222.796Y324.899Z-2.438",
+    "X222.638Y324.849Z-2.289",
+    "X222.574Y324.824Z-2.210",
+    "X221.605Y325.125Z-0.472",
+    "G0 Z3.810",
+    "M5",
+    "G0 X0.000 Y0.000",
+    "",
+  ],
+  "utf8ByteCount": 1024924,
+}
+`;

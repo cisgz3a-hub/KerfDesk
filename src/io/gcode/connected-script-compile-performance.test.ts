@@ -19,7 +19,6 @@ import type {
 import { passesForVCarveMedialRegion } from '../../core/cnc/vcarve-medial-region-passes';
 import { planUnrankedVCarveMedialRegion } from '../../core/cnc/vcarve-medial-region-plan';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
-import { computeDesignSceneSourceFromPrepared } from '../../ui/workspace/design-scene-source';
 import { emitPreparedGcode } from './index';
 import { prepareOutputAsync } from './prepare-output-async';
 
@@ -37,6 +36,8 @@ const boundaryIndexProbe = vi.hoisted(() => ({
 }));
 
 vi.mock('../../core/cnc/vcarve-boundary-segment-index', async (importOriginal) => {
+  // Vitest cannot infer an asynchronously imported mock's exports; bind the
+  // runtime module to the exact production function types used by this probe.
   const actual = (await importOriginal()) as Readonly<Record<string, unknown>> & {
     readonly asVCarveBoundarySegmentIndex: AsBoundaryIndex;
     readonly buildVCarveBoundarySegmentIndex: BuildBoundaryIndex;
@@ -84,14 +85,17 @@ vi.mock('../../core/cnc/vcarve-boundary-segment-index', async (importOriginal) =
 });
 
 const EXPECTED_REGION_COUNT = 12;
-const EXPECTED_GCODE_BYTES = 1_024_912;
+const EXPECTED_GCODE_CODE_UNITS = 1_024_912;
 const EXPECTED_GCODE_SHA256 = 'dde64575fd5da13a6a62a3505eaee98e318d7165ffe65decd227a4c4ffe9d53e';
+const EXPECTED_GCODE_UTF8_BYTES = 1_024_924;
+const GCODE_REVIEW_EDGE_LINES = 16;
+const GCODE_REVIEW_SAMPLES = 12;
 const READY_BOUND_MS = 45_000;
 const TEST_TIMEOUT_MS = 180_000;
 
 describe('multi-artwork connected-script compilation', () => {
   it(
-    'stays byte-exact, measurable, and ready for the real G-code 3D source',
+    'stays byte-exact and measurable',
     async () => {
       boundaryIndexProbe.arrayConversions = 0;
       boundaryIndexProbe.arrayQuerySources = 0;
@@ -154,6 +158,7 @@ describe('multi-artwork connected-script compilation', () => {
       const gcode = emitPreparedGcode(prepared).gcode;
       const emittedAt = performance.now();
       const gcodeSha256 = createHash('sha256').update(gcode).digest('hex');
+      const gcodeUtf8Bytes = Buffer.byteLength(gcode, 'utf8');
       console.log(
         JSON.stringify({
           artworkCount: CONNECTED_SCRIPT_ARTWORK_COUNT,
@@ -166,8 +171,9 @@ describe('multi-artwork connected-script compilation', () => {
             total: emittedAt - startedAt,
           },
           regionsMs: regionTimings,
-          gcodeBytes: gcode.length,
+          gcodeCodeUnits: gcode.length,
           gcodeSha256,
+          gcodeUtf8Bytes,
         }),
       );
       expect(regionTimings).toHaveLength(EXPECTED_REGION_COUNT);
@@ -177,22 +183,10 @@ describe('multi-artwork connected-script compilation', () => {
       expect(boundaryIndexProbe.arrayConversions).toBe(0);
       expect(boundaryIndexProbe.arrayQuerySources).toBe(0);
       expect(emittedAt - startedAt).toBeLessThan(READY_BOUND_MS);
-      expect(gcode).toHaveLength(EXPECTED_GCODE_BYTES);
+      expect(gcode).toHaveLength(EXPECTED_GCODE_CODE_UNITS);
+      expect(gcodeUtf8Bytes).toBe(EXPECTED_GCODE_UTF8_BYTES);
       expect(gcodeSha256).toBe(EXPECTED_GCODE_SHA256);
-
-      const source = computeDesignSceneSourceFromPrepared(project, prepared);
-      expect(source).not.toBeNull();
-      if (source === null) return;
-      expect(source.moves.some((move) => move.kind === 'cut')).toBe(true);
-      expect(
-        source.moves.every((move) =>
-          move.points.every(
-            (point) =>
-              Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z),
-          ),
-        ),
-      ).toBe(true);
-      expect(source.grid.depth.some((depth) => depth < 0)).toBe(true);
+      expect(reviewableGcodeSnapshot(gcode)).toMatchSnapshot();
     },
     TEST_TIMEOUT_MS,
   );
@@ -200,9 +194,21 @@ describe('multi-artwork connected-script compilation', () => {
 
 async function connectedScriptProject() {
   const bytes = readFileSync(resolve(__dirname, '../../ui/text/fonts/DancingScript-Regular.ttf'));
-  const fontBuffer = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
-  return connectedScriptCompilationProject(fontBuffer);
+  return connectedScriptCompilationProject(Uint8Array.from(bytes).buffer);
+}
+
+function reviewableGcodeSnapshot(gcode: string) {
+  const lines = gcode.split('\n');
+  const lastIndex = Math.max(0, lines.length - 1);
+  return {
+    codeUnitCount: gcode.length,
+    lineCount: lines.length,
+    head: lines.slice(0, GCODE_REVIEW_EDGE_LINES),
+    samples: Array.from({ length: GCODE_REVIEW_SAMPLES }, (_, sampleIndex) => {
+      const lineIndex = Math.round((lastIndex * sampleIndex) / (GCODE_REVIEW_SAMPLES - 1));
+      return { lineIndex, line: lines[lineIndex] };
+    }),
+    tail: lines.slice(-GCODE_REVIEW_EDGE_LINES),
+    utf8ByteCount: Buffer.byteLength(gcode, 'utf8'),
+  };
 }

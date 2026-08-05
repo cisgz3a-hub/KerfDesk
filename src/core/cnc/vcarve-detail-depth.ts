@@ -185,6 +185,8 @@ function depthQualityMet(
   // allowed radius interpolates linearly. If one boundary segment is within
   // the allowed radius at both endpoints, convexity certifies the whole span.
   // Requiring the same segment catches a narrow peak hidden between samples.
+  // A segment satisfying both endpoint limits must meet the smaller-radius
+  // endpoint's box, so this anchor cannot prune an accepted candidate.
   const [queryPoint, queryRadius] = radiusA <= radiusB ? [a, radiusA] : [b, radiusB];
   const queryReach = queryRadius + QUALITY_EPSILON_MM;
   return someVCarveBoundarySegmentInBox(

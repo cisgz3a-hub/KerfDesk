@@ -10,6 +10,7 @@ import {
 } from '../core/scene';
 import { textToPolylines } from '../core/text';
 
+/** Number of independently cloned text artworks in the compile fixture. */
 export const CONNECTED_SCRIPT_ARTWORK_COUNT = 4;
 const ARTWORK_COLORS = ['#c026d3', '#b91c1c', '#0369a1', '#047857'] as const;
 
