@@ -191,7 +191,7 @@ function depthLegend(model: GcodeRenderModel): LensLegend {
     kind: 'ramp',
     from: `Shallow ${formatDepth(scale.shallowMm)}`,
     to: `Deep ${formatDepth(scale.deepMm)}`,
-    note: `${scale.levelCount} depth ${levelWord}, light to dark`,
+    note: `${scale.levelCount} depth ${levelWord}, light blue to muted red`,
     fromColor: rgbCss(DEPTH_RAMP_SHALLOW),
     toColor: rgbCss(DEPTH_RAMP_DEEP),
   };

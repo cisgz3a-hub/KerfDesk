@@ -12294,6 +12294,16 @@ text itself (the read side).
   rebuild geometry, parse again, persist into the project, change emitted
   G-code, or affect simulation, Frame, Start, worker routing, or streaming.
 
+### Amendment - deepest depth uses a muted red (2026-08-05)
+
+- The ordered depth scale now runs from light blue through balanced muted
+  intermediate tones to a medium-light muted red at the deepest cut. The red
+  endpoint remains distinct from the more saturated traversal red and retains
+  readable contrast against the viewer background.
+- This amends only the palette and its legend wording. Depth calculation,
+  vertex-buffer recolouring, lens selection, and all non-viewer behavior above
+  remain unchanged.
+
 ## ADR-256 - 4040 starter feeds revised and CNC cut type defaults to On path
 
 **Date:** 2026-07-25

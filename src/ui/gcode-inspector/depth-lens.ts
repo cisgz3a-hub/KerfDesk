@@ -14,13 +14,13 @@ export type DepthLensScale = {
   readonly colorOf: (segmentIndex: number) => Rgb;
 };
 
-// One calm sequential blue scale: shallow passes are lighter and deeper
-// passes are darker. Every channel changes in one direction, so adjacent
-// depths stay adjacent shades rather than becoming unrelated colours.
+// One ordered blue-to-red scale: shallow passes are light blue, intermediate
+// passes stay balanced and muted, and the deepest pass is a readable muted
+// red. The continuous interpolation keeps adjacent depths as adjacent tones.
 /** Light endpoint used for the shallowest machining depth. */
 export const DEPTH_RAMP_SHALLOW: Rgb = [0.68, 0.82, 0.96];
-/** Dark endpoint used for the deepest machining depth. */
-export const DEPTH_RAMP_DEEP: Rgb = [0.18, 0.45, 0.78];
+/** Muted red endpoint used for the deepest machining depth. */
+export const DEPTH_RAMP_DEEP: Rgb = [0.75, 0.44, 0.46];
 
 const DEPTH_LEVEL_ROUND = 1000;
 const DEPTH_LEVEL_TOLERANCE_MM = 1 / DEPTH_LEVEL_ROUND;
