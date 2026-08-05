@@ -1,10 +1,10 @@
 import type { Vec2 } from '../scene';
 import {
-  EMIT_COORDINATE_QUANTUM_MM,
-  emittedPoint,
-  pointToSegmentDistance,
-  type BoundarySegment,
-} from './vcarve-detail-geometry';
+  asVCarveBoundarySegmentIndex,
+  minimumVCarveBoundaryPointDistance,
+  type VCarveBoundarySegmentSource,
+} from './vcarve-boundary-segment-index';
+import { EMIT_COORDINATE_QUANTUM_MM, emittedPoint } from './vcarve-detail-geometry';
 import { vcarveEmittedDepthAtPoint, type DetailDepthLaw } from './vcarve-detail-depth';
 import {
   radialEnvelopeDepthMm,
@@ -15,18 +15,16 @@ import {
 /** True only when fixed 0.001 mm emission can retain every route-node radius. */
 export function vcarveRoutePrecisionMet(
   points: ReadonlyArray<Vec2>,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   law: DetailDepthLaw,
   sweepToleranceMm: number,
 ): boolean {
   const radiusCapMm = radialEnvelopeFootprintMm(law, law.maxDepthMm);
+  const boundary = asVCarveBoundarySegmentIndex(segments);
   return points.every((rawPoint) => {
     const point = emittedPoint(rawPoint);
-    let clearanceMm = Number.POSITIVE_INFINITY;
-    for (const segment of segments) {
-      clearanceMm = Math.min(clearanceMm, pointToSegmentDistance(point.x, point.y, segment));
-    }
-    const emittedDepthMm = vcarveEmittedDepthAtPoint(point, segments, law);
+    const clearanceMm = minimumVCarveBoundaryPointDistance(boundary, point);
+    const emittedDepthMm = vcarveEmittedDepthAtPoint(point, boundary, law);
     // Preserve the exact pointed-bit arithmetic that owns existing emitted
     // profile compaction and snapshots. The flat-tip branch needs the inverse
     // law so sub-tip clearance has a zero target rather than a phantom disk.

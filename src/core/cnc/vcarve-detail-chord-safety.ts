@@ -1,4 +1,8 @@
 import type { Vec2 } from '../scene';
+import {
+  everyVCarveBoundarySegmentInBox,
+  type VCarveBoundarySegmentSource,
+} from './vcarve-boundary-segment-index';
 import type { BoundarySegment } from './vcarve-detail-geometry';
 import { radialEnvelopeSweepRadiiMm, type RadialEnvelope } from './radial-envelope';
 
@@ -9,7 +13,7 @@ export function emittedChordIsSafe(
   b: Vec2,
   depthA: number,
   depthB: number,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   envelope: RadialEnvelope,
 ): boolean {
   const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(envelope, depthA, depthB);
@@ -27,14 +31,9 @@ export function emittedChordIsSafe(
   const maxX = Math.max(a.x, b.x) + reach;
   const minY = Math.min(a.y, b.y) - reach;
   const maxY = Math.max(a.y, b.y) + reach;
-  for (const segment of segments) {
-    if (Math.min(segment.ax, segment.bx) > maxX) continue;
-    if (Math.max(segment.ax, segment.bx) < minX) continue;
-    if (Math.min(segment.ay, segment.by) > maxY) continue;
-    if (Math.max(segment.ay, segment.by) < minY) continue;
-    if (!radiusChordClearsSegment(a, b, radiusA, radiusB, segment)) return false;
-  }
-  return true;
+  return everyVCarveBoundarySegmentInBox(segments, { minX, minY, maxX, maxY }, (segment) =>
+    radiusChordClearsSegment(a, b, radiusA, radiusB, segment),
+  );
 }
 
 function radiusChordClearsSegment(
