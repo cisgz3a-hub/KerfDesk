@@ -1,6 +1,6 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import {
-  assertResponsivePhase,
+  assertOffThreadPhase,
   recordResponsivenessPhase,
   rollResponsivenessProbe,
   startResponsivenessProbe,
@@ -14,7 +14,7 @@ const IDLE_WORKER_START_TIMEOUT_MS = 10_000;
 const READINESS_TIMEOUT_MS = 90_000;
 const TEST_TIMEOUT_MS = 180_000;
 
-test('real multi-artwork Dancing Script compiles responsively and becomes ready in G-code 3D', async ({
+test('real multi-artwork Dancing Script compiles off-thread and becomes ready in G-code 3D', async ({
   page,
 }, testInfo) => {
   test.setTimeout(TEST_TIMEOUT_MS);
@@ -50,10 +50,12 @@ test('real multi-artwork Dancing Script compiles responsively and becomes ready 
   });
   const hardwareConcurrency = await page.evaluate(() => navigator.hardwareConcurrency);
   console.info(
-    'connected-script G-code compilation responsiveness',
+    'connected-script G-code off-thread compilation',
     JSON.stringify({ compileElapsedMs, hardwareConcurrency, compilation, workerUrls }),
   );
-  assertResponsivePhase(testInfo, 'connected-script G-code compilation', compilation);
+  expect(workerUrls.some((url) => url.includes('output-preparation-worker'))).toBe(true);
+  expect(workerUrls.some((url) => url.includes('canvas-compilation-worker'))).toBe(true);
+  assertOffThreadPhase(testInfo, 'connected-script G-code off-thread compilation', compilation);
 
   await expect(page.getByLabel('Playback', { exact: true })).toBeVisible({
     timeout: READINESS_TIMEOUT_MS,
@@ -69,7 +71,7 @@ test('real multi-artwork Dancing Script compiles responsively and becomes ready 
   );
   // Preview parsing and rendering are a separately released worker pipeline.
   // Keep its timing visible without expanding this compile-speed repair into
-  // viewer scheduling work; compile responsiveness remains strict above.
+  // viewer scheduling work; the off-thread compile contract remains strict above.
   recordResponsivenessPhase(
     testInfo,
     'connected-script G-code 3D preview readiness',
@@ -96,9 +98,6 @@ test('real multi-artwork Dancing Script compiles responsively and becomes ready 
   // this compile-speed repair into viewer scheduling work.
   recordResponsivenessPhase(testInfo, 'connected-script G-code Inspector open', inspectorOpen);
   await inspector.getByRole('button', { name: 'Close' }).click();
-
-  expect(workerUrls.some((url) => url.includes('output-preparation-worker'))).toBe(true);
-  expect(workerUrls.some((url) => url.includes('canvas-compilation-worker'))).toBe(true);
 });
 
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {

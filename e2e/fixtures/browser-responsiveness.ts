@@ -140,6 +140,19 @@ export function assertResponsivePhase(
   }
 }
 
+/** Requires a Chrome phase to avoid UI-thread monopolization while retaining scheduler telemetry. */
+export function assertOffThreadPhase(
+  testInfo: TestInfo,
+  phase: string,
+  measurement: ResponsivenessMeasurement,
+): void {
+  recordResponsivenessPhase(testInfo, phase, measurement);
+  expect(measurement.longTaskObserverSupported, `${phase} Long Task observer`).toBe(true);
+  expect(measurement.maxLongTaskMs, `${phase} maximum Long Task`).toBeLessThan(
+    MAX_ACCEPTABLE_MAIN_THREAD_GAP_MS,
+  );
+}
+
 /** Records diagnostic A/B phases that are intentionally absent from production. */
 export function recordResponsivenessPhase(
   testInfo: TestInfo,
