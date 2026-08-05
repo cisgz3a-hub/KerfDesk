@@ -5,8 +5,8 @@
 // mode, not only inside a modal. The dialog is now just a frame around it.
 
 import { useMemo, useRef, useState } from 'react';
-import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
-import { findProgramIssues, type GcodeRenderModel } from '../../core/gcode-view';
+import type { ProgramTimeModel } from '../../core/gcode-time';
+import type { GcodeRenderModel } from '../../core/gcode-view';
 import {
   directionArrows,
   resolveViewer3dTheme,
@@ -14,6 +14,7 @@ import {
   type Viewer3dSceneHandle,
 } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
+import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import { InspectorLensControl } from './InspectorLensControl';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import type { GcodeSourceLineIndex } from './gcode-source-line-index';
@@ -25,16 +26,7 @@ import { playheadAtTime, secondsAtLine } from './playhead';
 import { useInspectorPlayback } from './use-inspector-playback';
 import { useLiveMachine, type LiveMachine } from './use-live-machine';
 import { useSceneSync } from './use-scene-sync';
-import { useViewer3dScene } from './use-viewer3d-scene';
-
-// GRBL defaults. An opened file may not belong to the current machine, so the
-// Inspector times it against stock kinematics rather than silently borrowing
-// the connected device's — the timeline is labelled as an estimate.
-const INSPECTOR_LIMITS: MotionLimits = {
-  accelMmPerSec2: 500,
-  junctionDeviationMm: 0.01,
-  maxFeedMmPerMin: 6000,
-};
+import { useViewer3dScene, type Viewer3dSceneState } from './use-viewer3d-scene';
 
 /**
  * 'full' is the in-depth screen: 3D + source pane + readouts + health.
@@ -46,12 +38,14 @@ export type InspectorVariant = 'full' | 'preview';
 type InspectorViewProps =
   | {
       readonly model: GcodeRenderModel;
+      readonly analysis: GcodeInspectorAnalysis;
       readonly source: GcodeInspectionSource;
       readonly sourceIndex: GcodeSourceLineIndex;
       readonly variant?: 'full';
     }
   | {
       readonly model: GcodeRenderModel;
+      readonly analysis: GcodeInspectorAnalysis;
       readonly variant: 'preview';
     };
 
@@ -67,7 +61,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
   const { model } = props;
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
   const { time, playback, playhead, findings, atEnd, colorOf, arrows, activeLine } =
-    useInspectorDerived(model, lens, theme, arrowsVisible);
+    useInspectorDerived(model, props.analysis, lens, theme, arrowsVisible);
   const live = useLiveMachine();
 
   useSceneSync({
@@ -140,7 +134,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
 
 function PreviewLens(props: {
   readonly model: GcodeRenderModel;
-  readonly time: ReturnType<typeof buildProgramTime>;
+  readonly time: ProgramTimeModel;
   readonly theme: ReturnType<typeof resolveViewer3dTheme>;
   readonly lens: LensId;
   readonly onChange: (lens: LensId) => void;
@@ -162,28 +156,27 @@ function PreviewLens(props: {
  * the function-size cap. */
 function useInspectorDerived(
   model: GcodeRenderModel,
+  analysis: GcodeInspectorAnalysis,
   lens: LensId,
   theme: ReturnType<typeof resolveViewer3dTheme>,
   arrowsVisible: boolean,
 ): {
-  readonly time: ReturnType<typeof buildProgramTime>;
+  readonly time: ProgramTimeModel;
   readonly playback: ReturnType<typeof useInspectorPlayback>;
   readonly playhead: ReturnType<typeof playheadAtTime>;
-  readonly findings: ReturnType<typeof findProgramIssues>;
+  readonly findings: GcodeInspectorAnalysis['findings'];
   readonly atEnd: boolean;
   readonly colorOf: ReturnType<typeof lensColorFn>;
   readonly arrows: ReturnType<typeof directionArrows> | null;
   /** 3D -> source: the line whose move the playhead is executing. */
   readonly activeLine: number | null;
 } {
-  // Planner-true seconds: the same kinematics Job Review estimates with.
-  const time = useMemo(() => buildProgramTime(model, INSPECTOR_LIMITS), [model]);
+  const { time, findings } = analysis;
   const playback = useInspectorPlayback(time.motionSeconds);
   const playhead = useMemo(
     () => playheadAtTime(model, time.segTimeEndSec, playback.routeMm),
     [model, time, playback.routeMm],
   );
-  const findings = useMemo(() => findProgramIssues(model), [model]);
   const colorOf = useMemo(() => lensColorFn(model, time, lens, theme), [model, time, lens, theme]);
   // Cut direction is invisible without these: climb vs conventional.
   const arrows = useMemo(
@@ -208,12 +201,12 @@ function Viewport(props: {
   readonly canvasRef: React.RefObject<HTMLCanvasElement>;
   readonly live: LiveMachine;
   readonly handleRef: React.RefObject<Viewer3dSceneHandle | null>;
-  readonly state: string;
+  readonly state: Viewer3dSceneState;
   readonly reason: string;
   readonly children?: React.ReactNode;
 }): JSX.Element {
   return (
-    <div style={viewportStyle}>
+    <div style={viewportStyle} data-viewer-state={props.state}>
       <canvas ref={props.canvasRef} style={canvasStyle} />
       {props.live.streaming ? <LiveBadge live={props.live} /> : null}
       <InspectorViewControls

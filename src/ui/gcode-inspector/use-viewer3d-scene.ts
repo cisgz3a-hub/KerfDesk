@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { GcodeRenderModel } from '../../core/gcode-view';
 import { createViewer3dScene, type Viewer3dSceneHandle } from '../viewer3d';
 
-export type Viewer3dSceneState = 'loading' | 'ready' | 'no-webgl';
+export type Viewer3dSceneState = 'loading' | 'preparing' | 'ready' | 'no-webgl';
 
 export type Viewer3dSceneBinding = {
   readonly handleRef: RefObject<Viewer3dSceneHandle | null>;
@@ -26,6 +26,7 @@ export function useViewer3dScene(
   model: GcodeRenderModel,
 ): Viewer3dSceneBinding {
   const handleRef = useRef<Viewer3dSceneHandle | null>(null);
+  const drawnModelRef = useRef<GcodeRenderModel | null>(null);
   const [state, setState] = useState<Viewer3dSceneState>('loading');
   const [reason, setReason] = useState('');
 
@@ -33,6 +34,7 @@ export function useViewer3dScene(
     const canvas = canvasRef.current;
     if (canvas === null) return;
     let cancelled = false;
+    drawnModelRef.current = null;
     setState('loading');
     void createViewer3dScene(canvas)
       .then((outcome) => {
@@ -47,7 +49,7 @@ export function useViewer3dScene(
         }
         handleRef.current = outcome.handle;
         outcome.handle.resize(canvas.clientWidth, canvas.clientHeight);
-        setState('ready');
+        setState('preparing');
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -58,17 +60,22 @@ export function useViewer3dScene(
       cancelled = true;
       handleRef.current?.dispose();
       handleRef.current = null;
+      drawnModelRef.current = null;
     };
   }, [canvasRef]);
 
-  // Draw the current program. `state` is a dependency so the first model lands
-  // as soon as the scene is ready, and this runs before useSceneSync's effects
-  // (declared after this hook) push the playhead and lens onto the new
-  // geometry.
+  // Publish ready only after the initial model and bounds have landed. This
+  // runs before useSceneSync's effects push the playhead and lens.
   useEffect(() => {
-    if (state !== 'ready') return;
+    if (state !== 'preparing' && state !== 'ready') return;
+    if (drawnModelRef.current === model) {
+      if (state === 'preparing') setState('ready');
+      return;
+    }
     handleRef.current?.setSegments(model);
     handleRef.current?.fitToBounds(model.stats.motionBounds);
+    drawnModelRef.current = model;
+    if (state === 'preparing') setState('ready');
   }, [model, state]);
 
   useEffect(() => {

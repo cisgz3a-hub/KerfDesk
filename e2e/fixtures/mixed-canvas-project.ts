@@ -43,6 +43,29 @@ export async function showGcodeCanvas(page: Page): Promise<void> {
   });
 }
 
+/** Waits through a cheap DOM predicate so responsiveness probes measure the app,
+ * not Playwright's injected accessibility-tree traversal. Semantic assertions
+ * still run after the measured phase. */
+export async function waitForGcodeCanvasReady(page: Page, timeout = 30_000): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const refresh = document.querySelector<HTMLButtonElement>(
+        'button[title="Recompile this project\'s G-code"]',
+      );
+      const playback = document.querySelector<HTMLElement>('[aria-label="Playback"]');
+      const scene = document.querySelector<HTMLElement>('[data-viewer-state="ready"]');
+      return (
+        refresh?.disabled === false &&
+        playback !== null &&
+        playback.offsetParent !== null &&
+        scene !== null
+      );
+    },
+    undefined,
+    { timeout },
+  );
+}
+
 interface StoreApi {
   readonly useStore: {
     readonly getState: () => { readonly setProject: (project: unknown) => unknown };

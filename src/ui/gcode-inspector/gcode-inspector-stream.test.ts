@@ -14,6 +14,7 @@ describe('inspectGcodeSource', () => {
     const direct = inspectGcodeText(text);
 
     expect(streamed.parsed).toEqual(direct.parsed);
+    expect(streamed.analysis).toEqual(direct.analysis);
     expect(streamed.sourceLineCount).toBe(direct.sourceLineCount);
     await expect(
       readGcodeSourceLines(source, streamed.sourceIndex, 0, streamed.sourceLineCount),

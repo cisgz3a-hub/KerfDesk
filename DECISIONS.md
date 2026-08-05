@@ -15436,6 +15436,12 @@ not reduce the cost inside one large connected region.
    heavy canvas compilation remains in the bounded Worker architecture from ADR-288. Emitted G-code,
    fingerprints, Frame bounds, Job Review, and Start semantics do not change. No new guard or
    synchronous UI-thread fallback is introduced.
+5. **Finish large G-code previews without one terminal UI task.** The existing Inspector parser
+   Worker also derives the fixed-limit planner timeline and informational health findings, and
+   transfers their typed arrays with the render model. WebGL scene startup yields between renderer,
+   scene, and initial-camera phases, and reports ready only after initial geometry and bounds are
+   installed. These display-only changes do not alter the parsed program, emitted bytes, planner
+   geometry, or machine-facing behavior.
 
 ### Consequences
 
@@ -15445,6 +15451,9 @@ not reduce the cost inside one large connected region.
   regions may not become faster; ordinary low-cost operations still use their existing direct paths.
 - Browser responsiveness remains a separate invariant from compile wall-clock time. This amendment
   improves measured planning time but does not replace the ADR-288 Worker boundary.
+- Worker-side Inspector analysis adds seven transferable typed arrays proportional to displayed
+  segments. Their buffers move rather than clone, and the parser Worker already owns the matching
+  render-model lifetime.
 
 ### Verification
 
@@ -15462,6 +15471,10 @@ not reduce the cost inside one large connected region.
 - A real-browser G-code 3D regression reaches ready with the same eight-drawing fixture, observes
   both output-preparation and canvas-compilation Workers, and retains the unchanged one-second UI
   heartbeat ceiling.
+- Under a diagnostic-only 4x browser CPU slowdown, moving terminal analysis to the parser Worker
+  and separating WebGL startup phases reduced the maximum UI heartbeat gap from 1,035.2 ms to
+  371.5 ms and the longest product Long Task from 851 ms to 274 ms. The profiler harness was removed;
+  the production regression retains the same threshold.
 - NOT verified: controller execution, air-cut, material cut, physical containment, spindle load,
   cut quality, or a fixed latency on other CPUs.
 

@@ -87,8 +87,8 @@ beforeEach(() => {
     kind: 'ok' as const,
     handle: handle(),
   }));
-  sceneMocks.setSegments.mockClear();
-  sceneMocks.fitToBounds.mockClear();
+  sceneMocks.setSegments.mockReset();
+  sceneMocks.fitToBounds.mockReset();
   sceneMocks.dispose.mockClear();
 });
 
@@ -108,6 +108,18 @@ describe('useViewer3dScene', () => {
     expect(sceneMocks.createViewer3dScene).toHaveBeenCalledTimes(1);
     expect(sceneMocks.setSegments).toHaveBeenCalledWith(model);
     expect(sceneMocks.fitToBounds).toHaveBeenCalledWith(model.stats.motionBounds);
+    expect(binding?.state).toBe('ready');
+  });
+
+  it('publishes ready only after the initial geometry is installed', async () => {
+    sceneMocks.setSegments.mockImplementation(() => {
+      expect(binding?.state).toBe('preparing');
+    });
+
+    await mount(renderModel(FIRST_PROGRAM));
+
+    expect(sceneMocks.setSegments).toHaveBeenCalledTimes(1);
+    expect(binding?.state).toBe('ready');
   });
 
   // The WebGL context belongs to the canvas, not to the program: rebuilding

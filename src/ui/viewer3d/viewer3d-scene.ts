@@ -31,6 +31,7 @@ import {
 import { createMarkers, disposeMarkers, sizeMarkers, type MarkerMesh } from './scene-markers';
 import { buildFurniture, disposeChildren, frameCamera } from './scene-furniture';
 import { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
+import { yieldViewer3dInitialization } from './viewer3d-initialization-yield';
 
 export type Viewer3dSegments = Viewer3dSegmentsInput;
 
@@ -112,6 +113,7 @@ export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Vi
   const started = startRenderer(three, canvas, theme);
   if (started.kind === 'no-webgl') return started;
   const { renderer, width, height } = started;
+  await yieldViewer3dInitialization();
 
   const scene = new three.Scene();
   const toolpathGroup = new three.Group();
@@ -131,6 +133,7 @@ export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Vi
     width,
     height,
   });
+  await yieldViewer3dInitialization();
   handle.fitToBounds(null);
   return { kind: 'ok', handle };
 }

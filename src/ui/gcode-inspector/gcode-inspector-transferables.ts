@@ -1,10 +1,14 @@
-import type { GcodeInspectorWorkerResult } from './gcode-inspector-worker-protocol';
+import {
+  hasGcodeInspectorAnalysis,
+  type GcodeInspectorWorkerResult,
+} from './gcode-inspector-worker-protocol';
 
 export function gcodeInspectorTransferables(
   result: GcodeInspectorWorkerResult,
 ): ReadonlyArray<ArrayBuffer> {
-  if (result.parsed.kind !== 'ok') return arrayBufferOf(result.sourceIndex.starts.buffer);
+  if (!hasGcodeInspectorAnalysis(result)) return arrayBufferOf(result.sourceIndex.starts.buffer);
   const model = result.parsed.model;
+  const time = result.analysis.time;
   return uniqueArrayBuffers([
     result.sourceIndex.starts.buffer,
     model.positions.buffer,
@@ -15,6 +19,13 @@ export function gcodeInspectorTransferables(
     model.segPower.buffer,
     model.segRouteEndMm.buffer,
     model.lineCategories.buffer,
+    time.segSeconds.buffer,
+    time.segDistanceMm.buffer,
+    time.segTargetVelocityMmPerSec.buffer,
+    time.segEntryVelocityMmPerSec.buffer,
+    time.segExitVelocityMmPerSec.buffer,
+    time.segTimeEndSec.buffer,
+    time.segFeedLimited.buffer,
   ]);
 }
 
