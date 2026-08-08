@@ -391,6 +391,7 @@ function validateColoredPath(value: unknown, path: string): string | null {
   return firstError([
     requireString(value, `${path}.color`),
     validateOperationIds(value['operationIds'], `${path}.operationIds`),
+    optionalPositiveNumber(value, `${path}.strokeWidthMm`),
     validatePolylines(value['polylines'], `${path}.polylines`),
     validateCurveSubpaths(value['curves'], `${path}.curves`),
   ]);

@@ -6,6 +6,10 @@ import {
   type VCarveEmittedCapsule,
 } from './vcarve-emitted-profile-capsule';
 import {
+  MAX_VCARVE_COVERAGE_CAPSULE_CHECKS,
+  vcarveEmittedReferenceFitsSingleCapsule,
+} from './vcarve-emitted-profile-single-chord';
+import {
   buildVCarveProfileDistanceIndex,
   mappedVCarveProfileCapsuleIndex,
   type VCarveProfileDistanceIndex,
@@ -13,7 +17,6 @@ import {
 import { radialEnvelopeSweepRadiiMm, type RadialEnvelope } from './radial-envelope';
 
 const MAX_REFERENCE_SUBDIVISION_DEPTH = 12;
-const MAX_COVERAGE_CAPSULE_CHECKS = 250_000;
 const MAX_DISTANCE_INDEX_RADIUS = 8;
 
 type CoverageWork = { remaining: number };
@@ -33,9 +36,12 @@ export function vcarveEmittedProfileCovers(
 ): boolean {
   if (reference.length < 2 || candidate.length < 2) return reference.length === candidate.length;
   const capsules = buildVCarveEmittedCapsules(candidate, envelope, toleranceMm);
+  if (capsules.length === 1) {
+    return vcarveEmittedReferenceFitsSingleCapsule(reference, capsules[0], envelope, toleranceMm);
+  }
   const referenceDistance = buildVCarveProfileDistanceIndex(reference);
   const candidateDistance = buildVCarveProfileDistanceIndex(candidate);
-  const work: CoverageWork = { remaining: MAX_COVERAGE_CAPSULE_CHECKS };
+  const work: CoverageWork = { remaining: MAX_VCARVE_COVERAGE_CAPSULE_CHECKS };
   let capsuleHint = 0;
   for (let index = 1; index < reference.length; index += 1) {
     const a = reference[index - 1];

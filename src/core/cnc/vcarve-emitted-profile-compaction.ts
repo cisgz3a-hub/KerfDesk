@@ -5,7 +5,7 @@ import {
   type VCarveBoundarySegmentSource,
 } from './vcarve-boundary-segment-index';
 import { emittedChordIsSafe } from './vcarve-detail-depth';
-import { vcarveEmittedProfileCovers } from './vcarve-emitted-profile';
+import { vcarveEmittedSpanFitsChord } from './vcarve-emitted-profile-single-chord';
 import type { RadialEnvelope } from './radial-envelope';
 
 const MAX_COMPACTION_SPAN_POINTS = 32;
@@ -57,5 +57,5 @@ function spanCanCompact(
   if (!emittedChordIsSafe(a, b, Math.max(0, -a.z), Math.max(0, -b.z), boundary, envelope)) {
     return false;
   }
-  return vcarveEmittedProfileCovers(points.slice(start, end + 1), [a, b], envelope, toleranceMm);
+  return vcarveEmittedSpanFitsChord(points, start, end, a, b, envelope, toleranceMm);
 }

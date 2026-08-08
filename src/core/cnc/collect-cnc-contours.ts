@@ -14,6 +14,7 @@ import {
 import { cncTabAnchorPosition } from './cnc-tab-anchors';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 import { mergeTextObjectContours } from './vcarve-text-union';
+import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 
 export function collectLayerPolylines(
   objects: ReadonlyArray<SceneObject>,
@@ -74,16 +75,20 @@ function appendObjectContours(
       toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
       segmentBudget: 100_000,
     });
-    const polylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+    const sourcePolylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+    const strokeOutline =
+      layer.cnc?.cutType === 'v-carve' && path.strokeWidthMm !== undefined
+        ? roundStrokeOutline(sourcePolylines, path.strokeWidthMm)
+        : null;
+    const usesStrokeOutline = strokeOutline !== null && strokeOutline.length > 0;
+    const polylines = usesStrokeOutline ? strokeOutline : sourcePolylines;
     polylines.forEach((polyline, polylineIndex) => {
       if (polyline.points.length < 2) return;
-      const manualTabPoints = objectTabPoints(
-        object,
-        layer.color,
-        pathIndex,
-        polylineIndex,
-        device,
-      );
+      // Clipper can merge and reorder outlined strokes, so its result index no
+      // longer identifies the source polyline that owns a persisted tab anchor.
+      const manualTabPoints = usesStrokeOutline
+        ? []
+        : objectTabPoints(object, layer.color, pathIndex, polylineIndex, device);
       out.push({
         polyline: {
           points: polyline.points.map((point) =>

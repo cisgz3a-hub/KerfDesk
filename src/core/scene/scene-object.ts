@@ -49,6 +49,10 @@ export type ColoredPath = {
   readonly color: string;
   readonly operationIds?: ReadonlyArray<string>;
   readonly polylines: ReadonlyArray<Polyline>;
+  // Local-coordinate width of a trusted round-stroke source. Ordinary line
+  // operations keep the centerline; filled-region CAM may materialize the
+  // visible stroke outline without changing laser/engrave geometry.
+  readonly strokeWidthMm?: number;
   // Schema-v2 canonical geometry. `polylines` remains a deterministic
   // compatibility view while preview and compilation migrate subsystem by
   // subsystem; serializers always materialize this field for saved projects.
