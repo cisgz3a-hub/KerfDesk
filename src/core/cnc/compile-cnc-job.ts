@@ -61,7 +61,7 @@ import { passesForCncLayer } from './compile-cnc-layer-passes';
 export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
 
 /** Pure CNC compilation result used by output preparation and worker finalization. */
-type CncJobCompilationResult =
+export type CncJobCompilationResult =
   | { readonly kind: 'compiled'; readonly job: Job }
   | ReliefMaterializationFailure;
 

@@ -1,4 +1,4 @@
-import { createCncPreviewWorkerClient } from './cnc-removal-grid-worker-client-runtime';
+import { createCncPreviewWorkerClient } from './cnc-preview-worker-client-runtime';
 
 export { isCncRemovalGridSuperseded } from './cnc-preview-worker-client-types';
 

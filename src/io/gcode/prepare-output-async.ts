@@ -1,6 +1,7 @@
 import {
   finalizeCncCompilationArtifact,
   prepareBoundCncCompilation,
+  type CncJobCompilationResult,
 } from '../../core/cnc/compile-cnc-job';
 import {
   runCncCompilationTask,
@@ -8,8 +9,7 @@ import {
   type CncCompilationTaskResult,
   type PreparedCncCompilationArtifact,
 } from '../../core/cnc/cnc-compilation-artifact';
-import { compileJob, type Job } from '../../core/job';
-import type { ReliefMaterializationFailure } from '../../core/relief/relief-materialization-failure';
+import { compileJob } from '../../core/job';
 import type { Project } from '../../core/scene';
 import {
   isProgramMaterializationRangeError,
@@ -72,7 +72,7 @@ export async function prepareOutputAsync(
 async function compileOutputProject(
   project: Project,
   context: PrepareOutputAsyncContext,
-): Promise<{ readonly kind: 'compiled'; readonly job: Job } | ReliefMaterializationFailure> {
+): Promise<CncJobCompilationResult> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc')
     return { kind: 'compiled', job: compileJob(project.scene, project.device) };

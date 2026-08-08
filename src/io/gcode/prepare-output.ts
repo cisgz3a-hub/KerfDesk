@@ -18,8 +18,7 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
-import { compileCncJobResult } from '../../core/cnc/compile-cnc-job';
-import type { ReliefMaterializationFailure } from '../../core/relief/relief-materialization-failure';
+import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
   runPreEmitPreflight,
@@ -186,11 +185,7 @@ export function completePreparedOutput(
 
 // One compile entry per machine kind: the project's machine choice routes to
 // the CNC compiler (depth passes, tool offsets) or the laser compiler.
-type MachineCompilationResult =
-  | { readonly kind: 'compiled'; readonly job: Job }
-  | ReliefMaterializationFailure;
-
-function compileForMachine(project: Project): MachineCompilationResult {
+function compileForMachine(project: Project): CncJobCompilationResult {
   const machine = project.machine;
   return machine !== undefined && machine.kind === 'cnc'
     ? compileCncJobResult(project.scene, project.device, machine)
