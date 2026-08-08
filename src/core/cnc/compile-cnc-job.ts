@@ -22,6 +22,7 @@ import {
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
 import type { CncCompilationSidecar } from '../job/job';
+import type { ReliefMaterializationFailure } from '../relief/relief-materialization-failure';
 import { coolantFields } from './coolant-fields';
 import {
   capFeed,
@@ -59,7 +60,17 @@ import { passesForCncLayer } from './compile-cnc-layer-passes';
 
 export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
 
-export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
+/** Pure CNC compilation result used by output preparation and worker finalization. */
+type CncJobCompilationResult =
+  | { readonly kind: 'compiled'; readonly job: Job }
+  | ReliefMaterializationFailure;
+
+/** Compile CNC geometry while returning expected relief-source failures as data. */
+export function compileCncJobResult(
+  scene: Scene,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+): CncJobCompilationResult {
   if (!hasVCarveOperation(scene)) return compileCncSnapshot(scene, device, config, []);
   const identity = { jobId: 'synchronous', compilationId: 'synchronous' };
   const artifact = prepareCncCompilationArtifact(identity, scene, device, config);
@@ -74,11 +85,23 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   if (finalized.kind === 'rejected') {
     throw new Error(`Synchronous CNC compilation rejected: ${finalized.reason}`);
   }
-  return finalized.job;
+  return finalized;
+}
+
+/**
+ * Compatibility entry for already-validated core callers. Output preparation
+ * uses compileCncJobResult so a malformed stored relief never uses exceptions
+ * for expected compile-integrity control flow.
+ */
+export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
+  const result = compileCncJobResult(scene, device, config);
+  if (result.kind === 'compiled') return result.job;
+  throw new Error(`Relief "${result.source}" could not be materialized: ${result.reason}`);
 }
 
 export type FinalizedCncCompilation =
   | { readonly kind: 'rejected'; readonly reason: CncCompilationRejectionReason }
+  | ReliefMaterializationFailure
   | {
       readonly kind: 'compiled';
       readonly job: Job;
@@ -91,16 +114,13 @@ export function finalizeCncCompilationArtifact(
 ): FinalizedCncCompilation {
   const resolved = resolveCncCompilationArtifact(artifact, results);
   if (resolved.kind === 'rejected') return resolved;
-  return {
-    kind: 'compiled',
-    job: compileCncSnapshot(
-      resolved.scene,
-      resolved.device,
-      resolved.config,
-      resolved.evidence.vcarveLayers,
-    ),
-    evidence: resolved.evidence,
-  };
+  const compiled = compileCncSnapshot(
+    resolved.scene,
+    resolved.device,
+    resolved.config,
+    resolved.evidence.vcarveLayers,
+  );
+  return compiled.kind === 'compiled' ? { ...compiled, evidence: resolved.evidence } : compiled;
 }
 
 export function prepareBoundCncCompilation(
@@ -117,7 +137,7 @@ function compileCncSnapshot(
   device: DeviceProfile,
   config: CncMachineConfig,
   vcarveLayers: CncCompilationEvidence['vcarveLayers'],
-): Job {
+): CncJobCompilationResult {
   const clearingGroups: CncGroup[] = [];
   const profileGroups: CncGroup[] = [];
   const sourceObjects = scene.objects;
@@ -127,11 +147,9 @@ function compileCncSnapshot(
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
     // H.5/H.8: relief objects rough (and optionally finish, with their own
     // bit) as clearing groups — neither ever frees a part.
-    clearingGroups.push(
-      ...compileReliefGroupsForLayer(sourceObjects, layer, settings, device, config).map((group) =>
-        tagArtworkGroup(group, priorityObjectId),
-      ),
-    );
+    const relief = compileReliefGroupsForLayer(sourceObjects, layer, settings, device, config);
+    if (relief.kind === 'relief-materialization-failed') return relief;
+    clearingGroups.push(...relief.groups.map((group) => tagArtworkGroup(group, priorityObjectId)));
     const contours = collectLayerContours(sourceObjects, layer, device);
     const polylines = layerPolylinesFromContours(layer, contours);
     if (polylines.length === 0) continue;
@@ -194,7 +212,10 @@ function compileCncSnapshot(
   // profile-carrying sections last so freed parts are never re-machined.
   const groups = orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]);
   const cncCompilation = cncCompilationSidecar(vcarveLayers);
-  return cncCompilation === undefined ? { groups } : { groups, cncCompilation };
+  return {
+    kind: 'compiled',
+    job: cncCompilation === undefined ? { groups } : { groups, cncCompilation },
+  };
 }
 
 function hasVCarveOperation(scene: Scene): boolean {

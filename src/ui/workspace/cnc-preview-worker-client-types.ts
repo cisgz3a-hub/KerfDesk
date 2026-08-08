@@ -5,6 +5,7 @@ import type {
   ReliefHeightmapWorkerResult,
 } from './cnc-removal-grid-worker-protocol';
 
+/** Latest-only removal-grid or Cut 3D request accepted by the shared preview worker. */
 export type MainRequest = Extract<
   CncRemovalGridWorkerRequest,
   { readonly kind: 'grid' | 'surface' }
@@ -12,9 +13,10 @@ export type MainRequest = Extract<
 
 type MainCancellation = {
   readonly signal?: AbortSignal;
-  abortListener?: () => void;
+  readonly abortListener?: () => void;
 };
 
+/** Resolver and cancellation ownership for the current latest-only preview request. */
 export type MainPending = (
   | {
       readonly id: number;
@@ -31,15 +33,17 @@ export type MainPending = (
 ) &
   MainCancellation;
 
+/** Resolver, request payload, and cancellation ownership for one queued relief batch. */
 export type ReliefPending = {
   readonly id: number;
   readonly request: Extract<CncRemovalGridWorkerRequest, { readonly kind: 'relief-heightmaps' }>;
   readonly resolve: (items: ReadonlyArray<ReliefHeightmapWorkerResult>) => void;
   readonly reject: (error: Error) => void;
   readonly signal?: AbortSignal;
-  abortListener?: () => void;
+  readonly abortListener?: () => void;
 };
 
+/** Error used when newer latest-only preview work replaces an older request. */
 export class CncRemovalGridSupersededError extends Error {
   override readonly name = 'CncRemovalGridSupersededError';
 
@@ -48,6 +52,7 @@ export class CncRemovalGridSupersededError extends Error {
   }
 }
 
+/** Return whether a preview rejection means newer latest-only work replaced it. */
 export function isCncRemovalGridSuperseded(error: unknown): boolean {
   return error instanceof CncRemovalGridSupersededError;
 }

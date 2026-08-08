@@ -112,6 +112,7 @@ async function decodeIdat(
       }
       if (sawIdat) idatEnded = true;
       const data = await readChunkData(reader, chunk);
+      validatePaletteForColorType(chunk.type, format.colorType);
       densityDpi = densityFromChunk(chunk.type, sawIdat, data, densityDpi);
       if (chunk.type === 'IEND') {
         if (chunk.length !== 0) throw new Error('PNG IEND chunk must be empty.');
@@ -140,6 +141,11 @@ async function decodeIdat(
     await rows;
     throw error;
   }
+}
+
+function validatePaletteForColorType(type: string, colorType: number): void {
+  if (type !== 'PLTE' || (colorType !== 0 && colorType !== 4)) return;
+  throw new Error(`PNG PLTE is not permitted for grayscale color type ${colorType}.`);
 }
 
 type SettledRows = { readonly ok: true } | { readonly ok: false; readonly error: unknown };

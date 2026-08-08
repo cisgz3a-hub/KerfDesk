@@ -16,12 +16,11 @@ import {
   type DepthMapHeightmapOptions,
   type DepthMapHeightmapResult,
 } from '../../core/relief/depth-map-to-heightmap';
-import type { CncMachineConfig, ReliefObject } from '../../core/scene';
+import type { CncMachineConfig } from '../../core/scene';
+import type { ReliefDepthMap } from '../../core/scene/relief';
 import type { RemovalGrid } from '../../core/sim';
 import { prepareCncCut3DSurface } from './cnc-cut3d-surface';
 import { computeCncRemovalGrid } from './cnc-removal-grid';
-
-type ReliefDepthMap = NonNullable<ReliefObject['depthMap']>;
 
 export const CANVAS_COMPILATION_BRIDGE_CONNECTION = 'canvas-compilation-bridge-v1';
 

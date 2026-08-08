@@ -1,9 +1,8 @@
-import type { ReliefObject } from '../scene';
+import type { ReliefDepthMap } from '../scene/relief';
 import { decodeCanonicalBase64 } from './depth-map-base64';
 import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
 
-type ReliefDepthMap = NonNullable<ReliefObject['depthMap']>;
-
+/** Physical target dimensions and sampling density used to materialize a depth map. */
 export type DepthMapHeightmapOptions = {
   readonly targetWidthMm: number;
   readonly reliefDepthMm: number;
@@ -12,6 +11,7 @@ export type DepthMapHeightmapOptions = {
   readonly targetScaleY?: number;
 };
 
+/** Materialized heightmap dimensions, or the compile-integrity reason materialization failed. */
 export type DepthMapHeightmapResult =
   | {
       readonly kind: 'ok';
@@ -21,6 +21,7 @@ export type DepthMapHeightmapResult =
     }
   | { readonly kind: 'error'; readonly reason: string };
 
+/** Convert validated durable depth-map samples into the shared CAM heightmap representation. */
 export function depthMapToHeightmap(
   source: ReliefDepthMap,
   options: DepthMapHeightmapOptions,
@@ -137,6 +138,7 @@ function materializeDepths(
   reliefDepthMm: number,
 ): Float32Array {
   const output = new Float32Array(widthCells * heightCells);
+  const sampler: DepthSampler = { source, bytes, reliefDepthMm };
   for (let y = 0; y < heightCells; y += 1) {
     const sourceMinY = Math.min(source.height - 1, Math.floor((y * source.height) / heightCells));
     const sourceMaxY = Math.min(
@@ -152,7 +154,7 @@ function materializeDepths(
       let surface = Number.NEGATIVE_INFINITY;
       for (let sy = sourceMinY; sy <= sourceMaxY; sy += 1) {
         for (let sx = sourceMinX; sx <= sourceMaxX; sx += 1) {
-          surface = Math.max(surface, sampleDepth(source, bytes, sx, sy, reliefDepthMm));
+          surface = Math.max(surface, sampleDepth(sampler, sx, sy));
         }
       }
       output[y * widthCells + x] = surface;
@@ -161,13 +163,13 @@ function materializeDepths(
   return output;
 }
 
-function sampleDepth(
-  source: ReliefDepthMap,
-  bytes: Uint8Array,
-  x: number,
-  y: number,
-  reliefDepthMm: number,
-): number {
+type DepthSampler = {
+  readonly source: ReliefDepthMap;
+  readonly bytes: Uint8Array;
+  readonly reliefDepthMm: number;
+};
+
+function sampleDepth({ source, bytes, reliefDepthMm }: DepthSampler, x: number, y: number): number {
   const sampleIndex = y * source.width + x;
   const value =
     source.bitDepth === 8

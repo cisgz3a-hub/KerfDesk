@@ -1,5 +1,6 @@
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
+/** Result of decoding a canonical padded base64 payload without browser globals. */
 export type Base64DecodeResult =
   | { readonly kind: 'ok'; readonly bytes: Uint8Array }
   | { readonly kind: 'error'; readonly reason: string };
@@ -46,6 +47,7 @@ function hasCanonicalUnusedBits(value: string, dataLength: number, padding: numb
   return true;
 }
 
+/** Decode canonical padded base64, returning malformed input or allocation failure as data. */
 export function decodeCanonicalBase64(value: string): Base64DecodeResult {
   const byteLength = canonicalBase64ByteLength(value);
   if (byteLength === null)

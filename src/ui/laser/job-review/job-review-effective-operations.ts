@@ -41,7 +41,7 @@ function effectiveGroupSummary(group: Group): string {
         ? 'coolant off'
         : `${group.coolant} coolant`;
     const actualDepth = reportsGeometryDerivedDepth(group.cutType)
-      ? `Actual max depth ${formatNumber(cncGroupMaximumDepthMm(group))} mm Â· `
+      ? `Actual max depth ${formatNumber(cncGroupMaximumDepthMm(group))} mm · `
       : '';
     return (
       actualDepth +

@@ -7,7 +7,9 @@ import {
 } from './depth-map-to-heightmap';
 import { meshToHeightmap } from './mesh-to-heightmap';
 
+/** Materialization options shared by mesh-backed and depth-map-backed reliefs. */
 export type ReliefObjectHeightmapOptions = DepthMapHeightmapOptions;
+/** Materialization result shared by mesh-backed and depth-map-backed reliefs. */
 export type ReliefObjectHeightmapResult = DepthMapHeightmapResult;
 
 /** Materialize either durable relief source into the shared CAM heightmap. */

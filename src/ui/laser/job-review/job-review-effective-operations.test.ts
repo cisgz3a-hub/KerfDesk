@@ -104,7 +104,10 @@ describe('buildEffectiveOperationReview', () => {
     };
 
     const review = buildEffectiveOperationReview(job)[0];
-    expect(review?.summaries[0]).toContain('Actual max depth 3.798 mm');
+    expect(review?.summaries[0]).toBe(
+      'Actual max depth 3.798 mm · 90 degree V-bit · 1 pass · 600 mm/min feed · ' +
+        '250 mm/min plunge · 12,000 RPM · coolant off',
+    );
     expect(review?.cncActualMaxDepthMm).toBe(3.798);
   });
 

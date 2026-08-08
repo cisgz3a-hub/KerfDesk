@@ -102,7 +102,7 @@ test('production relief materialization worker cancels stale work and keeps the 
       ]);
       if (stale === null || current === null)
         throw new Error('production relief worker unavailable');
-      window.setTimeout(() => controller.abort(), 0);
+      controller.abort();
       let staleErrorName = '';
       try {
         await stale;

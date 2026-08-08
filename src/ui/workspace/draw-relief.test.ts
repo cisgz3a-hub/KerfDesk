@@ -19,6 +19,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetReliefPreviewCachesForTests();
+  vi.useRealTimers();
 });
 
 describe('depth-map canvas preview scheduling', () => {
@@ -46,7 +47,7 @@ describe('depth-map canvas preview scheduling', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
   });
 
-  it('does not resubmit an unchanged pending source', () => {
+  it('does not resubmit an unchanged pending source', async () => {
     const pending = deferred<ReadonlyArray<WorkerResult>>();
     worker.prepare.mockReturnValue(pending.promise);
     const object = relief('same', 'AA==');
@@ -55,6 +56,9 @@ describe('depth-map canvas preview scheduling', () => {
     scheduleReliefPreviews([object], visibleLayers());
 
     expect(worker.prepare).toHaveBeenCalledTimes(1);
+    pending.resolve([{ taskId: '0', result: { kind: 'error', reason: 'settled' } }]);
+    await pending.promise;
+    await Promise.resolve();
   });
 
   it('skips hidden layers and submits visible embedded sources one at a time', async () => {
@@ -74,6 +78,9 @@ describe('depth-map canvas preview scheduling', () => {
     scheduleReliefPreviews(objects, visibleLayers());
     expect(worker.prepare).toHaveBeenCalledTimes(2);
     expect(worker.prepare.mock.calls[1]?.[0]).toHaveLength(1);
+    second.resolve([{ taskId: '0', result: { kind: 'error', reason: 'settled' } }]);
+    await second.promise;
+    await Promise.resolve();
   });
 
   it('retries infrastructure rejection without poisoning the source cache', async () => {
@@ -94,9 +101,23 @@ describe('depth-map canvas preview scheduling', () => {
 
       scheduleReliefPreviews([object], visibleLayers(), onReady);
       expect(worker.prepare).toHaveBeenCalledTimes(2);
+      retry.resolve([{ taskId: '0', result: { kind: 'error', reason: 'settled' } }]);
+      await retry.promise;
+      await Promise.resolve();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('retries when the preview worker is unavailable without poisoning the source cache', () => {
+    worker.prepare.mockReturnValue(null);
+    const object = relief('retry-unavailable', 'AA==');
+
+    scheduleReliefPreviews([object], visibleLayers());
+    expect(worker.prepare).toHaveBeenCalledOnce();
+    scheduleReliefPreviews([object], visibleLayers());
+
+    expect(worker.prepare).toHaveBeenCalledTimes(2);
   });
 });
 

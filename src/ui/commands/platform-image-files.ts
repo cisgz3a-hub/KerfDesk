@@ -22,6 +22,7 @@ export async function pickPlatformImageFiles(
   return files;
 }
 
+/** Select zero or more PNG files through the active platform adapter. */
 export async function pickPlatformPngFiles(
   platform: PlatformAdapter,
 ): Promise<ReadonlyArray<File>> {

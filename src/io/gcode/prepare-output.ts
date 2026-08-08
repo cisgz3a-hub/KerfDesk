@@ -18,8 +18,8 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
-import { compileCncJob } from '../../core/cnc';
-import { isReliefMaterializationError } from '../../core/relief/relief-materialization-error';
+import { compileCncJobResult } from '../../core/cnc/compile-cnc-job';
+import type { ReliefMaterializationFailure } from '../../core/relief/relief-materialization-failure';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
   runPreEmitPreflight,
@@ -80,11 +80,12 @@ export function prepareOutput(
   const input = prepareOutputInput(project, options);
   if (!input.ok) return input.prepared;
   try {
-    return completePreparedOutput(input, compileForMachine(input.project));
-  } catch (error) {
-    if (isReliefMaterializationError(error)) {
-      return { ok: false, preflight: reliefMaterializationFailure(error) };
+    const compiled = compileForMachine(input.project);
+    if (compiled.kind === 'relief-materialization-failed') {
+      return { ok: false, preflight: reliefMaterializationFailure(compiled) };
     }
+    return completePreparedOutput(input, compiled.job);
+  } catch (error) {
     if (isProgramMaterializationRangeError(error)) {
       return { ok: false, preflight: programMaterializationFailure() };
     }
@@ -185,11 +186,15 @@ export function completePreparedOutput(
 
 // One compile entry per machine kind: the project's machine choice routes to
 // the CNC compiler (depth passes, tool offsets) or the laser compiler.
-function compileForMachine(project: Project): Job {
+type MachineCompilationResult =
+  | { readonly kind: 'compiled'; readonly job: Job }
+  | ReliefMaterializationFailure;
+
+function compileForMachine(project: Project): MachineCompilationResult {
   const machine = project.machine;
   return machine !== undefined && machine.kind === 'cnc'
-    ? compileCncJob(project.scene, project.device, machine)
-    : compileJob(project.scene, project.device);
+    ? compileCncJobResult(project.scene, project.device, machine)
+    : { kind: 'compiled', job: compileJob(project.scene, project.device) };
 }
 
 function resolveJobOriginOffset(

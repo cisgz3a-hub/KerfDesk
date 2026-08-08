@@ -1,9 +1,11 @@
-import type { ReliefObject } from '../../core/scene';
+import type { ReliefDepthMap } from '../../core/scene/relief';
 import { bytesToBase64 } from './base64-bytes';
-import { decodeIncrementalPngToLuma } from './png-incremental-decoder';
+import {
+  decodeIncrementalPngToLuma,
+  type IncrementalPngHeaderResult,
+} from './png-incremental-decoder';
 
-type ReliefDepthMap = NonNullable<ReliefObject['depthMap']>;
-
+/** Prepared durable depth-map samples, or the reason exact preparation was unavailable. */
 export type PreparedDepthMapImportResult =
   | {
       readonly kind: 'ok';
@@ -11,6 +13,7 @@ export type PreparedDepthMapImportResult =
     }
   | { readonly kind: 'error'; readonly reason: string };
 
+/** Cancellation and encoded-byte progress callbacks for one PNG preparation request. */
 export type DepthMapImportPreparationOptions = {
   readonly signal?: AbortSignal;
   readonly onProgress?: (encodedBytes: number) => void;
@@ -21,10 +24,7 @@ export async function prepareDepthMapPng(
   blob: Blob,
   options: DepthMapImportPreparationOptions = {},
 ): Promise<PreparedDepthMapImportResult> {
-  const state: { samples: Uint8Array | null; rowOffset: number } = {
-    samples: null,
-    rowOffset: 0,
-  };
+  const accumulator = createSampleAccumulator();
   const decoded = await decodeIncrementalPngToLuma(blob.stream(), {
     maxEdge: Number.MAX_SAFE_INTEGER,
     maxPixels: Number.MAX_SAFE_INTEGER,
@@ -32,35 +32,14 @@ export async function prepareDepthMapPng(
     ...(options.onProgress === undefined
       ? {}
       : { onProgress: ({ encodedBytes }) => options.onProgress?.(encodedBytes) }),
-    onHeader: (header) => {
-      if (header.bitDepth !== 8 || header.colorType !== 0) {
-        throw new Error('Height maps must be non-interlaced 8-bit grayscale PNG files.');
-      }
-      if (header.sampledWidth !== header.width || header.sampledHeight !== header.height) {
-        throw new Error('Height-map dimensions exceed the exact sample range.');
-      }
-      const sampleCount = header.width * header.height;
-      if (!Number.isSafeInteger(sampleCount)) {
-        throw new Error('Height-map sample count exceeds the exact numeric range.');
-      }
-      try {
-        state.samples = new Uint8Array(sampleCount);
-      } catch {
-        throw new Error('Height-map samples do not fit in this runtime.');
-      }
-    },
-    onRow: (row) => {
-      if (state.samples === null || state.rowOffset + row.length > state.samples.length) {
-        throw new Error('Height-map PNG produced inconsistent sample rows.');
-      }
-      state.samples.set(row, state.rowOffset);
-      state.rowOffset += row.length;
-    },
+    onHeader: accumulator.acceptHeader,
+    onRow: accumulator.acceptRow,
   });
   if (decoded.kind === 'legacy-fallback') {
     return { kind: 'error', reason: decoded.reason };
   }
-  if (state.samples === null || state.rowOffset !== state.samples.length) {
+  const samples = accumulator.complete();
+  if (samples === null) {
     return { kind: 'error', reason: 'Height-map PNG did not produce its declared samples.' };
   }
   return {
@@ -70,8 +49,50 @@ export async function prepareDepthMapPng(
       width: decoded.width,
       height: decoded.height,
       bitDepth: 8,
-      samplesBase64: bytesToBase64(state.samples),
+      samplesBase64: bytesToBase64(samples),
       polarity: 'light-is-high',
     },
   };
+}
+
+type SampleAccumulator = {
+  readonly acceptHeader: (header: IncrementalPngHeaderResult) => void;
+  readonly acceptRow: (row: Uint8Array) => void;
+  readonly complete: () => Uint8Array | null;
+};
+
+function createSampleAccumulator(): SampleAccumulator {
+  let samples: Uint8Array | null = null;
+  let rowOffset = 0;
+  return {
+    acceptHeader: (header) => {
+      samples = allocateSamples(header);
+    },
+    acceptRow: (row) => {
+      if (samples === null || rowOffset + row.length > samples.length) {
+        throw new Error('Height-map PNG produced inconsistent sample rows.');
+      }
+      samples.set(row, rowOffset);
+      rowOffset += row.length;
+    },
+    complete: () => (samples !== null && rowOffset === samples.length ? samples : null),
+  };
+}
+
+function allocateSamples(header: IncrementalPngHeaderResult): Uint8Array {
+  if (header.bitDepth !== 8 || header.colorType !== 0) {
+    throw new Error('Height maps must be non-interlaced 8-bit grayscale PNG files.');
+  }
+  if (header.sampledWidth !== header.width || header.sampledHeight !== header.height) {
+    throw new Error('Height-map dimensions exceed the exact sample range.');
+  }
+  const sampleCount = header.width * header.height;
+  if (!Number.isSafeInteger(sampleCount)) {
+    throw new Error('Height-map sample count exceeds the exact numeric range.');
+  }
+  try {
+    return new Uint8Array(sampleCount);
+  } catch {
+    throw new Error('Height-map samples do not fit in this runtime.');
+  }
 }

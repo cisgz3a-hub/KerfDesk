@@ -205,10 +205,39 @@ describe('.lf2 depth-map relief round-trip (ADR-290)', () => {
     ) as { scene: { objects: Array<Record<string, unknown>> } };
     const object = raw.scene.objects[0];
     if (object === undefined) throw new Error('fixture relief missing');
-    object['meshPositions'] = [0, 0, 0, 1, 0, 0, 0, 1, 1];
-    object['emptyCells'] = 'floor';
+    const ambiguous = {
+      ...raw,
+      scene: {
+        ...raw.scene,
+        objects: [
+          {
+            ...object,
+            meshPositions: [0, 0, 0, 1, 0, 0, 0, 1, 1],
+            emptyCells: 'floor',
+          },
+        ],
+      },
+    };
 
-    expect(deserializeProject(JSON.stringify(raw)).kind).not.toBe('ok');
+    expect(deserializeProject(JSON.stringify(ambiguous)).kind).not.toBe('ok');
+  });
+
+  it('rejects depth-map bounds that disagree with source aspect and target width', () => {
+    const base = reliefProject();
+    const raw = JSON.parse(
+      serializeProject({ ...base, scene: { ...base.scene, objects: [depthMapRelief()] } }),
+    ) as { scene: { objects: Array<Record<string, unknown>> } };
+    const object = raw.scene.objects[0];
+    if (object === undefined) throw new Error('fixture relief missing');
+    const mismatched = {
+      ...raw,
+      scene: {
+        ...raw.scene,
+        objects: [{ ...object, bounds: { minX: 0, minY: 0, maxX: 100, maxY: 75 } }],
+      },
+    };
+
+    expect(deserializeProject(JSON.stringify(mismatched))).toMatchObject({ kind: 'invalid' });
   });
 });
 

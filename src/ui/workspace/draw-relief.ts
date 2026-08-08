@@ -11,6 +11,7 @@ import type {
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import { transformedBBox } from '../../core/scene';
 import type { Layer, ReliefObject, SceneObject } from '../../core/scene';
+import type { ReliefDepthMap } from '../../core/scene/relief';
 import {
   isCncRemovalGridSuperseded,
   prepareReliefHeightmapsOffThread,
@@ -18,7 +19,6 @@ import {
 import { canvasTheme } from '../theme/canvas-theme';
 import type { ViewTransform } from './view-transform';
 
-type ReliefDepthMap = NonNullable<ReliefObject['depthMap']>;
 type DepthMapRelief = Extract<ReliefObject, { readonly depthMap: ReliefDepthMap }>;
 
 // Display sampling: enough cells to read the shape, cheap to rebuild.
@@ -71,10 +71,7 @@ export function scheduleReliefPreviews(
     })),
     controller.signal,
   );
-  if (work === null) {
-    for (const item of items) setDepthMapBitmap(item, null);
-    return;
-  }
+  if (work === null) return;
   pendingDepthMapPreview = batch;
   void work.then(
     (results) => {
@@ -154,15 +151,19 @@ function uniqueMissingDepthMapPreviews(
 ): ReadonlyArray<DepthMapPreviewItem> {
   const items: DepthMapPreviewItem[] = [];
   for (const object of objects) {
-    if (object.kind !== 'relief' || object.depthMap === undefined) continue;
+    if (!isDepthMapRelief(object)) continue;
     if (layerByColor.get(object.color)?.visible === false) continue;
-    const item = depthMapPreviewItem(object as DepthMapRelief);
+    const item = depthMapPreviewItem(object);
     const cache = depthMapBitmapCache.get(item.source);
     if (cache?.has(item.cacheKey) === true) continue;
     if (items.some((candidate) => samePreviewItem(candidate, item))) continue;
     items.push(item);
   }
   return items;
+}
+
+function isDepthMapRelief(object: SceneObject): object is DepthMapRelief {
+  return object.kind === 'relief' && object.depthMap !== undefined;
 }
 
 function depthMapPreviewItem(relief: DepthMapRelief): DepthMapPreviewItem {
@@ -218,6 +219,7 @@ function isAbort(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+/** Reset preview cache and cancellation state between isolated tests. */
 export function resetReliefPreviewCachesForTests(): void {
   pendingDepthMapPreview?.controller.abort();
   pendingDepthMapPreview = null;

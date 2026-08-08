@@ -5,17 +5,18 @@ import type {
   DepthMapHeightmapOptions,
   DepthMapHeightmapResult,
 } from '../../core/relief/depth-map-to-heightmap';
-import type { CncMachineConfig, ReliefObject } from '../../core/scene';
+import type { CncMachineConfig } from '../../core/scene';
+import type { ReliefDepthMap } from '../../core/scene/relief';
 import type { RemovalGrid } from '../../core/sim';
 
-type ReliefDepthMap = NonNullable<ReliefObject['depthMap']>;
-
+/** One independently bound depth-map materialization request inside a worker batch. */
 export type ReliefHeightmapWorkerItem = {
   readonly taskId: string;
   readonly source: ReliefDepthMap;
   readonly options: DepthMapHeightmapOptions;
 };
 
+/** Bound depth-map materialization result returned for one batch item. */
 export type ReliefHeightmapWorkerResult = {
   readonly taskId: string;
   readonly result: DepthMapHeightmapResult;
@@ -23,6 +24,7 @@ export type ReliefHeightmapWorkerResult = {
 
 export type CncRemovalGridWorkerRequest =
   | {
+      /** Existing relief request id to abort; cancellation does not allocate a new id. */
       readonly id: number;
       readonly kind: 'cancel-relief';
     }

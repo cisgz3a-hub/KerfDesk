@@ -9,7 +9,7 @@ import {
   type PreparedCncCompilationArtifact,
 } from '../../core/cnc/cnc-compilation-artifact';
 import { compileJob, type Job } from '../../core/job';
-import { isReliefMaterializationError } from '../../core/relief/relief-materialization-error';
+import type { ReliefMaterializationFailure } from '../../core/relief/relief-materialization-failure';
 import type { Project } from '../../core/scene';
 import {
   isProgramMaterializationRangeError,
@@ -56,12 +56,12 @@ export async function prepareOutputAsync(
   if (!input.ok) return input.prepared;
   try {
     const compiled = await compileOutputProject(input.project, context);
-    emitProgress(context, 'finalizing', 'direct', 0, 0, 0, 0);
-    return completePreparedOutput(input, compiled);
-  } catch (error) {
-    if (isReliefMaterializationError(error)) {
-      return { ok: false, preflight: reliefMaterializationFailure(error) };
+    if (compiled.kind === 'relief-materialization-failed') {
+      return { ok: false, preflight: reliefMaterializationFailure(compiled) };
     }
+    emitProgress(context, 'finalizing', 'direct', 0, 0, 0, 0);
+    return completePreparedOutput(input, compiled.job);
+  } catch (error) {
     if (isProgramMaterializationRangeError(error)) {
       return { ok: false, preflight: programMaterializationFailure() };
     }
@@ -72,10 +72,10 @@ export async function prepareOutputAsync(
 async function compileOutputProject(
   project: Project,
   context: PrepareOutputAsyncContext,
-): Promise<Job> {
+): Promise<{ readonly kind: 'compiled'; readonly job: Job } | ReliefMaterializationFailure> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc')
-    return compileJob(project.scene, project.device);
+    return { kind: 'compiled', job: compileJob(project.scene, project.device) };
   throwIfAborted(context.signal);
   emitProgress(context, 'normalizing', 'direct', 0, 0, 0, 0);
   const compilationId = `${context.jobId}:cnc`;
@@ -89,7 +89,7 @@ async function compileOutputProject(
   throwIfAborted(context.signal);
   emitProgress(context, 'merging', 'direct', results.length, 0, 0, artifact.tasks.length);
   const finalized = finalizeCncCompilationArtifact(artifact, results);
-  if (finalized.kind === 'compiled') return finalized.job;
+  if (finalized.kind !== 'rejected') return finalized;
   // A malformed/stale generation is never merged and never recomputed outside
   // the globally bounded broker. The outer Worker surfaces unavailable instead
   // of becoming an unaccounted extra planner lane.

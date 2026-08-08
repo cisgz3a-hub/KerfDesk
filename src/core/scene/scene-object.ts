@@ -5,6 +5,7 @@
 // time so the missing arm is the only compile error when a new variant lands.
 
 import type { VariableTemplate } from './variable-template';
+import type { ReliefDepthMap } from './relief';
 
 export type Vec2 = { readonly x: number; readonly y: number };
 
@@ -405,19 +406,6 @@ export type ShapeObject = ObjectPowerScale & {
   readonly fairingVersion?: number;
 };
 
-// Lossless source samples for top-down depth-map reliefs (ADR-290). Samples
-// are row-major grayscale values embedded as canonical base64. Sixteen-bit
-// samples use PNG/network byte order (most-significant byte first). Polarity
-// is explicit because a grayscale image alone does not say which tone is high.
-export type ReliefDepthMap = {
-  readonly schemaVersion: 1;
-  readonly width: number;
-  readonly height: number;
-  readonly bitDepth: 8 | 16;
-  readonly samplesBase64: string;
-  readonly polarity: 'light-is-high' | 'light-is-deep';
-};
-
 type ReliefObjectCommon = ObjectPowerScale & {
   readonly kind: 'relief';
   readonly id: string;
@@ -429,22 +417,21 @@ type ReliefObjectCommon = ObjectPowerScale & {
   readonly transform: Transform;
 };
 
-// 3D relief for CNC carving, Phase H.4 (ADR-098). Existing STL projects keep
-// the parsed triangle mesh exactly as before. A depth-map relief is a mutually
-// exclusive source variant; downstream code must deliberately materialize one
-// source or the other into the shared Heightmap CAM representation.
+/** Mesh-backed CNC relief whose triangle source is exclusive of a depth map. */
 export type MeshReliefObject = ReliefObjectCommon & {
   readonly meshPositions: ReadonlyArray<number> | Float32Array;
   readonly emptyCells: 'floor' | 'top';
   readonly depthMap?: never;
 };
 
+/** Depth-map-backed CNC relief whose sampled source is exclusive of a triangle mesh. */
 export type DepthMapReliefObject = ReliefObjectCommon & {
   readonly depthMap: ReliefDepthMap;
   readonly meshPositions?: never;
   readonly emptyCells?: never;
 };
 
+/** CNC relief backed by exactly one durable mesh or depth-map source. */
 export type ReliefObject = MeshReliefObject | DepthMapReliefObject;
 
 // Embedding cap: meshes beyond this bloat the .lf2 JSON into the hundreds of

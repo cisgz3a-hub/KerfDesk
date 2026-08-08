@@ -60,8 +60,11 @@ export function detectCncThroughCutTabWarnings(project: Project): ReadonlyArray<
 
 function layerCarriesOnlyReliefs(project: Project, layer: Layer): boolean {
   const bound = project.scene.objects.filter((object) => sceneObjectUsesOperation(object, layer));
-  return (
-    bound.some((object) => object.kind === 'relief') &&
-    !bound.some((object) => object.kind !== 'relief' && object.kind !== 'raster-image')
+  const hasRelief = bound.some((object) => object.kind === 'relief');
+  // Raster images do not contribute CNC depth geometry, so a relief plus a
+  // display-only raster still leaves layer.depthMm stale for this advisory.
+  const hasNonReliefCncGeometry = bound.some(
+    (object) => object.kind !== 'relief' && object.kind !== 'raster-image',
   );
+  return hasRelief && !hasNonReliefCncGeometry;
 }

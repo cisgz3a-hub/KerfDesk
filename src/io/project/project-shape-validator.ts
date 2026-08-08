@@ -14,7 +14,10 @@ import { validateCncTabAnchors } from './project-cnc-tab-validator';
 import { validateOptionalArtworkOrder } from './project-artwork-order-validator';
 import { validateProjectScanOffsetProfile } from './project-scan-offset-validator';
 import { validateTracedImageMetadata } from './project-trace-shape-validator';
-import { validateReliefDepthMapSource } from './project-relief-depth-map-validator';
+import {
+  validateReliefDepthMapBounds,
+  validateReliefDepthMapSource,
+} from './project-relief-depth-map-validator';
 import {
   firstError,
   isObject,
@@ -180,11 +183,10 @@ function validateSceneObject(obj: unknown, path: string): string | null {
 // H.4 (ADR-098): the embedded mesh is the carving source — a malformed or
 // non-finite mesh must never reach the heightmap sampler.
 function validateReliefObject(obj: Record<string, unknown>, path: string): string | null {
-  const sourceError = validateReliefSource(obj, path);
-  return firstError([
+  const fieldError = firstError([
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
-    sourceError,
+    validateReliefSource(obj, path),
     requirePositiveNumber(obj, `${path}.targetWidthMm`),
     requirePositiveNumber(obj, `${path}.reliefDepthMm`),
     requireString(obj, `${path}.color`),
@@ -194,6 +196,8 @@ function validateReliefObject(obj: Record<string, unknown>, path: string): strin
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
   ]);
+  if (fieldError !== null) return fieldError;
+  return validateReliefDepthMapBounds(obj, path);
 }
 
 function validateReliefSource(obj: Record<string, unknown>, path: string): string | null {

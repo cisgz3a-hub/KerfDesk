@@ -66,6 +66,7 @@ export function parseStlOffThread(
   return request({ kind: 'stl', blob, options: preparation }, 'stl', options);
 }
 
+/** Prepare one depth-map PNG in the import worker, or return null when Worker is unavailable. */
 export function prepareDepthMapPngOffThread(
   blob: Blob,
   options: ImportWorkerRequestOptions = {},
