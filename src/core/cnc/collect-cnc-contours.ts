@@ -80,17 +80,15 @@ function appendObjectContours(
       layer.cnc?.cutType === 'v-carve' && path.strokeWidthMm !== undefined
         ? roundStrokeOutline(sourcePolylines, path.strokeWidthMm)
         : null;
-    const polylines =
-      strokeOutline !== null && strokeOutline.length > 0 ? strokeOutline : sourcePolylines;
+    const usesStrokeOutline = strokeOutline !== null && strokeOutline.length > 0;
+    const polylines = usesStrokeOutline ? strokeOutline : sourcePolylines;
     polylines.forEach((polyline, polylineIndex) => {
       if (polyline.points.length < 2) return;
-      const manualTabPoints = objectTabPoints(
-        object,
-        layer.color,
-        pathIndex,
-        polylineIndex,
-        device,
-      );
+      // Clipper can merge and reorder outlined strokes, so its result index no
+      // longer identifies the source polyline that owns a persisted tab anchor.
+      const manualTabPoints = usesStrokeOutline
+        ? []
+        : objectTabPoints(object, layer.color, pathIndex, polylineIndex, device);
       out.push({
         polyline: {
           points: polyline.points.map((point) =>

@@ -6,6 +6,7 @@ import {
 } from './vcarve-emitted-profile-capsule';
 import type { RadialEnvelope } from './radial-envelope';
 
+/** Bound worst-case capsule checks during coverage certification. */
 export const MAX_VCARVE_COVERAGE_CAPSULE_CHECKS = 250_000;
 
 /** Certify a complete reference against one already-built candidate capsule. */

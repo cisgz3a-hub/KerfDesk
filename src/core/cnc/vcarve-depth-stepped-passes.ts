@@ -39,8 +39,8 @@ function certifiedLevel(
   options: DepthSteppedOptions,
 ): ReadonlyArray<Vec3> {
   const candidateLevel = pointsAtLevel(candidate, levelZ);
-  const sameProfile = candidate === reference;
-  const referenceLevel = sameProfile ? candidateLevel : pointsAtLevel(reference, levelZ);
+  const isSameProfile = candidate === reference;
+  const referenceLevel = isSameProfile ? candidateLevel : pointsAtLevel(reference, levelZ);
   const compact = compactVCarveEmittedProfile(
     candidateLevel,
     segments,
@@ -52,7 +52,7 @@ function certifiedLevel(
   // reference are the same profile. Recompacting that cloned depth level is
   // deterministic duplicate work; both legacy fallbacks return these same
   // reference coordinates when the first compact certificate fails.
-  if (sameProfile) return referenceLevel;
+  if (isSameProfile) return referenceLevel;
   if (covers(referenceLevel, candidateLevel, options)) return candidateLevel;
   const compactReference = compactVCarveEmittedProfile(
     referenceLevel,

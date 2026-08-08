@@ -3,10 +3,13 @@ import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
   createLayer,
+  type ImportedSvg,
   type Scene,
 } from '../scene';
 import { createEllipse } from '../shapes/primitives';
+import { collectLayerContours } from './collect-cnc-contours';
 import { compileCncJob } from './compile-cnc-job';
 
 describe('V-carve shape compilation', () => {
@@ -54,4 +57,47 @@ describe('V-carve shape compilation', () => {
     );
     expect(passes.length).toBeGreaterThan(0);
   }, 30_000);
+
+  it('does not transfer source tab indices onto merged stroke-outline contours', () => {
+    const color = '#000000';
+    const object: ImportedSvg = {
+      kind: 'imported-svg',
+      id: 'outlined-stroke-with-tab',
+      source: 'outlined-stroke.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color,
+          strokeWidthMm: 2,
+          polylines: [
+            {
+              closed: false,
+              points: [
+                { x: 0, y: 5 },
+                { x: 10, y: 5 },
+              ],
+            },
+            {
+              closed: false,
+              points: [
+                { x: 5, y: 0 },
+                { x: 5, y: 10 },
+              ],
+            },
+          ],
+        },
+      ],
+      cncTabAnchors: [{ layerColor: color, pathIndex: 0, polylineIndex: 0, pathT: 0.5 }],
+    };
+    const layer = {
+      ...createLayer({ id: 'outlined-stroke-vcarve', color }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' as const },
+    };
+
+    const contours = collectLayerContours([object], layer, DEFAULT_DEVICE_PROFILE);
+
+    expect(contours.length).toBeGreaterThan(0);
+    expect(contours.every((contour) => contour.manualTabPoints === undefined)).toBe(true);
+  });
 });
