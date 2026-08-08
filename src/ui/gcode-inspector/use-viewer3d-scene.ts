@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { GcodeRenderModel } from '../../core/gcode-view';
 import { createViewer3dScene, type Viewer3dSceneHandle } from '../viewer3d';
 
+/** Observable lifecycle of the Inspector's current WebGL scene. */
 export type Viewer3dSceneState = 'loading' | 'preparing' | 'ready' | 'no-webgl';
 
 export type Viewer3dSceneBinding = {

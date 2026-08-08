@@ -83,10 +83,18 @@ describe('lensColorFn', () => {
     expect(rgbCss(colorOf(firstOfKind(model, SEG_KIND.travel)))).toBe('rgb(204, 68, 68)');
   });
 
-  it('keeps traversal recessive red in the default depth/pass lens', () => {
+  it('keeps traversal red distinct from the deepest muted-red cut', () => {
     const { model, time } = built();
     const colorOf = lensColorFn(model, time, 'depth', THEME);
-    expect(rgbCss(colorOf(firstOfKind(model, SEG_KIND.travel)))).toBe('rgb(204, 68, 68)');
+    const traversal = rgbCss(colorOf(firstOfKind(model, SEG_KIND.travel)));
+    const deepestPlunge = [...model.segKind].findIndex(
+      (kind, index) => kind === SEG_KIND.plunge && model.positions[index * 6 + 5] === -3,
+    );
+    expect(deepestPlunge).toBeGreaterThanOrEqual(0);
+    const deepCut = rgbCss(colorOf(deepestPlunge));
+    expect(traversal).toBe('rgb(204, 68, 68)');
+    expect(deepCut).toBe('rgb(191, 112, 117)');
+    expect(deepCut).not.toBe(traversal);
   });
 
   it('separates the extremes on a ramp lens', () => {

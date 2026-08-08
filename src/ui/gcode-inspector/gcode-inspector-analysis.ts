@@ -5,6 +5,7 @@ import {
   type ProgramFinding,
 } from '../../core/gcode-view';
 
+/** Deterministic timeline and informational findings derived beside parsing. */
 export type GcodeInspectorAnalysis = {
   readonly time: ProgramTimeModel;
   readonly findings: ReadonlyArray<ProgramFinding>;

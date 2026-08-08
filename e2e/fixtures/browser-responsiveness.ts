@@ -96,6 +96,34 @@ export async function stopResponsivenessProbe(page: Page): Promise<Responsivenes
   });
 }
 
+/** Returns the current phase and starts the next without leaving an unmeasured browser gap. */
+export async function rollResponsivenessProbe(page: Page): Promise<ResponsivenessMeasurement> {
+  return page.evaluate(() => {
+    const target = window as ProbeWindow;
+    const state = target.__HEAVY_CANVAS_RESPONSIVENESS__;
+    if (state === undefined) throw new Error('Responsiveness probe is not running');
+    const rolledAt = performance.now();
+    state.maxGapMs = Math.max(state.maxGapMs, rolledAt - state.lastAt);
+    if (state.observer !== null) {
+      for (const entry of state.observer.takeRecords()) state.longTasks.push(entry.duration);
+    }
+    const result = {
+      ticks: state.ticks,
+      maxGapMs: state.maxGapMs,
+      elapsedMs: rolledAt - state.startedAt,
+      longTaskCount: state.longTasks.length,
+      maxLongTaskMs: Math.max(0, ...state.longTasks),
+      longTaskObserverSupported: state.observer !== null,
+    };
+    state.ticks = 0;
+    state.startedAt = rolledAt;
+    state.lastAt = rolledAt;
+    state.maxGapMs = 0;
+    state.longTasks = [];
+    return result;
+  });
+}
+
 export function assertResponsivePhase(
   testInfo: TestInfo,
   phase: string,
@@ -110,6 +138,19 @@ export function assertResponsivePhase(
       MAX_ACCEPTABLE_MAIN_THREAD_GAP_MS,
     );
   }
+}
+
+/** Requires a Chrome phase to avoid UI-thread monopolization while retaining scheduler telemetry. */
+export function assertOffThreadPhase(
+  testInfo: TestInfo,
+  phase: string,
+  measurement: ResponsivenessMeasurement,
+): void {
+  recordResponsivenessPhase(testInfo, phase, measurement);
+  expect(measurement.longTaskObserverSupported, `${phase} Long Task observer`).toBe(true);
+  expect(measurement.maxLongTaskMs, `${phase} maximum Long Task`).toBeLessThan(
+    MAX_ACCEPTABLE_MAIN_THREAD_GAP_MS,
+  );
 }
 
 /** Records diagnostic A/B phases that are intentionally absent from production. */

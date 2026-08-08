@@ -8,7 +8,6 @@ import {
   type BoundarySegment,
   type DetailDepthLaw,
 } from './vcarve-detail-depth';
-import { buildVCarveBoundaryIndex } from './vcarve-boundary-index';
 import { radialEnvelopeDepthMm } from './radial-envelope';
 
 const Z_TOLERANCE_MM = 0.02;
@@ -208,28 +207,35 @@ describe('detailPath3dPoints', () => {
     );
   });
 
-  it('keeps the indexed quality-epsilon annulus equal to the serial certificate', () => {
-    const edge: Polyline = {
+  it('keeps boundary candidates inside the depth-quality epsilon shell', () => {
+    const polyline: Polyline = {
       closed: false,
       points: [
         { x: 0, y: 0 },
-        { x: 1, y: 0 },
+        { x: 0, y: 0.1 },
       ],
     };
     const segments: ReadonlyArray<BoundarySegment> = [
-      { ax: 0, ay: 0.500_500_000_000_5, bx: 1, by: 0.500_500_000_000_5 },
+      { ax: 1.0000000000005, ay: -1, bx: 1.0000000000005, by: 1 },
     ];
-    const law = pointLaw(1, 2);
-    const serial = detailPath3dPlan(edge, segments, law, 0.0005);
-    const indexed = detailPath3dPlan(
-      edge,
-      segments,
-      law,
-      0.0005,
-      buildVCarveBoundaryIndex(segments),
-    );
+    const plan = detailPath3dPlan(polyline, segments, pointLaw(1, 2), 0.001);
 
-    expect(serial.points).toHaveLength(2);
-    expect(indexed).toEqual(serial);
+    expect(plan.toleranceMet).toBe(true);
+    expect(plan.points).toEqual([
+      { x: 0, y: 0, z: -0.999 },
+      { x: 0, y: 0.1, z: -0.999 },
+    ]);
+  });
+
+  it('keeps non-finite chord inputs fail-closed like the original full scan', () => {
+    const segments: ReadonlyArray<BoundarySegment> = [
+      { ax: 0, ay: 0, bx: 0, by: 2 },
+      { ax: 10, ay: 10, bx: 11, by: 11 },
+    ];
+    const law = pointLaw(Math.tan(Math.PI / 6), 1);
+
+    expect(
+      emittedChordIsSafe({ x: Number.NaN, y: 0 }, { x: 1, y: 0 }, 0.5, 0.5, segments, law),
+    ).toBe(false);
   });
 });

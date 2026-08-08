@@ -23,18 +23,28 @@ export function buildVCarveEmittedCapsules(
     const a = points[index - 1];
     const b = points[index];
     if (a === undefined || b === undefined) continue;
-    const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(envelope, -a.z, -b.z);
-    const radius = Math.max(radiusA, radiusB) + toleranceMm;
-    capsules.push({
-      a,
-      b,
-      minX: Math.min(a.x, b.x) - radius,
-      minY: Math.min(a.y, b.y) - radius,
-      maxX: Math.max(a.x, b.x) + radius,
-      maxY: Math.max(a.y, b.y) + radius,
-    });
+    capsules.push(buildVCarveEmittedCapsule(a, b, envelope, toleranceMm));
   }
   return capsules;
+}
+
+/** Build one expanded swept-cone capsule without allocating a profile array. */
+export function buildVCarveEmittedCapsule(
+  a: Vec3,
+  b: Vec3,
+  envelope: RadialEnvelope,
+  toleranceMm: number,
+): VCarveEmittedCapsule {
+  const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(envelope, -a.z, -b.z);
+  const radius = Math.max(radiusA, radiusB) + toleranceMm;
+  return {
+    a,
+    b,
+    minX: Math.min(a.x, b.x) - radius,
+    minY: Math.min(a.y, b.y) - radius,
+    maxX: Math.max(a.x, b.x) + radius,
+    maxY: Math.max(a.y, b.y) + radius,
+  };
 }
 
 /** Test whether an expanded emitted capsule contains a complete reference chord. */

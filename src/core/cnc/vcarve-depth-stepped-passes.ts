@@ -1,7 +1,6 @@
 import type { Vec3 } from '../geometry/vec3';
 import type { CncPass } from '../job';
-import type { VCarveBoundaryIndex } from './vcarve-boundary-index';
-import type { BoundarySegment } from './vcarve-detail-geometry';
+import type { VCarveBoundarySegmentSource } from './vcarve-boundary-segment-index';
 import { zPassDepths } from './depth-passes';
 import { compactVCarveEmittedProfile } from './vcarve-emitted-profile-compaction';
 import { vcarveEmittedProfileCovers } from './vcarve-emitted-profile';
@@ -11,7 +10,6 @@ type DepthSteppedOptions = RadialEnvelope & {
   readonly depthPerPassMm: number;
   readonly compactionToleranceMm: number;
   readonly sweepToleranceMm: number;
-  readonly boundaryIndex?: VCarveBoundaryIndex;
 };
 
 /** Build and independently certify every emitted depth level. */
@@ -19,7 +17,7 @@ export function certifiedVCarveDepthSteppedPasses(
   candidate: ReadonlyArray<Vec3>,
   reference: ReadonlyArray<Vec3>,
   closed: boolean,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   options: DepthSteppedOptions,
 ): ReadonlyArray<CncPass> {
   let deepest = 0;
@@ -37,26 +35,30 @@ function certifiedLevel(
   candidate: ReadonlyArray<Vec3>,
   reference: ReadonlyArray<Vec3>,
   levelZ: number,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   options: DepthSteppedOptions,
 ): ReadonlyArray<Vec3> {
   const candidateLevel = pointsAtLevel(candidate, levelZ);
-  const referenceLevel = pointsAtLevel(reference, levelZ);
+  const isSameProfile = candidate === reference;
+  const referenceLevel = isSameProfile ? candidateLevel : pointsAtLevel(reference, levelZ);
   const compact = compactVCarveEmittedProfile(
     candidateLevel,
     segments,
     options,
     options.compactionToleranceMm,
-    options.boundaryIndex,
   );
   if (covers(referenceLevel, compact, options)) return compact;
+  // When the unsimplified reference was selected upstream, candidate and
+  // reference are the same profile. Recompacting that cloned depth level is
+  // deterministic duplicate work; both legacy fallbacks return these same
+  // reference coordinates when the first compact certificate fails.
+  if (isSameProfile) return referenceLevel;
   if (covers(referenceLevel, candidateLevel, options)) return candidateLevel;
   const compactReference = compactVCarveEmittedProfile(
     referenceLevel,
     segments,
     options,
     options.compactionToleranceMm,
-    options.boundaryIndex,
   );
   return covers(referenceLevel, compactReference, options) ? compactReference : referenceLevel;
 }

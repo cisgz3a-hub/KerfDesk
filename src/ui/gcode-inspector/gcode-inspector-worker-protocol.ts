@@ -15,6 +15,7 @@ type GcodeInspectorWorkerResultBase = {
   readonly sourceLineCount: number;
 };
 
+/** A parsed render model paired with all analysis required by the Inspector UI. */
 export type SuccessfulGcodeInspectorWorkerResult = GcodeInspectorWorkerResultBase & {
   readonly parsed: Extract<BuildRenderModelResult, { readonly kind: 'ok' }>;
   readonly analysis: GcodeInspectorAnalysis;
@@ -29,6 +30,7 @@ export type GcodeInspectorWorkerResult =
   | SuccessfulGcodeInspectorWorkerResult
   | FailedGcodeInspectorWorkerResult;
 
+/** Narrows a Worker result to its successful parsed-and-analyzed form. */
 export function hasGcodeInspectorAnalysis(
   result: GcodeInspectorWorkerResult,
 ): result is SuccessfulGcodeInspectorWorkerResult {

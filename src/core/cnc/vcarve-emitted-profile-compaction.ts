@@ -1,8 +1,11 @@
 import type { Vec3 } from '../geometry/vec3';
-import type { VCarveBoundaryIndex } from './vcarve-boundary-index';
-import type { BoundarySegment } from './vcarve-detail-geometry';
+import {
+  asVCarveBoundarySegmentIndex,
+  type VCarveBoundarySegmentIndex,
+  type VCarveBoundarySegmentSource,
+} from './vcarve-boundary-segment-index';
 import { emittedChordIsSafe } from './vcarve-detail-depth';
-import { vcarveEmittedChordCoversProfileSpan } from './vcarve-emitted-chord-coverage';
+import { vcarveEmittedSpanFitsChord } from './vcarve-emitted-profile-single-chord';
 import type { RadialEnvelope } from './radial-envelope';
 
 const MAX_COMPACTION_SPAN_POINTS = 32;
@@ -10,12 +13,12 @@ const MAX_COMPACTION_SPAN_POINTS = 32;
 /** Remove emitted microsegments only when one safe chord preserves their swept cone. */
 export function compactVCarveEmittedProfile(
   points: ReadonlyArray<Vec3>,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   envelope: RadialEnvelope,
   toleranceMm: number,
-  boundaryIndex?: VCarveBoundaryIndex,
 ): ReadonlyArray<Vec3> {
   if (points.length < 3) return points;
+  const boundary = asVCarveBoundarySegmentIndex(segments);
   const compact: Vec3[] = [];
   let start = 0;
   while (start < points.length - 1) {
@@ -28,7 +31,7 @@ export function compactVCarveEmittedProfile(
       const b = points[end];
       if (
         b !== undefined &&
-        spanCanCompact(points, start, end, a, b, segments, envelope, toleranceMm, boundaryIndex)
+        spanCanCompact(points, start, end, a, b, boundary, envelope, toleranceMm)
       ) {
         chosenEnd = end;
         break;
@@ -47,23 +50,12 @@ function spanCanCompact(
   end: number,
   a: Vec3,
   b: Vec3,
-  segments: ReadonlyArray<BoundarySegment>,
+  boundary: VCarveBoundarySegmentIndex,
   envelope: RadialEnvelope,
   toleranceMm: number,
-  boundaryIndex?: VCarveBoundaryIndex,
 ): boolean {
-  if (
-    !emittedChordIsSafe(
-      a,
-      b,
-      Math.max(0, -a.z),
-      Math.max(0, -b.z),
-      segments,
-      envelope,
-      boundaryIndex,
-    )
-  ) {
+  if (!emittedChordIsSafe(a, b, Math.max(0, -a.z), Math.max(0, -b.z), boundary, envelope)) {
     return false;
   }
-  return vcarveEmittedChordCoversProfileSpan(points, start, end, a, b, envelope, toleranceMm);
+  return vcarveEmittedSpanFitsChord(points, start, end, a, b, envelope, toleranceMm);
 }

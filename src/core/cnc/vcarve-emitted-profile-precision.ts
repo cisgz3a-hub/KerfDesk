@@ -1,14 +1,10 @@
 import type { Vec2 } from '../scene';
 import {
-  minimumIndexedVCarveBoundaryDistance,
-  type VCarveBoundaryIndex,
-} from './vcarve-boundary-index';
-import {
-  EMIT_COORDINATE_QUANTUM_MM,
-  emittedPoint,
-  pointToSegmentDistance,
-  type BoundarySegment,
-} from './vcarve-detail-geometry';
+  asVCarveBoundarySegmentIndex,
+  minimumVCarveBoundaryPointDistance,
+  type VCarveBoundarySegmentSource,
+} from './vcarve-boundary-segment-index';
+import { EMIT_COORDINATE_QUANTUM_MM, emittedPoint } from './vcarve-detail-geometry';
 import { vcarveEmittedDepthAtPoint, type DetailDepthLaw } from './vcarve-detail-depth';
 import {
   radialEnvelopeDepthMm,
@@ -19,19 +15,16 @@ import {
 /** True only when fixed 0.001 mm emission can retain every route-node radius. */
 export function vcarveRoutePrecisionMet(
   points: ReadonlyArray<Vec2>,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   law: DetailDepthLaw,
   sweepToleranceMm: number,
-  boundaryIndex?: VCarveBoundaryIndex,
 ): boolean {
   const radiusCapMm = radialEnvelopeFootprintMm(law, law.maxDepthMm);
+  const boundary = asVCarveBoundarySegmentIndex(segments);
   return points.every((rawPoint) => {
     const point = emittedPoint(rawPoint);
-    const clearanceMm =
-      boundaryIndex === undefined
-        ? minimumBoundaryDistance(point, segments)
-        : minimumIndexedVCarveBoundaryDistance(boundaryIndex, point.x, point.y);
-    const emittedDepthMm = vcarveEmittedDepthAtPoint(point, segments, law, boundaryIndex);
+    const clearanceMm = minimumVCarveBoundaryPointDistance(boundary, point);
+    const emittedDepthMm = vcarveEmittedDepthAtPoint(point, boundary, law);
     // Preserve the exact pointed-bit arithmetic that owns existing emitted
     // profile compaction and snapshots. The flat-tip branch needs the inverse
     // law so sub-tip clearance has a zero target rather than a phantom disk.
@@ -45,14 +38,6 @@ export function vcarveRoutePrecisionMet(
         : radialEnvelopeRemovalRadiusMm(law, emittedDepthMm);
     return exactRadiusMm - emittedRadiusMm <= sweepToleranceMm + EMIT_COORDINATE_QUANTUM_MM * 1e-9;
   });
-}
-
-function minimumBoundaryDistance(point: Vec2, segments: ReadonlyArray<BoundarySegment>): number {
-  let minimum = Number.POSITIVE_INFINITY;
-  for (const segment of segments) {
-    minimum = Math.min(minimum, pointToSegmentDistance(point.x, point.y, segment));
-  }
-  return minimum;
 }
 
 function exactFlatTipRadiusMm(

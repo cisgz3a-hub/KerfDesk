@@ -12294,6 +12294,16 @@ text itself (the read side).
   rebuild geometry, parse again, persist into the project, change emitted
   G-code, or affect simulation, Frame, Start, worker routing, or streaming.
 
+### Amendment - deepest depth uses a muted red (2026-08-05)
+
+- The ordered depth scale now runs from light blue through balanced muted
+  intermediate tones to a medium-light muted red at the deepest cut. The red
+  endpoint remains distinct from the more saturated traversal red and retains
+  readable contrast against the viewer background.
+- This amends only the palette and its legend wording. Depth calculation,
+  vertex-buffer recolouring, lens selection, and all non-viewer behavior above
+  remain unchanged.
+
 ## ADR-256 - 4040 starter feeds revised and CNC cut type defaults to On path
 
 **Date:** 2026-07-25
@@ -15402,82 +15412,6 @@ to the next, while retaining tool-major sections for real multi-tool jobs.
 - NOT verified: physical air-cut, material cut, spindle load, chip evacuation, surface finish,
   bit-tip truth, machine rigidity, serial-driver latency, or physical lost steps.
 
-## ADR-285 Amendment 1 - exact indexed boundary queries for large V-carves (2026-08-05)
-
-**Date:** 2026-08-05
-**Status:** Accepted; exact software equivalence verified, hardware qualification pending
-
-### Context
-
-ADR-285's emitted-profile certification intentionally uses the normalized boundary as cutting
-authority. On connected-script text, one normalized region can contain hundreds of boundary
-segments and tens of thousands of emitted profile points. Profiling a real Dancing Script and
-Pacifico multi-object project found that medial-axis construction was no longer the dominant cost:
-repeated exact nearest-boundary, swept-chord, precision, and compaction certificates consumed most
-of the remaining region-planning time. Region-level Workers keep that work off the UI thread but do
-not reduce the cost inside one large connected region.
-
-### Decision
-
-1. **Index, but do not approximate, one normalized boundary.** Each region builds one immutable,
-   stable AABB tree over the same source `BoundarySegment` records. Nearest-distance traversal uses
-   a conservative point-to-box lower bound and evaluates the existing exact point-to-segment
-   function in visited leaves. Swept-chord and depth-quality queries use bounding boxes only to
-   reject segments that cannot reach the existing exact predicate.
-2. **Keep the serial implementation as the oracle and fallback.** Callers without an index, empty
-   boundaries, non-finite query data, or non-finite boundary data retain the previous serial scan.
-   Leaf ties retain source order; no tolerance, sampling budget, depth law, quantization, route,
-   containment predicate, or pass order changes.
-3. **Specialize the one-chord compaction certificate without changing its proof.** Compaction
-   always compares a reference span with one candidate chord. That case directly builds the same
-   emitted capsule and runs the same exact capsule-containment predicate with the same subdivision
-   depth and global work limit, avoiding temporary slices and general multi-chord distance indexes.
-4. **Preserve all external contracts.** Region discovery and deterministic merge remain ordered;
-   heavy canvas compilation remains in the bounded Worker architecture from ADR-288. Emitted G-code,
-   fingerprints, Frame bounds, Job Review, and Start semantics do not change. No new guard or
-   synchronous UI-thread fallback is introduced.
-5. **Finish large G-code previews without one terminal UI task.** The existing Inspector parser
-   Worker also derives the fixed-limit planner timeline and informational health findings, and
-   transfers their typed arrays with the render model. WebGL scene startup yields between renderer,
-   scene, and initial-camera phases, and reports ready only after initial geometry and bounds are
-   installed. These display-only changes do not alter the parsed program, emitted bytes, planner
-   geometry, or machine-facing behavior.
-
-### Consequences
-
-- Large connected regions still have real geometry-dependent cost, but exact certification no longer
-  rescans every remote boundary segment for every local query.
-- The immutable per-region index adds bounded linear memory and deterministic tree-build work. Small
-  regions may not become faster; ordinary low-cost operations still use their existing direct paths.
-- Browser responsiveness remains a separate invariant from compile wall-clock time. This amendment
-  improves measured planning time but does not replace the ADR-288 Worker boundary.
-- Worker-side Inspector analysis adds seven transferable typed arrays proportional to displayed
-  segments. Their buffers move rather than clone, and the parser Worker already owns the matching
-  render-model lifetime.
-
-### Verification
-
-- Three 300-case generated properties compare indexed nearest distance, AABB-filtered visitation,
-  and swept-chord safety with the unchanged serial implementations.
-- A 500-case generated property compares the one-chord specialization with the general emitted-
-  profile coverage certificate for every compaction-sized span.
-- A real eight-drawing, six-operation fixture uses bundled Dancing Script and Pacifico outlines.
-  Serial and reversed region completion produce equal prepared plans, equal fingerprints, and the
-  same 367,243 emitted G-code bytes. On the measured development host, its serial compile fell from
-  7,015.4 ms to 4,438.7 ms and its warm reversed completion fell from 6,901.2 ms to 3,548.7 ms.
-- The existing connected-script readiness fixture fell from 21,474 ms to 12,060 ms, while its
-  Pacifico deterministic-containment case fell from 8,937 ms to 5,820 ms on the same host. These are
-  development measurements, not production latency guarantees.
-- A real-browser G-code 3D regression reaches ready with the same eight-drawing fixture, observes
-  both output-preparation and canvas-compilation Workers, and retains the unchanged one-second UI
-  heartbeat ceiling.
-- Under a diagnostic-only 4x browser CPU slowdown, moving terminal analysis to the parser Worker
-  and separating WebGL startup phases reduced the maximum UI heartbeat gap from 1,035.2 ms to
-  371.5 ms and the longest product Long Task from 851 ms to 274 ms. The profiler harness was removed;
-  the production regression retains the same threshold.
-- NOT verified: controller execution, air-cut, material cut, physical containment, spindle load,
-  cut quality, or a fixed latency on other CPUs.
-
 ## ADR-286 - A text object's own glyphs resolve non-zero before a V-carve layer pools (2026-08-03)
 
 **Date:** 2026-08-03
@@ -15857,6 +15791,52 @@ would recreate the freeze this decision exists to remove.
   qualification; the test harness restores local storage and unmounts after its A/B.
 - NOT verified: physical air-cut, material cut, controller throughput, perceptual preview fidelity or
   measured browser responsiveness or GPU behavior on production hardware.
+
+## ADR-288 Amendment 1 - large G-code Inspector finalization stays off the UI thread (2026-08-05)
+
+**Date:** 2026-08-05
+**Status:** Accepted; software and real-browser verification required before release
+
+### Context
+
+ADR-288 moved costly output preparation into bounded Workers, but a completed large G-code model
+still triggered planner-timeline derivation, informational health analysis, and one uninterrupted
+WebGL startup task on the browser thread. A prepared program could therefore finish correctly while
+the final Inspector transition still delayed input and paint.
+
+### Decision
+
+1. **Finish deterministic analysis in the existing parser Worker.** The parser Worker derives the
+   Inspector's fixed-limit planner timeline and informational findings before it publishes the model.
+   Its seven typed arrays transfer with the render buffers rather than being cloned or rebuilt in the
+   UI realm.
+2. **Yield between independent WebGL startup phases.** Renderer creation, scene construction, and
+   initial camera setup are separate tasks so input and paint can run between them.
+3. **Publish ready only after initial geometry is installed.** The Inspector remains in a preparing
+   state until the first model and its bounds have reached the scene. Tests and operators therefore
+   observe the completed preview rather than an early renderer-only signal.
+4. **Keep this display-only.** Parsing, emitted G-code, fingerprints, Frame, Job Review, and Start
+   behavior do not change. The amendment adds no guard, warning, refusal, or machine command.
+
+### Consequences
+
+- Large previews avoid rebuilding their planner timeline and health report on the UI thread.
+- The Worker result owns seven additional transferable buffers proportional to displayed segments.
+- Scene creation still has real device- and GPU-dependent cost; task boundaries improve browser
+  responsiveness but do not establish a latency guarantee on every host.
+
+### Verification
+
+- Focused tests compare Worker-side analysis with the existing timeline and finding functions, cover
+  all transferred buffers, and require the ready state to follow initial geometry installation.
+- A real-browser regression uses bundled Dancing Script and Pacifico outlines across eight drawings
+  and six operations, observes the output, canvas-planning, and Inspector Workers, and retains the
+  one-second heartbeat ceiling.
+- Under a diagnostic-only four-times CPU slowdown on the development host, the measured maximum
+  heartbeat gap fell from 1,035.2 ms to 371.5 ms and the longest product Long Task fell from 851 ms
+  to 274 ms. These measurements are evidence for that host, not a production latency guarantee.
+- NOT verified: controller execution, air-cut, material cut, physical containment, spindle load,
+  cut quality, perceptual GPU fidelity, or fixed responsiveness on other CPUs.
 
 ## ADR-289 - Relief XY scale is resolved before physical cutter geometry (2026-08-05)
 

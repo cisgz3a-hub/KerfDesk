@@ -9,6 +9,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { CncLayerFields } from './CncLayerFields';
+import { CncSelectionDepthField } from './CncSelectionDepthField';
 import { LayerRowCutSettings } from './LayerRowCutSettings';
 import { LayerRowSettingsFields } from './LayerRowFields';
 import { useCutSettingsLauncher } from './use-cut-settings-launcher';
@@ -37,6 +38,9 @@ export function SelectedOperationInspector(props: {
         <p style={hintStyle}>
           {props.objects.length} selected artworks currently keep independent settings.
         </p>
+        {machineKind === 'cnc' ? (
+          <CncSelectionDepthField objects={props.objects} operations={context.candidates} />
+        ) : null}
         <OperationSelect
           operations={context.candidates}
           value={active.id}

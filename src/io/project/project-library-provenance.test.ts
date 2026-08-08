@@ -29,7 +29,21 @@ function projectWithLibraryAsset(): Project {
     libraryProvenance: PROVENANCE,
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
     transform: IDENTITY_TRANSFORM,
-    paths: [],
+    paths: [
+      {
+        color: '#000000',
+        strokeWidthMm: 0.5,
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x: 0, y: 0 },
+              { x: 10, y: 10 },
+            ],
+          },
+        ],
+      },
+    ],
   };
   return { ...base, scene: addObject(base.scene, object) };
 }
@@ -44,8 +58,22 @@ describe('project Library provenance IO', () => {
       expect(object?.kind).toBe('imported-svg');
       if (object?.kind === 'imported-svg') {
         expect(object.libraryProvenance).toEqual(PROVENANCE);
+        expect(object.paths[0]?.strokeWidthMm).toBe(0.5);
       }
     }
+  });
+
+  it('rejects a non-positive saved stroke width', () => {
+    const raw = JSON.parse(serializeProject(projectWithLibraryAsset())) as {
+      scene: { objects: Array<{ paths?: Array<Record<string, unknown>> }> };
+    };
+    const path = raw.scene.objects[0]?.paths?.[0];
+    if (path === undefined) throw new Error('expected Library path');
+    path['strokeWidthMm'] = 0;
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('invalid');
   });
 
   it('loads geometry and drops an unsupported provenance schema version', () => {

@@ -38,7 +38,10 @@ describe('InspectorLensControl', () => {
       expect(text).toContain('Shallow -1.00 mm');
       expect(text).toContain('Deep -2.00 mm');
       expect(view.host.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain(
-        'light to dark',
+        'light blue to muted red',
+      );
+      expect(view.host.querySelector<HTMLElement>('[role="img"]')?.style.backgroundImage).toBe(
+        'linear-gradient(to right, rgb(173, 209, 245), rgb(191, 112, 117))',
       );
     } finally {
       view.cleanup();

@@ -1,10 +1,13 @@
 import type { Vec3 } from '../geometry/vec3';
 import type { Polyline, Vec2 } from '../scene';
 import {
-  minimumIndexedVCarveBoundaryDistance,
-  someIndexedVCarveBoundarySegmentInBox,
-  type VCarveBoundaryIndex,
-} from './vcarve-boundary-index';
+  asVCarveBoundarySegmentIndex,
+  minimumVCarveBoundaryChordDistance,
+  minimumVCarveBoundaryPointDistance,
+  someVCarveBoundarySegmentInBox,
+  type VCarveBoundarySegmentIndex,
+  type VCarveBoundarySegmentSource,
+} from './vcarve-boundary-segment-index';
 import { emittedChordIsSafe } from './vcarve-detail-chord-safety';
 import {
   EMIT_COORDINATE_QUANTUM_MM,
@@ -12,8 +15,6 @@ import {
   emitXyKey,
   pointToSegmentDistance,
   samePoint,
-  segmentToSegmentDistance,
-  type BoundarySegment,
 } from './vcarve-detail-geometry';
 import { validDepthInputs, validDepthTolerance, type DetailDepthLaw } from './vcarve-detail-input';
 import { radialEnvelopeDepthMm, radialEnvelopeSweepRadiiMm } from './radial-envelope';
@@ -49,7 +50,7 @@ type MutableVec3 = { x: number; y: number; z: number };
 
 export function detailPath3dPoints(
   polyline: Polyline,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   law: DetailDepthLaw,
 ): ReadonlyArray<Vec3> {
   return detailPath3dPlan(polyline, segments, law).points;
@@ -57,11 +58,10 @@ export function detailPath3dPoints(
 
 export function vcarveEmittedDepthAtPoint(
   point: Vec2,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   law: DetailDepthLaw,
-  boundaryIndex?: VCarveBoundaryIndex,
 ): number {
-  return emittedSafeDepth(emittedPoint(point), segments, law, boundaryIndex);
+  return emittedSafeDepth(emittedPoint(point), asVCarveBoundarySegmentIndex(segments), law);
 }
 
 /**
@@ -73,13 +73,15 @@ export function vcarveEmittedDepthAtPoint(
  */
 export function detailPath3dPlan(
   polyline: Polyline,
-  segments: ReadonlyArray<BoundarySegment>,
+  segments: VCarveBoundarySegmentSource,
   law: DetailDepthLaw,
   zToleranceMm = DEFAULT_Z_TOLERANCE_MM,
-  boundaryIndex?: VCarveBoundaryIndex,
 ): DetailPath3dPlan {
   const path = pathPoints(polyline);
-  if (!validDepthInputs(path, segments, law)) return { points: [], toleranceMet: false };
+  const boundary = asVCarveBoundarySegmentIndex(segments);
+  if (!validDepthInputs(path, boundary.segments, law)) {
+    return { points: [], toleranceMet: false };
+  }
   const toleranceMm = validDepthTolerance(zToleranceMm, DEFAULT_Z_TOLERANCE_MM);
   const state: RefinementState = { remaining: MAX_ADDED_REFINEMENTS, toleranceMet: true };
   const leaves: DepthLeaf[] = [];
@@ -87,7 +89,7 @@ export function detailPath3dPlan(
     const a = path[index];
     const b = path[index + 1];
     if (a !== undefined && b !== undefined) {
-      leaves.push(...refineDepthSpan(a, b, segments, law, toleranceMm, state, boundaryIndex));
+      leaves.push(...refineDepthSpan(a, b, boundary, law, toleranceMm, state));
     }
   }
   const collapsed = collapseAtEmitPrecision(pointsForLeaves(leaves), polyline.closed);
@@ -100,19 +102,18 @@ export function detailPath3dPlan(
 function refineDepthSpan(
   a: Vec2,
   b: Vec2,
-  segments: ReadonlyArray<BoundarySegment>,
+  boundary: VCarveBoundarySegmentIndex,
   law: DetailDepthLaw,
   toleranceMm: number,
   state: RefinementState,
-  boundaryIndex?: VCarveBoundaryIndex,
 ): ReadonlyArray<DepthLeaf> {
   const leaves: DepthLeaf[] = [];
   const pending: Array<{ readonly a: Vec2; readonly b: Vec2 }> = [{ a, b }];
   while (pending.length > 0) {
     const span = pending.pop();
     if (span === undefined) continue;
-    const planned = plannedLeaf(span.a, span.b, segments, law, boundaryIndex);
-    if (planned.safe && depthQualityMet(planned.leaf, segments, law, toleranceMm, boundaryIndex)) {
+    const planned = plannedLeaf(span.a, span.b, boundary, law);
+    if (planned.safe && depthQualityMet(planned.leaf, boundary, law, toleranceMm)) {
       leaves.push(planned.leaf);
       continue;
     }
@@ -123,7 +124,7 @@ function refineDepthSpan(
       continue;
     }
     state.toleranceMet = false;
-    leaves.push(conservativeLeaf(span.a, span.b, segments, law));
+    leaves.push(conservativeLeaf(span.a, span.b, boundary, law));
   }
   return leaves;
 }
@@ -131,36 +132,32 @@ function refineDepthSpan(
 function plannedLeaf(
   rawA: Vec2,
   rawB: Vec2,
-  segments: ReadonlyArray<BoundarySegment>,
+  boundary: VCarveBoundarySegmentIndex,
   law: DetailDepthLaw,
-  boundaryIndex?: VCarveBoundaryIndex,
 ): { readonly leaf: DepthLeaf; readonly safe: boolean } {
   const a = emittedPoint(rawA);
   const b = emittedPoint(rawB);
   const leaf = {
     a: rawA,
     b: rawB,
-    depthA: emittedSafeDepth(a, segments, law, boundaryIndex),
-    depthB: emittedSafeDepth(b, segments, law, boundaryIndex),
+    depthA: emittedSafeDepth(a, boundary, law),
+    depthB: emittedSafeDepth(b, boundary, law),
   };
   return {
     leaf,
-    safe: emittedChordIsSafe(a, b, leaf.depthA, leaf.depthB, segments, law, boundaryIndex),
+    safe: emittedChordIsSafe(a, b, leaf.depthA, leaf.depthB, boundary, law),
   };
 }
 
 function conservativeLeaf(
   rawA: Vec2,
   rawB: Vec2,
-  segments: ReadonlyArray<BoundarySegment>,
+  boundary: VCarveBoundarySegmentIndex,
   law: DetailDepthLaw,
 ): DepthLeaf {
   const a = emittedPoint(rawA);
   const b = emittedPoint(rawB);
-  let clearanceMm = Number.POSITIVE_INFINITY;
-  for (const segment of segments) {
-    clearanceMm = Math.min(clearanceMm, segmentToSegmentDistance(a, b, segment));
-  }
+  const clearanceMm = minimumVCarveBoundaryChordDistance(boundary, a, b);
   const boundaryDepthMm = radialEnvelopeDepthMm(law, clearanceMm);
   const depth = quantizeDepth(
     Math.min(boundaryDepthMm, law.maxDepthMm),
@@ -171,10 +168,9 @@ function conservativeLeaf(
 
 function depthQualityMet(
   leaf: DepthLeaf,
-  segments: ReadonlyArray<BoundarySegment>,
+  boundary: VCarveBoundarySegmentIndex,
   law: DetailDepthLaw,
   toleranceMm: number,
-  boundaryIndex?: VCarveBoundaryIndex,
 ): boolean {
   const a = emittedPoint(leaf.a);
   const b = emittedPoint(leaf.b);
@@ -189,45 +185,35 @@ function depthQualityMet(
   // allowed radius interpolates linearly. If one boundary segment is within
   // the allowed radius at both endpoints, convexity certifies the whole span.
   // Requiring the same segment catches a narrow peak hidden between samples.
-  const matches = (segment: BoundarySegment) =>
-    pointToSegmentDistance(a.x, a.y, segment) <= radiusA + QUALITY_EPSILON_MM &&
-    pointToSegmentDistance(b.x, b.y, segment) <= radiusB + QUALITY_EPSILON_MM;
-  if (boundaryIndex === undefined) return segments.some(matches);
-  return someIndexedVCarveBoundarySegmentInBox(
-    boundaryIndex,
+  // A segment satisfying both endpoint limits must meet the smaller-radius
+  // endpoint's box, so this anchor cannot prune an accepted candidate.
+  const [queryPoint, queryRadius] = radiusA <= radiusB ? [a, radiusA] : [b, radiusB];
+  const queryReach = queryRadius + QUALITY_EPSILON_MM;
+  return someVCarveBoundarySegmentInBox(
+    boundary,
     {
-      minX: Math.min(a.x - radiusA, b.x - radiusB) - QUALITY_EPSILON_MM,
-      minY: Math.min(a.y - radiusA, b.y - radiusB) - QUALITY_EPSILON_MM,
-      maxX: Math.max(a.x + radiusA, b.x + radiusB) + QUALITY_EPSILON_MM,
-      maxY: Math.max(a.y + radiusA, b.y + radiusB) + QUALITY_EPSILON_MM,
+      minX: queryPoint.x - queryReach,
+      minY: queryPoint.y - queryReach,
+      maxX: queryPoint.x + queryReach,
+      maxY: queryPoint.y + queryReach,
     },
-    matches,
+    (segment) =>
+      pointToSegmentDistance(a.x, a.y, segment) <= radiusA + QUALITY_EPSILON_MM &&
+      pointToSegmentDistance(b.x, b.y, segment) <= radiusB + QUALITY_EPSILON_MM,
   );
 }
 
 function emittedSafeDepth(
   point: Vec2,
-  segments: ReadonlyArray<BoundarySegment>,
+  boundary: VCarveBoundarySegmentIndex,
   law: DetailDepthLaw,
-  boundaryIndex?: VCarveBoundaryIndex,
 ): number {
-  const distanceMm =
-    boundaryIndex === undefined
-      ? minimumBoundaryDistance(point, segments)
-      : minimumIndexedVCarveBoundaryDistance(boundaryIndex, point.x, point.y);
+  const distanceMm = minimumVCarveBoundaryPointDistance(boundary, point);
   const boundaryDepthMm = radialEnvelopeDepthMm(law, distanceMm);
   return quantizeDepth(
     Math.min(boundaryDepthMm, law.maxDepthMm),
     boundaryDepthMm > law.maxDepthMm + 1e-9,
   );
-}
-
-function minimumBoundaryDistance(point: Vec2, segments: ReadonlyArray<BoundarySegment>): number {
-  let distanceMm = Number.POSITIVE_INFINITY;
-  for (const segment of segments) {
-    distanceMm = Math.min(distanceMm, pointToSegmentDistance(point.x, point.y, segment));
-  }
-  return distanceMm;
 }
 
 function quantizeDepth(depthMm: number, safelyCapLimited: boolean): number {
