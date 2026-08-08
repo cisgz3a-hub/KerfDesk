@@ -13,6 +13,7 @@ import { useCurrentGcode, type CurrentGcode } from './use-current-gcode';
 import { useGcodeInspection, type InspectionState } from './use-gcode-inspection';
 import { InspectionPressureNotice } from './InspectionPressureNotice';
 import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
+import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
 
 export function CanvasGcodeView(props: { readonly active: boolean }): JSX.Element {
   const { state, stale, refresh } = useCurrentGcode(props.active);
@@ -63,14 +64,18 @@ function Body(props: {
   if (props.inspection.kind === 'error') {
     return <p style={messageStyle}>{props.inspection.reason}</p>;
   }
-  if (props.inspection.result.parsed.kind !== 'ok') {
+  if (!hasGcodeInspectorAnalysis(props.inspection.result)) {
     return <p style={messageStyle}>{props.inspection.result.parsed.reason}</p>;
   }
   return (
     <>
       {props.inspection.mainThreadFallback ? <MainThreadInspectionNotice /> : null}
       <InspectionPressureNotice result={props.inspection.result} />
-      <InspectorView model={props.inspection.result.parsed.model} variant="preview" />
+      <InspectorView
+        model={props.inspection.result.parsed.model}
+        analysis={props.inspection.result.analysis}
+        variant="preview"
+      />
     </>
   );
 }

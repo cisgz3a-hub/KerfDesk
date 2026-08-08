@@ -11,9 +11,14 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { GcodeRenderModel } from '../../core/gcode-view';
 import { createViewer3dScene, type Viewer3dSceneHandle } from '../viewer3d';
+import {
+  useViewer3dModelInstallation,
+  type Viewer3dSceneState,
+} from './use-viewer3d-model-installation';
 
-export type Viewer3dSceneState = 'loading' | 'ready' | 'no-webgl';
+export type { Viewer3dSceneState } from './use-viewer3d-model-installation';
 
+/** Current scene handle, lifecycle state, and any WebGL-unavailable reason. */
 export type Viewer3dSceneBinding = {
   readonly handleRef: RefObject<Viewer3dSceneHandle | null>;
   readonly state: Viewer3dSceneState;
@@ -21,11 +26,13 @@ export type Viewer3dSceneBinding = {
   readonly reason: string;
 };
 
+/** Owns one Inspector WebGL scene for the canvas and swaps models into that scene. */
 export function useViewer3dScene(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   model: GcodeRenderModel,
 ): Viewer3dSceneBinding {
   const handleRef = useRef<Viewer3dSceneHandle | null>(null);
+  const drawnModelRef = useRef<GcodeRenderModel | null>(null);
   const [state, setState] = useState<Viewer3dSceneState>('loading');
   const [reason, setReason] = useState('');
 
@@ -33,6 +40,7 @@ export function useViewer3dScene(
     const canvas = canvasRef.current;
     if (canvas === null) return;
     let cancelled = false;
+    drawnModelRef.current = null;
     setState('loading');
     void createViewer3dScene(canvas)
       .then((outcome) => {
@@ -47,7 +55,7 @@ export function useViewer3dScene(
         }
         handleRef.current = outcome.handle;
         outcome.handle.resize(canvas.clientWidth, canvas.clientHeight);
-        setState('ready');
+        setState('preparing');
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -58,18 +66,12 @@ export function useViewer3dScene(
       cancelled = true;
       handleRef.current?.dispose();
       handleRef.current = null;
+      drawnModelRef.current = null;
     };
   }, [canvasRef]);
 
-  // Draw the current program. `state` is a dependency so the first model lands
-  // as soon as the scene is ready, and this runs before useSceneSync's effects
-  // (declared after this hook) push the playhead and lens onto the new
-  // geometry.
-  useEffect(() => {
-    if (state !== 'ready') return;
-    handleRef.current?.setSegments(model);
-    handleRef.current?.fitToBounds(model.stats.motionBounds);
-  }, [model, state]);
+  // Registers before useSceneSync so geometry lands before view state.
+  useViewer3dModelInstallation({ model, state, handleRef, drawnModelRef, setState });
 
   useEffect(() => {
     const canvas = canvasRef.current;

@@ -1,7 +1,13 @@
 import { createGcodeRenderModelBuilder } from '../../core/gcode-view/gcode-render-model-builder';
+import type { BuildRenderModelResult } from '../../core/gcode-view';
 import type { BlobReadProgress } from '../import/blob-line-reader';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
-import { indexGcodeBlobLines, indexGcodeTextLines } from './gcode-source-line-index';
+import { analyzeGcodeModel } from './gcode-inspector-analysis';
+import {
+  indexGcodeBlobLines,
+  indexGcodeTextLines,
+  type GcodeSourceLineIndex,
+} from './gcode-source-line-index';
 import {
   INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   type GcodeInspectorWorkerResult,
@@ -12,11 +18,7 @@ export function inspectGcodeText(text: string): GcodeInspectorWorkerResult {
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   });
   const sourceIndex = indexGcodeTextLines(text, (line) => builder.pushLine(line));
-  return {
-    parsed: builder.finish(),
-    sourceIndex,
-    sourceLineCount: sourceIndex.starts.length,
-  };
+  return inspectionResult(builder.finish(), sourceIndex);
 }
 
 export async function inspectGcodeSource(
@@ -32,9 +34,14 @@ export async function inspectGcodeSource(
     (line) => builder.pushLine(line),
     onProgress,
   );
-  return {
-    parsed: builder.finish(),
-    sourceIndex,
-    sourceLineCount: sourceIndex.starts.length,
-  };
+  return inspectionResult(builder.finish(), sourceIndex);
+}
+
+function inspectionResult(
+  parsed: BuildRenderModelResult,
+  sourceIndex: GcodeSourceLineIndex,
+): GcodeInspectorWorkerResult {
+  const base = { sourceIndex, sourceLineCount: sourceIndex.starts.length };
+  if (parsed.kind === 'error') return { ...base, parsed, analysis: null };
+  return { ...base, parsed, analysis: analyzeGcodeModel(parsed.model) };
 }

@@ -15792,6 +15792,56 @@ would recreate the freeze this decision exists to remove.
 - NOT verified: physical air-cut, material cut, controller throughput, perceptual preview fidelity or
   measured browser responsiveness or GPU behavior on production hardware.
 
+## ADR-288 Amendment 1 - large G-code Inspector finalization stays off the UI thread (2026-08-05)
+
+**Date:** 2026-08-05
+**Status:** Accepted; software and real-browser verification required before release
+
+### Context
+
+ADR-288 moved costly output preparation into bounded Workers, but a completed large G-code model
+still triggered planner-timeline derivation, informational health analysis, and one uninterrupted
+WebGL startup task on the browser thread. A prepared program could therefore finish correctly while
+the final Inspector transition still delayed input and paint.
+
+### Decision
+
+1. **Finish deterministic analysis in the existing parser Worker.** The parser Worker derives the
+   Inspector's fixed-limit planner timeline and informational findings before it publishes the model.
+   Its seven typed arrays transfer with the render buffers rather than being cloned or rebuilt in the
+   UI realm.
+2. **Bound WebGL finalization work.** Renderer creation, scene construction, and initial camera
+   setup are separate tasks so input and paint can run between them. Scene mutations from one browser
+   task coalesce into one animation-frame render; PNG capture retains a synchronous render boundary.
+3. **Publish ready only after initial geometry is installed.** The Inspector remains in a preparing
+   state until the first model and its bounds have reached the scene. Tests and operators therefore
+   observe the completed preview rather than an early renderer-only signal.
+4. **Keep this display-only.** Parsing, emitted G-code, fingerprints, Frame, Job Review, and Start
+   behavior do not change. The amendment adds no guard, warning, refusal, or machine command.
+
+### Consequences
+
+- Large previews avoid rebuilding their planner timeline and health report on the UI thread.
+- The Worker result owns seven additional transferable buffers proportional to displayed segments.
+- Scene creation still has real device- and GPU-dependent cost; task boundaries improve browser
+  responsiveness but do not establish a latency guarantee on every host.
+
+### Verification
+
+- Focused tests compare Worker-side analysis with the existing timeline and finding functions, cover
+  all transferred buffers, and require the ready state to follow initial geometry installation.
+- A real-browser regression uses bundled Dancing Script and Pacifico outlines across eight drawings
+  and six operations, observes the output, canvas-planning, and Inspector Workers, and retains the
+  one-second heartbeat ceiling.
+- Historical branch notes recorded four-times CPU-slowdown measurements, but no retained trace or
+  reproduction command accompanies those figures. They are not independently verified and are not
+  release evidence.
+- The focused browser regression is reproducible with
+  `pnpm exec playwright test e2e/connected-script-gcode-viewer.e2e.ts --repeat-each=5`; an exact-head
+  hosted pass remains required before release.
+- NOT verified: controller execution, air-cut, material cut, physical containment, spindle load,
+  cut quality, perceptual GPU fidelity, or fixed responsiveness on other CPUs.
+
 ## ADR-289 - Relief XY scale is resolved before physical cutter geometry (2026-08-05)
 
 **Date:** 2026-08-05

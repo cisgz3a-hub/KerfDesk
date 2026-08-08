@@ -10,6 +10,7 @@ import { InspectionPressureNotice } from './InspectionPressureNotice';
 import { InspectorView } from './InspectorView';
 import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
 import { useGcodeInspection } from './use-gcode-inspection';
+import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
 
 export type GcodeInspectorDialogProps = {
   readonly programName: string;
@@ -44,12 +45,13 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
         <p style={messageStyle}>{inspectionProgressLabel(state.phase, state.queuePosition)}</p>
       ) : null}
       {state.kind === 'ready' ? (
-        state.result.parsed.kind === 'ok' ? (
+        hasGcodeInspectorAnalysis(state.result) ? (
           <>
             {state.mainThreadFallback ? <MainThreadInspectionNotice /> : null}
             <InspectionPressureNotice result={state.result} />
             <InspectorView
               model={state.result.parsed.model}
+              analysis={state.result.analysis}
               source={state.source}
               sourceIndex={state.result.sourceIndex}
             />
