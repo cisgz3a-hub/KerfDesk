@@ -19,6 +19,7 @@ import {
   type JobOriginPlacement,
 } from '../../core/job';
 import { compileCncJob } from '../../core/cnc';
+import { isReliefMaterializationError } from '../../core/relief/relief-materialization-error';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
   runPreEmitPreflight,
@@ -36,6 +37,7 @@ import {
   isProgramMaterializationRangeError,
   programMaterializationFailure,
 } from './program-materialization';
+import { reliefMaterializationFailure } from './relief-materialization-failure';
 
 export type PrepareOutputOptions = {
   readonly jobOrigin?: JobOriginPlacement;
@@ -80,6 +82,9 @@ export function prepareOutput(
   try {
     return completePreparedOutput(input, compileForMachine(input.project));
   } catch (error) {
+    if (isReliefMaterializationError(error)) {
+      return { ok: false, preflight: reliefMaterializationFailure(error) };
+    }
     if (isProgramMaterializationRangeError(error)) {
       return { ok: false, preflight: programMaterializationFailure() };
     }

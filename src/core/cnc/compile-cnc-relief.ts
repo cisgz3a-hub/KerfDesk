@@ -17,6 +17,7 @@ import { DEFAULT_RELIEF_SCALLOP_MM, reliefFinishingPasses, scallopRowSpacingMm }
 // variant cannot be added to it.
 import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
+import { ReliefMaterializationError } from '../relief/relief-materialization-error';
 import {
   applyTransform,
   layerCncTool,
@@ -129,7 +130,9 @@ function reliefFinishingGroup(
         Math.max(MIN_FINISHING_CELL_MM, finishTool.diameterMm / FINISHING_CELL_TOOL_FRACTION),
       ),
     });
-    if (heightmap.kind === 'error') continue;
+    if (heightmap.kind === 'error') {
+      throw new ReliefMaterializationError(relief.source, heightmap.reason);
+    }
     const kernel = kernelForTool(finishTool, heightmap.heightmap.mmPerCell);
     for (const pass of reliefFinishingPasses(heightmap.heightmap, {
       tool: finishTool,
@@ -168,8 +171,6 @@ function reliefObjectsForLayer(
   );
 }
 
-const NO_RELIEF_LADDER: ReliefRoughingLadder = { passes: [], offsetFailed: false };
-
 // The one place roughing geometry is produced. Both the compiler and the
 // diagnostics probe below go through it, so they can never disagree about
 // whether a level's ladder was cut short.
@@ -186,7 +187,9 @@ function reliefLadderFor(
     targetScaleY: machineSpace.targetScaleY,
     mmPerCell: Math.max(MIN_ROUGHING_CELL_MM, tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION),
   });
-  if (heightmap.kind === 'error') return NO_RELIEF_LADDER;
+  if (heightmap.kind === 'error') {
+    throw new ReliefMaterializationError(relief.source, heightmap.reason);
+  }
   return reliefRoughingLadder(heightmap.heightmap, {
     tool,
     reliefDepthMm: relief.reliefDepthMm,
@@ -209,7 +212,14 @@ export function reliefOffsetLadderFailed(
   const reliefs = reliefObjectsForLayer(objects, layer);
   if (reliefs.length === 0) return false;
   const tool = layerCncTool(config, settings);
-  return reliefs.some((relief) => reliefLadderFor(relief, settings, tool).offsetFailed);
+  try {
+    return reliefs.some((relief) => reliefLadderFor(relief, settings, tool).offsetFailed);
+  } catch (error) {
+    // Diagnostics inform only. Compile owns the named integrity failure and
+    // must not be replaced by a warning-path exception.
+    if (error instanceof ReliefMaterializationError) return false;
+    throw error;
+  }
 }
 
 function appendReliefPasses(

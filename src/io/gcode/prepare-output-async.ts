@@ -9,11 +9,13 @@ import {
   type PreparedCncCompilationArtifact,
 } from '../../core/cnc/cnc-compilation-artifact';
 import { compileJob, type Job } from '../../core/job';
+import { isReliefMaterializationError } from '../../core/relief/relief-materialization-error';
 import type { Project } from '../../core/scene';
 import {
   isProgramMaterializationRangeError,
   programMaterializationFailure,
 } from './program-materialization';
+import { reliefMaterializationFailure } from './relief-materialization-failure';
 import {
   completePreparedOutput,
   prepareOutputInput,
@@ -57,6 +59,9 @@ export async function prepareOutputAsync(
     emitProgress(context, 'finalizing', 'direct', 0, 0, 0, 0);
     return completePreparedOutput(input, compiled);
   } catch (error) {
+    if (isReliefMaterializationError(error)) {
+      return { ok: false, preflight: reliefMaterializationFailure(error) };
+    }
     if (isProgramMaterializationRangeError(error)) {
       return { ok: false, preflight: programMaterializationFailure() };
     }

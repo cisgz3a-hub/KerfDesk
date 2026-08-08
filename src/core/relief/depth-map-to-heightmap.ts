@@ -39,13 +39,21 @@ export function depthMapToHeightmap(
   if (size.kind === 'error') return size;
   const widthCells = Math.max(1, Math.ceil(target.widthMm / size.mmPerCell));
   const heightCells = Math.max(1, Math.ceil(target.heightMm / size.mmPerCell));
-  const depth = materializeDepths(
-    source,
-    samples.bytes,
-    widthCells,
-    heightCells,
-    options.reliefDepthMm,
-  );
+  let depth: Float32Array;
+  try {
+    depth = materializeDepths(
+      source,
+      samples.bytes,
+      widthCells,
+      heightCells,
+      options.reliefDepthMm,
+    );
+  } catch (error) {
+    if (error instanceof RangeError) {
+      return { kind: 'error', reason: 'Depth-map heightmap does not fit in this runtime.' };
+    }
+    throw error;
+  }
   return {
     kind: 'ok',
     heightmap: { widthCells, heightCells, mmPerCell: size.mmPerCell, depth },

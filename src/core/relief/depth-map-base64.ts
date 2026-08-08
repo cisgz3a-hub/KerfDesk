@@ -50,7 +50,14 @@ export function decodeCanonicalBase64(value: string): Base64DecodeResult {
   const byteLength = canonicalBase64ByteLength(value);
   if (byteLength === null)
     return { kind: 'error', reason: 'Sample payload is not canonical base64.' };
-  const bytes = new Uint8Array(byteLength);
+  return decodeCanonicalBytes(value, byteLength);
+}
+
+function decodeCanonicalBytes(value: string, byteLength: number): Base64DecodeResult {
+  const bytes = allocateBytes(byteLength);
+  if (bytes === null) {
+    return { kind: 'error', reason: 'Depth-map samples do not fit in this runtime.' };
+  }
   let output = 0;
   for (let index = 0; index < value.length; index += 4) {
     const a = BASE64_ALPHABET.indexOf(value[index] ?? '');
@@ -63,4 +70,12 @@ export function decodeCanonicalBase64(value: string): Base64DecodeResult {
     if (output < byteLength) bytes[output++] = packed & 0xff;
   }
   return { kind: 'ok', bytes };
+}
+
+function allocateBytes(byteLength: number): Uint8Array | null {
+  try {
+    return new Uint8Array(byteLength);
+  } catch {
+    return null;
+  }
 }

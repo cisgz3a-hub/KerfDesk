@@ -11,10 +11,17 @@ import type { BoundedCompilationBridgePort } from './bounded-compilation-bridge-
 import type { DeviceProfile } from '../../core/devices';
 import type { Toolpath } from '../../core/job';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
-import type { CncMachineConfig } from '../../core/scene';
+import {
+  depthMapToHeightmap,
+  type DepthMapHeightmapOptions,
+  type DepthMapHeightmapResult,
+} from '../../core/relief/depth-map-to-heightmap';
+import type { CncMachineConfig, ReliefObject } from '../../core/scene';
 import type { RemovalGrid } from '../../core/sim';
 import { prepareCncCut3DSurface } from './cnc-cut3d-surface';
 import { computeCncRemovalGrid } from './cnc-removal-grid';
+
+type ReliefDepthMap = NonNullable<ReliefObject['depthMap']>;
 
 export const CANVAS_COMPILATION_BRIDGE_CONNECTION = 'canvas-compilation-bridge-v1';
 
@@ -33,6 +40,11 @@ export type CanvasCompilationTaskPayload =
   | {
       readonly kind: 'cnc-cut3d-surface';
       readonly grid: RemovalGrid;
+    }
+  | {
+      readonly kind: 'relief-heightmap';
+      readonly source: ReliefDepthMap;
+      readonly options: DepthMapHeightmapOptions;
     };
 
 export type CanvasCompilationTaskResult =
@@ -41,7 +53,8 @@ export type CanvasCompilationTaskResult =
       readonly output: CncCompilationRegionResult;
     }
   | { readonly kind: 'cnc-removal-grid'; readonly output: RemovalGrid | null }
-  | { readonly kind: 'cnc-cut3d-surface'; readonly output: ReliefSurfaceMeshWithNormals };
+  | { readonly kind: 'cnc-cut3d-surface'; readonly output: ReliefSurfaceMeshWithNormals }
+  | { readonly kind: 'relief-heightmap'; readonly output: DepthMapHeightmapResult };
 
 /** Ownership transfers for clone-safe task results that carry large typed arrays. */
 export function canvasCompilationResultTransferables(
@@ -56,6 +69,9 @@ export function canvasCompilationResultTransferables(
       result.output.indices.buffer,
       result.output.normals.buffer,
     ];
+  }
+  if (result.kind === 'relief-heightmap' && result.output.kind === 'ok') {
+    return [result.output.heightmap.depth.buffer];
   }
   return [];
 }
@@ -95,5 +111,7 @@ export function executeCanvasCompilationTask(
       };
     case 'cnc-cut3d-surface':
       return { kind: task.kind, output: prepareCncCut3DSurface(task.grid) };
+    case 'relief-heightmap':
+      return { kind: task.kind, output: depthMapToHeightmap(task.source, task.options) };
   }
 }

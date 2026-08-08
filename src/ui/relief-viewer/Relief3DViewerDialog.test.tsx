@@ -4,8 +4,19 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDENTITY_TRANSFORM, type ReliefObject } from '../../core/scene';
+
+const worker = vi.hoisted(() => ({
+  prepare: vi.fn(),
+  prepareSurface: vi.fn(),
+}));
+
+vi.mock('../workspace/cnc-removal-grid-worker-client', () => ({
+  prepareReliefHeightmapOffThread: worker.prepare,
+  prepareCncCut3DSurfaceOffThread: worker.prepareSurface,
+}));
+
 import { Relief3DViewerDialog } from './Relief3DViewerDialog';
 
 (
@@ -14,6 +25,18 @@ import { Relief3DViewerDialog } from './Relief3DViewerDialog';
 
 afterEach(() => {
   document.body.innerHTML = '';
+});
+
+beforeEach(() => {
+  worker.prepare.mockReset();
+  worker.prepareSurface.mockReset();
+  worker.prepareSurface.mockResolvedValue({
+    positions: new Float32Array([0, 0, -1]),
+    indices: new Uint32Array(),
+    normals: new Float32Array([0, 0, 1]),
+    widthMm: 1,
+    heightMm: 1,
+  });
 });
 
 function relief(): ReliefObject {
@@ -28,6 +51,27 @@ function relief(): ReliefObject {
     emptyCells: 'floor',
     color: '#a0522d',
     bounds: { minX: 0, minY: 0, maxX: 50, maxY: 50 },
+    transform: IDENTITY_TRANSFORM,
+  };
+}
+
+function depthMapRelief(): ReliefObject {
+  return {
+    kind: 'relief',
+    id: 'D1',
+    source: 'height-map.png',
+    depthMap: {
+      schemaVersion: 1,
+      width: 2,
+      height: 1,
+      bitDepth: 8,
+      samplesBase64: 'AP8=',
+      polarity: 'light-is-high',
+    },
+    targetWidthMm: 50,
+    reliefDepthMm: 5,
+    color: '#a0522d',
+    bounds: { minX: 0, minY: 0, maxX: 50, maxY: 25 },
     transform: IDENTITY_TRANSFORM,
   };
 }
@@ -70,4 +114,68 @@ describe('Relief3DViewerDialog', () => {
       host.remove();
     }
   }, 30_000);
+
+  it('materializes depth maps in the shared worker and aborts when the dialog closes', async () => {
+    worker.prepare.mockReturnValue(
+      Promise.resolve({
+        kind: 'ok',
+        heightmap: {
+          widthCells: 2,
+          heightCells: 1,
+          mmPerCell: 25,
+          depth: new Float32Array([-5, 0]),
+        },
+        widthMm: 50,
+        heightMm: 25,
+      }),
+    );
+    const surface = deferred<{
+      positions: Float32Array;
+      indices: Uint32Array;
+      normals: Float32Array;
+      widthMm: number;
+      heightMm: number;
+    }>();
+    worker.prepareSurface.mockReturnValue(surface.promise);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(
+        <Relief3DViewerDialog
+          relief={depthMapRelief()}
+          stockThicknessMm={6.35}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    await vi.waitFor(() => {
+      expect(worker.prepare).toHaveBeenCalledOnce();
+      expect(worker.prepareSurface).toHaveBeenCalledOnce();
+    });
+    const signal = worker.prepare.mock.calls[0]?.[2] as AbortSignal | undefined;
+    expect(signal?.aborted).toBe(false);
+    expect(worker.prepareSurface.mock.calls[0]?.[1]).toBe(signal);
+
+    await act(async () => root.unmount());
+    expect(signal?.aborted).toBe(true);
+    surface.resolve({
+      positions: new Float32Array([0, 0, -1]),
+      indices: new Uint32Array(),
+      normals: new Float32Array([0, 0, 1]),
+      widthMm: 1,
+      heightMm: 1,
+    });
+    await surface.promise;
+    host.remove();
+  });
 });
+
+function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}

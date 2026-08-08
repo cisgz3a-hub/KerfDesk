@@ -107,4 +107,38 @@ describe('buildEffectiveOperationReview', () => {
     expect(review?.summaries[0]).toContain('Actual max depth 3.798 mm');
     expect(review?.cncActualMaxDepthMm).toBe(3.798);
   });
+
+  it('discloses exact relief depth without replacing the layer depth editor', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'cnc',
+          layerId: 'relief',
+          color: '#a0522d',
+          cutType: 'relief-finish',
+          toolName: 'Ball nose',
+          toolDiameterMm: 3.175,
+          feedMmPerMin: 600,
+          plungeMmPerMin: 250,
+          spindleRpm: 12_000,
+          spindleSpinupSec: 2,
+          safeZMm: 5,
+          passes: [
+            {
+              kind: 'path3d',
+              closed: false,
+              points: [
+                { x: 0, y: 0, z: 0 },
+                { x: 1, y: 0, z: -4.25 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const review = buildEffectiveOperationReview(job)[0];
+    expect(review?.summaries[0]).toContain('Actual max depth 4.25 mm');
+    expect(review?.cncActualMaxDepthMm).toBeUndefined();
+  });
 });

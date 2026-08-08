@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { RemovalGrid } from '../../core/sim';
 import {
-  cancelCncCut3DSurfaceOffThread,
   isCncRemovalGridSuperseded,
   prepareCncCut3DSurfaceOffThread,
 } from './cnc-removal-grid-worker-client';
@@ -39,8 +38,9 @@ export function useCncCut3DSurface(
       return;
     }
     let cancelled = false;
+    const controller = new AbortController();
     setStored({ grid, value: LOADING });
-    const pending = prepareCncCut3DSurfaceOffThread(grid);
+    const pending = prepareCncCut3DSurfaceOffThread(grid, controller.signal);
     if (pending === null) {
       setStored({
         grid,
@@ -71,7 +71,7 @@ export function useCncCut3DSurface(
     );
     return () => {
       cancelled = true;
-      cancelCncCut3DSurfaceOffThread();
+      controller.abort();
     };
   }, [active, grid]);
 

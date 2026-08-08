@@ -40,10 +40,9 @@ function effectiveGroupSummary(group: Group): string {
       group.coolant === undefined || group.coolant === 'off'
         ? 'coolant off'
         : `${group.coolant} coolant`;
-    const actualDepth =
-      group.cutType === 'v-carve'
-        ? `Actual max depth ${formatNumber(cncGroupMaximumDepthMm(group))} mm Â· `
-        : '';
+    const actualDepth = reportsGeometryDerivedDepth(group.cutType)
+      ? `Actual max depth ${formatNumber(cncGroupMaximumDepthMm(group))} mm Â· `
+      : '';
     return (
       actualDepth +
       `${tool} · ${group.passes.length} ${plural(group.passes.length, 'pass', 'passes')}` +
@@ -62,6 +61,10 @@ function effectiveGroupSummary(group: Group): string {
     ` · ${group.passes} ${plural(group.passes, 'pass', 'passes')}` +
     ` · air ${group.airAssist ? 'on' : 'off'}${powerMode}`
   );
+}
+
+function reportsGeometryDerivedDepth(cutType: string): boolean {
+  return cutType === 'v-carve' || cutType === 'relief-rough' || cutType === 'relief-finish';
 }
 
 function formatNumber(value: number): string {
