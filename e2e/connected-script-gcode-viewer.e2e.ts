@@ -25,6 +25,7 @@ test('real connected-script multi-operation G-code 3D reaches ready off-thread',
   const compileElapsedMs = Date.now() - startedAt;
   await page.waitForTimeout(750);
   const responsiveness = await stopResponsivenessProbe(page);
+  const hardwareConcurrency = await page.evaluate(() => navigator.hardwareConcurrency);
   await expect(page.getByLabel('G-code canvas view')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   await expect(page.getByLabel('Playback', { exact: true })).toBeVisible();
@@ -35,6 +36,10 @@ test('real connected-script multi-operation G-code 3D reaches ready off-thread',
       `real Dancing Script/Pacifico, eight drawings/six operations: ` +
       `compileMs=${compileElapsedMs}; workers=${workerUrls.length}`,
   });
+  console.info(
+    'connected-script G-code 3D initial open responsiveness',
+    JSON.stringify({ compileElapsedMs, hardwareConcurrency, responsiveness, workerUrls }),
+  );
   expect(compileElapsedMs).toBeLessThan(30_000);
   assertResponsivePhase(testInfo, 'connected-script G-code 3D initial open', responsiveness);
   expect(workerUrls.some((url) => url.includes('output-preparation-worker'))).toBe(true);

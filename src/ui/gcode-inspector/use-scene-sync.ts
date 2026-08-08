@@ -20,15 +20,20 @@ export function useSceneSync(args: {
 }): void {
   const { handleRef, state, playhead, colorOf, live, arrows } = args;
 
+  // Initial geometry owns the preparing phase. Sync once after ready so these
+  // effects do not redraw the same scene both before and after publication.
   useEffect(() => {
+    if (state !== 'ready') return;
     handleRef.current?.setPlayhead(playhead);
   }, [handleRef, playhead, state]);
 
   useEffect(() => {
+    if (state !== 'ready') return;
     handleRef.current?.recolor(colorOf);
   }, [handleRef, colorOf, state]);
 
   useEffect(() => {
+    if (state !== 'ready') return;
     handleRef.current?.setDirectionArrows(arrows);
   }, [handleRef, arrows, state]);
 
@@ -36,6 +41,7 @@ export function useSceneSync(args: {
   // arrive continuously and a fresh object each poll would re-render the
   // scene even when the machine has not moved.
   useEffect(() => {
+    if (state !== 'ready') return;
     handleRef.current?.setLiveMachine(live);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [handleRef, state, live?.x, live?.y, live?.z, live === null]);

@@ -3,12 +3,17 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import type * as Viewer3dModule from '../viewer3d';
+import { useSceneSync } from './use-scene-sync';
 import { useViewer3dScene, type Viewer3dSceneBinding } from './use-viewer3d-scene';
 
 const sceneMocks = vi.hoisted(() => ({
   createViewer3dScene: vi.fn(),
   setSegments: vi.fn(),
   fitToBounds: vi.fn(),
+  setPlayhead: vi.fn(),
+  setLiveMachine: vi.fn(),
+  recolor: vi.fn(),
+  setDirectionArrows: vi.fn(),
   dispose: vi.fn(),
 }));
 
@@ -24,6 +29,7 @@ vi.mock('../viewer3d', async (importOriginal) => {
 const FIRST_PROGRAM = ['G21 G90', 'M3 S500', 'G0 X10 Y0', 'G1 X20 Y0 F600'].join('\n');
 const SECOND_PROGRAM = ['G21 G90', 'M3 S500', 'G0 X0 Y0', 'G1 X40 Y30 F900'].join('\n');
 const NO_WEBGL_REASON = 'no context';
+const COLOR_OF = (): readonly [number, number, number] => [1, 0, 0];
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -36,12 +42,12 @@ function handle(): Viewer3dModule.Viewer3dSceneHandle {
     setSegments: sceneMocks.setSegments,
     fitToBounds: sceneMocks.fitToBounds,
     setTravelVisible: vi.fn(),
-    setPlayhead: vi.fn(),
-    setLiveMachine: vi.fn(),
-    recolor: vi.fn(),
+    setPlayhead: sceneMocks.setPlayhead,
+    setLiveMachine: sceneMocks.setLiveMachine,
+    recolor: sceneMocks.recolor,
     setView: vi.fn(),
     captureImage: vi.fn(() => ''),
-    setDirectionArrows: vi.fn(),
+    setDirectionArrows: sceneMocks.setDirectionArrows,
     resize: vi.fn(),
     requestRender: vi.fn(),
     dispose: sceneMocks.dispose,
@@ -60,7 +66,16 @@ function renderModel(text: string): GcodeRenderModel {
 let binding: Viewer3dSceneBinding | null = null;
 
 function Probe(props: { readonly model: GcodeRenderModel }): null {
-  binding = useViewer3dScene(canvasRef, props.model);
+  const nextBinding = useViewer3dScene(canvasRef, props.model);
+  useSceneSync({
+    handleRef: nextBinding.handleRef,
+    state: nextBinding.state,
+    playhead: null,
+    colorOf: COLOR_OF,
+    live: null,
+    arrows: null,
+  });
+  binding = nextBinding;
   return null;
 }
 
@@ -89,6 +104,10 @@ beforeEach(() => {
   }));
   sceneMocks.setSegments.mockReset();
   sceneMocks.fitToBounds.mockReset();
+  sceneMocks.setPlayhead.mockReset();
+  sceneMocks.setLiveMachine.mockReset();
+  sceneMocks.recolor.mockReset();
+  sceneMocks.setDirectionArrows.mockReset();
   sceneMocks.dispose.mockClear();
 });
 
@@ -114,11 +133,19 @@ describe('useViewer3dScene', () => {
   it('publishes ready only after the initial geometry is installed', async () => {
     sceneMocks.setSegments.mockImplementation(() => {
       expect(binding?.state).toBe('preparing');
+      expect(sceneMocks.setPlayhead).not.toHaveBeenCalled();
+      expect(sceneMocks.setLiveMachine).not.toHaveBeenCalled();
+      expect(sceneMocks.recolor).not.toHaveBeenCalled();
+      expect(sceneMocks.setDirectionArrows).not.toHaveBeenCalled();
     });
 
     await mount(renderModel(FIRST_PROGRAM));
 
     expect(sceneMocks.setSegments).toHaveBeenCalledTimes(1);
+    expect(sceneMocks.setPlayhead).toHaveBeenCalledTimes(1);
+    expect(sceneMocks.setLiveMachine).toHaveBeenCalledTimes(1);
+    expect(sceneMocks.recolor).toHaveBeenCalledTimes(1);
+    expect(sceneMocks.setDirectionArrows).toHaveBeenCalledTimes(1);
     expect(binding?.state).toBe('ready');
   });
 
