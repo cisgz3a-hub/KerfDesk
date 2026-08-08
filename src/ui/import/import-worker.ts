@@ -19,6 +19,7 @@ import { parseDxfBlob } from './parse-dxf-blob';
 import { parseGcodeBlob } from './parse-gcode-blob';
 import { prepareParsedStlImport } from './stl-import-preparation';
 import { importWorkerTransferables } from './import-worker-transferables';
+import { prepareDepthMapPng } from './depth-map-import-preparation';
 
 self.onmessage = (e: MessageEvent<ImportWorkerRequest>): void => {
   void handleRequest(e.data);
@@ -64,6 +65,16 @@ async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerR
           postProgress(request.id, 'parsing', bytesRead, totalBytes);
         }),
       ),
+    };
+  }
+  if (request.kind === 'depth-map-png') {
+    return {
+      id: request.id,
+      kind: 'depth-map-png',
+      result: await prepareDepthMapPng(request.blob, {
+        onProgress: (bytesRead) =>
+          postProgress(request.id, 'parsing', bytesRead, request.blob.size),
+      }),
     };
   }
   const parsed = await parseStlBlob(request.blob, ({ bytesRead, totalBytes }) => {

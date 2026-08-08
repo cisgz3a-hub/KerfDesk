@@ -22,6 +22,16 @@ export async function pickPlatformImageFiles(
   return files;
 }
 
+/** Select zero or more PNG files through the active platform adapter. */
+export async function pickPlatformPngFiles(
+  platform: PlatformAdapter,
+): Promise<ReadonlyArray<File>> {
+  const handles = await platform.pickFilesForOpen({ accept: ['.png'], multiple: true });
+  const files: File[] = [];
+  for (const handle of handles) files.push(await fileFromHandle(handle));
+  return files;
+}
+
 async function fileFromHandle(handle: FileHandle): Promise<File> {
   if (handle.blob === undefined) {
     throw new Error(`Platform file handle for ${handle.name} does not expose binary data.`);

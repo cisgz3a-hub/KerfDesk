@@ -5,6 +5,7 @@
 // time so the missing arm is the only compile error when a new variant lands.
 
 import type { VariableTemplate } from './variable-template';
+import type { ReliefDepthMap } from './relief';
 
 export type Vec2 = { readonly x: number; readonly y: number };
 
@@ -405,26 +406,33 @@ export type ShapeObject = ObjectPowerScale & {
   readonly fairingVersion?: number;
 };
 
-// 3D relief for CNC carving, Phase H.4 (ADR-098). Carries the parsed
-// triangle mesh as plain numbers (9 per triangle, file order) so the pure
-// core compiler can rebuild the heightmap without any decode API, and .lf2
-// round-trips it as ordinary JSON (RasterImage's embedded-source precedent).
-// targetWidthMm scales the mesh's XY footprint; reliefDepthMm maps its Z
-// range to [−depth, 0]; emptyCells picks the background: 'floor' carves it
-// away so the model stands proud, 'top' leaves it at stock height. Laser
-// mode ignores relief objects entirely (CNC-only geometry).
-export type ReliefObject = ObjectPowerScale & {
+type ReliefObjectCommon = ObjectPowerScale & {
   readonly kind: 'relief';
   readonly id: string;
   readonly source: string; // filename for display
-  readonly meshPositions: ReadonlyArray<number> | Float32Array;
   readonly targetWidthMm: number;
   readonly reliefDepthMm: number;
-  readonly emptyCells: 'floor' | 'top';
   readonly color: string; // lowercase hex; the layer key
   readonly bounds: Bounds; // natural bounds: (0,0)..(targetWidth, height by aspect)
   readonly transform: Transform;
 };
+
+/** Mesh-backed CNC relief whose triangle source is exclusive of a depth map. */
+export type MeshReliefObject = ReliefObjectCommon & {
+  readonly meshPositions: ReadonlyArray<number> | Float32Array;
+  readonly emptyCells: 'floor' | 'top';
+  readonly depthMap?: never;
+};
+
+/** Depth-map-backed CNC relief whose sampled source is exclusive of a triangle mesh. */
+export type DepthMapReliefObject = ReliefObjectCommon & {
+  readonly depthMap: ReliefDepthMap;
+  readonly meshPositions?: never;
+  readonly emptyCells?: never;
+};
+
+/** CNC relief backed by exactly one durable mesh or depth-map source. */
+export type ReliefObject = MeshReliefObject | DepthMapReliefObject;
 
 // Embedding cap: meshes beyond this bloat the .lf2 JSON into the hundreds of
 // MB. Decorative reliefs are typically well under it; the import path tells

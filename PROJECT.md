@@ -145,7 +145,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.1 | `CncPass` contour/path3d union (tidy-first) + plunged-rapid invariant | Built |
 | H.2 | Toolpath simulation: stock XY model, Z-aware steps, material-removal grid, depth-shaded preview | Built |
 | H.3 | True V-carving: certified vector-medial paths, shared pointed/truncated conical radial envelope, explicit flat-depth mode, envelope-footprint clearing | Built; hardware CLAIMED |
-| H.4 | Clean-room STL import → deterministic max-Z heightmap, `relief` SceneObject, canvas preview | Built |
+| H.4 | Clean-room STL or exact grayscale depth-map input → deterministic heightmap, durable `relief` SceneObject, canvas/3D preview | Built |
 | H.5 | Relief roughing: heightmap dilation + marching squares → existing pocket engine | Built |
 | H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults | Built |
 | H.7 | Tool + feeds/speeds libraries, including persisted engraving tip-flat geometry; multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |

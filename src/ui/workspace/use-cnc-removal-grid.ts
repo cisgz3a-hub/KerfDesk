@@ -7,7 +7,6 @@ import type { Toolpath } from '../../core/job';
 import type { CncMachineConfig, Project } from '../../core/scene';
 import type { RemovalGrid } from '../../core/sim';
 import {
-  cancelCncRemovalGridOffThread,
   isCncRemovalGridSuperseded,
   prepareCncRemovalGridOffThread,
 } from './cnc-removal-grid-worker-client';
@@ -40,12 +39,16 @@ export function useCncRemovalGrid(
       return;
     }
     let cancelled = false;
-    const pending = prepareCncRemovalGridOffThread({
-      device,
-      machine: cncMachine,
-      toolpath,
-      scrubFraction: quantT,
-    });
+    const controller = new AbortController();
+    const pending = prepareCncRemovalGridOffThread(
+      {
+        device,
+        machine: cncMachine,
+        toolpath,
+        scrubFraction: quantT,
+      },
+      controller.signal,
+    );
     if (pending === null) {
       setState(null);
       return;
@@ -62,7 +65,7 @@ export function useCncRemovalGrid(
     );
     return () => {
       cancelled = true;
-      cancelCncRemovalGridOffThread();
+      controller.abort();
     };
   }, [previewMode, cncMachine, device, toolpath, quantT]);
 

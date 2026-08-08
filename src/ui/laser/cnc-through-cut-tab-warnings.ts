@@ -14,7 +14,12 @@
 // (divergence from Easel's auto-tab default, recorded in the CNC-defaults ADR).
 
 import { isProfileCutType } from '../../core/cnc';
-import { DEFAULT_CNC_LAYER_SETTINGS, type Project } from '../../core/scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  sceneObjectUsesOperation,
+  type Layer,
+  type Project,
+} from '../../core/scene';
 
 export function detectCncThroughCutTabWarnings(project: Project): ReadonlyArray<string> {
   const machine = project.machine;
@@ -24,6 +29,10 @@ export function detectCncThroughCutTabWarnings(project: Project): ReadonlyArray<
   const warnings: string[] = [];
   for (const layer of project.scene.layers) {
     if (!layer.output) continue;
+    // Relief depth belongs to each relief object. A stale layer depth is not
+    // physical evidence when every object on the operation is a relief; the
+    // prepared-job warning below uses the exact rough/finish pass depth.
+    if (layerCarriesOnlyReliefs(project, layer)) continue;
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
     const cutsThrough =
       isProfileCutType(settings.cutType) &&
@@ -47,4 +56,15 @@ export function detectCncThroughCutTabWarnings(project: Project): ReadonlyArray<
     }
   }
   return warnings;
+}
+
+function layerCarriesOnlyReliefs(project: Project, layer: Layer): boolean {
+  const bound = project.scene.objects.filter((object) => sceneObjectUsesOperation(object, layer));
+  const hasRelief = bound.some((object) => object.kind === 'relief');
+  // Raster images do not contribute CNC depth geometry, so a relief plus a
+  // display-only raster still leaves layer.depthMm stale for this advisory.
+  const hasNonReliefCncGeometry = bound.some(
+    (object) => object.kind !== 'relief' && object.kind !== 'raster-image',
+  );
+  return hasRelief && !hasNonReliefCncGeometry;
 }

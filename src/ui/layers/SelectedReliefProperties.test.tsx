@@ -37,11 +37,32 @@ function relief(): ReliefObject {
   };
 }
 
-function installProject(machineKind: 'laser' | 'cnc'): void {
+function depthRelief(): ReliefObject {
+  return {
+    kind: 'relief',
+    id: 'R1',
+    source: 'depth.png',
+    depthMap: {
+      schemaVersion: 1,
+      width: 2,
+      height: 1,
+      bitDepth: 8,
+      samplesBase64: Buffer.from([0, 255]).toString('base64'),
+      polarity: 'light-is-high',
+    },
+    targetWidthMm: 100,
+    reliefDepthMm: 5,
+    color: DEFAULT_RELIEF_LAYER_COLOR,
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
+    transform: IDENTITY_TRANSFORM,
+  };
+}
+
+function installProject(machineKind: 'laser' | 'cnc', object: ReliefObject = relief()): void {
   const project: Project = {
     ...createProject(),
     scene: {
-      objects: [relief()],
+      objects: [object],
       layers: [createLayer({ id: DEFAULT_RELIEF_LAYER_COLOR, color: DEFAULT_RELIEF_LAYER_COLOR })],
     },
   };
@@ -149,6 +170,29 @@ describe('SelectedReliefProperties', () => {
 
       const stored = useStore.getState().project.scene.objects[0];
       expect(stored?.kind === 'relief' && stored.emptyCells).toBe('top');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('shows depth-map precision and commits explicit polarity without a mesh background control', async () => {
+    installProject('cnc', depthRelief());
+    const { host, root } = await render();
+    try {
+      expect(host.textContent).toContain('2 x 1, 8-bit grayscale');
+      expect(host.querySelector('select[aria-label="Relief background"]')).toBeNull();
+      const select = host.querySelector('select[aria-label="Relief height-map polarity"]');
+      if (!(select instanceof HTMLSelectElement)) throw new Error('polarity select missing');
+      await act(async () => {
+        select.value = 'light-is-deep';
+        Simulate.change(select);
+      });
+
+      const stored = useStore.getState().project.scene.objects[0];
+      expect(stored?.kind === 'relief' ? stored.depthMap?.polarity : undefined).toBe(
+        'light-is-deep',
+      );
     } finally {
       await act(async () => root.unmount());
       host.remove();

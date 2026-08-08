@@ -8,10 +8,11 @@ import {
   type CncLayerSettings,
   type ImportedSvg,
   type Layer,
+  type ReliefObject,
   type Scene,
 } from '../scene';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
-import { compileCncJob } from './compile-cnc-job';
+import { compileCncJob, compileCncJobResult } from './compile-cnc-job';
 
 // Narrows to a contour pass to read zMm/polyline. compileCncJob also produces
 // path3d passes — relief finishing, ramps, ADR-250 leads, and ADR-258 tabbed
@@ -76,6 +77,40 @@ function onlyGroup(scene: Scene): CncGroup {
 }
 
 describe('compileCncJob', () => {
+  it('returns malformed relief source data as a named compile result', () => {
+    const color = '#a0522d';
+    const relief: ReliefObject = {
+      kind: 'relief',
+      id: 'broken-relief',
+      source: 'broken-depth.png',
+      depthMap: {
+        schemaVersion: 1,
+        width: 2,
+        height: 2,
+        bitDepth: 8,
+        samplesBase64: 'AA==',
+        polarity: 'light-is-high',
+      },
+      targetWidthMm: 20,
+      reliefDepthMm: 3,
+      color,
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+      transform: IDENTITY_TRANSFORM,
+    };
+
+    expect(
+      compileCncJobResult(
+        { objects: [relief], layers: [createLayer({ id: 'relief-op', color })] },
+        dev,
+        config,
+      ),
+    ).toMatchObject({
+      kind: 'relief-materialization-failed',
+      source: 'broken-depth.png',
+      reason: expect.stringMatching(/payload length/),
+    });
+  });
+
   it('honors artwork priority inside the same CNC safety section', () => {
     const firstLayer = cncLayer('first-op', '#2563eb', {
       cutType: 'engrave',

@@ -36,6 +36,7 @@ import type { AppCommandContext } from './command-types';
 import { selectedImageMaskPair } from './image-mask-command-state';
 import { traceSourceForTracedImage } from './image-command-actions';
 import { hasPreviewableContent } from './previewable-content';
+import { handleImportHeightMaps } from '../app/height-map-import-action';
 import {
   selectedObject,
   selectedObjectIds,
@@ -213,6 +214,7 @@ function fileCommandContext(
   | 'importSvg'
   | 'importDxf'
   | 'importImage'
+  | 'importHeightMap'
   | 'saveGcode'
   | 'openGcodePreview'
   | 'inspectCurrentGcode'
@@ -238,6 +240,14 @@ function fileCommandContext(
     importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
     importDxf: () => void handleImportDxf(platform, app.importSvgObject, pushToast),
     importImage: callbacks.requestImportImage,
+    importHeightMap: () => {
+      const current = useStore.getState();
+      void handleImportHeightMaps(platform, {
+        project: current.project,
+        importObject: current.importSvgObject,
+        pushToast,
+      });
+    },
     saveGcode: () => saveGcodeAction(gcodeDeps())(),
     openGcodePreview: () => openGcodeInspectorAction(gcodeDeps())(),
     inspectCurrentGcode: () => inspectCurrentGcodeAction(gcodeDeps())(),

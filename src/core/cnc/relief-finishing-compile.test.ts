@@ -20,6 +20,8 @@ import {
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
 
+type MeshReliefObject = Exclude<ReliefObject, { readonly depthMap: unknown }>;
+
 const RELIEF_COLOR = '#a0522d';
 const SMALL_BALL_NOSE: CncTool = {
   id: 'bn-0100',
@@ -33,7 +35,7 @@ const SMALL_TOOL_CONFIG: CncMachineConfig = {
 };
 
 // A tilted triangle mesh — enough surface for a real heightmap.
-function relief(overrides: Partial<ReliefObject> = {}): ReliefObject {
+function relief(overrides: Partial<MeshReliefObject> = {}): MeshReliefObject {
   return {
     kind: 'relief',
     id: 'R1',
@@ -46,6 +48,27 @@ function relief(overrides: Partial<ReliefObject> = {}): ReliefObject {
     bounds: { minX: 0, minY: 0, maxX: 12, maxY: 12 },
     transform: IDENTITY_TRANSFORM,
     ...overrides,
+  };
+}
+
+function depthMapRelief(): ReliefObject {
+  return {
+    kind: 'relief',
+    id: 'D1',
+    source: 'surface.png',
+    depthMap: {
+      schemaVersion: 1,
+      width: 2,
+      height: 2,
+      bitDepth: 8,
+      samplesBase64: Buffer.from([0, 255, 128, 255]).toString('base64'),
+      polarity: 'light-is-high',
+    },
+    targetWidthMm: 12,
+    reliefDepthMm: 5,
+    color: RELIEF_COLOR,
+    bounds: { minX: 0, minY: 0, maxX: 12, maxY: 12 },
+    transform: IDENTITY_TRANSFORM,
   };
 }
 
@@ -83,6 +106,14 @@ function compiledReliefArtifact(
 }
 
 describe('relief finishing compile (H.8)', () => {
+  it('routes a durable depth map through existing relief roughing and finishing CAM', () => {
+    const job = compile({ reliefFinishToolId: 'bn-3175' }, depthMapRelief());
+    const groups = job.groups.filter((group) => group.kind === 'cnc');
+
+    expect(groups.map((group) => group.cutType)).toEqual(['relief-rough', 'relief-finish']);
+    expect(groups.every((group) => group.passes.length > 0)).toBe(true);
+  });
+
   it('adds a relief-finish group with the finishing bit after roughing', () => {
     const job = compile({ reliefFinishToolId: 'bn-3175' });
     const cutTypes = job.groups.map((group) => (group.kind === 'cnc' ? group.cutType : ''));

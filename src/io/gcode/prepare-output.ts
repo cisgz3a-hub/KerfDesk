@@ -18,7 +18,7 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
-import { compileCncJob } from '../../core/cnc';
+import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
   runPreEmitPreflight,
@@ -36,6 +36,7 @@ import {
   isProgramMaterializationRangeError,
   programMaterializationFailure,
 } from './program-materialization';
+import { reliefMaterializationFailure } from './relief-materialization-failure';
 
 export type PrepareOutputOptions = {
   readonly jobOrigin?: JobOriginPlacement;
@@ -78,7 +79,11 @@ export function prepareOutput(
   const input = prepareOutputInput(project, options);
   if (!input.ok) return input.prepared;
   try {
-    return completePreparedOutput(input, compileForMachine(input.project));
+    const compiled = compileForMachine(input.project);
+    if (compiled.kind === 'relief-materialization-failed') {
+      return { ok: false, preflight: reliefMaterializationFailure(compiled) };
+    }
+    return completePreparedOutput(input, compiled.job);
   } catch (error) {
     if (isProgramMaterializationRangeError(error)) {
       return { ok: false, preflight: programMaterializationFailure() };
@@ -180,11 +185,11 @@ export function completePreparedOutput(
 
 // One compile entry per machine kind: the project's machine choice routes to
 // the CNC compiler (depth passes, tool offsets) or the laser compiler.
-function compileForMachine(project: Project): Job {
+function compileForMachine(project: Project): CncJobCompilationResult {
   const machine = project.machine;
   return machine !== undefined && machine.kind === 'cnc'
-    ? compileCncJob(project.scene, project.device, machine)
-    : compileJob(project.scene, project.device);
+    ? compileCncJobResult(project.scene, project.device, machine)
+    : { kind: 'compiled', job: compileJob(project.scene, project.device) };
 }
 
 function resolveJobOriginOffset(

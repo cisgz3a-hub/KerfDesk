@@ -46,6 +46,13 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.importImage,
     ),
     enabled(
+      'file.import-height-map',
+      'file',
+      'Import Height Map...',
+      'Import an exact grayscale PNG as CNC relief depth',
+      ctx.importHeightMap,
+    ),
+    enabled(
       'file.save-gcode',
       'file',
       'Save G-code...',

@@ -10,6 +10,7 @@ import {
   parseDxfOffThread,
   parseGcodeOffThread,
   parseStlOffThread,
+  prepareDepthMapPngOffThread,
   resetImportWorkerForTests,
 } from './import-worker-client';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
@@ -73,6 +74,7 @@ describe('import worker client', () => {
     expect(parseDxfOffThread(blob(), 'id', 'a.dxf')).toBeNull();
     expect(parseGcodeOffThread(blob())).toBeNull();
     expect(parseStlOffThread(blob(), stlOptions)).toBeNull();
+    expect(prepareDepthMapPngOffThread(blob())).toBeNull();
   });
 
   it('sends the blob itself rather than pre-read text', () => {
@@ -99,6 +101,16 @@ describe('import worker client', () => {
     latest().reply({ id, kind: 'gcode', result: { kind: 'error', reason: 'nope' } });
 
     await expect(promise).resolves.toEqual({ kind: 'error', reason: 'nope' });
+  });
+
+  it('routes an exact depth-map preparation result under its own response kind', async () => {
+    const promise = prepareDepthMapPngOffThread(blob());
+    const id = latest().posted[0]?.id ?? -1;
+    const result = { kind: 'error' as const, reason: 'not grayscale' };
+
+    latest().reply({ id, kind: 'depth-map-png', result });
+
+    await expect(promise).resolves.toEqual(result);
   });
 
   it('unpacks a successful typed G-code response before resolving', async () => {
