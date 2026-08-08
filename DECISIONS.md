@@ -15810,8 +15810,9 @@ the final Inspector transition still delayed input and paint.
    Inspector's fixed-limit planner timeline and informational findings before it publishes the model.
    Its seven typed arrays transfer with the render buffers rather than being cloned or rebuilt in the
    UI realm.
-2. **Yield between independent WebGL startup phases.** Renderer creation, scene construction, and
-   initial camera setup are separate tasks so input and paint can run between them.
+2. **Bound WebGL finalization work.** Renderer creation, scene construction, and initial camera
+   setup are separate tasks so input and paint can run between them. Scene mutations from one browser
+   task coalesce into one animation-frame render; PNG capture retains a synchronous render boundary.
 3. **Publish ready only after initial geometry is installed.** The Inspector remains in a preparing
    state until the first model and its bounds have reached the scene. Tests and operators therefore
    observe the completed preview rather than an early renderer-only signal.
@@ -15832,9 +15833,12 @@ the final Inspector transition still delayed input and paint.
 - A real-browser regression uses bundled Dancing Script and Pacifico outlines across eight drawings
   and six operations, observes the output, canvas-planning, and Inspector Workers, and retains the
   one-second heartbeat ceiling.
-- Under a diagnostic-only four-times CPU slowdown on the development host, the measured maximum
-  heartbeat gap fell from 1,035.2 ms to 371.5 ms and the longest product Long Task fell from 851 ms
-  to 274 ms. These measurements are evidence for that host, not a production latency guarantee.
+- Historical branch notes recorded four-times CPU-slowdown measurements, but no retained trace or
+  reproduction command accompanies those figures. They are not independently verified and are not
+  release evidence.
+- The focused browser regression is reproducible with
+  `pnpm exec playwright test e2e/connected-script-gcode-viewer.e2e.ts --repeat-each=5`; an exact-head
+  hosted pass remains required before release.
 - NOT verified: controller execution, air-cut, material cut, physical containment, spindle load,
   cut quality, perceptual GPU fidelity, or fixed responsiveness on other CPUs.
 

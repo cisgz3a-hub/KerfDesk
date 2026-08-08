@@ -5,6 +5,10 @@ import {
   type ProgramFinding,
 } from '../../core/gcode-view';
 
+const INSPECTOR_ACCEL_MM_PER_SEC2 = 500;
+const INSPECTOR_JUNCTION_DEVIATION_MM = 0.01;
+const INSPECTOR_MAX_FEED_MM_PER_MIN = 6000;
+
 /** Deterministic timeline and informational findings derived beside parsing. */
 export type GcodeInspectorAnalysis = {
   readonly time: ProgramTimeModel;
@@ -15,9 +19,9 @@ export type GcodeInspectorAnalysis = {
 export function analyzeGcodeModel(model: GcodeRenderModel): GcodeInspectorAnalysis {
   return {
     time: buildProgramTime(model, {
-      accelMmPerSec2: 500,
-      junctionDeviationMm: 0.01,
-      maxFeedMmPerMin: 6000,
+      accelMmPerSec2: INSPECTOR_ACCEL_MM_PER_SEC2,
+      junctionDeviationMm: INSPECTOR_JUNCTION_DEVIATION_MM,
+      maxFeedMmPerMin: INSPECTOR_MAX_FEED_MM_PER_MIN,
     }),
     findings: findProgramIssues(model),
   };

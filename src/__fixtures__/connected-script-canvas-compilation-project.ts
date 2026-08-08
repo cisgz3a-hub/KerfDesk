@@ -2,6 +2,7 @@ import { textToPolylines } from '../core/text';
 import { IDENTITY_TRANSFORM, type Project, type TextObject } from '../core/scene';
 import { mixedCanvasCompilationProject } from './mixed-canvas-compilation-project';
 
+/** Resolves a fixture font key to the font's binary outline data. */
 export type OutlineFontLoader = (fontKey: string) => Promise<ArrayBuffer>;
 
 /** Eight drawings/six operations with real connected-script outline geometry. */

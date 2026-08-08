@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`keeps real connected-script multi-operation plans and emitted bytes exact 1`] = `
+{
+  "fingerprint": {
+    "chars": 367243,
+    "fnv1a": 866451639,
+    "lines": 14969,
+  },
+  "head": [
+    "G21",
+    "G90",
+    "G54",
+    "G94",
+    "G17",
+  ],
+  "lineCount": 14969,
+  "samples": [
+    {
+      "line": "G21",
+      "lineIndex": 0,
+    },
+    {
+      "line": "X113.014Y369.451Z-0.117",
+      "lineIndex": 2495,
+    },
+    {
+      "line": "X102.203Y363.438Z-0.526",
+      "lineIndex": 4989,
+    },
+    {
+      "line": "X201.106Y363.096Z-1.500",
+      "lineIndex": 7484,
+    },
+    {
+      "line": "X192.971Y359.697Z-3.982F860",
+      "lineIndex": 9979,
+    },
+    {
+      "line": "X180.960Y358.978Z-3.485",
+      "lineIndex": 12473,
+    },
+    {
+      "line": "",
+      "lineIndex": 14968,
+    },
+  ],
+  "tail": [
+    "G1 X180.826 Y327.588 Z-1.000",
+    "G0 Z3.810",
+    "M5",
+    "G0 X0.000 Y0.000",
+    "",
+  ],
+  "utf8ByteCount": 367252,
+}
+`;

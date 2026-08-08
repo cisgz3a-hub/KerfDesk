@@ -11,10 +11,14 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { GcodeRenderModel } from '../../core/gcode-view';
 import { createViewer3dScene, type Viewer3dSceneHandle } from '../viewer3d';
+import {
+  useViewer3dModelInstallation,
+  type Viewer3dSceneState,
+} from './use-viewer3d-model-installation';
 
-/** Observable lifecycle of the Inspector's current WebGL scene. */
-export type Viewer3dSceneState = 'loading' | 'preparing' | 'ready' | 'no-webgl';
+export type { Viewer3dSceneState } from './use-viewer3d-model-installation';
 
+/** Current scene handle, lifecycle state, and any WebGL-unavailable reason. */
 export type Viewer3dSceneBinding = {
   readonly handleRef: RefObject<Viewer3dSceneHandle | null>;
   readonly state: Viewer3dSceneState;
@@ -22,6 +26,7 @@ export type Viewer3dSceneBinding = {
   readonly reason: string;
 };
 
+/** Owns one Inspector WebGL scene for the canvas and swaps models into that scene. */
 export function useViewer3dScene(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   model: GcodeRenderModel,
@@ -65,19 +70,8 @@ export function useViewer3dScene(
     };
   }, [canvasRef]);
 
-  // Publish ready only after the initial model and bounds have landed. This
-  // runs before useSceneSync's effects push the playhead and lens.
-  useEffect(() => {
-    if (state !== 'preparing' && state !== 'ready') return;
-    if (drawnModelRef.current === model) {
-      if (state === 'preparing') setState('ready');
-      return;
-    }
-    handleRef.current?.setSegments(model);
-    handleRef.current?.fitToBounds(model.stats.motionBounds);
-    drawnModelRef.current = model;
-    if (state === 'preparing') setState('ready');
-  }, [model, state]);
+  // Registers before useSceneSync so geometry lands before view state.
+  useViewer3dModelInstallation({ model, state, handleRef, drawnModelRef, setState });
 
   useEffect(() => {
     const canvas = canvasRef.current;

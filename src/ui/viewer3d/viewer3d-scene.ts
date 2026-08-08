@@ -19,6 +19,7 @@ import {
   type Viewer3dSegmentsInput,
 } from './segment-buckets';
 import { cameraPlacement, type CameraPreset } from './camera-presets';
+import { createViewer3dRenderScheduler } from './create-viewer3d-render-scheduler';
 import type { ArrowPlacement } from './direction-arrows';
 import { createArrowMesh, disposeArrowMesh, type ArrowMesh } from './scene-arrows';
 import { boundsExtent } from './scene-furniture';
@@ -31,7 +32,7 @@ import {
 import { createMarkers, disposeMarkers, sizeMarkers, type MarkerMesh } from './scene-markers';
 import { buildFurniture, disposeChildren, frameCamera } from './scene-furniture';
 import { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
-import { yieldViewer3dInitialization } from './viewer3d-initialization-yield';
+import { yieldViewer3dInitialization } from './yield-viewer3d-initialization';
 
 export type Viewer3dSegments = Viewer3dSegmentsInput;
 
@@ -156,6 +157,7 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   const { modules, theme, renderer, scene, toolpathGroup, furnitureGroup } = deps;
   const { three } = modules;
   const { camera, controls, render } = deps.rig;
+  const renderScheduler = createViewer3dRenderScheduler({ render, renderChangeEvents: controls });
 
   // Fat-line materials size their strokes against the drawing buffer, so the
   // current view size is tracked and pushed into the material on resize.
@@ -183,37 +185,37 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       ({ fatMaterial, travelObject } = built);
       reveal = built.reveal;
       sizeMarkers(markers, segments);
-      render();
+      renderScheduler.requestRender();
     },
-    recolor: (colorOf) => void (applyRecolor(reveal, colorOf) && render()),
-    setLiveMachine: (point) => (placeMarker(liveMarker, point), render()),
+    recolor: (colorOf) => void (applyRecolor(reveal, colorOf) && renderScheduler.requestRender()),
+    setLiveMachine: (point) => (placeMarker(liveMarker, point), renderScheduler.requestRender()),
     setPlayhead: (playhead) => {
       applyReveal(reveal, playhead);
       placeMarker(marker, playhead?.point ?? null);
-      render();
+      renderScheduler.requestRender();
     },
     fitToBounds: (bounds) => {
       lastBounds = bounds;
       rebuildFurniture(three, furnitureGroup, bounds, theme);
       frameCamera(camera, controls, bounds);
-      render();
+      renderScheduler.requestRender();
     },
     setTravelVisible: (visible) => {
       travelVisible = visible;
       if (travelObject !== null) travelObject.visible = visible;
-      render();
+      renderScheduler.requestRender();
     },
 
     setDirectionArrows: (placements) => {
       arrowMesh = swapArrows(three, scene, arrowMesh, placements, boundsExtent(lastBounds), theme);
-      render();
+      renderScheduler.requestRender();
     },
     setView: (preset) => {
       applyView(camera, controls, cameraPlacement(preset, lastBounds));
-      render();
+      renderScheduler.requestRender();
     },
     captureImage: () => {
-      render();
+      renderScheduler.renderNow();
       return renderer.domElement.toDataURL('image/png');
     },
     resize: (nextWidth, nextHeight) => {
@@ -221,11 +223,11 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       viewWidth = nextWidth;
       viewHeight = nextHeight;
       applyResize({ renderer, camera, fatMaterial }, nextWidth, nextHeight);
-      render();
+      renderScheduler.requestRender();
     },
-    requestRender: render,
+    requestRender: renderScheduler.requestRender,
     dispose: () => {
-      controls.removeEventListener('change', render);
+      renderScheduler.dispose();
       controls.dispose();
       disposeChildren(toolpathGroup);
       disposeChildren(furnitureGroup);
