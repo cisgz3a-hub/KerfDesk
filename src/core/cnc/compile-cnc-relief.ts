@@ -11,17 +11,12 @@
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
-import {
-  DEFAULT_RELIEF_SCALLOP_MM,
-  meshToHeightmap,
-  reliefFinishingPasses,
-  scallopRowSpacingMm,
-} from '../relief';
-import { cachedFloat32Array } from '../util';
+import { DEFAULT_RELIEF_SCALLOP_MM, reliefFinishingPasses, scallopRowSpacingMm } from '../relief';
 // Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink, so the ladder
 // variant cannot be added to it.
 import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
+import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
 import {
   applyTransform,
   layerCncTool,
@@ -124,20 +119,16 @@ function reliefFinishingGroup(
   const passes: CncPass[] = [];
   for (const relief of reliefs) {
     const machineSpace = reliefMachineSpaceTransform(relief.transform);
-    const heightmap = meshToHeightmap(
-      { positions: cachedFloat32Array(relief, relief.meshPositions) },
-      {
-        targetWidthMm: relief.targetWidthMm,
-        reliefDepthMm: relief.reliefDepthMm,
-        emptyCells: relief.emptyCells,
-        targetScaleX: machineSpace.targetScaleX,
-        targetScaleY: machineSpace.targetScaleY,
-        mmPerCell: Math.min(
-          rowSpacingMm,
-          Math.max(MIN_FINISHING_CELL_MM, finishTool.diameterMm / FINISHING_CELL_TOOL_FRACTION),
-        ),
-      },
-    );
+    const heightmap = reliefObjectToHeightmap(relief, {
+      targetWidthMm: relief.targetWidthMm,
+      reliefDepthMm: relief.reliefDepthMm,
+      targetScaleX: machineSpace.targetScaleX,
+      targetScaleY: machineSpace.targetScaleY,
+      mmPerCell: Math.min(
+        rowSpacingMm,
+        Math.max(MIN_FINISHING_CELL_MM, finishTool.diameterMm / FINISHING_CELL_TOOL_FRACTION),
+      ),
+    });
     if (heightmap.kind === 'error') continue;
     const kernel = kernelForTool(finishTool, heightmap.heightmap.mmPerCell);
     for (const pass of reliefFinishingPasses(heightmap.heightmap, {
@@ -188,17 +179,13 @@ function reliefLadderFor(
   tool: CncTool,
 ): ReliefRoughingLadder {
   const machineSpace = reliefMachineSpaceTransform(relief.transform);
-  const heightmap = meshToHeightmap(
-    { positions: cachedFloat32Array(relief, relief.meshPositions) },
-    {
-      targetWidthMm: relief.targetWidthMm,
-      reliefDepthMm: relief.reliefDepthMm,
-      emptyCells: relief.emptyCells,
-      targetScaleX: machineSpace.targetScaleX,
-      targetScaleY: machineSpace.targetScaleY,
-      mmPerCell: Math.max(MIN_ROUGHING_CELL_MM, tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION),
-    },
-  );
+  const heightmap = reliefObjectToHeightmap(relief, {
+    targetWidthMm: relief.targetWidthMm,
+    reliefDepthMm: relief.reliefDepthMm,
+    targetScaleX: machineSpace.targetScaleX,
+    targetScaleY: machineSpace.targetScaleY,
+    mmPerCell: Math.max(MIN_ROUGHING_CELL_MM, tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION),
+  });
   if (heightmap.kind === 'error') return NO_RELIEF_LADDER;
   return reliefRoughingLadder(heightmap.heightmap, {
     tool,

@@ -7,7 +7,7 @@ const ROW_EDGE_TOLERANCE_ULPS = 4;
 export type QualifiedPngHeader = {
   readonly width: number;
   readonly height: number;
-  readonly channels: 3 | 4;
+  readonly channels: 1 | 3 | 4;
 };
 
 export type PngSamplingTarget = {
@@ -159,6 +159,7 @@ function sampleLumaRow(row: Uint8Array, header: QualifiedPngHeader, result: Floa
 
 function pixelLuma(row: Uint8Array, x: number, channels: number): number {
   const offset = x * channels;
+  if (channels === 1) return row[offset] ?? 0;
   const alpha = channels === 4 ? (row[offset + 3] ?? 255) : 255;
   const opacity = alpha / 255;
   const red = composite(row[offset] ?? 0, opacity);

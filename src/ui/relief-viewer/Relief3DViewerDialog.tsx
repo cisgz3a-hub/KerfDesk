@@ -5,8 +5,8 @@
 // jsdom tests assert).
 
 import { useCallback } from 'react';
-import { heightmapCellSize, meshToHeightmap, reliefSurfaceMesh } from '../../core/relief';
-import { cachedFloat32Array } from '../../core/util';
+import { heightmapCellSize, reliefSurfaceMesh } from '../../core/relief';
+import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import type { ReliefObject } from '../../core/scene';
 import { createReliefThreeScene } from './relief-three-scene';
 import { Viewer3DDialogShell } from './Viewer3DDialogShell';
@@ -51,15 +51,11 @@ async function buildReliefScene(
     if (displayCellSize.kind === 'error') {
       return { kind: 'no-webgl', reason: displayCellSize.reason };
     }
-    const heightmap = meshToHeightmap(
-      { positions: cachedFloat32Array(relief, relief.meshPositions) },
-      {
-        targetWidthMm: relief.targetWidthMm,
-        reliefDepthMm: relief.reliefDepthMm,
-        emptyCells: relief.emptyCells,
-        mmPerCell: displayCellSize.mmPerCell,
-      },
-    );
+    const heightmap = reliefObjectToHeightmap(relief, {
+      targetWidthMm: relief.targetWidthMm,
+      reliefDepthMm: relief.reliefDepthMm,
+      mmPerCell: displayCellSize.mmPerCell,
+    });
     if (heightmap.kind === 'error') return { kind: 'no-webgl', reason: heightmap.reason };
     return await createReliefThreeScene(
       canvas,

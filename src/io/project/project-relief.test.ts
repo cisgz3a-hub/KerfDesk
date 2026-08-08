@@ -10,7 +10,10 @@ import { deserializeProject } from './deserialize-project';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
 import { serializeProject } from './serialize-project';
 
-function relief(): ReliefObject {
+type MeshReliefObject = Exclude<ReliefObject, { readonly depthMap: unknown }>;
+type DepthMapReliefObject = Extract<ReliefObject, { readonly depthMap: unknown }>;
+
+function relief(): MeshReliefObject {
   return {
     kind: 'relief',
     id: 'R1',
@@ -34,6 +37,27 @@ function reliefProject(): Project {
       objects: [relief()],
       layers: [createLayer({ id: 'L1', color: '#a0522d' })],
     },
+  };
+}
+
+function depthMapRelief(): DepthMapReliefObject {
+  return {
+    kind: 'relief',
+    id: 'D1',
+    source: 'portrait-depth.png',
+    depthMap: {
+      schemaVersion: 1,
+      width: 2,
+      height: 2,
+      bitDepth: 8,
+      samplesBase64: Buffer.from([0, 64, 128, 255]).toString('base64'),
+      polarity: 'light-is-high',
+    },
+    targetWidthMm: 100,
+    reliefDepthMm: 5,
+    color: '#a0522d',
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+    transform: IDENTITY_TRANSFORM,
   };
 }
 
@@ -143,6 +167,48 @@ describe('.lf2 relief round-trip (H.4)', () => {
     obj['reliefDepthMm'] = 0;
     const result = deserializeProject(`${JSON.stringify(raw)}\n`);
     expect(result.kind).not.toBe('ok');
+  });
+});
+
+describe('.lf2 depth-map relief round-trip (ADR-290)', () => {
+  it('round-trips the exact source payload, precision, and polarity', () => {
+    const base = reliefProject();
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [depthMapRelief()] },
+    };
+
+    const result = deserializeProject(serializeProject(project));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.scene.objects[0]).toEqual(depthMapRelief());
+  });
+
+  it('rejects a payload whose byte length disagrees with its dimensions', () => {
+    const base = reliefProject();
+    const broken = {
+      ...depthMapRelief(),
+      depthMap: { ...depthMapRelief().depthMap, samplesBase64: 'AA==' },
+    };
+    const raw = JSON.parse(
+      serializeProject({ ...base, scene: { ...base.scene, objects: [broken] } }),
+    ) as { scene: { objects: Array<Record<string, unknown>> } };
+
+    expect(deserializeProject(JSON.stringify(raw)).kind).not.toBe('ok');
+  });
+
+  it('rejects ambiguous objects that carry both mesh and depth-map sources', () => {
+    const base = reliefProject();
+    const raw = JSON.parse(
+      serializeProject({ ...base, scene: { ...base.scene, objects: [depthMapRelief()] } }),
+    ) as { scene: { objects: Array<Record<string, unknown>> } };
+    const object = raw.scene.objects[0];
+    if (object === undefined) throw new Error('fixture relief missing');
+    object['meshPositions'] = [0, 0, 0, 1, 0, 0, 0, 1, 1];
+    object['emptyCells'] = 'floor';
+
+    expect(deserializeProject(JSON.stringify(raw)).kind).not.toBe('ok');
   });
 });
 

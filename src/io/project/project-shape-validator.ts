@@ -14,6 +14,7 @@ import { validateCncTabAnchors } from './project-cnc-tab-validator';
 import { validateOptionalArtworkOrder } from './project-artwork-order-validator';
 import { validateProjectScanOffsetProfile } from './project-scan-offset-validator';
 import { validateTracedImageMetadata } from './project-trace-shape-validator';
+import { validateReliefDepthMapSource } from './project-relief-depth-map-validator';
 import {
   firstError,
   isObject,
@@ -179,13 +180,13 @@ function validateSceneObject(obj: unknown, path: string): string | null {
 // H.4 (ADR-098): the embedded mesh is the carving source — a malformed or
 // non-finite mesh must never reach the heightmap sampler.
 function validateReliefObject(obj: Record<string, unknown>, path: string): string | null {
+  const sourceError = validateReliefSource(obj, path);
   return firstError([
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
-    validateMeshPositions(obj['meshPositions'], `${path}.meshPositions`),
+    sourceError,
     requirePositiveNumber(obj, `${path}.targetWidthMm`),
     requirePositiveNumber(obj, `${path}.reliefDepthMm`),
-    requireLiteral(obj, `${path}.emptyCells`, ['floor', 'top']),
     requireString(obj, `${path}.color`),
     optionalPercent(obj, `${path}.powerScale`),
     validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
@@ -193,6 +194,19 @@ function validateReliefObject(obj: Record<string, unknown>, path: string): strin
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
   ]);
+}
+
+function validateReliefSource(obj: Record<string, unknown>, path: string): string | null {
+  if (obj['depthMap'] === undefined) {
+    return firstError([
+      validateMeshPositions(obj['meshPositions'], `${path}.meshPositions`),
+      requireLiteral(obj, `${path}.emptyCells`, ['floor', 'top']),
+    ]);
+  }
+  if (obj['meshPositions'] !== undefined || obj['emptyCells'] !== undefined) {
+    return `\`${path}\` must contain exactly one relief source`;
+  }
+  return validateReliefDepthMapSource(obj['depthMap'], `${path}.depthMap`);
 }
 
 function validateMeshPositions(value: unknown, path: string): string | null {

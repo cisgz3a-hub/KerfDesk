@@ -7,6 +7,7 @@ import type {
 } from './stl-import-preparation';
 import { type PackedDxfResult, unpackDxfResult } from './packed-dxf-result';
 import { type PackedGcodeResult, unpackGcodeResult } from './packed-gcode-result';
+import type { PreparedDepthMapImportResult } from './depth-map-import-preparation';
 
 export type ImportWorkerProgress = {
   readonly phase: 'queued' | 'reading' | 'parsing' | 'preparing';
@@ -63,6 +64,13 @@ export function parseStlOffThread(
   options: ImportWorkerRequestOptions = {},
 ): Promise<PreparedStlImportResult> | null {
   return request({ kind: 'stl', blob, options: preparation }, 'stl', options);
+}
+
+export function prepareDepthMapPngOffThread(
+  blob: Blob,
+  options: ImportWorkerRequestOptions = {},
+): Promise<PreparedDepthMapImportResult> | null {
+  return request({ kind: 'depth-map-png', blob }, 'depth-map-png', options);
 }
 
 export function resetImportWorkerForTests(): void {

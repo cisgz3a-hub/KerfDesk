@@ -1,0 +1,2 @@
+export const DEFAULT_RELIEF_WIDTH_MM = 100;
+export const DEFAULT_RELIEF_DEPTH_MM = 5;

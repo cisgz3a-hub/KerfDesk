@@ -1,6 +1,8 @@
 import { deflateSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
+import { bytesToBase64 } from './base64-bytes';
 import { decodeIncrementalPngToLuma } from './png-incremental-decoder';
+import { prepareDepthMapPng } from './depth-map-import-preparation';
 
 describe('decodeIncrementalPngToLuma', () => {
   it('decodes split RGB input without retaining a full-file byte array', async () => {
@@ -28,6 +30,8 @@ describe('decodeIncrementalPngToLuma', () => {
       height: 2,
       sampledWidth: 2,
       sampledHeight: 2,
+      bitDepth: 8,
+      colorType: 2,
       densityDpi: null,
     });
     expect(rows.map((row) => [...row])).toEqual([
@@ -103,8 +107,35 @@ describe('decodeIncrementalPngToLuma', () => {
     expect(decoded).toEqual([18, 28, 38, 48, 58]);
   });
 
+  it('preserves qualified 8-bit grayscale samples exactly', async () => {
+    const rows: number[][] = [];
+    const png = makePng({
+      width: 3,
+      height: 2,
+      colorType: 0,
+      rows: [
+        [0, 127, 255],
+        [19, 87, 201],
+      ],
+      filters: [1, 4],
+    });
+
+    const result = await decodeIncrementalPngToLuma(chunksOf(png, 2), {
+      maxEdge: 8,
+      maxPixels: 64,
+      onRow: (row) => {
+        rows.push([...row]);
+      },
+    });
+
+    expect(result).toMatchObject({ kind: 'ok', bitDepth: 8, colorType: 0 });
+    expect(rows).toEqual([
+      [0, 127, 255],
+      [19, 87, 201],
+    ]);
+  });
+
   it.each([
-    { colorType: 0, bitDepth: 8, interlace: 0, reason: /color type 0/ },
     { colorType: 2, bitDepth: 16, interlace: 0, reason: /bit depth 16/ },
     { colorType: 2, bitDepth: 8, interlace: 1, reason: /interlaced/ },
   ])('routes an unqualified variant to the legacy fallback: $reason', async (variant) => {
@@ -167,6 +198,61 @@ describe('decodeIncrementalPngToLuma', () => {
   });
 });
 
+describe('prepareDepthMapPng', () => {
+  it('embeds every grayscale pixel without resampling', async () => {
+    const png = makePng({
+      width: 3,
+      height: 2,
+      colorType: 0,
+      rows: [
+        [0, 1, 2],
+        [127, 128, 255],
+      ],
+      filters: [1, 4],
+    });
+
+    const result = await prepareDepthMapPng(streamingBlob(png));
+
+    expect(result).toEqual({
+      kind: 'ok',
+      depthMap: {
+        schemaVersion: 1,
+        width: 3,
+        height: 2,
+        bitDepth: 8,
+        samplesBase64: Buffer.from([0, 1, 2, 127, 128, 255]).toString('base64'),
+        polarity: 'light-is-high',
+      },
+    });
+  });
+
+  it('does not reinterpret an ordinary RGB PNG as relief depth', async () => {
+    const png = makePng({ width: 1, height: 1, rows: [[10, 20, 30]] });
+    await expect(prepareDepthMapPng(streamingBlob(png))).rejects.toThrow(/grayscale PNG/);
+  });
+});
+
+describe('bytesToBase64', () => {
+  it('matches canonical encoding across the worker-safe chunk boundary', () => {
+    const bytes = Uint8Array.from({ length: 48 * 1024 + 5 }, (_, index) => index & 0xff);
+
+    expect(bytesToBase64(bytes)).toBe(Buffer.from(bytes).toString('base64'));
+  });
+});
+
+function streamingBlob(bytes: Uint8Array): Blob {
+  return {
+    size: bytes.length,
+    stream: () =>
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes);
+          controller.close();
+        },
+      }),
+  } as Blob;
+}
+
 type PngOptions = {
   readonly width: number;
   readonly height: number;
@@ -180,7 +266,7 @@ type PngOptions = {
 
 function makePng(options: PngOptions): Uint8Array {
   const colorType = options.colorType ?? 2;
-  const channels = colorType === 6 ? 4 : 3;
+  const channels = colorType === 0 ? 1 : colorType === 6 ? 4 : 3;
   const rawRows: Uint8Array[] = [];
   let previous = new Uint8Array(options.width * channels);
   for (let index = 0; index < options.rows.length; index += 1) {

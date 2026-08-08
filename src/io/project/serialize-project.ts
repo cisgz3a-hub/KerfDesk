@@ -18,7 +18,10 @@ export function serializeProject(project: Project): string {
 
 function hasTypedRelief(project: Project): boolean {
   return project.scene.objects.some(
-    (object) => object.kind === 'relief' && object.meshPositions instanceof Float32Array,
+    (object) =>
+      object.kind === 'relief' &&
+      object.depthMap === undefined &&
+      object.meshPositions instanceof Float32Array,
   );
 }
 

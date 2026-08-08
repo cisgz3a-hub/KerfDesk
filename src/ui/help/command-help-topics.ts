@@ -34,6 +34,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'file',
     tooltip: 'Import a PNG or JPG image for engraving or tracing.',
   },
+  'file.import-height-map': {
+    family: 'file',
+    tooltip: 'Import an 8-bit grayscale PNG as an explicit top-down CNC relief height map.',
+  },
   'file.open-gcode': {
     family: 'file',
     tooltip: 'Open a .nc/.gcode/.tap program in the 3D Inspector (both machine modes).',

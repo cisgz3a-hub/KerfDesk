@@ -3,8 +3,8 @@
 // carving reads like a depth map. Rendered at the object's transformed AABB;
 // rotation draws axis-aligned in v1 (noted in F-CNC7's edge states).
 
-import { meshToHeightmap, type Heightmap } from '../../core/relief';
-import { cachedFloat32Array } from '../../core/util';
+import { type Heightmap } from '../../core/relief';
+import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import { transformedBBox } from '../../core/scene';
 import type { Layer, ReliefObject } from '../../core/scene';
 import type { ViewTransform } from './view-transform';
@@ -49,15 +49,11 @@ function bitmapFor(obj: ReliefObject): HTMLCanvasElement | null {
 }
 
 function buildBitmap(obj: ReliefObject): HTMLCanvasElement | null {
-  const result = meshToHeightmap(
-    { positions: cachedFloat32Array(obj, obj.meshPositions) },
-    {
-      targetWidthMm: obj.targetWidthMm,
-      reliefDepthMm: obj.reliefDepthMm,
-      mmPerCell: obj.targetWidthMm / DISPLAY_CELLS_ACROSS,
-      emptyCells: obj.emptyCells,
-    },
-  );
+  const result = reliefObjectToHeightmap(obj, {
+    targetWidthMm: obj.targetWidthMm,
+    reliefDepthMm: obj.reliefDepthMm,
+    mmPerCell: obj.targetWidthMm / DISPLAY_CELLS_ACROSS,
+  });
   if (result.kind === 'error') return null;
   return heightmapToCanvas(result.heightmap, obj.reliefDepthMm);
 }

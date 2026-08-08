@@ -1,11 +1,12 @@
 // setReliefParams — edit a ReliefObject's carve parameters (width / depth /
-// background), the editor promised when H.5 roughing landed. Width edits
-// rescale the natural bounds by the mesh aspect ratio (bounds are always
+// source interpretation), the editor promised when H.5 roughing landed. Width edits
+// rescale the natural bounds by the source aspect ratio (bounds are always
 // (0,0)..(width, width·aspect)); the transform — and therefore the object's
 // placement — is untouched.
 
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
+import type { ReliefObject } from '../../core/scene';
 
 const MAX_BED_DIMENSION_MM = 1500;
 const MIN_RELIEF_WIDTH_MM = 1;
@@ -16,6 +17,7 @@ export type ReliefParamPatch = {
   targetWidthMm?: number;
   reliefDepthMm?: number;
   emptyCells?: 'floor' | 'top';
+  polarity?: 'light-is-high' | 'light-is-deep';
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -28,7 +30,7 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
         const objects = s.project.scene.objects.map((obj) => {
           if (obj.id !== id || obj.kind !== 'relief') return obj;
           changed = true;
-          const next = { ...obj, ...normalizeReliefPatch(patch) };
+          const next = applyReliefPatch(obj, normalizeReliefPatch(patch));
           return { ...next, bounds: boundsForWidth(obj, next.targetWidthMm) };
         });
         if (!changed) return s;
@@ -51,14 +53,37 @@ function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch {
     out.reliefDepthMm = clamp(patch.reliefDepthMm, MIN_RELIEF_DEPTH_MM, MAX_RELIEF_DEPTH_MM);
   }
   if (patch.emptyCells !== undefined) out.emptyCells = patch.emptyCells;
+  if (patch.polarity !== undefined) out.polarity = patch.polarity;
   return out;
+}
+
+function applyReliefPatch(relief: ReliefObject, patch: ReliefParamPatch): ReliefObject {
+  const common = {
+    ...(patch.targetWidthMm === undefined ? {} : { targetWidthMm: patch.targetWidthMm }),
+    ...(patch.reliefDepthMm === undefined ? {} : { reliefDepthMm: patch.reliefDepthMm }),
+  };
+  if (relief.depthMap === undefined) {
+    return {
+      ...relief,
+      ...common,
+      ...(patch.emptyCells === undefined ? {} : { emptyCells: patch.emptyCells }),
+    };
+  }
+  return {
+    ...relief,
+    ...common,
+    depthMap: {
+      ...relief.depthMap,
+      ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
+    },
+  };
 }
 
 function boundsForWidth(
   relief: { readonly bounds: { readonly maxX: number; readonly maxY: number } },
   widthMm: number,
 ): { minX: number; minY: number; maxX: number; maxY: number } {
-  // Natural relief bounds start at (0,0); the Y extent follows the mesh
+  // Natural relief bounds start at (0,0); the Y extent follows the source
   // aspect ratio captured at import.
   const aspect = relief.bounds.maxX > 0 ? relief.bounds.maxY / relief.bounds.maxX : 1;
   return { minX: 0, minY: 0, maxX: widthMm, maxY: widthMm * aspect };

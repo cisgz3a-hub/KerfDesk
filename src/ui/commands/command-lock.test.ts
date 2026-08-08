@@ -53,6 +53,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     openGcodePreview: vi.fn(),
     inspectCurrentGcode: vi.fn(),
     importImage: vi.fn(),
+    importHeightMap: vi.fn(),
     saveGcode: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),

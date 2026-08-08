@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC45 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC46 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -4005,6 +4005,62 @@ and lifts the command's CNC-only gate.)*
    per operation. Multi-tool jobs resume with the boundary group's tool loaded
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
+
+### F-CNC46. Import an explicit top-down height map - Phase H.4 (ADR-290)
+
+#### Success
+1. Choose **File -> Import Height Map...** and select one or more PNG files. This
+   command is deliberately separate from **Import Image...**: it declares that
+   tone is physical relief data rather than asking CurveDesk to infer 3D shape
+   from a photograph.
+2. A qualified input is a lossless, non-interlaced, 8-bit grayscale PNG. The
+   import worker verifies the PNG structure and CRCs and retains one exact
+   grayscale sample per source pixel; it does not resize, auto-level, blur,
+   sharpen, apply gamma, or run AI depth estimation.
+3. Each file becomes a top-down relief at 100 mm wide and 5 mm deep. Height
+   follows the pixel aspect ratio, **Light is high** is the declared default,
+   and the Relief properties panel shows the pixel dimensions and precision.
+4. Width, total depth, and polarity remain editable. **Light is deep** reverses
+   the full-range mapping without rewriting the embedded samples. Canvas,
+   **View 3D...**, and CAM use the same deterministic materialization rule and
+   embedded samples; each consumer chooses the grid resolution appropriate to
+   its job.
+5. Saving embeds the versioned samples, dimensions, bit depth, and polarity in
+   the project. Reopening validates their exact byte-length contract before the
+   data can reach preview or compilation.
+6. In CNC mode, the existing relief layer settings select the flat-end-mill
+   roughing and optional ball-nose finishing tools. The existing relief CAM,
+   tool changes, Job Review, Frame permit, preview, G-code, progress, and
+   cancellation paths remain in force.
+
+#### Error - the PNG is not an explicit qualified height map
+1. RGB/RGBA, palette, 16-bit, or interlaced PNG input reports the unsupported
+   source contract for this slice and imports nothing for that file. It is not
+   silently converted to grayscale and is never described as estimated depth.
+2. A malformed signature, chunk, CRC, row stream, base64 payload, dimension,
+   bit depth, or byte-length declaration reports a factual input-integrity
+   error. Other files in the same selection continue.
+
+#### Empty
+1. Cancelling the picker changes nothing. Pressing Escape during worker decode
+   cancels the current import and reports the cancellation.
+
+#### Edge - laser mode and large sources
+1. The file command remains available in laser mode because importing and
+   persisting geometry is machine-agnostic. The relief is stored and the toast
+   explains that it becomes output geometry in CNC mode; no new mode guard is
+   added.
+2. Large files receive the existing non-blocking size advisory. Worker startup
+   failure discloses the existing main-thread fallback; size never becomes an
+   arbitrary import refusal.
+3. The durable model admits 16-bit big-endian samples, but this first decoder
+   qualifies only exact 8-bit grayscale PNG. A later 16-bit decoder can populate
+   the same schema after its PNG filtering and precision path is verified.
+4. CAM grid coarsening uses the highest overlapping source surface at each
+   target cell. This preserves sampled peaks conservatively but does not prove
+   subpixel detail, a continuous swept cutter envelope, holder clearance,
+   controller tracking, material finish, or safe feeds for a particular tool,
+   wood, spindle, or machine.
 
 ## Phase I flows — multi-controller (ADR-094..097)
 

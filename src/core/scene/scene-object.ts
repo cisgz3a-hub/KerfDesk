@@ -405,26 +405,47 @@ export type ShapeObject = ObjectPowerScale & {
   readonly fairingVersion?: number;
 };
 
-// 3D relief for CNC carving, Phase H.4 (ADR-098). Carries the parsed
-// triangle mesh as plain numbers (9 per triangle, file order) so the pure
-// core compiler can rebuild the heightmap without any decode API, and .lf2
-// round-trips it as ordinary JSON (RasterImage's embedded-source precedent).
-// targetWidthMm scales the mesh's XY footprint; reliefDepthMm maps its Z
-// range to [−depth, 0]; emptyCells picks the background: 'floor' carves it
-// away so the model stands proud, 'top' leaves it at stock height. Laser
-// mode ignores relief objects entirely (CNC-only geometry).
-export type ReliefObject = ObjectPowerScale & {
+// Lossless source samples for top-down depth-map reliefs (ADR-290). Samples
+// are row-major grayscale values embedded as canonical base64. Sixteen-bit
+// samples use PNG/network byte order (most-significant byte first). Polarity
+// is explicit because a grayscale image alone does not say which tone is high.
+export type ReliefDepthMap = {
+  readonly schemaVersion: 1;
+  readonly width: number;
+  readonly height: number;
+  readonly bitDepth: 8 | 16;
+  readonly samplesBase64: string;
+  readonly polarity: 'light-is-high' | 'light-is-deep';
+};
+
+type ReliefObjectCommon = ObjectPowerScale & {
   readonly kind: 'relief';
   readonly id: string;
   readonly source: string; // filename for display
-  readonly meshPositions: ReadonlyArray<number> | Float32Array;
   readonly targetWidthMm: number;
   readonly reliefDepthMm: number;
-  readonly emptyCells: 'floor' | 'top';
   readonly color: string; // lowercase hex; the layer key
   readonly bounds: Bounds; // natural bounds: (0,0)..(targetWidth, height by aspect)
   readonly transform: Transform;
 };
+
+// 3D relief for CNC carving, Phase H.4 (ADR-098). Existing STL projects keep
+// the parsed triangle mesh exactly as before. A depth-map relief is a mutually
+// exclusive source variant; downstream code must deliberately materialize one
+// source or the other into the shared Heightmap CAM representation.
+export type MeshReliefObject = ReliefObjectCommon & {
+  readonly meshPositions: ReadonlyArray<number> | Float32Array;
+  readonly emptyCells: 'floor' | 'top';
+  readonly depthMap?: never;
+};
+
+export type DepthMapReliefObject = ReliefObjectCommon & {
+  readonly depthMap: ReliefDepthMap;
+  readonly meshPositions?: never;
+  readonly emptyCells?: never;
+};
+
+export type ReliefObject = MeshReliefObject | DepthMapReliefObject;
 
 // Embedding cap: meshes beyond this bloat the .lf2 JSON into the hundreds of
 // MB. Decorative reliefs are typically well under it; the import path tells

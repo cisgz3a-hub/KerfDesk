@@ -10,8 +10,8 @@ import {
   IDENTITY_TRANSFORM,
   machineKindOf,
   RELIEF_EMBED_TRIANGLE_LIMIT,
-  type Project,
   type ReliefObject,
+  type Project,
   type SceneObject,
 } from '../../core/scene';
 import { parseStl } from '../../io/stl';
@@ -24,9 +24,11 @@ import {
 import type { ToastVariant } from '../state/toast-store';
 import { importSourceSizeAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
+import { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
 
-export const DEFAULT_RELIEF_WIDTH_MM = 100;
-export const DEFAULT_RELIEF_DEPTH_MM = 5;
+type MeshReliefObject = Exclude<ReliefObject, { readonly depthMap: unknown }>;
+
+export { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
 // Coarse probe cell — only validates the mesh and derives the aspect ratio.
 const PROBE_CELL_MM = 1;
 const STL_PREPARATION_OPTIONS: StlImportPreparationOptions = {
@@ -118,7 +120,7 @@ function denseMeshAdvisory(name: string, triangles: number): string | null {
 function reliefFromPreparedStl(
   prepared: PreparedStlImportResult,
   source: string,
-): ReliefObject | string {
+): MeshReliefObject | string {
   if (prepared.kind === 'error') return prepared.reason;
   return {
     kind: 'relief',
