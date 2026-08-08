@@ -1,5 +1,5 @@
 // SelectedReliefProperties — the relief carve-parameter editor (width /
-// depth / background), promised when H.5 roughing landed. CNC-only: relief
+// depth / source interpretation), promised when H.5 roughing landed. CNC-only: relief
 // objects are inert in laser mode, so the section only renders for a CNC
 // project with exactly one relief selected (the laser Shape Properties
 // panel is the mirror case — ADR-101 §3).
@@ -32,8 +32,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
     <section aria-label="Relief properties" style={sectionStyle}>
       <h3 style={headingStyle}>Relief</h3>
       <p style={metaStyle}>
-        {relief.source} — {Math.round(relief.meshPositions.length / VERTICES_PER_TRIANGLE_FLOATS)}{' '}
-        triangles
+        {relief.source} — {reliefMeta(relief)}
       </p>
       <button
         type="button"
@@ -58,7 +57,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
         min={MIN_WIDTH_MM}
         max={MAX_WIDTH_MM}
         step={1}
-        title="Carved width on the stock. Height follows the mesh aspect ratio."
+        title="Carved width on the stock. Height follows the source aspect ratio."
         commitKey="targetWidthMm"
       />
       <ReliefNumberField
@@ -69,12 +68,22 @@ export function SelectedReliefProperties(): JSX.Element | null {
         min={MIN_DEPTH_MM}
         max={MAX_DEPTH_MM}
         step={0.5}
-        title="Total relief depth: the mesh's Z range maps to [-depth, 0] below the stock top."
+        title="Total relief depth: the source's numeric range maps to [-depth, 0] below the stock top."
         commitKey="reliefDepthMm"
       />
-      <BackgroundSelect relief={relief} />
+      {relief.depthMap === undefined ? (
+        <BackgroundSelect relief={relief} />
+      ) : (
+        <PolaritySelect relief={relief} />
+      )}
     </section>
   );
+}
+
+function reliefMeta(relief: ReliefObject): string {
+  return relief.depthMap === undefined
+    ? `${Math.round(relief.meshPositions.length / VERTICES_PER_TRIANGLE_FLOATS)} triangles`
+    : `${relief.depthMap.width} x ${relief.depthMap.height}, ${relief.depthMap.bitDepth}-bit grayscale`;
 }
 
 function ReliefNumberField(props: {
@@ -119,7 +128,9 @@ function ReliefNumberField(props: {
   );
 }
 
-function BackgroundSelect(props: { readonly relief: ReliefObject }): JSX.Element {
+function BackgroundSelect(props: {
+  readonly relief: Exclude<ReliefObject, { readonly depthMap: unknown }>;
+}): JSX.Element {
   const setReliefParams = useStore((s) => s.setReliefParams);
   return (
     <label style={rowStyle}>
@@ -138,6 +149,33 @@ function BackgroundSelect(props: { readonly relief: ReliefObject }): JSX.Element
         >
           <option value="floor">Carve away (floor)</option>
           <option value="top">Keep at stock top</option>
+        </select>
+      </span>
+    </label>
+  );
+}
+
+function PolaritySelect(props: {
+  readonly relief: Extract<ReliefObject, { readonly depthMap: unknown }>;
+}): JSX.Element {
+  const setReliefParams = useStore((s) => s.setReliefParams);
+  return (
+    <label style={rowStyle}>
+      <span style={labelStyle}>Polarity</span>
+      <span style={controlStyle}>
+        <select
+          value={props.relief.depthMap.polarity}
+          onChange={(event) =>
+            setReliefParams(props.relief.id, {
+              polarity: event.target.value === 'light-is-deep' ? 'light-is-deep' : 'light-is-high',
+            })
+          }
+          aria-label="Relief height-map polarity"
+          title="Declares whether lighter samples are nearer the stock top or deeper into the stock."
+          style={selectStyle}
+        >
+          <option value="light-is-high">Light is high</option>
+          <option value="light-is-deep">Light is deep</option>
         </select>
       </span>
     </label>

@@ -26,6 +26,7 @@ export type CommandId =
   | 'file.import-svg'
   | 'file.import-dxf'
   | 'file.import-image'
+  | 'file.import-height-map'
   | 'file.save-gcode'
   | 'file.open-gcode'
   | 'file.inspect-gcode'
@@ -164,6 +165,7 @@ export type AppCommandContext = {
   readonly importSvg: () => void;
   readonly importDxf: () => void;
   readonly importImage: () => void;
+  readonly importHeightMap: () => void;
   readonly openGcodePreview: () => void;
   readonly inspectCurrentGcode: () => void;
   readonly saveGcode: () => void;

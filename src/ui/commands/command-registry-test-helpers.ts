@@ -72,6 +72,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
     importSvg: vi.fn(),
     importDxf: vi.fn(),
     importImage: vi.fn(),
+    importHeightMap: vi.fn(),
     openGcodePreview: vi.fn(),
     inspectCurrentGcode: vi.fn(),
     multiFileTrace: vi.fn(),

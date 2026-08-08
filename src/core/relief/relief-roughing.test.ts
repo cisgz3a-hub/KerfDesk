@@ -17,10 +17,12 @@ import { meshToHeightmap } from './mesh-to-heightmap';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
 import { DEFAULT_RELIEF_ALLOWANCE_MM, reliefRoughingPasses } from './relief-roughing';
 
+type MeshReliefObject = Exclude<ReliefObject, { readonly depthMap: unknown }>;
+
 const FLAT_TOOL: CncTool = { id: 'em', name: 'end mill', kind: 'end-mill', diameterMm: 3.175 };
 
 // 4-triangle pyramid: 20 × 20 base at z 0, apex z 10 (analytic terraces).
-function pyramidRelief(): ReliefObject {
+function pyramidRelief(): MeshReliefObject {
   const s = 20;
   const apex = [s / 2, s / 2, 10];
   const c = [
@@ -49,7 +51,7 @@ function pyramidRelief(): ReliefObject {
   };
 }
 
-function heightmapOf(relief: ReliefObject): ReturnType<typeof meshToHeightmap> {
+function heightmapOf(relief: MeshReliefObject): ReturnType<typeof meshToHeightmap> {
   return meshToHeightmap(
     { positions: Float32Array.from(relief.meshPositions) },
     {

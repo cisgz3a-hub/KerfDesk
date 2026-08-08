@@ -12,12 +12,10 @@ import { useCncRemovalGrid } from './use-cnc-removal-grid';
 
 const workerMocks = vi.hoisted(() => ({
   prepare: vi.fn(),
-  cancel: vi.fn(),
 }));
 
 vi.mock('./cnc-removal-grid-worker-client', () => ({
   prepareCncRemovalGridOffThread: workerMocks.prepare,
-  cancelCncRemovalGridOffThread: workerMocks.cancel,
   isCncRemovalGridSuperseded: () => false,
 }));
 
@@ -52,7 +50,6 @@ let observed: RemovalGrid | null = null;
 
 beforeEach(() => {
   workerMocks.prepare.mockReset();
-  workerMocks.cancel.mockReset();
   observed = null;
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -81,9 +78,11 @@ describe('useCncRemovalGrid', () => {
     );
     await render(true);
     expect(observed).toBeNull();
+    const signal = workerMocks.prepare.mock.calls[0]?.[1] as AbortSignal | undefined;
+    expect(signal?.aborted).toBe(false);
 
     await render(false);
-    expect(workerMocks.cancel).toHaveBeenCalledOnce();
+    expect(signal?.aborted).toBe(true);
     await act(async () => finish?.(GRID));
 
     expect(observed).toBeNull();

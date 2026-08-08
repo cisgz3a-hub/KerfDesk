@@ -18,6 +18,7 @@ import type {
   PreparedStlImportResult,
   StlImportPreparationOptions,
 } from './stl-import-preparation';
+import type { PreparedDepthMapImportResult } from './depth-map-import-preparation';
 
 export type ImportWorkerRequest =
   | {
@@ -28,6 +29,7 @@ export type ImportWorkerRequest =
       readonly source: string;
     }
   | { readonly id: number; readonly kind: 'gcode'; readonly blob: Blob }
+  | { readonly id: number; readonly kind: 'depth-map-png'; readonly blob: Blob }
   | {
       readonly id: number;
       readonly kind: 'stl';
@@ -46,4 +48,9 @@ export type ImportWorkerResponse =
   | { readonly id: number; readonly kind: 'dxf'; readonly result: PackedDxfResult }
   | { readonly id: number; readonly kind: 'gcode'; readonly result: PackedGcodeResult }
   | { readonly id: number; readonly kind: 'stl'; readonly result: PreparedStlImportResult }
+  | {
+      readonly id: number;
+      readonly kind: 'depth-map-png';
+      readonly result: PreparedDepthMapImportResult;
+    }
   | { readonly id: number; readonly kind: 'error'; readonly message: string };

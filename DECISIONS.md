@@ -15899,3 +15899,98 @@ tool-center path determined by the cutter radius.
   https://www.w3.org/TR/css-transforms-1/
 - Autodesk projection milling, XY-plane stepover versus true surface scallop:
   https://help.autodesk.com/cloudhelp/2024/ENU/FCAM/files/GUID-B04CF897-44A8-4434-B2CB-AC229160BAB2.htm
+
+## ADR-290 - Explicit grayscale depth maps are durable relief sources (2026-08-08)
+
+**Date:** 2026-08-08
+**Status:** Accepted; software data/CAM integration verified, 16-bit PNG and hardware qualification pending
+
+### Context
+
+CurveDesk's relief pipeline previously began only with an STL triangle mesh. A normal photograph,
+SVG fill, or generic raster contains tone but no physical Z meaning: lighting, albedo, shadows,
+occlusion, perspective, and texture make brightness an unsafe substitute for geometry. The approved
+first photo-to-relief slice therefore needs an explicit depth-map contract, not a promise that an
+ordinary photo can be carved as recovered 3D shape.
+
+PNG provides lossless grayscale samples and declares dimensions, color type, bit depth, filtering,
+interlace, and per-chunk integrity. The PNG Recommendation permits grayscale sample depths through
+16 bits and defines multi-byte samples in network byte order. CurveDesk's existing streaming PNG
+decoder already validates signature, chunk CRCs, consecutive IDAT data, deflate rows, filters, and
+cancellation for qualified image imports; extending its qualified 8-bit path to grayscale avoids a
+second unaudited decoder.
+
+### Decision
+
+1. **Make intent explicit at import.** **File -> Import Height Map...** is separate from ordinary
+   PNG/JPG image import. It accepts only lossless, non-interlaced, 8-bit grayscale PNG in this first
+   slice. RGB/RGBA, palette, 16-bit, and interlaced files are reported as unsupported; they are not
+   converted, estimated, or re-labelled as depth. Normal-photo AI depth estimation is out of scope.
+2. **Persist source truth, not a derived Float32 cache.** `ReliefObject` is a mutually exclusive union:
+   the existing mesh variant remains byte-compatible, while the depth-map variant embeds a version-1
+   row-major payload with positive integer width/height, 8- or 16-bit precision, canonical base64,
+   and explicit `light-is-high` or `light-is-deep` polarity. Sixteen-bit samples are most-significant
+   byte first. The first importer emits 8-bit payloads; the 16-bit schema prevents a later qualified
+   decoder from requiring another project-model migration.
+3. **Validate the allocation contract before use.** Project load/save requires exactly one relief
+   source and an exact payload byte length of `width * height * bitDepth / 8`; dimensions and the
+   multiplication must remain positive safe integers. Canonical padding and unused base64 bits are
+   checked without first allocating a decoded copy. These are factual data-integrity conditions, not
+   policy ceilings.
+4. **Map tone deterministically.** The complete numeric range maps linearly to `[−reliefDepthMm, 0]`.
+   `light-is-high` maps white to stock top and black to total depth; `light-is-deep` reverses it. No
+   auto-levels, gamma, smoothing, sharpening, background inference, or tonal clipping occurs.
+5. **Materialize into the existing heightmap CAM.** Physical width is operator-controlled, physical
+   height follows source aspect, and existing object XY scale is resolved before cutter geometry per
+   ADR-289. When a requested CAM/display grid is coarser than the source, each cell takes the highest
+   overlapping source surface. This is deterministic and conservative for sampled peaks. Both source
+   variants then use the existing relief roughing, finishing, preview, diagnostics, and G-code path.
+6. **Keep the UI slice narrow.** The File command, source metadata, width, depth, polarity, canvas
+   preview, and existing 3D viewer are included. Manual painting, masks, background editing, tonal
+   curves, AI estimation, and a broad relief studio are deferred. Drag-and-drop PNG remains ordinary
+   image import because a drop alone cannot declare depth intent.
+7. **Decode off the UI thread.** The existing queued import worker owns PNG streaming, progress, and
+   Escape cancellation. Worker-construction failure uses the existing disclosed main-thread fallback.
+   Large-file thresholds remain advisories and never become size refusals.
+8. **Frame remains the only ordinary Start guard.** The command remains visible in both machine modes;
+   laser mode stores the relief and explains that only CNC consumes it. No new warning confirmation,
+   Start refusal, or policy cap is added. Existing compile integrity, Job Review, exact Frame permit,
+   and transport/handoff rules remain unchanged.
+9. **State qualification limits plainly.** A depth map is only as geometrically trustworthy as its
+   producer. Software tests do not establish tool reach, flute/holder clearance, continuous swept
+   volume, controller following error, workholding, feeds/speeds, grain response, tear-out, or finish.
+   Existing ADR-289 sampled-grid limits continue to apply.
+
+### Consequences
+
+- Existing STL projects, STL imports, mesh background semantics, and mesh-derived toolpaths are not
+  migrated. New projects remain self-contained and can reopen without the original PNG.
+- Source pixels survive save/reopen exactly. Changing polarity or physical depth is non-destructive;
+  the same embedded samples are materialized again for preview and CAM.
+- The durable representation may be larger than the PNG because it stores raw samples as base64.
+  This makes validation and deterministic use independent of a browser image decoder, at the cost of
+  project size. Large inputs advise but remain operator-controlled.
+- Eight-bit input provides 256 declared depth levels. At 5 mm total depth, one code step is about
+  0.0196 mm mathematically; this is numeric resolution, not a claim that a machine or wood reproduces
+  it. Sixteen-bit PNG import remains a separately qualified follow-up.
+
+### Verification
+
+- Pure fixtures cover both polarities, 8-bit endpoints, 16-bit network-order decoding, source aspect,
+  nonuniform physical scaling, conservative coarse-grid sampling, malformed canonical base64, and
+  exact payload-length rejection.
+- Streaming PNG fixtures cover exact grayscale rows through PNG Sub and Paeth filters, CRC-validated
+  decode, no resampling, cancellation, and refusal to reinterpret RGB as a height map.
+- Project fixtures prove exact save/reopen of payload, precision, and polarity; ambiguous dual-source
+  reliefs and mismatched payload declarations fail validation while legacy mesh round-trips remain.
+- Compiler integration produces non-empty existing flat-end-mill roughing and ball-nose finishing
+  groups from a depth-map relief. UI fixtures cover defaults, aspect, laser-mode storage disclosure,
+  metadata, polarity editing, and retained mesh background editing.
+- NOT verified: 16-bit PNG import, normal-photo depth estimation, perceptual source quality, hardware
+  air-cut, material cut, tool reach, holder clearance, feeds/speeds, controller tracking, or finish.
+
+### References
+
+- W3C, Portable Network Graphics (PNG) Specification, Third Edition (Recommendation, 24 June 2025):
+  https://www.w3.org/TR/png-3/
+- ADR-289, relief XY scale and sampled physical-cutter qualification boundary.

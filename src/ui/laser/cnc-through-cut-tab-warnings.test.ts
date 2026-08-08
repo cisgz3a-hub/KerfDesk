@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
   createLayer,
   createProject,
   type CncLayerSettings,
   type Project,
+  type ReliefObject,
+  type SceneObject,
 } from '../../core/scene';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
 
@@ -65,6 +68,80 @@ describe('detectCncThroughCutTabWarnings', () => {
     };
 
     expect(detectCncThroughCutTabWarnings(cncProjectWithLayerCnc(cnc))).toEqual([]);
+  });
+
+  it('does not treat a relief-only layer setting as the relief object depth', () => {
+    const project = cncProjectWithLayerCnc({
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'pocket',
+      depthMm: DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm + 20,
+    });
+    const relief: ReliefObject = {
+      kind: 'relief',
+      id: 'relief',
+      source: 'height.png',
+      depthMap: {
+        schemaVersion: 1,
+        width: 1,
+        height: 1,
+        bitDepth: 8,
+        samplesBase64: '/w==',
+        polarity: 'light-is-high',
+      },
+      targetWidthMm: 10,
+      reliefDepthMm: 2,
+      color: '#ff0000',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+    };
+
+    expect(
+      detectCncThroughCutTabWarnings({
+        ...project,
+        scene: { ...project.scene, objects: [relief] },
+      }),
+    ).toEqual([]);
+  });
+
+  it('retains the layer-depth warning when a relief shares its operation with vector geometry', () => {
+    const project = cncProjectWithLayerCnc({
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'pocket',
+      depthMm: DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm + 1,
+    });
+    const relief: ReliefObject = {
+      kind: 'relief',
+      id: 'relief',
+      source: 'height.png',
+      depthMap: {
+        schemaVersion: 1,
+        width: 1,
+        height: 1,
+        bitDepth: 8,
+        samplesBase64: '/w==',
+        polarity: 'light-is-high',
+      },
+      targetWidthMm: 10,
+      reliefDepthMm: 2,
+      color: '#ff0000',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+    };
+    const vector: SceneObject = {
+      kind: 'imported-svg',
+      id: 'vector',
+      source: 'shape.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [{ color: '#ff0000', polylines: [] }],
+    };
+
+    expect(
+      detectCncThroughCutTabWarnings({
+        ...project,
+        scene: { ...project.scene, objects: [relief, vector] },
+      }),
+    ).toEqual([expect.stringContaining('into the spoilboard')]);
   });
 
   it('warns about spoilboard overcut on a tabbed profile, not the free-part case', () => {

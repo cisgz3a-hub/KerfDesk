@@ -84,16 +84,19 @@ describe('buildAppCommands', () => {
   });
 
   it('keeps every File command available while a job is active', () => {
-    const commands = buildAppCommands(baseCtx({ jobActive: true })).filter(
+    const importHeightMap = vi.fn();
+    const commands = buildAppCommands(baseCtx({ jobActive: true, importHeightMap })).filter(
       (command) => command.family === 'file',
     );
 
-    expect(commands).toHaveLength(10);
+    expect(commands).toHaveLength(11);
     for (const command of commands) {
       expect(command.enabled, command.id).toBe(true);
       expect(command.disabledReason, command.id).toBeUndefined();
       expect(runCommand(command), command.id).toBe(true);
     }
+    expect(commandById(commands, 'file.import-height-map').id).toBe('file.import-height-map');
+    expect(importHeightMap).toHaveBeenCalledOnce();
   });
 
   it('does not run disabled image tools', () => {

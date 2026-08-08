@@ -66,6 +66,7 @@ describe('partitionSavePreflight', () => {
       'no-output-layer',
       'non-finite-coordinate',
       'program-materialization-failed',
+      'relief-materialization-failed',
       'relief-needs-cnc',
     ]);
     expect(COMPILE_INTEGRITY_PREFLIGHT_CODES.has('out-of-bed')).toBe(false);

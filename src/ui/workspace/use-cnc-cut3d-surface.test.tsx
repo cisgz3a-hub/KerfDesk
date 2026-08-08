@@ -11,12 +11,10 @@ import { useCncCut3DSurface, type CncCut3DSurfaceState } from './use-cnc-cut3d-s
 
 const workerMocks = vi.hoisted(() => ({
   prepare: vi.fn(),
-  cancel: vi.fn(),
 }));
 
 vi.mock('./cnc-removal-grid-worker-client', () => ({
   prepareCncCut3DSurfaceOffThread: workerMocks.prepare,
-  cancelCncCut3DSurfaceOffThread: workerMocks.cancel,
   isCncRemovalGridSuperseded: () => false,
 }));
 
@@ -42,7 +40,6 @@ let observed: CncCut3DSurfaceState = { kind: 'idle' };
 
 beforeEach(() => {
   workerMocks.prepare.mockReset();
-  workerMocks.cancel.mockReset();
   observed = { kind: 'idle' };
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -64,7 +61,7 @@ describe('useCncCut3DSurface', () => {
     );
     await render(true);
     expect(observed.kind).toBe('loading');
-    expect(workerMocks.prepare).toHaveBeenCalledWith(GRID);
+    expect(workerMocks.prepare).toHaveBeenCalledWith(GRID, expect.any(AbortSignal));
     await act(async () => finish?.(MESH));
     expect(observed).toEqual({ kind: 'ready', mesh: MESH, revision: 1 });
   });
@@ -77,8 +74,10 @@ describe('useCncCut3DSurface', () => {
       }),
     );
     await render(true);
+    const signal = workerMocks.prepare.mock.calls[0]?.[1] as AbortSignal | undefined;
+    expect(signal?.aborted).toBe(false);
     await render(false);
-    expect(workerMocks.cancel).toHaveBeenCalledOnce();
+    expect(signal?.aborted).toBe(true);
     await act(async () => finish?.(MESH));
     expect(observed.kind).toBe('idle');
   });

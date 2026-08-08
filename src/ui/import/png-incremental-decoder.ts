@@ -24,6 +24,8 @@ export type IncrementalPngResult =
       readonly height: number;
       readonly sampledWidth: number;
       readonly sampledHeight: number;
+      readonly bitDepth: number;
+      readonly colorType: number;
       readonly densityDpi: number | null;
     }
   | { readonly kind: 'legacy-fallback'; readonly reason: string };
@@ -65,7 +67,7 @@ export async function decodeIncrementalPngToLuma(
   const qualified: QualifiedPngHeader = {
     width: header.width,
     height: header.height,
-    channels: header.colorType === 6 ? 4 : 3,
+    channels: header.colorType === 0 ? 1 : header.colorType === 6 ? 4 : 3,
   };
   const target = pngSamplingTarget(header.width, header.height, options.maxEdge, options.maxPixels);
   await options.onHeader?.({
@@ -74,14 +76,17 @@ export async function decodeIncrementalPngToLuma(
     height: header.height,
     sampledWidth: target.width,
     sampledHeight: target.height,
+    bitDepth: header.bitDepth,
+    colorType: header.colorType,
   });
-  return decodeIdat(reader, qualified, target, options);
+  return decodeIdat(reader, qualified, target, header, options);
 }
 
 async function decodeIdat(
   reader: PngStreamReader,
   header: QualifiedPngHeader,
   target: { readonly width: number; readonly height: number },
+  format: Pick<PngHeader, 'bitDepth' | 'colorType'>,
   options: IncrementalPngOptions,
 ): Promise<IncrementalPngResult> {
   if (typeof DecompressionStream === 'undefined') {
@@ -107,6 +112,7 @@ async function decodeIdat(
       }
       if (sawIdat) idatEnded = true;
       const data = await readChunkData(reader, chunk);
+      validatePaletteForColorType(chunk.type, format.colorType);
       densityDpi = densityFromChunk(chunk.type, sawIdat, data, densityDpi);
       if (chunk.type === 'IEND') {
         if (chunk.length !== 0) throw new Error('PNG IEND chunk must be empty.');
@@ -126,6 +132,8 @@ async function decodeIdat(
       height: header.height,
       sampledWidth: target.width,
       sampledHeight: target.height,
+      bitDepth: format.bitDepth,
+      colorType: format.colorType,
       densityDpi,
     };
   } catch (error) {
@@ -133,6 +141,11 @@ async function decodeIdat(
     await rows;
     throw error;
   }
+}
+
+function validatePaletteForColorType(type: string, colorType: number): void {
+  if (type !== 'PLTE' || (colorType !== 0 && colorType !== 4)) return;
+  throw new Error(`PNG PLTE is not permitted for grayscale color type ${colorType}.`);
 }
 
 type SettledRows = { readonly ok: true } | { readonly ok: false; readonly error: unknown };
@@ -226,7 +239,7 @@ function parseHeader(bytes: Uint8Array): PngHeader {
 
 function fallbackReason(header: PngHeader): string | null {
   if (header.bitDepth !== 8) return `PNG bit depth ${header.bitDepth} is not yet qualified`;
-  if (header.colorType !== 2 && header.colorType !== 6) {
+  if (header.colorType !== 0 && header.colorType !== 2 && header.colorType !== 6) {
     return `PNG color type ${header.colorType} is not yet qualified`;
   }
   if (header.compression !== 0) {
