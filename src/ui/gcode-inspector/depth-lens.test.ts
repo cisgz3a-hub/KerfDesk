@@ -1,10 +1,28 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { buildGcodeRenderModel, SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
-import { buildDepthLensScale, DEPTH_RAMP_DEEP, DEPTH_RAMP_SHALLOW } from './depth-lens';
+import { resolveViewer3dTheme } from '../viewer3d';
+import { buildDepthLensScale, DEPTH_RAMP_DEEP, DEPTH_RAMP_SHALLOW, type Rgb } from './depth-lens';
 
 const DEPTH_PROPERTY_RUNS = 100;
 const DEPTH_PROPERTY_SEED = 2_026_080_5;
+const MAX_MUTED_RED_DOMINANCE = 0.35;
+const MIN_MUTED_RED_LUMINANCE = 0.2;
+const MIN_VIEWER_CONTRAST_RATIO = 4.5;
+const CONTRAST_LUMINANCE_OFFSET = 0.05;
+const SRGB_LINEAR_THRESHOLD = 0.04045;
+const SRGB_LINEAR_DIVISOR = 12.92;
+const SRGB_OFFSET = 0.055;
+const SRGB_SCALE = 1.055;
+const SRGB_EXPONENT = 2.4;
+const LUMINANCE_RED_WEIGHT = 0.2126;
+const LUMINANCE_GREEN_WEIGHT = 0.7152;
+const LUMINANCE_BLUE_WEIGHT = 0.0722;
+const RGB_RED_SHIFT = 16;
+const RGB_GREEN_SHIFT = 8;
+const RGB_CHANNEL_MASK = 0xff;
+const RGB_CHANNEL_SCALE = 255;
+const VIEWER_BACKGROUND = rgbChannels(resolveViewer3dTheme(null).background);
 
 const THREE_PASS_PROGRAM = [
   'G21 G90',
@@ -24,7 +42,7 @@ const THREE_PASS_PROGRAM = [
 ].join('\n');
 
 describe('buildDepthLensScale', () => {
-  it('maps ordered depth passes to ordered nearby shades', () => {
+  it('maps ordered depth passes from light blue through a balanced tone to muted red', () => {
     const model = renderModel(THREE_PASS_PROGRAM);
     const scale = buildDepthLensScale(model);
     expect(scale).not.toBeNull();
@@ -44,6 +62,23 @@ describe('buildDepthLensScale', () => {
         channelMidpoint(channel, DEPTH_RAMP_DEEP[index] ?? channel),
       ),
     );
+  });
+
+  it('keeps the muted red endpoint readable without making it overwhelming', () => {
+    const [red, green, blue] = DEPTH_RAMP_DEEP;
+    expect(red).toBeGreaterThan(green);
+    expect(red).toBeGreaterThan(blue);
+    expect(red - Math.max(green, blue)).toBeLessThan(MAX_MUTED_RED_DOMINANCE);
+    expect(relativeLuminance(DEPTH_RAMP_DEEP)).toBeGreaterThan(MIN_MUTED_RED_LUMINANCE);
+
+    const middle = DEPTH_RAMP_SHALLOW.map((channel, index) =>
+      channelMidpoint(channel, DEPTH_RAMP_DEEP[index] ?? channel),
+    );
+    for (const color of [DEPTH_RAMP_SHALLOW, middle, DEPTH_RAMP_DEEP]) {
+      expect(contrastRatio(color, VIEWER_BACKGROUND)).toBeGreaterThanOrEqual(
+        MIN_VIEWER_CONTRAST_RATIO,
+      );
+    }
   });
 
   it('excludes safe-height traversal from the depth range', () => {
@@ -83,7 +118,7 @@ describe('buildDepthLensScale', () => {
     expectRgbClose(scale?.colorOf(deepPlunge), DEPTH_RAMP_DEEP);
   });
 
-  it('preserves range and ordered-colour invariants across generated passes', () => {
+  it('preserves range and ordered warm-colour invariants across generated passes', () => {
     fc.assert(
       fc.property(
         fc.uniqueArray(fc.integer({ min: 1, max: 120 }), { minLength: 2, maxLength: 6 }),
@@ -109,9 +144,10 @@ describe('buildDepthLensScale', () => {
           for (let index = 1; index < orderedCuts.length; index += 1) {
             const shallower = scale.colorOf(orderedCuts[index - 1] ?? -1);
             const deeper = scale.colorOf(orderedCuts[index] ?? -1);
-            deeper.forEach((channel, channelIndex) =>
-              expect(channel).toBeLessThan(shallower[channelIndex] ?? channel + 1),
-            );
+            expect(deeper[0]).toBeGreaterThan(shallower[0]);
+            expect(deeper[1]).toBeLessThan(shallower[1]);
+            expect(deeper[2]).toBeLessThan(shallower[2]);
+            expect(relativeLuminance(deeper)).toBeLessThan(relativeLuminance(shallower));
           }
 
           const deepestPlunge = [...model.segKind]
@@ -180,6 +216,32 @@ function segmentEndZ(model: GcodeRenderModel, index: number): number {
 
 function channelMidpoint(shallow: number, deep: number): number {
   return shallow + (deep - shallow) * 0.5;
+}
+
+function contrastRatio(left: ReadonlyArray<number>, right: ReadonlyArray<number>): number {
+  const brighter = Math.max(relativeLuminance(left), relativeLuminance(right));
+  const darker = Math.min(relativeLuminance(left), relativeLuminance(right));
+  return (brighter + CONTRAST_LUMINANCE_OFFSET) / (darker + CONTRAST_LUMINANCE_OFFSET);
+}
+
+function relativeLuminance(rgb: ReadonlyArray<number>): number {
+  const linear = (channel: number): number =>
+    channel <= SRGB_LINEAR_THRESHOLD
+      ? channel / SRGB_LINEAR_DIVISOR
+      : ((channel + SRGB_OFFSET) / SRGB_SCALE) ** SRGB_EXPONENT;
+  return (
+    LUMINANCE_RED_WEIGHT * linear(rgb[0] ?? 0) +
+    LUMINANCE_GREEN_WEIGHT * linear(rgb[1] ?? 0) +
+    LUMINANCE_BLUE_WEIGHT * linear(rgb[2] ?? 0)
+  );
+}
+
+function rgbChannels(color: number): Rgb {
+  return [
+    ((color >> RGB_RED_SHIFT) & RGB_CHANNEL_MASK) / RGB_CHANNEL_SCALE,
+    ((color >> RGB_GREEN_SHIFT) & RGB_CHANNEL_MASK) / RGB_CHANNEL_SCALE,
+    (color & RGB_CHANNEL_MASK) / RGB_CHANNEL_SCALE,
+  ];
 }
 
 function expectRgbClose(
