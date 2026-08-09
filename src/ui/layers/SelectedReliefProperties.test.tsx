@@ -124,6 +124,7 @@ describe('SelectedReliefProperties', () => {
         'Top projection only; undercuts are not represented.',
       );
       expect(sourceMeaning?.querySelector('input, select, button')).toBeNull();
+      expect(host.querySelector('[aria-label="Relief recorded source details"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -440,6 +441,46 @@ describe('SelectedReliefProperties', () => {
           ? stored.reliefSource.mapping.polarity
           : undefined,
       ).toBe('light-is-deep');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('keeps recorded source polarity distinct from the current editable mapping', async () => {
+    const object = depthRelief();
+    if (object.reliefSource.kind !== 'heightfield-v1') throw new Error('heightfield missing');
+    installProject('cnc', {
+      ...object,
+      reliefSource: {
+        ...object.reliefSource,
+        mapping: { ...object.reliefSource.mapping, polarity: 'light-is-deep' },
+        provenance: {
+          ...object.reliefSource.provenance,
+          sourceName: 'recorded-depth.png',
+          sourcePolarity: 'light-is-high',
+          producer: { name: 'Depth Lab', model: 'relative-v2' },
+        },
+      },
+    });
+    const beforeProject = useStore.getState().project;
+    const beforeUndoStack = useStore.getState().undoStack;
+    const beforeDirty = useStore.getState().dirty;
+    const { host, root } = await render();
+    try {
+      const recorded = host.querySelector('[aria-label="Relief recorded source details"]');
+      const current = host.querySelector('select[aria-label="Relief height-map polarity"]');
+      expect(recorded?.textContent).toContain('recorded-depth.png');
+      expect(recorded?.textContent).toContain('Recorded metadata is not authenticated.');
+      expect(recorded?.textContent).toContain('Recorded source polarityLight is high');
+      expect(recorded?.textContent).toContain('Depth Lab');
+      expect(recorded?.textContent).toContain('relative-v2');
+      expect(recorded?.querySelector('input, select, button')).toBeNull();
+      expect(current).toBeInstanceOf(HTMLSelectElement);
+      expect(current instanceof HTMLSelectElement ? current.value : null).toBe('light-is-deep');
+      expect(useStore.getState().project).toBe(beforeProject);
+      expect(useStore.getState().undoStack).toBe(beforeUndoStack);
+      expect(useStore.getState().dirty).toBe(beforeDirty);
     } finally {
       await act(async () => root.unmount());
       host.remove();

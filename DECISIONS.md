@@ -17289,3 +17289,81 @@ display-only correction; it does not make the planned source-mode creation workf
 - ADR-291, source-mode meanings, source-truth requirements, and evidence boundaries.
 - ADR-292, schema-v4 canonical field and persisted provenance contract.
 - ADR-295 and ADR-296, qualified import paths that persist `depth-map` provenance.
+
+## ADR-302 - Relief properties shows recorded source details without authenticating them (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a source-truth slice; source-mode creation, output/Job Review provenance, and physical qualification stay open
+
+### Context
+
+ADR-301 exposes the exact persisted `provenance.sourceKind`, but the canonical heightfield also
+requires a string `sourceName` and permits optional `sourceBitDepth`, `sourcePolarity`, and producer
+name/model/version fields. Project validation constrains bit depth to `8` or `16`, constrains source
+polarity to `light-is-high` or `light-is-deep`, and requires strings for any present producer
+fields. It does not authenticate those declarations or forbid an empty string.
+
+Relief properties previously compressed source name and optional bit depth into its summary line
+while leaving source polarity and producer metadata invisible. More importantly,
+`provenance.sourcePolarity` records a declaration about the source, while `mapping.polarity` is the
+current editable tone-to-depth interpretation. Treating those fields as interchangeable would
+misreport a project after the operator changes its mapping.
+
+### Decision
+
+1. **Show recorded details only for canonical heightfields.** In CNC mode, a selected
+   `heightfield-v1` relief displays a read-only **Recorded source details** group. A `legacy-mesh`
+   carries no `ReliefHeightfieldProvenance`, so the group is omitted rather than inventing source
+   or producer metadata.
+2. **Expose the persisted fields explicitly.** The group shows source name, optional source bit
+   depth, optional recorded source polarity, and optional producer name, model, and version. It
+   reads values from `provenance` only; it does not derive them from the object name, file
+   extension, samples, source meaning, current mapping, or legacy mesh.
+3. **Name missing information honestly.** A blank source or producer string and every absent
+   optional field display **Not recorded**. The UI does not substitute a default producer, bit
+   depth, polarity, filename, or inferred value.
+4. **Separate source polarity from current mapping polarity.** **Recorded source polarity** renders
+   `provenance.sourcePolarity` as **Light is high** or **Light is deep**. It is inert metadata about
+   the recorded source declaration. The existing editable polarity control renders
+   `mapping.polarity` and continues to govern current materialization. The two values may differ;
+   neither is synchronized to or rewritten from the other.
+5. **Do not upgrade recorded metadata into evidence.** The disclosure states that the values are
+   recorded, not authenticated. Presence of a filename, bit depth, polarity, producer, model, or
+   version does not prove the source's origin, integrity, geometry, metric scale, model accuracy,
+   or physical suitability.
+6. **Make no persisted or execution change.** The group has no input or action and adds no guard,
+   cap, clamp, refusal, delay, or confirmation. It does not rewrite provenance, mapping,
+   samples, mask, digest, dimensions, bounds, transform, algorithm revision, or heightfield
+   revision, and it creates no dirty or undo state. Schema, validation, migration, serialization,
+   import, workers, application state, materialization, preview, CAM, simulation, G-code, Job
+   Review, Frame, and Start behavior remain unchanged.
+7. **Keep the product claim narrow.** This slice adds no source-mode creation, physical or
+   effective-cell creation disclosure, histogram or clipping surface, crop/aspect controls, mask
+   authoring, output/Job Review provenance, or physical qualification.
+
+### Consequences
+
+- Operators can inspect every source-detail field already stored by canonical heightfields without
+  confusing the original recorded polarity with the current editable mapping polarity.
+- Missing data stays visibly missing, and legacy meshes receive no fabricated heightfield
+  provenance.
+- Recorded producer and source declarations remain useful context, not authentication or machine-
+  readiness evidence.
+- Existing project and execution contracts are byte-for-byte unchanged by this display-only slice.
+
+### Verification
+
+- Focused component tests pin complete, partial, blank, and absent provenance displays; exact
+  polarity copy; the **Not recorded** fallback; the absence of controls; and omission for legacy
+  meshes.
+- A Relief-properties integration test pins canonical placement and proves rendering does not
+  change project, dirty, or undo references.
+- TypeScript, lint, formatting, focused UI tests, and release checks are required before
+  publication. Browser narrow-panel/perceptual review, packaged Electron, controller behavior,
+  hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, source-truth requirements, provenance boundaries, and planned output disclosure.
+- ADR-292, the canonical heightfield provenance and mapping contracts.
+- ADR-301, the preceding declared-source-meaning disclosure.
