@@ -50,6 +50,10 @@ describe('laser transcript', () => {
       kind: 'gcode',
       source: 'job',
     });
+    expect(outboundTranscriptEntry(4, 103, 'G0 X2.5\n', 'macro')).toMatchObject({
+      kind: 'gcode',
+      source: 'macro',
+    });
   });
 
   it('keeps transcript entries bounded', () => {

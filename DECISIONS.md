@@ -16309,3 +16309,85 @@ scalar-field boundary and its lifecycle instead of creating a parallel photo-onl
 - Grbl v1.1 Interface - acknowledgements and status reports describe protocol/controller state and
   do not qualify loaded physical motion:
   https://github.com/gnea/grbl/blob/master/doc/markdown/interface.md
+
+## ADR-292 - Saved user macros remain one-command Console invocations (2026-08-09)
+
+**Date:** 2026-08-09
+**Status:** Accepted for focused v1 by direct maintainer request; software verification required,
+hardware qualification excluded
+
+### Context
+
+CurveDesk already has one controller-specific Console path. The shared command deck prepares input
+with the active driver, obtains the existing persistent-setting confirmation when applicable,
+dispatches through the laser store's `sendConsoleCommand`, and records only successful dispatches in
+its local command history. The store rechecks live operation and Idle ownership, invalidates setup
+evidence according to the parsed command's state effect, and writes through `safeWrite`.
+
+A general macro language would not be a small extension of that path. Ordinary Console writes do
+not all await terminal acknowledgement, and a state-mutating first line immediately makes cached
+Idle and any Frame permit stale. Multiline sequencing would therefore need new acknowledgement,
+status, cancellation, and partial-execution ownership. It could also become a second program sender
+beside the exact-artifact Frame/Start flow governed by ADR-228, ADR-230, and ADR-232.
+
+### Decision
+
+1. **V1 stores one command per named macro.** A user macro contains a normalized display name, one
+   single-line controller-command template, and created/updated timestamps. The versioned collection
+   is app-local data, not `.lf2` project truth, controller storage, or a built-in command catalog.
+2. **Variables are numeric substitution, not scripting.** A template declares variables only as
+   `{{identifier}}`. Each run supplies one finite ordinary-decimal scalar per distinct name. Values
+   cannot contain whitespace, exponent notation, command words, braces, or control/newline bytes.
+   Expansion returns a structured error for malformed syntax or missing/invalid values and never
+   splits output into multiple commands.
+3. **The active driver remains the parser of record.** After expansion, the complete command is
+   passed to the current driver's existing `prepareConsoleCommand`. Macro code does not classify
+   firmware commands, duplicate persistent-write policy, or manufacture wire bytes.
+4. **Execution is exclusively the existing Console execution.** The macro panel is a child of the
+   shared `ConsoleCommandDeck` and invokes that deck's existing send model. Dispatch remains
+   `runConsoleCommand` -> `sendConsoleCommand` -> `writeConsoleCommand` -> `safeWrite`. V1 adds no
+   raw serial call, batch writer, stream, scheduler, connect/startup hook, or keyboard trigger.
+5. **History and confirmations keep their existing meaning.** The expanded normalized command enters
+   Arrow history only after the shared runner reports `sent`. Cancelled, invalid, storage-only, or
+   rejected attempts do not. A macro that expands to a persistent setting write uses the same
+   existing confirmation as manually typed input.
+6. **Provenance is explicit and truthful.** Successful macro dispatch marks the outbound transcript
+   source as `macro` and appends a macro-source message containing the saved name and expanded
+   command. The message says what CurveDesk dispatched through Console; it does not claim controller
+   acknowledgement, physical position, or machine execution.
+7. **Frame-first remains the only job authorization.** Macro modules do not import or call Frame,
+   `runStartJobFlow`, `startJob`, streamer creation, or permit helpers. A read-only macro preserves
+   existing evidence exactly like typed Console input. A state-mutating macro clears `framedRun`
+   before its asynchronous write through the existing Console state-effect path. No macro creates,
+   refreshes, claims, or consumes a permit, so ordinary Start still requires the single completed
+   exact-job Frame permit.
+8. **Storage changes are fail-soft and non-fabricating.** Invalid stored records are ignored. A
+   failed save, edit, or delete leaves the last persisted in-memory collection unchanged and reports
+   the failure inline. No account, sync, telemetry, import, or export path is added.
+
+### Consequences
+
+- Operators can name and reuse diagnostic, setup, and one-line manual motion commands without
+  retyping them. The UI labels them user-saved, local, and one-command so they cannot be mistaken for
+  CurveDesk-authored workflows or reviewed job artifacts.
+- Numeric-only placeholders cover coordinates, feeds, power, dwell, and controller settings while
+  preventing a variable value from injecting another G/M/$ command. Command vocabulary stays in the
+  operator-authored fixed template and the controller driver's existing parser.
+- V1 deliberately does not satisfy the older aspirational Console text about multiline macros.
+  Multiline or controller-resident programs require a separate decision and may not bypass the
+  ordinary Frame/Start path.
+- Running a saved motion or modal command has the same physical implications and evidence
+  invalidation as typing that exact line in Console. Automated tests cannot establish controller
+  response, physical motion, placement, beam state, or hardware safety.
+
+### Verification
+
+- Pure tests cover placeholder discovery, repeated values, decimal expansion, malformed templates,
+  missing values, injection attempts, and versioned storage validation/failure behavior.
+- Command-deck tests prove a macro uses the shared runner, carries provenance, and records the
+  expanded command in the existing success-only history.
+- Store tests prove macro-source writes use `safeWrite`, read-only macros cannot mint a permit,
+  state-mutating macros invalidate an existing permit before write, no streamer is created, and
+  transcript provenance is success-only.
+- Focused Console/controller tests plus typecheck, lint, formatting, the broader unit suite, web
+  build, and file-size checks remain required. Hardware operation and deployment are excluded.
