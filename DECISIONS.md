@@ -16099,9 +16099,14 @@ scalar-field boundary and its lifecycle instead of creating a parallel photo-onl
    project-schema v4 adds a discriminated `heightfield-v1` arm with positive integer width and
    height, physical width and height in millimetres, row-major U16 scalar codes, an optional U8
    inclusion mask, explicit mapping and outside-mask semantics, source provenance, an algorithm
-   revision, and a content digest. Stored scalar codes do not claim a physical height without their
-   mapping. The mapping resolves them into the canonical height convention: `65535` is stock top and
-   `0` is the deepest included point. The portable scalar encoding is explicitly named
+   revision, and a content digest. An absent mask includes every sample. A present mask is exactly
+   `width * height` bytes: `0` records no source coverage, `255` records full coverage, and `1..254`
+   preserve partial coverage. Mapping persists an integer `inclusionThreshold` in `1..255`; a cell
+   is inside when its mask byte is at least that threshold. Below-threshold cells resolve to stock
+   top, relief floor, or omission from CAM according to the persisted outside-mask meaning. Stored
+   scalar codes do not claim a physical height without their mapping. The mapping resolves them into
+   the canonical height convention: `65535` is stock top and `0` is the deepest included point. The
+   portable scalar encoding is explicitly named
    `u16le-base64-v1`; byte order is never inferred. Existing ADR-290 8-bit source codes migrate
    exactly as `value * 257`; existing 16-bit network-order source codes are decoded and re-encoded
    with the same numeric values, while their legacy polarity becomes explicit mapping state. This
@@ -16114,15 +16119,20 @@ scalar-field boundary and its lifecycle instead of creating a parallel photo-onl
    aspect/crop placement, and outside-mask meaning: **stock top**, **relief floor**, or **excluded
    from carving**. Raw depth-map samples are data: PNG color-space and gamma chunks are reported but
    are not silently applied. Brightness emboss uses one named, versioned luminance conversion.
-   Alpha is never silently composited. Its visible default is **excluded from carving**, and the
-   operator may instead map it to stock top or relief floor before or after import. The UI shows a
-   histogram, clipped-low and clipped-high
+   Alpha is never silently composited. Every alpha byte is copied unchanged into the canonical mask;
+   the visible default is `inclusionThreshold = 255` with below-threshold cells **excluded from
+   carving**, so any transparency is outside by default without discarding intermediate alpha. The
+   operator may change the displayed threshold or instead map below-threshold cells to stock top or
+   relief floor before or after import. Mask editing, target preview, and CAM use that same byte,
+   threshold, and outside meaning. The UI shows a histogram, clipped-low and clipped-high
    percentages, and effective millimetres per field cell. Structural impossibility is a factual
    import or compile-integrity error; resolution, clipping, and machining concerns are warnings, not
    silent clamps, hidden coarsening, or new guards.
 5. **Build Relief Map Studio on U16 scalar data, not an RGBA canvas.** The editor works on the
    canonical field and optional mask with deterministic **Set height**, **Raise/lower**, **Smooth**,
-   **Flatten**, and **Mask** tools. It may reuse Image Studio's session, tile-history, and undo
+   **Flatten**, and **Mask** tools. Mask tools write exact U8 coverage values; inclusion is evaluated
+   by the same persisted threshold used by preview and CAM. It may reuse Image Studio's session,
+   tile-history, and undo
    patterns, but not its 8-bit display-buffer representation as source truth. Edits increment the
    field revision and digest; canceled or stale worker results cannot replace a newer edit.
 6. **Give roughing and finishing independent, truthful setup.** Roughing and finishing each select

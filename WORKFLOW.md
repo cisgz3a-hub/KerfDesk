@@ -4078,9 +4078,10 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. Choose **Create Relief...** and select the source meaning before import:
-   **Depth map**, **Brightness emboss**, **Relative-depth map**, **Blank editable
-   map**, or **STL top projection**. The choice is persisted as provenance and
-   stays visible in Relief properties and Job Review.
+   **Depth map**, **Brightness emboss**, **Relative-depth map**, **Editable relief
+   map**, or **STL top projection**. **Blank editable map** is the creation option
+   for a new **Editable relief map**. The canonical source meaning is persisted as
+   provenance and stays visible in Relief properties and Job Review.
 2. **Depth map** accepts qualified 8- or 16-bit grayscale PNG samples as scalar
    data. It reports PNG gamma/color-space metadata without silently applying it.
    The operator sets polarity, input-low/input-high codes, maximum physical
@@ -4111,8 +4112,8 @@ and lifts the command's CNC-only gate.)*
 #### Error - no trustworthy scalar field can be produced
 1. Invalid PNG structure/CRC, unsupported or inconsistent sample layout, unsafe
    dimension multiplication, mismatched payload length, invalid base64, invalid
-   mask length, non-finite physical mapping, or digest mismatch reports the exact
-   factual integrity problem and creates no object.
+   mask length, invalid inclusion threshold, non-finite physical mapping, or digest
+   mismatch reports the exact factual integrity problem and creates no object.
 2. A source whose declared format cannot preserve the selected mode reports what
    is unsupported. CurveDesk does not silently flatten alpha, reduce 16-bit data
    through a display canvas, color-manage raw depth codes, invent missing depth,
@@ -4128,9 +4129,12 @@ and lifts the command's CNC-only gate.)*
    physical and sample dimensions are shown before creation.
 
 #### Edge - alpha, flat ranges, large fields, and source truth
-1. An alpha-bearing source visibly defaults transparent samples to **excluded from
-   carving**. The operator may instead map alpha to stock top or relief floor before
-   or after creation. It is never silently composited against black or white.
+1. An alpha-bearing source copies every alpha byte unchanged into the U8 mask:
+   `0` is no coverage, `255` is full coverage, and `1..254` preserves partial
+   coverage. The visible default threshold is `255`, so any transparency is below
+   threshold and **excluded from carving**. The operator may change the threshold
+   or map below-threshold cells to stock top or relief floor before or after
+   creation. Alpha is never silently composited against black or white.
 2. When input-low equals input-high or every sample has one value, the preview is
    flat and explains why; no auto-level operation is applied. Clipped samples and
    unusually coarse effective cell size produce warnings, not hidden correction.
@@ -4180,9 +4184,11 @@ and lifts the command's CNC-only gate.)*
    compiled output if no other machining geometry exists.
 
 #### Edge - masks, boundaries, undo pressure, and stale results
-1. Mask brushes edit inclusion independently of height. Top/floor outside semantics
-   affect previewed target height; **excluded from carving** removes cells from CAM.
-   Boundary behavior is visible in the cross-section and 3D target view.
+1. Mask brushes edit exact U8 coverage independently of height. The persisted
+   inclusion threshold classifies each byte exactly as import does. Below-threshold
+   top/floor semantics set the previewed and machined target to that fixed height;
+   **excluded from carving** omits those cells from CAM. Boundary behavior is visible
+   in the cross-section and 3D target view.
 2. Smoothing samples only the documented neighborhood and mask policy. It never
    fills an excluded hole, crosses a mask boundary, changes polarity, or auto-levels
    the field unless that behavior is the named operator action.
@@ -4229,8 +4235,9 @@ and lifts the command's CNC-only gate.)*
 
 #### Error - CAM cannot produce a streamable artifact
 1. Non-finite coordinates or settings, impossible sample/tool geometry, failed
-   source validation, NaN paths, or empty output reports a factual compile-integrity
-   error with the responsible stage. No partial prepared artifact is published.
+   source validation, NaN paths, or another structurally unusable artifact reports a
+   factual compile-integrity error with the responsible stage. No partial prepared
+   artifact is published.
 2. Worker crash, transfer failure, or cancellation leaves the previous matching
    simulation visible with its revision and **Stale** state; Retry restarts from a
    clean snapshot. A partial removal grid is never labelled complete.
@@ -4238,7 +4245,8 @@ and lifts the command's CNC-only gate.)*
 #### Empty
 1. Finishing-only is valid and prepares the finishing tool section without a
    hidden roughing dependency. Roughing-only is valid. If both stages are disabled
-   and no other job geometry exists, preparation reports factual empty output.
+   and no other job geometry exists, preparation reports the factual compile-integrity
+   result **empty output** in this Empty state; no prepared artifact is published.
 2. A completely excluded mask produces no relief cuts and says so; it is not filled
    or converted to a floor behind the operator's back.
 
