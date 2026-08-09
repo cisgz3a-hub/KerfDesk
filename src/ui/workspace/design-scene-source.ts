@@ -103,6 +103,8 @@ function paneGridSpec(project: Project, machine: CncMachineConfig): RemovalGridS
     widthMm,
     heightMm,
     mmPerCell,
+    requestedMmPerCell: DEFAULT_CELL_MM,
+    resolutionReason: 'interactive-preview-cell-budget',
   };
 }
 

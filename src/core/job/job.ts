@@ -331,9 +331,38 @@ export type CncVCarveCompilationEvidence = {
   readonly passLimited: boolean;
 };
 
+/** Exact nonblocking end-state retained for one bounded CNC planner. */
+export type CncOffsetLadderCompilationEvidence = {
+  readonly layerId: string;
+  readonly kind: 'geometry-failed' | 'pass-limit' | 'thin-detail-dropped';
+};
+
+/** Exact positive Stepover consumed by a compiled operation layer. */
+export type CncStepoverCompilationEvidence = {
+  readonly layerId: string;
+  readonly stepoverPercent: number;
+};
+
+/** Materialized planning grid and finishing geometry for one relief source. */
+export type CncReliefPlanningEvidence = {
+  readonly layerId: string;
+  readonly source: string;
+  readonly stage: 'roughing' | 'finishing';
+  readonly widthCells: number;
+  readonly heightCells: number;
+  readonly cellSizeMm: number;
+  readonly toolDiameterMm: number;
+  readonly toolKind: CncToolKind;
+  readonly rowSpacingMm?: number;
+  readonly scallopMm?: number;
+};
+
 /** Structured-clone-safe CNC evidence retained with the exact compiled Job. */
 export type CncCompilationSidecar = {
   readonly vcarveOperations: ReadonlyArray<CncVCarveCompilationEvidence>;
+  readonly offsetLadderDiagnostics?: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
+  readonly stepoverOperations?: ReadonlyArray<CncStepoverCompilationEvidence>;
+  readonly reliefPlans?: ReadonlyArray<CncReliefPlanningEvidence>;
 };
 
 export type Job = {

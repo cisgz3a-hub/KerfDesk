@@ -29,6 +29,11 @@ describe('downsampleRemovalGrid', () => {
     expect(small.depth[0]).toBe(-3);
     expect(small.depth[3]).toBe(-2);
     expect(small.depth[1]).toBe(0);
+    expect(small.resolution).toEqual({
+      requestedMmPerCell: 1,
+      effectiveMmPerCell: 2,
+      reason: 'display-mesh-cell-budget',
+    });
   });
 
   it('covers the whole footprint when dimensions do not divide evenly', () => {
@@ -40,5 +45,18 @@ describe('downsampleRemovalGrid', () => {
     expect(small.widthCells).toBe(2);
     expect(small.heightCells).toBe(1);
     expect(small.depth[1]).toBe(-4);
+  });
+
+  it('keeps a coarse output cell excluded when any source coverage is excluded', () => {
+    const grid: RemovalGrid = {
+      ...gridWithDepths(4, 2, 1),
+      depth: Float32Array.from([-5, -4, -3, -2, -1, -1, -1, -1]),
+      inclusion: Uint8Array.from([0, 0, 1, 0, 0, 0, 0, 0]),
+    };
+
+    const small = downsampleRemovalGrid(grid, 2);
+
+    expect([...small.depth]).toEqual([0, 0]);
+    expect([...small.inclusion!]).toEqual([0, 0]);
   });
 });

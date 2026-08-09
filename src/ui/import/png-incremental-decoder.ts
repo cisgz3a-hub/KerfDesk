@@ -17,6 +17,11 @@ export type IncrementalPngProgress = {
   readonly encodedBytes: number;
 };
 
+export type IncrementalPngTransparency = {
+  readonly kind: 'grayscale-sample';
+  readonly sample: number;
+};
+
 export type IncrementalPngResult =
   | {
       readonly kind: 'ok';
@@ -36,6 +41,7 @@ export type IncrementalPngOptions = {
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: IncrementalPngProgress) => void;
   readonly onHeader?: (result: IncrementalPngHeaderResult) => void | Promise<void>;
+  readonly onTransparency?: (transparency: IncrementalPngTransparency) => void | Promise<void>;
   readonly onRow: (row: Uint8Array) => void | Promise<void>;
 };
 
@@ -100,6 +106,7 @@ async function decodeIdat(
   let sawIdat = false;
   let idatEnded = false;
   let densityDpi: number | null = null;
+  let transparentGraySample: number | undefined;
   try {
     while (true) {
       throwIfAborted(options.signal);
@@ -113,6 +120,14 @@ async function decodeIdat(
       if (sawIdat) idatEnded = true;
       const data = await readChunkData(reader, chunk);
       validatePaletteForColorType(chunk.type, format.colorType);
+      transparentGraySample = await grayscaleTransparencyFromChunk(
+        chunk,
+        format,
+        sawIdat,
+        data,
+        transparentGraySample,
+        options.onTransparency,
+      );
       densityDpi = densityFromChunk(chunk.type, sawIdat, data, densityDpi);
       if (chunk.type === 'IEND') {
         if (chunk.length !== 0) throw new Error('PNG IEND chunk must be empty.');
@@ -141,6 +156,27 @@ async function decodeIdat(
     await rows;
     throw error;
   }
+}
+
+async function grayscaleTransparencyFromChunk(
+  chunk: Pick<ChunkHeader, 'length' | 'type'>,
+  format: Pick<PngHeader, 'bitDepth' | 'colorType'>,
+  afterImageData: boolean,
+  bytes: Uint8Array,
+  current: number | undefined,
+  publish: IncrementalPngOptions['onTransparency'],
+): Promise<number | undefined> {
+  if (chunk.type !== 'tRNS' || format.colorType !== 0) return current;
+  if (afterImageData) throw new Error('PNG tRNS chunk must precede IDAT image data.');
+  if (current !== undefined) throw new Error('PNG may contain only one tRNS chunk.');
+  if (chunk.length !== 2 || bytes.byteLength !== 2) {
+    throw new Error('PNG grayscale tRNS chunk must contain exactly 2 bytes.');
+  }
+  const stored = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint16(0);
+  // PNG 3 section 11.3.1.1 requires decoders to ignore unused high bits.
+  const sample = stored & (2 ** format.bitDepth - 1);
+  await publish?.({ kind: 'grayscale-sample', sample });
+  return sample;
 }
 
 function validatePaletteForColorType(type: string, colorType: number): void {

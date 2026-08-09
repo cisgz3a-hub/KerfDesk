@@ -12,6 +12,7 @@ const SMALL_BALL_NOSE: CncTool = {
   diameterMm: 0.1,
 };
 const END_MILL: CncTool = { id: 'em', name: 'flat', kind: 'end-mill', diameterMm: 3.175 };
+const POINT_KERNEL = { radiusCells: 0, offsets: [{ dx: 0, dy: 0, dz: 0 }] } as const;
 
 function flatMap(depthMm: number, widthCells = 20, heightCells = 20, mmPerCell = 0.5): Heightmap {
   return {
@@ -159,6 +160,181 @@ describe('reliefFinishingPasses', () => {
       scallopMm: 0.005,
     });
     expect(fine.length).toBeGreaterThan(coarse.length);
+  });
+
+  it('omits flat-tool centers whose physical footprint enters excluded stock', () => {
+    const map: Heightmap = {
+      ...flatMap(-2, 6, 1, 1),
+      inclusion: Uint8Array.from([1, 1, 0, 1, 1, 0]),
+    };
+    const passes = reliefFinishingPasses(map, {
+      tool: END_MILL,
+      kernel: kernelForTool(END_MILL, 1),
+      scallopMm: 0.025,
+    });
+
+    expect(passes).toEqual([]);
+  });
+
+  it('keeps an all-included mask byte-for-byte equivalent to the unmasked plan', () => {
+    const map = flatMap(-2, 7, 8, 0.25);
+    const options = {
+      tool: END_MILL,
+      kernel: kernelForTool(END_MILL, map.mmPerCell),
+      scallopMm: 0.025,
+    };
+
+    expect(
+      reliefFinishingPasses(
+        { ...map, inclusion: new Uint8Array(map.depth.length).fill(1) },
+        options,
+      ),
+    ).toEqual(reliefFinishingPasses(map, options));
+  });
+
+  it('anchors finishing rows inside a mask island that lies between global rows', () => {
+    const map = {
+      ...flatMap(-2, 4, 7, 0.25),
+      inclusion: Uint8Array.from([
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      ]),
+    };
+    const passes = reliefFinishingPasses(map, {
+      tool: END_MILL,
+      kernel: POINT_KERNEL,
+      scallopMm: 0.025,
+    });
+
+    expect(passes).toHaveLength(1);
+    expect(passes[0]?.kind === 'path3d' ? passes[0].points : []).toEqual([
+      { x: 0.375, y: 0.625, z: -2 },
+      { x: 0.625, y: 0.625, z: -2 },
+    ]);
+  });
+
+  it('finishes a one-row side lobe attached between a taller component stride', () => {
+    const map = {
+      ...flatMap(-2, 4, 5, 0.5),
+      inclusion: Uint8Array.from([1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+    };
+    const passes = reliefFinishingPasses(map, {
+      tool: END_MILL,
+      kernel: POINT_KERNEL,
+      scallopMm: 0.025,
+    });
+    const lobe = passes.find((pass) => pass.kind === 'path3d' && pass.points[0]?.y === 0.75);
+
+    expect(lobe?.kind === 'path3d' ? lobe.points : []).toEqual([
+      { x: 1.75, y: 0.75, z: -2 },
+      { x: 1.25, y: 0.75, z: -2 },
+      { x: 0.75, y: 0.75, z: -2 },
+    ]);
+  });
+
+  it('reaches a side lobe with the matched ball-nose envelope', () => {
+    const widthCells = 16;
+    const heightCells = 5;
+    const inclusion = new Uint8Array(widthCells * heightCells);
+    inclusion.fill(1, widthCells, widthCells * 2);
+    for (let row = 0; row < heightCells; row += 1) {
+      inclusion[row * widthCells + 8] = 1;
+    }
+    const map = { ...flatMap(-2, widthCells, heightCells, 0.25), inclusion };
+    const passes = reliefFinishingPasses(map, {
+      tool: BALL_NOSE,
+      kernel: kernelForTool(BALL_NOSE, map.mmPerCell),
+      scallopMm: 0.025,
+    });
+    const branchTargets = passes.flatMap((pass) =>
+      pass.kind === 'path3d' ? pass.points.filter((point) => point.y === 0.375 && point.z < 0) : [],
+    );
+
+    expect(branchTargets).toHaveLength(15);
+  });
+
+  it('represents a reachable singleton as a stock-top-to-target vertical plunge', () => {
+    const map = { ...flatMap(-2, 1, 1, 1), inclusion: Uint8Array.of(1) };
+    const passes = reliefFinishingPasses(map, {
+      tool: END_MILL,
+      kernel: POINT_KERNEL,
+      scallopMm: 0.025,
+    });
+
+    expect(passes).toEqual([
+      {
+        kind: 'path3d',
+        points: [
+          { x: 0.5, y: 0.5, z: 0 },
+          { x: 0.5, y: 0.5, z: -2 },
+        ],
+        closed: false,
+      },
+    ]);
+  });
+
+  it('keeps diagonal-only mask cells in separate vertical passes', () => {
+    const map = {
+      ...flatMap(-2, 2, 2, 1),
+      inclusion: Uint8Array.from([1, 0, 0, 1]),
+    };
+    const passes = reliefFinishingPasses(map, {
+      tool: END_MILL,
+      kernel: POINT_KERNEL,
+      scallopMm: 0.025,
+    });
+
+    expect(passes).toHaveLength(2);
+    expect(
+      passes.map((pass) =>
+        pass.kind === 'path3d' ? pass.points.map(({ x, y }) => ({ x, y })) : [],
+      ),
+    ).toEqual([
+      [
+        { x: 0.5, y: 0.5 },
+        { x: 0.5, y: 0.5 },
+      ],
+      [
+        { x: 1.5, y: 1.5 },
+        { x: 1.5, y: 1.5 },
+      ],
+    ]);
+  });
+
+  it('uses the requested row stride and component far row for a vertical strip', () => {
+    const map = {
+      ...flatMap(-2, 1, 7, 0.25),
+      inclusion: new Uint8Array(7).fill(1),
+    };
+    const passes = reliefFinishingPasses(map, {
+      tool: END_MILL,
+      kernel: POINT_KERNEL,
+      scallopMm: 0.025,
+    });
+    const rowYs = passes.map((pass) => (pass.kind === 'path3d' ? pass.points[0]?.y : undefined));
+
+    expect(rowYs).toEqual([0.125, 1.375, 1.625]);
+    expect(
+      Math.max(...rowYs.slice(1).map((y, index) => (y ?? 0) - (rowYs[index] ?? 0))),
+    ).toBeLessThanOrEqual(scallopRowSpacingMm(END_MILL, 0.025));
+  });
+
+  it('does not claim a singleton cut when the tool-center envelope stays at stock top', () => {
+    const map = { ...flatMap(-2, 2, 1, 1), inclusion: Uint8Array.from([1, 0]) };
+    const stockTopKernel = {
+      radiusCells: 1,
+      offsets: [
+        { dx: 0, dy: 0, dz: 0 },
+        { dx: 1, dy: 0, dz: 0 },
+      ],
+    } as const;
+
+    expect(
+      reliefFinishingPasses(map, {
+        tool: END_MILL,
+        kernel: stockTopKernel,
+        scallopMm: 0.025,
+      }),
+    ).toEqual([]);
   });
 
   it('never rounds sampled row spacing above the ball-nose planar scallop target', () => {

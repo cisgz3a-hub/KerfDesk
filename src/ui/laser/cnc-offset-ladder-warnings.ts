@@ -25,14 +25,25 @@ export function detectCncOffsetLadderWarnings(
 ): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
+  const exactCompiled = compiledJob?.cncCompilation?.offsetLadderDiagnostics;
   const diagnostics =
-    sourceGeometryChecks === 'compiled-evidence-only'
-      ? compiledVCarveDiagnostics(compiledJob)
-      : findCncOffsetLadderDiagnostics(project.scene, project.device, machine, compiledJob);
+    exactCompiled !== undefined
+      ? exactCompiled
+      : sourceGeometryChecks === 'compiled-evidence-only'
+        ? compiledLadderDiagnostics(compiledJob)
+        : findCncOffsetLadderDiagnostics(
+            project.scene,
+            project.device,
+            machine,
+            compiledJob,
+            false,
+          );
   return diagnostics.map((diagnostic) => ladderWarningFor(project, diagnostic));
 }
 
-function compiledVCarveDiagnostics(job: Job | undefined): ReadonlyArray<CncOffsetLadderDiagnostic> {
+function compiledLadderDiagnostics(job: Job | undefined): ReadonlyArray<CncOffsetLadderDiagnostic> {
+  const exact = job?.cncCompilation?.offsetLadderDiagnostics;
+  if (exact !== undefined) return exact;
   const diagnostics: CncOffsetLadderDiagnostic[] = [];
   const byLayer = new Map<string, number>();
   for (const evidence of job?.cncCompilation?.vcarveOperations ?? []) {

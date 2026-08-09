@@ -11,6 +11,7 @@ import {
   parseGcodeOffThread,
   parseStlOffThread,
   prepareDepthMapPngOffThread,
+  prepareReliefHeightfieldPngOffThread,
   resetImportWorkerForTests,
 } from './import-worker-client';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
@@ -75,6 +76,7 @@ describe('import worker client', () => {
     expect(parseGcodeOffThread(blob())).toBeNull();
     expect(parseStlOffThread(blob(), stlOptions)).toBeNull();
     expect(prepareDepthMapPngOffThread(blob())).toBeNull();
+    expect(prepareReliefHeightfieldPngOffThread(blob(), 'depth.png', 100, 5)).toBeNull();
   });
 
   it('sends the blob itself rather than pre-read text', () => {
@@ -109,6 +111,25 @@ describe('import worker client', () => {
     const result = { kind: 'error' as const, reason: 'not grayscale' };
 
     latest().reply({ id, kind: 'depth-map-png', result });
+
+    await expect(promise).resolves.toEqual(result);
+  });
+
+  it('routes canonical heightfield preparation with its physical mapping inputs', async () => {
+    const source = blob();
+    const promise = prepareReliefHeightfieldPngOffThread(source, 'depth.png', 100, 5);
+    const posted = latest().posted[0];
+    const id = posted?.id ?? -1;
+    const result = { kind: 'error' as const, reason: 'not grayscale' };
+
+    expect(posted).toMatchObject({
+      kind: 'relief-heightfield-png',
+      blob: source,
+      sourceName: 'depth.png',
+      physicalWidthMm: 100,
+      maxDepthMm: 5,
+    });
+    latest().reply({ id, kind: 'relief-heightfield-png', result });
 
     await expect(promise).resolves.toEqual(result);
   });

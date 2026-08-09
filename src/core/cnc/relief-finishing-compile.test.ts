@@ -3,6 +3,7 @@
 // order, both before any profile work; without one, roughing stays alone.
 
 import { describe, expect, it } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import { computeJobBounds, frameBoundsSignature } from '../job';
 import { scallopRowSpacingMm } from '../relief';
@@ -18,10 +19,8 @@ import {
   type ReliefObject,
   type Scene,
 } from '../scene';
+import type { MeshReliefObject } from '../scene/relief';
 import { compileCncJob } from './compile-cnc-job';
-
-type MeshReliefObject = Exclude<ReliefObject, { readonly depthMap: unknown }>;
-type DepthMapReliefObject = Extract<ReliefObject, { readonly depthMap: unknown }>;
 
 const RELIEF_COLOR = '#a0522d';
 const SMALL_BALL_NOSE: CncTool = {
@@ -35,42 +34,66 @@ const SMALL_TOOL_CONFIG: CncMachineConfig = {
   tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, SMALL_BALL_NOSE],
 };
 
-// A tilted triangle mesh — enough surface for a real heightmap.
-function relief(overrides: Partial<MeshReliefObject> = {}): MeshReliefObject {
+// A tilted triangle mesh â€” enough surface for a real heightmap.
+type ReliefOverrides = Partial<Omit<MeshReliefObject, 'reliefSource'>> &
+  Partial<MeshReliefObject['reliefSource']>;
+
+function relief(overrides: ReliefOverrides = {}): MeshReliefObject {
+  const {
+    meshPositions = [0, 0, 0, 12, 0, 3, 0, 12, 6],
+    emptyCells = 'floor',
+    ...commonOverrides
+  } = overrides;
   return {
     kind: 'relief',
     id: 'R1',
     source: 'model.stl',
-    meshPositions: [0, 0, 0, 12, 0, 3, 0, 12, 6],
     targetWidthMm: 12,
     reliefDepthMm: 5,
-    emptyCells: 'floor',
+    reliefSource: { kind: 'legacy-mesh', meshPositions, emptyCells },
     color: RELIEF_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 12, maxY: 12 },
     transform: IDENTITY_TRANSFORM,
-    ...overrides,
+    ...commonOverrides,
   };
 }
 
-function depthMapRelief(overrides: Partial<DepthMapReliefObject> = {}): DepthMapReliefObject {
+function depthMapRelief(): ReliefObject {
   return {
     kind: 'relief',
     id: 'D1',
     source: 'surface.png',
-    depthMap: {
-      schemaVersion: 1,
+    reliefSource: testReliefHeightfield({
       width: 2,
       height: 2,
-      bitDepth: 8,
-      samplesBase64: Buffer.from([0, 255, 128, 255]).toString('base64'),
-      polarity: 'light-is-high',
-    },
+      physicalWidthMm: 12,
+      physicalHeightMm: 12,
+      maxDepthMm: 5,
+      samplesU8: [0, 255, 128, 255],
+      provenance: { sourceName: 'surface.png' },
+    }),
     targetWidthMm: 12,
     reliefDepthMm: 5,
     color: RELIEF_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 12, maxY: 12 },
     transform: IDENTITY_TRANSFORM,
-    ...overrides,
+  };
+}
+
+function shallowDepthMapRelief(): ReliefObject {
+  const maxDepthMm = 0.1;
+  return {
+    ...depthMapRelief(),
+    reliefDepthMm: maxDepthMm,
+    reliefSource: testReliefHeightfield({
+      width: 2,
+      height: 2,
+      physicalWidthMm: 12,
+      physicalHeightMm: 12,
+      maxDepthMm,
+      samplesU8: [0, 0, 0, 0],
+      provenance: { sourceName: 'shallow.png' },
+    }),
   };
 }
 
@@ -117,17 +140,7 @@ describe('relief finishing compile (H.8)', () => {
   });
 
   it('keeps a selected finishing skim when the relief is shallower than roughing allowance', () => {
-    const object = depthMapRelief({
-      reliefDepthMm: 0.1,
-      depthMap: {
-        schemaVersion: 1,
-        width: 2,
-        height: 2,
-        bitDepth: 8,
-        samplesBase64: Buffer.from([0, 0, 0, 0]).toString('base64'),
-        polarity: 'light-is-high',
-      },
-    });
+    const object = shallowDepthMapRelief();
     expect(compile({}, object).groups).toHaveLength(0);
     const job = compile({ reliefFinishToolId: 'bn-3175' }, object);
     const groups = job.groups.filter((group) => group.kind === 'cnc');
@@ -293,9 +306,28 @@ describe('relief finishing compile (H.8)', () => {
     const maxGap = Math.max(...rowYs.slice(1).map((y, index) => Math.abs(y - (rowYs[index] ?? y))));
     const radius = SMALL_BALL_NOSE.diameterMm / 2;
     const planarCusp = radius - Math.sqrt(radius * radius - (maxGap * maxGap) / 4);
+    const finishPlan = job.cncCompilation?.reliefPlans?.find((plan) => plan.stage === 'finishing');
 
     expect(maxGap).toBeLessThan(0.05);
     expect(maxGap).toBeLessThanOrEqual(scallopRowSpacingMm(SMALL_BALL_NOSE, scallopMm) + 1e-9);
     expect(planarCusp).toBeLessThanOrEqual(scallopMm + 1e-12);
+    expect(finishPlan?.cellSizeMm).toBeCloseTo(SMALL_BALL_NOSE.diameterMm / 10, 12);
+  });
+
+  it('does not floor roughing resolution for a small exact tool', () => {
+    const object = relief({
+      meshPositions: [0, 0, 0, 0.2, 0, 0.1, 0, 0.2, 0.2],
+      targetWidthMm: 0.2,
+      bounds: { minX: 0, minY: 0, maxX: 0.2, maxY: 0.2 },
+    });
+    const job = compile(
+      { toolId: SMALL_BALL_NOSE.id },
+      object,
+      DEFAULT_DEVICE_PROFILE,
+      SMALL_TOOL_CONFIG,
+    );
+    const roughingPlan = job.cncCompilation?.reliefPlans?.find((plan) => plan.stage === 'roughing');
+
+    expect(roughingPlan?.cellSizeMm).toBeCloseTo(SMALL_BALL_NOSE.diameterMm / 8, 12);
   });
 });

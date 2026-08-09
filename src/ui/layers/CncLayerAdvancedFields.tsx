@@ -175,7 +175,7 @@ export function StepoverField(props: {
       step={5}
       title={
         props.hasReliefObjects
-          ? 'Ring spacing as a percentage of the bit diameter — drives pocket clearing and relief roughing.'
+          ? 'Relief roughing and pocket ring spacing as a percentage of the bit diameter.'
           : 'Pocket ring spacing as a percentage of the bit diameter.'
       }
       onCommit={(stepoverPercent) => props.onCommit({ stepoverPercent })}

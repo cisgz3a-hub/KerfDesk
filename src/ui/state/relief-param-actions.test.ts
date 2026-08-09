@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   createLayer,
   createProject,
@@ -16,10 +17,13 @@ function relief(): ReliefObject {
     kind: 'relief',
     id: 'R1',
     source: 'model.stl',
-    meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    emptyCells: 'floor',
+    reliefSource: {
+      kind: 'legacy-mesh',
+      meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
+      emptyCells: 'floor',
+    },
     color: DEFAULT_RELIEF_LAYER_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
     transform: { ...IDENTITY_TRANSFORM, x: 20, y: 30 },
@@ -54,7 +58,9 @@ describe('setReliefParams', () => {
 
     const updated = storedRelief();
     expect(updated.reliefDepthMm).toBe(8);
-    expect(updated.emptyCells).toBe('top');
+    expect(
+      updated.reliefSource.kind === 'legacy-mesh' ? updated.reliefSource.emptyCells : null,
+    ).toBe('top');
     expect(useStore.getState().dirty).toBe(true);
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
@@ -69,12 +75,91 @@ describe('setReliefParams', () => {
     expect(updated.transform).toMatchObject({ x: 20, y: 30 });
   });
 
-  it('clamps width and depth to their editor ranges', () => {
-    useStore.getState().setReliefParams('R1', { targetWidthMm: 99999, reliefDepthMm: 0 });
+  it('accepts uncapped positive dimensions and ignores non-positive or non-finite values', () => {
+    useStore.getState().setReliefParams('R1', { targetWidthMm: 99_999, reliefDepthMm: 500 });
+
+    expect(storedRelief()).toMatchObject({ targetWidthMm: 99_999, reliefDepthMm: 500 });
+    const acceptedProject = useStore.getState().project;
+    useStore.setState({ dirty: false, undoStack: [] });
+
+    useStore
+      .getState()
+      .setReliefParams('R1', { targetWidthMm: Number.POSITIVE_INFINITY, reliefDepthMm: 0 });
+
+    expect(storedRelief()).toMatchObject({ targetWidthMm: 99_999, reliefDepthMm: 500 });
+    expect(useStore.getState().project).toBe(acceptedProject);
+    expect(useStore.getState().dirty).toBe(false);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it('keeps canonical field dimensions, mapping, and revision synchronized', () => {
+    const field = testReliefHeightfield({
+      width: 2,
+      height: 1,
+      physicalWidthMm: 100,
+      physicalHeightMm: 50,
+      maxDepthMm: 5,
+      samplesU8: [0, 255],
+    });
+    const current = useStore.getState().project;
+    useStore.setState({
+      project: {
+        ...current,
+        scene: {
+          ...current.scene,
+          objects: [{ ...relief(), source: 'depth.png', reliefSource: field }],
+        },
+      },
+    });
+
+    useStore.getState().setReliefParams('R1', {
+      targetWidthMm: 200,
+      reliefDepthMm: 8,
+      polarity: 'light-is-deep',
+    });
 
     const updated = storedRelief();
-    expect(updated.targetWidthMm).toBe(1500);
-    expect(updated.reliefDepthMm).toBe(0.1);
+    expect(updated.bounds).toEqual({ minX: 0, minY: 0, maxX: 200, maxY: 100 });
+    expect(updated.reliefSource.kind).toBe('heightfield-v1');
+    if (updated.reliefSource.kind !== 'heightfield-v1') return;
+    expect(updated.reliefSource).toMatchObject({
+      physicalWidthMm: 200,
+      physicalHeightMm: 100,
+      revision: 1,
+      mapping: { maxDepthMm: 8, polarity: 'light-is-deep' },
+    });
+  });
+
+  it('does not advance the field revision when canonical values are unchanged', () => {
+    const field = testReliefHeightfield({
+      width: 2,
+      height: 1,
+      physicalWidthMm: 100,
+      physicalHeightMm: 50,
+      maxDepthMm: 5,
+      samplesU8: [0, 255],
+    });
+    const current = useStore.getState().project;
+    useStore.setState({
+      project: {
+        ...current,
+        scene: {
+          ...current.scene,
+          objects: [{ ...relief(), source: 'depth.png', reliefSource: field }],
+        },
+      },
+    });
+
+    useStore.getState().setReliefParams('R1', {
+      targetWidthMm: 100,
+      reliefDepthMm: 5,
+      polarity: 'light-is-high',
+    });
+
+    const updated = storedRelief();
+    expect(updated.reliefSource.kind).toBe('heightfield-v1');
+    if (updated.reliefSource.kind !== 'heightfield-v1') return;
+    expect(updated.reliefSource.revision).toBe(field.revision);
   });
 
   it('is a no-op for unknown ids and non-relief objects', () => {

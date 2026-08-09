@@ -27,6 +27,7 @@ import {
   computeDesignSceneSource,
   computeDesignSceneSourceFromPrepared,
 } from './design-scene-source';
+import { cnc3dPaneDisplayResolution } from './use-cnc-3d-scene';
 
 function squareObject(
   id: string,
@@ -122,6 +123,23 @@ const TWO_BIT_PROJECT: Project = {
 };
 
 describe('computeDesignSceneSource', () => {
+  it('retains the request and discloses the bounded pane display resolution', () => {
+    const source = preparedDesignSceneSource(TWO_BIT_PROJECT);
+    expect(source).not.toBeNull();
+    if (source === null) return;
+
+    expect(source.grid.resolution).toEqual({
+      requestedMmPerCell: 0.2,
+      effectiveMmPerCell: 0.2,
+      reason: null,
+    });
+    expect(cnc3dPaneDisplayResolution(source.grid)).toEqual({
+      requestedMmPerCell: 0.2,
+      effectiveMmPerCell: 0.4,
+      reason: 'display-mesh-cell-budget',
+    });
+  });
+
   it('stamps each tool section of a two-bit job with its own bit kernel', () => {
     const source = preparedDesignSceneSource(TWO_BIT_PROJECT);
     expect(source).not.toBeNull();

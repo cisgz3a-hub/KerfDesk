@@ -36,8 +36,10 @@ export function reliefPhysicalDimensions(relief: ReliefObject): ReliefPhysicalDi
 }
 
 function reliefSourceAspect(relief: ReliefObject): number {
-  if (relief.depthMap !== undefined) return relief.depthMap.height / relief.depthMap.width;
-  return meshSourceAspect(relief.meshPositions);
+  if (relief.reliefSource.kind === 'heightfield-v1') {
+    return relief.reliefSource.physicalHeightMm / relief.reliefSource.physicalWidthMm;
+  }
+  return meshSourceAspect(relief.reliefSource.meshPositions);
 }
 
 const meshAspectByPositions = new WeakMap<object, number>();

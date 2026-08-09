@@ -6,11 +6,11 @@ import {
   type ReliefObject,
   type SceneObject,
 } from '../../core/scene';
-import type { ReliefDepthMap } from '../../core/scene/relief';
+import type { ReliefHeightfield } from '../../core/scene/relief';
 import type { PlatformAdapter } from '../../platform/types';
 import { pickPlatformPngFiles } from '../commands/platform-image-files';
-import { prepareDepthMapPng } from '../import/depth-map-import-preparation';
-import { prepareDepthMapPngOffThread } from '../import/import-worker-client';
+import { prepareReliefHeightfieldPng } from '../import/depth-map-import-preparation';
+import { prepareReliefHeightfieldPngOffThread } from '../import/import-worker-client';
 import type { ToastVariant } from '../state/toast-store';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
@@ -58,7 +58,13 @@ async function importHeightMapFile(
   if (advisory !== null) context.pushToast(advisory, 'warning');
   const controls = createImportWorkerControls(file.name, context.pushToast);
   try {
-    const pending = prepareDepthMapPngOffThread(file, controls.options);
+    const pending = prepareReliefHeightfieldPngOffThread(
+      file,
+      file.name,
+      DEFAULT_RELIEF_WIDTH_MM,
+      DEFAULT_RELIEF_DEPTH_MM,
+      controls.options,
+    );
     const prepared =
       pending === null
         ? await prepareOnMainThread(file, context.pushToast, controls.options.signal)
@@ -67,8 +73,8 @@ async function importHeightMapFile(
       context.pushToast(`${file.name}: ${prepared.reason}`, 'error');
       return false;
     }
-    context.importObject(reliefFromDepthMap(file.name, prepared.depthMap), batchIndex);
-    reportImportSuccess(file.name, prepared.depthMap, context);
+    context.importObject(reliefFromHeightfield(file.name, prepared.heightfield), batchIndex);
+    reportImportSuccess(file.name, prepared.heightfield, context);
     return true;
   } catch (error) {
     reportImportFailure(file.name, error, context.pushToast);
@@ -80,7 +86,7 @@ async function importHeightMapFile(
 
 function reportImportSuccess(
   fileName: string,
-  depthMap: ReliefDepthMap,
+  heightfield: ReliefHeightfield,
   context: HeightMapImportContext,
 ): void {
   const laserNote =
@@ -88,7 +94,7 @@ function reportImportSuccess(
       ? ' It is stored now and becomes output geometry in CNC mode.'
       : '';
   context.pushToast(
-    `Imported height map "${fileName}" (${depthMap.width}x${depthMap.height}, light is high) at ` +
+    `Imported height map "${fileName}" (${heightfield.width}x${heightfield.height}, light is high) at ` +
       `${DEFAULT_RELIEF_WIDTH_MM} mm wide x ${DEFAULT_RELIEF_DEPTH_MM} mm deep.${laserNote}`,
     'success',
   );
@@ -112,20 +118,25 @@ async function prepareOnMainThread(
   signal: AbortSignal | undefined,
 ) {
   pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
-  return prepareDepthMapPng(file, signal === undefined ? {} : { signal });
+  return prepareReliefHeightfieldPng(file, {
+    sourceName: file.name,
+    physicalWidthMm: DEFAULT_RELIEF_WIDTH_MM,
+    maxDepthMm: DEFAULT_RELIEF_DEPTH_MM,
+    ...(signal === undefined ? {} : { signal }),
+  });
 }
 
-function reliefFromDepthMap(source: string, depthMap: ReliefDepthMap): ReliefObject {
-  const heightMm = DEFAULT_RELIEF_WIDTH_MM * (depthMap.height / depthMap.width);
+function reliefFromHeightfield(source: string, heightfield: ReliefHeightfield): ReliefObject {
+  const heightMm = heightfield.physicalHeightMm;
   return {
     kind: 'relief',
     id: crypto.randomUUID(),
     source,
-    depthMap,
-    targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
-    reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
+    targetWidthMm: heightfield.physicalWidthMm,
+    reliefDepthMm: heightfield.mapping.maxDepthMm,
+    reliefSource: heightfield,
     color: DEFAULT_RELIEF_LAYER_COLOR,
-    bounds: { minX: 0, minY: 0, maxX: DEFAULT_RELIEF_WIDTH_MM, maxY: heightMm },
+    bounds: { minX: 0, minY: 0, maxX: heightfield.physicalWidthMm, maxY: heightMm },
     transform: IDENTITY_TRANSFORM,
   };
 }

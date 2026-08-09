@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
-import { DEFAULT_CNC_MACHINE_CONFIG, type ReliefObject } from '../../core/scene';
+import { DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type { RemovalGrid } from '../../core/sim';
 import { isCanvasCompilationBridgeConnection } from './canvas-compilation-worker-protocol';
 import {
@@ -77,6 +78,7 @@ const GRID: RemovalGrid = {
   originX: 0,
   originY: 0,
   depth: new Float32Array([-1]),
+  resolution: { requestedMmPerCell: 1, effectiveMmPerCell: 1, reason: null },
 };
 const SURFACE: ReliefSurfaceMeshWithNormals = {
   positions: new Float32Array([0, 0, -1]),
@@ -85,14 +87,14 @@ const SURFACE: ReliefSurfaceMeshWithNormals = {
   widthMm: 1,
   heightMm: 1,
 };
-const DEPTH_MAP: NonNullable<ReliefObject['depthMap']> = {
-  schemaVersion: 1,
+const DEPTH_MAP = testReliefHeightfield({
   width: 1,
   height: 1,
-  bitDepth: 8,
-  samplesBase64: '/w==',
-  polarity: 'light-is-high',
-};
+  physicalWidthMm: 1,
+  physicalHeightMm: 1,
+  maxDepthMm: 1,
+  samplesU8: [255],
+});
 
 beforeEach(() => {
   resetCncRemovalGridWorkerForTests();
