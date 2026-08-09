@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC46 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47..F-CNC50 are approved planned behavior under ADR-291 and are not current UI.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2399,6 +2399,10 @@ profile, F-CNC14 tool-change job, F-CNC15 Z zeroing, F-CNC16 drill,
 F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
+F-CNC46 records the shipped ADR-290 explicit 8-bit grayscale height-map path.
+F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Those four flows are
+**planned**, not descriptions of controls currently available in CurveDesk.
+
 ### F-CNC1. Switch to CNC mode and configure the machine
 
 #### Success
@@ -4066,6 +4070,268 @@ and lifts the command's CNC-only gate.)*
    subpixel detail, a continuous swept cutter envelope, holder clearance,
    controller tracking, material finish, or safe feeds for a particular tool,
    wood, spindle, or machine.
+
+### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
+
+> **Planned - not current UI.** Until P2R.1 ships, use F-CNC46's narrower
+> **Import Height Map...** flow and its 8-bit grayscale contract.
+
+#### Success
+1. Choose **Create Relief...** and select the source meaning before import:
+   **Depth map**, **Brightness emboss**, **Relative-depth map**, **Editable relief
+   map**, or **STL top projection**. **Blank editable map** is the creation option
+   for a new **Editable relief map**. The canonical source meaning is persisted as
+   provenance and stays visible in Relief properties and Job Review.
+2. **Depth map** accepts qualified 8- or 16-bit grayscale PNG samples as scalar
+   data. It reports PNG gamma/color-space metadata without silently applying it.
+   The operator sets polarity, input-low/input-high codes, maximum physical
+   depth, aspect/crop placement, and any alpha/mask meaning. The original source
+   range remains recoverable while these controls remap it non-destructively.
+3. **Brightness emboss** accepts a normal raster as an artistic tonal source. A
+   named, versioned luminance transform produces the scalar field; the surface
+   repeatedly labels the result **artistic emboss - not recovered 3D geometry**.
+4. **Relative-depth map** accepts an externally estimated scalar map and optional
+   producer/model provenance. It repeatedly labels values **relative - not
+   millimetres**; the operator maps the relative range to maximum physical depth.
+   This phase performs no in-app AI inference and downloads no model weights.
+5. **Blank editable map** creates a flat U16 field at displayed pixel and physical
+   dimensions. **STL top projection** preserves the existing mesh unless the user
+   explicitly chooses **Convert to editable relief map** and accepts the displayed
+   field resolution as the new editable representation.
+6. A histogram, low/high clipping percentages, physical width/height, effective
+   millimetres per field cell, polarity, and outside-mask choice update with the
+   target preview. Outside-mask meaning is explicit: **stock top**, **relief
+   floor**, or **excluded from carving**.
+7. **Create** adds a one-sided top-down relief whose canonical editable arm uses
+   row-major U16 scalar codes, optional U8 inclusion mask, mapping/provenance/revision,
+   and digest. Stored source codes remain lossless; the explicit mapping resolves them
+   to canonical height codes (`65535` stock top, `0` deepest). Preview, editing, CAM,
+   simulation, save, and output consume that same field and mapping rather than
+   separately reinterpreting the source image.
+
+#### Error - no trustworthy scalar field can be produced
+1. Invalid PNG structure/CRC, unsupported or inconsistent sample layout, unsafe
+   dimension multiplication, mismatched payload length, invalid base64, invalid
+   mask length, invalid inclusion threshold, non-finite physical mapping, or digest
+   mismatch reports the exact factual integrity problem and creates no object.
+2. A source whose declared format cannot preserve the selected mode reports what
+   is unsupported. CurveDesk does not silently flatten alpha, reduce 16-bit data
+   through a display canvas, color-manage raw depth codes, invent missing depth,
+   or relabel RGB brightness as measured geometry.
+3. Failure or cancellation leaves the project unchanged and offers **Retry** or
+   the previous source selection; other files in a multi-file selection continue.
+
+#### Empty
+1. Canceling the picker or creation surface changes nothing. A zero-byte source,
+   zero dimension, or empty decoded field is a factual input-integrity error, not
+   a flat relief.
+2. **Blank editable map** is the deliberate way to begin from a flat field. Its
+   physical and sample dimensions are shown before creation.
+
+#### Edge - alpha, flat ranges, large fields, and source truth
+1. An alpha-bearing source copies every alpha byte unchanged into the U8 mask:
+   `0` is no coverage, `255` is full coverage, and `1..254` preserves partial
+   coverage. The visible default threshold is `255`, so any transparency is below
+   threshold and **excluded from carving**. The operator may change the threshold
+   or map below-threshold cells to stock top or relief floor before or after
+   creation. Alpha is never silently composited against black or white.
+2. When input-low equals input-high or every sample has one value, the preview is
+   flat and explains why; no auto-level operation is applied. Clipped samples and
+   unusually coarse effective cell size produce warnings, not hidden correction.
+3. Large sources use worker decode with byte/row progress and cooperative Escape
+   cancellation. Size and estimated memory are advisories. CurveDesk neither
+   invents a policy ceiling nor silently downsamples; any operator-selected
+   reduction displays the resulting dimensions and millimetres per cell.
+4. A source producer may be unknown. Missing provenance is displayed as unknown,
+   not fabricated. Relative-depth provenance never upgrades relative values to
+   metric depth.
+
+### F-CNC48. Edit the canonical relief field - planned (ADR-291 / P2R.2)
+
+> **Planned - not current UI.** P2R.2 begins only after P2R.1's schema, migration,
+> import, worker, and persistence contracts are verified.
+
+#### Success
+1. Select an editable relief and choose **Edit Relief Map...**. Relief Map Studio
+   opens the canonical U16 field and optional U8 inclusion mask, not a reduced
+   RGBA display copy.
+2. Use **Set height**, **Raise/lower**, **Smooth**, **Flatten**, and **Mask** tools.
+   Brush size and strength are expressed in visible field/physical units; the
+   numeric height readout uses the current physical mapping and never changes the
+   underlying depth convention (`Z = 0` at stock top, negative into stock).
+3. Tonal controls remain non-destructive mapping state. Pixel tools change the
+   field or mask. Each completed stroke is one deterministic undo item; Undo/Redo
+   restores exact affected tiles and increments the published field revision.
+4. The 2D field, histogram, cursor sample, cross-section, and interactive target
+   surface update from the same revision. Zoom, shading, and camera changes alter
+   only the view.
+5. **Apply** writes the exact revised field, mask, mapping, provenance, revision,
+   and digest back to the relief object. **Cancel** discards the editing session
+   and leaves the project object byte-for-byte unchanged.
+
+#### Error - edit work cannot publish
+1. Worker construction/crash, transfer failure, allocation failure, invalid tile,
+   or digest/revision mismatch reports the operation and keeps the last committed
+   field. A failed partial stroke never publishes half of its tiles.
+2. **Retry** restarts from the last committed revision. If a disclosed bounded
+   main-thread fallback exists for an operation, the UI names it before work starts;
+   a fallback result must satisfy the same digest and determinism fixtures.
+
+#### Empty
+1. A valid blank map is a flat field and remains editable. If the inclusion mask
+   excludes every cell, the target preview says **No included carving area**; Save
+   still preserves the authored field, while output later reports factual empty
+   compiled output if no other machining geometry exists.
+
+#### Edge - masks, boundaries, undo pressure, and stale results
+1. Mask brushes edit exact U8 coverage independently of height. The persisted
+   inclusion threshold classifies each byte exactly as import does. Below-threshold
+   top/floor semantics set the previewed and machined target to that fixed height;
+   **excluded from carving** omits those cells from CAM. Boundary behavior is visible
+   in the cross-section and 3D target view.
+2. Smoothing samples only the documented neighborhood and mask policy. It never
+   fills an excluded hole, crosses a mask boundary, changes polarity, or auto-levels
+   the field unless that behavior is the named operator action.
+3. Worker requests carry source revision/digest and edit parameters. A result for
+   an older revision is ignored. Cancel stops cooperatively at a documented work
+   unit; the last committed field remains authoritative.
+4. History may spill tiles to local content-addressed storage. Quota failure keeps
+   the current field and available in-memory undo states, warns about reduced undo
+   depth, and never corrupts the manually saved project.
+
+### F-CNC49. Configure and simulate two-stage relief CAM - planned (ADR-291 / P2R.3)
+
+> **Planned - not current UI.** Existing ADR-290 relief settings remain the
+> current behavior until this flow's independent stage and worker contracts land.
+
+#### Success
+1. In CNC mode, select the relief operation and enable **Roughing**, **Finishing**,
+   or both. Each stage selects its own tool, feed, plunge, spindle speed, and
+   strategy parameters. The stock panel supplies XYZ dimensions, origin, safe Z,
+   and fixture/clamp geometry when known.
+2. Roughing uses the existing top-down waterline/max-plus strategy in its first
+   expanded release. Set depth per pass, lateral stepover, and explicit
+   **Vertical stock to leave**; the UI does not substitute the previous fixed
+   allowance after this control ships.
+3. Finishing initially offers deterministic X- or Y-parallel passes. For a ball
+   nose, choose direct stepover or **Nominal flat-plane cusp height**. The displayed
+   relation is `s = 2 * sqrt(c * (2 * r - c))`, and the result is labelled nominal:
+   it does not prove constant true-surface scallop on slopes. Non-ball tools use
+   direct linear stepover and are never labelled cusp-controlled.
+4. Tool setup shows diameter, geometry, flute/cutting length, stickout, overall
+   length, and holder envelope where the tool record provides them. Unknown values
+   remain **Unknown**. Job Review later warns about unverified reach/holder/clamp
+   clearance and provisional feeds rather than inventing a pass result.
+5. The immediate **Target** preview shows only the requested surface. Choose
+   **Simulate tools** to run the real prepared roughing/finishing paths through the
+   removal grid for the exact field revision, mapping, stock, tool, and stage
+   settings. Progress names its countable unit: rows, triangles, Z levels, finish
+   rows, segments, or indeterminate when no honest total exists.
+6. The matching simulation reports grid/cell resolution and any coarsening and can
+   display **Simulated surface**, **Remaining stock**, and **Gouge** maps, using
+   `max(0, simulated - target)` and `max(0, target - simulated)` respectively in
+   the documented negative-Z convention. Cross-section and cursor values identify
+   both target and simulated heights.
+
+#### Error - CAM cannot produce a streamable artifact
+1. Non-finite coordinates or settings, impossible sample/tool geometry, failed
+   source validation, NaN paths, or another structurally unusable artifact reports a
+   factual compile-integrity error with the responsible stage. No partial prepared
+   artifact is published.
+2. Worker crash, transfer failure, or cancellation leaves the previous matching
+   simulation visible with its revision and **Stale** state; Retry restarts from a
+   clean snapshot. A partial removal grid is never labelled complete.
+
+#### Empty
+1. Finishing-only is valid and prepares the finishing tool section without a
+   hidden roughing dependency. Roughing-only is valid. If both stages are disabled
+   and no other job geometry exists, preparation reports the factual compile-integrity
+   result **empty output** in this Empty state; no prepared artifact is published.
+2. A completely excluded mask produces no relief cuts and says so; it is not filled
+   or converted to a floor behind the operator's back.
+
+#### Edge - resolution, spacing, reach, and simulation limits
+1. If source/CAM resolution changes for a requested preview, CurveDesk displays the
+   requested and effective cell spacing before treating the result as current. It
+   does not silently clamp stepover percentages, cusp height, or cell count.
+2. Invalid ball-cusp domains (`r <= 0`, `c <= 0`, or `c > r`) remain editable and
+   explain that a finite spacing cannot be calculated; direct stepover remains
+   available. This numeric state is not a new Frame/Start policy guard.
+3. A stale simulation, coarse grid, relative-depth source, clipped tones, depth near
+   stock thickness, missing flute/stickout/holder data, clamp intersection concern,
+   or provisional feed/RPM produces Job Review warnings only. Frame remains the sole
+   ordinary Start guard.
+4. Geometric simulation cannot establish controller following, physical position,
+   actual spindle RPM, cutting force, runout, deflection, workholding, dust capture,
+   grain response, tear-out, or finish quality. The UI names those limits beside
+   the simulation evidence.
+
+### F-CNC50. Save, review, Frame, and run a photo relief - planned (ADR-291 / P2R.4-P2R.6)
+
+> **Planned - not current UI.** This flow adds relief-specific portability,
+> provenance, review, and qualification evidence without adding a Start guard.
+
+#### Success
+1. Manual **Save** writes a self-contained `.lf2` project. The canonical U16 field
+   and mask include schema/encoding/endian declarations, exact dimensions and byte
+   lengths, mapping, provenance, revision, and digest. The file can reopen in a new
+   browser profile or computer without the original image or local database.
+2. Autosave may reference content-addressed IndexedDB blobs through an atomically
+   replaced manifest. Manual Save hydrates and embeds those blobs; display meshes,
+   histograms, toolpaths, and removal grids remain disposable caches.
+3. **Preview output**, **Save G-code**, **Frame**, and **Start** use the exact same
+   `prepareOutput` artifact. Deterministic inert comments identify source kind and
+   digest, physical dimensions/resolution, mapping/depth/polarity, roughing and
+   finishing tool/settings snapshots, and algorithm revision without changing
+   controller motion semantics.
+4. Job Review presents relief warnings together: source meaning and provenance,
+   polarity/clipping, effective resolution/coarsening, depth versus stock, tool
+   reach/holder/clamp unknowns, provisional feeds/RPM, stale or missing geometric
+   simulation, and the limits of software evidence. The dialog informs; it does not
+   refuse the job.
+5. Complete Frame for the exact prepared job and origin identity. That clean Frame
+   completion creates the ordinary Start permit. Start streams the reviewed exact
+   artifact through the existing controller driver and progress/cancel/recovery
+   paths; no relief-specific confirmation or second permit is added.
+6. P2R.6 qualification records are separate artifacts tied to exact machine,
+   controller/firmware, tool and stickout, holder, stock species/grain/moisture,
+   workholding, dust extraction, feeds/RPM/depth/stepover, program digest, date, and
+   observed result. An air cut observes motion/setup only; representative wood
+   coupons are required before a profile can claim that material result.
+
+#### Error - persistence, preparation, or transport factually fails
+1. Autosave quota/write/digest failure leaves the previous manifest recoverable and
+   discloses that the newest state is not autosaved. Manual Save fails visibly if a
+   referenced blob cannot be hydrated or validated; it never writes a project whose
+   only relief authority is a local ID.
+2. Project load rejects corrupt schema/encoding/endian/length/digest declarations
+   before allocation or CAM. The original file remains untouched and the error
+   identifies the invalid field.
+3. Existing compile-integrity failures refuse unusable output. Existing factual
+   transport preconditions refuse streaming only when the channel cannot accept it,
+   with the existing in-place fix where available. Exact-handoff mismatch refuses a
+   different artifact from using the reviewed/Framed artifact's evidence.
+
+#### Empty
+1. A project may save an editable flat or fully excluded relief. If the complete
+   prepared job has no motion/output, preparation reports factual empty output; no
+   Frame or Start artifact exists to run.
+
+#### Edge - exact-job changes, recovery, and evidence boundaries
+1. Any change to field revision/digest, mapping, dimensions, stock, origin, tools,
+   stage settings, or emitted program creates a different job and invalidates the
+   previous exact-job Frame permit under the existing signature rule. Run Frame for
+   the new exact job; no extra relief gate is introduced.
+2. A project opened without its autosave database still works when it came from a
+   valid manual `.lf2`; local history/caches may be absent and are rebuilt.
+3. GRBL `ok`, status, or `MPos` evidence reports controller protocol state; it does
+   not prove the cutter's loaded physical position. Hardware records distinguish
+   software checks, controller observation, air-cut observation, and material-cut
+   results.
+4. Wood dust extraction, guarding, workholding, tool reach, spindle/tool condition,
+   fire risk, and material response remain operator/machine-system responsibilities.
+   They are disclosed in review and qualification records, not represented as facts
+   proved by CurveDesk's preview or G-code tests.
 
 ## Phase I flows — multi-controller (ADR-094..097)
 

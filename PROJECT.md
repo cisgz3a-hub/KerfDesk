@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 289. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-290's narrow explicit 8-bit grayscale height-map path is built; ADR-291 approves the phased CurveDesk photo-to-relief expansion, whose P2R.1-P2R.6 slices remain planned. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 291. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -160,6 +160,23 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.16 | Verified constant-load adaptive clearing for bounded island-free pockets (ADR-154) | Built; hardware CLAIMED |
 | H.17 | Linked straight-sided inlay pocket and insert pairs with radius-matched geometry (ADR-155) | Built; hardware CLAIMED |
 | H.18 | Persisted drag-placeable holding-tab anchors for closed CNC profiles (ADR-156) | Built; hardware CLAIMED |
+
+#### Photo-to-relief expansion - ADR-291
+
+This expansion extends H.4's shipped ADR-290 height-map source. It does not replace the existing
+STL/mesh path or imply that planned rows are present in the UI. Every source converges on one
+one-sided top-down scalar-field contract; source labels preserve whether values are declared depth,
+artistic brightness, externally estimated relative order, hand edits, or an STL top projection.
+
+| Slice | Delivers | Status |
+| --- | --- | --- |
+| P2R.0 | Architecture, product scope, evidence boundaries, phased acceptance, and F-CNC47-F-CNC50 user-flow contracts | Accepted by ADR-291; documentation only |
+| P2R.1 | Schema-v4 canonical U16 field; lossless legacy migration; 8/16-bit grayscale, alpha/mask, tonal mapping, external-relative input; self-contained manual save and atomic autosave | Planned; ADR-290's explicit 8-bit depth-map subset is built |
+| P2R.2 | Relief Map Studio with deterministic U16 height/mask editing, undo, histogram, cross-section, and target 2D/3D previews | Planned |
+| P2R.3 | Independent rough/finish tools and parameters, explicit rough stock-to-leave, nominal ball-cusp or linear stepover, reach metadata, worker routing, and tool simulation/residual maps | Planned |
+| P2R.4 | Deterministic output provenance, exact prepared-artifact handoff, Job Review warnings, and full software release verification | Planned |
+| P2R.5 | Optional in-app relative-depth inference, only after a separate model/license/runtime/privacy ADR | Deferred; not authorized by ADR-291 |
+| P2R.6 | Exact machine/tool/material air-cut and representative wood coupon qualification | Planned hardware evidence; no universal parameter claim |
 
 
 ### Phase I — v0.9 "Multi-controller" [Merged to main; awaiting remaining hardware passes]
@@ -595,8 +612,12 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   preset-to-layer bindings have shipped under Phase F.5 and ADR-164.
 - Multi-machine, networked control.
 - Cloud, accounts, sharing, sync, activation, entitlement, trials, subscriptions, device binding, paywalls, and dormant monetization code.
-- ~~DXF~~, AI, PDF import. **DXF moved in-scope by Phase H.6 (clean-room
-  parser, ADR-098)**; AI and PDF import remain out of scope.
+- ~~DXF~~ and PDF import. **DXF moved in-scope by Phase H.6 (clean-room
+  parser, ADR-098)**; PDF import remains out of scope.
+- In-app AI depth inference and bundled model weights remain out of scope until P2R.5 receives its
+  own model/license/runtime/privacy ADR. Externally produced relative-depth maps are accepted input
+  under ADR-291/P2R.1 once their provenance and relative-not-metric UI lands; today's ADR-290 path
+  imports qualified files only as explicit height maps and makes no AI or metric-depth claim.
 - Manual tabs / bridges, lead-in / lead-out, advanced fill patterns. Several
   narrow parity features have since shipped and are no longer out of scope:
   Line-mode kerf compensation (`core/geometry/kerf-offset.ts`, per-layer
