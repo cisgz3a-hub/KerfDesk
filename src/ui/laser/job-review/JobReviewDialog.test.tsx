@@ -110,8 +110,31 @@ describe('JobReviewDialog', () => {
     expect(host.querySelector('select')).toBeNull();
     // Laser profiles have no stock; the CNC card must stay out of the way.
     expect(host.textContent).not.toContain('Material & stock');
+    expect(buttonByText('Approve settings').disabled).toBe(false);
     expect(buttonByText('Start job').disabled).toBe(false);
     expect(host.querySelector('form')).toBeNull();
+  });
+
+  it('commits an edited value to the main settings and approves an immediate rebuild', async () => {
+    useJobReviewStore.getState().open(model);
+    await render();
+    const power = host.querySelector('input[aria-label^="Power % for"]');
+    if (!(power instanceof HTMLInputElement)) throw new Error('Power input not found');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+
+    await act(async () => {
+      setter?.call(power, '55');
+      power.dispatchEvent(new Event('input', { bubbles: true }));
+      power.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+    expect(useStore.getState().project.scene.layers[0]?.power).toBe(55);
+    expect(host.textContent).toContain('Changes are synced to the main Artwork / Operations');
+
+    await act(async () => buttonByText('Approve settings').click());
+
+    expect(host.textContent).toContain('Approved — current values are synced');
+    expect(useJobReviewStore.getState().pendingSignal).toBe('rebuild');
+    expect(buttonByText('Start job').disabled).toBe(false);
   });
 
   it.each([

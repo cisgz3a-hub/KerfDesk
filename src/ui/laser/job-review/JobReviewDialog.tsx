@@ -24,6 +24,7 @@ import { JobReviewControllerSection } from './JobReviewControllerSection';
 import { JobReviewHeader } from './JobReviewHeader';
 import { JobReviewLayersTable } from './JobReviewLayersTable';
 import { JobReviewMachineSection } from './JobReviewMachineSection';
+import { JobReviewSettingsApproval } from './JobReviewSettingsApproval';
 import { JobReviewStats } from './JobReviewStats';
 import { JobReviewStockCard } from './JobReviewStockCard';
 import { JobReviewWarnings } from './JobReviewWarnings';
@@ -41,7 +42,7 @@ function OpenJobReview(props: {
   const { model, purpose, isPreparing, blocker } = props.state;
   const copy = reviewCopy(purpose);
   const topAnchorRef = useRef<HTMLSpanElement>(null);
-  useJobReviewRebuildTrigger();
+  const requestReviewRebuild = useJobReviewRebuildTrigger();
   useReviewInitialFocus(topAnchorRef);
   const handleCancel = (): void => useJobReviewStore.getState().cancel();
   const handleConfirm = (): void => useJobReviewStore.getState().confirm();
@@ -62,6 +63,7 @@ function OpenJobReview(props: {
         machineKind={model.machineKind}
         effectiveOperations={model.effectiveOperations}
       />
+      <JobReviewSettingsApproval onApprove={requestReviewRebuild} />
       <section aria-label="Before you start" style={sectionStyle}>
         <h3 style={sectionHeadingStyle}>Before you start</h3>
         <JobReviewControllerSection machineKind={model.machineKind} />

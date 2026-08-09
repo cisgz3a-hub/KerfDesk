@@ -892,7 +892,12 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 4. Editing a value inside the review commits through the normal layer/placement store actions and
    re-runs the full prepare pipeline (debounced). The stat tiles dim behind "Recomputing…" until
    the fresh program replaces the shown one — the artifact framed and later streamed is always the
-   one last shown.
+   one last shown. The **Approve settings** status identifies an editable value changed since the
+   review opened or was last approved. Clicking the always-available action marks the currently
+   synchronized main Artwork / Operations values approved and requests an immediate refresh when
+   needed. It never gates Start: **Start job** still approves the complete review in one click. If
+   the edit changed the exact framed artifact, the existing Frame-again requirement is shown and
+   remains the only ordinary Start guard.
 5. Frame traces the exact generated motion envelope with the tool off, then returns to the exact
    preparation-time work position — the acknowledged G54 position when serial preparation began
    under G55-G59. Dispatch alone authorizes nothing: every Frame command must receive its terminal
