@@ -2,6 +2,7 @@ import type { ReliefObject } from '../../core/scene';
 import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
 import { NumberField } from '../common/NumberField';
 import { useStore } from '../state';
+import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
 import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -11,10 +12,12 @@ export function ReliefPropertyControls(props: {
   readonly widthMm: number;
   readonly targetScaleX: number;
 }): JSX.Element {
+  const projectDocumentEpoch = useStore((state) => state.projectDocumentEpoch);
+  const fieldKey = (field: string): string => `${projectDocumentEpoch}:${props.relief.id}:${field}`;
   return (
     <>
       <ReliefNumberField
-        key={`${props.relief.id}:width`}
+        key={fieldKey('width')}
         relief={props.relief}
         label="Width"
         value={props.widthMm}
@@ -24,7 +27,7 @@ export function ReliefPropertyControls(props: {
         toStoredValue={(value) => value / props.targetScaleX}
       />
       <ReliefNumberField
-        key={`${props.relief.id}:depth`}
+        key={fieldKey('depth')}
         relief={props.relief}
         label="Depth"
         value={props.relief.reliefDepthMm}
@@ -37,7 +40,8 @@ export function ReliefPropertyControls(props: {
       ) : (
         <>
           <PolaritySelect relief={props.relief} />
-          <GammaField key={`${props.relief.id}:gamma`} relief={props.relief} />
+          <ReliefInputLevelsControl key={fieldKey('input-levels')} relief={props.relief} />
+          <GammaField key={fieldKey('gamma')} relief={props.relief} />
           <ReliefMaskOutsideMeaningControl relief={props.relief} />
         </>
       )}

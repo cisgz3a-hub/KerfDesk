@@ -58,6 +58,8 @@ function heightfieldRelief(): HeightfieldReliefObject {
       samplesU8: [0, 64, 128, 255],
       inclusionMask: [0, 127, 254, 255],
       mapping: {
+        inputLowCode: 49_152,
+        inputHighCode: 8192,
         curve: { kind: 'gamma-v1', gamma: 3.25 },
         inclusionThreshold: 128,
         outsideMask: 'relief-floor',
@@ -165,7 +167,7 @@ describe('.lf2 mesh relief round-trip', () => {
 });
 
 describe('.lf2 canonical heightfield round-trip', () => {
-  it('round-trips exact samples, mask, non-default gamma, provenance, revision, and digest', () => {
+  it('round-trips samples, mask, crossed levels, gamma, provenance, revision, and digest', () => {
     const base = reliefProject();
     const project: Project = {
       ...base,

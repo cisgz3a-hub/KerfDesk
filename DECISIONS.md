@@ -17024,3 +17024,83 @@ warning, confirmation, or Start guard.
 - ADR-292, schema-v4 canonical field and shared materialization contract.
 - ADR-296, exact grayscale-alpha import into the existing U8 mask.
 - ADR-297, the preceding non-destructive gamma-control slice.
+
+## ADR-299 - Relief properties exposes exact U16 input endpoints without ordering policy (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a tonal-mapping slice; histogram, clipping percentages, auto-level, crop/aspect controls, and physical qualification stay open
+
+### Context
+
+ADR-292 already persists `mapping.inputLowCode` and `mapping.inputHighCode` as two independent U16
+integers. Project validation accepts each exact code from `0` through `65535` and deliberately adds
+no low-before-high rule. The common heightfield materializer applies those endpoints before gamma
+and polarity, but Relief properties does not expose them. Operators therefore cannot inspect or
+change a durable mapping fact without editing project data outside CurveDesk.
+
+The existing formula also defines two non-conventional but valid states. Crossed endpoints reverse
+the tonal response; equal endpoints resolve every included sample to normalized `0.5`. Hiding,
+swapping, or rejecting either state would rewrite an already accepted project contract. This slice
+exposes the two exact integer fields without claiming histogram, auto-level, or conventional image-
+editor Levels parity.
+
+### Decision
+
+1. **Show both stored endpoints only for canonical heightfields.** A `heightfield-v1` relief shows
+   **Input low** and **Input high** after Polarity and before Gamma. Each field displays the exact
+   persisted U16 code. Legacy mesh reliefs keep their existing properties surface unchanged.
+2. **Commit only exact U16 integers without rewriting a draft.** The editor accepts every finite
+   integer from `0` through `65535`, including both endpoints. Blank, fractional, non-finite, or
+   out-of-domain drafts do not commit and restore the prior exact value on blur. The UI does not
+   clamp, round, swap, impose `low <= high`, delay the action behind confirmation, or add a warning
+   or Start guard.
+3. **Expose the existing mapping equation exactly.** When low and high differ, an included source
+   code `c` becomes `clamp((c - low) / (high - low), 0, 1)`. Low below high gives the conventional
+   increasing response; crossed endpoints deliberately reverse it. When low equals high, every
+   included code becomes normalized `0.5`. Gamma is applied next and polarity last. Mask-outside
+   cells retain their existing separate meaning.
+4. **Change mapping state only.** A distinct endpoint edit updates only the selected
+   `mapping.inputLowCode` or `mapping.inputHighCode` value and advances the heightfield revision
+   once. Samples, mask bytes, digest, provenance, dimensions, bounds, transform, the other endpoint,
+   gamma, polarity, maximum depth, crop, aspect, mask threshold, outside meaning, and algorithm
+   revision remain unchanged. A same-value edit, invalid runtime patch, or legacy-mesh patch is an
+   identity operation with no dirty or undo state.
+5. **Keep the product claim narrow.** This slice adds no histogram, clipped-low/high percentage,
+   auto-level, black/white-point picker, source-mode inference, crop/aspect editor, or source-byte
+   rewrite. It neither claims LightBurn parity nor silently narrows CurveDesk's accepted equal and
+   crossed endpoint states.
+6. **Keep the evidence boundary software-only.** Tests can prove state identity, persistence,
+   exact ordered/crossed/equal materialization, and UI draft behavior. They cannot prove a mapping
+   is visually suitable for a photograph, recover real depth, select safe physical depth, predict
+   controller following, or establish a material finish. Perceptual review, controller testing,
+   air cuts, and material coupons remain separate qualification.
+
+### Consequences
+
+- Operators can remap the lossless canonical U16 source range without rewriting samples, mask, or
+  digest.
+- Existing schema-v4 projects with equal or crossed endpoints remain representable and editable
+  exactly; no migration or normalization is introduced.
+- Project schema, import, worker protocol, materializer, preview, CAM algorithms, simulation,
+  G-code metadata, Job Review, Frame, and Start behavior remain unchanged.
+- Full tonal controls remain incomplete: histogram/clipping disclosure, auto-level as an explicit
+  operator action, curve editing beyond gamma, crop/aspect controls, and source modes stay planned.
+
+### Verification
+
+- State tests pin `0` and `65535`, ordered, crossed, equal, same-value, invalid, and mesh cases; a
+  distinct edit advances revision once while every unrelated source/object field keeps identity.
+- UI tests pin heightfield-only visibility, exact stored values, order before Gamma, endpoint and
+  crossed/equal commits, and blank/fractional/non-finite/out-of-domain restoration without commit.
+- Project round-trip tests preserve non-default crossed endpoints. Materialization tests pin the
+  ordered equation, crossed reversal, and equal flat midpoint before gamma and polarity.
+- TypeScript, lint, formatting, focused state/UI/project/materialization tests, and release checks
+  are required before publication. Browser perceptual comparison, packaged Electron, controller
+  behavior, hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, P2R.1 non-destructive tone-to-depth mapping and evidence boundaries.
+- ADR-292, schema-v4 canonical heightfield and shared materialization contract.
+- ADR-297, the preceding gamma-control slice.
+- ADR-298, the preceding outside-mask-meaning slice.

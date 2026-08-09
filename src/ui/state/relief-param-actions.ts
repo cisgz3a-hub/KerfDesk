@@ -7,20 +7,16 @@
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import type { ReliefObject } from '../../core/scene';
-import type {
-  HeightfieldReliefObject,
-  MeshReliefObject,
-  ReliefHeightfieldMapping,
-} from '../../core/scene/relief';
+import type { MeshReliefObject } from '../../core/scene/relief';
+import {
+  applyHeightfieldReliefPatch,
+  hasReliefPatch,
+  isNoOpHeightfieldMappingPatch,
+  normalizeReliefPatch,
+  type ReliefParamPatch,
+} from './relief-heightfield-param-patch';
 
-export type ReliefParamPatch = {
-  targetWidthMm?: number;
-  reliefDepthMm?: number;
-  emptyCells?: 'floor' | 'top';
-  polarity?: 'light-is-high' | 'light-is-deep';
-  gamma?: number;
-  outsideMask?: ReliefHeightfieldMapping['outsideMask'];
-};
+export type { ReliefParamPatch } from './relief-heightfield-param-patch';
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
@@ -54,49 +50,6 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
   };
 }
 
-function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch {
-  const out: ReliefParamPatch = {};
-  if (positiveFinite(patch.targetWidthMm)) {
-    out.targetWidthMm = patch.targetWidthMm;
-  }
-  if (positiveFinite(patch.reliefDepthMm)) {
-    out.reliefDepthMm = patch.reliefDepthMm;
-  }
-  if (patch.emptyCells !== undefined) out.emptyCells = patch.emptyCells;
-  if (patch.polarity !== undefined) out.polarity = patch.polarity;
-  if (positiveFinite(patch.gamma)) out.gamma = patch.gamma;
-  if (isOutsideMask(patch.outsideMask)) out.outsideMask = patch.outsideMask;
-  return out;
-}
-
-function hasReliefPatch(patch: ReliefParamPatch): boolean {
-  return (
-    patch.targetWidthMm !== undefined ||
-    patch.reliefDepthMm !== undefined ||
-    patch.emptyCells !== undefined ||
-    patch.polarity !== undefined ||
-    patch.gamma !== undefined ||
-    patch.outsideMask !== undefined
-  );
-}
-
-function isNoOpHeightfieldMappingPatch(relief: ReliefObject, patch: ReliefParamPatch): boolean {
-  const isGammaOrOutsideOnly =
-    (patch.gamma !== undefined || patch.outsideMask !== undefined) &&
-    patch.targetWidthMm === undefined &&
-    patch.reliefDepthMm === undefined &&
-    patch.emptyCells === undefined &&
-    patch.polarity === undefined;
-  if (!isGammaOrOutsideOnly) return false;
-  if (isMeshRelief(relief)) return true;
-  const gammaUnchanged =
-    patch.gamma === undefined || relief.reliefSource.mapping.curve.gamma === patch.gamma;
-  const outsideMaskUnchanged =
-    patch.outsideMask === undefined ||
-    relief.reliefSource.mapping.outsideMask === patch.outsideMask;
-  return gammaUnchanged && outsideMaskUnchanged;
-}
-
 function applyReliefPatch(relief: ReliefObject, patch: ReliefParamPatch): ReliefObject {
   const common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>> = {
     ...(patch.targetWidthMm === undefined ? {} : { targetWidthMm: patch.targetWidthMm }),
@@ -127,67 +80,6 @@ function applyMeshReliefPatch(
   };
 }
 
-function applyHeightfieldReliefPatch(
-  relief: HeightfieldReliefObject,
-  common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>>,
-  patch: ReliefParamPatch,
-): HeightfieldReliefObject {
-  const canonicalChanged =
-    widthPatchChangesSource(relief, patch.targetWidthMm) ||
-    mappingPatchChangesSource(relief, patch);
-  return {
-    ...relief,
-    ...common,
-    reliefSource: {
-      ...relief.reliefSource,
-      ...physicalDimensionsForWidth(relief, patch.targetWidthMm),
-      mapping: {
-        ...relief.reliefSource.mapping,
-        ...(patch.reliefDepthMm === undefined ? {} : { maxDepthMm: patch.reliefDepthMm }),
-        ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
-        ...(patch.gamma === undefined
-          ? {}
-          : { curve: { ...relief.reliefSource.mapping.curve, gamma: patch.gamma } }),
-        ...(patch.outsideMask === undefined ? {} : { outsideMask: patch.outsideMask }),
-      },
-      revision: relief.reliefSource.revision + (canonicalChanged ? 1 : 0),
-    },
-  };
-}
-
-function mappingPatchChangesSource(
-  relief: HeightfieldReliefObject,
-  patch: ReliefParamPatch,
-): boolean {
-  const mapping = relief.reliefSource.mapping;
-  const nextDepthMm = patch.reliefDepthMm ?? relief.reliefDepthMm;
-  const nextPolarity = patch.polarity ?? mapping.polarity;
-  const nextGamma = patch.gamma ?? mapping.curve.gamma;
-  const nextOutsideMask = patch.outsideMask ?? mapping.outsideMask;
-  return (
-    nextDepthMm !== mapping.maxDepthMm ||
-    nextPolarity !== mapping.polarity ||
-    nextGamma !== mapping.curve.gamma ||
-    nextOutsideMask !== mapping.outsideMask
-  );
-}
-
-function widthPatchChangesSource(
-  relief: HeightfieldReliefObject,
-  widthMm: number | undefined,
-): boolean {
-  return widthMm !== undefined && widthMm !== relief.reliefSource.physicalWidthMm;
-}
-
-function physicalDimensionsForWidth(
-  relief: HeightfieldReliefObject,
-  widthMm: number | undefined,
-): Partial<Pick<HeightfieldReliefObject['reliefSource'], 'physicalWidthMm' | 'physicalHeightMm'>> {
-  if (widthMm === undefined) return {};
-  const aspect = relief.reliefSource.physicalHeightMm / relief.reliefSource.physicalWidthMm;
-  return { physicalWidthMm: widthMm, physicalHeightMm: widthMm * aspect };
-}
-
 function boundsForWidth(
   relief: { readonly bounds: { readonly maxX: number; readonly maxY: number } },
   widthMm: number,
@@ -196,12 +88,4 @@ function boundsForWidth(
   // aspect ratio captured at import.
   const aspect = relief.bounds.maxX > 0 ? relief.bounds.maxY / relief.bounds.maxX : 1;
   return { minX: 0, minY: 0, maxX: widthMm, maxY: widthMm * aspect };
-}
-
-function positiveFinite(value: number | undefined): value is number {
-  return value !== undefined && Number.isFinite(value) && value > 0;
-}
-
-function isOutsideMask(value: unknown): value is ReliefHeightfieldMapping['outsideMask'] {
-  return value === 'excluded' || value === 'stock-top' || value === 'relief-floor';
 }
