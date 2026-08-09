@@ -32,10 +32,10 @@ export type GcodeMetadata = {
  * ADR-273's secondary-cutter settings provenance, ADR-282's thin-detail
  * rescue stage, ADR-285's certified vector-medial V-carve planner, and
  * ADR-286's non-zero resolution of a text object's own glyphs, ADR-287's
- * flat-tip V-carve radial envelope, and ADR-289's transformed-relief
- * machine-space cutter envelope.
+ * flat-tip V-carve radial envelope, ADR-289's transformed-relief machine-space
+ * cutter envelope, and ADR-294's exact partial terminal-cell relief geometry.
  */
-export const EMITTER_REVISION = 'adr-289-relief-machine-space-envelope';
+export const EMITTER_REVISION = 'adr-294-relief-partial-edge-grid';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

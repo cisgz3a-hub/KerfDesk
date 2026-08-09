@@ -3090,14 +3090,13 @@ and lifts the command's CNC-only gate.)*
    scallop field requests a planar-grid ridge-height target. Compile then emits the
    roughing group AND a finishing group cut with that bit (an M0 change
    separates them when the bits differ).
-2. Finishing rides the sampled max-plus tip surface in serpentine rows. A
-   ball nose requests 2·sqrt(c·(2r−c)) physical-XY spacing (flat bits request
-   40% of diameter); the grid refines when needed and its whole-row stride
-   rounds down so it does not overshoot that request. This qualifies finishing
-   sample vertices and planar cusp only when the four-million-cell cap has not
-   coarsened one cell past the request. It is not a continuous swept-volume or
-   true along-surface scallop proof; roughing contour vertices are also outside
-   the pointwise sampled-envelope qualification (ADR-289).
+2. Finishing rides the sampled max-plus tip surface in serpentine rows. A ball
+   nose requests `2*sqrt(c*(2r-c))` physical-XY spacing through the bit radius;
+   flat bits and larger stored ball targets use the layer's exact linear
+   Stepover. The grid attempts that exact positive request and its whole-row
+   stride rounds down so it does not overshoot it. This qualifies sampled
+   finishing vertices and planar cusp, not a continuous included-surface sweep
+   or true along-surface scallop proof (ADR-292/294).
 3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
    pass); finishing consumes it down to the true surface.
 
@@ -3111,13 +3110,17 @@ and lifts the command's CNC-only gate.)*
 1. "Roughing only" (the default) emits no finishing group.
 
 #### Edge — flat reliefs / tiny scallop
-1. A flat surface skims at exactly its depth; scallop clamps to
-   [0.001 mm, bit radius]. Ball-nose spacing follows that clamped analytic
-   request; flat-tool row spacing retains its 0.05 mm floor.
+1. A flat surface skims at exactly its depth. Every finite positive scallop and
+   Stepover remains editable and drives planning without a hidden floor or cap.
+   At the ball radius the widest analytic spacing is one diameter; above the
+   radius, the explicit linear Stepover drives the row spacing and Job Review
+   discloses the fallback.
 2. Uniform and nonuniform object scale are resolved before sampling, cutter
    dilation, and row spacing. Mirror/rotation/translation are residual
-   isometries. Subcell peaks, edge overhang, straight XYZ chords between
-   samples, and holder/shank clearance remain unqualified (ADR-289).
+   isometries. Partial terminal cells keep the exact requested interior pitch
+   while ending at the declared physical edge. Included subcell peaks, straight
+   XYZ chords between samples, the cutter footprint beyond an unmasked outer
+   relief boundary, and holder/shank clearance remain unqualified (ADR-294).
 
 ### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
 
@@ -4022,7 +4025,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4086,12 +4089,21 @@ and lifts the command's CNC-only gate.)*
    filtering, byte-order, worker-memory, and precision path is verified.
 4. CAM requests its exact positive cell spacing and attempts the exact derived
    allocation; allocation failure is reported factually rather than silently
-   coarsening. When that spacing does not divide the declared physical width or
-   height, the current square grid uses ceil-rounded dimensions and can extend
-   by less than one cell. Exact relief-edge containment and 2D/CAM edge agreement
-   remain unqualified until an edge-cell model lands.
+   coarsening. When that spacing does not divide a declared physical dimension,
+   full interior cells retain the request and only the terminal row or column is
+   shorter. Canvas cell rectangles, stepped 3D cell quads, the simulation domain,
+   roughing, and finishing share that exact logical Float64 boundary. Smooth 3D
+   surfaces remain contained samples at actual cell centers, with exact stock-envelope
+   metadata; they are not cell-edge or mask-boundary evidence. Float32 preview
+   positions round to their nearest representable values. At ordinary magnitudes where
+   the existing `toFixed(3)` emitter produces fixed-decimal text, emitted coordinates use
+   a 0.001 mm quantum and may differ from the stored edge by up to 0.0005 mm;
+   astronomical G-code grammar and output remain unqualified. Frame reviews the generated
+   job rather than asserting bit-exact equality with the object edge. Exact IEEE-754 input
+   arithmetic remains authoritative, so a representable one-ULP remainder is a real
+   partial cell rather than a hidden tolerance rewrite.
 5. Coarser target cells use the highest overlapping source surface and require
-   all overlapping source-mask coverage. Excluded mask squares are protected by
+   all overlapping source-mask coverage. Excluded mask cell rectangles are protected by
    emitted-precision cutter envelopes in roughing and finishing, but this does
    not prove included subpixel surface detail, holder clearance, controller
    tracking, material finish, or safe feeds for a particular physical setup.
@@ -4104,7 +4116,7 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-293 supply schema-v4/U16LE
+> **Planned - not current UI.** P2R.1a plus ADR-293/294 supply schema-v4/U16LE
 > storage, migration, qualified 8-bit grayscale import, simple transparency
 > masks, atomic large-project autosave/recovery, and the existing CAM/preview
 > substrate. The creation modes and controls below remain planned; use F-CNC46's

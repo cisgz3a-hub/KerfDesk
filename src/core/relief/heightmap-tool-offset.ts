@@ -14,6 +14,14 @@
 import type { ToolKernel } from '../sim';
 import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/cnc-output-precision';
 import type { Heightmap } from './heightmap';
+import {
+  hasPartialTerminalCandidate,
+  isPartialTerminalCenter,
+  partialExcludedConstraint,
+  partialFlatSurfaceConstraint,
+  partialSurfaceConstraint,
+  partialTerminalSurfaceConstraint,
+} from './heightmap-tool-offset-partial';
 
 export function dilateHeightmapByTool(
   map: Heightmap,
@@ -81,17 +89,54 @@ function dilatedCell(
   center: number,
 ): number {
   let best = excludedMaskConstraint(map, kernel, cx, cy, touchesExcluded, center);
-  for (const offset of kernel.offsets) {
-    const neighbor = kernelCellIndex(map, cx + offset.dx, cy + offset.dy);
-    if (neighbor === null) continue;
-    if (map.inclusion?.[neighbor] === 0) continue;
-    const targetDepth = map.depth[neighbor] ?? 0;
-    const candidate = targetDepth - offset.dz;
-    if (candidate > best) best = candidate;
-  }
+  best = Math.max(best, includedSurfaceConstraint(map, kernel, cx, cy));
   const safe = best === Number.NEGATIVE_INFINITY ? (map.depth[center] ?? 0) : best;
   // The roughing target never rises above the stock top.
   return Math.min(0, safe + allowanceMm);
+}
+
+function includedSurfaceConstraint(
+  map: Heightmap,
+  kernel: ToolKernel,
+  cx: number,
+  cy: number,
+): number {
+  const isTerminalCenter = isPartialTerminalCenter(map, cx, cy);
+  if (isTerminalCenter && kernel.tool.kind !== 'end-mill') {
+    return partialSurfaceConstraint(map, kernel, cx, cy);
+  }
+  const hasTerminalCandidate = hasPartialTerminalCandidate(
+    map,
+    cx,
+    cy,
+    kernel.surfaceCandidateSpanCells,
+  );
+  const best = regularIncludedSurfaceConstraint(map, kernel, cx, cy);
+  if (isTerminalCenter || (hasTerminalCandidate && kernel.tool.kind === 'end-mill')) {
+    return Math.max(best, partialFlatSurfaceConstraint(map, kernel, cx, cy));
+  }
+  // A shortened terminal cell moves its sample center inward. Every supported
+  // cutter profile is nondecreasing with radius, so the exact candidate below
+  // dominates its retained nominal candidate without branching in the hot loop.
+  return hasTerminalCandidate
+    ? Math.max(best, partialTerminalSurfaceConstraint(map, kernel, cx, cy))
+    : best;
+}
+
+function regularIncludedSurfaceConstraint(
+  map: Heightmap,
+  kernel: ToolKernel,
+  cx: number,
+  cy: number,
+): number {
+  let best = Number.NEGATIVE_INFINITY;
+  for (const offset of kernel.offsets) {
+    const neighbor = kernelCellIndex(map, cx + offset.dx, cy + offset.dy);
+    if (neighbor === null || map.inclusion?.[neighbor] === 0) continue;
+    const candidate = (map.depth[neighbor] ?? 0) - offset.dz;
+    if (candidate > best) best = candidate;
+  }
+  return best;
 }
 
 function excludedMaskConstraint(
@@ -103,6 +148,21 @@ function excludedMaskConstraint(
   center: number,
 ): number {
   if (map.inclusion === undefined) return Number.NEGATIVE_INFINITY;
+  // A nonterminal center sees the unchanged near face of every shortened cell,
+  // so regular mask AABB offsets remain exact. Only a shifted terminal center
+  // changes those distances and needs the full physical scan.
+  if (isPartialTerminalCenter(map, cx, cy)) {
+    const best = partialExcludedConstraint(
+      map,
+      kernel,
+      cx,
+      cy,
+      kernel.maskCellCandidateSpanCells,
+      kernel.maskPathUncertaintyMm,
+    );
+    markExcludedSweep(map, kernel, cx, cy, touchesExcluded, center);
+    return best;
+  }
   let best = Number.NEGATIVE_INFINITY;
   for (const offset of kernel.maskCellOffsets ?? kernel.offsets) {
     const neighbor = kernelCellIndex(map, cx + offset.dx, cy + offset.dy);
@@ -123,6 +183,20 @@ function markExcludedSweep(
   center: number,
 ): void {
   if (touchesExcluded === undefined || map.inclusion === undefined) return;
+  // Sweep uncertainty enlarges the same AABBs; the unchanged-near-face proof
+  // above still holds until the cutter center itself is terminal.
+  if (isPartialTerminalCenter(map, cx, cy)) {
+    const constraint = partialExcludedConstraint(
+      map,
+      kernel,
+      cx,
+      cy,
+      kernel.maskSweepCandidateSpanCells,
+      kernel.maskSweepPathUncertaintyMm,
+    );
+    if (constraint !== Number.NEGATIVE_INFINITY) touchesExcluded[center] = 1;
+    return;
+  }
   for (const offset of kernel.maskSweepCellOffsets ?? kernel.maskCellOffsets ?? kernel.offsets) {
     const neighbor = kernelCellIndex(map, cx + offset.dx, cy + offset.dy);
     if (neighbor === null || map.inclusion[neighbor] !== 0) continue;

@@ -37,6 +37,8 @@ describe('canvas compilation main bridge connection admission', () => {
         output: {
           widthCells: 2,
           heightCells: 2,
+          widthMm: 2,
+          heightMm: 2,
           mmPerCell: 1,
           originX: 0,
           originY: 0,

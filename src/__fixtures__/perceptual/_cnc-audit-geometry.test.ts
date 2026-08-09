@@ -194,6 +194,8 @@ it.runIf(RUN)('1.11 — relief finishing reaches the far-Y edge', () => {
     {
       widthCells: cells,
       heightCells: cells,
+      widthMm: cells * 0.5,
+      heightMm: cells * 0.5,
       mmPerCell: 0.5,
       depth: new Float32Array(cells * cells).fill(-3),
     },

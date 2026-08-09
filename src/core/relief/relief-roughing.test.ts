@@ -3,6 +3,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { compileCncJob } from '../cnc/compile-cnc-job';
 import { cncGrblStrategy } from '../output';
 import { findPlungedTravelIssues } from '../invariants';
+import { computeJobBounds } from '../job';
 import {
   createLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -84,6 +85,8 @@ describe('reliefRoughingPasses', () => {
       {
         widthCells: 5,
         heightCells: 5,
+        widthMm: 5,
+        heightMm: 5,
         mmPerCell: 1,
         depth: new Float32Array(25).fill(-4),
         inclusion,
@@ -151,6 +154,8 @@ describe('reliefRoughingPasses', () => {
     const grid = {
       widthCells: map.widthCells,
       heightCells: map.heightCells,
+      widthMm: map.widthMm,
+      heightMm: map.heightMm,
       mmPerCell: map.mmPerCell,
       originX: 0,
       originY: 0,
@@ -195,6 +200,8 @@ describe('reliefRoughingPasses', () => {
       {
         widthCells: 3,
         heightCells: 3,
+        widthMm: 3,
+        heightMm: 3,
         mmPerCell: 1,
         depth: new Float32Array(9).fill(-1),
       },
@@ -234,6 +241,12 @@ describe('relief roughing — compile pipeline', () => {
     if (group?.kind !== 'cnc') throw new Error('expected cnc group');
     expect(group.cutType).toBe('relief-rough');
     expect(group.passes.length).toBeGreaterThan(0);
+    expect(computeJobBounds(job, device)).toEqual({
+      minX: 0,
+      minY: device.bedHeight - 20,
+      maxX: 20,
+      maxY: device.bedHeight,
+    });
 
     const gcode = cncGrblStrategy.emit(job, device);
     expect(findPlungedTravelIssues(gcode, { safeZMm: group.safeZMm })).toEqual([]);

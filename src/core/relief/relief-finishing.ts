@@ -21,6 +21,7 @@
 import type { ToolKernel } from '../sim';
 import type { CncPass } from '../job';
 import type { CncTool } from '../scene';
+import { partialCellCenter } from '../grid';
 import { dilateHeightmapByToolWithMaskEvidence } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
 
@@ -65,7 +66,7 @@ export function reliefFinishingPasses(
   const passes: CncPass[] = [];
   let leftToRight = true;
   for (const row of rows) {
-    const y = (row + 0.5) * mmPerCell;
+    const y = partialCellCenter(map, 'y', row);
     let points: Array<{ x: number; y: number; z: number }> = [];
     for (let i = 0; i < widthCells; i += 1) {
       const col = leftToRight ? i : widthCells - 1 - i;
@@ -76,7 +77,7 @@ export function reliefFinishingPasses(
         continue;
       }
       points.push({
-        x: (col + 0.5) * mmPerCell,
+        x: partialCellCenter(map, 'x', col),
         y,
         z: tip[index] ?? 0,
       });
@@ -114,7 +115,7 @@ function appendMaskedFinishingRow(
   selected: Uint8Array,
   touchesExcluded: Uint8Array | undefined,
 ): void {
-  const y = (row + 0.5) * map.mmPerCell;
+  const y = partialCellCenter(map, 'y', row);
   let points: FinishingPoint[] = [];
   for (let i = 0; i < map.widthCells; i += 1) {
     const col = leftToRight ? i : map.widthCells - 1 - i;
@@ -123,11 +124,13 @@ function appendMaskedFinishingRow(
       appendFinishingRun(passes, points);
       points = [];
       if (selected[index] !== 0) {
-        appendFinishingRun(passes, [{ x: (col + 0.5) * map.mmPerCell, y, z: tip[index] ?? 0 }]);
+        appendFinishingRun(passes, [
+          { x: partialCellCenter(map, 'x', col), y, z: tip[index] ?? 0 },
+        ]);
       }
       continue;
     }
-    points.push({ x: (col + 0.5) * map.mmPerCell, y, z: tip[index] ?? 0 });
+    points.push({ x: partialCellCenter(map, 'x', col), y, z: tip[index] ?? 0 });
   }
   appendFinishingRun(passes, points);
 }

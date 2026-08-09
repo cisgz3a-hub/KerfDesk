@@ -21,6 +21,8 @@ vi.mock('./cnc-removal-grid-worker-client', () => ({
 const GRID: RemovalGrid = {
   widthCells: 1,
   heightCells: 1,
+  widthMm: 1,
+  heightMm: 1,
   mmPerCell: 1,
   originX: 0,
   originY: 0,

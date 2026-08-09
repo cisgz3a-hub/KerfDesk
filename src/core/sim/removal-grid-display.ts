@@ -4,13 +4,17 @@
 // coarse display cell excluded so preview downsampling cannot fill holes.
 // Pure and deterministic (indexed loops only).
 
+import { partialCellCount } from '../grid';
 import type { RemovalGrid, RemovalGridResolution } from './removal-grid';
 
 export function downsampleRemovalGrid(grid: RemovalGrid, maxCellsAcross: number): RemovalGrid {
   const factor = displayFactor(grid, maxCellsAcross);
   if (factor <= 1) return grid;
-  const widthCells = Math.ceil(grid.widthCells / factor);
-  const heightCells = Math.ceil(grid.heightCells / factor);
+  const mmPerCell = grid.mmPerCell * factor;
+  const widthCells =
+    partialCellCount(grid.widthMm, mmPerCell) ?? Math.ceil(grid.widthCells / factor);
+  const heightCells =
+    partialCellCount(grid.heightMm, mmPerCell) ?? Math.ceil(grid.heightCells / factor);
   const depth = new Float32Array(widthCells * heightCells);
   const inclusion = grid.inclusion === undefined ? undefined : new Uint8Array(depth.length);
   for (let row = 0; row < heightCells; row += 1) {
@@ -24,7 +28,9 @@ export function downsampleRemovalGrid(grid: RemovalGrid, maxCellsAcross: number)
   return {
     widthCells,
     heightCells,
-    mmPerCell: grid.mmPerCell * factor,
+    widthMm: grid.widthMm,
+    heightMm: grid.heightMm,
+    mmPerCell,
     originX: grid.originX,
     originY: grid.originY,
     depth,

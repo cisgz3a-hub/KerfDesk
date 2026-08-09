@@ -11,6 +11,8 @@ function grid(): RemovalGrid {
   return {
     widthCells: 3,
     heightCells: 2,
+    widthMm: 30,
+    heightMm: 20,
     mmPerCell: 10,
     originX: 100,
     originY: 200,
@@ -48,5 +50,16 @@ describe('probeRemovalGrid', () => {
     // off the grid. Including it would read one cell past the buffer.
     expect(probeRemovalGrid(grid(), { x: 100, y: 200 }).kind).toBe('inside');
     expect(probeRemovalGrid(grid(), { x: 130, y: 220 }).kind).toBe('outside');
+  });
+
+  it('excludes the former count-times-pitch overhang of a partial terminal cell', () => {
+    const partial = { ...grid(), widthMm: 25 };
+
+    expect(probeRemovalGrid(partial, { x: 124.999, y: 215 })).toEqual({
+      kind: 'inside',
+      depthMm: -5,
+    });
+    expect(probeRemovalGrid(partial, { x: 125, y: 215 })).toEqual({ kind: 'outside' });
+    expect(probeRemovalGrid(partial, { x: 129, y: 215 })).toEqual({ kind: 'outside' });
   });
 });

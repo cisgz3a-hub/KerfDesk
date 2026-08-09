@@ -93,6 +93,86 @@ describe('meshToHeightmap', () => {
     }
   });
 
+  it('samples an STL ramp at the actual centers of terminal partial cells', () => {
+    const result = meshToHeightmap(rampMesh(), {
+      targetWidthMm: 1,
+      reliefDepthMm: 10,
+      mmPerCell: 0.3,
+    });
+    if (result.kind !== 'ok') throw new Error(result.reason);
+
+    expect(result.heightmap).toMatchObject({
+      widthCells: 4,
+      heightCells: 4,
+      widthMm: 1,
+      heightMm: 1,
+      mmPerCell: 0.3,
+    });
+    const expectedRow = [-8.5, -5.5, -2.5, -0.5];
+    for (let row = 0; row < result.heightmap.heightCells; row += 1) {
+      const offset = row * result.heightmap.widthCells;
+      expect([...result.heightmap.depth.slice(offset, offset + 4)]).toEqual(expectedRow);
+    }
+  });
+
+  it('keeps divisible ramp samples byte-exact and samples a one-cell domain at its midpoint', () => {
+    const divisible = meshToHeightmap(rampMesh(), {
+      targetWidthMm: 2,
+      reliefDepthMm: 10,
+      mmPerCell: 0.5,
+    });
+    const oneCell = meshToHeightmap(rampMesh(), {
+      targetWidthMm: 1,
+      reliefDepthMm: 10,
+      mmPerCell: 2,
+    });
+    if (divisible.kind !== 'ok' || oneCell.kind !== 'ok') throw new Error('expected ok');
+
+    const exactRegularRow = [-8.75, -6.25, -3.75, -1.25];
+    expect([...divisible.heightmap.depth.slice(0, 4)]).toEqual(exactRegularRow);
+    expect([...oneCell.heightmap.depth]).toEqual([-5]);
+    expect(oneCell.heightmap).toMatchObject({ widthCells: 1, heightCells: 1 });
+  });
+
+  it.each([2_000_000, Number.MAX_VALUE])(
+    'samples a valid one-cell STL ramp at the midpoint with finite pitch %s',
+    (mmPerCell) => {
+      const result = meshToHeightmap(rampMesh(), {
+        targetWidthMm: 1,
+        reliefDepthMm: 10,
+        mmPerCell,
+      });
+      if (result.kind !== 'ok') throw new Error(result.reason);
+
+      expect(result.heightmap).toMatchObject({
+        widthCells: 1,
+        heightCells: 1,
+        widthMm: 1,
+        heightMm: 1,
+        mmPerCell,
+      });
+      expect([...result.heightmap.depth]).toEqual([-5]);
+    },
+  );
+
+  it('keeps a finite quotient-underflow mesh as one sampled terminal cell', () => {
+    const result = meshToHeightmap(rampMesh(), {
+      targetWidthMm: Number.MIN_VALUE,
+      reliefDepthMm: 10,
+      mmPerCell: Number.MAX_VALUE,
+    });
+    if (result.kind !== 'ok') throw new Error(result.reason);
+
+    expect(result.heightmap).toMatchObject({
+      widthCells: 1,
+      heightCells: 1,
+      widthMm: Number.MIN_VALUE,
+      heightMm: Number.MIN_VALUE,
+      mmPerCell: Number.MAX_VALUE,
+    });
+    expect([...result.heightmap.depth]).toEqual([-5]);
+  });
+
   it('is deterministic and depths stay within [−reliefDepth, 0]', () => {
     const a = meshToHeightmap(pyramidMesh(), { targetWidthMm: 20, reliefDepthMm: 5 });
     const b = meshToHeightmap(pyramidMesh(), { targetWidthMm: 20, reliefDepthMm: 5 });

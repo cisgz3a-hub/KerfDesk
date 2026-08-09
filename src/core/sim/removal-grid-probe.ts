@@ -11,7 +11,7 @@
 //
 // PURE: a grid and a point in, a reading out.
 
-import type { RemovalGrid } from './removal-grid';
+import { gridCellIndex, gridCellOfPoint, type RemovalGrid } from './removal-grid';
 
 export type RemovalGridProbe =
   | { readonly kind: 'outside' }
@@ -29,12 +29,10 @@ export function probeRemovalGrid(
   grid: RemovalGrid,
   point: { readonly x: number; readonly y: number },
 ): RemovalGridProbe {
-  const cx = Math.floor((point.x - grid.originX) / grid.mmPerCell);
-  const cy = Math.floor((point.y - grid.originY) / grid.mmPerCell);
-  if (cx < 0 || cy < 0 || cx >= grid.widthCells || cy >= grid.heightCells) {
-    return { kind: 'outside' };
-  }
-  const depth = grid.depth[cy * grid.widthCells + cx];
+  const { cx, cy } = gridCellOfPoint(grid, point.x, point.y);
+  const index = gridCellIndex(grid, cx, cy);
+  if (index === null) return { kind: 'outside' };
+  const depth = grid.depth[index];
   // The bounds check above makes a hole impossible, but
   // noUncheckedIndexedAccess keeps the possibility in the type, and untouched
   // stock is the truthful reading for it.
