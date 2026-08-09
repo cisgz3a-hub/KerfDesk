@@ -16535,3 +16535,124 @@ no toolpath-resolution context.
 - Dialog tests cover the legacy-mesh and canonical-heightfield arms, physical transform scale,
   materializer and surface-worker propagation, absence below the threshold, visible status above
   it, cancellation, failure fallback, and an available Close action.
+
+## ADR-295 - Large canonical relief autosave uses atomic whole-project IndexedDB snapshots (2026-08-09)
+
+**Date:** 2026-08-09
+**Status:** Accepted and implemented as a bounded P2R.1 persistence slice; abrupt-process and packaged-Electron qualification remain open
+
+### Context
+
+ADR-292 made canonical U16 reliefs self-contained in schema-v4 project JSON but left large-field
+autosave planned. A 2048 x 2048 U16 field carries 8,388,608 scalar bytes and 11,184,812 base64
+characters; the complete project exceeds the practical localStorage recovery path even though the
+same payload fits IndexedDB. The new persistence path must keep the previous complete recovery,
+prevent a late asynchronous writer from resurrecting data after Save/Open cleanup, distinguish live
+windows from abandoned sessions, and never turn cleanup trouble into a file-operation guard.
+
+ADR-291 permits content-addressed blobs but does not require them. The smallest contract-compatible
+slice is therefore one self-contained project JSON string per immutable snapshot. It closes the
+capacity and atomic-replacement gap without making manual `.lf2` files depend on browser storage or
+claiming that serialization cost has been solved.
+
+### Decision
+
+1. **Store whole prepared project JSON in IndexedDB.** The interval autosave path writes the same
+   validated, self-contained project representation used by recovery into
+   `curvedesk-project-autosave-v1`. `manifests` holds the small per-session authority record and
+   `snapshots` holds immutable project JSON. Manual `.lf2` Save remains independently self-contained;
+   it never references or hydrates an IndexedDB-only relief blob.
+2. **Replace current and previous atomically.** One read/write transaction spans both stores. A
+   compare-and-swap `expectedEpoch` admits exactly one writer, adds the new snapshot, rotates current
+   to previous, deletes only the superseded older snapshot, and publishes the new manifest. Clear
+   deletes the referenced snapshots and writes an incremented empty-manifest tombstone in the same
+   atomic transaction, so a writer holding an earlier epoch conflicts instead of recreating cleared
+   data.
+3. **Serialize same-window writes and clears.** One service queue orders interval writes, recovery
+   re-homes, and Save/Open/import cleanup. A clear invalidates the synchronous interval generation
+   immediately and commits behind any in-flight write. A conflict identifies stale epoch knowledge;
+   the service refreshes that epoch, and a later interval tick may retry the then-current project
+   state without labeling the conflict as corruption.
+4. **Give each live window one owned session.** A Web Lock named from the autosave session ID is
+   acquired exclusively with `ifAvailable`. Contention rotates the new window to a different session
+   rather than queuing or sharing identity. Recovery excludes a live foreign session and repeats the
+   exclusive abandonment probe around destructive source cleanup. When Web Locks are unsupported or
+   fail, CurveDesk may copy a recovery but retains the foreign source because abandonment is unknown.
+5. **Recover without sacrificing the prior complete copy.** Startup ranks eligible snapshots by
+   save time, validates project JSON and its embedded heightfield digest, and falls back from an
+   invalid/missing current snapshot to the previous complete snapshot with a warning. A snapshot's
+   storage key, session identity, epoch, and save time must agree with its authoritative manifest,
+   whose current/previous references must also agree with its epoch and rotation order;
+   local fallback session identity must likewise agree with the session encoded by its physical key.
+   A malformed or inconsistent record is isolated to its slot and disclosed; it cannot hide other
+   valid sessions or impersonate the reading window for ownership classification.
+   Recovery rechecks that the active document identity is unchanged and the in-memory project is
+   still empty after asynchronous reads, re-homes an accepted project before source cleanup, and
+   marks the restored project dirty until manual Save. The asynchronous read is bound to the entry
+   document epoch, so a New/Open handoff to a different clean empty project cannot be overwritten by
+   a stale recovery continuation.
+6. **Keep localStorage as compatibility, not the large-field authority.** Normal interval writes are
+   IndexedDB-first. If IndexedDB is unavailable, the existing synchronous local slot remains a
+   best-effort fallback. Physical per-session keys are enumerated directly during recovery; the
+   shared compatibility index is advisory because localStorage read/modify/write is not atomic across
+   windows. `beforeunload` remains synchronous and local-only because the page cannot await an
+   IndexedDB transaction during teardown; an oversized project therefore recovers the last completed
+   interval snapshot, not necessarily its final unload-time edit.
+7. **Make failure and cleanup truthful but nonblocking.** If both write backends fail, one warning
+   tells the operator the newest project is not autosaved and to save `.lf2` manually. Save completion
+   marks the document clean and clears recovery only when the current project is the exact captured
+   project written to disk; edits made while a slow write is pending remain dirty and recoverable,
+   and that captured-version-only outcome cannot authorize a pending destructive New/Open flow.
+   Successful Save/Open/import handoff is never reclassified or delayed by recovery cleanup. Local or
+   IndexedDB clear failure produces a later warning that an older prompt may reappear; it adds no
+   confirmation, refusal, cap, clamp, Frame effect, or Start effect.
+8. **Defer content-addressed decomposition.** Separate heightfield blobs could reduce repeated JSON
+   serialization and structured-clone cost, but they are an optimization requiring hydration,
+   reachability, garbage-collection, and manual-file portability contracts. This slice does not
+   invent those contracts or claim background/off-main-thread serialization.
+
+### Consequences
+
+- Large canonical fields no longer depend on localStorage capacity for periodic recovery. Current
+  and previous complete snapshots survive transactional aborts, and epoch tombstones prevent stale
+  resurrection after successful handoff cleanup.
+- Multiple live windows keep independent recovery slots. A closed window becomes eligible only after
+  its exclusive ownership lock is gone; unsupported ownership deliberately favors retention and can
+  cause a repeated prompt rather than silent deletion.
+- Preparing and serializing project JSON still runs in the renderer. IndexedDB removes the storage
+  ceiling demonstrated by localStorage; it does not prove absence of UI jank, bounded peak memory,
+  or a universal browser quota.
+- Manual saves, output preparation, Frame, Start, CAM, G-code, and hardware behavior are unchanged.
+  Frame remains the sole ordinary Start guard.
+
+### Verification
+
+- Fake-IndexedDB tests cover current/previous rotation, transaction abort rollback, same-epoch writer
+  contention, persistent clear tombstones, per-session isolation, malformed-manifest isolation,
+  manifest/snapshot identity disagreement, impossible manifest reference order, local key/session
+  identity disagreement, corrupt-current fallback, queued clear-after-write ordering, and a commit
+  failure that falls back locally while clear is queued.
+- Storage failure tests cover IndexedDB-to-local fallback, both-backend failure, inaccessible or
+  throwing storage globals, failed local deletion, unindexed per-session fallback discovery, malformed
+  local disclosure, nonblocking file-handoff cleanup, slow-save project-version binding, destructive
+  flow retention, stale recovery/document-epoch binding, live foreign retention, abandoned cleanup,
+  unsupported ownership retention, and warning disclosure.
+- A deterministic 2048 x 2048 U16 fixture pins the 11,184,812-character payload and digest, then
+  round-trips the complete canonical source through the production durable service without a local
+  autosave write.
+- Real Chrome tests cover reload through the production recovery prompt and completed re-home write,
+  plus two-window exclusive-lock contention, session rotation, live exclusion, post-close recovery,
+  mutation-time retention, and exact source cleanup.
+
+These tests qualify committed Chrome IndexedDB state across reload. They do not qualify an abrupt
+browser/OS process kill, power loss, packaged Electron restart, all target-device quotas, or absence
+of renderer stalls. Those claims require separate runtime evidence.
+
+### References
+
+- W3C, Indexed Database API 3.0, transactions and object stores:
+  https://www.w3.org/TR/IndexedDB/
+- W3C, Web Locks API, exclusive locks and `ifAvailable`:
+  https://www.w3.org/TR/web-locks/
+- ADR-291, P2R.1 portable manual files and atomic autosave contract.
+- ADR-292, P2R.1a canonical heightfield substrate and its superseded large-autosave limitation.

@@ -205,3 +205,34 @@ describe('startAutosaveLoop backs off after a quota failure', () => {
     stop();
   });
 });
+
+describe('startAutosaveLoop async writer serialization', () => {
+  it('never overlaps interval writes and resumes after completion', async () => {
+    let finishFirst = (_result: { readonly kind: 'ok' }): void => undefined;
+    const first = new Promise<{ readonly kind: 'ok' }>((resolve) => {
+      finishFirst = resolve;
+    });
+    const writer = vi
+      .fn()
+      .mockImplementationOnce(() => first)
+      .mockResolvedValue({ kind: 'ok' });
+    let project = createProject();
+    const stop = startAutosaveLoop(
+      () => ({ project, dirty: true, isStreaming: false }),
+      TICK_MS,
+      undefined,
+      writer,
+    );
+
+    vi.advanceTimersByTime(TICK_MS * IDLE_TICKS);
+    expect(writer).toHaveBeenCalledOnce();
+
+    finishFirst({ kind: 'ok' });
+    await first;
+    await Promise.resolve();
+    project = { ...project, notes: 'edited after first write' };
+    vi.advanceTimersByTime(TICK_MS);
+    expect(writer).toHaveBeenCalledTimes(2);
+    stop();
+  });
+});

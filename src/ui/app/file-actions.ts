@@ -24,7 +24,7 @@ import { prepareProjectForPersistence } from '../../io/project';
 import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { requestSaveFilename } from '../state/save-filename-store';
-import { clearAutosave } from '../state/autosave';
+import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { handleSalvageExportProject } from './salvage-export';
 import type { ImportOutcome } from '../state/store';
@@ -275,14 +275,17 @@ export type SaveProjectCtx = {
   readonly project: Project;
   readonly savedName: string | null;
   readonly lastSaveTarget: SaveTarget | null;
-  readonly markSaved: (target: SaveTarget) => void;
+  readonly markSaved: (target: SaveTarget, expectedProject: Project) => boolean | undefined;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
 // LU18: the Save-before-discard flow needs to know whether the save
 // actually landed — a cancelled picker must abort the destructive action
 // that triggered it, not fall through to "discard anyway".
-export type SaveProjectOutcome = 'saved' | 'cancelled' | 'error';
+export type SaveProjectOutcome = 'saved' | 'saved-with-newer-edits' | 'cancelled' | 'error';
+
+export const SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE =
+  'Saved the captured version; newer edits remain unsaved and recovery is preserved.';
 
 // F-A11 Save vs Save As. Without `forceDialog`, Ctrl+S reuses the in-memory
 // SaveTarget from the last save (no dialog, toast just says "Saved").
@@ -318,11 +321,15 @@ export async function handleSaveProject(
   if (target === null) return 'cancelled';
   try {
     await target.write(prepared.json);
-    ctx.markSaved(target);
-    // Manual save succeeded → autosave slot is redundant. Drop it so
-    // the recovery prompt doesn't fire on the next boot.
-    clearAutosave();
-    ctx.pushToast(reuseTarget ? 'Saved' : `Saved project to ${target.displayName}`, 'success');
+    const savedCurrentProject = ctx.markSaved(target, ctx.project) !== false;
+    if (savedCurrentProject) {
+      // This exact project reached disk, so its recovery slot is redundant.
+      clearAutosaveAfterFileHandoff(ctx.pushToast);
+      ctx.pushToast(reuseTarget ? 'Saved' : `Saved project to ${target.displayName}`, 'success');
+    } else {
+      ctx.pushToast(SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE, 'warning');
+      return 'saved-with-newer-edits';
+    }
     return 'saved';
   } catch (err) {
     ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
@@ -397,7 +404,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     const loadResult = ctx.setProject(result.project);
     markCapabilityAwareLoad(ctx, file.name, loadResult);
     // Opening a real .lf2 makes any autosaved snapshot stale.
-    clearAutosave();
+    clearAutosaveAfterFileHandoff(ctx.pushToast);
     if (result.migratedFrom !== undefined) {
       ctx.pushToast(`Opened ${file.name} — migrated from schema v${result.migratedFrom}`, 'info');
     } else {
@@ -426,7 +433,7 @@ function openLightBurnMigration(
   }
   const loadResult = ctx.setProject(result.project);
   ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'), { dirty: true });
-  clearAutosave();
+  clearAutosaveAfterFileHandoff(ctx.pushToast);
   const unsupported = result.report.unsupportedShapeTypes.length;
   const warnings = result.report.warnings.length;
   ctx.pushToast(
