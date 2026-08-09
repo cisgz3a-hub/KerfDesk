@@ -35,6 +35,13 @@ function inputByLabel(container: HTMLElement, label: string): HTMLInputElement {
   return input;
 }
 
+async function expandHud(container: HTMLElement): Promise<HTMLButtonElement> {
+  const expand = container.querySelector('button[aria-label="Expand Stock controls"]');
+  if (!(expand instanceof HTMLButtonElement)) throw new Error('expand button missing');
+  await act(async () => expand.click());
+  return expand;
+}
+
 async function editAndBlur(input: HTMLInputElement, value: string): Promise<void> {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   if (setter === undefined) throw new Error('native input value setter missing');
@@ -47,7 +54,7 @@ async function editAndBlur(input: HTMLInputElement, value: string): Promise<void
 }
 
 describe('CncStockCanvasHud', () => {
-  it('stays off the laser canvas and opens with the current CNC stock summary', async () => {
+  it('stays off the laser canvas and starts folded with the current CNC stock summary', async () => {
     const laserHost = await renderHud('laser');
     expect(laserHost.querySelector('[aria-label="Stock controls"]')).toBeNull();
 
@@ -58,33 +65,33 @@ describe('CncStockCanvasHud', () => {
 
     const cncHost = await renderHud('cnc');
     expect(cncHost.textContent).toContain('400 × 400 × 6.35 mm');
-    expect(inputByLabel(cncHost, 'Stock thickness').value).toBe('6.35');
-    expect(inputByLabel(cncHost, 'Stock width').value).toBe('400');
-    expect(inputByLabel(cncHost, 'Stock origin X').value).toBe('0');
+    expect(cncHost.querySelector('input')).toBeNull();
+    const expand = cncHost.querySelector('button[aria-label="Expand Stock controls"]');
+    expect(expand?.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('collapses to the summary and restores the editable fields', async () => {
+  it('expands the folded summary and collapses back to the compact state', async () => {
     const container = await renderHud('cnc');
     const panel = container.querySelector('[aria-label="Stock controls"]');
     if (!(panel instanceof HTMLElement)) throw new Error('stock panel missing');
-    const collapse = container.querySelector('button[aria-label="Collapse Stock controls"]');
-    if (!(collapse instanceof HTMLButtonElement)) throw new Error('collapse button missing');
-
-    await act(async () => collapse.click());
-    expect(collapse.getAttribute('aria-expanded')).toBe('false');
     expect(panel.style.width).toBe('176px');
     expect(panel.style.background).toBe('color-mix(in srgb, var(--lf-bg-1) 68%, transparent)');
     expect(panel.style.backdropFilter).toBe('blur(6px)');
     expect(container.textContent).toContain('400 × 400 × 6.35 mm');
     expect(container.querySelector('input')).toBeNull();
 
-    await act(async () => collapse.click());
-    expect(collapse.getAttribute('aria-expanded')).toBe('true');
+    const toggle = await expandHud(container);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(inputByLabel(container, 'Stock height').value).toBe('400');
+
+    await act(async () => toggle.click());
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('input')).toBeNull();
   });
 
   it('commits canvas edits through the existing clamped CNC stock action', async () => {
     const container = await renderHud('cnc');
+    await expandHud(container);
     await editAndBlur(inputByLabel(container, 'Stock width'), '520');
     await editAndBlur(inputByLabel(container, 'Stock thickness'), '250');
     await editAndBlur(inputByLabel(container, 'Stock origin X'), '-25');
