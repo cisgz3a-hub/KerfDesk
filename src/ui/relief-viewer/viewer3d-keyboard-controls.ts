@@ -9,8 +9,9 @@ const ZOOM_EXPONENT_PER_PIXEL = 0.001;
 
 /** Maps focused-canvas keys onto the same compact controls used by pointer input. */
 export function viewer3DCameraControlForKey(
-  event: Pick<KeyboardEvent, 'key' | 'shiftKey'>,
+  event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'key' | 'metaKey' | 'shiftKey'>,
 ): Viewer3DCameraControl | null {
+  if (event.altKey || event.ctrlKey || event.metaKey) return null;
   if (event.key === '+' || event.key === '=') {
     return { kind: 'zoom', deltaY: -KEYBOARD_ZOOM_STEP_PX };
   }

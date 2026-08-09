@@ -17,6 +17,10 @@ export function installViewer3DThreeKeyboard(
   camera: PerspectiveCamera,
   controls: Viewer3DThreeKeyboardControls,
 ): () => void {
+  const preserveHostModifiedArrow = (event: KeyboardEvent): void => {
+    if (isHostModifiedArrow(event)) event.stopImmediatePropagation();
+  };
+  canvas.addEventListener('keydown', preserveHostModifiedArrow, { capture: true });
   controls.listenToKeyEvents(canvas);
   const handleKeyDown = (event: KeyboardEvent): void => {
     const control = viewer3DCameraControlForKey(event);
@@ -26,9 +30,25 @@ export function installViewer3DThreeKeyboard(
   };
   canvas.addEventListener('keydown', handleKeyDown);
   return () => {
+    canvas.removeEventListener('keydown', preserveHostModifiedArrow, { capture: true });
     canvas.removeEventListener('keydown', handleKeyDown);
     controls.stopListenToKeyEvents();
   };
+}
+
+// OrbitControls owns modified arrows as well as the documented Shift variant.
+// Keep Ctrl/Cmd/Alt chords away from that target listener without preventing
+// their browser or Electron default action.
+function isHostModifiedArrow(
+  event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'key' | 'metaKey'>,
+): boolean {
+  if (!event.altKey && !event.ctrlKey && !event.metaKey) return false;
+  return (
+    event.key === 'ArrowLeft' ||
+    event.key === 'ArrowRight' ||
+    event.key === 'ArrowUp' ||
+    event.key === 'ArrowDown'
+  );
 }
 
 function applyZoom(

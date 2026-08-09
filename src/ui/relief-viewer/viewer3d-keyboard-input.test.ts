@@ -8,6 +8,7 @@ describe('installViewer3DKeyboardInput', () => {
     const dispose = installViewer3DKeyboardInput(canvas, onControl);
 
     expect(keydown(canvas, 'Tab').defaultPrevented).toBe(false);
+    expect(keydown(canvas, '+', { ctrlKey: true }).defaultPrevented).toBe(false);
     expect(keydown(canvas, 'ArrowDown').defaultPrevented).toBe(true);
     expect(onControl).toHaveBeenCalledOnce();
 
@@ -17,8 +18,12 @@ describe('installViewer3DKeyboardInput', () => {
   });
 });
 
-function keydown(canvas: HTMLCanvasElement, key: string): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+function keydown(
+  canvas: HTMLCanvasElement,
+  key: string,
+  init: Pick<KeyboardEventInit, 'ctrlKey'> = {},
+): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
   canvas.dispatchEvent(event);
   return event;
 }

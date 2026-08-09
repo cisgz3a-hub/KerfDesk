@@ -25,26 +25,64 @@ describe('installViewer3DThreeKeyboard', () => {
     keydown(canvas, '-');
     expect(camera.position.distanceTo(controls.target)).toBe(distance);
   });
+
+  it('does not let OrbitControls or custom zoom consume host modifier chords', () => {
+    const canvas = document.createElement('canvas');
+    const camera = new PerspectiveCamera();
+    camera.position.set(0, 0, 10);
+    const controls = fakeControls();
+    const dispose = installViewer3DThreeKeyboard(canvas, camera, controls);
+
+    const browserZoom = keydown(canvas, '+', { ctrlKey: true });
+    expect(browserZoom.defaultPrevented).toBe(false);
+    controls.delegatedKeyDown.mockClear();
+    const browserNavigation = keydown(canvas, 'ArrowLeft', { altKey: true });
+    expect(browserNavigation.defaultPrevented).toBe(false);
+    expect(controls.delegatedKeyDown).not.toHaveBeenCalled();
+    expect(camera.position.distanceTo(controls.target)).toBe(10);
+    dispose();
+  });
 });
 
 function fakeControls(): Viewer3DThreeKeyboardControls & {
   readonly listenToKeyEvents: ReturnType<typeof vi.fn>;
   readonly stopListenToKeyEvents: ReturnType<typeof vi.fn>;
   readonly update: ReturnType<typeof vi.fn>;
+  readonly delegatedKeyDown: ReturnType<typeof vi.fn>;
 } {
+  let keyTarget: HTMLElement | Window | null = null;
+  const delegatedKeyDown = vi.fn((event: Event) => {
+    if (event instanceof KeyboardEvent && event.key.startsWith('Arrow')) event.preventDefault();
+  });
   return {
     enabled: true,
     target: new Vector3(),
     minDistance: 0,
     maxDistance: Number.POSITIVE_INFINITY,
-    listenToKeyEvents: vi.fn(),
-    stopListenToKeyEvents: vi.fn(),
+    listenToKeyEvents: vi.fn((element: HTMLElement | Window) => {
+      keyTarget = element;
+      element.addEventListener('keydown', delegatedKeyDown);
+    }),
+    stopListenToKeyEvents: vi.fn(() => {
+      keyTarget?.removeEventListener('keydown', delegatedKeyDown);
+      keyTarget = null;
+    }),
     update: vi.fn(() => true),
+    delegatedKeyDown,
   };
 }
 
-function keydown(canvas: HTMLCanvasElement, key: string): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+function keydown(
+  canvas: HTMLCanvasElement,
+  key: string,
+  init: Pick<KeyboardEventInit, 'altKey' | 'ctrlKey' | 'metaKey'> = {},
+): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
   canvas.dispatchEvent(event);
   return event;
 }
