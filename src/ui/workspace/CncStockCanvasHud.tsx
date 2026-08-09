@@ -24,7 +24,7 @@ type MachineUpdater = ReturnType<typeof useStore.getState>['updateCncMachine'];
 export function CncStockCanvasHud(): JSX.Element | null {
   const machine = useStore((state) => state.project.machine);
   const updateCncMachine = useStore((state) => state.updateCncMachine);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   if (machine?.kind !== 'cnc') return null;
 
   const stock = machine.stock;
@@ -65,6 +65,7 @@ function StockHeader(props: {
       aria-expanded={expanded}
       aria-controls={STOCK_FIELDS_ID}
       aria-label={expanded ? 'Collapse Stock controls' : 'Expand Stock controls'}
+      title={expanded ? 'Collapse Stock controls' : 'Expand Stock controls'}
       onClick={onToggle}
     >
       {expanded ? (
