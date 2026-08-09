@@ -16763,3 +16763,101 @@ qualification boundaries stay in force.
   https://www.w3.org/TR/2025/REC-png-3-20250624/#11tRNS
 - ADR-290, the original explicit 8-bit height-map import.
 - ADR-292, the canonical U16 P2R.1a substrate and prior PNG16 limitation.
+
+## ADR-296 - Exact grayscale-alpha-8 PNG import preserves scalar and mask bytes (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a software-import slice; full mask controls, 16-bit alpha, and physical qualification remain open
+
+### Context
+
+ADR-295 qualified non-interlaced PNG color type 0 at bit depth 8 or 16 as explicit
+height-map input. The canonical heightfield already stores exact U16 scalar codes plus an optional
+U8 inclusion mask, and ADR-291 defines alpha as mask data rather than a color to composite. The
+remaining narrow gap is PNG color type 4 at bit depth 8: each pixel already contains exactly one
+8-bit grayscale scalar and one 8-bit alpha value that map losslessly into those existing fields.
+
+Treating the source as an ordinary RGBA image would incorrectly introduce color/luma conversion.
+Discarding or compositing alpha would erase source data. Accepting color type 4 at bit depth 16
+would also be untruthful because its 16-bit alpha channel cannot fit losslessly in the current U8
+mask. This decision therefore adds only the representation the existing canonical contract can
+preserve exactly.
+
+This decision supersedes ADR-295 decision 1 only where it names grayscale-alpha as unsupported.
+The scalar-only color-type-0 path and every other schema, worker, CAM, guard, output, and
+qualification boundary remain in force.
+
+### Decision
+
+1. **Qualify one additional exact source layout.** **Import Height Map...** accepts
+   non-interlaced PNG color type 4 at bit depth 8 with compression and filter method 0. Color type
+   4 at bit depth 16, RGB/RGBA, palette, Adam7, APNG behavior, sidecar masks, and inferred depth
+   remain outside this slice. The ordinary image-import luma route is unchanged.
+2. **Reconstruct grayscale and alpha as source bytes.** The shared filtered-row reader treats each
+   color-type-4/8 pixel as two bytes, so Sub, Average, and Paeth use a two-byte preceding-pixel
+   displacement. Grayscale byte `v` becomes canonical U16 value `v * 257`; the adjacent alpha byte
+   is copied unchanged into the U8 inclusion mask. No resizing, luma conversion, compositing,
+   gamma, auto-level, blur, sharpening, or color management is applied.
+3. **Always retain the alpha channel as mask data.** A color-type-4 import persists its mask even
+   when every alpha byte is `255`, preserving the exact supplied mask bytes and mask presence. The existing
+   mapping remains `inclusionThreshold: 255` and `outsideMask: 'excluded'`: only fully opaque cells
+   are included by default, while values `1..254` remain recoverable for future controls. This is
+   existing mapping behavior, not a new clamp, threshold rewrite, warning, or guard.
+4. **Keep PNG transparency rules explicit.** PNG forbids `tRNS` for a source that already has an
+   alpha channel. A parsed color-type-4 `tRNS` is therefore a factual malformed-source error for
+   this newly qualified route. Existing grayscale `tRNS` matching and ordinary image-import
+   behavior remain unchanged.
+5. **Reuse the existing durable and execution contracts.** The canonical schema remains v4,
+   provenance remains an 8-bit depth-map source, and the same mask bytes participate in the
+   existing heightfield digest. Worker protocol and lifecycle, progress, cancellation,
+   stale-result handling, persistence, preview, CAM, simulation, G-code, Job Review, Frame, and
+   Start receive no new contract or revision. The existing main-thread fallback runs the same
+   preparation path and therefore accepts this newly qualified input too.
+6. **Keep the evidence boundary explicit.** Exact grayscale codes, exact alpha bytes, canonical
+   samples/mask/digest, worker/main parity, and software materialization are qualified. This slice
+   does not establish mask editing, a user-selectable threshold, subpixel physical coverage,
+   16-bit alpha, general PNG conformance, metric source truth, tool reachability, controller
+   behavior, or wood-cut quality.
+
+### Consequences
+
+- A qualified grayscale-alpha PNG no longer loses alpha or requires an externally flattened mask
+  before import.
+- Partial alpha is preserved but, under the current explicit threshold-255 mapping, is excluded
+  from carving until a separately designed mask-control surface exists.
+- Fully opaque color-type-4 sources intentionally retain an all-`255` mask instead of being
+  normalized to an unmasked source.
+- Project schema, canonical encodings, digest algorithm, import-worker message shape, CAM, output,
+  and Frame/Start semantics remain unchanged.
+- This remains a narrow explicit-height-map decoder, not a claim that every PNG alpha layout is a
+  trustworthy or physically meaningful relief mask.
+
+### Verification
+
+- Generated color-type-4/8 fixtures cover all five PNG filters, one-byte stream chunking, random
+  grayscale/alpha pairs, and the required two-byte filter displacement.
+- A hard-coded canonical golden pins U16LE sample bytes, the exact U8 alpha mask, mapping,
+  provenance, and SHA-256 digest. A separate all-opaque fixture proves that the supplied mask is
+  retained.
+- Unsupported color-type-4/16, forbidden color-type-4 `tRNS`, palette, and interlace behavior are
+  pinned without broadening the ordinary display-luma importer.
+- Direct preparation, the application fallback path, and a real bundled-worker Chrome test compare
+  the complete structured-cloned result. Existing color-type-0/8 and color-type-0/16 goldens remain
+  unchanged.
+- TypeScript, lint, formatting, focused import/project tests, browser E2E, and release checks are
+  required before publication. Packaged Electron, abrupt process loss, controller behavior,
+  hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- W3C, PNG Third Edition, allowed color-type/bit-depth combinations:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#11IHDR
+- W3C, PNG Third Edition, alpha representation:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#6Alpha-representation
+- W3C, PNG Third Edition, bytewise filter types:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#9Filter-types
+- W3C, PNG Third Edition, `tRNS` prohibition for sources with alpha:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#11tRNS
+- ADR-291, the exact alpha-to-mask product contract.
+- ADR-292, the canonical U16-plus-U8-mask P2R.1a substrate.
+- ADR-295, exact grayscale-8/16 PNG import and its prior grayscale-alpha limitation.

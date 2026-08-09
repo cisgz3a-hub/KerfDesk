@@ -2,8 +2,9 @@ import { createReliefHeightfield } from '../../core/relief/relief-heightfield-fa
 import type { ReliefDepthMap, ReliefHeightfield } from '../../core/scene/relief';
 import { bytesToBase64 } from './base64-bytes';
 import { pngHeightfieldMaskInput } from './png-heightfield-mask';
+import { createPngHeightfieldRowAccumulator } from './png-heightfield-row-accumulator';
 import {
-  decodeIncrementalPngToGrayscaleSamples,
+  decodeIncrementalPngToHeightfieldSamples,
   decodeIncrementalPngToLuma,
   type IncrementalPngHeaderResult,
 } from './png-incremental-decoder';
@@ -81,9 +82,9 @@ export async function prepareReliefHeightfieldPng(
       reason: 'Height-map physical width and maximum depth must be finite and positive.',
     };
   }
-  const accumulator = createU16SampleAccumulator();
+  const accumulator = createPngHeightfieldRowAccumulator();
   let transparentGraySample: number | undefined;
-  const decoded = await decodeIncrementalPngToGrayscaleSamples(blob.stream(), {
+  const decoded = await decodeIncrementalPngToHeightfieldSamples(blob.stream(), {
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.onProgress === undefined
       ? {}
@@ -97,9 +98,9 @@ export async function prepareReliefHeightfieldPng(
   if (decoded.kind === 'legacy-fallback') {
     return { kind: 'error', reason: decoded.reason };
   }
-  const sourceBitDepth = qualifiedGrayscaleBitDepth(decoded.bitDepth);
-  const samples = accumulator.complete();
-  if (samples === null) {
+  const sourceBitDepth = qualifiedHeightfieldBitDepth(decoded.bitDepth);
+  const accumulated = accumulator.complete();
+  if (accumulated === null) {
     return { kind: 'error', reason: 'Height-map PNG did not produce its declared samples.' };
   }
   const physicalHeightMm = options.physicalWidthMm * (decoded.height / decoded.width);
@@ -115,8 +116,13 @@ export async function prepareReliefHeightfieldPng(
       height: decoded.height,
       physicalWidthMm: options.physicalWidthMm,
       physicalHeightMm,
-      samples,
-      ...pngHeightfieldMaskInput(samples, transparentGraySample, sourceBitDepth),
+      samples: accumulated.samples,
+      ...resolvedHeightfieldMaskInput(
+        accumulated.samples,
+        accumulated.inclusionMask,
+        transparentGraySample,
+        sourceBitDepth,
+      ),
       mapping: {
         polarity: 'light-is-high',
         inputLowCode: 0,
@@ -144,12 +150,6 @@ type SampleAccumulator = {
   readonly complete: () => Uint8Array | null;
 };
 
-type U16SampleAccumulator = {
-  readonly acceptHeader: (header: IncrementalPngHeaderResult) => void;
-  readonly acceptRow: (row: Uint8Array) => void;
-  readonly complete: () => Uint8Array | null;
-};
-
 function createSampleAccumulator(): SampleAccumulator {
   let samples: Uint8Array | null = null;
   let rowOffset = 0;
@@ -168,38 +168,6 @@ function createSampleAccumulator(): SampleAccumulator {
   };
 }
 
-function createU16SampleAccumulator(): U16SampleAccumulator {
-  let samples: Uint8Array | null = null;
-  let sampleOffset = 0;
-  let sourceBitDepth: 8 | 16 | null = null;
-  return {
-    acceptHeader: (header) => {
-      samples = allocateU16Samples(header);
-      sourceBitDepth = header.bitDepth === 16 ? 16 : 8;
-    },
-    acceptRow: (row) => {
-      const bytesPerSample = sourceBitDepth === 16 ? 2 : 1;
-      const rowSamples = row.length / bytesPerSample;
-      if (
-        samples === null ||
-        sourceBitDepth === null ||
-        !Number.isInteger(rowSamples) ||
-        (sampleOffset + rowSamples) * 2 > samples.length
-      ) {
-        throw new Error('Height-map PNG produced inconsistent sample rows.');
-      }
-      for (let index = 0; index < row.length; index += bytesPerSample) {
-        const mostSignificant = row[index] ?? 0;
-        const leastSignificant = sourceBitDepth === 16 ? (row[index + 1] ?? 0) : mostSignificant;
-        samples[sampleOffset * 2] = leastSignificant;
-        samples[sampleOffset * 2 + 1] = mostSignificant;
-        sampleOffset += 1;
-      }
-    },
-    complete: () => (samples !== null && sampleOffset * 2 === samples.length ? samples : null),
-  };
-}
-
 function allocateSamples(header: IncrementalPngHeaderResult): Uint8Array {
   validateHeader(header);
   const sampleCount = header.width * header.height;
@@ -210,19 +178,6 @@ function allocateSamples(header: IncrementalPngHeaderResult): Uint8Array {
     return new Uint8Array(sampleCount);
   } catch {
     throw new Error('Height-map samples do not fit in this runtime.');
-  }
-}
-
-function allocateU16Samples(header: IncrementalPngHeaderResult): Uint8Array {
-  validateHeader(header);
-  const outputBytes = header.width * header.height * 2;
-  if (!Number.isSafeInteger(outputBytes)) {
-    throw new Error('Canonical height-map sample bytes exceed the exact numeric range.');
-  }
-  try {
-    return new Uint8Array(outputBytes);
-  } catch {
-    throw new Error('Canonical height-map samples do not fit in this runtime.');
   }
 }
 
@@ -245,7 +200,18 @@ function positiveFinite(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
-function qualifiedGrayscaleBitDepth(value: number): 8 | 16 {
+function qualifiedHeightfieldBitDepth(value: number): 8 | 16 {
   if (value === 8 || value === 16) return value;
   throw new Error('Height-map PNG produced an unqualified grayscale sample depth.');
+}
+
+function resolvedHeightfieldMaskInput(
+  samples: Uint8Array,
+  inclusionMask: Uint8Array | undefined,
+  transparentGraySample: number | undefined,
+  sourceBitDepth: 8 | 16,
+): { readonly inclusionMask?: Uint8Array } {
+  return inclusionMask === undefined
+    ? pngHeightfieldMaskInput(samples, transparentGraySample, sourceBitDepth)
+    : { inclusionMask };
 }
