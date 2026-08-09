@@ -3,8 +3,10 @@ import {
   decodeCanonicalBase64,
   type Base64DecodeResult,
 } from './depth-map-base64';
+import type { PartialCellGrid } from '../grid';
 import { reliefHeightfieldDigest } from './heightfield-digest';
 import { heightfieldMetadataError } from './heightfield-metadata-validator';
+import { heightfieldTargetGrid, targetCellFraction } from './heightfield-target-grid';
 import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
 import type { ReliefHeightfield } from '../scene/relief';
 
@@ -60,16 +62,11 @@ export function heightfieldToHeightmap(
     options.mmPerCell ?? DEFAULT_HEIGHTMAP_CELL_MM,
   );
   if (size.kind === 'error') return size;
-  const widthCells = Math.max(1, Math.ceil(target.widthMm / size.mmPerCell));
-  const heightCells = Math.max(1, Math.ceil(target.heightMm / size.mmPerCell));
-  const materialized = materializeHeightmap(
-    source,
-    decoded,
-    widthCells,
-    heightCells,
-    size.mmPerCell,
-    runtime,
-  );
+  const grid = heightfieldTargetGrid(target.widthMm, target.heightMm, size.mmPerCell);
+  if (grid === null) {
+    return { kind: 'error', reason: 'Relief heightfield does not fit in this runtime.' };
+  }
+  const materialized = materializeHeightmap(source, decoded, grid, runtime);
   if (materialized.kind === 'allocation-error') {
     return { kind: 'error', reason: 'Relief heightfield does not fit in this runtime.' };
   }
@@ -227,12 +224,10 @@ type MaterializedHeightmapResult =
 function materializeHeightmap(
   source: ReliefHeightfield,
   decoded: DecodedHeightfield,
-  widthCells: number,
-  heightCells: number,
-  mmPerCell: number,
+  grid: PartialCellGrid,
   runtime: HeightfieldMaterializationRuntime,
 ): MaterializedHeightmapResult {
-  const cellCount = widthCells * heightCells;
+  const cellCount = grid.widthCells * grid.heightCells;
   const depth = allocateTypedArray(runtime.allocateFloat32 ?? allocateFloat32, cellCount);
   if (depth === null) return { kind: 'allocation-error' };
   const tracksExclusion = decoded.mask !== undefined && source.mapping.outsideMask === 'excluded';
@@ -240,10 +235,10 @@ function materializeHeightmap(
     ? allocateTypedArray(runtime.allocateUint8 ?? allocateUint8, cellCount)
     : undefined;
   if (inclusion === null) return { kind: 'allocation-error' };
-  for (let y = 0; y < heightCells; y += 1) {
-    for (let x = 0; x < widthCells; x += 1) {
-      const targetIndex = y * widthCells + x;
-      const sampled = sampleTargetCell(source, decoded, x, y, widthCells, heightCells);
+  for (let y = 0; y < grid.heightCells; y += 1) {
+    for (let x = 0; x < grid.widthCells; x += 1) {
+      const targetIndex = y * grid.widthCells + x;
+      const sampled = sampleTargetCell(source, decoded, grid, x, y);
       if (!storeMaterializedCell(depth, inclusion, targetIndex, sampled)) {
         return { kind: 'sample-error' };
       }
@@ -252,9 +247,7 @@ function materializeHeightmap(
   return {
     kind: 'ok',
     heightmap: {
-      widthCells,
-      heightCells,
-      mmPerCell,
+      ...grid,
       depth,
       ...(inclusion === undefined ? {} : { inclusion }),
     },
@@ -289,24 +282,23 @@ function allocateTypedArray<T extends { readonly length: number }>(
 function sampleTargetCell(
   source: ReliefHeightfield,
   decoded: DecodedHeightfield,
+  grid: PartialCellGrid,
   x: number,
   y: number,
-  widthCells: number,
-  heightCells: number,
 ): { readonly included: boolean; readonly depth: number } {
   const rangeX = sourceRange(
     source.mapping.crop.x,
     source.mapping.crop.width,
     source.width,
-    x,
-    widthCells,
+    targetCellFraction(grid, 'x', x),
+    targetCellFraction(grid, 'x', x + 1),
   );
   const rangeY = sourceRange(
     source.mapping.crop.y,
     source.mapping.crop.height,
     source.height,
-    y,
-    heightCells,
+    targetCellFraction(grid, 'y', y),
+    targetCellFraction(grid, 'y', y + 1),
   );
   let included = false;
   let surface = Number.NEGATIVE_INFINITY;
@@ -328,11 +320,11 @@ function sourceRange(
   cropStart: number,
   cropSize: number,
   sourceSize: number,
-  targetIndex: number,
-  targetSize: number,
+  targetStart: number,
+  targetEnd: number,
 ): { readonly min: number; readonly max: number } {
-  const start = (cropStart + (targetIndex / targetSize) * cropSize) * sourceSize;
-  const end = (cropStart + ((targetIndex + 1) / targetSize) * cropSize) * sourceSize;
+  const start = (cropStart + targetStart * cropSize) * sourceSize;
+  const end = (cropStart + targetEnd * cropSize) * sourceSize;
   const min = Math.min(sourceSize - 1, Math.floor(start));
   const max = Math.min(sourceSize - 1, Math.max(min, Math.ceil(end) - 1));
   return { min, max };

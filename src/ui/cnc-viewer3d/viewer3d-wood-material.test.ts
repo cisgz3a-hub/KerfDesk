@@ -11,6 +11,8 @@ function grid(): RemovalGrid {
   return {
     widthCells: 2,
     heightCells: 2,
+    widthMm: 2,
+    heightMm: 2,
     mmPerCell: 1,
     originX: 0,
     originY: 0,
@@ -19,15 +21,15 @@ function grid(): RemovalGrid {
   };
 }
 
-function woodMaterial() {
+function woodMaterial(inputGrid = grid(), widthMm = 20, heightMm = 10) {
   const grain = woodGrainFor(undefined);
   if (grain === null) throw new Error('Custom stock must have a grain');
   return createCarvedWoodMaterial(three, {
     appearance: materialAppearance(undefined),
     grain,
-    grid: grid(),
-    widthMm: 20,
-    heightMm: 10,
+    grid: inputGrid,
+    widthMm,
+    heightMm,
   });
 }
 
@@ -75,6 +77,31 @@ describe('createCarvedWoodMaterial', () => {
 
     const size = shader.uniforms.uCarveSizeMm?.value as three.Vector2;
     expect([size.x, size.y]).toEqual([20, 10]);
+    wood.dispose();
+  });
+
+  it('publishes exact grid shape and partial axes for position-aware texture sampling', () => {
+    const partial: RemovalGrid = {
+      ...grid(),
+      widthCells: 4,
+      heightCells: 3,
+      widthMm: 1,
+      heightMm: 0.65,
+      mmPerCell: 0.3,
+      depth: new Float32Array(12),
+    };
+    const wood = woodMaterial(partial, partial.widthMm, partial.heightMm);
+    const shader = standardShader();
+    wood.material.onBeforeCompile(shader as never, null as never);
+
+    const cells = shader.uniforms.uCarveCells?.value as three.Vector2;
+    const partialAxes = shader.uniforms.uCarveHasPartialCell?.value as three.Vector2;
+    expect([cells.x, cells.y]).toEqual([4, 3]);
+    expect([partialAxes.x, partialAxes.y]).toEqual([1, 1]);
+    expect(shader.fragmentShader).toContain(
+      'if (hasPartialCell < 0.5) return coordinateMm / extentMm;',
+    );
+    expect(shader.fragmentShader).toContain('(coordinateMm - terminalStartMm)');
     wood.dispose();
   });
 

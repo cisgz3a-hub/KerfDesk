@@ -7,6 +7,10 @@
 export type Heightmap = {
   readonly widthCells: number;
   readonly heightCells: number;
+  // Exact physical domain. Interior cells retain mmPerCell; the terminal cell
+  // on either axis ends at this dimension and may therefore be shorter.
+  readonly widthMm: number;
+  readonly heightMm: number;
   readonly mmPerCell: number;
   // length = widthCells * heightCells; values in [−reliefDepthMm, 0].
   readonly depth: Float32Array;

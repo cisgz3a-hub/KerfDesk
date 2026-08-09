@@ -10,6 +10,12 @@
 // Pure and deterministic: triangles in file order, max-Z accumulation is
 // order-independent, indexed loops only.
 
+import {
+  partialCellCount,
+  partialGridHasPartialCell,
+  type PartialCellAxis,
+  type PartialCellGrid,
+} from '../grid';
 import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
 import { meshBounds, FLOATS_PER_TRIANGLE, type TriangleMesh } from './triangle-mesh';
 import { rasterizeTriangleMaxZ, type RasterTarget } from './triangle-raster';
@@ -61,20 +67,24 @@ export function meshToHeightmap(
   const targetMetrics = targetSize(options, yExtent / xExtent);
   if (targetMetrics.kind === 'error') return targetMetrics;
   const { widthMm, heightMm } = targetMetrics;
-  const size = heightmapCellSize(widthMm, heightMm, options.mmPerCell ?? DEFAULT_HEIGHTMAP_CELL_MM);
-  if (size.kind === 'error') return size;
-  const { mmPerCell } = size;
-  const widthCells = Math.max(1, Math.ceil(widthMm / mmPerCell));
-  const heightCells = Math.max(1, Math.ceil(heightMm / mmPerCell));
-  const cellCount = widthCells * heightCells;
+  const gridResult = meshGrid(widthMm, heightMm, options.mmPerCell ?? DEFAULT_HEIGHTMAP_CELL_MM);
+  if (gridResult.kind === 'error') return gridResult;
+  const { grid } = gridResult;
+  const cellCount = grid.widthCells * grid.heightCells;
 
   const maxZ = allocateFloat32(runtime, cellCount);
   if (maxZ === null) {
     return { kind: 'error', reason: 'Relief mesh heightmap does not fit in this runtime.' };
   }
   maxZ.fill(Number.NEGATIVE_INFINITY);
-  const target: RasterTarget = { widthCells, heightCells, maxZ };
-  rasterizeMesh(target, mesh, bounds, widthCells / xExtent, heightCells / yExtent);
+  const target: RasterTarget = { ...grid, maxZ };
+  rasterizeMesh(
+    target,
+    mesh,
+    bounds,
+    cellsPerModelUnit(grid, 'x', xExtent),
+    cellsPerModelUnit(grid, 'y', yExtent),
+  );
   const depth = allocateFloat32(runtime, cellCount);
   if (depth === null) {
     return { kind: 'error', reason: 'Relief mesh heightmap does not fit in this runtime.' };
@@ -82,10 +92,40 @@ export function meshToHeightmap(
   normalizeDepths(maxZ, depth, bounds, options);
   return {
     kind: 'ok',
-    heightmap: { widthCells, heightCells, mmPerCell, depth },
+    heightmap: { ...grid, depth },
     widthMm,
     heightMm,
   };
+}
+
+type MeshGridResult =
+  | { readonly kind: 'ok'; readonly grid: PartialCellGrid }
+  | { readonly kind: 'error'; readonly reason: string };
+
+function meshGrid(widthMm: number, heightMm: number, requestedMm: number): MeshGridResult {
+  const size = heightmapCellSize(widthMm, heightMm, requestedMm);
+  if (size.kind === 'error') return size;
+  const widthCells = partialCellCount(widthMm, size.mmPerCell);
+  const heightCells = partialCellCount(heightMm, size.mmPerCell);
+  if (widthCells === null || heightCells === null) {
+    return { kind: 'error', reason: 'Relief mesh heightmap does not fit in this runtime.' };
+  }
+  return {
+    kind: 'ok',
+    grid: { widthCells, heightCells, widthMm, heightMm, mmPerCell: size.mmPerCell },
+  };
+}
+
+function cellsPerModelUnit(
+  grid: PartialCellGrid,
+  axis: PartialCellAxis,
+  modelExtent: number,
+): number {
+  const cellCount = axis === 'x' ? grid.widthCells : grid.heightCells;
+  if (!partialGridHasPartialCell(grid, axis)) return cellCount / modelExtent;
+  const extentMm = axis === 'x' ? grid.widthMm : grid.heightMm;
+  const nominalExtent = extentMm / grid.mmPerCell;
+  return (nominalExtent === 0 ? cellCount : nominalExtent) / modelExtent;
 }
 
 function allocateFloat32(runtime: MeshHeightmapRuntime, length: number): Float32Array | null {

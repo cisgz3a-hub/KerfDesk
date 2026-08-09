@@ -11,6 +11,8 @@ function heightmap(widthCells: number, heightCells: number, depth: readonly numb
   return {
     widthCells,
     heightCells,
+    widthMm: widthCells,
+    heightMm: heightCells,
     mmPerCell: 1,
     depth: Float32Array.from(depth),
   } as Heightmap;
@@ -121,12 +123,39 @@ describe('steppedSurfaceMesh', () => {
     const mesh = steppedSurfaceMesh({
       widthCells: 4,
       heightCells: 3,
+      widthMm: 2,
+      heightMm: 1.5,
       mmPerCell: 0.5,
       depth: new Float32Array(12),
     } as Heightmap);
 
     expect(mesh.widthMm).toBe(2);
     expect(mesh.heightMm).toBe(1.5);
+  });
+
+  it('ends terminal top faces at exact partial-cell extents', () => {
+    const mesh = steppedSurfaceMesh({
+      widthCells: 4,
+      heightCells: 2,
+      widthMm: 1,
+      heightMm: 0.5,
+      mmPerCell: 0.3,
+      depth: new Float32Array(8),
+    });
+    const finalCellVertex = 7 * VERTICES_PER_QUAD;
+    const corners = [0, 1, 2, 3].map((offset) => {
+      const at = (finalCellVertex + offset) * FLOATS_PER_VERTEX;
+      return [mesh.positions[at] ?? 0, mesh.positions[at + 1] ?? 0];
+    });
+
+    expect(corners).toEqual([
+      [expect.closeTo(0.9, 6), expect.closeTo(0.3, 6)],
+      [1, expect.closeTo(0.3, 6)],
+      [1, 0.5],
+      [expect.closeTo(0.9, 6), 0.5],
+    ]);
+    expect(mesh.widthMm).toBe(1);
+    expect(mesh.heightMm).toBe(0.5);
   });
 
   it('keeps buffers exactly sized and every index in range', () => {

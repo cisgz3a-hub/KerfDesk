@@ -26,14 +26,15 @@
 
 import type { Toolpath, ToolpathStep } from '../job';
 import type { CncTool } from '../scene';
+import { partialGridHasPartialCell } from '../grid';
 import {
   createRemovalGrid,
   gridCellIndex,
-  gridCellOfPoint,
   type RemovalGrid,
   type RemovalGridResult,
   type RemovalGridSpec,
 } from './removal-grid';
+import { stampPartialToolTip } from './stamp-partial-tool';
 import { kernelForTool, type ToolKernel } from './tool-kernels';
 
 export type ComputeRemovalOptions = {
@@ -275,7 +276,39 @@ function stampSegment(
 }
 
 function stampTip(grid: RemovalGrid, kernel: ToolKernel, x: number, y: number, tipZ: number): void {
-  const { cx, cy } = gridCellOfPoint(grid, x, y);
+  // Use the nominal lattice even outside stock: an edge-centred cutter can
+  // still overlap interior cells. Probe lookup deliberately remains stricter.
+  const cx = Math.floor((x - grid.originX) / grid.mmPerCell);
+  const cy = Math.floor((y - grid.originY) / grid.mmPerCell);
+  if (!hasTerminalCellInSurfaceRange(grid, kernel, cx, cy)) {
+    stampUniformTip(grid, kernel, cx, cy, tipZ);
+    return;
+  }
+  stampPartialToolTip(grid, kernel, cx, cy, x, y, tipZ);
+}
+
+function hasTerminalCellInSurfaceRange(
+  grid: RemovalGrid,
+  kernel: ToolKernel,
+  cx: number,
+  cy: number,
+): boolean {
+  const span = kernel.surfaceCandidateSpanCells;
+  const terminalX = grid.widthCells - 1;
+  const terminalY = grid.heightCells - 1;
+  return (
+    (partialGridHasPartialCell(grid, 'x') && Math.abs(cx - terminalX) <= span) ||
+    (partialGridHasPartialCell(grid, 'y') && Math.abs(cy - terminalY) <= span)
+  );
+}
+
+function stampUniformTip(
+  grid: RemovalGrid,
+  kernel: ToolKernel,
+  cx: number,
+  cy: number,
+  tipZ: number,
+): void {
   for (const offset of kernel.offsets) {
     const index = gridCellIndex(grid, cx + offset.dx, cy + offset.dy);
     if (index === null) continue;

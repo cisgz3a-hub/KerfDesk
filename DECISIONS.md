@@ -16580,3 +16580,118 @@ of renderer stalls. Those claims require separate runtime evidence.
   https://www.w3.org/TR/web-locks/
 - ADR-291, P2R.1 portable manual files and atomic autosave contract.
 - ADR-292, P2R.1a canonical heightfield substrate and its superseded large-autosave limitation.
+
+## ADR-294 - Relief grids preserve exact interior pitch with partial terminal cells (2026-08-09)
+
+**Date:** 2026-08-09
+**Status:** Accepted and implemented for relief CAM, simulation, canvas, and 3D software geometry; physical qualification remains open
+
+### Context
+
+ADR-292 deliberately kept an operator's requested relief cell spacing exact, but its ceil-rounded
+grid treated every cell as a full square. A non-divisible physical dimension therefore produced a
+larger computational domain than the declared relief. For a 10.1 x 2.1 mm field at 1 mm spacing,
+finishing centers reached 10.5 x 2.5 mm and roughing/stepped geometry reached 11 x 3 mm while the
+canvas compressed the same bitmap into 10.1 x 2.1 mm. A compiled 10 x 10 mm legacy-mesh relief at
+the default roughing pitch emitted X10.319. Frame remained truthful to that emitted centerline, but
+the relief object, source-mask bands, canvas, 3D meshes, and CAM did not describe one physical XY
+domain.
+
+Uniformly shrinking every cell would contain the output, but it would silently rewrite the exact
+operator request forbidden by ADR-292 clauses 5 and 8. A partial terminal cell is the smallest
+model that preserves both the requested interior pitch and the declared physical boundary.
+
+This decision supersedes ADR-292 decision 8 only for its ceil-grid outer-boundary limitation; every
+other ADR-292 evidence boundary remains in force.
+
+### Decision
+
+1. **Make exact physical extents first-class grid data.** `Heightmap` and `RemovalGrid` carry
+   `widthMm` and `heightMm`. The cell count is the least safe integer covering each positive finite
+   extent at the requested pitch. Full interior cells keep that pitch; only the final cell on an
+   axis may be shorter and always ends at the exact extent. An unrepresentable derived count remains
+   a factual materialization error, never a policy cap. If the finite extent/pitch quotient
+   underflows to zero, the domain remains one terminal cell and normalized raster sampling retains
+   its source midpoint rather than adding a new refusal.
+2. **Sample sources in the same physical domain.** Canonical heightfields map every target cell's
+   actual start/end footprint through crop into source pixels, keeping the highest overlapping
+   surface and requiring all overlapping mask coverage. Legacy meshes scale X and Y independently
+   and rasterize triangles at actual terminal-cell centers. Ordinary well-conditioned triangles on
+   exact regular grids retain their prior raster arithmetic and output; a partial grid whose nominal
+   scaling makes a represented nonzero triangle sub-threshold uses a translated unit frame so scale
+   alone does not erase it.
+3. **Use position-aware cutter geometry only where the terminal cell can matter.** Finishing points
+   use actual centers and roughing's marching dual coordinates use actual edges and terminal
+   midpoints. Cutter dilation evaluates physical center distances near a partial edge; excluded
+   coverage uses distance to the exact cell rectangle plus the existing Float32 and emitted-XYZ
+   clearance. The regular-grid indexed-kernel path remains unchanged.
+4. **Keep every preview consumer on those extents.** Stepped meshes, removal-grid
+   creation/downsampling/probing/stamping, Cut 3D labels, hover inversion, and worker handoffs carry
+   the exact logical domain. Smooth meshes remain contained, center-sampled interpolation surfaces;
+   their stock/envelope metadata is exact, but their vertices and omitted mask quads are not cell-edge
+   boundary evidence. Canvas divides a relief bitmap into at most four source regions so a short
+   terminal pixel row/column is drawn at its proportional physical size under translation, rotation,
+   scale, and mirror. The carved-wood shader maps physical positions cell-locally on a partial axis
+   so depth, normal, ambient-occlusion, and shadow texels stay registered.
+5. **Do not migrate durable project data.** The exact width/height already come from the relief
+   source, target geometry, and transform; the cell grid is derived transient state. Project schema
+   v4, canonical samples, digest, mapping, autosave, and manual file bytes therefore need no new
+   persisted field or migration.
+6. **Version the output change.** Relief coordinates can change whenever a dimension is not exactly
+   divisible by its CAM pitch, so exported metadata advances to
+   `adr-294-relief-partial-edge-grid`. Group order, tool selection, and divisible-grid motion
+   coordinates/toolpaths remain unchanged; the metadata header records the new emitter revision.
+7. **Keep the result informational and nonblocking.** This decision adds no policy rounding, clamp,
+   cap, refusal, delay, or confirmation. Factual validation/allocation errors and existing
+   display-only resolution selection remain unchanged. Frame remains the only ordinary Start guard;
+   Job Review and resolution evidence keep their existing warning-only roles.
+8. **Keep the numeric and physical evidence boundary explicit.** JavaScript's stored IEEE-754
+   values are authoritative. If `count * pitch` exceeds the stored extent by one representable ULP,
+   the terminal remainder stays distinct and source-footprint sampling remains conservative rather
+   than applying a hidden human-decimal tolerance.
+   Exactness here describes the logical Float64 grid/CAM domain. Float32 preview positions and shader
+   uniforms round to their nearest representable values at every scale and can overflow at astronomical
+   dimensions. At ordinary magnitudes where the existing `toFixed(3)` emitter produces fixed-decimal
+   text, emitted XY uses a 0.001 mm coordinate quantum and can differ from a stored edge by up to
+   0.0005 mm; astronomical G-code grammar and output remain unqualified. Frame remains the operational
+   review of the generated job, not evidence that those representations equal the object edge
+   bit-for-bit. This ADR also does not prove
+   included subpixel interpolation, the cutter footprint beyond an unmasked outer relief boundary,
+   holder clearance, controller tracking, tool runout, cutting forces, wood finish, dust control, or
+   safe parameters for a physical setup. Those limits remain disclosed qualification debt, never a
+   reason to clamp input.
+
+### Consequences
+
+- Logical relief CAM centerlines and the preview envelope no longer use the ceil-rounded padding
+  beyond the object. A source mask band occupies the same logical XY interval in canvas, stepped
+  meshes, simulation, and cutter planning; the contained smooth interpolation surface remains
+  center-sampled and omits every quad touching excluded coverage.
+- Partial grids pay position-aware cutter and stamping work near their terminal axes. Exactly
+  divisible grids retain the established indexed fast paths.
+- Extremely small representable remainders can conservatively include an adjacent source pixel.
+  That is the consequence of exact stored-input semantics, not silent spacing coarsening.
+- Hardware air cuts and representative wood coupons remain required before claiming physical edge
+  or finish accuracy.
+
+### Verification
+
+- Grid property tests cover least-covering counts, exact ends/centers, 0.07 / 0.01 count stability,
+  a one-ULP terminal remainder, one-cell axes, quotient underflow, stable maximum-finite midpoints,
+  and numeric-limit errors.
+- Heightfield and mesh tests cover physical source footprints, masks, nonuniform XY, terminal-center
+  interpolation, and regular-grid preservation.
+- CAM tests cover exact finishing centers, exact roughing dual edges, partial-center ball dilation,
+  terminal-cell mask adjacency, transformed emitted mask margins, and exact compiled job bounds.
+- Preview tests cover smooth/stepped meshes, downsampling, probing, position-aware stamping,
+  proportional canvas blits, Cut 3D dimensions, hover inversion, wood-shader texel coordinates, and
+  the initial scene-content handoff.
+- Focused tests, TypeScript, lint, formatting, file/export/ADR ratchets, full release checks, and an
+  independent whole-diff audit are required before publication. Browser screenshots, packaged
+  Electron, air cuts, and material coupons are not established by this decision.
+
+### References
+
+- ADR-289, transformed relief machine-space cutter-envelope semantics.
+- ADR-292, exact-input P2R.1a contract and the sampled-grid boundary this decision closes.
+- ADR-293, large canonical relief autosave/recovery; unchanged by this transient grid model.
