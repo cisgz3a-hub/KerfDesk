@@ -381,7 +381,7 @@ describe('SelectedReliefProperties', () => {
     }
   });
 
-  it('shows depth-map precision and commits explicit polarity without a mesh background control', async () => {
+  it('shows depth-map precision and input levels after polarity without mesh controls', async () => {
     installProject('cnc', depthRelief());
     const { host, root } = await render();
     try {
@@ -389,6 +389,9 @@ describe('SelectedReliefProperties', () => {
       expect(host.querySelector('select[aria-label="Relief background"]')).toBeNull();
       const select = host.querySelector('select[aria-label="Relief height-map polarity"]');
       if (!(select instanceof HTMLSelectElement)) throw new Error('polarity select missing');
+      const levels = host.querySelector('[aria-label="Relief input levels"]');
+      if (!(levels instanceof HTMLDivElement)) throw new Error('input levels missing');
+      expect(select.closest('label')?.nextElementSibling).toBe(levels);
       await act(async () => {
         select.value = 'light-is-deep';
         Simulate.change(select);

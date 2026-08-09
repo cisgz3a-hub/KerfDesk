@@ -6,8 +6,8 @@
 //   * schedule(next) starts (or restarts) a timer; commit fires once the
 //     timer elapses, only if `next` differs from the last committed value.
 //   * flush(next) cancels the timer and commits synchronously.
-//   * acknowledge(next) records that the canonical store value is now `next`
-//     so a subsequent schedule(next) becomes a no-op.
+//   * acknowledge(next) cancels pending work and records that the canonical
+//     store value is now `next`, so stale drafts cannot overwrite it.
 //   * cancel() drops any pending commit.
 
 export type DebouncerArgs<T> = {
@@ -54,6 +54,7 @@ export function createDebouncer<T>(args: DebouncerArgs<T>): Debouncer<T> {
       commitIfNew(next);
     },
     acknowledge: (next) => {
+      cancel();
       lastCommitted = next;
     },
     cancel,

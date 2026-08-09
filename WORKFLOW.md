@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, read-only-threshold mask-meaning control, existing CAM/preview, manual persistence, and exact partial-edge substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint and read-only-threshold mask-meaning controls, existing CAM/preview, manual persistence, and exact partial-edge substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2497,7 +2497,7 @@ F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit 8-bit grayscale height-map path.
-F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Their bounded ADR-292/294/295/296/297
+F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Their bounded ADR-292/294/295/296/297/298
 substrate is current where explicitly marked below; the remaining controls and
 user-facing flows are planned.
 
@@ -4123,7 +4123,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4143,8 +4143,12 @@ and lifts the command's CNC-only gate.)*
 3. Each file becomes a top-down relief at 100 mm wide and 5 mm deep. Height
    follows the pixel aspect ratio, **Light is high** is the declared default,
    and the Relief properties panel shows the pixel dimensions and precision.
-4. Width, total depth, and polarity remain editable. **Light is deep** reverses
-   the full-range mapping without rewriting the embedded samples. When the source
+4. Width, total depth, polarity, and exact **Input low**/**Input high** U16 codes are editable.
+   Each endpoint accepts an integer from `0` through `65535` without rounding, clamping, swapping,
+   or an ordering rule. With low below high, codes outside the interval clip to its ends; crossed
+   endpoints deliberately reverse that response. Equal endpoints produce one flat normalized value
+   of `0.5` before the stored curve and polarity. **Light is deep** reverses the resulting mapping
+   without rewriting embedded samples, mask bytes, digest, or provenance. When the source
    carries a mask, **Mask below N** states the persisted inclusion threshold read-only; qualified
    imports initialize `N = 255`. The operator can map below-threshold cells to **Excluded from
    carving**, **Keep at stock top**, or **Carve to relief floor**. This changes only the persisted
@@ -4223,12 +4227,12 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-294/295/296/297 supply schema-v4/U16LE
+> **Planned - not current UI.** P2R.1a plus ADR-294/295/296/297/298 supply schema-v4/U16LE
 > storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha import,
-> simple transparency masks, persisted-threshold outside-mask meaning, exact partial-edge
-> geometry, and the existing CAM/preview substrate. Large-project atomic autosave/recovery,
-> gamma, and the creation modes and remaining controls below stay planned; use F-CNC46's
-> narrower **Import Height Map...** flow today.
+> simple transparency masks, exact input-endpoint mapping, persisted-threshold outside-mask
+> meaning, exact partial-edge geometry, and the existing CAM/preview substrate. Large-project
+> atomic autosave/recovery, gamma, and the creation modes and remaining controls below stay
+> planned; use F-CNC46's narrower **Import Height Map...** flow today.
 
 #### Success
 1. Choose **Create Relief...** and select the source meaning before import:
@@ -4293,9 +4297,10 @@ and lifts the command's CNC-only gate.)*
    instead map lower bytes to stock top or relief floor without changing mask bytes. Threshold
    editing remains part of this planned creation surface. Alpha is never silently composited
    against black or white.
-2. When input-low equals input-high or every sample has one value, the preview is
-   flat and explains why; no auto-level operation is applied. Clipped samples and
-   unusually coarse effective cell size produce warnings, not hidden correction.
+2. Current Relief properties already preserves equal input endpoints as a flat normalized `0.5`
+   and crossed endpoints as a deliberate reversed response; no auto-level or endpoint-order rule is
+   applied. The planned creation surface adds histogram and clipped-sample percentages. Unusually
+   coarse effective cell size remains disclosed rather than silently corrected.
 3. Large sources use worker decode with byte/row progress and cooperative Escape
    cancellation. Size and estimated memory are advisories. CurveDesk neither
    invents a policy ceiling nor silently downsamples; any operator-selected

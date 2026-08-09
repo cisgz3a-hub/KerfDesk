@@ -52,16 +52,39 @@ describe('heightfieldToHeightmap', () => {
     expect(result.heightmap.depth[1]).toBeCloseTo(-10 * (1 - normalized ** 2), 6);
   });
 
+  it('preserves crossed input endpoints as a clipped reversed response', () => {
+    const result = materialize(
+      source({
+        values: [0, 0x4000, 0x8000, 0xc000, 0xffff],
+        width: 5,
+        mapping: { inputLowCode: 0xc000, inputHighCode: 0x4000 },
+      }),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect([...result.heightmap.depth]).toEqual([0, 0, -2.5, -5, -5]);
+    }
+  });
+
   it('defines equal input levels as a deterministic flat midpoint', () => {
     for (const polarity of ['light-is-high', 'light-is-deep'] as const) {
       const result = materialize(
         source({
           values: [0, 12345, 0xffff],
-          mapping: { polarity, inputLowCode: 1000, inputHighCode: 1000 },
+          mapping: {
+            polarity,
+            inputLowCode: 1000,
+            inputHighCode: 1000,
+            curve: { kind: 'gamma-v1', gamma: 2 },
+          },
         }),
       );
       expect(result.kind).toBe('ok');
-      if (result.kind === 'ok') expect([...result.heightmap.depth]).toEqual([-2.5, -2.5, -2.5]);
+      const expectedDepth = polarity === 'light-is-high' ? -3.75 : -1.25;
+      if (result.kind === 'ok') {
+        expect([...result.heightmap.depth]).toEqual([expectedDepth, expectedDepth, expectedDepth]);
+      }
     }
   });
 
