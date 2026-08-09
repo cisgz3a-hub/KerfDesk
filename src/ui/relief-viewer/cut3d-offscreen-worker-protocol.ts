@@ -1,9 +1,7 @@
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
+import type { Viewer3DCameraControl } from './viewer3d-keyboard-controls';
 
-export type Cut3DOffscreenControl =
-  | { readonly kind: 'pan'; readonly deltaX: number; readonly deltaY: number }
-  | { readonly kind: 'rotate'; readonly deltaX: number; readonly deltaY: number }
-  | { readonly kind: 'zoom'; readonly deltaY: number };
+export type Cut3DOffscreenControl = Viewer3DCameraControl;
 
 export type Cut3DOffscreenWorkerRequest =
   | {

@@ -44,6 +44,7 @@ export type SceneHandleDeps = {
   readonly sectionSpanMm: number;
   readonly content: ViewerContentHandle;
   readonly render: () => void;
+  readonly disposeKeyboard: () => void;
   readonly disposeLighting: () => void;
 };
 
@@ -98,6 +99,7 @@ export function createSceneHandle(deps: SceneHandleDeps): SceneHandle {
       }),
     dispose: () => {
       controls.removeEventListener('change', render);
+      deps.disposeKeyboard();
       controls.dispose();
       deps.disposeLighting();
       content.dispose();

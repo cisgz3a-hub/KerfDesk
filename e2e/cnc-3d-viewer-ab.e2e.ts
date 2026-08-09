@@ -11,6 +11,7 @@ import {
   assertUnsupportedCut3D,
   cancelThenRemountCut3D,
   exerciseCut3DControlsAndResize,
+  exerciseCut3DKeyboardControls,
   injectCut3DLateError,
   openReadyCut3D,
 } from './fixtures/cut3d-offscreen-browser';
@@ -102,6 +103,7 @@ test('mixed-operation Preview and Cut 3D complete without a delayed UI stall', a
   expect(workerUrls.some((url) => url.includes('canvas-compilation-worker'))).toBe(true);
   expect(workerUrls.some((url) => url.includes('cut3d-offscreen-worker'))).toBe(true);
   await assertNoMainRealmThreeImport(page);
+  await exerciseCut3DKeyboardControls(cut3D);
   await exerciseCut3DControlsAndResize(page, cut3D, testInfo);
   await injectCut3DLateError(cut3D);
   await cancelThenRemountCut3D(page, cut3D.canvas);
