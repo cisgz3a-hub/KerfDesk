@@ -16,7 +16,13 @@ import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
 import { DesignStudioHost } from '../design-studio';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
-import { Cnc3DPane, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
+import {
+  Cnc3DPane,
+  CncStockCanvasHud,
+  RegistrationJigPanel,
+  ToolStrip,
+  Workspace,
+} from '../workspace';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
@@ -96,6 +102,7 @@ function CanvasArea(): JSX.Element {
       <RegistrationJigPanel />
       <CameraPanel />
       <BoardCapturePanel />
+      {!showGcode ? <CncStockCanvasHud /> : null}
       {showGcode ? <CanvasGcodeView active /> : null}
       <div style={canvasSwitchStyle}>
         <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />

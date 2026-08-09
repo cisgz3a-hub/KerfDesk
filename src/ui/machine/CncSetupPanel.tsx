@@ -1,8 +1,7 @@
-// CncSetupPanel — "Material & Bit" card shown in the left rail when the
-// project machine is CNC. The Easel-style job setup: what stock is on the
-// bed, which bit is in the spindle, and the machine's Z/spindle parameters.
-// The card reads as three labeled groups (Stock / Spindle / Motion) with
-// related X/Y values paired on one row — the operations-rail design language.
+// CncSetupPanel — "Material & Bit" card shown in the machine rail when the
+// project machine is CNC. Stock dimensions and placement live beside the
+// visible workpiece on the canvas; this rail keeps material, bit, spindle,
+// motion, probe, and machine-library setup together.
 
 import { isCncCoolantMode, type CncCoolantMode, type CncMachineConfig } from '../../core/scene';
 import { useStore } from '../state';
@@ -34,7 +33,6 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
       <Row label="Bit">
         <CncActiveBitSelect machine={machine} style={selectStyle} />
       </Row>
-      <CncStockFields machine={machine} />
       <CncMachineParamsFields machine={machine} />
       <RailSection
         label="Set work zero (probe)"
@@ -51,75 +49,6 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
       <CncTilingPanel machine={machine} />
       <SurfacingPanel machine={machine} />
     </section>
-  );
-}
-
-// Stock (workpiece) dimensions + placement — split from CncSetupFields to
-// keep both components inside the size limits (H.2 added the XY footprint).
-function CncStockFields(props: { readonly machine: CncMachineConfig }): JSX.Element {
-  const { machine } = props;
-  const updateCncMachine = useStore((s) => s.updateCncMachine);
-  const origin = machine.stock.originOffset;
-  return (
-    <>
-      <h4 className="lf-subhead">Stock</h4>
-      <NumberRow
-        label="Stock thickness"
-        unit="mm"
-        value={machine.stock.thicknessMm}
-        min={0.1}
-        max={200}
-        step={0.05}
-        title="Workpiece thickness. Cutting deeper than this is allowed — Job Review warns how far past the stock bottom the cut goes."
-        onCommit={(thicknessMm) => updateCncMachine({ stock: { thicknessMm } })}
-      />
-      <NumberPairRow
-        label="Stock size"
-        unit="mm"
-        prefixes={['W', 'H']}
-        first={{
-          label: 'Stock width',
-          value: machine.stock.widthMm,
-          min: 1,
-          max: 1500,
-          step: 1,
-          title: 'Workpiece width (X). Toolpaths outside the stock footprint raise an advisory.',
-          onCommit: (widthMm) => updateCncMachine({ stock: { widthMm } }),
-        }}
-        second={{
-          label: 'Stock height',
-          value: machine.stock.heightMm,
-          min: 1,
-          max: 1500,
-          step: 1,
-          title: 'Workpiece height (Y). Toolpaths outside the stock footprint raise an advisory.',
-          onCommit: (heightMm) => updateCncMachine({ stock: { heightMm } }),
-        }}
-      />
-      <NumberPairRow
-        label="Stock origin"
-        unit="mm"
-        prefixes={['X', 'Y']}
-        first={{
-          label: 'Stock origin X',
-          value: origin.x,
-          min: -1500,
-          max: 1500,
-          step: 1,
-          title: "Machine-coordinate X of the stock's near-left corner.",
-          onCommit: (x) => updateCncMachine({ stock: { originOffset: { ...origin, x } } }),
-        }}
-        second={{
-          label: 'Stock origin Y',
-          value: origin.y,
-          min: -1500,
-          max: 1500,
-          step: 1,
-          title: "Machine-coordinate Y of the stock's near-left corner.",
-          onCommit: (y) => updateCncMachine({ stock: { originOffset: { ...origin, y } } }),
-        }}
-      />
-    </>
   );
 }
 
