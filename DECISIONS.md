@@ -16056,3 +16056,215 @@ second unaudited decoder.
 - W3C, Portable Network Graphics (PNG) Specification, Third Edition (Recommendation, 24 June 2025):
   https://www.w3.org/TR/png-3/
 - ADR-289, relief XY scale and sampled physical-cutter qualification boundary.
+
+## ADR-291 - Photo-to-relief converges on one editable U16 heightfield pipeline (2026-08-09)
+
+**Date:** 2026-08-09
+**Status:** Accepted as the phased product and architecture contract; ADR-290's first slice remains shipped; phases P2R.1-P2R.6 are not implemented by this decision
+
+### Context
+
+ADR-290 shipped a deliberately narrow, truthful first slice: an explicit non-interlaced 8-bit
+grayscale PNG can become a durable relief source and use the existing top-down STL heightmap CAM.
+That slice does not yet provide 16-bit PNG import, ordinary-photo interpretation, manual relief
+editing, masks, independent roughing and finishing tools, tool-aware residual previews, portable
+large-field autosave, or integrated AI inference.
+
+The approved product direction must accept five sources without pretending that they have the same
+meaning: declared grayscale depth maps, artistic brightness embossing, externally generated
+relative-depth maps, hand-edited maps, and existing STL reliefs. All can feed the same one-sided
+2.5D machining model, but a photograph's brightness is not recovered geometry and monocular AI
+depth is not a millimetre measurement. The stored data, UI labels, previews, provenance, tests, and
+G-code metadata must preserve those distinctions.
+
+CurveDesk's current relief compiler already projects an STL from above to one maximum surface Z per
+XY cell, applies a sampled cutter envelope, emits roughing and finishing `path3d` groups, and sends
+the prepared artifact through the shared output pipeline. The expansion therefore standardizes the
+scalar-field boundary and its lifecycle instead of creating a parallel photo-only CAM stack.
+
+### Decision
+
+1. **Keep the physical scope explicitly one-sided and top-down.** A relief has exactly one target Z
+   for each included XY sample. Stock top is `Z = 0`; material removal is negative Z down to the
+   declared maximum relief depth. Undercuts, multiple Z values at one XY, back-side registration,
+   indexed machining, and rotary reliefs are not represented. STL continues to use the maximum-Z
+   top projection; features hidden below that surface are not recoverable by this workflow.
+2. **Name source modes by what they mean.** The creation surface exposes **Depth map** for declared
+   scalar data, **Brightness emboss** for an artistic versioned luminance mapping, **Relative-depth
+   map** for externally estimated ordering, **Editable relief map** for operator-authored scalar
+   data, and **STL top projection** for existing meshes. Brightness emboss never claims recovered
+   geometry. Relative depth never claims millimetres; the operator maps its range to physical depth.
+   The current ADR-290 importer remains **Depth map** behavior until these modes land.
+3. **Adopt a versioned canonical editable field without destroying legacy sources.** A future
+   project-schema v4 adds a discriminated `heightfield-v1` arm with positive integer width and
+   height, physical width and height in millimetres, row-major U16 samples, an optional U8 inclusion
+   mask, explicit mapping and outside-mask semantics, source provenance, an algorithm revision, and
+   a content digest. `65535` means stock top and `0` means the deepest included point. The portable
+   field encoding is explicitly named `u16le-base64-v1`; byte order is never inferred. Existing
+   ADR-290 8-bit samples migrate exactly as `value * 257`; existing 16-bit network-order samples are
+   decoded and re-encoded with the same numeric values. Existing mesh reliefs remain lossless in a
+   `legacy-mesh` arm. They are rasterized only through an explicit **Convert to editable relief
+   map** action at a displayed resolution. The v3-to-v4 migration must be pure, deterministic,
+   allocation-validated, and covered by round-trip fixtures before schema v4 can ship.
+4. **Make tone-to-depth mapping explicit and non-destructive.** Persist polarity/invert, input-low
+   and input-high codes, a versioned gamma or curve definition, maximum depth in millimetres,
+   aspect/crop placement, and outside-mask meaning: **stock top**, **relief floor**, or **excluded
+   from carving**. Raw depth-map samples are data: PNG color-space and gamma chunks are reported but
+   are not silently applied. Brightness emboss uses one named, versioned luminance conversion.
+   Alpha is never silently composited. Its visible default is **excluded from carving**, and the
+   operator may instead map it to stock top or relief floor before or after import. The UI shows a
+   histogram, clipped-low and clipped-high
+   percentages, and effective millimetres per field cell. Structural impossibility is a factual
+   import or compile-integrity error; resolution, clipping, and machining concerns are warnings, not
+   silent clamps, hidden coarsening, or new guards.
+5. **Build Relief Map Studio on U16 scalar data, not an RGBA canvas.** The editor works on the
+   canonical field and optional mask with deterministic **Set height**, **Raise/lower**, **Smooth**,
+   **Flatten**, and **Mask** tools. It may reuse Image Studio's session, tile-history, and undo
+   patterns, but not its 8-bit display-buffer representation as source truth. Edits increment the
+   field revision and digest; canceled or stale worker results cannot replace a newer edit.
+6. **Give roughing and finishing independent, truthful setup.** Roughing and finishing each select
+   their own tool, feed, plunge, spindle speed, strategy settings, and enable state; finish-only is a
+   supported job. The first expanded roughing stage reuses the current waterline/max-plus route and
+   replaces its fixed allowance with explicit `verticalStockToLeaveMm`. Finishing starts with
+   deterministic X- or Y-parallel passes. A ball-nose tool may request a nominal flat-plane cusp
+   height `c`, with radius `r` and stepover `s = 2 * sqrt(c * (2 * r - c))`; the UI states that this
+   is not a true slope-compensated surface-scallop guarantee. Flat, V, or otherwise non-ball tools
+   use explicit linear stepover and are not labelled scallop-controlled. No percentage clamp or
+   automatic spacing change is silent. Angle, crosshatch, steep/shallow, rest-machining, and
+   adaptive expansion are later revisions, not first-release promises.
+7. **Extend tool and stock truth before claiming collision coverage.** Stock retains explicit XYZ
+   dimensions, origin, and safe Z. Tool definitions are extended in a separate reviewed schema
+   change with cutting/flute length, stickout, overall length, and holder envelope where known.
+   Missing reach or holder data produces a Job Review warning and an unknown collision result, not
+   invented clearance. Feed, plunge, RPM, depth-per-pass, stepover, stickout, and stock-to-leave
+   defaults remain provisional profile data until exact machine/tool/material coupon qualification.
+8. **Separate target preview from tool simulation.** Every relief offers an immediate 2D field,
+   histogram, cross-section, and interactive target-surface view. Explicit simulation runs the real
+   preparation/CAM path against the removal grid and carries the exact field revision, mapping,
+   stock, tool, and CAM snapshot. It reports resolution and any disclosed coarsening and shows
+   `remaining stock = max(0, simulated surface - target surface)` and
+   `gouge = max(0, target surface - simulated surface)` in the same Z convention. A stale badge
+   remains until a matching simulation completes. This is sampled geometric evidence only; it does
+   not simulate cutting force, deflection, runout, grain, dust extraction, actual RPM, or controller
+   following error.
+9. **Move source, edit, CAM, and simulation work off the UI thread with real progress.** A source/
+   editor worker owns decode, mapping, histogram, resampling, masking, and edit tiles. A CAM/
+   simulation worker owns heightmap materialization, cutter envelopes, roughing, finishing, and the
+   removal grid. The output-preparation complexity router must include relief cost. Requests bind a
+   field revision/digest plus mapping, tool, stock, and CAM snapshots; only a matching result may
+   publish. Cancellation is cooperative. Progress uses countable units such as bytes, rows,
+   triangles, Z levels, finish rows, or segments and is indeterminate when no honest denominator is
+   available.
+10. **Keep manual projects portable and autosave atomic.** A manually saved `.lf2` is self-contained:
+    it embeds the canonical field and mask with schema version, encoding/endian declaration, exact
+    dimensions and byte lengths, and a digest. It never depends only on browser-local asset IDs.
+    Autosave may use content-addressed IndexedDB blobs plus an atomic manifest to bound JSON churn;
+    quota, write, or digest failure leaves the previous manifest recoverable and is disclosed.
+    Manual Save hydrates and embeds referenced blobs. Derived display meshes, histograms, CAM paths,
+    and removal grids are caches and are not durable project truth.
+11. **Reuse the exact prepared output and add inert provenance.** Preview, Save G-code, Frame, and
+    Start continue through `prepareOutput`, the existing `path3d` representation, and the selected
+    controller emitter. Deterministic comment metadata records source kind and digest, physical
+    dimensions and field resolution, mapping/polarity/depth, roughing and finishing tools/settings,
+    and algorithm revision. Comments do not alter motion semantics. The exact reviewed prepared
+    artifact remains the artifact saved or streamed, and any change invalidates the existing exact-
+    job Frame permit under the current bounds-signature/origin-identity rule.
+12. **Keep integrated AI and physical qualification separate.** P2R.1 accepts externally produced
+    relative-depth maps and optional provenance metadata through the same explicit scalar importer.
+    In-app model weights require a separate ADR covering model and weight licensing, legal review,
+    runtime and memory budget, privacy, provenance, update policy, and offline behavior. No weights
+    ship under this ADR. Software acceptance can prove decode, migration, deterministic mapping,
+    sampled cutter-envelope math, path generation, geometric simulation, emitter invariants, and
+    warnings. It cannot prove physical position from GRBL acknowledgement or reported `MPos`, actual
+    spindle RPM, workholding, clamp/holder clearance without complete geometry, dust control,
+    deflection/runout, grain tear-out, or surface finish.
+13. **Frame remains the only ordinary Start guard.** Relief depth versus stock, source polarity and
+    clipping, effective field resolution, AI-relative provenance, tool reach/holder/clamp unknowns,
+    provisional cutting parameters, and simulation staleness appear in the single Job Review
+    warning surface. They do not refuse Frame or Start, add confirmation dialogs, hide output, cap
+    operator values, or create a second permit. Existing factual transport preconditions, compile
+    integrity, and exact-handoff consistency remain the only non-guard refusals.
+
+### Delivery phases
+
+| Slice | Deliverable | Exit evidence |
+| --- | --- | --- |
+| P2R.0 | This ADR plus aligned product scope and user-flow contracts | Documentation names current behavior, planned behavior, evidence, and unknowns without contradiction |
+| P2R.1 | Canonical U16 field, schema-v4 migration, 8/16-bit grayscale import, explicit mappings/masks, external-relative mode, and portable/manual plus atomic-autosave persistence | Analytic import/mapping/migration/round-trip fixtures; exact legacy preservation; worker cancellation and stale-result tests |
+| P2R.2 | Relief Map Studio and target previews | Deterministic brush/mask/undo fixtures, transfer tests, visual goldens, histogram/cross-section agreement |
+| P2R.3 | Independent rough/finish setup, tool/stock reach metadata, relief worker routing, and explicit tool simulation/residual maps | Analytic surface and cutter fixtures; finish-only; rough stock-to-leave; cusp/stepover; residual and progress tests |
+| P2R.4 | Output provenance, exact-artifact handoff, Job Review warnings, and complete software release coverage | Prepared-artifact identity, deterministic G-code, warning-only policy, browser workflow, performance, accessibility, and release checks |
+| P2R.5 | Optional in-app relative-depth inference | Separate accepted ADR, legal/license record, offline/runtime/privacy budgets, model-specific accuracy disclosures, and no metric-depth claim |
+| P2R.6 | Machine/tool/material qualification | Recorded air-cut observations and representative wood coupons tied to exact machine, controller, tool, stickout, stock species/grain/moisture, workholding, dust extraction, parameters, program digest, and result |
+
+### Consequences
+
+- ADR-290 remains the source of truth for today's shipped 8-bit explicit height-map path. This ADR
+  does not make planned controls, 16-bit import, editing, two-tool CAM, residual simulation, or AI
+  inference available merely by documenting them.
+- The canonical field prevents separate photo, AI, editor, preview, and CAM interpretations from
+  drifting. A project-schema revision and worker/persistence work are deliberate costs.
+- Legacy mesh projects remain lossless. Editable conversion is explicit because choosing a raster
+  resolution permanently bounds what can be represented in that converted field.
+- Manual project portability is independent of local autosave performance. IndexedDB can accelerate
+  recovery but cannot be the sole authority for a user-saved file.
+- Source labels and provenance are part of technical correctness: they prevent artistic brightness
+  or relative AI order from being presented as measured geometry.
+- There is no universal safe or high-quality wood parameter set. Software and sampled simulation
+  evidence remain separate from controller, machine, tooling, material, extraction, and finish
+  qualification.
+
+### Required verification
+
+- Analytic scalar fields: flat, ramp, step, dome/spherical cap, saddle, sinusoid, thin ridge, and
+  mask/hole; verify mapping, polarity, clipping, crop/aspect, resampling, and STL/field equivalence.
+- PNG fixtures: 8- and 16-bit grayscale, alpha interpretations, gamma/color chunks, interlace,
+  corrupt CRC, corrupt/truncated payload, declared-length overflow, and both byte orders at the
+  durable migration boundary.
+- CAM/simulation fixtures: roughing stock-to-leave, finish-only, ball nominal-cusp calculation,
+  non-ball linear stepover, sampled cutter-envelope containment, both raster directions,
+  deterministic ordering, remaining-stock and gouge signs, and disclosed resolution/coarsening.
+- Worker fixtures: transferable ownership, bounded memory behavior, cancellation, stale revision/
+  digest suppression, honest progress units, worker-construction fallback, and deterministic merge.
+- Persistence/output fixtures: v3-to-v4 lossless migration, exact endian/length/digest validation,
+  manual-file portability without local storage, atomic autosave recovery, deterministic provenance,
+  modal/path invariants, and exact prepared-artifact reuse across preview/save/Frame/Start.
+- Visual and browser fixtures: histogram/cross-section/2D/3D agreement, tonal controls, masks,
+  stale-simulation disclosure, keyboard and assistive access, error recovery, Job Review warnings,
+  and no guard beyond exact-job Frame.
+- Hardware evidence remains a separate P2R.6 record. An air cut can observe motion and setup but
+  cannot qualify loaded cutting, dust capture, workholding, grain response, deflection, or finish.
+
+### References
+
+- W3C, Portable Network Graphics (PNG) Specification, Third Edition - lossless grayscale, 1-16-bit
+  samples, alpha/color-space metadata, integrity, and network byte order:
+  https://www.w3.org/TR/png-3/
+- Vectric Aspire, Create Component from Bitmap - an established bitmap-to-component workflow
+  preserves image shades and then exposes component height/combination as model controls:
+  https://docs.vectric.com/docs/V12.0/Aspire/ENU/Help/form/create-component-from-bitmap/
+- Autodesk Fusion, Cusp Height and Steep and Shallow - cusp controls spacing; steep and shallow
+  regions use different finishing strategies and parameters:
+  https://help.autodesk.com/view/fusion360/ENU/?contextId=MFG-CUSP-HEIGHT-OVERVIEW
+  https://help.autodesk.com/view/fusion360/ENU/?contextId=MFG-REF-3DM-STEEP-SHALLOW
+- Autodesk Fusion, Adaptive Clearing and Milling Setup - stock-to-leave, tool setup, work coordinate,
+  stock, and fixture definitions are explicit CAM inputs:
+  https://help.autodesk.com/view/fusion360/ENU/?contextId=MFG-REF-3D-ADAPTIVE-CMD
+  https://help.autodesk.com/cloudhelp/ENU/Fusion-CAM/files/MFG-REF-SETUP-MILL.htm
+- Depth Anything V2 paper and upstream repository - monocular relative-depth evidence and model-
+  specific weight licenses; any bundled model still requires the separate P2R.5 review:
+  https://papers.nips.cc/paper_files/paper/2024/file/26cfdcd8fe6fd75cc53e92963a656c58-Paper-Conference.pdf
+  https://github.com/DepthAnything/Depth-Anything-V2
+- LMT Onsrud, High Performance Cutting Tools catalog - chip load relates feed, RPM, and flute count
+  and tool/material-specific starting data still requires machine qualification:
+  https://onsrud.com/images/2016%20LMT%20Onsrud%20High%20Performance%20End%20Mill%20Catalog.pdf
+- USDA Forest Products Laboratory, Wood Handbook - wood structure, moisture relations, physical
+  properties, and mechanical properties are material-specific engineering inputs:
+  https://research.fs.usda.gov/fpl/wood-handbook
+- NIOSH, Control of Wood Dust from Automated Routers; OSHA 29 CFR 1910.212 - local exhaust and
+  guarding are physical-system responsibilities beyond geometric CAM simulation:
+  https://stacks.cdc.gov/view/cdc/209704
+  https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.212
+- Grbl v1.1 Interface - acknowledgements and status reports describe protocol/controller state and
+  do not qualify loaded physical motion:
+  https://github.com/gnea/grbl/blob/master/doc/markdown/interface.md
