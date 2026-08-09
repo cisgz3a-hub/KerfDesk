@@ -126,9 +126,8 @@ function routeDroppedFiles(dt: DataTransfer, actions: DropImportActions): void {
     pushToast: actions.pushToast,
   });
   void importImagesInOrder(imageFiles, actions.importRasterImage, actions.pushToast);
-  // H.4: STL → relief (CNC mode only; the action toasts the laser-mode case).
+  // H.4: STL → durable relief in either mode; only CNC emits its toolpath.
   void importStlFiles(stlFiles, {
-    project: useStore.getState().project,
     importObject: actions.importSvgObject,
     pushToast: actions.pushToast,
   });

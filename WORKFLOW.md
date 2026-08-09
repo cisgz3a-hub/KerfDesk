@@ -2557,7 +2557,7 @@ F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Those four flows are
 ### F-CNC7. Import an STL relief — Phase H.4
 
 #### Success
-1. In CNC mode, the user drags an `.stl` file onto the workspace. Both
+1. In either machine mode, the user drags an `.stl` file onto the workspace. Both
    binary and ASCII STLs parse (a binary file whose header starts with
    "solid" is detected by its length signature). Reading, parsing, and
    the coarse relief-preparation probe run in the import worker; the
@@ -2571,12 +2571,14 @@ F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Those four flows are
    top, dark = floor. It selects, moves, and saves/loads like any object;
    `.lf2` embeds the mesh as the existing JSON number-array schema so
    projects stay self-contained and older saved projects still reopen.
-4. Roughing toolpaths compile from it starting with H.5.
+4. The success toast explains in either mode that the relief stays stored while
+   only CNC generates its output geometry. In CNC mode, roughing toolpaths compile
+   from it starting with H.5; in laser mode, no relief toolpath is emitted. When
+   other laser artwork makes the job emittable, Job Review warns that the relief
+   will be skipped while remaining stored.
 
-#### Error — wrong mode / malformed
-1. Dropping an STL in laser mode toasts "STL relief import needs CNC
-   mode" and imports nothing.
-2. Truncated binaries, partial ASCII facets, and non-numeric vertices are
+#### Error — malformed
+1. Truncated binaries, partial ASCII facets, and non-numeric vertices are
    rejected with the specific reason.
 
 #### Empty
@@ -4059,13 +4061,16 @@ and lifts the command's CNC-only gate.)*
    persisting geometry is machine-agnostic. The relief is stored and the toast
    explains that it becomes output geometry in CNC mode; no new mode guard is
    added.
-2. Large files receive the existing non-blocking size advisory. Worker startup
+2. When other laser artwork makes the job emittable, Job Review warns that relief
+   geometry will be skipped while remaining stored. The warning never refuses
+   Frame, Start, preview, save, or output.
+3. Large files receive the existing non-blocking size advisory. Worker startup
    failure discloses the existing main-thread fallback; size never becomes an
    arbitrary import refusal.
-3. The durable model admits 16-bit big-endian samples, but this first decoder
+4. The durable model admits 16-bit big-endian samples, but this first decoder
    qualifies only exact 8-bit grayscale PNG. A later 16-bit decoder can populate
    the same schema after its PNG filtering and precision path is verified.
-4. CAM grid coarsening uses the highest overlapping source surface at each
+5. CAM grid coarsening uses the highest overlapping source surface at each
    target cell. This preserves sampled peaks conservatively but does not prove
    subpixel detail, a continuous swept cutter envelope, holder clearance,
    controller tracking, material finish, or safe feeds for a particular tool,

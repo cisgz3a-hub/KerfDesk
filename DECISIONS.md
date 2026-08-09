@@ -4581,6 +4581,34 @@ unaffected. The Trace dialog shows a CNC note to this effect.
 `CNC_SURVIVORS`, locking the new behavior; the data-driven "hidden set equals
 the laser-only set" assertion updates from the source of truth automatically.
 
+### Amendment 2026-08-09 — STL relief import is machine-agnostic
+
+**Trigger:** Rule 7 now defines an import refusal as a guard, and this ADR's
+original section 8 explicitly left relief-in-laser behavior undecided. The STL
+drop action nevertheless returned before reading the file whenever laser mode
+was active, even though relief geometry already persists independently of machine
+mode and the laser compiler can factually ignore it.
+
+**Change:** STL parsing and insertion run in either machine mode. The success
+message always states that the relief remains stored in either mode and that only
+CNC generates its output geometry. The import API no longer accepts a captured
+project snapshot merely to decide whether work may start or which disclosure to
+show, so an asynchronous mode switch cannot stale that message. A mixed laser job
+with other emittable artwork also receives a warning-only Job Review advisory that
+the relief will be skipped while remaining stored.
+
+**Why it is safe:** parsing, worker cancellation, mesh validation, durable project
+data, and CNC CAM are unchanged. Laser compilation still emits no relief motion,
+and the selected-operation inspector already explains that relief artwork has no
+laser toolpath. This removes a policy refusal; it adds no Start, Frame, import,
+save, preview, or output guard.
+
+**Verification:** focused tests prove that a valid STL is read and inserted
+without machine context, that its success message states the CNC-only output
+boundary, and that the existing worker-unavailable fallback remains valid. Warning
+tests cover both durable relief source variants, output-disabled operations, CNC
+mode, and the shared Job Review aggregation path.
+
 ## ADR-102 — three.js for the 3D relief viewer (explicit ADR-098 §2 override)
 
 **Status:** Accepted; §2 import location amended by ADR-255 (adds `src/ui/viewer3d/`)
