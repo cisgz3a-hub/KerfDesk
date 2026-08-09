@@ -171,7 +171,6 @@ export {
   type ArraySpec,
   type CircularArraySpec,
   type GridArraySpec,
-  type PointRotationArraySpec,
 } from './array-layout';
 export type { PrintAndCutDesignTargets } from './print-and-cut';
 export { sceneObjectHasVisibleLayer, sceneObjectHasVisibleLayerFromMap } from './visibility';
