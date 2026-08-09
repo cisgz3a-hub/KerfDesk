@@ -5,6 +5,7 @@
 // jsdom tests assert).
 
 import { useCallback } from 'react';
+import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
 import { heightmapCellSize, type Heightmap } from '../../core/relief';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import type { ReliefObject } from '../../core/scene';
@@ -25,6 +26,7 @@ export function Relief3DViewerDialog(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const { relief, stockThicknessMm } = props;
+  const physical = reliefMachineSpaceGeometry(relief);
   const buildScene = useCallback(
     (canvas: HTMLCanvasElement, signal: AbortSignal) =>
       buildReliefScene(canvas, relief, stockThicknessMm, signal),
@@ -34,7 +36,7 @@ export function Relief3DViewerDialog(props: {
     <Viewer3DDialogShell
       ariaLabel="Relief 3D viewer"
       canvasAriaLabel="Relief 3D preview"
-      title={`${relief.source} — ${relief.targetWidthMm.toFixed(0)} mm wide × ${relief.reliefDepthMm.toFixed(1)} mm deep`}
+      title={`${relief.source} — ${physical.widthMm.toFixed(0)} mm wide × ${relief.reliefDepthMm.toFixed(1)} mm deep`}
       onClose={props.onClose}
       buildScene={buildScene}
     />
@@ -48,25 +50,27 @@ async function buildReliefScene(
   signal: AbortSignal,
 ): Promise<Awaited<ReturnType<typeof createReliefThreeScene>>> {
   try {
-    const targetHeightMm = reliefTargetHeightMm(relief);
+    const physical = reliefMachineSpaceGeometry(relief);
     const mmPerCell = Math.max(
       MIN_DISPLAY_CELL_MM,
-      Math.max(relief.targetWidthMm, targetHeightMm) / DISPLAY_CELLS_ACROSS,
+      Math.max(physical.widthMm, physical.heightMm) / DISPLAY_CELLS_ACROSS,
     );
-    const displayCellSize = heightmapCellSize(relief.targetWidthMm, targetHeightMm, mmPerCell);
+    const displayCellSize = heightmapCellSize(physical.widthMm, physical.heightMm, mmPerCell);
     if (displayCellSize.kind === 'error') {
       return { kind: 'no-webgl', reason: displayCellSize.reason };
     }
     const options = {
       targetWidthMm: relief.targetWidthMm,
       reliefDepthMm: relief.reliefDepthMm,
+      targetScaleX: physical.targetScaleX,
+      targetScaleY: physical.targetScaleY,
       mmPerCell: displayCellSize.mmPerCell,
     };
     const offThread =
-      relief.depthMap === undefined
+      relief.reliefSource.kind === 'legacy-mesh'
         ? null
-        : prepareReliefHeightmapOffThread(relief.depthMap, options, signal);
-    if (relief.depthMap !== undefined && offThread === null) {
+        : prepareReliefHeightmapOffThread(relief.reliefSource, options, signal);
+    if (relief.reliefSource.kind === 'heightfield-v1' && offThread === null) {
       return { kind: 'no-webgl', reason: 'Relief preview worker is unavailable.' };
     }
     const heightmap =
@@ -92,16 +96,14 @@ async function buildReliefScene(
 }
 
 function removalGridFrom(map: Heightmap) {
-  return { ...map, originX: 0, originY: 0 };
-}
-
-function reliefTargetHeightMm(relief: ReliefObject): number {
-  if (relief.depthMap !== undefined) {
-    return relief.targetWidthMm * (relief.depthMap.height / relief.depthMap.width);
-  }
-  const sourceWidth = relief.bounds.maxX - relief.bounds.minX;
-  const sourceHeight = relief.bounds.maxY - relief.bounds.minY;
-  return sourceWidth > 0 && sourceHeight > 0
-    ? relief.targetWidthMm * (sourceHeight / sourceWidth)
-    : relief.targetWidthMm;
+  return {
+    ...map,
+    originX: 0,
+    originY: 0,
+    resolution: {
+      requestedMmPerCell: map.mmPerCell,
+      effectiveMmPerCell: map.mmPerCell,
+      reason: null,
+    },
+  };
 }

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { insetContoursChecked } from '../geometry/offset-ladder';
+import { fillHatching } from '../job/fill-hatching';
 import type { Polyline } from '../scene';
-import { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';
+import {
+  pocketRasterToolpaths,
+  pocketRingToolpaths,
+  pocketToolpathRaster,
+  pocketToolpathRings,
+} from './pocket-paths';
 
 const TOOL_DIAMETER_MM = 3.175;
 
@@ -47,6 +54,25 @@ describe('pocketToolpathRings', () => {
     const inset = (20 - span(rings[0] as Polyline)) / 2;
     const k = (inset - TOOL_DIAMETER_MM / 2) / stepMm;
     expect(k).toBeCloseTo(Math.round(k), 6);
+  });
+
+  it('preserves 1% and 200% stepovers instead of rewriting them to legacy bounds', () => {
+    const contours = [square(0, 0, 20)];
+    const onePercent = pocketRingToolpaths(contours, TOOL_DIAMETER_MM, 1);
+    const formerTenPercent = pocketRingToolpaths(contours, TOOL_DIAMETER_MM, 10);
+    const twoHundredPercent = pocketRingToolpaths(contours, TOOL_DIAMETER_MM, 200);
+    const formerEightyFivePercent = pocketRingToolpaths(contours, TOOL_DIAMETER_MM, 85);
+
+    expect(onePercent.toolpaths.length).toBeGreaterThan(formerTenPercent.toolpaths.length);
+    expect(twoHundredPercent.toolpaths).not.toEqual(formerEightyFivePercent.toolpaths);
+  });
+
+  it('reports when an exact microscopic stepover exhausts the ring budget', () => {
+    const result = pocketRingToolpaths([square(0, 0, 20)], 1, 0.001);
+
+    expect(result.offsetFailed).toBe(false);
+    expect(result.passLimited).toBe(true);
+    expect(result.toolpaths.length).toBeGreaterThanOrEqual(4096);
   });
 
   it('produces multiple clearing rings for a pocket larger than the bit', () => {
@@ -125,11 +151,49 @@ describe('pocketToolpathRaster (ADR-105 G10)', () => {
     expect(first?.points.every((p) => Math.abs(p.y - (first.points[0]?.y ?? 0)) < 1e-6)).toBe(true);
   });
 
+  it('keeps ordinary 40% raster output byte-equivalent to legacy hatching', () => {
+    const result = pocketRasterToolpaths([square], 4, 40, 'x');
+    const wall = insetContoursChecked([square], 2);
+    const legacySweeps = fillHatching({
+      polylines: wall.contours,
+      hatchAngleDeg: 0,
+      hatchSpacingMm: 1.6,
+      fillRule: 'nonzero',
+      bidirectional: true,
+    });
+
+    expect(wall.offsetFailed).toBe(false);
+    expect(result.passLimited).toBe(false);
+    expect(result.toolpaths).toEqual([...legacySweeps, ...wall.contours]);
+  });
+
   it('raster-y sweeps run vertically instead', () => {
     const paths = pocketToolpathRaster([square], 4, 40, 'y');
     const first = paths[0];
     expect(first?.closed).toBe(false);
     expect(first?.points.every((p) => Math.abs(p.x - (first.points[0]?.x ?? 0)) < 1e-6)).toBe(true);
+  });
+
+  it('uses the exact positive CNC spacing below the legacy laser floor', () => {
+    const result = pocketRasterToolpaths([square], 1, 1, 'x');
+    const sweeps = result.toolpaths.filter((path) => !path.closed);
+    const firstY = sweeps[0]?.points[0]?.y;
+    const secondY = sweeps[1]?.points[0]?.y;
+
+    expect(result.passLimited).toBe(false);
+    expect(sweeps.length).toBeGreaterThan(100);
+    expect(firstY).toBeDefined();
+    expect(secondY).toBeDefined();
+    if (firstY === undefined || secondY === undefined) return;
+    expect(secondY - firstY).toBeCloseTo(0.01, 12);
+  });
+
+  it('reports when exact CNC raster spacing exhausts the scanline budget', () => {
+    const result = pocketRasterToolpaths([square], 1, 0.001, 'x');
+
+    expect(result.offsetFailed).toBe(false);
+    expect(result.passLimited).toBe(true);
+    expect(result.toolpaths.filter((path) => !path.closed)).toHaveLength(4096);
   });
 
   it('returns empty when the bit cannot fit', () => {

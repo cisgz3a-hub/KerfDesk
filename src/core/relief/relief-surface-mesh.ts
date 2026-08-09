@@ -40,7 +40,7 @@ export function reliefSurfaceMesh(map: Heightmap): ReliefSurfaceMesh {
   }
   const quadCols = Math.max(0, widthCells - 1);
   const quadRows = Math.max(0, heightCells - 1);
-  const indices = new Uint32Array(quadCols * quadRows * INDICES_PER_CELL_QUAD);
+  const indices = new Uint32Array(includedQuadCount(map) * INDICES_PER_CELL_QUAD);
   let write = 0;
   for (let row = 0; row < quadRows; row += 1) {
     for (let col = 0; col < quadCols; col += 1) {
@@ -48,6 +48,7 @@ export function reliefSurfaceMesh(map: Heightmap): ReliefSurfaceMesh {
       const b = a + 1;
       const c = a + widthCells;
       const d = c + 1;
+      if (!quadIncluded(map, a, b, c, d)) continue;
       indices[write] = a;
       indices[write + 1] = c;
       indices[write + 2] = b;
@@ -63,6 +64,28 @@ export function reliefSurfaceMesh(map: Heightmap): ReliefSurfaceMesh {
     widthMm: widthCells * mmPerCell,
     heightMm: heightCells * mmPerCell,
   };
+}
+
+function includedQuadCount(map: Heightmap): number {
+  const quadCols = Math.max(0, map.widthCells - 1);
+  const quadRows = Math.max(0, map.heightCells - 1);
+  if (map.inclusion === undefined) return quadCols * quadRows;
+  let count = 0;
+  for (let row = 0; row < quadRows; row += 1) {
+    for (let col = 0; col < quadCols; col += 1) {
+      const a = row * map.widthCells + col;
+      if (quadIncluded(map, a, a + 1, a + map.widthCells, a + map.widthCells + 1)) count += 1;
+    }
+  }
+  return count;
+}
+
+function quadIncluded(map: Heightmap, a: number, b: number, c: number, d: number): boolean {
+  const inclusion = map.inclusion;
+  return (
+    inclusion === undefined ||
+    (inclusion[a] !== 0 && inclusion[b] !== 0 && inclusion[c] !== 0 && inclusion[d] !== 0)
+  );
 }
 
 /**

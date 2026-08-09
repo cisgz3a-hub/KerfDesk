@@ -3,12 +3,17 @@
 // transform into positive axis magnitudes used by heightmap planning and a
 // residual isometry used to place the finished cutter-center paths.
 
-import type { Transform } from '../scene';
+import type { ReliefObject, Transform } from '../scene';
 
 export type ReliefMachineSpaceTransform = {
   readonly targetScaleX: number;
   readonly targetScaleY: number;
   readonly residualTransform: Transform;
+};
+
+export type ReliefMachineSpaceGeometry = ReliefMachineSpaceTransform & {
+  readonly widthMm: number;
+  readonly heightMm: number;
 };
 
 export function reliefMachineSpaceTransform(transform: Transform): ReliefMachineSpaceTransform {
@@ -23,6 +28,27 @@ export function reliefMachineSpaceTransform(transform: Transform): ReliefMachine
       scaleY: transform.scaleY / targetScaleY,
     },
   };
+}
+
+/** Physical planning size and residual placement used by relief CAM and previews. */
+export function reliefMachineSpaceGeometry(relief: ReliefObject): ReliefMachineSpaceGeometry {
+  const machineSpace = reliefMachineSpaceTransform(relief.transform);
+  return {
+    ...machineSpace,
+    widthMm: relief.targetWidthMm * machineSpace.targetScaleX,
+    heightMm: reliefNaturalHeightMm(relief) * machineSpace.targetScaleY,
+  };
+}
+
+function reliefNaturalHeightMm(relief: ReliefObject): number {
+  if (relief.reliefSource.kind === 'heightfield-v1') {
+    return relief.reliefSource.physicalHeightMm;
+  }
+  const sourceWidth = relief.bounds.maxX - relief.bounds.minX;
+  const sourceHeight = relief.bounds.maxY - relief.bounds.minY;
+  return sourceWidth > 0 && sourceHeight > 0
+    ? relief.targetWidthMm * (sourceHeight / sourceWidth)
+    : relief.targetWidthMm;
 }
 
 function planningScale(scale: number): number {

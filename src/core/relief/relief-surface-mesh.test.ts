@@ -47,6 +47,16 @@ describe('reliefSurfaceMesh', () => {
     expect(mesh.indices).toHaveLength(0);
   });
 
+  it('omits every preview quad that touches an excluded cell', () => {
+    const map: Heightmap = {
+      ...heightmap(3, 2, [0, 0, 0, 0, 0, 0]),
+      inclusion: Uint8Array.from([1, 1, 0, 1, 1, 0]),
+    };
+    const mesh = reliefSurfaceMesh(map);
+
+    expect([...mesh.indices]).toEqual([0, 3, 1, 1, 3, 4]);
+  });
+
   it('authors the same normals Three previously computed after the viewer reflection', () => {
     const map = heightmap(3, 3, [0, -1, 0, -2, -3, -1, 0, -1, 0]);
     const plain = reliefSurfaceMesh(map);

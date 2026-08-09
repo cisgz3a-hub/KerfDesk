@@ -62,12 +62,39 @@ export type HatchPolyline = Polyline & {
   readonly reverse: boolean;
 };
 
+/** Exact-spacing hatch output plus bounded-planner completion evidence. */
+export type HatchPlan = {
+  readonly hatches: ReadonlyArray<Polyline>;
+  readonly passLimited: boolean;
+};
+
+type HatchMetadataPlan = {
+  readonly hatches: ReadonlyArray<HatchPolyline>;
+  readonly passLimited: boolean;
+};
+
 export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   return fillHatchingWithMetadata(input).map(stripHatchMetadata);
 }
 
 export function fillHatchingWithMetadata(input: HatchInput): ReadonlyArray<HatchPolyline> {
-  const spacing = Math.max(MIN_HATCH_SPACING_MM, input.hatchSpacingMm);
+  return planHatching(
+    input,
+    Math.max(MIN_HATCH_SPACING_MM, input.hatchSpacingMm),
+    Number.POSITIVE_INFINITY,
+  ).hatches;
+}
+
+/** Plans exact positive spacing up to `maxScanlines` without coarsening it. */
+export function fillHatchingExactWithBudget(input: HatchInput, maxScanlines: number): HatchPlan {
+  if (!Number.isFinite(input.hatchSpacingMm) || !(input.hatchSpacingMm > 0)) {
+    return { hatches: [], passLimited: true };
+  }
+  const plan = planHatching(input, input.hatchSpacingMm, maxScanlines);
+  return { hatches: plan.hatches.map(stripHatchMetadata), passLimited: plan.passLimited };
+}
+
+function planHatching(input: HatchInput, spacing: number, maxScanlines: number): HatchMetadataPlan {
   // Accept polylines whose `closed` flag is set, OR whose first and
   // last points coincide within float epsilon. Defense-in-depth for
   // upstream sources that don't set the flag — notably opentype.js v2
@@ -76,12 +103,12 @@ export function fillHatchingWithMetadata(input: HatchInput): ReadonlyArray<Hatch
   // the original Frame=empty bug even after deploy). Caller doesn't
   // have to re-render the text — we just notice the geometry.
   const closed = input.polylines.filter(isClosedEnough);
-  if (closed.length === 0) return [];
+  if (closed.length === 0) return { hatches: [], passLimited: false };
 
   const angle = normalizeAngle(input.hatchAngleDeg);
   const rotated = closed.map((pl) => rotatePolyline(pl, -angle));
   const yBounds = polylineYBounds(rotated);
-  if (yBounds === null) return [];
+  if (yBounds === null) return { hatches: [], passLimited: false };
 
   // Build the edge table ONCE, then sweep scanlines with an active set —
   // rather than re-walking every edge of every contour at every scanline.
@@ -103,7 +130,11 @@ export function fillHatchingWithMetadata(input: HatchInput): ReadonlyArray<Hatch
   // drift doesn't decide whether the last scanline sits exactly on the top
   // boundary (which the half-open rule would then reject anyway). The
   // integer count is also rotation-invariant for equal-height polygons.
-  const scanCount = Math.max(0, Math.floor((yBounds.maxY - yStart) / spacing + SCANLINE_EPS) + 1);
+  // The edge rule is half-open at maxY, so an exactly aligned top-boundary
+  // scanline is not work and must not make an exact-sized budget look capped.
+  const lastInteriorY = yBounds.maxY - SCANLINE_EPS;
+  const requestedScanCount = Math.max(0, Math.floor((lastInteriorY - yStart) / spacing) + 1);
+  const scanCount = Math.min(requestedScanCount, maxScanlines);
   let nextEdge = 0;
   let active: ScanEdge[] = [];
   for (let scanIndex = 0; scanIndex < scanCount; scanIndex += 1) {
@@ -139,7 +170,10 @@ export function fillHatchingWithMetadata(input: HatchInput): ReadonlyArray<Hatch
     }
   }
 
-  return hatchesRotated.map((pl) => rotateHatchPolyline(pl, angle));
+  return {
+    hatches: hatchesRotated.map((pl) => rotateHatchPolyline(pl, angle)),
+    passLimited: requestedScanCount > maxScanlines,
+  };
 }
 
 function stripHatchMetadata(pl: HatchPolyline): Polyline {

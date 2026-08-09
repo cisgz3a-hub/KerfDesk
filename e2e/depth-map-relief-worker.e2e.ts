@@ -4,93 +4,63 @@ import {
   startResponsivenessProbe,
   stopResponsivenessProbe,
 } from './fixtures/browser-responsiveness';
+import { testReliefHeightfield } from '../src/__fixtures__/relief-heightfield';
+import type { RemovalGrid } from '../src/core/sim';
 
-test('production relief materialization worker cancels stale work and keeps the UI responsive', async ({
+const SOURCE_WIDTH_CELLS = 2048;
+const SOURCE_PHYSICAL_SIZE_MM = 256;
+const RELIEF_DEPTH_MM = 6;
+const PREVIEW_MM_PER_CELL = 1;
+const U8_SAMPLE_MASK = 0xff;
+const U8_TO_U16_SCALE = 0x0101;
+const WORKER_SETTLE_MS = 150;
+const POSITION_COMPONENTS = 3;
+const WORKER_FIXTURE = {
+  source: testReliefHeightfield({
+    width: SOURCE_WIDTH_CELLS,
+    height: SOURCE_WIDTH_CELLS,
+    physicalWidthMm: SOURCE_PHYSICAL_SIZE_MM,
+    physicalHeightMm: SOURCE_PHYSICAL_SIZE_MM,
+    maxDepthMm: RELIEF_DEPTH_MM,
+    samplesU16: Array.from(
+      { length: SOURCE_WIDTH_CELLS * SOURCE_WIDTH_CELLS },
+      (_, index) => (index & U8_SAMPLE_MASK) * U8_TO_U16_SCALE,
+    ),
+    provenance: { sourceName: 'worker-heightfield.png' },
+  }),
+  options: {
+    targetWidthMm: SOURCE_PHYSICAL_SIZE_MM,
+    reliefDepthMm: RELIEF_DEPTH_MM,
+    mmPerCell: PREVIEW_MM_PER_CELL,
+  },
+  workerSettleMs: WORKER_SETTLE_MS,
+  positionComponents: POSITION_COMPONENTS,
+};
+
+test('production canonical heightfield worker cancels stale work and keeps the UI responsive', async ({
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
   const workerUrls: string[] = [];
   page.on('worker', (worker) => workerUrls.push(worker.url()));
   await page.goto('/');
-  await page.evaluate(() => {
-    const width = 2048;
-    const samples = new Uint8Array(width * width);
-    for (let index = 0; index < samples.length; index += 1) samples[index] = index & 0xff;
-    let binary = '';
-    const chunkSize = 32_768;
-    for (let offset = 0; offset < samples.length; offset += chunkSize) {
-      binary += String.fromCharCode(...samples.subarray(offset, offset + chunkSize));
-    }
-    (
-      window as typeof window & {
-        __RELIEF_WORKER_SOURCE__?: {
-          readonly schemaVersion: 1;
-          readonly width: number;
-          readonly height: number;
-          readonly bitDepth: 8;
-          readonly samplesBase64: string;
-          readonly polarity: 'light-is-high';
-        };
-      }
-    ).__RELIEF_WORKER_SOURCE__ = {
-      schemaVersion: 1,
-      width,
-      height: width,
-      bitDepth: 8,
-      samplesBase64: btoa(binary),
-      polarity: 'light-is-high',
-    };
-  });
   await startResponsivenessProbe(page);
 
-  const result = await page.evaluate(async () => {
-    interface Result {
-      readonly taskId: string;
-      readonly result:
-        | {
-            readonly kind: 'ok';
-            readonly heightmap: {
-              readonly widthCells: number;
-              readonly heightCells: number;
-              readonly mmPerCell: number;
-              readonly depth: Float32Array;
-            };
-          }
-        | { readonly kind: 'error'; readonly reason: string };
-    }
-    interface ClientApi {
-      readonly prepareReliefHeightmapsOffThread: (
-        items: readonly {
-          readonly taskId: string;
-          readonly source: object;
-          readonly options: {
-            readonly targetWidthMm: number;
-            readonly reliefDepthMm: number;
-            readonly mmPerCell: number;
-          };
-        }[],
-        signal?: AbortSignal,
-      ) => Promise<readonly Result[]> | null;
-      readonly resetCncRemovalGridWorkerForTests: () => void;
-      readonly prepareCncCut3DSurfaceOffThread: (grid: {
-        readonly widthCells: number;
-        readonly heightCells: number;
-        readonly mmPerCell: number;
-        readonly originX: number;
-        readonly originY: number;
-        readonly depth: Float32Array;
-      }) => Promise<{
-        readonly positions: Float32Array;
-        readonly indices: Uint32Array;
-        readonly normals: Float32Array;
-      }> | null;
-    }
-    const target = window as typeof window & { __RELIEF_WORKER_SOURCE__?: object };
-    const source = target.__RELIEF_WORKER_SOURCE__;
-    if (source === undefined) throw new Error('relief source fixture missing');
+  const result = await page.evaluate(async (fixture) => {
+    type ClientApi = typeof import('../src/ui/workspace/cnc-removal-grid-worker-client');
     const modulePath = '/src/ui/workspace/cnc-removal-grid-worker-client.ts';
-    const client = (await import(/* @vite-ignore */ modulePath)) as unknown as ClientApi;
-    const options = { targetWidthMm: 256, reliefDepthMm: 6, mmPerCell: 1 };
+    const loaded: unknown = await import(/* @vite-ignore */ modulePath);
+    // The Vite runtime import is string-addressed; runtime checks below provide
+    // the narrowing that a static browser import cannot safely provide here.
+    const client = loaded as Partial<ClientApi>;
+    if (
+      typeof client.prepareReliefHeightmapsOffThread !== 'function' ||
+      typeof client.prepareCncCut3DSurfaceOffThread !== 'function' ||
+      typeof client.resetCncRemovalGridWorkerForTests !== 'function'
+    ) {
+      throw new Error('production relief worker client is unavailable');
+    }
+    const { source, options, workerSettleMs, positionComponents } = fixture;
     const controller = new AbortController();
     try {
       const stale = client.prepareReliefHeightmapsOffThread(
@@ -115,37 +85,52 @@ test('production relief materialization worker cancels stale work and keeps the 
         throw new Error('production relief worker returned no heightmap');
       }
       const map = currentResult.result.heightmap;
-      const surfaceWork = client.prepareCncCut3DSurfaceOffThread({
+      const grid: RemovalGrid = {
         ...map,
         originX: 0,
         originY: 0,
-      });
+        resolution: {
+          requestedMmPerCell: options.mmPerCell,
+          effectiveMmPerCell: map.mmPerCell,
+          reason: null,
+        },
+      };
+      const surfaceWork = client.prepareCncCut3DSurfaceOffThread(grid);
       if (surfaceWork === null) throw new Error('production relief surface worker unavailable');
       const surface = await surfaceWork;
-      await new Promise((resolve) => window.setTimeout(resolve, 150));
+      await new Promise((resolve) => window.setTimeout(resolve, workerSettleMs));
       return {
         staleErrorName,
-        widthCells: currentResult.result.heightmap.widthCells,
-        heightCells: currentResult.result.heightmap.heightCells,
-        retainedCells: currentResult.result.heightmap.depth.length,
-        surfaceVertices: surface.positions.length / 3,
-        surfaceNormals: surface.normals.length / 3,
+        sourceKind: source.kind,
+        sourceEncoding: source.encoding,
+        widthCells: map.widthCells,
+        heightCells: map.heightCells,
+        retainedCells: map.depth.length,
+        resolution: grid.resolution,
+        surfaceVertices: surface.positions.length / positionComponents,
+        surfaceNormals: surface.normals.length / positionComponents,
       };
     } finally {
-      delete target.__RELIEF_WORKER_SOURCE__;
       client.resetCncRemovalGridWorkerForTests();
     }
-  });
+  }, WORKER_FIXTURE);
 
   const responsiveness = await stopResponsivenessProbe(page);
-  assertResponsivePhase(testInfo, 'depth-map relief worker', responsiveness);
+  assertResponsivePhase(testInfo, 'heightfield relief worker', responsiveness);
   expect(result).toEqual({
     staleErrorName: 'AbortError',
-    widthCells: 256,
-    heightCells: 256,
-    retainedCells: 256 * 256,
-    surfaceVertices: 256 * 256,
-    surfaceNormals: 256 * 256,
+    sourceKind: 'heightfield-v1',
+    sourceEncoding: 'u16le-base64-v1',
+    widthCells: SOURCE_PHYSICAL_SIZE_MM,
+    heightCells: SOURCE_PHYSICAL_SIZE_MM,
+    retainedCells: SOURCE_PHYSICAL_SIZE_MM * SOURCE_PHYSICAL_SIZE_MM,
+    resolution: {
+      requestedMmPerCell: PREVIEW_MM_PER_CELL,
+      effectiveMmPerCell: PREVIEW_MM_PER_CELL,
+      reason: null,
+    },
+    surfaceVertices: SOURCE_PHYSICAL_SIZE_MM * SOURCE_PHYSICAL_SIZE_MM,
+    surfaceNormals: SOURCE_PHYSICAL_SIZE_MM * SOURCE_PHYSICAL_SIZE_MM,
   });
   expect(workerUrls.some((url) => url.includes('cnc-removal-grid-worker'))).toBe(true);
   expect(workerUrls.some((url) => url.includes('canvas-compilation-worker'))).toBe(true);

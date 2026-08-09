@@ -11,6 +11,7 @@
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
+import type { CncReliefPlanningEvidence } from '../job/job';
 import { DEFAULT_RELIEF_SCALLOP_MM, reliefFinishingPasses, scallopRowSpacingMm } from '../relief';
 // Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink, so the ladder
@@ -36,21 +37,36 @@ import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
 import { cncGroupProvenance } from './cnc-group-provenance';
 import { parkFields } from './motion-polish';
-import { reliefMachineSpaceTransform } from './relief-machine-space';
+import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
 
 const MIN_FEED_MM_PER_MIN = 1;
-const MIN_ROUGHING_CELL_MM = 0.2;
 const ROUGHING_CELL_TOOL_FRACTION = 8;
 // Finishing samples finer than roughing: quality lives in the skim.
-const MIN_FINISHING_CELL_MM = 0.1;
 const FINISHING_CELL_TOOL_FRACTION = 10;
+
+function finishingCellSizeMm(rowSpacingMm: number, toolDiameterMm: number): number {
+  return Math.min(rowSpacingMm, toolDiameterMm / FINISHING_CELL_TOOL_FRACTION);
+}
 
 // Roughing group (H.5) plus — when the layer names a finishing bit — the
 // H.8 finishing group that skims the true surface with it.
 /** Result of compiling every relief assigned to one operation layer. */
 export type ReliefGroupsCompilation =
-  | { readonly kind: 'compiled'; readonly groups: ReadonlyArray<CncGroup> }
+  | {
+      readonly kind: 'compiled';
+      readonly groups: ReadonlyArray<CncGroup>;
+      readonly evidence: ReliefLayerCompilationEvidence;
+    }
   | ReliefMaterializationFailure;
+
+type ReliefPlanEvidence = Omit<CncReliefPlanningEvidence, 'layerId'>;
+
+type ReliefLayerCompilationEvidence = {
+  readonly offsetFailed: boolean;
+  readonly passLimited: boolean;
+  readonly stepoverUsed: boolean;
+  readonly plans: ReadonlyArray<CncReliefPlanningEvidence>;
+};
 
 /** Compile every relief assigned to one CNC layer, returning source failures as data. */
 export function compileReliefGroupsForLayer(
@@ -61,20 +77,39 @@ export function compileReliefGroupsForLayer(
   config: CncMachineConfig,
 ): ReliefGroupsCompilation {
   const reliefs = reliefObjectsForLayer(objects, layer);
-  if (reliefs.length === 0) return { kind: 'compiled', groups: [] };
+  if (reliefs.length === 0) {
+    return {
+      kind: 'compiled',
+      groups: [],
+      evidence: { offsetFailed: false, passLimited: false, stepoverUsed: false, plans: [] },
+    };
+  }
   const tool = layerCncTool(config, settings);
   const passes: CncContourPass[] = [];
+  const plans: CncReliefPlanningEvidence[] = [];
+  let offsetFailed = false;
+  let passLimited = false;
+  let stepoverUsed = false;
   for (const relief of reliefs) {
-    const failure = appendReliefPasses(passes, relief, settings, device, tool);
-    if (failure !== null) return failure;
+    const roughing = appendReliefPasses(passes, relief, settings, device, tool);
+    if (roughing.kind === 'relief-materialization-failed') return roughing;
+    plans.push({ ...roughing.plan, layerId: layer.id });
+    if (roughing.offsetFailed) offsetFailed = true;
+    if (roughing.passLimited) passLimited = true;
+    if (roughing.stepoverUsed) stepoverUsed = true;
   }
-  if (passes.length === 0) return { kind: 'compiled', groups: [] };
-  const roughing = reliefGroup(layer, settings, device, config, tool, 'relief-rough', passes);
+  const groups: CncGroup[] = [];
+  if (passes.length > 0) {
+    groups.push(reliefGroup(layer, settings, device, config, tool, 'relief-rough', passes));
+  }
   const finishing = reliefFinishingGroup(reliefs, layer, settings, device, config);
   if (finishing.kind === 'relief-materialization-failed') return finishing;
+  plans.push(...finishing.plans);
+  if (finishing.group !== null) groups.push(finishing.group);
   return {
     kind: 'compiled',
-    groups: finishing.group === null ? [roughing] : [roughing, finishing.group],
+    groups,
+    evidence: { offsetFailed, passLimited, stepoverUsed, plans },
   };
 }
 
@@ -125,33 +160,52 @@ function reliefFinishingGroup(
   settings: CncLayerSettings,
   device: DeviceProfile,
   config: CncMachineConfig,
-): { readonly kind: 'compiled'; readonly group: CncGroup | null } | ReliefMaterializationFailure {
-  if (settings.reliefFinishToolId === undefined) return { kind: 'compiled', group: null };
+):
+  | {
+      readonly kind: 'compiled';
+      readonly group: CncGroup | null;
+      readonly plans: ReadonlyArray<CncReliefPlanningEvidence>;
+    }
+  | ReliefMaterializationFailure {
+  if (settings.reliefFinishToolId === undefined) {
+    return { kind: 'compiled', group: null, plans: [] };
+  }
   const finishTool = config.tools.find((tool) => tool.id === settings.reliefFinishToolId);
-  if (finishTool === undefined) return { kind: 'compiled', group: null };
+  if (finishTool === undefined) return { kind: 'compiled', group: null, plans: [] };
   const scallopMm = settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM;
-  const rowSpacingMm = scallopRowSpacingMm(finishTool, scallopMm);
+  const rowSpacingMm = scallopRowSpacingMm(finishTool, scallopMm, settings.stepoverPercent);
   const passes: CncPass[] = [];
+  const plans: CncReliefPlanningEvidence[] = [];
   for (const relief of reliefs) {
-    const machineSpace = reliefMachineSpaceTransform(relief.transform);
+    const machineSpace = reliefMachineSpaceGeometry(relief);
     const heightmap = reliefObjectToHeightmap(relief, {
       targetWidthMm: relief.targetWidthMm,
       reliefDepthMm: relief.reliefDepthMm,
       targetScaleX: machineSpace.targetScaleX,
       targetScaleY: machineSpace.targetScaleY,
-      mmPerCell: Math.min(
-        rowSpacingMm,
-        Math.max(MIN_FINISHING_CELL_MM, finishTool.diameterMm / FINISHING_CELL_TOOL_FRACTION),
-      ),
+      mmPerCell: finishingCellSizeMm(rowSpacingMm, finishTool.diameterMm),
     });
     if (heightmap.kind === 'error') {
       return reliefMaterializationFailure(relief.source, heightmap.reason);
     }
+    plans.push({
+      layerId: layer.id,
+      source: relief.source,
+      stage: 'finishing',
+      widthCells: heightmap.heightmap.widthCells,
+      heightCells: heightmap.heightmap.heightCells,
+      cellSizeMm: heightmap.heightmap.mmPerCell,
+      toolDiameterMm: finishTool.diameterMm,
+      toolKind: finishTool.kind,
+      rowSpacingMm,
+      scallopMm,
+    });
     const kernel = kernelForTool(finishTool, heightmap.heightmap.mmPerCell);
     for (const pass of reliefFinishingPasses(heightmap.heightmap, {
       tool: finishTool,
       kernel,
       scallopMm,
+      stepoverPercent: settings.stepoverPercent,
     })) {
       if (pass.kind !== 'path3d') continue;
       passes.push({
@@ -163,9 +217,10 @@ function reliefFinishingGroup(
       });
     }
   }
-  if (passes.length === 0) return { kind: 'compiled', group: null };
+  if (passes.length === 0) return { kind: 'compiled', group: null, plans };
   return {
     kind: 'compiled',
+    plans,
     group: reliefGroup(
       layer,
       settings,
@@ -196,27 +251,41 @@ function reliefLadderFor(
   settings: CncLayerSettings,
   tool: CncTool,
 ):
-  | { readonly kind: 'compiled'; readonly ladder: ReliefRoughingLadder }
+  | {
+      readonly kind: 'compiled';
+      readonly ladder: ReliefRoughingLadder;
+      readonly plan: ReliefPlanEvidence;
+    }
   | ReliefMaterializationFailure {
-  const machineSpace = reliefMachineSpaceTransform(relief.transform);
+  const machineSpace = reliefMachineSpaceGeometry(relief);
   const heightmap = reliefObjectToHeightmap(relief, {
     targetWidthMm: relief.targetWidthMm,
     reliefDepthMm: relief.reliefDepthMm,
     targetScaleX: machineSpace.targetScaleX,
     targetScaleY: machineSpace.targetScaleY,
-    mmPerCell: Math.max(MIN_ROUGHING_CELL_MM, tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION),
+    mmPerCell: tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION,
   });
   if (heightmap.kind === 'error') {
     return reliefMaterializationFailure(relief.source, heightmap.reason);
   }
+  const ladder = reliefRoughingLadder(heightmap.heightmap, {
+    tool,
+    reliefDepthMm: relief.reliefDepthMm,
+    depthPerPassMm: settings.depthPerPassMm,
+    stepoverPercent: settings.stepoverPercent,
+  });
   return {
     kind: 'compiled',
-    ladder: reliefRoughingLadder(heightmap.heightmap, {
-      tool,
-      reliefDepthMm: relief.reliefDepthMm,
-      depthPerPassMm: settings.depthPerPassMm,
-      stepoverPercent: settings.stepoverPercent,
-    }),
+    ladder,
+    plan: {
+      source: relief.source,
+      stage: 'roughing',
+      widthCells: heightmap.heightmap.widthCells,
+      heightCells: heightmap.heightmap.heightCells,
+      cellSizeMm: heightmap.heightmap.mmPerCell,
+      toolDiameterMm: tool.diameterMm,
+      toolKind: tool.kind,
+    },
   };
 }
 
@@ -225,23 +294,26 @@ function reliefLadderFor(
  * short by an offset-engine failure rather than by the level running out of
  * area? Advisory input only — the caller warns, never refuses (rule 7).
  */
-export function reliefOffsetLadderFailed(
+export function reliefOffsetLadderStatus(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   settings: CncLayerSettings,
   config: CncMachineConfig,
-): boolean {
+): { readonly offsetFailed: boolean; readonly passLimited: boolean } {
   const reliefs = reliefObjectsForLayer(objects, layer);
-  if (reliefs.length === 0) return false;
+  if (reliefs.length === 0) return { offsetFailed: false, passLimited: false };
   const tool = layerCncTool(config, settings);
+  let offsetFailed = false;
+  let passLimited = false;
   for (const relief of reliefs) {
     const result = reliefLadderFor(relief, settings, tool);
     // Diagnostics inform only. Compile owns the named integrity failure and
     // must not replace it with a warning-path exception.
-    if (result.kind === 'relief-materialization-failed') return false;
-    if (result.ladder.offsetFailed) return true;
+    if (result.kind === 'relief-materialization-failed') continue;
+    if (result.ladder.offsetFailed) offsetFailed = true;
+    if (result.ladder.passLimited) passLimited = true;
   }
-  return false;
+  return { offsetFailed, passLimited };
 }
 
 function appendReliefPasses(
@@ -250,7 +322,15 @@ function appendReliefPasses(
   settings: CncLayerSettings,
   device: DeviceProfile,
   tool: CncTool,
-): ReliefMaterializationFailure | null {
+):
+  | {
+      readonly kind: 'compiled';
+      readonly offsetFailed: boolean;
+      readonly passLimited: boolean;
+      readonly stepoverUsed: boolean;
+      readonly plan: ReliefPlanEvidence;
+    }
+  | ReliefMaterializationFailure {
   const residualTransform = reliefMachineSpaceTransform(relief.transform).residualTransform;
   const result = reliefLadderFor(relief, settings, tool);
   if (result.kind === 'relief-materialization-failed') return result;
@@ -263,7 +343,13 @@ function appendReliefPasses(
       ),
     });
   }
-  return null;
+  return {
+    kind: 'compiled',
+    offsetFailed: result.ladder.offsetFailed,
+    passLimited: result.ladder.passLimited,
+    stepoverUsed: true,
+    plan: result.plan,
+  };
 }
 
 function cap(feedMmPerMin: number, maxFeed: number): number {

@@ -179,7 +179,11 @@ function WorkspacePreviewOverlays(props: {
   const stockThicknessMm = machine?.kind === 'cnc' ? machine.stock.thicknessMm : 0;
   return (
     <>
-      <PreviewStatusOverlays project={props.project} toolpath={props.toolpath} />
+      <PreviewStatusOverlays
+        project={props.project}
+        toolpath={props.toolpath}
+        {...(grid === null ? {} : { resolution: grid.resolution })}
+      />
       <PreviewControlsPanel
         toolpath={props.toolpath}
         estimate={props.estimate}

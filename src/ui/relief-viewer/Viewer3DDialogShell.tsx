@@ -24,6 +24,8 @@ export function Viewer3DDialogShell(props: {
   // Must be referentially stable (useCallback) — it is the effect dependency.
   // Null means a background preparation task has not produced its mesh yet.
   readonly buildScene: ViewerDialogSceneBuilder | null;
+  // Display-only disclosure such as bounded preview coarsening. Never a gate.
+  readonly notice?: string;
   readonly preparationFailure?: string;
   // A transferred canvas cannot be transferred again. Incrementing this
   // remounts a fresh element when background preparation yields a new mesh.
@@ -59,6 +61,11 @@ export function Viewer3DDialogShell(props: {
           aria-label={props.canvasAriaLabel}
           style={canvasStyle}
         />
+        {props.notice === undefined ? null : (
+          <p style={noticeStyle} role="status">
+            {props.notice}
+          </p>
+        )}
         {visibleState.kind === 'loading' ? <p style={hintStyle}>Building the 3D surface…</p> : null}
         {visibleState.kind === 'failed' ? (
           <p style={hintStyle} role="alert">
@@ -113,4 +120,8 @@ const hintStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-text-muted)',
   margin: '8px 0 0 0',
+};
+const noticeStyle: React.CSSProperties = {
+  ...hintStyle,
+  color: 'var(--lf-warning)',
 };

@@ -4,13 +4,15 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { Simulate } from 'react-dom/test-utils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createLayer,
   createProject,
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
+  type CncLayerSettings,
   type Layer,
   type ImportedSvg,
   type Project,
@@ -41,10 +43,13 @@ function installProject(layer: Layer, withRelief: boolean): void {
     kind: 'relief',
     id: 'R1',
     source: 'model.stl',
-    meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    emptyCells: 'floor',
+    reliefSource: {
+      kind: 'legacy-mesh',
+      meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
+      emptyCells: 'floor',
+    },
     color: layer.color,
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
     transform: IDENTITY_TRANSFORM,
@@ -57,7 +62,10 @@ function installProject(layer: Layer, withRelief: boolean): void {
   useStore.getState().setMachineKind('cnc');
 }
 
-async function render(layer: Layer): Promise<{
+async function render(
+  layer: Layer,
+  onSettingsChange?: (settings: CncLayerSettings) => void,
+): Promise<{
   readonly host: HTMLDivElement;
   readonly root: Root;
 }> {
@@ -65,7 +73,12 @@ async function render(layer: Layer): Promise<{
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<CncLayerFields layer={layer} />);
+    root.render(
+      <CncLayerFields
+        layer={layer}
+        {...(onSettingsChange === undefined ? {} : { onSettingsChange })}
+      />,
+    );
   });
   return { host, root };
 }
@@ -99,6 +112,45 @@ describe('CncLayerFields relief contract', () => {
     } finally {
       await act(async () => root.unmount());
       host.remove();
+    }
+  });
+
+  it('retains 1% and 200% Stepover without policy min/max attributes', async () => {
+    vi.useFakeTimers();
+    const layer = reliefLayer('engrave');
+    installProject(layer, true);
+    const onSettingsChange = vi.fn();
+    const { host, root } = await render(layer, onSettingsChange);
+    try {
+      const input = stepoverInput(host, layer.color);
+      if (input === null) throw new Error('stepover input missing');
+      expect(input.getAttribute('min')).toBeNull();
+      expect(input.getAttribute('max')).toBeNull();
+      expect(input.value).toBe('40');
+
+      input.value = '1';
+      await act(async () => Simulate.change(input));
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(onSettingsChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ stepoverPercent: 1 }),
+      );
+
+      input.value = '200';
+      await act(async () => Simulate.change(input));
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(onSettingsChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ stepoverPercent: 200 }),
+      );
+
+      const cutDepth = host.querySelector<HTMLInputElement>(
+        `input[aria-label="Cut depth for ${layer.color}"]`,
+      );
+      expect(cutDepth?.getAttribute('min')).toBe('0.05');
+      expect(cutDepth?.getAttribute('max')).toBe('200');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      vi.useRealTimers();
     }
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TriangleMesh } from './triangle-mesh';
-import { meshToHeightmap } from './mesh-to-heightmap';
+import { meshToHeightmap, type MeshHeightmapRuntime } from './mesh-to-heightmap';
 
 // Analytic meshes (ADR-025 perceptual pattern): surfaces with closed-form
 // height fields, so every cell can be checked against ground truth.
@@ -176,5 +176,116 @@ describe('meshToHeightmap', () => {
       kind: 'error',
       reason: 'Target XY scale must be finite and positive.',
     });
+  });
+
+  it('attempts the exact cell count above the advisory threshold and reports RangeError', () => {
+    let attemptedLength: number | undefined;
+    const runtime: MeshHeightmapRuntime = {
+      allocateFloat32: (length) => {
+        attemptedLength = length;
+        throw new RangeError('controlled allocation failure');
+      },
+    };
+    const result = meshToHeightmap(
+      pyramidMesh(),
+      { targetWidthMm: 2001, reliefDepthMm: 5, mmPerCell: 1 },
+      runtime,
+    );
+
+    expect(attemptedLength).toBe(2001 * 2001);
+    expect(attemptedLength).toBeGreaterThan(4_000_000);
+    expect(result).toEqual({
+      kind: 'error',
+      reason: 'Relief mesh heightmap does not fit in this runtime.',
+    });
+  });
+
+  it('turns a native typed-array allocation RangeError into a structured result', () => {
+    expect(
+      meshToHeightmap(pyramidMesh(), {
+        targetWidthMm: Number.MAX_VALUE,
+        reliefDepthMm: 5,
+        mmPerCell: Number.MIN_VALUE,
+      }),
+    ).toEqual({
+      kind: 'error',
+      reason: 'Relief mesh heightmap does not fit in this runtime.',
+    });
+  });
+
+  // The 2 x 2 fixture requests four cells, so -4 also covers a zero-length return.
+  it.each([-4, -1, 1])(
+    'rejects a max-Z allocation whose length differs from the exact request by %i',
+    (delta) => {
+      expect(
+        meshToHeightmap(
+          pyramidMesh(),
+          { targetWidthMm: 2, reliefDepthMm: 5, mmPerCell: 1 },
+          { allocateFloat32: (length) => new Float32Array(Math.max(0, length + delta)) },
+        ),
+      ).toEqual({
+        kind: 'error',
+        reason: 'Relief mesh heightmap does not fit in this runtime.',
+      });
+    },
+  );
+
+  it.each([-4, -1, 1])(
+    'rejects a depth allocation whose length differs from the exact request by %i',
+    (delta) => {
+      let calls = 0;
+      expect(
+        meshToHeightmap(
+          pyramidMesh(),
+          { targetWidthMm: 2, reliefDepthMm: 5, mmPerCell: 1 },
+          {
+            allocateFloat32: (length) => {
+              calls += 1;
+              return new Float32Array(calls === 1 ? length : Math.max(0, length + delta));
+            },
+          },
+        ),
+      ).toEqual({
+        kind: 'error',
+        reason: 'Relief mesh heightmap does not fit in this runtime.',
+      });
+      expect(calls).toBe(2);
+    },
+  );
+
+  it('rethrows a non-allocation materialization failure', () => {
+    const programmerError = new Error('controlled allocator error');
+
+    expect(() =>
+      meshToHeightmap(
+        pyramidMesh(),
+        { targetWidthMm: 20, reliefDepthMm: 5, mmPerCell: 1 },
+        {
+          allocateFloat32: () => {
+            throw programmerError;
+          },
+        },
+      ),
+    ).toThrow(programmerError);
+  });
+
+  it('rethrows a non-allocation failure from the second exact allocation', () => {
+    const programmerError = new Error('controlled depth allocator error');
+    let calls = 0;
+
+    expect(() =>
+      meshToHeightmap(
+        pyramidMesh(),
+        { targetWidthMm: 2, reliefDepthMm: 5, mmPerCell: 1 },
+        {
+          allocateFloat32: (length) => {
+            calls += 1;
+            if (calls === 2) throw programmerError;
+            return new Float32Array(length);
+          },
+        },
+      ),
+    ).toThrow(programmerError);
+    expect(calls).toBe(2);
   });
 });

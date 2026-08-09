@@ -19,7 +19,7 @@ import { parseDxfBlob } from './parse-dxf-blob';
 import { parseGcodeBlob } from './parse-gcode-blob';
 import { prepareParsedStlImport } from './stl-import-preparation';
 import { importWorkerTransferables } from './import-worker-transferables';
-import { prepareDepthMapPng } from './depth-map-import-preparation';
+import { prepareDepthMapPng, prepareReliefHeightfieldPng } from './depth-map-import-preparation';
 
 self.onmessage = (e: MessageEvent<ImportWorkerRequest>): void => {
   void handleRequest(e.data);
@@ -74,6 +74,20 @@ async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerR
       result: await prepareDepthMapPng(request.blob, {
         onProgress: (bytesRead) =>
           postProgress(request.id, 'parsing', bytesRead, request.blob.size),
+      }),
+    };
+  }
+  if (request.kind === 'relief-heightfield-png') {
+    return {
+      id: request.id,
+      kind: 'relief-heightfield-png',
+      result: await prepareReliefHeightfieldPng(request.blob, {
+        sourceName: request.sourceName,
+        physicalWidthMm: request.physicalWidthMm,
+        maxDepthMm: request.maxDepthMm,
+        onProgress: (bytesRead) =>
+          postProgress(request.id, 'parsing', bytesRead, request.blob.size),
+        onPreparing: () => postProgress(request.id, 'preparing'),
       }),
     };
   }

@@ -1,7 +1,13 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { applyTransform, type Transform, type Vec2 } from '../scene';
-import { reliefMachineSpaceTransform } from './relief-machine-space';
+import {
+  applyTransform,
+  IDENTITY_TRANSFORM,
+  type ReliefObject,
+  type Transform,
+  type Vec2,
+} from '../scene';
+import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
 
 const finite = fc.double({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true });
 const scale = fc.double({ min: -4, max: 4, noNaN: true, noDefaultInfinity: true });
@@ -75,5 +81,30 @@ describe('reliefMachineSpaceTransform', () => {
     expect(applyTransform(planned, machineSpace.residualTransform)).toEqual(
       applyTransform(local, transform),
     );
+  });
+
+  it('resolves nonuniform and negative scale into the physical CAM dimensions', () => {
+    const relief: ReliefObject = {
+      kind: 'relief',
+      id: 'R1',
+      source: 'surface.stl',
+      targetWidthMm: 100,
+      reliefDepthMm: 5,
+      reliefSource: {
+        kind: 'legacy-mesh',
+        meshPositions: [0, 0, 0, 10, 0, 1, 0, 5, 2],
+        emptyCells: 'floor',
+      },
+      color: '#a0522d',
+      bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
+      transform: { ...IDENTITY_TRANSFORM, scaleX: -0.5, scaleY: 2 },
+    };
+
+    expect(reliefMachineSpaceGeometry(relief)).toMatchObject({
+      targetScaleX: 0.5,
+      targetScaleY: 2,
+      widthMm: 50,
+      heightMm: 100,
+    });
   });
 });

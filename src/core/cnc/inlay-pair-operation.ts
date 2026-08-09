@@ -11,7 +11,11 @@ import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
 import { tabRampedPoints } from './cnc-tab-ramp';
 import { sourceRegionMajorDepthPasses } from './compile-cnc-helpers';
 import { zPassDepths } from './depth-passes';
-import { planStraightInlayPairForSettings, straightInlayPocketDepthMm } from './inlay-pair';
+import {
+  planStraightInlayPairForSettings,
+  straightInlayPocketDepthMm,
+  type StraightInlayPairPlanningEvidence,
+} from './inlay-pair';
 import { orderInnerFirst } from './profile-ordering';
 
 const COORD_EPS = 1e-9;
@@ -20,8 +24,21 @@ export type StraightInlayOperation = {
   readonly tool: CncTool;
   readonly femaleSettings: CncLayerSettings;
   readonly maleSettings: CncLayerSettings;
+  readonly femalePocketOffsetFailed: boolean;
+  readonly femalePocketPassLimited: boolean;
+  readonly stepoverUsed: boolean;
   readonly femalePasses: ReadonlyArray<CncPass>;
   readonly malePasses: ReadonlyArray<CncPass>;
+};
+
+export type StraightInlayGroupsCompilation = StraightInlayPairPlanningEvidence & {
+  readonly groups: { readonly female: CncGroup; readonly male: CncGroup } | null;
+};
+
+const NO_INLAY_PLANNING_EVIDENCE: StraightInlayPairPlanningEvidence = {
+  femalePocketOffsetFailed: false,
+  femalePocketPassLimited: false,
+  stepoverUsed: false,
 };
 
 export function compileStraightInlayGroups(
@@ -33,12 +50,40 @@ export function compileStraightInlayGroups(
     tool: CncTool,
     passes: ReadonlyArray<CncPass>,
   ) => CncGroup | null,
-): { readonly female: CncGroup; readonly male: CncGroup } | null {
-  const operation = compileStraightInlayOperation(polylines, settings, config);
-  if (operation === null) return null;
+): {
+  readonly female: CncGroup;
+  readonly male: CncGroup;
+  readonly femalePocketPassLimited: boolean;
+} | null {
+  const compiled = compileStraightInlayGroupsWithEvidence(polylines, settings, config, buildGroup);
+  return compiled === null || compiled.groups === null
+    ? null
+    : {
+        ...compiled.groups,
+        femalePocketPassLimited: compiled.femalePocketPassLimited,
+      };
+}
+
+export function compileStraightInlayGroupsWithEvidence(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+  buildGroup: (
+    groupSettings: CncLayerSettings,
+    tool: CncTool,
+    passes: ReadonlyArray<CncPass>,
+  ) => CncGroup | null,
+): StraightInlayGroupsCompilation | null {
+  if (settings.cutType !== 'inlay-pair') return null;
+  const compiled = compileStraightInlayOperationWithEvidence(polylines, settings, config);
+  const operation = compiled.operation;
+  if (operation === null) return { groups: null, ...compiled.evidence };
   const female = buildGroup(operation.femaleSettings, operation.tool, operation.femalePasses);
   const male = buildGroup(operation.maleSettings, operation.tool, operation.malePasses);
-  return female === null || male === null ? null : { female, male };
+  return {
+    groups: female === null || male === null ? null : { female, male },
+    ...compiled.evidence,
+  };
 }
 
 export function compileStraightInlayOperation(
@@ -46,10 +91,30 @@ export function compileStraightInlayOperation(
   settings: CncLayerSettings,
   config: CncMachineConfig,
 ): StraightInlayOperation | null {
-  if (settings.cutType !== 'inlay-pair') return null;
+  return compileStraightInlayOperationWithEvidence(polylines, settings, config).operation;
+}
+
+type StraightInlayOperationCompilation = {
+  readonly operation: StraightInlayOperation | null;
+  readonly evidence: StraightInlayPairPlanningEvidence;
+};
+
+function compileStraightInlayOperationWithEvidence(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+): StraightInlayOperationCompilation {
+  if (settings.cutType !== 'inlay-pair') {
+    return { operation: null, evidence: NO_INLAY_PLANNING_EVIDENCE };
+  }
   const tool = layerCncTool(config, settings);
   const plan = planStraightInlayPairForSettings(polylines, settings, tool);
-  if (!plan.ok) return null;
+  const evidence: StraightInlayPairPlanningEvidence = {
+    femalePocketOffsetFailed: plan.femalePocketOffsetFailed,
+    femalePocketPassLimited: plan.femalePocketPassLimited,
+    stepoverUsed: plan.stepoverUsed,
+  };
+  if (!plan.ok) return { operation: null, evidence };
   const femaleSettings: CncLayerSettings = {
     ...settings,
     cutType: 'pocket',
@@ -58,19 +123,23 @@ export function compileStraightInlayOperation(
   };
   const maleSettings: CncLayerSettings = { ...settings, cutType: 'profile-outside' };
   return {
-    tool,
-    femaleSettings,
-    maleSettings,
-    femalePasses: sourceRegionMajorDepthPasses(
-      polylines,
-      plan.femaleToolpaths,
-      zPassDepths(femaleSettings.depthMm, femaleSettings.depthPerPassMm),
-    ),
-    malePasses: tabbedProfilePasses(
-      orderInnerFirst(plan.maleToolpaths),
+    operation: {
+      tool,
+      femaleSettings,
       maleSettings,
-      tool.diameterMm,
-    ),
+      ...evidence,
+      femalePasses: sourceRegionMajorDepthPasses(
+        polylines,
+        plan.femaleToolpaths,
+        zPassDepths(femaleSettings.depthMm, femaleSettings.depthPerPassMm),
+      ),
+      malePasses: tabbedProfilePasses(
+        orderInnerFirst(plan.maleToolpaths),
+        maleSettings,
+        tool.diameterMm,
+      ),
+    },
+    evidence,
   };
 }
 

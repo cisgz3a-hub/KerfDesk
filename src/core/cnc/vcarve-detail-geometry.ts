@@ -1,4 +1,5 @@
 import type { Vec2 } from '../scene';
+import { CNC_COORDINATE_DECIMAL_PLACES, CNC_COORDINATE_QUANTUM_MM } from './cnc-output-precision';
 
 export type BoundarySegment = {
   readonly ax: number;
@@ -7,7 +8,7 @@ export type BoundarySegment = {
   readonly by: number;
 };
 
-export const EMIT_COORDINATE_QUANTUM_MM = 0.001;
+export const EMIT_COORDINATE_QUANTUM_MM = CNC_COORDINATE_QUANTUM_MM;
 
 export function emittedPoint(point: Vec2): Vec2 {
   return {
@@ -17,7 +18,9 @@ export function emittedPoint(point: Vec2): Vec2 {
 }
 
 export function emitXyKey(point: Vec2): string {
-  return `${point.x.toFixed(3)},${point.y.toFixed(3)}`;
+  return `${point.x.toFixed(CNC_COORDINATE_DECIMAL_PLACES)},${point.y.toFixed(
+    CNC_COORDINATE_DECIMAL_PLACES,
+  )}`;
 }
 
 export function samePoint(a: Vec2, b: Vec2): boolean {

@@ -5,11 +5,31 @@
 // operator zeroed X/Y at the area's front-left corner and Z on the surface
 // to be faced. Pure and deterministic (no clock, no randomness).
 
+import {
+  buildSurfacingOutputPrecisionEvidence as buildOutputPrecisionEvidence,
+  summarizeSurfacingEmittedCoordinates as summarizeEmittedCoordinates,
+} from './surfacing-output-precision';
+import type { SurfacingOutputPrecisionEvidence } from './surfacing-output-precision';
+import {
+  buildSurfacingHeader as surfacingHeader,
+  type SurfacingCoverageEvidence,
+} from './surfacing-header';
+import {
+  formatSurfacingInteger as fmtInteger,
+  formatSurfacingNumber as fmt,
+} from './surfacing-number-format';
+
+export type {
+  SurfacingOutputDifferenceField,
+  SurfacingOutputPrecisionEvidence,
+} from './surfacing-output-precision';
+export type { SurfacingCoverageEvidence } from './surfacing-header';
+
 export type SurfacingParams = {
   readonly widthMm: number;
   readonly heightMm: number;
   readonly bitDiameterMm: number;
-  /** Row spacing as a percentage of bit diameter (10–100). */
+  /** Exact positive row spacing as a percentage of bit diameter. */
   readonly stepoverPct: number;
   readonly depthPerPassMm: number;
   readonly totalDepthMm: number;
@@ -24,10 +44,43 @@ export type SurfacingProgram = {
   readonly lines: ReadonlyArray<string>;
   readonly passes: number;
   readonly rowsPerPass: number;
+  readonly planning: SurfacingPlanningEvidence;
+  readonly coverage: SurfacingCoverageEvidence;
+  readonly outputPrecision: SurfacingOutputPrecisionEvidence | null;
 };
 
+type SurfacingPlanMeasurements = {
+  readonly stepoverPct: number;
+  readonly stepMm: number;
+  readonly generatedRowsPerPass: number;
+  readonly generatedPasses: number;
+  readonly generatedRouteRows: number;
+};
+
+export type SurfacingPassLimitStage = 'rows' | 'depth-passes';
+
+export type SurfacingPlanningEvidence =
+  | (SurfacingPlanMeasurements & { readonly kind: 'complete' })
+  | (SurfacingPlanMeasurements & {
+      readonly kind: 'pass-limit';
+      readonly passLimit: number;
+      readonly limitedStages: ReadonlyArray<SurfacingPassLimitStage>;
+      readonly requestedYCoverageMm: number;
+      readonly achievedYCoverageMm: number;
+      readonly requestedDepthMm: number;
+      readonly achievedDepthMm: number;
+    });
+
+type SurfacingPlanningTermination =
+  | { readonly kind: 'complete' }
+  | { readonly kind: 'pass-limit'; readonly passLimit: number };
+
 export type SurfacingRowsResult =
-  | { readonly ok: true; readonly rows: ReadonlyArray<number> }
+  | {
+      readonly ok: true;
+      readonly rows: ReadonlyArray<number>;
+      readonly termination: SurfacingPlanningTermination;
+    }
   | { readonly ok: false; readonly reason: string };
 
 export type SurfacingProgramResult =
@@ -38,20 +91,11 @@ export const SURFACING_DEFAULT_STEPOVER_PCT = 40;
 export const SURFACING_DEFAULT_DEPTH_PER_PASS_MM = 0.5;
 export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
 
-const MIN_STEPOVER_PCT = 10;
-const MAX_STEPOVER_PCT = 100;
-const MIN_STEP_MM = 0.05;
-// Hard ceiling on serpentine rows / depth passes so a pathological but finite
-// height or total depth (e.g. 1e12 mm) cannot exhaust memory building the
-// arrays. 100k rows is ~a 5 m area at the 0.05 mm minimum step — far beyond
-// any real bed — so no valid job is affected. Checked before allocation.
-const MAX_SURFACING_ITERATIONS = 100_000;
+// Existing bounded-work budget, now reported as pass-limit evidence instead of
+// refusing an exact positive input. It applies to rows across every depth pass,
+// so the formerly unbounded rows x passes product cannot exhaust the process.
+const MAX_SURFACING_ROUTE_ROWS = 100_000;
 const POSITIVE_FINITE_REASON = 'must be a positive finite number.';
-
-function fmt(value: number): string {
-  const text = value.toFixed(3);
-  return text === '-0.000' ? '0.000' : text;
-}
 
 // Row centers 0..heightMm inclusive; the final row lands exactly on the far
 // edge so the whole area is faced even when the height doesn't divide.
@@ -60,31 +104,64 @@ export function surfacingRowYs(heightMm: number, stepMm: number): SurfacingRowsR
   if (heightReason !== null) return { ok: false, reason: heightReason };
   const stepReason = positiveFiniteReason('step', stepMm);
   if (stepReason !== null) return { ok: false, reason: stepReason };
-  const capReason = iterationCapReason('row', heightMm, stepMm);
-  if (capReason !== null) return { ok: false, reason: capReason };
-
   const rows: number[] = [];
-  for (let y = 0; y < heightMm; y += stepMm) rows.push(y);
+  let y = 0;
+  while (y < heightMm && rows.length < MAX_SURFACING_ROUTE_ROWS) {
+    rows.push(y);
+    y += stepMm;
+  }
+  if (y < heightMm || rows.length >= MAX_SURFACING_ROUTE_ROWS) {
+    return {
+      ok: true,
+      rows,
+      termination: { kind: 'pass-limit', passLimit: MAX_SURFACING_ROUTE_ROWS },
+    };
+  }
   rows.push(heightMm);
-  return { ok: true, rows };
+  return { ok: true, rows, termination: { kind: 'complete' } };
 }
 
 export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgramResult {
   const paramReason = validateSurfacingParams(params);
   if (paramReason !== null) return { ok: false, reason: paramReason };
 
-  const stepover = Math.min(MAX_STEPOVER_PCT, Math.max(MIN_STEPOVER_PCT, params.stepoverPct));
-  const stepMm = Math.max(MIN_STEP_MM, (params.bitDiameterMm * stepover) / 100);
+  const stepMm = (params.bitDiameterMm * params.stepoverPct) / 100;
   const rowResult = surfacingRowYs(params.heightMm, stepMm);
   if (!rowResult.ok) return rowResult;
   const { rows } = rowResult;
-  const depthResult = depthLadder(params.depthPerPassMm, params.totalDepthMm);
+  const depthPassLimit = Math.max(1, Math.floor(MAX_SURFACING_ROUTE_ROWS / rows.length));
+  const depthResult = depthLadder(params.depthPerPassMm, params.totalDepthMm, depthPassLimit);
   if (!depthResult.ok) return depthResult;
   const { depths } = depthResult;
+  const yOutput = summarizeEmittedCoordinates(rows, false);
+  const depthOutput = summarizeEmittedCoordinates(depths, true);
+  const coverage = surfacingCoverageEvidence(rows, params.bitDiameterMm);
+  const outputPrecision = buildOutputPrecisionEvidence(params, stepMm, yOutput, depthOutput);
+  const limitedStages: SurfacingPassLimitStage[] = [];
+  if (rowResult.termination.kind === 'pass-limit') limitedStages.push('rows');
+  if (depthResult.termination.kind === 'pass-limit') limitedStages.push('depth-passes');
+  const measurements: SurfacingPlanMeasurements = {
+    stepoverPct: params.stepoverPct,
+    stepMm,
+    generatedRowsPerPass: rows.length,
+    generatedPasses: depths.length,
+    generatedRouteRows: rows.length * depths.length,
+  };
+  const planning: SurfacingPlanningEvidence =
+    limitedStages.length === 0
+      ? { kind: 'complete', ...measurements }
+      : {
+          kind: 'pass-limit',
+          ...measurements,
+          passLimit: MAX_SURFACING_ROUTE_ROWS,
+          limitedStages,
+          requestedYCoverageMm: params.heightMm,
+          achievedYCoverageMm: yOutput.achievedFinalMm,
+          requestedDepthMm: params.totalDepthMm,
+          achievedDepthMm: depthOutput.achievedFinalMm,
+        };
   const lines: string[] = [
-    '; KerfDesk spoilboard surfacing',
-    `; area ${fmt(params.widthMm)} x ${fmt(params.heightMm)} mm, bit ${fmt(params.bitDiameterMm)} mm, stepover ${stepover}%`,
-    '; zero X/Y at the front-left corner of the area, Z0 on the surface to face',
+    ...surfacingHeader(params, planning, coverage, outputPrecision),
     'G21',
     'G90',
     'G54',
@@ -96,9 +173,9 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
     // contract with the job emitter.
     'G17',
     `G0 Z${fmt(params.safeZMm)}`,
-    `M3 S${Math.round(params.spindleRpm)}`,
+    `M3 S${fmtInteger(params.spindleRpm)}`,
   ];
-  if (params.spindleSpinupSec > 0) lines.push(`G4 P${params.spindleSpinupSec.toFixed(3)}`);
+  if (params.spindleSpinupSec > 0) lines.push(`G4 P${fmt(params.spindleSpinupSec)}`);
   for (const depth of depths) {
     lines.push('G0 X0.000 Y0.000');
     lines.push(`G1 Z${fmt(-depth)} F${fmt(params.plungeMmPerMin)}`);
@@ -111,28 +188,63 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   }
   lines.push('M5');
   lines.push('G0 X0.000 Y0.000');
-  return { ok: true, program: { lines, passes: depths.length, rowsPerPass: rows.length } };
+  return {
+    ok: true,
+    program: {
+      lines,
+      passes: depths.length,
+      rowsPerPass: rows.length,
+      planning,
+      coverage,
+      outputPrecision,
+    },
+  };
+}
+
+const NOMINAL_COVERAGE_TOLERANCE_MM = 1e-9;
+
+function surfacingCoverageEvidence(
+  rows: ReadonlyArray<number>,
+  bitDiameterMm: number,
+): SurfacingCoverageEvidence {
+  let maxEmittedCenterGapMm = 0;
+  let previous = Number(fmt(rows[0] ?? 0));
+  for (const row of rows.slice(1)) {
+    const emitted = Number(fmt(row));
+    maxEmittedCenterGapMm = Math.max(maxEmittedCenterGapMm, emitted - previous);
+    previous = emitted;
+  }
+  const nominalUncutGapMm = maxEmittedCenterGapMm - bitDiameterMm;
+  if (nominalUncutGapMm <= NOMINAL_COVERAGE_TOLERANCE_MM) {
+    return { kind: 'nominal-complete', maxEmittedCenterGapMm };
+  }
+  return { kind: 'nominal-gap', bitDiameterMm, maxEmittedCenterGapMm, nominalUncutGapMm };
 }
 
 type DepthLadderResult =
-  | { readonly ok: true; readonly depths: ReadonlyArray<number> }
+  | {
+      readonly ok: true;
+      readonly depths: ReadonlyArray<number>;
+      readonly termination: SurfacingPlanningTermination;
+    }
   | { readonly ok: false; readonly reason: string };
 
-function depthLadder(perPassMm: number, totalMm: number): DepthLadderResult {
-  const step = Math.max(MIN_STEP_MM, perPassMm);
-  const total = Math.max(MIN_STEP_MM, totalMm);
-  const capReason = iterationCapReason('depth pass', total, step);
-  if (capReason !== null) return { ok: false, reason: capReason };
+function depthLadder(perPassMm: number, totalMm: number, passLimit: number): DepthLadderResult {
   const depths: number[] = [];
-  for (let depth = step; depth < total; depth += step) depths.push(depth);
-  depths.push(total);
-  return { ok: true, depths };
-}
-
-function iterationCapReason(label: string, spanMm: number, stepMm: number): string | null {
-  return spanMm / stepMm <= MAX_SURFACING_ITERATIONS
-    ? null
-    : `Surfacing ${label} count exceeds the ${MAX_SURFACING_ITERATIONS} limit.`;
+  let depth = perPassMm;
+  while (depth < totalMm && depths.length < passLimit) {
+    depths.push(depth);
+    depth += perPassMm;
+  }
+  if (depth < totalMm || depths.length >= passLimit) {
+    return {
+      ok: true,
+      depths,
+      termination: { kind: 'pass-limit', passLimit },
+    };
+  }
+  depths.push(totalMm);
+  return { ok: true, depths, termination: { kind: 'complete' } };
 }
 
 function validateSurfacingParams(params: SurfacingParams): string | null {

@@ -5,6 +5,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { IDENTITY_TRANSFORM, type ReliefObject } from '../../core/scene';
 
 const worker = vi.hoisted(() => ({
@@ -45,10 +46,13 @@ function relief(): ReliefObject {
     id: 'R1',
     source: 'model.stl',
     // One tilted triangle — enough for a real heightmap.
-    meshPositions: [0, 0, 0, 10, 0, 2, 0, 10, 4],
     targetWidthMm: 50,
     reliefDepthMm: 5,
-    emptyCells: 'floor',
+    reliefSource: {
+      kind: 'legacy-mesh',
+      meshPositions: [0, 0, 0, 10, 0, 2, 0, 10, 4],
+      emptyCells: 'floor',
+    },
     color: '#a0522d',
     bounds: { minX: 0, minY: 0, maxX: 50, maxY: 50 },
     transform: IDENTITY_TRANSFORM,
@@ -60,14 +64,15 @@ function depthMapRelief(): ReliefObject {
     kind: 'relief',
     id: 'D1',
     source: 'height-map.png',
-    depthMap: {
-      schemaVersion: 1,
+    reliefSource: testReliefHeightfield({
       width: 2,
       height: 1,
-      bitDepth: 8,
-      samplesBase64: 'AP8=',
-      polarity: 'light-is-high',
-    },
+      physicalWidthMm: 50,
+      physicalHeightMm: 25,
+      maxDepthMm: 5,
+      samplesU8: [0, 255],
+      provenance: { sourceName: 'height-map.png' },
+    }),
     targetWidthMm: 50,
     reliefDepthMm: 5,
     color: '#a0522d',
@@ -169,6 +174,46 @@ describe('Relief3DViewerDialog', () => {
     });
     await surface.promise;
     host.remove();
+  });
+
+  it('uses the same nonuniform physical scale as relief CAM', async () => {
+    worker.prepare.mockResolvedValue({
+      kind: 'ok',
+      heightmap: {
+        widthCells: 2,
+        heightCells: 1,
+        mmPerCell: 0.25,
+        depth: new Float32Array([-5, 0]),
+      },
+      widthMm: 25,
+      heightMm: 50,
+    });
+    const scaled: ReliefObject = {
+      ...depthMapRelief(),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: -0.5, scaleY: 2 },
+    };
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => {
+        root.render(
+          <Relief3DViewerDialog relief={scaled} stockThicknessMm={6.35} onClose={vi.fn()} />,
+        );
+      });
+
+      await vi.waitFor(() => expect(worker.prepare).toHaveBeenCalledOnce());
+      expect(host.textContent).toContain('25 mm wide');
+      expect(worker.prepare.mock.calls[0]?.[1]).toMatchObject({
+        targetWidthMm: 50,
+        targetScaleX: 0.5,
+        targetScaleY: 2,
+        mmPerCell: 0.25,
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
   });
 });
 

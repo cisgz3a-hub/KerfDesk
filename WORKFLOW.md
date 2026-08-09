@@ -4015,7 +4015,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 (ADR-290)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4025,7 +4025,9 @@ and lifts the command's CNC-only gate.)*
 2. A qualified input is a lossless, non-interlaced, 8-bit grayscale PNG. The
    import worker verifies the PNG structure and CRCs and retains one exact
    grayscale sample per source pixel; it does not resize, auto-level, blur,
-   sharpen, apply gamma, or run AI depth estimation.
+   sharpen, apply gamma, or run AI depth estimation. An optional grayscale
+   `tRNS` chunk maps pixels matching its transparent sample to mask byte `0`
+   and every other pixel to `255`; transparency is not composited.
 3. Each file becomes a top-down relief at 100 mm wide and 5 mm deep. Height
    follows the pixel aspect ratio, **Light is high** is the declared default,
    and the Relief properties panel shows the pixel dimensions and precision.
@@ -4034,9 +4036,11 @@ and lifts the command's CNC-only gate.)*
    **View 3D...**, and CAM use the same deterministic materialization rule and
    embedded samples; each consumer chooses the grid resolution appropriate to
    its job.
-5. Saving embeds the versioned samples, dimensions, bit depth, and polarity in
-   the project. Reopening validates their exact byte-length contract before the
-   data can reach preview or compilation.
+5. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
+   physical and pixel dimensions, optional U8 inclusion mask, mapping,
+   provenance, revision, and digest. Eight-bit PNG sample `v` is represented
+   exactly as U16 value `v * 257`. Reopening validates the exact byte-length,
+   source-authority, mapping, and digest contracts before preview or compilation.
 6. In CNC mode, the existing relief layer settings select the flat-end-mill
    roughing and optional ball-nose finishing tools. The existing relief CAM,
    tool changes, Job Review, Frame permit, preview, G-code, progress, and
@@ -4047,8 +4051,8 @@ and lifts the command's CNC-only gate.)*
    source contract for this slice and imports nothing for that file. It is not
    silently converted to grayscale and is never described as estimated depth.
 2. A malformed signature, chunk, CRC, row stream, base64 payload, dimension,
-   bit depth, or byte-length declaration reports a factual input-integrity
-   error. Other files in the same selection continue.
+   bit depth, byte-length declaration, or grayscale `tRNS` length/order/duplicate
+   reports a factual input-integrity error. Other files in the same selection continue.
 
 #### Empty
 1. Cancelling the picker changes nothing. Pressing Escape during worker decode
@@ -4062,19 +4066,28 @@ and lifts the command's CNC-only gate.)*
 2. Large files receive the existing non-blocking size advisory. Worker startup
    failure discloses the existing main-thread fallback; size never becomes an
    arbitrary import refusal.
-3. The durable model admits 16-bit big-endian samples, but this first decoder
-   qualifies only exact 8-bit grayscale PNG. A later 16-bit decoder can populate
-   the same schema after its PNG filtering and precision path is verified.
-4. CAM grid coarsening uses the highest overlapping source surface at each
-   target cell. This preserves sampled peaks conservatively but does not prove
-   subpixel detail, a continuous swept cutter envelope, holder clearance,
-   controller tracking, material finish, or safe feeds for a particular tool,
-   wood, spindle, or machine.
+3. The durable model is canonical U16 little-endian (`u16le-base64-v1`), but this
+   decoder qualifies only exact 8-bit grayscale PNG and expands each input code
+   losslessly. A later 16-bit decoder can populate the same schema after its PNG
+   filtering, byte-order, worker-memory, and precision path is verified.
+4. CAM requests its exact positive cell spacing and attempts the exact derived
+   allocation; allocation failure is reported factually rather than silently
+   coarsening. When that spacing does not divide the declared physical width or
+   height, the current square grid uses ceil-rounded dimensions and can extend
+   by less than one cell. Exact relief-edge containment and 2D/CAM edge agreement
+   remain unqualified until an edge-cell model lands.
+5. Coarser target cells use the highest overlapping source surface and require
+   all overlapping source-mask coverage. Excluded mask squares are protected by
+   emitted-precision cutter envelopes in roughing and finishing, but this does
+   not prove included subpixel surface detail, holder clearance, controller
+   tracking, material finish, or safe feeds for a particular physical setup.
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** Until P2R.1 ships, use F-CNC46's narrower
-> **Import Height Map...** flow and its 8-bit grayscale contract.
+> **Planned - not current UI.** P2R.1a supplies the schema-v4/U16LE storage,
+> migration, qualified 8-bit grayscale import, simple transparency mask, and
+> existing CAM/preview substrate. The creation modes and controls below remain
+> planned; use F-CNC46's narrower **Import Height Map...** flow today.
 
 #### Success
 1. Choose **Create Relief...** and select the source meaning before import:

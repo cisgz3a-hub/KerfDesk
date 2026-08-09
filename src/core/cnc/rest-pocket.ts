@@ -22,12 +22,11 @@ export type RestPocketPlan =
       // pass budget can leave rest stock standing, so callers surface an
       // advisory without changing the emitted paths or gating the job.
       readonly completion: RestPocketCompletion;
+      readonly stepoverUsed: boolean;
     }
   | { readonly ok: false; readonly reason: string };
 
 const MIN_POINTS = 3;
-const MIN_STEPOVER_PERCENT = 10;
-const MAX_STEPOVER_PERCENT = 85;
 const MAX_RINGS = 4096;
 const PRECISION_DECIMALS = 3;
 const EPSILON = 1e-9;
@@ -45,7 +44,13 @@ export function planRestPocketToolpaths(
   const stock = remainingStock(contours, roughToolDiameterMm);
   if (!stock.ok) return stock;
   if (stock.rest.length === 0) {
-    return { ok: true, toolpaths: [], restRegions: [], completion: 'complete' };
+    return {
+      ok: true,
+      toolpaths: [],
+      restRegions: [],
+      completion: 'complete',
+      stepoverUsed: false,
+    };
   }
   const target = finishTarget(stock.original, stock.rest, finishToolDiameterMm);
   if (target === null) return clipperFailure();
@@ -55,6 +60,7 @@ export function planRestPocketToolpaths(
     toolpaths: rings.toolpaths,
     restRegions: stock.rest.map(toPolyline),
     completion: rings.completion,
+    stepoverUsed: true,
   };
 }
 
@@ -122,9 +128,7 @@ function centerRegionRings(
   toolDiameterMm: number,
   stepoverPercent: number,
 ): CenterRegionRings {
-  const stepMm =
-    (Math.min(MAX_STEPOVER_PERCENT, Math.max(MIN_STEPOVER_PERCENT, stepoverPercent)) / 100) *
-    toolDiameterMm;
+  const stepMm = (stepoverPercent / 100) * toolDiameterMm;
   const levels: PathsD[] = [];
   let completion: RestPocketCompletion = 'pass-limit';
   for (let index = 0; index < MAX_RINGS; index += 1) {

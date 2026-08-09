@@ -51,7 +51,13 @@ export function buildOffsetLadder(
     if (offset.value.length === 0) return { rings, offsetFailed: false, capped: false };
     rings.push(offset.value);
   }
-  return { rings, offsetFailed: false, capped: rings.length === maxSteps && maxSteps > 0 };
+  // One non-emitting lookahead distinguishes "the last allowed ring was also
+  // the natural final ring" from "usable interior remains beyond the budget."
+  // Without it, merely filling the last slot produced a false pass-limit
+  // warning even when the very next inset was empty.
+  const lookahead = offsetClosedPolylinesForKerfChecked(contours, -insetMmForStep(maxSteps));
+  if (lookahead.kind === 'error') return { rings, offsetFailed: true, capped: false };
+  return { rings, offsetFailed: false, capped: lookahead.value.length > 0 };
 }
 
 /**

@@ -10,6 +10,9 @@ export type PngFixtureOptions = {
   readonly filters?: ReadonlyArray<number>;
   readonly pixelsPerMetre?: number;
   readonly palette?: Uint8Array;
+  readonly transparency?: Uint8Array;
+  readonly transparencyAfterIdat?: boolean;
+  readonly duplicateTransparency?: boolean;
 };
 
 export function makePng(options: PngFixtureOptions): Uint8Array {
@@ -39,15 +42,32 @@ export function makePng(options: PngFixtureOptions): Uint8Array {
       ? []
       : [chunk('pHYs', physicalDimensions(options.pixelsPerMetre))];
   const palette = options.palette === undefined ? [] : [chunk('PLTE', options.palette)];
+  const transparency = transparencyChunks(options);
   return concat([
     Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10),
     chunk('IHDR', ihdr),
     ...density,
     ...palette,
+    ...transparency.beforeIdat,
     chunk('IDAT', compressed.subarray(0, split)),
     chunk('IDAT', compressed.subarray(split)),
+    ...transparency.afterIdat,
     chunk('IEND', new Uint8Array()),
   ]);
+}
+
+function transparencyChunks(
+  options: Pick<
+    PngFixtureOptions,
+    'duplicateTransparency' | 'transparency' | 'transparencyAfterIdat'
+  >,
+): { readonly beforeIdat: Uint8Array[]; readonly afterIdat: Uint8Array[] } {
+  if (options.transparency === undefined) return { beforeIdat: [], afterIdat: [] };
+  const chunks = [chunk('tRNS', options.transparency)];
+  if (options.duplicateTransparency === true) chunks.push(chunk('tRNS', options.transparency));
+  return options.transparencyAfterIdat === true
+    ? { beforeIdat: [], afterIdat: chunks }
+    : { beforeIdat: chunks, afterIdat: [] };
 }
 
 export function streamingBlob(bytes: Uint8Array): Blob {

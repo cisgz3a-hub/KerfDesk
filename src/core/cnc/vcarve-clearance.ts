@@ -49,7 +49,12 @@ export function vcarveClearancePocket(
 ): PocketToolpaths {
   const floorRegions = vcarveClearanceFloor(polylines, options);
   if (floorRegions.contours.length === 0) {
-    return { toolpaths: [], offsetFailed: floorRegions.offsetFailed };
+    return {
+      toolpaths: [],
+      offsetFailed: floorRegions.offsetFailed,
+      passLimited: false,
+      stepoverUsed: false,
+    };
   }
   return pocketRingToolpaths(
     floorRegions.contours,

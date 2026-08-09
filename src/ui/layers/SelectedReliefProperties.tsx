@@ -5,15 +5,13 @@
 // panel is the mirror case — ADR-101 §3).
 
 import { useState } from 'react';
+import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
 import { machineKindOf, type ReliefObject } from '../../core/scene';
+import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
 import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
-const MIN_WIDTH_MM = 1;
-const MAX_WIDTH_MM = 1500;
-const MIN_DEPTH_MM = 0.1;
-const MAX_DEPTH_MM = 200;
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
 
 export function SelectedReliefProperties(): JSX.Element | null {
@@ -28,6 +26,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
   );
   const [viewerOpen, setViewerOpen] = useState(false);
   if (relief === null) return null;
+  const physical = reliefMachineSpaceGeometry(relief);
   return (
     <section aria-label="Relief properties" style={sectionStyle}>
       <h3 style={headingStyle}>Relief</h3>
@@ -53,25 +52,22 @@ export function SelectedReliefProperties(): JSX.Element | null {
         key={`${relief.id}:width`}
         relief={relief}
         label="Width"
-        value={relief.targetWidthMm}
-        min={MIN_WIDTH_MM}
-        max={MAX_WIDTH_MM}
+        value={physical.widthMm}
         step={1}
-        title="Carved width on the stock. Height follows the source aspect ratio."
+        title="Carved width on the stock after object scale. Editing preserves the current scale."
         commitKey="targetWidthMm"
+        toStoredValue={(value) => value / physical.targetScaleX}
       />
       <ReliefNumberField
         key={`${relief.id}:depth`}
         relief={relief}
         label="Depth"
         value={relief.reliefDepthMm}
-        min={MIN_DEPTH_MM}
-        max={MAX_DEPTH_MM}
         step={0.5}
         title="Total relief depth: the source's numeric range maps to [-depth, 0] below the stock top."
         commitKey="reliefDepthMm"
       />
-      {relief.depthMap === undefined ? (
+      {isMeshRelief(relief) ? (
         <BackgroundSelect relief={relief} />
       ) : (
         <PolaritySelect relief={relief} />
@@ -80,30 +76,38 @@ export function SelectedReliefProperties(): JSX.Element | null {
   );
 }
 
+function isMeshRelief(relief: ReliefObject): relief is MeshReliefObject {
+  return relief.reliefSource.kind === 'legacy-mesh';
+}
+
 function reliefMeta(relief: ReliefObject): string {
-  return relief.depthMap === undefined
-    ? `${Math.round(relief.meshPositions.length / VERTICES_PER_TRIANGLE_FLOATS)} triangles`
-    : `${relief.depthMap.width} x ${relief.depthMap.height}, ${relief.depthMap.bitDepth}-bit grayscale`;
+  if (relief.reliefSource.kind === 'legacy-mesh') {
+    return `${Math.round(relief.reliefSource.meshPositions.length / VERTICES_PER_TRIANGLE_FLOATS)} triangles`;
+  }
+  const sourceBits = relief.reliefSource.provenance.sourceBitDepth;
+  const sourceLabel = sourceBits === undefined ? '' : ` (source ${sourceBits}-bit)`;
+  return `${relief.reliefSource.width} x ${relief.reliefSource.height}, canonical 16-bit${sourceLabel}`;
 }
 
 function ReliefNumberField(props: {
   readonly relief: ReliefObject;
   readonly label: string;
   readonly value: number;
-  readonly min: number;
-  readonly max: number;
   readonly step: number;
   readonly title: string;
   readonly commitKey: 'targetWidthMm' | 'reliefDepthMm';
+  readonly toStoredValue?: (value: number) => number;
 }): JSX.Element {
   const setReliefParams = useStore((s) => s.setReliefParams);
   const debounced = useDebouncedCommit<number>({
     value: props.value,
-    commit: (value) => setReliefParams(props.relief.id, { [props.commitKey]: value }),
+    commit: (value) =>
+      setReliefParams(props.relief.id, {
+        [props.commitKey]: props.toStoredValue?.(value) ?? value,
+      }),
     parse: (input) => {
       const parsed = Number.parseFloat(input);
-      if (!Number.isFinite(parsed)) return props.value;
-      return Math.max(props.min, Math.min(props.max, parsed));
+      return positiveFinite(parsed) ? parsed : props.value;
     },
   });
   return (
@@ -112,8 +116,6 @@ function ReliefNumberField(props: {
       <span style={controlStyle}>
         <input
           type="number"
-          min={props.min}
-          max={props.max}
           step={props.step}
           value={debounced.displayValue}
           onChange={debounced.onChange}
@@ -128,16 +130,18 @@ function ReliefNumberField(props: {
   );
 }
 
-function BackgroundSelect(props: {
-  readonly relief: Exclude<ReliefObject, { readonly depthMap: unknown }>;
-}): JSX.Element {
+function positiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
+}
+
+function BackgroundSelect(props: { readonly relief: MeshReliefObject }): JSX.Element {
   const setReliefParams = useStore((s) => s.setReliefParams);
   return (
     <label style={rowStyle}>
       <span style={labelStyle}>Background</span>
       <span style={controlStyle}>
         <select
-          value={props.relief.emptyCells}
+          value={props.relief.reliefSource.emptyCells}
           onChange={(e) =>
             setReliefParams(props.relief.id, {
               emptyCells: e.target.value === 'top' ? 'top' : 'floor',
@@ -155,16 +159,14 @@ function BackgroundSelect(props: {
   );
 }
 
-function PolaritySelect(props: {
-  readonly relief: Extract<ReliefObject, { readonly depthMap: unknown }>;
-}): JSX.Element {
+function PolaritySelect(props: { readonly relief: HeightfieldReliefObject }): JSX.Element {
   const setReliefParams = useStore((s) => s.setReliefParams);
   return (
     <label style={rowStyle}>
       <span style={labelStyle}>Polarity</span>
       <span style={controlStyle}>
         <select
-          value={props.relief.depthMap.polarity}
+          value={props.relief.reliefSource.mapping.polarity}
           onChange={(event) =>
             setReliefParams(props.relief.id, {
               polarity: event.target.value === 'light-is-deep' ? 'light-is-deep' : 'light-is-high',

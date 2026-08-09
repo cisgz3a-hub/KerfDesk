@@ -58,6 +58,29 @@ describe('planRestPocketToolpaths', () => {
     }
   });
 
+  it('preserves 1% and 200% finishing stepovers instead of legacy clamp values', () => {
+    const contours = [square(0, 0, 100)];
+    const onePercent = planRestPocketToolpaths(contours, 30, 1, 1);
+    const formerTenPercent = planRestPocketToolpaths(contours, 30, 1, 10);
+    const twoHundredPercent = planRestPocketToolpaths(contours, 30, 1, 200);
+    const formerEightyFivePercent = planRestPocketToolpaths(contours, 30, 1, 85);
+
+    expect(onePercent.ok).toBe(true);
+    expect(formerTenPercent.ok).toBe(true);
+    expect(twoHundredPercent.ok).toBe(true);
+    expect(formerEightyFivePercent.ok).toBe(true);
+    if (
+      !onePercent.ok ||
+      !formerTenPercent.ok ||
+      !twoHundredPercent.ok ||
+      !formerEightyFivePercent.ok
+    ) {
+      return;
+    }
+    expect(onePercent.toolpaths.length).toBeGreaterThan(formerTenPercent.toolpaths.length);
+    expect(twoHundredPercent.toolpaths).not.toEqual(formerEightyFivePercent.toolpaths);
+  });
+
   it('refuses invalid tool ordering, open contours, and an oversized rougher', () => {
     expect(planRestPocketToolpaths([square(0, 0, 20)], 2, 2, 40)).toMatchObject({
       ok: false,

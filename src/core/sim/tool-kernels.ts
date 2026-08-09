@@ -26,6 +26,7 @@
 // behaviour and correct for a V-bit, so saved projects are unchanged.
 
 import { assertNever, type CncTool } from '../scene';
+import { CNC_MASK_EMISSION_XY_CLEARANCE_MM } from '../cnc/cnc-output-precision';
 import { vcarveIncludedAngleDeg } from '../cnc/vcarve-angle';
 import { conicalRadialEnvelope, radialEnvelopeHeightMm } from '../cnc/radial-envelope';
 
@@ -38,13 +39,26 @@ export type ToolKernelOffset = {
 export type ToolKernel = {
   readonly radiusCells: number;
   readonly offsets: ReadonlyArray<ToolKernelOffset>;
+  // Mask cells represent square areas, not point samples. These offsets cover
+  // every cell square intersected by the physical cutter plus the caller's
+  // path-location uncertainty; dz is taken at the nearest possible point.
+  readonly maskCellOffsets?: ReadonlyArray<ToolKernelOffset>;
+  // A finishing chord lies no farther than half a cell from one of its adjacent
+  // sampled endpoints. This wider XY-only envelope identifies endpoints that
+  // cannot be joined, while maskCellOffsets retains the tighter stationary Z
+  // constraint so safely reachable one-cell lobes are not discarded.
+  readonly maskSweepCellOffsets?: ReadonlyArray<ToolKernelOffset>;
 };
 
 // V-bits with a missing/degenerate angle fall back to this so the cone stays
 // a cone instead of dividing by tan(0).
 const FALLBACK_V_TIP_ANGLE_DEG = 60;
 
-export function kernelForTool(tool: CncTool, mmPerCell: number): ToolKernel {
+export function kernelForTool(
+  tool: CncTool,
+  mmPerCell: number,
+  maskPathUncertaintyMm = 0,
+): ToolKernel {
   const radiusMm = Math.max(0, tool.diameterMm / 2);
   const radiusCells = Math.max(0, Math.ceil(radiusMm / mmPerCell));
   const offsets: ToolKernelOffset[] = [];
@@ -55,7 +69,48 @@ export function kernelForTool(tool: CncTool, mmPerCell: number): ToolKernel {
       offsets.push({ dx, dy, dz: cuttingSurfaceDz(tool, dMm, radiusMm) });
     }
   }
-  return { radiusCells, offsets };
+  return {
+    radiusCells,
+    offsets,
+    maskCellOffsets: maskCellOffsets(
+      tool,
+      radiusMm,
+      mmPerCell,
+      maskPathUncertaintyMm + CNC_MASK_EMISSION_XY_CLEARANCE_MM,
+    ),
+    maskSweepCellOffsets: maskCellOffsets(
+      tool,
+      radiusMm,
+      mmPerCell,
+      mmPerCell / 2 + CNC_MASK_EMISSION_XY_CLEARANCE_MM,
+    ),
+  };
+}
+
+function maskCellOffsets(
+  tool: CncTool,
+  radiusMm: number,
+  mmPerCell: number,
+  centerClearanceMm: number,
+): ReadonlyArray<ToolKernelOffset> {
+  const halfCell = mmPerCell / 2;
+  const span = Math.ceil((radiusMm + centerClearanceMm + Math.SQRT2 * halfCell) / mmPerCell);
+  const tolerance = Number.EPSILON * Math.max(1, radiusMm, mmPerCell) * 16;
+  const offsets: ToolKernelOffset[] = [];
+  for (let dy = -span; dy <= span; dy += 1) {
+    for (let dx = -span; dx <= span; dx += 1) {
+      const nearestX = Math.max(0, Math.abs(dx) * mmPerCell - halfCell);
+      const nearestY = Math.max(0, Math.abs(dy) * mmPerCell - halfCell);
+      const nearestDistanceMm = Math.max(0, Math.hypot(nearestX, nearestY) - centerClearanceMm);
+      if (nearestDistanceMm > radiusMm + tolerance) continue;
+      offsets.push({
+        dx,
+        dy,
+        dz: cuttingSurfaceDz(tool, Math.min(radiusMm, nearestDistanceMm), radiusMm),
+      });
+    }
+  }
+  return offsets;
 }
 
 /**

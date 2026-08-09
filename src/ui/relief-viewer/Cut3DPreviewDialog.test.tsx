@@ -30,7 +30,48 @@ function grid() {
   return g;
 }
 
+function coarsenedGrid() {
+  const result = createRemovalGrid({
+    originX: 0,
+    originY: 0,
+    widthMm: 800,
+    heightMm: 1,
+    mmPerCell: 1,
+    requestedMmPerCell: 0.25,
+    resolutionReason: 'interactive-preview-cell-budget',
+  });
+  if (result.kind === 'error') throw new Error(result.reason);
+  return result.grid;
+}
+
 describe('Cut3DPreviewDialog', () => {
+  it('discloses the final bounded 3D mesh resolution', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <Cut3DPreviewDialog
+            grid={coarsenedGrid()}
+            mesh={null}
+            stockThicknessMm={6.35}
+            onClose={() => undefined}
+          />,
+        );
+      });
+
+      expect(host.querySelector('[role="status"]')?.textContent).toContain(
+        '3D cut preview uses 3 mm cells instead of the requested 0.25 mm cells',
+      );
+      expect(host.textContent).toContain('3D display mesh budget');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('renders the stock-sized dialog and falls back gracefully without WebGL', async () => {
     const onClose = vi.fn();
     const host = document.createElement('div');

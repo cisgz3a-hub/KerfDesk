@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   createLayer,
   createProject,
@@ -51,13 +52,17 @@ function mixedMalformedReliefProject(): Project {
     kind: 'relief',
     id: 'bad-relief',
     source: 'broken-depth.png',
-    depthMap: {
-      schemaVersion: 1,
-      width: 2,
-      height: 2,
-      bitDepth: 8,
+    reliefSource: {
+      ...testReliefHeightfield({
+        width: 2,
+        height: 2,
+        physicalWidthMm: 20,
+        physicalHeightMm: 20,
+        maxDepthMm: 3,
+        samplesU8: [0, 255, 128, 255],
+        provenance: { sourceName: 'broken-depth.png' },
+      }),
       samplesBase64: 'AA==',
-      polarity: 'light-is-high',
     },
     targetWidthMm: 20,
     reliefDepthMm: 3,

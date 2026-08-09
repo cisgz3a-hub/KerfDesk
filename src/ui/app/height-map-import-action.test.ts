@@ -1,33 +1,36 @@
 import fc from 'fast-check';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG, type SceneObject } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
-import { prepareDepthMapPngOffThread } from '../import/import-worker-client';
+import { prepareReliefHeightfieldPngOffThread } from '../import/import-worker-client';
+import { makePng, streamingBlob } from '../import/png-incremental-decoder.test-support';
 import { handleImportHeightMaps, importHeightMapFiles } from './height-map-import-action';
 
 vi.mock('../import/import-worker-client', () => ({
-  prepareDepthMapPngOffThread: vi.fn(),
+  prepareReliefHeightfieldPngOffThread: vi.fn(),
 }));
 
 const PREPARED = {
   kind: 'ok' as const,
-  depthMap: {
-    schemaVersion: 1 as const,
+  heightfield: testReliefHeightfield({
     width: 4,
     height: 2,
-    bitDepth: 8 as const,
-    samplesBase64: Buffer.from([0, 32, 64, 96, 128, 160, 192, 255]).toString('base64'),
-    polarity: 'light-is-high' as const,
-  },
+    physicalWidthMm: 100,
+    physicalHeightMm: 50,
+    maxDepthMm: 5,
+    samplesU8: [0, 32, 64, 96, 128, 160, 192, 255],
+    provenance: { sourceName: 'depth.png' },
+  }),
 };
 
 beforeEach(() => {
-  vi.mocked(prepareDepthMapPngOffThread).mockReset();
+  vi.mocked(prepareReliefHeightfieldPngOffThread).mockReset();
 });
 
 describe('importHeightMapFiles', () => {
   it('creates an aspect-correct durable relief with explicit safe defaults', async () => {
-    vi.mocked(prepareDepthMapPngOffThread).mockResolvedValue(PREPARED);
+    vi.mocked(prepareReliefHeightfieldPngOffThread).mockResolvedValue(PREPARED);
     const importObject = vi.fn();
     const pushToast = vi.fn();
 
@@ -37,14 +40,39 @@ describe('importHeightMapFiles', () => {
       pushToast,
     });
 
+    expect(prepareReliefHeightfieldPngOffThread).toHaveBeenCalledWith(
+      expect.any(File),
+      'depth.png',
+      100,
+      5,
+      expect.objectContaining({ onProgress: expect.any(Function) }),
+    );
     expect(importObject).toHaveBeenCalledOnce();
     expect(importObject.mock.calls[0]?.[0]).toMatchObject({
       kind: 'relief',
       source: 'depth.png',
-      depthMap: PREPARED.depthMap,
       targetWidthMm: 100,
       reliefDepthMm: 5,
       bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
+      reliefSource: {
+        kind: 'heightfield-v1',
+        schemaVersion: 1,
+        width: 4,
+        height: 2,
+        physicalWidthMm: 100,
+        physicalHeightMm: 50,
+        encoding: 'u16le-base64-v1',
+        samplesBase64: Buffer.from([
+          0, 0, 32, 32, 64, 64, 96, 96, 128, 128, 160, 160, 192, 192, 255, 255,
+        ]).toString('base64'),
+        mapping: { polarity: 'light-is-high', maxDepthMm: 5, aspect: 'preserve' },
+        provenance: {
+          sourceKind: 'depth-map',
+          sourceName: 'depth.png',
+          sourceBitDepth: 8,
+          sourcePolarity: 'light-is-high',
+        },
+      },
     });
     expect(pushToast).toHaveBeenCalledWith(expect.stringMatching(/light is high/i), 'success');
   });
@@ -55,13 +83,17 @@ describe('importHeightMapFiles', () => {
         fc.integer({ min: 1, max: 128 }),
         fc.integer({ min: 1, max: 128 }),
         async (width, height) => {
-          vi.mocked(prepareDepthMapPngOffThread).mockResolvedValueOnce({
+          vi.mocked(prepareReliefHeightfieldPngOffThread).mockResolvedValueOnce({
             kind: 'ok',
-            depthMap: {
-              ...PREPARED.depthMap,
+            heightfield: testReliefHeightfield({
               width,
               height,
-            },
+              physicalWidthMm: 100,
+              physicalHeightMm: (100 * height) / width,
+              maxDepthMm: 5,
+              samplesU8: new Array(width * height).fill(128),
+              provenance: { sourceName: 'depth.png' },
+            }),
           });
           const imported: SceneObject[] = [];
           await importHeightMapFiles([new File(['png'], 'depth.png')], {
@@ -81,7 +113,7 @@ describe('importHeightMapFiles', () => {
   });
 
   it('does not block storage in laser mode and discloses that output begins in CNC mode', async () => {
-    vi.mocked(prepareDepthMapPngOffThread).mockResolvedValue(PREPARED);
+    vi.mocked(prepareReliefHeightfieldPngOffThread).mockResolvedValue(PREPARED);
     const importObject = vi.fn();
     const pushToast = vi.fn();
 
@@ -97,7 +129,80 @@ describe('importHeightMapFiles', () => {
       'success',
     );
   });
+
+  it('falls back visibly to exact main-thread preparation when a worker cannot start', async () => {
+    vi.mocked(prepareReliefHeightfieldPngOffThread).mockReturnValue(null);
+    const importObject = vi.fn();
+    const pushToast = vi.fn();
+    const png = makePng({ width: 2, height: 1, colorType: 0, rows: [[0, 255]] });
+
+    await importHeightMapFiles([streamingFile(png, 'fallback.png')], {
+      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+      importObject,
+      pushToast,
+    });
+
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/background worker could not start.*main thread/i),
+      'warning',
+    );
+    expect(importObject).toHaveBeenCalledOnce();
+    expect(importObject.mock.calls[0]?.[0]).toMatchObject({
+      kind: 'relief',
+      source: 'fallback.png',
+      reliefSource: {
+        kind: 'heightfield-v1',
+        width: 2,
+        height: 1,
+        samplesBase64: 'AAD//w==',
+      },
+    });
+  });
+
+  it('reports worker cancellation as a warning and leaves the scene unchanged', async () => {
+    const cancelled = new Error('cancelled');
+    cancelled.name = 'AbortError';
+    vi.mocked(prepareReliefHeightfieldPngOffThread).mockRejectedValue(cancelled);
+    const importObject = vi.fn();
+    const pushToast = vi.fn();
+
+    await importHeightMapFiles([new File(['png'], 'cancelled.png')], {
+      project: createProject(),
+      importObject,
+      pushToast,
+    });
+
+    expect(importObject).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith('cancelled.png: import cancelled.', 'warning');
+  });
+
+  it('reports a worker failure as an error and leaves the scene unchanged', async () => {
+    vi.mocked(prepareReliefHeightfieldPngOffThread).mockRejectedValue(
+      new Error('worker terminated unexpectedly'),
+    );
+    const importObject = vi.fn();
+    const pushToast = vi.fn();
+
+    await importHeightMapFiles([new File(['png'], 'failed.png')], {
+      project: createProject(),
+      importObject,
+      pushToast,
+    });
+
+    expect(importObject).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith('failed.png: worker terminated unexpectedly', 'error');
+  });
 });
+
+function streamingFile(bytes: Uint8Array, name: string): File {
+  return {
+    ...streamingBlob(bytes),
+    name,
+    type: 'image/png',
+    lastModified: 0,
+    webkitRelativePath: '',
+  } as File;
+}
 
 describe('handleImportHeightMaps', () => {
   it('reports a picker failure without leaking an unhandled rejection', async () => {

@@ -25,10 +25,13 @@ import { marchingSquares } from './marching-squares';
 // Material intentionally left everywhere for the finishing pass (H.8).
 export const DEFAULT_RELIEF_ALLOWANCE_MM = 0.5;
 const LEVEL_EPS = 1e-6;
-const MIN_STEPOVER_PERCENT = 10;
-const MAX_STEPOVER_PERCENT = 85;
 const MAX_RINGS_PER_LEVEL = 4096;
 const MIN_RING_POINTS = 3;
+// Exhausting the current 16-case marching-squares table, the farthest point on
+// a produced segment from its nearest selected center occurs in cases 7/11/13/14:
+// sqrt((3/4)^2 + (1/4)^2) cells. The mask kernel expands by this amount so the
+// whole dual-grid contour, rather than only its sampled centers, is proven safe.
+const MARCHING_SQUARES_CENTER_CLEARANCE_CELLS = Math.sqrt(10) / 4;
 
 export type ReliefRoughingOptions = {
   readonly tool: CncTool;
@@ -44,6 +47,10 @@ export type ReliefRoughingLadder = {
   // rather than on running out of interior: that level is under-cleared and
   // the finishing skim meets stock it expected gone. Advisory only (rule 7).
   readonly offsetFailed: boolean;
+  // True when a level still had an interior after the bounded ring budget.
+  // The emitted passes remain usable, but stock the ladder should have cleared
+  // can remain. Advisory only; callers surface the existing pass-limit warning.
+  readonly passLimited: boolean;
 };
 
 export function reliefRoughingPasses(
@@ -60,9 +67,13 @@ export function reliefRoughingLadder(
   options: ReliefRoughingOptions,
 ): ReliefRoughingLadder {
   if (!(options.reliefDepthMm > 0) || !(options.tool.diameterMm > 0)) {
-    return { passes: [], offsetFailed: false };
+    return { passes: [], offsetFailed: false, passLimited: false };
   }
-  const kernel: ToolKernel = kernelForTool(options.tool, map.mmPerCell);
+  const kernel: ToolKernel = kernelForTool(
+    options.tool,
+    map.mmPerCell,
+    MARCHING_SQUARES_CENTER_CLEARANCE_CELLS * map.mmPerCell,
+  );
   const dilated = dilateHeightmapByTool(
     map,
     kernel,
@@ -71,18 +82,18 @@ export function reliefRoughingLadder(
   const stepMm = stepoverMm(options.stepoverPercent, options.tool.diameterMm);
   const passes: CncContourPass[] = [];
   let offsetFailed = false;
+  let passLimited = false;
   for (const level of zPassDepths(options.reliefDepthMm, options.depthPerPassMm)) {
     const contours = levelContoursMm(map, dilated, level);
-    if (appendLevelRings(passes, contours, level, stepMm)) offsetFailed = true;
+    const completion = appendLevelRings(passes, contours, level, stepMm);
+    if (completion.offsetFailed) offsetFailed = true;
+    if (completion.passLimited) passLimited = true;
   }
-  return { passes, offsetFailed };
+  return { passes, offsetFailed, passLimited };
 }
 
 function stepoverMm(stepoverPercent: number, toolDiameterMm: number): number {
-  const clamped = Number.isFinite(stepoverPercent)
-    ? Math.min(MAX_STEPOVER_PERCENT, Math.max(MIN_STEPOVER_PERCENT, stepoverPercent))
-    : MIN_STEPOVER_PERCENT;
-  return (clamped / 100) * toolDiameterMm;
+  return (stepoverPercent / 100) * toolDiameterMm;
 }
 
 // Region at a level: dilated target at or below the level (the tool must
@@ -95,7 +106,7 @@ function levelContoursMm(
   const mask = new Uint8Array(map.widthCells * map.heightCells);
   let any = false;
   for (let i = 0; i < mask.length; i += 1) {
-    if ((dilated[i] ?? 0) <= levelZ + LEVEL_EPS) {
+    if (map.inclusion?.[i] !== 0 && (dilated[i] ?? 0) <= levelZ + LEVEL_EPS) {
       mask[i] = 1;
       any = true;
     }
@@ -114,14 +125,14 @@ function appendLevelRings(
   contours: ReadonlyArray<Polyline>,
   levelZ: number,
   stepMm: number,
-): boolean {
+): { readonly offsetFailed: boolean; readonly passLimited: boolean } {
   const usable = contours.filter((c) => c.points.length >= MIN_RING_POINTS);
-  if (usable.length === 0) return false;
-  // Ring 0 = the dual-grid region boundary. Its vertices are marching-squares
-  // edge midpoints rather than evaluated dilation samples, so pointwise cutter
-  // clearance is outside the sampled-grid proof (ADR-289). Deeper rings shrink
-  // inward by the stepover until they vanish. Step 0's inset is 0, which the
-  // offset engine returns unchanged, so ring 0 is still exactly `usable`.
+  if (usable.length === 0) return { offsetFailed: false, passLimited: false };
+  // Ring 0 = the dual-grid region boundary. The mask-aware dilation expands its
+  // excluded-cell envelope by the exact worst displacement of this marching-
+  // squares table, so every boundary segment remains inside the mask proof.
+  // Deeper rings shrink inward by the stepover until they vanish. Step 0's inset
+  // is 0, which the offset engine returns unchanged.
   const ladder = buildOffsetLadder(usable, MAX_RINGS_PER_LEVEL, (step) => step * stepMm);
   for (const ring of ladder.rings) {
     for (const polyline of ring) {
@@ -129,7 +140,7 @@ function appendLevelRings(
       passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
     }
   }
-  return ladder.offsetFailed;
+  return { offsetFailed: ladder.offsetFailed, passLimited: ladder.capped };
 }
 
 function closeRing(polyline: Polyline): ReadonlyArray<{ x: number; y: number }> {
