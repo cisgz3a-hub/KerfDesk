@@ -36,7 +36,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'file.import-height-map': {
     family: 'file',
-    tooltip: 'Import an 8-bit grayscale PNG as an explicit top-down CNC relief height map.',
+    tooltip:
+      'Import a qualified non-interlaced grayscale PNG (8-bit, 16-bit, or 8-bit with alpha) as an explicit top-down CNC relief height map.',
   },
   'file.open-gcode': {
     family: 'file',
