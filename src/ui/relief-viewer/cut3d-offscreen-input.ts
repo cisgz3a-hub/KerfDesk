@@ -1,4 +1,5 @@
 import type { Cut3DOffscreenControl } from './cut3d-offscreen-worker-protocol';
+import { installViewer3DKeyboardInput } from './viewer3d-keyboard-input';
 
 export type Cut3DViewportSize = {
   readonly widthPx: number;
@@ -30,6 +31,7 @@ export function createCut3DOffscreenInput(
   let lastX = 0;
   let lastY = 0;
   let observer: ResizeObserver | null = null;
+  let disposeKeyboard: (() => void) | null = null;
   let isStarted = false;
 
   const handlePointerDown = (event: PointerEvent): void => {
@@ -73,6 +75,7 @@ export function createCut3DOffscreenInput(
       canvas.addEventListener('pointerup', handlePointerEnd);
       canvas.addEventListener('pointercancel', handlePointerEnd);
       canvas.addEventListener('wheel', handleWheel, { passive: false });
+      disposeKeyboard = installViewer3DKeyboardInput(canvas, onControl);
       canvas.addEventListener('contextmenu', preventContextMenu);
       window.addEventListener('resize', sendCurrentSize);
       if (typeof ResizeObserver !== 'undefined') {
@@ -93,6 +96,8 @@ export function createCut3DOffscreenInput(
       canvas.removeEventListener('pointerup', handlePointerEnd);
       canvas.removeEventListener('pointercancel', handlePointerEnd);
       canvas.removeEventListener('wheel', handleWheel);
+      disposeKeyboard?.();
+      disposeKeyboard = null;
       canvas.removeEventListener('contextmenu', preventContextMenu);
     },
   };

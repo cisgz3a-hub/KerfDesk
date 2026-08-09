@@ -27,6 +27,7 @@ import {
   type ViewerToolpathOverlay,
 } from '../cnc-viewer3d';
 import { applySceneLighting } from './scene-lighting';
+import { installViewer3DThreeKeyboard } from './viewer3d-three-keyboard';
 
 export type { ViewerSurfaceMesh, ViewerToolpathOverlay };
 
@@ -83,6 +84,7 @@ export async function createReliefThreeScene(
     stockThicknessMm,
     ...(toolpath === undefined ? {} : { toolpath }),
   });
+  const disposeKeyboard = installViewer3DThreeKeyboard(canvas, camera, controls);
   scene.add(content.object);
   render();
 
@@ -100,6 +102,7 @@ export async function createReliefThreeScene(
       sectionSpanMm: mesh.heightMm,
       content,
       render,
+      disposeKeyboard,
       disposeLighting: lighting.dispose,
     }),
   };

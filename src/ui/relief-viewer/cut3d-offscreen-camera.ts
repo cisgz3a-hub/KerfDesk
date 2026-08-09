@@ -1,4 +1,5 @@
 import type { Cut3DOffscreenControl } from './cut3d-offscreen-worker-protocol';
+import { viewer3DZoomScale } from './viewer3d-keyboard-controls';
 
 export type Cut3DCameraState = {
   readonly targetX: number;
@@ -20,7 +21,6 @@ export const CUT3D_CAMERA_FOV_DEG = 40;
 const ORBIT_RADIUS_FACTOR = 1.6;
 const THICKNESS_FRAMING_FACTOR = 4;
 const ROTATION_RADIANS_PER_PIXEL = 0.005;
-const ZOOM_EXPONENT_PER_PIXEL = 0.001;
 const PITCH_LIMIT_RAD = Math.PI / 2 - 0.01;
 const MIN_RADIUS_FACTOR = 0.05;
 const MAX_RADIUS_FACTOR = 20;
@@ -69,7 +69,7 @@ export function applyCut3DCameraControl(
     return {
       ...state,
       radiusMm: clamp(
-        state.radiusMm * Math.exp(control.deltaY * ZOOM_EXPONENT_PER_PIXEL),
+        state.radiusMm * viewer3DZoomScale(control.deltaY),
         state.minRadiusMm,
         state.maxRadiusMm,
       ),
