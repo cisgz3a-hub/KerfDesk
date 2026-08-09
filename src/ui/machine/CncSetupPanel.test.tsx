@@ -29,7 +29,7 @@ afterEach(async () => {
   resetStore();
 });
 
-describe('CncSetupPanel stock location', () => {
+describe('CncSetupPanel', () => {
   it('leaves stock dimensions to the canvas HUD instead of duplicating them in the rail', async () => {
     useStore.getState().setMachineKind('cnc');
     host = document.createElement('div');
