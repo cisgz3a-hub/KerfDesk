@@ -21,6 +21,7 @@ import {
 import { compileCncJob } from './compile-cnc-job';
 
 type MeshReliefObject = Exclude<ReliefObject, { readonly depthMap: unknown }>;
+type DepthMapReliefObject = Extract<ReliefObject, { readonly depthMap: unknown }>;
 
 const RELIEF_COLOR = '#a0522d';
 const SMALL_BALL_NOSE: CncTool = {
@@ -51,7 +52,7 @@ function relief(overrides: Partial<MeshReliefObject> = {}): MeshReliefObject {
   };
 }
 
-function depthMapRelief(): ReliefObject {
+function depthMapRelief(overrides: Partial<DepthMapReliefObject> = {}): DepthMapReliefObject {
   return {
     kind: 'relief',
     id: 'D1',
@@ -69,6 +70,7 @@ function depthMapRelief(): ReliefObject {
     color: RELIEF_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 12, maxY: 12 },
     transform: IDENTITY_TRANSFORM,
+    ...overrides,
   };
 }
 
@@ -112,6 +114,35 @@ describe('relief finishing compile (H.8)', () => {
 
     expect(groups.map((group) => group.cutType)).toEqual(['relief-rough', 'relief-finish']);
     expect(groups.every((group) => group.passes.length > 0)).toBe(true);
+  });
+
+  it('keeps a selected finishing skim when the relief is shallower than roughing allowance', () => {
+    const object = depthMapRelief({
+      reliefDepthMm: 0.1,
+      depthMap: {
+        schemaVersion: 1,
+        width: 2,
+        height: 2,
+        bitDepth: 8,
+        samplesBase64: Buffer.from([0, 0, 0, 0]).toString('base64'),
+        polarity: 'light-is-high',
+      },
+    });
+    expect(compile({}, object).groups).toHaveLength(0);
+    const job = compile({ reliefFinishToolId: 'bn-3175' }, object);
+    const groups = job.groups.filter((group) => group.kind === 'cnc');
+
+    expect(groups.map((group) => group.cutType)).toEqual(['relief-finish']);
+    const finish = groups[0];
+    if (finish?.kind !== 'cnc') throw new Error('finish group missing');
+    expect(finish.toolId).toBe('bn-3175');
+    expect(finish.layerPrimaryToolId).toBe(DEFAULT_CNC_MACHINE_CONFIG.toolId);
+    expect(finish.passes.length).toBeGreaterThan(0);
+    expect(finish.passes.every((pass) => pass.kind === 'path3d')).toBe(true);
+    for (const pass of finish.passes) {
+      if (pass.kind !== 'path3d') continue;
+      for (const point of pass.points) expect(point.z).toBeCloseTo(-0.1, 6);
+    }
   });
 
   it('adds a relief-finish group with the finishing bit after roughing', () => {
