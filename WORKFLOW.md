@@ -4232,9 +4232,9 @@ and lifts the command's CNC-only gate.)*
 > **Planned - not current UI.** P2R.1a plus ADR-294/295/296/297/298/299 supply schema-v4/U16LE
 > storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha import,
 > simple transparency masks, exact input-endpoint mapping, exact inclusion-threshold and
-> outside-mask-meaning controls, exact partial-edge geometry, and the existing CAM/preview substrate. Large-project
-> atomic autosave/recovery, gamma, and the creation modes and remaining controls below stay
-> planned; use F-CNC46's narrower **Import Height Map...** flow today.
+> outside-mask-meaning controls, exact partial-edge geometry, and the existing CAM/preview
+> substrate. Large-project atomic autosave/recovery, gamma, and the creation modes and remaining
+> controls below stay planned; use F-CNC46's narrower **Import Height Map...** flow today.
 
 #### Success
 1. Choose **Create Relief...** and select the source meaning before import:
