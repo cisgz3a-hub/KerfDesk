@@ -201,6 +201,64 @@ describe('setReliefParams', () => {
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
 
+  it.each([
+    ['excluded', 'stock-top'],
+    ['excluded', 'relief-floor'],
+    ['stock-top', 'excluded'],
+  ] as const)(
+    'updates only outside-mask meaning from %s to %s for an imported masked heightfield',
+    (initialOutsideMask, outsideMask) => {
+      const sourceWidth = 5;
+      const sourceHeight = 11;
+      const sampleCount = sourceWidth * sourceHeight;
+      const field = testReliefHeightfield({
+        width: sourceWidth,
+        height: sourceHeight,
+        physicalWidthMm: 100,
+        physicalHeightMm: 220,
+        maxDepthMm: 5,
+        samplesU8: Array.from({ length: sampleCount }, (_, index) => index),
+        inclusionMask: Array.from({ length: sampleCount }, (_, index) =>
+          index % 5 === 0 ? 0 : 255,
+        ),
+        mapping: {
+          polarity: 'light-is-deep',
+          curve: { kind: 'gamma-v1', gamma: 2.25 },
+          crop: { kind: 'normalized-v1', x: 0.1, y: 0.2, width: 0.8, height: 0.7 },
+          aspect: 'stretch',
+          inclusionThreshold: 128,
+          outsideMask: initialOutsideMask,
+        },
+        provenance: { sourceName: 'masked-source.png' },
+        revision: 4,
+      });
+      installHeightfieldRelief(field);
+      const before = storedRelief();
+
+      useStore.getState().setReliefParams('R1', { outsideMask });
+
+      const updated = storedRelief();
+      expect(updated.reliefSource.kind).toBe('heightfield-v1');
+      if (updated.reliefSource.kind !== 'heightfield-v1') return;
+      expect(updated).toEqual({
+        ...before,
+        reliefSource: {
+          ...field,
+          mapping: { ...field.mapping, outsideMask },
+          revision: 5,
+        },
+      });
+      expect(updated.reliefSource.inclusionMask).toBe(field.inclusionMask);
+      expect(updated.reliefSource.provenance).toBe(field.provenance);
+      expect(updated.reliefSource.mapping.curve).toBe(field.mapping.curve);
+      expect(updated.reliefSource.mapping.crop).toBe(field.mapping.crop);
+      expect(updated.bounds).toBe(before.bounds);
+      expect(updated.transform).toBe(before.transform);
+      expect(useStore.getState()).toMatchObject({ dirty: true });
+      expect(useStore.getState().undoStack).toHaveLength(1);
+    },
+  );
+
   it('retains a large finite gamma exactly and ignores invalid gamma values', () => {
     const largeGamma = Number.MAX_VALUE;
     installHeightfieldRelief(testReliefHeightfieldFixture());
@@ -227,20 +285,33 @@ describe('setReliefParams', () => {
     expect(unchanged.reliefSource.revision).toBe(acceptedRevision);
   });
 
-  it('does nothing when gamma is unchanged or the relief uses a legacy mesh', () => {
+  it('does nothing when heightfield-only mapping is unchanged or the relief is a mesh', () => {
     installHeightfieldRelief(testReliefHeightfieldFixture());
     const beforeHeightfield = useStore.getState().project;
 
     useStore.getState().setReliefParams('R1', { gamma: 1 });
+    useStore.getState().setReliefParams('R1', { outsideMask: 'excluded' });
 
     expect(useStore.getState().project).toBe(beforeHeightfield);
     expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
     installReliefProject();
     const beforeMesh = useStore.getState().project;
 
-    useStore.getState().setReliefParams('R1', { gamma: 2 });
+    useStore.getState().setReliefParams('R1', { gamma: 2, outsideMask: 'stock-top' });
 
     expect(useStore.getState().project).toBe(beforeMesh);
+    expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
+  });
+
+  it('ignores outside-mask values outside the exact persisted enum', () => {
+    installHeightfieldRelief(testReliefHeightfieldFixture());
+    const before = useStore.getState().project;
+
+    for (const outsideMask of ['floor', 'top', 'stock-top ', null, 0]) {
+      Reflect.apply(useStore.getState().setReliefParams, undefined, ['R1', { outsideMask }]);
+    }
+
+    expect(useStore.getState().project).toBe(before);
     expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
   });
 

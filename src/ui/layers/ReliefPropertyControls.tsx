@@ -2,6 +2,7 @@ import type { ReliefObject } from '../../core/scene';
 import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
 import { NumberField } from '../common/NumberField';
 import { useStore } from '../state';
+import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 /** Renders mesh or heightfield controls using parent-resolved machine-space width and scale. */
@@ -37,6 +38,7 @@ export function ReliefPropertyControls(props: {
         <>
           <PolaritySelect relief={props.relief} />
           <GammaField key={`${props.relief.id}:gamma`} relief={props.relief} />
+          <ReliefMaskOutsideMeaningControl relief={props.relief} />
         </>
       )}
     </>
