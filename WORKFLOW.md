@@ -4097,10 +4097,11 @@ and lifts the command's CNC-only gate.)*
    target preview. Outside-mask meaning is explicit: **stock top**, **relief
    floor**, or **excluded from carving**.
 7. **Create** adds a one-sided top-down relief whose canonical editable arm uses
-   row-major U16 samples (`65535` stock top, `0` deepest), optional U8 inclusion
-   mask, mapping/provenance/revision, and digest. Preview, editing, CAM, simulation,
-   save, and output consume that same field rather than separately reinterpreting
-   the source image.
+   row-major U16 scalar codes, optional U8 inclusion mask, mapping/provenance/revision,
+   and digest. Stored source codes remain lossless; the explicit mapping resolves them
+   to canonical height codes (`65535` stock top, `0` deepest). Preview, editing, CAM,
+   simulation, save, and output consume that same field and mapping rather than
+   separately reinterpreting the source image.
 
 #### Error - no trustworthy scalar field can be produced
 1. Invalid PNG structure/CRC, unsupported or inconsistent sample layout, unsafe
