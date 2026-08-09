@@ -118,6 +118,12 @@ describe('SelectedReliefProperties', () => {
       expect(depth.max).toBe('');
       expect(host.textContent).toContain('model.stl');
       expect(host.querySelector('input[aria-label="Relief height-map gamma"]')).toBeNull();
+      const sourceMeaning = host.querySelector('[aria-label="Relief declared source meaning"]');
+      expect(sourceMeaning?.textContent).toContain('STL top projection');
+      expect(sourceMeaning?.textContent).toContain(
+        'Top projection only; undercuts are not represented.',
+      );
+      expect(sourceMeaning?.querySelector('input, select, button')).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -398,10 +404,20 @@ describe('SelectedReliefProperties', () => {
 
   it('shows depth-map precision, polarity, input levels, then an uncapped gamma field', async () => {
     installProject('cnc', depthRelief());
+    const beforeProject = useStore.getState().project;
+    const beforeUndoStack = useStore.getState().undoStack;
+    const beforeDirty = useStore.getState().dirty;
     const { host, root } = await render();
     try {
       expect(host.textContent).toContain('2 x 1, canonical 16-bit (source 8-bit)');
       expect(host.querySelector('select[aria-label="Relief background"]')).toBeNull();
+      const sourceMeaning = host.querySelector('[aria-label="Relief declared source meaning"]');
+      expect(sourceMeaning?.textContent).toContain('Depth map');
+      expect(sourceMeaning?.textContent).toContain('Declared scalar depth data.');
+      expect(sourceMeaning?.querySelector('input, select, button')).toBeNull();
+      expect(useStore.getState().project).toBe(beforeProject);
+      expect(useStore.getState().undoStack).toBe(beforeUndoStack);
+      expect(useStore.getState().dirty).toBe(beforeDirty);
       const select = host.querySelector('select[aria-label="Relief height-map polarity"]');
       if (!(select instanceof HTMLSelectElement)) throw new Error('polarity select missing');
       const levels = host.querySelector('[aria-label="Relief input levels"]');

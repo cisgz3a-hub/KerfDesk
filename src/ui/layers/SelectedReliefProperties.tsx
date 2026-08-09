@@ -12,6 +12,7 @@ import { machineKindOf, type ReliefObject } from '../../core/scene';
 import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
 import { ReliefPropertyControls } from './ReliefPropertyControls';
+import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
 
@@ -35,6 +36,13 @@ export function SelectedReliefProperties(): JSX.Element | null {
       <p style={metaStyle}>
         {relief.source} — {reliefMeta(relief)}
       </p>
+      <ReliefSourceMeaning
+        sourceKind={
+          relief.reliefSource.kind === 'legacy-mesh'
+            ? 'stl-top-projection'
+            : relief.reliefSource.provenance.sourceKind
+        }
+      />
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
