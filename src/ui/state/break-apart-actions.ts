@@ -106,6 +106,7 @@ function splitPaths(paths: ReadonlyArray<ColoredPath>): ReadonlyArray<ColoredPat
   return paths.flatMap((path) =>
     path.polylines.map((polyline) => ({
       color: path.color,
+      ...(path.strokeWidthMm === undefined ? {} : { strokeWidthMm: path.strokeWidthMm }),
       polylines: [polyline],
     })),
   );

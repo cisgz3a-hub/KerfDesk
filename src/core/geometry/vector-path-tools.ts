@@ -63,6 +63,7 @@ export function materializeVectorObject(object: VectorSceneObject, id = object.i
   const paths = object.paths.map((path) => ({
     color: path.color,
     ...(path.operationIds === undefined ? {} : { operationIds: path.operationIds }),
+    ...materializedStrokeWidth(path, object.transform),
     polylines: path.polylines.map((polyline) => materializePolyline(polyline, object.transform)),
   }));
   return {
@@ -154,6 +155,14 @@ function materializePolyline(polyline: Polyline, transform: SceneObject['transfo
     closed: polyline.closed,
     points: polyline.points.map((point) => cleanPoint(applyTransform(point, transform))),
   };
+}
+
+function materializedStrokeWidth(
+  path: ColoredPath,
+  transform: SceneObject['transform'],
+): Pick<ColoredPath, 'strokeWidthMm'> {
+  if (path.strokeWidthMm === undefined || transform.scaleX !== transform.scaleY) return {};
+  return { strokeWidthMm: path.strokeWidthMm * Math.abs(transform.scaleX) };
 }
 
 function displaySource(object: VectorSceneObject): string {
