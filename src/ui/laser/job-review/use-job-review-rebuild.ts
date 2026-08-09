@@ -10,6 +10,10 @@ import { useJobReviewStore } from './job-review-store';
 
 const REBUILD_DEBOUNCE_MS = 250;
 
+/**
+ * Debounces compile-relevant store changes and returns an immediate rebuild callback.
+ * The callback cancels any pending debounce so explicit approval produces exactly one signal.
+ */
 export function useJobReviewRebuildTrigger(): () => void {
   const timerRef = useRef<number | null>(null);
   const requestRebuildNow = useCallback((): void => {

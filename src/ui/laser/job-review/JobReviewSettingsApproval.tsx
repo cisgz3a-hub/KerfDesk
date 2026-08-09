@@ -3,6 +3,10 @@ import type { Layer, LayerOperationSettings } from '../../../core/scene';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
 
+/**
+ * Tracks the editable Job Review values against their last approved main-store state.
+ * `onApprove` runs only for changed values so the caller can refresh the exact prepared job.
+ */
 export function JobReviewSettingsApproval(props: { readonly onApprove: () => void }): JSX.Element {
   const signature = useStore((state) => settingsSignature(state.project.scene.layers));
   const [approvedSignature, setApprovedSignature] = useState(signature);
