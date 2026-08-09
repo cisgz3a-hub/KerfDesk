@@ -4140,9 +4140,9 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-293/294/295/296/297/298/299 supply schema-v4/U16LE
+> **Planned - not current UI.** P2R.1a plus ADR-293/294/295/296/297/298/299/300 supply schema-v4/U16LE
 > storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha import, simple transparency
-> masks, non-destructive manual gamma/input-endpoint mapping, persisted-threshold outside-mask meaning, atomic large-project autosave/recovery, and the existing
+> masks, non-destructive manual gamma/input-endpoint mapping, editable persisted threshold/outside-mask meaning, atomic large-project autosave/recovery, and the existing
 > CAM/preview substrate. The creation modes and remaining controls below stay planned; use
 > F-CNC46's narrower **Import Height Map...** flow today.
 
