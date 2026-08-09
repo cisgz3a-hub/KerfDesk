@@ -16940,3 +16940,87 @@ the current P2R.1 surface.
 - ADR-291, P2R.1 non-destructive mapping and evidence boundaries.
 - ADR-292, schema-v4 canonical heightfield and `gamma-v1` mapping contract.
 - ADR-296, the latest qualified scalar-plus-mask import slice.
+
+## ADR-298 - Relief properties exposes outside-mask meaning at the persisted threshold (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a mask-mapping slice; threshold editing, mask editing, 16-bit alpha, and physical qualification stay open
+
+### Context
+
+ADR-292 already persists an optional exact U8 inclusion mask, integer threshold, and one of three
+meanings for below-threshold cells: `excluded`, `stock-top`, or `relief-floor`. ADR-295 and ADR-296
+now import qualified transparency into that mask, with qualified import initializing the threshold
+to `255` and the outside meaning to `excluded`. Valid project data can retain another threshold in
+the already-supported `1..255` range. Relief properties exposes neither that stored threshold nor
+the outside meaning, so the current surface can hide material mapping facts.
+
+The three meanings are already validated, persisted, and consumed by the common heightfield
+materializer. Exposing only that enum is a smaller truthful boundary than implying that threshold,
+mask painting, or 16-bit alpha support exists. It adds no numeric range, cap, clamp, ordering rule,
+warning, confirmation, or Start guard.
+
+### Decision
+
+1. **Show the control only when a canonical mask exists.** A `heightfield-v1` relief with an
+   `inclusionMask` shows **Mask below N** after Gamma, where `N` is the actual persisted threshold,
+   including when every stored mask byte is `255`. A canonical field without a mask and every
+   legacy mesh relief keep their existing properties surface unchanged. The threshold is read-only
+   in this slice; qualified imports initialize it to `255`, while a valid loaded project displays
+   its exact stored value rather than a hard-coded import default.
+2. **Expose exactly the three persisted meanings.** The selector offers **Excluded from carving**,
+   **Keep at stock top**, and **Carve to relief floor**. It does not edit the threshold, rewrite
+   mask bytes, composite alpha, infer source intent, or claim a full mask editor.
+3. **Change mapping state only.** A distinct selection updates only `mapping.outsideMask` and
+   advances the heightfield revision once. Samples, mask bytes, digest, provenance, physical and
+   pixel dimensions, bounds, transform, input levels, gamma, polarity, maximum depth, crop, aspect,
+   threshold, and `heightfield-map-v1` remain unchanged. A same-value patch and any legacy-mesh
+   patch are identity operations with no dirty or undo state.
+4. **Reuse the existing materialization semantics.** Below-threshold cells are omitted from CAM for
+   `excluded`, included at `Z = 0` for `stock-top`, or included at the declared maximum depth for
+   `relief-floor`. Preview, CAM, simulation, persistence, and output already consume this mapping;
+   this decision does not revise the schema, digest, worker protocol, materializer, mask-safety
+   geometry, CAM algorithms, or G-code metadata.
+5. **Keep the choice nonblocking and explicit.** A selection commits through the existing project
+   undo lifecycle. It adds no confirmation, warning, delay, Job Review item, Frame effect, or Start
+   effect. Frame remains the only ordinary Start guard. The operator's explicit mapping choice can
+   materially change which source regions are carved, and target preview remains the software view
+   of that chosen meaning.
+6. **Keep the evidence boundary narrow.** Tests can prove exact state identity, project
+   persistence, deterministic target materialization, and unchanged conservative excluded-mask
+   geometry. They do not prove that a chosen outside meaning is appropriate for a photograph,
+   physically safe for a particular setup, controller-accurate, or capable of a desired finish.
+   Threshold controls, mask painting, 16-bit alpha, histogram/cross-section views, controller
+   tracking, air cuts, and material coupons remain separate work.
+
+### Consequences
+
+- Operators can choose the already-durable treatment of transparent or partially covered source
+  cells without changing the source mask or its digest.
+- Qualified imports still initialize the threshold to exactly `255`; valid loaded non-default
+  thresholds remain exact and visible. This slice neither discards intermediate U8 alpha nor
+  exposes a misleading threshold or mask-editing surface.
+- Projects remain schema v4 and use the same `heightfield-map-v1` materialization. Saving and
+  reopening a non-default outside meaning preserves the enum without changing source content.
+- Full P2R.1 mask control remains incomplete: threshold editing, mask authoring, 16-bit alpha, and
+  source-mode-specific defaults are still planned.
+
+### Verification
+
+- State tests pin all three exact enum values, same-value and mesh no-ops, one revision increment,
+  and identity of samples, mask, digest, provenance, dimensions, bounds, transform, and every other
+  mapping field.
+- UI tests pin mask-present visibility, mask-absent and mesh omission, the actual persisted
+  threshold including a non-default value, exact option copy, selection, and ordering after Gamma.
+- Existing project round-trip and materialization tests continue to pin non-default outside meaning,
+  threshold behavior, and the distinct excluded/stock-top/relief-floor surfaces.
+- TypeScript, lint, formatting, focused UI/state/project/materialization and mask-safety tests, and
+  release checks are required before publication. Perceptual comparison, packaged Electron,
+  controller behavior, hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, exact U8 mask, threshold, and outside-meaning product contract.
+- ADR-292, schema-v4 canonical field and shared materialization contract.
+- ADR-296, exact grayscale-alpha import into the existing U8 mask.
+- ADR-297, the preceding non-destructive gamma-control slice.
