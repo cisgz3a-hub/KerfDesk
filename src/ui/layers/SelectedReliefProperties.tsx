@@ -10,6 +10,7 @@ import { machineKindOf, type ReliefObject } from '../../core/scene';
 import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
 import { ReliefPropertyControls } from './ReliefPropertyControls';
+import { ReliefRecordedSourceDetails } from './ReliefRecordedSourceDetails';
 import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
@@ -40,6 +41,9 @@ export function SelectedReliefProperties(): JSX.Element | null {
             : relief.reliefSource.provenance.sourceKind
         }
       />
+      {relief.reliefSource.kind === 'heightfield-v1' ? (
+        <ReliefRecordedSourceDetails provenance={relief.reliefSource.provenance} />
+      ) : null}
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
