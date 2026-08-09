@@ -68,13 +68,16 @@ export function compileReliefGroupsForLayer(
     const failure = appendReliefPasses(passes, relief, settings, device, tool);
     if (failure !== null) return failure;
   }
-  if (passes.length === 0) return { kind: 'compiled', groups: [] };
-  const roughing = reliefGroup(layer, settings, device, config, tool, 'relief-rough', passes);
   const finishing = reliefFinishingGroup(reliefs, layer, settings, device, config);
   if (finishing.kind === 'relief-materialization-failed') return finishing;
+  const groups: CncGroup[] = [];
+  if (passes.length > 0) {
+    groups.push(reliefGroup(layer, settings, device, config, tool, 'relief-rough', passes));
+  }
+  if (finishing.group !== null) groups.push(finishing.group);
   return {
     kind: 'compiled',
-    groups: finishing.group === null ? [roughing] : [roughing, finishing.group],
+    groups,
   };
 }
 

@@ -33,9 +33,10 @@ export type GcodeMetadata = {
  * rescue stage, ADR-285's certified vector-medial V-carve planner, and
  * ADR-286's non-zero resolution of a text object's own glyphs, ADR-287's
  * flat-tip V-carve radial envelope, and ADR-289's transformed-relief
- * machine-space cutter envelope.
+ * machine-space cutter envelope, plus finish-only relief output when the
+ * roughing allowance leaves no roughing passes.
  */
-export const EMITTER_REVISION = 'adr-289-relief-machine-space-envelope';
+export const EMITTER_REVISION = 'relief-finish-without-rough-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
