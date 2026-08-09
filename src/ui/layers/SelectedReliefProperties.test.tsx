@@ -396,7 +396,7 @@ describe('SelectedReliefProperties', () => {
     }
   });
 
-  it('shows depth-map precision, polarity, then an uncapped gamma field', async () => {
+  it('shows depth-map precision, polarity, input levels, then an uncapped gamma field', async () => {
     installProject('cnc', depthRelief());
     const { host, root } = await render();
     try {
@@ -404,12 +404,15 @@ describe('SelectedReliefProperties', () => {
       expect(host.querySelector('select[aria-label="Relief background"]')).toBeNull();
       const select = host.querySelector('select[aria-label="Relief height-map polarity"]');
       if (!(select instanceof HTMLSelectElement)) throw new Error('polarity select missing');
+      const levels = host.querySelector('[aria-label="Relief input levels"]');
+      if (!(levels instanceof HTMLDivElement)) throw new Error('input levels missing');
       const gamma = gammaField(host);
       expect(gamma.value).toBe('1');
       expect(gamma.step).toBe('0.05');
       expect(gamma.min).toBe('');
       expect(gamma.max).toBe('');
-      expect(select.closest('label')?.nextElementSibling).toBe(gamma.closest('label'));
+      expect(select.closest('label')?.nextElementSibling).toBe(levels);
+      expect(levels.nextElementSibling).toBe(gamma.closest('label'));
       await act(async () => {
         select.value = 'light-is-deep';
         Simulate.change(select);
