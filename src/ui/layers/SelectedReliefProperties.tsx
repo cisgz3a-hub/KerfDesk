@@ -16,6 +16,7 @@ import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
 import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
 import { ReliefMaskThresholdControl } from './ReliefMaskThresholdControl';
 import { useDebouncedCommit } from './use-debounced-commit';
+import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
 
@@ -39,6 +40,13 @@ export function SelectedReliefProperties(): JSX.Element | null {
       <p style={metaStyle}>
         {relief.source} — {reliefMeta(relief)}
       </p>
+      <ReliefSourceMeaning
+        sourceKind={
+          relief.reliefSource.kind === 'legacy-mesh'
+            ? 'stl-top-projection'
+            : relief.reliefSource.provenance.sourceKind
+        }
+      />
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
