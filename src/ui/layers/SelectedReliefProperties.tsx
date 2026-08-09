@@ -16,6 +16,7 @@ import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
 import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
 import { ReliefMaskThresholdControl } from './ReliefMaskThresholdControl';
 import { useDebouncedCommit } from './use-debounced-commit';
+import { ReliefRecordedSourceDetails } from './ReliefRecordedSourceDetails';
 import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
@@ -40,13 +41,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
       <p style={metaStyle}>
         {relief.source} — {reliefMeta(relief)}
       </p>
-      <ReliefSourceMeaning
-        sourceKind={
-          relief.reliefSource.kind === 'legacy-mesh'
-            ? 'stl-top-projection'
-            : relief.reliefSource.provenance.sourceKind
-        }
-      />
+      <ReliefSourceDisclosure relief={relief} />
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
@@ -103,6 +98,22 @@ export function SelectedReliefProperties(): JSX.Element | null {
 
 function isMeshRelief(relief: ReliefObject): relief is MeshReliefObject {
   return relief.reliefSource.kind === 'legacy-mesh';
+}
+
+function ReliefSourceDisclosure(props: { readonly relief: ReliefObject }): JSX.Element {
+  const source = props.relief.reliefSource;
+  return (
+    <>
+      <ReliefSourceMeaning
+        sourceKind={
+          source.kind === 'legacy-mesh' ? 'stl-top-projection' : source.provenance.sourceKind
+        }
+      />
+      {source.kind === 'heightfield-v1' ? (
+        <ReliefRecordedSourceDetails provenance={source.provenance} />
+      ) : null}
+    </>
+  );
 }
 
 function reliefMeta(relief: ReliefObject): string {
