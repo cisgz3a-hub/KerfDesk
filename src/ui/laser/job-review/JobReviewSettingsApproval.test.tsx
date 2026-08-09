@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import fc from 'fast-check';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import {
   createLayer,
   createLayerSubLayer,
@@ -112,6 +112,57 @@ function approvalSettingsKey(settings: ApprovalSettings): string {
   return JSON.stringify(settings);
 }
 
+type ApprovalSequenceState = {
+  approvedKey: string;
+  expectedRebuilds: number;
+};
+
+async function exerciseApprovalSettingsCase(
+  settings: ApprovalSettings,
+  state: ApprovalSequenceState,
+  onApprove: Mock,
+): Promise<void> {
+  await setApprovalSettings(settings);
+  const nextKey = approvalSettingsKey(settings);
+  const changed = nextKey !== state.approvedKey;
+  expect(host.textContent).toContain(
+    changed
+      ? 'Changes are synced to the main Artwork / Operations'
+      : state.expectedRebuilds === 0
+        ? 'Main Artwork / Operations settings match this review.'
+        : 'Approved — current values are synced',
+  );
+
+  await act(async () => approveButton().click());
+  if (changed) state.expectedRebuilds += 1;
+  state.approvedKey = nextKey;
+  expect(onApprove).toHaveBeenCalledTimes(state.expectedRebuilds);
+  expect(host.textContent).toContain('Approved — current values are synced');
+
+  await setApprovalSettings(settings);
+  await act(async () => approveButton().click());
+  expect(onApprove).toHaveBeenCalledTimes(state.expectedRebuilds);
+}
+
+async function exerciseApprovalSettingsSequence(
+  settingsCases: readonly ApprovalSettings[],
+): Promise<void> {
+  await unmount();
+  const initial = settingsCases[0];
+  if (initial === undefined) throw new Error('Property generated no settings.');
+  await setApprovalSettings(initial);
+  const onApprove = vi.fn();
+  await render(onApprove);
+  const state: ApprovalSequenceState = {
+    approvedKey: approvalSettingsKey(initial),
+    expectedRebuilds: 0,
+  };
+
+  for (const settings of settingsCases) {
+    await exerciseApprovalSettingsCase(settings, state, onApprove);
+  }
+}
+
 describe('JobReviewSettingsApproval', () => {
   it('approves live-synced main settings and re-arms after another edit', async () => {
     const onApprove = vi.fn();
@@ -164,39 +215,7 @@ describe('JobReviewSettingsApproval', () => {
     await fc.assert(
       fc.asyncProperty(
         fc.array(approvalSettingsArbitrary, { minLength: 1, maxLength: MAX_PROPERTY_SETTINGS }),
-        async (settingsCases) => {
-          await unmount();
-          const initial = settingsCases[0];
-          if (initial === undefined) throw new Error('Property generated no settings.');
-          await setApprovalSettings(initial);
-          const onApprove = vi.fn();
-          await render(onApprove);
-          let approvedKey = approvalSettingsKey(initial);
-          let expectedRebuilds = 0;
-
-          for (const settings of settingsCases) {
-            await setApprovalSettings(settings);
-            const nextKey = approvalSettingsKey(settings);
-            const changed = nextKey !== approvedKey;
-            expect(host.textContent).toContain(
-              changed
-                ? 'Changes are synced to the main Artwork / Operations'
-                : expectedRebuilds === 0
-                  ? 'Main Artwork / Operations settings match this review.'
-                  : 'Approved — current values are synced',
-            );
-
-            await act(async () => approveButton().click());
-            if (changed) expectedRebuilds += 1;
-            approvedKey = nextKey;
-            expect(onApprove).toHaveBeenCalledTimes(expectedRebuilds);
-            expect(host.textContent).toContain('Approved — current values are synced');
-
-            await setApprovalSettings(settings);
-            await act(async () => approveButton().click());
-            expect(onApprove).toHaveBeenCalledTimes(expectedRebuilds);
-          }
-        },
+        exerciseApprovalSettingsSequence,
       ),
       { numRuns: PROPERTY_RUNS },
     );
