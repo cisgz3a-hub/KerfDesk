@@ -16309,3 +16309,69 @@ scalar-field boundary and its lifecycle instead of creating a parallel photo-onl
 - Grbl v1.1 Interface - acknowledgements and status reports describe protocol/controller state and
   do not qualify loaded physical motion:
   https://github.com/gnea/grbl/blob/master/doc/markdown/interface.md
+
+## ADR-292 - Point Rotation is a transient rigid-selection array mode (2026-08-09)
+
+**Date:** 2026-08-09
+**Status:** Accepted; software geometry, dialog behavior, and deterministic perceptual artifact verified
+
+### Context
+
+CurveDesk already turns selected scene objects into bounded Grid and Circular arrays through one
+immutable document mutation. A Point Rotation workflow is still missing: repeated instances should
+stay at the original selection location while rotating around that selection's own centre. The
+contract must define whether count includes the original, how a full turn avoids a duplicate 360
+degree endpoint, how a multi-selection moves, and whether the settings become durable project data.
+
+The existing array command already owns selection eligibility, fresh object/group identities, the
+single undo step, and the 500-instance array bound. The existing transform model applies scale and
+mirror before rotation and translation. A new mode can therefore remain a pure placement rule rather
+than introducing a second transformation or output pipeline.
+
+### Decision
+
+1. **Add one transient union arm.** `PointRotationArraySpec` contains `count` and signed
+   `totalAngleDeg`. It exists only while applying the command; `.lf2` stores the resulting ordinary
+   scene objects, not array-generator state. No project migration or emitter revision is required.
+2. **Count includes the original.** After the existing array count normalization, instance `i` uses
+   `i * totalAngleDeg / count`, starting with the identity at `i = 0`. Four instances over 360 degrees
+   are therefore 0, 90, 180, and 270 degrees. Partial and negative angles use the same exclusive-end
+   distribution, and count one is identity-only.
+3. **Rotate the selection as one rigid unit.** The pivot is the centre of the transformed combined
+   selection bounds. Every selected object's origin rotates around that one scene-space pivot and its
+   existing rotation composes with the placement angle. Relative positions and complete groups are
+   preserved in each repeated instance.
+4. **Keep the first instance and clone the rest.** Original objects retain their IDs. Every later
+   object and every copied group receives a fresh ID. Apply selects all resulting instances, clears
+   redo, marks the document dirty, and creates one undo entry through the existing array action.
+5. **Expose a third Array tab.** The modal dialog shows Copies and Total angle for Point Rotation.
+   Create Array applies once; Cancel and Escape use the existing dialog close path and mutate nothing.
+   Live preview and canvas direct manipulation are deferred.
+6. **Preserve the existing exact-output authority.** Grid and Circular specs and default behavior do
+   not change. Point Rotation materializes ordinary scene objects before compilation, so preview,
+   estimate, Save, Frame, Start, recovery, and G-code use the existing exact artifact path.
+7. **Frame remains the only Start guard.** The mode adds no warning, refusal, confirmation, output
+   rewrite, or machine-policy boundary. Overlap is the requested geometry and remains visible in the
+   ordinary workspace and prepared preview.
+
+### Consequences
+
+- Rosettes, radial ornament, repeated blade/leaf motifs, and multi-object rotational patterns can be
+  created without moving the source selection onto a circular path.
+- A full turn never overlays a redundant 360-degree endpoint. Point Rotation instances intentionally
+  overlap at their shared centre, while Circular continues to translate instances around a ring.
+- Reopening a saved project preserves the materialized objects but not editable generator settings.
+  A later non-destructive/live array system would require a separate project-model decision.
+- Existing Grid and Circular projects, actions, undo behavior, and emitted programs remain unchanged.
+
+### Verification
+
+- Pure placement fixtures cover full, partial, negative, and identity-only angles plus existing Grid
+  and Circular behavior.
+- State fixtures cover rigid multi-selection rotation, fresh object/group IDs, one undo entry, result
+  selection, and composition with an existing object rotation.
+- Dialog fixtures cover the third tab, signed angle submission, and cancellation without Apply.
+- An independently constructed eight-arrow rosette matches the production placement path at
+  `IoU=1.0000`, precision `1.0000`, and recall `1.0000`; the opt-in perceptual artifact shows the
+  expected, production, and green agreement panels. No hardware evidence is relevant because this
+  is an editor-only transform.

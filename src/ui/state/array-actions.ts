@@ -92,10 +92,9 @@ export function placedObject(object: SceneObject, placement: ArrayPlacement): Sc
     x: object.transform.x + placement.dx,
     y: object.transform.y + placement.dy,
   };
-  // A rotated copy must SPIN about the ring point dx/dy just centred it on.
-  // applyTransform rotates about the object's local origin, so adding
-  // rotationDeg alone swings the copy off the ring; rotate its origin about the
-  // pivot to keep the copy centred there.
+  // applyTransform rotates about the object's local origin. Moving that origin
+  // around the placement pivot makes Circular and Point Rotation both rotate
+  // the complete selection rigidly around their requested scene-space point.
   if (placement.rotationDeg === 0 || placement.pivot === undefined) {
     return { ...object, transform: moved } as SceneObject;
   }

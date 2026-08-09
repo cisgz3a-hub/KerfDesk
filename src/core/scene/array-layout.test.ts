@@ -36,6 +36,38 @@ describe('arrayPlacements', () => {
     expect(placements[1]?.dy).toBeCloseTo(95);
   });
 
+  it('rotates copies in place over a full turn without duplicating the endpoint', () => {
+    expect(
+      arrayPlacements(bounds, {
+        kind: 'point-rotation',
+        count: 4,
+        totalAngleDeg: 360,
+      }),
+    ).toEqual([
+      { dx: 0, dy: 0, rotationDeg: 0 },
+      { dx: 0, dy: 0, rotationDeg: 90, pivot: { x: 20, y: 25 } },
+      { dx: 0, dy: 0, rotationDeg: 180, pivot: { x: 20, y: 25 } },
+      { dx: 0, dy: 0, rotationDeg: 270, pivot: { x: 20, y: 25 } },
+    ]);
+  });
+
+  it('supports a signed partial point rotation and an identity-only count', () => {
+    expect(
+      arrayPlacements(bounds, {
+        kind: 'point-rotation',
+        count: 4,
+        totalAngleDeg: -180,
+      }).map((placement) => placement.rotationDeg),
+    ).toEqual([0, -45, -90, -135]);
+    expect(
+      arrayPlacements(bounds, {
+        kind: 'point-rotation',
+        count: 1,
+        totalAngleDeg: 360,
+      }),
+    ).toEqual([{ dx: 0, dy: 0, rotationDeg: 0 }]);
+  });
+
   it('clamps pathological counts and non-finite inputs', () => {
     const placements = arrayPlacements(bounds, {
       kind: 'grid',

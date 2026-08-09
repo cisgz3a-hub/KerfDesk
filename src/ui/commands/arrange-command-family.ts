@@ -56,7 +56,7 @@ function arrayCommand(ctx: AppCommandContext): AppCommand {
         'arrange.array',
         'arrange',
         'Array...',
-        'Create a grid or circular array',
+        'Create a grid, point-rotation, or circular array',
         ctx.createArray,
       )
     : disabled('arrange.array', 'arrange', 'Array...', 'Select artwork to array.', ctx.createArray);
