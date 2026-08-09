@@ -24,7 +24,7 @@ type MachineUpdater = ReturnType<typeof useStore.getState>['updateCncMachine'];
 export function CncStockCanvasHud(): JSX.Element | null {
   const machine = useStore((state) => state.project.machine);
   const updateCncMachine = useStore((state) => state.updateCncMachine);
-  const [expanded, setExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   if (machine?.kind !== 'cnc') return null;
 
   const stock = machine.stock;
@@ -32,56 +32,60 @@ export function CncStockCanvasHud(): JSX.Element | null {
     <section
       aria-label="Stock controls"
       className="lf-chip"
-      style={expanded ? styles.panel : { ...styles.panel, ...styles.collapsedPanel }}
+      style={isExpanded ? styles.panel : { ...styles.panel, ...styles.collapsedPanel }}
     >
-      {expanded ? (
+      {isExpanded ? (
         <span aria-hidden="true" style={styles.connector}>
           <span style={styles.connectorDot} />
         </span>
       ) : null}
       <StockHeader
-        expanded={expanded}
+        isExpanded={isExpanded}
         stock={stock}
-        onToggle={() => setExpanded((current) => !current)}
+        onToggle={() => setIsExpanded((current) => !current)}
       />
-      {expanded ? <StockFields stock={stock} onCommit={updateCncMachine} /> : null}
+      {isExpanded ? <StockFields stock={stock} onCommit={updateCncMachine} /> : null}
     </section>
   );
 }
 
 function StockHeader(props: {
-  readonly expanded: boolean;
+  readonly isExpanded: boolean;
   readonly stock: CncStock;
   readonly onToggle: () => void;
 }): JSX.Element {
-  const { expanded, stock, onToggle } = props;
+  const { isExpanded, stock, onToggle } = props;
   return (
     <button
       type="button"
       className="lf-btn lf-btn--ghost"
       style={
-        expanded ? styles.headerButton : { ...styles.headerButton, ...styles.collapsedHeaderButton }
+        isExpanded
+          ? styles.headerButton
+          : { ...styles.headerButton, ...styles.collapsedHeaderButton }
       }
-      aria-expanded={expanded}
+      aria-expanded={isExpanded}
       aria-controls={STOCK_FIELDS_ID}
-      aria-label={expanded ? 'Collapse Stock controls' : 'Expand Stock controls'}
-      title={expanded ? 'Collapse Stock controls' : 'Expand Stock controls'}
+      aria-label={isExpanded ? 'Collapse Stock controls' : 'Expand Stock controls'}
+      title={isExpanded ? 'Collapse Stock controls' : 'Expand Stock controls'}
       onClick={onToggle}
     >
-      {expanded ? (
+      {isExpanded ? (
         <span style={styles.stockIcon}>
           <Icon name="square" size={18} />
         </span>
       ) : null}
       <span style={styles.headingText}>
-        <strong style={expanded ? styles.title : { ...styles.title, ...styles.collapsedTitle }}>
+        <strong style={isExpanded ? styles.title : { ...styles.title, ...styles.collapsedTitle }}>
           Stock
         </strong>
-        <span style={expanded ? styles.summary : { ...styles.summary, ...styles.collapsedSummary }}>
+        <span
+          style={isExpanded ? styles.summary : { ...styles.summary, ...styles.collapsedSummary }}
+        >
           {stockSummary(stock)}
         </span>
       </span>
-      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={expanded ? 16 : 12} />
+      <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={isExpanded ? 16 : 12} />
     </button>
   );
 }
@@ -125,7 +129,7 @@ function StockFields(props: {
             min: -1500,
             max: 1500,
             title: "Machine-coordinate X of the stock's near-left corner.",
-            onCommit: (x) => onCommit({ stock: { originOffset: { ...stock.originOffset, x } } }),
+            onCommit: (x) => commitCurrentOriginOffset('x', x, onCommit),
           }}
           second={{
             label: 'Stock origin Y',
@@ -134,13 +138,23 @@ function StockFields(props: {
             min: -1500,
             max: 1500,
             title: "Machine-coordinate Y of the stock's near-left corner.",
-            onCommit: (y) => onCommit({ stock: { originOffset: { ...stock.originOffset, y } } }),
+            onCommit: (y) => commitCurrentOriginOffset('y', y, onCommit),
           }}
         />
         <StockOriginDiagram />
       </div>
     </div>
   );
+}
+
+function commitCurrentOriginOffset(axis: 'x' | 'y', value: number, onCommit: MachineUpdater): void {
+  const machine = useStore.getState().project.machine;
+  if (machine?.kind !== 'cnc') return;
+  const originOffset =
+    axis === 'x'
+      ? { ...machine.stock.originOffset, x: value }
+      : { ...machine.stock.originOffset, y: value };
+  onCommit({ stock: { originOffset } });
 }
 
 function ThicknessField(props: {

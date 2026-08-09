@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { CncStockCanvasHud } from './CncStockCanvasHud';
@@ -43,14 +43,18 @@ async function expandHud(container: HTMLElement): Promise<HTMLButtonElement> {
 }
 
 async function editAndBlur(input: HTMLInputElement, value: string): Promise<void> {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-  if (setter === undefined) throw new Error('native input value setter missing');
   await act(async () => {
     input.focus();
-    setter.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    setInputValue(input, value);
     input.blur();
   });
+}
+
+function setInputValue(input: HTMLInputElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  if (setter === undefined) throw new Error('native input value setter missing');
+  setter.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 describe('CncStockCanvasHud', () => {
@@ -103,5 +107,27 @@ describe('CncStockCanvasHud', () => {
     expect(machine.stock.thicknessMm).toBe(200);
     expect(machine.stock.originOffset).toEqual({ x: -25, y: 0 });
     expect(container.textContent).toContain('520 × 400 × 200 mm');
+  });
+
+  it('preserves both origin coordinates when their debounced edits commit together', async () => {
+    vi.useFakeTimers();
+    try {
+      const container = await renderHud('cnc');
+      await expandHud(container);
+      const originX = inputByLabel(container, 'Stock origin X');
+      const originY = inputByLabel(container, 'Stock origin Y');
+
+      await act(async () => {
+        setInputValue(originX, '125');
+        setInputValue(originY, '250');
+      });
+      await act(async () => vi.advanceTimersByTime(300));
+
+      const machine = useStore.getState().project.machine;
+      if (machine?.kind !== 'cnc') throw new Error('CNC machine missing');
+      expect(machine.stock.originOffset).toEqual({ x: 125, y: 250 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
