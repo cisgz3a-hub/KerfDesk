@@ -133,11 +133,9 @@ test('keeps paired CNC values readable inside the supported rail widths', async 
   await page.getByRole('button', { name: 'CNC', exact: true }).click();
 
   const panel = page.getByLabel('Cuts / Layers resizable panel');
-  const pairedInputs = page.locator(
-    'input[aria-label="Stock origin X"], input[aria-label="Stock origin Y"]',
-  );
+  const pairedInputs = page.locator('input[aria-label="Park X"], input[aria-label="Park Y"]');
   await expect(pairedInputs).toHaveCount(2);
-  for (const label of ['Stock origin X', 'Stock origin Y']) {
+  for (const label of ['Park X', 'Park Y']) {
     const input = page.getByLabel(label, { exact: true });
     await input.fill('-1500');
     await input.blur();
