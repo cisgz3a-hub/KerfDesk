@@ -17106,3 +17106,81 @@ editor Levels parity.
 - ADR-292, schema-v4 canonical heightfield and shared materialization contract.
 - ADR-297, the preceding gamma-control slice.
 - ADR-298, the preceding outside-mask-meaning slice.
+
+## ADR-300 - Relief properties exposes the exact persisted inclusion threshold (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a mask-mapping slice; mask authoring, histogram, 16-bit alpha, and physical qualification stay open
+
+### Context
+
+ADR-291 and the schema-v4 heightfield already persist `mapping.inclusionThreshold` as an integer
+from `1` through `255`. A mask byte at or above that value uses mapped relief depth; a lower byte
+uses the separately persisted outside-mask meaning. Qualified imports initialize the threshold to
+`255`, while existing valid projects may carry any other value in the accepted range. ADR-298 made
+that fact visible and exposed the outside meaning, but deliberately left the threshold read-only.
+
+The validators, project serializer, materializer, preview, and CAM already consume the stored
+threshold. Exposing the existing value is therefore a mapping-control slice, not a schema or CAM
+change. It must preserve exact integer input and cannot silently clamp, round, or rewrite source
+mask bytes.
+
+### Decision
+
+1. **Show the editor only when a canonical mask exists.** A `heightfield-v1` relief with an
+   `inclusionMask` shows **Mask threshold** after Gamma and before the below-threshold meaning.
+   Unmasked canonical fields and legacy mesh reliefs keep their existing properties surface.
+2. **Commit only exact integers from `1` through `255`.** The field accepts exact decimal integer
+   notation whose mathematical value is in the persisted domain, including both endpoints. Blank,
+   fractional, non-finite, or out-of-domain drafts do not commit and restore the current exact value
+   on blur. CurveDesk does not clamp, round, infer a replacement, add confirmation, or introduce a
+   warning or Start guard.
+3. **Keep the materialization rule explicit.** Mask bytes at or above the threshold use mapped
+   depth. Lower bytes use `excluded`, `stock-top`, or `relief-floor` according to the existing
+   selector. Editing the threshold reinterprets the exact stored mask; it does not alter any mask
+   byte, scalar sample, digest, or provenance.
+4. **Change mapping state only.** A distinct edit updates only `mapping.inclusionThreshold` and
+   advances the heightfield revision once. Samples, mask bytes, digest, provenance, physical and
+   pixel dimensions, bounds, transform, input levels, gamma, polarity, maximum depth, crop, aspect,
+   outside meaning, and algorithm revision remain unchanged. Same-value, invalid-runtime, and
+   legacy-mesh patches are identity operations with no dirty or undo state.
+5. **Use the existing undo and debounce lifecycle.** A valid edit creates one ordinary project undo
+   step after the existing quiet period or on blur. Field identity includes the active project
+   document epoch and relief id, so a pending draft cannot cross selection or project replacement.
+   The edit adds no delay beyond that existing parameter-edit lifecycle and has no Frame or Start
+   effect. Frame remains the sole ordinary Start guard.
+6. **Keep the evidence boundary software-only.** Tests can prove exact parsing, state identity,
+   persistence, deterministic materialization, and UI reconciliation. They cannot prove that a
+   threshold is visually suitable for a photograph, physically safe for a setup, controller-
+   accurate, or capable of a desired finish. Histogram review, perceptual comparison, controller
+   tests, air cuts, and material coupons remain separate qualification.
+
+### Consequences
+
+- Operators can reinterpret preserved partial alpha/mask coverage without editing source bytes.
+- Qualified imports still initialize `255`; valid non-default project values stay exact and are now
+  editable without a migration or schema change.
+- Project schema, import, worker protocol, materializer, preview, CAM, simulation, G-code metadata,
+  Job Review, Frame, and Start behavior remain unchanged.
+- Full mask control remains incomplete: mask authoring, histogram and clipping disclosure, 16-bit
+  alpha, crop/aspect controls, and source-mode-specific defaults stay planned.
+
+### Verification
+
+- Parser tests pin both endpoints, exact decimal/scientific notation, invalid draft restoration,
+  and long compensated exponents without adding a fixed input cap.
+- State and UI-to-store tests pin one revision and undo step for a distinct edit, same-value and
+  invalid no-ops, mesh/unmasked omission, project-epoch timer cancellation, and identity of every
+  unrelated source/object field.
+- Existing project round-trip and materialization tests continue to pin non-default threshold
+  persistence and the exact at/above versus below-threshold surfaces for all outside meanings.
+- TypeScript, lint, formatting, focused UI/state/project/materialization tests, and release checks
+  are required before publication. Browser perceptual comparison, packaged Electron, controller
+  behavior, hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, exact U8 mask, threshold, and outside-meaning product contract.
+- ADR-292, schema-v4 canonical field and shared materialization contract.
+- ADR-296, exact grayscale-alpha import into the existing U8 mask.
+- ADR-298, the preceding read-only threshold and editable outside-meaning slice.

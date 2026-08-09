@@ -10,6 +10,7 @@ export type ReliefParamPatch = {
   inputLowCode?: number;
   inputHighCode?: number;
   gamma?: number;
+  inclusionThreshold?: number;
   outsideMask?: ReliefHeightfieldMapping['outsideMask'];
 };
 
@@ -23,6 +24,9 @@ export function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch 
   if (isU16Code(patch.inputLowCode)) out.inputLowCode = patch.inputLowCode;
   if (isU16Code(patch.inputHighCode)) out.inputHighCode = patch.inputHighCode;
   if (positiveFinite(patch.gamma)) out.gamma = patch.gamma;
+  if (isInclusionThreshold(patch.inclusionThreshold)) {
+    out.inclusionThreshold = patch.inclusionThreshold;
+  }
   if (isOutsideMask(patch.outsideMask)) out.outsideMask = patch.outsideMask;
   return out;
 }
@@ -37,6 +41,7 @@ export function hasReliefPatch(patch: ReliefParamPatch): boolean {
     patch.inputLowCode !== undefined ||
     patch.inputHighCode !== undefined ||
     patch.gamma !== undefined ||
+    patch.inclusionThreshold !== undefined ||
     patch.outsideMask !== undefined
   );
 }
@@ -50,6 +55,7 @@ export function isNoOpHeightfieldMappingPatch(
     patch.inputLowCode,
     patch.inputHighCode,
     patch.gamma,
+    patch.inclusionThreshold,
     patch.outsideMask,
   ].some(isDefined);
   const hasOtherPatch = [
@@ -65,6 +71,7 @@ export function isNoOpHeightfieldMappingPatch(
     isUnchanged(patch.inputLowCode, mapping.inputLowCode) &&
     isUnchanged(patch.inputHighCode, mapping.inputHighCode) &&
     isUnchanged(patch.gamma, mapping.curve.gamma) &&
+    isUnchanged(patch.inclusionThreshold, mapping.inclusionThreshold) &&
     isUnchanged(patch.outsideMask, mapping.outsideMask)
   );
 }
@@ -93,6 +100,9 @@ export function applyHeightfieldReliefPatch(
         ...(patch.gamma === undefined
           ? {}
           : { curve: { ...relief.reliefSource.mapping.curve, gamma: patch.gamma } }),
+        ...(patch.inclusionThreshold === undefined
+          ? {}
+          : { inclusionThreshold: patch.inclusionThreshold }),
         ...(patch.outsideMask === undefined ? {} : { outsideMask: patch.outsideMask }),
       },
       revision: relief.reliefSource.revision + (canonicalChanged ? 1 : 0),
@@ -105,20 +115,25 @@ function mappingPatchChangesSource(
   patch: ReliefParamPatch,
 ): boolean {
   const mapping = relief.reliefSource.mapping;
-  const nextDepthMm = patch.reliefDepthMm ?? relief.reliefDepthMm;
-  const nextPolarity = patch.polarity ?? mapping.polarity;
-  const nextInputLowCode = patch.inputLowCode ?? mapping.inputLowCode;
-  const nextInputHighCode = patch.inputHighCode ?? mapping.inputHighCode;
-  const nextGamma = patch.gamma ?? mapping.curve.gamma;
-  const nextOutsideMask = patch.outsideMask ?? mapping.outsideMask;
-  return (
-    nextDepthMm !== mapping.maxDepthMm ||
-    nextPolarity !== mapping.polarity ||
-    nextInputLowCode !== mapping.inputLowCode ||
-    nextInputHighCode !== mapping.inputHighCode ||
-    nextGamma !== mapping.curve.gamma ||
-    nextOutsideMask !== mapping.outsideMask
-  );
+  const current = [
+    mapping.maxDepthMm,
+    mapping.polarity,
+    mapping.inputLowCode,
+    mapping.inputHighCode,
+    mapping.curve.gamma,
+    mapping.inclusionThreshold,
+    mapping.outsideMask,
+  ];
+  const next = [
+    patch.reliefDepthMm ?? relief.reliefDepthMm,
+    patch.polarity ?? mapping.polarity,
+    patch.inputLowCode ?? mapping.inputLowCode,
+    patch.inputHighCode ?? mapping.inputHighCode,
+    patch.gamma ?? mapping.curve.gamma,
+    patch.inclusionThreshold ?? mapping.inclusionThreshold,
+    patch.outsideMask ?? mapping.outsideMask,
+  ];
+  return next.some((value, index) => value !== current[index]);
 }
 
 function widthPatchChangesSource(
@@ -147,6 +162,10 @@ function isU16Code(value: unknown): value is number {
   return (
     typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_U16_CODE
   );
+}
+
+function isInclusionThreshold(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 0xff;
 }
 
 function isOutsideMask(value: unknown): value is ReliefHeightfieldMapping['outsideMask'] {

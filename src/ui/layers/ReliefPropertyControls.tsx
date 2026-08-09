@@ -4,6 +4,7 @@ import { NumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
 import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
+import { ReliefMaskThresholdControl } from './ReliefMaskThresholdControl';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 /** Renders mesh or heightfield controls using parent-resolved machine-space width and scale. */
@@ -42,6 +43,7 @@ export function ReliefPropertyControls(props: {
           <PolaritySelect relief={props.relief} />
           <ReliefInputLevelsControl key={fieldKey('input-levels')} relief={props.relief} />
           <GammaField key={fieldKey('gamma')} relief={props.relief} />
+          <ReliefMaskThresholdControl key={fieldKey('mask-threshold')} relief={props.relief} />
           <ReliefMaskOutsideMeaningControl relief={props.relief} />
         </>
       )}
