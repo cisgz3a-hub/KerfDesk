@@ -9,10 +9,9 @@ import { useState } from 'react';
 // barrel and may only shrink; keep the established exports intact.
 import { reliefPhysicalDimensions } from '../../core/relief/relief-physical-dimensions';
 import { machineKindOf, type ReliefObject } from '../../core/scene';
-import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
 import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
-import { useDebouncedCommit } from './use-debounced-commit';
+import { ReliefPropertyControls } from './ReliefPropertyControls';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
 
@@ -51,36 +50,13 @@ export function SelectedReliefProperties(): JSX.Element | null {
           onClose={() => setViewerOpen(false)}
         />
       ) : null}
-      <ReliefNumberField
-        key={`${projectDocumentEpoch}:${relief.id}:width`}
-        relief={relief}
-        label="Width"
-        value={relief.targetWidthMm}
-        scale={physical.targetScaleX}
-        step={1}
-        title="Relief surface planning width along its local X axis before rotation. Height also uses the current Y scale; a legacy zero-scale axis remains collapsed in output."
-        commitKey="targetWidthMm"
-      />
-      <ReliefNumberField
-        key={`${projectDocumentEpoch}:${relief.id}:depth`}
-        relief={relief}
-        label="Depth"
-        value={relief.reliefDepthMm}
-        step={0.5}
-        title="Total relief depth: the source's numeric range maps to [-depth, 0] below the stock top."
-        commitKey="reliefDepthMm"
-      />
-      {isMeshRelief(relief) ? (
-        <BackgroundSelect relief={relief} />
-      ) : (
-        <PolaritySelect relief={relief} />
-      )}
-    </section>
+        <ReliefPropertyControls
+          key={${projectDocumentEpoch}:}
+          relief={relief}
+          widthMm={physical.widthMm}
+          targetScaleX={physical.targetScaleX}
+        />    </section>
   );
-}
-
-function isMeshRelief(relief: ReliefObject): relief is MeshReliefObject {
-  return relief.reliefSource.kind === 'legacy-mesh';
 }
 
 function reliefMeta(relief: ReliefObject): string {
@@ -90,126 +66,6 @@ function reliefMeta(relief: ReliefObject): string {
   const sourceBits = relief.reliefSource.provenance.sourceBitDepth;
   const sourceLabel = sourceBits === undefined ? '' : ` (source ${sourceBits}-bit)`;
   return `${relief.reliefSource.width} x ${relief.reliefSource.height}, canonical 16-bit${sourceLabel}`;
-}
-
-function ReliefNumberField(props: {
-  readonly relief: ReliefObject;
-  readonly label: string;
-  readonly value: number;
-  readonly scale?: number;
-  readonly step: number;
-  readonly title: string;
-  readonly commitKey: 'targetWidthMm' | 'reliefDepthMm';
-}): JSX.Element {
-  // A scale change remounts the input so cleanup cancels a pending commit
-  // parsed under the old authored-to-physical mapping.
-  return <ReliefNumberInput key={props.scale ?? 1} {...props} />;
-}
-
-function ReliefNumberInput(props: {
-  readonly relief: ReliefObject;
-  readonly label: string;
-  readonly value: number;
-  readonly scale?: number;
-  readonly step: number;
-  readonly title: string;
-  readonly commitKey: 'targetWidthMm' | 'reliefDepthMm';
-}): JSX.Element {
-  const setReliefParams = useStore((s) => s.setReliefParams);
-  const scale = props.scale ?? 1;
-  const canonicalDisplay = formatReliefValue(props.value * scale);
-  const debounced = useDebouncedCommit<number>({
-    value: props.value,
-    commit: (value) => setReliefParams(props.relief.id, { [props.commitKey]: value }),
-    reconcileKey: scale,
-    parse: (input) => {
-      // Preserve the exact authored value when the untouched canonical display
-      // is rounded. Otherwise blur could create an undo frame and subtly alter
-      // bounds at irrational transform scales.
-      if (input.trim() === canonicalDisplay) return props.value;
-      const parsed = Number.parseFloat(input) / scale;
-      return positiveFinite(parsed) ? parsed : props.value;
-    },
-    format: (value) => formatReliefValue(value * scale),
-  });
-  return (
-    <label style={rowStyle}>
-      <span style={labelStyle}>{props.label}</span>
-      <span style={controlStyle}>
-        <input
-          type="number"
-          step={props.step}
-          value={debounced.displayValue}
-          onChange={debounced.onChange}
-          onBlur={debounced.onBlur}
-          aria-label={`Relief ${props.label.toLowerCase()} (mm)`}
-          title={props.title}
-          style={inputStyle}
-        />
-        <span style={unitStyle}>mm</span>
-      </span>
-    </label>
-  );
-}
-
-const MAX_RELIEF_DIMENSION_DECIMALS = 6;
-function formatReliefValue(value: number): string {
-  if (!Number.isFinite(value)) return '';
-  return value.toFixed(MAX_RELIEF_DIMENSION_DECIMALS).replace(/0+$/, '').replace(/\.$/, '');
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
-}
-
-function BackgroundSelect(props: { readonly relief: MeshReliefObject }): JSX.Element {
-  const setReliefParams = useStore((s) => s.setReliefParams);
-  return (
-    <label style={rowStyle}>
-      <span style={labelStyle}>Background</span>
-      <span style={controlStyle}>
-        <select
-          value={props.relief.reliefSource.emptyCells}
-          onChange={(e) =>
-            setReliefParams(props.relief.id, {
-              emptyCells: e.target.value === 'top' ? 'top' : 'floor',
-            })
-          }
-          aria-label="Relief background"
-          title="Where mesh-free cells sit: carved to the floor (model stands proud) or kept at the stock top."
-          style={selectStyle}
-        >
-          <option value="floor">Carve away (floor)</option>
-          <option value="top">Keep at stock top</option>
-        </select>
-      </span>
-    </label>
-  );
-}
-
-function PolaritySelect(props: { readonly relief: HeightfieldReliefObject }): JSX.Element {
-  const setReliefParams = useStore((s) => s.setReliefParams);
-  return (
-    <label style={rowStyle}>
-      <span style={labelStyle}>Polarity</span>
-      <span style={controlStyle}>
-        <select
-          value={props.relief.reliefSource.mapping.polarity}
-          onChange={(event) =>
-            setReliefParams(props.relief.id, {
-              polarity: event.target.value === 'light-is-deep' ? 'light-is-deep' : 'light-is-high',
-            })
-          }
-          aria-label="Relief height-map polarity"
-          title="Declares whether lighter samples are nearer the stock top or deeper into the stock."
-          style={selectStyle}
-        >
-          <option value="light-is-high">Light is high</option>
-          <option value="light-is-deep">Light is deep</option>
-        </select>
-      </span>
-    </label>
-  );
 }
 
 const sectionStyle: React.CSSProperties = {
@@ -226,24 +82,4 @@ const metaStyle: React.CSSProperties = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 };
-const rowStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '92px 1fr',
-  alignItems: 'center',
-  gap: 8,
-  marginBottom: 6,
-};
-const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
-const controlStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '4px 6px',
-  border: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-input)',
-  color: 'var(--lf-text)',
-  borderRadius: 4,
-};
-const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 12, padding: '2px 4px' };
-const unitStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
 const viewerButtonStyle: React.CSSProperties = { marginBottom: 8 };

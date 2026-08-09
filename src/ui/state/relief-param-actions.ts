@@ -14,6 +14,7 @@ export type ReliefParamPatch = {
   reliefDepthMm?: number;
   emptyCells?: 'floor' | 'top';
   polarity?: 'light-is-high' | 'light-is-deep';
+  gamma?: number;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -27,9 +28,14 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
         let changed = false;
         const objects = s.project.scene.objects.map((obj) => {
           if (obj.id !== id || obj.kind !== 'relief') return obj;
+          if (isNoOpGammaPatch(obj, normalized)) return obj;
           changed = true;
           const next = applyReliefPatch(obj, normalized);
-          return { ...next, bounds: boundsForWidth(obj, next.targetWidthMm) };
+          const bounds =
+            normalized.targetWidthMm === undefined
+              ? obj.bounds
+              : boundsForWidth(obj, next.targetWidthMm);
+          return { ...next, bounds };
         });
         if (!changed) return s;
         return {
@@ -53,6 +59,7 @@ function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch {
   }
   if (patch.emptyCells !== undefined) out.emptyCells = patch.emptyCells;
   if (patch.polarity !== undefined) out.polarity = patch.polarity;
+  if (positiveFinite(patch.gamma)) out.gamma = patch.gamma;
   return out;
 }
 
@@ -61,8 +68,20 @@ function hasReliefPatch(patch: ReliefParamPatch): boolean {
     patch.targetWidthMm !== undefined ||
     patch.reliefDepthMm !== undefined ||
     patch.emptyCells !== undefined ||
-    patch.polarity !== undefined
+    patch.polarity !== undefined ||
+    patch.gamma !== undefined
   );
+}
+
+function isNoOpGammaPatch(relief: ReliefObject, patch: ReliefParamPatch): boolean {
+  const isGammaOnly =
+    patch.gamma !== undefined &&
+    patch.targetWidthMm === undefined &&
+    patch.reliefDepthMm === undefined &&
+    patch.emptyCells === undefined &&
+    patch.polarity === undefined;
+  if (!isGammaOnly) return false;
+  return isMeshRelief(relief) || relief.reliefSource.mapping.curve.gamma === patch.gamma;
 }
 
 function applyReliefPatch(relief: ReliefObject, patch: ReliefParamPatch): ReliefObject {
@@ -100,29 +119,47 @@ function applyHeightfieldReliefPatch(
   common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>>,
   patch: ReliefParamPatch,
 ): HeightfieldReliefObject {
-  const nextWidthMm = patch.targetWidthMm ?? relief.targetWidthMm;
-  const aspect = relief.reliefSource.physicalHeightMm / relief.reliefSource.physicalWidthMm;
   const nextDepthMm = patch.reliefDepthMm ?? relief.reliefDepthMm;
   const nextPolarity = patch.polarity ?? relief.reliefSource.mapping.polarity;
+  const nextGamma = patch.gamma ?? relief.reliefSource.mapping.curve.gamma;
   const canonicalChanged =
-    nextWidthMm !== relief.reliefSource.physicalWidthMm ||
+    widthPatchChangesSource(relief, patch.targetWidthMm) ||
     nextDepthMm !== relief.reliefSource.mapping.maxDepthMm ||
-    nextPolarity !== relief.reliefSource.mapping.polarity;
+    nextPolarity !== relief.reliefSource.mapping.polarity ||
+    nextGamma !== relief.reliefSource.mapping.curve.gamma;
   return {
     ...relief,
     ...common,
     reliefSource: {
       ...relief.reliefSource,
-      physicalWidthMm: nextWidthMm,
-      physicalHeightMm: nextWidthMm * aspect,
+      ...physicalDimensionsForWidth(relief, patch.targetWidthMm),
       mapping: {
         ...relief.reliefSource.mapping,
         ...(patch.reliefDepthMm === undefined ? {} : { maxDepthMm: patch.reliefDepthMm }),
         ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
+        ...(patch.gamma === undefined
+          ? {}
+          : { curve: { ...relief.reliefSource.mapping.curve, gamma: patch.gamma } }),
       },
       revision: relief.reliefSource.revision + (canonicalChanged ? 1 : 0),
     },
   };
+}
+
+function widthPatchChangesSource(
+  relief: HeightfieldReliefObject,
+  widthMm: number | undefined,
+): boolean {
+  return widthMm !== undefined && widthMm !== relief.reliefSource.physicalWidthMm;
+}
+
+function physicalDimensionsForWidth(
+  relief: HeightfieldReliefObject,
+  widthMm: number | undefined,
+): Partial<Pick<HeightfieldReliefObject['reliefSource'], 'physicalWidthMm' | 'physicalHeightMm'>> {
+  if (widthMm === undefined) return {};
+  const aspect = relief.reliefSource.physicalHeightMm / relief.reliefSource.physicalWidthMm;
+  return { physicalWidthMm: widthMm, physicalHeightMm: widthMm * aspect };
 }
 
 function boundsForWidth(

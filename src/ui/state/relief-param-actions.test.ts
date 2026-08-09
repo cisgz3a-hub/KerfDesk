@@ -162,6 +162,88 @@ describe('setReliefParams', () => {
     expect(updated.reliefSource.revision).toBe(field.revision);
   });
 
+  it('updates only gamma and revision without rebuilding exact imported geometry', () => {
+    const sourceWidth = 5;
+    const sourceHeight = 11;
+    const sampleCount = sourceWidth * sourceHeight;
+    const field = testReliefHeightfield({
+      width: sourceWidth,
+      height: sourceHeight,
+      physicalWidthMm: 100,
+      physicalHeightMm: 220,
+      maxDepthMm: 5,
+      samplesU8: Array.from({ length: sampleCount }, (_, index) => index),
+      inclusionMask: Array.from({ length: sampleCount }, () => 255),
+      provenance: { sourceName: 'gamma-source.png' },
+      revision: 4,
+    });
+    installHeightfieldRelief(field);
+    const before = storedRelief();
+
+    useStore.getState().setReliefParams('R1', { gamma: 2.75 });
+
+    const updated = storedRelief();
+    expect(updated.reliefSource.kind).toBe('heightfield-v1');
+    if (updated.reliefSource.kind !== 'heightfield-v1') return;
+    expect(updated).toEqual({
+      ...before,
+      reliefSource: {
+        ...field,
+        mapping: { ...field.mapping, curve: { kind: 'gamma-v1', gamma: 2.75 } },
+        revision: 5,
+      },
+    });
+    expect(updated.reliefSource.physicalWidthMm).toBe(field.physicalWidthMm);
+    expect(updated.reliefSource.physicalHeightMm).toBe(field.physicalHeightMm);
+    expect(updated.bounds).toBe(before.bounds);
+    expect(updated.transform).toBe(before.transform);
+    expect(useStore.getState()).toMatchObject({ dirty: true });
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it('retains a large finite gamma exactly and ignores invalid gamma values', () => {
+    const largeGamma = Number.MAX_VALUE;
+    installHeightfieldRelief(testReliefHeightfieldFixture());
+
+    useStore.getState().setReliefParams('R1', { gamma: largeGamma });
+
+    const accepted = storedRelief();
+    expect(accepted.reliefSource.kind).toBe('heightfield-v1');
+    if (accepted.reliefSource.kind !== 'heightfield-v1') return;
+    expect(accepted.reliefSource.mapping.curve.gamma).toBe(largeGamma);
+    const acceptedProject = useStore.getState().project;
+    const acceptedRevision = accepted.reliefSource.revision;
+    useStore.setState({ dirty: false, undoStack: [] });
+
+    for (const gamma of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      useStore.getState().setReliefParams('R1', { gamma });
+    }
+
+    expect(useStore.getState().project).toBe(acceptedProject);
+    expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
+    const unchanged = storedRelief();
+    expect(unchanged.reliefSource.kind).toBe('heightfield-v1');
+    if (unchanged.reliefSource.kind !== 'heightfield-v1') return;
+    expect(unchanged.reliefSource.revision).toBe(acceptedRevision);
+  });
+
+  it('does nothing when gamma is unchanged or the relief uses a legacy mesh', () => {
+    installHeightfieldRelief(testReliefHeightfieldFixture());
+    const beforeHeightfield = useStore.getState().project;
+
+    useStore.getState().setReliefParams('R1', { gamma: 1 });
+
+    expect(useStore.getState().project).toBe(beforeHeightfield);
+    expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
+    installReliefProject();
+    const beforeMesh = useStore.getState().project;
+
+    useStore.getState().setReliefParams('R1', { gamma: 2 });
+
+    expect(useStore.getState().project).toBe(beforeMesh);
+    expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
+  });
+
   it('is a no-op for unknown ids and non-relief objects', () => {
     const before = useStore.getState().project;
     useStore.getState().setReliefParams('nope', { reliefDepthMm: 9 });
@@ -169,3 +251,44 @@ describe('setReliefParams', () => {
     expect(useStore.getState().undoStack).toHaveLength(0);
   });
 });
+
+function testReliefHeightfieldFixture(): ReturnType<typeof testReliefHeightfield> {
+  return testReliefHeightfield({
+    width: 2,
+    height: 1,
+    physicalWidthMm: 100,
+    physicalHeightMm: 50,
+    maxDepthMm: 5,
+    samplesU8: [0, 255],
+  });
+}
+
+function installHeightfieldRelief(field: ReturnType<typeof testReliefHeightfield>): void {
+  const current = useStore.getState().project;
+  useStore.setState({
+    project: {
+      ...current,
+      scene: {
+        ...current.scene,
+        objects: [
+          {
+            ...relief(),
+            source: 'depth.png',
+            targetWidthMm: field.physicalWidthMm,
+            reliefDepthMm: field.mapping.maxDepthMm,
+            bounds: {
+              minX: 0,
+              minY: 0,
+              maxX: field.physicalWidthMm,
+              maxY: field.physicalHeightMm,
+            },
+            reliefSource: field,
+          },
+        ],
+      },
+    },
+    dirty: false,
+    undoStack: [],
+    redoStack: [],
+  });
+}

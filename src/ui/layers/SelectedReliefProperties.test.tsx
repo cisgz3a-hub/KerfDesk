@@ -41,10 +41,10 @@ function relief(): ReliefObject {
   };
 }
 
-function depthRelief(): ReliefObject {
+function depthRelief(id = 'R1', gamma = 1): ReliefObject {
   return {
     kind: 'relief',
-    id: 'R1',
+    id,
     source: 'depth.png',
     reliefSource: testReliefHeightfield({
       width: 2,
@@ -53,6 +53,7 @@ function depthRelief(): ReliefObject {
       physicalHeightMm: 50,
       maxDepthMm: 5,
       samplesU8: [0, 255],
+      mapping: { curve: { kind: 'gamma-v1', gamma } },
       provenance: { sourceName: 'depth.png' },
     }),
     targetWidthMm: 100,
@@ -74,6 +75,19 @@ function installProject(machineKind: 'laser' | 'cnc', object: ReliefObject = rel
   useStore.setState({ project });
   useStore.getState().setMachineKind(machineKind);
   useStore.getState().selectObject('R1');
+}
+
+function gammaField(host: HTMLElement): HTMLInputElement {
+  const input = host.querySelector('input[aria-label="Relief height-map gamma"]');
+  if (!(input instanceof HTMLInputElement)) throw new Error('gamma input missing');
+  return input;
+}
+
+function storedGamma(id = 'R1'): number | null {
+  const stored = useStore.getState().project.scene.objects.find((object) => object.id === id);
+  return stored?.kind === 'relief' && stored.reliefSource.kind === 'heightfield-v1'
+    ? stored.reliefSource.mapping.curve.gamma
+    : null;
 }
 
 async function render(): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
@@ -103,6 +117,7 @@ describe('SelectedReliefProperties', () => {
       expect(depth.min).toBe('');
       expect(depth.max).toBe('');
       expect(host.textContent).toContain('model.stl');
+      expect(host.querySelector('input[aria-label="Relief height-map gamma"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -381,7 +396,7 @@ describe('SelectedReliefProperties', () => {
     }
   });
 
-  it('shows depth-map precision and commits explicit polarity without a mesh background control', async () => {
+  it('shows depth-map precision, polarity, then an uncapped gamma field', async () => {
     installProject('cnc', depthRelief());
     const { host, root } = await render();
     try {
@@ -389,6 +404,12 @@ describe('SelectedReliefProperties', () => {
       expect(host.querySelector('select[aria-label="Relief background"]')).toBeNull();
       const select = host.querySelector('select[aria-label="Relief height-map polarity"]');
       if (!(select instanceof HTMLSelectElement)) throw new Error('polarity select missing');
+      const gamma = gammaField(host);
+      expect(gamma.value).toBe('1');
+      expect(gamma.step).toBe('0.05');
+      expect(gamma.min).toBe('');
+      expect(gamma.max).toBe('');
+      expect(select.closest('label')?.nextElementSibling).toBe(gamma.closest('label'));
       await act(async () => {
         select.value = 'light-is-deep';
         Simulate.change(select);
@@ -403,6 +424,82 @@ describe('SelectedReliefProperties', () => {
     } finally {
       await act(async () => root.unmount());
       host.remove();
+    }
+  });
+
+  it('commits a large positive gamma unchanged', async () => {
+    installProject('cnc', depthRelief());
+    const { host, root } = await render();
+    try {
+      const gamma = gammaField(host);
+      await act(async () => {
+        gamma.value = '123456.75';
+        Simulate.change(gamma);
+      });
+      await act(async () => Simulate.blur(gamma));
+
+      expect(storedGamma()).toBe(123456.75);
+      expect(gammaField(host).value).toBe('123456.75');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('does not mutate for zero gamma and restores the canonical value on blur', async () => {
+    installProject('cnc', depthRelief('R1', 1.25));
+    const beforeProject = useStore.getState().project;
+    const beforeUndoStack = useStore.getState().undoStack;
+    const beforeDirty = useStore.getState().dirty;
+    const { host, root } = await render();
+    try {
+      const gamma = gammaField(host);
+      await act(async () => {
+        gamma.value = '0';
+        Simulate.change(gamma);
+      });
+      await act(async () => Simulate.blur(gamma));
+
+      expect(useStore.getState().project).toBe(beforeProject);
+      expect(useStore.getState().undoStack).toBe(beforeUndoStack);
+      expect(useStore.getState().dirty).toBe(beforeDirty);
+      expect(gammaField(host).value).toBe('1.25');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('cancels a pending gamma edit instead of retargeting a new selected relief', async () => {
+    vi.useFakeTimers();
+    installProject('cnc', depthRelief('R1', 1));
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: {
+        ...project,
+        scene: {
+          ...project.scene,
+          objects: [depthRelief('R1', 1), depthRelief('R2', 2)],
+        },
+      },
+    });
+    const { host, root } = await render();
+    try {
+      const gamma = gammaField(host);
+      await act(async () => {
+        gamma.value = '4';
+        Simulate.change(gamma);
+      });
+      await act(async () => useStore.getState().selectObject('R2'));
+      await act(async () => vi.advanceTimersByTime(300));
+
+      expect(gammaField(host).value).toBe('2');
+      expect(storedGamma('R1')).toBe(1);
+      expect(storedGamma('R2')).toBe(2);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      vi.useRealTimers();
     }
   });
 

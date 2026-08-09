@@ -33,6 +33,21 @@ async function render(
   return { host, root };
 }
 
+async function renderPositive(
+  value: number,
+  onCommit: (n: number) => void,
+): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  await act(async () => {
+    root.render(
+      <NumberField ariaLabel="Test" value={value} positiveOnly step={0.05} onCommit={onCommit} />,
+    );
+  });
+  return { host, root };
+}
+
 function field(host: HTMLElement): HTMLInputElement {
   const input = host.querySelector('input[aria-label="Test"]');
   if (!(input instanceof HTMLInputElement)) throw new Error('field missing');
@@ -69,6 +84,43 @@ describe('NumberField (clearable)', () => {
       await act(async () => Simulate.change(input));
       await act(async () => vi.advanceTimersByTime(400));
       expect(onCommit).toHaveBeenCalledWith(20);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('keeps positive-only fields uncapped and omits browser min/max bounds', async () => {
+    const onCommit = vi.fn();
+    const { host, root } = await renderPositive(1, onCommit);
+    try {
+      const input = field(host);
+      expect(input.min).toBe('');
+      expect(input.max).toBe('');
+      input.value = '123456.75';
+      await act(async () => Simulate.change(input));
+      await act(async () => Simulate.blur(input));
+      expect(onCommit).toHaveBeenCalledWith(123456.75);
+      expect(field(host).value).toBe('123456.75');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('restores a positive-only field after zero without committing', async () => {
+    const onCommit = vi.fn();
+    const { host, root } = await renderPositive(1.25, onCommit);
+    try {
+      const input = field(host);
+      input.value = '0';
+      await act(async () => Simulate.change(input));
+      await act(async () => vi.advanceTimersByTime(400));
+      expect(input.value).toBe('0');
+      expect(onCommit).not.toHaveBeenCalled();
+      await act(async () => Simulate.blur(input));
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(field(host).value).toBe('1.25');
     } finally {
       await act(async () => root.unmount());
       host.remove();
