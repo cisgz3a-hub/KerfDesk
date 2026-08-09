@@ -4,14 +4,23 @@
 // the dialog's own fields or anywhere else. Field commits are themselves
 // debounced (F-A7), so the visible latency is commit debounce + this one.
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../../state';
 import { useJobReviewStore } from './job-review-store';
 
 const REBUILD_DEBOUNCE_MS = 250;
 
-export function useJobReviewRebuildTrigger(): void {
+/**
+ * Debounces compile-relevant store changes and returns an immediate rebuild callback.
+ * The callback cancels any pending debounce so explicit approval produces exactly one signal.
+ */
+export function useJobReviewRebuildTrigger(): () => void {
   const timerRef = useRef<number | null>(null);
+  const requestRebuildNow = useCallback((): void => {
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+    useJobReviewStore.getState().requestRebuild();
+  }, []);
   useEffect(() => {
     const unsubscribe = useStore.subscribe((current, previous) => {
       if (
@@ -24,12 +33,13 @@ export function useJobReviewRebuildTrigger(): void {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => {
         timerRef.current = null;
-        useJobReviewStore.getState().requestRebuild();
+        requestRebuildNow();
       }, REBUILD_DEBOUNCE_MS);
     });
     return (): void => {
       unsubscribe();
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     };
-  }, []);
+  }, [requestRebuildNow]);
+  return requestRebuildNow;
 }

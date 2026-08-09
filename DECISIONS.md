@@ -9891,6 +9891,18 @@ detail row now reports every distinct effective operation from the exact prepare
 object overrides, per-object power scaling, split tools, and other compile-time resolution visible
 before Start instead of implying that the base layer row is the emitted truth. The disclosure is
 advisory only: it adds no guard, refusal, clamp, confirmation, or change to Frame or streamed bytes.
+
+### Amendment - explicit settings approval (2026-08-09)
+
+The editable Artwork settings keep committing through the normal project-store actions, so changes
+remain synchronized with the main Artwork / Operations panel and retain the existing undo, dirty,
+and exact-job invalidation behavior. Job Review now shows an **Approve settings** action with a live
+status that identifies values changed since the review opened or were last approved. Approving
+records that the operator reviewed the currently synchronized values and, when they changed,
+requests an immediate exact-job rebuild. It is not a prerequisite for Start: **Start job** continues
+to approve the complete review in one click. A setting change that invalidates the framed artifact
+still uses the existing handoff-consistency path and requires Frame again; the new action does not
+bypass or expand that contract.
 > **Numbering note.** Drafted as ADR-221, but the fleet landed ADR-221 (elapsed-time badge),
 > ADR-222 (single-artwork selection), and ADR-223 (Canvas Focus layout) on main mid-flight - so
 > this entry is **ADR-224**. Re-verify the tail and open-PR claims before merge.
