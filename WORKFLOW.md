@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/293 schema, import, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/293/294/295 schema, import, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -4025,18 +4025,19 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294/295)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
    command is deliberately separate from **Import Image...**: it declares that
    tone is physical relief data rather than asking CurveDesk to infer 3D shape
    from a photograph.
-2. A qualified input is a lossless, non-interlaced, 8-bit grayscale PNG. The
-   import worker verifies the PNG structure and CRCs and retains one exact
+2. A qualified input is a lossless, non-interlaced, 8- or 16-bit grayscale PNG. The
+   import worker verifies the supported PNG structure and every parsed chunk CRC
+   through `IEND`, then retains one exact
    grayscale sample per source pixel; it does not resize, auto-level, blur,
    sharpen, apply gamma, or run AI depth estimation. An optional grayscale
-   `tRNS` chunk maps pixels matching its transparent sample to mask byte `0`
+   `tRNS` chunk maps pixels matching its complete transparent sample code to mask byte `0`
    and every other pixel to `255`; transparency is not composited.
 3. Each file becomes a top-down relief at 100 mm wide and 5 mm deep. Height
    follows the pixel aspect ratio, **Light is high** is the declared default,
@@ -4051,7 +4052,8 @@ and lifts the command's CNC-only gate.)*
 5. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
    physical and pixel dimensions, optional U8 inclusion mask, mapping,
    provenance, revision, and digest. Eight-bit PNG sample `v` is represented
-   exactly as U16 value `v * 257`. Reopening validates the exact byte-length,
+   exactly as U16 value `v * 257`; each 16-bit PNG sample keeps its numeric code
+   while its network-order bytes are written in canonical little-endian order. Reopening validates the exact byte-length,
    source-authority, mapping, and digest contracts before preview or compilation.
 6. Periodic recovery writes the complete validated project JSON to atomic
    current/previous IndexedDB snapshots. A live second window receives its own
@@ -4064,7 +4066,7 @@ and lifts the command's CNC-only gate.)*
    cancellation paths remain in force.
 
 #### Error - the PNG is not an explicit qualified height map
-1. RGB/RGBA, palette, 16-bit, or interlaced PNG input reports the unsupported
+1. RGB/RGBA, palette, non-grayscale sample layouts, or interlaced PNG input reports the unsupported
    source contract for this slice and imports nothing for that file. It is not
    silently converted to grayscale and is never described as estimated depth.
 2. A malformed signature, chunk, CRC, row stream, base64 payload, dimension,
@@ -4083,10 +4085,12 @@ and lifts the command's CNC-only gate.)*
 2. Large files receive the existing non-blocking size advisory. Worker startup
    failure discloses the existing main-thread fallback; size never becomes an
    arbitrary import refusal.
-3. The durable model is canonical U16 little-endian (`u16le-base64-v1`), but this
-   decoder qualifies only exact 8-bit grayscale PNG and expands each input code
-   losslessly. A later 16-bit decoder can populate the same schema after its PNG
-   filtering, byte-order, worker-memory, and precision path is verified.
+3. The durable model is canonical U16 little-endian (`u16le-base64-v1`). The exact
+   height-map decoder qualifies color type 0 at 8 or 16 bits. It expands each 8-bit
+   code losslessly by `257`; it reconstructs 16-bit scanlines with a two-byte PNG
+   filter stride and converts each MSB-first source code to little-endian bytes
+   without luma conversion, resampling, or precision reduction. Ordinary image
+   import retains its separate existing 8-bit display-luma path.
 4. CAM requests its exact positive cell spacing and attempts the exact derived
    allocation; allocation failure is reported factually rather than silently
    coarsening. When that spacing does not divide a declared physical dimension,
@@ -4116,8 +4120,8 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-293/294 supply schema-v4/U16LE
-> storage, migration, qualified 8-bit grayscale import, simple transparency
+> **Planned - not current UI.** P2R.1a plus ADR-293/294/295 supply schema-v4/U16LE
+> storage, migration, qualified 8/16-bit grayscale import, simple transparency
 > masks, atomic large-project autosave/recovery, and the existing CAM/preview
 > substrate. The creation modes and controls below remain planned; use F-CNC46's
 > narrower **Import Height Map...** flow today.

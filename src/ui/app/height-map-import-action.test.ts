@@ -4,7 +4,7 @@ import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG, type SceneObject } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { prepareReliefHeightfieldPngOffThread } from '../import/import-worker-client';
-import { makePng, streamingBlob } from '../import/png-incremental-decoder.test-support';
+import { makePng, streamingBlob, u16beBytes } from '../import/png-incremental-decoder.test-support';
 import { handleImportHeightMaps, importHeightMapFiles } from './height-map-import-action';
 
 vi.mock('../import/import-worker-client', () => ({
@@ -155,6 +155,49 @@ describe('importHeightMapFiles', () => {
         width: 2,
         height: 1,
         samplesBase64: 'AAD//w==',
+      },
+    });
+  });
+
+  it('preserves exact grayscale-16 codes through the disclosed main-thread fallback', async () => {
+    vi.mocked(prepareReliefHeightfieldPngOffThread).mockReturnValue(null);
+    const importObject = vi.fn();
+    const pushToast = vi.fn();
+    const png = makePng({
+      width: 4,
+      height: 2,
+      colorType: 0,
+      bitDepth: 16,
+      rows: [
+        u16beBytes(0x0000, 0x0001, 0x00ff, 0x0100),
+        u16beBytes(0x1234, 0x7fff, 0x8000, 0xffff),
+      ],
+      filters: [1, 4],
+      transparency: Uint8Array.of(0x12, 0x34),
+    });
+
+    await importHeightMapFiles([streamingFile(png, 'fallback-u16.png')], {
+      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+      importObject,
+      pushToast,
+    });
+
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/background worker could not start.*main thread/i),
+      'warning',
+    );
+    expect(importObject).toHaveBeenCalledOnce();
+    expect(importObject.mock.calls[0]?.[0]).toMatchObject({
+      kind: 'relief',
+      source: 'fallback-u16.png',
+      reliefSource: {
+        kind: 'heightfield-v1',
+        width: 4,
+        height: 2,
+        samplesBase64: 'AAABAP8AAAE0Ev9/AID//w==',
+        inclusionMask: { encoding: 'u8-base64-v1', samplesBase64: '/////wD///8=' },
+        provenance: { sourceBitDepth: 16 },
+        digest: 'sha256:c4f8f369dc15354d066ab2411b3a2dbc4e65c16b8ed914e1ca55c733448d8b8a',
       },
     });
   });

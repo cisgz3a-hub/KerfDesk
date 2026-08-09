@@ -17,20 +17,22 @@ export type PngFixtureOptions = {
 
 export function makePng(options: PngFixtureOptions): Uint8Array {
   const colorType = options.colorType ?? 2;
+  const bitDepth = options.bitDepth ?? 8;
   const channels = colorType === 0 ? 1 : colorType === 6 ? 4 : 3;
+  const bytesPerPixel = channels * bytesPerSample(bitDepth);
   const rawRows: Uint8Array[] = [];
-  let previous = new Uint8Array(options.width * channels);
+  let previous = new Uint8Array(options.width * bytesPerPixel);
   for (let index = 0; index < options.rows.length; index += 1) {
     const row = Uint8Array.from(options.rows[index] ?? []);
     const filter = options.filters?.[index] ?? 0;
-    rawRows.push(Uint8Array.of(filter), filterRow(row, previous, channels, filter));
+    rawRows.push(Uint8Array.of(filter), filterRow(row, previous, bytesPerPixel, filter));
     previous = row;
   }
   const ihdr = new Uint8Array(13);
   const view = new DataView(ihdr.buffer);
   view.setUint32(0, options.width);
   view.setUint32(4, options.height);
-  ihdr[8] = options.bitDepth ?? 8;
+  ihdr[8] = bitDepth;
   ihdr[9] = colorType;
   ihdr[10] = 0;
   ihdr[11] = 0;
@@ -95,6 +97,15 @@ export async function* chunksOf(bytes: Uint8Array, size: number): AsyncGenerator
 
 export function rgba(...values: number[]): number[] {
   return values;
+}
+
+/** Serialize numeric U16 samples in PNG network byte order. */
+export function u16beBytes(...values: number[]): number[] {
+  return values.flatMap((value) => [(value >>> 8) & 0xff, value & 0xff]);
+}
+
+function bytesPerSample(bitDepth: number): number {
+  return bitDepth === 16 ? 2 : 1;
 }
 
 function physicalDimensions(pixelsPerMetre: number): Uint8Array {

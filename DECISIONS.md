@@ -16667,3 +16667,99 @@ other ADR-292 evidence boundary remains in force.
 - ADR-289, transformed relief machine-space cutter-envelope semantics.
 - ADR-292, exact-input P2R.1a contract and the sampled-grid boundary this decision closes.
 - ADR-293, large canonical relief autosave/recovery; unchanged by this transient grid model.
+
+## ADR-295 - Exact grayscale-16 PNG import preserves source codes in the canonical field (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a software-import slice; full photo-to-relief UI and physical qualification remain open
+
+### Context
+
+ADR-292 established a canonical U16 little-endian relief field but deliberately qualified only
+non-interlaced 8-bit grayscale PNG input. The durable schema, provenance, digest, project
+validation, worker protocol, persistence, preview, and CAM already accept exact U16 values. The
+remaining gap was the PNG boundary: the display-luma decoder treated one grayscale pixel as one
+byte, while PNG color type 0 at bit depth 16 stores one two-byte, network-order sample and applies
+filters to those bytes with a two-byte preceding-pixel displacement.
+
+Merely allowing the 16-bit header would read half of each scanline, apply the Sub/Average/Paeth
+predictors at the wrong displacement, and reduce the result through an 8-bit luma row. The import
+therefore needs an exact reconstructed-byte route rather than a relaxed header check.
+
+This decision supersedes ADR-290 decision 1 and ADR-292 decisions 2 and 7 only where they name
+16-bit PNG as unsupported or pending. Their remaining source, schema, worker, CAM, guard, and
+qualification boundaries stay in force.
+
+### Decision
+
+1. **Qualify only the explicit scalar format this workflow can preserve.** **Import Height Map...**
+   accepts non-interlaced PNG color type 0 at bit depth 8 or 16, with PNG compression and filter
+   method 0. RGB/RGBA, grayscale-alpha, palette, Adam7, and inferred photographic depth remain
+   outside this explicit scalar importer. The ordinary image-import luma decoder keeps its existing
+   8-bit qualification and output.
+2. **Reconstruct scanlines byte-for-byte before interpreting samples.** A shared filtered-row reader
+   applies PNG filters to bytes. Eight-bit grayscale uses one byte per pixel; 16-bit grayscale uses
+   two bytes per pixel, so Sub, Average, and Paeth refer to the byte two positions earlier. The exact
+   route emits the source-width rows without resize, luma conversion, gamma, auto-level, blur,
+   sharpening, or color management.
+3. **Preserve numeric codes in the existing canonical encoding.** Eight-bit code `v` remains U16
+   value `v * 257`, preserving all prior fields and digests. A 16-bit PNG sample arrives MSB first
+   and is written as the same numeric value in canonical U16 little-endian bytes. Provenance records
+   source bit depth 8 or 16. No project-schema, mapping, digest algorithm, worker message, CAM, or
+   G-code revision is added.
+4. **Match transparency before any precision change.** A grayscale `tRNS` chunk names one two-byte
+   sample. For 16-bit input, the entire 16-bit code must match; a shared low byte is insufficient.
+   For 8-bit input, the existing PNG-required masking of unused high bits and `v * 257` canonical
+   comparison remain unchanged. Matches become mask byte `0`; every other pixel remains `255`.
+5. **Keep execution and failure behavior unchanged.** Decode, byte-order conversion, canonical
+   base64, mask creation, and digest construction run in the existing import worker when available.
+   Worker cancellation, progress, replacement, stale-result handling, and the disclosed main-thread
+   fallback retain their current contracts. This decision broadens one supported input combination;
+   it adds no clamp, cap, delay, confirmation, import guard, Frame effect, or Start effect. Existing
+   qualified 8-bit malformed-file errors are unchanged; trailing content after `IEND` remains inherited unqualified
+   decoder behavior rather than a new refusal in this slice.
+6. **Keep the evidence boundary explicit.** Exact source codes, canonical bytes, masks, worker/main
+   parity, persistence compatibility, and software materialization are qualified. The import does not
+   establish that a source is metric depth, perceptually suitable, tool-reachable, physically safe,
+   or capable of producing a particular wood finish. Full alpha/mask controls, tonal/source-mode UI,
+   editing, AI inference, holder clearance, controller tracking, air cuts, and material coupons remain
+   separate work.
+
+### Consequences
+
+- A qualified 16-bit depth map no longer needs an external 8-bit reduction before CurveDesk import.
+  Intermediate codes such as `0x0001`, `0x00ff`, `0x0100`, `0x7fff`, and `0x8000` remain distinct.
+- The exact filtered-row reader is shared with the 8-bit luma path, but that path's qualification,
+  sampling arithmetic, and emitted bytes remain unchanged.
+- Canonical projects remain schema v4 and self-contained. Existing manual save, IndexedDB recovery,
+  preview, simulation, Job Review, Frame, and output behavior consume the same named heightfield
+  encoding.
+- The importer remains a deliberately narrow explicit-height-map decoder, not a claim of general PNG
+  decoder conformance.
+
+### Verification
+
+- Generated PNG fixtures cover all five PNG filters, one-byte stream chunking, arbitrary external
+  chunk boundaries, random U16 codes, and values whose high and low bytes differ.
+- A hard-coded 4 x 2 golden pins exact U16LE bytes, `tRNS` mask, source-bit-depth provenance, mapping,
+  aspect, and SHA-256 digest while the prior 8-bit golden remains unchanged.
+- A full-width `tRNS` fixture distinguishes `0x1234` from `0x1235` and `0x0034`.
+- Real Chrome loads the production bundled worker and deep-compares its structured-cloned PNG16
+  heightfield with direct main-thread preparation. Existing cancellation/replacement evidence remains
+  in force.
+- TypeScript, lint, formatting, focused import tests, project/persistence tests, and release checks are
+  required before publication. Browser visual quality, packaged Electron, controller behavior,
+  hardware air cuts, and wood coupons are not established by this ADR.
+
+### References
+
+- W3C, Portable Network Graphics (PNG) Specification, Third Edition, allowed IHDR combinations:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#11IHDR
+- W3C, PNG Third Edition, integer byte order and scanline serialization:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#7Integers-and-byte-order
+- W3C, PNG Third Edition, bytewise filter types:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#9Filter-types
+- W3C, PNG Third Edition, grayscale `tRNS` full-sample matching:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#11tRNS
+- ADR-290, the original explicit 8-bit height-map import.
+- ADR-292, the canonical U16 P2R.1a substrate and prior PNG16 limitation.
