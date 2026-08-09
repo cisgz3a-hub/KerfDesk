@@ -49,3 +49,42 @@ describe('fitObjectToBed', () => {
     expect(fitObjectToBed(o, 400, 400)).toBe(o);
   });
 });
+
+describe('fitObjectToBed center-only mode', () => {
+  it('centers an over-bed object without reducing either scale axis', () => {
+    const centered = fitObjectToBed(
+      obj({ minX: 0, minY: 0, maxX: 100, maxY: 1000 }),
+      400,
+      400,
+      'center-only',
+    );
+
+    expect(centered.transform.scaleX).toBe(1);
+    expect(centered.transform.scaleY).toBe(1);
+    expect(applyTransform({ x: 50, y: 500 }, centered.transform)).toEqual({ x: 200, y: 200 });
+  });
+
+  it('preserves nonuniform scale, rotation, and mirror while centering', () => {
+    const source = {
+      ...obj({ minX: 10, minY: 20, maxX: 110, maxY: 70 }),
+      transform: {
+        ...IDENTITY_TRANSFORM,
+        x: 31,
+        y: 47,
+        scaleX: -2,
+        scaleY: 0.5,
+        rotationDeg: 25,
+        mirrorX: true,
+      },
+    };
+    const centered = fitObjectToBed(source, 400, 300, 'center-only');
+
+    expect(centered.transform).toMatchObject({
+      scaleX: -2,
+      scaleY: 0.5,
+      rotationDeg: 25,
+      mirrorX: true,
+    });
+    expect(applyTransform({ x: 60, y: 45 }, centered.transform)).toMatchObject({ x: 200, y: 150 });
+  });
+});

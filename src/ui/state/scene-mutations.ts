@@ -207,9 +207,18 @@ export function applyFreshImport(
   object: SceneObject,
   batchOffsetIdx: number,
 ): MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> } {
-  // Auto-fit + center on the bed so a 1000 mm SVG dropped on a 400 mm
-  // bed doesn't disappear off the corner. Small designs stay at scale 1.
-  const fitted = fitObjectToBed(object, s.project.device.bedWidth, s.project.device.bedHeight);
+  // Auto-fit ordinary artwork so a 1000 mm SVG dropped on a 400 mm bed does
+  // not disappear off the corner. An explicit depth map keeps its authored
+  // physical scale: the import toast and relief editor promise that width, so
+  // only center it and let Job Review/Frame disclose an over-bed outline.
+  const placementMode =
+    object.kind === 'relief' && object.depthMap !== undefined ? 'center-only' : 'fit';
+  const fitted = fitObjectToBed(
+    object,
+    s.project.device.bedWidth,
+    s.project.device.bedHeight,
+    placementMode,
+  );
   // Multi-import stagger (F-A3): shift Nth file by 10 mm × N right+down.
   const offset = batchOffsetIdx * MULTI_IMPORT_OFFSET_MM;
   let positioned: SceneObject =

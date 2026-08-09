@@ -185,6 +185,25 @@ describe('.lf2 depth-map relief round-trip (ADR-290)', () => {
     expect(result.project.scene.objects[0]).toEqual(depthMapRelief());
   });
 
+  it('preserves an existing authored-width and transform pair byte-for-byte', () => {
+    const base = reliefProject();
+    const transformed = {
+      ...depthMapRelief(),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: -0.36, scaleY: 2 },
+    };
+    const serialized = serializeProject({
+      ...base,
+      scene: { ...base.scene, objects: [transformed], groups: [] },
+    });
+
+    const result = deserializeProject(serialized);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.scene.objects[0]).toEqual(transformed);
+    expect(serializeProject(result.project)).toBe(serialized);
+  });
+
   it('rejects a payload whose byte length disagrees with its dimensions', () => {
     const base = reliefProject();
     const broken = {

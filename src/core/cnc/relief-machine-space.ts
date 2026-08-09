@@ -4,6 +4,7 @@
 // residual isometry used to place the finished cutter-center paths.
 
 import type { Transform } from '../scene';
+import { reliefPlanningScale } from '../relief/relief-physical-dimensions';
 
 export type ReliefMachineSpaceTransform = {
   readonly targetScaleX: number;
@@ -12,8 +13,8 @@ export type ReliefMachineSpaceTransform = {
 };
 
 export function reliefMachineSpaceTransform(transform: Transform): ReliefMachineSpaceTransform {
-  const targetScaleX = planningScale(transform.scaleX);
-  const targetScaleY = planningScale(transform.scaleY);
+  const targetScaleX = reliefPlanningScale(transform.scaleX);
+  const targetScaleY = reliefPlanningScale(transform.scaleY);
   return {
     targetScaleX,
     targetScaleY,
@@ -23,13 +24,4 @@ export function reliefMachineSpaceTransform(transform: Transform): ReliefMachine
       scaleY: transform.scaleY / targetScaleY,
     },
   };
-}
-
-function planningScale(scale: number): number {
-  // Saved projects require finite scale, and interactive handles clamp away
-  // from zero. Retain the legacy collapsed-axis behavior for a hand-built or
-  // old zero-scale scene instead of turning this geometry correction into a
-  // new compile refusal. Non-finite values remain in the residual transform
-  // so the existing non-finite output integrity checks still catch them.
-  return Number.isFinite(scale) && scale !== 0 ? Math.abs(scale) : 1;
 }

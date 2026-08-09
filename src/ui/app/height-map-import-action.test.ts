@@ -1,8 +1,14 @@
 import fc from 'fast-check';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createProject, DEFAULT_CNC_MACHINE_CONFIG, type SceneObject } from '../../core/scene';
+import {
+  applyTransform,
+  createProject,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  type SceneObject,
+} from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { prepareDepthMapPngOffThread } from '../import/import-worker-client';
+import { applyFreshImport } from '../state/scene-mutations';
 import { handleImportHeightMaps, importHeightMapFiles } from './height-map-import-action';
 
 vi.mock('../import/import-worker-client', () => ({
@@ -96,6 +102,46 @@ describe('importHeightMapFiles', () => {
       expect.stringMatching(/becomes output geometry in CNC/i),
       'success',
     );
+  });
+
+  it('keeps the reported physical width when a tall map enters the live scene', async () => {
+    vi.mocked(prepareDepthMapPngOffThread).mockResolvedValue({
+      kind: 'ok',
+      depthMap: {
+        ...PREPARED.depthMap,
+        width: 1,
+        height: 10,
+        samplesBase64: Buffer.alloc(10).toString('base64'),
+      },
+    });
+    let state: Parameters<typeof applyFreshImport>[0] = {
+      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+      undoStack: [],
+    };
+
+    await importHeightMapFiles([new File(['png'], 'tall-depth.png')], {
+      project: state.project,
+      importObject: (object, batchIndex) => {
+        const result = applyFreshImport(state, object, batchIndex ?? 0);
+        state = { project: result.project, undoStack: result.undoStack };
+      },
+      pushToast: vi.fn(),
+    });
+
+    const stored = state.project.scene.objects[0];
+    if (stored?.kind !== 'relief') throw new Error('height-map relief missing');
+    expect(stored.targetWidthMm * Math.abs(stored.transform.scaleX)).toBe(100);
+    expect(stored.transform.scaleX).toBe(1);
+    expect(stored.transform.scaleY).toBe(1);
+    const center = applyTransform(
+      {
+        x: (stored.bounds.minX + stored.bounds.maxX) / 2,
+        y: (stored.bounds.minY + stored.bounds.maxY) / 2,
+      },
+      stored.transform,
+    );
+    expect(center.x).toBe(state.project.device.bedWidth / 2);
+    expect(center.y).toBe(state.project.device.bedHeight / 2);
   });
 });
 
