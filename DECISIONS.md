@@ -16097,12 +16097,15 @@ scalar-field boundary and its lifecycle instead of creating a parallel photo-onl
    The current ADR-290 importer remains **Depth map** behavior until these modes land.
 3. **Adopt a versioned canonical editable field without destroying legacy sources.** A future
    project-schema v4 adds a discriminated `heightfield-v1` arm with positive integer width and
-   height, physical width and height in millimetres, row-major U16 samples, an optional U8 inclusion
-   mask, explicit mapping and outside-mask semantics, source provenance, an algorithm revision, and
-   a content digest. `65535` means stock top and `0` means the deepest included point. The portable
-   field encoding is explicitly named `u16le-base64-v1`; byte order is never inferred. Existing
-   ADR-290 8-bit samples migrate exactly as `value * 257`; existing 16-bit network-order samples are
-   decoded and re-encoded with the same numeric values. Existing mesh reliefs remain lossless in a
+   height, physical width and height in millimetres, row-major U16 scalar codes, an optional U8
+   inclusion mask, explicit mapping and outside-mask semantics, source provenance, an algorithm
+   revision, and a content digest. Stored scalar codes do not claim a physical height without their
+   mapping. The mapping resolves them into the canonical height convention: `65535` is stock top and
+   `0` is the deepest included point. The portable scalar encoding is explicitly named
+   `u16le-base64-v1`; byte order is never inferred. Existing ADR-290 8-bit source codes migrate
+   exactly as `value * 257`; existing 16-bit network-order source codes are decoded and re-encoded
+   with the same numeric values, while their legacy polarity becomes explicit mapping state. This
+   preserves the source codes and the resolved surface. Existing mesh reliefs remain lossless in a
    `legacy-mesh` arm. They are rasterized only through an explicit **Convert to editable relief
    map** action at a displayed resolution. The v3-to-v4 migration must be pure, deterministic,
    allocation-validated, and covered by round-trip fixtures before schema v4 can ship.
