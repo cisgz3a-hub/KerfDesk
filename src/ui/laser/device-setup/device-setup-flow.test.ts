@@ -7,7 +7,9 @@ import {
 import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG } from '../../../core/scene';
 import {
   canAdvanceDeviceSetup,
+  CNC_DEVICE_SETUP_STEP_ORDER,
   DEVICE_SETUP_STEP_ORDER,
+  deviceSetupStepOrder,
   deviceSetupReducer,
   initDeviceSetup,
   machineSetupProfile,
@@ -33,13 +35,27 @@ describe('unified machine setup flow', () => {
     ]);
   });
 
-  it('walks the same beginner sequence for laser and CNC without running a probe', () => {
+  it('walks the laser sequence without running a probe', () => {
     let state = open();
     for (const step of DEVICE_SETUP_STEP_ORDER.slice(1)) {
       state = deviceSetupReducer(state, { kind: 'next' });
       expect(state.step).toBe(step);
     }
     expect(DEVICE_SETUP_STEP_ORDER).not.toContain('probe');
+  });
+
+  it('adds one dedicated Startup Setup page only for an active CNC project', () => {
+    expect(deviceSetupStepOrder('laser')).toEqual(DEVICE_SETUP_STEP_ORDER);
+    expect(deviceSetupStepOrder('cnc')).toEqual(CNC_DEVICE_SETUP_STEP_ORDER);
+    expect(CNC_DEVICE_SETUP_STEP_ORDER).toEqual([
+      'capability',
+      'identify',
+      'connect',
+      'confirm',
+      'cnc-setup',
+      'options',
+      'review',
+    ]);
   });
 
   it('keeps DeviceProfile and CNC config in the same draft', () => {
@@ -115,6 +131,26 @@ describe('unified machine setup flow', () => {
     expect(machineSetupValidationIssues(state)).not.toContain(
       'CNC spindle spin-up delay must be at or above zero.',
     );
+  });
+
+  it('never strands invalid CNC limits before their dedicated edit page', () => {
+    let state = deviceSetupReducer(open(), {
+      kind: 'set-machine-kinds',
+      machineKinds: ['cnc'],
+    });
+    state = deviceSetupReducer(state, {
+      kind: 'edit-machine',
+      machine: {
+        ...state.cncDraft,
+        params: { ...state.cncDraft.params, safeZMm: 0, spindleMaxRpm: 0 },
+      },
+    });
+    state = deviceSetupReducer(state, { kind: 'go', step: 'confirm' });
+    expect(machineSetupValidationIssues(state)).not.toHaveLength(0);
+    expect(canAdvanceDeviceSetup(state)).toBe(true);
+    state = deviceSetupReducer(state, { kind: 'next' });
+    expect(state.step).toBe('cnc-setup');
+    expect(canAdvanceDeviceSetup(state)).toBe(true);
   });
 
   it('persists both output capabilities and CNC machine values for a hybrid machine', () => {

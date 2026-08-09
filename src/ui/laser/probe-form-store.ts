@@ -1,7 +1,7 @@
 // probe-form-store — the touch-plate probe form, shared by every surface that
 // hosts ProbeControls.
 //
-// The controls are mounted in three places (the CNC Material & Bit rail, the
+// The controls are mounted in the CNC Machine rail and supervised setup flows; the
 // Device-Setup wizard step, and ProbePanel). Holding the form in component
 // state gave each mount its own private copy: plate offsets and probe depths
 // dialled in the wizard were absent from the rail, and the rail's Run then

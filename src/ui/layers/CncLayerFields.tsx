@@ -4,8 +4,9 @@
 // setLayerParam action as a whole `cnc` patch, so undo/dirty tracking and
 // .lf2 persistence come for free.
 //
-// Core fields (material, cut type, bit, cut depth, depth-per-pass, feed,
-// plunge, spindle, tabs) lead the card. The always-visible Advanced section
+// Startup-owned material, cutter, stock, and machine values are shown
+// read-only. Operation fields (cut type, depth, feeds, spindle, tabs) lead the
+// card. The always-visible Advanced section
 // follows with feed helpers, stepover, pocket fill, and cut-type tails.
 // Shared row/input controls live in CncLayerPrimitives; the advanced group in
 // CncLayerAdvancedFields.
@@ -24,9 +25,9 @@ import { CncCoreCutFields, CncLayerAdvancedGroup, TabFields } from './CncLayerAd
 import { CncLineArtContoursField } from './CncLineArtContoursField';
 import { CncOpenPathNote } from './CncOpenPathNote';
 import { CncRetractPassesField } from './CncRetractPassesField';
-import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
-import { CncMaterialRow } from './CncMaterialRow';
+import { useLayerHasReliefObjects } from './CncLayerToolFields';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
+import { CncSetupReferenceFields } from './CncSetupReferenceFields';
 
 export function CncLayerFields(props: {
   readonly layer: Layer;
@@ -51,12 +52,7 @@ export function CncLayerFields(props: {
 
   return (
     <>
-      <CncMaterialRow
-        layer={layer}
-        settings={settings}
-        onCommit={commit}
-        onCommitSettings={commitSettings}
-      />
+      <CncSetupReferenceFields settings={settings} hasReliefObjects={hasReliefObjects} />
       <Row label="Cut type">
         <select
           value={settings.cutType}
@@ -85,12 +81,6 @@ export function CncLayerFields(props: {
         on the preparation worker instead of the render thread. CncOpenPathNote
         above stays: it only flattens contours, it never builds the ladder.
       */}
-      <LayerBitSelect
-        layer={layer}
-        settings={settings}
-        onCommit={commit}
-        onCommitSettings={commitSettings}
-      />
       <CutDepthField
         layer={layer}
         settings={settings}

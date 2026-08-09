@@ -61,11 +61,12 @@ describe('DeviceSetupWizard router commit', () => {
       await act(async () => button(view.host, 'Use detected values').click());
       await act(async () => button(view.host, 'Next').click()); // confirm settings
       expect(input(view.host, 'Bed width (mm)').value).toBe('750');
+      await act(async () => button(view.host, 'Next').click()); // CNC Startup Setup
       expect(input(view.host, 'Spindle maximum').value).toBe('24000');
       expect(view.host.textContent).not.toContain('Laser output and accessories');
 
-      await advanceUntil(view.host, 'Step 6 of 6 — Review & save');
-      await act(async () => button(view.host, 'Save machine setup').click());
+      await advanceUntil(view.host, 'Step 7 of 7 — Review & save');
+      await act(async () => button(view.host, 'Save CNC startup setup').click());
 
       const state = useStore.getState();
       const machine = state.project.machine;
@@ -108,6 +109,7 @@ describe('DeviceSetupWizard router commit', () => {
       expect(view.host.textContent).not.toContain('Use detected values');
       await act(async () => button(view.host, 'Next').click()); // confirm settings
       expect(view.host.textContent).toContain('No controller values were imported');
+      await act(async () => button(view.host, 'Next').click()); // CNC Startup Setup
       expect(input(view.host, 'Spindle maximum').value).toBe('12000');
     } finally {
       await view.unmount();

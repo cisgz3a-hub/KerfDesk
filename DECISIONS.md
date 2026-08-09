@@ -9922,15 +9922,16 @@ advisory only: it adds no guard, refusal, clamp, confirmation, or change to Fram
 
 ### Amendment - explicit settings approval (2026-08-09)
 
-The editable Artwork settings keep committing through the normal project-store actions, so changes
-remain synchronized with the main Artwork / Operations panel and retain the existing undo, dirty,
-and exact-job invalidation behavior. Job Review now shows an **Approve settings** action with a live
-status that identifies values changed since the review opened or were last approved. Approving
-records that the operator reviewed the currently synchronized values and, when they changed,
-requests an immediate exact-job rebuild. It is not a prerequisite for Start: **Start job** continues
-to approve the complete review in one click. A setting change that invalidates the framed artifact
-still uses the existing handoff-consistency path and requires Frame again; the new action does not
-bypass or expand that contract.
+Editable laser Artwork settings keep committing through the normal project-store actions, so
+changes remain synchronized with the main Artwork / Operations panel and retain the existing undo,
+dirty, and exact-job invalidation behavior. Laser Job Review now shows an **Approve settings** action
+with a live status that identifies values changed since the review opened or were last approved.
+Approving records that the operator reviewed the currently synchronized values and, when they
+changed, requests an immediate exact-job rebuild. It is not a prerequisite for Start: **Start job**
+continues to approve the complete review in one click. CNC Job Review remains read-only and routes
+changes to Artwork or Startup Setup under ADR-292. A setting change that invalidates the framed
+artifact still uses the existing handoff-consistency path and requires Frame again; the new action
+does not bypass or expand that contract.
 > **Numbering note.** Drafted as ADR-221, but the fleet landed ADR-221 (elapsed-time badge),
 > ADR-222 (single-artwork selection), and ADR-223 (Canvas Focus layout) on main mid-flight - so
 > this entry is **ADR-224**. Re-verify the tail and open-PR claims before merge.
@@ -16309,3 +16310,151 @@ scalar-field boundary and its lifecycle instead of creating a parallel photo-onl
 - Grbl v1.1 Interface - acknowledgements and status reports describe protocol/controller state and
   do not qualify loaded physical motion:
   https://github.com/gnea/grbl/blob/master/doc/markdown/interface.md
+## ADR-292 - CNC settings have one writable owner in Startup Setup
+
+**Date:** 2026-08-09
+**Status:** Accepted; implemented and software/browser verified; controller and hardware qualification pending
+
+### Context
+
+The maintainer rejected the repeated CNC setup questions shown around artwork. The current contract
+deliberately created three writable surfaces:
+
+- ADR-111 put material and cutter-dependent automatic settings in every CNC operation card and put
+  detected machine parameters in the bottom Material & Bit card.
+- ADR-112/264 put project material and its explicit Apply flow in that bottom card while preserving
+  a per-operation material override.
+- ADR-224 made CNC depth, depth/pass, feed, plunge, and spindle editable again in Job Review.
+- ADR-205/240 made Machine Setup the one atomic machine-configuration workflow, but explicitly left
+  current-job stock/material/bit in Material & Bit and deferred removal of its live duplicates.
+- ADR-281 standardized the duplicated rail controls visually without resolving their ownership.
+
+As a result, machine maximum RPM and operation RPM read like competing spindle questions, placing
+or selecting artwork exposes material/bit controls that look like setup must be repeated, and Job
+Review is a third authoring location. Moving the same inputs into another card would preserve the
+problem. The settings need one writable owner per scope.
+
+### Decision
+
+1. **Extend the existing atomic setup workflow; do not create another one.** The CNC-facing job page
+   in the global Machine Setup flow is named **Startup Setup** (`cnc-setup`). A CNC-active draft inserts that page
+   between Confirm settings and Options. Machine-rail launchers and read-only Artwork references
+   open the same dialog host and may deep-link to an exact section/field. Selecting CNC mode or
+   placing/importing artwork never opens it automatically.
+2. **Startup Setup is the sole writable owner for setup values.** Its sections have explicit scopes:
+   - **Machine limits:** safe Z, spindle maximum, spin-up delay, coolant, and park.
+   - **Current job:** project material, default/active bit, stock thickness/footprint/origin, and
+     tiling.
+   - **Tool Plan:** each operation's material and primary/secondary cutter assignments, including an
+     explicit reset to the Current job default.
+   Bit-library and saved-CNC-profile management remain reachable inside Startup Setup, but do not
+   create another operation-assignment surface. Probe remains the supervised Machine-rail operation;
+   surfacing moves to Machine > CNC Utilities because it generates output rather than configuring a
+   job.
+3. **Artwork settings owns operation cutting behavior.** Cut type, cut/insert depth, depth per pass,
+   feed, plunge, **Artwork spindle speed**, tabs, and specialist CAM controls remain writable in the
+   persistent one-artwork inspector. Material, resolved cutter, stock, spindle maximum, spin-up,
+   coolant, safe Z, and park are read-only setup references there. The Feeds calculator consumes the
+   effective material/cutter/flute evidence as read-only inputs; it does not add another material or
+   cutter selector.
+4. **A read-only setup reference remains an accessible route, not a disabled input.** It uses muted
+   read-only styling while remaining keyboard-focusable. Activating it explains the value and its
+   scope, then offers **Edit in Startup Setup** at the exact field. This is information plus direct
+   navigation, not a confirmation required before editing. The machine ceiling is labeled
+   **Machine maximum** immediately beside or above **Artwork spindle speed** so the two RPM meanings
+   cannot be confused.
+5. **CNC Job Review is read-only.** It reports the exact prepared operation values, resolved
+   material/tool plan, machine facts, and warnings, but accepts no CNC numeric or setup edits.
+   **Edit Artwork settings** and **Edit Startup Setup** leave the review and return to the one
+   writable owner. Laser Job Review inline editing is outside this decision and remains unchanged.
+   ADR-224's exact-artifact review, acknowledgement, and Start-time handoff contract remain intact.
+6. **Save and Cancel keep one atomic boundary.** Device profile, machine configuration, current-job
+   setup, and Tool Plan edits stay in one draft. Browsing a material is non-mutating; the existing
+   explicit **Apply [material] preset** / **Use manual feeds** action updates only that draft. **Save
+   machine setup** commits the complete draft through one store transaction and one undo entry.
+   **Cancel** changes no live project value, dirty flag, undo/redo history, controller state, or
+   firmware setting. Firmware writes retain ADR-205/240's separate explicit queue and verified-write
+   policy after the software commit.
+7. **Preserve the existing explicit-Apply contract and later automatic-versus-manual intent.**
+   **Apply [material] preset** deliberately recalculates feed, plunge, and depth/pass for every
+   operation in the draft, including operations that previously carried manual values; this is the
+   existing ADR-112 bulk-Apply behavior, now staged until final Save. **Use manual feeds** clears the
+   setup association while keeping the current numeric cutting values. Later machine-limit,
+   default-cutter, profile, or detected-value refreshes may recalculate only values whose provenance
+   says they are automatic; manual feed, plunge, depth/pass, and artwork-spindle values remain
+   exact. Changing a cutter's Startup-owned flute metadata refreshes only material-recipe operations
+   resolved through that cutter; manual numeric values remain exact. New operations inherit the
+   committed Current job defaults without another question.
+   Existing mixed-material and multi-tool operations load into Tool Plan as explicit overrides and
+   are never silently flattened unless the operator explicitly applies one material to all.
+8. **This is a UI/state-ownership migration, not a project or output migration.** Existing
+   `CncStock.materialKey`, operation material/provenance fields, tool ids, secondary-tool roles,
+   machine parameters, serialization, compiler resolution, tool-section ordering, tool-change
+   pauses, and emitted G-code semantics remain authoritative. No schema version is added. An
+   unchanged project must round-trip and emit byte-identical G-code before and after this change.
+   Legacy saved Design Studio layer tool ids remain accepted as read-only compatibility data:
+   applying such a saved design may carry those exact ids into the created operations, but Design
+   Studio cannot create or change the assignments. After Apply, Startup Setup > Tool Plan is their
+   only writable owner.
+9. **Add no guard or confirmation.** Startup Setup does not become mandatory before import, preview,
+   save, Frame, or Start. Muted references do not disable operation editing. This decision adds no
+   refusal, clamp, cap, automatic rewrite, controller command, warning acknowledgement, or
+   confirmation. A committed job-affecting edit continues to invalidate an exact Frame permit under
+   the existing handoff-consistency contract; Frame remains the sole ordinary Start guard and Job
+   Review remains the single warning surface.
+
+### Supersession scope
+
+- ADR-111 Decision #1's layer-card material-picker placement and Decision #3a's Material & Bit
+  placement are superseded. Its catalog calculation, automatic provenance, machine-detection
+  semantics, always-visible Advanced section, through-cut action, and limit advisories remain.
+- ADR-112's Material & Bit picker placement and per-layer override UI are superseded. Its stock-owned
+  project material, explicit bulk application, inheritance/seeding, validation, and data model
+  remain; overrides move to Tool Plan.
+- ADR-264's Material & Bit and layer-selector placements are superseded. Species grouping,
+  evidence-bounded recipes, preview-then-explicit-Apply behavior, manual-feed preservation, and
+  scrap-test disclosure remain.
+- ADR-224's live/editable decision is superseded for CNC rows only. Its Start-time review,
+  exact-prepared-artifact disclosure, laser editing, warnings, acknowledgement, and handoff binding
+  remain.
+- ADR-205/240's exclusion of job-specific stock/material/bit from Machine Setup and ADR-240's fixed
+  six-page composition are superseded for a CNC-active draft. Their single global draft, atomic
+  commit, detection, controller selection, firmware-write policy, and commissioning language remain.
+- ADR-281's Material & Bit group placement is superseded. Its shared rail grammar remains available
+  to the surviving Artwork and Machine-rail surfaces.
+
+### Consequences
+
+- The bottom Material & Bit card is removed. Each CNC value has one writable UI owner, while Artwork
+  and Job Review still show the effective values needed to understand the operation and exact job.
+- Startup Setup contains both machine-scoped and project-scoped data, so headings and review copy
+  must name what persists with the machine versus the open project. One dialog does not imply one
+  persistence lifetime.
+- Operators may establish material, default bit, and stock before artwork exists. Importing or
+  placing artwork then inherits those defaults without presenting the same setup fields again.
+- Mixed-material and multi-tool work remains supported without hiding its operation assignments;
+  Tool Plan is the deliberate authoring surface for those exceptions.
+- Removing a duplicate UI must not remove its non-setting utilities. Probe remains reachable once,
+  and surfacing remains reachable once under CNC Utilities.
+- The implementation is present in source and covered by automated, production-build, and
+  desktop/compact browser verification. Controller and hardware qualification remain pending and are
+  not implied by those results.
+
+### Required verification
+
+- Component tests must prove there is no Material & Bit card; importing/placing artwork does not
+  open setup; setup references are focusable, explanatory, and deep-link to the exact field; and
+  Machine maximum is visually and accessibly distinct from Artwork spindle speed at compact and
+  desktop widths.
+- Flow/store tests must prove material browsing and Cancel are side-effect-free; Save creates one
+  undo entry; explicit material Apply refreshes every operation; Use manual feeds preserves the
+  current numeric values; and later automatic refreshes leave manual values exact.
+- Project/compiler tests must load legacy mixed-material/multi-tool jobs, preserve explicit Tool Plan
+  overrides and secondary roles, round-trip without schema change, retain tool-change sections, and
+  produce byte-identical G-code for unchanged project data.
+- Job Review tests must prove CNC values are visible but have no writable inputs, exact compiled
+  operation disclosure remains, and laser inline editing is unchanged.
+- Navigation tests must cover direct launch and exact-field deep links when the Machine rail is not
+  mounted in compact mode. Perceptual review must cover 240, 300, and 340 px rails plus desktop.
+- Software verification does not qualify physical cutter setup, spindle limits, feeds/speeds,
+  controller behavior, workholding, air-cut, material cut, or finish quality.

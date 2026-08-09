@@ -1,8 +1,8 @@
 // JobReviewDialog — the pre-start Job Review window (ADR-224). Opens for
 // every Start that goes through the shared start flow, shows everything the
 // burn depends on (stats from the exact prepared G-code, grouped warnings,
-// editable artwork settings with per-mode detail lines, CNC material &
-// stock, live controller/machine facts, and the absorbed safety
+// laser-editable / CNC read-only artwork settings with per-mode detail
+// lines, CNC material & stock, live controller/machine facts, and the absorbed safety
 // acknowledgement), and hands the operator's Confirm/Cancel back to the
 // flow's review gate. Placement is read-only here (v2): the origin tile and
 // the footer fact echo it, editing stays on the machine rail.
@@ -20,6 +20,7 @@ import {
   startButtonContentStyle,
 } from './job-review.styles';
 import { JobReviewAcknowledgement } from './JobReviewAcknowledgement';
+import { JobReviewCncOwnerActions } from './JobReviewCncOwnerActions';
 import { JobReviewControllerSection } from './JobReviewControllerSection';
 import { JobReviewHeader } from './JobReviewHeader';
 import { JobReviewLayersTable } from './JobReviewLayersTable';
@@ -58,12 +59,15 @@ function OpenJobReview(props: {
       <JobReviewStats stats={model.stats} isPreparing={isPreparing} />
       {blocker !== null ? <BlockerBanner blocker={blocker} purpose={purpose} /> : null}
       <JobReviewWarnings warnings={model.warnings} />
+      {model.machineKind === 'cnc' ? <JobReviewCncOwnerActions /> : null}
       <JobReviewStockCard />
       <JobReviewLayersTable
         machineKind={model.machineKind}
         effectiveOperations={model.effectiveOperations}
       />
-      <JobReviewSettingsApproval onApprove={requestReviewRebuild} />
+      {model.machineKind === 'laser' ? (
+        <JobReviewSettingsApproval onApprove={requestReviewRebuild} />
+      ) : null}
       <section aria-label="Before you start" style={sectionStyle}>
         <h3 style={sectionHeadingStyle}>Before you start</h3>
         <JobReviewControllerSection machineKind={model.machineKind} />

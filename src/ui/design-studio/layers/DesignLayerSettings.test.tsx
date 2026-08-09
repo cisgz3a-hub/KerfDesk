@@ -1,9 +1,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_DESIGN_LAYER } from '../../../core/design/layers';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_DESIGN_LAYER, type DesignLayer } from '../../../core/design/layers';
 import type { CncTool } from '../../../core/scene';
-import { useToastStore } from '../../state/toast-store';
+import { useMachineSetupDialogStore } from '../../laser/device-setup/machine-setup-dialog-store';
 import { DesignLayerSettings } from './DesignLayerSettings';
 
 (
@@ -27,157 +27,122 @@ const tools: ReadonlyArray<CncTool> = [
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 
+beforeEach(() => {
+  useMachineSetupDialogStore.setState({ state: { kind: 'idle' }, configuredRevision: 0 });
+});
+
 afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = null;
   host = null;
-  for (const toast of useToastStore.getState().toasts) {
-    useToastStore.getState().dismissToast(toast.id);
-  }
+  useMachineSetupDialogStore.setState({ state: { kind: 'idle' }, configuredRevision: 0 });
 });
 
 describe('DesignLayerSettings', () => {
-  it('offers only flat end mills for V-carve flat-floor clearing', () => {
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-    act(() => {
-      root?.render(
-        <DesignLayerSettings
-          layer={{
-            ...DEFAULT_DESIGN_LAYER,
-            cutType: 'v-carve',
-            vCarveFlatDepthEnabled: true,
-          }}
-          tools={tools}
-          activeTool={tools[4]!}
-          stockThicknessMm={12}
-          onPatch={vi.fn()}
-        />,
-      );
-    });
-
-    const clearSelect = [...host.querySelectorAll('select')].find((select) =>
-      select.title.startsWith('Two-stage v-carve'),
-    );
-    if (clearSelect === undefined) throw new Error('clearing bit select missing');
-    const optionValues = [...clearSelect.options].map((option) => option.value);
-
-    expect(optionValues).toEqual(['', 'flat']);
-    expect(optionValues).not.toContain('ball');
-    expect(optionValues).not.toContain('core-box');
-    expect(optionValues).not.toContain('engraver');
-    expect(optionValues).not.toContain('v90');
-    expect(clearSelect.querySelector('optgroup')?.label).toBe('Square / straight end mills');
-    expect(clearSelect.querySelector('option[value="flat"]')?.textContent).toBe(
-      '3.175 mm, End mill — Flat end mill',
-    );
-  });
-
-  it('keeps a persisted invalid clearing bit visible but disabled', () => {
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-    act(() => {
-      root?.render(
-        <DesignLayerSettings
-          layer={{
-            ...DEFAULT_DESIGN_LAYER,
-            cutType: 'v-carve',
-            vCarveFlatDepthEnabled: true,
-            vClearToolId: 'ball',
-          }}
-          tools={tools}
-          activeTool={tools[4]!}
-          stockThicknessMm={12}
-          onPatch={vi.fn()}
-        />,
-      );
-    });
-
-    const clearSelect = [...host.querySelectorAll('select')].find((select) =>
-      select.title.startsWith('Two-stage v-carve'),
-    );
-    if (clearSelect === undefined) throw new Error('clearing bit select missing');
-    const invalid = clearSelect.querySelector('option[value="ball"]');
-
-    expect(clearSelect.value).toBe('ball');
-    expect(invalid).toBeInstanceOf(HTMLOptionElement);
-    expect((invalid as HTMLOptionElement).disabled).toBe(true);
-    expect(invalid?.textContent).toContain('choose a flat end mill');
-    expect(invalid?.textContent).toContain('3.175 mm, Ball nose — Ball nose');
-    expect(clearSelect.querySelector('option[value="core-box"]')).toBeNull();
-    expect(clearSelect.querySelector('option[value="engraver"]')).toBeNull();
-    expect(clearSelect.querySelector('option[value="v90"]')).toBeNull();
-  });
-
-  it('warns when Design Studio selects a secondary V-carve clearing bit', () => {
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
+  it('shows the Startup default bit read-only and deep-links to Tool Plan after explaining Apply', () => {
     const onPatch = vi.fn();
-    act(() => {
-      root?.render(
-        <DesignLayerSettings
-          layer={{
-            ...DEFAULT_DESIGN_LAYER,
-            cutType: 'v-carve',
-            toolId: 'v90',
-            vCarveFlatDepthEnabled: true,
-          }}
-          tools={tools}
-          activeTool={tools[4]!}
-          stockThicknessMm={12}
-          onPatch={onPatch}
-        />,
-      );
-    });
-    const clearSelect = [...host.querySelectorAll('select')].find((select) =>
-      select.title.startsWith('Two-stage v-carve'),
+    renderSettings(DEFAULT_DESIGN_LAYER, onPatch);
+
+    expect(host?.querySelectorAll('select')).toHaveLength(1);
+    const bitReference = referenceButton('Bit');
+    expect(bitReference.disabled).toBe(false);
+    expect(bitReference.textContent).toContain('90 degree V-bit');
+    expect(bitReference.textContent).toContain('Startup default');
+    expect(host?.textContent).toContain(
+      'Apply the design, then edit its operation in Startup Setup › Tool Plan.',
     );
-    if (clearSelect === undefined) throw new Error('clearing bit select missing');
 
-    act(() => {
-      clearSelect.value = 'flat';
-      clearSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    act(() => bitReference.click());
+    expect(host?.querySelector('[role="note"]')?.textContent).toMatch(
+      /inherits the current job default bit.*Apply the design first/i,
+    );
+    const edit = [...(host?.querySelectorAll('button') ?? [])].find(
+      (button) => button.textContent === 'Edit in Startup Setup',
+    );
+    if (!(edit instanceof HTMLButtonElement)) throw new Error('Startup Setup action missing');
+    act(() => edit.click());
+
+    expect(useMachineSetupDialogStore.getState().state).toEqual({
+      kind: 'open',
+      target: { kind: 'cnc', field: 'tool-plan' },
+      requestId: 1,
+    });
+    expect(onPatch).not.toHaveBeenCalled();
+  });
+
+  it('preserves known legacy primary and clearing ids as read-only saved overrides', () => {
+    const onPatch = vi.fn();
+    renderSettings(
+      {
+        ...DEFAULT_DESIGN_LAYER,
+        cutType: 'v-carve',
+        vCarveFlatDepthEnabled: true,
+        toolId: 'v90',
+        vClearToolId: 'ball',
+      },
+      onPatch,
+    );
+
+    expect(host?.querySelectorAll('select')).toHaveLength(1);
+    expect(referenceButton('Bit').textContent).toMatch(/90 degree V-bit.*saved design override/i);
+    const clearing = referenceButton('Clear bit');
+    expect(clearing.textContent).toMatch(/Ball nose.*saved design override/i);
+
+    act(() => clearing.click());
+    expect(host?.querySelector('[role="note"]')?.textContent).toMatch(
+      /legacy clearing-bit override.*preserved when you Apply/i,
+    );
+    expect(onPatch).not.toHaveBeenCalled();
+  });
+
+  it('keeps unavailable legacy tool ids visible without silently clearing them', () => {
+    const onPatch = vi.fn();
+    renderSettings(
+      {
+        ...DEFAULT_DESIGN_LAYER,
+        toolId: 'missing-primary',
+        vClearToolId: 'missing-clear',
+      },
+      onPatch,
+    );
+
+    expect(referenceButton('Bit').textContent).toContain('Unavailable bit (missing-primary)');
+    const clearing = referenceButton('Clear bit');
+    expect(clearing.textContent).toContain('Unavailable bit (missing-clear)');
+    act(() => clearing.click());
+    expect(host?.querySelector('[role="note"]')?.textContent).toContain(
+      'The current cut settings do not use this clearing assignment.',
+    );
+    expect(onPatch).not.toHaveBeenCalled();
+  });
+
+  it('shows a read-only single-stage clearing reference for a flat-floor V-carve', () => {
+    renderSettings({
+      ...DEFAULT_DESIGN_LAYER,
+      cutType: 'v-carve',
+      vCarveFlatDepthEnabled: true,
     });
 
-    expect(onPatch).toHaveBeenCalledWith({ vClearToolId: 'flat' });
-    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
-      variant: 'warning',
-      message: expect.stringMatching(/secondary.*feed.*plunge.*RPM.*depth\/pass.*verify/i),
-    });
+    const clearing = referenceButton('Clear bit');
+    expect(clearing.textContent).toContain('Single stage');
+    act(() => clearing.click());
+    expect(host?.querySelector('[role="note"]')?.textContent).toMatch(
+      /Apply the design first.*Startup Setup › Tool Plan/i,
+    );
   });
 
   it('shows the Flat control but hides floor-only controls for flowing V-carve', () => {
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
     const onPatch = vi.fn();
-    act(() => {
-      root?.render(
-        <DesignLayerSettings
-          layer={{ ...DEFAULT_DESIGN_LAYER, cutType: 'v-carve' }}
-          tools={tools}
-          activeTool={tools[4]!}
-          stockThicknessMm={12}
-          onPatch={onPatch}
-        />,
-      );
-    });
+    renderSettings({ ...DEFAULT_DESIGN_LAYER, cutType: 'v-carve' }, onPatch);
 
-    const flat = host.querySelector(
+    const flat = host?.querySelector(
       `input[aria-label="Flat depth for ${DEFAULT_DESIGN_LAYER.name}"]`,
     );
     expect(flat).toBeInstanceOf(HTMLInputElement);
     expect((flat as HTMLInputElement).checked).toBe(false);
-    expect(host.textContent).not.toContain('Floor');
-    expect(
-      [...host.querySelectorAll('select')].some((select) =>
-        select.title.startsWith('Two-stage v-carve'),
-      ),
-    ).toBe(false);
+    expect(host?.textContent).not.toContain('Floor');
+    expect(host?.querySelector('button[aria-label^="Clear bit:"]')).toBeNull();
 
     act(() => {
       (flat as HTMLInputElement).click();
@@ -185,3 +150,26 @@ describe('DesignLayerSettings', () => {
     expect(onPatch).toHaveBeenCalledWith({ vCarveFlatDepthEnabled: true });
   });
 });
+
+function renderSettings(layer: DesignLayer, onPatch = vi.fn()): void {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  act(() => {
+    root?.render(
+      <DesignLayerSettings
+        layer={layer}
+        tools={tools}
+        activeTool={tools[4]!}
+        stockThicknessMm={12}
+        onPatch={onPatch}
+      />,
+    );
+  });
+}
+
+function referenceButton(label: string): HTMLButtonElement {
+  const button = host?.querySelector(`button[aria-label^="${label}:"]`);
+  if (!(button instanceof HTMLButtonElement)) throw new Error(`${label} reference missing`);
+  return button;
+}

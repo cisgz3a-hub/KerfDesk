@@ -29,7 +29,7 @@ export function detectCncDefaultFeedWarnings(project: Project): ReadonlyArray<st
       warnings.push(
         `Layer ${layer.id} uses the generic starter feeds ` +
           `(${DEFAULT_CNC_LAYER_SETTINGS.feedMmPerMin} mm/min, ${DEFAULT_CNC_LAYER_SETTINGS.depthPerPassMm} mm/pass). ` +
-          'Pick a material in Material & Bit to tune them for your stock and bit.',
+          'Pick and apply a material in CNC Startup Setup to tune them for your stock and bit.',
       );
     }
   }

@@ -168,29 +168,38 @@ baseTest(
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/');
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toHaveAccessibleName('Machine Setup');
 
     await dialog.getByRole('radio', { name: /CNC only/ }).check();
+    await expect(dialog).toHaveAccessibleName('CNC Startup Setup');
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();
     await dialog.getByLabel('Built-in CNC machine').selectOption('genmitsu-3018');
     await dialog.getByRole('button', { name: 'Load into draft', exact: true }).click();
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();
-    await expect(dialog).toContainText('CNC clearance and spindle contract');
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(dialog).toContainText('CNC machine limits');
     await expect(dialog).not.toContainText('Laser output and accessories');
-    await dialog.getByLabel('Safe Z').fill('9');
-    await dialog.getByLabel('Safe Z').blur();
-    for (let step = 0; step < 2; step += 1) {
-      await dialog.getByRole('button', { name: 'Next', exact: true }).click();
-    }
-    await expect(dialog).toContainText(
-      'Probe plate thickness, electrical contact, and plate removal',
-    );
-    await dialog.getByRole('button', { name: 'Save machine setup', exact: true }).click();
+    await dialog.getByRole('spinbutton', { name: 'Safe Z', exact: true }).fill('9');
+    await dialog.getByRole('spinbutton', { name: 'Safe Z', exact: true }).blur();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(dialog).toContainText('Z axis and probe');
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Save CNC startup setup', exact: true }).click();
 
     await expect(page.getByLabel('Router controls')).toBeVisible();
-    await expect(page.getByLabel('Safe Z')).toHaveValue('9');
-    await expect(page.getByLabel('Spindle max')).toHaveValue('10000');
+    await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+    const reopened = page.getByRole('dialog', { name: 'CNC Startup Setup' });
+    await reopened
+      .getByRole('button', { name: 'Go to step 5: CNC Startup Setup', exact: true })
+      .click();
+    await expect(reopened.getByRole('spinbutton', { name: 'Safe Z', exact: true })).toHaveValue(
+      '9',
+    );
+    await expect(
+      reopened.getByRole('spinbutton', { name: 'Spindle maximum', exact: true }),
+    ).toHaveValue('10000');
   },
 );
 

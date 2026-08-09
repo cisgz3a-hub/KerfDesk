@@ -11,20 +11,15 @@ import { isVCarveToolCompatible } from '../../core/cnc/vcarve-tool-compatibility
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { CncFinishAllowanceField } from './CncFinishAllowanceField';
-import {
-  HelicalEntryRows,
-  MotionPolishRows,
-  ReliefLayerRows,
-  VClearToolSelect,
-} from './CncLayerToolFields';
+import { HelicalEntryRows, MotionPolishRows, ReliefLayerRows } from './CncLayerToolFields';
 import { CncFeedPresetRows } from './CncFeedPresetRows';
-import { RestPocketToolSelect } from './CncRestPocketFields';
 import { FeedsCalculatorRow } from './FeedsCalculatorRow';
 import { NumberField, Row } from './CncLayerPrimitives';
 import { PocketFillRow } from './PocketFillRow';
 import { AdaptivePocketFields } from './AdaptivePocketFields';
 import { CncInlayFields } from './CncInlayFields';
 import { CncTabPositionControls } from './CncTabPositionControls';
+import { SetupOwnedValueRow } from './SetupOwnedValueRow';
 
 // The whole advanced field set. Tabs is NOT here — it moved to the core group.
 export function CncLayerAdvancedGroup(props: {
@@ -113,15 +108,21 @@ export function CncCoreCutFields(props: {
         title="Z plunge feed rate — slower than XY feed, bits cut poorly straight down."
         onCommit={(plungeMmPerMin) => onCommit({ plungeMmPerMin })}
       />
+      <SetupOwnedValueRow
+        label="Machine maximum"
+        value={`${spindleMaxRpm.toLocaleString('en-US')} RPM`}
+        description="This is the machine maximum spindle speed saved in Startup Setup. Artwork spindle speed below is the requested running speed for this operation."
+        setupField="spindle-max"
+      />
       <NumberField
         layer={layer}
-        label="Spindle"
+        label="Artwork spindle speed"
         unit="RPM"
         value={settings.spindleRpm}
         min={1000}
         max={spindleMaxRpm}
         step={500}
-        title="Spindle running speed for this layer's cut (up to the machine's Spindle max in Material & Bit)."
+        title="Requested spindle running speed for this artwork operation. Machine maximum is shown above and is edited in Startup Setup."
         onCommit={(spindleRpm) => onCommit({ spindleRpm })}
       />
     </>
@@ -203,37 +204,20 @@ export function CutTypeSections(props: {
     <>
       <CncFinishAllowanceField layer={layer} settings={settings} onCommit={onCommit} />
       {props.hasReliefObjects ? (
-        <ReliefLayerRows
-          layer={layer}
-          settings={settings}
-          onCommit={onCommit}
-          onCommitSettings={onCommitSettings}
-        />
+        <ReliefLayerRows layer={layer} settings={settings} onCommit={onCommit} />
       ) : null}
       {settings.cutType === 'v-carve' ? (
-        <VCarveSection
-          layer={layer}
-          settings={settings}
-          onCommit={onCommit}
-          onCommitSettings={onCommitSettings}
-        />
+        <VCarveFields layer={layer} settings={settings} onCommit={onCommit} />
       ) : null}
       {settings.cutType === 'pocket' ? (
         <>
           {settings.pocketStrategy !== 'adaptive' ? (
-            <>
-              <RestPocketToolSelect
-                layer={layer}
-                settings={settings}
-                onCommitSettings={onCommitSettings}
-              />
-              <HelicalEntryRows
-                layer={layer}
-                settings={settings}
-                onCommit={onCommit}
-                onCommitSettings={onCommitSettings}
-              />
-            </>
+            <HelicalEntryRows
+              layer={layer}
+              settings={settings}
+              onCommit={onCommit}
+              onCommitSettings={onCommitSettings}
+            />
           ) : null}
         </>
       ) : null}
@@ -243,29 +227,6 @@ export function CutTypeSections(props: {
           settings={settings}
           onCommit={onCommit}
           onCommitSettings={onCommitSettings}
-        />
-      ) : null}
-    </>
-  );
-}
-
-// H.3 ring detail + H.7 two-stage clearing bit, grouped so the parent
-// component stays under the function-size cap.
-function VCarveSection(props: {
-  readonly layer: Layer;
-  readonly settings: CncLayerSettings;
-  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-  readonly onCommitSettings: (settings: CncLayerSettings) => void;
-}): JSX.Element {
-  return (
-    <>
-      <VCarveFields layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
-      {(props.settings.vCarveFlatDepthEnabled ?? true) ? (
-        <VClearToolSelect
-          layer={props.layer}
-          settings={props.settings}
-          onCommit={props.onCommit}
-          onCommitSettings={props.onCommitSettings}
         />
       ) : null}
     </>
@@ -301,8 +262,8 @@ function VCarveFields(props: {
       />
       {!activeToolIsCompatible ? (
         <div style={vbitWarningStyle} role="alert">
-          V-carve needs a V-bit or modeled angled engraving bit — pick one in Material &amp; Bit.
-          Unsupported selections may use legacy 60° fallback geometry where compatible.
+          V-carve needs a V-bit or modeled angled engraving bit — assign one in the Startup Setup
+          tool plan. Unsupported selections may use legacy 60° fallback geometry where compatible.
         </div>
       ) : null}
     </>

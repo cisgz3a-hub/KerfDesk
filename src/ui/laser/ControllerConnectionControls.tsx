@@ -5,7 +5,7 @@ import { machineNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { ConnectionBar } from './ConnectionBar';
-import { DeviceSetupControls, type DeviceSetupOpenRequest } from './device-setup';
+import { DeviceSetupControls } from './device-setup';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 
 type Props = {
@@ -13,7 +13,6 @@ type Props = {
   readonly autofocusBusy: boolean;
   readonly motionOperation: ReturnType<typeof useLaserStore.getState>['motionOperation'];
   readonly controllerOperation: ReturnType<typeof useLaserStore.getState>['controllerOperation'];
-  readonly openRequest: DeviceSetupOpenRequest | undefined;
   readonly onForget: () => void;
 };
 
@@ -47,7 +46,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         }
       />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
-      <DeviceSetupControls openRequest={props.openRequest} />
+      <DeviceSetupControls />
       <ConnectionBar
         connection={connection}
         machineNoun={machineNoun(props.machineKind)}

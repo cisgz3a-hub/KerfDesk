@@ -49,6 +49,66 @@ describe('operation settings clipboard', () => {
     expect(useStore.getState().dirty).toBe(true);
   });
 
+  it('pastes artwork settings without replacing Startup-owned CNC bindings', () => {
+    arrangeTwoOperations();
+    const [sourceId, targetId] = operationIdsFor('O1');
+    if (sourceId === undefined || targetId === undefined) throw new Error('operations missing');
+    useStore.getState().setLayerParam(sourceId, {
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'pocket',
+        depthMm: 8,
+        depthPerPassMm: 2,
+        feedMmPerMin: 900,
+        plungeMmPerMin: 180,
+        spindleRpm: 18_000,
+        materialKey: 'hardwood',
+        toolId: 'source-primary',
+        vClearToolId: 'source-clear',
+        pocketRoughToolId: 'source-rough',
+        reliefFinishToolId: 'source-finish',
+        feedSource: {
+          kind: 'material-recipe',
+          materialKey: 'hardwood',
+          fluteCount: 2,
+        },
+      },
+    });
+    useStore.getState().setLayerParam(targetId, {
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        materialKey: 'acrylic',
+        toolId: 'target-primary',
+        vClearToolId: 'target-clear',
+        pocketRoughToolId: 'target-rough',
+        reliefFinishToolId: 'target-finish',
+        feedSource: {
+          kind: 'material-recipe',
+          materialKey: 'acrylic',
+          fluteCount: 1,
+        },
+      },
+    });
+
+    useStore.getState().copyLayerSettings(sourceId);
+    useStore.getState().pasteLayerSettings(targetId);
+
+    expect(operation(targetId)?.cnc).toMatchObject({
+      cutType: 'pocket',
+      depthMm: 8,
+      depthPerPassMm: 2,
+      feedMmPerMin: 900,
+      plungeMmPerMin: 180,
+      spindleRpm: 18_000,
+      materialKey: 'acrylic',
+      toolId: 'target-primary',
+      vClearToolId: 'target-clear',
+      pocketRoughToolId: 'target-rough',
+      reliefFinishToolId: 'target-finish',
+    });
+    expect(operation(targetId)?.cnc).not.toHaveProperty('feedSource');
+  });
+
   it('does nothing when no settings were copied', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const [operationId] = operationIdsFor('O1');

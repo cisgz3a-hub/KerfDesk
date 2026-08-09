@@ -135,7 +135,7 @@ function LayersCardHeader(props: {
       </button>
       <button
         type="button"
-        title="Add a carve layer — draw the next shapes on it with its own cut, depth, and bit"
+        title="Add a carve layer — draw the next shapes with its own cut and depth; it inherits the Startup Setup default bit"
         onClick={props.onNew}
         style={actionButtonStyle}
       >

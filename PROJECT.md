@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-290's narrow explicit 8-bit grayscale height-map path is built; ADR-291 approves the phased CurveDesk photo-to-relief expansion, whose P2R.1-P2R.6 slices remain planned. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 291. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-290's narrow explicit 8-bit grayscale height-map path is built; ADR-291 approves the phased CurveDesk photo-to-relief expansion, whose P2R.1-P2R.6 slices remain planned. The CNC Startup Setup ownership consolidation is built and software/browser-verified under ADR-292; controller and hardware qualification remain pending. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 292. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -61,11 +61,16 @@ The Desktop Preview track is additive packaging and release governance. Its appl
 See `WORKFLOW.md` for granular flows including success, error, empty, and edge states for each step.
 
 1. Open app → workspace at machine bed dimensions.
-2. Add content (Phase A: import SVG. Phase D: type text. Phase E: vectorize image).
-3. Position objects (move, scale, rotate, mirror, align).
-4. Configure named Artwork Operations (per artwork or intentionally shared: process, speed, power/depth, passes, visibility, output).
-5. Preview toolpath.
-6. Generate G-code; save to disk or stream to laser.
+2. In CNC mode, set or review machine limits and current-job material, bit, stock, and operation
+   material/tool assignments in **Startup Setup** when needed. This may happen before artwork exists
+   and is never opened or required automatically.
+3. Add content (Phase A: import SVG. Phase D: type text. Phase E: vectorize image).
+4. Position objects (move, scale, rotate, mirror, align).
+5. Configure named Artwork Operations (per artwork or intentionally shared: process, speed,
+   power/depth, passes, visibility, output). CNC Artwork settings own operation cutting values;
+   setup-owned values remain read-only references there.
+6. Preview toolpath.
+7. Generate G-code; save to disk or stream to laser.
 
 ---
 
@@ -154,12 +159,13 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
 | H.11 | Market-parity build-out (ADR-103): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator, machine-aware G-code banner | Built (G1–G8) |
 | H.12 | Easel-parity pack (ADR-105): persistent live 3D pane, pocket raster fill (offset/raster-X/raster-Y), bundled local design library | Built |
-| H.13 | CNC usability pack (ADR-111, amended): layer material picker (auto-fills feeds), always-visible Advanced section + through-cut, machine auto-fill from detected `$$`, stock/feed limit advisories | Built |
-| H.14 | Project material picker (ADR-112/264): grouped species-level wood presets in Material & Bit; explicit Apply auto-fills feeds for every layer and seeds new ones (manual Add, SVG import); per-layer picker still overrides | Built |
+| H.13 | CNC usability pack (ADR-111, amended): material-based automatic feeds, always-visible Advanced section + through-cut, machine auto-fill from detected `$$`, stock/feed limit advisories; original per-layer picker placement is superseded by H.19 | Built; placement superseded |
+| H.14 | Project material model (ADR-112/264): grouped species-level wood presets; explicit Apply auto-fills feeds for every operation and seeds new ones; original Material & Bit/per-layer placement is superseded by H.19 | Built; placement superseded |
 | H.15 | Two-tool pocket rest machining with bounded 2D remaining-stock geometry and guarded manual tool change (ADR-153) | Built; hardware CLAIMED |
 | H.16 | Verified constant-load adaptive clearing for bounded island-free pockets (ADR-154) | Built; hardware CLAIMED |
 | H.17 | Linked straight-sided inlay pocket and insert pairs with radius-matched geometry (ADR-155) | Built; hardware CLAIMED |
 | H.18 | Persisted drag-placeable holding-tab anchors for closed CNC profiles (ADR-156) | Built; hardware CLAIMED |
+| H.19 | CNC settings ownership consolidation (ADR-292): Startup Setup is the sole writer for machine limits, current-job material/bit/stock, and the operation material/tool plan; Artwork owns operation cutting values; CNC Job Review is read-only | Built; software/browser verified; controller and hardware qualification pending |
 
 #### Photo-to-relief expansion - ADR-291
 

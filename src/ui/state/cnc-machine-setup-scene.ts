@@ -17,7 +17,26 @@ export function sceneAfterMachineSetup(
     const prepared = applyCncTextDefaultsForScene(scene, machine);
     return seedCncModeSwitchLayers(scene, prepared, context);
   }
-  return refreshAutomaticCncFeeds(scene, context);
+  return refreshAutomaticCncFeeds(scene, {
+    ...context,
+    activeToolChanged: previousMachine.toolId !== machine.toolId,
+    fluteCountChangedToolIds: changedFluteCountToolIds(previousMachine, machine),
+  });
+}
+
+function changedFluteCountToolIds(
+  previous: Extract<MachineConfig, { readonly kind: 'cnc' }>,
+  next: Extract<MachineConfig, { readonly kind: 'cnc' }>,
+): ReadonlySet<string> {
+  const previousTools = new Map(previous.tools.map((tool) => [tool.id, tool]));
+  return new Set(
+    next.tools
+      .filter((tool) => {
+        const previousTool = previousTools.get(tool.id);
+        return previousTool === undefined || previousTool.fluteCount !== tool.fluteCount;
+      })
+      .map((tool) => tool.id),
+  );
 }
 
 export function sceneAfterDeviceProfileChange(

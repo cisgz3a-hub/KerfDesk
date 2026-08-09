@@ -8,8 +8,16 @@ import type { DeviceSetupStepProps } from './device-setup-flow';
 import { deviceSetupSupportsMachineKind, machineSetupValidationIssues } from './device-setup-flow';
 import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
+import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
+import { DeviceSetupCncReview } from './DeviceSetupCncReview';
 
-export function DeviceSetupReviewStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
+export function DeviceSetupReviewStep({
+  state,
+  dispatch,
+  operationDrafts,
+}: DeviceSetupStepProps & {
+  readonly operationDrafts: ReadonlyArray<CncStartupOperationDraft>;
+}): JSX.Element {
   const issues = machineSetupValidationIssues(state);
   const rows = useLaserStore((store) => store.grblSettingsRows);
   const queuedFirmwareWrites = computeFirmwareDiffs(state.draft, rows, {
@@ -27,7 +35,14 @@ export function DeviceSetupReviewStep({ state, dispatch }: DeviceSetupStepProps)
         onEdit={() => dispatch({ kind: 'go', step: 'identify' })}
       />
       <WorkspaceReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'confirm' })} />
-      <OutputReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'confirm' })} />
+      <OutputReview state={state} dispatch={dispatch} />
+      {state.machineKind === 'cnc' ? (
+        <DeviceSetupCncReview
+          machine={state.cncDraft}
+          operationDrafts={operationDrafts}
+          onEdit={() => dispatch({ kind: 'go', step: 'cnc-setup' })}
+        />
+      ) : null}
       <SafetyReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'options' })} />
       <HardwareHandoff machineKinds={state.machineKinds} />
     </section>
@@ -133,17 +148,23 @@ function WorkspaceReview(props: {
 
 function OutputReview(props: {
   readonly state: DeviceSetupStepProps['state'];
-  readonly onEdit: () => void;
+  readonly dispatch: DeviceSetupStepProps['dispatch'];
 }): JSX.Element {
   return (
     <>
       {deviceSetupSupportsMachineKind(props.state, 'laser') ? (
-        <ReviewSection title="Laser machine output" onEdit={props.onEdit}>
+        <ReviewSection
+          title="Laser machine output"
+          onEdit={() => props.dispatch({ kind: 'go', step: 'confirm' })}
+        >
           <LaserOutputRows state={props.state} />
         </ReviewSection>
       ) : null}
       {deviceSetupSupportsMachineKind(props.state, 'cnc') ? (
-        <ReviewSection title="CNC machine output" onEdit={props.onEdit}>
+        <ReviewSection
+          title="CNC machine output"
+          onEdit={() => props.dispatch({ kind: 'go', step: 'cnc-setup' })}
+        >
           <CncOutputRows state={props.state} />
         </ReviewSection>
       ) : null}

@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { canvasTheme } from '../theme/canvas-theme';
 
-/** Layout and paint for the compact Stock canvas surface. */
+/** Layout and paint for the compact read-only Stock canvas reference. */
 export const cncStockCanvasHudStyles = {
   panel: {
     position: 'absolute',
@@ -27,7 +27,7 @@ export const cncStockCanvasHudStyles = {
   },
   connector: {
     position: 'absolute',
-    top: 120,
+    top: 86,
     left: '100%',
     width: 28,
     borderTop: `1px solid ${canvasTheme.stockStroke}`,
@@ -63,12 +63,7 @@ export const cncStockCanvasHudStyles = {
     border: `1px solid ${canvasTheme.stockStroke}`,
     borderRadius: 'var(--lf-radius-md)',
   },
-  headingText: {
-    display: 'flex',
-    flexDirection: 'column',
-    minWidth: 0,
-    flex: 1,
-  },
+  headingText: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 },
   title: { fontSize: 'var(--lf-text-lg)' },
   collapsedTitle: { fontSize: 'var(--lf-text-sm)', lineHeight: 1.1 },
   summary: {
@@ -78,50 +73,34 @@ export const cncStockCanvasHudStyles = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  collapsedSummary: { fontSize: 'var(--lf-text-xs)', lineHeight: 1.1 },
+  collapsedSummary: {
+    overflow: 'hidden',
+    color: 'var(--lf-text-muted)',
+    fontSize: 'var(--lf-text-xs)',
+    lineHeight: 1.1,
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
   body: {
     display: 'grid',
-    gap: 12,
+    gap: 10,
     marginTop: 8,
-    padding: '12px 4px 2px',
+    padding: '10px 4px 2px',
     borderTop: '1px solid var(--lf-border)',
   },
-  thicknessRow: {
+  note: { margin: 0, color: 'var(--lf-text-muted)', fontSize: 'var(--lf-text-sm)' },
+  factGrid: {
     display: 'grid',
-    gridTemplateColumns: '76px minmax(0, 1fr) auto',
-    alignItems: 'center',
-    gap: 6,
+    gridTemplateColumns: '72px minmax(0, 1fr)',
+    gap: '6px 8px',
+    margin: 0,
   },
-  pairGroup: { display: 'grid', gap: 5, minWidth: 0 },
-  pairFields: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: 8,
-  },
-  originRow: {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) 58px',
-    alignItems: 'end',
-    gap: 12,
-  },
-  prefixedField: {
-    display: 'grid',
-    gridTemplateColumns: '16px minmax(0, 1fr)',
-    alignItems: 'center',
-    gap: 4,
-  },
-  groupLabel: {
+  factLabel: { color: 'var(--lf-text-faint)', fontSize: 'var(--lf-text-sm)' },
+  factValue: {
+    margin: 0,
     color: 'var(--lf-text-muted)',
     fontSize: 'var(--lf-text-sm)',
+    fontWeight: 600,
   },
-  prefix: {
-    color: 'var(--lf-text-faint)',
-    fontSize: 'var(--lf-text-sm)',
-  },
-  unit: {
-    color: 'var(--lf-text-faint)',
-    fontSize: 'var(--lf-text-xs)',
-  },
-  input: { width: '100%', minWidth: 0, height: 30 },
-  diagram: { color: 'var(--lf-text-faint)', overflow: 'visible' },
+  actionRow: { display: 'flex', justifyContent: 'flex-end' },
 } satisfies Readonly<Record<string, CSSProperties>>;
