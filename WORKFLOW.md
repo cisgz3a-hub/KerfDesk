@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/293/294/295/296 schema, import, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/293/294/295/296/297 schema, import, gamma mapping, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2406,7 +2406,7 @@ F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit 8-bit grayscale height-map path.
-F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Their bounded ADR-292/293
+F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Their bounded ADR-292 through ADR-297
 substrate is current where explicitly marked below; the remaining controls and
 user-facing flows are planned.
 
@@ -4025,7 +4025,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294/295/296)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294/295/296/297)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4045,8 +4045,10 @@ and lifts the command's CNC-only gate.)*
 3. Each file becomes a top-down relief at 100 mm wide and 5 mm deep. Height
    follows the pixel aspect ratio, **Light is high** is the declared default,
    and the Relief properties panel shows the pixel dimensions and precision.
-4. Width, total depth, and polarity remain editable. **Light is deep** reverses
-   the full-range mapping without rewriting the embedded samples. Canvas,
+4. Width, total depth, polarity, and **Gamma** are editable. Gamma accepts every positive
+   finite value without a minimum or maximum cap; `1` is linear. It raises each normalized source
+   sample to that exponent before polarity, without rewriting embedded samples, mask bytes,
+   digest, or provenance. **Light is deep** then reverses the full-range mapping. Canvas,
    **View 3D...**, and CAM use the same deterministic materialization rule and
    embedded samples; each consumer chooses the grid resolution appropriate to
    its job. **View 3D...** targets 0.25 mm display cells; when the longest edge
@@ -4129,11 +4131,11 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-293/294/295/296 supply schema-v4/U16LE
+> **Planned - not current UI.** P2R.1a plus ADR-293/294/295/296/297 supply schema-v4/U16LE
 > storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha import, simple transparency
-> masks, atomic large-project autosave/recovery, and the existing CAM/preview
-> substrate. The creation modes and controls below remain planned; use F-CNC46's
-> narrower **Import Height Map...** flow today.
+> masks, non-destructive manual gamma mapping, atomic large-project autosave/recovery, and the existing
+> CAM/preview substrate. The creation modes and remaining controls below stay planned; use
+> F-CNC46's narrower **Import Height Map...** flow today.
 
 #### Success
 1. Choose **Create Relief...** and select the source meaning before import:

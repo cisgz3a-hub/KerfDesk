@@ -16861,3 +16861,82 @@ qualification boundary remain in force.
 - ADR-291, the exact alpha-to-mask product contract.
 - ADR-292, the canonical U16-plus-U8-mask P2R.1a substrate.
 - ADR-295, exact grayscale-8/16 PNG import and its prior grayscale-alpha limitation.
+
+## ADR-297 - Relief properties exposes the existing non-destructive gamma mapping (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a mapping-control slice; remaining tonal/source-mode UI and physical qualification stay open
+
+### Context
+
+The schema-v4 heightfield introduced by ADR-292 already persists a positive finite
+`mapping.curve.gamma`, qualified import initializes it to `1`, project loading validates it, and
+materialization applies `normalized ** gamma` before polarity. That durable and computational
+contract has no corresponding Relief-properties control, so an operator cannot adjust the mapping
+without editing project data outside CurveDesk.
+
+Gamma can be exposed without changing source codes, masks, the digest algorithm, the materializer,
+or CAM. Input-low/high, histogram, crop/aspect placement, source-mode creation, and mask controls
+need their own product semantics and evidence; coupling them to this small control would overstate
+the current P2R.1 surface.
+
+### Decision
+
+1. **Expose gamma only for canonical heightfields.** Relief properties shows a unitless **Gamma**
+   field for `heightfield-v1` sources and omits it for legacy mesh reliefs. The field follows
+   polarity and identifies `1` as the linear mapping. It does not relabel source provenance or
+   imply that tone is metric depth.
+2. **Preserve every positive finite operator value exactly.** The control adds no minimum, maximum,
+   cap, clamp, normalization, or hidden recommended range. Blank, zero, negative, and non-finite
+   drafts do not replace canonical state; while focused the draft remains visible, and blur restores
+   the stored value. This is the existing positive-finite schema contract for a newly exposed field,
+   not a new refusal on any existing action.
+3. **Change mapping state, not source data.** A distinct committed value updates only
+   `mapping.curve.gamma` and advances the heightfield revision once. Scalar samples, inclusion-mask
+   bytes, digest, provenance, physical and pixel dimensions, maximum depth, polarity, crop, aspect,
+   and `heightfield-map-v1` remain unchanged. A same-value or invalid patch creates no canonical
+   change.
+4. **Keep selection identity explicit.** The gamma editor is keyed to the selected relief so a
+   pending debounced draft cannot commit to a newly selected object. Valid input uses the existing
+   numeric-field commit lifecycle; no new delay, confirmation, warning, Job Review item, Frame
+   effect, or Start effect is introduced.
+5. **Reuse the existing materialization algorithm.** Preview, CAM, simulation, persistence, and
+   output already consume the stored mapping. Gamma is applied to normalized source samples before
+   polarity; this decision does not revise the algorithm, heightfield digest, schema version,
+   worker protocol, G-code metadata, or compile behavior.
+6. **Keep the evidence boundary explicit.** Tests can prove state identity, exact numeric
+   persistence, project round-trip, and deterministic software materialization. They do not prove
+   that a chosen exponent is perceptually suitable, tool-reachable, physically safe, or capable of
+   producing a particular material finish. Input-level clipping, histograms, cross-sections,
+   source-mode creation, mask controls, controller tracking, air cuts, and material coupons remain
+   separate work.
+
+### Consequences
+
+- Operators can non-destructively brighten or compress the mapped relief response from the existing
+  Relief properties surface while retaining the imported samples and mask exactly.
+- Very small or large positive exponents remain exact operator inputs and can concentrate most
+  midtones near an endpoint; CurveDesk does not silently rewrite them.
+- Projects remain schema v4 and use the same `gamma-v1` / `heightfield-map-v1` contract. Saving and
+  reopening a non-default gamma preserves the value without changing the content digest.
+- Full P2R.1 tonal/source interpretation is still incomplete: only maximum depth, polarity, and
+  gamma are current manual mapping controls.
+
+### Verification
+
+- State tests pin positive-finite uncapped values, invalid/no-op drafts, one revision increment, and
+  byte-for-byte identity of samples, mask, digest, provenance, dimensions, polarity, and maximum
+  depth.
+- UI tests pin heightfield-only visibility, the absence of `min`/`max`, invalid-draft restoration,
+  exact large-value commits, and selection-bound cancellation.
+- Project round-trip tests persist a non-default gamma. Existing materialization tests continue to
+  pin the `normalized ** gamma` equation and polarity order.
+- TypeScript, lint, formatting, focused state/UI/project/materialization tests, and release checks
+  are required before publication. Perceptual comparison, packaged Electron, controller behavior,
+  hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, P2R.1 non-destructive mapping and evidence boundaries.
+- ADR-292, schema-v4 canonical heightfield and `gamma-v1` mapping contract.
+- ADR-296, the latest qualified scalar-plus-mask import slice.
