@@ -40,7 +40,7 @@ export function depthMapToHeightmap(
   if (size.kind === 'error') return size;
   const widthCells = Math.max(1, Math.ceil(target.widthMm / size.mmPerCell));
   const heightCells = Math.max(1, Math.ceil(target.heightMm / size.mmPerCell));
-  let depth: Float32Array;
+  let depth: Float32Array | null;
   try {
     depth = materializeDepths(
       source,
@@ -54,6 +54,12 @@ export function depthMapToHeightmap(
       return { kind: 'error', reason: 'Depth-map heightmap does not fit in this runtime.' };
     }
     throw error;
+  }
+  if (depth === null) {
+    return {
+      kind: 'error',
+      reason: 'Depth-map samples must materialize to finite Float32 depths.',
+    };
   }
   return {
     kind: 'ok',
@@ -136,7 +142,7 @@ function materializeDepths(
   widthCells: number,
   heightCells: number,
   reliefDepthMm: number,
-): Float32Array {
+): Float32Array | null {
   const output = new Float32Array(widthCells * heightCells);
   const sampler: DepthSampler = { source, bytes, reliefDepthMm };
   for (let y = 0; y < heightCells; y += 1) {
@@ -157,7 +163,9 @@ function materializeDepths(
           surface = Math.max(surface, sampleDepth(sampler, sx, sy));
         }
       }
-      output[y * widthCells + x] = surface;
+      const outputIndex = y * widthCells + x;
+      output[outputIndex] = surface;
+      if (!Number.isFinite(output[outputIndex])) return null;
     }
   }
   return output;

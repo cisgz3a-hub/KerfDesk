@@ -127,6 +127,16 @@ describe('depthMapToHeightmap', () => {
     expect(map).toMatchObject({ kind: 'error', reason: expect.stringMatching(/length/) });
   });
 
+  it('rejects a declared depth that overflows the Float32 heightmap', () => {
+    const map = depthMapToHeightmap(source([0]), {
+      targetWidthMm: 1,
+      reliefDepthMm: Number.MAX_VALUE,
+      mmPerCell: 1,
+    });
+
+    expect(map).toMatchObject({ kind: 'error', reason: expect.stringMatching(/finite/) });
+  });
+
   it('returns a compile-integrity error for a malformed in-memory payload type', () => {
     // Deliberately bypass the type contract to exercise the runtime-integrity boundary.
     const malformed = { ...source([0]), samplesBase64: 7 } as unknown as ReliefDepthMap;
