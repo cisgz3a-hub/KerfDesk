@@ -24,6 +24,8 @@ const RING: Polyline = {
 const MAP: Heightmap = {
   widthCells: 3,
   heightCells: 3,
+  widthMm: 3,
+  heightMm: 3,
   mmPerCell: 1,
   depth: Float32Array.from([0, 0, 0, 0, -1, 0, 0, 0, 0]),
 };

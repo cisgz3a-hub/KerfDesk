@@ -44,7 +44,44 @@ function coarsenedGrid() {
   return result.grid;
 }
 
+function partialGrid() {
+  const result = createRemovalGrid({
+    originX: 0,
+    originY: 0,
+    widthMm: 1.4,
+    heightMm: 0.6,
+    mmPerCell: 1,
+  });
+  if (result.kind === 'error') throw new Error(result.reason);
+  return result.grid;
+}
+
 describe('Cut3DPreviewDialog', () => {
+  it('labels the exact stock size instead of count-times-pitch overhang', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <Cut3DPreviewDialog
+            grid={partialGrid()}
+            mesh={null}
+            stockThicknessMm={6.35}
+            onClose={() => undefined}
+          />,
+        );
+      });
+
+      expect(host.textContent).toContain('1.4 × 0.6 mm stock');
+      expect(host.textContent).not.toContain('2 × 1 mm stock');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('discloses the final bounded 3D mesh resolution', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

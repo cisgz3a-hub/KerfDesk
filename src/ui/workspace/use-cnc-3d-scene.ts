@@ -80,6 +80,40 @@ export type SurfaceReading = {
   readonly depthMm: number;
 };
 
+type InitialSceneOptions = {
+  readonly outcome: Promise<Awaited<ReturnType<typeof createReliefThreeScene>>>;
+  readonly content: Parameters<ReliefSceneHandle['updateContent']>[0];
+  readonly isCancelled: () => boolean;
+  readonly onReady: (handle: ReliefSceneHandle) => void;
+  readonly onFailed: () => void;
+};
+
+async function installInitialScene(options: InitialSceneOptions): Promise<void> {
+  let handle: ReliefSceneHandle | null = null;
+  try {
+    const outcome = await options.outcome;
+    if (outcome.kind !== 'ok') {
+      if (!options.isCancelled()) options.onFailed();
+      return;
+    }
+    handle = outcome.handle;
+    if (options.isCancelled()) {
+      handle.dispose();
+      return;
+    }
+    // The shared scene builder accepts only mesh and route. Install the full
+    // CNC input before readiness so the first visible frame owns the matching
+    // depth grid and material, not only later content updates.
+    await handle.updateContent(options.content);
+  } catch {
+    handle?.dispose();
+    if (!options.isCancelled()) options.onFailed();
+    return;
+  }
+  if (options.isCancelled()) handle.dispose();
+  else options.onReady(handle);
+}
+
 /**
  * Creates and maintains the pane's 3D scene for a design source.
  *
@@ -125,25 +159,19 @@ export function useCnc3dScene(
     }
 
     setState('loading');
-    void createReliefThreeScene(canvas, content.mesh, stockThicknessMm, content.toolpath)
-      .then((outcome) => {
-        if (cancelled) {
-          if (outcome.kind === 'ok') outcome.handle.dispose();
-          return;
-        }
-        if (outcome.kind !== 'ok') {
-          setState('failed');
-          return;
-        }
-        handleRef.current = outcome.handle;
+    void installInitialScene({
+      outcome: createReliefThreeScene(canvas, content.mesh, stockThicknessMm, content.toolpath),
+      content,
+      isCancelled: () => cancelled,
+      onReady: (handle) => {
+        handleRef.current = handle;
         // The pane is resizable, so fit the freshly-built scene to the
         // canvas's actual laid-out size rather than its mount-time attrs.
-        outcome.handle.resize(canvas.clientWidth, canvas.clientHeight);
+        handle.resize(canvas.clientWidth, canvas.clientHeight);
         setState('ready');
-      })
-      .catch(() => {
-        if (!cancelled) setState('failed');
-      });
+      },
+      onFailed: () => setState('failed'),
+    });
 
     return () => {
       cancelled = true;
@@ -205,8 +233,8 @@ function readSurface(
   const local = handle.probeAt(offsetX, offsetY);
   if (local === null) return null;
   const mesh = {
-    widthMm: source.grid.widthCells * source.grid.mmPerCell,
-    heightMm: source.grid.heightCells * source.grid.mmPerCell,
+    widthMm: source.grid.widthMm,
+    heightMm: source.grid.heightMm,
   };
   const scene = sceneFromLocal(local, { x: source.grid.originX, y: source.grid.originY }, mesh);
   const probe = probeRemovalGrid(source.grid, scene);

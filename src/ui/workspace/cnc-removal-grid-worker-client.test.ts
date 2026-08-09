@@ -74,6 +74,8 @@ class FakeWorker {
 const GRID: RemovalGrid = {
   widthCells: 1,
   heightCells: 1,
+  widthMm: 1,
+  heightMm: 1,
   mmPerCell: 1,
   originX: 0,
   originY: 0,
@@ -177,7 +179,14 @@ describe('CNC removal-grid worker client', () => {
         taskId: 'current',
         result: {
           kind: 'ok',
-          heightmap: { widthCells: 1, heightCells: 1, mmPerCell: 1, depth: new Float32Array(1) },
+          heightmap: {
+            widthCells: 1,
+            heightCells: 1,
+            widthMm: 1,
+            heightMm: 1,
+            mmPerCell: 1,
+            depth: new Float32Array(1),
+          },
           widthMm: 1,
           heightMm: 1,
         },
@@ -207,7 +216,14 @@ describe('CNC removal-grid worker client', () => {
         taskId: 'relief',
         result: {
           kind: 'ok',
-          heightmap: { widthCells: 1, heightCells: 1, mmPerCell: 1, depth: new Float32Array(1) },
+          heightmap: {
+            widthCells: 1,
+            heightCells: 1,
+            widthMm: 1,
+            heightMm: 1,
+            mmPerCell: 1,
+            depth: new Float32Array(1),
+          },
           widthMm: 1,
           heightMm: 1,
         },
@@ -244,7 +260,14 @@ describe('CNC removal-grid worker client', () => {
         taskId: 'relief',
         result: {
           kind: 'ok',
-          heightmap: { widthCells: 1, heightCells: 1, mmPerCell: 1, depth: new Float32Array(1) },
+          heightmap: {
+            widthCells: 1,
+            heightCells: 1,
+            widthMm: 1,
+            heightMm: 1,
+            mmPerCell: 1,
+            depth: new Float32Array(1),
+          },
           widthMm: 1,
           heightMm: 1,
         },

@@ -18,7 +18,7 @@ import {
   type Transform,
   type Vec2,
 } from '../scene';
-import { cuttingSurfaceDz } from '../sim/tool-kernels';
+import { cuttingSurfaceDz } from '../sim/cutting-surface';
 import type { Heightmap } from './heightmap';
 import { reliefRoughingPasses } from './relief-roughing';
 
@@ -172,6 +172,8 @@ function directMaskedMap(candidate: MaskEmissionCase): Heightmap {
   return {
     widthCells: candidate.columns,
     heightCells: 1,
+    widthMm: candidate.columns * candidate.cellMm,
+    heightMm: candidate.cellMm,
     mmPerCell: candidate.cellMm,
     depth: new Float32Array(candidate.columns).fill(-2),
     inclusion,

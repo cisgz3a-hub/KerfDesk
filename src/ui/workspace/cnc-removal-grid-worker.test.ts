@@ -13,6 +13,8 @@ describe('CNC preview response ownership', () => {
       grid: {
         widthCells: 1,
         heightCells: 1,
+        widthMm: 0.5,
+        heightMm: 0.5,
         mmPerCell: 0.5,
         originX: 0,
         originY: 0,
@@ -44,7 +46,15 @@ describe('CNC preview response ownership', () => {
           taskId: 'relief',
           result: {
             kind: 'ok',
-            heightmap: { widthCells: 2, heightCells: 1, mmPerCell: 1, depth, inclusion },
+            heightmap: {
+              widthCells: 2,
+              heightCells: 1,
+              widthMm: 2,
+              heightMm: 1,
+              mmPerCell: 1,
+              depth,
+              inclusion,
+            },
             widthMm: 2,
             heightMm: 1,
           },

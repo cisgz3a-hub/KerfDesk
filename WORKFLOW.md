@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47..F-CNC50 are approved planned behavior under ADR-291 and are not current UI.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294 schema, import, existing CAM/preview, manual-persistence, and exact partial-edge substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2442,8 +2442,9 @@ F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit 8-bit grayscale height-map path.
-F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Those four flows are
-**planned**, not descriptions of controls currently available in CurveDesk.
+F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Their bounded ADR-292/294
+substrate is current where explicitly marked below; the remaining controls and
+user-facing flows are planned.
 
 ### F-CNC1. Switch to CNC mode and configure the machine
 
@@ -3133,14 +3134,13 @@ and lifts the command's CNC-only gate.)*
    scallop field requests a planar-grid ridge-height target. Compile then emits the
    roughing group AND a finishing group cut with that bit (an M0 change
    separates them when the bits differ).
-2. Finishing rides the sampled max-plus tip surface in serpentine rows. A
-   ball nose requests 2·sqrt(c·(2r−c)) physical-XY spacing (flat bits request
-   40% of diameter); the grid refines when needed and its whole-row stride
-   rounds down so it does not overshoot that request. This qualifies finishing
-   sample vertices and planar cusp only when the four-million-cell cap has not
-   coarsened one cell past the request. It is not a continuous swept-volume or
-   true along-surface scallop proof; roughing contour vertices are also outside
-   the pointwise sampled-envelope qualification (ADR-289).
+2. Finishing rides the sampled max-plus tip surface in serpentine rows. A ball
+   nose uses `2*sqrt(c*(2r-c))` physical-XY spacing after bounding scallop `c`
+   to [0.001 mm, bit radius]; flat bits use the larger of 0.05 mm and 40% of
+   diameter. The grid attempts that resolved spacing and its whole-row stride
+   rounds down so it does not overshoot it. This qualifies sampled finishing
+   vertices and planar cusp, not a continuous included-surface sweep or true
+   along-surface scallop proof (ADR-292/294).
 3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
    pass); finishing consumes it down to the true surface.
 
@@ -3156,11 +3156,14 @@ and lifts the command's CNC-only gate.)*
 #### Edge — flat reliefs / tiny scallop
 1. A flat surface skims at exactly its depth; scallop clamps to
    [0.001 mm, bit radius]. Ball-nose spacing follows that clamped analytic
-   request; flat-tool row spacing retains its 0.05 mm floor.
+   request; flat-tool row spacing retains its 0.05 mm floor. The established
+   Stepover editor and planner range remains 10–85%.
 2. Uniform and nonuniform object scale are resolved before sampling, cutter
    dilation, and row spacing. Mirror/rotation/translation are residual
-   isometries. Subcell peaks, edge overhang, straight XYZ chords between
-   samples, and holder/shank clearance remain unqualified (ADR-289).
+   isometries. Partial terminal cells keep the exact requested interior pitch
+   while ending at the declared physical edge. Included subcell peaks, straight
+   XYZ chords between samples, the cutter footprint beyond an unmasked outer
+   relief boundary, and holder/shank clearance remain unqualified (ADR-294).
 
 ### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
 
@@ -4065,7 +4068,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4127,22 +4130,32 @@ and lifts the command's CNC-only gate.)*
    filtering, byte-order, worker-memory, and precision path is verified.
 5. CAM requests its exact positive cell spacing and attempts the exact derived
    allocation; allocation failure is reported factually rather than silently
-   coarsening. When that spacing does not divide the declared physical width or
-   height, the current square grid uses ceil-rounded dimensions and can extend
-   by less than one cell. Exact relief-edge containment and 2D/CAM edge agreement
-   remain unqualified until an edge-cell model lands.
+   coarsening. When that spacing does not divide a declared physical dimension,
+   full interior cells retain the request and only the terminal row or column is
+   shorter. Canvas cell rectangles, stepped 3D cell quads, the simulation domain,
+   roughing, and finishing share that exact logical Float64 boundary. Smooth 3D
+   surfaces remain contained samples at actual cell centers, with exact stock-envelope
+   metadata; they are not cell-edge or mask-boundary evidence. Float32 preview
+   positions round to their nearest representable values. At ordinary magnitudes where
+   the existing `toFixed(3)` emitter produces fixed-decimal text, emitted coordinates use
+   a 0.001 mm quantum and may differ from the stored edge by up to 0.0005 mm;
+   astronomical G-code grammar and output remain unqualified. Frame reviews the generated
+   job rather than asserting bit-exact equality with the object edge. Exact IEEE-754 input
+   arithmetic remains authoritative, so a representable one-ULP remainder is a real
+   partial cell rather than a hidden tolerance rewrite.
 6. Coarser target cells use the highest overlapping source surface and require
-   all overlapping source-mask coverage. Excluded mask squares are protected by
+   all overlapping source-mask coverage. Excluded mask cell rectangles are protected by
    emitted-precision cutter envelopes in roughing and finishing, but this does
    not prove included subpixel surface detail, holder clearance, controller
    tracking, material finish, or safe feeds for a particular physical setup.
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a supplies the schema-v4/U16LE storage,
-> migration, qualified 8-bit grayscale import, simple transparency mask, and
-> existing CAM/preview substrate. The creation modes and controls below remain
-> planned; use F-CNC46's narrower **Import Height Map...** flow today.
+> **Planned - not current UI.** P2R.1a plus ADR-294 supply schema-v4/U16LE
+> storage, migration, qualified 8-bit grayscale import, simple transparency
+> masks, exact partial-edge geometry, and the existing CAM/preview substrate.
+> Large-project atomic autosave/recovery and the creation modes and controls
+> below remain planned; use F-CNC46's narrower **Import Height Map...** flow today.
 
 #### Success
 1. Choose **Create Relief...** and select the source meaning before import:

@@ -9,6 +9,13 @@
 // subscribe to the load event and schedule one redraw.
 
 import { canvasTheme } from '../theme/canvas-theme';
+import {
+  partialCellEnd,
+  partialCellStart,
+  partialGridHasPartialCell,
+  type PartialCellAxis,
+  type PartialCellGrid,
+} from '../../core/grid';
 import type { AABB, RasterImage, Transform as ObjTransform } from '../../core/scene';
 import type { ViewTransform } from './view-transform';
 
@@ -155,4 +162,69 @@ export function drawBitmapAtTransform(
   ctx.scale(sx, sy);
   ctx.drawImage(bitmap, bounds.minX, bounds.minY, w, h);
   ctx.restore();
+}
+
+type BitmapAxisSpan = {
+  readonly sourceStart: number;
+  readonly sourceSize: number;
+  readonly gridStartMm: number;
+  readonly gridEndMm: number;
+};
+
+/** Blits a grid bitmap without stretching its shorter terminal cells. */
+export function drawPartialGridBitmapAtTransform(
+  ctx: CanvasRenderingContext2D,
+  bitmap: CanvasImageSource,
+  grid: PartialCellGrid,
+  bounds: AABB,
+  transform: ObjTransform,
+  view: ViewTransform,
+): void {
+  if (grid.widthCells <= 0 || grid.heightCells <= 0) return;
+  const xSpans = bitmapAxisSpans(grid, 'x');
+  const ySpans = bitmapAxisSpans(grid, 'y');
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  ctx.save();
+  ctx.translate(view.offsetX + transform.x * view.scale, view.offsetY + transform.y * view.scale);
+  ctx.rotate(transform.rotationDeg * DEG_TO_RAD);
+  ctx.scale(
+    (transform.mirrorX ? -1 : 1) * transform.scaleX * view.scale,
+    (transform.mirrorY ? -1 : 1) * transform.scaleY * view.scale,
+  );
+  for (const y of ySpans) {
+    for (const x of xSpans) {
+      ctx.drawImage(
+        bitmap,
+        x.sourceStart,
+        y.sourceStart,
+        x.sourceSize,
+        y.sourceSize,
+        bounds.minX + (x.gridStartMm / grid.widthMm) * width,
+        bounds.minY + (y.gridStartMm / grid.heightMm) * height,
+        ((x.gridEndMm - x.gridStartMm) / grid.widthMm) * width,
+        ((y.gridEndMm - y.gridStartMm) / grid.heightMm) * height,
+      );
+    }
+  }
+  ctx.restore();
+}
+
+function bitmapAxisSpans(grid: PartialCellGrid, axis: PartialCellAxis): readonly BitmapAxisSpan[] {
+  const count = axis === 'x' ? grid.widthCells : grid.heightCells;
+  const extentMm = axis === 'x' ? grid.widthMm : grid.heightMm;
+  if (count <= 1 || !partialGridHasPartialCell(grid, axis)) {
+    return [{ sourceStart: 0, sourceSize: count, gridStartMm: 0, gridEndMm: extentMm }];
+  }
+  const last = count - 1;
+  const terminalStartMm = partialCellStart(grid, axis, last);
+  return [
+    { sourceStart: 0, sourceSize: last, gridStartMm: 0, gridEndMm: terminalStartMm },
+    {
+      sourceStart: last,
+      sourceSize: 1,
+      gridStartMm: terminalStartMm,
+      gridEndMm: partialCellEnd(grid, axis, last),
+    },
+  ];
 }

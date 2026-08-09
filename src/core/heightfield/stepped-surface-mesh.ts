@@ -17,6 +17,7 @@
 // UI boundary. Vertex count is roughly 4-6x the smooth builder's, which is why
 // callers pair it with the display downsample that is already in place.
 
+import { partialCellEnd, partialCellStart } from '../grid';
 import type { Heightmap } from '../relief';
 
 export type SteppedSurfaceMesh = {
@@ -68,8 +69,8 @@ export function steppedSurfaceMesh(map: Heightmap): SteppedSurfaceMesh {
     positions: writer.positions,
     normals: writer.normals,
     indices: writer.indices,
-    widthMm: map.widthCells * map.mmPerCell,
-    heightMm: map.heightCells * map.mmPerCell,
+    widthMm: map.widthMm,
+    heightMm: map.heightMm,
   };
 }
 
@@ -126,19 +127,20 @@ function pushQuad(writer: MeshWriter, corners: readonly Point3[], normal: Point3
 // Each cell is a full-width flat quad at its own height — not a point sample at
 // the centre — so the floor of a pocket is genuinely flat right up to its wall.
 function writeTopFaces(writer: MeshWriter, map: Heightmap): void {
-  const mm = map.mmPerCell;
   for (let row = 0; row < map.heightCells; row += 1) {
     for (let col = 0; col < map.widthCells; col += 1) {
       const z = depthAt(map, col, row);
-      const x0 = col * mm;
-      const y0 = row * mm;
+      const x0 = partialCellStart(map, 'x', col);
+      const x1 = partialCellEnd(map, 'x', col);
+      const y0 = partialCellStart(map, 'y', row);
+      const y1 = partialCellEnd(map, 'y', row);
       pushQuad(
         writer,
         [
           [x0, y0, z],
-          [x0 + mm, y0, z],
-          [x0 + mm, y0 + mm, z],
-          [x0, y0 + mm, z],
+          [x1, y0, z],
+          [x1, y1, z],
+          [x0, y1, z],
         ],
         NORMAL_UP,
       );
@@ -163,11 +165,11 @@ function writeColumnWall(writer: MeshWriter, map: Heightmap, col: number, row: n
   const here = depthAt(map, col, row);
   const next = depthAt(map, col + 1, row);
   if (here === next) return;
-  const mm = map.mmPerCell;
-  const x = (col + 1) * mm;
-  const y0 = row * mm;
+  const x = partialCellEnd(map, 'x', col);
+  const y0 = partialCellStart(map, 'y', row);
+  const y1 = partialCellEnd(map, 'y', row);
   const taller = here > next;
-  const [ya, yb] = taller ? [y0, y0 + mm] : [y0 + mm, y0];
+  const [ya, yb] = taller ? [y0, y1] : [y1, y0];
   pushQuad(
     writer,
     [
@@ -187,11 +189,11 @@ function writeRowWall(writer: MeshWriter, map: Heightmap, col: number, row: numb
   const here = depthAt(map, col, row);
   const next = depthAt(map, col, row + 1);
   if (here === next) return;
-  const mm = map.mmPerCell;
-  const y = (row + 1) * mm;
-  const x0 = col * mm;
+  const y = partialCellEnd(map, 'y', row);
+  const x0 = partialCellStart(map, 'x', col);
+  const x1 = partialCellEnd(map, 'x', col);
   const taller = here > next;
-  const [xa, xb] = taller ? [x0 + mm, x0] : [x0, x0 + mm];
+  const [xa, xb] = taller ? [x1, x0] : [x0, x1];
   pushQuad(
     writer,
     [
