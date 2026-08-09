@@ -81,6 +81,10 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   // parsed draft doesn't already match — otherwise the user's in-flight
   // typing would be wiped mid-keystroke.
   useEffect(() => {
+    // A canonical store update or display-mapping change owns the field now.
+    // Drop work parsed against the previous state before acknowledging the new
+    // baseline, or its stale timer can overwrite undo/toolbar/document changes.
+    debouncerRef.current?.cancel();
     debouncerRef.current?.acknowledge(value);
     if (parseRef.current(draftRef.current) !== value) {
       setDraft(formatRef.current(value));

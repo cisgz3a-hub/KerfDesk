@@ -7,6 +7,9 @@
 import { useCallback } from 'react';
 import { heightmapCellSize, type Heightmap } from '../../core/relief';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
+// Deep import: core/relief's public barrel is a ratcheted over-cap legacy
+// barrel and may only shrink; keep the established exports intact.
+import { reliefPhysicalDimensions } from '../../core/relief/relief-physical-dimensions';
 import type { ReliefObject } from '../../core/scene';
 import {
   prepareCncCut3DSurfaceOffThread,
@@ -25,6 +28,7 @@ export function Relief3DViewerDialog(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const { relief, stockThicknessMm } = props;
+  const dimensions = reliefPhysicalDimensions(relief);
   const buildScene = useCallback(
     (canvas: HTMLCanvasElement, signal: AbortSignal) =>
       buildReliefScene(canvas, relief, stockThicknessMm, signal),
@@ -34,7 +38,7 @@ export function Relief3DViewerDialog(props: {
     <Viewer3DDialogShell
       ariaLabel="Relief 3D viewer"
       canvasAriaLabel="Relief 3D preview"
-      title={`${relief.source} — ${relief.targetWidthMm.toFixed(0)} mm wide × ${relief.reliefDepthMm.toFixed(1)} mm deep`}
+      title={`${relief.source} — ${formatMm(dimensions.widthMm)} mm wide × ${formatMm(relief.reliefDepthMm)} mm deep`}
       onClose={props.onClose}
       buildScene={buildScene}
     />
@@ -48,18 +52,20 @@ async function buildReliefScene(
   signal: AbortSignal,
 ): Promise<Awaited<ReturnType<typeof createReliefThreeScene>>> {
   try {
-    const targetHeightMm = reliefTargetHeightMm(relief);
+    const dimensions = reliefPhysicalDimensions(relief);
     const mmPerCell = Math.max(
       MIN_DISPLAY_CELL_MM,
-      Math.max(relief.targetWidthMm, targetHeightMm) / DISPLAY_CELLS_ACROSS,
+      Math.max(dimensions.widthMm, dimensions.heightMm) / DISPLAY_CELLS_ACROSS,
     );
-    const displayCellSize = heightmapCellSize(relief.targetWidthMm, targetHeightMm, mmPerCell);
+    const displayCellSize = heightmapCellSize(dimensions.widthMm, dimensions.heightMm, mmPerCell);
     if (displayCellSize.kind === 'error') {
       return { kind: 'no-webgl', reason: displayCellSize.reason };
     }
     const options = {
       targetWidthMm: relief.targetWidthMm,
       reliefDepthMm: relief.reliefDepthMm,
+      targetScaleX: dimensions.targetScaleX,
+      targetScaleY: dimensions.targetScaleY,
       mmPerCell: displayCellSize.mmPerCell,
     };
     const offThread =
@@ -95,13 +101,7 @@ function removalGridFrom(map: Heightmap) {
   return { ...map, originX: 0, originY: 0 };
 }
 
-function reliefTargetHeightMm(relief: ReliefObject): number {
-  if (relief.depthMap !== undefined) {
-    return relief.targetWidthMm * (relief.depthMap.height / relief.depthMap.width);
-  }
-  const sourceWidth = relief.bounds.maxX - relief.bounds.minX;
-  const sourceHeight = relief.bounds.maxY - relief.bounds.minY;
-  return sourceWidth > 0 && sourceHeight > 0
-    ? relief.targetWidthMm * (sourceHeight / sourceWidth)
-    : relief.targetWidthMm;
+function formatMm(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  return value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
 }

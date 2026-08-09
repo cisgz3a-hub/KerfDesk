@@ -85,13 +85,22 @@ describe('Relief3DViewerDialog', () => {
     try {
       await act(async () => {
         root = createRoot(host);
+        const tinyWidthRelief = {
+          ...relief(),
+          transform: { ...IDENTITY_TRANSFORM, scaleX: 0.005 },
+        };
         root.render(
-          <Relief3DViewerDialog relief={relief()} stockThicknessMm={6.35} onClose={onClose} />,
+          <Relief3DViewerDialog
+            relief={tinyWidthRelief}
+            stockThicknessMm={6.35}
+            onClose={onClose}
+          />,
         );
       });
 
       expect(host.querySelector('[role="dialog"]')).not.toBeNull();
       expect(host.textContent).toContain('model.stl');
+      expect(host.textContent).toContain('0.25 mm wide');
       // jsdom: the three renderer cannot start → the fallback line shows
       // once the lazy import + scene setup settle (real task turns).
       await vi.waitFor(
@@ -116,17 +125,21 @@ describe('Relief3DViewerDialog', () => {
   }, 30_000);
 
   it('materializes depth maps in the shared worker and aborts when the dialog closes', async () => {
+    const transformedRelief = {
+      ...depthMapRelief(),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 0.5, scaleY: 20 },
+    };
     worker.prepare.mockReturnValue(
       Promise.resolve({
         kind: 'ok',
         heightmap: {
           widthCells: 2,
           heightCells: 1,
-          mmPerCell: 25,
+          mmPerCell: 500 / 256,
           depth: new Float32Array([-5, 0]),
         },
-        widthMm: 50,
-        heightMm: 25,
+        widthMm: 25,
+        heightMm: 500,
       }),
     );
     const surface = deferred<{
@@ -143,7 +156,7 @@ describe('Relief3DViewerDialog', () => {
     await act(async () => {
       root.render(
         <Relief3DViewerDialog
-          relief={depthMapRelief()}
+          relief={transformedRelief}
           stockThicknessMm={6.35}
           onClose={vi.fn()}
         />,
@@ -153,6 +166,13 @@ describe('Relief3DViewerDialog', () => {
     await vi.waitFor(() => {
       expect(worker.prepare).toHaveBeenCalledOnce();
       expect(worker.prepareSurface).toHaveBeenCalledOnce();
+    });
+    expect(host.textContent).toContain('25 mm wide');
+    expect(worker.prepare.mock.calls[0]?.[1]).toMatchObject({
+      targetWidthMm: 50,
+      targetScaleX: 0.5,
+      targetScaleY: 20,
+      mmPerCell: 500 / 256,
     });
     const signal = worker.prepare.mock.calls[0]?.[2] as AbortSignal | undefined;
     expect(signal?.aborted).toBe(false);

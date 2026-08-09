@@ -39,6 +39,28 @@ async function renderProbe(
   };
 }
 
+async function renderMutableProbe(
+  value: number,
+  commit: (n: number) => void,
+): Promise<{
+  readonly setValue: (next: number) => Promise<void>;
+  readonly unmount: () => Promise<void>;
+}> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  await act(async () => root.render(<Probe value={value} commit={commit} />));
+  return {
+    setValue: async (next) => {
+      await act(async () => root.render(<Probe value={next} commit={commit} />));
+    },
+    unmount: async () => {
+      await act(async () => root.unmount());
+      host.remove();
+    },
+  };
+}
+
 function typeText(text: string): void {
   probe.current?.onChange({ target: { value: text } } as React.ChangeEvent<HTMLInputElement>);
 }
@@ -212,5 +234,21 @@ describe('useDebouncedCommit clear-to-retype', () => {
     expect(probe.current?.displayValue).toBe('25');
 
     await unmount();
+  });
+});
+
+describe('useDebouncedCommit external ownership', () => {
+  it('cancels a pending edit when the canonical store value changes', async () => {
+    const commit = vi.fn();
+    const view = await renderMutableProbe(1500, commit);
+
+    await act(async () => typeText('2500'));
+    await view.setValue(1800);
+    await act(async () => vi.advanceTimersByTime(400));
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(probe.current?.displayValue).toBe('1800');
+
+    await view.unmount();
   });
 });

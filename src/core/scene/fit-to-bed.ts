@@ -1,13 +1,14 @@
-// fitObjectToBed — returns the SceneObject with its transform set so the
-// object fits inside `(bedWidth × bedHeight)` (with a 10% margin) and is
-// centered on the bed. Used by the import flow so dragging in a big SVG
-// doesn't dump a 1m-wide drawing into the corner of a 400 mm bed.
+// fitObjectToBed — returns the SceneObject centered on the bed, normally
+// scaled to fit `(bedWidth × bedHeight)` with a 10% margin. The explicit
+// center-only mode preserves scale for imports whose authored physical size is
+// part of their contract.
 //
 // Math: scale s = 0.9 × min(bedW / w, bedH / h). For objects that already
 // fit, s caps at 1 (we don't grow small designs to fill the bed). Translation
 // puts the object's center at (bedW/2, bedH/2) in logical scene coords.
 
 import type { SceneObject } from './scene-object';
+import { applyTransform } from './transform';
 
 const FIT_MARGIN = 0.9;
 
@@ -15,7 +16,9 @@ export function fitObjectToBed(
   object: SceneObject,
   bedWidth: number,
   bedHeight: number,
+  mode: 'fit' | 'center-only' = 'fit',
 ): SceneObject {
+  if (mode === 'center-only') return centerObjectOnBed(object, bedWidth, bedHeight);
   const { bounds } = object;
   const w = bounds.maxX - bounds.minX;
   const h = bounds.maxY - bounds.minY;
@@ -32,6 +35,28 @@ export function fitObjectToBed(
       scaleY: scale,
       x: bedWidth / 2 - scale * cx,
       y: bedHeight / 2 - scale * cy,
+    },
+  };
+}
+
+/** Center an object on the bed while preserving its authored transform scale. */
+function centerObjectOnBed(object: SceneObject, bedWidth: number, bedHeight: number): SceneObject {
+  const { bounds } = object;
+  const w = bounds.maxX - bounds.minX;
+  const h = bounds.maxY - bounds.minY;
+  if (w <= 0 || h <= 0) return object;
+  const localCenter = {
+    x: (bounds.minX + bounds.maxX) / 2,
+    y: (bounds.minY + bounds.maxY) / 2,
+  };
+  const withoutTranslation = { ...object.transform, x: 0, y: 0 };
+  const mappedCenter = applyTransform(localCenter, withoutTranslation);
+  return {
+    ...object,
+    transform: {
+      ...object.transform,
+      x: bedWidth / 2 - mappedCenter.x,
+      y: bedHeight / 2 - mappedCenter.y,
     },
   };
 }
