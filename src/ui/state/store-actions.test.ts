@@ -5,11 +5,14 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
   LASER_MACHINE_CONFIG,
+  createLayer,
 } from '../../core/scene';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { emitGcode } from '../../io/gcode';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -101,5 +104,106 @@ describe('useStore — undo/redo selection preservation (CNV-13)', () => {
 
     expect(useStore.getState().project.machine).toEqual(LASER_MACHINE_CONFIG);
     expect(useStore.getState().cachedCncMachine?.params.safeZMm).toBe(12);
+  });
+
+  it('commits Startup material and operation bindings as one undoable action', () => {
+    const layer = {
+      ...createLayer({ id: 'cnc-operation', color: '#aa0000' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS },
+    };
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: {
+        ...project,
+        machine: DEFAULT_CNC_MACHINE_CONFIG,
+        scene: { ...project.scene, layers: [layer] },
+      },
+      cachedCncMachine: DEFAULT_CNC_MACHINE_CONFIG,
+      undoStack: [],
+      redoStack: [],
+      dirty: false,
+    });
+    const machine = {
+      ...DEFAULT_CNC_MACHINE_CONFIG,
+      stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, materialKey: 'hardwood' },
+    };
+
+    useStore.getState().replaceCncStartupSetup(DEFAULT_DEVICE_PROFILE, machine, machine, {
+      operationDrafts: [
+        {
+          layerId: layer.id,
+          materialKey: 'hardwood',
+          toolId: 'em-6350',
+          vClearToolId: null,
+          pocketRoughToolId: null,
+          reliefFinishToolId: null,
+        },
+      ],
+      customTools: [],
+      materialApplyRequested: true,
+    });
+
+    const saved = useStore.getState();
+    expect(
+      saved.project.machine?.kind === 'cnc' ? saved.project.machine.stock.materialKey : null,
+    ).toBe('hardwood');
+    expect(saved.project.scene.layers[0]?.cnc).toMatchObject({
+      materialKey: 'hardwood',
+      toolId: 'em-6350',
+      feedSource: { kind: 'material-recipe', materialKey: 'hardwood' },
+    });
+    expect(saved.undoStack).toHaveLength(1);
+
+    saved.undo();
+    expect(useStore.getState().project.scene.layers[0]?.cnc?.materialKey).toBeUndefined();
+  });
+
+  it('keeps emitted CNC G-code byte-identical when Startup values are unchanged', () => {
+    const layer = {
+      ...createLayer({ id: 'cnc-operation', color: '#aa0000' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS },
+    };
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: {
+        ...project,
+        machine: DEFAULT_CNC_MACHINE_CONFIG,
+        scene: {
+          objects: [svgObj('cnc-artwork', [layer.color])],
+          layers: [layer],
+        },
+      },
+      cachedCncMachine: DEFAULT_CNC_MACHINE_CONFIG,
+      undoStack: [],
+      redoStack: [],
+      dirty: false,
+    });
+    const before = emitGcode(useStore.getState().project);
+
+    useStore
+      .getState()
+      .replaceCncStartupSetup(
+        DEFAULT_DEVICE_PROFILE,
+        DEFAULT_CNC_MACHINE_CONFIG,
+        DEFAULT_CNC_MACHINE_CONFIG,
+        {
+          operationDrafts: [
+            {
+              layerId: layer.id,
+              materialKey: null,
+              toolId: null,
+              vClearToolId: null,
+              pocketRoughToolId: null,
+              reliefFinishToolId: null,
+            },
+          ],
+          customTools: [],
+          materialApplyRequested: false,
+        },
+      );
+
+    const after = emitGcode(useStore.getState().project);
+    expect(after.preflight.ok).toBe(before.preflight.ok);
+    expect(after.gcode).toBe(before.gcode);
   });
 });

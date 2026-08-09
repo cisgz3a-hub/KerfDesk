@@ -29,6 +29,7 @@ function install4040Cnc(): void {
     },
   });
   useStore.getState().setMachineKind('cnc');
+  useStore.getState().updateCncMachine({ stock: { materialKey: 'plywood-mdf' } });
 }
 
 async function render(
@@ -53,12 +54,7 @@ async function apply(host: HTMLElement): Promise<void> {
 }
 
 describe('FeedsCalculatorRow', () => {
-  // Audit 1.20: the panel opened on hardcoded 'plywood-mdf' / 2 flutes whatever
-  // the layer's own recipe said, so it previewed - and on Apply committed -
-  // another material's numbers under this layer's name.
-  // The seed was fixed at mount, so a material or bit change from another
-  // surface left the picker — and therefore Apply — on the old material.
-  it('follows the layer’s recipe when the material changes while it stays mounted', async () => {
+  it('follows the read-only Startup material when it changes while mounted', async () => {
     install4040Cnc();
     const onCommitSettings = vi.fn();
     const host = document.createElement('div');
@@ -84,6 +80,11 @@ describe('FeedsCalculatorRow', () => {
         ...DEFAULT_CNC_LAYER_SETTINGS,
         feedSource: { kind: 'material-recipe', materialKey: 'acrylic', fluteCount: 1 },
       });
+      expect(host.querySelector('select[aria-label="Chipload material"]')).toBeNull();
+      expect(
+        host.querySelector('output[aria-label="Chipload material from Startup Setup"]')
+          ?.textContent,
+      ).toBe('Acrylic');
       await apply(host);
       const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
       expect(next.feedSource).toMatchObject({ kind: 'material-recipe', materialKey: 'acrylic' });
@@ -98,9 +99,18 @@ describe('FeedsCalculatorRow', () => {
     const onCommitSettings = vi.fn();
     const { host, root } = await render(onCommitSettings, {
       ...DEFAULT_CNC_LAYER_SETTINGS,
+      materialKey: 'hardwood',
       feedSource: { kind: 'material-recipe', materialKey: 'hardwood', fluteCount: 3 },
     });
     try {
+      expect(host.querySelector('select[aria-label="Chipload material"]')).toBeNull();
+      expect(
+        host.querySelector('output[aria-label="Chipload material from Startup Setup"]')
+          ?.textContent,
+      ).toBe('Hardwood (general)');
+      expect(
+        host.querySelector('output[aria-label="Bit flute count from Startup Setup"]')?.textContent,
+      ).toBe('3');
       await apply(host);
       const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
       expect(next.feedSource).toMatchObject({
@@ -108,6 +118,7 @@ describe('FeedsCalculatorRow', () => {
         materialKey: 'hardwood',
         fluteCount: 3,
       });
+      expect(next.materialKey).toBe('hardwood');
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -126,7 +137,6 @@ describe('FeedsCalculatorRow', () => {
 
       const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
       expect(next).toMatchObject({
-        materialKey: 'plywood-mdf',
         feedMmPerMin: 300,
         plungeMmPerMin: 120,
         spindleRpm: 12_000,
@@ -137,6 +147,7 @@ describe('FeedsCalculatorRow', () => {
           fluteCount: 2,
         },
       });
+      expect(next.materialKey).toBeUndefined();
       expect(next.cutType).toBe(DEFAULT_CNC_LAYER_SETTINGS.cutType);
     } finally {
       await act(async () => root.unmount());
@@ -162,8 +173,10 @@ describe('FeedsCalculatorRow', () => {
         if (toolId === undefined) throw new Error('Catalog tool missing');
         useStore.getState().updateCncMachine({ toolId });
       });
-      const fluteSelect = host.querySelector('select[aria-label="Bit flute count"]');
-      expect(fluteSelect).toHaveProperty('value', '1');
+      expect(
+        host.querySelector('output[aria-label="Bit flute count from Startup Setup"]')?.textContent,
+      ).toBe('1');
+      expect(host.querySelector('select[aria-label="Bit flute count"]')).toBeNull();
       await apply(host);
       expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({
         feedSource: { kind: 'material-recipe', fluteCount: 1 },
@@ -174,20 +187,18 @@ describe('FeedsCalculatorRow', () => {
     }
   });
 
-  it('preserves an explicit flute override across unrelated machine rerenders', async () => {
+  it('shows flute evidence read-only across unrelated machine rerenders', async () => {
     install4040Cnc();
     const { host, root } = await render(vi.fn());
     try {
-      const fluteSelect = host.querySelector('select[aria-label="Bit flute count"]');
-      if (!(fluteSelect instanceof HTMLSelectElement)) throw new Error('Flute select missing');
-      await act(async () => {
-        fluteSelect.value = '3';
-        fluteSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-      expect(fluteSelect.value).toBe('3');
+      const fluteOutput = host.querySelector(
+        'output[aria-label="Bit flute count from Startup Setup"]',
+      );
+      expect(fluteOutput?.textContent).toBe('2');
+      expect(host.querySelector('select[aria-label="Bit flute count"]')).toBeNull();
 
       await act(async () => useStore.getState().updateCncMachine({ stock: { thicknessMm: 12 } }));
-      expect(fluteSelect.value).toBe('3');
+      expect(fluteOutput?.textContent).toBe('2');
     } finally {
       await act(async () => root.unmount());
       host.remove();

@@ -127,22 +127,44 @@ test('keeps rail focus visible without leaking rail chrome into nested dialogs',
   }
 });
 
-test('keeps paired CNC values readable inside the supported rail widths', async ({ page }) => {
+test('keeps CNC job setup out of Artwork and opens it through Startup Setup', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
   await page.getByRole('button', { name: 'CNC', exact: true }).click();
 
-  const panel = page.getByLabel('Cuts / Layers resizable panel');
-  const pairedInputs = page.locator('input[aria-label="Park X"], input[aria-label="Park Y"]');
-  await expect(pairedInputs).toHaveCount(2);
-  for (const label of ['Park X', 'Park Y']) {
-    const input = page.getByLabel(label, { exact: true });
-    await input.fill('-1500');
-    await input.blur();
-    await expect(input).toHaveValue('-1500');
-  }
+  const artworkPanel = page.getByLabel('Cuts / Layers resizable panel');
+  await expect(artworkPanel.locator('section[aria-label="Material and bit setup"]')).toHaveCount(0);
+  await expect(artworkPanel.getByLabel('Stock origin X', { exact: true })).toHaveCount(0);
+  await expect(artworkPanel.getByLabel('Stock origin Y', { exact: true })).toHaveCount(0);
 
-  for (const width of [240, 300]) {
+  const stockReference = page.getByLabel('Stock from Startup Setup');
+  await expect(stockReference).toBeVisible();
+  await stockReference
+    .getByRole('button', { name: 'Expand stock reference from Startup Setup' })
+    .click();
+  await expect(stockReference.locator('input')).toHaveCount(0);
+  await stockReference.getByRole('button', { name: 'Edit in Startup Setup' }).click();
+  const startup = page.getByRole('dialog', { name: 'CNC Startup Setup' });
+  await expect(startup).toBeVisible();
+  await expect(startup.getByLabel('Stock origin X', { exact: true })).toBeVisible();
+  await expect(startup.getByLabel('Stock origin Y', { exact: true })).toBeVisible();
+});
+
+test('keeps setup-owned CNC references readable at supported Artwork widths', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'CNC', exact: true }).click();
+  await page.getByRole('button', { name: 'Text...', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Text content' }).fill('CNC width check');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+  const panel = page.getByLabel('Cuts / Layers resizable panel');
+  const machineMaximum = panel.getByRole('button', { name: /^Machine maximum:/ });
+  const artworkSpindle = panel.getByRole('spinbutton', { name: /^Artwork spindle speed for/ });
+  await expect(machineMaximum).toBeVisible();
+  await expect(artworkSpindle).toBeVisible();
+
+  for (const width of [240, 300, 340]) {
     await panel.evaluate((element, nextWidth) => {
       const panelElement = element as HTMLElement;
       const pixels = `${nextWidth}px`;
@@ -159,63 +181,36 @@ test('keeps paired CNC values readable inside the supported rail widths', async 
     );
 
     const panelMetrics = await panel.evaluate((element) => {
-      const panelElement = element as HTMLElement;
-      const box = panelElement.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
       return {
-        clientWidth: panelElement.clientWidth,
+        clientWidth: element.clientWidth,
         left: box.left,
         right: box.right,
-        scrollWidth: panelElement.scrollWidth,
+        scrollWidth: element.scrollWidth,
         width: box.width,
       };
     });
     expect(Math.abs(panelMetrics.width - width)).toBeLessThanOrEqual(1);
-    expect(panelMetrics.scrollWidth).toBeLessThanOrEqual(panelMetrics.clientWidth);
+    expect(panelMetrics.scrollWidth).toBeLessThanOrEqual(panelMetrics.clientWidth + 1);
 
-    const metrics = await pairedInputs.evaluateAll((inputs) =>
-      inputs.map((input) => {
-        if (!(input instanceof HTMLInputElement)) throw new Error('paired number input missing');
-        const group = input.parentElement;
-        const column = group?.parentElement;
-        const prefix = group?.firstElementChild;
-        const card = input.closest('section[aria-label="Material and bit setup"]');
-        if (!(group instanceof HTMLSpanElement)) throw new Error('pair group missing');
-        if (!(column instanceof HTMLDivElement)) throw new Error('pair value column missing');
-        if (!(prefix instanceof HTMLSpanElement)) throw new Error('pair prefix missing');
-        if (!(card instanceof HTMLElement)) throw new Error('material and bit card missing');
-        const inputBox = input.getBoundingClientRect();
-        const groupBox = group.getBoundingClientRect();
-        const columnBox = column.getBoundingClientRect();
-        const cardBox = card.getBoundingClientRect();
-        return {
-          cardLeft: cardBox.left,
-          cardRight: cardBox.right,
-          clientWidth: input.clientWidth,
-          scrollWidth: input.scrollWidth,
-          inputLeft: inputBox.left,
-          inputRight: inputBox.right,
-          inputWidth: inputBox.width,
-          groupLeft: groupBox.left,
-          groupRight: groupBox.right,
-          columnLeft: columnBox.left,
-          columnRight: columnBox.right,
-          prefix: prefix.textContent,
-        };
-      }),
-    );
-
-    expect(metrics.map((metric) => metric.prefix)).toEqual(['X', 'Y']);
-    for (const metric of metrics) {
-      expect(metric.inputWidth).toBeGreaterThanOrEqual(64);
-      expect(metric.scrollWidth).toBeLessThanOrEqual(metric.clientWidth);
-      expect(metric.groupLeft).toBeGreaterThanOrEqual(metric.columnLeft - 0.5);
-      expect(metric.groupRight).toBeLessThanOrEqual(metric.columnRight + 0.5);
-      expect(metric.inputLeft).toBeGreaterThanOrEqual(metric.columnLeft - 0.5);
-      expect(metric.inputRight).toBeLessThanOrEqual(metric.columnRight + 0.5);
-      expect(metric.groupLeft).toBeGreaterThanOrEqual(metric.cardLeft - 0.5);
-      expect(metric.groupRight).toBeLessThanOrEqual(metric.cardRight + 0.5);
-      expect(metric.inputLeft).toBeGreaterThanOrEqual(panelMetrics.left - 0.5);
-      expect(metric.inputRight).toBeLessThanOrEqual(panelMetrics.right + 0.5);
+    const maximumBox = await machineMaximum.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return { bottom: box.bottom, left: box.left, right: box.right, top: box.top };
+    });
+    const spindleBox = await artworkSpindle.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return { bottom: box.bottom, left: box.left, right: box.right, top: box.top };
+    });
+    for (const box of [maximumBox, spindleBox]) {
+      expect(box.left).toBeGreaterThanOrEqual(panelMetrics.left - 1);
+      expect(box.right).toBeLessThanOrEqual(panelMetrics.right + 1);
     }
+    expect(maximumBox.bottom).toBeLessThanOrEqual(spindleBox.top + 1);
   }
+
+  await machineMaximum.click();
+  await expect(
+    panel.getByText('This is the machine maximum spindle speed saved in Startup Setup.'),
+  ).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Edit in Startup Setup' })).toBeVisible();
 });

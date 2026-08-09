@@ -8,6 +8,7 @@ import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { LaserWindow } from './LaserWindow';
+import { MachineSetupDialogHost } from './device-setup';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -65,7 +66,10 @@ describe('LaserWindow alarm recovery homing capability', () => {
         root = createRoot(host);
         root.render(
           <PlatformProvider adapter={mockPlatform}>
-            <LaserWindow />
+            <>
+              <LaserWindow />
+              <MachineSetupDialogHost />
+            </>
           </PlatformProvider>,
         );
       });

@@ -1,9 +1,8 @@
 // The Artwork settings table of the Job Review dialog (ADR-224 v2): one row
 // per output-enabled operation (plus enabled laser sub-operations) with the
-// core numbers editable in place, and a muted detail line per row carrying
-// the mode-specific settings and the bound material. Reads the layers live
-// from the store; edits commit through the same store actions the layer
-// panels use, and the gate's debounced re-prepare keeps the stats truthful.
+// laser core numbers editable in place, CNC values read-only, and a muted
+// detail line per row carrying the mode-specific settings and bound material.
+// Laser edits still use the panel store actions; CNC changes return to Artwork.
 
 import { Fragment } from 'react';
 import {
@@ -69,9 +68,7 @@ export function JobReviewLayersTable(props: {
     <section aria-label="Artwork settings" style={sectionStyle}>
       <h3 style={sectionHeadingStyle}>
         Artwork settings
-        <span style={sectionHintStyle}>
-          core numbers editable — full editors stay in the panels
-        </span>
+        <span style={sectionHintStyle}>{reviewHint(props.machineKind)}</span>
       </h3>
       {outputLayers.length === 0 ? (
         <div className="lf-banner lf-banner--info" style={bannerStyle}>
@@ -172,8 +169,6 @@ function CncLayersTable(props: {
 }): JSX.Element {
   const objects = useStore((s) => s.project.scene.objects);
   const machine = useStore((s) => s.project.machine);
-  const maxFeed = useStore((s) => s.project.device.maxFeed);
-  const setLayerParam = useStore((s) => s.setLayerParam);
   if (machine?.kind !== 'cnc') return <p style={{ margin: 0 }}>Machine is not in CNC mode.</p>;
   return (
     <table style={tableStyle}>
@@ -191,12 +186,9 @@ function CncLayersTable(props: {
                 <CncRowCells
                   ariaContext={layer.name}
                   settings={settings}
-                  maxFeedMmPerMin={maxFeed}
-                  spindleMaxRpm={machine.params.spindleMaxRpm}
                   {...(effective?.cncActualMaxDepthMm === undefined
                     ? {}
                     : { actualVCarveDepthMm: effective.cncActualMaxDepthMm })}
-                  onCommit={(next) => setLayerParam(layer.id, { cnc: next })}
                 />
                 <td style={tableCellStyle}>{operationArtworkCount(objects, layer)}</td>
               </tr>
@@ -216,6 +208,12 @@ function CncLayersTable(props: {
       </tbody>
     </table>
   );
+}
+
+function reviewHint(machineKind: MachineKind): string {
+  return machineKind === 'cnc'
+    ? 'read-only — edit operation values in Artwork settings'
+    : 'core numbers editable — full editors stay in the panels';
 }
 
 function TableHeader(props: { readonly columns: ReadonlyArray<string> }): JSX.Element {

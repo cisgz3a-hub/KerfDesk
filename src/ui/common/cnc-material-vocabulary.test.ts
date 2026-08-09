@@ -1,16 +1,15 @@
-// Pins "one term per concept" for the no-recipe state. Three surfaces render
-// it — the layer card's Material row, the project material picker, and the Job
-// Review stock card — and they drifted into two different names. A future edit
-// that reintroduces a second wording fails here rather than in front of an
-// operator comparing two panels.
+// Pins "one term per concept" for the no-recipe state across the sole Startup
+// authoring flow and its read-only Artwork / Job Review representations.
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MANUAL_FEEDS_LABEL } from './cnc-material-vocabulary';
 
 const SURFACES = [
-  'src/ui/layers/CncMaterialRow.tsx',
-  'src/ui/machine/CncProjectMaterialPicker.tsx',
+  'src/ui/laser/device-setup/DeviceSetupCncJobStep.tsx',
+  'src/ui/laser/device-setup/DeviceSetupCncToolPlan.tsx',
+  'src/ui/laser/device-setup/DeviceSetupCncReview.tsx',
+  'src/ui/layers/CncSetupReferenceFields.tsx',
   'src/ui/laser/job-review/JobReviewStockCard.tsx',
 ];
 

@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { DEFAULT_CNC_TOOLS } from '../../core/scene';
+import { DEFAULT_CNC_TOOLS, type CncTool } from '../../core/scene';
 import { useStore } from '../state';
 import {
   MODELED_CNC_BIT_CATALOG,
@@ -29,9 +29,15 @@ const BUILT_IN_CATALOG_IDS = new Set(
   DEFAULT_CNC_TOOLS.flatMap((tool) => (tool.catalogId === undefined ? [] : [tool.catalogId])),
 );
 
-export function CncBitCatalogPanel(): JSX.Element {
+export function CncBitCatalogPanel(
+  props: {
+    readonly customTools?: ReadonlyArray<CncTool>;
+    readonly onAdd?: (tool: Omit<CncTool, 'id'>) => void;
+  } = {},
+): JSX.Element {
   const addCustomCncTool = useStore((state) => state.addCustomCncTool);
-  const customTools = useStore((state) => state.cncLibrary.customTools);
+  const storedCustomTools = useStore((state) => state.cncLibrary.customTools);
+  const customTools = props.customTools ?? storedCustomTools;
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query.trim().toLocaleLowerCase());
   const savedCatalogIds = useMemo(
@@ -80,7 +86,7 @@ export function CncBitCatalogPanel(): JSX.Element {
         reference={reference}
         savedCatalogIds={savedCatalogIds}
         query={query}
-        onAdd={(entry) => addCustomCncTool({ ...entry.tool, catalogId: entry.id })}
+        onAdd={(entry) => (props.onAdd ?? addCustomCncTool)({ ...entry.tool, catalogId: entry.id })}
       />
     </RailSection>
   );

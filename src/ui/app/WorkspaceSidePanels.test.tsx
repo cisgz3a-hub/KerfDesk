@@ -120,6 +120,26 @@ describe('WorkspaceSidePanels', () => {
       await act(async () => machine?.click());
       expect(host.textContent).not.toContain('Layer rail');
       expect(host.textContent).toContain('Machine rail');
+
+      await act(async () => useUiStore.getState().focusRailPanel('layers'));
+      expect(host.textContent).toContain('Layer rail');
+      expect(host.textContent).not.toContain('Machine rail');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('reopens a hidden desktop panel when another surface routes to it', async () => {
+    const { host, root } = await renderPanels();
+    try {
+      const layersToggle = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === 'Layers',
+      );
+      await act(async () => layersToggle?.click());
+      expect(host.textContent).not.toContain('Layer rail');
+
+      await act(async () => useUiStore.getState().focusRailPanel('layers'));
+      expect(host.textContent).toContain('Layer rail');
     } finally {
       await act(async () => root.unmount());
     }

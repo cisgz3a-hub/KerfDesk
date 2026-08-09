@@ -4,61 +4,35 @@
 // explicit setup launch, removing the former pair of near-synonym workflows.
 
 import { useEffect, useState } from 'react';
-import type { DeviceProfile } from '../../../core/devices';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
 import {
   browserLocalStorage,
   loadConfiguredSignatures,
-  persistConfiguredSignatures,
 } from '../../state/device-setup-configured-persistence';
 import { useLaserStore } from '../../state/laser-store';
-import { deviceProfileSignature, shouldPromptDeviceSetup } from './device-setup-nudge';
-import type { DeviceSetupStep } from './device-setup-flow';
-import { DeviceSetupWizard, type DeviceSetupHighlight } from './DeviceSetupWizard';
+import { shouldPromptDeviceSetup } from './device-setup-nudge';
+import { openMachineSetup, useMachineSetupDialogStore } from './machine-setup-dialog-store';
 
-export type DeviceSetupOpenRequest = {
-  readonly initialStep: DeviceSetupStep;
-  readonly highlight?: DeviceSetupHighlight;
-};
-
-export function DeviceSetupControls(props: {
-  readonly openRequest?: DeviceSetupOpenRequest | undefined;
-}): JSX.Element {
-  const [machineSetupOpen, setMachineSetupOpen] = useState(false);
-  const [initialStep, setInitialStep] = useState<DeviceSetupStep>('capability');
-  const [highlight, setHighlight] = useState<DeviceSetupHighlight | undefined>(undefined);
+export function DeviceSetupControls(): JSX.Element {
   const [configured, setConfigured] = useState<ReadonlySet<string>>(() => {
     const storage = browserLocalStorage();
     return storage === null ? new Set() : loadConfiguredSignatures(storage);
   });
+  const configuredRevision = useMachineSetupDialogStore((store) => store.configuredRevision);
   const connected = useLaserStore((s) => s.connection.kind === 'connected');
   const device = useStore((s) => s.project.device);
   const needsSetup = shouldPromptDeviceSetup({ connected, device, configured });
   useEffect(() => {
-    if (props.openRequest === undefined) return;
-    setInitialStep(props.openRequest.initialStep);
-    setHighlight(props.openRequest.highlight);
-    setMachineSetupOpen(true);
-  }, [props.openRequest]);
-  const openSetup = (step: DeviceSetupStep): void => {
-    setInitialStep(step);
-    setHighlight(undefined);
-    setMachineSetupOpen(true);
-  };
-  const markConfigured = (profile: DeviceProfile): void => {
-    const next = new Set(configured);
-    next.add(deviceProfileSignature(profile));
-    setConfigured(next);
     const storage = browserLocalStorage();
-    if (storage !== null) persistConfiguredSignatures(storage, next);
-  };
+    setConfigured(storage === null ? new Set() : loadConfiguredSignatures(storage));
+  }, [configuredRevision]);
   return (
     <>
       <Button
         variant={needsSetup ? 'primary' : 'default'}
-        onClick={() => openSetup('capability')}
+        onClick={() => openMachineSetup()}
         {...helpProps('control:laser.machine-setup.launch')}
       >
         Machine Setup
@@ -67,14 +41,6 @@ export function DeviceSetupControls(props: {
         <p style={mutedNoteStyle} role="note">
           This machine isn&apos;t set up yet.
         </p>
-      )}
-      {machineSetupOpen && (
-        <DeviceSetupWizard
-          initialStep={initialStep}
-          highlight={highlight}
-          onClose={() => setMachineSetupOpen(false)}
-          onConfigured={markConfigured}
-        />
       )}
     </>
   );

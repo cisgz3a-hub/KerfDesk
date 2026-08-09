@@ -2,7 +2,7 @@ import { CHIPLOAD_MATERIALS } from '../../core/cnc';
 
 const MATERIAL_GROUPS = [...new Set(CHIPLOAD_MATERIALS.map((material) => material.group))];
 
-/** Shared grouped options for CNC stock and layer material selectors. */
+/** Shared grouped options for CNC Startup Setup material selectors. */
 export function CncMaterialOptions(): JSX.Element {
   return (
     <>

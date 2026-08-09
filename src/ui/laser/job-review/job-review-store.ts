@@ -38,6 +38,7 @@ type JobReviewStore = {
   // Dialog-facing.
   readonly confirm: () => void;
   readonly cancel: () => void;
+  readonly cancelAndClose: () => void;
   readonly requestRebuild: () => void;
 };
 
@@ -111,6 +112,12 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
       fire('confirm');
     },
     cancel: () => fire('cancel'),
+    cancelAndClose: () => {
+      fire('cancel');
+      // Owner-navigation actions must reveal their destination immediately.
+      // Keep the pending/resolved signal intact for the awaiting gate.
+      set({ state: { kind: 'idle' } });
+    },
     requestRebuild: () => fire('rebuild'),
   };
 });

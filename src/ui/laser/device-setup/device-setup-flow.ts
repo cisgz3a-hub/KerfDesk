@@ -24,35 +24,25 @@ import {
 } from '../../../core/scene';
 import { deviceSetupSupportsMachineKind } from './device-setup-capability';
 import { mergeDetectedSetupFacts } from './device-setup-detected-facts';
+import {
+  deviceSetupStepOrder,
+  isDeviceSetupStep,
+  type DeviceSetupStep,
+} from './device-setup-steps';
 
 export { deviceSetupSupportsMachineKind } from './device-setup-capability';
+export {
+  CNC_DEVICE_SETUP_STEP_ORDER,
+  DEVICE_SETUP_STEP_ORDER,
+  deviceSetupStepOrder,
+  type DeviceSetupStep,
+} from './device-setup-steps';
 
 // Six steps (ADR-240, maintainer-ordered): machine type first, then the
 // profile catalog, then a dedicated connect-and-detect page, then one flat
 // confirm page (coordinates + machine output), optional calibrations as
 // closed status rows, and firmware comparison + review before the single
 // atomic Save.
-export type DeviceSetupStep =
-  | 'capability'
-  | 'identify'
-  | 'connect'
-  | 'confirm'
-  | 'options'
-  | 'review';
-
-export const DEVICE_SETUP_STEP_ORDER: ReadonlyArray<DeviceSetupStep> = [
-  'capability',
-  'identify',
-  'connect',
-  'confirm',
-  'options',
-  'review',
-];
-
-export function deviceSetupStepOrder(_machineKind: MachineKind): ReadonlyArray<DeviceSetupStep> {
-  return DEVICE_SETUP_STEP_ORDER;
-}
-
 export type DeviceSetupState = {
   readonly step: DeviceSetupStep;
   // Physical output capability. This may contain both kinds, while
@@ -187,7 +177,7 @@ export function deviceSetupReducer(
   if (action.kind === 'next') return { ...state, step: adjacentStep(state, 1) };
   if (action.kind === 'back') return { ...state, step: adjacentStep(state, -1) };
   if (action.kind === 'go') {
-    return DEVICE_SETUP_STEP_ORDER.includes(action.step) ? { ...state, step: action.step } : state;
+    return isDeviceSetupStep(action.step) ? { ...state, step: action.step } : state;
   }
   return reduceDraftAction(state, action);
 }
@@ -420,9 +410,11 @@ export function canAdvanceDeviceSetup(state: DeviceSetupState): boolean {
     // the operator away from the fix.
     case 'capability':
     case 'connect':
+    case 'cnc-setup':
       return true;
-    case 'identify':
     case 'confirm':
+      return state.machineKind === 'cnc' || machineSetupValidationIssues(state).length === 0;
+    case 'identify':
     case 'options':
       return machineSetupValidationIssues(state).length === 0;
     case 'review':
@@ -432,19 +424,21 @@ export function canAdvanceDeviceSetup(state: DeviceSetupState): boolean {
   }
 }
 
-export function isFirstDeviceSetupStep(step: DeviceSetupStep, _machineKind: MachineKind): boolean {
-  return step === DEVICE_SETUP_STEP_ORDER[0];
+export function isFirstDeviceSetupStep(step: DeviceSetupStep, machineKind: MachineKind): boolean {
+  return step === deviceSetupStepOrder(machineKind)[0];
 }
 
-export function isLastDeviceSetupStep(step: DeviceSetupStep, _machineKind: MachineKind): boolean {
-  return step === DEVICE_SETUP_STEP_ORDER[DEVICE_SETUP_STEP_ORDER.length - 1];
+export function isLastDeviceSetupStep(step: DeviceSetupStep, machineKind: MachineKind): boolean {
+  const order = deviceSetupStepOrder(machineKind);
+  return step === order[order.length - 1];
 }
 
 function adjacentStep(state: DeviceSetupState, delta: number): DeviceSetupStep {
-  const index = DEVICE_SETUP_STEP_ORDER.indexOf(state.step);
-  if (index < 0) return DEVICE_SETUP_STEP_ORDER[0] ?? state.step;
-  const clamped = Math.min(DEVICE_SETUP_STEP_ORDER.length - 1, Math.max(0, index + delta));
-  return DEVICE_SETUP_STEP_ORDER[clamped] ?? state.step;
+  const order = deviceSetupStepOrder(state.machineKind);
+  const index = order.indexOf(state.step);
+  if (index < 0) return order[0] ?? state.step;
+  const clamped = Math.min(order.length - 1, Math.max(0, index + delta));
+  return order[clamped] ?? state.step;
 }
 
 function positive(value: number): boolean {

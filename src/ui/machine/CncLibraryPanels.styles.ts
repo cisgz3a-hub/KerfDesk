@@ -40,6 +40,7 @@ export const toolNameStyle: CSSProperties = {
 };
 export const toolFamilyStyle: CSSProperties = { color: 'var(--lf-text-faint)' };
 export const deleteButtonStyle: CSSProperties = { flexShrink: 0 };
+export const fluteInputStyle: CSSProperties = { width: 48, flexShrink: 0, padding: '2px 4px' };
 export const addFormStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',

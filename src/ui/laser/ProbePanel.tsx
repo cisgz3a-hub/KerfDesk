@@ -1,6 +1,6 @@
 // ProbePanel — the right-rail touch-plate probing panel (ADR-103 G2, F-CNC20).
 // CNC-only chrome around ProbeControls; the same controls are also hosted in
-// the CNC Material & Bit panel and the Device-Setup wizard (F-CNC20 setup).
+// the CNC Machine rail and the Device-Setup wizard (F-CNC20 setup).
 
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';

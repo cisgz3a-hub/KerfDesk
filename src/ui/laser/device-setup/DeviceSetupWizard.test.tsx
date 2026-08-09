@@ -70,7 +70,7 @@ afterEach(() => {
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 
-// The six-step shell and searchable-catalog behavior are pinned in
+// The laser six-step shell and searchable-catalog behavior are pinned in
 // DeviceSetupWizard.catalog.test.tsx.
 describe('DeviceSetupWizard', () => {
   it('connects only after using the selected controller and baud', async () => {
@@ -179,12 +179,13 @@ describe('DeviceSetupWizard', () => {
       await act(async () => button(view.host, 'Load into draft').click());
       await act(async () => button(view.host, 'Next').click()); // connect & detect
       await act(async () => button(view.host, 'Next').click()); // confirm settings
-      expect(view.host.textContent).toContain('CNC clearance and spindle contract');
+      await act(async () => button(view.host, 'Next').click()); // CNC Startup Setup
+      expect(view.host.textContent).toContain('CNC machine limits');
       expect(view.host.textContent).not.toContain('Laser output and accessories');
       expect(input(view.host, 'Spindle maximum').value).toBe('10000');
       await changeInput(view.host, 'Safe Z', '9');
       await advanceToReview(view.host);
-      await act(async () => button(view.host, 'Save machine setup').click());
+      await act(async () => button(view.host, 'Save CNC startup setup').click());
 
       const machine = useStore.getState().project.machine;
       expect(machine?.kind).toBe('cnc');
@@ -212,8 +213,9 @@ describe('DeviceSetupWizard', () => {
       await act(async () => button(view.host, 'Next').click()); // choose your machine
       await act(async () => button(view.host, 'Next').click()); // connect & detect
       await act(async () => button(view.host, 'Next').click()); // confirm settings
+      // Hybrid saves with Laser active, so its retained CNC draft stays on Confirm.
       expect(view.host.textContent).toContain('Laser output and accessories');
-      expect(view.host.textContent).toContain('CNC clearance and spindle contract');
+      expect(view.host.textContent).toContain('CNC machine limits');
       await changeInput(view.host, 'Safe Z', '10');
       await advanceToReview(view.host);
       await act(async () => button(view.host, 'Save machine setup').click());
@@ -335,7 +337,13 @@ describe('DeviceSetupWizard', () => {
 });
 
 async function advanceToReview(host: HTMLElement): Promise<void> {
-  while (!host.textContent?.includes('Step 6 of 6 — Review & save')) {
+  while (
+    ![...host.querySelectorAll('button')].some(
+      (candidate) =>
+        candidate.textContent?.includes('Save machine setup') ||
+        candidate.textContent?.includes('Save CNC startup setup'),
+    )
+  ) {
     await act(async () => button(host, 'Next').click());
   }
 }

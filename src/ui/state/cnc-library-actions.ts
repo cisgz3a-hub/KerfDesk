@@ -43,6 +43,7 @@ export type CncLibraryActions = {
   readonly saveCncFeedPreset: (name: string, settings: CncLayerSettings) => void;
   readonly deleteCncFeedPreset: (presetId: string) => void;
   readonly saveCncMachineProfile: (name: string) => void;
+  readonly saveCncMachineProfileFromDraft: (name: string, machine: CncMachineConfig) => void;
   readonly applyCncMachineProfile: (profileId: string) => void;
   readonly deleteCncMachineProfile: (profileId: string) => void;
 };
@@ -215,7 +216,10 @@ function machineProfileActions(
   set: Setter,
 ): Pick<
   CncLibraryActions,
-  'saveCncMachineProfile' | 'applyCncMachineProfile' | 'deleteCncMachineProfile'
+  | 'saveCncMachineProfile'
+  | 'saveCncMachineProfileFromDraft'
+  | 'applyCncMachineProfile'
+  | 'deleteCncMachineProfile'
 > {
   return {
     saveCncMachineProfile: (name) =>
@@ -230,6 +234,16 @@ function machineProfileActions(
           },
         };
       }),
+    saveCncMachineProfileFromDraft: (name, machine) =>
+      set((state) => ({
+        cncLibrary: {
+          ...state.cncLibrary,
+          machineProfiles: [
+            ...state.cncLibrary.machineProfiles,
+            { id: crypto.randomUUID(), name, machine },
+          ],
+        },
+      })),
     applyCncMachineProfile: (profileId) =>
       set((s) => {
         if (s.project.machine?.kind !== 'cnc') return s;

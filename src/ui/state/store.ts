@@ -13,7 +13,6 @@ import {
   type EmbeddedFont,
   type Layer,
   type LayerMoveDirection,
-  type MachineConfig,
   type Project,
   type RasterImage,
   type Scene,
@@ -125,7 +124,6 @@ import {
   interactionActions,
   saveTrackingActions,
   sceneActions,
-  type MachineSetupReplacementResult,
   viewActions,
 } from './store-actions';
 import { variableDataActions, type VariableDataActions } from './variable-data-actions';
@@ -133,6 +131,7 @@ import { arrayActions, type ArrayActions } from './array-actions';
 import { nestActions, type NestActions } from './nest-actions';
 import { printCutProjectActions, type PrintCutProjectActions } from './print-cut-project-actions';
 import { cncTabActions, type CncTabActions } from './cnc-tab-actions';
+import type { MachineSetupActions } from './machine-setup-actions';
 export { currentOutputScope } from './output-scope-state';
 
 export type { ImportOutcome } from './scene-mutations';
@@ -150,6 +149,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 export type AppState = ObjectPropertiesActions &
   OperationActions &
   ArtworkOrderActions &
+  MachineSetupActions &
   CncTabActions &
   ArrayActions &
   NestActions &
@@ -329,9 +329,6 @@ export type AppState = ObjectPropertiesActions &
     readonly setReliefParams: (id: string, patch: ReliefParamPatch) => void;
     readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
     readonly replaceDeviceProfile: (profile: DeviceProfile) => void;
-    readonly replaceMachineSetup: (
-      ...args: [DeviceProfile, MachineConfig, MachineConfig?]
-    ) => MachineSetupReplacementResult;
     readonly undo: () => void;
     readonly redo: () => void;
     // Single-select on plain click; clears all when id is null.

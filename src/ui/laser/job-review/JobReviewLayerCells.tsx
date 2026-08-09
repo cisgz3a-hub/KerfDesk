@@ -1,11 +1,9 @@
 // The per-row cell sets for the Job Review artwork-settings table: the
-// editable core numbers for a laser or CNC operation, plus the shared name /
-// mode-chip / detail-line cells (ADR-224 v2). Everything beyond the core
-// numbers stays read-only in the review — Cancel and use the full layer
-// editors for structural changes.
+// editable core numbers for laser operations, read-only CNC operation values,
+// plus the shared name / mode-chip / detail-line cells. CNC changes belong in
+// Artwork settings so this remains a review surface.
 
 import type { CncLayerSettings, LayerOperationSettings } from '../../../core/scene';
-import { withManualCncFeedPatch } from '../../state/cnc-feed-provenance';
 import {
   airCellLabelStyle,
   detailCellStyle,
@@ -23,8 +21,6 @@ import { ReviewNumberCell } from './ReviewNumberCell';
 const PERCENT_MAX = 100;
 const MIN_SPEED_MM_PER_MIN = 1;
 const MIN_PASSES = 1;
-const MIN_CNC_DEPTH_MM = 0.1;
-const MIN_FEED_MM_PER_MIN = 1;
 
 export function OperationNameCell(props: {
   readonly color: string;
@@ -130,10 +126,7 @@ export function LaserRowCells(props: {
 export function CncRowCells(props: {
   readonly ariaContext: string;
   readonly settings: CncLayerSettings;
-  readonly maxFeedMmPerMin: number;
-  readonly spindleMaxRpm: number;
   readonly actualVCarveDepthMm?: number;
-  readonly onCommit: (next: CncLayerSettings) => void;
 }): JSX.Element {
   const { settings } = props;
   return (
@@ -150,53 +143,46 @@ export function CncRowCells(props: {
           </output>
         </td>
       ) : (
-        <ReviewNumberCell
+        <ReadOnlyNumberCell
           label={`Cut depth mm for ${props.ariaContext}`}
           value={settings.depthMm}
-          min={MIN_CNC_DEPTH_MM}
-          step="any"
-          onCommit={(depthMm) => props.onCommit({ ...settings, depthMm })}
         />
       )}
-      <ReviewNumberCell
+      <ReadOnlyNumberCell
         label={`Depth per pass mm for ${props.ariaContext}`}
         value={settings.depthPerPassMm}
-        min={MIN_CNC_DEPTH_MM}
-        step="any"
-        onCommit={(depthPerPassMm) =>
-          props.onCommit(withManualCncFeedPatch(settings, { depthPerPassMm }))
-        }
       />
-      <ReviewNumberCell
+      <ReadOnlyNumberCell
         label={`Feed mm/min for ${props.ariaContext}`}
         value={settings.feedMmPerMin}
-        min={MIN_FEED_MM_PER_MIN}
-        max={props.maxFeedMmPerMin}
-        onCommit={(feedMmPerMin) =>
-          props.onCommit(withManualCncFeedPatch(settings, { feedMmPerMin }))
-        }
       />
-      <ReviewNumberCell
+      <ReadOnlyNumberCell
         label={`Plunge mm/min for ${props.ariaContext}`}
         value={settings.plungeMmPerMin}
-        min={MIN_FEED_MM_PER_MIN}
-        max={props.maxFeedMmPerMin}
-        onCommit={(plungeMmPerMin) =>
-          props.onCommit(withManualCncFeedPatch(settings, { plungeMmPerMin }))
-        }
       />
-      <ReviewNumberCell
+      <ReadOnlyNumberCell
         label={`Spindle RPM for ${props.ariaContext}`}
         value={settings.spindleRpm}
-        min={0}
-        max={props.spindleMaxRpm}
-        isInteger
-        onCommit={(spindleRpm) => props.onCommit(withManualCncFeedPatch(settings, { spindleRpm }))}
       />
     </>
   );
 }
 
+function ReadOnlyNumberCell(props: {
+  readonly label: string;
+  readonly value: number;
+}): JSX.Element {
+  return (
+    <td style={tableCellStyle}>
+      <output aria-label={props.label}>{formatNumber(props.value)}</output>
+    </td>
+  );
+}
+
 function formatDepth(value: number): string {
   return `${value.toLocaleString('en-US', { maximumFractionDigits: 3 })} mm actual`;
+}
+
+function formatNumber(value: number): string {
+  return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
 }

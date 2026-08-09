@@ -107,17 +107,17 @@ describe('JobReviewLayersTable', () => {
     expect(host.querySelectorAll('input[aria-label^="Power % for"]')).toHaveLength(1);
   });
 
-  it('commits CNC edits as a whole-object merge that preserves the other fields', async () => {
+  it('shows CNC operation values read-only without mutating the store', async () => {
     const layer = createLayer({ id: 'red', color: '#ff0000' });
     seedLayers([layer], 'cnc');
     await render('cnc');
 
-    await typeAndBlur(numberInput(`Feed mm/min for ${layer.name}`), '777');
-
-    const cnc = storedLayer('red').cnc;
-    expect(cnc?.feedMmPerMin).toBe(777);
-    expect(cnc?.depthMm).toBe(1);
-    expect(cnc?.cutType).toBe('profile-on-path');
+    expect(host.querySelectorAll('input')).toHaveLength(0);
+    expect(
+      host.querySelector(`output[aria-label="Feed mm/min for ${layer.name}"]`)?.textContent,
+    ).toBe('1,000');
+    expect(storedLayer('red').cnc).toBeUndefined();
+    expect(host.textContent).toContain('read-only — edit operation values in Artwork settings');
   });
 
   it('shows compiled actual depth instead of an inert cut-depth editor for flowing V-carve', async () => {
@@ -144,7 +144,9 @@ describe('JobReviewLayersTable', () => {
       `output[aria-label="Actual compiled max depth mm for ${layer.name}"]`,
     );
     expect(actual?.textContent).toBe('3.175 mm actual');
-    expect(numberInput(`Depth per pass mm for ${layer.name}`)).toBeInstanceOf(HTMLInputElement);
+    expect(
+      host.querySelector(`output[aria-label="Depth per pass mm for ${layer.name}"]`)?.textContent,
+    ).toBe('1.5');
   });
 
   it('states plainly when nothing has Output enabled', async () => {
