@@ -12,6 +12,7 @@ import { machineKindOf, type ReliefObject } from '../../core/scene';
 import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
 import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
+import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
@@ -73,7 +74,10 @@ export function SelectedReliefProperties(): JSX.Element | null {
       {isMeshRelief(relief) ? (
         <BackgroundSelect relief={relief} />
       ) : (
-        <PolaritySelect relief={relief} />
+        <>
+          <PolaritySelect relief={relief} />
+          <ReliefMaskOutsideMeaningControl relief={relief} />
+        </>
       )}
     </section>
   );
