@@ -35,6 +35,7 @@ import {
 import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
 import { cncGroupProvenance } from './cnc-group-provenance';
+import { zPassArrayMaterializationError } from './depth-passes';
 import { parkFields } from './motion-polish';
 import { reliefMachineSpaceTransform } from './relief-machine-space';
 
@@ -198,6 +199,13 @@ function reliefLadderFor(
 ):
   | { readonly kind: 'compiled'; readonly ladder: ReliefRoughingLadder }
   | ReliefMaterializationFailure {
+  const passArrayError = zPassArrayMaterializationError(
+    relief.reliefDepthMm,
+    settings.depthPerPassMm,
+  );
+  if (passArrayError !== null) {
+    return reliefMaterializationFailure(relief.source, passArrayError);
+  }
   const machineSpace = reliefMachineSpaceTransform(relief.transform);
   const heightmap = reliefObjectToHeightmap(relief, {
     targetWidthMm: relief.targetWidthMm,

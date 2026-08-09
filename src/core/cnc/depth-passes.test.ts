@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { zPassDepths } from './depth-passes';
+import { zPassArrayMaterializationError, zPassDepths } from './depth-passes';
 
 describe('zPassDepths', () => {
   it('splits depth into equal passes with an exact final depth', () => {
@@ -37,5 +37,19 @@ describe('zPassDepths', () => {
     for (let i = 1; i < depths.length; i += 1) {
       expect(depths[i]).toBeLessThan(depths[i - 1] ?? 0);
     }
+  });
+});
+
+describe('zPassArrayMaterializationError', () => {
+  it('accepts a pass ladder at the maximum ECMAScript Array length', () => {
+    expect(zPassArrayMaterializationError(0xffff_ffff, 1)).toBeNull();
+  });
+
+  it('rejects a pass ladder that no ECMAScript Array can represent', () => {
+    expect(zPassArrayMaterializationError(0x1_0000_0000, 1)).toMatch(/Array length/);
+  });
+
+  it('uses the same single-pass fallback as zPassDepths for an invalid per-pass depth', () => {
+    expect(zPassArrayMaterializationError(Number.MAX_VALUE, 0)).toBeNull();
   });
 });
