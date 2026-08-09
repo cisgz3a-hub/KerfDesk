@@ -98,13 +98,14 @@ describe('ReliefPropertyControls outside-mask meaning', () => {
     const { host, root } = await render(relief);
     try {
       expect(host.querySelector('select[aria-label="Relief outside-mask meaning"]')).toBeNull();
+      expect(host.querySelector('input[aria-label="Relief mask threshold"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
     }
   });
 
-  it('shows the exact persisted meaning and read-only threshold for a present mask', async () => {
+  it('shows the exact persisted meaning after the editable threshold for a present mask', async () => {
     const { host, root } = await render(
       heightfieldRelief({
         inclusionMask: [0, 255],
@@ -120,12 +121,16 @@ describe('ReliefPropertyControls outside-mask meaning', () => {
         ['stock-top', 'Keep at stock top'],
         ['relief-floor', 'Carve to relief floor'],
       ]);
-      expect(select.closest('label')?.textContent).toContain('Mask below 128');
+      const threshold = host.querySelector('input[aria-label="Relief mask threshold"]');
+      if (!(threshold instanceof HTMLInputElement)) throw new Error('threshold input missing');
+      expect(threshold.value).toBe('128');
+      expect(threshold.closest('label')?.nextElementSibling).toBe(select.closest('label'));
+      expect(select.closest('label')?.textContent).toContain('Below threshold');
       expect(select.title).toContain('at or above 128 use mapped depth');
-      expect(host.textContent).toContain('Stored mask threshold: 128 (read-only here)');
-      expect(host.textContent).toContain('at or above 128 use mapped depth');
-      expect(host.textContent).toContain('lower bytes use this meaning');
-      expect(host.querySelector('input[aria-label*="threshold" i]')).toBeNull();
+      expect(select.closest('label')?.textContent).toContain(
+        'Mask bytes below 128 use this selected outside meaning',
+      );
+      expect(host.textContent).not.toContain('read-only here');
       expect(host.textContent).not.toContain('16-bit alpha');
       expect(host.textContent).not.toContain('full mask');
     } finally {
@@ -143,10 +148,13 @@ describe('ReliefPropertyControls outside-mask meaning', () => {
     try {
       const select = outsideMeaningSelect(host);
       const gamma = host.querySelector('input[aria-label="Relief height-map gamma"]');
+      const threshold = host.querySelector('input[aria-label="Relief mask threshold"]');
       if (!(gamma instanceof HTMLInputElement)) throw new Error('gamma input missing');
-      expect(gamma.closest('label')?.nextElementSibling).toBe(select.closest('label'));
-      expect(select.closest('label')?.textContent).toContain('Mask below 255');
-      expect(host.textContent).toContain('Stored mask threshold: 255 (read-only here)');
+      if (!(threshold instanceof HTMLInputElement)) throw new Error('threshold input missing');
+      expect(gamma.closest('label')?.nextElementSibling).toBe(threshold.closest('label'));
+      expect(threshold.closest('label')?.nextElementSibling).toBe(select.closest('label'));
+      expect(select.closest('label')?.textContent).toContain('Below threshold');
+      expect(host.textContent).not.toContain('read-only here');
 
       await act(async () => {
         select.value = 'stock-top';

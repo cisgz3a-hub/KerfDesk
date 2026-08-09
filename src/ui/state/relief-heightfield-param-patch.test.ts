@@ -35,6 +35,7 @@ function heightfieldRelief(): HeightfieldReliefObject {
       mapping: {
         inputLowCode: INITIAL_LOW_CODE,
         inputHighCode: INITIAL_HIGH_CODE,
+        inclusionThreshold: 128,
       },
       provenance: { sourceName: 'levels-source.png' },
       revision: 4,
@@ -69,6 +70,8 @@ describe('relief heightfield parameter patches', () => {
     ['high endpoint', { inputHighCode: MAX_U16_CODE }],
     ['equal endpoints', { inputLowCode: 12_345, inputHighCode: 12_345 }],
     ['crossed endpoints', { inputLowCode: 50_000, inputHighCode: 10_000 }],
+    ['minimum mask threshold', { inclusionThreshold: 1 }],
+    ['maximum mask threshold', { inclusionThreshold: 255 }],
   ] as const)('applies an exact %s and advances only the canonical revision', (_label, patch) => {
     const relief = heightfieldRelief();
     const field = relief.reliefSource;
@@ -117,6 +120,15 @@ describe('relief heightfield parameter patches', () => {
     expect(hasReliefPatch(normalized)).toBe(false);
   });
 
+  it.each([0, 256, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'drops invalid mask threshold %s',
+    (inclusionThreshold) => {
+      const normalized = normalizeReliefPatch({ inclusionThreshold });
+      expect(normalized).toEqual({});
+      expect(hasReliefPatch(normalized)).toBe(false);
+    },
+  );
+
   it('recognizes same-value and legacy-mesh mapping-only no-ops', () => {
     const relief = heightfieldRelief();
     expect(
@@ -126,6 +138,9 @@ describe('relief heightfield parameter patches', () => {
       }),
     ).toBe(true);
     expect(isNoOpHeightfieldMappingPatch(relief, { inputLowCode: 200 })).toBe(false);
+    expect(isNoOpHeightfieldMappingPatch(relief, { inclusionThreshold: 128 })).toBe(true);
+    expect(isNoOpHeightfieldMappingPatch(relief, { inclusionThreshold: 255 })).toBe(false);
     expect(isNoOpHeightfieldMappingPatch(meshRelief(), { inputLowCode: 200 })).toBe(true);
+    expect(isNoOpHeightfieldMappingPatch(meshRelief(), { inclusionThreshold: 64 })).toBe(true);
   });
 });
