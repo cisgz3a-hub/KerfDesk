@@ -2553,6 +2553,12 @@ F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Those four flows are
 2. Roughing samples the physical heightmap at bit-diameter/8 cells (0.2 mm
    floor), so compile stays bounded; the four-million-cell cap coarsens in
    the final scaled metric for very large meshes.
+3. Each depth level emits at most 4,096 inward rings. A non-emitting next-inset
+   probe distinguishes exact exhaustion, an offset-engine failure, and usable
+   interior beyond that limit. The latter two are retained with the exact
+   compiled/recovery Job and reach Job Review as warnings only; they never
+   refuse Frame, Start, preview, save, or G-code emission, and the probe never
+   adds a cutter move.
 
 ### F-CNC7. Import an STL relief — Phase H.4
 

@@ -22,10 +22,10 @@ export type OffsetLadder = {
   // because the region ran out of interior: the toolpath is truncated and
   // material the ladder should have cleared is still standing.
   readonly offsetFailed: boolean;
-  // True when the ladder ran out of BUDGET (maxSteps) while the last step
-  // still produced contours: interior remains that no ring visited. Silent
-  // before the #584 audit made the case reachable from valid UI settings —
-  // callers report it as a pass-limit advisory, never a refusal (rule 7).
+  // True when the ladder ran out of BUDGET (maxSteps) while the last permitted
+  // step still produced contours. This alone does not prove the next inset is
+  // non-empty; callers that need exact pass-limit evidence must perform one
+  // non-emitting lookahead. Advisory only, never a refusal (rule 7).
   readonly capped: boolean;
 };
 
