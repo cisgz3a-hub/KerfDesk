@@ -17184,3 +17184,80 @@ mask bytes.
 - ADR-292, schema-v4 canonical field and shared materialization contract.
 - ADR-296, exact grayscale-alpha import into the existing U8 mask.
 - ADR-298, the preceding read-only threshold and editable outside-meaning slice.
+
+## ADR-301 - Relief properties names the exact persisted declared source meaning (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a source-truth slice; source-mode creation, full provenance-detail UI, Job Review disclosure, and physical qualification stay open
+
+### Context
+
+ADR-291 defines five distinct meanings for canonical relief samples: declared scalar depth,
+artistic brightness emboss, externally estimated relative depth, operator-authored relief data,
+and an STL top projection. Schema v4 already persists exactly one of those meanings in
+`provenance.sourceKind`, and project validation accepts only the five named enum values. Source
+labels are part of technical correctness because artistic brightness must not be presented as
+recovered geometry and relative ordering must not be presented as millimetres.
+
+Relief properties currently shows the object source name, field dimensions, canonical precision,
+and optional source bit depth, but not the persisted source meaning. A valid loaded project can
+therefore carry truthful provenance that the operator cannot see. Exposing that existing enum is a
+display-only correction; it does not make the planned source-mode creation workflow current.
+
+### Decision
+
+1. **Show the exact source declaration for both relief arms.** In CNC mode, a selected
+   `heightfield-v1` relief displays a read-only **Declared source meaning** line from
+   `provenance.sourceKind`. A `legacy-mesh` has no
+   `provenance.sourceKind`, so it displays **STL top projection** from its own discriminated source
+   arm without fabricating provenance.
+2. **Map every persisted enum explicitly.** The five labels are **Depth map**, **Brightness
+   emboss**, **Relative-depth map**, **Editable relief map**, and **STL top projection**. The UI
+   exhaustively maps the validated enum rather than deriving meaning from a file extension, pixel
+   values, producer name, or current mapping controls. The legacy mesh arm reuses the truthful STL
+   top-projection label and boundary description.
+3. **Keep the semantic boundary visible.** Depth map is described as declared scalar data.
+   Brightness emboss says it is artistic and not recovered 3D geometry. Relative-depth map says it
+   is relative and not millimetres. Editable relief map says it is operator-authored scalar data.
+   STL top projection says relief interpretation uses only the top projected surface and does not
+   represent undercuts; the legacy mesh itself remains stored losslessly.
+4. **Make no persisted or derived change.** The disclosure is read-only. It does not edit or infer
+   `sourceKind`, rewrite provenance, samples, mask, digest, mapping, dimensions, bounds, transform,
+   algorithm revision, or heightfield revision, and it creates no dirty or undo state.
+5. **Keep the product claim narrow.** The current qualified PNG importer still writes exactly
+   `depth-map`. Valid projects carrying another accepted meaning display that stored fact, but this
+   slice adds no **Create Relief...** flow, source-mode selector, brightness conversion, relative-
+   depth inference, editable-map authoring, STL conversion, full source-name/source-polarity/
+   producer detail, histogram, crop/aspect control, or Job Review provenance surface.
+6. **Keep the evidence boundary software-only.** Tests can prove exact enum-to-copy mapping,
+   legacy-arm derivation, integration in Relief properties, and absence of state mutation. They cannot
+   prove that source metadata is honest, that artistic brightness recovers geometry, that relative
+   depth is metric, that an STL projection preserves undercuts, or that any result is physically
+   suitable for a machine or material.
+
+### Consequences
+
+- Operators can distinguish stored source declarations before changing mapping controls or interpreting a
+  relief preview.
+- Existing project schema, validation, migration, serialization, import, workers, digest,
+  materialization, preview, CAM, simulation, G-code, Job Review, Frame, and Start behavior remain
+  unchanged.
+- Full source interpretation remains incomplete: creation choices, remaining provenance detail,
+  histogram/clipping disclosure, crop/aspect controls, editable-map authoring, and physical
+  qualification stay planned.
+
+### Verification
+
+- Focused component tests pin all five persisted labels and semantic descriptions plus the
+  legacy-mesh STL-top-projection derivation.
+- A Relief-properties integration test pins the current imported `depth-map` disclosure alongside
+  existing dimensions, bit depth, polarity, levels, and gamma controls.
+- TypeScript, lint, formatting, focused UI tests, and release checks are required before
+  publication. Browser perceptual review, packaged Electron, controller behavior, hardware air
+  cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, source-mode meanings, source-truth requirements, and evidence boundaries.
+- ADR-292, schema-v4 canonical field and persisted provenance contract.
+- ADR-295 and ADR-296, qualified import paths that persist `depth-map` provenance.

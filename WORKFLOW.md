@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292 through ADR-300 schema, import, gamma/input-endpoint and mask-threshold/outside-meaning controls, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292 through ADR-301 schema, import, gamma/input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning disclosure, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2405,10 +2405,10 @@ profile, F-CNC14 tool-change job, F-CNC15 Z zeroing, F-CNC16 drill,
 F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
-F-CNC46 records the shipped ADR-290 explicit 8-bit grayscale height-map path.
-F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Their bounded ADR-292 through ADR-300
-substrate is current where explicitly marked below; the remaining controls and
-user-facing flows are planned.
+F-CNC46 records the shipped ADR-290 explicit height-map path plus the bounded
+ADR-292 through ADR-301 schema, import, mapping, recovery, and declared-source-
+meaning work marked current below. F-CNC47-F-CNC50 specify the approved ADR-291
+expansion; their remaining controls and user-facing flows are planned.
 
 ### F-CNC1. Switch to CNC mode and configure the machine
 
@@ -4025,7 +4025,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294/295/296/297/298/299/300)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294/295/296/297/298/299/300/301)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4044,7 +4044,11 @@ and lifts the command's CNC-only gate.)*
    into the required U8 mask, including when every alpha value is `255`.
 3. Each file becomes a top-down relief at 100 mm wide and 5 mm deep. Height
    follows the pixel aspect ratio, **Light is high** is the declared default,
-   and the Relief properties panel shows the pixel dimensions and precision.
+   and, in CNC mode when that relief is selected, the Relief properties panel
+   shows the pixel dimensions, precision, and persisted declared source meaning
+   **Depth map**. A loaded canonical project instead shows whichever of the five
+   validated source meanings it actually stores; CurveDesk does not infer or
+   edit that value in this flow.
 4. Width, total depth, polarity, exact **Input low**/**Input high** U16 codes, and **Gamma** are
    editable. Each endpoint accepts an integer from `0` through `65535` without rounding, clamping,
    swapping, or an ordering rule. With low below high, codes outside the interval clip to its ends;
@@ -4140,9 +4144,9 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-293/294/295/296/297/298/299/300 supply schema-v4/U16LE
+> **Planned - not current UI.** P2R.1a plus ADR-293/294/295/296/297/298/299/300/301 supply schema-v4/U16LE
 > storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha import, simple transparency
-> masks, non-destructive manual gamma/input-endpoint mapping, editable persisted threshold/outside-mask meaning, atomic large-project autosave/recovery, and the existing
+> masks, non-destructive manual gamma/input-endpoint mapping, editable persisted threshold/outside-mask meaning, read-only declared-source-meaning disclosure, atomic large-project autosave/recovery, and the existing
 > CAM/preview substrate. The creation modes and remaining controls below stay planned; use
 > F-CNC46's narrower **Import Height Map...** flow today.
 
@@ -4151,7 +4155,9 @@ and lifts the command's CNC-only gate.)*
    **Depth map**, **Brightness emboss**, **Relative-depth map**, **Editable relief
    map**, or **STL top projection**. **Blank editable map** is the creation option
    for a new **Editable relief map**. The canonical source meaning is persisted as
-   provenance and stays visible in Relief properties and Job Review.
+   provenance. Relief properties already shows that stored declaration read-only;
+   choosing it during creation and disclosing it in Job Review remain part of this
+   planned flow.
 2. **Depth map** accepts qualified 8- or 16-bit grayscale PNG samples as scalar
    data. It reports PNG gamma/color-space metadata without silently applying it.
    The operator sets polarity, input-low/input-high codes, maximum physical
