@@ -9,6 +9,7 @@ export type ReliefParamPatch = {
   polarity?: 'light-is-high' | 'light-is-deep';
   inputLowCode?: number;
   inputHighCode?: number;
+  inclusionThreshold?: number;
   outsideMask?: ReliefHeightfieldMapping['outsideMask'];
 };
 
@@ -21,6 +22,9 @@ export function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch 
   if (patch.polarity !== undefined) out.polarity = patch.polarity;
   if (isU16Code(patch.inputLowCode)) out.inputLowCode = patch.inputLowCode;
   if (isU16Code(patch.inputHighCode)) out.inputHighCode = patch.inputHighCode;
+  if (isInclusionThreshold(patch.inclusionThreshold)) {
+    out.inclusionThreshold = patch.inclusionThreshold;
+  }
   if (isOutsideMask(patch.outsideMask)) out.outsideMask = patch.outsideMask;
   return out;
 }
@@ -34,6 +38,7 @@ export function hasReliefPatch(patch: ReliefParamPatch): boolean {
     patch.polarity !== undefined ||
     patch.inputLowCode !== undefined ||
     patch.inputHighCode !== undefined ||
+    patch.inclusionThreshold !== undefined ||
     patch.outsideMask !== undefined
   );
 }
@@ -43,9 +48,12 @@ export function isNoOpHeightfieldMappingPatch(
   relief: ReliefObject,
   patch: ReliefParamPatch,
 ): boolean {
-  const hasMappingPatch = [patch.inputLowCode, patch.inputHighCode, patch.outsideMask].some(
-    isDefined,
-  );
+  const hasMappingPatch = [
+    patch.inputLowCode,
+    patch.inputHighCode,
+    patch.inclusionThreshold,
+    patch.outsideMask,
+  ].some(isDefined);
   const hasOtherPatch = [
     patch.targetWidthMm,
     patch.reliefDepthMm,
@@ -58,6 +66,7 @@ export function isNoOpHeightfieldMappingPatch(
   return (
     isUnchanged(patch.inputLowCode, mapping.inputLowCode) &&
     isUnchanged(patch.inputHighCode, mapping.inputHighCode) &&
+    isUnchanged(patch.inclusionThreshold, mapping.inclusionThreshold) &&
     isUnchanged(patch.outsideMask, mapping.outsideMask)
   );
 }
@@ -83,6 +92,9 @@ export function applyHeightfieldReliefPatch(
         ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
         ...(patch.inputLowCode === undefined ? {} : { inputLowCode: patch.inputLowCode }),
         ...(patch.inputHighCode === undefined ? {} : { inputHighCode: patch.inputHighCode }),
+        ...(patch.inclusionThreshold === undefined
+          ? {}
+          : { inclusionThreshold: patch.inclusionThreshold }),
         ...(patch.outsideMask === undefined ? {} : { outsideMask: patch.outsideMask }),
       },
       revision: relief.reliefSource.revision + (canonicalChanged ? 1 : 0),
@@ -99,12 +111,14 @@ function mappingPatchChangesSource(
   const nextPolarity = patch.polarity ?? mapping.polarity;
   const nextInputLowCode = patch.inputLowCode ?? mapping.inputLowCode;
   const nextInputHighCode = patch.inputHighCode ?? mapping.inputHighCode;
+  const nextInclusionThreshold = patch.inclusionThreshold ?? mapping.inclusionThreshold;
   const nextOutsideMask = patch.outsideMask ?? mapping.outsideMask;
   return (
     nextDepthMm !== mapping.maxDepthMm ||
     nextPolarity !== mapping.polarity ||
     nextInputLowCode !== mapping.inputLowCode ||
     nextInputHighCode !== mapping.inputHighCode ||
+    nextInclusionThreshold !== mapping.inclusionThreshold ||
     nextOutsideMask !== mapping.outsideMask
   );
 }
@@ -135,6 +149,10 @@ function isU16Code(value: unknown): value is number {
   return (
     typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_U16_CODE
   );
+}
+
+function isInclusionThreshold(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 0xff;
 }
 
 function isOutsideMask(value: unknown): value is ReliefHeightfieldMapping['outsideMask'] {
