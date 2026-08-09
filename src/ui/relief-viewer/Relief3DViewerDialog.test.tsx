@@ -46,7 +46,7 @@ function relief(): ReliefObject {
     id: 'R1',
     source: 'model.stl',
     // One tilted triangle — enough for a real heightmap.
-    targetWidthMm: 50,
+    targetWidthMm: 100,
     reliefDepthMm: 5,
     reliefSource: {
       kind: 'legacy-mesh',
@@ -54,7 +54,7 @@ function relief(): ReliefObject {
       emptyCells: 'floor',
     },
     color: '#a0522d',
-    bounds: { minX: 0, minY: 0, maxX: 50, maxY: 50 },
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
     transform: IDENTITY_TRANSFORM,
   };
 }
@@ -106,6 +106,9 @@ describe('Relief3DViewerDialog', () => {
       expect(host.querySelector('[role="dialog"]')).not.toBeNull();
       expect(host.textContent).toContain('model.stl');
       expect(host.textContent).toContain('0.25 mm wide');
+      expect(host.textContent).toContain(
+        'Relief 3D preview uses 0.390625 mm display cells (0.25 mm nominal target)',
+      );
       // jsdom: the three renderer cannot start → the fallback line shows
       // once the lazy import + scene setup settle (real task turns).
       await vi.waitFor(
@@ -114,6 +117,14 @@ describe('Relief3DViewerDialog', () => {
         },
         { timeout: 20_000 },
       );
+      expect(worker.prepare).not.toHaveBeenCalled();
+      expect(worker.prepareSurface.mock.calls[0]?.[0]).toMatchObject({
+        resolution: {
+          requestedMmPerCell: 0.25,
+          effectiveMmPerCell: 0.390625,
+          reason: 'display-mesh-cell-budget',
+        },
+      });
 
       const close = [...host.querySelectorAll('button')].find(
         (button) => button.textContent === 'Close',
@@ -167,6 +178,7 @@ describe('Relief3DViewerDialog', () => {
         />,
       );
     });
+    expect(host.querySelector('[role="status"]')).toBeNull();
 
     await vi.waitFor(() => {
       expect(worker.prepare).toHaveBeenCalledOnce();
@@ -202,15 +214,15 @@ describe('Relief3DViewerDialog', () => {
       heightmap: {
         widthCells: 2,
         heightCells: 1,
-        mmPerCell: 0.25,
+        mmPerCell: 0.390625,
         depth: new Float32Array([-5, 0]),
       },
-      widthMm: 25,
-      heightMm: 50,
+      widthMm: 100,
+      heightMm: 100,
     });
     const scaled: ReliefObject = {
       ...depthMapRelief(),
-      transform: { ...IDENTITY_TRANSFORM, scaleX: -0.5, scaleY: 2 },
+      transform: { ...IDENTITY_TRANSFORM, scaleX: -2, scaleY: 4 },
     };
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -222,13 +234,24 @@ describe('Relief3DViewerDialog', () => {
         );
       });
 
-      await vi.waitFor(() => expect(worker.prepare).toHaveBeenCalledOnce());
-      expect(host.textContent).toContain('25 mm wide');
+      await vi.waitFor(() => {
+        expect(worker.prepare).toHaveBeenCalledOnce();
+        expect(worker.prepareSurface).toHaveBeenCalledOnce();
+      });
+      expect(host.textContent).toContain('100 mm wide');
+      expect(host.textContent).toContain('Preview only; CAM and G-code are unchanged.');
       expect(worker.prepare.mock.calls[0]?.[1]).toMatchObject({
         targetWidthMm: 50,
-        targetScaleX: 0.5,
-        targetScaleY: 2,
-        mmPerCell: 0.25,
+        targetScaleX: 2,
+        targetScaleY: 4,
+        mmPerCell: 0.390625,
+      });
+      expect(worker.prepareSurface.mock.calls[0]?.[0]).toMatchObject({
+        resolution: {
+          requestedMmPerCell: 0.25,
+          effectiveMmPerCell: 0.390625,
+          reason: 'display-mesh-cell-budget',
+        },
       });
     } finally {
       await act(async () => root.unmount());
