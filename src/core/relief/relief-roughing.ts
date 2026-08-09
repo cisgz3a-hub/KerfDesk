@@ -14,6 +14,7 @@
 // Depth-major: every ring of one level before the next. Pure and deterministic.
 
 import { buildOffsetLadder } from '../geometry/offset-ladder';
+import { partialDualCoordinate } from '../grid';
 import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { kernelForTool, type ToolKernel } from '../sim';
@@ -112,7 +113,10 @@ function levelContoursMm(
   if (!any) return [];
   return marchingSquares(mask, map.widthCells, map.heightCells).map((contour) => ({
     closed: true,
-    points: contour.points.map((p) => ({ x: p.x * map.mmPerCell, y: p.y * map.mmPerCell })),
+    points: contour.points.map((p) => ({
+      x: partialDualCoordinate(map, 'x', p.x),
+      y: partialDualCoordinate(map, 'y', p.y),
+    })),
   }));
 }
 

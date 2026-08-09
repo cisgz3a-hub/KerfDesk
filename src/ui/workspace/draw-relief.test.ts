@@ -5,7 +5,7 @@ import { createLayer, IDENTITY_TRANSFORM, type ReliefObject } from '../../core/s
 const worker = vi.hoisted(() => ({
   prepare: vi.fn(),
 }));
-const raster = vi.hoisted(() => ({ drawBitmapAtTransform: vi.fn() }));
+const raster = vi.hoisted(() => ({ drawPartialGridBitmapAtTransform: vi.fn() }));
 
 vi.mock('./cnc-removal-grid-worker-client', () => ({
   prepareReliefHeightmapsOffThread: worker.prepare,
@@ -13,7 +13,7 @@ vi.mock('./cnc-removal-grid-worker-client', () => ({
 }));
 
 vi.mock('./draw-raster', () => ({
-  drawBitmapAtTransform: raster.drawBitmapAtTransform,
+  drawPartialGridBitmapAtTransform: raster.drawPartialGridBitmapAtTransform,
 }));
 
 import {
@@ -24,7 +24,7 @@ import {
 
 beforeEach(() => {
   worker.prepare.mockReset();
-  raster.drawBitmapAtTransform.mockReset();
+  raster.drawPartialGridBitmapAtTransform.mockReset();
   resetReliefPreviewCachesForTests();
 });
 
@@ -90,7 +90,7 @@ describe('depth-map canvas preview scheduling', () => {
 
     expect(ctx.strokeRect).toHaveBeenCalledOnce();
     expect(ctx.fillText).toHaveBeenCalledWith(`[!] Relief preview failed: ${reason}`, 6, 12);
-    expect(raster.drawBitmapAtTransform).not.toHaveBeenCalled();
+    expect(raster.drawPartialGridBitmapAtTransform).not.toHaveBeenCalled();
   });
 
   it('caches a terminal failure without retrying the same source and options', async () => {
@@ -231,6 +231,8 @@ describe('depth-map canvas preview scheduling', () => {
           heightmap: {
             widthCells: 2,
             heightCells: 1,
+            widthMm: 2,
+            heightMm: 1,
             mmPerCell: 1,
             depth: Float32Array.from([-3, -3]),
             inclusion: Uint8Array.from([1, 0]),
@@ -272,7 +274,9 @@ describe('depth-map canvas preview scheduling', () => {
           heightmap: {
             widthCells: 1,
             heightCells: 1,
-            mmPerCell: 1,
+            widthMm: 20,
+            heightMm: 20,
+            mmPerCell: 20,
             depth: Float32Array.of(-1),
           },
           widthMm: 20,
@@ -301,9 +305,10 @@ describe('depth-map canvas preview scheduling', () => {
     const ctx = { imageSmoothingEnabled: false } as unknown as CanvasRenderingContext2D;
     drawReliefObject(ctx, object, visibleLayers(), view);
 
-    expect(raster.drawBitmapAtTransform).toHaveBeenCalledWith(
+    expect(raster.drawPartialGridBitmapAtTransform).toHaveBeenCalledWith(
       ctx,
       bitmap,
+      expect.objectContaining({ widthMm: 20, heightMm: 20, mmPerCell: 20 }),
       object.bounds,
       object.transform,
       view,

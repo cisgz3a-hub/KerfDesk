@@ -11,7 +11,7 @@ const META: GcodeMetadata = {
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('relief-finish-without-rough-v1');
+    expect(EMITTER_REVISION).toBe('relief-finish-without-rough-partial-edge-grid-v1');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

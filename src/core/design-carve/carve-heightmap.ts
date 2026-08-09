@@ -27,6 +27,8 @@ export function designCarveHeightmap(input: DesignCarveInput): Heightmap {
   return {
     widthCells: grid.widthCells,
     heightCells: grid.heightCells,
+    widthMm: grid.widthCells * grid.mmPerCell,
+    heightMm: grid.heightCells * grid.mmPerCell,
     mmPerCell: grid.mmPerCell,
     depth,
   };

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
 import { buildToolpath } from '../job';
-import type { CncPass, Job } from '../job';
+import type { CncPass, Job, Toolpath } from '../job';
 import { compileCncJob } from '../cnc';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -18,6 +18,12 @@ import { kernelForTool } from './tool-kernels';
 
 const SAFE_Z_MM = 3.81;
 const FLAT_TOOL = { id: 't', name: 't', kind: 'end-mill', diameterMm: 2 } as const;
+const PARTIAL_GRID_BALL_TOOL = {
+  id: 'partial-ball',
+  name: 'partial-ball',
+  kind: 'ball-nose',
+  diameterMm: 0.4,
+} as const;
 
 function jobOf(passes: ReadonlyArray<CncPass>): Job {
   return {
@@ -118,6 +124,59 @@ describe('computeRemovalGrid — properties', () => {
       }),
       { numRuns: 100 },
     );
+  });
+});
+
+describe('computeRemovalGrid - partial terminal cells', () => {
+  it('keeps the established indexed kernel on exact regular grids', () => {
+    const toolpath: Toolpath = {
+      steps: [
+        {
+          kind: 'plunge',
+          at: { x: 0.01, y: 0.01 },
+          fromZ: 0,
+          toZ: -0.3,
+          length: 0.3,
+        },
+      ],
+      totalLength: 0.3,
+    };
+    const grid = expectGrid(
+      computeRemovalGrid(
+        toolpath,
+        { originX: 0, originY: 0, widthMm: 1.2, heightMm: 1.2, mmPerCell: 0.3 },
+        kernelForTool(PARTIAL_GRID_BALL_TOOL, 0.3),
+      ),
+    );
+
+    expect(grid.depth[0]).toBeCloseTo(-0.3, 6);
+  });
+
+  it('evaluates tool depth from the axis to exact terminal-cell centers', () => {
+    const toolpath: Toolpath = {
+      steps: [
+        {
+          kind: 'plunge',
+          at: { x: 0.91, y: 0.45 },
+          fromZ: 0,
+          toZ: -0.3,
+          length: 0.3,
+        },
+      ],
+      totalLength: 0.3,
+    };
+    const grid = expectGrid(
+      computeRemovalGrid(
+        toolpath,
+        { originX: 0, originY: 0, widthMm: 1, heightMm: 1, mmPerCell: 0.3 },
+        kernelForTool(PARTIAL_GRID_BALL_TOOL, 0.3),
+      ),
+    );
+
+    expect(grid.depth[6]).toBe(0);
+    expect(grid.depth[7]).toBeCloseTo(-0.3 + 0.2 - Math.sqrt(0.2 ** 2 - 0.04 ** 2), 6);
+    expect(grid.widthMm).toBe(1);
+    expect(grid.heightMm).toBe(1);
   });
 });
 
