@@ -4035,7 +4035,9 @@ and lifts the command's CNC-only gate.)*
    the full-range mapping without rewriting the embedded samples. Canvas,
    **View 3D...**, and CAM use the same deterministic materialization rule and
    embedded samples; each consumer chooses the grid resolution appropriate to
-   its job.
+   its job. **View 3D...** targets 0.25 mm display cells; when the longest edge
+   exceeds 64 mm, its non-blocking status names the effective cell size and the
+   256-cell display-mesh budget. That display choice never changes CAM or G-code.
 5. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
    physical and pixel dimensions, optional U8 inclusion mask, mapping,
    provenance, revision, and digest. Eight-bit PNG sample `v` is represented

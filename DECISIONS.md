@@ -16389,3 +16389,45 @@ records its exact evidence and exclusions.
 - ADR-289, sampled physical relief geometry and its unresolved exact-boundary limits.
 - ADR-290, explicit 8-bit grayscale height-map import.
 - ADR-291, the complete phased photo-to-relief product contract.
+
+## ADR-292 Amendment 1 - Relief 3D discloses its viewer-owned display mesh budget (2026-08-09)
+
+### Context
+
+P2R.1a's Relief 3D dialog already sampled both canonical heightfields and legacy meshes at
+`max(0.25 mm, longest physical edge / 256)`. That bounded display mesh was silent, and the surface
+handoff replaced its provenance with equal requested/effective values and no reason. Calling
+0.25 mm a source, operator, or CAM request would also be false: the viewer owns that target and has
+no toolpath-resolution context.
+
+### Decision
+
+1. **Name 0.25 mm as the nominal Relief 3D display target.** The effective square-cell size remains
+   `max(0.25 mm, longest physical edge / 256)`. The evidence records the nominal target as
+   `requestedMmPerCell`, the selected spacing as `effectiveMmPerCell`, and
+   `display-mesh-cell-budget` only when the longest edge exceeds 64 mm.
+2. **Use one resolution result through the whole display path.** The same result drives exact
+   materialization, the removal-grid worker handoff, and the dialog status. At or below 64 mm no
+   status is rendered. Above it, the status names the nominal and effective spacing, the 256-cell
+   budget, and that the choice is preview-only and cannot change CAM or G-code.
+3. **Keep the disclosure informational.** It adds no control, clamp, refusal, delay, confirmation,
+   project mutation, Frame effect, or Start effect. Closing and cancellation retain their existing
+   behavior. Very large finite values remain finite in the message instead of overflowing during
+   decimal presentation.
+
+### Consequences
+
+- Existing display geometry and mesh budgets are unchanged; larger previews now preserve and show
+  the policy evidence they previously discarded.
+- Relief CAM continues to select its own tool- and operation-derived resolution. No setting or
+  emitted G-code depends on this viewer result.
+- This amendment does not qualify real WebGL fidelity, target-device performance, astronomical
+  Float32 mesh coordinates, exact ceil-rounded outer edges, or one-cell-axis surface topology.
+
+### Verification
+
+- Pure resolver tests cover the exact 64 mm boundary, a 100 x 50 mm adjusted case, truthful copy,
+  and a maximum-finite input without presentation overflow.
+- Dialog tests cover the legacy-mesh and canonical-heightfield arms, physical transform scale,
+  materializer and surface-worker propagation, absence below the threshold, visible status above
+  it, cancellation, failure fallback, and an available Close action.
