@@ -312,7 +312,7 @@ describe('SelectedReliefProperties', () => {
       expect(recorded?.textContent).toContain('Depth Lab');
       expect(recorded?.textContent).toContain('relative-v2');
       expect(recorded?.querySelector('input, select, button')).toBeNull();
-      expect(current).toBeInstanceOf(HTMLSelectElement);
+      expect(host.textContent).toContain('Resolved aspect policyPreserve');
       expect(current instanceof HTMLSelectElement ? current.value : null).toBe('light-is-deep');
       expect(useStore.getState().project).toBe(beforeProject);
       expect(useStore.getState().undoStack).toBe(beforeUndoStack);

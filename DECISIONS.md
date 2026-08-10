@@ -17691,4 +17691,98 @@ collapsed axis.
 - ADR-292, schema-v4 `heightfield-v1` and crop/mapping contract.
 - ADR-294, exact relief-grid extents and the separation between source and target cells.
 
+## ADR-292 Amendment 2 - Canonical Width edits keep source and bounds coherent through binary64 ratio extremes (2026-08-10)
+
+**Status:** Accepted and implemented as a bounded P2R.1a state-integrity repair; editable aspect controls and physical qualification remain open
+
+### Context
+
+Canonical heightfields persist physical width and height, natural bounds, a duplicate relief target
+width, and the resolved import/editor aspect policy. The Width action updated those authorities
+through two different native binary64 ratios: canonical height followed the source dimensions while
+bounds followed the tolerated duplicate bounds. A schema-valid field near the binding tolerance
+could therefore become internally inconsistent and fail manual-save or autosave preparation after
+an ordinary Width edit. At the representable extremes, dividing before multiplying could also
+produce `0` or `Infinity` even when a differently associated exact result was representable, or
+could write a derived height whose correctly rounded result was not positive finite into otherwise
+valid state.
+
+Rejecting, clamping, delaying, or confirming an accepted canonical Width patch would violate the
+exact-input and sole-Frame-guard contracts. Silently retaining height while continuing to label the
+mapping `preserve` would also make the stored resolved policy false.
+
+### Decision
+
+1. **Use the canonical field as the single heightfield geometry authority.** A real Width edit keeps
+   `targetWidthMm` and `reliefSource.physicalWidthMm` synchronized. Natural heightfield bounds are
+   rebuilt from the updated canonical `physicalWidthMm` and `physicalHeightMm`; tolerated duplicate
+   bounds do not supply a second aspect ratio. Legacy-mesh Width and bounds behavior is unchanged.
+2. **Honor the persisted resolved aspect policy.** For `aspect: 'preserve'`, derive intended height
+   as `newWidth * oldHeight / oldWidth`. Combine the exact stored IEEE-754 factors before one
+   correctly rounded binary64 result so intermediate overflow or underflow cannot change a
+   representable answer. For `aspect: 'stretch'`, Width and Height are independent and a Width edit
+   retains the current positive finite canonical height.
+3. **Resolve a zero or infinite rounded height without a guard.** If the exact preserve-aspect
+   result rounds to `0` or overflows to `Infinity`, keep the already-normalized positive finite
+   canonical Width patch unchanged, retain the prior positive finite Height, and persist
+   `aspect: 'stretch'`. Do not reject, clamp, cap, delay, or add confirmation. Input parsing and the
+   machine-space editor's existing conversion into stored Width are unchanged; this repair begins
+   after normalization retains a canonical Width patch. The selected canonical relief shows the
+   resolved policy read-only and explains that it records editor behavior rather than applying a
+   second CAM transform.
+4. **Keep state changes atomic and narrow.** One real Width edit advances the canonical revision
+   once and produces one existing undo/dirty transition. Samples, mask bytes, digest, provenance,
+   transform, tonal mapping, maximum depth, and crop remain unchanged. A same-value or invalid
+   input retains its existing behavior.
+5. **Keep machining algorithms and authorization rules unchanged.** Heightmap CAM continues to
+   consume the resolved physical dimensions directly and does not reapply `mapping.aspect`.
+   Corrected dimensions and bounds can legitimately change materialized geometry, emitted bytes,
+   and the exact bounds signature or Frame reachability after an affected edit. This amendment
+   changes no CAM or emitter algorithm, machine command, Frame/Job Review/Start policy, schema
+   version, migration, or worker protocol, and adds no refusal, warning gate, clamp, cap, delay, or
+   confirmation.
+
+### Consequences
+
+- A Width edit cannot make a previously valid canonical field unsaveable merely because accepted
+  duplicate bounds carried a slightly different aspect.
+- Ordinary representable `preserve` edits retain their existing result; for example, `100 x 50 mm`
+  edited to `200 mm` remains `200 x 100 mm`. Existing `stretch` fields retain Height when Width is
+  edited.
+- At the binary64 ratio extremes, the accepted canonical Width patch remains exact and the durable
+  mapping truthfully records the chosen positive-finite fallback instead of storing `0`, `Infinity`,
+  or a false `preserve` policy.
+- Crop editing, an editable aspect selector, source creation, CAM and emitter algorithms,
+  controller behavior, and physical qualification remain outside this repair. Downstream geometry,
+  bytes, and exact Frame signatures may reflect the corrected dimensions rather than the invalid or
+  incoherent pre-repair state.
+
+### Verification
+
+- `relief-heightfield-width-resolution.test.ts` covers ordinary preservation, false intermediate
+  overflow and underflow, nearest-even finite results, genuine zero/Infinity outcomes, existing
+  `stretch` behavior, and positive-finite identity properties. `positive-float64.test.ts` directly
+  pins the shared exact binary64 decomposition used by Width resolution and Field geometry.
+- `relief-width-bounds.test.ts` pins synchronized canonical/target Width, canonical bounds, one
+  revision and undo transition, source-byte identity, the zero/Infinity rounded-result `stretch`
+  fallback, and unchanged legacy-mesh bounds. Its production persistence regression starts from
+  validator-accepted duplicate bounds, performs the Width edit, and proves save preparation remains
+  valid.
+- `ReliefResolvedAspectDisclosure.test.tsx` pins both recorded aspect-policy explanations,
+  read-only structure, and project/undo/dirty identity. `SelectedReliefProperties.test.tsx` pins
+  selected canonical composition, while `SelectedReliefFieldGeometry.test.tsx` retains the
+  geometry-only integration and legacy-mesh omission.
+- TypeScript, focused Vitest, ESLint, Prettier, ADR-number, file-size, export-ratchet, diff, and the
+  full release gate are required before publication. Focused verification does not establish exact
+  compiled-program, emitted-byte, or Frame-signature deltas. Browser perceptual layout, packaged
+  Electron, controller behavior, air cuts, material cuts, and finish quality are not established
+  here.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-291, exact operator inputs and resolved heightfield mapping policy.
+- ADR-292, canonical schema-v4 field authority and non-guard contract.
+- ADR-305, selected canonical field geometry and Width representation disclosure.
+
 ---

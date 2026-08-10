@@ -1,18 +1,12 @@
 import type { Transform } from '../../core/scene';
 import type { ReliefHeightfield } from '../../core/scene/relief';
+import { positiveFloat64Factor } from '../positive-float64';
 
 const DISPLAY_SIGNIFICANT_DIGITS = 6;
 const FIXED_NOTATION_MIN_EXPONENT = -6;
 const FIXED_NOTATION_MAX_EXPONENT = 8;
 const DECIMAL_RADIX = 10n;
 const ROUND_HALF_MULTIPLIER = 2n;
-const FLOAT64_BYTE_LENGTH = 8;
-const FLOAT64_FRACTION_BITS = 52n;
-const FLOAT64_EXPONENT_BIAS = 1023;
-const FLOAT64_SUBNORMAL_EXPONENT = -1074;
-const FLOAT64_EXPONENT_MASK = 0x7ffn;
-const FLOAT64_FRACTION_MASK = (1n << FLOAT64_FRACTION_BITS) - 1n;
-const FLOAT64_HIDDEN_BIT = 1n << FLOAT64_FRACTION_BITS;
 
 /** Preformatted relief-local field measurements and exact collapsed-axis state. */
 export type ReliefFieldGeometryDisplay = {
@@ -30,11 +24,6 @@ type ExactMagnitude =
       readonly numerator: bigint;
       readonly denominator: bigint;
     };
-
-type BinaryFactor = {
-  readonly significand: bigint;
-  readonly exponent: number;
-};
 
 type RoundedMagnitude = {
   readonly digits: string;
@@ -73,34 +62,18 @@ function productQuotient(
   let denominator = 1n;
   let exponent = 0;
   for (const value of numerators) {
-    const part = binaryFactor(value);
+    const part = positiveFloat64Factor(value);
     numerator *= part.significand;
     exponent += part.exponent;
   }
   for (const value of denominators) {
-    const part = binaryFactor(value);
+    const part = positiveFloat64Factor(value);
     denominator *= part.significand;
     exponent -= part.exponent;
   }
   return exponent >= 0
     ? { kind: 'positive', numerator: numerator << BigInt(exponent), denominator }
     : { kind: 'positive', numerator, denominator: denominator << BigInt(-exponent) };
-}
-
-function binaryFactor(value: number): BinaryFactor {
-  const buffer = new ArrayBuffer(FLOAT64_BYTE_LENGTH);
-  const view = new DataView(buffer);
-  view.setFloat64(0, value);
-  const bits = view.getBigUint64(0);
-  const exponentBits = Number((bits >> FLOAT64_FRACTION_BITS) & FLOAT64_EXPONENT_MASK);
-  const fraction = bits & FLOAT64_FRACTION_MASK;
-  if (exponentBits === 0) {
-    return { significand: fraction, exponent: FLOAT64_SUBNORMAL_EXPONENT };
-  }
-  return {
-    significand: FLOAT64_HIDDEN_BIT | fraction,
-    exponent: exponentBits - FLOAT64_EXPONENT_BIAS - Number(FLOAT64_FRACTION_BITS),
-  };
 }
 
 function formatMagnitude(magnitude: ExactMagnitude): string {

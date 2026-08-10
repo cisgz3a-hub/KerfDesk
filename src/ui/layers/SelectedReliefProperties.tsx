@@ -12,6 +12,7 @@ import { useStore } from '../state';
 import { reliefPropertyWidthMm } from './ReliefPlanningWidthDisclosure';
 import { ReliefPropertyControls } from './ReliefPropertyControls';
 import { ReliefRecordedSourceDetails } from './ReliefRecordedSourceDetails';
+import { ReliefResolvedAspectDisclosure } from './ReliefResolvedAspectDisclosure';
 import { SelectedReliefFieldGeometry } from './SelectedReliefFieldGeometry';
 import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
@@ -47,6 +48,9 @@ export function SelectedReliefProperties(): JSX.Element | null {
         <ReliefRecordedSourceDetails provenance={relief.reliefSource.provenance} />
       ) : null}
       <SelectedReliefFieldGeometry relief={relief} />
+      {relief.reliefSource.kind === 'heightfield-v1' ? (
+        <ReliefResolvedAspectDisclosure aspect={relief.reliefSource.mapping.aspect} />
+      ) : null}
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
