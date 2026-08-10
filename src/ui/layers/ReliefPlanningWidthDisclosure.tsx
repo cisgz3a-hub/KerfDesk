@@ -12,7 +12,7 @@ export function reliefPlanningWidthTitle(relief: ReliefObject): string {
   }
   return relief.transform.scaleX === 0
     ? 'Stored planning width. This zero-scale compatibility axis collapses after planning; editing width remains available.'
-    : 'Heightmap planning width from the canonical source after native binary64 absolute object X scale. Field geometry uses exact-factor display math. Editing synchronizes the object target and source widths while preserving scale.';
+    : 'Heightmap planning width from the canonical source after native binary64 absolute object X scale. Field geometry uses exact-factor display math. Editing synchronizes the object target and source widths; an exact bounded local re-factor may change both scale axes without changing transformed geometry.';
 }
 
 /** Resolves the editable Width authority while preserving mesh and exact-zero compatibility. */
