@@ -226,8 +226,9 @@ export type LaserState = LaserStoreActions &
      * when the bounds signature no longer matches. null = not verified.
      */
     readonly frameVerification: FrameVerification | null;
-    /** Exact reviewed program authorized only after its Frame physically
-     * completes. A pending Frame candidate lives on motionOperation instead. */
+    /** Exact one-use permit issued only after Frame physically completes.
+     * Ordinary permits await Start-time review; transient candidates may carry
+     * review evidence from birth. A pending candidate lives on motionOperation. */
     readonly framedRun: FramedRunPermit | null;
     /** Atomic owner while ordinary Start hands one exact permit to the store. */
     readonly framedRunStartClaim: FramedRunStartClaim | null;

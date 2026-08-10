@@ -488,17 +488,21 @@ G-code**, a factual no-file outcome stops before the picker: placement cannot be
 resolved; selection, variable, registration, or output-snapshot preparation
 produces no program; the post-prepare emitter refuses the requested output (for
 example, rotary raster while its Labs permission is off); or emitted preflight
-contains one of the six codes in `COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
+contains one of the seven codes in `COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
 other preflight finding is an advisory reported after a successful save.
 
-For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232): the same six
-compile-integrity codes cover unproducible or unstreamable output. Calculated
-bed bounds, configured no-go zones, and live output-setting findings are carried
-into Job Review as warnings before the Frame trace; they do not refuse Frame.
-The actual controller outcome is authoritative: only a cleanly completed trace
-and return earns the exact-job permit. A Frame still cannot dispatch when
-transport cannot accept it or when the executable motion cannot be constructed.
-Start itself adds no policy gate.
+For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232, ADR-237): the same
+seven compile-integrity codes cover unproducible or unstreamable output. Pressing
+Frame, or pressing Start without a live exact permit, prepares the candidate and
+runs the physical tool-off Frame dialog-free. Calculated bed bounds, configured
+no-go zones, and live output-setting findings travel with that exact candidate;
+they surface as warnings when the operator presses Start on the review-pending
+permit after a clean Frame. They do not refuse Frame or Start. The actual
+controller outcome is authoritative: only a cleanly completed trace and return
+earns the exact-job permit. Confirming the Start-time Job Review creates the
+review evidence, claims that permit, and streams its bound program. A Frame still
+cannot dispatch when transport cannot accept it or when executable motion cannot
+be constructed. Start itself adds no policy gate.
 
 The authoritative list is the `PreflightCode` set in
 `src/core/preflight/preflight.ts` (laser + CNC shared codes) and
@@ -525,7 +529,10 @@ grouped by what each validates:
 11. **Layer mode matches its geometry** — a fill/offset needs closed contours.
 12. **Raster rotation follows the compile path** — output rasters, including image sub-layers,
     may use the supported object rotation; preflight does not claim that rotation is unsupported.
-13. **Raster output stays within the pixel budget.**
+13. **Raster size is advisory, not a predictive pixel-budget refusal.** Valid rasters stream
+    row-by-row at any pixel size. Live preview and estimate may pause above their preparation
+    budgets, and Job Review warns; only an actual engine program-materialization failure is
+    compile integrity.
 14. **Island-fill short-sweep risk** on the active machine profile is surfaced.
 15. **Relief objects appear only in CNC mode.**
 
@@ -545,7 +552,7 @@ grouped by what each validates:
     every calculated cut depth. Selecting a non-V-bit remains the established
     advisory-only wrong-kind path.
 
-For **Save G-code**, the six-code set controls the emitted-preflight partition;
+For **Save G-code**, the seven-code set controls the emitted-preflight partition;
 it is not an exhaustive list of reasons no file can exist. Factual
 placement/preparation failures and a post-prepare emission refusal return
 distinct non-writable outcomes before that partition. Calculated
@@ -775,10 +782,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Success
 1. User clicks **Frame job** while connected and the controller is Idle.
 2. Frame preparation compares the live controller output contract with the selected process.
-   Known, unknown, stale, or unavailable `$30`/`$32` values remain explicit Job Review advisories;
-   they do not refuse Frame. If the exact program contains `M7` and current stock-GRBL build info
-   proves option `M` absent, preparation refuses as a factual command incompatibility. Missing,
-   stale, or non-stock build evidence remains an acknowledged warning.
+   Known, unknown, stale, or unavailable `$30`/`$32` values and stock-GRBL option `M` observations
+   for an exact program containing `M7` remain explicit Start-time Job Review advisories; they do
+   not refuse Frame or Start. Exact-handoff evidence still binds whether the reviewed program uses
+   `M7`, so changing that program shape after review invalidates the handoff.
 3. App resolves placement once. For any serial Frame, if G55-G59 is active, preparation selects G54
    through an owned controller operation and waits for its terminal acknowledgement plus fresh
    position evidence. This changes only the active WCS selection; it does not erase the stored
@@ -867,85 +874,76 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B6. Start job
 
 #### Success
-1. User clicks **Start job** while connected and idle (toolbar button or Cmd/Ctrl+Return; Run
-   again and confirmed checkpoint replacement follow the same path).
-2. App runs the F-A10 preflight on the current project. If issues, surfaces the modal (same as Save G-code path).
-3. A laser controller that reports `$32=0` no longer refuses Start — frame-first (ADR-228)
-   demoted it to the Job Review `$32` acknowledgement banner, which the operator must
-   acknowledge inside the dialog before confirming.
-4. App compiles the project to G-code via `emitGcode`, then opens the **Job Review** dialog
-   (ADR-224, v2 look) built from the exact prepared program: five stat tiles (estimated time as
-   the accent hero tile with cut/travel split, job size and motion envelope, operations/cutters,
-   G-code lines and bytes, and a read-only Origin tile), a **collapsed amber "Warnings (N)"
-   dropdown** whose summary always shows the count (identical warnings arrive grouped — e.g. one
-   uncalibrated-defaults message naming the affected operations instead of one per layer), a CNC
-   **Material & stock** card (project material, stock footprint, stock origin, safe Z), the
-   **Artwork settings** table with the core numbers editable in place (laser: power / speed /
-   passes / air; CNC: depth, depth-per-pass, feed, plunge, spindle RPM) and a muted per-row
-   detail line carrying the mode-specific settings (kerf/tabs/hatch/dither; CNC passes,
-   stepover, direction, tabs, entry) plus the bound material chip, collapsible read-only
-   Controller ($32, $30 vs profile, travel, homing, units, WCS, overrides, position) and
-   Machine (bed, stock, bit, safe-Z, spindle, coolant, park, rotary, tool plan) fact sections
-   with counts, and the safety acknowledgement — the unverified-`$32` cable-loss/latched-output
-   prompt or the CNC workholding/exclusive-access attestation, verbatim. If preparation selected
-   G54 from G55-G59, the durable warning names the original WCS and says that the active selection
-   changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is **not**
-   editable in the review (it stays on the machine rail); the sticky footer echoes the resolved
-   origin ("Runs from …") beside Cancel and **Start job** (ADR-237: the review opens at Start for
-   the framed permit). Pressing Start job records the
-   same evidence objects the previous native confirms produced. For scan output, the review also
-   names each operation's effective direction/reason, exact pass-weighted runway coverage, requested
-   runway values, and any controlled laser-off seek policy warning.
-4. Editing a value inside the review commits through the normal layer/placement store actions and
-   re-runs the full prepare pipeline (debounced). The stat tiles dim behind "Recomputing…" until
-   the fresh program replaces the shown one — the artifact framed and later streamed is always the
-   one last shown. The **Approve settings** status identifies an editable value changed since the
-   review opened or was last approved. Clicking the always-available action marks the currently
-   synchronized main Artwork / Operations values approved and requests an immediate refresh when
-   needed. It never gates Start: **Start job** still approves the complete review in one click. If
-   the edit changed the exact framed artifact, the existing Frame-again requirement is shown and
-   remains the only ordinary Start guard.
-5. Frame traces the exact generated motion envelope with the tool off, then returns to the exact
+1. With no live exact permit, the ordinary primary action reads **Set up & Frame**. The user clicks
+   it while connected and idle (or invokes Cmd/Ctrl+Return). The separate **Frame job** button runs
+   the same dialog-free prepare-and-Frame path.
+2. App prepares the exact program and runs F-A10. A factual compile-integrity, construction-input,
+   or transport failure stops before Frame and reports its fix; policy findings do not. Job Review
+   does not open. Calculated bounds, no-go, controller-setting, and other advisory findings travel
+   with the exact candidate for the later Start-time review.
+3. Frame traces the exact generated motion envelope with the tool off, then returns to the exact
    preparation-time work position — the acknowledged G54 position when serial preparation began
    under G55-G59. Dispatch alone authorizes nothing: every Frame command must receive its terminal
-   acknowledgement and the controller must reach final clean Idle without interruption or reviewed
-   spatial session/origin drift. Advisory settings and build-info observations may refresh.
-6. Clean completion issues a one-run exact `FramedRunPermit`. The controls read **Ready to start —
-   framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
+   acknowledgement and the controller must reach final clean Idle without interruption or spatial
+   session/origin drift. Advisory settings and build-info observations may refresh.
+4. Clean completion issues a one-run, review-pending `FramedRunPermit`. The controls read **Ready to
+   start — framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
    one-use. Any project, output-scope, placement, registration, or rotary-raster edit, Jog, Home,
    origin/probe/reset/disconnect, or controller drift expires it. Camera-only UI state does not.
-7. User clicks **Start framed job**. Start atomically claims the permit and sends its cached G-code
-   without recompiling, reopening Job Review, or rerunning policy gates. Only live transport and
-   exact-handoff checks remain; a deterministic empty/comment-only or RX-oversized program was
-   already rejected before Frame. After queue fencing, an exact program containing `M7` is checked
-   once more against current stock-GRBL build evidence; a proven missing option `M` refuses before
-   permit consumption or streamer creation, while observation drift alone is not incompatibility.
-8. App builds the streamer and writes the first batch (as much as the RX window allows — default
+5. The user clicks **Start framed job**. The app opens the single **Job Review** dialog (ADR-224,
+   ADR-237) against the permit's exact prepared program plus current controller state; it neither
+   recompiles nor streams before confirmation. A laser controller that reports `$32=0` contributes
+   the `$32` acknowledgement banner rather than refusing Frame or Start.
+6. Job Review uses the v2 surface: five stat tiles (estimated time as the accent hero tile with
+   cut/travel split, job size and motion envelope, operations/cutters, G-code lines and bytes, and a
+   read-only Origin tile); a collapsed amber **Warnings (N)** dropdown whose summary always shows
+   the count and groups identical warnings; a CNC **Material & stock** card; the editable **Artwork
+   settings** table; collapsible read-only Controller and Machine fact sections; and the applicable
+   laser acknowledgement or CNC workholding/exclusive-access attestation. If Frame preparation
+   selected G54 from G55-G59, the durable warning names the original WCS and says the active
+   selection changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is
+   not editable in review; the sticky footer echoes the resolved origin beside Cancel and **Start
+   job**. Scan output also names effective direction/reason, exact pass-weighted runway coverage,
+   requested runway values, and any controlled laser-off seek warning.
+7. Editing a value in Job Review commits through the normal store actions and re-runs preparation.
+   The stat tiles dim behind **Recomputing…** while synchronized evidence refreshes. **Approve
+   settings** remains informational and never adds a Start gate. If the edit changes the exact
+   execution signature, or any other invalidation kills the permit, no job bytes stream and the
+   operator must complete Frame again for the changed artifact.
+8. Confirming **Start job** records the review evidence and acknowledgements, verifies that the same
+   permit is still current, then atomically claims it and hands its bound G-code to the streamer.
+   Only live transport and exact-handoff checks remain. Stock-GRBL option `M` observations for `M7`
+   remain advisory-only: missing, stale, or proven-absent support never refuses Start. The factual
+   handoff still stops if the exact program changes whether `M7` is required after review.
+9. Transient camera-marker Frames are the narrow exception: their candidates are reviewed before
+   dispatch and their completed permits carry review evidence from birth, so Start streams them
+   without reopening Job Review.
+10. App builds the streamer and writes the first batch (as much as the RX window allows — default
    120 bytes, per-profile `rxBufferBytes`). Every `ok` advances one line and progress reflects
    `completed / total`.
-9. While the job is active the app holds a screen wake lock so OS
+11. While the job is active the app holds a screen wake lock so OS
    display-sleep can't suspend the stream (ADR-117; re-acquired on tab
    visibility changes, released when the job ends). If the platform
    refuses the lock, one LaserLog line warns the operator to disable
    system sleep before long burns — the job itself always proceeds.
-10. During a CNC job the canvas motion overlay's head label and status badge
-    add the running depth pass and the passes remaining (`Pass k of N •
-    m remaining`), derived from the ADR-215 pass spans of the exact started
-    program and advancing only with route-reconciled motion (ADR-216). When
-    the mapping cannot be derived (e.g. a supervised recovery stream), the
-    counter is omitted rather than estimated.
-11. While any job is running, the status badge also shows the live
-    controller-reported feed rate (`N mm/min`, inch reports normalized),
-    taken from each status frame's `FS:` field (ADR-217). It appears only
-    while running and only when the controller reports feed; a held machine
-    or a controller that omits `FS:` shows no rate.
-12. For a running CNC job the badge additionally shows the live spindle
-    speed (`N rpm`) from the same `FS:` field (ADR-220). It is CNC-only —
-    a laser's `FS:` spindle slot is a power value, not RPM — and, like the
-    feed rate, appears only while running and only when reported.
-13. The badge also shows wall-clock elapsed time since Start (`5m 12s`,
-    same format as the pre-job ETA), counting through holds and tool
-    changes and freezing at the run's first terminal state — finished,
+12. During a CNC job the canvas motion overlay's head label and status badge
+     add the running depth pass and the passes remaining (`Pass k of N •
+     m remaining`), derived from the ADR-215 pass spans of the exact started
+     program and advancing only with route-reconciled motion (ADR-216). When
+     the mapping cannot be derived (e.g. a supervised recovery stream), the
+     counter is omitted rather than estimated.
+13. While any job is running, the status badge also shows the live
+     controller-reported feed rate (`N mm/min`, inch reports normalized),
+     taken from each status frame's `FS:` field (ADR-217). It appears only
+     while running and only when the controller reports feed; a held machine
+     or a controller that omits `FS:` shows no rate.
+14. For a running CNC job the badge additionally shows the live spindle
+     speed (`N rpm`) from the same `FS:` field (ADR-220). It is CNC-only —
+     a laser's `FS:` spindle slot is a power value, not RPM — and, like the
+     feed rate, appears only while running and only when reported.
+15. The badge also shows wall-clock elapsed time since Start (`5m 12s`,
+     same format as the pre-job ETA), counting through holds and tool
+     changes and freezing at the run's first terminal state — finished,
     stopped, errored, or disconnected — so the final duration stays
     readable (ADR-221). Runs without a recorded start show no timer.
 
@@ -973,11 +971,13 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    on the next re-prepare; one that introduces a warning brings it back.
 
 #### Edge — cancel the review
-1. **Cancel** or Escape sends no Frame/job bytes, stages no candidate, and issues no permit. Edits
-   already made in the review are ordinary project edits and are kept (undo applies as usual).
-2. If owned preparation selected G54 from an original G55-G59, cancellation does not restore the
-   prior selection: G54 remains active, while every stored G55-G59 offset remains intact. The
-   durable warning states both facts before cancellation is available.
+1. **Cancel** or Escape sends no job bytes. If the exact artifact and evidence remain current, the
+   review-pending permit stays armed so the operator may press **Start framed job** and review it
+   again. Edits already made in review are ordinary project edits and are kept (undo applies as
+   usual); an edit that changes the exact artifact invalidates the permit and requires Frame again.
+2. If Frame preparation selected G54 from an original G55-G59, cancelling the later Start-time
+   review does not restore the prior selection: G54 remains active, while every stored G55-G59
+   offset remains intact. The durable warning states both facts before cancellation is available.
 3. Recovery flows (supervised recovery, start-from-line, checkpoint resume) are untouched and keep
    their own review surfaces and confirms.
 
@@ -1895,10 +1895,10 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    re-jogs and re-sets if they want the offset back.
 5. **Off-bed risk.** Operator sets origin near the bed edge, then
    runs a job whose scene-mm bounds *fit the bed* but extend off the
-   *machine* once the offset is applied. When WCO is known, Job Review
-   names the physical bounds (`job bounds + WCO`) and the out-of-bed
-   finding before Frame; it is a warning, not an ordinary Frame/Start
-   policy block. If no controller position/WCO has been observed yet,
+   *machine* once the offset is applied. When WCO is known, the Start-time
+   Job Review after a clean Frame names the physical bounds (`job bounds +
+   WCO`) and the out-of-bed finding; it is a warning, not an ordinary
+   Frame/Start policy block. If no controller position/WCO has been observed yet,
    the review says the physical extents are unproven. A genuinely
    unresolved placement remains a factual compile input and cannot
    produce the exact candidate.
@@ -2633,7 +2633,7 @@ expansion; their remaining controls and user-facing flows are planned.
    part.
 
 #### Error — active bit is not a compatible angled cutter
-1. The layer panel and pre-Frame Job Review ask for a V-bit or angled
+1. The layer panel and Start-time Job Review ask for a V-bit or angled
    engraving bit.
    It is an ordinary Save/Frame/Start warning, not a gate. Output remains
    available for compatibility and can use the legacy 60-degree wrong-kind
@@ -2701,8 +2701,8 @@ expansion; their remaining controls and user-facing flows are planned.
    round-trips the footprint.
 3. On Save G-code / Start job, toolpaths that leave the stock footprint
    raise a non-blocking advisory toast ("bit will cut air or clamps").
-   Physical bed bounds are likewise a Job Review warning before ordinary
-   Frame; Save G-code retains its separate export preflight.
+   Physical bed bounds are likewise a warning in the Start-time Job Review
+   after ordinary Frame; Save G-code retains its separate export preflight.
 
 #### Error — invalid dimension
 1. Width/height clamp to [1, 1500] mm; origin clamps to [-1500, 1500] mm;
@@ -3772,14 +3772,14 @@ and lifts the command's CNC-only gate.)*
    feedback must not be used as proof of measured physical RPM; each machine
    must be configured with the delay its spindle actually requires.
 
-### F-CNC39. Review controller overrides before CNC Frame — Phase H.11
+### F-CNC39. Review controller overrides at CNC Start — Phase H.11
 
 #### Success
 1. When the live GRBL `Ov:` cache is known, Job Review shows the exact feed,
    rapid, and spindle percentages. The 100/100/100 baseline is labelled verified.
 2. Reductions, increases, zero/invalid values, and missing evidence are named in
-   the warning list for the operator to acknowledge before Frame; none is an
-   ordinary Frame/Start policy gate.
+   the Start-time Job Review warning list after a clean Frame; none is an ordinary
+   Frame/Start policy gate.
 3. Once streaming begins, the operator may still adjust overrides deliberately
    through the existing in-job controls.
 
@@ -3796,7 +3796,7 @@ and lifts the command's CNC-only gate.)*
    external senders changing it remain outside the observation contract.
 2. No override value or missing observation blocks ordinary Frame/Start.
 
-### F-CNC40. Review live spindle and coolant state before CNC Frame - Phase H.11
+### F-CNC40. Review live spindle and coolant state at CNC Start - Phase H.11
 
 #### Success
 1. GRBL accessory reports decode clockwise spindle (`A:S`), counter-clockwise
@@ -3889,24 +3889,24 @@ and lifts the command's CNC-only gate.)*
    jobs (ADR-143/215) are a different feature from live Pause/Resume and remain as
    specified in their own flows. This amendment changes only same-session Resume.
 
-### F-CNC42. Attest exclusive controller access before CNC Frame - Phase H.11
+### F-CNC42. Attest exclusive controller access at CNC Start - Phase H.11
 
-#### Success - one pre-Frame Job Review acknowledgement
-1. After compile/readiness succeeds, Job Review names physical
-   workholding/clearance and every common competing command path: pendant/MPG,
-   WebUI/network, another sender app, PLC motion or spindle commands, controller
-   macros, and SD/file jobs.
-2. The operator confirms KerfDesk is the sole command owner while emergency-
+#### Success - one Start-time Job Review acknowledgement
+1. After a clean ordinary Frame issues the review-pending permit, pressing Start
+   opens Job Review. It names physical workholding/clearance and every common
+   competing command path: pendant/MPG, WebUI/network, another sender app, PLC
+   motion or spindle commands, controller macros, and SD/file jobs.
+2. The operator confirms CurveDesk is the sole command owner while emergency-
    stop, safety-door, and feed-hold circuits remain enabled.
-3. The resulting evidence is bound to the exact program fingerprint plus the
-   current trusted-position and work-Z-reference epochs before Frame.
+3. The resulting evidence is bound to the permit's exact program fingerprint plus
+   the current trusted-position and work-Z-reference epochs before claim/stream.
 
 #### Error - missing, incomplete, or stale evidence
-1. A missing acknowledgement keeps Job Review incomplete; there is no separate
-   post-Frame ordinary Start confirmation.
+1. A missing acknowledgement keeps the Start-time Job Review incomplete and no
+   job bytes stream. Cancelling keeps the unchanged review-pending permit armed.
 2. A reconnect, controller banner/reset, alarm/sleep, homing, origin/probe
    change, tool change, or other setup-trust invalidation expires the exact
-   candidate/permit and requires a new Job Review plus completed Frame.
+   permit and requires a newly completed Frame; the next Start opens a fresh review.
 
 #### Edge - declaration is not protocol ownership
 1. GRBL cannot identify a sender or grant an exclusive lease. The confirmation
@@ -3919,8 +3919,8 @@ and lifts the command's CNC-only gate.)*
 
 #### Success - explicit MPG release or no MPG telemetry
 1. `MPG:0` records that grblHAL released manual-pulse-generator ownership for
-   the current controller session. CNC continues through the ordinary pre-Frame
-   review and exact-artifact flow.
+   the current controller session. CNC continues through the ordinary dialog-free
+   Frame, Start-time Job Review, and exact-artifact flow.
 2. Controllers that do not implement the field remain unknown and use the
    operator exclusive-access contract in F-CNC42.
 

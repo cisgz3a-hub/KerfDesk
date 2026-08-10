@@ -17412,3 +17412,135 @@ for supported output rasters, including rasters routed through image sub-layers.
 - `src/core/preflight/preflight-raster.test.ts`, image-sub-layer preflight regression.
 
 ---
+
+## ADR-304 - Align current Frame and Job Review guidance with the implemented Start sequence (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a workflow and control-copy correction; runtime behavior is unchanged
+
+### Context
+
+ADR-237 superseded ADR-230's review sequencing: an ordinary Frame prepares and physically traces
+the exact candidate without opening Job Review, clean completion issues a review-pending permit,
+and the next Start opens the single Job Review before claiming that permit and streaming. The
+current `runStartJobFlow` and Frame action implement that sequence, and focused tests pin both the
+dialog-free ordinary Frame and the Start-time review.
+
+Several current WORKFLOW passages still described the superseded pre-Frame review, including F-A10,
+F-B6, and CNC warnings/attestations that surface in the Start-time dialog. The two idle machine-rail
+button titles repeated the same reversal by promising review before the tool-off trace. F-A10 also
+lagged the canonical seven-code compile-integrity set and ADR-243's removal of predictive raster-size
+refusals. F-B4 and F-B6 retained a deleted policy refusal for stock-GRBL option `M`, although current
+runtime treats `M7` support as advisory and binds only the exact program's reviewed `M7` shape at
+handoff. Central framed-run, laser-store, Frame-completion, readiness, and Start-authorization
+comments likewise described exact candidates and completed permits as reviewed before Frame or
+claimed a live M7 capability recheck, despite adjacent runtime contracts saying otherwise. Together,
+those statements described a sequence and refusal CurveDesk does not run. The Start-evidence
+messages and option comment also called M7 capability a required proof or acknowledgement even
+though only `$30`/`$32` settings require that acknowledgement and the exact program carries only an
+M7-shape binding. Machine Setup zone help retained both the reversed review-before-Frame wording and
+a deleted G-code-export policy block, while one Start-flow test comment retained the reversed order.
+
+### Decision
+
+1. **State the ordinary sequence exactly.** Pressing Frame, or pressing Start without a live exact
+   permit, prepares the exact artifact and runs the physical tool-off Frame without a dialog. Only
+   clean trace-and-return completion issues the one-use review-pending permit. Pressing Start on that
+   permit opens Job Review; confirmation creates the review evidence, atomically claims the permit,
+   and streams its bound program subject only to the existing factual transport and handoff checks.
+2. **Keep the transient-camera exception explicit.** A transient camera-marker candidate is reviewed
+   before its Frame and is born with review evidence. Its completed permit streams without reopening
+   Job Review. This narrow exception does not change the ordinary laser or CNC sequence.
+3. **Preserve exact-artifact invalidation.** Cancelling the ordinary Start-time review streams
+   nothing and leaves the unchanged permit armed. An edit or evidence change that invalidates the
+   exact candidate requires a fresh completed Frame; no reviewed artifact may be substituted for the
+   one physically traced.
+4. **Correct the two idle control titles.** **Set up & Frame** says it prepares and Frames with the
+   tool off, then tells the operator to press Start again to review and run. **Frame job** says it
+   traces the generated motion envelope with the tool off, then tells the operator to press Start to
+   review and run. Exact-copy assertions pin both messages.
+5. **Correct only current workflow truth.** F-A10, F-B4, F-B6, F-CNC8, F-CNC39, F-CNC40,
+   F-CNC42, F-CNC43, and the adjacent current physical-bounds passages use the ADR-237 sequence.
+   F-A10 names seven canonical compile-integrity codes and records ADR-243's actual boundary: raster
+   preparation size is an advisory, while only an actual engine program-materialization failure is
+   compile integrity. F-B4 and F-B6 remove the stale option-`M` policy refusal while retaining the
+   factual exact-handoff check when the program changes whether `M7` is required after review.
+   The framed-run, laser-store, Frame-completion, readiness, and Start-authorization comments use
+   the same ordinary-versus-transient review distinction and advisory-only M7 capability boundary.
+   Machine Setup zone help locates findings in Start-time Job Review after a clean Frame and after a
+   successful G-code save, while retaining only the separate known-path jog block. The ordinary
+   laser-mode flow comment states the same two-press Frame-then-review sequence.
+   Historical decision text and unrelated physical pre-Frame-position wording remain untouched.
+6. **Supersede the stale option-`M` refusal.** This decision supersedes only ADR-236's decision to
+   refuse preparation or Start when stock-GRBL build evidence proves option `M` absent. Capability
+   observation remains advisory; the existing exact-handoff check still requires the reviewed and
+   streamed programs to agree on whether `M7` is present. Start-evidence copy names only the
+   acknowledgeable `$30`/`$32` settings and distinguishes that acknowledgement from the M7-shape
+   binding. All other ADR-236 decisions remain.
+7. **Add no executable policy.** This decision changes no Frame, Job Review, Start, preparation,
+   preflight, compiler, emitter, transport, permit, or invalidation logic. It adds no guard, refusal,
+   cap, clamp, delay, or confirmation, and changes no generated motion or emitted G-code bytes.
+
+### Consequences
+
+- The machine-rail help and current workflow manual now describe the same two-action ordinary flow
+  the application runs: clean tool-off Frame first, then Start-time review and execution.
+- CNC controller-state warnings and the exclusive-access attestation are correctly located in the
+  Start-time review without weakening their evidence binding or factual transport preconditions.
+- Stock-GRBL option `M` observations remain advisory-only even when the exact program uses `M7`;
+  changing the reviewed program's `M7` shape remains a factual handoff inconsistency, not an M7
+  capability proof or acknowledgement.
+- No-go findings remain advisories in Start-time Job Review and after successful G-code save; they
+  do not refuse Frame, Start, or export. The separate direct-jog known-path crossing block is
+  unchanged.
+- Large raster preparation remains visible as an advisory without being misdescribed as a pixel
+  budget that can predictively refuse output.
+- Existing runtime and hardware evidence is unchanged. This correction does not prove browser
+  rendering, packaged Electron behavior, controller execution, a hardware air cut, or a material run.
+
+### Verification
+
+- `JobControls-absolute-placement.test.tsx` asserts the exact unframed Start and Frame titles while
+  retaining its frame-first clickability and dispatch regression.
+- The existing `start-job-flow.review-at-start.test.ts`, `start-job-review-at-start.test.ts`, and
+  `use-frame-action.framed-run.test.ts` suites remain the source-backed behavioral checks for
+  review-pending permits, birth-reviewed transient permits, invalidation, and dialog-free Frame.
+- `laser-mode-start-acknowledgement.test.ts` pins proven-missing option `M` as non-refusing and a
+  changed post-review `M7` program shape as a handoff failure, and pins the prompt's advisory-only
+  M7 wording.
+- `laser-store-start-evidence-wire-guard.test.ts` pins the exact missing-evidence message and proves
+  that this factual handoff failure writes no job bytes.
+- `MachineSetupSafetyZones.test.tsx` pins zone warnings to Start-time review and successful-save
+  advisory surfaces without a G-code-export block; `start-job-laser-mode-flow.test.ts` retains the
+  two-press ordinary behavior regression with exact sequence commentary.
+- `framed-run.ts` and `laser-store.ts` state that ordinary bundles, controller snapshots, and
+  completed permits are reviewed at Start while transient-camera candidates may carry prior review
+  evidence.
+- `framed-run-readiness.ts` and `start-job-authorization.ts` state that build capability is advisory
+  and the wire boundary binds only reviewed evidence and the exact program's `M7` shape.
+- `laser-frame-status.ts` calls the completion input an exact prepared candidate rather than
+  fabricating ordinary pre-Frame review.
+- Focused tests, TypeScript, scoped lint and formatting, the ADR policy gate, exact diff review, and
+  file-size checks are required before publication.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-236, whose option-`M` policy refusal is superseded here while its other decisions remain.
+- ADR-237, Job Review at Start and dialog-free ordinary Frame.
+- ADR-243, streamed rasters and advisory-only predictive preparation budgets.
+- `src/ui/laser/start-job-flow.ts`, ordinary and birth-reviewed permit handling.
+- `src/ui/state/laser-start-program-assertions.ts`, advisory-only `M7` capability and exact-shape
+  handoff assertions.
+- `src/ui/state/laser-mode-start-evidence.ts`, `src/ui/state/laser-job-options.ts`, and
+  `src/ui/laser/laser-mode-start-acknowledgement.ts`, controller-setting acknowledgement and M7-shape
+  evidence copy.
+- `src/ui/state/framed-run.ts`, exact candidate and review-evidence type contracts.
+- `src/ui/state/laser-store.ts`, completed Frame-permit state contract.
+- `src/ui/state/laser-frame-status.ts`, clean-completion permit issuance contract.
+- `src/ui/laser/framed-run-readiness.ts` and `src/ui/laser/start-job-authorization.ts`, advisory
+  controller evidence and exact-handoff comments.
+- `src/ui/laser/MachineSetupSafetyZones.tsx`, operator-facing no-go-zone warning and jog boundary.
+- `src/ui/laser/JobControls.tsx`, machine-rail control labels and titles.
+
+---
