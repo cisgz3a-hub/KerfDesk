@@ -11,9 +11,9 @@
 
 ## Decision index
 
-> The index is numerically complete; gaps in the numbering are reserved blocks with no ADR body
-> (e.g. most of 054–091, reserved by the build plan). The body itself is in insertion order, not
-> numeric order — locate any ADR by searching `## ADR-NNN`.
+> This index is a historical, non-exhaustive navigation aid; it is not the ADR registry.
+> The `## ADR-NNN` decision bodies below are authoritative and remain in insertion order.
+> Locate any decision by searching `## ADR-NNN`; numbering gaps may be reserved or unused.
 
 | ID | Date | Status | Title |
 |---|---|---|---|
@@ -17570,5 +17570,35 @@ a deleted G-code-export policy block, while one Start-flow test comment retained
   controller evidence and exact-handoff comments.
 - `src/ui/laser/MachineSetupSafetyZones.tsx`, operator-facing no-go-zone warning and jog boundary.
 - `src/ui/laser/JobControls.tsx`, machine-rail control labels and titles.
+
+---
+
+## ADR-016 Amendment 1 - Decision bodies, not the navigation index, are authoritative (2026-08-10)
+
+**Status:** Accepted amendment | **Date:** 2026-08-10
+
+### Context
+
+The Decision index claims numerical completeness, but its table ends at ADR-248 while accepted
+decision bodies continue through ADR-304. ADR-262 already records that the ADR-number gate does not
+check the index.
+
+### Decision
+
+`DECISIONS.md` remains the architecture-rationale source of truth. Its `## ADR-NNN` decision bodies
+are authoritative. The Decision index is a historical, non-exhaustive navigation aid; new ADR bodies
+do not require matching index rows. Locate a decision by searching `## ADR-NNN`. Numbering gaps may
+be reserved or unused and do not make the body set incomplete.
+
+### Consequences
+
+No index backfill or index-completeness gate is required. `scripts/check-adr-numbers.mjs` continues
+to enforce uniqueness of decision-body headings only.
+
+### Verification
+
+- `pnpm check:adr-numbers`
+- `pnpm exec prettier --check DECISIONS.md`
+- `git diff --check`
 
 ---
