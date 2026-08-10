@@ -25,7 +25,7 @@ export type StartJobOptions = CreateStreamerOptions & {
   readonly machineKind?: MachineKind;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncSetupAttestation?: CncSetupAttestation;
-  /** Session-bound $30/$32/M7 proof or explicit unknown-state acknowledgement. */
+  /** Session-bound $30/$32 evidence or acknowledgement plus exact-program M7-shape binding. */
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly canvasPlan?: CanvasMotionPlan;
   /** In-memory timing result for the exact G-code passed to startJob. */

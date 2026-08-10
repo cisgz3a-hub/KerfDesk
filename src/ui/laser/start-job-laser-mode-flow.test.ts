@@ -187,8 +187,8 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     useLaserStore.setState({ framedRun: null, frameVerification: null });
     const review = captureJobReviewModels();
 
-    // First press performs the single review and watched Frame. The deliberate
-    // second press consumes the exact completion-issued artifact.
+    // First press performs the dialog-free watched Frame. The deliberate second
+    // press opens the single review and consumes the exact completion-issued artifact.
     await runStartJobFlow(recoveryHarness());
     await runStartJobFlow(recoveryHarness());
 

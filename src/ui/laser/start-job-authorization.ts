@@ -68,8 +68,8 @@ export function currentLaserForAuthorizedStartNow(
   if (
     controllerStartPreparationStillCurrent(args.preparedAgainst, current, {
       // ADR-232: a completion-issued ordinary-Start permit survives a later
-      // $30/$32 or $I refresh. Settings stay advisory, while the store checks
-      // the exact program against current M7 evidence at the queue fence.
+      // $30/$32 or $I refresh. Settings and build capability stay advisory;
+      // the wire boundary later checks reviewed evidence and exact M7 shape.
       ignoreAdvisoryControllerEvidence: args.framedRunClaim !== undefined,
     })
   ) {

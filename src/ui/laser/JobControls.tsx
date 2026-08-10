@@ -191,7 +191,7 @@ function useSetupRowModel(props: { readonly disabled: boolean; readonly streamin
       busy,
       framedReady
         ? startJobTitle(estimate, jobTimeNoun(machineKind))
-        : 'Prepare and review the exact job, then trace its full motion envelope with the tool off.',
+        : 'Prepare and Frame the exact job with the tool off. After a clean Frame, press Start again to review and run.',
     ),
     // No portable autofocus G-code exists, so an empty command becomes a
     // direct setup entry instead of a disabled control that leaves users
@@ -362,7 +362,7 @@ function frameControlProps(busy: boolean, state: string | undefined): ControlBut
   return {
     disabled: busy || !ready,
     title: ready
-      ? 'Review the exact job, then trace its full generated motion envelope with the tool off.'
+      ? "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run."
       : frameBlockedTitle(state),
   };
 }
