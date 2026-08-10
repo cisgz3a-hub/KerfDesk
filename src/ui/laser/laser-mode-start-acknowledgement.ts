@@ -8,8 +8,8 @@ import {
 } from '../state/laser-mode-start-evidence';
 
 export const LASER_MODE_UNVERIFIED_START_PROMPT =
-  'Controller requirements cannot be fully verified.\n\n' +
-  'KerfDesk could not confirm, or observed a mismatch in, one or more requirements shown in Job Review: the GRBL power scale ($30), laser mode ($32=1), or M7 support when this job uses M7. Cancel and re-read the controller information when possible. Confirm only if you have independently checked every unverified requirement.\n\n' +
+  'Controller settings cannot be fully verified.\n\n' +
+  'CurveDesk could not confirm, or observed a mismatch in, the GRBL power scale ($30) or laser mode ($32=1) shown in Job Review. M7 capability remains a separate Job Review advisory and never requires this acknowledgement. Cancel and re-read the controller information when possible. Confirm only if you have independently checked each unverified setting.\n\n' +
   'Start this laser job anyway?';
 
 export function laserModeStartAcknowledgementRequired(

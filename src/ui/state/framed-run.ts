@@ -17,7 +17,8 @@ import type { PreparedJobMetrics } from '../laser/prepared-job-metrics';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from './canvas-job-timing-plan';
 
-/** The exact executable bundle prepared and reviewed before a physical Frame. */
+/** The exact executable bundle carried through Frame. Ordinary permits review
+ * it at Start; transient-camera candidates may carry prior review evidence. */
 export type PreparedStartProgram = {
   readonly ok: true;
   readonly gcode: string;
@@ -55,7 +56,8 @@ export type FramedRunCandidate = {
   /** Bounds/origin compatibility proof retained during the Frame-first
    * migration. It becomes visible only with the completion-issued permit. */
   readonly frameVerification: FrameVerification;
-  /** Reviewed controller/setup identity captured immediately before dispatch. */
+  /** Controller/setup identity captured immediately before Frame dispatch and
+   * interpreted by the later Start-time review for an ordinary permit. */
   readonly controllerBeforeFrame: FramedRunControllerSnapshot;
   readonly externalEnvironment: FramedRunExternalEnvironment;
   /** Work-coordinate point occupied while this exact program was prepared.

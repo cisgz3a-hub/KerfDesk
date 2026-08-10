@@ -106,6 +106,12 @@ describe('JobControls Absolute Coordinates frame-first', () => {
       expect(buttonByText('Home').disabled).toBe(false);
       expect(buttonByText('Frame job').disabled).toBe(false);
       expect(buttonByText('Set up & Frame').disabled).toBe(false);
+      expect(buttonByText('Frame job').title).toBe(
+        "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run.",
+      );
+      expect(buttonByText('Set up & Frame').title).toBe(
+        'Prepare and Frame the exact job with the tool off. After a clean Frame, press Start again to review and run.',
+      );
 
       await act(async () => {
         buttonByText('Frame job').dispatchEvent(new MouseEvent('click', { bubbles: true }));
