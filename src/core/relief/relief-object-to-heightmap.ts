@@ -6,6 +6,10 @@ import {
   type HeightfieldHeightmapResult,
 } from './heightfield-to-heightmap';
 import { meshToHeightmap } from './mesh-to-heightmap';
+import { FLOATS_PER_TRIANGLE } from './triangle-mesh';
+
+const VALUES_PER_VERTEX = 3;
+const Z_VALUE_OFFSET = 2;
 
 /** Materialization options shared by mesh-backed and heightfield-backed reliefs. */
 export type ReliefObjectHeightmapOptions = HeightfieldHeightmapOptions;
@@ -20,10 +24,15 @@ export function reliefObjectToHeightmap(
   if (relief.reliefSource.kind === 'heightfield-v1') {
     return heightfieldToHeightmap(relief.reliefSource, options);
   }
-  return meshToHeightmap(
-    {
-      positions: cachedFloat32Array(relief.reliefSource, relief.reliefSource.meshPositions),
-    },
-    { ...options, emptyCells: relief.reliefSource.emptyCells },
-  );
+  const positions = cachedFloat32Array(relief.reliefSource, relief.reliefSource.meshPositions);
+  const hasNonFiniteZ = positions.length >= FLOATS_PER_TRIANGLE && meshHasNonFiniteZ(positions);
+  if (hasNonFiniteZ) return { kind: 'error', reason: 'Mesh bounds must be finite.' };
+  return meshToHeightmap({ positions }, { ...options, emptyCells: relief.reliefSource.emptyCells });
+}
+
+function meshHasNonFiniteZ(positions: Float32Array): boolean {
+  for (let index = Z_VALUE_OFFSET; index < positions.length; index += VALUES_PER_VERTEX) {
+    if (!Number.isFinite(positions[index])) return true;
+  }
+  return false;
 }

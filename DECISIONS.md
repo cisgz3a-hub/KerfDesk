@@ -18092,3 +18092,89 @@ or every positive-finite operator intent.
   supersedes only its legacy-mesh Width-tooltip-preservation statement.
 
 ---
+
+## ADR-292 Amendment 6 - Non-finite Float32 legacy geometry fails at materialization, not project acceptance (2026-08-11)
+
+**Status:** Accepted and implemented as an explicitly authorized compile-integrity correction; schema and import/persistence acceptance are unchanged
+
+### Context
+
+Project schema v4 deliberately preserves legacy-mesh coordinates as finite JavaScript numbers. A
+stored value can therefore be finite in the project while overflowing when the reopened source is
+converted to CurveDesk's authoritative Float32 legacy-CAM representation. The existing materializer
+already rejected non-finite X or Y bounds, but it did not test Z. A reproduced legacy source with
+stored `Z = 1e39` reopened, passed manual-save and autosave preparation, and materialized with 66
+`NaN` depth cells while still returning success. Rough-only preparation then emitted 12 passes and
+623 lines of finite G-code with zero CNC preflight issues. A finite normalized reference emitted 11
+passes, 476 points, and 9,905 bytes; the overflow source emitted 12 passes, 579 points, and 11,918
+bytes. This was a silent wrong-program defect, not merely an unavailable preview.
+
+Finishing happened to expose non-finite Z motion to the existing post-emission integrity check, but
+roughing could consume the invalid depth field and produce a different streamable program. Relying
+on a later operation type or emitted-text scan does not establish materialization integrity.
+
+The maintainer explicitly authorized this narrow widening of the existing factual compile-integrity
+refusal on 2026-08-11. The authorization forbids changes to import, project open, manual save,
+autosave validation, or policy guards.
+
+### Decision
+
+1. **Validate the actual legacy-CAM representation.** After a persisted legacy source is converted
+   through the existing owner-keyed Float32 cache, `reliefObjectToHeightmap` checks one Z value per
+   vertex before rasterization. Non-finite Z returns the same factual reason already used for
+   non-finite X/Y bounds: `Mesh bounds must be finite.` The existing mesh materializer continues to
+   own X/Y bounds validation.
+2. **Fail the whole output through the existing named integrity path.** The materializer error
+   propagates as `relief-materialization-failed`, naming the affected relief and advising re-import
+   or replacement. A mixed job produces no partial prepared program, emitted G-code, Frame
+   candidate, or Start permit from that failed preparation.
+3. **Do not move the refusal earlier.** Parser and STL import-preparation acceptance remain
+   unchanged. Schema v4, deserialization, project-open validation, manual-save preparation,
+   autosave preparation, and stored source bytes remain unchanged. This amendment does not add a
+   Float32-magnitude cap to project data or convert the factual failure into an import policy.
+4. **Preserve the valid numeric boundary.** Every finite Float32 Z value, including the greatest
+   finite Float32 value, retains existing materialization behavior. Existing non-finite X/Y
+   behavior, canonical heightfields, empty and flat meshes, toolpath algorithms, emission, and
+   Frame/Job Review/Start policy remain unchanged.
+5. **Keep the cost explicit.** Legacy-object materialization performs one synchronous O(vertices)
+   finite-Z scan and short-circuits at the first invalid value. No browser or packaged-Electron
+   latency budget is established for that scan. It is an integrity check over the representation
+   already consumed by CAM, not a deliberate policy delay.
+6. **Do not generalize the authorization.** The maintainer approval applies only to actual
+   non-finite Float32 X/Y/Z legacy materialization bounds. It does not authorize another refusal,
+   clamp, cap, confirmation, hidden action, warning promotion, or change to the sole Frame guard.
+
+### Consequences
+
+- A saveable legacy project whose finite stored Z overflows Float32 continues to open and persist,
+  but output preparation now returns the named factual failure instead of a wrong roughing program.
+- ASCII and binary STL parser/preparation behavior is unchanged. Sources already represented as
+  non-finite typed Float32 retain their pre-existing import and persistence limitations; this
+  amendment neither newly accepts nor newly rejects them.
+- Ordinary finite legacy meshes and every canonical heightfield retain their prior materialized
+  depth, prepared job, emitted bytes, and authorization behavior.
+- The additional linear Z scan is unqualified for browser, packaged Electron, and very large-mesh
+  wall-clock latency. A future shared finite-bounds cache could remove repeated scans without
+  changing this integrity result.
+
+### Verification
+
+- `relief-object-to-heightmap.test.ts` pins existing X/Y failures, persisted-finite Z overflow,
+  direct non-finite Z values, and acceptance of the greatest finite Float32 Z value.
+- `stl-import-preparation.test.ts` pins unchanged ASCII overflow parse/preparation acceptance.
+- `prepare-output-relief-materialization.test.ts` pins project-persistence acceptance plus the
+  whole-job `relief-materialization-failed` code and exact finite-bounds reason.
+- Focused and adjacent relief materialization, compile, persistence, import, and preflight suites;
+  TypeScript; ESLint; Prettier; ADR-number; file-size; export; diff; and the full release gate are
+  required before publication.
+- Browser UI presentation, packaged Electron, controller behavior, a physical Frame, air cut,
+  material cut, and finish quality are not established.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-232, factual compile integrity versus policy refusal.
+- ADR-292 and Amendment 5, durable relief source authority and Float32 legacy-CAM equivalence.
+- ADR-294, factual relief materialization failures and runtime-fit evidence.
+
+---

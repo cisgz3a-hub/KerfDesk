@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ParseStlResult } from '../../io/stl';
+import { parseStl, type ParseStlResult } from '../../io/stl';
 import { prepareParsedStlImport } from './stl-import-preparation';
 
 const options = { targetWidthMm: 100, reliefDepthMm: 5, mmPerCell: 1 };
@@ -26,5 +26,22 @@ describe('prepareParsedStlImport', () => {
       kind: 'error',
       reason: 'broken STL',
     });
+  });
+
+  it('leaves Float32 Z overflow accepted for factual materialization diagnosis', () => {
+    const source = `solid overflow
+facet normal 0 0 1
+outer loop
+vertex 0 0 0
+vertex 2 0 1e39
+vertex 0 1.5 0
+endloop
+endfacet
+endsolid`;
+    const parsed = parseStl(new TextEncoder().encode(source).buffer as ArrayBuffer);
+    expect(parsed.kind).toBe('ok');
+    if (parsed.kind !== 'ok') return;
+    expect(parsed.mesh.positions[5]).toBe(Number.POSITIVE_INFINITY);
+    expect(prepareParsedStlImport(parsed, options).kind).toBe('ok');
   });
 });
