@@ -1,5 +1,6 @@
 import type { ReliefObject } from '../../core/scene';
 import type { HeightfieldReliefObject, ReliefHeightfieldMapping } from '../../core/scene/relief';
+import { resolveReliefHeightfieldWidthPatch } from './relief-heightfield-width-resolution';
 
 /** Operator-editable relief parameters accepted by the shared relief state action. */
 export type ReliefParamPatch = {
@@ -82,6 +83,10 @@ export function applyHeightfieldReliefPatch(
   common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>>,
   patch: ReliefParamPatch,
 ): HeightfieldReliefObject {
+  const widthResolution = resolveReliefHeightfieldWidthPatch(
+    relief.reliefSource,
+    patch.targetWidthMm,
+  );
   const canonicalChanged =
     widthPatchChangesSource(relief, patch.targetWidthMm) ||
     mappingPatchChangesSource(relief, patch);
@@ -90,9 +95,15 @@ export function applyHeightfieldReliefPatch(
     ...common,
     reliefSource: {
       ...relief.reliefSource,
-      ...physicalDimensionsForWidth(relief, patch.targetWidthMm),
+      ...(widthResolution === undefined
+        ? {}
+        : {
+            physicalWidthMm: widthResolution.physicalWidthMm,
+            physicalHeightMm: widthResolution.physicalHeightMm,
+          }),
       mapping: {
         ...relief.reliefSource.mapping,
+        ...(widthResolution === undefined ? {} : { aspect: widthResolution.aspect }),
         ...(patch.reliefDepthMm === undefined ? {} : { maxDepthMm: patch.reliefDepthMm }),
         ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
         ...(patch.inputLowCode === undefined ? {} : { inputLowCode: patch.inputLowCode }),
@@ -141,15 +152,6 @@ function widthPatchChangesSource(
   widthMm: number | undefined,
 ): boolean {
   return widthMm !== undefined && widthMm !== relief.reliefSource.physicalWidthMm;
-}
-
-function physicalDimensionsForWidth(
-  relief: HeightfieldReliefObject,
-  widthMm: number | undefined,
-): Partial<Pick<HeightfieldReliefObject['reliefSource'], 'physicalWidthMm' | 'physicalHeightMm'>> {
-  if (widthMm === undefined) return {};
-  const aspect = relief.reliefSource.physicalHeightMm / relief.reliefSource.physicalWidthMm;
-  return { physicalWidthMm: widthMm, physicalHeightMm: widthMm * aspect };
 }
 
 function positiveFinite(value: number | undefined): value is number {
