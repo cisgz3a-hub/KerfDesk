@@ -4,10 +4,7 @@
 // residual isometry used to place the finished cutter-center paths.
 
 import type { ReliefObject, Transform } from '../scene';
-import {
-  reliefPhysicalDimensions,
-  reliefPlanningScale,
-} from '../relief/relief-physical-dimensions';
+import { reliefMachineSpacePlanningWidthMm } from './relief-machine-space-planning-width';
 
 export type ReliefMachineSpaceTransform = {
   readonly targetScaleX: number;
@@ -21,8 +18,8 @@ export type ReliefMachineSpaceGeometry = ReliefMachineSpaceTransform & {
 };
 
 export function reliefMachineSpaceTransform(transform: Transform): ReliefMachineSpaceTransform {
-  const targetScaleX = reliefPlanningScale(transform.scaleX);
-  const targetScaleY = reliefPlanningScale(transform.scaleY);
+  const targetScaleX = planningScale(transform.scaleX);
+  const targetScaleY = planningScale(transform.scaleY);
   return {
     targetScaleX,
     targetScaleY,
@@ -33,13 +30,33 @@ export function reliefMachineSpaceTransform(transform: Transform): ReliefMachine
     },
   };
 }
+
 /** Physical planning size and residual placement used by relief CAM and previews. */
 export function reliefMachineSpaceGeometry(relief: ReliefObject): ReliefMachineSpaceGeometry {
   const machineSpace = reliefMachineSpaceTransform(relief.transform);
-  const physical = reliefPhysicalDimensions(relief);
   return {
     ...machineSpace,
-    widthMm: physical.widthMm,
-    heightMm: physical.heightMm,
+    widthMm: reliefMachineSpacePlanningWidthMm(relief) * machineSpace.targetScaleX,
+    heightMm: reliefNaturalHeightMm(relief) * machineSpace.targetScaleY,
   };
+}
+
+function reliefNaturalHeightMm(relief: ReliefObject): number {
+  if (relief.reliefSource.kind === 'heightfield-v1') {
+    return relief.reliefSource.physicalHeightMm;
+  }
+  const sourceWidth = relief.bounds.maxX - relief.bounds.minX;
+  const sourceHeight = relief.bounds.maxY - relief.bounds.minY;
+  return sourceWidth > 0 && sourceHeight > 0
+    ? relief.targetWidthMm * (sourceHeight / sourceWidth)
+    : relief.targetWidthMm;
+}
+
+function planningScale(scale: number): number {
+  // Saved projects require finite scale, and interactive handles clamp away
+  // from zero. Retain the legacy collapsed-axis behavior for a hand-built or
+  // old zero-scale scene instead of turning this geometry correction into a
+  // new compile refusal. Non-finite values remain in the residual transform
+  // so the existing non-finite output integrity checks still catch them.
+  return Number.isFinite(scale) && scale !== 0 ? Math.abs(scale) : 1;
 }

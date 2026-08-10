@@ -17814,3 +17814,78 @@ mapping `preserve` would also make the stored resolved policy false.
 - ADR-305, selected canonical field geometry and Width representation disclosure.
 
 ---
+
+## ADR-292 Amendment 3 - Canonical heightfield Width owns preview planning (2026-08-10)
+
+**Status:** Accepted and implemented as a bounded P2R.1a preview-authority repair; editable crop/aspect controls and physical qualification remain open
+
+### Context
+
+Schema-v4 heightfields persist canonical physical dimensions and a compatibility duplicate
+`targetWidthMm`. Project validation permits those Width values to differ within the existing binding
+tolerance. Heightmap materialization already uses canonical `reliefSource.physicalWidthMm`, and
+ADR-292 Amendment 2 makes that field the authority for accepted Width edits and natural bounds.
+However, the shared machine-space geometry readout still derived Width from the duplicate. Relief 3D
+used that result for its title and display-mesh resolution, while the canvas heightfield preview used
+the duplicate for its preview cell size and cache identity. A valid project could therefore machine
+the canonical field while two previews budgeted or labelled a slightly different Width.
+
+Exact-zero object scale is intentionally different. The compatibility path plans the stored target
+Width with scale magnitude `1`, then collapses the finished placement through the residual transform.
+Legacy meshes also have no canonical heightfield dimensions and continue to use their stored target
+Width.
+
+### Decision
+
+1. **Use one preview/planning Width authority.** For `heightfield-v1` with nonzero object X scale,
+   derive the unscaled planning Width from `reliefSource.physicalWidthMm`. Use that same authority in
+   machine-space geometry, the selected-property Width disclosure, the canvas heightfield preview's
+   target Width, cell-size choice and cache identity, and Relief 3D's title and display-resolution
+   choice. A tolerated `targetWidthMm` duplicate cannot select an alternate preview budget.
+2. **Preserve exact-zero compatibility and legacy meshes.** At exact zero object X scale, retain
+   `targetWidthMm` as the stored compatibility planning Width before residual collapse. A
+   `legacy-mesh` relief continues to derive planning Width from `targetWidthMm` at every scale.
+3. **Keep canonical materialization and machine authorization unchanged.** Heightfield
+   materialization continues to use canonical physical dimensions and scale directly. The compiler
+   continues to consume the existing machine-space scale magnitudes and residual transform; the
+   corrected Width field is preview/readout authority, not a second CAM transform. No schema,
+   migration, project mutation, emitter algorithm, machine command, Frame/Job Review/Start policy,
+   refusal, clamp, cap, delay, or confirmation is added.
+4. **Keep the evidence boundary explicit.** Focused tests must pin validator-tolerated duplicate
+   Widths, ordinary nonzero scale, exact-zero compatibility, and unchanged legacy-mesh behavior for
+   every affected preview/readout seam. Browser/WebGL appearance, exact emitted-byte parity,
+   controller behavior, air cuts, material cuts, and finish quality remain separate evidence.
+
+### Consequences
+
+- A schema-valid duplicate Width can no longer make Relief 3D or the canvas preview choose geometry
+  labels, cell size, or cache identity that disagrees with the canonical heightfield source.
+- Exact-zero compatibility and legacy-mesh planning keep their existing stored target authority.
+- Existing heightfield samples, mask, mapping, provenance, digest, transform, dimensions, bounds,
+  undo, dirty state, CAM materialization, and machine authorization are unchanged by merely opening
+  or drawing a preview.
+- This amendment does not repair the separate machine-space Width editor conversion when division by
+  an extreme object scale rounds a positive finite draft to `0` or `Infinity`.
+
+### Verification
+
+- `relief-machine-space-planning-width.test.ts` pins canonical nonzero Width, exact-zero
+  compatibility, and legacy-mesh machine-space geometry.
+- `ReliefPlanningWidthDisclosure.test.tsx`,
+  `draw-relief-heightfield-preview-request.test.ts`, and
+  `Relief3DViewerDialog/relief-3d-viewer-dialog-plan.test.ts` pin the common authority at the
+  selected-property, canvas-preview, cache/resolution, and Relief 3D seams.
+- TypeScript, focused Vitest, ESLint, Prettier, ADR-number, file-size, export-ratchet, diff, and the
+  full release gate are required before publication.
+- Focused verification does not establish browser/WebGL perceptual layout, packaged Electron,
+  bit-for-bit compiled or emitted output, controller behavior, an air cut, a material cut, or finish
+  quality.
+
+### References
+
+- ADR-289, relief scale factoring and exact-zero compatibility.
+- ADR-292, canonical schema-v4 heightfield authority.
+- ADR-292 Amendment 2, canonical Width edit and bounds integrity.
+- ADR-305, selected canonical field geometry and planning-Width disclosure.
+
+---
