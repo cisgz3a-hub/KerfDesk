@@ -17889,3 +17889,98 @@ Width.
 - ADR-305, selected canonical field geometry and planning-Width disclosure.
 
 ---
+
+## ADR-292 Amendment 4 - Exact common-factor Width rebasing preserves project-v4 persistence when representable (2026-08-10)
+
+**Status:** Accepted and implemented as a bounded P2R.1a persistence repair; an all-positive-finite intent representation remains planned
+
+### Context
+
+ADR-292 Amendment 2 made canonical heightfield dimensions and natural bounds move together after a
+Width edit. Project v4 separately retains its long-standing local-coordinate magnitude limit of
+`1,000,000 mm` and object-scale magnitude limit of `100,000`. A valid field with X scale `5e-7`
+can therefore accept a displayed Width of `1 mm`, resolve it to canonical Width `2,000,000 mm`, and
+immediately become invalid for manual save and autosave even though its machine-space width remains
+exactly `1 mm`.
+
+Removing the heightfield natural-bounds limit is not a validator-only repair. Very large finite
+physical dimensions can overflow transformed scene bounds; a `Number.MAX_VALUE`-wide Relief 3D
+display can keep a bounded cell count while Float32 surface coordinates become infinite, normals
+become `NaN`, and camera framing overflows. Widening the persisted bounds domain would therefore
+move the representation failure into canvas and 3D consumers. Rejecting, clamping, restoring, or
+confirming the accepted Width would violate the exact-input and sole-Frame-guard contracts.
+
+### Decision
+
+1. **Keep project-v4 numeric domains unchanged.** Generic coordinates, heightfield natural bounds,
+   object scales, legacy meshes, and project validation retain their existing limits. Do not add a
+   heightfield-only finite-bounds exemption.
+2. **Re-factor only when the representation is exact.** After the existing Width/aspect resolver
+   produces canonical dimensions, retain ordinary in-domain results unchanged. Otherwise choose
+   the smallest common power-of-two factor that brings both dimensions into the local-coordinate
+   domain. Divide canonical Width, canonical Height, duplicate target Width, and natural bounds by
+   that factor; multiply both object scale axes by the same factor. Independent X/Y factors are
+   outside this repair even when a Stretch object could encode them: they would change canonical
+   aspect and future Preserve-Width semantics, and they would change the canonical square-cell 2D
+   preview sampling budget.
+3. **Prove equivalence before adopting the candidate.** Both scale axes must be nonzero. Candidate
+   dimensions must remain positive finite and candidate scales must remain finite and inside the
+   existing scale domain. Multiplying each candidate dimension by the factor and dividing each
+   candidate scale by it must reproduce the prior binary64 value exactly. Native machine-space W
+   and H products must be exactly equal, and all four transformed corners must remain finite and
+   bit-identical. If any condition fails, report factorization as unavailable; never approximate,
+   clamp, cap, or relax validation.
+4. **Keep the state transition atomic.** An adopted factor changes only the internal local
+   representation: canonical dimensions, duplicate target Width, natural bounds, and both scale
+   axes. Scale signs, mirrors, rotation, translation, mapping, samples, mask, digest, provenance,
+   relief depth, and source algorithm remain unchanged. The existing Width edit still produces one
+   revision increment, one undo entry, and one dirty transition.
+5. **State the bounded evidence honestly.** This amendment fixes the concrete common-factor case
+   and other exactly representable common-power-of-two candidates. Exact-zero compatibility, transform-scale
+   exhaustion, non-reversible subnormal factors, non-finite transformed geometry, and Widths beyond
+   this bounded common-factor repair remain open. `scale-domain`, `zero-scale`, and related
+   unavailable results do not claim that every independent-axis v4 encoding is mathematically
+   impossible. The current caller retains its prior behavior when factorization is unavailable,
+   which can still leave such an exceptional edit unsaveable. A future schema must separate durable
+   positive-finite operator intent from the geometry that current Canvas, Float32 preview, and CAM
+   number representations can materialize.
+6. **Do not change machining or authorization policy.** An adopted exact factor preserves current
+   machine-space dimensions and transformed corners. No validator, schema version, migration, CAM
+   or emitter algorithm, machine command, Frame/Job Review/Start policy, refusal, clamp, delay, or
+   confirmation changes. Future extreme Preserve edits can encounter binary64 underflow at a
+   different canonical ratio after rebasing; all-positive-finite edit-sequence equivalence is not
+   claimed by this bounded repair.
+
+### Consequences
+
+- The reproduced `2,000,000 x 1,000,000` local result at scales `(5e-7, 1)` persists as the exactly
+  equivalent `1,000,000 x 500,000` result at scales `(1e-6, 2)`. Its transformed corners and
+  machine dimensions are unchanged, and both manual save and autosave preparation remain valid.
+- Factorization returns ordinary in-domain Width results unchanged, so their stored scene
+  representation is unaffected. Exact-zero heightfield compatibility and legacy-mesh Width behavior
+  are unchanged.
+- The selected Width tooltip no longer promises that every edit preserves object scale; it names
+  the possible exact bounded local re-factor.
+- This is a partial v4 integrity repair, not permission to add an input cap or a claim that every
+  positive-finite Width is saveable under the existing representation.
+
+### Verification
+
+- `relief-heightfield-width-factorization.test.ts` pins the concrete save/autosave regression,
+  common-factor geometry and materialization equality, negative scale and rotation, unchanged
+  in-domain identity, Stretch-policy retention, exact-zero and scale-domain unavailability,
+  subnormal reversibility, one revision/undo/dirty transition, and source-byte identity.
+- Existing Width-resolution, bounds, parameter-action, heightfield materialization, and
+  machine-space suites remain green. TypeScript, focused Vitest, ESLint, Prettier, ADR-number,
+  file-size, export-ratchet, diff, and full release gates are required before publication.
+- Browser perceptual layout, packaged Electron, exact compiled/emitted-byte parity, controller
+  behavior, an air cut, a material cut, and finish quality are not established.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-289, relief scale factoring and exact-zero compatibility.
+- ADR-292 and Amendment 2, canonical heightfield authority and Width resolution.
+- ADR-305, exact-factor field-geometry disclosure and native planning representation.
+
+---

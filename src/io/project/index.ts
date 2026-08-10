@@ -9,3 +9,7 @@ export {
   prepareProjectForAutosave,
   type PreparedProjectAutosave,
 } from './prepare-project-autosave';
+export {
+  MAX_PROJECT_COORDINATE_MAGNITUDE_MM,
+  MAX_PROJECT_TRANSFORM_SCALE,
+} from './project-shape-primitives';
