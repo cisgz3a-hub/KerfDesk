@@ -6,10 +6,7 @@
 import { type Heightmap } from '../../core/relief';
 // Deep imports: core/relief's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
-import type {
-  HeightfieldHeightmapOptions,
-  HeightfieldHeightmapResult,
-} from '../../core/relief/heightfield-to-heightmap';
+import type { HeightfieldHeightmapResult } from '../../core/relief/heightfield-to-heightmap';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import { transformedBBox } from '../../core/scene';
 import type { Layer, ReliefObject, SceneObject } from '../../core/scene';
@@ -19,6 +16,10 @@ import {
   prepareReliefHeightmapsOffThread,
 } from './cnc-removal-grid-worker-client';
 import { canvasTheme } from '../theme/canvas-theme';
+import {
+  drawReliefHeightfieldPreviewRequest,
+  type DrawReliefHeightfieldPreviewRequest,
+} from './draw-relief-heightfield-preview-request';
 import { drawPartialGridBitmapAtTransform } from './draw-raster';
 import { heightmapToCanvas } from './relief-heightmap-bitmap';
 import type { ViewTransform } from './view-transform';
@@ -47,16 +48,11 @@ type HeightfieldPreview =
     }
   | { readonly kind: 'failed'; readonly reason: string };
 
+type HeightfieldPreviewItem = DrawReliefHeightfieldPreviewRequest;
+
 type PendingHeightfieldPreview = {
   readonly controller: AbortController;
   readonly items: ReadonlyArray<HeightfieldPreviewItem>;
-};
-
-type HeightfieldPreviewItem = {
-  readonly source: ReliefHeightfield;
-  readonly cacheKey: string;
-  readonly reliefDepthMm: number;
-  readonly options: HeightfieldHeightmapOptions;
 };
 
 let pendingHeightfieldPreview: PendingHeightfieldPreview | null = null;
@@ -153,7 +149,7 @@ export function drawReliefObject(
 
 function previewFor(obj: ReliefObject): HeightfieldPreview | null {
   if (isHeightfieldRelief(obj)) {
-    const item = heightfieldPreviewItem(obj);
+    const item = drawReliefHeightfieldPreviewRequest(obj, DISPLAY_CELLS_ACROSS);
     return heightfieldPreviewCache.get(item.source)?.get(item.cacheKey) ?? null;
   }
   const cached = meshBitmapCache.get(obj);
@@ -182,7 +178,7 @@ function uniqueMissingHeightfieldPreviews(
   for (const object of objects) {
     if (!isHeightfieldRelief(object)) continue;
     if (layerByColor.get(object.color)?.visible === false) continue;
-    const item = heightfieldPreviewItem(object);
+    const item = drawReliefHeightfieldPreviewRequest(object, DISPLAY_CELLS_ACROSS);
     const cache = heightfieldPreviewCache.get(item.source);
     if (cache?.has(item.cacheKey) === true) continue;
     if (items.some((candidate) => samePreviewItem(candidate, item))) continue;
@@ -193,22 +189,6 @@ function uniqueMissingHeightfieldPreviews(
 
 function isHeightfieldRelief(object: SceneObject): object is HeightfieldReliefObject {
   return object.kind === 'relief' && object.reliefSource.kind === 'heightfield-v1';
-}
-
-function heightfieldPreviewItem(relief: HeightfieldReliefObject): HeightfieldPreviewItem {
-  const heightMm = relief.reliefSource.physicalHeightMm;
-  const mmPerCell = Math.max(relief.targetWidthMm, heightMm) / DISPLAY_CELLS_ACROSS;
-  const options = {
-    targetWidthMm: relief.targetWidthMm,
-    reliefDepthMm: relief.reliefDepthMm,
-    mmPerCell,
-  };
-  return {
-    source: relief.reliefSource,
-    cacheKey: `${relief.targetWidthMm}:${relief.reliefDepthMm}:${mmPerCell}`,
-    reliefDepthMm: relief.reliefDepthMm,
-    options,
-  };
 }
 
 function samePreviewItems(

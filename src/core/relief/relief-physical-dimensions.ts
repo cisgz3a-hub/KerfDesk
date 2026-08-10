@@ -5,6 +5,7 @@
 // differs from the surface CAM materializes.
 
 import type { ReliefObject } from '../scene';
+import { reliefMachineSpacePlanningWidthMm } from '../cnc/relief-machine-space-planning-width';
 
 export type ReliefPhysicalDimensions = {
   readonly widthMm: number;
@@ -27,9 +28,10 @@ export function reliefPhysicalDimensions(relief: ReliefObject): ReliefPhysicalDi
   const targetScaleX = reliefPlanningScale(relief.transform.scaleX);
   const targetScaleY = reliefPlanningScale(relief.transform.scaleY);
   const aspect = reliefSourceAspect(relief);
+  const planningWidthMm = reliefMachineSpacePlanningWidthMm(relief);
   return {
-    widthMm: relief.targetWidthMm * targetScaleX,
-    heightMm: relief.targetWidthMm * aspect * targetScaleY,
+    widthMm: planningWidthMm * targetScaleX,
+    heightMm: planningWidthMm * aspect * targetScaleY,
     targetScaleX,
     targetScaleY,
   };

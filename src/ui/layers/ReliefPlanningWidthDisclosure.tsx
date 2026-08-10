@@ -1,4 +1,5 @@
 import type { ReliefObject } from '../../core/scene';
+import { reliefMachineSpacePlanningWidthMm } from '../../core/cnc/relief-machine-space-planning-width';
 
 const NOTE_FONT_SIZE_PX = 11;
 const NOTE_LINE_HEIGHT = 1.25;
@@ -16,9 +17,7 @@ export function reliefPlanningWidthTitle(relief: ReliefObject): string {
 
 /** Resolves the editable Width authority while preserving mesh and exact-zero compatibility. */
 export function reliefPropertyWidthSourceMm(relief: ReliefObject): number {
-  return relief.reliefSource.kind === 'heightfield-v1' && relief.transform.scaleX !== 0
-    ? relief.reliefSource.physicalWidthMm
-    : relief.targetWidthMm;
+  return reliefMachineSpacePlanningWidthMm(relief);
 }
 
 /** Resolves the native binary64 Width readout from the editable source authority. */
