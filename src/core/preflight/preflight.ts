@@ -52,7 +52,6 @@ export type PreflightCode =
   | 'passes-below-one'
   | 'layer-mode-mismatch'
   | 'offset-fill-open-contour'
-  | 'unsupported-raster-transform'
   | 'laser-on-travel'
   | 'long-blank-feed'
   | 'no-go-zone-collision'
@@ -139,8 +138,6 @@ export function runPreflight(
   issues.push(...findLayerModeMismatchIssues(project.scene.objects, outputLayers));
 
   appendOffsetFillOpenContourIssues(project.scene, outputLayers, issues);
-
-  appendUnsupportedRasterTransformIssues(project.scene, outputLayers, issues);
 
   // A8: split the (up to ~96 MB raster) body ONCE and thread the lines through
   // every G-code scanner below, instead of each re-splitting the whole string.
@@ -341,30 +338,6 @@ function objectHasOpenContourOnLayer(obj: SceneObject, layer: Layer): boolean {
       return false;
     default:
       return assertNever(obj, 'SceneObject');
-  }
-}
-
-function appendUnsupportedRasterTransformIssues(
-  scene: Scene,
-  outputLayers: ReadonlyArray<Layer>,
-  issues: PreflightIssue[],
-): void {
-  const outputImageLayers = outputLayers.filter((layer) => layer.mode === 'image');
-  for (const obj of scene.objects) {
-    if (obj.kind !== 'raster-image') continue;
-    if (obj.role === 'trace-source') continue;
-    if (!outputImageLayers.some((layer) => sceneObjectUsesOperation(obj, layer))) continue;
-    // Mirror is supported: compile-job's orientRasterLumaForMachine XORs the
-    // object's mirror flags into the machine orientation flip (M35; pinned by
-    // compile-job.test.ts column-mirror test). Only rotation remains
-    // unsupported — raster emit is axis-aligned.
-    if (obj.transform.rotationDeg !== 0) {
-      issues.push({
-        code: 'unsupported-raster-transform',
-        message:
-          'Image raster output currently supports scale, mirror, and position only. Clear rotation before engraving, or convert after placing the artwork.',
-      });
-    }
   }
 }
 

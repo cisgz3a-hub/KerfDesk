@@ -148,7 +148,7 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
     expect(codes).not.toContain('layer-mode-mismatch');
   });
 
-  it('checks unsupported raster transforms through image sub-layers', () => {
+  it('does not warn for a rotated output raster through an image sub-layer', () => {
     const baseLayer = createLayer({ id: 'L-gray', color: '#808080' });
     const imageSubLayer = createLayerSubLayer(baseLayer, {
       id: 'image-op',
@@ -170,21 +170,7 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
       },
     };
     const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
-    expect(codes).toContain('unsupported-raster-transform');
-  });
-
-  it('flags a rotated raster image because raster emit is axis-aligned', () => {
-    const imageLayer = createLayer({ id: 'L-gray', color: '#808080', mode: 'image' });
-    const rotatedRaster: SceneObject = {
-      ...grayRaster,
-      transform: { ...IDENTITY_TRANSFORM, rotationDeg: 45 },
-    };
-    const project: Project = {
-      ...createProject(),
-      scene: { ...EMPTY_SCENE, objects: [rotatedRaster], layers: [imageLayer] },
-    };
-    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
-    expect(codes).toContain('unsupported-raster-transform');
+    expect(codes).not.toContain('unsupported-raster-transform');
   });
 
   // M1 (AUDIT-2026-06-10): images within 5 mm of the bed's X edges always
@@ -210,24 +196,6 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
     expect(result.ok).toBe(false);
     expect(result.issues.some((i) => i.message.includes('overscan'))).toBe(true);
     expect(result.issues.some((i) => i.message.includes('5 mm'))).toBe(true);
-  });
-
-  // M35 (AUDIT-2026-06-10): compile-job's orientRasterLumaForMachine handles
-  // mirror (XOR with the origin flip — pinned in compile-job.test.ts), but
-  // this gate predates that support and still rejected ANY mirror, so the
-  // H/V flip shortcuts made an image project un-emittable.
-  it('accepts a mirrored raster image now that compile orients mirrored luma', () => {
-    const imageLayer = createLayer({ id: 'L-gray', color: '#808080', mode: 'image' });
-    const mirroredRaster: SceneObject = {
-      ...grayRaster,
-      transform: { ...IDENTITY_TRANSFORM, mirrorX: true, mirrorY: true },
-    };
-    const project: Project = {
-      ...createProject(),
-      scene: { ...EMPTY_SCENE, objects: [mirroredRaster], layers: [imageLayer] },
-    };
-    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
-    expect(codes).not.toContain('unsupported-raster-transform');
   });
 
   it('does not block on rotated trace-source backing images', () => {
@@ -266,7 +234,6 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
       scene: { ...EMPTY_SCENE, objects: [traceSource, traced], layers: [imageLayer, traceLayer] },
     };
     const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
-    expect(codes).not.toContain('unsupported-raster-transform');
     expect(codes).not.toContain('layer-mode-mismatch');
   });
 });
