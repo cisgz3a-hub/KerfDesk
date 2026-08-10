@@ -523,7 +523,8 @@ grouped by what each validates:
 
 **Mode / geometry consistency**
 11. **Layer mode matches its geometry** — a fill/offset needs closed contours.
-12. **Raster transform is emittable** — a rotation/shear the raster path cannot engrave is refused.
+12. **Raster rotation follows the compile path** — output rasters, including image sub-layers,
+    may use the supported object rotation; preflight does not claim that rotation is unsupported.
 13. **Raster output stays within the pixel budget.**
 14. **Island-fill short-sweep risk** on the active machine profile is surfaced.
 15. **Relief objects appear only in CNC mode.**

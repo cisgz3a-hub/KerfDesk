@@ -17339,3 +17339,76 @@ misreport a project after the operator changes its mapping.
 - ADR-291, source-truth requirements, provenance boundaries, and planned output disclosure.
 - ADR-292, the canonical heightfield provenance and mapping contracts.
 - ADR-301, the preceding declared-source-meaning disclosure.
+
+---
+
+## ADR-303 - Remove the obsolete unsupported-raster-rotation preflight warning (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented; raster compile and emitted-byte behavior are unchanged
+
+### Context
+
+The raster compiler has a transformed sampler for non-identity object rotation modulo a full turn.
+Its focused tests pin
+90-degree content rotation, 180-degree equivalence to a double mirror, unburned axis-aligned
+bounding-box padding around a 45-degree rotation, and the streamed row-provider path. The preflight
+layer still carried an older `unsupported-raster-transform` issue that fired for every non-zero
+`rotationDeg` and told the operator to clear rotation because raster emit was axis-aligned.
+
+That warning no longer described the program CurveDesk actually compiles. It was advisory rather
+than a member of the factual compile-integrity refusal set, but it still presented false guidance
+for supported output rasters, including rasters routed through image sub-layers.
+
+### Decision
+
+1. **Delete the obsolete issue family.** Remove `unsupported-raster-transform` from
+   `PreflightCode`, remove its `runPreflight` appender, and remove the helper that emitted it for a
+   non-zero raster-image rotation.
+2. **Treat supported rotation as ordinary compiled output.** A rotated output raster, including one
+   assigned through an image sub-layer, receives the same remaining preflight checks as any other
+   compiled raster. Preflight does not tell the operator to clear a rotation the compiler supports.
+3. **Keep compiler and emitter executable logic unchanged.** This decision does not modify raster
+   sampling, transformed bounds, luma orientation, row streaming, power values, motion, ordering,
+   or emitted G-code bytes. Existing focused compiler tests remain the authority for rotation
+   behavior.
+4. **Do not widen another refusal or warning.** Bounds, no-go, non-finite-coordinate, layer-mode,
+   laser-off-travel, empty-output, factual compile-integrity, transport, handoff, Job Review, Frame,
+   and Start contracts remain unchanged. This correction adds no guard, cap, clamp, refusal, delay,
+   or confirmation. As the corrected `emit-gcode.ts` header now states, callers partition factual
+   compile-integrity issues from advisories and must not gate a write or Start on aggregate
+   `preflight.ok`; that source-comment correction changes no runtime behavior.
+5. **Correct only the matching workflow statement.** F-A10 records that supported object rotation
+   follows the compile path. Other known manual drift is separate work and is not bundled here.
+6. **Keep historical evidence in its time boundary.** ADR-029 amendment (i) §4 and older audit
+   records describe the raster-output rotation limitation that existed before transformed sampling
+   shipped. This ADR supersedes that runtime claim, not Convert to Bitmap's transform-bake behavior;
+   historical audit files remain records rather than the current workflow contract.
+
+### Consequences
+
+- Operators no longer receive a false instruction to clear a supported raster rotation.
+- Rotated rasters keep the same compiled program and emitted bytes they had before this decision;
+  only the obsolete advisory is removed.
+- Preflight still reports every unrelated issue produced by the same rotated job.
+- This decision makes no claim about arbitrary shear, perceptual fidelity, controller execution, or
+  physical burn quality.
+
+### Verification
+
+- A focused preflight regression proves that a rotated output raster routed through an image
+  sub-layer does not receive the removed warning.
+- The existing raster-rotation compiler suite is required to remain green to pin the supported
+  transformed-sampling paths without changing compiler or emitter executable logic.
+- TypeScript, scoped lint and formatting, the ADR policy gate, and the exact diff/size checks are
+  required before publication. Browser perceptual review, packaged Electron, controller behavior,
+  hardware air cuts, and material burns are not established by this ADR.
+
+### References
+
+- ADR-228, Frame-only guard and advisory-only Job Review policy.
+- ADR-029 amendment (i) §4, the historical pre-rotation-support runtime statement.
+- `src/core/job/compile-job-raster-rotation.test.ts`, supported raster-rotation behavior.
+- `src/core/preflight/preflight-raster.test.ts`, image-sub-layer preflight regression.
+
+---
