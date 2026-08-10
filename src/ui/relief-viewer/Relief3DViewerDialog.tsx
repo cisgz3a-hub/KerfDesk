@@ -5,7 +5,6 @@
 // jsdom tests assert).
 
 import { useCallback, useMemo } from 'react';
-import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
 import { heightmapCellSize, type Heightmap } from '../../core/relief';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import type { ReliefObject } from '../../core/scene';
@@ -15,10 +14,13 @@ import {
 } from '../workspace/cnc-removal-grid-worker-client';
 import { createReliefThreeScene } from './relief-three-scene';
 import {
-  relief3dDisplayResolution,
   relief3dDisplayResolutionNotice,
   type Relief3DDisplayResolution,
 } from './relief3d-display-resolution';
+import {
+  relief3dViewerDialogPlan,
+  type Relief3DViewerDialogPlan,
+} from './Relief3DViewerDialog/relief-3d-viewer-dialog-plan';
 import { Viewer3DDialogShell } from './Viewer3DDialogShell';
 
 export function Relief3DViewerDialog(props: {
@@ -27,22 +29,18 @@ export function Relief3DViewerDialog(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const { relief, stockThicknessMm } = props;
-  const physical = reliefMachineSpaceGeometry(relief);
-  const resolution = useMemo(
-    () => relief3dDisplayResolution(physical.widthMm, physical.heightMm),
-    [physical.heightMm, physical.widthMm],
-  );
-  const resolutionNotice = relief3dDisplayResolutionNotice(resolution);
+  const plan = useMemo(() => relief3dViewerDialogPlan(relief), [relief]);
+  const resolutionNotice = relief3dDisplayResolutionNotice(plan.resolution);
   const buildScene = useCallback(
     (canvas: HTMLCanvasElement, signal: AbortSignal) =>
-      buildReliefScene(canvas, relief, stockThicknessMm, resolution, signal),
-    [relief, resolution, stockThicknessMm],
+      buildReliefScene(canvas, relief, stockThicknessMm, plan, signal),
+    [relief, plan, stockThicknessMm],
   );
   return (
     <Viewer3DDialogShell
       ariaLabel="Relief 3D viewer"
       canvasAriaLabel="Relief 3D preview"
-      title={`${relief.source} — ${physical.widthMm.toFixed(0)} mm wide × ${relief.reliefDepthMm.toFixed(1)} mm deep`}
+      title={plan.title}
       {...(resolutionNotice === undefined ? {} : { notice: resolutionNotice })}
       onClose={props.onClose}
       buildScene={buildScene}
@@ -54,24 +52,23 @@ async function buildReliefScene(
   canvas: HTMLCanvasElement,
   relief: ReliefObject,
   stockThicknessMm: number,
-  resolution: Relief3DDisplayResolution,
+  plan: Relief3DViewerDialogPlan,
   signal: AbortSignal,
 ): Promise<Awaited<ReturnType<typeof createReliefThreeScene>>> {
   try {
-    const physical = reliefMachineSpaceGeometry(relief);
     const displayCellSize = heightmapCellSize(
-      physical.widthMm,
-      physical.heightMm,
-      resolution.effectiveMmPerCell,
+      plan.machineSpace.widthMm,
+      plan.machineSpace.heightMm,
+      plan.resolution.effectiveMmPerCell,
     );
     if (displayCellSize.kind === 'error') {
       return { kind: 'no-webgl', reason: displayCellSize.reason };
     }
     const options = {
-      targetWidthMm: relief.targetWidthMm,
+      targetWidthMm: plan.planningWidthMm,
       reliefDepthMm: relief.reliefDepthMm,
-      targetScaleX: physical.targetScaleX,
-      targetScaleY: physical.targetScaleY,
+      targetScaleX: plan.machineSpace.targetScaleX,
+      targetScaleY: plan.machineSpace.targetScaleY,
       mmPerCell: displayCellSize.mmPerCell,
     };
     const offThread =
@@ -86,7 +83,7 @@ async function buildReliefScene(
     if (heightmap.kind === 'error') return { kind: 'no-webgl', reason: heightmap.reason };
     if (signal.aborted) return { kind: 'no-webgl', reason: 'Relief preview was cancelled.' };
     const surfaceWork = prepareCncCut3DSurfaceOffThread(
-      removalGridFrom(heightmap.heightmap, resolution),
+      removalGridFrom(heightmap.heightmap, plan.resolution),
       signal,
     );
     if (surfaceWork === null) {

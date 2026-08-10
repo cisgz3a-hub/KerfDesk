@@ -159,7 +159,7 @@ describe('ReliefPlanningWidthDisclosure', () => {
   it('follows canonical source width when near-equal stored duplicates diverge at underflow', async () => {
     const sourceUnderflows = relief(0.5, Number.MIN_VALUE, 1e-9);
     const sourceUnderflowPlanning = reliefMachineSpaceGeometry(sourceUnderflows);
-    expect(sourceUnderflowPlanning.widthMm).toBe(5e-10);
+    expect(sourceUnderflowPlanning.widthMm).toBe(0);
     const sourceWidthMm = reliefPropertyWidthMm(
       sourceUnderflows,
       sourceUnderflowPlanning.targetScaleX,
@@ -185,7 +185,7 @@ describe('ReliefPlanningWidthDisclosure', () => {
 
     const targetUnderflows = relief(0.5, 1e-9, Number.MIN_VALUE);
     const targetUnderflowPlanning = reliefMachineSpaceGeometry(targetUnderflows);
-    expect(targetUnderflowPlanning.widthMm).toBe(0);
+    expect(targetUnderflowPlanning.widthMm).toBe(5e-10);
     const targetWidthMm = reliefPropertyWidthMm(
       targetUnderflows,
       targetUnderflowPlanning.targetScaleX,

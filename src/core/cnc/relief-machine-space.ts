@@ -4,6 +4,7 @@
 // residual isometry used to place the finished cutter-center paths.
 
 import type { ReliefObject, Transform } from '../scene';
+import { reliefMachineSpacePlanningWidthMm } from './relief-machine-space-planning-width';
 
 export type ReliefMachineSpaceTransform = {
   readonly targetScaleX: number;
@@ -35,7 +36,7 @@ export function reliefMachineSpaceGeometry(relief: ReliefObject): ReliefMachineS
   const machineSpace = reliefMachineSpaceTransform(relief.transform);
   return {
     ...machineSpace,
-    widthMm: relief.targetWidthMm * machineSpace.targetScaleX,
+    widthMm: reliefMachineSpacePlanningWidthMm(relief) * machineSpace.targetScaleX,
     heightMm: reliefNaturalHeightMm(relief) * machineSpace.targetScaleY,
   };
 }
