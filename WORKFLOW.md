@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292 through ADR-302, ADR-305, and ADR-292 Amendments 2-5 schema, import, gamma/input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, selected-heightfield field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292 through ADR-302, ADR-305, and ADR-292 Amendments 2-6 schema, import, gamma/input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, selected-heightfield field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, legacy Float32 materialization integrity, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2407,7 +2407,7 @@ F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit height-map path plus the bounded
-ADR-292 through ADR-302, ADR-305, and ADR-292 Amendments 2-5 schema, import, mapping,
+ADR-292 through ADR-302, ADR-305, and ADR-292 Amendments 2-6 schema, import, mapping,
 recovery, declared-source-meaning, recorded-source-detail, selected-field-geometry,
 resolved-aspect-policy, canonical-Width-integrity, bounded exact Width re-factorization, and canonical-preview-authority work marked current below. F-CNC47-F-CNC50 specify the approved ADR-291
 expansion; their remaining controls and user-facing flows are planned.
@@ -2577,7 +2577,7 @@ expansion; their remaining controls and user-facing flows are planned.
    layer created automatically. Toast reports the triangle count. The
    worker transfers its typed mesh into the live object without expanding
    it into a boxed number array on the UI thread.
-3. The canvas shows the relief as a grayscale depth map — light = stock
+3. For finite-Float32 meshes, the canvas shows the relief as a grayscale depth map — light = stock
    top, dark = floor. It selects, moves, and saves/loads like any object;
    `.lf2` embeds the mesh as the existing JSON number-array schema so
    projects stay self-contained and older saved projects still reopen.
@@ -2596,6 +2596,12 @@ expansion; their remaining controls and user-facing flows are planned.
 1. A mesh flat in X or Y is rejected — nothing to carve.
 2. Rotated reliefs render axis-aligned in v1 (the depth map draws in the
    transformed bounding box); toolpaths (H.5) will honor the transform.
+3. Parser and import-preparation acceptance remain unchanged. If a saveable legacy source contains
+   finite stored numbers that become non-finite in the actual Float32 CAM representation, project
+   open, manual-save, and autosave validation still accept the stored source. Output preparation
+   returns `relief-materialization-failed` with `Mesh bounds must be finite.` before a partial
+   program, Frame candidate, or Start permit exists. This is factual compile integrity, not an
+   import refusal or a policy guard.
 
 ### F-CNC6. V-carve a layer — Phase H.3
 
@@ -4028,7 +4034,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294/295/296/297/298/299/300/301/302/305; ADR-292 Amendments 2-5)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294/295/296/297/298/299/300/301/302/305; ADR-292 Amendments 2-6)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4258,7 +4264,7 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-292 Amendments 2-5 and ADR-293/294/295/296/297/298/299/300/301/302/305 supply schema-v4/U16LE
+> **Planned - not current UI.** P2R.1a plus ADR-292 Amendments 2-6 and ADR-293/294/295/296/297/298/299/300/301/302/305 supply schema-v4/U16LE
 > storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha import, simple transparency
 > masks, non-destructive manual gamma/input-endpoint mapping, editable persisted threshold/outside-mask meaning, read-only declared-source-meaning, recorded-source-detail, selected-heightfield field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, atomic large-project autosave/recovery, and the existing
 > CAM/preview substrate. The creation modes and remaining controls below stay planned; use

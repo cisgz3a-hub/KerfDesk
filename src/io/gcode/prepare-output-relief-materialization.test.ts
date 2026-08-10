@@ -9,6 +9,8 @@ import {
   type ReliefObject,
   type SceneObject,
 } from '../../core/scene';
+import { prepareProjectForPersistence } from '../project';
+import { legacyFloat32OverflowProject } from './legacy-float32-materialization-test-project';
 import { prepareOutputAsync } from './prepare-output-async';
 import { prepareOutput } from './prepare-output';
 
@@ -41,6 +43,22 @@ describe('relief materialization compile integrity', () => {
     expect(prepared).toMatchObject({
       ok: false,
       preflight: { issues: [{ code: 'relief-materialization-failed' }] },
+    });
+  });
+
+  it('keeps finite persisted mesh data saveable but refuses its Float32 Z overflow', () => {
+    const input = legacyFloat32OverflowProject();
+    expect(prepareProjectForPersistence(input)).toMatchObject({ kind: 'ok' });
+    expect(prepareOutput(input)).toMatchObject({
+      ok: false,
+      preflight: {
+        issues: [
+          {
+            code: 'relief-materialization-failed',
+            message: expect.stringMatching(/overflow-z\.stl.*Mesh bounds must be finite/s),
+          },
+        ],
+      },
     });
   });
 });
