@@ -17557,3 +17557,121 @@ to enforce uniqueness of decision-body headings only.
 - `git diff --check`
 
 ---
+
+## ADR-304 - Selected canonical reliefs disclose relief-axis field geometry (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a read-only disclosure; creation-surface geometry controls and physical qualification remain open
+
+### Context
+
+The canonical `heightfield-v1` source already stores positive pixel dimensions, declared physical
+width and height, a normalized crop, and an object transform. Relief properties showed source
+resolution and editable mapping controls but did not state how much physical relief-axis span the
+selected field currently occupies or the nominal physical pitch represented by one complete source
+cell inside the crop. Operators could therefore mistake source pixels, a preview mesh grid, a CAM
+heightmap request, emitted coordinate precision, and the rotated machine-axis envelope for one
+interchangeable resolution.
+
+The exact-zero-scale compatibility path needs a separate truth boundary. ADR-289 deliberately keeps
+legacy or hand-built zero-scale objects compilable: CAM plans a full-dimensional cutter path before
+the residual transform collapses its cutter centers. The existing Width editor consequently retains
+a recoverable planning value at zero scale, but that value is not a physical carved width on the
+collapsed axis.
+
+### Decision
+
+1. **Add one heightfield-only read-only block.** In CNC mode, the current Selected Relief properties
+   show **Field geometry** only for a selected `heightfield-v1` relief. Legacy mesh reliefs keep
+   their existing surface. The block has no input, action, persistence, or undo behavior.
+2. **Report relief-local physical magnitudes after absolute object scale.** For source fields
+   `physicalWidthMm` and `physicalHeightMm` and object scales `scaleX` and `scaleY`, define
+   `W = physicalWidthMm * abs(scaleX)` and
+   `H = physicalHeightMm * abs(scaleY)`. Rotation and explicit mirror flags change orientation,
+   not these magnitudes.
+3. **Name crop-aware source pitch as nominal full-cell pitch.** For positive source sample counts
+   `width` and `height` and normalized crop spans `crop.width` and `crop.height`, define
+   `pitchX = W / (width * crop.width)` and
+   `pitchY = H / (height * crop.height)`. These are the physical spans of complete source cells in
+   the relief-local X/Y sampling basis under the current crop, not a count or extent of CAM cells.
+   The readout combines the positive factors as an exact rational of their stored IEEE-754
+   significands before presentation, so a finite real-valued result is not mislabeled as binary64
+   `0` or `Infinity`. It rounds to six significant decimal digits and uses scientific notation for
+   very large or small finite results; display rounding never rewrites project state.
+4. **Disclose fractional boundary coverage.** A crop boundary may cut through a source cell, so the
+   first or last included source cell can cover less physical distance than the nominal full-cell
+   pitch. If a crop contains only a fraction of one source cell, its nominal full-cell pitch can be
+   larger than the displayed physical span. The UI states that fact rather than clamping the pitch
+   to the selected relief's size or relabelling it as effective target spacing.
+5. **Keep the evidence category narrow.** Field geometry describes durable source sampling. It is
+   not Relief 3D display-mesh spacing, a CAM target cell size or finishing-row request, emitted XYZ
+   precision, a machine-axis axis-aligned bounding box after rotation, continuous cutter coverage,
+   controller motion, or hardware/material evidence.
+6. **Name exact zero scale as collapsed legacy compatibility.** On a zero-scale axis, the reported
+   physical magnitude and nominal pitch are zero. The block discloses that the axis collapses after
+   planning and that physical carving geometry on it is not qualified. The existing editable Width
+   remains available as stored, recoverable planning state. Its zero-scale tooltip says
+   **Stored planning width** and does not call that value physical carved width. This is a UI-copy
+   correction; the field's commit behavior and the compatibility planner are unchanged. Outside
+   exact zero scale, canonical Width follows `physicalWidthMm`, heightmap CAM's source authority,
+   through the same native binary64 absolute X scale. It does not substitute the separately stored
+   `targetWidthMm` duplicate, which existing validation permits to differ within binding tolerance;
+   editing Width synchronizes both stored widths. If positive canonical source factors underflow to
+   zero or overflow to `Infinity` in the native representation, an informational note distinguishes
+   that value from the six-significant-digit source-factor readout and names CAM's existing factual
+   finite-positive-width error. The note does not rewrite either value or add a new refusal.
+7. **Change no stored-data or machining contract.** This decision adds no CAM, schema, validation, migration,
+   source mapping, object state, worker protocol, persistence, preview, simulation, output,
+   provenance, Frame, Job Review, Start, transport, refusal, guard, clamp, cap, delay, or
+   confirmation change. It emits no G-code and changes no machine command.
+8. **Keep creation-surface geometry planned.** F-CNC47's **Create Relief...** controls, pre-create
+   physical/effective-cell disclosure, crop/aspect editing, histogram, and source-mode selection
+   remain planned. A current selected-object readout does not make that creation workflow available.
+
+### Consequences
+
+- The selected canonical field now states its physical relief-axis span and source-sampling pitch
+  without conflating either with preview, CAM, emission, machine-axis, or hardware evidence.
+- Rotation, negative scale, and mirror changes remain distinguishable from magnitude changes.
+- Partial source-cell crops remain exact and can produce a nominal pitch larger than the displayed
+  span; the readout records the sampling model instead of hiding that edge case.
+- Positive finite factor combinations retain their magnitude category across binary64 result
+  overflow or underflow instead of appearing as `Infinity` or an undisclosed zero.
+- Zero-scale canonical heightfield compatibility objects remain recoverable and compilable exactly
+  as before, while the UI no longer presents their planning width as physical carved width.
+- Outside exact-zero compatibility, the adjacent editable Width follows the canonical source width
+  used by heightmap CAM through native binary64 scaling. Near-equal legacy target duplicates cannot
+  invert the note; editing Width synchronizes the two stored widths. When a positive source span
+  underflows or overflows, the panel visibly distinguishes native `0` or `Infinity` from the rounded
+  finite source-factor magnitude.
+- Legacy mesh properties, project bytes, prepared jobs, emitted bytes, Frame permits, and machine
+  behavior are unchanged.
+
+### Verification
+
+- `relief-field-geometry-display.test.ts` pins ordinary crop-aware calculation, six-significant-digit
+  presentation, binary64 result overflow/underflow, and exact zero-scale classification.
+- `ReliefFieldGeometry.test.tsx` pins full-crop physical size/pitch, crop-aware one-cell partial
+  coverage, absolute nonuniform scale, rotation/mirror invariance, finite extreme presentation,
+  read-only structure, and exact zero-scale disclosure.
+- `ReliefPlanningWidthDisclosure.test.tsx` pins ordinary native CAM Width copy, zero-scale
+  **Stored planning width** wording, canonical source-width authority, and the accepted
+  near-equal duplicate, positive-underflow, and overflow cases where Field geometry retains the
+  finite source-factor magnitude while native CAM planning loses it, plus legacy-mesh tooltip
+  preservation, without mutating state.
+- `SelectedReliefFieldGeometry.test.tsx` pins canonical rendering and legacy-mesh omission through
+  the heightfield-only integration seam.
+- Documentation gates are `pnpm exec prettier --check DECISIONS.md PROJECT.md WORKFLOW.md`,
+  `pnpm check:adr-numbers`, and `git diff --check`.
+- Not verified by this decision: browser perceptual layout, packaged Electron, CAM or emitted-byte
+  changes because none are made, controller behavior, an air cut, a material cut, source truth,
+  cutter reach, or finish quality.
+
+### References
+
+- ADR-289, relief scale factoring and exact-zero-scale compatibility.
+- ADR-291, canonical field and planned creation-surface geometry disclosure.
+- ADR-292, schema-v4 `heightfield-v1` and crop/mapping contract.
+- ADR-294, exact relief-grid extents and the separation between source and target cells.
+
+---

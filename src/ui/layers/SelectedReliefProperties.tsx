@@ -16,7 +16,14 @@ import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
 import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
 import { ReliefMaskThresholdControl } from './ReliefMaskThresholdControl';
 import { useDebouncedCommit } from './use-debounced-commit';
+import {
+  ReliefPlanningWidthDisclosure,
+  reliefPropertyWidthMm,
+  reliefPropertyWidthSourceMm,
+  reliefPlanningWidthTitle,
+} from './ReliefPlanningWidthDisclosure';
 import { ReliefRecordedSourceDetails } from './ReliefRecordedSourceDetails';
+import { SelectedReliefFieldGeometry } from './SelectedReliefFieldGeometry';
 import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
@@ -35,6 +42,8 @@ export function SelectedReliefProperties(): JSX.Element | null {
   const [viewerOpen, setViewerOpen] = useState(false);
   if (relief === null) return null;
   const physical = reliefPhysicalDimensions(relief);
+  const widthSourceMm = reliefPropertyWidthSourceMm(relief);
+  const widthMm = reliefPropertyWidthMm(relief, physical.targetScaleX);
   return (
     <section aria-label="Relief properties" style={sectionStyle}>
       <h3 style={headingStyle}>Relief</h3>
@@ -42,6 +51,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
         {relief.source} — {reliefMeta(relief)}
       </p>
       <ReliefSourceDisclosure relief={relief} />
+      <SelectedReliefFieldGeometry relief={relief} />
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
@@ -61,12 +71,13 @@ export function SelectedReliefProperties(): JSX.Element | null {
         key={`${projectDocumentEpoch}:${relief.id}:width`}
         relief={relief}
         label="Width"
-        value={relief.targetWidthMm}
+        value={widthSourceMm}
         scale={physical.targetScaleX}
         step={1}
-        title="Relief surface planning width along its local X axis before rotation. Height also uses the current Y scale; a legacy zero-scale axis remains collapsed in output."
+        title={reliefPlanningWidthTitle(relief)}
         commitKey="targetWidthMm"
       />
+      <ReliefPlanningWidthDisclosure relief={relief} widthMm={widthMm} />
       <ReliefNumberField
         key={`${projectDocumentEpoch}:${relief.id}:depth`}
         relief={relief}
@@ -188,7 +199,11 @@ function ReliefNumberInput(props: {
 const MAX_RELIEF_DIMENSION_DECIMALS = 6;
 function formatReliefValue(value: number): string {
   if (!Number.isFinite(value)) return '';
-  return value.toFixed(MAX_RELIEF_DIMENSION_DECIMALS).replace(/0+$/, '').replace(/\.$/, '');
+  const rounded = value
+    .toFixed(MAX_RELIEF_DIMENSION_DECIMALS)
+    .replace(/0+$/, '')
+    .replace(/\.$/, '');
+  return rounded === '0' && value !== 0 ? String(value) : rounded;
 }
 
 function positiveFinite(value: number): boolean {

@@ -145,7 +145,7 @@ describe('SelectedReliefProperties', () => {
       expect(width.value).toBe('36');
       expect(width.min).toBe('');
       expect(width.max).toBe('');
-      expect(width.title).toMatch(/local X axis.*current Y scale/i);
+      expect(width.title).toContain('Heightmap planning width from the canonical source');
 
       await act(async () => Simulate.blur(width));
       let stored = useStore.getState().project.scene.objects[0];
