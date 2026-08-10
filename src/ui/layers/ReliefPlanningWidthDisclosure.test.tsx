@@ -84,7 +84,7 @@ describe('ReliefPlanningWidthDisclosure', () => {
       },
     };
     expect(reliefPlanningWidthTitle(legacy)).toBe(
-      'Carved width on the stock after object scale. Editing preserves the current scale.',
+      'Carved width on the stock after object scale. An exact bounded local re-factor may change both scale axes without changing transformed geometry or mesh CAM.',
     );
     const { host, root } = await render(
       <>

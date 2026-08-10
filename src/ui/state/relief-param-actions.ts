@@ -1,9 +1,9 @@
 // setReliefParams — edit a ReliefObject's carve parameters (width / depth /
 // source interpretation), the editor promised when H.5 roughing landed. Width edits
 // keep canonical heightfield bounds synchronized with their resolved physical
-// dimensions; legacy meshes retain their natural bounds aspect. When an exact
-// common factor exists, heightfields re-express local dimensions and scale
-// together while keeping every transformed corner unchanged.
+// dimensions; legacy meshes retain stored natural-bounds aspect and intrinsic
+// mesh CAM. When an exact common factor exists, either representation re-expresses
+// local dimensions and scale together while keeping every transformed corner unchanged.
 
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
@@ -17,6 +17,7 @@ import {
   type ReliefParamPatch,
 } from './relief-heightfield-param-patch';
 import { factorReliefHeightfieldWidth } from './relief-heightfield-width-factorization';
+import { factorReliefLegacyWidth } from './relief-legacy-width-factorization';
 import { reliefWidthBounds } from './relief-width-bounds';
 
 export type { ReliefParamPatch } from './relief-heightfield-param-patch';
@@ -37,7 +38,9 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
           const next = applyReliefPatch(obj, normalized);
           if (normalized.targetWidthMm === undefined) return next;
           const resized = { ...next, bounds: reliefWidthBounds(obj, next) };
-          return isMeshRelief(resized) ? resized : factorReliefHeightfieldWidth(resized).relief;
+          return isMeshRelief(resized)
+            ? factorReliefLegacyWidth(resized).relief
+            : factorReliefHeightfieldWidth(resized).relief;
         });
         if (!changed) return s;
         return {
@@ -71,12 +74,12 @@ function applyMeshReliefPatch(
   common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>>,
   patch: ReliefParamPatch,
 ): MeshReliefObject {
+  const emptyCells = patch.emptyCells;
   return {
     ...relief,
     ...common,
-    reliefSource: {
-      ...relief.reliefSource,
-      ...(patch.emptyCells === undefined ? {} : { emptyCells: patch.emptyCells }),
-    },
+    ...(emptyCells === undefined || emptyCells === relief.reliefSource.emptyCells
+      ? {}
+      : { reliefSource: { ...relief.reliefSource, emptyCells } }),
   };
 }
