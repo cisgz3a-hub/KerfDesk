@@ -67,7 +67,7 @@ async function render(node: React.ReactNode): Promise<{
 describe('ReliefPlanningWidthDisclosure', () => {
   it('distinguishes ordinary native CAM planning width from exact zero compatibility', () => {
     expect(reliefPlanningWidthTitle(relief(-0.5))).toBe(
-      'Heightmap planning width from the canonical source after native binary64 absolute object X scale. Field geometry uses exact-factor display math. Editing synchronizes the object target and source widths while preserving scale.',
+      'Heightmap planning width from the canonical source after native binary64 absolute object X scale. Field geometry uses exact-factor display math. Editing synchronizes the object target and source widths; an exact bounded local re-factor may change both scale axes without changing transformed geometry.',
     );
     expect(reliefPlanningWidthTitle(relief(0))).toBe(
       'Stored planning width. This zero-scale compatibility axis collapses after planning; editing width remains available.',

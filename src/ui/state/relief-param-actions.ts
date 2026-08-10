@@ -1,8 +1,9 @@
 // setReliefParams — edit a ReliefObject's carve parameters (width / depth /
 // source interpretation), the editor promised when H.5 roughing landed. Width edits
 // keep canonical heightfield bounds synchronized with their resolved physical
-// dimensions; legacy meshes retain their natural bounds aspect. The transform —
-// and therefore the object's placement — is untouched.
+// dimensions; legacy meshes retain their natural bounds aspect. When an exact
+// common factor exists, heightfields re-express local dimensions and scale
+// together while keeping every transformed corner unchanged.
 
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
@@ -15,6 +16,7 @@ import {
   normalizeReliefPatch,
   type ReliefParamPatch,
 } from './relief-heightfield-param-patch';
+import { factorReliefHeightfieldWidth } from './relief-heightfield-width-factorization';
 import { reliefWidthBounds } from './relief-width-bounds';
 
 export type { ReliefParamPatch } from './relief-heightfield-param-patch';
@@ -33,9 +35,9 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
           if (isNoOpHeightfieldMappingPatch(obj, normalized)) return obj;
           changed = true;
           const next = applyReliefPatch(obj, normalized);
-          const bounds =
-            normalized.targetWidthMm === undefined ? obj.bounds : reliefWidthBounds(obj, next);
-          return { ...next, bounds };
+          if (normalized.targetWidthMm === undefined) return next;
+          const resized = { ...next, bounds: reliefWidthBounds(obj, next) };
+          return isMeshRelief(resized) ? resized : factorReliefHeightfieldWidth(resized).relief;
         });
         if (!changed) return s;
         return {
