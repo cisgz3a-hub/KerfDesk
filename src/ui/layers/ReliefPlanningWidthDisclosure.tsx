@@ -8,7 +8,7 @@ const NOTE_MARGIN = '-2px 0 6px 0';
 /** Names the existing mesh width or the canonical field's compatibility/native CAM representation. */
 export function reliefPlanningWidthTitle(relief: ReliefObject): string {
   if (relief.reliefSource.kind === 'legacy-mesh') {
-    return 'Carved width on the stock after object scale. Editing preserves the current scale.';
+    return 'Carved width on the stock after object scale. An exact bounded local re-factor may change both scale axes without changing transformed geometry or mesh CAM.';
   }
   return relief.transform.scaleX === 0
     ? 'Stored planning width. This zero-scale compatibility axis collapses after planning; editing width remains available.'

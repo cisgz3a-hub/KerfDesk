@@ -27,7 +27,9 @@ export type MeshBounds = {
   readonly maxZ: number;
 };
 
-export function meshBounds(mesh: TriangleMesh): MeshBounds | null {
+type MeshBoundsSource = { readonly positions: ArrayLike<number> };
+
+export function meshBounds(mesh: MeshBoundsSource): MeshBounds | null {
   const p = mesh.positions;
   if (p.length < FLOATS_PER_TRIANGLE) return null;
   let minX = Number.POSITIVE_INFINITY;
@@ -37,9 +39,9 @@ export function meshBounds(mesh: TriangleMesh): MeshBounds | null {
   let maxY = Number.NEGATIVE_INFINITY;
   let maxZ = Number.NEGATIVE_INFINITY;
   for (let i = 0; i + 2 < p.length; i += 3) {
-    const x = p[i] ?? 0;
-    const y = p[i + 1] ?? 0;
-    const z = p[i + 2] ?? 0;
+    const x = Math.fround(p[i] ?? 0);
+    const y = Math.fround(p[i + 1] ?? 0);
+    const z = Math.fround(p[i + 2] ?? 0);
     minX = Math.min(minX, x);
     minY = Math.min(minY, y);
     minZ = Math.min(minZ, z);
