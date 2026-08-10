@@ -11,8 +11,10 @@ import { reliefPhysicalDimensions } from '../../core/relief/relief-physical-dime
 import { machineKindOf, type ReliefObject } from '../../core/scene';
 import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
+import { reliefPropertyWidthMm } from './ReliefPlanningWidthDisclosure';
 import { ReliefPropertyControls } from './ReliefPropertyControls';
 import { ReliefRecordedSourceDetails } from './ReliefRecordedSourceDetails';
+import { SelectedReliefFieldGeometry } from './SelectedReliefFieldGeometry';
 import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
@@ -47,6 +49,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
       {relief.reliefSource.kind === 'heightfield-v1' ? (
         <ReliefRecordedSourceDetails provenance={relief.reliefSource.provenance} />
       ) : null}
+      <SelectedReliefFieldGeometry relief={relief} />
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
@@ -63,12 +66,12 @@ export function SelectedReliefProperties(): JSX.Element | null {
         />
       ) : null}
         <ReliefPropertyControls
-          key={${projectDocumentEpoch}:}
+          key={`${projectDocumentEpoch}:${relief.id}`}
           relief={relief}
-          widthMm={physical.widthMm}
+          widthMm={reliefPropertyWidthMm(relief, physical.targetScaleX)}
           targetScaleX={physical.targetScaleX}
-        />    </section>
-  );
+        />
+      </section>  );
 }
 
 function reliefMeta(relief: ReliefObject): string {

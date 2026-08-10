@@ -5,6 +5,10 @@ import { useStore } from '../state';
 import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
 import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
 import { ReliefMaskThresholdControl } from './ReliefMaskThresholdControl';
+import {
+  ReliefPlanningWidthDisclosure,
+  reliefPlanningWidthTitle,
+} from './ReliefPlanningWidthDisclosure';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 /** Renders mesh or heightfield controls using parent-resolved machine-space width and scale. */
@@ -23,10 +27,11 @@ export function ReliefPropertyControls(props: {
         label="Width"
         value={props.widthMm}
         step={1}
-        title="Carved width on the stock after object scale. Editing preserves the current scale."
+        title={reliefPlanningWidthTitle(props.relief)}
         commitKey="targetWidthMm"
         toStoredValue={(value) => value / props.targetScaleX}
       />
+      <ReliefPlanningWidthDisclosure relief={props.relief} widthMm={props.widthMm} />
       <ReliefNumberField
         key={fieldKey('depth')}
         relief={props.relief}

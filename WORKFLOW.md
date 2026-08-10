@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292 through ADR-302 schema, import, gamma/input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning and recorded-source-detail disclosures, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292 through ADR-302 and ADR-305 schema, import, gamma/input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, and selected-heightfield field-geometry disclosures, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2407,8 +2407,8 @@ F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit height-map path plus the bounded
-ADR-292 through ADR-302 schema, import, mapping, recovery, declared-source-
-meaning, and recorded-source-detail work marked current below. F-CNC47-F-CNC50 specify the approved ADR-291
+ADR-292 through ADR-302 and ADR-305 schema, import, mapping, recovery, declared-source-
+meaning, recorded-source-detail, and selected-field-geometry work marked current below. F-CNC47-F-CNC50 specify the approved ADR-291
 expansion; their remaining controls and user-facing flows are planned.
 
 ### F-CNC1. Switch to CNC mode and configure the machine
@@ -4029,7 +4029,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294/295/296/297/298/299/300/301/302)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293/294/295/296/297/298/299/300/301/302/305)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4060,7 +4060,36 @@ and lifts the command's CNC-only gate.)*
    **Light is high** / **Light is deep** mapping below controls the current
    materialization and may differ. A legacy-mesh relief has no canonical
    provenance object, so CurveDesk does not fabricate this group for it.
-4. Width, total depth, polarity, exact **Input low**/**Input high** U16 codes, and **Gamma** are
+4. For a selected canonical heightfield only, the CNC Relief properties panel shows a read-only
+   **Field geometry** block. If the stored field is `width` by `height`, its declared physical
+   dimensions are `physicalWidthMm` by `physicalHeightMm`, its object transform has scales
+   `scaleX` and `scaleY`, and its normalized crop has `crop.width` and `crop.height`, the block
+   reports relief-local magnitudes:
+   - `W = physicalWidthMm * abs(scaleX)` and
+     `H = physicalHeightMm * abs(scaleY)`;
+   - nominal full source-cell pitch
+     `pitchX = W / (width * crop.width)` and
+     `pitchY = H / (height * crop.height)`.
+   The readout rounds the exact stored factor magnitudes to six significant decimal digits. Very
+   large or small finite factor combinations remain visible in scientific notation instead of
+   being presented as an overflowed `Infinity` or an underflowed zero.
+   Rotation and explicit mirrors change orientation, not those magnitudes. A fractional crop can
+   cover only part of a source cell at either boundary, so a boundary cell's physical coverage can
+   be smaller than the nominal full-cell pitch. In the one-cell partial-crop case, the nominal
+   pitch can therefore be larger than the displayed physical span. These values describe source
+   sampling only: they are not preview or CAM target spacing, emitted coordinate precision,
+   a machine-axis bounding box, or hardware evidence. The block has no inputs and does not mutate
+   the project. Outside exact-zero compatibility, the adjacent editable **Width** follows canonical
+   `physicalWidthMm`, the source authority used by heightmap CAM, through native binary64 absolute X
+   scale; it is not a second exact-factor readout. The separately stored `targetWidthMm` may differ
+   within the existing binding tolerance, but does not replace that display authority, and a Width
+   edit synchronizes both stored values. Exact zero scale retains its stored target compatibility
+   value. If positive canonical source factors underflow to `0` or overflow to `Infinity` in the
+   native CAM representation, an informational note distinguishes that value from the
+   six-significant-digit finite Field geometry magnitude and names the existing factual requirement
+   that the heightmap width be finite and positive; it does not rewrite either value or add a
+   refusal.
+5. Width, total depth, polarity, exact **Input low**/**Input high** U16 codes, and **Gamma** are
    editable. Each endpoint accepts an integer from `0` through `65535` without rounding, clamping,
    swapping, or an ordering rule. With low below high, codes outside the interval clip to its ends;
    crossed endpoints deliberately reverse that response. Equal endpoints produce one flat normalized
@@ -4078,18 +4107,18 @@ and lifts the command's CNC-only gate.)*
    its job. **View 3D...** targets 0.25 mm display cells; when the longest edge
    exceeds 64 mm, its non-blocking status names the effective cell size and the
    256-cell display-mesh budget. That display choice never changes CAM or G-code.
-5. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
+6. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
    physical and pixel dimensions, optional U8 inclusion mask, mapping,
    provenance, revision, and digest. Eight-bit PNG sample `v` is represented
    exactly as U16 value `v * 257`; each 16-bit PNG sample keeps its numeric code
    while its network-order bytes are written in canonical little-endian order. Reopening validates the exact byte-length,
    source-authority, mapping, and digest contracts before preview or compilation.
-6. Periodic recovery writes the complete validated project JSON to atomic
+7. Periodic recovery writes the complete validated project JSON to atomic
    current/previous IndexedDB snapshots. A live second window receives its own
    recovery session; an abandoned window becomes eligible after its ownership
    lock is released. Accepting recovery re-homes the project before cleanup and
    keeps it dirty until a successful manual Save.
-7. In CNC mode, the existing relief layer settings select the flat-end-mill
+8. In CNC mode, the existing relief layer settings select the flat-end-mill
    roughing and optional ball-nose finishing tools. The existing relief CAM,
    tool changes, Job Review, Frame permit, preview, G-code, progress, and
    cancellation paths remain in force.
@@ -4180,12 +4209,19 @@ and lifts the command's CNC-only gate.)*
    so the recoverable state may be only the most recent successfully committed
    IndexedDB interval snapshot; final edits immediately before closing are not
    promised.
+7. An exact zero object scale reports physical size and nominal source pitch as zero on that axis
+   and identifies the axis as collapsed legacy compatibility. Existing CAM compatibility still
+   plans the stored width before its cutter-center output collapses; that path has no qualified
+   physical carving geometry on the collapsed axis. The existing editable **Width** remains
+   available as the stored, recoverable planning width, and its tooltip names that fact rather
+   than calling it physical carved width. This is UI copy and disclosure only; editable behavior,
+   CAM, schema, state, mapping, output, Frame, and Start are unchanged.
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-293/294/295/296/297/298/299/300/301/302 supply schema-v4/U16LE
+> **Planned - not current UI.** P2R.1a plus ADR-293/294/295/296/297/298/299/300/301/302/305 supply schema-v4/U16LE
 > storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha import, simple transparency
-> masks, non-destructive manual gamma/input-endpoint mapping, editable persisted threshold/outside-mask meaning, read-only declared-source-meaning and recorded-source-detail disclosures, atomic large-project autosave/recovery, and the existing
+> masks, non-destructive manual gamma/input-endpoint mapping, editable persisted threshold/outside-mask meaning, read-only declared-source-meaning, recorded-source-detail, and selected-heightfield field-geometry disclosures, atomic large-project autosave/recovery, and the existing
 > CAM/preview substrate. The creation modes and remaining controls below stay planned; use
 > F-CNC46's narrower **Import Height Map...** flow today.
 
@@ -4214,9 +4250,11 @@ and lifts the command's CNC-only gate.)*
    dimensions. **STL top projection** preserves the existing mesh unless the user
    explicitly chooses **Convert to editable relief map** and accepts the displayed
    field resolution as the new editable representation.
-6. A histogram, low/high clipping percentages, physical width/height, effective
-   millimetres per field cell, polarity, and outside-mask choice update with the
-   target preview. Outside-mask meaning is explicit: **stock top**, **relief
+6. The planned creation surface adds editable physical geometry controls and pre-create histogram,
+   low/high clipping percentages, physical width/height, effective millimetres per field cell,
+   polarity, crop/aspect placement, and outside-mask choice that update with the target preview.
+   This remains planned and is distinct from F-CNC46's current selected-object, read-only physical
+   span and nominal source-cell pitch. Outside-mask meaning is explicit: **stock top**, **relief
    floor**, or **excluded from carving**.
 7. **Create** adds a one-sided top-down relief whose canonical editable arm uses
    row-major U16 scalar codes, optional U8 inclusion mask, mapping/provenance/revision,
