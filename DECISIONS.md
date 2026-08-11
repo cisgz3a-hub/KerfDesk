@@ -18308,3 +18308,45 @@ project schema rather than adding another transient cache or weakening validatio
 - ADR-305, selected relief field geometry and Width disclosure.
 
 ---
+
+## ADR-288 Amendment 2 - Browser microtask scheduling preserves the global receiver (2026-08-11)
+
+**Status:** Accepted and implemented correction | **Date:** 2026-08-11
+
+### Context
+
+ADR-288 requires a closing Cut 3D dialog to dispose its OffscreenCanvas session and terminate the
+dedicated Worker. The shared runtime deferred that disposal through a dependency property containing
+the browser's bare `queueMicrotask` function. Calling the stored Web API as an object method supplied
+the dependency object as its receiver, so Chromium threw `TypeError: Illegal invocation` instead of
+scheduling cleanup.
+
+### Decision
+
+1. The production dependency uses a receiver-safe wrapper that calls `queueMicrotask(callback)` as a
+   global Web API operation. Injected schedulers retain the same callback-only contract.
+2. StrictMode lease replay and real-unmount disposal remain deferred by exactly one microtask. The
+   change does not alter rendering, CAM, preview data, output, Frame, Job Review, Start, or any guard.
+
+### Consequences
+
+- Closing Cut 3D can schedule the existing reference-counted disposal instead of throwing before the
+  cleanup callback is queued.
+- The wrapper is a small testable browser-boundary seam; no fallback renderer or new lifecycle path is
+  introduced.
+
+### Verification
+
+- `schedule-browser-microtask.test.ts` uses a receiver-sensitive scheduler to reproduce the Chromium
+  invocation contract.
+- `cut3d-offscreen-worker-client.test.ts` continues to pin StrictMode lease reuse and real-unmount
+  Worker termination.
+- Focused 3D-dialog tests, TypeScript, scoped ESLint/Prettier, size policy, and diff checks remain
+  required before publication. Browser, packaged-Electron, controller, and hardware evidence stay
+  separate.
+
+### References
+
+- ADR-288, globally bounded worker preparation and Cut 3D OffscreenCanvas lifecycle.
+
+---
