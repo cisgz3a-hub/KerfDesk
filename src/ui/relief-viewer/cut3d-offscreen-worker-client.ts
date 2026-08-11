@@ -1,6 +1,7 @@
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { ViewerDialogSceneBuilder, ViewerDialogSceneResult } from './use-viewer-dialog-scene';
 import { Cut3DOffscreenSession, type Cut3DWorkerPort } from './cut3d-offscreen-session';
+import { scheduleBrowserMicrotask } from './schedule-browser-microtask';
 
 export type Cut3DOffscreenCoordinator = {
   readonly buildScene: ViewerDialogSceneBuilder;
@@ -109,6 +110,6 @@ function defaultDependencies(): Cut3DOffscreenCoordinatorDependencies {
     canCreateWorker: () => typeof Worker !== 'undefined',
     createWorker: () =>
       new Worker(new URL('./cut3d-offscreen-worker.ts', import.meta.url), { type: 'module' }),
-    scheduleMicrotask: queueMicrotask,
+    scheduleMicrotask: scheduleBrowserMicrotask,
   };
 }
