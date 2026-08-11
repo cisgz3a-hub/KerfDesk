@@ -1,8 +1,20 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   relief3dDisplayResolution,
   relief3dDisplayResolutionNotice,
 } from './relief3d-display-resolution';
+
+const NOMINAL_DISPLAY_CELL_MM = 0.25;
+const DISPLAY_BUDGET_REASON = 'display-mesh-cell-budget';
+const PROPERTY_RUNS = 200;
+const PROPERTY_SEED = 20_260_811;
+const positiveFiniteDimensionMm = fc.double({
+  min: Number.MIN_VALUE,
+  max: Number.MAX_VALUE,
+  noNaN: true,
+  noDefaultInfinity: true,
+});
 
 describe('relief3dDisplayResolution', () => {
   it('retains the nominal display target through the 64 mm boundary', () => {
@@ -37,5 +49,20 @@ describe('relief3dDisplayResolution', () => {
       resolution.effectiveMmPerCell.toString(),
     );
     expect(relief3dDisplayResolutionNotice(resolution)).not.toContain('Infinity');
+  });
+
+  it('keeps the nominal target and budget reason consistent for positive finite dimensions', () => {
+    fc.assert(
+      fc.property(positiveFiniteDimensionMm, positiveFiniteDimensionMm, (widthMm, heightMm) => {
+        const resolution = relief3dDisplayResolution(widthMm, heightMm);
+
+        expect(resolution.requestedMmPerCell).toBe(NOMINAL_DISPLAY_CELL_MM);
+        expect(resolution.effectiveMmPerCell).toBeGreaterThanOrEqual(NOMINAL_DISPLAY_CELL_MM);
+        expect(resolution.reason).toBe(
+          resolution.effectiveMmPerCell > NOMINAL_DISPLAY_CELL_MM ? DISPLAY_BUDGET_REASON : null,
+        );
+      }),
+      { numRuns: PROPERTY_RUNS, seed: PROPERTY_SEED },
+    );
   });
 });
