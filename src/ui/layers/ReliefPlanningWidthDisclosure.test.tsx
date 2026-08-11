@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
 import {
@@ -67,7 +68,7 @@ async function render(node: React.ReactNode): Promise<{
 describe('ReliefPlanningWidthDisclosure', () => {
   it('distinguishes ordinary native CAM planning width from exact zero compatibility', () => {
     expect(reliefPlanningWidthTitle(relief(-0.5))).toBe(
-      'Heightmap planning width from the canonical source after native binary64 absolute object X scale. Field geometry uses exact-factor display math. Editing synchronizes the object target and source widths; an exact bounded local re-factor may change both scale axes without changing transformed geometry.',
+      'Heightmap planning width from the canonical source after absolute object X scale. Field geometry uses exact-factor display math. Width commits in machine space; if native scale division would round to 0 or Infinity, CurveDesk preserves the exact draft by rebasing X scale to unit magnitude. An exact bounded local re-factor may then change both scale axes without changing transformed geometry.',
     );
     expect(reliefPlanningWidthTitle(relief(0))).toBe(
       'Stored planning width. This zero-scale compatibility axis collapses after planning; editing width remains available.',
@@ -77,14 +78,13 @@ describe('ReliefPlanningWidthDisclosure', () => {
   it('renders no note for representable, exact-zero, or legacy-mesh planning width', async () => {
     const legacy: ReliefObject = {
       ...relief(0.5, Number.MIN_VALUE),
-      reliefSource: {
-        kind: 'legacy-mesh',
-        meshPositions: [0, 0, 0, 1, 0, 0, 0, 1, 1],
-        emptyCells: 'floor',
-      },
+      ...testLegacyMeshGeometry({
+        positions: [0, 0, 0, 1, 0, 0, 0, 1, 1],
+        targetWidthMm: Number.MIN_VALUE,
+      }),
     };
     expect(reliefPlanningWidthTitle(legacy)).toBe(
-      'Carved width on the stock after object scale. An exact bounded local re-factor may change both scale axes without changing transformed geometry or mesh CAM.',
+      'Carved width on the stock. Width commits in machine space; if native scale division would round to 0 or Infinity, CurveDesk preserves the exact draft by rebasing X scale to unit magnitude. An exact bounded local re-factor may then change both scale axes without changing transformed geometry or mesh CAM.',
     );
     const { host, root } = await render(
       <>
@@ -110,11 +110,7 @@ describe('ReliefPlanningWidthDisclosure', () => {
     const { host, root } = await render(
       <>
         <ReliefFieldGeometry source={object.reliefSource} transform={object.transform} />
-        <ReliefPropertyControls
-          relief={object}
-          widthMm={widthMm}
-          targetScaleX={planning.targetScaleX}
-        />
+        <ReliefPropertyControls relief={object} widthMm={widthMm} />
       </>,
     );
     try {
@@ -166,11 +162,7 @@ describe('ReliefPlanningWidthDisclosure', () => {
     );
     expect(sourceWidthMm).toBe(0);
     const sourceRender = await render(
-      <ReliefPropertyControls
-        relief={sourceUnderflows}
-        widthMm={sourceWidthMm}
-        targetScaleX={sourceUnderflowPlanning.targetScaleX}
-      />,
+      <ReliefPropertyControls relief={sourceUnderflows} widthMm={sourceWidthMm} />,
     );
     try {
       const input = sourceRender.host.querySelector('input[aria-label="Relief width (mm)"]');
@@ -192,11 +184,7 @@ describe('ReliefPlanningWidthDisclosure', () => {
     );
     expect(targetWidthMm).toBe(5e-10);
     const targetRender = await render(
-      <ReliefPropertyControls
-        relief={targetUnderflows}
-        widthMm={targetWidthMm}
-        targetScaleX={targetUnderflowPlanning.targetScaleX}
-      />,
+      <ReliefPropertyControls relief={targetUnderflows} widthMm={targetWidthMm} />,
     );
     try {
       const input = targetRender.host.querySelector('input[aria-label="Relief width (mm)"]');

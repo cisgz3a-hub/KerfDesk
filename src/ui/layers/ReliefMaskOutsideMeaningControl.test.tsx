@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   DEFAULT_RELIEF_LAYER_COLOR,
@@ -28,11 +29,10 @@ function meshRelief(): ReliefObject {
     source: 'model.stl',
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
+      targetWidthMm: 100,
+    }),
     color: DEFAULT_RELIEF_LAYER_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
     transform: IDENTITY_TRANSFORM,
@@ -79,7 +79,7 @@ async function render(
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<ReliefPropertyControls relief={relief} widthMm={100} targetScaleX={1} />);
+    root.render(<ReliefPropertyControls relief={relief} widthMm={100} />);
   });
   return { host, root };
 }

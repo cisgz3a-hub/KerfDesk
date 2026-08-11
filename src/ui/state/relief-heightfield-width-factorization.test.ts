@@ -23,7 +23,7 @@ const TRANSLATION_Y_MM = -3;
 const COARSE_CELL_MM = 1_000_000;
 const FULL_MASK_BYTE = 0xff;
 
-describe('heightfield Width project-v4 factorization', () => {
+describe('heightfield Width project-v5 factorization', () => {
   it('uses one exact common factor while preserving transformed geometry', () => {
     const intended = heightfieldRelief({
       widthMm: INTENDED_WIDTH_MM,

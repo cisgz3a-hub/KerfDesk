@@ -73,10 +73,9 @@ export function SelectedReliefProperties(): JSX.Element | null {
           key={`${projectDocumentEpoch}:${relief.id}`}
           relief={relief}
           widthMm={reliefPropertyWidthMm(relief, physical.targetScaleX)}
-          targetScaleX={physical.targetScaleX}
         />
-      </section>  );
-}
+      </section>
+  );}
 
 function reliefMeta(relief: ReliefObject): string {
   if (relief.reliefSource.kind === 'legacy-mesh') {

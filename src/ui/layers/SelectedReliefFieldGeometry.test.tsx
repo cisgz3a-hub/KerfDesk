@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   DEFAULT_RELIEF_LAYER_COLOR,
@@ -41,11 +42,10 @@ function legacyRelief(): ReliefObject {
   return {
     ...heightfieldRelief(),
     source: 'model.stl',
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 1, 0, 0, 0, 1, 1],
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 1, 0, 0, 0, 1, 1],
+      targetWidthMm: 100,
+    }),
   };
 }
 

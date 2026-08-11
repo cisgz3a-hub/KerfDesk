@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { mixedCanvasCompilationProject } from '../../__fixtures__/mixed-canvas-compilation-project';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -141,11 +142,11 @@ function reliefProject(): Project {
     source: 'relief.stl',
     targetWidthMm: 10,
     reliefDepthMm: 2,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 1],
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 10, 0, 0, 0, 10, 1],
+      targetWidthMm: 10,
       emptyCells: 'top',
-    },
+    }),
     color: COLOR,
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
     transform: IDENTITY_TRANSFORM,

@@ -6,6 +6,10 @@
 
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
+import type {
+  ReliefMeshIntrinsicBounds,
+  ReliefMeshWidthAspect,
+} from './relief/relief-mesh-geometry';
 
 export type Vec2 = { readonly x: number; readonly y: number };
 
@@ -417,12 +421,15 @@ type ReliefObjectCommon = ObjectPowerScale & {
   readonly transform: Transform;
 };
 
-/** Mesh-backed CNC relief preserved losslessly through the v4 source union. */
+/** Mesh-backed CNC relief with lossless source bytes and schema-v5 Float32 geometry authority. */
 export type MeshReliefObject = ReliefObjectCommon & {
+  readonly targetHeightMm: number;
+  readonly widthAspect: ReliefMeshWidthAspect;
   readonly reliefSource: {
     readonly kind: 'legacy-mesh';
     readonly meshPositions: ReadonlyArray<number> | Float32Array;
     readonly emptyCells: 'floor' | 'top';
+    readonly intrinsicBounds: ReliefMeshIntrinsicBounds;
   };
 };
 

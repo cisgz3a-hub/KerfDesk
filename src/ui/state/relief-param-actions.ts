@@ -7,18 +7,12 @@
 
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
-import type { ReliefObject } from '../../core/scene';
-import type { MeshReliefObject } from '../../core/scene/relief';
 import {
-  applyHeightfieldReliefPatch,
   hasReliefPatch,
   isNoOpHeightfieldMappingPatch,
   normalizeReliefPatch,
-  type ReliefParamPatch,
 } from './relief-heightfield-param-patch';
-import { factorReliefHeightfieldWidth } from './relief-heightfield-width-factorization';
-import { factorReliefLegacyWidth } from './relief-legacy-width-factorization';
-import { reliefWidthBounds } from './relief-width-bounds';
+import { applyReliefParamPatch } from './relief-param-patch-application';
 
 export type { ReliefParamPatch } from './relief-heightfield-param-patch';
 
@@ -35,12 +29,7 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
           if (obj.id !== id || obj.kind !== 'relief') return obj;
           if (isNoOpHeightfieldMappingPatch(obj, normalized)) return obj;
           changed = true;
-          const next = applyReliefPatch(obj, normalized);
-          if (normalized.targetWidthMm === undefined) return next;
-          const resized = { ...next, bounds: reliefWidthBounds(obj, next) };
-          return isMeshRelief(resized)
-            ? factorReliefLegacyWidth(resized).relief
-            : factorReliefHeightfieldWidth(resized).relief;
+          return applyReliefParamPatch(obj, normalized);
         });
         if (!changed) return s;
         return {
@@ -51,35 +40,5 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
         };
       });
     },
-  };
-}
-
-function applyReliefPatch(relief: ReliefObject, patch: ReliefParamPatch): ReliefObject {
-  const common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>> = {
-    ...(patch.targetWidthMm === undefined ? {} : { targetWidthMm: patch.targetWidthMm }),
-    ...(patch.reliefDepthMm === undefined ? {} : { reliefDepthMm: patch.reliefDepthMm }),
-  };
-  if (isMeshRelief(relief)) {
-    return applyMeshReliefPatch(relief, common, patch);
-  }
-  return applyHeightfieldReliefPatch(relief, common, patch);
-}
-
-function isMeshRelief(relief: ReliefObject): relief is MeshReliefObject {
-  return relief.reliefSource.kind === 'legacy-mesh';
-}
-
-function applyMeshReliefPatch(
-  relief: MeshReliefObject,
-  common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>>,
-  patch: ReliefParamPatch,
-): MeshReliefObject {
-  const emptyCells = patch.emptyCells;
-  return {
-    ...relief,
-    ...common,
-    ...(emptyCells === undefined || emptyCells === relief.reliefSource.emptyCells
-      ? {}
-      : { reliefSource: { ...relief.reliefSource, emptyCells } }),
   };
 }

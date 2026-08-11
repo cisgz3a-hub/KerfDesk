@@ -1,6 +1,6 @@
-/** Largest persisted local/scene coordinate magnitude accepted by project v4. */
+/** Largest persisted local/scene coordinate magnitude accepted by project v5. */
 export const MAX_PROJECT_COORDINATE_MAGNITUDE_MM = 1_000_000;
-/** Largest persisted object-transform scale magnitude accepted by project v4. */
+/** Largest persisted object-transform scale magnitude accepted by project v5. */
 export const MAX_PROJECT_TRANSFORM_SCALE = 100_000;
 
 export function validateArray(

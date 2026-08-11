@@ -11,6 +11,7 @@
 import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { migrateV2OperationBindings } from './migrate-v2-operation-bindings';
 import { migrateV3ReliefSources } from './migrate-v4-relief-heightfields';
+import { migrateV4ReliefMeshGeometry } from './migrate-v5-relief-mesh-geometry';
 import { isMigrationFailure, type MigrationFailure } from './migration-failure';
 
 export type RawProject = Record<string, unknown>;
@@ -27,6 +28,7 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   1: migrateV1ToV2,
   2: migrateV2OperationBindings,
   3: migrateV3ReliefSources,
+  4: migrateV4ReliefMeshGeometry,
 };
 
 function migrateV1ToV2(raw: RawProject): RawProject {

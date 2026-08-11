@@ -4,7 +4,9 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { Simulate } from 'react-dom/test-utils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import {
   createLayer,
   createProject,
@@ -44,11 +46,10 @@ function installProject(layer: Layer, withRelief: boolean): void {
     source: 'model.stl',
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
+      targetWidthMm: 100,
+    }),
     color: layer.color,
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
     transform: IDENTITY_TRANSFORM,
@@ -114,16 +115,32 @@ describe('CncLayerFields relief contract', () => {
     }
   });
 
-  it('preserves the current-main Stepover editor range', async () => {
+  it('retains 1% and 200% Stepover without policy min/max attributes', async () => {
+    vi.useFakeTimers();
     const layer = reliefLayer('engrave');
     installProject(layer, true);
-    const { host, root } = await render(layer);
+    const onSettingsChange = vi.fn();
+    const { host, root } = await render(layer, onSettingsChange);
     try {
       const input = stepoverInput(host, layer.color);
       if (input === null) throw new Error('stepover input missing');
-      expect(input.getAttribute('min')).toBe('10');
-      expect(input.getAttribute('max')).toBe('85');
+      expect(input.getAttribute('min')).toBeNull();
+      expect(input.getAttribute('max')).toBeNull();
       expect(input.value).toBe('40');
+
+      input.value = '1';
+      await act(async () => Simulate.change(input));
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(onSettingsChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ stepoverPercent: 1 }),
+      );
+
+      input.value = '200';
+      await act(async () => Simulate.change(input));
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(onSettingsChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ stepoverPercent: 200 }),
+      );
 
       const cutDepth = host.querySelector<HTMLInputElement>(
         `input[aria-label="Cut depth for ${layer.color}"]`,
@@ -133,6 +150,7 @@ describe('CncLayerFields relief contract', () => {
     } finally {
       await act(async () => root.unmount());
       host.remove();
+      vi.useRealTimers();
     }
   });
 

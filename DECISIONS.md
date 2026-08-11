@@ -18178,3 +18178,133 @@ autosave validation, or policy guards.
 - ADR-294, factual relief materialization failures and runtime-fit evidence.
 
 ---
+
+## ADR-292 Amendment 7 - Schema v5 persists legacy Float32 geometry and commits machine-space Width across native division loss (2026-08-11)
+
+**Status:** Accepted and implemented for the reproduced exact bounded cases; unchanged numeric domains still limit all-positive-finite intent
+
+### Context
+
+The selected relief **Width** control displayed machine-space millimetres but previously converted a
+draft to stored local Width with native `draft / abs(scaleX)`. A positive finite draft could therefore
+round to `0` or `Infinity`. The local normalizer discarded that result, while the debounced input kept
+showing the accepted draft. Reproduced heightfield and legacy-mesh cases left project, revision, undo,
+dirty state, preview, CAM, and Frame geometry unchanged behind a false Width display.
+
+Legacy meshes also had no durable intrinsic-geometry authority. Factorization repeatedly scanned
+persisted positions with Float32 semantics to prove intrinsic aspect, and materialization scanned the
+converted Float32 mesh again for bounds. ADR-292 Amendment 6 added a further materialization-time Z
+scan to catch finite stored values that overflow Float32. The scans were factual, but repeating them
+on immutable source data added synchronous O(vertices) work and left Width policy implicit in mesh
+aspect arithmetic.
+
+The existing project-v4 object could not persist a trusted Float32 bounds result, an independently
+editable legacy target Height, or the Width aspect policy. This amendment therefore advances the
+project schema rather than adding another transient cache or weakening validation.
+
+### Decision
+
+1. **Advance projects to schema v5.** Every v4 legacy-mesh relief migrates without rewriting its
+   persisted coordinate array. The migration derives the exact bounds seen after per-coordinate
+   Float32 conversion and stores either all six finite extrema under `finite-float32-v1` or the
+   factual `non-finite-float32-v1` marker. It also stores object-level `targetHeightMm` and
+   `widthAspect`. Canonical heightfield source bytes and mapping remain unchanged.
+2. **Preserve the old legacy CAM geometry exactly.** For a finite intrinsic X/Y extent, migration
+   derives target Height with the same native ratio-then-multiply order used by the old
+   materializer and records `preserve`. If that result is not positive finite, it retains a
+   positive stored natural-bound Height and records `stretch`. The source remains the immutable
+   owner of mesh positions, empty-cell meaning, and intrinsic Float32 bounds; editable target
+   Width, target Height, and Width policy live on the relief object. Relief 3D planning uses that
+   explicit CAM target Height; canvas selection and natural placement continue to use stored bounds.
+3. **Validate persisted authority in one source pass.** Project validation continues to require
+   every persisted mesh coordinate to be a finite JavaScript number. During that same pass it
+   applies `Math.fround`, derives the authoritative six extrema or non-finite marker, and requires
+   exact JSON equality with the persisted metadata. This does not add an import, open, manual-save,
+   or autosave refusal: data accepted before Amendment 6 remains accepted, including a source whose
+   finite stored coordinate overflows Float32 and carries the non-finite marker.
+4. **Consume trusted bounds without rescanning mesh positions.** STL preparation derives intrinsic
+   bounds once for the object it creates. Legacy factorization reads the persisted metadata and
+   explicit target Height rather than scanning positions. Materialization reuses the owner-keyed
+   Float32 conversion and passes the validated finite bounds directly to the rasterizer. A
+   non-finite marker returns Amendment 6's explicitly authorized factual
+   `relief-materialization-failed` result. Schema validation still performs its required one-pass
+   source/metadata proof at load or persistence boundaries; no claim is made that raw source
+   validation is O(1). This supersedes Amendment 5's per-candidate intrinsic-bounds scan consequence.
+5. **Commit Width in machine space before native division can erase it.** The Width input sends the
+   parsed positive finite machine-space draft to the state action. If native division by the
+   nonzero absolute X scale produces a positive finite local Width, ordinary and exact-zero
+   behavior remain unchanged. If it rounds to `0` or `Infinity`, CurveDesk keeps the exact draft,
+   rebases signed X scale to unit magnitude, and resolves the corresponding local Height from the
+   pre-edit machine-space aspect with exact binary64 factor arithmetic and one final rounding.
+   When that Height is not positive finite, the prior Height remains and the policy becomes
+   `stretch`; the Width is not silently discarded. This supersedes Amendment 5's deferral of the
+   shared native divide-underflow/divide-overflow defect for these exact bounded cases.
+6. **Keep the transition atomic and representation-specific.** Heightfields synchronize canonical
+   physical Width, duplicate target Width, natural bounds, mapping policy, and source revision.
+   Legacy meshes synchronize target Width, explicit target Height, stored natural bounds, and
+   Width policy while retaining the exact relief-source owner. The existing common-factor repair
+   may then re-express an oversized exact candidate inside the unchanged local-coordinate and
+   transform-scale domains. One accepted edit still produces one project replacement, undo entry,
+   and dirty transition.
+7. **Keep the boundary honest.** The reproduced divide-underflow and divide-overflow drafts are
+   durable because their exact rebased geometry fits the existing numeric domains. Schema v5 does
+   not widen those domains or claim that every positive finite machine Width has an exact current
+   Canvas/Float32/CAM scene representation. Common-factor scale exhaustion, non-reversible
+   factors, non-finite transformed geometry, and intents beyond every exact bounded encoding remain
+   planned representation work; they are not grounds for an input cap, clamp, confirmation, or
+   policy refusal.
+8. **Do not change authorization or invent a refusal.** This amendment adds no guard, warning
+   promotion, import policy, output policy, Frame/Job Review/Start condition, clamp, cap, delay, or
+   confirmation. A successfully applied Width can legitimately change later materialized geometry,
+   emitted bytes, and the exact Frame signature because the old path silently applied nothing.
+   CAM/emitter algorithms and the sole-Frame-guard contract are unchanged.
+
+### Consequences
+
+- A displayed Width of `Number.MIN_VALUE` at X scale `2`, and a displayed Width of `1 mm` at X
+  scale `Number.MIN_VALUE`, now remain visible because the stored relief actually carries that
+  machine Width. Both heightfield and legacy-mesh reproductions persist, autosave, materialize, and
+  record one undo/dirty transition.
+- Reopened v4 legacy meshes gain deterministic Float32 intrinsic bounds, explicit target Height,
+  and explicit Width aspect without rewriting source positions. Saving writes schema v5.
+- Legacy Width factorization and repeated materialization no longer rescan mesh coordinates merely
+  to rediscover intrinsic bounds. Initial array-to-Float32 conversion and project-boundary source
+  validation remain linear in source size.
+- A legacy mesh whose stored natural-bounds aspect differs from intrinsic CAM aspect now gives
+  Relief 3D the explicit CAM target Height for display-resolution planning. Its canvas bounds and
+  placement remain unchanged.
+- The non-finite marker preserves Amendment 6's exact acceptance/materialization boundary. It does
+  not convert a factual compile-integrity failure into an earlier project or import policy.
+- Project-v4 readers cannot open schema-v5 files. The migration is one-way; no downgrade writer is
+  introduced.
+
+### Verification
+
+- `ReliefWidthInput.test.tsx` pins real controlled-input/store commits for heightfield and
+  legacy-mesh divide underflow/overflow, truthful display reconciliation, source identity, one
+  undo/dirty transition, persistence/autosave, materialization, and machine Width.
+- `relief-machine-width-resolution.test.ts`, `positive-float64-rational.test.ts`, and the existing
+  heightfield Width-resolution suite pin ordinary division, exact-zero compatibility, signed unit
+  rebasing, exact ratio rounding, and Stretch fallback.
+- `migrate-v5-relief-mesh-geometry.test.ts` pins v4-to-v5 source-byte preservation, finite and
+  non-finite Float32 metadata, explicit target geometry, and open-migrate-save behavior.
+- `project-relief-mesh-geometry-validator.test.ts` pins one indexed read per persisted coordinate,
+  exact metadata equality, tamper rejection, and unchanged acceptance of finite stored values that
+  overflow Float32.
+- `legacy-mesh-intrinsic-bounds.test.ts`, `relief-object-to-heightmap.test.ts`, import-preparation,
+  factorization, compile, preflight, persistence, preview, and 3D suites pin trusted-bound reuse and
+  unchanged valid geometry.
+- TypeScript, focused Vitest, ESLint, Prettier, ADR-number, hard/soft file-size, export-ratchet,
+  diff, and full release gates are required before publication. Browser perceptual layout,
+  packaged Electron, controller behavior, a physical Frame, an air cut, a material cut, and finish
+  quality are not established.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-289, relief scale factoring and exact-zero compatibility.
+- ADR-292 Amendments 2-6, Width authority, bounded rebasing, and Float32 materialization integrity.
+- ADR-293, atomic whole-project autosave/recovery.
+- ADR-305, selected relief field geometry and Width disclosure.
+
+---

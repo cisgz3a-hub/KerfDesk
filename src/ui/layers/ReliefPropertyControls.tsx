@@ -5,32 +5,20 @@ import { useStore } from '../state';
 import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
 import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
 import { ReliefMaskThresholdControl } from './ReliefMaskThresholdControl';
-import {
-  ReliefPlanningWidthDisclosure,
-  reliefPlanningWidthTitle,
-} from './ReliefPlanningWidthDisclosure';
+import { ReliefPlanningWidthDisclosure } from './ReliefPlanningWidthDisclosure';
+import { ReliefWidthInput } from './ReliefWidthInput';
 import { useDebouncedCommit } from './use-debounced-commit';
 
-/** Renders mesh or heightfield controls using parent-resolved machine-space width and scale. */
+/** Renders mesh or heightfield controls using the parent-resolved machine-space width. */
 export function ReliefPropertyControls(props: {
   readonly relief: ReliefObject;
   readonly widthMm: number;
-  readonly targetScaleX: number;
 }): JSX.Element {
   const projectDocumentEpoch = useStore((state) => state.projectDocumentEpoch);
   const fieldKey = (field: string): string => `${projectDocumentEpoch}:${props.relief.id}:${field}`;
   return (
     <>
-      <ReliefNumberField
-        key={fieldKey('width')}
-        relief={props.relief}
-        label="Width"
-        value={props.widthMm}
-        step={1}
-        title={reliefPlanningWidthTitle(props.relief)}
-        commitKey="targetWidthMm"
-        toStoredValue={(value) => value / props.targetScaleX}
-      />
+      <ReliefWidthInput key={fieldKey('width')} relief={props.relief} widthMm={props.widthMm} />
       <ReliefPlanningWidthDisclosure relief={props.relief} widthMm={props.widthMm} />
       <ReliefNumberField
         key={fieldKey('depth')}
@@ -39,7 +27,6 @@ export function ReliefPropertyControls(props: {
         value={props.relief.reliefDepthMm}
         step={0.5}
         title="Total relief depth: the source's numeric range maps to [-depth, 0] below the stock top."
-        commitKey="reliefDepthMm"
       />
       {isMeshRelief(props.relief) ? (
         <BackgroundSelect relief={props.relief} />
@@ -66,16 +53,11 @@ function ReliefNumberField(props: {
   readonly value: number;
   readonly step: number;
   readonly title: string;
-  readonly commitKey: 'targetWidthMm' | 'reliefDepthMm';
-  readonly toStoredValue?: (value: number) => number;
 }): JSX.Element {
   const setReliefParams = useStore((s) => s.setReliefParams);
   const debounced = useDebouncedCommit<number>({
     value: props.value,
-    commit: (value) =>
-      setReliefParams(props.relief.id, {
-        [props.commitKey]: props.toStoredValue?.(value) ?? value,
-      }),
+    commit: (value) => setReliefParams(props.relief.id, { reliefDepthMm: value }),
     parse: (input) => {
       const parsed = Number.parseFloat(input);
       return positiveFinite(parsed) ? parsed : props.value;

@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import {
   applyTransform,
   IDENTITY_TRANSFORM,
@@ -90,11 +91,10 @@ describe('reliefMachineSpaceTransform', () => {
       source: 'surface.stl',
       targetWidthMm: 100,
       reliefDepthMm: 5,
-      reliefSource: {
-        kind: 'legacy-mesh',
-        meshPositions: [0, 0, 0, 10, 0, 1, 0, 5, 2],
-        emptyCells: 'floor',
-      },
+      ...testLegacyMeshGeometry({
+        positions: [0, 0, 0, 10, 0, 1, 0, 5, 2],
+        targetWidthMm: 100,
+      }),
       color: '#a0522d',
       bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
       transform: { ...IDENTITY_TRANSFORM, scaleX: -0.5, scaleY: 2 },

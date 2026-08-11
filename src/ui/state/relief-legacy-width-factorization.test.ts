@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import type { MeshReliefObject } from '../../core/scene/relief';
 import { cachedFloat32Array } from '../../core/util';
 import { prepareProjectForAutosave, prepareProjectForPersistence } from '../../io/project';
@@ -30,7 +31,7 @@ import {
 import { factorReliefLegacyWidth } from './relief-legacy-width-factorization';
 import { useStore } from './store';
 
-describe('legacy-mesh Width project-v4 factorization', () => {
+describe('legacy-mesh Width project-v5 factorization', () => {
   it('repairs the real Width edit without changing mesh CAM, prepared-job JSON, or Frame', () => {
     const initial = legacyRelief({
       targetWidthMm: 2,
@@ -88,22 +89,6 @@ describe('legacy-mesh Width project-v4 factorization', () => {
     expect(useStore.getState()).toMatchObject({ dirty: true });
     expect(useStore.getState().undoStack).toHaveLength(1);
     expectPersistence('ok');
-  });
-
-  it('retains the real Width edit when intrinsic mesh-bound reading throws', () => {
-    const meshPositions = Array.from(MESH_POSITIONS);
-    Object.defineProperty(meshPositions, 0, {
-      get: () => {
-        throw new RangeError('injected mesh read failure');
-      },
-    });
-    const { initial, updated } = resizeLegacyMesh(meshPositions);
-    expect(updated).toMatchObject({
-      targetWidthMm: INTENDED_WIDTH_MM,
-      bounds: { maxX: INTENDED_WIDTH_MM, maxY: INTENDED_HEIGHT_MM },
-      transform: initial.transform,
-    });
-    expect(updated.reliefSource).toBe(initial.reliefSource);
   });
 
   it.each([
@@ -177,7 +162,10 @@ describe('legacy-mesh Width project-v4 factorization', () => {
           scaleX,
           scaleY,
         }),
-        reliefSource: { kind: 'legacy-mesh', meshPositions, emptyCells: 'floor' },
+        ...testLegacyMeshGeometry({
+          positions: meshPositions,
+          targetWidthMm: INTENDED_WIDTH_MM,
+        }),
       } satisfies MeshReliefObject;
 
       expect(factorReliefLegacyWidth(relief)).toEqual({ kind: 'unavailable', reason, relief });

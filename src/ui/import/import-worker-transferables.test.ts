@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { legacyMeshIntrinsicBounds } from '../../core/relief/legacy-mesh';
 import { importWorkerTransferables } from './import-worker-transferables';
 import { packGcodeResult, packedGcodeTransferables } from './packed-gcode-result';
 
@@ -13,6 +14,8 @@ describe('importWorkerTransferables', () => {
         positions,
         widthMm: 100,
         heightMm: 100,
+        intrinsicBounds: legacyMeshIntrinsicBounds(positions),
+        widthAspect: 'preserve' as const,
         format: 'binary' as const,
       },
     };

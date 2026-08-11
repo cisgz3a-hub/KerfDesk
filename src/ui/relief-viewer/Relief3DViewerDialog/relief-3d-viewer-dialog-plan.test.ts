@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../../__fixtures__/legacy-relief';
 import { testReliefHeightfield } from '../../../__fixtures__/relief-heightfield';
 import { IDENTITY_TRANSFORM, type ReliefObject } from '../../../core/scene';
 import {
@@ -97,18 +98,18 @@ describe('relief3dViewerDialogPlan', () => {
         scaleX: -3,
         scaleY: 1,
       }),
-      reliefSource: {
-        kind: 'legacy-mesh',
-        meshPositions: [0, 0, 0, 20, 0, 1, 0, 10, 0],
-        emptyCells: 'floor',
-      },
-      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
+      ...testLegacyMeshGeometry({
+        positions: [0, 0, 0, 20, 0, 1, 0, 10, 0],
+        targetWidthMm: 20.00000001,
+      }),
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 5 },
     };
 
     const plan = relief3dViewerDialogPlan(object);
 
     expect(plan.planningWidthMm).toBe(20.00000001);
     expect(plan.machineSpace.widthMm).toBe(60.00000003);
+    expect(plan.machineSpace.heightMm).toBe(10.000000005);
     expect(plan.title).toContain('60 mm wide');
   });
 });

@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import {
   createLayer,
   createProject,
@@ -43,11 +44,10 @@ function installUsedLayer(settings: CncLayerSettings, output = true, relief = fa
         source: 'model.stl',
         targetWidthMm: 10,
         reliefDepthMm: 2,
-        reliefSource: {
-          kind: 'legacy-mesh',
-          meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
-          emptyCells: 'floor',
-        },
+        ...testLegacyMeshGeometry({
+          positions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
+          targetWidthMm: 10,
+        }),
         color: layer.color,
         bounds: { minX: 0, minY: 0, maxX: 10, maxY: 5 },
         transform: IDENTITY_TRANSFORM,

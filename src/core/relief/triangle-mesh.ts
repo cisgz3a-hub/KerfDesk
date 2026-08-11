@@ -10,6 +10,8 @@
 export type TriangleMesh = {
   // length = triangleCount * 9
   readonly positions: Float32Array;
+  /** Trusted Float32 bounds supplied by a validated persisted legacy source. */
+  readonly intrinsicBounds?: MeshBounds;
 };
 
 export const FLOATS_PER_TRIANGLE = 9;
@@ -27,11 +29,15 @@ export type MeshBounds = {
   readonly maxZ: number;
 };
 
-type MeshBoundsSource = { readonly positions: ArrayLike<number> };
+type MeshBoundsSource = {
+  readonly positions: ArrayLike<number>;
+  readonly intrinsicBounds?: MeshBounds;
+};
 
 export function meshBounds(mesh: MeshBoundsSource): MeshBounds | null {
   const p = mesh.positions;
   if (p.length < FLOATS_PER_TRIANGLE) return null;
+  if (mesh.intrinsicBounds !== undefined) return mesh.intrinsicBounds;
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let minZ = Number.POSITIVE_INFINITY;

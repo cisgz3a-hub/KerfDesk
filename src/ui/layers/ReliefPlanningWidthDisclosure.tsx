@@ -8,11 +8,11 @@ const NOTE_MARGIN = '-2px 0 6px 0';
 /** Names the existing mesh width or the canonical field's compatibility/native CAM representation. */
 export function reliefPlanningWidthTitle(relief: ReliefObject): string {
   if (relief.reliefSource.kind === 'legacy-mesh') {
-    return 'Carved width on the stock after object scale. An exact bounded local re-factor may change both scale axes without changing transformed geometry or mesh CAM.';
+    return 'Carved width on the stock. Width commits in machine space; if native scale division would round to 0 or Infinity, CurveDesk preserves the exact draft by rebasing X scale to unit magnitude. An exact bounded local re-factor may then change both scale axes without changing transformed geometry or mesh CAM.';
   }
   return relief.transform.scaleX === 0
     ? 'Stored planning width. This zero-scale compatibility axis collapses after planning; editing width remains available.'
-    : 'Heightmap planning width from the canonical source after native binary64 absolute object X scale. Field geometry uses exact-factor display math. Editing synchronizes the object target and source widths; an exact bounded local re-factor may change both scale axes without changing transformed geometry.';
+    : 'Heightmap planning width from the canonical source after absolute object X scale. Field geometry uses exact-factor display math. Width commits in machine space; if native scale division would round to 0 or Infinity, CurveDesk preserves the exact draft by rebasing X scale to unit magnitude. An exact bounded local re-factor may then change both scale axes without changing transformed geometry.';
 }
 
 /** Resolves the editable Width authority while preserving mesh and exact-zero compatibility. */

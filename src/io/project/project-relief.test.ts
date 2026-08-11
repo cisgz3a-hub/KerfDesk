@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { decodeCanonicalBase64 } from '../../core/relief/depth-map-base64';
 import { reliefHeightfieldDigest } from '../../core/relief/heightfield-digest';
@@ -19,12 +20,11 @@ function relief(): MeshReliefObject {
     source: 'pyramid.stl',
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      // One triangle is enough to exercise the schema.
-      meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
-      emptyCells: 'floor',
-    },
+    // One triangle is enough to exercise the schema.
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
+      targetWidthMm: 100,
+    }),
     color: '#a0522d',
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
     transform: IDENTITY_TRANSFORM,
@@ -407,9 +407,10 @@ describe('dense relief round-trips without an embed ceiling', () => {
 });
 
 function withMeshPositions(meshPositions: ReadonlyArray<number> | Float32Array): MeshReliefObject {
+  const base = relief();
   return {
-    ...relief(),
-    reliefSource: { ...relief().reliefSource, meshPositions },
+    ...base,
+    ...testLegacyMeshGeometry({ positions: meshPositions, targetWidthMm: base.targetWidthMm }),
   };
 }
 

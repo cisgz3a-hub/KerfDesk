@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import {
   createLayer,
   createProject,
@@ -74,11 +75,10 @@ function reliefObject(): ReliefObject {
     source: 'model.stl',
     targetWidthMm: 40,
     reliefDepthMm: 5,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 40, 0, 3, 0, 40, 6],
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 40, 0, 3, 0, 40, 6],
+      targetWidthMm: 40,
+    }),
     color: VCARVE_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 40, maxY: 40 },
     transform: IDENTITY_TRANSFORM,

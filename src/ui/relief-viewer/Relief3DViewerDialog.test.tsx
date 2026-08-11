@@ -5,6 +5,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { IDENTITY_TRANSFORM, type ReliefObject } from '../../core/scene';
 
@@ -48,11 +49,10 @@ function relief(): ReliefObject {
     // One tilted triangle — enough for a real heightmap.
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 10, 0, 2, 0, 10, 4],
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 10, 0, 2, 0, 10, 4],
+      targetWidthMm: 100,
+    }),
     color: '#a0522d',
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
     transform: IDENTITY_TRANSFORM,

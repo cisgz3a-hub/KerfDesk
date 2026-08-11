@@ -77,7 +77,7 @@ async function render(
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<ReliefPropertyControls relief={relief} widthMm={100} targetScaleX={1} />);
+    root.render(<ReliefPropertyControls relief={relief} widthMm={100} />);
   });
   return { host, root };
 }
