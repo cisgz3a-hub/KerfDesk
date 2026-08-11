@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { IDENTITY_TRANSFORM, type ReliefObject } from '../scene';
 import { meshToHeightmap } from './mesh-to-heightmap';
 import { reliefPhysicalDimensions, reliefPlanningScale } from './relief-physical-dimensions';
@@ -8,14 +9,15 @@ function depthMapRelief(): ReliefObject {
     kind: 'relief',
     id: 'D1',
     source: 'depth.png',
-    depthMap: {
-      schemaVersion: 1,
+    reliefSource: testReliefHeightfield({
       width: 2,
       height: 1,
-      bitDepth: 8,
-      samplesBase64: 'AP8=',
-      polarity: 'light-is-high',
-    },
+      physicalWidthMm: 100,
+      physicalHeightMm: 50,
+      maxDepthMm: 5,
+      samplesU8: [0, 255],
+      provenance: { sourceName: 'depth.png' },
+    }),
     targetWidthMm: 100,
     reliefDepthMm: 5,
     color: '#a0522d',
@@ -45,10 +47,13 @@ describe('reliefPhysicalDimensions', () => {
       kind: 'relief',
       id: 'M1',
       source: 'mesh.stl',
-      meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 1],
       targetWidthMm: 100,
       reliefDepthMm: 5,
-      emptyCells: 'floor',
+      reliefSource: {
+        kind: 'legacy-mesh',
+        meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 1],
+        emptyCells: 'floor',
+      },
       color: '#a0522d',
       bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
       transform: { ...IDENTITY_TRANSFORM, scaleX: 2, scaleY: 0.5 },
@@ -66,10 +71,9 @@ describe('reliefPhysicalDimensions', () => {
       kind: 'relief',
       id: 'M2',
       source: 'precision.stl',
-      meshPositions,
       targetWidthMm: 100,
       reliefDepthMm: 5,
-      emptyCells: 'floor',
+      reliefSource: { kind: 'legacy-mesh', meshPositions, emptyCells: 'floor' },
       color: '#a0522d',
       bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
       transform: { ...IDENTITY_TRANSFORM, scaleX: 0.36, scaleY: 1.75 },

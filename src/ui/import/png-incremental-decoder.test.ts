@@ -162,6 +162,76 @@ describe('decodeIncrementalPngToLuma', () => {
     );
   });
 
+  it('publishes the exact grayscale tRNS sample after masking unused high bits', async () => {
+    const rows: number[][] = [];
+    const onTransparency = vi.fn();
+    const result = await decodeIncrementalPngToLuma(
+      chunksOf(
+        makePng({
+          width: 3,
+          height: 1,
+          colorType: 0,
+          rows: [[7, 127, 200]],
+          transparency: Uint8Array.of(0xff, 127),
+        }),
+        2,
+      ),
+      {
+        maxEdge: 8,
+        maxPixels: 64,
+        onTransparency,
+        onRow: (row) => {
+          rows.push([...row]);
+        },
+      },
+    );
+
+    expect(result).toMatchObject({ kind: 'ok', bitDepth: 8, colorType: 0 });
+    expect(rows).toEqual([[7, 127, 200]]);
+    expect(onTransparency).toHaveBeenCalledOnce();
+    expect(onTransparency).toHaveBeenCalledWith({ kind: 'grayscale-sample', sample: 127 });
+  });
+
+  it.each([
+    {
+      label: 'wrong byte length',
+      png: () => grayscaleTransparencyPng({ transparency: Uint8Array.of(127) }),
+      reason: /tRNS.*exactly 2 bytes/,
+    },
+    {
+      label: 'after IDAT',
+      png: () =>
+        grayscaleTransparencyPng({
+          transparency: Uint8Array.of(0, 127),
+          transparencyAfterIdat: true,
+        }),
+      reason: /tRNS.*precede IDAT/,
+    },
+    {
+      label: 'duplicate',
+      png: () =>
+        grayscaleTransparencyPng({
+          transparency: Uint8Array.of(0, 127),
+          duplicateTransparency: true,
+        }),
+      reason: /only one tRNS/,
+    },
+    {
+      label: 'CRC mismatch',
+      png: () =>
+        corruptTransparencyCrc(grayscaleTransparencyPng({ transparency: Uint8Array.of(0, 127) })),
+      reason: /tRNS CRC mismatch/,
+    },
+  ])('rejects grayscale tRNS with $label', async ({ png, reason }) => {
+    await expect(
+      decodeIncrementalPngToLuma(chunksOf(png(), 3), {
+        maxEdge: 8,
+        maxPixels: 64,
+        onRow: () => undefined,
+      }),
+    ).rejects.toThrow(reason);
+  });
+
   it('rejects a PLTE chunk in a grayscale PNG', async () => {
     const png = makePng({
       width: 1,
@@ -261,4 +331,28 @@ function grayscalePngCase() {
         chunkSize: fc.integer({ min: 1, max: 19 }),
       }),
     );
+}
+
+function grayscaleTransparencyPng(
+  options: Pick<
+    Parameters<typeof makePng>[0],
+    'duplicateTransparency' | 'transparency' | 'transparencyAfterIdat'
+  >,
+): Uint8Array {
+  return makePng({ width: 3, height: 1, colorType: 0, rows: [[7, 127, 200]], ...options });
+}
+
+function corruptTransparencyCrc(png: Uint8Array): Uint8Array {
+  const typeOffset = png.findIndex(
+    (byte, index) =>
+      byte === 0x74 &&
+      png[index + 1] === 0x52 &&
+      png[index + 2] === 0x4e &&
+      png[index + 3] === 0x53,
+  );
+  if (typeOffset < 4) throw new Error('fixture has no tRNS chunk');
+  const length = new DataView(png.buffer, png.byteOffset + typeOffset - 4, 4).getUint32(0);
+  const crcOffset = typeOffset + 4 + length;
+  png[crcOffset] = (png[crcOffset] ?? 0) ^ 0xff;
+  return png;
 }

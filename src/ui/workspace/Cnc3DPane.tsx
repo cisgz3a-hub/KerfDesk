@@ -11,11 +11,16 @@ import { useOutputScope, useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { Cnc3DFullPage } from './Cnc3DFullPage';
 import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
-import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
+import {
+  cnc3dPaneDisplayResolution,
+  useCnc3dScene,
+  type DesignSceneSource,
+} from './use-cnc-3d-scene';
 import { useDesignSceneSource } from './use-design-scene-source';
 import { useCncCanvasFocus } from './use-cnc-canvas-focus';
 import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { useCncPaneWidth } from './use-cnc-pane-width';
+import { previewResolutionMessage } from './preview-resolution';
 
 const CANVAS_WIDTH_PX = 244;
 const CANVAS_HEIGHT_PX = 240;
@@ -87,6 +92,10 @@ function PaneScene(props: {
   const { canvasRef, state } = useCnc3dScene(source, stockThicknessMm, scrubberT, live);
 
   if (source === null) return null;
+  const resolutionNotice = previewResolutionMessage(
+    '3D result',
+    cnc3dPaneDisplayResolution(source.grid),
+  );
   return (
     <>
       <canvas
@@ -121,6 +130,11 @@ function PaneScene(props: {
         </p>
       ) : (
         <p style={hintStyle}>Drag to orbit, scroll to zoom. Updates as you edit.</p>
+      )}
+      {resolutionNotice === null ? null : (
+        <p style={resolutionNoticeStyle} role="status">
+          {resolutionNotice}
+        </p>
       )}
     </>
   );
@@ -184,4 +198,8 @@ const hintStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-text-muted)',
   margin: '4px 0 0 0',
+};
+const resolutionNoticeStyle: React.CSSProperties = {
+  ...hintStyle,
+  color: 'var(--lf-warning)',
 };

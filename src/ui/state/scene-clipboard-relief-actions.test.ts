@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   createLayer,
   createProject,
@@ -28,8 +29,8 @@ describe('machine-agnostic relief paste', () => {
 
     const reliefs = currentReliefs();
     expect(reliefs).toHaveLength(2);
-    expect(reliefs[1]?.meshPositions).toEqual(reliefs[0]?.meshPositions);
-    expect(reliefs[1]?.meshPositions).not.toBe(reliefs[0]?.meshPositions);
+    expect(reliefs[1]?.reliefSource).toEqual(reliefs[0]?.reliefSource);
+    expect(reliefs[1]?.reliefSource).not.toBe(reliefs[0]?.reliefSource);
   });
 
   it('pastes a mixed selection including a depth-map relief in laser mode', () => {
@@ -65,8 +66,8 @@ describe('machine-agnostic relief paste', () => {
     if (pasted === undefined) throw new Error('expected pasted relief');
     expect(pasted.id).not.toBe('relief-1');
     expect(pasted.transform).toMatchObject({ x: 10, y: 10 });
-    expect(pasted.depthMap).toEqual(reliefs[0]?.depthMap);
-    expect(pasted.depthMap).not.toBe(reliefs[0]?.depthMap);
+    expect(pasted.reliefSource).toEqual(reliefs[0]?.reliefSource);
+    expect(pasted.reliefSource).not.toBe(reliefs[0]?.reliefSource);
     expectPastedOperationToRetainSettings(pasted, pastedState.project);
     expect(pastedState.selectedObjectId).toBe(pasted.id);
     expect(pastedState.undoStack).toHaveLength(1);
@@ -124,7 +125,7 @@ function cncProjectWithRelief(relief: ReliefObject): Project {
   return useStore.getState().project;
 }
 
-function reliefCommon(): Omit<ReliefObject, 'depthMap' | 'meshPositions' | 'emptyCells'> {
+function reliefCommon(): Omit<ReliefObject, 'reliefSource'> {
   return {
     kind: 'relief',
     id: 'relief-1',
@@ -141,8 +142,11 @@ function meshRelief(): ReliefObject {
   return {
     ...reliefCommon(),
     source: 'model.stl',
-    meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
-    emptyCells: 'floor',
+    reliefSource: {
+      kind: 'legacy-mesh',
+      meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
+      emptyCells: 'floor',
+    },
   };
 }
 
@@ -150,13 +154,14 @@ function depthMapRelief(): ReliefObject {
   return {
     ...reliefCommon(),
     source: 'portrait-depth.png',
-    depthMap: {
-      schemaVersion: 1,
+    reliefSource: testReliefHeightfield({
       width: 2,
       height: 2,
-      bitDepth: 8,
-      samplesBase64: 'AP+A/w==',
-      polarity: 'light-is-high',
-    },
+      physicalWidthMm: 100,
+      physicalHeightMm: 100,
+      maxDepthMm: 5,
+      samplesU8: [0, 255, 128, 255],
+      provenance: { sourceName: 'portrait-depth.png' },
+    }),
   };
 }

@@ -26,6 +26,7 @@ afterEach(() => {
 describe('canvas compilation main bridge connection admission', () => {
   it('transfers ownership of grid and Cut 3D surface arrays between worker realms', () => {
     const depth = new Float32Array(4);
+    const inclusion = new Uint8Array(4);
     const positions = new Float32Array(12);
     const indices = new Uint32Array(6);
     const normals = new Float32Array(12);
@@ -40,9 +41,11 @@ describe('canvas compilation main bridge connection admission', () => {
           originX: 0,
           originY: 0,
           depth,
+          inclusion,
+          resolution: { requestedMmPerCell: 1, effectiveMmPerCell: 1, reason: null },
         },
       }),
-    ).toEqual([depth.buffer]);
+    ).toEqual([depth.buffer, inclusion.buffer]);
     expect(
       canvasCompilationResultTransferables({
         kind: 'cnc-cut3d-surface',

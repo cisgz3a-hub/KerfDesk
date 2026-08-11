@@ -7,11 +7,7 @@
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import type { ReliefObject } from '../../core/scene';
-
-const MAX_BED_DIMENSION_MM = 1500;
-const MIN_RELIEF_WIDTH_MM = 1;
-const MIN_RELIEF_DEPTH_MM = 0.1;
-const MAX_RELIEF_DEPTH_MM = 200;
+import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
 
 export type ReliefParamPatch = {
   targetWidthMm?: number;
@@ -24,13 +20,15 @@ type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
 export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams'> {
   return {
-    setReliefParams: (id, patch) =>
+    setReliefParams: (id, patch) => {
+      const normalized = normalizeReliefPatch(patch);
+      if (!hasReliefPatch(normalized)) return;
       set((s) => {
         let changed = false;
         const objects = s.project.scene.objects.map((obj) => {
           if (obj.id !== id || obj.kind !== 'relief') return obj;
           changed = true;
-          const next = applyReliefPatch(obj, normalizeReliefPatch(patch));
+          const next = applyReliefPatch(obj, normalized);
           return { ...next, bounds: boundsForWidth(obj, next.targetWidthMm) };
         });
         if (!changed) return s;
@@ -40,41 +38,89 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
           redoStack: [],
           dirty: true,
         };
-      }),
+      });
+    },
   };
 }
 
 function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch {
   const out: ReliefParamPatch = {};
-  if (patch.targetWidthMm !== undefined) {
-    out.targetWidthMm = clamp(patch.targetWidthMm, MIN_RELIEF_WIDTH_MM, MAX_BED_DIMENSION_MM);
+  if (positiveFinite(patch.targetWidthMm)) {
+    out.targetWidthMm = patch.targetWidthMm;
   }
-  if (patch.reliefDepthMm !== undefined) {
-    out.reliefDepthMm = clamp(patch.reliefDepthMm, MIN_RELIEF_DEPTH_MM, MAX_RELIEF_DEPTH_MM);
+  if (positiveFinite(patch.reliefDepthMm)) {
+    out.reliefDepthMm = patch.reliefDepthMm;
   }
   if (patch.emptyCells !== undefined) out.emptyCells = patch.emptyCells;
   if (patch.polarity !== undefined) out.polarity = patch.polarity;
   return out;
 }
 
+function hasReliefPatch(patch: ReliefParamPatch): boolean {
+  return (
+    patch.targetWidthMm !== undefined ||
+    patch.reliefDepthMm !== undefined ||
+    patch.emptyCells !== undefined ||
+    patch.polarity !== undefined
+  );
+}
+
 function applyReliefPatch(relief: ReliefObject, patch: ReliefParamPatch): ReliefObject {
-  const common = {
+  const common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>> = {
     ...(patch.targetWidthMm === undefined ? {} : { targetWidthMm: patch.targetWidthMm }),
     ...(patch.reliefDepthMm === undefined ? {} : { reliefDepthMm: patch.reliefDepthMm }),
   };
-  if (relief.depthMap === undefined) {
-    return {
-      ...relief,
-      ...common,
-      ...(patch.emptyCells === undefined ? {} : { emptyCells: patch.emptyCells }),
-    };
+  if (isMeshRelief(relief)) {
+    return applyMeshReliefPatch(relief, common, patch);
   }
+  return applyHeightfieldReliefPatch(relief, common, patch);
+}
+
+function isMeshRelief(relief: ReliefObject): relief is MeshReliefObject {
+  return relief.reliefSource.kind === 'legacy-mesh';
+}
+
+function applyMeshReliefPatch(
+  relief: MeshReliefObject,
+  common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>>,
+  patch: ReliefParamPatch,
+): MeshReliefObject {
   return {
     ...relief,
     ...common,
-    depthMap: {
-      ...relief.depthMap,
-      ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
+    reliefSource: {
+      ...relief.reliefSource,
+      ...(patch.emptyCells === undefined ? {} : { emptyCells: patch.emptyCells }),
+    },
+  };
+}
+
+function applyHeightfieldReliefPatch(
+  relief: HeightfieldReliefObject,
+  common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>>,
+  patch: ReliefParamPatch,
+): HeightfieldReliefObject {
+  const nextWidthMm = patch.targetWidthMm ?? relief.targetWidthMm;
+  const aspect = relief.reliefSource.physicalHeightMm / relief.reliefSource.physicalWidthMm;
+  const nextDepthMm = patch.reliefDepthMm ?? relief.reliefDepthMm;
+  const nextPolarity = patch.polarity ?? relief.reliefSource.mapping.polarity;
+  const canonicalChanged =
+    nextWidthMm !== relief.reliefSource.physicalWidthMm ||
+    nextDepthMm !== relief.reliefSource.mapping.maxDepthMm ||
+    nextPolarity !== relief.reliefSource.mapping.polarity;
+  return {
+    ...relief,
+    ...common,
+    reliefSource: {
+      ...relief.reliefSource,
+      physicalWidthMm: nextWidthMm,
+      physicalHeightMm: nextWidthMm * aspect,
+      mapping: {
+        ...relief.reliefSource.mapping,
+        ...(patch.reliefDepthMm === undefined ? {} : { maxDepthMm: patch.reliefDepthMm }),
+        ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
+      },
+      revision: relief.reliefSource.revision + (canonicalChanged ? 1 : 0),
     },
   };
 }
@@ -89,6 +135,6 @@ function boundsForWidth(
   return { minX: 0, minY: 0, maxX: widthMm, maxY: widthMm * aspect };
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
+function positiveFinite(value: number | undefined): value is number {
+  return value !== undefined && Number.isFinite(value) && value > 0;
 }

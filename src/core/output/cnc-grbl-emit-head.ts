@@ -3,7 +3,10 @@
 // last COMMANDED position at emit precision so the emitters can skip
 // zero-length moves and redundant retracts by construction.
 
-const DECIMAL_PLACES = 3;
+// Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
+import { CNC_COORDINATE_DECIMAL_PLACES } from '../cnc/cnc-output-precision';
+
 const MIN_FEED_MM_PER_MIN = 1;
 
 /** Last commanded position, formatted — compared at emit precision. */
@@ -15,7 +18,7 @@ export type Head = {
 
 /** Format a coordinate at the emitter's fixed decimal precision. */
 export function fmt(n: number): string {
-  return n.toFixed(DECIMAL_PLACES);
+  return n.toFixed(CNC_COORDINATE_DECIMAL_PLACES);
 }
 
 /** Round a feed to a whole positive mm/min the controller accepts. */

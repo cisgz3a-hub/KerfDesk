@@ -23,8 +23,8 @@ import { hasFinitePoints } from './profile-paths';
 const MIN_CLOSED_POINTS = 3;
 const MIN_STEPOVER_PERCENT = 10;
 const MAX_STEPOVER_PERCENT = 85;
-// Backstop against degenerate inputs (huge pocket + microscopic stepover).
-// 4096 rings × stepover ≥ 0.1 × diameter covers any real bed.
+// Existing backstop against degenerate inputs (huge pocket + microscopic
+// effective stepover). This slice preserves current-main planner semantics.
 const MAX_POCKET_RINGS = 4096;
 // Bisection for the innermost ring: 24 halvings resolve any bed-sized span to
 // well under the tolerance, and 0.01 mm is finer than the 3-decimal emit grid.
@@ -37,9 +37,21 @@ export type PocketToolpaths = {
   // on running out of interior: the pocket is truncated and material is still
   // standing in it. Surfaced as a Job Review warning, never a refusal (rule 7).
   readonly offsetFailed: boolean;
+  // The inherited ring planner exhausted its fixed ladder budget. This field
+  // only exposes existing behavior; this slice does not create partial raster
+  // output or expand microscopic-Stepover reach.
+  readonly passLimited: boolean;
+  // True only when this invocation reached the spacing-dependent planner.
+  // Compile evidence uses this instead of inferring consumption from settings.
+  readonly stepoverUsed: boolean;
 };
 
-const NO_POCKET_TOOLPATHS: PocketToolpaths = { toolpaths: [], offsetFailed: false };
+const NO_POCKET_TOOLPATHS: PocketToolpaths = {
+  toolpaths: [],
+  offsetFailed: false,
+  passLimited: false,
+  stepoverUsed: false,
+};
 
 export function pocketToolpathRings(
   polylines: ReadonlyArray<Polyline>,
@@ -68,6 +80,8 @@ export function pocketRingToolpaths(
     // Innermost ring first, boundary (ring 0) last as the finishing pass.
     toolpaths: innermostFirst(rings),
     offsetFailed: ladder.offsetFailed || core.offsetFailed,
+    passLimited: ladder.capped,
+    stepoverUsed: true,
   };
 }
 
@@ -171,7 +185,14 @@ export function pocketRasterToolpaths(
   if (contours.length === 0 || !(toolDiameterMm > 0)) return NO_POCKET_TOOLPATHS;
   const stepMm = (clampStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
   const wall = insetContoursChecked(contours, toolDiameterMm / 2);
-  if (wall.contours.length === 0) return { toolpaths: [], offsetFailed: wall.offsetFailed };
+  if (wall.contours.length === 0) {
+    return {
+      toolpaths: [],
+      offsetFailed: wall.offsetFailed,
+      passLimited: false,
+      stepoverUsed: true,
+    };
+  }
   const sweeps = fillHatching({
     polylines: wall.contours,
     hatchAngleDeg: axis === 'x' ? 0 : 90,
@@ -179,5 +200,10 @@ export function pocketRasterToolpaths(
     fillRule: 'nonzero',
     bidirectional: true,
   });
-  return { toolpaths: [...sweeps, ...wall.contours], offsetFailed: false };
+  return {
+    toolpaths: [...sweeps, ...wall.contours],
+    offsetFailed: false,
+    passLimited: false,
+    stepoverUsed: true,
+  };
 }

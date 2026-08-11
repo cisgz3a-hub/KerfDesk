@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -80,14 +81,14 @@ describe('detectCncThroughCutTabWarnings', () => {
       kind: 'relief',
       id: 'relief',
       source: 'height.png',
-      depthMap: {
-        schemaVersion: 1,
+      reliefSource: testReliefHeightfield({
         width: 1,
         height: 1,
-        bitDepth: 8,
-        samplesBase64: '/w==',
-        polarity: 'light-is-high',
-      },
+        physicalWidthMm: 10,
+        physicalHeightMm: 10,
+        maxDepthMm: 2,
+        samplesU8: [255],
+      }),
       targetWidthMm: 10,
       reliefDepthMm: 2,
       color: '#ff0000',
@@ -113,14 +114,14 @@ describe('detectCncThroughCutTabWarnings', () => {
       kind: 'relief',
       id: 'relief',
       source: 'height.png',
-      depthMap: {
-        schemaVersion: 1,
+      reliefSource: testReliefHeightfield({
         width: 1,
         height: 1,
-        bitDepth: 8,
-        samplesBase64: '/w==',
-        polarity: 'light-is-high',
-      },
+        physicalWidthMm: 10,
+        physicalHeightMm: 10,
+        maxDepthMm: 2,
+        samplesU8: [255],
+      }),
       targetWidthMm: 10,
       reliefDepthMm: 2,
       color: '#ff0000',

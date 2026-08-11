@@ -14,7 +14,10 @@ import {
   sourceRegionMajorDepthPasses,
 } from './compile-cnc-helpers';
 import { orderInnerFirst } from './profile-ordering';
-import { pocketToolpathsForSettings, resolveRestPocketOperation } from './cnc-rest-operation';
+import {
+  pocketToolpathsForSettingsWithEvidence,
+  resolveRestPocketOperation,
+} from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
 import { helicalPocketPassesBySourceRegion } from './cnc-helical-pocket-passes';
 import { profileFinishAllowanceMm, profilePassesWithFinishAllowance } from './finish-allowance';
@@ -40,17 +43,45 @@ export function passesForCncLayer(
   sourceContours: ReadonlyArray<CollectedCncContour> = [],
   vcarveLadder?: VCarveLadder,
 ): ReadonlyArray<CncPass> {
+  return passesForCncLayerWithEvidence(
+    polylines,
+    settings,
+    tool,
+    config,
+    handedness,
+    sourceContours,
+    vcarveLadder,
+  ).passes;
+}
+
+export type CncLayerPassesResult = {
+  readonly passes: ReadonlyArray<CncPass>;
+  readonly offsetFailed: boolean;
+  readonly passLimited: boolean;
+  readonly stepoverUsed: boolean;
+};
+
+export function passesForCncLayerWithEvidence(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  tool: CncTool,
+  config: CncMachineConfig,
+  handedness: FrameHandedness,
+  sourceContours: ReadonlyArray<CollectedCncContour> = [],
+  vcarveLadder?: VCarveLadder,
+): CncLayerPassesResult {
   const specialized = resolvedSpecializedPasses(polylines, settings, tool, vcarveLadder);
-  if (specialized !== null) return specialized;
+  if (specialized !== null) return completePasses(specialized);
 
   const contours = lineArtContoursForLayer(polylines, settings, tool.diameterMm, sourceContours);
   const allowanceMm = profileFinishAllowanceMm(settings);
   const raw = rawToolpathsForLayer(polylines, contours, settings, tool, config, allowanceMm);
-  if (raw === null) return [];
 
-  const toolpaths = directedToolpaths(raw, settings, handedness);
+  const toolpaths = directedToolpaths(raw.toolpaths, settings, handedness);
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
-  if (toolpaths.length === 0 || depths.length === 0) return [];
+  if (toolpaths.length === 0 || depths.length === 0) {
+    return { ...raw, passes: [] };
+  }
 
   const passes = passesForDepths(
     polylines,
@@ -63,9 +94,15 @@ export function passesForCncLayer(
     handedness,
     sourceContours,
   );
-  return settings.rampEntryDeg === undefined
-    ? passes
-    : applyRampEntry(passes, settings.rampEntryDeg);
+  return {
+    ...raw,
+    passes:
+      settings.rampEntryDeg === undefined ? passes : applyRampEntry(passes, settings.rampEntryDeg),
+  };
+}
+
+function completePasses(passes: ReadonlyArray<CncPass>): CncLayerPassesResult {
+  return { passes, offsetFailed: false, passLimited: false, stepoverUsed: false };
 }
 
 function resolvedSpecializedPasses(
@@ -87,13 +124,33 @@ function rawToolpathsForLayer(
   tool: CncTool,
   config: CncMachineConfig,
   allowanceMm: number,
-): ReadonlyArray<Polyline> | null {
+): CncLayerToolpathsResult {
   const restOperation = resolveRestPocketOperation(sourcePolylines, settings, config);
-  if (restOperation.kind === 'error') return null;
-  return restOperation.kind === 'ok'
-    ? restOperation.restToolpaths
-    : xyToolpathsForCutType(contours, settings, tool.diameterMm, allowanceMm);
+  if (restOperation.kind === 'error') {
+    return {
+      toolpaths: [],
+      offsetFailed: restOperation.offsetFailed,
+      passLimited: restOperation.passLimited,
+      stepoverUsed: restOperation.stepoverUsed,
+    };
+  }
+  if (restOperation.kind === 'ok') {
+    return {
+      toolpaths: restOperation.restToolpaths,
+      offsetFailed: restOperation.offsetFailed,
+      passLimited: restOperation.passLimited,
+      stepoverUsed: restOperation.stepoverUsed,
+    };
+  }
+  return xyToolpathsForCutTypeWithEvidence(contours, settings, tool.diameterMm, allowanceMm);
 }
+
+type CncLayerToolpathsResult = {
+  readonly toolpaths: ReadonlyArray<Polyline>;
+  readonly offsetFailed: boolean;
+  readonly passLimited: boolean;
+  readonly stepoverUsed: boolean;
+};
 
 function directedToolpaths(
   toolpaths: ReadonlyArray<Polyline>,
@@ -165,32 +222,50 @@ export function xyToolpathsForCutType(
   toolDiameterMm: number,
   allowanceMm: number,
 ): ReadonlyArray<Polyline> {
+  return xyToolpathsForCutTypeWithEvidence(polylines, settings, toolDiameterMm, allowanceMm)
+    .toolpaths;
+}
+
+export function xyToolpathsForCutTypeWithEvidence(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  toolDiameterMm: number,
+  allowanceMm: number,
+): CncLayerToolpathsResult {
   switch (settings.cutType) {
     case 'profile-outside':
-      return orderInnerFirst(
-        profileToolpathPolylines(polylines, 'outside', toolDiameterMm, allowanceMm),
+      return completeToolpaths(
+        orderInnerFirst(
+          profileToolpathPolylines(polylines, 'outside', toolDiameterMm, allowanceMm),
+        ),
       );
     case 'profile-inside':
-      return orderInnerFirst(
-        profileToolpathPolylines(polylines, 'inside', toolDiameterMm, allowanceMm),
+      return completeToolpaths(
+        orderInnerFirst(profileToolpathPolylines(polylines, 'inside', toolDiameterMm, allowanceMm)),
       );
     case 'profile-on-path':
-      return orderInnerFirst(profileToolpathPolylines(polylines, 'on-path', toolDiameterMm));
+      return completeToolpaths(
+        orderInnerFirst(profileToolpathPolylines(polylines, 'on-path', toolDiameterMm)),
+      );
     case 'pocket':
-      return pocketToolpathsForSettings(polylines, settings, toolDiameterMm);
+      return pocketToolpathsForSettingsWithEvidence(polylines, settings, toolDiameterMm);
     case 'engrave':
-      return polylines.filter(
-        (polyline) => polyline.points.length >= 2 && hasFinitePoints(polyline),
+      return completeToolpaths(
+        polylines.filter((polyline) => polyline.points.length >= 2 && hasFinitePoints(polyline)),
       );
     case 'v-carve':
     case 'inlay-pair':
     case 'drill':
     case 'relief-rough':
     case 'relief-finish':
-      return [];
+      return completeToolpaths([]);
     default:
       return assertNever(settings.cutType, 'CncCutType');
   }
+}
+
+function completeToolpaths(toolpaths: ReadonlyArray<Polyline>): CncLayerToolpathsResult {
+  return { toolpaths, offsetFailed: false, passLimited: false, stepoverUsed: false };
 }
 
 function contourMajorPasses(

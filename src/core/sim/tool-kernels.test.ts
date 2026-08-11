@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CncTool } from '../scene';
+import { CNC_MASK_EMISSION_XY_CLEARANCE_MM } from '../cnc/cnc-output-precision';
 import { kernelForTool } from './tool-kernels';
 
 const CELL = 0.2;
@@ -90,6 +91,21 @@ describe('kernelForTool', () => {
     const kernel = kernelForTool(tool('end-mill', 2), CELL);
     for (const o of kernel.offsets) {
       expect(Math.hypot(o.dx, o.dy) * CELL).toBeLessThanOrEqual(1 + 1e-9);
+    }
+  });
+
+  it('covers excluded cell squares that intersect a fractional-radius footprint', () => {
+    const mmPerCell = 1 / 5.8;
+    const kernel = kernelForTool(tool('end-mill', 2), mmPerCell);
+
+    expect(kernel.offsets.some(({ dx, dy }) => dx === 6 && dy === 0)).toBe(false);
+    expect(kernel.maskCellOffsets).toContainEqual({ dx: 6, dy: 0, dz: 0 });
+    for (const offset of kernel.maskCellOffsets ?? []) {
+      const nearestX = Math.max(0, Math.abs(offset.dx) * mmPerCell - mmPerCell / 2);
+      const nearestY = Math.max(0, Math.abs(offset.dy) * mmPerCell - mmPerCell / 2);
+      expect(
+        Math.max(0, Math.hypot(nearestX, nearestY) - CNC_MASK_EMISSION_XY_CLEARANCE_MM),
+      ).toBeLessThanOrEqual(1 + 1e-9);
     }
   });
 });

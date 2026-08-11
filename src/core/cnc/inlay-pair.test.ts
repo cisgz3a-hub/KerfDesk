@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Polyline } from '../scene';
 import { planStraightInlayPair } from './inlay-pair';
+import { pocketToolpathRings } from './pocket-paths';
 
 function square(size: number): Polyline {
   return {
@@ -29,6 +30,8 @@ describe('planStraightInlayPair', () => {
     });
     expect(plan.ok).toBe(true);
     if (!plan.ok) return;
+    expect(plan.femalePocketPassLimited).toBe(false);
+    expect(plan.femaleToolpaths).toEqual(pocketToolpathRings(plan.femaleContours, 3.175, 40));
     expect(plan.femaleToolpaths.length).toBeGreaterThan(0);
     expect(plan.maleToolpaths.length).toBeGreaterThan(0);
     const female = xBounds(plan.femaleContours);

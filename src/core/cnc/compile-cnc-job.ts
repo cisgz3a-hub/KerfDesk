@@ -21,27 +21,24 @@ import {
   type Scene,
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
-import type { CncCompilationSidecar } from '../job/job';
+// Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
+import type {
+  CncOffsetLadderCompilationEvidence,
+  CncReliefPlanningEvidence,
+  CncStepoverCompilationEvidence,
+} from '../job/job';
 import type { ReliefMaterializationFailure } from '../relief/relief-materialization-failure';
 import { coolantFields } from './coolant-fields';
 import {
   capFeed,
   capSpindle,
-  sourceRegionMajorDepthPasses,
   isProfileCutType,
   resolveRetractBetweenPasses,
   type CncGroupCompileOptions,
 } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
-import { resolveRestPocketOperation } from './cnc-rest-operation';
-import { zPassDepths } from './depth-passes';
-import { compileStraightInlayGroups } from './inlay-pair-operation';
-import { machineFrameHandedness } from './machine-frame-handedness';
-import { applyRampEntry, parkFields } from './motion-polish';
-import { applyProfileLeadPasses } from './profile-lead-passes';
-import { vcarveClearanceToolpaths } from './vcarve-clearance';
-import { vcarveEffectiveDepthMm } from './vcarve-depth';
 import { collectLayerContours, layerPolylinesFromContours } from './collect-cnc-contours';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 import { cncGroupProvenance } from './cnc-group-provenance';
@@ -56,9 +53,20 @@ import {
   type PreparedCncCompilationArtifact,
 } from './cnc-compilation-artifact';
 import type { VCarveLadder } from './vcarve-ladder';
-import { passesForCncLayer } from './compile-cnc-layer-passes';
+import { passesForCncLayerWithEvidence } from './compile-cnc-layer-passes';
+import { machineFrameHandedness } from './machine-frame-handedness';
+import { parkFields } from './motion-polish';
+import { applyProfileLeadPasses } from './profile-lead-passes';
+import {
+  boundVCarveLadder,
+  buildCncCompilationSidecar,
+  hasVCarveOperation,
+  offsetDiagnosticsForStatus,
+} from './cnc-compilation-sidecar';
+import { compiledInlayGroups, secondaryClearingGroups } from './compile-cnc-operation-groups';
 
 export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
+export { vcarveClearanceGroupForLayer } from './compile-cnc-operation-groups';
 
 /** Pure CNC compilation result used by output preparation and worker finalization. */
 export type CncJobCompilationResult =
@@ -140,123 +148,183 @@ function compileCncSnapshot(
 ): CncJobCompilationResult {
   const clearingGroups: CncGroup[] = [];
   const profileGroups: CncGroup[] = [];
+  const stepoverOperations: CncStepoverCompilationEvidence[] = [];
+  const offsetLadderDiagnostics: CncOffsetLadderCompilationEvidence[] = [];
+  const reliefPlans: CncReliefPlanningEvidence[] = [];
   const sourceObjects = scene.objects;
-  for (const [operationIndex, { layer, priorityObjectId }] of artworkOperationRuns(
-    scene,
-  ).entries()) {
-    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    // H.5/H.8: relief objects rough (and optionally finish, with their own
-    // bit) as clearing groups — neither ever frees a part.
-    const relief = compileReliefGroupsForLayer(sourceObjects, layer, settings, device, config);
-    if (relief.kind === 'relief-materialization-failed') return relief;
-    clearingGroups.push(...relief.groups.map((group) => tagArtworkGroup(group, priorityObjectId)));
-    const contours = collectLayerContours(sourceObjects, layer, device);
-    const polylines = layerPolylinesFromContours(layer, contours);
-    if (polylines.length === 0) continue;
-    const inlayGroups = compileStraightInlayGroups(
-      polylines,
-      settings,
-      config,
-      // The inlay pair builds its groups directly rather than through
-      // cncGroupForLayer, so it has to apply the ADR-250 lead itself or the
-      // male insert plunges full-depth onto the very wall that must fit the
-      // pocket. applyProfileLeadPasses is a no-op for the female pocket.
-      (groupSettings, tool, passes) =>
-        cncGroupForPasses(
-          layer,
-          groupSettings,
-          tool,
-          applyProfileLeadPasses(
-            passes,
-            groupSettings,
-            tool.diameterMm,
-            machineBoundsForDevice(device),
-          ),
-          device,
-          config,
-        ),
-    );
-    if (inlayGroups !== null) {
-      clearingGroups.push(tagArtworkGroup(inlayGroups.female, priorityObjectId));
-      profileGroups.push(tagArtworkGroup(inlayGroups.male, priorityObjectId));
-      continue;
-    }
-    // H.7 two-stage V-carve clearance runs before the V-bit medial finish.
-    const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
-    if (clearance !== null) clearingGroups.push(tagArtworkGroup(clearance, priorityObjectId));
-    const roughing = restPocketRoughingGroupForLayer(layer, settings, polylines, device, config);
-    if (roughing !== null) clearingGroups.push(tagArtworkGroup(roughing, priorityObjectId));
-    const group = cncGroupForLayerResolved(
-      layer,
-      settings,
-      polylines,
+  for (const [operationIndex, run] of artworkOperationRuns(scene).entries()) {
+    const operation = compileCncOperation(
+      sourceObjects,
+      run,
+      operationIndex,
       device,
       config,
-      contours,
-      vcarveLadderForOperation(
-        vcarveLayers,
-        operationIndex,
-        layer.id,
-        priorityObjectId,
-        settings.cutType === 'v-carve',
-      ),
+      vcarveLayers,
     );
-    if (group === null) continue;
-    if (isProfileCutType(settings.cutType)) {
-      profileGroups.push(tagArtworkGroup(group, priorityObjectId));
-    } else {
-      clearingGroups.push(tagArtworkGroup(group, priorityObjectId));
+    if (operation.kind === 'relief-materialization-failed') return operation;
+    clearingGroups.push(...operation.clearingGroups);
+    profileGroups.push(...operation.profileGroups);
+    reliefPlans.push(...operation.reliefPlans);
+    offsetLadderDiagnostics.push(...operation.offsetLadderDiagnostics);
+    if (operation.stepoverOperation !== undefined) {
+      stepoverOperations.push(operation.stepoverOperation);
     }
   }
   // H.7 multi-tool: contiguous per-bit sections (one change per bit),
   // profile-carrying sections last so freed parts are never re-machined.
   const groups = orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]);
-  const cncCompilation = cncCompilationSidecar(vcarveLayers);
+  const cncCompilation = buildCncCompilationSidecar(
+    vcarveLayers,
+    stepoverOperations,
+    reliefPlans,
+    offsetLadderDiagnostics,
+  );
   return {
     kind: 'compiled',
-    job: cncCompilation === undefined ? { groups } : { groups, cncCompilation },
+    job: { groups, cncCompilation },
   };
 }
 
-function hasVCarveOperation(scene: Scene): boolean {
-  return artworkOperationRuns(scene).some(
-    ({ layer }) => (layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS).cutType === 'v-carve',
-  );
-}
+type CompiledCncOperation = {
+  readonly kind: 'compiled';
+  readonly layerId: string;
+  readonly clearingGroups: ReadonlyArray<CncGroup>;
+  readonly profileGroups: ReadonlyArray<CncGroup>;
+  readonly reliefPlans: ReadonlyArray<CncReliefPlanningEvidence>;
+  readonly offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
+  readonly stepoverOperation?: CncStepoverCompilationEvidence;
+};
 
-function vcarveLadderForOperation(
-  layers: CncCompilationEvidence['vcarveLayers'],
+function compileCncOperation(
+  sourceObjects: Scene['objects'],
+  run: { readonly layer: Layer; readonly priorityObjectId: string },
   operationIndex: number,
-  layerId: string,
-  priorityObjectId: string,
-  required: boolean,
-): VCarveLadder | undefined {
-  const evidence = layers.find((candidate) => candidate.operationIndex === operationIndex);
-  if (evidence === undefined) {
-    if (required)
-      throw new Error(`Missing bound V-carve evidence for operation ${operationIndex}.`);
-    return undefined;
-  }
-  if (evidence.layerId !== layerId || evidence.priorityObjectId !== priorityObjectId) {
-    throw new Error(`Bound V-carve evidence does not match operation ${operationIndex}.`);
-  }
-  return evidence.ladder;
+  device: DeviceProfile,
+  config: CncMachineConfig,
+  vcarveLayers: CncCompilationEvidence['vcarveLayers'],
+): CompiledCncOperation | ReliefMaterializationFailure {
+  const { layer, priorityObjectId } = run;
+  const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const relief = compileReliefGroupsForLayer(sourceObjects, layer, settings, device, config);
+  if (relief.kind === 'relief-materialization-failed') return relief;
+  const contours = collectLayerContours(sourceObjects, layer, device);
+  const polylines = layerPolylinesFromContours(layer, contours);
+  const vectorGroups = compileVectorOperationGroups(
+    layer,
+    settings,
+    polylines,
+    contours,
+    priorityObjectId,
+    operationIndex,
+    device,
+    config,
+    vcarveLayers,
+  );
+  const usesStepover = relief.evidence.stepoverUsed || vectorGroups.stepoverUsed;
+  return {
+    kind: 'compiled',
+    layerId: layer.id,
+    clearingGroups: [
+      ...relief.groups.map((group) => tagArtworkGroup(group, priorityObjectId)),
+      ...vectorGroups.clearingGroups,
+    ],
+    profileGroups: vectorGroups.profileGroups,
+    reliefPlans: relief.evidence.plans,
+    offsetLadderDiagnostics: [
+      ...vectorGroups.offsetLadderDiagnostics,
+      ...offsetDiagnosticsForStatus(layer.id, {
+        offsetFailed: relief.evidence.offsetFailed,
+        passLimited: false,
+      }),
+    ],
+    ...(usesStepover
+      ? { stepoverOperation: { layerId: layer.id, stepoverPercent: settings.stepoverPercent } }
+      : {}),
+  };
 }
 
-function cncCompilationSidecar(
-  layers: CncCompilationEvidence['vcarveLayers'],
-): CncCompilationSidecar | undefined {
-  if (layers.length === 0) return undefined;
-  return {
-    vcarveOperations: layers.map(({ operationIndex, layerId, ladder }) => ({
+type CncOperationGroups = {
+  readonly clearingGroups: ReadonlyArray<CncGroup>;
+  readonly profileGroups: ReadonlyArray<CncGroup>;
+  readonly offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
+  readonly stepoverUsed: boolean;
+};
+
+function compileVectorOperationGroups(
+  layer: Layer,
+  settings: CncLayerSettings,
+  polylines: ReadonlyArray<Polyline>,
+  contours: ReadonlyArray<CollectedCncContour>,
+  priorityObjectId: string,
+  operationIndex: number,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+  vcarveLayers: CncCompilationEvidence['vcarveLayers'],
+): CncOperationGroups {
+  if (polylines.length === 0) {
+    return {
+      clearingGroups: [],
+      profileGroups: [],
+      offsetLadderDiagnostics: [],
+      stepoverUsed: false,
+    };
+  }
+  const inlay = compiledInlayGroups(layer, settings, polylines, device, config);
+  if (inlay !== null) {
+    const groups = inlay.groups;
+    return {
+      clearingGroups: groups === null ? [] : [tagArtworkGroup(groups.female, priorityObjectId)],
+      profileGroups: groups === null ? [] : [tagArtworkGroup(groups.male, priorityObjectId)],
+      offsetLadderDiagnostics: offsetDiagnosticsForStatus(layer.id, {
+        offsetFailed: inlay.femalePocketOffsetFailed,
+        passLimited: inlay.femalePocketPassLimited,
+      }),
+      stepoverUsed: inlay.stepoverUsed,
+    };
+  }
+  const secondary = secondaryClearingGroups(layer, settings, polylines, device, config);
+  const clearingGroups = secondary.groups.map((group) => tagArtworkGroup(group, priorityObjectId));
+  const compiledGroup = cncGroupForLayerResolvedWithEvidence(
+    layer,
+    settings,
+    polylines,
+    device,
+    config,
+    contours,
+    boundVCarveLadder(
+      vcarveLayers,
       operationIndex,
-      layerId,
-      entryIssue: ladder.entryIssue,
-      offsetFailed: ladder.offsetFailed,
-      thinResidual: ladder.thinResidual,
-      passLimited: ladder.passLimited,
-    })),
-  };
+      layer.id,
+      priorityObjectId,
+      settings.cutType === 'v-carve',
+    ),
+  );
+  const offsetLadderDiagnostics = offsetDiagnosticsForStatus(layer.id, {
+    offsetFailed: secondary.offsetFailed || compiledGroup.offsetFailed,
+    passLimited: secondary.passLimited || compiledGroup.passLimited,
+  });
+  if (compiledGroup.group === null) {
+    return {
+      clearingGroups,
+      profileGroups: [],
+      offsetLadderDiagnostics,
+      stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
+    };
+  }
+  const tagged = tagArtworkGroup(compiledGroup.group, priorityObjectId);
+  return isProfileCutType(settings.cutType)
+    ? {
+        clearingGroups,
+        profileGroups: [tagged],
+        offsetLadderDiagnostics,
+        stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
+      }
+    : {
+        clearingGroups: [...clearingGroups, tagged],
+        profileGroups: [],
+        offsetLadderDiagnostics,
+        stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
+      };
 }
 
 function tagArtworkGroup(group: CncGroup, sourceObjectId: string): CncGroup {
@@ -273,10 +341,24 @@ export function cncGroupForLayer(
   config: CncMachineConfig,
   sourceContours?: ReadonlyArray<CollectedCncContour>,
 ): CncGroup | null {
-  return cncGroupForLayerResolved(layer, settings, polylines, device, config, sourceContours);
+  return cncGroupForLayerResolvedWithEvidence(
+    layer,
+    settings,
+    polylines,
+    device,
+    config,
+    sourceContours,
+  ).group;
 }
 
-function cncGroupForLayerResolved(
+type CompiledLayerGroup = {
+  readonly group: CncGroup | null;
+  readonly offsetFailed: boolean;
+  readonly passLimited: boolean;
+  readonly stepoverUsed: boolean;
+};
+
+function cncGroupForLayerResolvedWithEvidence(
   layer: Layer,
   settings: CncLayerSettings,
   polylines: ReadonlyArray<Polyline>,
@@ -284,12 +366,12 @@ function cncGroupForLayerResolved(
   config: CncMachineConfig,
   sourceContours?: ReadonlyArray<CollectedCncContour>,
   vcarveLadder?: VCarveLadder,
-): CncGroup | null {
+): CompiledLayerGroup {
   const tool = layerCncTool(config, settings);
   // Cut direction is a physical rule applied to machine numbers, and
   // front-right / rear-left mirror the frame — see machine-frame-handedness.
   const handedness = machineFrameHandedness(device.origin);
-  const passes = passesForCncLayer(
+  const result = passesForCncLayerWithEvidence(
     polylines,
     settings,
     tool,
@@ -301,34 +383,17 @@ function cncGroupForLayerResolved(
   // ADR-250: bake profile lead-in/out into closed profile passes (default-on
   // for profile-outside/inside; a no-op for other cut types and shape 'none').
   const led = applyProfileLeadPasses(
-    passes,
+    result.passes,
     settings,
     tool.diameterMm,
     machineBoundsForDevice(device),
   );
-  return cncGroupForPasses(layer, settings, tool, led, device, config);
-}
-
-function restPocketRoughingGroupForLayer(
-  layer: Layer,
-  settings: CncLayerSettings,
-  polylines: ReadonlyArray<Polyline>,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-): CncGroup | null {
-  const operation = resolveRestPocketOperation(polylines, settings, config);
-  if (operation.kind !== 'ok') return null;
-  const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
-  let passes: ReadonlyArray<CncPass> = sourceRegionMajorDepthPasses(
-    polylines,
-    operation.roughToolpaths,
-    depths,
-  );
-  if (settings.rampEntryDeg !== undefined) passes = applyRampEntry(passes, settings.rampEntryDeg);
-  const primaryTool = layerCncTool(config, settings);
-  return cncGroupForPasses(layer, settings, operation.roughTool, passes, device, config, {
-    layerPrimaryTool: primaryTool,
-  });
+  return {
+    group: cncGroupForPasses(layer, settings, tool, led, device, config),
+    offsetFailed: result.offsetFailed,
+    passLimited: result.passLimited,
+    stepoverUsed: result.stepoverUsed,
+  };
 }
 
 function cncGroupForPasses(
@@ -364,45 +429,4 @@ function cncGroupForPasses(
     retractBetweenPasses: options.retractBetweenPasses ?? resolveRetractBetweenPasses(settings),
     passes,
   };
-}
-
-// The two-stage V-carve's clearing group (H.7): pocket an explicitly enabled
-// flat floor with the layer's clearing bit before the V-bit medial finish.
-export function vcarveClearanceGroupForLayer(
-  layer: Layer,
-  settings: CncLayerSettings,
-  polylines: ReadonlyArray<Polyline>,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-): CncGroup | null {
-  if (
-    settings.cutType !== 'v-carve' ||
-    !(settings.vCarveFlatDepthEnabled ?? true) ||
-    settings.vClearToolId === undefined
-  ) {
-    return null;
-  }
-  const clearTool = config.tools.find((tool) => tool.id === settings.vClearToolId);
-  if (clearTool === undefined || clearTool.kind !== 'end-mill') return null;
-  const vBit = layerCncTool(config, settings);
-  const effectiveDepthMm = vcarveEffectiveDepthMm(vBit, settings.depthMm);
-  if (effectiveDepthMm === null) return null;
-  const toolpaths = vcarveClearanceToolpaths(polylines, {
-    vBit,
-    clearTool,
-    maxDepthMm: effectiveDepthMm,
-    stepoverPercent: settings.stepoverPercent,
-  });
-  const depths = zPassDepths(effectiveDepthMm, settings.depthPerPassMm);
-  if (toolpaths.length === 0 || depths.length === 0) return null;
-  const clearingSettings: CncLayerSettings = { ...settings, cutType: 'pocket' };
-  return cncGroupForPasses(
-    layer,
-    clearingSettings,
-    clearTool,
-    sourceRegionMajorDepthPasses(polylines, toolpaths, depths),
-    device,
-    config,
-    { layerPrimaryTool: vBit, includeRampEntry: false, retractBetweenPasses: false },
-  );
 }

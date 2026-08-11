@@ -20,8 +20,8 @@ function hasTypedRelief(project: Project): boolean {
   return project.scene.objects.some(
     (object) =>
       object.kind === 'relief' &&
-      object.depthMap === undefined &&
-      object.meshPositions instanceof Float32Array,
+      object.reliefSource.kind === 'legacy-mesh' &&
+      object.reliefSource.meshPositions instanceof Float32Array,
   );
 }
 

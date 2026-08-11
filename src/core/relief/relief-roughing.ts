@@ -29,6 +29,11 @@ const MIN_STEPOVER_PERCENT = 10;
 const MAX_STEPOVER_PERCENT = 85;
 const MAX_RINGS_PER_LEVEL = 4096;
 const MIN_RING_POINTS = 3;
+// Exhausting the current 16-case marching-squares table, the farthest point on
+// a produced segment from its nearest selected center occurs in cases 7/11/13/14:
+// sqrt((3/4)^2 + (1/4)^2) cells. The mask kernel expands by this amount so the
+// whole dual-grid contour, rather than only its sampled centers, is proven safe.
+const MARCHING_SQUARES_CENTER_CLEARANCE_CELLS = Math.sqrt(10) / 4;
 
 export type ReliefRoughingOptions = {
   readonly tool: CncTool;
@@ -62,7 +67,11 @@ export function reliefRoughingLadder(
   if (!(options.reliefDepthMm > 0) || !(options.tool.diameterMm > 0)) {
     return { passes: [], offsetFailed: false };
   }
-  const kernel: ToolKernel = kernelForTool(options.tool, map.mmPerCell);
+  const kernel: ToolKernel = kernelForTool(
+    options.tool,
+    map.mmPerCell,
+    MARCHING_SQUARES_CENTER_CLEARANCE_CELLS * map.mmPerCell,
+  );
   const dilated = dilateHeightmapByTool(
     map,
     kernel,
@@ -95,7 +104,7 @@ function levelContoursMm(
   const mask = new Uint8Array(map.widthCells * map.heightCells);
   let any = false;
   for (let i = 0; i < mask.length; i += 1) {
-    if ((dilated[i] ?? 0) <= levelZ + LEVEL_EPS) {
+    if (map.inclusion?.[i] !== 0 && (dilated[i] ?? 0) <= levelZ + LEVEL_EPS) {
       mask[i] = 1;
       any = true;
     }
@@ -117,11 +126,11 @@ function appendLevelRings(
 ): boolean {
   const usable = contours.filter((c) => c.points.length >= MIN_RING_POINTS);
   if (usable.length === 0) return false;
-  // Ring 0 = the dual-grid region boundary. Its vertices are marching-squares
-  // edge midpoints rather than evaluated dilation samples, so pointwise cutter
-  // clearance is outside the sampled-grid proof (ADR-289). Deeper rings shrink
-  // inward by the stepover until they vanish. Step 0's inset is 0, which the
-  // offset engine returns unchanged, so ring 0 is still exactly `usable`.
+  // Ring 0 = the dual-grid region boundary. The mask-aware dilation expands its
+  // excluded-cell envelope by the exact worst displacement of this marching-
+  // squares table, so every boundary segment remains inside the mask proof.
+  // Deeper rings shrink inward by the stepover until they vanish. Step 0's inset
+  // is 0, which the offset engine returns unchanged.
   const ladder = buildOffsetLadder(usable, MAX_RINGS_PER_LEVEL, (step) => step * stepMm);
   for (const ring of ladder.rings) {
     for (const polyline of ring) {

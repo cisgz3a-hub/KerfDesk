@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   createLayer,
   createProject,
@@ -103,7 +104,7 @@ function laserProject(objects: ReadonlyArray<SceneObject>, output = true): Proje
   };
 }
 
-function reliefCommon(id: string): Omit<ReliefObject, 'depthMap' | 'meshPositions' | 'emptyCells'> {
+function reliefCommon(id: string): Omit<ReliefObject, 'reliefSource'> {
   return {
     kind: 'relief',
     id,
@@ -121,8 +122,11 @@ function meshRelief(): ReliefObject {
   return {
     ...reliefCommon('mesh-relief'),
     source: 'model.stl',
-    meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 2],
-    emptyCells: 'floor',
+    reliefSource: {
+      kind: 'legacy-mesh',
+      meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 2],
+      emptyCells: 'floor',
+    },
   };
 }
 
@@ -130,13 +134,14 @@ function depthMapRelief(): ReliefObject {
   return {
     ...reliefCommon('depth-map-relief'),
     source: 'depth.png',
-    depthMap: {
-      schemaVersion: 1,
+    reliefSource: testReliefHeightfield({
       width: 2,
       height: 2,
-      bitDepth: 8,
-      samplesBase64: 'AP+A/w==',
-      polarity: 'light-is-high',
-    },
+      physicalWidthMm: 10,
+      physicalHeightMm: 10,
+      maxDepthMm: 2,
+      samplesU8: [0, 255, 128, 255],
+      provenance: { sourceName: 'depth.png' },
+    }),
   };
 }

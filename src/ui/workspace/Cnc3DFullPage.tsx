@@ -20,7 +20,13 @@ import {
 } from '../cnc-viewer3d/viewer3d-display-mode';
 import { SECTION_DISABLED_FRACTION } from '../cnc-viewer3d/viewer3d-clipping';
 import { DEFAULT_SCREENSHOT_SCALE, screenshotFileName } from '../cnc-viewer3d/viewer3d-screenshot';
-import { useCnc3dScene, type DesignSceneSource, type SurfaceReading } from './use-cnc-3d-scene';
+import {
+  cnc3dPaneDisplayResolution,
+  useCnc3dScene,
+  type DesignSceneSource,
+  type SurfaceReading,
+} from './use-cnc-3d-scene';
+import { previewResolutionMessage } from './preview-resolution';
 
 const CLOSE_KEY = 'Escape';
 
@@ -36,6 +42,10 @@ export function Cnc3DFullPage(props: {
   const [mode, setMode] = useState<Viewer3DDisplayMode>(DEFAULT_DISPLAY_MODE);
   const [sectionFraction, setSectionFraction] = useState(SECTION_DISABLED_FRACTION);
   const [reading, setReading] = useState<SurfaceReading | null>(null);
+  const resolutionNotice = previewResolutionMessage(
+    '3D result',
+    cnc3dPaneDisplayResolution(source.grid),
+  );
   useCloseOnEscape(onClose);
 
   // Pushed on every change AND on every state change: the controls no-op until
@@ -87,6 +97,11 @@ export function Cnc3DFullPage(props: {
           onSavePng={handleSavePng}
         />
       </div>
+      {resolutionNotice === null ? null : (
+        <div style={resolutionNoticeStyle} role="status">
+          {resolutionNotice}
+        </div>
+      )}
       <canvas
         ref={canvasRef}
         aria-label="Live 3D cut result"
@@ -133,6 +148,11 @@ const barStyle: React.CSSProperties = {
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
 const toolbarRowStyle: React.CSSProperties = { padding: '0 12px 8px', flexShrink: 0 };
+const resolutionNoticeStyle: React.CSSProperties = {
+  padding: '0 12px 8px',
+  color: 'var(--lf-warning)',
+  flexShrink: 0,
+};
 const readoutRowStyle: React.CSSProperties = { padding: '6px 12px', flexShrink: 0 };
 const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', flex: 1 };
 const closeStyle: React.CSSProperties = { padding: '4px 12px', cursor: 'pointer' };

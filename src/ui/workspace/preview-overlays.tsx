@@ -6,9 +6,13 @@
 
 import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
+// Deep type import: core/sim's public barrel is hard-capped at 20 exports by
+// its index contract, so this display-resolution type remains on a leaf path.
+import type { RemovalGridResolution } from '../../core/sim/removal-grid';
 import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore, type PreviewPlaybackSpeed } from '../state/ui-store';
 import { hasOutOfBoundsObjects } from './out-of-bounds';
+import { PreviewResolutionBanner } from './preview-resolution';
 import { previewHasBurnableContent, previewIssueFor, type PreviewIssue } from './preview-status';
 
 function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX.Element | null {
@@ -57,16 +61,19 @@ function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX
 export function PreviewStatusOverlays(props: {
   readonly project: Project;
   readonly toolpath: Toolpath;
+  readonly resolution?: RemovalGridResolution;
 }): JSX.Element | null {
   const issue = previewIssueFor(props.toolpath);
   // Any preview issue (too-complex, placement failure) already explains the
   // blank route, so the scope-oriented "enable Output" hint must not fire.
   const empty = issue === null && !previewHasBurnableContent(props.project, props.toolpath);
   const outOfBounds = hasOutOfBoundsObjects(props.project);
-  if (issue === null && !empty && !outOfBounds) return null;
+  const hasResolutionNotice = props.resolution !== undefined && props.resolution.reason !== null;
+  if (issue === null && !empty && !outOfBounds && !hasResolutionNotice) return null;
   return (
     <div style={stackStyle}>
       <PreviewIssueBanner issue={issue} />
+      <PreviewResolutionBanner label="2D cut shading" resolution={props.resolution} />
       {empty ? (
         <div className="lf-chip" style={hintStyle} role="status">
           Nothing to preview — enable Output on at least one layer with objects.

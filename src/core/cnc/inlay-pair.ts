@@ -1,6 +1,6 @@
 import { offsetClosedPolylinesWithRoundJoins } from '../geometry/kerf-offset';
 import type { CncLayerSettings, CncTool, Polyline, Vec2 } from '../scene';
-import { pocketToolpathRings } from './pocket-paths';
+import { pocketRingToolpaths } from './pocket-paths';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 
 const MIN_CLOSED_POINTS = 3;
@@ -12,15 +12,27 @@ export type StraightInlayPairOptions = {
   readonly stepoverPercent: number;
 };
 
+export type StraightInlayPairPlanningEvidence = {
+  readonly femalePocketOffsetFailed: boolean;
+  readonly femalePocketPassLimited: boolean;
+  readonly stepoverUsed: boolean;
+};
+
 export type StraightInlayPairPlan =
-  | { readonly ok: false; readonly reason: string }
-  | {
+  | ({ readonly ok: false; readonly reason: string } & StraightInlayPairPlanningEvidence)
+  | ({
       readonly ok: true;
       readonly femaleToolpaths: ReadonlyArray<Polyline>;
       readonly maleToolpaths: ReadonlyArray<Polyline>;
       readonly femaleContours: ReadonlyArray<Polyline>;
       readonly maleContours: ReadonlyArray<Polyline>;
-    };
+    } & StraightInlayPairPlanningEvidence);
+
+const NO_INLAY_PLANNING_EVIDENCE: StraightInlayPairPlanningEvidence = {
+  femalePocketOffsetFailed: false,
+  femalePocketPassLimited: false,
+  stepoverUsed: false,
+};
 
 export function planStraightInlayPairForSettings(
   polylines: ReadonlyArray<Polyline>,
@@ -83,16 +95,30 @@ export function planStraightInlayPair(
     return failure('The fit allowance removes geometry from one half of the inlay.');
   }
   const maleContours = placeMirroredToRight(femaleContours, maleBase, options.pairSpacingMm);
-  const femaleToolpaths = pocketToolpathRings(
+  const femalePocket = pocketRingToolpaths(
     femaleContours,
     options.toolDiameterMm,
     options.stepoverPercent,
   );
+  const femaleToolpaths = femalePocket.toolpaths;
   const maleToolpaths = profileToolpathPolylines(maleContours, 'outside', options.toolDiameterMm);
+  const pocketEvidence: StraightInlayPairPlanningEvidence = {
+    femalePocketOffsetFailed: femalePocket.offsetFailed,
+    femalePocketPassLimited: femalePocket.passLimited,
+    stepoverUsed: femalePocket.stepoverUsed,
+  };
   if (femaleToolpaths.length === 0)
-    return failure('The selected bit does not fit the inlay pocket.');
-  if (maleToolpaths.length === 0) return failure('The insert profile could not be generated.');
-  return { ok: true, femaleToolpaths, maleToolpaths, femaleContours, maleContours };
+    return failure('The selected bit does not fit the inlay pocket.', pocketEvidence);
+  if (maleToolpaths.length === 0)
+    return failure('The insert profile could not be generated.', pocketEvidence);
+  return {
+    ok: true,
+    femaleToolpaths,
+    maleToolpaths,
+    femaleContours,
+    maleContours,
+    ...pocketEvidence,
+  };
 }
 
 function inlayOptionIssue(options: StraightInlayPairOptions): string | null {
@@ -158,6 +184,9 @@ function boundsOf(polylines: ReadonlyArray<Polyline>): Bounds | null {
   }
 }
 
-function failure(reason: string): StraightInlayPairPlan {
-  return { ok: false, reason };
+function failure(
+  reason: string,
+  evidence: StraightInlayPairPlanningEvidence = NO_INLAY_PLANNING_EVIDENCE,
+): StraightInlayPairPlan {
+  return { ok: false, reason, ...evidence };
 }

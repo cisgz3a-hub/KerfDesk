@@ -27,10 +27,9 @@ function typedReliefProject(notes = ''): Project {
     kind: 'relief',
     id: 'typed-relief',
     source: 'large.stl',
-    meshPositions,
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    emptyCells: 'floor',
+    reliefSource: { kind: 'legacy-mesh', meshPositions, emptyCells: 'floor' },
     color: DEFAULT_RELIEF_LAYER_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
     transform: IDENTITY_TRANSFORM,
@@ -63,8 +62,9 @@ describe('large typed relief persistence', () => {
     );
     expect(reopenedSave.project.scene.objects[0]?.kind).toBe('relief');
     expect(
-      reopenedSave.project.scene.objects[0]?.kind === 'relief'
-        ? reopenedSave.project.scene.objects[0].meshPositions
+      reopenedSave.project.scene.objects[0]?.kind === 'relief' &&
+        reopenedSave.project.scene.objects[0].reliefSource.kind === 'legacy-mesh'
+        ? reopenedSave.project.scene.objects[0].reliefSource.meshPositions
         : [],
     ).toHaveLength(POSITION_COUNT);
   });
@@ -78,8 +78,8 @@ describe('large typed relief persistence', () => {
     expect(readAutosave()?.project.notes).toBe('recover me');
     const recovered = readAutosave()?.project.scene.objects[0];
     expect(recovered?.kind).toBe('relief');
-    if (recovered?.kind !== 'relief') return;
-    expect(recovered.meshPositions).toHaveLength(POSITION_COUNT);
+    if (recovered?.kind !== 'relief' || recovered.reliefSource.kind !== 'legacy-mesh') return;
+    expect(recovered.reliefSource.meshPositions).toHaveLength(POSITION_COUNT);
   });
 
   it('quota pressure reports failure and preserves the prior recovery slot', () => {

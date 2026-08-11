@@ -11,13 +11,15 @@ import type { BoundedCompilationBridgePort } from './bounded-compilation-bridge-
 import type { DeviceProfile } from '../../core/devices';
 import type { Toolpath } from '../../core/job';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
+// Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import {
-  depthMapToHeightmap,
-  type DepthMapHeightmapOptions,
-  type DepthMapHeightmapResult,
-} from '../../core/relief/depth-map-to-heightmap';
+  heightfieldToHeightmap,
+  type HeightfieldHeightmapOptions,
+  type HeightfieldHeightmapResult,
+} from '../../core/relief/heightfield-to-heightmap';
 import type { CncMachineConfig } from '../../core/scene';
-import type { ReliefDepthMap } from '../../core/scene/relief';
+import type { ReliefHeightfield } from '../../core/scene/relief';
 import type { RemovalGrid } from '../../core/sim';
 import { prepareCncCut3DSurface } from './cnc-cut3d-surface';
 import { computeCncRemovalGrid } from './cnc-removal-grid';
@@ -42,8 +44,8 @@ export type CanvasCompilationTaskPayload =
     }
   | {
       readonly kind: 'relief-heightmap';
-      readonly source: ReliefDepthMap;
-      readonly options: DepthMapHeightmapOptions;
+      readonly source: ReliefHeightfield;
+      readonly options: HeightfieldHeightmapOptions;
     };
 
 export type CanvasCompilationTaskResult =
@@ -53,14 +55,19 @@ export type CanvasCompilationTaskResult =
     }
   | { readonly kind: 'cnc-removal-grid'; readonly output: RemovalGrid | null }
   | { readonly kind: 'cnc-cut3d-surface'; readonly output: ReliefSurfaceMeshWithNormals }
-  | { readonly kind: 'relief-heightmap'; readonly output: DepthMapHeightmapResult };
+  | { readonly kind: 'relief-heightmap'; readonly output: HeightfieldHeightmapResult };
 
 /** Ownership transfers for clone-safe task results that carry large typed arrays. */
 export function canvasCompilationResultTransferables(
   result: CanvasCompilationTaskResult,
 ): Transferable[] {
   if (result.kind === 'cnc-removal-grid') {
-    return result.output === null ? [] : [result.output.depth.buffer];
+    return result.output === null
+      ? []
+      : [
+          result.output.depth.buffer,
+          ...(result.output.inclusion === undefined ? [] : [result.output.inclusion.buffer]),
+        ];
   }
   if (result.kind === 'cnc-cut3d-surface') {
     return [
@@ -70,7 +77,11 @@ export function canvasCompilationResultTransferables(
     ];
   }
   if (result.kind === 'relief-heightmap' && result.output.kind === 'ok') {
-    return [result.output.heightmap.depth.buffer];
+    const { heightmap } = result.output;
+    return [
+      heightmap.depth.buffer,
+      ...(heightmap.inclusion === undefined ? [] : [heightmap.inclusion.buffer]),
+    ];
   }
   return [];
 }
@@ -111,6 +122,6 @@ export function executeCanvasCompilationTask(
     case 'cnc-cut3d-surface':
       return { kind: task.kind, output: prepareCncCut3DSurface(task.grid) };
     case 'relief-heightmap':
-      return { kind: task.kind, output: depthMapToHeightmap(task.source, task.options) };
+      return { kind: task.kind, output: heightfieldToHeightmap(task.source, task.options) };
   }
 }

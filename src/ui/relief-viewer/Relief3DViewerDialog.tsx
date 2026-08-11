@@ -69,10 +69,10 @@ async function buildReliefScene(
       mmPerCell: displayCellSize.mmPerCell,
     };
     const offThread =
-      relief.depthMap === undefined
+      relief.reliefSource.kind === 'legacy-mesh'
         ? null
-        : prepareReliefHeightmapOffThread(relief.depthMap, options, signal);
-    if (relief.depthMap !== undefined && offThread === null) {
+        : prepareReliefHeightmapOffThread(relief.reliefSource, options, signal);
+    if (relief.reliefSource.kind === 'heightfield-v1' && offThread === null) {
       return { kind: 'no-webgl', reason: 'Relief preview worker is unavailable.' };
     }
     const heightmap =
@@ -98,7 +98,16 @@ async function buildReliefScene(
 }
 
 function removalGridFrom(map: Heightmap) {
-  return { ...map, originX: 0, originY: 0 };
+  return {
+    ...map,
+    originX: 0,
+    originY: 0,
+    resolution: {
+      requestedMmPerCell: map.mmPerCell,
+      effectiveMmPerCell: map.mmPerCell,
+      reason: null,
+    },
+  };
 }
 
 function formatMm(value: number): string {

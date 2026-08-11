@@ -119,6 +119,21 @@ function probeDepth(grid: RemovalGrid, x: number, y: number): number {
 }
 
 describe('computeCncRemovalGrid', () => {
+  it('discloses the interactive preview cell budget without changing the bounded grid', () => {
+    const wideMachine: CncMachineConfig = {
+      ...MACHINE,
+      stock: { ...STOCK, widthMm: 300 },
+    };
+    const grid = computeCncRemovalGrid(DEVICE, wideMachine, sceneToolpath(TWO_BIT_SCENE), 1);
+
+    expect(grid?.resolution).toEqual({
+      requestedMmPerCell: 0.2,
+      effectiveMmPerCell: 0.3,
+      reason: 'interactive-preview-cell-budget',
+    });
+    expect(grid?.widthCells).toBe(1_000);
+  });
+
   it('shades a two-bit job with each section its own bit', () => {
     const grid = computeCncRemovalGrid(DEVICE, MACHINE, sceneToolpath(TWO_BIT_SCENE), 1);
     expect(grid).not.toBeNull();

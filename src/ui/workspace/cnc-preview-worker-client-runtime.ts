@@ -1,9 +1,11 @@
+// Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import type {
-  DepthMapHeightmapOptions,
-  DepthMapHeightmapResult,
-} from '../../core/relief/depth-map-to-heightmap';
+  HeightfieldHeightmapOptions,
+  HeightfieldHeightmapResult,
+} from '../../core/relief/heightfield-to-heightmap';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
-import type { ReliefDepthMap } from '../../core/scene/relief';
+import type { ReliefHeightfield } from '../../core/scene/relief';
 import type { RemovalGrid } from '../../core/sim';
 import {
   connectCanvasCompilationMainBridge,
@@ -42,10 +44,10 @@ export type CncPreviewWorkerClient = {
     signal?: AbortSignal,
   ) => Promise<ReadonlyArray<ReliefHeightmapWorkerResult>> | null;
   readonly prepareRelief: (
-    source: ReliefDepthMap,
-    options: DepthMapHeightmapOptions,
+    source: ReliefHeightfield,
+    options: HeightfieldHeightmapOptions,
     signal?: AbortSignal,
-  ) => Promise<DepthMapHeightmapResult> | null;
+  ) => Promise<HeightfieldHeightmapResult> | null;
   readonly resetForTests: () => void;
 };
 
@@ -93,10 +95,10 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
   }
 
   prepareRelief(
-    source: ReliefDepthMap,
-    options: DepthMapHeightmapOptions,
+    source: ReliefHeightfield,
+    options: HeightfieldHeightmapOptions,
     signal?: AbortSignal,
-  ): Promise<DepthMapHeightmapResult> | null {
+  ): Promise<HeightfieldHeightmapResult> | null {
     const batch = this.prepareReliefBatch([{ taskId: 'relief', source, options }], signal);
     if (batch === null) return null;
     return batch.then((items) => {
