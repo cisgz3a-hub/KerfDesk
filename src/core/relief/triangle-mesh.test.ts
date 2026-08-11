@@ -10,4 +10,21 @@ describe('meshBounds persisted-coordinate parity', () => {
       meshBounds({ positions: Float32Array.from(persisted) }),
     );
   });
+
+  it('uses trusted metadata only for a nonempty mesh and never rescans it', () => {
+    expect(
+      meshBounds({
+        positions: [],
+        intrinsicBounds: { minX: 0, minY: 0, minZ: 0, maxX: 1, maxY: 1, maxZ: 1 },
+      }),
+    ).toBeNull();
+    const positions = new Array<number>(9).fill(0);
+    Object.defineProperty(positions, 0, {
+      get: () => {
+        throw new Error('bounds scan should not read positions');
+      },
+    });
+    const intrinsicBounds = { minX: 0, minY: 0, minZ: 0, maxX: 2, maxY: 1, maxZ: 3 };
+    expect(meshBounds({ positions, intrinsicBounds })).toBe(intrinsicBounds);
+  });
 });

@@ -4,6 +4,7 @@
 // residual isometry used to place the finished cutter-center paths.
 
 import type { ReliefObject, Transform } from '../scene';
+import type { MeshReliefObject } from '../scene/relief';
 import { reliefMachineSpacePlanningWidthMm } from './relief-machine-space-planning-width';
 
 export type ReliefMachineSpaceTransform = {
@@ -42,14 +43,11 @@ export function reliefMachineSpaceGeometry(relief: ReliefObject): ReliefMachineS
 }
 
 function reliefNaturalHeightMm(relief: ReliefObject): number {
-  if (relief.reliefSource.kind === 'heightfield-v1') {
-    return relief.reliefSource.physicalHeightMm;
-  }
-  const sourceWidth = relief.bounds.maxX - relief.bounds.minX;
-  const sourceHeight = relief.bounds.maxY - relief.bounds.minY;
-  return sourceWidth > 0 && sourceHeight > 0
-    ? relief.targetWidthMm * (sourceHeight / sourceWidth)
-    : relief.targetWidthMm;
+  return isMeshRelief(relief) ? relief.targetHeightMm : relief.reliefSource.physicalHeightMm;
+}
+
+function isMeshRelief(relief: ReliefObject): relief is MeshReliefObject {
+  return relief.reliefSource.kind === 'legacy-mesh';
 }
 
 function planningScale(scale: number): number {

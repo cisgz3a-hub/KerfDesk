@@ -3,6 +3,7 @@
 // order, both before any profile work; without one, roughing stays alone.
 
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import { computeJobBounds, frameBoundsSignature } from '../job';
@@ -42,15 +43,22 @@ function relief(overrides: ReliefOverrides = {}): MeshReliefObject {
   const {
     meshPositions = [0, 0, 0, 12, 0, 3, 0, 12, 6],
     emptyCells = 'floor',
+    targetWidthMm = 12,
+    targetHeightMm,
     ...commonOverrides
   } = overrides;
   return {
     kind: 'relief',
     id: 'R1',
     source: 'model.stl',
-    targetWidthMm: 12,
+    targetWidthMm,
     reliefDepthMm: 5,
-    reliefSource: { kind: 'legacy-mesh', meshPositions, emptyCells },
+    ...testLegacyMeshGeometry({
+      positions: meshPositions,
+      targetWidthMm,
+      ...(targetHeightMm === undefined ? {} : { targetHeightMm }),
+      emptyCells,
+    }),
     color: RELIEF_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 12, maxY: 12 },
     transform: IDENTITY_TRANSFORM,

@@ -15,6 +15,7 @@ import { validateOptionalArtworkOrder } from './project-artwork-order-validator'
 import { validateProjectScanOffsetProfile } from './project-scan-offset-validator';
 import { validateTracedImageMetadata } from './project-trace-shape-validator';
 import * as reliefField from './project-relief-heightfield-validator';
+import { validateProjectReliefMeshGeometry } from './project-relief-mesh-geometry-validator';
 import { validateSingleReliefSource } from './project-relief-source-authority';
 import {
   firstError,
@@ -203,27 +204,9 @@ function validateReliefSource(obj: Record<string, unknown>, path: string): strin
   const authorityError = validateSingleReliefSource(obj, source, path);
   if (authorityError !== null) return authorityError;
   if (source['kind'] === 'legacy-mesh') {
-    return firstError([
-      validateMeshPositions(source['meshPositions'], `${path}.reliefSource.meshPositions`),
-      requireLiteral(source, `${path}.reliefSource.emptyCells`, ['floor', 'top']),
-    ]);
+    return validateProjectReliefMeshGeometry(obj, source, path);
   }
   return reliefField.validateReliefHeightfield(source, `${path}.reliefSource`);
-}
-
-function validateMeshPositions(value: unknown, path: string): string | null {
-  if (!Array.isArray(value) || value.length === 0) {
-    return `missing or invalid \`${path}\``;
-  }
-  if (value.length % 9 !== 0) {
-    return `\`${path}\` length must be a multiple of 9 (three xyz vertices per triangle)`;
-  }
-  for (const n of value) {
-    if (typeof n !== 'number' || !Number.isFinite(n)) {
-      return `non-finite number in \`${path}\``;
-    }
-  }
-  return null;
 }
 
 function validateVectorObject(obj: Record<string, unknown>, path: string): string | null {

@@ -4,6 +4,7 @@ import { resolveReliefHeightfieldWidthPatch } from './relief-heightfield-width-r
 
 /** Operator-editable relief parameters accepted by the shared relief state action. */
 export type ReliefParamPatch = {
+  machineWidthMm?: number;
   targetWidthMm?: number;
   reliefDepthMm?: number;
   emptyCells?: 'floor' | 'top';
@@ -18,6 +19,7 @@ export type ReliefParamPatch = {
 /** Retains only factual values that the durable relief model can represent exactly. */
 export function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch {
   const out: ReliefParamPatch = {};
+  if (positiveFinite(patch.machineWidthMm)) out.machineWidthMm = patch.machineWidthMm;
   if (positiveFinite(patch.targetWidthMm)) out.targetWidthMm = patch.targetWidthMm;
   if (positiveFinite(patch.reliefDepthMm)) out.reliefDepthMm = patch.reliefDepthMm;
   if (patch.emptyCells !== undefined) out.emptyCells = patch.emptyCells;
@@ -36,6 +38,7 @@ export function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch 
 export function hasReliefPatch(patch: ReliefParamPatch): boolean {
   return (
     patch.targetWidthMm !== undefined ||
+    patch.machineWidthMm !== undefined ||
     patch.reliefDepthMm !== undefined ||
     patch.emptyCells !== undefined ||
     patch.polarity !== undefined ||
@@ -61,6 +64,7 @@ export function isNoOpHeightfieldMappingPatch(
   ].some(isDefined);
   const hasOtherPatch = [
     patch.targetWidthMm,
+    patch.machineWidthMm,
     patch.reliefDepthMm,
     patch.emptyCells,
     patch.polarity,

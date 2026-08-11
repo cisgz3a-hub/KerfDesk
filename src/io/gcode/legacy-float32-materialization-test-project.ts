@@ -7,6 +7,7 @@ import {
   type Project,
   type ReliefObject,
 } from '../../core/scene';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 
 /** Build a persistable legacy relief whose finite stored Z overflows Float32 during CAM. */
 export function legacyFloat32OverflowProject(): Project {
@@ -14,12 +15,13 @@ export function legacyFloat32OverflowProject(): Project {
     kind: 'relief',
     id: 'overflow-z-relief',
     source: 'overflow-z.stl',
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 2, 0, Number.MAX_VALUE, 0, 1.5, 0],
-      emptyCells: 'floor',
-    },
     targetWidthMm: 20,
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 2, 0, Number.MAX_VALUE, 0, 1.5, 0],
+      targetWidthMm: 20,
+      targetHeightMm: 15,
+      widthAspect: 'stretch',
+    }),
     reliefDepthMm: 3,
     color: DEFAULT_RELIEF_LAYER_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 20, maxY: 15 },

@@ -1,4 +1,5 @@
 import { expect } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { computeJobBounds, frameBoundsSignature } from '../../core/job';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import {
@@ -44,11 +45,10 @@ export function legacyRelief(geometry: LegacyGeometry): MeshReliefObject {
     source: 'legacy.stl',
     targetWidthMm: geometry.targetWidthMm,
     reliefDepthMm: 5,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: Array.from(MESH_POSITIONS),
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({
+      positions: Array.from(MESH_POSITIONS),
+      targetWidthMm: geometry.targetWidthMm,
+    }),
     color: RELIEF_COLOR,
     bounds: {
       minX: 0,
@@ -114,7 +114,7 @@ export function resizeLegacyMesh(meshPositions: ReadonlyArray<number> | Float32A
       scaleX: INITIAL_SCALE,
       scaleY: INITIAL_SCALE,
     }),
-    reliefSource: { kind: 'legacy-mesh', meshPositions, emptyCells: 'floor' },
+    ...testLegacyMeshGeometry({ positions: meshPositions, targetWidthMm: 2 }),
   } satisfies MeshReliefObject;
   installRelief(initial);
   useStore.getState().setReliefParams(RELIEF_ID, { targetWidthMm: INTENDED_WIDTH_MM });

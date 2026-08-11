@@ -4,6 +4,7 @@
 // (preflight-raster.test.ts precedent).
 
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { compileJob } from '../job';
 import { grblStrategy } from '../output';
 import {
@@ -27,11 +28,10 @@ function reliefOnlyProject(layerPatch: Partial<ReturnType<typeof createLayer>> =
     source: 'model.stl',
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
+      targetWidthMm: 100,
+    }),
     color: '#a0522d',
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
     transform: IDENTITY_TRANSFORM,

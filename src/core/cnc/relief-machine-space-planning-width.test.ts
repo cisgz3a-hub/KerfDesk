@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { heightfieldMetadataError } from '../relief/heightfield-metadata-validator';
 import { IDENTITY_TRANSFORM, type ReliefObject } from '../scene';
@@ -78,14 +79,14 @@ describe('reliefMachineSpacePlanningWidthMm', () => {
   });
 
   it('preserves legacy-mesh target width behavior', () => {
+    const targetWidthMm = 20.00000001;
     const relief: ReliefObject = {
       ...heightfieldRelief({ physicalWidthMm: 20, targetWidthMm: 20, scaleX: -3 }),
-      reliefSource: {
-        kind: 'legacy-mesh',
-        meshPositions: [0, 0, 0, 1, 0, 1, 0, 1, 0],
-        emptyCells: 'floor',
-      },
-      targetWidthMm: 20.00000001,
+      targetWidthMm,
+      ...testLegacyMeshGeometry({
+        positions: [0, 0, 0, 1, 0, 1, 0, 1, 0],
+        targetWidthMm,
+      }),
     };
 
     expect(reliefMachineSpacePlanningWidthMm(relief)).toBe(20.00000001);

@@ -69,7 +69,6 @@ export function SelectedReliefProperties(): JSX.Element | null {
       <ReliefPropertyControls
         relief={relief}
         widthMm={reliefPropertyWidthMm(relief, physical.targetScaleX)}
-        targetScaleX={physical.targetScaleX}
       />
     </section>
   );

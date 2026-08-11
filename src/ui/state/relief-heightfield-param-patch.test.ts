@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   DEFAULT_RELIEF_LAYER_COLOR,
@@ -53,11 +54,10 @@ function meshRelief(): ReliefObject {
     source: 'mesh.stl',
     targetWidthMm: 90,
     reliefDepthMm: 7,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 1, 0, 0, 0, 1, 1],
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 1, 0, 0, 0, 1, 1],
+      targetWidthMm: 90,
+    }),
     color: DEFAULT_RELIEF_LAYER_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 90, maxY: 45 },
     transform: IDENTITY_TRANSFORM,

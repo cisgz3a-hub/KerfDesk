@@ -15,7 +15,7 @@ export type ReliefHeightfieldWidthFactorization =
       readonly relief: HeightfieldReliefObject;
     };
 
-/** Re-expresses an edited heightfield Width inside the existing project-v4 numeric domains. */
+/** Re-expresses an edited heightfield Width inside the existing project-v5 numeric domains. */
 export function factorReliefHeightfieldWidth(
   relief: HeightfieldReliefObject,
 ): ReliefHeightfieldWidthFactorization {

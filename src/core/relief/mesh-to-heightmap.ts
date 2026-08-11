@@ -17,11 +17,14 @@ import {
   type PartialCellGrid,
 } from '../grid';
 import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
+import { meshTargetSize } from './mesh-target-size';
 import { meshBounds, FLOATS_PER_TRIANGLE, type TriangleMesh } from './triangle-mesh';
 import { rasterizeTriangleMaxZ, type RasterTarget } from './triangle-raster';
 
 export type MeshHeightmapOptions = {
   readonly targetWidthMm: number;
+  /** Resolved unscaled target height; absent keeps legacy intrinsic-aspect derivation. */
+  readonly targetHeightMm?: number;
   readonly reliefDepthMm: number;
   readonly mmPerCell?: number;
   readonly emptyCells?: 'floor' | 'top';
@@ -64,7 +67,7 @@ export function meshToHeightmap(
   if (!Number.isFinite(xExtent) || !Number.isFinite(yExtent)) {
     return { kind: 'error', reason: 'Mesh bounds must be finite.' };
   }
-  const targetMetrics = targetSize(options, yExtent / xExtent);
+  const targetMetrics = meshTargetSize(options, yExtent / xExtent);
   if (targetMetrics.kind === 'error') return targetMetrics;
   const { widthMm, heightMm } = targetMetrics;
   const gridResult = meshGrid(widthMm, heightMm, options.mmPerCell ?? DEFAULT_HEIGHTMAP_CELL_MM);
@@ -143,33 +146,6 @@ function isRangeError(error: unknown): boolean {
   if (Object.prototype.toString.call(error) !== '[object Error]') return false;
   const constructor = (error as { readonly constructor?: unknown }).constructor;
   return typeof constructor === 'function' && constructor.name === 'RangeError';
-}
-
-type TargetSizeResult =
-  | { readonly kind: 'ok'; readonly widthMm: number; readonly heightMm: number }
-  | { readonly kind: 'error'; readonly reason: string };
-
-function targetSize(options: MeshHeightmapOptions, aspect: number): TargetSizeResult {
-  if (!positiveFinite(options.targetWidthMm) || !positiveFinite(options.reliefDepthMm)) {
-    return {
-      kind: 'error',
-      reason: 'Target width and relief depth must be finite positive numbers.',
-    };
-  }
-  const targetScaleX = options.targetScaleX ?? 1;
-  const targetScaleY = options.targetScaleY ?? 1;
-  if (!positiveFinite(targetScaleX) || !positiveFinite(targetScaleY)) {
-    return { kind: 'error', reason: 'Target XY scale must be finite and positive.' };
-  }
-  return {
-    kind: 'ok',
-    widthMm: options.targetWidthMm * targetScaleX,
-    heightMm: aspect * options.targetWidthMm * targetScaleY,
-  };
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function rasterizeMesh(

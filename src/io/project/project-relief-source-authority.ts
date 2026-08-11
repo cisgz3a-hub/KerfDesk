@@ -1,5 +1,7 @@
 const LEGACY_RELIEF_SIBLINGS = ['depthMap', 'meshPositions', 'emptyCells'] as const;
+const LEGACY_RELIEF_GEOMETRY_FIELDS = ['targetHeightMm', 'widthAspect'] as const;
 const NESTED_LEGACY_SOURCE_FIELDS = ['depthMap'] as const;
+const LEGACY_SOURCE_FIELDS = ['meshPositions', 'emptyCells', 'intrinsicBounds'] as const;
 const HEIGHTFIELD_SOURCE_FIELDS = [
   'schemaVersion',
   'width',
@@ -16,7 +18,7 @@ const HEIGHTFIELD_SOURCE_FIELDS = [
   'digest',
 ] as const;
 
-/** Reject v4 reliefs that retain another recognized source authority. */
+/** Reject v5 reliefs that retain another recognized source authority. */
 export function validateSingleReliefSource(
   object: Record<string, unknown>,
   source: Record<string, unknown>,
@@ -25,7 +27,8 @@ export function validateSingleReliefSource(
   const hasLegacySibling = hasOwnField(object, LEGACY_RELIEF_SIBLINGS);
   const hasOppositeArm =
     hasOwnField(source, NESTED_LEGACY_SOURCE_FIELDS) ||
-    (source['kind'] === 'heightfield-v1' && hasOwnField(source, ['meshPositions', 'emptyCells'])) ||
+    (source['kind'] === 'heightfield-v1' && hasOwnField(object, LEGACY_RELIEF_GEOMETRY_FIELDS)) ||
+    (source['kind'] === 'heightfield-v1' && hasOwnField(source, LEGACY_SOURCE_FIELDS)) ||
     (source['kind'] === 'legacy-mesh' && hasOwnField(source, HEIGHTFIELD_SOURCE_FIELDS));
   return hasLegacySibling || hasOppositeArm
     ? `invalid \`${path}\`: relief must contain exactly one source arm`

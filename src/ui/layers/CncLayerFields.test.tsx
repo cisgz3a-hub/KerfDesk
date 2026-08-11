@@ -6,6 +6,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import {
   createLayer,
   createProject,
@@ -45,11 +46,10 @@ function installProject(layer: Layer, withRelief: boolean): void {
     source: 'model.stl',
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
+      targetWidthMm: 100,
+    }),
     color: layer.color,
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
     transform: IDENTITY_TRANSFORM,

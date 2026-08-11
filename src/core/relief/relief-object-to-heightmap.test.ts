@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { DEFAULT_RELIEF_LAYER_COLOR, IDENTITY_TRANSFORM } from '../scene';
 import type { MeshReliefObject } from '../scene/relief';
 import { reliefObjectToHeightmap } from './relief-object-to-heightmap';
@@ -55,12 +56,13 @@ function legacyRelief(value: number, coordinateIndex: number): MeshReliefObject 
     kind: 'relief',
     id: 'float32-z-integrity',
     source: 'float32-z-integrity.stl',
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: positions,
-      emptyCells: 'floor',
-    },
     targetWidthMm: 2,
+    ...testLegacyMeshGeometry({
+      positions,
+      targetWidthMm: 2,
+      targetHeightMm: 1.5,
+      widthAspect: 'stretch',
+    }),
     reliefDepthMm: 1,
     color: DEFAULT_RELIEF_LAYER_COLOR,
     bounds: { minX: 0, minY: 0, maxX: 2, maxY: 1.5 },

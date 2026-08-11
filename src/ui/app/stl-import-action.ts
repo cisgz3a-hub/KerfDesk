@@ -126,11 +126,15 @@ function reliefFromPreparedStl(
     id: crypto.randomUUID(),
     source,
     targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
+    targetHeightMm: prepared.heightMm,
+    widthAspect:
+      prepared.intrinsicBounds.kind === 'finite-float32-v1' ? prepared.widthAspect : 'stretch',
     reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
     reliefSource: {
       kind: 'legacy-mesh',
       meshPositions: prepared.positions,
       emptyCells: 'floor',
+      intrinsicBounds: prepared.intrinsicBounds,
     },
     color: DEFAULT_RELIEF_LAYER_COLOR,
     bounds: { minX: 0, minY: 0, maxX: prepared.widthMm, maxY: prepared.heightMm },

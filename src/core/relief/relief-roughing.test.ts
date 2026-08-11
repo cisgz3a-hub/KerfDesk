@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { compileCncJob } from '../cnc/compile-cnc-job';
 import { cncGrblStrategy } from '../output';
@@ -46,17 +47,14 @@ function pyramidRelief(): MeshReliefObject {
     [...(c[2] ?? []), ...(c[3] ?? []), ...apex],
     [...(c[3] ?? []), ...(c[0] ?? []), ...apex],
   ];
+  const positions = tris.flat();
   return {
     kind: 'relief',
     id: 'R1',
     source: 'pyramid.stl',
     targetWidthMm: 20,
     reliefDepthMm: 4,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: tris.flat(),
-      emptyCells: 'floor',
-    },
+    ...testLegacyMeshGeometry({ positions, targetWidthMm: 20 }),
     color: '#a0522d',
     bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
     transform: IDENTITY_TRANSFORM,

@@ -38,6 +38,15 @@ describe('importStlFiles', () => {
 
     expect(arrayBuffer).toHaveBeenCalledOnce();
     expect(importObject).toHaveBeenCalledOnce();
+    expect(importObject.mock.calls[0]?.[0]).toMatchObject({
+      targetWidthMm: 100,
+      targetHeightMm: 100,
+      widthAspect: 'preserve',
+      reliefSource: {
+        kind: 'legacy-mesh',
+        intrinsicBounds: { kind: 'finite-float32-v1', maxX: 10, maxY: 10, maxZ: 1 },
+      },
+    });
     expect(pushToast).toHaveBeenCalledWith(
       expect.stringMatching(/part\.stl.*main thread.*unresponsive/i),
       'warning',
