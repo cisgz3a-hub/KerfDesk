@@ -14,7 +14,6 @@
 // Depth-major: every ring of one level before the next. Pure and deterministic.
 
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
-import { buildOffsetLadder } from '../geometry/offset-ladder';
 import { partialDualCoordinate } from '../grid';
 import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
