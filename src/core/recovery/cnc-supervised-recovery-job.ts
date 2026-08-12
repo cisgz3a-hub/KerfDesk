@@ -1,4 +1,5 @@
 import type { CncContourPass, CncGroup, Job } from '../job';
+import { retainedCncCompilationSidecar } from './cnc-retained-compilation-sidecar';
 import {
   planCncContourRunway,
   type CncContourRunwayPlan,
@@ -60,12 +61,12 @@ export function buildCncSupervisedRecoveryJob(
   if (laterGroups.some((group) => group.kind !== 'cnc')) {
     return { kind: 'error', reason: 'invalid-source-job' };
   }
+  const groups = [recoveryGroup(sourceGroup, sourcePass, plan), ...laterGroups];
+  const cncCompilation = retainedCncCompilationSidecar(request.job, groups);
   return {
     kind: 'recovery-job',
     plan,
-    job: {
-      groups: [recoveryGroup(sourceGroup, sourcePass, plan), ...laterGroups],
-    },
+    job: cncCompilation === undefined ? { groups } : { groups, cncCompilation },
   };
 }
 

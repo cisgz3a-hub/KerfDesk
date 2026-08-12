@@ -66,6 +66,7 @@ type ReliefPlanEvidence = Omit<CncReliefPlanningEvidence, 'layerId'>;
 
 type ReliefLayerCompilationEvidence = {
   readonly offsetFailed: boolean;
+  readonly passLimited: boolean;
   readonly stepoverUsed: boolean;
   readonly plans: ReadonlyArray<CncReliefPlanningEvidence>;
 };
@@ -83,19 +84,21 @@ export function compileReliefGroupsForLayer(
     return {
       kind: 'compiled',
       groups: [],
-      evidence: { offsetFailed: false, stepoverUsed: false, plans: [] },
+      evidence: { offsetFailed: false, passLimited: false, stepoverUsed: false, plans: [] },
     };
   }
   const tool = layerCncTool(config, settings);
   const passes: CncContourPass[] = [];
   const plans: CncReliefPlanningEvidence[] = [];
   let offsetFailed = false;
+  let passLimited = false;
   let stepoverUsed = false;
   for (const relief of reliefs) {
     const roughing = appendReliefPasses(passes, relief, settings, device, tool);
     if (roughing.kind === 'relief-materialization-failed') return roughing;
     plans.push({ ...roughing.plan, layerId: layer.id });
     if (roughing.offsetFailed) offsetFailed = true;
+    if (roughing.passLimited) passLimited = true;
     if (roughing.stepoverUsed) stepoverUsed = true;
   }
   const groups: CncGroup[] = [];
@@ -109,7 +112,7 @@ export function compileReliefGroupsForLayer(
   return {
     kind: 'compiled',
     groups,
-    evidence: { offsetFailed, stepoverUsed, plans },
+    evidence: { offsetFailed, passLimited, stepoverUsed, plans },
   };
 }
 
@@ -300,23 +303,35 @@ function reliefLadderFor(
  * short by an offset-engine failure rather than by the level running out of
  * area? Advisory input only — the caller warns, never refuses (rule 7).
  */
+export function reliefOffsetLadderDiagnostics(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+): { readonly offsetFailed: boolean; readonly passLimited: boolean } | null {
+  const reliefs = reliefObjectsForLayer(objects, layer);
+  if (reliefs.length === 0) return null;
+  const tool = layerCncTool(config, settings);
+  let offsetFailed = false;
+  let passLimited = false;
+  for (const relief of reliefs) {
+    const result = reliefLadderFor(relief, settings, tool);
+    // Diagnostics inform only. Compile owns the named integrity failure and
+    // must not replace it with a warning-path exception.
+    if (result.kind === 'relief-materialization-failed') return null;
+    offsetFailed = offsetFailed || result.ladder.offsetFailed;
+    passLimited = passLimited || result.ladder.passLimited;
+  }
+  return { offsetFailed, passLimited };
+}
+
 export function reliefOffsetLadderFailed(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   settings: CncLayerSettings,
   config: CncMachineConfig,
 ): boolean {
-  const reliefs = reliefObjectsForLayer(objects, layer);
-  if (reliefs.length === 0) return false;
-  const tool = layerCncTool(config, settings);
-  for (const relief of reliefs) {
-    const result = reliefLadderFor(relief, settings, tool);
-    // Diagnostics inform only. Compile owns the named integrity failure and
-    // must not replace it with a warning-path exception.
-    if (result.kind === 'relief-materialization-failed') continue;
-    if (result.ladder.offsetFailed) return true;
-  }
-  return false;
+  return reliefOffsetLadderDiagnostics(objects, layer, settings, config)?.offsetFailed ?? false;
 }
 
 function appendReliefPasses(
@@ -329,6 +344,7 @@ function appendReliefPasses(
   | {
       readonly kind: 'compiled';
       readonly offsetFailed: boolean;
+      readonly passLimited: boolean;
       readonly stepoverUsed: boolean;
       readonly plan: ReliefPlanEvidence;
     }
@@ -348,6 +364,7 @@ function appendReliefPasses(
   return {
     kind: 'compiled',
     offsetFailed: result.ladder.offsetFailed,
+    passLimited: result.ladder.passLimited,
     stepoverUsed: true,
     plan: result.plan,
   };

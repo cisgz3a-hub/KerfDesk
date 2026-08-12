@@ -21,6 +21,16 @@ export function offsetDiagnosticsForStatus(
   ];
 }
 
+export function reliefOffsetDiagnosticsForStatus(
+  layerId: string,
+  status: { readonly offsetFailed: boolean; readonly passLimited: boolean },
+): ReadonlyArray<CncOffsetLadderCompilationEvidence> {
+  return [
+    ...(status.offsetFailed ? ([{ layerId, kind: 'geometry-failed' }] as const) : []),
+    ...(status.passLimited ? ([{ layerId, kind: 'relief-pass-limit' }] as const) : []),
+  ];
+}
+
 export function hasVCarveOperation(scene: Scene): boolean {
   return artworkOperationRuns(scene).some(
     ({ layer }) => (layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS).cutType === 'v-carve',
