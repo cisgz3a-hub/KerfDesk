@@ -1577,7 +1577,7 @@ Machine capability is an enforced physical-output contract (ADR-210), not descri
 
 The six machine pages remain ordered as ADR-240 defined. A draft whose active output is CNC inserts
 one **Startup Setup** (`cnc-setup`) page between Confirm settings and Options, so CNC has seven visible pages and
-laser-only setup remains six (ADR-292 supersedes ADR-240's fixed six-page composition):
+laser-only setup remains six (ADR-295 supersedes ADR-240's fixed six-page composition):
 
 1. **Machine type** — Laser only / CNC only / Laser + CNC, and for hybrids the active mode after
    Save. Nothing else competes with this choice.
@@ -2523,7 +2523,7 @@ F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit 8-bit grayscale height-map path.
-F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Their bounded ADR-292/293/294
+F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Their bounded ADR-292/296/297
 substrate is current where explicitly marked below; the remaining controls and
 user-facing flows are planned.
 
@@ -3226,7 +3226,7 @@ and lifts the command's CNC-only gate.)*
    diameter. The grid attempts that resolved spacing and its whole-row stride
    rounds down so it does not overshoot it. This qualifies sampled finishing
    vertices and planar cusp, not a continuous included-surface sweep or true
-   along-surface scallop proof (ADR-292/294).
+   along-surface scallop proof (ADR-292/297).
 3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
    pass); finishing consumes it down to the true surface.
 
@@ -3249,7 +3249,7 @@ and lifts the command's CNC-only gate.)*
    isometries. Partial terminal cells keep the exact requested interior pitch
    while ending at the declared physical edge. Included subcell peaks, straight
    XYZ chords between samples, the cutter footprint beyond an unmasked outer
-   relief boundary, and holder/shank clearance remain unqualified (ADR-294).
+   relief boundary, and holder/shank clearance remain unqualified (ADR-297).
 
 ### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
 
@@ -3700,7 +3700,7 @@ and lifts the command's CNC-only gate.)*
    apply directly; pocketing requires closed shapes (draw or import
    filled artwork instead).
 
-### F-CNC31. Auto-fill operation feeds from a material — ADR-111 #1, amended by ADR-292
+### F-CNC31. Auto-fill operation feeds from a material — ADR-111 #1, amended by ADR-295
 
 #### Success
 1. **Startup Setup > Tool Plan** has a grouped material assignment for each operation (Use job
@@ -3731,7 +3731,7 @@ and lifts the command's CNC-only gate.)*
    actual cutter count in **Startup Setup > Manage bits**; set operation RPM with the editable
    **Artwork spindle speed**. The Artwork calculator reads both and does not duplicate either input.
 
-### F-CNC32. Edit operation values beside read-only setup references — ADR-111 #4 / ADR-292
+### F-CNC32. Edit operation values beside read-only setup references — ADR-111 #4 / ADR-295
 
 #### Success
 1. CNC Artwork settings lead with a compact **Setup references** group: project/effective material,
@@ -3804,7 +3804,7 @@ and lifts the command's CNC-only gate.)*
    and depth/pass values plus the diameter-band model limitation. Manual and
    machine-starter values do not claim that material-recipe calculation.
 
-### F-CNC35. Set the project material once — ADR-112/264, amended by ADR-292
+### F-CNC35. Set the project material once — ADR-112/264, amended by ADR-295
 
 #### Success
 1. **Startup Setup > Current job** shows a grouped Material picker beside the default bit and stock;
@@ -4266,7 +4266,7 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-293/294 supply schema-v4/U16LE
+> **Planned - not current UI.** P2R.1a plus ADR-296/297 supply schema-v4/U16LE
 > storage, migration, qualified 8-bit grayscale import, simple transparency
 > masks, atomic large-project autosave/recovery, and the existing CAM/preview
 > substrate. The creation modes and controls below remain planned; use F-CNC46's
@@ -4467,7 +4467,7 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC50. Save, review, Frame, and run a photo relief - planned (ADR-291/293 / P2R.4-P2R.6)
 
 > **Partially current.** Self-contained manual Save and atomic whole-project
-> autosave/recovery are current under ADR-292/293. Relief-specific output
+> autosave/recovery are current under ADR-292/296. Relief-specific output
 > provenance, consolidated review, and machine/material qualification below
 > remain planned and add no Start guard.
 

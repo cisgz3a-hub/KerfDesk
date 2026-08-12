@@ -9929,7 +9929,7 @@ with a live status that identifies values changed since the review opened or wer
 Approving records that the operator reviewed the currently synchronized values and, when they
 changed, requests an immediate exact-job rebuild. It is not a prerequisite for Start: **Start job**
 continues to approve the complete review in one click. CNC Job Review remains read-only and routes
-changes to Artwork or Startup Setup under ADR-292. A setting change that invalidates the framed
+changes to Artwork or Startup Setup under ADR-295. A setting change that invalidates the framed
 artifact still uses the existing handoff-consistency path and requires Frame again; the new action
 does not bypass or expand that contract.
 > **Numbering note.** Drafted as ADR-221, but the fleet landed ADR-221 (elapsed-time badge),
@@ -16608,7 +16608,7 @@ than introducing a second transformation or output pipeline.
   `IoU=1.0000`, precision `1.0000`, and recall `1.0000`; the opt-in perceptual artifact shows the
   expected, production, and green agreement panels. No hardware evidence is relevant because this
   is an editor-only transform.
-## ADR-292 - CNC settings have one writable owner in Startup Setup
+## ADR-295 - CNC settings have one writable owner in Startup Setup
 
 **Date:** 2026-08-09
 **Status:** Accepted; implemented and software/browser verified; controller and hardware qualification pending
@@ -16757,7 +16757,7 @@ problem. The settings need one writable owner per scope.
 - Software verification does not qualify physical cutter setup, spindle limits, feeds/speeds,
   controller behavior, workholding, air-cut, material cut, or finish quality.
 
-## ADR-293 - Large canonical relief autosave uses atomic whole-project IndexedDB snapshots (2026-08-09)
+## ADR-296 - Large canonical relief autosave uses atomic whole-project IndexedDB snapshots (2026-08-09)
 
 **Date:** 2026-08-09
 **Status:** Accepted and implemented as a bounded P2R.1 persistence slice; abrupt-process and packaged-Electron qualification remain open
@@ -16878,7 +16878,7 @@ of renderer stalls. Those claims require separate runtime evidence.
 - ADR-291, P2R.1 portable manual files and atomic autosave contract.
 - ADR-292, P2R.1a canonical heightfield substrate and its superseded large-autosave limitation.
 
-## ADR-294 - Relief grids preserve exact interior pitch with partial terminal cells (2026-08-09)
+## ADR-297 - Relief grids preserve exact interior pitch with partial terminal cells (2026-08-09)
 
 **Date:** 2026-08-09
 **Status:** Accepted and implemented for relief CAM, simulation, canvas, and 3D software geometry; physical qualification remains open
@@ -16991,4 +16991,4 @@ other ADR-292 evidence boundary remains in force.
 
 - ADR-289, transformed relief machine-space cutter-envelope semantics.
 - ADR-292, exact-input P2R.1a contract and the sampled-grid boundary this decision closes.
-- ADR-293, large canonical relief autosave/recovery; unchanged by this transient grid model.
+- ADR-296, large canonical relief autosave/recovery; unchanged by this transient grid model.

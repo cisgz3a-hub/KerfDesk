@@ -178,7 +178,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.16 | Verified constant-load adaptive clearing for bounded island-free pockets (ADR-154) | Built; hardware CLAIMED |
 | H.17 | Linked straight-sided inlay pocket and insert pairs with radius-matched geometry (ADR-155) | Built; hardware CLAIMED |
 | H.18 | Persisted drag-placeable holding-tab anchors for closed CNC profiles (ADR-156) | Built; hardware CLAIMED |
-| H.19 | CNC settings ownership consolidation (ADR-292): Startup Setup is the sole writer for machine limits, current-job material/bit/stock, and the operation material/tool plan; Artwork owns operation cutting values; CNC Job Review is read-only | Built; software/browser verified; controller and hardware qualification pending |
+| H.19 | CNC settings ownership consolidation (ADR-295): Startup Setup is the sole writer for machine limits, current-job material/bit/stock, and the operation material/tool plan; Artwork owns operation cutting values; CNC Job Review is read-only | Built; software/browser verified; controller and hardware qualification pending |
 
 #### Photo-to-relief expansion - ADR-291
 
