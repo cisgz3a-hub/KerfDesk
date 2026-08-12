@@ -1,6 +1,6 @@
 import {
   EMPTY_USER_MACRO_COLLECTION,
-  isValidUserMacroTimestamp,
+  isValidTimestamp,
   macroNameKey,
   normalizeUserMacroName,
   type UserMacro,
@@ -113,8 +113,8 @@ function parseStoredMacro(value: unknown): UserMacro | null {
   const updatedAt = value['updatedAt'];
   if (typeof name !== 'string' || normalizeUserMacroName(name) !== name) return null;
   if (typeof template !== 'string' || parseUserMacroTemplate(template).kind !== 'ok') return null;
-  if (typeof createdAt !== 'number' || !isValidUserMacroTimestamp(createdAt)) return null;
-  if (typeof updatedAt !== 'number' || !isValidUserMacroTimestamp(updatedAt)) return null;
+  if (typeof createdAt !== 'number' || !isValidTimestamp(createdAt)) return null;
+  if (typeof updatedAt !== 'number' || !isValidTimestamp(updatedAt)) return null;
   if (updatedAt < createdAt) return null;
   return { name, template, createdAt, updatedAt };
 }

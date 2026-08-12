@@ -1,28 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createLayer,
-  createProject,
-  IDENTITY_TRANSFORM,
-  type Project,
-  type ReliefObject,
-} from '../../core/scene';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
+import { decodeCanonicalBase64 } from '../../core/relief/depth-map-base64';
+import { reliefHeightfieldDigest } from '../../core/relief/heightfield-digest';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
+import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
 import { deserializeProject } from './deserialize-project';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
+import {
+  validateReliefHeightfield,
+  type ReliefHeightfieldValidationRuntime,
+} from './project-relief-heightfield-validator';
 import { serializeProject } from './serialize-project';
-
-type MeshReliefObject = Exclude<ReliefObject, { readonly depthMap: unknown }>;
-type DepthMapReliefObject = Extract<ReliefObject, { readonly depthMap: unknown }>;
 
 function relief(): MeshReliefObject {
   return {
     kind: 'relief',
     id: 'R1',
     source: 'pyramid.stl',
-    // One triangle is enough to exercise the schema.
-    meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    emptyCells: 'floor',
+    reliefSource: {
+      kind: 'legacy-mesh',
+      // One triangle is enough to exercise the schema.
+      meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
+      emptyCells: 'floor',
+    },
     color: '#a0522d',
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
     transform: IDENTITY_TRANSFORM,
@@ -40,50 +42,53 @@ function reliefProject(): Project {
   };
 }
 
-function depthMapRelief(): DepthMapReliefObject {
+function heightfieldRelief(): HeightfieldReliefObject {
   return {
     kind: 'relief',
     id: 'D1',
     source: 'portrait-depth.png',
-    depthMap: {
-      schemaVersion: 1,
-      width: 2,
-      height: 2,
-      bitDepth: 8,
-      samplesBase64: Buffer.from([0, 64, 128, 255]).toString('base64'),
-      polarity: 'light-is-high',
-    },
     targetWidthMm: 100,
     reliefDepthMm: 5,
+    reliefSource: testReliefHeightfield({
+      width: 2,
+      height: 2,
+      physicalWidthMm: 100,
+      physicalHeightMm: 100,
+      maxDepthMm: 5,
+      samplesU8: [0, 64, 128, 255],
+      inclusionMask: [0, 127, 254, 255],
+      mapping: { inclusionThreshold: 128, outsideMask: 'relief-floor' },
+      provenance: { sourceName: 'portrait-depth.png' },
+      revision: 3,
+    }),
     color: '#a0522d',
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
     transform: IDENTITY_TRANSFORM,
   };
 }
 
-describe('.lf2 relief round-trip (H.4)', () => {
-  it('round-trips a relief object exactly', () => {
+describe('.lf2 mesh relief round-trip', () => {
+  it('round-trips a legacy mesh source exactly', () => {
     const result = deserializeProject(serializeProject(reliefProject()));
     if (result.kind !== 'ok') throw new Error(`expected ok, got ${result.kind}`);
     expect(result.project.scene.objects[0]).toEqual(relief());
   });
 
   it('serializes a worker-owned Float32Array mesh and reopens it as project JSON', () => {
-    const typedRelief = {
+    const typedRelief: MeshReliefObject = {
       ...relief(),
-      meshPositions: Float32Array.from(relief().meshPositions),
+      reliefSource: {
+        ...relief().reliefSource,
+        meshPositions: Float32Array.from(relief().reliefSource.meshPositions),
+      },
     };
     const project = reliefProject();
     const result = deserializeProject(
-      serializeProject({
-        ...project,
-        scene: { ...project.scene, objects: [typedRelief] },
-      }),
+      serializeProject({ ...project, scene: { ...project.scene, objects: [typedRelief] } }),
     );
 
     expect(result.kind).toBe('ok');
-    if (result.kind !== 'ok') return;
-    expect(result.project.scene.objects[0]).toEqual(relief());
+    if (result.kind === 'ok') expect(result.project.scene.objects[0]).toEqual(relief());
   });
 
   it('serializes a typed mesh without iterating it into a boxed array', () => {
@@ -103,7 +108,7 @@ describe('.lf2 relief round-trip (H.4)', () => {
       ...base,
       scene: {
         ...base.scene,
-        objects: [{ ...relief(), meshPositions: Array.from(meshPositions) }],
+        objects: [withMeshPositions(Array.from(meshPositions))],
       },
     };
     const expected = serializeProject(plainProject);
@@ -114,10 +119,7 @@ describe('.lf2 relief round-trip (H.4)', () => {
     });
     const typedProject: Project = {
       ...plainProject,
-      scene: {
-        ...plainProject.scene,
-        objects: [{ ...relief(), meshPositions }],
-      },
+      scene: { ...plainProject.scene, objects: [withMeshPositions(meshPositions)] },
     };
 
     expect(serializeProject(typedProject)).toBe(expected);
@@ -133,62 +135,49 @@ describe('.lf2 relief round-trip (H.4)', () => {
     const base = reliefProject();
     const project: Project = {
       ...base,
-      scene: { ...base.scene, objects: [{ ...relief(), meshPositions }] },
+      scene: { ...base.scene, objects: [withMeshPositions(meshPositions)] },
     };
 
     expect(prepareProjectForPersistence(project)).toMatchObject({ kind: 'invalid' });
   });
 
-  it('rejects a relief whose mesh is not a whole number of triangles', () => {
-    const raw = JSON.parse(serializeProject(reliefProject())) as {
-      scene: { objects: Array<Record<string, unknown>> };
-    };
-    const obj = raw.scene.objects[0] as Record<string, unknown>;
-    obj['meshPositions'] = [0, 0, 0, 10]; // 4 numbers — not ×9
-    const result = deserializeProject(`${JSON.stringify(raw)}\n`);
-    expect(result.kind).not.toBe('ok');
-  });
-
-  it('rejects a relief with non-finite mesh numbers', () => {
-    const raw = JSON.parse(serializeProject(reliefProject())) as {
-      scene: { objects: Array<Record<string, unknown>> };
-    };
-    const obj = raw.scene.objects[0] as Record<string, unknown>;
-    obj['meshPositions'] = [0, 0, 0, 10, 0, 0, 0, 10, 'five'];
-    const result = deserializeProject(`${JSON.stringify(raw)}\n`);
-    expect(result.kind).not.toBe('ok');
+  it('rejects malformed or non-finite mesh coordinates', () => {
+    for (const meshPositions of [
+      [0, 0, 0, 10],
+      [0, 0, 0, 10, 0, 0, 0, 10, 'five'],
+    ]) {
+      const raw = rawProject(reliefProject());
+      const source = rawReliefSource(raw);
+      source['meshPositions'] = meshPositions;
+      expect(deserializeProject(JSON.stringify(raw)).kind).not.toBe('ok');
+    }
   });
 
   it('rejects a relief with a non-positive depth', () => {
-    const raw = JSON.parse(serializeProject(reliefProject())) as {
-      scene: { objects: Array<Record<string, unknown>> };
-    };
-    const obj = raw.scene.objects[0] as Record<string, unknown>;
-    obj['reliefDepthMm'] = 0;
-    const result = deserializeProject(`${JSON.stringify(raw)}\n`);
-    expect(result.kind).not.toBe('ok');
+    const raw = rawProject(reliefProject());
+    rawRelief(raw)['reliefDepthMm'] = 0;
+    expect(deserializeProject(JSON.stringify(raw)).kind).not.toBe('ok');
   });
 });
 
-describe('.lf2 depth-map relief round-trip (ADR-290)', () => {
-  it('round-trips the exact source payload, precision, and polarity', () => {
+describe('.lf2 canonical heightfield round-trip', () => {
+  it('round-trips exact U16 samples, mask, mapping, provenance, revision, and digest', () => {
     const base = reliefProject();
     const project: Project = {
       ...base,
-      scene: { ...base.scene, objects: [depthMapRelief()] },
+      scene: { ...base.scene, objects: [heightfieldRelief()] },
     };
 
     const result = deserializeProject(serializeProject(project));
 
     expect(result.kind).toBe('ok');
-    if (result.kind !== 'ok') return;
-    expect(result.project.scene.objects[0]).toEqual(depthMapRelief());
+    if (result.kind === 'ok') expect(result.project.scene.objects[0]).toEqual(heightfieldRelief());
   });
 
   it('preserves an existing authored-width and transform pair byte-for-byte', () => {
     const base = reliefProject();
     const transformed = {
-      ...depthMapRelief(),
+      ...heightfieldRelief(),
       transform: { ...IDENTITY_TRANSFORM, scaleX: -0.36, scaleY: 2 },
     };
     const serialized = serializeProject({
@@ -204,68 +193,186 @@ describe('.lf2 depth-map relief round-trip (ADR-290)', () => {
     expect(serializeProject(result.project)).toBe(serialized);
   });
 
-  it('rejects a payload whose byte length disagrees with its dimensions', () => {
+  it('rejects a payload length that disagrees with declared dimensions', () => {
     const base = reliefProject();
-    const broken = {
-      ...depthMapRelief(),
-      depthMap: { ...depthMapRelief().depthMap, samplesBase64: 'AA==' },
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [heightfieldRelief()] },
     };
-    const raw = JSON.parse(
-      serializeProject({ ...base, scene: { ...base.scene, objects: [broken] } }),
-    ) as { scene: { objects: Array<Record<string, unknown>> } };
+    const raw = rawProject(project);
+    rawReliefSource(raw)['samplesBase64'] = 'AA==';
+
+    expect(deserializeProject(JSON.stringify(raw))).toMatchObject({ kind: 'invalid' });
+  });
+
+  it('reports a well-formed but wrong SHA-256 digest as a digest mismatch', () => {
+    const base = reliefProject();
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [heightfieldRelief()] },
+    };
+    const raw = rawProject(project);
+    rawReliefSource(raw)['digest'] = `sha256:${'0'.repeat(64)}`;
+
+    expect(deserializeProject(JSON.stringify(raw))).toEqual({
+      kind: 'invalid',
+      reason: 'digest mismatch in `scene.objects[0].reliefSource.digest`',
+    });
+  });
+
+  it('reports sample, mask, and digest allocation failures without throwing', () => {
+    const source = heightfieldRelief().reliefSource;
+    const cases: ReadonlyArray<{
+      readonly runtime: () => ReliefHeightfieldValidationRuntime;
+      readonly field: string;
+    }> = [
+      {
+        runtime: () => ({
+          decodeBase64: () => ({
+            kind: 'error',
+            code: 'allocation',
+            reason: 'controlled sample allocation failure',
+          }),
+          digest: reliefHeightfieldDigest,
+        }),
+        field: 'reliefSource.samplesBase64',
+      },
+      {
+        runtime: () => {
+          let decodeCount = 0;
+          return {
+            decodeBase64: (value) => {
+              decodeCount += 1;
+              return decodeCount === 1
+                ? decodeCanonicalBase64(value)
+                : {
+                    kind: 'error',
+                    code: 'allocation',
+                    reason: 'controlled mask allocation failure',
+                  };
+            },
+            digest: reliefHeightfieldDigest,
+          };
+        },
+        field: 'reliefSource.inclusionMask.samplesBase64',
+      },
+      {
+        runtime: () => ({
+          decodeBase64: decodeCanonicalBase64,
+          digest: () => {
+            throw new RangeError('controlled digest allocation failure');
+          },
+        }),
+        field: 'reliefSource.digest',
+      },
+    ];
+
+    for (const { runtime, field } of cases) {
+      let result: string | null | undefined;
+      expect(() => {
+        result = validateReliefHeightfield(source, 'reliefSource', runtime());
+      }).not.toThrow();
+      expect(result).toBe(`allocation failed for \`${field}\``);
+    }
+  });
+
+  it('rejects legacy sibling fields and opposite source-arm fields', () => {
+    const heightfieldBase = reliefProject();
+    const heightfieldProject: Project = {
+      ...heightfieldBase,
+      scene: { ...heightfieldBase.scene, objects: [heightfieldRelief()] },
+    };
+    const cases: Array<ReturnType<typeof rawProject>> = [];
+    for (const [field, value] of [
+      ['depthMap', {}],
+      ['meshPositions', [0, 0, 0, 1, 0, 0, 0, 1, 1]],
+      ['emptyCells', 'floor'],
+    ] as const) {
+      const raw = rawProject(heightfieldProject);
+      rawRelief(raw)[field] = value;
+      cases.push(raw);
+    }
+    for (const [field, value] of [
+      ['depthMap', {}],
+      ['meshPositions', [0, 0, 0, 1, 0, 0, 0, 1, 1]],
+      ['emptyCells', 'floor'],
+    ] as const) {
+      const raw = rawProject(heightfieldProject);
+      rawReliefSource(raw)[field] = value;
+      cases.push(raw);
+    }
+    for (const [field, value] of [
+      ['depthMap', {}],
+      ['samplesBase64', 'AA=='],
+    ] as const) {
+      const meshWithOppositeField = rawProject(reliefProject());
+      rawReliefSource(meshWithOppositeField)[field] = value;
+      cases.push(meshWithOppositeField);
+    }
+
+    for (const raw of cases) {
+      expect(deserializeProject(JSON.stringify(raw))).toMatchObject({
+        kind: 'invalid',
+        reason: 'invalid `scene.objects[0]`: relief must contain exactly one source arm',
+      });
+    }
+  });
+
+  it('rejects a non-literal outside-mask value without invoking object coercion', () => {
+    const base = reliefProject();
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [heightfieldRelief()] },
+    };
+    const raw = rawProject(project);
+    const source = rawReliefSource(raw);
+    const mapping = source['mapping'];
+    if (typeof mapping !== 'object' || mapping === null) throw new Error('mapping fixture missing');
+    (mapping as Record<string, unknown>)['outsideMask'] = { toString: null };
+
+    expect(() => deserializeProject(JSON.stringify(raw))).not.toThrow();
+    expect(deserializeProject(JSON.stringify(raw))).toMatchObject({ kind: 'invalid' });
+  });
+
+  it('rejects an unsupported relief source discriminant', () => {
+    const base = reliefProject();
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [heightfieldRelief()] },
+    };
+    const raw = rawProject(project);
+    rawReliefSource(raw)['kind'] = 'ambiguous-source';
 
     expect(deserializeProject(JSON.stringify(raw)).kind).not.toBe('ok');
   });
 
-  it('rejects ambiguous objects that carry both mesh and depth-map sources', () => {
+  it('rejects object dimensions or depth that disagree with the canonical source', () => {
     const base = reliefProject();
-    const raw = JSON.parse(
-      serializeProject({ ...base, scene: { ...base.scene, objects: [depthMapRelief()] } }),
-    ) as { scene: { objects: Array<Record<string, unknown>> } };
-    const object = raw.scene.objects[0];
-    if (object === undefined) throw new Error('fixture relief missing');
-    const ambiguous = {
-      ...raw,
-      scene: {
-        ...raw.scene,
-        objects: [
-          {
-            ...object,
-            meshPositions: [0, 0, 0, 1, 0, 0, 0, 1, 1],
-            emptyCells: 'floor',
-          },
-        ],
-      },
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [heightfieldRelief()] },
     };
-
-    expect(deserializeProject(JSON.stringify(ambiguous)).kind).not.toBe('ok');
-  });
-
-  it('rejects depth-map bounds that disagree with source aspect and target width', () => {
-    const base = reliefProject();
-    const raw = JSON.parse(
-      serializeProject({ ...base, scene: { ...base.scene, objects: [depthMapRelief()] } }),
-    ) as { scene: { objects: Array<Record<string, unknown>> } };
-    const object = raw.scene.objects[0];
-    if (object === undefined) throw new Error('fixture relief missing');
-    const mismatched = {
-      ...raw,
-      scene: {
-        ...raw.scene,
-        objects: [{ ...object, bounds: { minX: 0, minY: 0, maxX: 100, maxY: 75 } }],
+    const mutations = [
+      (object: Record<string, unknown>) => {
+        object['bounds'] = { minX: 0, minY: 0, maxX: 100, maxY: 75 };
       },
-    };
-
-    expect(deserializeProject(JSON.stringify(mismatched))).toMatchObject({ kind: 'invalid' });
+      (object: Record<string, unknown>) => {
+        object['targetWidthMm'] = 75;
+      },
+      (object: Record<string, unknown>) => {
+        object['reliefDepthMm'] = 4;
+      },
+    ];
+    for (const mutation of mutations) {
+      const raw = rawProject(project);
+      mutation(rawRelief(raw));
+      expect(deserializeProject(JSON.stringify(raw))).toMatchObject({ kind: 'invalid' });
+    }
   });
 });
 
-// ADR-268 follow-up: import demoted the RELIEF_EMBED_TRIANGLE_LIMIT refusal to an
-// advisory but the project validator kept refusing, so a dense STL imported and
-// then could neither be saved nor reloaded — worse than the consistent refusal it
-// replaced. Both ceilings are policy; the shape and finiteness checks are not.
-describe('dense relief round-trips (no embed ceiling)', () => {
-  it('serializes and reloads a relief far past the old 200k-triangle limit', () => {
+describe('dense relief round-trips without an embed ceiling', () => {
+  it('serializes and reloads a relief far past the former 200k-triangle policy limit', () => {
     const triangles = 200_001;
     const meshPositions = new Float32Array(triangles * 9).fill(1);
     Object.defineProperty(meshPositions, Symbol.iterator, {
@@ -274,10 +381,9 @@ describe('dense relief round-trips (no embed ceiling)', () => {
       },
     });
     const base = createProject();
-    const denseRelief = { ...relief(), meshPositions };
     const project: Project = {
       ...base,
-      scene: { ...base.scene, objects: [denseRelief] },
+      scene: { ...base.scene, objects: [withMeshPositions(meshPositions)] },
     };
 
     const prepared = prepareProjectForPersistence(project);
@@ -289,7 +395,36 @@ describe('dense relief round-trips (no embed ceiling)', () => {
     if (reloaded.kind !== 'ok') return;
     const restored = reloaded.project.scene.objects[0];
     expect(restored?.kind).toBe('relief');
-    if (restored?.kind !== 'relief') return;
-    expect(restored.meshPositions).toHaveLength(triangles * 9);
+    if (restored?.kind !== 'relief' || restored.reliefSource.kind !== 'legacy-mesh') return;
+    expect(restored.reliefSource.meshPositions).toHaveLength(triangles * 9);
   });
 });
+
+function withMeshPositions(meshPositions: ReadonlyArray<number> | Float32Array): MeshReliefObject {
+  return {
+    ...relief(),
+    reliefSource: { ...relief().reliefSource, meshPositions },
+  };
+}
+
+function rawProject(project: Project): { scene: { objects: Array<Record<string, unknown>> } } {
+  return JSON.parse(serializeProject(project)) as {
+    scene: { objects: Array<Record<string, unknown>> };
+  };
+}
+
+function rawRelief(raw: {
+  scene: { objects: Array<Record<string, unknown>> };
+}): Record<string, unknown> {
+  const object = raw.scene.objects[0];
+  if (object === undefined) throw new Error('fixture relief missing');
+  return object;
+}
+
+function rawReliefSource(raw: {
+  scene: { objects: Array<Record<string, unknown>> };
+}): Record<string, unknown> {
+  const source = rawRelief(raw)['reliefSource'];
+  if (typeof source !== 'object' || source === null) throw new Error('fixture source missing');
+  return source as Record<string, unknown>;
+}

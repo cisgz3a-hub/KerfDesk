@@ -76,7 +76,7 @@ export function computeRemovalGrid(
     stampStep(grid, stepKernel(kernels, kernel, step), step, budget);
     traversed += step.length;
   }
-  return { kind: 'ok', grid };
+  return { kind: 'ok', grid, resolution: result.resolution };
 }
 
 function kernelsByToolKey(

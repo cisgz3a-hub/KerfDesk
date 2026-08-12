@@ -2,8 +2,8 @@ import type { UserMacro } from './user-macro-collection';
 import { useUserMacroPanelModel, type MacroEditor } from './use-user-macro-panel-model';
 
 export function UserMacroPanel(props: {
-  readonly sending: boolean;
-  readonly inputDisabled: boolean;
+  readonly isSending: boolean;
+  readonly isInputDisabled: boolean;
   readonly onRun: (command: string, macro: UserMacro) => Promise<void>;
 }): JSX.Element {
   const model = useUserMacroPanelModel(props.onRun);
@@ -37,8 +37,8 @@ export function UserMacroPanel(props: {
             variables={model.variables}
             values={model.values}
             preview={model.expansion?.kind === 'ok' ? model.expansion.command : null}
-            sending={props.sending}
-            inputDisabled={props.inputDisabled}
+            isSending={props.isSending}
+            isInputDisabled={props.isInputDisabled}
             onValue={model.setValue}
             onRun={model.runSelected}
           />
@@ -111,7 +111,7 @@ function MacroEditorForm(props: {
   const update = (patch: Partial<Pick<MacroEditor, 'name' | 'template'>>): void =>
     props.onChange({ ...props.editor, ...patch });
   return (
-    <div style={editorStyle} aria-label="User macro editor">
+    <div role="group" style={editorStyle} aria-label="User macro editor">
       <input
         aria-label="Macro name"
         title="Enter the local name shown for this user macro."
@@ -148,13 +148,13 @@ function MacroRunner(props: {
   readonly variables: ReadonlyArray<string>;
   readonly values: Readonly<Record<string, string>>;
   readonly preview: string | null;
-  readonly sending: boolean;
-  readonly inputDisabled: boolean;
+  readonly isSending: boolean;
+  readonly isInputDisabled: boolean;
   readonly onValue: (variable: string, value: string) => void;
   readonly onRun: () => void;
 }): JSX.Element {
   return (
-    <div style={runnerStyle} aria-label={`Run user macro ${props.macro.name}`}>
+    <div role="group" style={runnerStyle} aria-label={`Run user macro ${props.macro.name}`}>
       {props.variables.map((variable) => (
         <label key={variable} style={variableStyle}>
           <span>{`{{${variable}}}`}</span>
@@ -178,11 +178,11 @@ function MacroRunner(props: {
       </div>
       <button
         type="button"
-        disabled={props.sending || props.inputDisabled}
+        disabled={props.isSending || props.isInputDisabled}
         title="Expand and send this one command through the existing Console path."
         onClick={props.onRun}
       >
-        {props.sending ? 'Sending...' : 'Run user macro'}
+        {props.isSending ? 'Sending...' : 'Run user macro'}
       </button>
     </div>
   );

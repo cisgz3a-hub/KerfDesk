@@ -15,6 +15,7 @@ function grid(): RemovalGrid {
     originX: 0,
     originY: 0,
     depth: new Float32Array([0, -1, -2.5, 0]),
+    resolution: { requestedMmPerCell: 1, effectiveMmPerCell: 1, reason: null },
   };
 }
 

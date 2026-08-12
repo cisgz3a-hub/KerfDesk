@@ -15,6 +15,7 @@ function grid(): RemovalGrid {
     originX: 100,
     originY: 200,
     depth,
+    resolution: { requestedMmPerCell: 10, effectiveMmPerCell: 10, reason: null },
   };
 }
 

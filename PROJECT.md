@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-290's narrow explicit 8-bit grayscale height-map path is built; ADR-291 approves the phased CurveDesk photo-to-relief expansion, whose P2R.1-P2R.6 slices remain planned. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 292. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-292 implements the bounded P2R.1a substrate: project schema v4, a canonical U16LE heightfield, exact legacy migration, worker-backed qualified 8-bit grayscale import with simple transparency masks, and existing relief CAM/preview integration. The remaining P2R.1 product surface and P2R.2-P2R.6 stay planned. ADR-293 adds focused one-command CurveDesk user macros through the existing Console path. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 293. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -81,7 +81,7 @@ Acceptance: see `WORKFLOW.md` Phase A flows + `DECISIONS.md` Phase A acceptance 
 
 Match LightBurn's core loop. Adds WebSerial-based GRBL controller, Laser window, Device Profile UI, Home/Frame/Jog/Start/Pause/Abort, alarm handling, job progress.
 
-Focused CurveDesk user macros v1 extends the existing Console under ADR-292: operators can save
+Focused CurveDesk user macros v1 extends the existing Console under ADR-293: operators can save
 named, local, single-command templates with finite-decimal variables. Every expansion reuses the
 current controller driver's parser, `sendConsoleCommand`, safe writer, transcript, and successful
 command-history model. Macros do not stream programs, run automatically, call Start, or create or
@@ -177,7 +177,7 @@ artistic brightness, externally estimated relative order, hand edits, or an STL 
 | Slice | Delivers | Status |
 | --- | --- | --- |
 | P2R.0 | Architecture, product scope, evidence boundaries, phased acceptance, and F-CNC47-F-CNC50 user-flow contracts | Accepted by ADR-291; documentation only |
-| P2R.1 | Schema-v4 canonical U16 field; lossless legacy migration; 8/16-bit grayscale, alpha/mask, tonal mapping, external-relative input; self-contained manual save and atomic autosave | Planned; ADR-290's explicit 8-bit depth-map subset is built |
+| P2R.1 | Schema-v4 canonical U16 field; lossless legacy migration; 8/16-bit grayscale, alpha/mask, tonal mapping, external-relative input; self-contained manual save and atomic autosave | In progress — P2R.1a built under ADR-292: schema v4/U16LE, v3 migration, manual-file persistence, worker-backed 8-bit grayscale plus simple `tRNS` mask, and existing CAM/previews. 16-bit PNG, full alpha/mask UI, tonal/source-mode UI, large atomic autosave, and exact edge-cell containment remain planned |
 | P2R.2 | Relief Map Studio with deterministic U16 height/mask editing, undo, histogram, cross-section, and target 2D/3D previews | Planned |
 | P2R.3 | Independent rough/finish tools and parameters, explicit rough stock-to-leave, nominal ball-cusp or linear stepover, reach metadata, worker routing, and tool simulation/residual maps | Planned |
 | P2R.4 | Deterministic output provenance, exact prepared-artifact handoff, Job Review warnings, and full software release verification | Planned |

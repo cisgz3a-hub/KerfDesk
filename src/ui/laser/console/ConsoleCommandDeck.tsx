@@ -30,28 +30,31 @@ export function ConsoleCommandDeck({
           quickCommands={model.driver.consoleQuickCommands}
           driver={model.driver}
           availabilityState={model.availabilityState}
-          sending={model.sending}
-          onSend={(command) => void model.send(command, false)}
+          sending={model.isSending}
+          onSend={(command) => void model.send(command, { kind: 'quick-command' })}
         />
       ) : null}
       <ConsoleCommandForm
         autoFocus={autoFocus}
         command={model.command}
-        inputDisabled={model.inputDisabled}
-        sending={model.sending}
+        inputDisabled={model.isInputDisabled}
+        sending={model.isSending}
         sendDisabledReason={model.sendDisabledReason}
         onChange={model.changeCommand}
         onHistoryKey={model.handleHistoryKey}
-        onSend={() => void model.send(model.command, true)}
+        onSend={() => void model.send(model.command, { kind: 'manual-draft' })}
       />
       <UserMacroPanel
-        sending={model.sending}
-        inputDisabled={model.inputDisabled}
+        isSending={model.isSending}
+        isInputDisabled={model.isInputDisabled}
         onRun={(command, macro) =>
-          model.send(command, false, {
+          model.send(command, {
             kind: 'user-macro',
-            macroName: macro.name,
-            macroTemplate: macro.template,
+            provenance: {
+              kind: 'user-macro',
+              macroName: macro.name,
+              macroTemplate: macro.template,
+            },
           })
         }
       />

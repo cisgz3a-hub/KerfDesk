@@ -42,6 +42,7 @@ const GRID: RemovalGrid = {
   originX: 0,
   originY: 0,
   depth: new Float32Array([-1]),
+  resolution: { requestedMmPerCell: 1, effectiveMmPerCell: 1, reason: null },
 };
 
 let host: HTMLDivElement;

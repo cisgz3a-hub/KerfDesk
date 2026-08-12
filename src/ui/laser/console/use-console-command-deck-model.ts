@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent } from 'react';
-import { selectControllerDriver } from '../../../core/controllers';
-import type { ConsoleCommandProvenance } from '../../state/console-command-provenance';
+import { selectControllerDriver, type ControllerDriver } from '../../../core/controllers';
+import type { ConsoleCommandProvenance } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import {
   consoleCommandDisabledReason,
@@ -13,10 +13,32 @@ import {
 } from './console-command-history';
 import { runConsoleCommand } from './run-console-command';
 
+type ConsoleCommandSendMode =
+  | { readonly kind: 'manual-draft' }
+  | { readonly kind: 'quick-command' }
+  | { readonly kind: 'user-macro'; readonly provenance: ConsoleCommandProvenance };
+
+type ConsoleCommandDeckModel = {
+  readonly availabilityState: ConsoleCommandAvailabilityState;
+  readonly command: string;
+  readonly driver: ControllerDriver;
+  readonly error: string | null;
+  readonly isSending: boolean;
+  readonly sendDisabledReason: string | null;
+  readonly isInputDisabled: boolean;
+  readonly send: (input: string, mode: ConsoleCommandSendMode) => Promise<void>;
+  readonly handleHistoryKey: (event: KeyboardEvent<HTMLInputElement>) => void;
+  readonly changeCommand: (value: string) => void;
+};
+
+/**
+ * Builds the shared Console command-deck model, including optional successful-command history and
+ * the callback invoked after the existing Console transport accepts a command.
+ */
 export function useConsoleCommandDeckModel(
   enableHistory: boolean,
   onCommandSent: ((command: string) => void) | undefined,
-) {
+): ConsoleCommandDeckModel {
   const connection = useLaserStore((state) => state.connection);
   const statusReport = useLaserStore((state) => state.statusReport);
   const fireActive = useLaserStore((state) => state.fireActive);
@@ -38,23 +60,20 @@ export function useConsoleCommandDeckModel(
   };
   const [command, setCommand] = useState('');
   const [history, setHistory] = useState(createConsoleCommandHistory);
-  const [sending, setSending] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sendDisabledReason = consoleCommandDisabledReason(driver, command, availabilityState);
 
-  const send = async (
-    input: string,
-    shouldClearInput: boolean,
-    provenance?: ConsoleCommandProvenance,
-  ): Promise<void> => {
-    if (sending) return;
-    setSending(true);
+  const send = async (input: string, mode: ConsoleCommandSendMode): Promise<void> => {
+    if (isSending) return;
+    setIsSending(true);
     setError(null);
+    const provenance = mode.kind === 'user-macro' ? mode.provenance : undefined;
     const result = await runConsoleCommand(driver, input, sendConsoleCommand, provenance);
-    setSending(false);
+    setIsSending(false);
     if (result.status === 'sent') {
       setHistory((current) => recordSuccessfulConsoleCommand(current, result.command));
-      if (shouldClearInput) {
+      if (mode.kind === 'manual-draft') {
         // A transport write can be slow. Preserve a new draft the operator
         // typed while the submitted command was still in flight.
         setCommand((current) => (current === input ? '' : current));
@@ -84,9 +103,9 @@ export function useConsoleCommandDeckModel(
     command,
     driver,
     error,
-    sending,
+    isSending,
     sendDisabledReason,
-    inputDisabled: connection.kind !== 'connected' || !driver.capabilities.console,
+    isInputDisabled: connection.kind !== 'connected' || !driver.capabilities.console,
     send,
     handleHistoryKey,
     changeCommand: (value: string) => {

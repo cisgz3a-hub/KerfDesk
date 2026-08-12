@@ -1,7 +1,6 @@
 import { circularArcGeometry } from '../geometry/circular-arc';
 import type { CncHelicalContourPass } from '../job';
-
-const DECIMAL_PLACES = 3;
+import { fmt } from './cnc-grbl-emit-head';
 
 export type PreparedHelicalMotion = {
   readonly first: { readonly x: number; readonly y: number };
@@ -41,8 +40,4 @@ export function prepareHelicalMotion(
     finalZ: fmt(pass.zMm),
     arcLines,
   };
-}
-
-function fmt(value: number): string {
-  return value.toFixed(DECIMAL_PLACES);
 }

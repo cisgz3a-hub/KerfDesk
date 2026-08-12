@@ -120,8 +120,9 @@ export function macroNameKey(name: string): string {
   return name.normalize('NFC').toLowerCase();
 }
 
-export function isValidUserMacroTimestamp(value: number): boolean {
-  return isValidTimestamp(value);
+/** Returns whether a persisted macro timestamp is finite and non-negative. */
+export function isValidTimestamp(value: number): boolean {
+  return Number.isFinite(value) && value >= 0;
 }
 
 function findOriginalMacro(
@@ -140,8 +141,4 @@ function hasNameConflict(
 ): boolean {
   const key = macroNameKey(name);
   return collection.some((macro) => macro !== editedMacro && macroNameKey(macro.name) === key);
-}
-
-function isValidTimestamp(value: number): boolean {
-  return Number.isFinite(value) && value >= 0;
 }

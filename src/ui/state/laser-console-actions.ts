@@ -45,6 +45,7 @@ type ConsoleWriteFn = (
   source: TranscriptSource,
 ) => Promise<void>;
 
+/** Existing Console confirmation state plus optional saved-macro transcript provenance. */
 export type ConsoleCommandOptions = {
   readonly confirmed?: boolean;
   readonly provenance?: ConsoleCommandProvenance;

@@ -23,6 +23,26 @@ type MacroPanelState = {
   readonly error: string | null;
 };
 
+type MacroPanelActionsContext = {
+  readonly state: MacroPanelState;
+  readonly setState: Dispatch<SetStateAction<MacroPanelState>>;
+  readonly selected: UserMacro | null;
+  readonly expansion: UserMacroExpansionResult | null;
+  readonly library: ReturnType<typeof useUserMacroLibrary>;
+  readonly onRun: (command: string, macro: UserMacro) => Promise<void>;
+};
+
+type UserMacroPanelModel = {
+  readonly editor: MacroEditor | null;
+  readonly error: string | null;
+  readonly expansion: UserMacroExpansionResult | null;
+  readonly macros: ReturnType<typeof useUserMacroLibrary>['macros'];
+  readonly selected: UserMacro | null;
+  readonly values: Readonly<Record<string, string>>;
+  readonly variables: ReadonlyArray<string>;
+  readonly setEditor: (editor: MacroEditor) => void;
+} & ReturnType<typeof macroPanelActions>;
+
 const INITIAL_PANEL_STATE: MacroPanelState = {
   selectedName: '',
   editor: null,
@@ -30,9 +50,10 @@ const INITIAL_PANEL_STATE: MacroPanelState = {
   error: null,
 };
 
+/** Builds the saved-macro editor, selection, expansion, persistence, and Console-run model. */
 export function useUserMacroPanelModel(
   onRun: (command: string, macro: UserMacro) => Promise<void>,
-) {
+): UserMacroPanelModel {
   const library = useUserMacroLibrary();
   const [state, setState] = useState<MacroPanelState>(INITIAL_PANEL_STATE);
   const selected = findUserMacro(library.macros, state.selectedName) ?? library.macros[0] ?? null;
@@ -50,18 +71,12 @@ export function useUserMacroPanelModel(
     variables,
     setEditor: (editor: MacroEditor) =>
       setState((current) => ({ ...current, editor, error: null })),
-    ...macroPanelActions(state, setState, selected, expansion, library, onRun),
+    ...macroPanelActions({ state, setState, selected, expansion, library, onRun }),
   };
 }
 
-function macroPanelActions(
-  state: MacroPanelState,
-  setState: Dispatch<SetStateAction<MacroPanelState>>,
-  selected: UserMacro | null,
-  expansion: UserMacroExpansionResult | null,
-  library: ReturnType<typeof useUserMacroLibrary>,
-  onRun: (command: string, macro: UserMacro) => Promise<void>,
-) {
+function macroPanelActions(context: MacroPanelActionsContext) {
+  const { state, setState, selected, expansion, library, onRun } = context;
   return {
     select: (name: string) => setState({ ...INITIAL_PANEL_STATE, selectedName: name }),
     beginNew: () =>

@@ -20,6 +20,7 @@ describe('user macro dependency boundary', () => {
     const files = readdirSync(directory).filter(
       (file) => PRODUCTION_FILE_PATTERN.test(file) && !file.includes('.test.'),
     );
+    expect(files.length, 'no user macro production modules were scanned').toBeGreaterThan(0);
 
     for (const file of files) {
       const source = readFileSync(resolve(directory, file), 'utf8');

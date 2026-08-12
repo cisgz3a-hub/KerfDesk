@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   applyTransform,
   createProject,
@@ -21,19 +22,23 @@ function tallRelief(source: 'mesh' | 'depth-map'): ReliefObject {
   return source === 'mesh'
     ? {
         ...common,
-        meshPositions: [0, 0, 0, 1, 0, 0, 0, 10, 1],
-        emptyCells: 'floor',
+        reliefSource: {
+          kind: 'legacy-mesh',
+          meshPositions: [0, 0, 0, 1, 0, 0, 0, 10, 1],
+          emptyCells: 'floor',
+        },
       }
     : {
         ...common,
-        depthMap: {
-          schemaVersion: 1,
+        reliefSource: testReliefHeightfield({
           width: 1,
           height: 10,
-          bitDepth: 8,
-          samplesBase64: Buffer.alloc(10).toString('base64'),
-          polarity: 'light-is-high',
-        },
+          physicalWidthMm: 100,
+          physicalHeightMm: 1000,
+          maxDepthMm: 5,
+          samplesU8: Array.from({ length: 10 }, () => 0),
+          provenance: { sourceName: 'depth.png' },
+        }),
       };
 }
 

@@ -11,6 +11,7 @@ import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
+  type CncLayerSettings,
   type Layer,
   type ImportedSvg,
   type Project,
@@ -41,10 +42,13 @@ function installProject(layer: Layer, withRelief: boolean): void {
     kind: 'relief',
     id: 'R1',
     source: 'model.stl',
-    meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
     targetWidthMm: 100,
     reliefDepthMm: 5,
-    emptyCells: 'floor',
+    reliefSource: {
+      kind: 'legacy-mesh',
+      meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
+      emptyCells: 'floor',
+    },
     color: layer.color,
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
     transform: IDENTITY_TRANSFORM,
@@ -57,7 +61,10 @@ function installProject(layer: Layer, withRelief: boolean): void {
   useStore.getState().setMachineKind('cnc');
 }
 
-async function render(layer: Layer): Promise<{
+async function render(
+  layer: Layer,
+  onSettingsChange?: (settings: CncLayerSettings) => void,
+): Promise<{
   readonly host: HTMLDivElement;
   readonly root: Root;
 }> {
@@ -65,7 +72,12 @@ async function render(layer: Layer): Promise<{
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<CncLayerFields layer={layer} />);
+    root.render(
+      <CncLayerFields
+        layer={layer}
+        {...(onSettingsChange === undefined ? {} : { onSettingsChange })}
+      />,
+    );
   });
   return { host, root };
 }
@@ -96,6 +108,28 @@ describe('CncLayerFields relief contract', () => {
     try {
       expect(stepoverInput(host, layer.color)).toBeNull();
       expect(host.textContent).not.toContain('total depth comes from the relief');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('preserves the current-main Stepover editor range', async () => {
+    const layer = reliefLayer('engrave');
+    installProject(layer, true);
+    const { host, root } = await render(layer);
+    try {
+      const input = stepoverInput(host, layer.color);
+      if (input === null) throw new Error('stepover input missing');
+      expect(input.getAttribute('min')).toBe('10');
+      expect(input.getAttribute('max')).toBe('85');
+      expect(input.value).toBe('40');
+
+      const cutDepth = host.querySelector<HTMLInputElement>(
+        `input[aria-label="Cut depth for ${layer.color}"]`,
+      );
+      expect(cutDepth?.getAttribute('min')).toBe('0.05');
+      expect(cutDepth?.getAttribute('max')).toBe('200');
     } finally {
       await act(async () => root.unmount());
       host.remove();

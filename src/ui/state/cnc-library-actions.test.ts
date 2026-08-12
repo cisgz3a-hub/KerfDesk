@@ -63,10 +63,7 @@ function installSecondaryReference(
   }));
 }
 
-function objectForLayer(
-  layer: Layer,
-  relief: boolean,
-): ReliefObject | ReturnType<typeof createRectangle> {
+function objectForLayer(layer: Layer, relief: boolean) {
   if (!relief) {
     return createRectangle({
       id: 'R1',
@@ -78,14 +75,17 @@ function objectForLayer(
     kind: 'relief',
     id: 'R1',
     source: 'model.stl',
-    meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
     targetWidthMm: 10,
     reliefDepthMm: 2,
-    emptyCells: 'floor',
+    reliefSource: {
+      kind: 'legacy-mesh',
+      meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 5],
+      emptyCells: 'floor',
+    },
     color: layer.color,
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 5 },
     transform: IDENTITY_TRANSFORM,
-  };
+  } satisfies ReliefObject;
 }
 
 describe('custom bits (F-CNC11)', () => {

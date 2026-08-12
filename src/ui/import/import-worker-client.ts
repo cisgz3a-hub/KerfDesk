@@ -7,7 +7,10 @@ import type {
 } from './stl-import-preparation';
 import { type PackedDxfResult, unpackDxfResult } from './packed-dxf-result';
 import { type PackedGcodeResult, unpackGcodeResult } from './packed-gcode-result';
-import type { PreparedDepthMapImportResult } from './depth-map-import-preparation';
+import type {
+  PreparedDepthMapImportResult,
+  PreparedReliefHeightfieldImportResult,
+} from './depth-map-import-preparation';
 
 export type ImportWorkerProgress = {
   readonly phase: 'queued' | 'reading' | 'parsing' | 'preparing';
@@ -72,6 +75,27 @@ export function prepareDepthMapPngOffThread(
   options: ImportWorkerRequestOptions = {},
 ): Promise<PreparedDepthMapImportResult> | null {
   return request({ kind: 'depth-map-png', blob }, 'depth-map-png', options);
+}
+
+/** Decode, canonicalize, encode, and digest one relief PNG in the import worker. */
+export function prepareReliefHeightfieldPngOffThread(
+  blob: Blob,
+  sourceName: string,
+  physicalWidthMm: number,
+  maxDepthMm: number,
+  options: ImportWorkerRequestOptions = {},
+): Promise<PreparedReliefHeightfieldImportResult> | null {
+  return request(
+    {
+      kind: 'relief-heightfield-png',
+      blob,
+      sourceName,
+      physicalWidthMm,
+      maxDepthMm,
+    },
+    'relief-heightfield-png',
+    options,
+  );
 }
 
 export function resetImportWorkerForTests(): void {

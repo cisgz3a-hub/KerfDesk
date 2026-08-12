@@ -5,7 +5,7 @@
 // time so the missing arm is the only compile error when a new variant lands.
 
 import type { VariableTemplate } from './variable-template';
-import type { ReliefDepthMap } from './relief';
+import type { ReliefHeightfield } from './relief/relief-heightfield';
 
 export type Vec2 = { readonly x: number; readonly y: number };
 
@@ -417,26 +417,25 @@ type ReliefObjectCommon = ObjectPowerScale & {
   readonly transform: Transform;
 };
 
-/** Mesh-backed CNC relief whose triangle source is exclusive of a depth map. */
+/** Mesh-backed CNC relief preserved losslessly through the v4 source union. */
 export type MeshReliefObject = ReliefObjectCommon & {
-  readonly meshPositions: ReadonlyArray<number> | Float32Array;
-  readonly emptyCells: 'floor' | 'top';
-  readonly depthMap?: never;
+  readonly reliefSource: {
+    readonly kind: 'legacy-mesh';
+    readonly meshPositions: ReadonlyArray<number> | Float32Array;
+    readonly emptyCells: 'floor' | 'top';
+  };
 };
 
-/** Depth-map-backed CNC relief whose sampled source is exclusive of a triangle mesh. */
-export type DepthMapReliefObject = ReliefObjectCommon & {
-  readonly depthMap: ReliefDepthMap;
-  readonly meshPositions?: never;
-  readonly emptyCells?: never;
+/** Canonical scalar-field CNC relief (ADR-291). */
+export type HeightfieldReliefObject = ReliefObjectCommon & {
+  readonly reliefSource: ReliefHeightfield;
 };
 
-/** CNC relief backed by exactly one durable mesh or depth-map source. */
-export type ReliefObject = MeshReliefObject | DepthMapReliefObject;
+/** CNC relief backed by exactly one discriminated durable source. */
+export type ReliefObject = MeshReliefObject | HeightfieldReliefObject;
 
-// Embedding cap: meshes beyond this bloat the .lf2 JSON into the hundreds of
-// MB. Decorative reliefs are typically well under it; the import path tells
-// the user to decimate when over.
+// Advisory threshold: meshes beyond this can bloat .lf2 JSON into the hundreds
+// of MB. Import remains available and explains that decimation improves speed.
 export const RELIEF_EMBED_TRIANGLE_LIMIT = 200_000;
 
 // Canonical layer color for fresh relief imports (DEFAULT_RASTER_LAYER_COLOR

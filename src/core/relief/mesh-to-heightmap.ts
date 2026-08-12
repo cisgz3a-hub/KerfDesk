@@ -33,11 +33,20 @@ export type MeshHeightmapResult =
     }
   | { readonly kind: 'error'; readonly reason: string };
 
+export type MeshHeightmapRuntime = {
+  readonly allocateFloat32: (length: number) => Float32Array;
+};
+
+const DEFAULT_RUNTIME: MeshHeightmapRuntime = {
+  allocateFloat32: (length) => new Float32Array(length),
+};
+
 const MIN_EXTENT = 1e-9;
 
 export function meshToHeightmap(
   mesh: TriangleMesh,
   options: MeshHeightmapOptions,
+  runtime: MeshHeightmapRuntime = DEFAULT_RUNTIME,
 ): MeshHeightmapResult {
   const bounds = meshBounds(mesh);
   if (bounds === null) return { kind: 'error', reason: 'Mesh has no triangles.' };
@@ -57,20 +66,43 @@ export function meshToHeightmap(
   const { mmPerCell } = size;
   const widthCells = Math.max(1, Math.ceil(widthMm / mmPerCell));
   const heightCells = Math.max(1, Math.ceil(heightMm / mmPerCell));
+  const cellCount = widthCells * heightCells;
 
-  const target: RasterTarget = {
-    widthCells,
-    heightCells,
-    maxZ: new Float32Array(widthCells * heightCells).fill(Number.NEGATIVE_INFINITY),
-  };
+  const maxZ = allocateFloat32(runtime, cellCount);
+  if (maxZ === null) {
+    return { kind: 'error', reason: 'Relief mesh heightmap does not fit in this runtime.' };
+  }
+  maxZ.fill(Number.NEGATIVE_INFINITY);
+  const target: RasterTarget = { widthCells, heightCells, maxZ };
   rasterizeMesh(target, mesh, bounds, widthCells / xExtent, heightCells / yExtent);
-  const depth = normalizeDepths(target.maxZ, bounds, options);
+  const depth = allocateFloat32(runtime, cellCount);
+  if (depth === null) {
+    return { kind: 'error', reason: 'Relief mesh heightmap does not fit in this runtime.' };
+  }
+  normalizeDepths(maxZ, depth, bounds, options);
   return {
     kind: 'ok',
     heightmap: { widthCells, heightCells, mmPerCell, depth },
     widthMm,
     heightMm,
   };
+}
+
+function allocateFloat32(runtime: MeshHeightmapRuntime, length: number): Float32Array | null {
+  try {
+    const allocated = runtime.allocateFloat32(length);
+    return allocated.length === length ? allocated : null;
+  } catch (error) {
+    if (isRangeError(error)) return null;
+    throw error;
+  }
+}
+
+function isRangeError(error: unknown): boolean {
+  if (error instanceof RangeError) return true;
+  if (Object.prototype.toString.call(error) !== '[object Error]') return false;
+  const constructor = (error as { readonly constructor?: unknown }).constructor;
+  return typeof constructor === 'function' && constructor.name === 'RangeError';
 }
 
 type TargetSizeResult =
@@ -126,16 +158,15 @@ function rasterizeMesh(
 
 function normalizeDepths(
   maxZ: Float32Array,
+  depth: Float32Array,
   bounds: NonNullable<ReturnType<typeof meshBounds>>,
   options: MeshHeightmapOptions,
-): Float32Array {
+): void {
   const zExtent = bounds.maxZ - bounds.minZ;
   const scale = zExtent < MIN_EXTENT ? 0 : options.reliefDepthMm / zExtent;
   const emptyDepth = (options.emptyCells ?? 'floor') === 'floor' ? -options.reliefDepthMm : 0;
-  const depth = new Float32Array(maxZ.length);
   for (let i = 0; i < maxZ.length; i += 1) {
     const z = maxZ[i] ?? Number.NEGATIVE_INFINITY;
     depth[i] = z === Number.NEGATIVE_INFINITY ? emptyDepth : (z - bounds.maxZ) * scale;
   }
-  return depth;
 }

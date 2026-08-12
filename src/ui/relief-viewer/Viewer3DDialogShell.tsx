@@ -24,6 +24,8 @@ export function Viewer3DDialogShell(props: {
   // Must be referentially stable (useCallback) — it is the effect dependency.
   // Null means a background preparation task has not produced its mesh yet.
   readonly buildScene: ViewerDialogSceneBuilder | null;
+  // Display-only disclosure such as bounded preview coarsening. Never a gate.
+  readonly notice?: string;
   readonly preparationFailure?: string;
   // A transferred canvas cannot be transferred again. Incrementing this
   // remounts a fresh element when background preparation yields a new mesh.
@@ -67,6 +69,11 @@ export function Viewer3DDialogShell(props: {
         tabIndex={0}
         className="lf-viewer3d-dialog__canvas"
       />
+      {props.notice === undefined ? null : (
+        <p className="lf-viewer3d-dialog__hint" role="status" style={noticeStyle}>
+          {props.notice}
+        </p>
+      )}
       <ViewerStateHint id={hintId} state={visibleState} />
     </Dialog>
   );
@@ -97,3 +104,6 @@ function ViewerStateHint(props: {
     </p>
   );
 }
+const noticeStyle: React.CSSProperties = {
+  color: 'var(--lf-warning)',
+};

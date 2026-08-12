@@ -5,7 +5,7 @@ import {
   type ConsoleCommandProvenance,
 } from './console-command-provenance';
 
-const provenance: ConsoleCommandProvenance = {
+const PROVENANCE: ConsoleCommandProvenance = {
   kind: 'user-macro',
   macroName: 'Nudge "X"',
   macroTemplate: 'G0 X{{distance}}',
@@ -14,11 +14,11 @@ const provenance: ConsoleCommandProvenance = {
 describe('console command provenance', () => {
   it('distinguishes manual Console and saved user-macro writes', () => {
     expect(consoleCommandTranscriptSource(undefined)).toBe('console');
-    expect(consoleCommandTranscriptSource(provenance)).toBe('macro');
+    expect(consoleCommandTranscriptSource(PROVENANCE)).toBe('macro');
   });
 
   it('records a truthful single-line expansion message', () => {
-    expect(macroDispatchTranscriptEntry(4, 10, provenance, 'G0 X2.5')).toEqual({
+    expect(macroDispatchTranscriptEntry(4, 10, PROVENANCE, 'G0 X2.5')).toEqual({
       id: 4,
       at: 10,
       direction: 'system',

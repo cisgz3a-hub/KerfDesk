@@ -12,6 +12,7 @@ import type {
   CncRemovalGridWorkerRequest,
   CncRemovalGridWorkerResponse,
 } from './cnc-removal-grid-worker-protocol';
+import { cncPreviewResponseTransferables } from './cnc-removal-grid-worker-protocol';
 
 type WorkRequest = Exclude<CncRemovalGridWorkerRequest, { readonly kind: 'cancel-relief' }>;
 const reliefControllers = new Map<number, AbortController>();
@@ -47,7 +48,7 @@ async function prepare(request: WorkRequest): Promise<void> {
       reliefControllers.delete(request.id);
     }
   }
-  self.postMessage(response, responseTransfers(response));
+  self.postMessage(response, cncPreviewResponseTransferables(response));
 }
 
 type WorkerTask = {
@@ -121,21 +122,4 @@ function bindSingleResponse(
     return { id: request.id, kind: request.kind, surface: result.output };
   }
   throw new Error('CNC preview worker returned a mismatched result.');
-}
-
-function responseTransfers(response: CncRemovalGridWorkerResponse): Transferable[] {
-  if (response.kind === 'grid') return response.grid === null ? [] : [response.grid.depth.buffer];
-  if (response.kind === 'surface') {
-    return [
-      response.surface.positions.buffer,
-      response.surface.indices.buffer,
-      response.surface.normals.buffer,
-    ];
-  }
-  if (response.kind === 'relief-heightmaps') {
-    return response.items.flatMap((item) =>
-      item.result.kind === 'ok' ? [item.result.heightmap.depth.buffer] : [],
-    );
-  }
-  return [];
 }

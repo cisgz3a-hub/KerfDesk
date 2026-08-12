@@ -3,7 +3,7 @@ import { createFramedRunPermit, type FramedRunCandidate } from './framed-run';
 import { useLaserStore } from './laser-store';
 import { connectWith, makeConnection } from './laser-store-console.test-support';
 
-const provenance = {
+const PROVENANCE = {
   kind: 'user-macro' as const,
   macroName: 'Nudge X',
   macroTemplate: 'G0 X{{distance}}',
@@ -34,7 +34,7 @@ describe('saved user macro Console dispatch', () => {
     await connectWith(connection);
     useLaserStore.getState().clearTranscript();
 
-    await useLaserStore.getState().sendConsoleCommand('$#', { provenance });
+    await useLaserStore.getState().sendConsoleCommand('$#', { provenance: PROVENANCE });
 
     expect(useLaserStore.getState()).toMatchObject({ framedRun: null, streamer: null });
     expect(useLaserStore.getState().transcript).toMatchObject([
@@ -57,7 +57,7 @@ describe('saved user macro Console dispatch', () => {
     );
     useLaserStore.setState({ framedRun: permit });
 
-    await useLaserStore.getState().sendConsoleCommand('$#', { provenance });
+    await useLaserStore.getState().sendConsoleCommand('$#', { provenance: PROVENANCE });
 
     expect(useLaserStore.getState().framedRun).toBe(permit);
     expect(useLaserStore.getState().streamer).toBeNull();
@@ -78,7 +78,9 @@ describe('saved user macro Console dispatch', () => {
     writes.length = 0;
     useLaserStore.setState({ framedRun: permit });
 
-    const dispatch = useLaserStore.getState().sendConsoleCommand('G0 X2.5', { provenance });
+    const dispatch = useLaserStore
+      .getState()
+      .sendConsoleCommand('G0 X2.5', { provenance: PROVENANCE });
     expect(useLaserStore.getState().framedRun).toBeNull();
     await dispatch;
 
@@ -95,17 +97,17 @@ describe('saved user macro Console dispatch', () => {
   });
 
   it('does not record success provenance when the transport rejects the write', async () => {
-    let rejectWrites = false;
+    let shouldRejectWrites = false;
     const connection = makeConnection(async () => {
-      if (!rejectWrites) return;
+      if (!shouldRejectWrites) return;
       throw new Error('adapter rejected macro write');
     });
     await connectWith(connection);
     useLaserStore.getState().clearTranscript();
-    rejectWrites = true;
+    shouldRejectWrites = true;
 
     await expect(
-      useLaserStore.getState().sendConsoleCommand('G0 X2.5', { provenance }),
+      useLaserStore.getState().sendConsoleCommand('G0 X2.5', { provenance: PROVENANCE }),
     ).rejects.toThrow('adapter rejected macro write');
     expect(useLaserStore.getState().transcript).toEqual([]);
     expect(useLaserStore.getState()).toMatchObject({ framedRun: null, streamer: null });
