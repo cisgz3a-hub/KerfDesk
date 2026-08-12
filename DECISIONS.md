@@ -16458,7 +16458,8 @@ beside the exact-artifact Frame/Start flow governed by ADR-228, ADR-230, and ADR
 5. **History and confirmations keep their existing meaning.** The expanded normalized command enters
    Arrow history only after the shared runner reports `sent`. Cancelled, invalid, storage-only, or
    rejected attempts do not. A macro that expands to a persistent setting write uses the same
-   existing confirmation as manually typed input.
+   existing confirmation as manually typed input. Running a macro does not replace or clear unsent
+   manual Console text; that draft remains available before and after macro dispatch.
 6. **Provenance is explicit and truthful.** Successful macro dispatch marks the outbound transcript
    source as `macro` and appends a macro-source message containing the saved name and expanded
    command. The message says what CurveDesk dispatched through Console; it does not claim controller
@@ -16492,8 +16493,8 @@ beside the exact-artifact Frame/Start flow governed by ADR-228, ADR-230, and ADR
 
 - Pure tests cover placeholder discovery, repeated values, decimal expansion, malformed templates,
   missing values, injection attempts, and versioned storage validation/failure behavior.
-- Command-deck tests prove a macro uses the shared runner, carries provenance, and records the
-  expanded command in the existing success-only history.
+- Command-deck tests prove a macro uses the shared runner, carries provenance, preserves the unsent
+  manual Console draft, and records the expanded command in the existing success-only history.
 - Store tests prove macro-source writes use `safeWrite`, read-only macros cannot mint a permit,
   state-mutating macros invalidate an existing permit before write, no streamer is created, and
   transcript provenance is success-only.

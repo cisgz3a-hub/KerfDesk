@@ -75,6 +75,7 @@ describe('ConsoleCommandDeck', () => {
     await clickButton(host, 'Send');
     expect(input.value).toBe('G0 X');
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('Controller is busy');
+    expect(button(host, 'Send').disabled).toBe(false);
 
     await unmount();
   });
