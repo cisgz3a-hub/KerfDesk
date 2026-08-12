@@ -263,6 +263,25 @@ Identical to F-A3 except:
 
 ---
 
+### F-A6a. Array selected artwork — grid, point rotation, circular (ADR-294)
+
+1. Select one or more visible, unlocked artwork objects and choose **Arrange → Array...**.
+2. Choose **Grid**, **Point Rotation**, or **Circular**. Grid and Circular keep their existing fields
+   and behavior.
+3. For **Point Rotation**, enter **Copies (includes original)** and **Total angle (deg)**. The original
+   selection is the 0-degree instance. Every later instance rotates around the current combined
+   selection centre by `index * total angle / copies`; a 360-degree array therefore stops before a
+   duplicate endpoint.
+4. A negative total angle reverses direction. A partial angle uses the same exclusive-endpoint law.
+5. **Create array** keeps the original IDs for the 0-degree instance, gives every added object and
+   copied complete group fresh IDs, selects the complete result, and commits one undo entry.
+6. **Cancel** or Escape closes the dialog without mutating the project. This slice has no live canvas
+   preview or direct-manipulation point; those remain deferred rather than partially implemented.
+7. Point Rotation is intentionally overlapping geometry. Preview, G-code preparation, Save, Frame,
+   and Start consume the resulting ordinary scene objects through the unchanged exact-output path.
+
+---
+
 ### F-A7. Artwork Operations panel
 
 #### Layout

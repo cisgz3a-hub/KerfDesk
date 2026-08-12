@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-292 implements the bounded P2R.1a substrate: project schema v4, a canonical U16LE heightfield, exact legacy migration, worker-backed qualified 8-bit grayscale import with simple transparency masks, and existing relief CAM/preview integration. The remaining P2R.1 product surface and P2R.2-P2R.6 stay planned. ADR-293 adds focused one-command CurveDesk user macros through the existing Console path. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 293. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-292 implements the bounded P2R.1a substrate: project schema v4, a canonical U16LE heightfield, exact legacy migration, worker-backed qualified 8-bit grayscale import with simple transparency masks, and existing relief CAM/preview integration. The remaining P2R.1 product surface and P2R.2-P2R.6 stay planned. ADR-293 adds focused one-command CurveDesk user macros through the existing Console path. ADR-294 adds Point Rotation to the existing Array workflow. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 294. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -96,6 +96,10 @@ Job time estimates, settings panel, SVG re-import with diff, and a persisted det
 Layout extension (ADR-151): Quick Nest can compact small/medium jobs against real closed outlines,
 with deterministic item/point/candidate budgets and immediate rectangular fallback for dense,
 invalid, or oversized inputs.
+
+Array extension (ADR-294): **Arrange → Array...** adds Point Rotation beside the existing Grid and
+Circular modes. It makes overlapping rotated instances around the current selection centre in one
+undoable document mutation; the transient array settings do not add a project schema or output path.
 
 Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `flatten-svg` (ISC) for path simplification.
 

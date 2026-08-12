@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createLayer, createProject, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
+import {
+  combinedBBox,
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  type SceneObject,
+} from '../../core/scene';
 import { applyArraySelection } from './array-actions';
 import type { AppState } from './store';
 
@@ -71,5 +77,54 @@ describe('arraySelection', () => {
         spacingY: 0,
       }),
     ).toBe(locked);
+  });
+
+  it('rotates a grouped selection rigidly around its combined center in one undo action', () => {
+    let nextId = 0;
+    const before = state();
+    const result = applyArraySelection(
+      before,
+      { kind: 'point-rotation', count: 4, totalAngleDeg: 360 },
+      () => `point-${nextId++}`,
+    ) as AppState;
+
+    expect(result.project.scene.objects).toHaveLength(8);
+    expect(result.project.scene.groups).toHaveLength(4);
+    expect(result.undoStack).toEqual([before.project]);
+    expect(result.redoStack).toEqual([]);
+    expect(result.additionalSelectedIds.size).toBe(7);
+    expect(new Set(result.project.scene.objects.map((item) => item.id)).size).toBe(8);
+
+    const firstRotatedCopy = result.project.scene.objects.slice(2, 4);
+    const rotatedBounds = combinedBBox(firstRotatedCopy);
+    expect(rotatedBounds).not.toBeNull();
+    expect(((rotatedBounds?.minX ?? 0) + (rotatedBounds?.maxX ?? 0)) / 2).toBeCloseTo(12.5);
+    expect(((rotatedBounds?.minY ?? 0) + (rotatedBounds?.maxY ?? 0)) / 2).toBeCloseTo(2.5);
+    expect(firstRotatedCopy.map((item) => item.transform.rotationDeg)).toEqual([90, 90]);
+  });
+
+  it('composes point rotation with the source rotation', () => {
+    const before = state();
+    const rotated = {
+      ...before,
+      additionalSelectedIds: new Set<string>(),
+      project: {
+        ...before.project,
+        scene: {
+          ...before.project.scene,
+          objects: before.project.scene.objects.map((item) =>
+            item.id === 'A' ? { ...item, transform: { ...item.transform, rotationDeg: 30 } } : item,
+          ),
+        },
+      },
+    };
+    const result = applyArraySelection(
+      rotated,
+      { kind: 'point-rotation', count: 2, totalAngleDeg: 180 },
+      () => 'rotated-copy',
+    ) as AppState;
+
+    expect(result.project.scene.objects[0]?.transform.rotationDeg).toBe(30);
+    expect(result.project.scene.objects[2]?.transform.rotationDeg).toBe(120);
   });
 });
