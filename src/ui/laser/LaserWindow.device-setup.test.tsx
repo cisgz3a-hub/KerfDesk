@@ -10,6 +10,7 @@ import { DEVICE_SETUP_CONFIGURED_STORAGE_KEY } from '../state/device-setup-confi
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { LaserWindow } from './LaserWindow';
+import { MachineSetupDialogHost } from './device-setup';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -246,7 +247,10 @@ async function renderLaserWindow(): Promise<{
     root = createRoot(host);
     root.render(
       <PlatformProvider adapter={mockPlatform}>
-        <LaserWindow />
+        <>
+          <LaserWindow />
+          <MachineSetupDialogHost />
+        </>
       </PlatformProvider>,
     );
   });

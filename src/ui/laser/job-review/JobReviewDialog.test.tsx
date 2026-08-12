@@ -10,6 +10,8 @@ import {
 import { MANUAL_FEEDS_LABEL } from '../../common/cnc-material-vocabulary';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
+import { useUiStore } from '../../state/ui-store';
+import { useMachineSetupDialogStore } from '../device-setup/machine-setup-dialog-store';
 import type { JobReviewModel } from './job-review-model';
 import { useJobReviewStore } from './job-review-store';
 import { JobReviewDialog } from './JobReviewDialog';
@@ -56,6 +58,7 @@ beforeEach(() => {
     },
   });
   useJobReviewStore.getState().close();
+  useMachineSetupDialogStore.getState().close();
   host = document.createElement('div');
   document.body.appendChild(host);
 });
@@ -65,6 +68,7 @@ afterEach(async () => {
   root = null;
   host.remove();
   useJobReviewStore.getState().close();
+  useMachineSetupDialogStore.getState().close();
   resetStore();
 });
 
@@ -111,6 +115,8 @@ describe('JobReviewDialog', () => {
     // Laser profiles have no stock; the CNC card must stay out of the way.
     expect(host.textContent).not.toContain('Material & stock');
     expect(buttonByText('Approve settings').disabled).toBe(false);
+    expect(host.textContent).not.toContain('Edit Artwork settings');
+    expect(host.textContent).not.toContain('Edit Startup Setup');
     expect(buttonByText('Start job').disabled).toBe(false);
     expect(host.querySelector('form')).toBeNull();
   });
@@ -242,8 +248,54 @@ describe('JobReviewDialog', () => {
     expect(host.textContent).toContain('400 × 400 × 6.4 mm');
     expect(host.textContent).toContain('Stock');
     expect(host.textContent).toContain('Safe Z');
+    expect(buttonByText('Edit Artwork settings')).toBeInstanceOf(HTMLButtonElement);
+    expect(buttonByText('Edit Startup Setup')).toBeInstanceOf(HTMLButtonElement);
+    expect(host.textContent).not.toContain('Approve settings');
     expect(host.textContent).toContain('1. 3.175 mm (1/8") end mill');
     expect(host.textContent).toContain('2. 60° V-bit');
+  });
+
+  it('leaves CNC review for the editable Artwork settings owner', async () => {
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    }));
+    useUiStore.getState().setRailPanelVisible('layers', false);
+    useUiStore.getState().setCutsLayersView('run-order');
+    useJobReviewStore.getState().open({
+      ...model,
+      machineKind: 'cnc',
+      acknowledgement: { kind: 'cnc', prompt: 'CNC attestation prompt body.' },
+    });
+    await render();
+
+    await act(async () => buttonByText('Edit Artwork settings').click());
+
+    expect(useJobReviewStore.getState().state.kind).toBe('idle');
+    expect(useJobReviewStore.getState().pendingSignal).toBe('cancel');
+    expect(useUiStore.getState().cutsLayersView).toBe('layers');
+    expect(useUiStore.getState().railPanelVisibility.layers).toBe(true);
+    expect(useUiStore.getState().railPanelFocusRequest?.panel).toBe('layers');
+  });
+
+  it('leaves CNC review for the Startup Setup owner', async () => {
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    }));
+    useJobReviewStore.getState().open({
+      ...model,
+      machineKind: 'cnc',
+      acknowledgement: { kind: 'cnc', prompt: 'CNC attestation prompt body.' },
+    });
+    await render();
+
+    await act(async () => buttonByText('Edit Startup Setup').click());
+
+    expect(useJobReviewStore.getState().state.kind).toBe('idle');
+    expect(useJobReviewStore.getState().pendingSignal).toBe('cancel');
+    expect(useMachineSetupDialogStore.getState().state).toMatchObject({
+      kind: 'open',
+      target: { kind: 'step', step: 'cnc-setup' },
+    });
   });
 
   it('surfaces a rebuild refusal as a blocker and keeps Confirm inert', async () => {

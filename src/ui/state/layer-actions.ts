@@ -17,6 +17,7 @@ import { recolorLayer } from '../../core/scene/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
+import { cncSettingsForArtworkPaste } from './cnc-settings-clipboard';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
@@ -139,8 +140,9 @@ export function layerActions(set: LayerActionSet): LayerActions {
         if (state.copiedLayerSettings === null) return {};
         const target = state.project.scene.layers.find((layer) => layer.id === layerId);
         if (target === undefined) return {};
-        if (layerSettingsEqual(target, state.copiedLayerSettings)) return {};
-        const scene = updateLayer(state.project.scene, layerId, state.copiedLayerSettings);
+        const settings = layerSettingsForPaste(target, state.copiedLayerSettings);
+        if (layerSettingsEqual(target, settings)) return {};
+        const scene = updateLayer(state.project.scene, layerId, settings);
         return mutation(state, { ...state.project, scene });
       }),
     ...layerSubLayerActions(set),
@@ -329,6 +331,15 @@ function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
     ...(layer.materialBinding === undefined ? {} : { materialBinding: layer.materialBinding }),
     ...(layer.cnc === undefined ? {} : { cnc: layer.cnc }),
   };
+}
+
+function layerSettingsForPaste(
+  target: Layer,
+  copied: LayerSettingsClipboard,
+): LayerSettingsClipboard {
+  return copied.cnc === undefined
+    ? copied
+    : { ...copied, cnc: cncSettingsForArtworkPaste(copied.cnc, target.cnc) };
 }
 
 function layerSettingsEqual(layer: Layer, settings: LayerSettingsClipboard): boolean {

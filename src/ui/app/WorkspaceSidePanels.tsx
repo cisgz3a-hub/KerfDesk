@@ -16,6 +16,7 @@ export function WorkspaceSidePanels(): JSX.Element {
   const layersExpanded = useUiStore((state) => state.railPanelVisibility.layers);
   const machinePanel = useMachineRailVisibility();
   const runOrderOpen = useUiStore((state) => state.cutsLayersView === 'run-order');
+  useWorkspacePanelFocus(setActive, setCutsOpen, setMachineOpen);
 
   if (compact) {
     return (
@@ -80,6 +81,23 @@ export function WorkspaceSidePanels(): JSX.Element {
       </div>
     </section>
   );
+}
+
+function useWorkspacePanelFocus(
+  setActive: (panel: PanelId) => void,
+  setCutsOpen: (open: boolean) => void,
+  setMachineOpen: (open: boolean) => void,
+): void {
+  const request = useUiStore((state) => state.railPanelFocusRequest);
+  useEffect(() => {
+    if (request?.panel === 'layers') {
+      setActive('cuts');
+      setCutsOpen(true);
+    } else if (request?.panel === 'machine') {
+      setActive('machine');
+      setMachineOpen(true);
+    }
+  }, [request, setActive, setCutsOpen, setMachineOpen]);
 }
 
 function useCompactWorkspace(): boolean {

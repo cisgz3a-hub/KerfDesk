@@ -12,7 +12,6 @@
 
 import { machineKindOf } from '../../core/scene';
 import { CollapsedRail, RailPanelHeading } from '../common';
-import { CncSetupPanel } from '../machine/CncSetupPanel';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { type CutsLayersView, useUiStore } from '../state/ui-store';
@@ -139,7 +138,6 @@ function LayersView(props: {
   return (
     <>
       <SelectedObjectProperties />
-      <CncSetupPanel />
       <OffsetPathsRow />
       <DogboneRow />
       <SelectedReliefProperties />

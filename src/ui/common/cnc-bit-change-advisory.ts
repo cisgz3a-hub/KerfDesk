@@ -5,6 +5,7 @@ import {
   type CncLayerSettings,
   type CncMachineConfig,
   type CncTool,
+  type Layer,
   type Project,
   type Scene,
 } from '../../core/scene';
@@ -66,6 +67,107 @@ export function hasRetainedFeedsAfterEffectiveToolChange(before: Project, after:
   });
 }
 
+/** Returns the unique non-blocking review notices produced by one committed
+ * Startup Setup change. Primary and secondary cutter comparisons happen after
+ * the atomic store replacement, so Cancel remains silent and material recipes
+ * that successfully recalculated do not receive the primary warning. */
+export function cncRetainedFeedAdvisoriesAfterSetupChange(
+  before: Project,
+  after: Project,
+): ReadonlyArray<string> {
+  const advisories = new Set<string>();
+  if (hasRetainedFeedsAfterEffectiveToolChange(before, after)) {
+    advisories.add(CNC_RETAINED_FEEDS_WARNING);
+  }
+  const beforeMachine = before.machine;
+  const afterMachine = after.machine;
+  if (beforeMachine?.kind !== 'cnc' || afterMachine?.kind !== 'cnc') {
+    return [...advisories];
+  }
+  for (const afterLayer of after.scene.layers) {
+    addLayerSecondaryAdvisories({
+      advisories,
+      before,
+      after,
+      beforeMachine,
+      afterMachine,
+      afterLayer,
+    });
+  }
+  return [...advisories];
+}
+
+function addLayerSecondaryAdvisories(input: {
+  readonly advisories: Set<string>;
+  readonly before: Project;
+  readonly after: Project;
+  readonly beforeMachine: CncMachineConfig;
+  readonly afterMachine: CncMachineConfig;
+  readonly afterLayer: Layer;
+}): void {
+  if (!operationProducesOutput(input.after, input.afterLayer)) return;
+  const beforeLayer = input.before.scene.layers.find(
+    (candidate) => candidate.id === input.afterLayer.id,
+  );
+  if (beforeLayer === undefined) return;
+  const beforeSettings = beforeLayer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const afterSettings = input.afterLayer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const primary = layerCncTool(input.afterMachine, afterSettings);
+  if (retainedFeedValues(beforeSettings, afterSettings)) {
+    addSharedSecondaryAdvisory({
+      ...input,
+      beforeToolId: beforeSettings.vClearToolId,
+      afterToolId: afterSettings.vClearToolId,
+      primary,
+      message: CNC_SECONDARY_RETAINED_FEEDS_WARNING,
+    });
+    addSharedSecondaryAdvisory({
+      ...input,
+      beforeToolId: beforeSettings.pocketRoughToolId,
+      afterToolId: afterSettings.pocketRoughToolId,
+      primary,
+      message: CNC_SECONDARY_RETAINED_FEEDS_WARNING,
+    });
+  }
+  if (retainedReliefFeedValues(beforeSettings, afterSettings)) {
+    addSharedSecondaryAdvisory({
+      ...input,
+      beforeToolId: beforeSettings.reliefFinishToolId,
+      afterToolId: afterSettings.reliefFinishToolId,
+      primary,
+      message: CNC_SECONDARY_RETAINED_RELIEF_FEEDS_WARNING,
+    });
+  }
+}
+
+function operationProducesOutput(project: Project, layer: Layer): boolean {
+  return (
+    layer.output && project.scene.objects.some((object) => sceneObjectUsesOperation(object, layer))
+  );
+}
+
+function addSharedSecondaryAdvisory(input: {
+  readonly advisories: Set<string>;
+  readonly beforeMachine: CncMachineConfig;
+  readonly afterMachine: CncMachineConfig;
+  readonly beforeToolId: string | undefined;
+  readonly afterToolId: string | undefined;
+  readonly primary: CncTool;
+  readonly message: string;
+}): void {
+  const afterTool = toolById(input.afterMachine, input.afterToolId);
+  if (afterTool === null || sameCncTool(afterTool, input.primary)) return;
+  const beforeTool = toolById(input.beforeMachine, input.beforeToolId);
+  if (beforeTool === null || !sameCncTool(beforeTool, afterTool)) {
+    input.advisories.add(input.message);
+  }
+}
+
+function toolById(machine: CncMachineConfig, toolId: string | undefined): CncTool | null {
+  if (toolId === undefined) return null;
+  return machine.tools.find((tool) => tool.id === toolId) ?? null;
+}
+
 function sameCncTool(left: CncTool, right: CncTool): boolean {
   return (
     left.id === right.id &&
@@ -83,5 +185,13 @@ function retainedFeedValues(left: CncLayerSettings, right: CncLayerSettings): bo
     left.plungeMmPerMin === right.plungeMmPerMin &&
     left.spindleRpm === right.spindleRpm &&
     left.depthPerPassMm === right.depthPerPassMm
+  );
+}
+
+function retainedReliefFeedValues(left: CncLayerSettings, right: CncLayerSettings): boolean {
+  return (
+    left.feedMmPerMin === right.feedMmPerMin &&
+    left.plungeMmPerMin === right.plungeMmPerMin &&
+    left.spindleRpm === right.spindleRpm
   );
 }

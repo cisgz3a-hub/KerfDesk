@@ -58,22 +58,23 @@ async function renderFields(
 }
 
 describe('CNC layer clarity', () => {
-  it('leads with material and warns when manual values are active', async () => {
+  it('shows setup-owned material and bit read-only before operation fields', async () => {
     installCnc();
     const view = await renderFields();
     try {
       const selectLabels = [...view.host.querySelectorAll('select')].map((select) =>
         select.getAttribute('aria-label'),
       );
-      expect(selectLabels.slice(0, 4)).toEqual([
-        'Material for #000000',
+      expect(selectLabels.slice(0, 2)).toEqual([
         'Cut type for #000000',
         // ADR-218: the line-art side qualifies the cut type, so it sits
         // directly under it (default cut type is profile-outside → shown).
         'Line art contours for #000000',
-        'Bit for #000000',
       ]);
-      expect(view.host.textContent).toContain('Manual values are active');
+      expect(view.host.querySelector('select[aria-label="Material for #000000"]')).toBeNull();
+      expect(view.host.querySelector('select[aria-label="Bit for #000000"]')).toBeNull();
+      expect(view.host.querySelector('button[aria-label^="Material: Manual"]')).not.toBeNull();
+      expect(view.host.querySelector('button[aria-label^="Bit:"]')).not.toBeNull();
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();
@@ -137,9 +138,9 @@ describe('CNC layer clarity', () => {
     });
     const view = await renderFields(layer);
     try {
-      expect(view.host.querySelector('[role="alert"]')?.textContent).toContain(
-        'V-carve needs a V-bit or modeled angled engraving bit',
-      );
+      const alert = view.host.querySelector('[role="alert"]');
+      expect(alert?.textContent).toContain('V-carve needs a V-bit or modeled angled engraving bit');
+      expect(alert?.textContent).toContain('Startup Setup tool plan');
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();

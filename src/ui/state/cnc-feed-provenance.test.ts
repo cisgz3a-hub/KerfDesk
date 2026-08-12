@@ -24,7 +24,7 @@ describe('withManualCncFeedPatch', () => {
 
     expect(result).toMatchObject(patch);
     expect(result).not.toHaveProperty('feedSource');
-    expect(result).not.toHaveProperty('materialKey');
+    expect(result.materialKey).toBe('plywood-mdf');
   });
 
   it('preserves provenance for edits unrelated to feed calculation', () => {
@@ -36,7 +36,7 @@ describe('withManualCncFeedPatch', () => {
 });
 
 describe('withoutCncFeedProvenance', () => {
-  it('removes source metadata without changing numeric settings', () => {
+  it('clears the explicit material association without changing numeric settings', () => {
     const result = withoutCncFeedProvenance(automaticSettings);
 
     expect(result.feedMmPerMin).toBe(automaticSettings.feedMmPerMin);

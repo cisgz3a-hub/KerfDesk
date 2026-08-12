@@ -207,7 +207,7 @@ function appendCncLayerIssues(
       code: 'cnc-settings-invalid',
       message:
         `Layer ${layer.id}: V-carve requires a V-bit or angled engraving bit; the layer's bit ` +
-        `("${layerTool.name}") is not one. Pick a compatible bit in Material & Bit.`,
+        `("${layerTool.name}") is not one. Pick a compatible bit in Startup Setup > Tool Plan.`,
     });
   }
 }

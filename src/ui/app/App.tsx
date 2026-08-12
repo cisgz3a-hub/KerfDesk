@@ -8,6 +8,7 @@ import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
+import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
 import { AddTextDialog } from '../text/AddTextDialog';
@@ -83,6 +84,7 @@ export function App(): JSX.Element {
       <ImportImageDialog />
       <ConfirmSaveDialog />
       <JobReviewDialog />
+      <MachineSetupDialogHost />
       <ImageEditorHost />
       <DesignStudioHost />
     </div>

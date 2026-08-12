@@ -5,7 +5,8 @@ import {
   isValidCncTipAngleDeg,
 } from '../../core/cnc-tip-angle';
 import { isValidCncTipDiameterMm } from '../../core/cnc-tip-diameter';
-import type { CncToolKind } from '../../core/scene';
+import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
+import type { CncTool, CncToolKind } from '../../core/scene';
 import { useStore } from '../state';
 
 const TOOL_KIND_OPTIONS: ReadonlyArray<{ readonly value: CncToolKind; readonly label: string }> = [
@@ -17,12 +18,18 @@ const TOOL_KIND_OPTIONS: ReadonlyArray<{ readonly value: CncToolKind; readonly l
 
 const MAX_TOOL_DIAMETER_MM = 50;
 const MIN_TOOL_DIAMETER_MM = 0.1;
+const MAX_TOOL_FLUTES = 16;
 
-export function AddCncBitForm(): JSX.Element {
+export function AddCncBitForm(
+  props: {
+    readonly onAdd?: (tool: Omit<CncTool, 'id'>) => void;
+  } = {},
+): JSX.Element {
   const addCustomCncTool = useStore((state) => state.addCustomCncTool);
   const [name, setName] = useState('');
   const [kind, setKind] = useState<CncToolKind>('end-mill');
   const [diameter, setDiameter] = useState('');
+  const [flutes, setFlutes] = useState(String(DEFAULT_ASSUMED_FLUTE_COUNT));
   const [tipAngle, setTipAngle] = useState('');
   const [tipDiameter, setTipDiameter] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -30,15 +37,16 @@ export function AddCncBitForm(): JSX.Element {
   // Only an engraving bit has a flat land at the tip; a v-bit comes to a point
   // by definition, which is the physical difference between the two kinds.
   const needsTipDiameter = kind === 'engraving';
-  const error = bitFormError({ name, diameter, tipAngle, tipDiameter, needsAngle });
+  const error = bitFormError({ name, diameter, flutes, tipAngle, tipDiameter, needsAngle });
 
   const handleAdd = (): void => {
     setHasSubmitted(true);
     if (error !== null) return;
-    addCustomCncTool({
+    (props.onAdd ?? addCustomCncTool)({
       name: name.trim(),
       kind,
       diameterMm: Number(diameter),
+      fluteCount: Number(flutes),
       ...(needsAngle ? { tipAngleDeg: Number(tipAngle) } : {}),
       // Blank stays absent: the simulator reads that as a true point, matching
       // how every tool behaved before the field existed.
@@ -48,6 +56,7 @@ export function AddCncBitForm(): JSX.Element {
     });
     setName('');
     setDiameter('');
+    setFlutes(String(DEFAULT_ASSUMED_FLUTE_COUNT));
     setTipAngle('');
     setTipDiameter('');
     setHasSubmitted(false);
@@ -59,6 +68,7 @@ export function AddCncBitForm(): JSX.Element {
         name={name}
         kind={kind}
         diameter={diameter}
+        flutes={flutes}
         tipAngle={tipAngle}
         tipDiameter={tipDiameter}
         needsAngle={needsAngle}
@@ -69,6 +79,7 @@ export function AddCncBitForm(): JSX.Element {
           setHasSubmitted(false);
         }}
         onDiameterChange={setDiameter}
+        onFlutesChange={setFlutes}
         onTipAngleChange={setTipAngle}
         onTipDiameterChange={setTipDiameter}
       />
@@ -88,6 +99,7 @@ type BitFieldsProps = {
   readonly name: string;
   readonly kind: CncToolKind;
   readonly diameter: string;
+  readonly flutes: string;
   readonly tipAngle: string;
   readonly tipDiameter: string;
   readonly needsAngle: boolean;
@@ -95,6 +107,7 @@ type BitFieldsProps = {
   readonly onNameChange: (value: string) => void;
   readonly onKindChange: (value: CncToolKind) => void;
   readonly onDiameterChange: (value: string) => void;
+  readonly onFlutesChange: (value: string) => void;
   readonly onTipAngleChange: (value: string) => void;
   readonly onTipDiameterChange: (value: string) => void;
 };
@@ -136,6 +149,18 @@ function BitFields(props: BitFieldsProps): JSX.Element {
         title="Enter the cutter's actual diameter in millimeters."
         style={numberInputStyle}
       />
+      <input
+        type="number"
+        value={props.flutes}
+        onChange={(event) => props.onFlutesChange(event.target.value)}
+        min={1}
+        max={MAX_TOOL_FLUTES}
+        step={1}
+        placeholder="Flutes"
+        aria-label="New bit flute count"
+        title="Enter the cutter's actual number of cutting flutes."
+        style={numberInputStyle}
+      />
       {props.needsAngle ? (
         <input
           type="number"
@@ -171,6 +196,7 @@ function BitFields(props: BitFieldsProps): JSX.Element {
 function bitFormError(input: {
   readonly name: string;
   readonly diameter: string;
+  readonly flutes: string;
   readonly tipAngle: string;
   readonly tipDiameter: string;
   readonly needsAngle: boolean;
@@ -185,11 +211,24 @@ function bitFormError(input: {
   ) {
     return `Enter the actual cutter diameter from ${MIN_TOOL_DIAMETER_MM} to ${MAX_TOOL_DIAMETER_MM} mm.`;
   }
+  const fluteCount = Number(input.flutes);
+  if (isInvalidFluteCount(input.flutes, fluteCount)) {
+    return `Enter the actual flute count from 1 to ${MAX_TOOL_FLUTES}.`;
+  }
   const tipAngleDeg = Number(input.tipAngle);
   if (input.needsAngle && (input.tipAngle.trim() === '' || !isValidCncTipAngleDeg(tipAngleDeg))) {
     return `Enter the actual included angle from ${MIN_CNC_TIP_ANGLE_DEG} to ${MAX_CNC_TIP_ANGLE_DEG} degrees.`;
   }
   return tipDiameterError(input.tipDiameter, diameterMm);
+}
+
+function isInvalidFluteCount(rawValue: string, fluteCount: number): boolean {
+  return (
+    rawValue.trim() === '' ||
+    !Number.isInteger(fluteCount) ||
+    fluteCount < 1 ||
+    fluteCount > MAX_TOOL_FLUTES
+  );
 }
 
 // Blank is valid — it means the bit comes to a point. A land at or past the

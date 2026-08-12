@@ -18,10 +18,16 @@ export function withManualCncFeedPatch(
   ) {
     return next;
   }
-  return withoutCncFeedProvenance(next);
+  return withoutCncFeedSource(next);
+}
+
+/** Withdraws automatic numeric provenance without changing the Startup material binding. */
+export function withoutCncFeedSource(settings: CncLayerSettings): CncLayerSettings {
+  const { feedSource: _source, ...manual } = settings;
+  return manual;
 }
 
 export function withoutCncFeedProvenance(settings: CncLayerSettings): CncLayerSettings {
-  const { feedSource: _source, materialKey: _material, ...manual } = settings;
+  const { materialKey: _material, ...manual } = withoutCncFeedSource(settings);
   return manual;
 }

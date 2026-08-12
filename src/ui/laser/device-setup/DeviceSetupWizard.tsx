@@ -1,19 +1,17 @@
 // Unified Machine Setup dialog. Every step edits a local DeviceProfile +
 // MachineConfig draft and the final action commits both atomically.
 
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useReducer } from 'react';
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
 import { LASER_MACHINE_CONFIG, assertNever } from '../../../core/scene';
 import { helpProps } from '../../help/help-topics';
 import { Button, Dialog, DialogActions } from '../../kit';
 import { useStore } from '../../state';
+import { cncMachineWithCustomTools } from '../../state/machine-actions';
 import { useLaserStore } from '../../state/laser-store';
-import { useToastStore } from '../../state/toast-store';
-import { blockedMachineModeMessage } from '../../machine/machine-capability-messages';
 import { DeviceSetupConfirmStep } from './DeviceSetupConfirmStep';
 import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
 import { DeviceSetupFirmwareStep } from './DeviceSetupFirmwareStep';
-import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
 import {
   canAdvanceDeviceSetup,
   deviceSetupReducer,
@@ -21,40 +19,45 @@ import {
   initDeviceSetup,
   isFirstDeviceSetupStep,
   isLastDeviceSetupStep,
-  machineSetupProfile,
   machineSetupValidationIssues,
   type DeviceSetupAction,
   type DeviceSetupState,
   type DeviceSetupStep,
 } from './device-setup-flow';
 import { DeviceSetupCapabilityStep } from './DeviceSetupCapabilityStep';
+import { DeviceSetupCncJobStep } from './DeviceSetupCncJobStep';
+import { DeviceSetupCncMachineStep } from './DeviceSetupCncMachineStep';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
 import { DeviceSetupMachineStep } from './DeviceSetupMachineStep';
 import { DeviceSetupOptionsStep } from './DeviceSetupOptionsStep';
 import { DeviceSetupReviewStep } from './DeviceSetupReviewStep';
+import { useCncStartupWizardDraft, type CncStartupWizardDraft } from './cnc-startup-wizard-draft';
+import type { DeviceSetupHighlight, MachineSetupTarget } from './machine-setup-dialog-store';
+import { useMachineSetupSave } from './use-machine-setup-save';
+import { useMachineSetupTargetFocus } from './use-machine-setup-target-focus';
 
 const STEP_TITLES: Record<DeviceSetupStep, string> = {
   capability: 'Machine type',
   identify: 'Choose your machine',
   connect: 'Connect & detect',
   confirm: 'Confirm settings',
+  'cnc-setup': 'CNC Startup Setup',
   options: 'Options & calibration',
   review: 'Review & save',
 };
-
-export type DeviceSetupHighlight = 'autofocus';
 
 type DeviceSetupWizardProps = {
   readonly onClose: () => void;
   readonly onConfigured?: (profile: DeviceProfile) => void;
   readonly initialStep?: DeviceSetupStep;
   readonly highlight?: DeviceSetupHighlight | undefined;
+  readonly target?: MachineSetupTarget | undefined;
 };
 
 export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
   const project = useStore((s) => s.project);
   const cachedCncMachine = useStore((s) => s.cachedCncMachine);
-  const replaceMachineSetup = useStore((s) => s.replaceMachineSetup);
+  const libraryCustomTools = useStore((s) => s.cncLibrary.customTools);
   const detected = useLaserStore((s) => s.detectedSettings);
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const lastReadAt = useLaserStore((s) => s.lastSettingsReadAt);
@@ -63,8 +66,15 @@ export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
     const initial = initDeviceSetup(seed, detected, {
       detectedControllerKind,
       controllerRead: lastReadAt !== null,
-      machine: project.machine ?? LASER_MACHINE_CONFIG,
-      ...(cachedCncMachine === null ? {} : { fallbackCncMachine: cachedCncMachine }),
+      machine:
+        project.machine?.kind === 'cnc'
+          ? cncMachineWithCustomTools(project.machine, libraryCustomTools)
+          : (project.machine ?? LASER_MACHINE_CONFIG),
+      ...(cachedCncMachine === null
+        ? {}
+        : {
+            fallbackCncMachine: cncMachineWithCustomTools(cachedCncMachine, libraryCustomTools),
+          }),
     });
     return props.initialStep === undefined ? initial : { ...initial, step: props.initialStep };
   });
@@ -72,10 +82,26 @@ export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
     controllerRead: lastReadAt !== null,
     connected: connectionKind === 'connected',
   });
-  const save = useMachineSetupSave(state, props, replaceMachineSetup);
+  const cncSetup = useCncStartupWizardDraft(project.scene.layers, libraryCustomTools);
+  useMachineSetupTargetFocus(props.target, state.step);
+  const save = useMachineSetupSave({
+    state,
+    operationDrafts: cncSetup.operationDrafts,
+    customTools: cncSetup.customTools,
+    materialApplyRequested: cncSetup.materialApplyRequested,
+    onClose: props.onClose,
+    onConfigured: props.onConfigured,
+  });
+  const dialogTitle = state.machineKind === 'cnc' ? 'CNC Startup Setup' : 'Machine Setup';
   return (
-    <Dialog title="Machine Setup" size="xl" onClose={save.saving ? () => undefined : props.onClose}>
-      <SetupLayout state={state} dispatch={dispatch} highlight={props.highlight} />
+    <Dialog title={dialogTitle} size="xl" onClose={save.saving ? () => undefined : props.onClose}>
+      <SetupLayout
+        state={state}
+        dispatch={dispatch}
+        highlight={props.highlight}
+        layers={project.scene.layers}
+        cncSetup={cncSetup}
+      />
       <SetupActions
         state={state}
         dispatch={dispatch}
@@ -107,70 +133,12 @@ function useDetectedSetupSync(
   }, [connected, controllerRead, detected, detectedControllerKind, dispatch]);
 }
 
-function useMachineSetupSave(
-  state: DeviceSetupState,
-  props: DeviceSetupWizardProps,
-  replaceMachineSetup: ReturnType<typeof useStore.getState>['replaceMachineSetup'],
-): { readonly saving: boolean; readonly firmwareWriteCount: number; readonly onSave: () => void } {
-  const [saving, setSaving] = useState(false);
-  const rows = useLaserStore((s) => s.grblSettingsRows);
-  const writeGrblSetting = useLaserStore((s) => s.writeGrblSetting);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const writes = queuedFirmwareDiffs(state, rows);
-  const onSave = (): void => {
-    if (saving) return;
-    setSaving(true);
-    void saveAndSync().catch((error: unknown) => {
-      pushToast(`Machine Setup could not save: ${errorMessage(error)}`, 'error');
-      setSaving(false);
-    });
-  };
-  const saveAndSync = async (): Promise<void> => {
-    const profile = machineSetupProfile(state);
-    const replacement = replaceMachineSetup(profile, state.draftMachine, state.cncDraft);
-    if (replacement.kind === 'blocked-by-capability') {
-      throw new Error(blockedMachineModeMessage(replacement.requestedKind));
-    }
-    props.onConfigured?.(profile);
-    try {
-      for (const write of writes) await writeGrblSetting(write.id, write.desired);
-      if (writes.length > 0) {
-        pushToast(
-          `Firmware sync complete: ${writes.map((write) => write.code).join(', ')} exactly verified.`,
-          'success',
-        );
-      }
-    } catch (error: unknown) {
-      pushToast(
-        `Software setup was saved, but firmware sync stopped: ${errorMessage(error)} Reopen Machine Setup after checking the controller.`,
-        'error',
-      );
-    }
-    props.onClose();
-  };
-  return { saving, firmwareWriteCount: writes.length, onSave };
-}
-
-function queuedFirmwareDiffs(
-  state: DeviceSetupState,
-  rows: ReturnType<typeof useLaserStore.getState>['grblSettingsRows'],
-): ReadonlyArray<FirmwareDiff> {
-  return computeFirmwareDiffs(state.draft, rows, {
-    machine: state.draftMachine,
-    machineKinds: state.machineKinds,
-  }).filter(
-    (diff) => diff.differs && diff.writable && state.queuedFirmwareWriteIds.includes(diff.id),
-  );
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function SetupLayout(props: {
   readonly state: DeviceSetupState;
   readonly dispatch: React.Dispatch<DeviceSetupAction>;
   readonly highlight?: DeviceSetupHighlight | undefined;
+  readonly layers: ReturnType<typeof useStore.getState>['project']['scene']['layers'];
+  readonly cncSetup: CncStartupWizardDraft;
 }): JSX.Element {
   const stepOrder = deviceSetupStepOrder(props.state.machineKind);
   const stepNumber = stepOrder.indexOf(props.state.step) + 1;
@@ -181,7 +149,9 @@ function SetupLayout(props: {
         <p style={stepHintStyle}>
           Step {stepNumber} of {stepOrder.length} — {STEP_TITLES[props.state.step]}
         </p>
-        <div style={bodyStyle}>{renderStep(props.state, props.dispatch, props.highlight)}</div>
+        <div style={bodyStyle}>
+          {renderStep(props.state, props.dispatch, props.layers, props.cncSetup, props.highlight)}
+        </div>
       </div>
     </div>
   );
@@ -248,7 +218,7 @@ function SetupActions(props: {
             ready ? undefined : 'Resolve the flagged software configuration items before saving.',
           )}
         >
-          {saveButtonLabel(props.saving, props.firmwareWriteCount)}
+          {saveButtonLabel(props.saving, props.firmwareWriteCount, props.state.machineKind)}
         </Button>
       ) : (
         <Button
@@ -264,10 +234,17 @@ function SetupActions(props: {
   );
 }
 
-function saveButtonLabel(saving: boolean, firmwareWriteCount: number): string {
+function saveButtonLabel(
+  saving: boolean,
+  firmwareWriteCount: number,
+  machineKind: DeviceSetupState['machineKind'],
+): string {
   if (saving) return 'Saving and verifying…';
-  if (firmwareWriteCount === 0) return 'Save machine setup';
-  return `Save setup and write ${firmwareWriteCount} setting${firmwareWriteCount === 1 ? '' : 's'}`;
+  if (firmwareWriteCount === 0) {
+    return machineKind === 'cnc' ? 'Save CNC startup setup' : 'Save machine setup';
+  }
+  const setupLabel = machineKind === 'cnc' ? 'CNC startup setup' : 'setup';
+  return `Save ${setupLabel} and write ${firmwareWriteCount} setting${firmwareWriteCount === 1 ? '' : 's'}`;
 }
 
 // The confirm page stacks the coordinate model and machine output on one
@@ -277,6 +254,8 @@ function saveButtonLabel(saving: boolean, firmwareWriteCount: number): string {
 function renderStep(
   state: DeviceSetupState,
   dispatch: React.Dispatch<DeviceSetupAction>,
+  layers: ReturnType<typeof useStore.getState>['project']['scene']['layers'],
+  cncSetup: CncStartupWizardDraft,
   highlight?: DeviceSetupHighlight | undefined,
 ): JSX.Element {
   switch (state.step) {
@@ -290,7 +269,26 @@ function renderStep(
       return (
         <div style={stackedStepStyle}>
           <DeviceSetupConfirmStep state={state} dispatch={dispatch} />
-          <DeviceSetupMachineStep state={state} dispatch={dispatch} />
+          {state.machineKind === 'cnc' ? null : (
+            <DeviceSetupMachineStep state={state} dispatch={dispatch} />
+          )}
+        </div>
+      );
+    case 'cnc-setup':
+      return (
+        <div style={stackedStepStyle}>
+          <DeviceSetupCncMachineStep state={state} dispatch={dispatch} machine={state.cncDraft} />
+          <DeviceSetupCncJobStep
+            state={state}
+            dispatch={dispatch}
+            layers={layers}
+            operationDrafts={cncSetup.operationDrafts}
+            customTools={cncSetup.customTools}
+            onApplyMaterial={cncSetup.applyMaterial}
+            onChangeOperation={cncSetup.changeOperation}
+            onChangeCustomTools={cncSetup.changeCustomTools}
+            onRemoveTool={cncSetup.removeTool}
+          />
         </div>
       );
     case 'options':
@@ -305,7 +303,11 @@ function renderStep(
       return (
         <div style={stackedStepStyle}>
           <DeviceSetupFirmwareStep state={state} dispatch={dispatch} />
-          <DeviceSetupReviewStep state={state} dispatch={dispatch} />
+          <DeviceSetupReviewStep
+            state={state}
+            dispatch={dispatch}
+            operationDrafts={cncSetup.operationDrafts}
+          />
         </div>
       );
     default:

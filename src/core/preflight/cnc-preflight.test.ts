@@ -335,6 +335,10 @@ describe('runCncPreflight', () => {
         issue.message.includes('V-carve requires a V-bit or angled engraving bit'),
       ),
     ).toBe(true);
+    expect(result.issues.map((issue) => issue.message).join('\n')).toContain(
+      'Pick a compatible bit in Startup Setup > Tool Plan.',
+    );
+    expect(result.issues.map((issue) => issue.message).join('\n')).not.toContain('Material & Bit');
     expect(result.ok).toBe(false);
   });
 
