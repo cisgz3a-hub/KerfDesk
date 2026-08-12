@@ -1,5 +1,6 @@
 import type { ControllerDriver } from '../../../core/controllers';
 import type { ConsoleCommandOptions } from '../../state/laser-console-actions';
+import type { ConsoleCommandProvenance } from '../../state';
 import { jobAwareConfirm } from '../../state/job-aware-dialogs';
 
 export type SendConsoleCommand = (
@@ -13,13 +14,16 @@ export type RunConsoleCommandResult =
   | { readonly status: 'rejected'; readonly command: string; readonly reason: string };
 
 /**
- * Confirms persistent writes and delegates exclusively to the laser store's
- * sendConsoleCommand action. Rejections are returned for inline UI display.
+ * Validates one Console command with the active driver, obtains the existing persistent-write
+ * confirmation when required, and dispatches through the supplied Console action. The result
+ * distinguishes sent, cancelled, and rejected outcomes; optional macro provenance is forwarded
+ * without creating another command path.
  */
 export async function runConsoleCommand(
   driver: ControllerDriver,
   input: string,
   sendConsoleCommand: SendConsoleCommand,
+  provenance?: ConsoleCommandProvenance,
 ): Promise<RunConsoleCommandResult> {
   const prepared = driver.prepareConsoleCommand(input);
   if (!prepared.ok) {
@@ -36,7 +40,12 @@ export async function runConsoleCommand(
 
   try {
     if (prepared.command.requiresConfirmation) {
-      await sendConsoleCommand(command, { confirmed: true });
+      await sendConsoleCommand(command, {
+        confirmed: true,
+        ...(provenance === undefined ? {} : { provenance }),
+      });
+    } else if (provenance !== undefined) {
+      await sendConsoleCommand(command, { provenance });
     } else {
       await sendConsoleCommand(command);
     }

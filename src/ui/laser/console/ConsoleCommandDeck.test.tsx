@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { jobAwareConfirm } from '../../state/job-aware-dialogs';
 import { useLaserStore } from '../../state/laser-store';
 import { ConsoleCommandDeck } from './ConsoleCommandDeck';
+import { readUserMacros, writeUserMacros } from './user-macros/user-macro-storage';
 
 vi.mock('../../state/job-aware-dialogs', () => ({ jobAwareConfirm: vi.fn() }));
 
@@ -14,6 +15,7 @@ vi.mock('../../state/job-aware-dialogs', () => ({ jobAwareConfirm: vi.fn() }));
 const originalSendConsoleCommand = useLaserStore.getState().sendConsoleCommand;
 
 beforeEach(() => {
+  localStorage.clear();
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   useLaserStore.setState({
     connection: { kind: 'connected' },
@@ -37,6 +39,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  localStorage.clear();
   vi.restoreAllMocks();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
@@ -72,6 +75,7 @@ describe('ConsoleCommandDeck', () => {
     await clickButton(host, 'Send');
     expect(input.value).toBe('G0 X');
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('Controller is busy');
+    expect(button(host, 'Send').disabled).toBe(false);
 
     await unmount();
   });
@@ -129,6 +133,87 @@ describe('ConsoleCommandDeck', () => {
 
     await unmount();
   });
+
+  it('runs a numeric macro through the shared sender and successful command history', async () => {
+    expect(
+      writeUserMacros([
+        {
+          name: 'Nudge X',
+          template: 'G0 X{{toString}}',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ]),
+    ).toEqual({ kind: 'ok' });
+    const sendConsoleCommand = vi.fn(async () => undefined);
+    useLaserStore.setState({ sendConsoleCommand });
+    const { host, unmount } = await renderDeck();
+    const consoleInput = requiredInput(host);
+    const variableInput = requiredInputByLabel(host, 'Macro variable toString');
+
+    expect(variableInput.value).toBe('');
+    await enterCommand(consoleInput, 'draft command');
+    await enterCommand(variableInput, '2.5');
+    await clickButton(host, 'Run user macro');
+
+    expect(sendConsoleCommand).toHaveBeenCalledWith('G0 X2.5', {
+      provenance: {
+        kind: 'user-macro',
+        macroName: 'Nudge X',
+        macroTemplate: 'G0 X{{toString}}',
+      },
+    });
+    expect(consoleInput.value).toBe('draft command');
+    await pressKey(consoleInput, 'ArrowUp');
+    expect(consoleInput.value).toBe('G0 X2.5');
+    await pressKey(consoleInput, 'ArrowDown');
+    expect(consoleInput.value).toBe('draft command');
+
+    await enterCommand(variableInput, '1 M3');
+    await clickButton(host, 'Run user macro');
+    expect(sendConsoleCommand).toHaveBeenCalledTimes(1);
+    expect(requiredMacroPanel(host).querySelector('[role="alert"]')?.textContent).toContain(
+      'one finite decimal number',
+    );
+    await unmount();
+  });
+
+  it('creates, edits, and deletes the last-persisted macro collection', async () => {
+    const { host, unmount } = await renderDeck();
+
+    await clickButton(host, 'New macro');
+    await enterCommand(requiredInputByLabel(host, 'Macro name'), 'Read state');
+    await enterCommand(requiredInputByLabel(host, 'Macro command template'), '$G');
+    await clickButton(host, 'Save macro');
+    expect(readUserMacros()).toMatchObject([{ name: 'Read state', template: '$G' }]);
+
+    await clickButton(host, 'Edit');
+    await enterCommand(requiredInputByLabel(host, 'Macro command template'), '$I');
+    await clickButton(host, 'Save macro');
+    expect(readUserMacros()).toMatchObject([{ name: 'Read state', template: '$I' }]);
+
+    await clickButton(host, 'Delete');
+    expect(readUserMacros()).toEqual([]);
+    await unmount();
+  });
+
+  it('reports a storage failure inline without fabricating a saved macro', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
+    const { host, unmount } = await renderDeck();
+
+    await clickButton(host, 'New macro');
+    await enterCommand(requiredInputByLabel(host, 'Macro name'), 'Read state');
+    await enterCommand(requiredInputByLabel(host, 'Macro command template'), '$G');
+    await clickButton(host, 'Save macro');
+
+    expect(readUserMacros()).toEqual([]);
+    expect(requiredMacroPanel(host).querySelector('[role="alert"]')?.textContent).toContain(
+      'saved collection was not changed',
+    );
+    await unmount();
+  });
 });
 
 async function renderDeck(): Promise<{
@@ -155,6 +240,21 @@ function requiredInput(host: HTMLElement): HTMLInputElement {
   const input = host.querySelector<HTMLInputElement>('input[aria-label="Console command"]');
   if (input === null) throw new Error('console input missing');
   return input;
+}
+
+function requiredInputByLabel(host: HTMLElement, label: string): HTMLInputElement {
+  const input = host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
+  if (input === null) throw new Error(`${label} input missing`);
+  return input;
+}
+
+function requiredMacroPanel(host: HTMLElement): HTMLDetailsElement {
+  const summary = [...host.querySelectorAll('summary')].find((candidate) =>
+    candidate.textContent?.includes('User macros'),
+  );
+  const panel = summary?.closest('details');
+  if (panel === undefined || panel === null) throw new Error('user macro panel missing');
+  return panel;
 }
 
 async function enterCommand(input: HTMLInputElement, value: string): Promise<void> {

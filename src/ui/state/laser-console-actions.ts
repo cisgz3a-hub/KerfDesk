@@ -29,6 +29,11 @@ import {
 import type { LaserState } from './laser-store';
 import { appendTranscript, systemTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import { useStore } from './store';
+import {
+  consoleCommandTranscriptSource,
+  macroDispatchTranscriptEntry,
+  type ConsoleCommandProvenance,
+} from './console-command-provenance';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -40,8 +45,10 @@ type ConsoleWriteFn = (
   source: TranscriptSource,
 ) => Promise<void>;
 
+/** Existing Console confirmation state plus optional saved-macro transcript provenance. */
 export type ConsoleCommandOptions = {
   readonly confirmed?: boolean;
+  readonly provenance?: ConsoleCommandProvenance;
 };
 
 export type ConsoleActionRefs = ControllerLifecycleRefs & {
@@ -72,7 +79,23 @@ export function consoleActions(
       }
       const idleBlocked = consoleCommandBlockReason(get(), prepared.command, true);
       if (idleBlocked !== null) return block(set, get, refs, idleBlocked);
-      await dispatchPreparedConsoleCommand(set, get, refs, write, prepared.command);
+      await dispatchPreparedConsoleCommand(
+        set,
+        get,
+        refs,
+        write,
+        prepared.command,
+        consoleCommandTranscriptSource(options.provenance),
+      );
+      if (options.provenance !== undefined) {
+        const entry = macroDispatchTranscriptEntry(
+          refs.nextTranscriptId++,
+          Date.now(),
+          options.provenance,
+          prepared.command.normalized,
+        );
+        set((state) => ({ transcript: appendTranscript(state.transcript, entry) }));
+      }
     },
     selectPrimaryWcsForFrame: async () => {
       const prepared = refs.driver.prepareConsoleCommand('G54');
@@ -119,11 +142,12 @@ async function dispatchPreparedConsoleCommand(
   refs: ConsoleActionRefs,
   write: ConsoleWriteFn,
   command: PreparedConsoleCommand,
+  source: TranscriptSource,
 ): Promise<void> {
   beginConsoleSettingsRead(set, get, refs, command);
   invalidateConsoleCommandEvidence(set, command);
   try {
-    await writeConsoleCommand(refs, write, command);
+    await writeConsoleCommand(refs, write, command, source);
   } catch (error) {
     if (command.kind === 'settings-query') releaseFailedConsoleSettingsRead(set, get, refs);
     throw error;

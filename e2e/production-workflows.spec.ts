@@ -697,8 +697,9 @@ async function fillAndCommit(page: Page, name: string, value: string): Promise<v
 }
 
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {
-  await page.getByText(family, { exact: true }).click();
-  await page.getByRole('menuitem').filter({ hasText: command }).click();
+  const applicationMenu = page.getByRole('menubar', { name: 'Application menu' });
+  await applicationMenu.getByRole('menuitem', { name: family, exact: true }).click();
+  await applicationMenu.getByRole('menuitem').filter({ hasText: command }).click();
 }
 
 async function enableLab(page: Page, label: string): Promise<void> {
