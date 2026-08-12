@@ -3,15 +3,14 @@
 //
 // useAutosave:
 //   * 30s interval that snapshots project + dirty + streaming from
-//     both stores. Background safety net for force-kills.
-//   * beforeunload listener that writes synchronously if dirty when
-//     the window closes (X button / Cmd+Q / Alt+F4 / app quit). This
-//     is the path the user actually takes — the 30s interval was
-//     never going to fire in time for normal closes.
-//   Clears both on unmount.
+//     both stores into atomic IndexedDB, with localStorage fallback.
+//   * beforeunload listener that preserves the existing synchronous
+//     localStorage best effort. Large projects recover the last completed
+//     interval snapshot because unload cannot await IndexedDB.
+//   Stops scheduling on unmount; the browser releases session ownership.
 //
 // useAutosaveRecovery:
-//   Runs once on mount. If localStorage has an autosave AND the
+//   Runs once on mount. If durable storage has an autosave AND the
 //   current project is empty (no objects), asks the user (job-aware
 //   confirm) whether to restore. Restoring keeps the slot armed until
 //   the first manual save (M15); declining discards it so the user
@@ -19,12 +18,14 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
+import { AUTOSAVE_INTERVAL_MS, writeAutosave } from '../state/autosave';
 import {
-  AUTOSAVE_INTERVAL_MS,
-  clearAutosave,
-  readAutosave,
-  writeAutosave,
-} from '../state/autosave';
+  projectAutosaveService,
+  type AutosaveDurableClearResult,
+  type AutosaveDurableReadResult,
+  type AutosaveDurableSnapshot,
+  type AutosaveDurableWriteResult,
+} from '../state/autosave-durable';
 import { startAutosaveLoop } from '../state/autosave-loop';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
@@ -32,7 +33,13 @@ import { useToastStore } from '../state/toast-store';
 import { repairedMachineCapabilityMessage } from '../machine/machine-capability-messages';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
-  'Autosave could not write this project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
+  'Autosave could not preserve the newest project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
+export const AUTOSAVE_RECOVERY_DEGRADED_MESSAGE =
+  'The newest autosave was unavailable; CurveDesk recovered the previous complete snapshot.';
+export const AUTOSAVE_RECOVERY_STORAGE_MESSAGE =
+  'Autosave recovery storage could not be fully read. Any available local recovery was still checked.';
+export const AUTOSAVE_RECOVERY_RETAINED_MESSAGE =
+  'The source autosave belongs to another or unverified window, so CurveDesk retained it instead of deleting it.';
 
 type PushToast = ReturnType<typeof useToastStore.getState>['pushToast'];
 
@@ -66,7 +73,9 @@ export function useAutosave(): void {
       snapshotForAutosave,
       AUTOSAVE_INTERVAL_MS,
       reportAutosaveFailure,
+      (project) => projectAutosaveService.write(project),
     );
+    void projectAutosaveService.session();
     const onBeforeUnload = (): void => {
       const snap = snapshotForAutosave();
       // Even mid-stream: if the user closed the window, persisting
@@ -87,24 +96,45 @@ export function useAutosave(): void {
   }, [pushToast]);
 }
 
-export function runAutosaveRecovery(
+type AutosaveRecoveryService = {
+  readLatest(): Promise<AutosaveDurableReadResult>;
+  write(
+    project: ReturnType<typeof snapshotForAutosave>['project'],
+  ): Promise<AutosaveDurableWriteResult>;
+  clearRecovered(
+    snapshot: AutosaveDurableSnapshot,
+    retainedStorageKey?: string,
+  ): Promise<AutosaveDurableClearResult>;
+};
+
+export async function runAutosaveRecovery(
   // jobAwareConfirm is a pass-through native confirm here (recovery runs at
   // app start, before any connection), but keeps the raw-dialog lint ban
   // (H13) airtight with a single exempt module.
   confirmRestore: (message: string) => boolean = jobAwareConfirm,
-): void {
-  const record = readAutosave();
+  service: AutosaveRecoveryService = projectAutosaveService,
+): Promise<void> {
+  const entryDocumentEpoch = useStore.getState().projectDocumentEpoch;
+  const read = await service.readLatest();
+  reportRecoveryWarnings(read);
+  const record = read.snapshot;
   if (record === null) return;
   // Only prompt if the in-memory project is still the empty default.
   // If something already loaded (URL drop, deep-link, etc.), the user
   // is mid-workflow and recovery would clobber it. Leave the slot alone
   // (M15: clearing here silently destroyed the only backup).
   const s = useStore.getState();
-  if (s.dirty || s.project.scene.objects.length > 0) return;
+  if (
+    s.projectDocumentEpoch !== entryDocumentEpoch ||
+    s.dirty ||
+    s.project.scene.objects.length > 0
+  ) {
+    return;
+  }
   const ageMin = Math.max(0, Math.round((Date.now() - record.savedAt) / 60_000));
   const ageLabel = ageMin === 0 ? 'less than a minute ago' : `${ageMin} minute(s) ago`;
   const ok = confirmRestore(
-    `KerfDesk found an auto-saved project from ${ageLabel}. Restore it?\n\n` +
+    `CurveDesk found an auto-saved project from ${ageLabel}. Restore it?\n\n` +
       '(Click Cancel to discard the auto-save and start fresh.)',
   );
   if (ok) {
@@ -130,20 +160,48 @@ export function runAutosaveRecovery(
     // write failure keep the source slot rather than lose the only backup.
     // When the source already IS this session's slot (same-tab reload), the
     // re-home targets the same key, so skip the clear and leave it in place.
-    const rehome = writeAutosave(record.project);
+    const rehome = await service.write(record.project);
     if (rehome.kind === 'ok') {
-      if (rehome.storageKey !== record.storageKey) clearAutosave(record);
+      reportCleanupResult(await service.clearRecovered(record, rehome.storageKey));
     } else {
       useToastStore.getState().pushToast(AUTOSAVE_FAILURE_MESSAGE, 'warning');
     }
     return;
   }
   // Declining is an explicit discard — clearing stops the re-prompt loop.
-  clearAutosave(record);
+  reportCleanupResult(await service.clearRecovered(record));
 }
 
 export function useAutosaveRecovery(): void {
   useEffect(() => {
-    runAutosaveRecovery();
+    void runAutosaveRecovery();
   }, []);
+}
+
+function reportRecoveryWarnings(result: AutosaveDurableReadResult): void {
+  if (result.warnings.includes('recovered-previous')) {
+    useToastStore.getState().pushToast(AUTOSAVE_RECOVERY_DEGRADED_MESSAGE, 'warning');
+  }
+  if (
+    result.warnings.includes('indexeddb-read-failed') ||
+    result.warnings.includes('local-read-failed') ||
+    result.warnings.includes('corrupt-slot')
+  ) {
+    useToastStore.getState().pushToast(AUTOSAVE_RECOVERY_STORAGE_MESSAGE, 'warning');
+  }
+  if (result.warnings.includes('ownership-probe-failed')) {
+    useToastStore.getState().pushToast(AUTOSAVE_RECOVERY_RETAINED_MESSAGE, 'warning');
+  }
+}
+
+function reportCleanupResult(result: AutosaveDurableClearResult): void {
+  if (result.kind === 'ok') return;
+  useToastStore
+    .getState()
+    .pushToast(
+      result.kind === 'retained'
+        ? AUTOSAVE_RECOVERY_RETAINED_MESSAGE
+        : 'Autosave cleanup did not complete; an older recovery prompt may appear again.',
+      'warning',
+    );
 }
