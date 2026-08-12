@@ -33,6 +33,26 @@ function source(physicalWidthMm: number, physicalHeightMm: number, inclusionMask
 }
 
 describe('heightfieldToHeightmap exact resolution', () => {
+  it('keeps a finite quotient-underflow field as one terminal cell', () => {
+    const field = source(Number.MIN_VALUE, Number.MIN_VALUE);
+    const result = heightfieldToHeightmap(field, {
+      targetWidthMm: Number.MIN_VALUE,
+      reliefDepthMm: 5,
+      mmPerCell: Number.MAX_VALUE,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.heightmap).toMatchObject({
+      widthCells: 1,
+      heightCells: 1,
+      widthMm: Number.MIN_VALUE,
+      heightMm: Number.MIN_VALUE,
+      mmPerCell: Number.MAX_VALUE,
+    });
+    expect([...result.heightmap.depth]).toEqual([0]);
+  });
+
   it('attempts the exact field above the advisory threshold and reports RangeError', () => {
     const field = source(2001, 2000);
     let attemptedLength: number | undefined;
@@ -57,7 +77,7 @@ describe('heightfieldToHeightmap exact resolution', () => {
     });
   });
 
-  it('turns a native typed-array allocation RangeError into a structured result', () => {
+  it('signals a derived grid count outside the safe integer range', () => {
     const field = source(Number.MAX_VALUE, 1);
 
     expect(

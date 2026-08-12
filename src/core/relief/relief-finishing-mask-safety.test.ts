@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildToolpath, type CncPass, type Job } from '../job';
+import { partialCellEnd, partialCellIndex, partialCellStart } from '../grid';
 import { computeRemovalGrid, kernelForTool, type ToolKernel } from '../sim';
-import { cuttingSurfaceDz } from '../sim/tool-kernels';
+import { cuttingSurfaceDz } from '../sim/cutting-surface';
 import type { CncTool } from '../scene';
 import type { Heightmap } from './heightmap';
 import { reliefFinishingPasses } from './relief-finishing';
@@ -89,6 +90,8 @@ function maskedRow(): Heightmap {
   return {
     widthCells: 15,
     heightCells: 1,
+    widthMm: 3,
+    heightMm: 0.2,
     mmPerCell: 0.2,
     depth: new Float32Array(15).fill(-2),
     inclusion: Uint8Array.from([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]),
@@ -102,6 +105,8 @@ function fractionalMaskedRow(): Heightmap {
   return {
     widthCells,
     heightCells: 1,
+    widthMm: widthCells / 5.8,
+    heightMm: 1 / 5.8,
     mmPerCell: 1 / 5.8,
     depth: new Float32Array(widthCells).fill(-2),
     inclusion,
@@ -122,6 +127,8 @@ function complexMask(): Heightmap {
   return {
     widthCells,
     heightCells,
+    widthMm: widthCells / 5.8,
+    heightMm: heightCells / 5.8,
     mmPerCell: 1 / 5.8,
     depth: new Float32Array(widthCells * heightCells).fill(-2),
     inclusion,
@@ -176,8 +183,9 @@ function passTouchesExcluded(pass: FinishingPass, map: Heightmap, kernel: ToolKe
 }
 
 function kernelTouchesExcluded(map: Heightmap, kernel: ToolKernel, x: number, y: number): boolean {
-  const centerX = Math.floor(x / map.mmPerCell);
-  const centerY = Math.floor(y / map.mmPerCell);
+  const centerX = partialCellIndex(map, 'x', x);
+  const centerY = partialCellIndex(map, 'y', y);
+  if (centerX === null || centerY === null) return false;
   return (kernel.maskCellOffsets ?? kernel.offsets).some(({ dx, dy }) => {
     const cellX = centerX + dx;
     const cellY = centerY + dy;
@@ -266,10 +274,10 @@ function cellBounds(map: Heightmap, cell: number) {
   const col = cell % map.widthCells;
   const row = Math.floor(cell / map.widthCells);
   return {
-    minX: col * map.mmPerCell,
-    maxX: (col + 1) * map.mmPerCell,
-    minY: row * map.mmPerCell,
-    maxY: (row + 1) * map.mmPerCell,
+    minX: partialCellStart(map, 'x', col),
+    maxX: partialCellEnd(map, 'x', col),
+    minY: partialCellStart(map, 'y', row),
+    maxY: partialCellEnd(map, 'y', row),
   };
 }
 

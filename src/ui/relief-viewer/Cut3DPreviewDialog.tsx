@@ -8,6 +8,7 @@
 import { useMemo } from 'react';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { RemovalGrid } from '../../core/sim';
+import { formatDisplayMillimetres } from '../format-display-millimetres';
 import { cncCut3dDisplayResolution, previewResolutionMessage } from '../workspace/preview';
 import { createCut3DOffscreenCoordinator } from './cut3d-offscreen-worker-client';
 import { Viewer3DDialogShell } from './Viewer3DDialogShell';
@@ -28,8 +29,7 @@ export function Cut3DPreviewDialog(props: {
       mesh === null ? null : createCut3DOffscreenCoordinator(mesh, stockThicknessMm).buildScene,
     [mesh, stockThicknessMm],
   );
-  const widthMm = grid.widthCells * grid.mmPerCell;
-  const heightMm = grid.heightCells * grid.mmPerCell;
+  const { widthMm, heightMm } = grid;
   const resolutionNotice = previewResolutionMessage(
     '3D cut preview',
     cncCut3dDisplayResolution(grid),
@@ -38,7 +38,7 @@ export function Cut3DPreviewDialog(props: {
     <Viewer3DDialogShell
       ariaLabel="Cut 3D preview"
       canvasAriaLabel="Cut 3D preview surface"
-      title={`Cut preview — ${widthMm.toFixed(0)} × ${heightMm.toFixed(0)} mm stock`}
+      title={`Cut preview — ${formatDisplayMillimetres(widthMm)} × ${formatDisplayMillimetres(heightMm)} mm stock`}
       onClose={props.onClose}
       {...(resolutionNotice === null ? {} : { notice: resolutionNotice })}
       buildScene={buildScene}
