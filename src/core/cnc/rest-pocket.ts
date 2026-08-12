@@ -22,6 +22,7 @@ export type RestPocketPlan =
       // pass budget can leave rest stock standing, so callers surface an
       // advisory without changing the emitted paths or gating the job.
       readonly completion: RestPocketCompletion;
+      readonly stepoverUsed: boolean;
     }
   | { readonly ok: false; readonly reason: string };
 
@@ -45,7 +46,13 @@ export function planRestPocketToolpaths(
   const stock = remainingStock(contours, roughToolDiameterMm);
   if (!stock.ok) return stock;
   if (stock.rest.length === 0) {
-    return { ok: true, toolpaths: [], restRegions: [], completion: 'complete' };
+    return {
+      ok: true,
+      toolpaths: [],
+      restRegions: [],
+      completion: 'complete',
+      stepoverUsed: false,
+    };
   }
   const target = finishTarget(stock.original, stock.rest, finishToolDiameterMm);
   if (target === null) return clipperFailure();
@@ -55,6 +62,7 @@ export function planRestPocketToolpaths(
     toolpaths: rings.toolpaths,
     restRegions: stock.rest.map(toPolyline),
     completion: rings.completion,
+    stepoverUsed: true,
   };
 }
 

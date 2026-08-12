@@ -16,6 +16,10 @@ import {
   type RemovalGrid,
   type ToolProfilePoint,
 } from '../../core/sim';
+// Deep imports: core/sim's public barrel is hard-capped at 20 exports by its
+// index contract, so these display-resolution symbols remain on leaf paths.
+import { removalGridDisplayResolution } from '../../core/sim/removal-grid-display';
+import type { RemovalGridResolution } from '../../core/sim/removal-grid';
 import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
 import type { Viewer3DDisplayMode } from '../cnc-viewer3d/viewer3d-display-mode';
 import type { LiveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
@@ -28,6 +32,11 @@ import {
 // Display resolution for the pane's surface mesh. The stepped builder emits
 // several times the vertex count of a smooth grid, so the downsample matters.
 const PANE_DISPLAY_CELLS_ACROSS = 300;
+
+/** Exact resolution of the bounded surface rendered by the docked/full-page pane. */
+export function cnc3dPaneDisplayResolution(grid: RemovalGrid): RemovalGridResolution {
+  return removalGridDisplayResolution(grid, PANE_DISPLAY_CELLS_ACROSS);
+}
 
 export type Cnc3dSceneState = 'loading' | 'ready' | 'failed';
 

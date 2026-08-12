@@ -263,7 +263,7 @@ Identical to F-A3 except:
 
 ---
 
-### F-A6a. Array selected artwork — grid, point rotation, circular (ADR-292)
+### F-A6a. Array selected artwork — grid, point rotation, circular (ADR-294)
 
 1. Select one or more visible, unlocked artwork objects and choose **Arrange → Array...**.
 2. Choose **Grid**, **Point Rotation**, or **Circular**. Grid and Circular keep their existing fields
@@ -1193,7 +1193,8 @@ authorization, Frame proof, controller command, or safety boundary.
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
-2. Multiline input is rejected; persistent macros are deferred to a later lane.
+2. Multiline input is rejected. Saved user macros are single-command templates described in
+   F-B13b; multiline sequencing remains out of scope.
 3. Every accepted command carries a controller-specific state-effect tag.
    Ordinary motion/modal commands clear cached Idle/position and frame
    evidence until a fresh status report arrives. XY-only coordinate commands
@@ -1253,6 +1254,60 @@ authorization, Frame proof, controller command, or safety boundary.
 2. Search includes every displayed column. **Copy visible** produces escaped, timestamped TSV so
    embedded tabs/newlines cannot turn one controller entry into multiple rows.
 3. If clipboard access fails, the dialog exposes the exact TSV in a selectable nonblocking field.
+
+### F-B13b. Saved user macros v1 (ADR-293)
+
+#### Success - save a named one-command template
+1. The shared Console command deck shows **User macros** in both the docked and Super Console.
+2. User clicks **New macro**, enters a name and one controller-command template, then clicks
+   **Save macro**. The macro is labelled **User-saved / local / one Console command**.
+3. `{{variable_name}}` placeholders declare run-time finite-decimal values. Repeating the same
+   placeholder reuses one value. Fixed commands need no placeholder.
+4. CurveDesk persists the versioned macro collection in local application storage. Macros are not
+   project data, cloud data, controller-resident programs, or built-in CurveDesk commands.
+
+#### Success - run through the existing Console path
+1. User selects a saved macro, fills any variable fields, reviews the expanded-command preview,
+   and clicks **Run user macro**.
+2. CurveDesk expands exactly one command, then passes the complete result to the active controller
+   driver's existing `prepareConsoleCommand` parser.
+3. The shared command deck calls the existing `runConsoleCommand` -> `sendConsoleCommand` ->
+   `safeWrite` path. A persistent setting still uses the existing setting-write confirmation, and
+   the store still rechecks connection, operation ownership, and Idle at dispatch time.
+4. Only a successfully dispatched expanded command enters the existing Arrow Up / Arrow Down
+   history. The transcript marks the outbound source as `macro` and adds the saved macro name plus
+   expanded command as provenance without claiming controller acknowledgement or physical motion.
+
+#### Empty - no saved macros
+1. The selector says no user macros are saved. **New macro** remains available.
+2. Nothing runs and no controller bytes are sent until the user saves, selects, and explicitly runs
+   a macro.
+
+#### Error - invalid template, variable, or controller command
+1. Macro names must contain visible text. Templates must contain exactly one line and only complete
+   `{{identifier}}` placeholders; malformed placeholder syntax is reported inline and is not saved.
+2. Each variable value must be one finite decimal scalar. Missing values, command words, whitespace,
+   exponent notation, non-finite values, and control/newline injection produce an inline expansion
+   error and no send attempt.
+3. Expansion never substitutes a second command. The fully expanded command must still pass the
+   active driver's ordinary parser; its existing rejection text is shown unchanged.
+
+#### Error - local storage unavailable
+1. A failed save, edit, or delete reports that the local macro collection was not changed.
+2. The in-memory list remains at its last persisted state; the UI never claims an unsaved mutation
+   succeeded.
+
+#### Edge - Frame-first and operation ownership
+1. A macro is a named manual Console command, not a job. It has no Start callback, no streamer, no
+   automatic trigger, no keyboard shortcut, and no direct serial writer.
+2. Read-only commands preserve the existing Frame proof exactly as their manually typed equivalent.
+   Any state-mutating command invalidates `framedRun` before the asynchronous write, so a later job
+   still requires a fresh completed exact-job Frame and the ordinary one-use Start permit.
+3. Macros cannot create, refresh, claim, or consume a Frame permit. They cannot invoke Frame or
+   Start. Active job/motion/operation and Idle behavior remains the existing Console behavior.
+4. Multiline command lists, batched writes, acknowledgement sequencing, connect/startup hooks,
+   import/export, and controller-resident macro programs are outside v1.
+
 ### F-B14. Machine Settings read-only backup
 
 #### Success — read connected controller settings
@@ -4036,7 +4091,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 (ADR-290)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4046,7 +4101,9 @@ and lifts the command's CNC-only gate.)*
 2. A qualified input is a lossless, non-interlaced, 8-bit grayscale PNG. The
    import worker verifies the PNG structure and CRCs and retains one exact
    grayscale sample per source pixel; it does not resize, auto-level, blur,
-   sharpen, apply gamma, or run AI depth estimation.
+   sharpen, apply gamma, or run AI depth estimation. An optional grayscale
+   `tRNS` chunk maps pixels matching its transparent sample to mask byte `0`
+   and every other pixel to `255`; transparency is not composited.
 3. Each file becomes a top-down relief at 100 mm wide and 5 mm deep. Height
    follows the pixel aspect ratio, **Light is high** is the declared default,
    and the Relief properties panel shows the pixel dimensions and precision.
@@ -4055,9 +4112,11 @@ and lifts the command's CNC-only gate.)*
    **View 3D...**, and CAM use the same deterministic materialization rule and
    embedded samples; each consumer chooses the grid resolution appropriate to
    its job.
-5. Saving embeds the versioned samples, dimensions, bit depth, and polarity in
-   the project. Reopening validates their exact byte-length contract before the
-   data can reach preview or compilation.
+5. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
+   physical and pixel dimensions, optional U8 inclusion mask, mapping,
+   provenance, revision, and digest. Eight-bit PNG sample `v` is represented
+   exactly as U16 value `v * 257`. Reopening validates the exact byte-length,
+   source-authority, mapping, and digest contracts before preview or compilation.
 6. In CNC mode, the existing relief layer settings select the flat-end-mill
    roughing and optional ball-nose finishing tools. The existing relief CAM,
    tool changes, Job Review, Frame permit, preview, G-code, progress, and
@@ -4068,8 +4127,8 @@ and lifts the command's CNC-only gate.)*
    source contract for this slice and imports nothing for that file. It is not
    silently converted to grayscale and is never described as estimated depth.
 2. A malformed signature, chunk, CRC, row stream, base64 payload, dimension,
-   bit depth, or byte-length declaration reports a factual input-integrity
-   error. Other files in the same selection continue.
+   bit depth, byte-length declaration, or grayscale `tRNS` length/order/duplicate
+   reports a factual input-integrity error. Other files in the same selection continue.
 
 #### Empty
 1. Cancelling the picker changes nothing. Pressing Escape during worker decode
@@ -4086,19 +4145,28 @@ and lifts the command's CNC-only gate.)*
 3. Large files receive the existing non-blocking size advisory. Worker startup
    failure discloses the existing main-thread fallback; size never becomes an
    arbitrary import refusal.
-4. The durable model admits 16-bit big-endian samples, but this first decoder
-   qualifies only exact 8-bit grayscale PNG. A later 16-bit decoder can populate
-   the same schema after its PNG filtering and precision path is verified.
-5. CAM grid coarsening uses the highest overlapping source surface at each
-   target cell. This preserves sampled peaks conservatively but does not prove
-   subpixel detail, a continuous swept cutter envelope, holder clearance,
-   controller tracking, material finish, or safe feeds for a particular tool,
-   wood, spindle, or machine.
+4. The durable model is canonical U16 little-endian (`u16le-base64-v1`), but this
+   decoder qualifies only exact 8-bit grayscale PNG and expands each input code
+   losslessly. A later 16-bit decoder can populate the same schema after its PNG
+   filtering, byte-order, worker-memory, and precision path is verified.
+5. CAM requests its exact positive cell spacing and attempts the exact derived
+   allocation; allocation failure is reported factually rather than silently
+   coarsening. When that spacing does not divide the declared physical width or
+   height, the current square grid uses ceil-rounded dimensions and can extend
+   by less than one cell. Exact relief-edge containment and 2D/CAM edge agreement
+   remain unqualified until an edge-cell model lands.
+6. Coarser target cells use the highest overlapping source surface and require
+   all overlapping source-mask coverage. Excluded mask squares are protected by
+   emitted-precision cutter envelopes in roughing and finishing, but this does
+   not prove included subpixel surface detail, holder clearance, controller
+   tracking, material finish, or safe feeds for a particular physical setup.
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** Until P2R.1 ships, use F-CNC46's narrower
-> **Import Height Map...** flow and its 8-bit grayscale contract.
+> **Planned - not current UI.** P2R.1a supplies the schema-v4/U16LE storage,
+> migration, qualified 8-bit grayscale import, simple transparency mask, and
+> existing CAM/preview substrate. The creation modes and controls below remain
+> planned; use F-CNC46's narrower **Import Height Map...** flow today.
 
 #### Success
 1. Choose **Create Relief...** and select the source meaning before import:
@@ -4277,10 +4345,12 @@ and lifts the command's CNC-only gate.)*
 #### Edge - resolution, spacing, reach, and simulation limits
 1. If source/CAM resolution changes for a requested preview, CurveDesk displays the
    requested and effective cell spacing before treating the result as current. It
-   does not silently clamp stepover percentages, cusp height, or cell count.
-2. Invalid ball-cusp domains (`r <= 0`, `c <= 0`, or `c > r`) remain editable and
-   explain that a finite spacing cannot be calculated; direct stepover remains
-   available. This numeric state is not a new Frame/Start policy guard.
+   does not silently coarsen the canonical heightfield cell count. This slice preserves
+   the established Stepover and scallop editor/planner ranges from current main.
+2. A stored ball-nose cusp above the cutter radius is disclosed in Job Review. The
+   established planner retains the value in the project, limits its calculation to
+   the radius, and uses one cutter diameter of row spacing; this does not add a new
+   Frame/Start policy guard.
 3. A stale simulation, coarse grid, relative-depth source, clipped tones, depth near
    stock thickness, missing flute/stickout/holder data, clamp intersection concern,
    or provisional feed/RPM produces Job Review warnings only. Frame remains the sole

@@ -10,19 +10,23 @@
 
 import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { migrateV2OperationBindings } from './migrate-v2-operation-bindings';
+import { migrateV3ReliefSources } from './migrate-v4-relief-heightfields';
+import { isMigrationFailure, type MigrationFailure } from './migration-failure';
 
 export type RawProject = Record<string, unknown>;
-export type Migrator = (raw: RawProject) => RawProject;
+export type Migrator = (raw: RawProject) => RawProject | MigrationFailure;
 
 export type MigrationResult =
   | { readonly kind: 'ok'; readonly raw: RawProject; readonly steps: ReadonlyArray<number> }
-  | { readonly kind: 'no-path'; readonly stoppedAt: number };
+  | { readonly kind: 'no-path'; readonly stoppedAt: number }
+  | { readonly kind: 'invalid'; readonly reason: string };
 
 // Registry. Keyed by FROM version: e.g. `1` means "migrate v1 → v2".
 // Phase A ships empty. Phase D/E will add the first entries here.
 const MIGRATORS: Readonly<Record<number, Migrator>> = {
   1: migrateV1ToV2,
   2: migrateV2OperationBindings,
+  3: migrateV3ReliefSources,
 };
 
 function migrateV1ToV2(raw: RawProject): RawProject {
@@ -86,7 +90,9 @@ export function migrateToCurrent(
   while (v < PROJECT_SCHEMA_VERSION) {
     const migrator = registry[v];
     if (migrator === undefined) return { kind: 'no-path', stoppedAt: v };
-    current = migrator(current);
+    const migrated = migrator(current);
+    if (isMigrationFailure(migrated)) return { kind: 'invalid', reason: migrated.reason };
+    current = migrated;
     steps.push(v);
     v += 1;
   }

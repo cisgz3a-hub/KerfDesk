@@ -77,6 +77,7 @@ export function deserializeProjectValue(raw: unknown): DeserializeResult {
     if (migrated.kind === 'no-path') {
       return { kind: 'schema-too-old', sawVersion: version };
     }
+    if (migrated.kind === 'invalid') return migrated;
     workingRaw = migrated.raw;
     migratedFrom = version;
   }

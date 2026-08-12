@@ -85,6 +85,20 @@ describe('PreviewStatsPanel', () => {
 });
 
 describe('PreviewStatusOverlays', () => {
+  it('visibly discloses bounded 2D resolution without blocking preview', async () => {
+    const host = await renderStatus(toolpath, {
+      requestedMmPerCell: 0.2,
+      effectiveMmPerCell: 0.5,
+      reason: 'interactive-preview-cell-budget',
+    });
+
+    const notice = [...host.querySelectorAll('[role="status"]')].find((element) =>
+      element.textContent?.includes('2D cut shading uses 0.5 mm cells'),
+    );
+    expect(notice?.textContent).toContain('interactive preview cell budget');
+    expect(notice?.textContent).toContain('CAM and G-code are unchanged');
+  });
+
   it('shows route-too-large status instead of the empty-project hint', async () => {
     const host = await renderStatus({
       steps: [],
@@ -205,13 +219,22 @@ async function renderPanel(
   return host;
 }
 
-async function renderStatus(toolpathValue: Toolpath): Promise<HTMLDivElement> {
+async function renderStatus(
+  toolpathValue: Toolpath,
+  resolution?: React.ComponentProps<typeof PreviewStatusOverlays>['resolution'],
+): Promise<HTMLDivElement> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);
-    root.render(<PreviewStatusOverlays project={createProject()} toolpath={toolpathValue} />);
+    root.render(
+      <PreviewStatusOverlays
+        project={createProject()}
+        toolpath={toolpathValue}
+        {...(resolution === undefined ? {} : { resolution })}
+      />,
+    );
   });
   cleanup = async () => {
     if (root !== null) await act(async () => root?.unmount());

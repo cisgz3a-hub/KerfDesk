@@ -9,7 +9,7 @@ describe('prepareConsoleCommand', () => {
     });
     expect(prepareConsoleCommand('$$\n$G')).toEqual({
       ok: false,
-      reason: 'Console commands must be one line. Use macros later for multi-line commands.',
+      reason: 'Console commands and saved macros must contain exactly one line.',
     });
   });
 

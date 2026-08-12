@@ -32,6 +32,37 @@ describe('runConsoleCommand', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('carries saved macro provenance through the same store call', async () => {
+    const send = vi.fn(async () => undefined);
+    const provenance = {
+      kind: 'user-macro' as const,
+      macroName: 'Nudge X',
+      macroTemplate: 'G0 X{{distance}}',
+    };
+
+    await expect(runConsoleCommand(grblDriver, 'G0 X2.5', send, provenance)).resolves.toEqual({
+      status: 'sent',
+      command: 'G0 X2.5',
+    });
+    expect(send).toHaveBeenCalledWith('G0 X2.5', { provenance });
+  });
+
+  it('keeps the existing persistent-setting confirmation for a saved macro', async () => {
+    const send = vi.fn(async () => undefined);
+    const provenance = {
+      kind: 'user-macro' as const,
+      macroName: 'Set acceleration',
+      macroTemplate: '$120={{value}}',
+    };
+
+    await expect(runConsoleCommand(grblDriver, '$120=250', send, provenance)).resolves.toEqual({
+      status: 'sent',
+      command: '$120=250',
+    });
+    expect(jobAwareConfirm).toHaveBeenCalledWith('Send persistent controller setting?\n\n$120=250');
+    expect(send).toHaveBeenCalledWith('$120=250', { confirmed: true, provenance });
+  });
+
   it('returns validation and asynchronous store failures without throwing', async () => {
     const validationSend = vi.fn(async () => undefined);
     const invalid = await runConsoleCommand(grblDriver, 'G0 X0\nG0 Y0', validationSend);

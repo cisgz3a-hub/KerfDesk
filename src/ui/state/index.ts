@@ -1,3 +1,4 @@
+export type { ConsoleCommandProvenance } from './console-command-provenance';
 export type { AppState, OutputScopeSettings } from './store';
 export { DEFAULT_OUTPUT_SCOPE_SETTINGS, currentOutputScope, useStore } from './store';
 export { positionTraceOverRasterSource } from './trace-placement';

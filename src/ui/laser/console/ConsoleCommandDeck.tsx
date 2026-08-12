@@ -1,21 +1,11 @@
-import { useState, type KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
+import { type ConsoleQuickCommand, type ControllerDriver } from '../../../core/controllers';
 import {
-  selectControllerDriver,
-  type ConsoleQuickCommand,
-  type ControllerDriver,
-} from '../../../core/controllers';
-import { useLaserStore } from '../../state/laser-store';
-import {
-  consoleCommandDisabledReason,
   consoleQuickCommandDisabledReason,
   type ConsoleCommandAvailabilityState,
 } from './console-command-availability';
-import {
-  createConsoleCommandHistory,
-  navigateConsoleCommandHistory,
-  recordSuccessfulConsoleCommand,
-} from './console-command-history';
-import { runConsoleCommand } from './run-console-command';
+import { UserMacroPanel } from './user-macros/UserMacroPanel';
+import { useConsoleCommandDeckModel } from './use-console-command-deck-model';
 
 export type ConsoleCommandDeckProps = {
   readonly ariaLabel?: string;
@@ -40,19 +30,33 @@ export function ConsoleCommandDeck({
           quickCommands={model.driver.consoleQuickCommands}
           driver={model.driver}
           availabilityState={model.availabilityState}
-          sending={model.sending}
-          onSend={(command) => void model.send(command, false)}
+          sending={model.isSending}
+          onSend={(command) => void model.send(command, { kind: 'quick-command' })}
         />
       ) : null}
       <ConsoleCommandForm
         autoFocus={autoFocus}
         command={model.command}
-        inputDisabled={model.inputDisabled}
-        sending={model.sending}
+        inputDisabled={model.isInputDisabled}
+        sending={model.isSending}
         sendDisabledReason={model.sendDisabledReason}
         onChange={model.changeCommand}
         onHistoryKey={model.handleHistoryKey}
-        onSend={() => void model.send(model.command, true)}
+        onSend={() => void model.send(model.command, { kind: 'manual-draft' })}
+      />
+      <UserMacroPanel
+        isSending={model.isSending}
+        isInputDisabled={model.isInputDisabled}
+        onRun={(command, macro) =>
+          model.send(command, {
+            kind: 'user-macro',
+            provenance: {
+              kind: 'user-macro',
+              macroName: macro.name,
+              macroTemplate: macro.template,
+            },
+          })
+        }
       />
       {model.error !== null ? (
         <div role="alert" style={errorStyle}>
@@ -66,86 +70,6 @@ export function ConsoleCommandDeck({
       ) : null}
     </section>
   );
-}
-
-function useConsoleCommandDeckModel(
-  enableHistory: boolean,
-  onCommandSent: ((command: string) => void) | undefined,
-) {
-  const connection = useLaserStore((state) => state.connection);
-  const statusReport = useLaserStore((state) => state.statusReport);
-  const fireActive = useLaserStore((state) => state.fireActive);
-  const streamer = useLaserStore((state) => state.streamer);
-  const motionOperation = useLaserStore((state) => state.motionOperation);
-  const controllerOperation = useLaserStore((state) => state.controllerOperation);
-  const autofocusBusy = useLaserStore((state) => state.autofocusBusy);
-  const activeControllerKind = useLaserStore((state) => state.activeControllerKind);
-  const sendConsoleCommand = useLaserStore((state) => state.sendConsoleCommand);
-  const driver = selectControllerDriver(activeControllerKind);
-  const availabilityState: ConsoleCommandAvailabilityState = {
-    connection,
-    statusReport,
-    fireActive,
-    streamer,
-    motionOperation,
-    controllerOperation,
-    autofocusBusy,
-  };
-  const [command, setCommand] = useState('');
-  const [history, setHistory] = useState(createConsoleCommandHistory);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const sendDisabledReason = consoleCommandDisabledReason(driver, command, availabilityState);
-
-  const send = async (input: string, clearInput: boolean): Promise<void> => {
-    if (sending) return;
-    setSending(true);
-    setError(null);
-    const result = await runConsoleCommand(driver, input, sendConsoleCommand);
-    setSending(false);
-    if (result.status === 'sent') {
-      setHistory((current) => recordSuccessfulConsoleCommand(current, result.command));
-      if (clearInput) {
-        // A transport write can be slow. Preserve a new draft the operator
-        // typed while the submitted command was still in flight.
-        setCommand((current) => (current === input ? '' : current));
-      }
-      onCommandSent?.(result.command);
-    } else if (result.status === 'rejected') {
-      setError(result.reason);
-    }
-  };
-
-  const handleHistoryKey = (event: KeyboardEvent<HTMLInputElement>): void => {
-    if (!enableHistory || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
-    const navigation = navigateConsoleCommandHistory(
-      history,
-      command,
-      event.key === 'ArrowUp' ? 'older' : 'newer',
-    );
-    if (!navigation.handled) return;
-    event.preventDefault();
-    setHistory(navigation.history);
-    setCommand(navigation.value);
-    setError(null);
-  };
-
-  return {
-    availabilityState,
-    command,
-    driver,
-    error,
-    sending,
-    sendDisabledReason,
-    inputDisabled: connection.kind !== 'connected' || !driver.capabilities.console,
-    send,
-    handleHistoryKey,
-    changeCommand: (value: string) => {
-      setCommand(value);
-      setHistory((current) => ({ ...current, cursor: null, draft: '' }));
-      setError(null);
-    },
-  };
 }
 
 function QuickCommandRow(props: {

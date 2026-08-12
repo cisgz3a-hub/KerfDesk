@@ -1,8 +1,8 @@
 // Memoized ReadonlyArray<number> -> Float32Array conversion, keyed on the
 // immutable object that owns the numbers.
 //
-// Relief meshes are the motivating case. ReliefObject.meshPositions is a plain
-// number[] because that is what survives JSON round-tripping into .lf2, but
+// Relief meshes are the motivating case. The legacy-mesh source's positions
+// are a plain number[] because that is what survives JSON round-tripping into .lf2, but
 // every consumer wants a Float32Array, and four call sites rebuilt one
 // independently: core/cnc/compile-cnc-relief.ts (twice — roughing and
 // finishing), ui/relief-viewer/Relief3DViewerDialog.tsx, and

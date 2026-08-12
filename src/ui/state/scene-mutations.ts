@@ -212,7 +212,9 @@ export function applyFreshImport(
   // physical scale: the import toast and relief editor promise that width, so
   // only center it and let Job Review/Frame disclose an over-bed outline.
   const placementMode =
-    object.kind === 'relief' && object.depthMap !== undefined ? 'center-only' : 'fit';
+    object.kind === 'relief' && object.reliefSource.kind === 'heightfield-v1'
+      ? 'center-only'
+      : 'fit';
   const fitted = fitObjectToBed(
     object,
     s.project.device.bedWidth,

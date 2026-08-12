@@ -8,9 +8,9 @@ import {
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
   RELIEF_EMBED_TRIANGLE_LIMIT,
-  type ReliefObject,
   type SceneObject,
 } from '../../core/scene';
+import type { MeshReliefObject } from '../../core/scene/relief';
 import { parseStl } from '../../io/stl';
 import { parseStlOffThread } from '../import/import-worker-client';
 import {
@@ -22,8 +22,6 @@ import type { ToastVariant } from '../state/toast-store';
 import { importSourceSizeAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
-
-type MeshReliefObject = Exclude<ReliefObject, { readonly depthMap: unknown }>;
 
 export { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
 // Coarse probe cell — only validates the mesh and derives the aspect ratio.
@@ -65,12 +63,13 @@ export async function importStlFiles(
         ctx.pushToast(`${file.name}: ${relief}`, 'error');
         continue;
       }
-      const denseAdvisory = denseMeshAdvisory(file.name, relief.meshPositions.length / 9);
+      const triangles = relief.reliefSource.meshPositions.length / 9;
+      const denseAdvisory = denseMeshAdvisory(file.name, triangles);
       if (denseAdvisory !== null) ctx.pushToast(denseAdvisory, 'warning');
       ctx.importObject(relief, successIdx);
       successIdx += 1;
       ctx.pushToast(
-        `Imported relief "${file.name}" (${relief.meshPositions.length / 9} triangles) at ` +
+        `Imported relief "${file.name}" (${triangles} triangles) at ` +
           `${DEFAULT_RELIEF_WIDTH_MM} mm wide × ${DEFAULT_RELIEF_DEPTH_MM} mm deep.${CNC_OUTPUT_NOTE}`,
         'success',
       );
@@ -117,10 +116,13 @@ function reliefFromPreparedStl(
     kind: 'relief',
     id: crypto.randomUUID(),
     source,
-    meshPositions: prepared.positions,
     targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
     reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
-    emptyCells: 'floor',
+    reliefSource: {
+      kind: 'legacy-mesh',
+      meshPositions: prepared.positions,
+      emptyCells: 'floor',
+    },
     color: DEFAULT_RELIEF_LAYER_COLOR,
     bounds: { minX: 0, minY: 0, maxX: prepared.widthMm, maxY: prepared.heightMm },
     transform: IDENTITY_TRANSFORM,

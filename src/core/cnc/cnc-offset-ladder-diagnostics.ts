@@ -24,6 +24,8 @@
 
 import type { DeviceProfile } from '../devices';
 import type { Job } from '../job';
+// Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import type { CncVCarveCompilationEvidence } from '../job/job';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -31,6 +33,7 @@ import {
   type CncLayerSettings,
   type CncMachineConfig,
   type CncTool,
+  type Layer,
   type Polyline,
   type Scene,
 } from '../scene';
@@ -65,43 +68,64 @@ export function findCncOffsetLadderDiagnostics(
   device: DeviceProfile,
   config: CncMachineConfig,
   compiledJob?: Job,
+  probeRelief = true,
 ): ReadonlyArray<CncOffsetLadderDiagnostic> {
   const diagnostics: CncOffsetLadderDiagnostic[] = [];
   for (const layer of scene.layers) {
     if (!layer.output) continue;
-    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    const polylines = collectLayerPolylines(scene.objects, layer, device);
-    const restCompletion =
-      polylines.length === 0 ? 'complete' : restPocketCompletion(polylines, settings, config);
-    if (restCompletion !== 'complete') {
-      diagnostics.push({ layerId: layer.id, kind: restCompletion });
-      continue;
-    }
-    const vectorKinds =
-      polylines.length > 0
-        ? vectorLadderDiagnosticKinds(
-            polylines,
-            settings,
-            config,
-            compiledVCarveEvidence(compiledJob, layer.id),
-          )
-        : [];
-    // A layer can carry both relief objects and vector shapes; either ladder
-    // failing makes the layer's output incomplete.
-    if (
-      vectorKinds.includes('geometry-failed') ||
-      reliefOffsetLadderFailed(scene.objects, layer, settings, config)
-    ) {
-      diagnostics.push({ layerId: layer.id, kind: 'geometry-failed' });
-    }
-    if (vectorKinds.includes('thin-detail-dropped')) {
-      diagnostics.push({ layerId: layer.id, kind: 'thin-detail-dropped' });
-    }
-    if (vectorKinds.includes('pass-limit')) {
-      diagnostics.push({ layerId: layer.id, kind: 'pass-limit' });
-    }
+    diagnostics.push(
+      ...layerOffsetLadderDiagnostics(scene, layer, device, config, compiledJob, probeRelief),
+    );
   }
   return diagnostics;
+}
+
+const CNC_OFFSET_DIAGNOSTIC_KIND_ORDER = [
+  'geometry-failed',
+  'thin-detail-dropped',
+  'pass-limit',
+] as const satisfies ReadonlyArray<CncOffsetLadderDiagnostic['kind']>;
+
+function layerOffsetLadderDiagnostics(
+  scene: Scene,
+  layer: Layer,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+  compiledJob: Job | undefined,
+  probeRelief: boolean,
+): ReadonlyArray<CncOffsetLadderDiagnostic> {
+  const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const polylines = collectLayerPolylines(scene.objects, layer, device);
+  const restCompletion =
+    polylines.length === 0 ? 'complete' : restPocketCompletion(polylines, settings, config);
+  const vectorKinds =
+    polylines.length === 0
+      ? []
+      : vectorLadderDiagnosticKinds(
+          polylines,
+          settings,
+          config,
+          compiledVCarveEvidence(compiledJob, layer.id),
+        );
+  const reliefFailed =
+    probeRelief && reliefOffsetLadderFailed(scene.objects, layer, settings, config);
+  // A layer can carry both relief objects and vector shapes; either ladder
+  // failing makes the layer's output incomplete.
+  const kinds = new Set<CncOffsetLadderDiagnostic['kind']>([
+    ...restCompletionDiagnosticKinds(restCompletion),
+    ...vectorKinds,
+    ...(reliefFailed ? (['geometry-failed'] as const) : []),
+  ]);
+  return CNC_OFFSET_DIAGNOSTIC_KIND_ORDER.filter((kind) => kinds.has(kind)).map((kind) => ({
+    layerId: layer.id,
+    kind,
+  }));
+}
+
+function restCompletionDiagnosticKinds(
+  completion: 'complete' | 'geometry-failed' | 'pass-limit',
+): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
+  return completion === 'complete' ? [] : [completion];
 }
 
 function vectorLadderDiagnosticKinds(
@@ -112,7 +136,7 @@ function vectorLadderDiagnosticKinds(
 ): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
   const tool = layerCncTool(config, settings);
   if (settings.cutType === 'pocket') {
-    return pocketLadderFailed(polylines, settings, config, tool) ? ['geometry-failed'] : [];
+    return pocketLadderDiagnosticKinds(polylines, settings, config, tool);
   }
   if (settings.cutType === 'v-carve') {
     // A compiled job with no matching sidecar evidence is a legacy exact
@@ -148,31 +172,38 @@ function compiledVCarveDiagnosticKinds(
   evidence: ReadonlyArray<CncVCarveCompilationEvidence>,
 ): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
   const kinds: Array<CncOffsetLadderDiagnostic['kind']> = [];
-  if (
-    evidence.some((entry) => entry.offsetFailed) ||
-    vcarveClearanceFailed(polylines, settings, config, tool)
-  ) {
+  const clearanceKinds = vcarveClearanceDiagnosticKinds(polylines, settings, config, tool);
+  if (evidence.some((entry) => entry.offsetFailed) || clearanceKinds.includes('geometry-failed')) {
     kinds.push('geometry-failed');
   }
   if (evidence.some((entry) => entry.thinResidual)) kinds.push('thin-detail-dropped');
-  if (evidence.some((entry) => entry.passLimited)) kinds.push('pass-limit');
+  if (evidence.some((entry) => entry.passLimited) || clearanceKinds.includes('pass-limit')) {
+    kinds.push('pass-limit');
+  }
   return kinds;
 }
 
-function pocketLadderFailed(
+function pocketLadderDiagnosticKinds(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   config: CncMachineConfig,
   tool: CncTool,
-): boolean {
+): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
   // Rest machining roughs with a second, larger bit through the same pocket
   // engine, and its ladder can fail where the finishing bit's does not. It also
   // runs a THIRD ladder of its own over the leftover stock region
   // (rest-pocket.ts), on raw clipper paths rather than the kerf-offset wrapper.
-  if (restPocketCompletion(polylines, settings, config) === 'geometry-failed') return true;
+  const kinds = new Set<CncOffsetLadderDiagnostic['kind']>();
+  const restCompletion = restPocketCompletion(polylines, settings, config);
+  if (restCompletion !== 'complete') kinds.add(restCompletion);
   const roughTool = toolById(config, settings.pocketRoughToolId);
   const diameters = [tool.diameterMm, ...(roughTool === null ? [] : [roughTool.diameterMm])];
-  return diameters.some((diameterMm) => pocketStrategyFailed(polylines, settings, diameterMm));
+  for (const diameterMm of diameters) {
+    const status = pocketStrategyStatus(polylines, settings, diameterMm);
+    if (status.offsetFailed) kinds.add('geometry-failed');
+    if (status.passLimited) kinds.add('pass-limit');
+  }
+  return CNC_OFFSET_DIAGNOSTIC_KIND_ORDER.filter((kind) => kinds.has(kind));
 }
 
 function restPocketCompletion(
@@ -181,24 +212,29 @@ function restPocketCompletion(
   config: CncMachineConfig,
 ): 'complete' | 'geometry-failed' | 'pass-limit' {
   const rest = resolveRestPocketOperation(polylines, settings, config);
-  return rest.kind === 'ok' ? rest.completion : 'complete';
+  if (rest.kind === 'ok') return rest.completion;
+  if (rest.kind !== 'error') return 'complete';
+  if (rest.offsetFailed) return 'geometry-failed';
+  return rest.passLimited ? 'pass-limit' : 'complete';
 }
 
-function pocketStrategyFailed(
+function pocketStrategyStatus(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   toolDiameterMm: number,
-): boolean {
-  if (settings.pocketStrategy === 'adaptive') return false;
+): { readonly offsetFailed: boolean; readonly passLimited: boolean } {
+  if (settings.pocketStrategy === 'adaptive') {
+    return { offsetFailed: false, passLimited: false };
+  }
   if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') {
     return pocketRasterToolpaths(
       polylines,
       toolDiameterMm,
       settings.stepoverPercent,
       settings.pocketStrategy === 'raster-x' ? 'x' : 'y',
-    ).offsetFailed;
+    );
   }
-  return pocketRingToolpaths(polylines, toolDiameterMm, settings.stepoverPercent).offsetFailed;
+  return pocketRingToolpaths(polylines, toolDiameterMm, settings.stepoverPercent);
 }
 
 function vcarveDiagnosticKinds(
@@ -218,7 +254,8 @@ function vcarveDiagnosticKinds(
       : { rampAngleDeg: settings.vCarveRampEntryDeg }),
   });
   const kinds: Array<CncOffsetLadderDiagnostic['kind']> = [];
-  if (plan.offsetFailed || vcarveClearanceFailed(polylines, settings, config, tool)) {
+  const clearanceKinds = vcarveClearanceDiagnosticKinds(polylines, settings, config, tool);
+  if (plan.offsetFailed || clearanceKinds.includes('geometry-failed')) {
     kinds.push('geometry-failed');
   }
   // Artwork finer than certified medial sampling can represent stays uncut;
@@ -226,27 +263,31 @@ function vcarveDiagnosticKinds(
   if (plan.thinResidual) kinds.push('thin-detail-dropped');
   // A medial sample budget or flat-core route budget can leave detail
   // unresolved; it remains advisory-only under the same rule.
-  if (plan.passLimited) kinds.push('pass-limit');
+  if (plan.passLimited || clearanceKinds.includes('pass-limit')) kinds.push('pass-limit');
   return kinds;
 }
 
-function vcarveClearanceFailed(
+function vcarveClearanceDiagnosticKinds(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   config: CncMachineConfig,
   tool: CncTool,
-): boolean {
-  if (!(settings.vCarveFlatDepthEnabled ?? true)) return false;
+): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
+  if (!(settings.vCarveFlatDepthEnabled ?? true)) return [];
   const clearTool = toolById(config, settings.vClearToolId);
-  if (clearTool === null) return false;
+  if (clearTool === null) return [];
   const effectiveDepthMm = vcarveEffectiveDepthMm(tool, settings.depthMm);
-  if (effectiveDepthMm === null) return false;
-  return vcarveClearancePocket(polylines, {
+  if (effectiveDepthMm === null) return [];
+  const clearance = vcarveClearancePocket(polylines, {
     vBit: tool,
     clearTool,
     maxDepthMm: effectiveDepthMm,
     stepoverPercent: settings.stepoverPercent,
-  }).offsetFailed;
+  });
+  return [
+    ...(clearance.offsetFailed ? (['geometry-failed'] as const) : []),
+    ...(clearance.passLimited ? (['pass-limit'] as const) : []),
+  ];
 }
 
 function toolById(config: CncMachineConfig, toolId: string | undefined): CncTool | null {

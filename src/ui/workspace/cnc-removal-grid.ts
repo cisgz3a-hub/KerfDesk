@@ -71,5 +71,7 @@ function overlayGridSpec(device: DeviceProfile, machine: CncMachineConfig): Remo
     widthMm,
     heightMm,
     mmPerCell: Math.max(DEFAULT_CELL_MM, Math.max(widthMm, heightMm) / UI_TARGET_CELLS_PER_AXIS),
+    requestedMmPerCell: DEFAULT_CELL_MM,
+    resolutionReason: 'interactive-preview-cell-budget',
   };
 }

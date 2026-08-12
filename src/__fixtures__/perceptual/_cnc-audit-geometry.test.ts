@@ -197,7 +197,11 @@ it.runIf(RUN)('1.11 — relief finishing reaches the far-Y edge', () => {
       mmPerCell: 0.5,
       depth: new Float32Array(cells * cells).fill(-3),
     },
-    { tool: END_MILL, kernel: kernelForTool(END_MILL, 0.5), scallopMm: 0.025 },
+    {
+      tool: END_MILL,
+      kernel: kernelForTool(END_MILL, 0.5),
+      scallopMm: 0.025,
+    },
   );
   write('1.11-relief-far-edge', 'Relief finishing rows — last row must sit on the far-Y edge', [
     ...passes.flatMap((pass, index) =>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PROJECT_SCHEMA_VERSION } from '../../core/scene';
+import { migrationFailure } from './migration-failure';
 import { migrateToCurrent, type Migrator } from './migrations';
 
 describe('migrateToCurrent', () => {
@@ -16,19 +17,32 @@ describe('migrateToCurrent', () => {
     expect(migrateToCurrent({}, 0).kind).toBe('no-path');
   });
 
+  it('returns a structured invalid result when a migration step cannot allocate', () => {
+    const registry: Readonly<Record<number, Migrator>> = {
+      3: () => migrationFailure('controlled migration allocation failure'),
+    };
+
+    expect(migrateToCurrent({ schemaVersion: 3 }, 3, registry)).toEqual({
+      kind: 'invalid',
+      reason: 'controlled migration allocation failure',
+    });
+  });
+
   it('walks the registry from sawVersion upward', () => {
     const registry: Readonly<Record<number, Migrator>> = {
       0: (raw) => ({ ...raw, addedAtV0: true }),
       1: (raw) => ({ ...raw, addedAtV1: true }),
       2: (raw) => ({ ...raw, addedAtV2: true }),
+      3: (raw) => ({ ...raw, addedAtV3: true }),
     };
     const result = migrateToCurrent({ schemaVersion: 0 }, 0, registry);
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.steps).toEqual([0, 1, 2]);
+      expect(result.steps).toEqual([0, 1, 2, 3]);
       expect(result.raw['addedAtV0']).toBe(true);
       expect(result.raw['addedAtV1']).toBe(true);
       expect(result.raw['addedAtV2']).toBe(true);
+      expect(result.raw['addedAtV3']).toBe(true);
       expect(result.raw['schemaVersion']).toBe(PROJECT_SCHEMA_VERSION);
     }
   });
@@ -62,9 +76,9 @@ describe('migrateToCurrent', () => {
     );
     expect(result).toMatchObject({
       kind: 'ok',
-      steps: [1, 2],
+      steps: [1, 2, 3],
       raw: {
-        schemaVersion: 3,
+        schemaVersion: 4,
         scene: {
           objects: [
             {

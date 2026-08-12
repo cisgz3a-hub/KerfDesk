@@ -16310,7 +16310,197 @@ scalar-field boundary and its lifecycle instead of creating a parallel photo-onl
   do not qualify loaded physical motion:
   https://github.com/gnea/grbl/blob/master/doc/markdown/interface.md
 
-## ADR-292 - Point Rotation is a transient rigid-selection array mode (2026-08-09)
+## ADR-292 - P2R.1a ships the canonical heightfield substrate without claiming full photo-to-relief (2026-08-09)
+
+**Date:** 2026-08-09
+**Status:** Accepted and implemented as a bounded software slice; remaining P2R.1 and all hardware qualification stay planned
+
+### Context
+
+ADR-290 shipped an explicit 8-bit grayscale height-map workflow. ADR-291 then defined the larger
+photo-to-relief product, but deliberately did not make its P2R.1-P2R.6 rows current behavior. The
+implementation now needs a truthful intermediate boundary: durable canonical storage, migration,
+worker import, masks, and existing relief CAM can ship before 16-bit PNG, full alpha editing,
+source-mode controls, Relief Map Studio, large-field autosave, or physical qualification.
+
+Calling that intermediate state either “ADR-290 only” or “P2R.1 complete” is inaccurate. The former
+hides a project-schema migration and new scalar-field authority; the latter promises UI and
+persistence behavior that is not present. This ADR names the bounded implementation P2R.1a and
+records its exact evidence and exclusions.
+
+### Decision
+
+1. **Ship project schema v4 with one authoritative relief source.** `heightfield-v1` stores positive
+   sample and physical dimensions, row-major `u16le-base64-v1` samples, an optional U8 inclusion
+   mask, mapping, provenance, algorithm revision, revision, and a SHA-256 digest. A relief has
+   exactly one durable source arm. Legacy depth maps migrate with numeric value `v * 257`; legacy
+   mesh data remains a lossless `legacy-mesh` source. Allocation and authority failures remain
+   factual deserialize/materialization errors, not policy guards.
+2. **Keep the qualified decoder narrower than the durable schema.** Current import accepts exact
+   non-interlaced 8-bit grayscale PNG. It runs decode, U16 expansion, canonical base64, and digest
+   creation in the import worker when available, with the disclosed main-thread fallback,
+   cancellation, byte/phase progress, and stale-result handling. It does not qualify 16-bit PNG,
+   grayscale-alpha, RGB/RGBA, palette, interlace, color management, or inferred depth.
+3. **Honor simple grayscale transparency exactly.** For color type 0, a valid `tRNS` chunk names one
+   transparent grayscale sample. Matching pixels become mask byte `0`; all others become `255`;
+   the default threshold `255` and outside meaning `excluded` therefore preserve transparent
+   regions without compositing. Per PNG Third Edition, the decoder compares the least-significant
+   `bitDepth` bits and masks other stored bits before use. Chunk CRC, length, uniqueness, and
+   before-IDAT ordering remain integrity-checked.
+4. **Use one mapping and mask contract in persistence, preview, and CAM.** Polarity, code range,
+   gamma-v1 mapping, maximum depth, normalized crop, aspect provenance, threshold, and outside-mask
+   meaning materialize deterministically. Coarse sampling keeps the highest overlapping surface and
+   excludes an output cell if any overlapping source coverage is excluded. Aspect records the
+   import/editor policy already resolved into physical dimensions and crop; it is not applied a
+   second time during CAM.
+5. **Keep relief dimensions and sampling requests exact.** Positive relief size/depth, heightmap
+   resolution, and scallop requests are not silently clamped or coarsened. Exact derived allocations
+   are attempted. This supersedes ADR-289's four-million-cell relief cap; the former count remains
+   advisory evidence only. Ball-nose minor-sagitta spacing retains the established radius-limited
+   calculation and larger stored targets receive a warning. Shared pocket, rest-machining, relief-
+   roughing, and standalone-surfacing Stepover behavior remains unchanged from current main and is
+   outside this heightfield slice.
+6. **Protect excluded stock through emitted precision.** Mask cells are physical square areas, not
+   point samples. Finishing separates boundary samples from lateral chords; roughing expands its
+   mask proof by the exact worst displacement of the current marching-squares case table. Both use
+   the physical flat/ball/conical cutting envelope, conservative Float32 storage, residual isometry,
+   and the GRBL emitter's shared 0.001 mm coordinate quantum. These are software-geometry claims;
+   they do not establish controller or physical cutter accuracy.
+7. **Do not claim full P2R.1.** Still planned are 16-bit PNG import, full alpha/partial-mask source
+   support and controls, brightness/relative/editable creation modes, tonal histogram and curve UI,
+   Relief Map Studio, explicit editable STL projection, large-field atomic autosave/recovery,
+   independent complete rough/finish setup, holder/reach metadata, residual/gouge views, and
+   machine/tool/material qualification.
+8. **Record the remaining sampled-grid boundary honestly.** A requested square cell size is kept
+   exact and cell counts are ceil-rounded. When a physical dimension is not divisible by that size,
+   the current grid can extend by less than one cell while the 2D bitmap is drawn into the declared
+   object bounds. Exact relief-edge containment and 2D/CAM edge agreement are therefore not
+   qualified by P2R.1a. This is a disclosed follow-up, not a hidden spacing rewrite or a new guard.
+9. **Frame remains the only ordinary Start guard.** Import size, requested resolution, reach
+   unknowns, and physical qualification concerns remain visible information or Job Review warnings.
+   Only factual import/compile integrity, transport preconditions, and exact handoff consistency
+   retain their existing refusal semantics.
+
+### Consequences
+
+- Manual project files now carry a self-contained canonical U16 source and optional mask; v3 files
+  migrate deterministically, while legacy meshes remain lossless.
+- Worker-backed import avoids a second UI-thread decode/expand/re-encode/hash pass. The resulting
+  base64 object still crosses the structured-clone boundary and large-field peak memory is not yet
+  qualified.
+- Existing target and Cut 3D views can consume the canonical field, but no histogram, cross-section,
+  mask editor, or full source-mode creation surface is implied.
+- Excluded-mask software geometry is conservative at emitted precision. Included subcell surface
+  interpolation, exact outer relief edges, holder collision, machine following, cutting forces,
+  wood behavior, dust extraction, and finish remain outside this evidence.
+
+### Verification
+
+- Golden digest vectors, v3-to-v4 migration, strict single-source authority, malformed base64,
+  allocation-failure propagation, mask length/threshold, and exact manual round trips cover the
+  durable contract.
+- A real Vite/browser worker test covers cancellation/replacement, structured clone, exact U16LE
+  bytes, mapping/provenance, and an independent digest golden. Focused preparation fixtures cover
+  PNG filters, CRC, `tRNS` matching/nonmatching samples, required low-bit masking, and chunk errors.
+- Analytic and compiled mask fixtures cover end mills, ball noses, and V-bits; fractional grid/tool
+  ratios; islands, concavities, and diagonal exclusions; shallow roughing; rotation, mirror,
+  translation; Float32 tangency; and parsed three-decimal G-code XYZ motion.
+- Focused schema/CAM/UI suites, TypeScript, lint, formatting, export-ratchet, and diff checks are
+  required before publication. Browser visual fidelity, large-field autosave/quota recovery,
+  performance across target devices, full release CI, air-cut, and representative wood coupons are
+  not established by this ADR.
+
+### References
+
+- W3C, Portable Network Graphics (PNG) Specification, Third Edition, §11.3.1.1 `tRNS`:
+  https://www.w3.org/TR/png-3/#11tRNS
+- ADR-289, sampled physical relief geometry and its unresolved exact-boundary limits.
+- ADR-290, explicit 8-bit grayscale height-map import.
+- ADR-291, the complete phased photo-to-relief product contract.
+
+## ADR-293 - Saved user macros remain one-command Console invocations (2026-08-09)
+
+**Date:** 2026-08-09
+**Status:** Accepted for focused v1 by direct maintainer request; software verification required,
+hardware qualification excluded
+
+### Context
+
+CurveDesk already has one controller-specific Console path. The shared command deck prepares input
+with the active driver, obtains the existing persistent-setting confirmation when applicable,
+dispatches through the laser store's `sendConsoleCommand`, and records only successful dispatches in
+its local command history. The store rechecks live operation and Idle ownership, invalidates setup
+evidence according to the parsed command's state effect, and writes through `safeWrite`.
+
+A general macro language would not be a small extension of that path. Ordinary Console writes do
+not all await terminal acknowledgement, and a state-mutating first line immediately makes cached
+Idle and any Frame permit stale. Multiline sequencing would therefore need new acknowledgement,
+status, cancellation, and partial-execution ownership. It could also become a second program sender
+beside the exact-artifact Frame/Start flow governed by ADR-228, ADR-230, and ADR-232.
+
+### Decision
+
+1. **V1 stores one command per named macro.** A user macro contains a normalized display name, one
+   single-line controller-command template, and created/updated timestamps. The versioned collection
+   is app-local data, not `.lf2` project truth, controller storage, or a built-in command catalog.
+2. **Variables are numeric substitution, not scripting.** A template declares variables only as
+   `{{identifier}}`. Each run supplies one finite ordinary-decimal scalar per distinct name. Values
+   cannot contain whitespace, exponent notation, command words, braces, or control/newline bytes.
+   Expansion returns a structured error for malformed syntax or missing/invalid values and never
+   splits output into multiple commands.
+3. **The active driver remains the parser of record.** After expansion, the complete command is
+   passed to the current driver's existing `prepareConsoleCommand`. Macro code does not classify
+   firmware commands, duplicate persistent-write policy, or manufacture wire bytes.
+4. **Execution is exclusively the existing Console execution.** The macro panel is a child of the
+   shared `ConsoleCommandDeck` and invokes that deck's existing send model. Dispatch remains
+   `runConsoleCommand` -> `sendConsoleCommand` -> `writeConsoleCommand` -> `safeWrite`. V1 adds no
+   raw serial call, batch writer, stream, scheduler, connect/startup hook, or keyboard trigger.
+5. **History and confirmations keep their existing meaning.** The expanded normalized command enters
+   Arrow history only after the shared runner reports `sent`. Cancelled, invalid, storage-only, or
+   rejected attempts do not. A macro that expands to a persistent setting write uses the same
+   existing confirmation as manually typed input.
+6. **Provenance is explicit and truthful.** Successful macro dispatch marks the outbound transcript
+   source as `macro` and appends a macro-source message containing the saved name and expanded
+   command. The message says what CurveDesk dispatched through Console; it does not claim controller
+   acknowledgement, physical position, or machine execution.
+7. **Frame-first remains the only job authorization.** Macro modules do not import or call Frame,
+   `runStartJobFlow`, `startJob`, streamer creation, or permit helpers. A read-only macro preserves
+   existing evidence exactly like typed Console input. A state-mutating macro clears `framedRun`
+   before its asynchronous write through the existing Console state-effect path. No macro creates,
+   refreshes, claims, or consumes a permit, so ordinary Start still requires the single completed
+   exact-job Frame permit.
+8. **Storage changes are fail-soft and non-fabricating.** Invalid stored records are ignored. A
+   failed save, edit, or delete leaves the last persisted in-memory collection unchanged and reports
+   the failure inline. No account, sync, telemetry, import, or export path is added.
+
+### Consequences
+
+- Operators can name and reuse diagnostic, setup, and one-line manual motion commands without
+  retyping them. The UI labels them user-saved, local, and one-command so they cannot be mistaken for
+  CurveDesk-authored workflows or reviewed job artifacts.
+- Numeric-only placeholders cover coordinates, feeds, power, dwell, and controller settings while
+  preventing a variable value from injecting another G/M/$ command. Command vocabulary stays in the
+  operator-authored fixed template and the controller driver's existing parser.
+- V1 deliberately does not satisfy the older aspirational Console text about multiline macros.
+  Multiline or controller-resident programs require a separate decision and may not bypass the
+  ordinary Frame/Start path.
+- Running a saved motion or modal command has the same physical implications and evidence
+  invalidation as typing that exact line in Console. Automated tests cannot establish controller
+  response, physical motion, placement, beam state, or hardware safety.
+
+### Verification
+
+- Pure tests cover placeholder discovery, repeated values, decimal expansion, malformed templates,
+  missing values, injection attempts, and versioned storage validation/failure behavior.
+- Command-deck tests prove a macro uses the shared runner, carries provenance, and records the
+  expanded command in the existing success-only history.
+- Store tests prove macro-source writes use `safeWrite`, read-only macros cannot mint a permit,
+  state-mutating macros invalidate an existing permit before write, no streamer is created, and
+  transcript provenance is success-only.
+- Focused Console/controller tests plus typecheck, lint, formatting, the broader unit suite, web
+  build, and file-size checks remain required. Hardware operation and deployment are excluded.
+
+## ADR-294 - Point Rotation is a transient rigid-selection array mode (2026-08-09)
 
 **Date:** 2026-08-09
 **Status:** Accepted; software geometry, dialog behavior, and deterministic perceptual artifact verified

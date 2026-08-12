@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import {
   createLayer,
   createProject,
@@ -62,13 +63,17 @@ describe('relief materialization compile integrity', () => {
 function mixedMalformedReliefProject(): Project {
   return mixedReliefProject({
     source: 'broken-depth.png',
-    depthMap: {
-      schemaVersion: 1,
-      width: 2,
-      height: 2,
-      bitDepth: 8,
+    reliefSource: {
+      ...testReliefHeightfield({
+        width: 2,
+        height: 2,
+        physicalWidthMm: 20,
+        physicalHeightMm: 20,
+        maxDepthMm: 3,
+        samplesU8: [0, 255, 128, 255],
+        provenance: { sourceName: 'broken-depth.png' },
+      }),
       samplesBase64: 'AA==',
-      polarity: 'light-is-high',
     },
     reliefDepthMm: 3,
   });
@@ -77,21 +82,22 @@ function mixedMalformedReliefProject(): Project {
 function mixedUnrepresentablePassReliefProject(): Project {
   return mixedReliefProject({
     source: 'extreme-depth.png',
-    depthMap: {
-      schemaVersion: 1,
+    reliefSource: testReliefHeightfield({
       width: 1,
       height: 1,
-      bitDepth: 8,
-      samplesBase64: 'AA==',
-      polarity: 'light-is-high',
-    },
+      physicalWidthMm: 20,
+      physicalHeightMm: 20,
+      maxDepthMm: 0x1_0000_0000,
+      samplesU16: [0],
+      provenance: { sourceName: 'extreme-depth.png' },
+    }),
     reliefDepthMm: 0x1_0000_0000,
   });
 }
 
 function mixedReliefProject(reliefFixture: {
   readonly source: string;
-  readonly depthMap: NonNullable<ReliefObject['depthMap']>;
+  readonly reliefSource: ReturnType<typeof testReliefHeightfield>;
   readonly reliefDepthMm: number;
 }): Project {
   const base = createProject();
@@ -100,7 +106,7 @@ function mixedReliefProject(reliefFixture: {
     kind: 'relief',
     id: 'bad-relief',
     source: reliefFixture.source,
-    depthMap: reliefFixture.depthMap,
+    reliefSource: reliefFixture.reliefSource,
     targetWidthMm: 20,
     reliefDepthMm: reliefFixture.reliefDepthMm,
     color,
