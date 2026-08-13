@@ -42,13 +42,7 @@ async function renderPositive(
   const root = createRoot(host);
   await act(async () => {
     root.render(
-      <NumberField
-        ariaLabel="Test"
-        value={value}
-        positiveOnly
-        step={0.05}
-        onCommit={onCommit}
-      />,
+      <NumberField ariaLabel="Test" value={value} positiveOnly step={0.05} onCommit={onCommit} />,
     );
   });
   return { host, root };
