@@ -18,23 +18,28 @@ export function Row(props: {
   );
 }
 
-export function NumberField(props: {
+type NumberFieldRange =
+  | { readonly positiveOnly: true; readonly min?: never; readonly max?: never }
+  | { readonly positiveOnly?: false; readonly min: number; readonly max: number };
+
+type NumberFieldProps = {
   readonly layer: Layer;
   readonly label: string;
   readonly unit: string;
   readonly value: number;
-  readonly min: number;
-  readonly max: number;
   readonly step: number;
   readonly title: string;
   readonly onCommit: (value: number) => void;
-}): JSX.Element {
+} & NumberFieldRange;
+
+export function NumberField(props: NumberFieldProps): JSX.Element {
   const debounced = useDebouncedCommit<number>({
     value: props.value,
     commit: props.onCommit,
     parse: (s) => {
       const n = Number.parseFloat(s);
       if (!Number.isFinite(n)) return props.value;
+      if (props.positiveOnly === true) return n > 0 ? n : props.value;
       return Math.max(props.min, Math.min(props.max, n));
     },
   });
@@ -42,8 +47,7 @@ export function NumberField(props: {
     <Row label={props.label}>
       <input
         type="number"
-        min={props.min}
-        max={props.max}
+        {...(props.positiveOnly === true ? {} : { min: props.min, max: props.max })}
         step={props.step}
         value={debounced.displayValue}
         onChange={debounced.onChange}

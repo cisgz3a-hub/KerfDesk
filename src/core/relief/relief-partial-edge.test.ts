@@ -81,6 +81,7 @@ describe('relief partial terminal cells', () => {
       tool,
       reliefDepthMm: 1,
       depthPerPassMm: 1,
+      stepoverPercent: 100,
       allowanceMm: 0,
     });
     const points = passes.flatMap((pass) => (pass.kind === 'contour' ? pass.polyline : []));

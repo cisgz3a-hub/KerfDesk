@@ -146,8 +146,7 @@ function GammaField(props: { readonly relief: HeightfieldReliefObject }): JSX.El
         <NumberField
           ariaLabel="Relief height-map gamma"
           value={props.relief.reliefSource.mapping.curve.gamma}
-          min={Number.MIN_VALUE}
-          max={Number.MAX_VALUE}
+          positiveOnly
           step={0.05}
           title="Power exponent applied to normalized source samples. 1 keeps the mapping linear; source samples are not rewritten."
           onCommit={(gamma) => setReliefParams(props.relief.id, { gamma })}

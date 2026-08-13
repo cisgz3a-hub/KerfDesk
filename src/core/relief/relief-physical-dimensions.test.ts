@@ -3,7 +3,7 @@ import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { IDENTITY_TRANSFORM, type ReliefObject } from '../scene';
 import { meshToHeightmap } from './mesh-to-heightmap';
 import { reliefPhysicalDimensions, reliefPlanningScale } from './relief-physical-dimensions';
-import { legacyMeshIntrinsicBounds } from './legacy-mesh-intrinsic-bounds';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 
 function depthMapRelief(): ReliefObject {
   return {
@@ -50,12 +50,11 @@ describe('reliefPhysicalDimensions', () => {
       source: 'mesh.stl',
       targetWidthMm: 100,
       reliefDepthMm: 5,
-      reliefSource: {
-        kind: 'legacy-mesh',
-        meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 1],
+      ...testLegacyMeshGeometry({
+        positions: [0, 0, 0, 10, 0, 0, 0, 5, 1],
+        targetWidthMm: 100,
         emptyCells: 'floor',
-        intrinsicBounds: legacyMeshIntrinsicBounds([0, 0, 0, 10, 0, 0, 0, 5, 1]),
-      },
+      }),
       color: '#a0522d',
       bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
       transform: { ...IDENTITY_TRANSFORM, scaleX: 2, scaleY: 0.5 },
@@ -75,7 +74,11 @@ describe('reliefPhysicalDimensions', () => {
       source: 'precision.stl',
       targetWidthMm: 100,
       reliefDepthMm: 5,
-      reliefSource: { kind: 'legacy-mesh', meshPositions, emptyCells: 'floor' },
+      ...testLegacyMeshGeometry({
+        positions: meshPositions,
+        targetWidthMm: 100,
+        emptyCells: 'floor',
+      }),
       color: '#a0522d',
       bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
       transform: { ...IDENTITY_TRANSFORM, scaleX: 0.36, scaleY: 1.75 },

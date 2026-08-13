@@ -69,13 +69,14 @@ export function SelectedReliefProperties(): JSX.Element | null {
           onClose={() => setViewerOpen(false)}
         />
       ) : null}
-        <ReliefPropertyControls
-          key={`${projectDocumentEpoch}:${relief.id}`}
-          relief={relief}
-          widthMm={reliefPropertyWidthMm(relief, physical.targetScaleX)}
-        />
-      </section>
-  );}
+      <ReliefPropertyControls
+        key={`${projectDocumentEpoch}:${relief.id}`}
+        relief={relief}
+        widthMm={reliefPropertyWidthMm(relief, physical.targetScaleX)}
+      />
+    </section>
+  );
+}
 
 function reliefMeta(relief: ReliefObject): string {
   if (relief.reliefSource.kind === 'legacy-mesh') {

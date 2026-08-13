@@ -13,7 +13,7 @@ import {
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 import { useToastStore } from './toast-store';
-import { legacyMeshIntrinsicBounds } from '../../core/relief/legacy-mesh-intrinsic-bounds';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 
 describe('machine-agnostic relief paste', () => {
   beforeEach(() => {
@@ -143,12 +143,11 @@ function meshRelief(): ReliefObject {
   return {
     ...reliefCommon(),
     source: 'model.stl',
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
+    ...testLegacyMeshGeometry({
+      positions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
+      targetWidthMm: 100,
       emptyCells: 'floor',
-      intrinsicBounds: legacyMeshIntrinsicBounds([0, 0, 0, 10, 0, 0, 0, 10, 5]),
-    },
+    }),
   };
 }
 

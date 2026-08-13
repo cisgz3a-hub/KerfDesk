@@ -7,7 +7,7 @@ import {
   type ReliefObject,
 } from '../../core/scene';
 import { applyFreshImport } from './scene-mutations';
-import { legacyMeshIntrinsicBounds } from '../../core/relief/legacy-mesh-intrinsic-bounds';
+import { testLegacyMeshGeometry } from '../../__fixtures__/legacy-relief';
 
 function tallRelief(source: 'mesh' | 'depth-map'): ReliefObject {
   const common = {
@@ -23,12 +23,11 @@ function tallRelief(source: 'mesh' | 'depth-map'): ReliefObject {
   return source === 'mesh'
     ? {
         ...common,
-        reliefSource: {
-          kind: 'legacy-mesh',
-          meshPositions: [0, 0, 0, 1, 0, 0, 0, 10, 1],
+        ...testLegacyMeshGeometry({
+          positions: [0, 0, 0, 1, 0, 0, 0, 10, 1],
+          targetWidthMm: 100,
           emptyCells: 'floor',
-          intrinsicBounds: legacyMeshIntrinsicBounds([0, 0, 0, 1, 0, 0, 0, 10, 1]),
-        },
+        }),
       }
     : {
         ...common,
