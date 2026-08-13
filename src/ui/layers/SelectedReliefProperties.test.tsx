@@ -82,7 +82,9 @@ describe('SelectedReliefProperties', () => {
       expect(width.value).toBe('36');
       expect(width.min).toBe('');
       expect(width.max).toBe('');
-      expect(width.title).toMatch(/local X axis.*current Y scale/i);
+      // The shipped tooltip is ReliefPlanningWidthDisclosure's canonical-source text
+      // (covered in full by ReliefPlanningWidthDisclosure.test.tsx).
+      expect(width.title).toMatch(/Heightmap planning width from the canonical source/i);
 
       await act(async () => Simulate.blur(width));
       let stored = useStore.getState().project.scene.objects[0];
@@ -119,7 +121,9 @@ describe('SelectedReliefProperties', () => {
     try {
       const width = host.querySelector('input[aria-label="Relief width (mm)"]');
       if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
-      expect(width.value).toBe('33.333333');
+      // Exact display: the invariant under test is that blur below does not
+      // round-trip this value back into authored bounds.
+      expect(width.value).toBe('33.33333333333333');
       await act(async () => Simulate.blur(width));
 
       const stored = useStore.getState().project.scene.objects[0];

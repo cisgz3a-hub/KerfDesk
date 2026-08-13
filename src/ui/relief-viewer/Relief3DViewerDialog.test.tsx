@@ -105,7 +105,7 @@ describe('Relief3DViewerDialog', () => {
 
       expect(host.querySelector('[role="dialog"]')).not.toBeNull();
       expect(host.textContent).toContain('model.stl');
-      expect(host.textContent).toContain('0.25 mm wide');
+      expect(host.textContent).toContain('0.5 mm wide');
       expect(host.textContent).toContain(
         'Relief 3D preview uses 0.390625 mm display cells (0.25 mm nominal target)',
       );
@@ -178,7 +178,9 @@ describe('Relief3DViewerDialog', () => {
         />,
       );
     });
-    expect(host.querySelector('[role="status"]')).toBeNull();
+    // 25 x 500 mm after scale, so the 256-cell budget binds and the viewer
+    // discloses the coarser display cells (ADR-292 Amendment 1).
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Relief 3D preview uses');
 
     await vi.waitFor(() => {
       expect(worker.prepare).toHaveBeenCalledOnce();
