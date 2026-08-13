@@ -7,6 +7,7 @@ import {
   type ReliefObject,
 } from '../../core/scene';
 import { applyFreshImport } from './scene-mutations';
+import { legacyMeshIntrinsicBounds } from '../../core/relief/legacy-mesh-intrinsic-bounds';
 
 function tallRelief(source: 'mesh' | 'depth-map'): ReliefObject {
   const common = {
@@ -26,6 +27,7 @@ function tallRelief(source: 'mesh' | 'depth-map'): ReliefObject {
           kind: 'legacy-mesh',
           meshPositions: [0, 0, 0, 1, 0, 0, 0, 10, 1],
           emptyCells: 'floor',
+          intrinsicBounds: legacyMeshIntrinsicBounds([0, 0, 0, 1, 0, 0, 0, 10, 1]),
         },
       }
     : {

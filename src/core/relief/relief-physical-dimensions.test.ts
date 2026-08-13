@@ -3,6 +3,7 @@ import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { IDENTITY_TRANSFORM, type ReliefObject } from '../scene';
 import { meshToHeightmap } from './mesh-to-heightmap';
 import { reliefPhysicalDimensions, reliefPlanningScale } from './relief-physical-dimensions';
+import { legacyMeshIntrinsicBounds } from './legacy-mesh-intrinsic-bounds';
 
 function depthMapRelief(): ReliefObject {
   return {
@@ -53,6 +54,7 @@ describe('reliefPhysicalDimensions', () => {
         kind: 'legacy-mesh',
         meshPositions: [0, 0, 0, 10, 0, 0, 0, 5, 1],
         emptyCells: 'floor',
+        intrinsicBounds: legacyMeshIntrinsicBounds([0, 0, 0, 10, 0, 0, 0, 5, 1]),
       },
       color: '#a0522d',
       bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },

@@ -13,6 +13,7 @@ import { prepareOutput } from '../../io/gcode';
 import { svgObj } from '../state/test-helpers';
 import { detectLaserReliefWarnings } from './laser-relief-warnings';
 import { detectMachineJobWarnings } from './machine-job-warnings';
+import { legacyMeshIntrinsicBounds } from '../../core/relief/legacy-mesh-intrinsic-bounds';
 
 const OPERATION_ID = 'relief-operation';
 const RELIEF_COLOR = '#a0522d';
@@ -126,6 +127,7 @@ function meshRelief(): ReliefObject {
       kind: 'legacy-mesh',
       meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 2],
       emptyCells: 'floor',
+      intrinsicBounds: legacyMeshIntrinsicBounds([0, 0, 0, 10, 0, 0, 0, 10, 2]),
     },
   };
 }
