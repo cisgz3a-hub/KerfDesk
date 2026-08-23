@@ -323,4 +323,38 @@ describe('RegistrationJigPanel', () => {
       container.querySelector<HTMLInputElement>('input[aria-label="Vertical jig spacing"]')?.value,
     ).toBe('6');
   });
+
+  it('refreshes saved grid geometry when a project opens while the panel is already mounted', () => {
+    useStore.getState().replaceRegistrationJigSet({
+      outline: { kind: 'rectangle', widthMm: 40, heightMm: 30 },
+      rows: 2,
+      columns: 3,
+      spacingX: 8,
+      spacingY: 6,
+    });
+    const savedProject = useStore.getState().project;
+    useStore.getState().newProject();
+    render();
+
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Jig rows"]')?.value).toBe(
+      '1',
+    );
+    act(() => {
+      useStore.getState().setProject(savedProject);
+    });
+
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Jig rows"]')?.value).toBe(
+      '2',
+    );
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Jig columns"]')?.value,
+    ).toBe('3');
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Horizontal jig spacing"]')
+        ?.value,
+    ).toBe('8');
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Vertical jig spacing"]')?.value,
+    ).toBe('6');
+  });
 });

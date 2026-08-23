@@ -31,6 +31,7 @@ type PanelPositionSetter = (next: FloatingPanelPosition) => void;
 export function RegistrationJigPanel(): JSX.Element | null {
   const open = useUiStore((s) => s.registrationPanelOpen);
   const scene = useStore((s) => s.project.scene);
+  const projectDocumentEpoch = useStore((s) => s.projectDocumentEpoch);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const centerInBox = useStore((s) => s.centerSelectionInRegistrationBox);
@@ -74,7 +75,7 @@ export function RegistrationJigPanel(): JSX.Element | null {
 
       <NextBurnBanner state={runState} outlineCount={boxes.length} />
 
-      <RegistrationJigOutlineControls />
+      <RegistrationJigOutlineControls key={projectDocumentEpoch} />
 
       <Button
         onClick={centerInBox}
