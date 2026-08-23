@@ -82,13 +82,13 @@ export function RegistrationJigPanel(): JSX.Element | null {
         disabled={!canCenter}
         title={
           canCenter
-            ? `Center the selected artwork in all ${boxes.length} jig outline${boxes.length === 1 ? '' : 's'}`
-            : 'Select your artwork first, then center it in every jig outline'
+            ? `Auto-fit the selected artwork and copy it into all ${boxes.length} jig outline${boxes.length === 1 ? '' : 's'}`
+            : 'Select your artwork first, then auto-fit it in every jig outline'
         }
       >
         {boxes.length > 1
-          ? `Center + copy artwork to all ${boxes.length}`
-          : 'Center artwork in outline'}
+          ? `Auto-fit + copy artwork to all ${boxes.length}`
+          : 'Auto-fit artwork in outline'}
       </Button>
 
       <BurnRunToggle
@@ -359,10 +359,10 @@ function RegistrationJigHelp(props: { readonly outlineCount: number }): JSX.Elem
             Add one artwork, select it, then{' '}
             <strong>
               {props.outlineCount > 1
-                ? 'Center + copy artwork to all'
-                : 'Center artwork in outline'}
+                ? 'Auto-fit + copy artwork to all'
+                : 'Auto-fit artwork in outline'}
             </strong>
-            .
+            . Auto-fit preserves proportions and leaves a 10% margin.
           </li>
           <li>
             Pick <strong>Artwork only</strong>, then Start to burn every artwork copy.

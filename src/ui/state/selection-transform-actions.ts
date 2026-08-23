@@ -32,8 +32,8 @@ export type SelectionTransformActions = {
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
   readonly nudgeSelection: (dx: number, dy: number) => void;
   readonly flipSelection: (axis: SelectionFlipAxis) => void;
-  // ADR-057: center the selected artwork in every registration-jig outline,
-  // retaining the original in the first slot and copying it into the rest.
+  // ADR-057: proportionally fit the selected artwork in the first jig outline,
+  // retaining it there and copying the fitted layout into every remaining outline.
   readonly centerSelectionInRegistrationBox: () => void;
   // ADR-124: snap the selected artwork to a corner (or the center) of the
   // captured-board outline — the registration box the operator built from jogged

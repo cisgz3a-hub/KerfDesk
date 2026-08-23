@@ -1,5 +1,6 @@
 import {
   addObject,
+  boardFitRegion,
   combinedBBox,
   findRegistrationBoxes,
   isRegistrationBox,
@@ -9,16 +10,25 @@ import {
   type SceneGroup,
   type SceneObject,
 } from '../../core/scene';
+import { fitSelectionToRegion } from '../../core/scene/fit-selection-to-region';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
+
+const REGISTRATION_JIG_ARTWORK_FIT_FRACTION = 0.9;
 
 export function applyCenterArtworkInRegistrationJigSet(
   state: AppState,
 ): AppState | Partial<AppState> {
   const boxes = findRegistrationBoxes(state.project.scene);
   const selected = selectedArtwork(state);
-  const selectionBounds = combinedBBox(selected);
-  if (boxes.length === 0 || selectionBounds === null) return state;
+  const firstBox = boxes[0];
+  if (firstBox === undefined) return state;
+  const fitted = fitSelectionToRegion(selected, boardFitRegion(firstBox), {
+    marginFraction: REGISTRATION_JIG_ARTWORK_FIT_FRACTION,
+    grow: true,
+  });
+  const selectionBounds = combinedBBox(fitted);
+  if (selectionBounds === null) return state;
 
   const sourceCenter = centerOf(selectionBounds);
   const movedById = new Map<string, SceneObject>();
@@ -29,14 +39,14 @@ export function applyCenterArtworkInRegistrationJigSet(
     const targetCenter = centerOf(transformedBBox(box));
     const delta = { x: targetCenter.x - sourceCenter.x, y: targetCenter.y - sourceCenter.y };
     if (boxIndex === 0) {
-      for (const object of selected) {
+      for (const object of fitted) {
         movedById.set(object.id, translatedObject(object, object.id, delta));
         selectionIds.push(object.id);
       }
       continue;
     }
     const copiedIds = new Map<string, string>();
-    for (const object of selected) {
+    for (const object of fitted) {
       const id = registrationJigCopyId(object.id, box.id);
       copiedIds.set(object.id, id);
       copies.push(translatedObject(object, id, delta));
