@@ -103,6 +103,19 @@ describe('setRegistrationOutput', () => {
     expect(output[disabledOperationId]).toBe(false);
   });
 
+  it('enables all artwork after reopening a project saved in Outline-only mode', () => {
+    useStore.getState().setRegistrationOutput('box');
+    const savedProject = useStore.getState().project;
+    useStore.getState().setProject(savedProject);
+    expect(useStore.getState().registrationArtworkOutputSnapshot).toBeNull();
+
+    useStore.getState().setRegistrationOutput('artwork');
+
+    const output = outputById();
+    expect(output[REGISTRATION_LAYER_ID]).toBe(false);
+    expect(output[operationIdFor('art')]).toBe(true);
+  });
+
   it('clears the temporary artwork-output snapshot on undo', () => {
     useStore.getState().setRegistrationOutput('box');
     expect(useStore.getState().registrationArtworkOutputSnapshot).not.toBeNull();
