@@ -1,7 +1,7 @@
-// registration-output-actions — the two-run jig helper (ADR-057). Sets per-layer
-// output so a single Start burns ONLY the registration box (run 1: burn the jig
-// on scrap) or ONLY the artwork (run 2: burn the design, not the box). The box
-// and the artwork must never burn in the same pass.
+// registration-output-actions — the two-run jig-set helper (ADR-057). The one
+// registration operation owns every outline, so Outline only applies to the
+// complete set. Artwork copies retain their source operations, so Artwork only
+// applies to every copy while disabling every outline.
 
 import { REGISTRATION_LAYER_ID, updateLayer, type Scene } from '../../core/scene';
 import type { AppState } from './store';

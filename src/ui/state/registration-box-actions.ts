@@ -1,9 +1,7 @@
 // registration-box-actions — insert, replace, lock, or remove the registration jig
-// box on the reserved registration layer (ADR-057). Distinct from applyDrawShape for
-// two reasons: the box must land on the reserved id='registration' layer
-// (createRegistrationLayer), not a geometry-color-derived operation
-// create; and only ONE jig may exist, because two boxes would make the
-// box-anchored placement span both (combinedBBox).
+// outline set on the reserved registration layer (ADR-057). Distinct from
+// applyDrawShape because every outline must land on the one reserved registration
+// operation so the two burn-run choices apply to the complete set.
 
 import {
   addLayer,
@@ -50,20 +48,31 @@ export function applyAddRegistrationBox(
   s: StateSlice,
   box: ShapeObject,
 ): MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> } {
+  return applyReplaceRegistrationBoxes(s, box);
+}
+
+export function applyReplaceRegistrationBoxes(
+  s: StateSlice,
+  firstBox: ShapeObject,
+  additionalBoxes: ReadonlyArray<ShapeObject> = [],
+): MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> } {
+  const boxes = [firstBox, ...additionalBoxes];
   let scene = s.project.scene;
-  // Single jig only: drop any existing registration box first.
+  // One set replaces the previous set atomically; every member shares the same
+  // registration operation and therefore the same Outline-only burn run.
   for (const existing of findRegistrationBoxes(scene)) {
     scene = removeObject(scene, existing.id);
   }
-  scene = addObject(scene, box);
+  for (const box of boxes) scene = addObject(scene, box);
   if (findRegistrationLayer(scene) === null) {
     scene = addLayer(scene, createRegistrationLayer());
   }
   if (hasRegistrationArtwork(scene)) scene = applyRegistrationOutputToScene(scene, 'artwork');
+  const additionalSelectedIds = additionalBoxes.map((box) => box.id);
   return {
     project: { ...s.project, scene },
-    selectedObjectId: box.id,
-    additionalSelectedIds: new Set<string>(),
+    selectedObjectId: firstBox.id,
+    additionalSelectedIds: new Set(additionalSelectedIds),
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,

@@ -3346,6 +3346,31 @@ Two follow-ups refined the above after the maintainer tested it:
   start mode; in **Absolute** mode both runs emit at their true on-canvas positions,
   so a homed machine aligns the two runs with no Set-Origin step.
 
+### Amendment (2026-08-23) — multi-outline jig sets
+
+The single outline generalizes to one **jig set** containing a rectangular grid
+of one or more identical rectangle or circle outlines. Every outline remains a
+normal `ShapeObject` bound to the same reserved `registration` operation, so no
+scene union, project field, or schema version changes. Creating a set replaces
+the previous set atomically; rows, columns, and horizontal/vertical spacing define
+the layout, and the complete set can be moved or locked with ordinary scene tools.
+
+The two-run contract is set-wide. **Outline only** enables the one registration
+operation and therefore emits every outline. **Artwork only** disables that
+operation and restores the artwork operations, so every operation-preserving copy
+is emitted. **Center + copy artwork to all N** moves the selected artwork group
+into the first outline and duplicates it into every remaining outline without
+creating new operations. The existing single-outline center behavior is the N=1
+case.
+
+Placement treats the combined compiled bounds of all registration outlines as one
+physical fixture anchor. Outline and artwork runs receive that same anchor, while
+Absolute Coordinates continues to emit at the true canvas positions. This is one
+fixture coordinate system, not multiple work origins. The existing exact-job Frame
+permit remains the only Start guard; the amendment adds no refusal or confirmation.
+Captured-board provenance remains exclusive to Place Board and cannot be replaced
+through the jig-set action.
+
 ### Consequences
 
 - The jig is a composition of existing machinery — reserved-id layer (ADR-005
@@ -3386,6 +3411,10 @@ Two follow-ups refined the above after the maintainer tested it:
   identical box-anchored offset; the box anchors to work-zero; the art lands at its
   offset relative to the box, not at the corner
   (`registration-placement.property.test.ts`).
+- **Jig-set coverage:** state and panel tests create five outlines, center and copy
+  one artwork into all five slots, prove both output choices apply set-wide, and
+  round-trip the complete set. Placement tests measure and anchor the combined
+  fixture bounds in both runs.
 - Full suite + `tsc --noEmit` + lint green; no existing G-code snapshot moves
   (non-jig placement unchanged).
 - **Hardware (gates "done"):** on the 4040, Set Origin, burn the box, place the

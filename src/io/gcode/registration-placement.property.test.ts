@@ -40,10 +40,10 @@ type Geom = {
   readonly ah: number;
 };
 
-function artObject(x: number, y: number, w: number, h: number): SceneObject {
+function artObject(x: number, y: number, w: number, h: number, id = 'art'): SceneObject {
   return {
     kind: 'imported-svg',
-    id: 'art',
+    id,
     source: 'art.svg',
     bounds: { minX: 0, minY: 0, maxX: w, maxY: h },
     transform: { ...IDENTITY_TRANSFORM, x, y },
@@ -65,6 +65,25 @@ function artObject(x: number, y: number, w: number, h: number): SceneObject {
       },
     ],
   };
+}
+
+function fiveJigProject(runs: { boxOutput: boolean; artOutput: boolean }): Project {
+  const base = createProject();
+  let scene = base.scene;
+  for (let index = 0; index < 5; index += 1) {
+    const x = 20 + index * 50;
+    scene = addObject(
+      scene,
+      createRegistrationBox({ widthMm: 40, heightMm: 30, x, y: 40, id: `box-${index}` }),
+    );
+    scene = addObject(scene, artObject(x + 10, 50, 20, 10, `art-${index}`));
+  }
+  scene = addLayer(scene, { ...createRegistrationLayer(), output: runs.boxOutput });
+  scene = addLayer(scene, {
+    ...createLayer({ id: ART_COLOR, color: ART_COLOR }),
+    output: runs.artOutput,
+  });
+  return { ...base, scene };
 }
 
 function jigProject(g: Geom, runs: { boxOutput: boolean; artOutput: boolean }): Project {
@@ -171,5 +190,24 @@ describe('registration jig placement — alignment invariance', () => {
     expect(artOut.maxY).toBeLessThanOrEqual(boxOut.maxY + EPS);
     // ...and strictly inside (not coincident with the outline on every edge).
     expect(artOut.maxX - artOut.minX).toBeLessThan(boxOut.maxX - boxOut.minX);
+  });
+
+  it('anchors both runs to the combined bounds of a five-outline fixture set', () => {
+    const boxRun = prepareOutput(fiveJigProject({ boxOutput: true, artOutput: false }), {
+      jobOrigin: USER_ORIGIN_JOB_PLACEMENT,
+    });
+    const artRun = prepareOutput(fiveJigProject({ boxOutput: false, artOutput: true }), {
+      jobOrigin: USER_ORIGIN_JOB_PLACEMENT,
+    });
+    expect(boxRun.ok && artRun.ok).toBe(true);
+    if (!boxRun.ok || !artRun.ok) return;
+    expect(artRun.jobOriginOffset).toEqual(boxRun.jobOriginOffset);
+
+    const boxOut = computeJobBounds(boxRun.job);
+    const artOut = computeJobBounds(artRun.job);
+    if (boxOut === null || artOut === null) throw new Error('expected five-jig output bounds');
+    expect(boxOut.maxX - boxOut.minX).toBeCloseTo(240, 6);
+    expect(artOut.minX).toBeGreaterThan(boxOut.minX);
+    expect(artOut.maxX).toBeLessThan(boxOut.maxX);
   });
 });

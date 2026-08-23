@@ -67,8 +67,8 @@ export function findRegistrationBoxes(scene: Scene): ReadonlyArray<ShapeObject> 
   );
 }
 
-// Scene-space bounds of the registration box(es) — the anchor both burn runs
-// share so the artwork lands inside the box, not at the bed corner (ADR-057).
+// Combined scene-space bounds of the registration outline set — the one fixture
+// anchor both burn runs share so every artwork copy retains its slot (ADR-057).
 // Null when no registration jig is present.
 export function findRegistrationBoxBounds(scene: Scene): AABB | null {
   return combinedBBox(findRegistrationBoxes(scene));

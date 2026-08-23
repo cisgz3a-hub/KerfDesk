@@ -49,6 +49,23 @@ function jigScene(boxOutput: boolean): Scene {
   return scene;
 }
 
+function fiveJigScene(boxOutput: boolean): Scene {
+  let scene = createProject().scene;
+  for (let index = 0; index < 5; index += 1) {
+    scene = addObject(
+      scene,
+      createRegistrationBox({
+        widthMm: 40,
+        heightMm: 30,
+        x: 10 + index * 50,
+        y: 20,
+        id: `box-${index}`,
+      }),
+    );
+  }
+  return addLayer(scene, { ...createRegistrationLayer(), output: boxOutput });
+}
+
 describe('computeRegistrationBoxBounds', () => {
   it('returns null when there is no registration jig', () => {
     expect(computeRegistrationBoxBounds(createProject().scene, device)).toBeNull();
@@ -69,5 +86,15 @@ describe('computeRegistrationBoxBounds', () => {
     // preserved: the box is 80x40, and the 5 mm art line at (200,200) is excluded.
     expect(bounds.maxX - bounds.minX).toBeCloseTo(80, 6);
     expect(bounds.maxY - bounds.minY).toBeCloseTo(40, 6);
+  });
+
+  it('measures the combined fixture bounds of all five jig outlines in either run', () => {
+    const onRun = computeRegistrationBoxBounds(fiveJigScene(true), device);
+    const offRun = computeRegistrationBoxBounds(fiveJigScene(false), device);
+    expect(offRun).toEqual(onRun);
+    expect(onRun).not.toBeNull();
+    if (onRun === null) return;
+    expect(onRun.maxX - onRun.minX).toBeCloseTo(240, 6);
+    expect(onRun.maxY - onRun.minY).toBeCloseTo(30, 6);
   });
 });
