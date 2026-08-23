@@ -1300,9 +1300,11 @@ authorization, Frame proof, controller command, or safety boundary.
 1. Open **Registration Jig**, choose Rectangle or Circle, enter the outline size,
    then enter rows, columns, and horizontal/vertical spacing. A 1 x 5 grid creates
    five independently visible outlines as one fixture set.
-2. Select one artwork and click **Center + copy artwork to all N**. The original
-   moves into the first outline and one operation-preserving copy is centered in
-   every remaining outline.
+2. Select one artwork or artwork group and click **Auto-fit + copy artwork to all N**.
+   The original is proportionally fitted into 90% of the first outline's usable
+   region, preserving aspect ratio, and one identical operation-preserving copy is
+   centered in every remaining outline. Circle outlines use their inscribed-square
+   fit region so the artwork remains inside the arc.
 3. Pick **Outline only**. Every registration outline is enabled and every artwork
    operation is disabled; Frame, Preview, Save G-code, and Start therefore describe
    the complete physical fixture outline run.
@@ -1320,6 +1322,8 @@ authorization, Frame proof, controller command, or safety boundary.
 3. **Lock all outlines** applies one lock state to the complete fixture set.
 4. A captured-board outline remains owned by **Place Board** and is not replaced
    from Registration Jig; the existing provenance explanation remains in the panel.
+5. Repeating **Auto-fit + copy artwork to all N** replaces the generated copies
+   instead of layering another set on the canvas.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 

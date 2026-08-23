@@ -6,6 +6,7 @@ import {
   IDENTITY_TRANSFORM,
   isRegistrationBox,
   REGISTRATION_LAYER_ID,
+  transformedBBox,
 } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
@@ -287,11 +288,16 @@ describe('RegistrationJigPanel', () => {
     expect(container.textContent).toContain('5 jigs on canvas');
 
     addArt();
-    click('Center + copy artwork to all 5');
+    click('Auto-fit + copy artwork to all 5');
     const artwork = useStore
       .getState()
       .project.scene.objects.filter((object) => !isRegistrationBox(object));
     expect(artwork).toHaveLength(5);
+    for (const object of artwork) {
+      const bounds = transformedBBox(object);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(36);
+      expect(bounds.maxY - bounds.minY).toBeCloseTo(36);
+    }
 
     click('Outline only');
     expect(container.textContent).toContain('all 5 JIG outlines');

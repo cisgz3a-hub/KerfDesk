@@ -3358,10 +3358,12 @@ the layout, and the complete set can be moved or locked with ordinary scene tool
 The two-run contract is set-wide. **Outline only** enables the one registration
 operation and therefore emits every outline. **Artwork only** disables that
 operation and restores the artwork operations, so every operation-preserving copy
-is emitted. **Center + copy artwork to all N** moves the selected artwork group
-into the first outline and duplicates it into every remaining outline without
-creating new operations. The existing single-outline center behavior is the N=1
-case.
+is emitted. **Auto-fit + copy artwork to all N** proportionally scales the selected
+artwork group into 90% of the first outline's usable region, preserving aspect ratio
+and internal group spacing, then duplicates that fitted layout into every remaining
+outline without creating new operations. Circle outlines use the existing inscribed-
+square fit region so axis-aligned artwork remains inside the arc. Repeating the action
+replaces its prior generated copies. The single-outline fit behavior is the N=1 case.
 
 Placement treats the combined compiled bounds of all registration outlines as one
 physical fixture anchor. Outline and artwork runs receive that same anchor, while

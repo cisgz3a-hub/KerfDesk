@@ -198,15 +198,17 @@ describe('centerSelectionInRegistrationBox store action', () => {
     );
   }
 
-  it('centers the selected artwork on the registration box', () => {
+  it('auto-fits the selected artwork on the registration box', () => {
     // 80x40 box centers at (160,180) on the 400x400 bed -> box center (200,200).
     useStore.getState().addRegistrationBox(80, 40);
     addArt('art', 10, 10);
     useStore.getState().centerSelectionInRegistrationBox();
     const moved = useStore.getState().project.scene.objects.find((o) => o.id === 'art');
-    // 20x20 art centered on (200,200) -> top-left (190,190).
-    expect(moved?.transform.x).toBe(190);
-    expect(moved?.transform.y).toBe(190);
+    // 20x20 art fills 90% of the limiting 40 mm height and stays centered.
+    expect(moved?.transform.scaleX).toBeCloseTo(1.8);
+    expect(moved?.transform.scaleY).toBeCloseTo(1.8);
+    expect(moved?.transform.x).toBeCloseTo(182);
+    expect(moved?.transform.y).toBeCloseTo(182);
   });
 
   it('leaves the registration box itself unmoved', () => {
