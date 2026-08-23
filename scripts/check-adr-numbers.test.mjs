@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +35,8 @@ function runGate(lines, newline) {
     };
   } catch (error) {
     return { code: error.status, output: `${error.stdout ?? ''}${error.stderr ?? ''}` };
+  } finally {
+    rmSync(dir, { force: true, recursive: true });
   }
 }
 
