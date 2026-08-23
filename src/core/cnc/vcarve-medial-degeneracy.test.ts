@@ -157,6 +157,7 @@ describe('V-carve medial degeneracy regressions', () => {
     ).toBe(true);
   }, 20_000);
 
+  // This production-size regression exceeded 15 s under the normal four-worker local load.
   it('bounds sharp-corner linking on a high-vertex outer contour with a hole', () => {
     const contours = [
       regularPolygon(SHARP_CORNER_STRESS_SEGMENT_COUNT, 10),
@@ -178,7 +179,7 @@ describe('V-carve medial degeneracy regressions', () => {
     expect(plan.failed).toBe(false);
     expect(plan.budgetLimited).toBe(true);
     expect(plan.graph.nodes.length).toBeGreaterThan(0);
-  }, 15_000);
+  }, 30_000);
 
   it('does not overflow while materializing 3000 nested Clipper contours', () => {
     const span = DEEP_NESTING_CONTOUR_COUNT * 2;

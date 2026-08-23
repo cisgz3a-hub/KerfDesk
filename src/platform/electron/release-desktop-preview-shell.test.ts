@@ -8,7 +8,8 @@ const VERIFY_STEP = '      - name: Verify the published immutable release and ex
 const RUN_BLOCK = '        run: |';
 const NEXT_STEP = '      - name:';
 const RUN_INDENT = 10;
-const SHELL_TEST_TIMEOUT_MS = 15_000;
+const BASH_PROCESS_TIMEOUT_MS = 60_000;
+const SHELL_TEST_TIMEOUT_MS = BASH_PROCESS_TIMEOUT_MS + 5_000;
 
 function finalVerifierScript(): string {
   const lines = readFileSync(
@@ -39,8 +40,12 @@ describe('Desktop Preview release shell', () => {
       const result = spawnSync('bash', ['-n', '-s'], {
         encoding: 'utf8',
         input: finalVerifierScript(),
-        timeout: SHELL_TEST_TIMEOUT_MS,
+        timeout: BASH_PROCESS_TIMEOUT_MS,
       });
+      expect(
+        result.error,
+        'Bash failed to start or timed out before syntax validation',
+      ).toBeUndefined();
       expect(result.status, result.stderr).toBe(0);
     },
     SHELL_TEST_TIMEOUT_MS,
