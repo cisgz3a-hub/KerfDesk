@@ -103,10 +103,7 @@ import {
   selectionTransformActions,
   type SelectionTransformActions,
 } from './selection-transform-actions';
-import {
-  registrationOutputActions,
-  type RegistrationOutputActions,
-} from './registration-output-actions';
+import { registrationActions, type RegistrationActions } from './registration-actions';
 import { boardCaptureActions } from './board-capture-actions';
 import { boardTileActions, type BoardTileActions } from './board-tile-actions';
 import {
@@ -163,7 +160,7 @@ export type AppState = ObjectPropertiesActions &
   ProjectOptimizationActions &
   ProjectNotesActions &
   SelectionTransformActions &
-  RegistrationOutputActions &
+  RegistrationActions &
   PathNodeEditActions &
   PathNodeCurveCommandActions &
   BreakApartActions &
@@ -459,7 +456,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...projectOptimizationActions(set),
   ...projectNotesActions(set),
   ...selectionTransformActions(set),
-  ...registrationOutputActions(set),
+  ...registrationActions(set),
   ...boardCaptureActions(set),
   ...boardTileActions(set),
   ...pathNodeEditActions(set),

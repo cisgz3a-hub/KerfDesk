@@ -1,13 +1,24 @@
 import { useState } from 'react';
-import { findRegistrationBoxes, type ShapeObject } from '../../core/scene';
-import { Button, NumberInput } from '../kit';
+import { findRegistrationBoxes, transformedBBox, type ShapeObject } from '../../core/scene';
+import type { RegistrationJigSetSpec } from '../state/registration-jig-set-actions';
+import { Button } from '../kit';
 import { useStore } from '../state';
+import {
+  LockRegistrationJigSetControl,
+  RegistrationJigGridFields,
+  RegistrationJigShapeFields,
+  RemoveRegistrationJigSetButton,
+  type RegistrationJigShape,
+} from './RegistrationJigOutlineFields';
 
 const DEFAULT_WIDTH_MM = 80;
 const DEFAULT_HEIGHT_MM = 40;
 const DEFAULT_DIAMETER_MM = 60;
+const DEFAULT_ROWS = 1;
+const DEFAULT_COLUMNS = 1;
+const DEFAULT_SPACING_MM = 5;
+const GRID_ALIGNMENT_TOLERANCE_MM = 0.0001;
 
-type RegistrationJigShape = 'rectangle' | 'circle';
 type InitialOutlineControls = {
   readonly hasOutline: boolean;
   readonly locked: boolean;
@@ -17,74 +28,101 @@ type InitialOutlineControls = {
   readonly diameterMm: string;
 };
 
-export function RegistrationJigOutlineControls(): JSX.Element {
-  const scene = useStore((s) => s.project.scene);
-  const addRegistrationBox = useStore((s) => s.addRegistrationBox);
-  const addRegistrationCircle = useStore((s) => s.addRegistrationCircle);
-  const removeBox = useStore((s) => s.removeRegistrationBox);
-  const setBoxLocked = useStore((s) => s.setRegistrationBoxLocked);
+type InitialGridControls = {
+  readonly rows: string;
+  readonly columns: string;
+  readonly spacingX: string;
+  readonly spacingY: string;
+};
 
-  const box = findRegistrationBoxes(scene)[0];
-  const initial = initialOutlineControls(box);
-  // A captured board (Place Board) encodes the physical work origin in its canvas
-  // position; unlocking/replacing it from the jig panel silently breaks
-  // registration, so those controls are disabled for it (CAM-04).
-  const isCapturedBoard = box?.provenance === 'captured-board';
+export function RegistrationJigOutlineControls(): JSX.Element {
+  const scene = useStore((state) => state.project.scene);
+  const replaceSet = useStore((state) => state.replaceRegistrationJigSet);
+  const removeSet = useStore((state) => state.removeRegistrationBox);
+  const setLocked = useStore((state) => state.setRegistrationBoxLocked);
+  const boxes = findRegistrationBoxes(scene);
+  const initial = initialOutlineControls(boxes[0]);
+  const initialGrid = initialGridControls(boxes);
+  const isCapturedBoard = boxes.some((box) => box.provenance === 'captured-board');
   const [shape, setShape] = useState<RegistrationJigShape>(initial.shape);
   const [widthMm, setWidthMm] = useState(initial.widthMm);
   const [heightMm, setHeightMm] = useState(initial.heightMm);
   const [diameterMm, setDiameterMm] = useState(initial.diameterMm);
+  const [rows, setRows] = useState(initialGrid.rows);
+  const [columns, setColumns] = useState(initialGrid.columns);
+  const [spacingX, setSpacingX] = useState(initialGrid.spacingX);
+  const [spacingY, setSpacingY] = useState(initialGrid.spacingY);
+  const requestedCount = positiveInteger(rows) * positiveInteger(columns);
 
   return (
     <>
-      <div style={sizeRowStyle}>
-        <ShapeSelect value={shape} onChange={setShape} />
-        <ShapeSizeFields
-          shape={shape}
-          widthMm={widthMm}
-          heightMm={heightMm}
-          diameterMm={diameterMm}
-          onWidthChange={setWidthMm}
-          onHeightChange={setHeightMm}
-          onDiameterChange={setDiameterMm}
-        />
-        <span style={unitStyle}>mm</span>
+      <RegistrationJigShapeFields
+        shape={shape}
+        widthMm={widthMm}
+        heightMm={heightMm}
+        diameterMm={diameterMm}
+        onShapeChange={setShape}
+        onWidthChange={setWidthMm}
+        onHeightChange={setHeightMm}
+        onDiameterChange={setDiameterMm}
+      />
+      <RegistrationJigGridFields
+        rows={rows}
+        columns={columns}
+        spacingX={spacingX}
+        spacingY={spacingY}
+        onRowsChange={setRows}
+        onColumnsChange={setColumns}
+        onSpacingXChange={setSpacingX}
+        onSpacingYChange={setSpacingY}
+      />
+      <p style={setSummaryStyle}>
+        {boxes.length === 0
+          ? `${requestedCount} ${jigWord(requestedCount)} requested`
+          : `${boxes.length} ${jigWord(boxes.length)} on canvas`}
+      </p>
+      <div style={actionRowStyle}>
         <Button
           variant="primary"
           disabled={isCapturedBoard}
           title={
             isCapturedBoard
               ? 'This outline is a captured board — Remove it or re-capture with Place Board.'
-              : undefined
+              : 'Create one registered outline for every row and column in the jig set'
           }
           onClick={() =>
-            createOutlineFromState({
-              shape,
-              widthMm,
-              heightMm,
-              diameterMm,
-              addRegistrationBox,
-              addRegistrationCircle,
-            })
+            replaceSet(
+              jigSetSpec(shape, widthMm, heightMm, diameterMm, rows, columns, spacingX, spacingY),
+            )
           }
         >
-          {buttonLabel(shape, initial.hasOutline)}
+          {createButtonLabel(initial.hasOutline, requestedCount)}
         </Button>
-        <RemoveOutlineButton show={initial.hasOutline} onClick={removeBox} />
+        <RemoveRegistrationJigSetButton
+          show={initial.hasOutline}
+          outlineCount={boxes.length}
+          onClick={removeSet}
+        />
       </div>
-      <LockOutlineControl
+      <LockRegistrationJigSetControl
         show={initial.hasOutline}
         checked={initial.locked}
         disabled={isCapturedBoard}
-        onChange={setBoxLocked}
+        outlineCount={boxes.length}
+        onChange={setLocked}
       />
-      {isCapturedBoard && (
-        <p style={capturedWarnStyle}>
-          This outline is a captured board — unlocking or replacing it here breaks its physical
-          registration. Use Place Board to re-capture, or Remove it first.
-        </p>
-      )}
+      <CapturedBoardWarning show={isCapturedBoard} />
     </>
+  );
+}
+
+function CapturedBoardWarning(props: { readonly show: boolean }): JSX.Element | null {
+  if (!props.show) return null;
+  return (
+    <p style={capturedWarnStyle}>
+      This outline is a captured board — replacing it here breaks its physical registration. Use
+      Place Board to re-capture, or Remove it first.
+    </p>
   );
 }
 
@@ -124,162 +162,99 @@ function defaultOutlineControls(): InitialOutlineControls {
   };
 }
 
-function ShapeSelect(props: {
-  readonly value: RegistrationJigShape;
-  readonly onChange: (shape: RegistrationJigShape) => void;
-}): JSX.Element {
-  return (
-    <select
-      aria-label="Registration jig shape"
-      title="Choose the physical outline to burn for aligning rectangular or round blanks."
-      value={props.value}
-      style={shapeSelectStyle}
-      onChange={(event) => props.onChange(parseJigShape(event.target.value))}
-    >
-      <option value="rectangle">Rectangle</option>
-      <option value="circle">Circle</option>
-    </select>
-  );
-}
-
-function ShapeSizeFields(props: {
-  readonly shape: RegistrationJigShape;
-  readonly widthMm: string;
-  readonly heightMm: string;
-  readonly diameterMm: string;
-  readonly onWidthChange: (value: string) => void;
-  readonly onHeightChange: (value: string) => void;
-  readonly onDiameterChange: (value: string) => void;
-}): JSX.Element {
-  if (props.shape === 'circle') {
-    return (
-      <>
-        <span>D</span>
-        <NumberInput
-          value={props.diameterMm}
-          min={1}
-          step={1}
-          aria-label="Registration circle diameter"
-          style={sizeInputStyle}
-          onChange={(e) => props.onDiameterChange(e.target.value)}
-        />
-      </>
-    );
+function initialGridControls(boxes: ReadonlyArray<ShapeObject>): InitialGridControls {
+  if (boxes.length === 0) return defaultGridControls();
+  const bounds = boxes.map(transformedBBox);
+  const xCenters = distinctCoordinates(bounds.map((box) => (box.minX + box.maxX) / 2));
+  const yCenters = distinctCoordinates(bounds.map((box) => (box.minY + box.maxY) / 2));
+  if (xCenters.length * yCenters.length !== boxes.length) {
+    return { ...defaultGridControls(), columns: String(boxes.length) };
   }
-  return (
-    <>
-      <span>W</span>
-      <NumberInput
-        value={props.widthMm}
-        min={1}
-        step={1}
-        aria-label="Registration box width"
-        style={sizeInputStyle}
-        onChange={(e) => props.onWidthChange(e.target.value)}
-      />
-      <span>H</span>
-      <NumberInput
-        value={props.heightMm}
-        min={1}
-        step={1}
-        aria-label="Registration box height"
-        style={sizeInputStyle}
-        onChange={(e) => props.onHeightChange(e.target.value)}
-      />
-    </>
+  const first = bounds[0];
+  if (first === undefined) return defaultGridControls();
+  return {
+    rows: String(yCenters.length),
+    columns: String(xCenters.length),
+    spacingX: String(axisSpacing(xCenters, first.maxX - first.minX)),
+    spacingY: String(axisSpacing(yCenters, first.maxY - first.minY)),
+  };
+}
+
+function defaultGridControls(): InitialGridControls {
+  return {
+    rows: String(DEFAULT_ROWS),
+    columns: String(DEFAULT_COLUMNS),
+    spacingX: String(DEFAULT_SPACING_MM),
+    spacingY: String(DEFAULT_SPACING_MM),
+  };
+}
+
+function distinctCoordinates(values: ReadonlyArray<number>): ReadonlyArray<number> {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted.filter(
+    (value, index) =>
+      index === 0 || Math.abs(value - (sorted[index - 1] ?? value)) > GRID_ALIGNMENT_TOLERANCE_MM,
   );
 }
 
-function LockOutlineControl(props: {
-  readonly show: boolean;
-  readonly checked: boolean;
-  readonly disabled?: boolean;
-  readonly onChange: (locked: boolean) => void;
-}): JSX.Element | null {
-  if (!props.show) return null;
-  return (
-    <label style={lockRowStyle}>
-      <input
-        type="checkbox"
-        checked={props.checked}
-        disabled={props.disabled === true}
-        aria-label="Lock registration outline"
-        title={
-          props.disabled === true
-            ? 'A captured board stays locked — its position is the work origin'
-            : "Lock the outline so it can't move between the two burns"
-        }
-        onChange={(e) => props.onChange(e.target.checked)}
-      />
-      Lock outline (prevent moving between burns)
-    </label>
-  );
+function axisSpacing(coordinates: ReadonlyArray<number>, outlineSpan: number): number {
+  const first = coordinates[0];
+  const second = coordinates[1];
+  return first === undefined || second === undefined
+    ? DEFAULT_SPACING_MM
+    : Math.max(0, second - first - outlineSpan);
 }
 
-function RemoveOutlineButton(props: {
-  readonly show: boolean;
-  readonly onClick: () => void;
-}): JSX.Element | null {
-  if (!props.show) return null;
-  return (
-    <Button variant="danger" onClick={props.onClick}>
-      Remove outline
-    </Button>
-  );
-}
-
-function createOutlineFromState(args: {
-  readonly shape: RegistrationJigShape;
-  readonly widthMm: string;
-  readonly heightMm: string;
-  readonly diameterMm: string;
-  readonly addRegistrationBox: (widthMm: number, heightMm: number) => void;
-  readonly addRegistrationCircle: (diameterMm: number) => void;
-}): void {
-  if (args.shape === 'circle') {
-    addCircleIfValid(args.diameterMm, args.addRegistrationCircle);
-    return;
-  }
-  addBoxIfValid(args.widthMm, args.heightMm, args.addRegistrationBox);
-}
-
-function addCircleIfValid(diameterMm: string, addCircle: (diameterMm: number) => void): void {
-  const d = Number(diameterMm);
-  if (Number.isFinite(d) && d >= 1) addCircle(d);
-}
-
-function addBoxIfValid(
+function jigSetSpec(
+  shape: RegistrationJigShape,
   widthMm: string,
   heightMm: string,
-  addBox: (widthMm: number, heightMm: number) => void,
-): void {
-  const w = Number(widthMm);
-  const h = Number(heightMm);
-  if (Number.isFinite(w) && Number.isFinite(h) && w >= 1 && h >= 1) addBox(w, h);
+  diameterMm: string,
+  rows: string,
+  columns: string,
+  spacingX: string,
+  spacingY: string,
+): RegistrationJigSetSpec {
+  return {
+    outline:
+      shape === 'circle'
+        ? { kind: 'circle', diameterMm: finiteNumber(diameterMm) }
+        : { kind: 'rectangle', widthMm: finiteNumber(widthMm), heightMm: finiteNumber(heightMm) },
+    rows: positiveInteger(rows),
+    columns: positiveInteger(columns),
+    spacingX: finiteNumber(spacingX),
+    spacingY: finiteNumber(spacingY),
+  };
 }
 
-function parseJigShape(value: string): RegistrationJigShape {
-  return value === 'circle' ? 'circle' : 'rectangle';
+function finiteNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function buttonLabel(shape: RegistrationJigShape, hasBox: boolean): string {
-  if (shape === 'circle') return hasBox ? 'Replace circle' : 'Create circle';
-  return hasBox ? 'Replace box' : 'Create box';
+function positiveInteger(value: string): number {
+  const parsed = Math.floor(finiteNumber(value));
+  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : 1;
 }
 
-const sizeRowStyle: React.CSSProperties = {
+function createButtonLabel(hasOutline: boolean, count: number): string {
+  if (count === 1) return hasOutline ? 'Replace outline' : 'Create outline';
+  return hasOutline ? `Replace with ${count} jigs` : `Create ${count} jigs`;
+}
+
+function jigWord(count: number): string {
+  return count === 1 ? 'jig' : 'jigs';
+}
+
+const actionRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
   flexWrap: 'wrap',
 };
-const shapeSelectStyle: React.CSSProperties = { width: 92 };
-const sizeInputStyle: React.CSSProperties = { width: 56 };
-const unitStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
-const lockRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
+const setSummaryStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-text-muted)',
   fontSize: 12,
 };
 const capturedWarnStyle: React.CSSProperties = {

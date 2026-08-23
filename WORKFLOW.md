@@ -1295,6 +1295,32 @@ authorization, Frame proof, controller command, or safety boundary.
 2. No Move Laser to Selection physical move.
 3. No Set Start Point or node-level start ordering.
 
+### F-B15a. Burn a multi-outline registration jig set (ADR-057 amendment)
+
+1. Open **Registration Jig**, choose Rectangle or Circle, enter the outline size,
+   then enter rows, columns, and horizontal/vertical spacing. A 1 x 5 grid creates
+   five independently visible outlines as one fixture set.
+2. Select one artwork and click **Center + copy artwork to all N**. The original
+   moves into the first outline and one operation-preserving copy is centered in
+   every remaining outline.
+3. Pick **Outline only**. Every registration outline is enabled and every artwork
+   operation is disabled; Frame, Preview, Save G-code, and Start therefore describe
+   the complete physical fixture outline run.
+4. Put one blank inside each burned outline, then pick **Artwork only**. Every
+   registration outline is disabled and every artwork copy on an enabled source
+   operation is included in the second run.
+5. Both runs use the combined bounds of the complete outline set as their one
+   placement anchor. Moving or replacing the set changes that ordinary job evidence;
+   the existing exact-job Frame rule remains the only Start guard.
+
+#### Empty and edge cases
+
+1. A 1 x 1 grid preserves the original single-jig workflow and button wording.
+2. **Remove all outlines** deletes the complete set and its reserved operation.
+3. **Lock all outlines** applies one lock state to the complete fixture set.
+4. A captured-board outline remains owned by **Place Board** and is not replaced
+   from Registration Jig; the existing provenance explanation remains in the panel.
+
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 
 While a job streams, the app owns an immutable exact execution artifact in
