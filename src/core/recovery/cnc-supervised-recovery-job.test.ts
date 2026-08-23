@@ -125,6 +125,32 @@ describe('buildCncSupervisedRecoveryJob', () => {
     expect(result.job.groups[1]).toEqual(laterGroup);
   });
 
+  it('preserves compiled evidence only for layers retained by the recovery job', () => {
+    const job: Job = {
+      ...sourceJob(),
+      cncCompilation: {
+        vcarveOperations: [
+          vcarveEvidence('profile', 0),
+          vcarveEvidence('engrave', 1),
+          vcarveEvidence('omitted', 2),
+        ],
+        offsetLadderDiagnostics: [
+          reliefEvidence('profile', 0),
+          reliefEvidence('engrave', 1),
+          reliefEvidence('omitted', 2),
+        ],
+      },
+    };
+
+    const result = build(job);
+
+    if (result.kind !== 'recovery-job') throw new Error(`Unexpected ${result.reason}`);
+    expect(result.job.cncCompilation).toEqual({
+      vcarveOperations: [vcarveEvidence('profile', 0), vcarveEvidence('engrave', 1)],
+      offsetLadderDiagnostics: [reliefEvidence('profile', 0), reliefEvidence('engrave', 1)],
+    });
+  });
+
   it('emits a fresh-job preamble that retracts before spindle start and plunges only at runway start', () => {
     const result = build();
     if (result.kind !== 'recovery-job') throw new Error(`Unexpected ${result.reason}`);
@@ -163,3 +189,19 @@ describe('buildCncSupervisedRecoveryJob', () => {
     expect(result).toEqual({ kind: 'error', reason: 'cleared-path-unproved' });
   });
 });
+
+function vcarveEvidence(layerId: string, operationIndex: number) {
+  return {
+    operationIndex,
+    layerId,
+    entryIssue: null,
+    offsetFailed: false,
+    thinResidual: false,
+    passLimited: false,
+  } as const;
+}
+
+function reliefEvidence(layerId: string, operationIndex: number) {
+  void operationIndex;
+  return { layerId, kind: 'relief-pass-limit' } as const;
+}
