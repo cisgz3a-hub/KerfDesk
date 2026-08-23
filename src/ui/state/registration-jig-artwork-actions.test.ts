@@ -59,6 +59,23 @@ describe('center artwork in a registration jig set', () => {
       expect(operationIdsForObject(copy, scene.layers)).toEqual(sourceOperationIds);
     }
   });
+
+  it('replaces its generated copies instead of multiplying them on a second click', () => {
+    useStore.getState().centerSelectionInRegistrationBox();
+    const firstIds = useStore
+      .getState()
+      .project.scene.objects.filter((object) => !isRegistrationBox(object))
+      .map((object) => object.id);
+
+    useStore.getState().centerSelectionInRegistrationBox();
+
+    const state = useStore.getState();
+    const artwork = state.project.scene.objects.filter((object) => !isRegistrationBox(object));
+    expect(artwork).toHaveLength(5);
+    expect(artwork.map((object) => object.id)).toEqual(firstIds);
+    expect(state.selectedObjectId).toBe('art');
+    expect(state.additionalSelectedIds).toEqual(new Set());
+  });
 });
 
 function centerOf(bounds: {

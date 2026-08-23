@@ -14,7 +14,6 @@ import { pushUndo } from './scene-mutations';
 
 export function applyCenterArtworkInRegistrationJigSet(
   state: AppState,
-  idFactory: () => string = () => crypto.randomUUID(),
 ): AppState | Partial<AppState> {
   const boxes = findRegistrationBoxes(state.project.scene);
   const selected = selectedArtwork(state);
@@ -38,20 +37,30 @@ export function applyCenterArtworkInRegistrationJigSet(
     }
     const copiedIds = new Map<string, string>();
     for (const object of selected) {
-      const id = idFactory();
+      const id = registrationJigCopyId(object.id, box.id);
       copiedIds.set(object.id, id);
       copies.push(translatedObject(object, id, delta));
-      selectionIds.push(id);
     }
     copiedGroups.push(
-      ...cloneCompleteSelectedGroups(state.project.scene, selected, copiedIds, idFactory),
+      ...cloneCompleteSelectedGroups(state.project.scene, selected, copiedIds, box.id),
     );
   }
 
+  const copyPrefixes = selected.map((object) => registrationJigCopyPrefix(object.id));
+  const copiedGroupPrefixes = completeSelectedGroups(state.project.scene, selected).map((group) =>
+    registrationJigGroupCopyPrefix(group.id),
+  );
   let scene: Scene = {
     ...state.project.scene,
-    objects: state.project.scene.objects.map((object) => movedById.get(object.id) ?? object),
-    groups: [...(state.project.scene.groups ?? []), ...copiedGroups],
+    objects: state.project.scene.objects
+      .filter((object) => !copyPrefixes.some((prefix) => object.id.startsWith(prefix)))
+      .map((object) => movedById.get(object.id) ?? object),
+    groups: [
+      ...(state.project.scene.groups ?? []).filter(
+        (group) => !copiedGroupPrefixes.some((prefix) => group.id.startsWith(prefix)),
+      ),
+      ...copiedGroups,
+    ],
   };
   for (const copy of copies) scene = addObject(scene, copy);
   const [selectedObjectId, ...additionalSelectedIds] = selectionIds;
@@ -99,22 +108,40 @@ function cloneCompleteSelectedGroups(
   scene: Scene,
   selected: ReadonlyArray<SceneObject>,
   copiedIds: ReadonlyMap<string, string>,
-  idFactory: () => string,
+  boxId: string,
+): ReadonlyArray<SceneGroup> {
+  return completeSelectedGroups(scene, selected).map((group) => ({
+    ...group,
+    id: registrationJigGroupCopyId(group.id, boxId),
+    objectIds: group.objectIds.flatMap((id) => {
+      const copy = copiedIds.get(id);
+      return copy === undefined ? [] : [copy];
+    }),
+  }));
+}
+
+function completeSelectedGroups(
+  scene: Scene,
+  selected: ReadonlyArray<SceneObject>,
 ): ReadonlyArray<SceneGroup> {
   const selectedIds = new Set(selected.map((object) => object.id));
-  return (scene.groups ?? []).flatMap((group) => {
-    if (!group.objectIds.every((id) => selectedIds.has(id))) return [];
-    return [
-      {
-        ...group,
-        id: idFactory(),
-        objectIds: group.objectIds.flatMap((id) => {
-          const copy = copiedIds.get(id);
-          return copy === undefined ? [] : [copy];
-        }),
-      },
-    ];
-  });
+  return (scene.groups ?? []).filter((group) => group.objectIds.every((id) => selectedIds.has(id)));
+}
+
+function registrationJigCopyPrefix(sourceId: string): string {
+  return `registration-jig-copy:${encodeURIComponent(sourceId)}:`;
+}
+
+function registrationJigCopyId(sourceId: string, boxId: string): string {
+  return `${registrationJigCopyPrefix(sourceId)}${encodeURIComponent(boxId)}`;
+}
+
+function registrationJigGroupCopyPrefix(sourceGroupId: string): string {
+  return `registration-jig-group-copy:${encodeURIComponent(sourceGroupId)}:`;
+}
+
+function registrationJigGroupCopyId(sourceGroupId: string, boxId: string): string {
+  return `${registrationJigGroupCopyPrefix(sourceGroupId)}${encodeURIComponent(boxId)}`;
 }
 
 function centerOf(bounds: {
