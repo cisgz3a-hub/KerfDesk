@@ -22,7 +22,10 @@ const HEADING_PATTERN = /^## ADR-(\d+)(.*)$/;
 const AMENDMENT_PATTERN = /^\s+Amendment\b/;
 
 const source = readFileSync(DECISIONS_FILE, 'utf8');
-const lines = source.split('\n');
+// Split on either ending: `text=auto eol=lf` stores LF but checks out CRLF on
+// Windows, and a trailing `\r` defeats the `$` anchor above, which made the
+// gate silently report zero decisions instead of parsing them.
+const lines = source.split(/\r?\n/);
 
 /** @type {Map<number, number[]>} decision number -> 1-indexed heading lines */
 const decisionLines = new Map();
