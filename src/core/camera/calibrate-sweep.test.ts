@@ -55,11 +55,11 @@ function mappingErrorPx(result: ReturnType<typeof calibrate>): number {
 
 describe('calibrateWithFocalSweep', () => {
   // The multi-start is deterministic; this timeout only guards against a hang, so
-  // it is generous on the slow shared CI runner (runs ~13s locally, blew 40s under
-  // CI load). The mappingErrorPx / fx assertions below are the real gate.
+  // it is generous for a local four-worker run (runs ~13s alone, exceeded 40s under
+  // ordinary suite load). The mappingErrorPx / fx assertions below are the real gate.
   it(
     'recovers the camera where a single default-seeded run stalls',
-    { timeout: ciBudgetMs(40_000, 240_000) },
+    { timeout: ciBudgetMs(60_000, 240_000) },
     () => {
       const views = observations();
       const options = {
