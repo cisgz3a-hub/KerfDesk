@@ -31,6 +31,7 @@ type PanelPositionSetter = (next: FloatingPanelPosition) => void;
 export function RegistrationJigPanel(): JSX.Element | null {
   const open = useUiStore((s) => s.registrationPanelOpen);
   const scene = useStore((s) => s.project.scene);
+  const projectDocumentEpoch = useStore((s) => s.projectDocumentEpoch);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const centerInBox = useStore((s) => s.centerSelectionInRegistrationBox);
@@ -72,30 +73,33 @@ export function RegistrationJigPanel(): JSX.Element | null {
         </Button>
       </header>
 
-      <NextBurnBanner state={runState} />
+      <NextBurnBanner state={runState} outlineCount={boxes.length} />
 
-      <RegistrationJigOutlineControls />
+      <RegistrationJigOutlineControls key={projectDocumentEpoch} />
 
       <Button
         onClick={centerInBox}
         disabled={!canCenter}
         title={
           canCenter
-            ? 'Center the selected artwork in the jig outline'
-            : 'Select your artwork first, then center it in the jig outline'
+            ? `Center the selected artwork in all ${boxes.length} jig outline${boxes.length === 1 ? '' : 's'}`
+            : 'Select your artwork first, then center it in every jig outline'
         }
       >
-        Center artwork in outline
+        {boxes.length > 1
+          ? `Center + copy artwork to all ${boxes.length}`
+          : 'Center artwork in outline'}
       </Button>
 
       <BurnRunToggle
         state={runState}
         disabled={!hasBox}
         artworkDisabled={!hasArtwork}
+        outlineCount={boxes.length}
         onPick={setOutput}
       />
 
-      <RegistrationJigHelp />
+      <RegistrationJigHelp outlineCount={boxes.length} />
     </section>
   );
 }
@@ -261,8 +265,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function NextBurnBanner(props: { readonly state: RegistrationRunState }): JSX.Element {
-  const banner = bannerFor(props.state);
+function NextBurnBanner(props: {
+  readonly state: RegistrationRunState;
+  readonly outlineCount: number;
+}): JSX.Element {
+  const banner = bannerFor(props.state, props.outlineCount);
   return (
     <div className={banner.className} role="status">
       {banner.text}
@@ -270,7 +277,10 @@ function NextBurnBanner(props: { readonly state: RegistrationRunState }): JSX.El
   );
 }
 
-function bannerFor(state: RegistrationRunState): {
+function bannerFor(
+  state: RegistrationRunState,
+  outlineCount: number,
+): {
   readonly className: string;
   readonly text: string;
 } {
@@ -280,12 +290,18 @@ function bannerFor(state: RegistrationRunState): {
     case 'box':
       return {
         className: 'lf-banner lf-banner--info',
-        text: '▶ Next Start burns: JIG outline (run 1)',
+        text:
+          outlineCount === 1
+            ? '▶ Next Start burns: JIG outline (run 1)'
+            : `▶ Next Start burns: all ${outlineCount} JIG outlines (run 1)`,
       };
     case 'artwork':
       return {
         className: 'lf-banner lf-banner--info',
-        text: '▶ Next Start burns: your ARTWORK (run 2)',
+        text:
+          outlineCount === 1
+            ? '▶ Next Start burns: your ARTWORK (run 2)'
+            : '▶ Next Start burns: all ARTWORK copies (run 2)',
       };
     case 'mixed':
       return {
@@ -299,6 +315,7 @@ function BurnRunToggle(props: {
   readonly state: RegistrationRunState;
   readonly disabled: boolean;
   readonly artworkDisabled: boolean;
+  readonly outlineCount: number;
   readonly onPick: (scope: 'box' | 'artwork') => void;
 }): JSX.Element {
   return (
@@ -307,6 +324,7 @@ function BurnRunToggle(props: {
       <Button
         pressed={props.state === 'box'}
         disabled={props.disabled}
+        title={`Burn all ${props.outlineCount} registration outline${props.outlineCount === 1 ? '' : 's'}`}
         onClick={() => props.onPick('box')}
       >
         Outline only
@@ -323,7 +341,7 @@ function BurnRunToggle(props: {
   );
 }
 
-function RegistrationJigHelp(): JSX.Element {
+function RegistrationJigHelp(props: { readonly outlineCount: number }): JSX.Element {
   const [open, setOpen] = useState(true);
   return (
     <div style={helpStyle}>
@@ -333,15 +351,21 @@ function RegistrationJigHelp(): JSX.Element {
       {open && (
         <ol style={helpListStyle}>
           <li>
-            Pick Rectangle or Circle, set the size, and create the outline. Pick{' '}
-            <strong>Outline only</strong>, then Start to burn the outline on scrap.
+            Pick Rectangle or Circle, set the size and grid, then create the jig set. Pick{' '}
+            <strong>Outline only</strong>, then Start to burn every outline on scrap.
           </li>
-          <li>Put your object inside the burned outline.</li>
+          <li>Put one object inside each burned outline.</li>
           <li>
-            Add your artwork, select it, then <strong>Center artwork in outline</strong>.
+            Add one artwork, select it, then{' '}
+            <strong>
+              {props.outlineCount > 1
+                ? 'Center + copy artwork to all'
+                : 'Center artwork in outline'}
+            </strong>
+            .
           </li>
           <li>
-            Pick <strong>Artwork only</strong>, then Start to burn the art.
+            Pick <strong>Artwork only</strong>, then Start to burn every artwork copy.
           </li>
           <li style={helpNoteStyle}>
             Drag the outline onto your material to move it; Remove outline deletes it. On a
