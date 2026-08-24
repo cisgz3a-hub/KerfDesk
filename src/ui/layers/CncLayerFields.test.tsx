@@ -114,15 +114,15 @@ describe('CncLayerFields relief contract', () => {
     }
   });
 
-  it('preserves the current-main Stepover editor range', async () => {
+  it('accepts exact positive Stepover values without hidden editor bounds', async () => {
     const layer = reliefLayer('engrave');
     installProject(layer, true);
     const { host, root } = await render(layer);
     try {
       const input = stepoverInput(host, layer.color);
       if (input === null) throw new Error('stepover input missing');
-      expect(input.getAttribute('min')).toBe('10');
-      expect(input.getAttribute('max')).toBe('85');
+      expect(input.getAttribute('min')).toBeNull();
+      expect(input.getAttribute('max')).toBeNull();
       expect(input.value).toBe('40');
 
       const cutDepth = host.querySelector<HTMLInputElement>(

@@ -73,6 +73,27 @@ async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null>
   };
 }
 
+async function reserveFileForSave(req: FileSaveRequest): Promise<SaveTarget | null> {
+  if (typeof window.showDirectoryPicker !== 'function') {
+    throw new Error('File System Access directory picker is required to save files safely.');
+  }
+  let directory: FileSystemDirectoryHandle;
+  try {
+    directory = await window.showDirectoryPicker({ mode: 'readwrite' });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') return null;
+    throw err;
+  }
+  return {
+    displayName: req.suggestedName,
+    write: async (data) => {
+      const handle = await directory.getFileHandle(req.suggestedName, { create: true });
+      const writable = await handle.createWritable();
+      await writeAndClose(writable, data);
+    },
+  };
+}
+
 async function writeAndClose(
   writable: FileSystemWritableFileStream,
   data: string | BufferSource | Blob,
@@ -100,6 +121,7 @@ export const webAdapter: PlatformAdapter = {
   id: 'web',
   pickFilesForOpen,
   pickFileForSave,
+  reserveFileForSave,
   serial: webSerial,
   camera: webCamera,
   cameraBridge: createHttpCameraBridge(),

@@ -202,8 +202,17 @@ describe('computeRemovalGrid — path3d per-vertex Z', () => {
       computeRemovalGrid(toolpath, FINE_GRID, kernelForTool(FLAT_TOOL, FINE_GRID.mmPerCell)),
     );
 
-    const retainedCell = 31 * grid.widthCells + 42;
-    expect(grid.depth[retainedCell]).toBeCloseTo(-3.4, 6);
+    // Cell (42, 31) centres on (4.25, 3.15), which is 1.051 mm from this
+    // segment — outside the 1 mm end mill. It only ever registered as cut
+    // because the stamper snapped the tool to the nearest cell centre, so the
+    // assertion moves to cell (41, 32) at 0.917 mm, which the bit truly
+    // reaches. That is still mid-segment, so it still proves earlier samples
+    // survive to the completed grid.
+    const unreachableCell = 31 * grid.widthCells + 42;
+    expect(grid.depth[unreachableCell]).toBe(0);
+
+    const retainedCell = 32 * grid.widthCells + 41;
+    expect(grid.depth[retainedCell]).toBeLessThan(-4);
   });
 
   it('makes exact-total and over-total scrub budgets identical to the finished grid', () => {

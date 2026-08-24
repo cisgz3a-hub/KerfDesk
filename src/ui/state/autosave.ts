@@ -27,6 +27,7 @@ const LEGACY_AUTOSAVE_KEY = 'lf2:autosave:v1';
 const AUTOSAVE_KEY_PREFIX = `${LEGACY_AUTOSAVE_KEY}:`;
 const AUTOSAVE_INDEX_KEY = 'lf2:autosave:index:v1';
 const AUTOSAVE_SESSION_KEY = 'lf2:autosave:session-id:v1';
+const AUTOSAVE_GENERATION_KEY = 'lf2:autosave:generation:v1';
 const AUTOSAVE_SCHEMA_VERSION = 1;
 export const AUTOSAVE_INTERVAL_MS = 30_000;
 
@@ -62,8 +63,6 @@ export type AutosaveWriteFailure = Exclude<AutosaveWriteResult, { readonly kind:
 export type AutosaveScope = {
   readonly sessionId?: string;
 };
-
-let fallbackSessionId: string | null = null;
 
 export function writeAutosave(
   project: Project,
@@ -134,12 +133,16 @@ function readAutosaveAtKey(storageKey: string): AutosaveSnapshot | null {
 // pull a possibly hundreds-of-megabyte record back out of localStorage on every
 // tick, which is exactly the cost such a memo exists to avoid — a counter says
 // the same thing for free.
-let autosaveClearCount = 0;
-
 // Monotonic stamp of the slot's clear history: a memo about the slot's contents
 // is only still true if it was taken at the current generation.
 export function autosaveSlotGeneration(): number {
-  return autosaveClearCount;
+  if (typeof sessionStorage === 'undefined') return 0;
+  try {
+    const value = Number(sessionStorage.getItem(AUTOSAVE_GENERATION_KEY) ?? '0');
+    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export function clearAutosave(target: AutosaveScope | AutosaveSnapshot = {}): void {
@@ -147,7 +150,13 @@ export function clearAutosave(target: AutosaveScope | AutosaveSnapshot = {}): vo
   // Bump for any clear, including one aimed at another window session's key:
   // over-reporting costs a memoizing writer one redundant write, while
   // under-reporting leaves the slot empty and the operator's work unprotected.
-  autosaveClearCount += 1;
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.setItem(AUTOSAVE_GENERATION_KEY, String(autosaveSlotGeneration() + 1));
+    } catch {
+      /* the clear itself can still proceed */
+    }
+  }
   const keys = 'storageKey' in target ? [target.storageKey] : keysForClearScope(target);
   for (const storageKey of keys) {
     try {
@@ -195,11 +204,10 @@ function autosaveSessionId(): string {
       sessionStorage.setItem(AUTOSAVE_SESSION_KEY, next);
       return next;
     } catch {
-      /* fall through to process-local id */
+      /* fall through to an unscoped recovery slot */
     }
   }
-  fallbackSessionId ??= createSessionId();
-  return fallbackSessionId;
+  return 'unscoped';
 }
 
 function createSessionId(): string {

@@ -16,16 +16,16 @@
 // leftover material meets a later pass that believed it was cleared.
 
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
-import { fillHatching } from '../job/fill-hatching';
+import { fillHatchingExactWithBudget } from '../job/fill-hatching';
 import type { Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
 
 const MIN_CLOSED_POINTS = 3;
 const MIN_STEPOVER_PERCENT = 10;
-const MAX_STEPOVER_PERCENT = 85;
 // Existing backstop against degenerate inputs (huge pocket + microscopic
 // effective stepover). This slice preserves current-main planner semantics.
 const MAX_POCKET_RINGS = 4096;
+const MAX_POCKET_RASTER_SCANLINES = 4096;
 // Bisection for the innermost ring: 24 halvings resolve any bed-sized span to
 // well under the tolerance, and 0.01 mm is finer than the 3-decimal emit grid.
 const RING_BISECT_ITERATIONS = 24;
@@ -71,7 +71,7 @@ export function pocketRingToolpaths(
   const contours = pocketContours(polylines);
   if (contours.length === 0 || !(toolDiameterMm > 0)) return NO_POCKET_TOOLPATHS;
   const radius = toolDiameterMm / 2;
-  const stepMm = (clampStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
+  const stepMm = (positiveStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
 
   const ladder = buildOffsetLadder(contours, MAX_POCKET_RINGS, (step) => radius + step * stepMm);
   const core = coreRing(contours, ladder.rings, radius, stepMm);
@@ -154,9 +154,10 @@ function pocketContours(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Polyl
   );
 }
 
-function clampStepoverPercent(stepoverPercent: number): number {
-  if (!Number.isFinite(stepoverPercent)) return MIN_STEPOVER_PERCENT;
-  return Math.min(MAX_STEPOVER_PERCENT, Math.max(MIN_STEPOVER_PERCENT, stepoverPercent));
+function positiveStepoverPercent(stepoverPercent: number): number {
+  return Number.isFinite(stepoverPercent) && stepoverPercent > 0
+    ? stepoverPercent
+    : MIN_STEPOVER_PERCENT;
 }
 
 // Raster pocket clearing (ADR-105 G10) — Easel's Fill Method raster X/Y.
@@ -183,7 +184,7 @@ export function pocketRasterToolpaths(
 ): PocketToolpaths {
   const contours = pocketContours(polylines);
   if (contours.length === 0 || !(toolDiameterMm > 0)) return NO_POCKET_TOOLPATHS;
-  const stepMm = (clampStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
+  const stepMm = (positiveStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
   const wall = insetContoursChecked(contours, toolDiameterMm / 2);
   if (wall.contours.length === 0) {
     return {
@@ -193,17 +194,20 @@ export function pocketRasterToolpaths(
       stepoverUsed: true,
     };
   }
-  const sweeps = fillHatching({
-    polylines: wall.contours,
-    hatchAngleDeg: axis === 'x' ? 0 : 90,
-    hatchSpacingMm: stepMm,
-    fillRule: 'nonzero',
-    bidirectional: true,
-  });
+  const sweeps = fillHatchingExactWithBudget(
+    {
+      polylines: wall.contours,
+      hatchAngleDeg: axis === 'x' ? 0 : 90,
+      hatchSpacingMm: stepMm,
+      fillRule: 'nonzero',
+      bidirectional: true,
+    },
+    MAX_POCKET_RASTER_SCANLINES,
+  );
   return {
-    toolpaths: [...sweeps, ...wall.contours],
+    toolpaths: [...sweeps.hatches, ...wall.contours],
     offsetFailed: false,
-    passLimited: false,
+    passLimited: sweeps.passLimited,
     stepoverUsed: true,
   };
 }

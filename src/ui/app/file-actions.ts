@@ -180,18 +180,13 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   )) {
     ctx.pushToast(advisory, 'warning');
   }
-  // The picker is opened BEFORE the program is emitted because
-  // showSaveFilePicker requires transient user activation, and that activation
-  // expires while an await runs (Chromium: ~5 s). Emitting first made every job
-  // whose compile outran the window impossible to save at all, failing with
-  // "Must be handling a user gesture to show a file picker" — a V-carve text
-  // layer measures ~13.7 s. Cost of this order: a compile that then fails
-  // leaves the file the picker already created at zero bytes. Nothing is
-  // written to it, and an empty file the operator can delete is recoverable
-  // where a save that cannot open a dialog at all is not.
+  // Web reserves only a directory during transient user activation. The file
+  // handle and writable stream are created after successful preparation, so a
+  // compile failure cannot create or truncate the destination. Native dialogs
+  // already defer file creation until write and use the ordinary picker.
   let target: SaveTarget | null;
   try {
-    target = await ctx.platform.pickFileForSave({
+    target = await pickGcodeDestination(ctx.platform, {
       suggestedName: suggestedGcodeName(ctx.savedName),
       extensions: ['.gcode', '.nc'],
     });
@@ -218,6 +213,13 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }
+}
+
+function pickGcodeDestination(
+  platform: PlatformAdapter,
+  request: Parameters<PlatformAdapter['pickFileForSave']>[0],
+): Promise<SaveTarget | null> {
+  return (platform.reserveFileForSave ?? platform.pickFileForSave)(request);
 }
 
 function advanceExportVariables(ctx: SaveGcodeCtx): void {

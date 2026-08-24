@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { webAdapter } from './web-adapter';
 
 const originalSavePickerDescriptor = Object.getOwnPropertyDescriptor(window, 'showSaveFilePicker');
+const originalDirectoryPickerDescriptor = Object.getOwnPropertyDescriptor(
+  window,
+  'showDirectoryPicker',
+);
 
 const saveRequest = { suggestedName: 'out.gcode', extensions: ['.gcode'] };
 
@@ -10,6 +14,11 @@ afterEach(() => {
     Reflect.deleteProperty(window, 'showSaveFilePicker');
   } else {
     Object.defineProperty(window, 'showSaveFilePicker', originalSavePickerDescriptor);
+  }
+  if (originalDirectoryPickerDescriptor === undefined) {
+    Reflect.deleteProperty(window, 'showDirectoryPicker');
+  } else {
+    Object.defineProperty(window, 'showDirectoryPicker', originalDirectoryPickerDescriptor);
   }
   vi.restoreAllMocks();
 });
@@ -32,6 +41,26 @@ describe('webAdapter save target', () => {
     Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined });
 
     await expect(webAdapter.pickFileForSave(saveRequest)).rejects.toThrow(/File System Access API/);
+  });
+
+  it('reserves a directory without creating the destination until write', async () => {
+    const writable = writableStreamMock();
+    const createWritable = vi.fn(async () => writable as unknown as FileSystemWritableFileStream);
+    const getFileHandle = vi.fn(async () => ({ name: 'out.gcode', createWritable }));
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: vi.fn(async () => ({ getFileHandle })),
+    });
+
+    const target = await webAdapter.reserveFileForSave?.(saveRequest);
+    if (target === null || target === undefined) throw new Error('expected reserved target');
+    expect(getFileHandle).not.toHaveBeenCalled();
+
+    await target.write('G21\n');
+
+    expect(getFileHandle).toHaveBeenCalledWith('out.gcode', { create: true });
+    expect(createWritable).toHaveBeenCalledOnce();
+    expect(writable.write).toHaveBeenCalledWith('G21\n');
   });
 });
 

@@ -194,9 +194,6 @@ async function saveSurfacingProgram({
   }
 }
 
-const NUM_MIN = 0.1;
-const NUM_MAX = 5000;
-
 function Num(props: {
   readonly label: string;
   readonly value: number;
@@ -210,8 +207,7 @@ function Num(props: {
         ariaLabel={`Surfacing ${props.label.toLowerCase()}`}
         title={props.title}
         value={props.value}
-        min={NUM_MIN}
-        max={NUM_MAX}
+        positiveOnly
         step={0.1}
         onCommit={props.onCommit}
         style={inputStyle}

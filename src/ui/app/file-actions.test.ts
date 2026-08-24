@@ -356,6 +356,26 @@ describe('handleSaveGcode rotary raster emission', () => {
     );
   });
 
+  it('does not create or truncate the reserved destination when preparation fails', async () => {
+    const target: SaveTarget = { displayName: 'existing.gcode', write: vi.fn() };
+    const reserveFileForSave = vi.fn(async () => target);
+    const pickFileForSave = vi.fn(async () => {
+      throw new Error('the destructive picker must not be used');
+    });
+    vi.spyOn(window, 'alert').mockReturnValue(undefined);
+
+    await handleSaveGcode({
+      platform: { ...mockPlatform({ save: pickFileForSave }), reserveFileForSave },
+      project: rotaryRasterSaveProject(),
+      savedName: null,
+      pushToast: vi.fn(),
+    });
+
+    expect(reserveFileForSave).toHaveBeenCalledOnce();
+    expect(pickFileForSave).not.toHaveBeenCalled();
+    expect(target.write).not.toHaveBeenCalled();
+  });
+
   it('writes non-empty rotary raster bytes and reports success with explicit permission', async () => {
     const project = rotaryRasterSaveProject();
     const written: string[] = [];

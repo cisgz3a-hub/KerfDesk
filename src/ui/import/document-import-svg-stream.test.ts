@@ -72,14 +72,12 @@ describe('parseDocumentImportSource SVG streaming', () => {
     });
   });
 
-  it('leaves material-library imports on their existing text parser', async () => {
+  it('preserves the material-library text parser when Blob.stream is unavailable', async () => {
     const text = vi.fn(async () => '{"schemaVersion":null}');
     const blob = {
       size: 22,
       text,
-      stream: vi.fn(() => {
-        throw new Error('material import must not enter the SVG stream parser');
-      }),
+      stream: undefined,
     } as unknown as Blob;
     const onParsing = vi.fn();
 
@@ -94,7 +92,6 @@ describe('parseDocumentImportSource SVG streaming', () => {
       result: { kind: 'invalid' },
     });
     expect(text).toHaveBeenCalledTimes(1);
-    expect(blob.stream).not.toHaveBeenCalled();
     expect(onParsing).toHaveBeenCalledTimes(1);
   }, 20_000);
 

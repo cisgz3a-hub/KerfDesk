@@ -38,8 +38,6 @@ export const SURFACING_DEFAULT_STEPOVER_PCT = 40;
 export const SURFACING_DEFAULT_DEPTH_PER_PASS_MM = 0.5;
 export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
 
-const MIN_STEPOVER_PCT = 10;
-const MAX_STEPOVER_PCT = 100;
 const MIN_STEP_MM = 0.05;
 // Hard ceiling on serpentine rows / depth passes so a pathological but finite
 // height or total depth (e.g. 1e12 mm) cannot exhaust memory building the
@@ -73,8 +71,7 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   const paramReason = validateSurfacingParams(params);
   if (paramReason !== null) return { ok: false, reason: paramReason };
 
-  const stepover = Math.min(MAX_STEPOVER_PCT, Math.max(MIN_STEPOVER_PCT, params.stepoverPct));
-  const stepMm = Math.max(MIN_STEP_MM, (params.bitDiameterMm * stepover) / 100);
+  const stepMm = Math.max(MIN_STEP_MM, (params.bitDiameterMm * params.stepoverPct) / 100);
   const rowResult = surfacingRowYs(params.heightMm, stepMm);
   if (!rowResult.ok) return rowResult;
   const { rows } = rowResult;
@@ -83,7 +80,7 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   const { depths } = depthResult;
   const lines: string[] = [
     '; KerfDesk spoilboard surfacing',
-    `; area ${fmt(params.widthMm)} x ${fmt(params.heightMm)} mm, bit ${fmt(params.bitDiameterMm)} mm, stepover ${stepover}%`,
+    `; area ${fmt(params.widthMm)} x ${fmt(params.heightMm)} mm, bit ${fmt(params.bitDiameterMm)} mm, stepover ${params.stepoverPct}%`,
     '; zero X/Y at the front-left corner of the area, Z0 on the surface to face',
     'G21',
     'G90',

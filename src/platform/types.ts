@@ -207,6 +207,10 @@ export type PlatformAdapter = {
   // Show a file-save picker. Resolves to a SaveTarget the caller writes
   // through, or `null` if the user cancels.
   readonly pickFileForSave: (req: FileSaveRequest) => Promise<SaveTarget | null>;
+  /** Reserve a destination during user activation without creating or
+   * truncating the file. Web uses a directory handle; native adapters can
+   * omit this and keep their non-destructive save-dialog behavior. */
+  readonly reserveFileForSave?: (req: FileSaveRequest) => Promise<SaveTarget | null>;
 
   // Phase B: serial port access for connecting to the laser controller.
   readonly serial: SerialAdapter;
