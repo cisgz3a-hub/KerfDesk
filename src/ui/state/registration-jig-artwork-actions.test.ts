@@ -5,6 +5,7 @@ import {
   isRegistrationBox,
   operationIdsForObject,
   transformedBBox,
+  type SceneObject,
 } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from './store';
@@ -80,6 +81,47 @@ describe('center artwork in a registration jig set', () => {
     expect(state.additionalSelectedIds).toEqual(new Set());
   });
 
+  it('applies one exact proportional size to every copy and recenters each jig', () => {
+    useStore.getState().centerSelectionInRegistrationBox();
+    const beforeUndoCount = useStore.getState().undoStack.length;
+
+    const result = useStore.getState().resizeRegistrationJigArtwork({
+      widthMm: 30,
+      heightMm: 15,
+      drivingDimension: 'width',
+    });
+
+    expect(result).toEqual({ kind: 'ok' });
+    const state = useStore.getState();
+    const boxes = findRegistrationBoxes(state.project.scene);
+    const artwork = state.project.scene.objects.filter((object) => !isRegistrationBox(object));
+    for (const [index, object] of artwork.entries()) {
+      const bounds = transformedBBox(object);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(30);
+      expect(bounds.maxY - bounds.minY).toBeCloseTo(15);
+      expect(centerOf(bounds)).toEqual(centerOf(transformedBBox(boxes[index]!)));
+    }
+    expect(state.undoStack).toHaveLength(beforeUndoCount + 1);
+  });
+
+  it('uses height as the proportional size driver for every copy', () => {
+    useStore.getState().centerSelectionInRegistrationBox();
+
+    const result = useStore.getState().resizeRegistrationJigArtwork({
+      widthMm: 30,
+      heightMm: 18,
+      drivingDimension: 'height',
+    });
+
+    expect(result).toEqual({ kind: 'ok' });
+    const scene = useStore.getState().project.scene;
+    for (const object of scene.objects.filter((candidate) => !isRegistrationBox(candidate))) {
+      const bounds = transformedBBox(object);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(36);
+      expect(bounds.maxY - bounds.minY).toBeCloseTo(18);
+    }
+  });
+
   it('uses the circle-safe fit region for round jig outlines', () => {
     useStore.getState().replaceRegistrationJigSet({
       outline: { kind: 'circle', diameterMm: 50 },
@@ -131,7 +173,54 @@ describe('center artwork in a registration jig set', () => {
       expect(inBox).toHaveLength(2);
     }
   });
+
+  it('resizes every copied group as one layout while preserving its internal spacing', () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'art-right',
+        color: '#0000ff',
+        spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 30, y: 0 },
+      }),
+    );
+    useStore.setState({ selectedObjectId: 'art', additionalSelectedIds: new Set(['art-right']) });
+    useStore.getState().groupSelection();
+    useStore.getState().centerSelectionInRegistrationBox();
+
+    const result = useStore.getState().resizeRegistrationJigArtwork({
+      widthMm: 40,
+      heightMm: 10,
+      drivingDimension: 'width',
+    });
+
+    expect(result).toEqual({ kind: 'ok' });
+    const scene = useStore.getState().project.scene;
+    const boxes = findRegistrationBoxes(scene);
+    const artwork = scene.objects.filter((object) => !isRegistrationBox(object));
+    for (const box of boxes) {
+      const boxCenter = centerOf(transformedBBox(box));
+      const inBox = artwork.filter((object) => {
+        const objectCenter = centerOf(transformedBBox(object));
+        return (
+          Math.abs(objectCenter.x - boxCenter.x) < 25 && Math.abs(objectCenter.y - boxCenter.y) < 15
+        );
+      });
+      const bounds = combinedBounds(inBox);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(40);
+      expect(centerOf(bounds)).toEqual(boxCenter);
+    }
+  });
 });
+
+function combinedBounds(objects: ReadonlyArray<SceneObject>) {
+  const bounds = objects.map(transformedBBox);
+  return {
+    minX: Math.min(...bounds.map((candidate) => candidate.minX)),
+    minY: Math.min(...bounds.map((candidate) => candidate.minY)),
+    maxX: Math.max(...bounds.map((candidate) => candidate.maxX)),
+    maxY: Math.max(...bounds.map((candidate) => candidate.maxY)),
+  };
+}
 
 function centerOf(bounds: {
   readonly minX: number;

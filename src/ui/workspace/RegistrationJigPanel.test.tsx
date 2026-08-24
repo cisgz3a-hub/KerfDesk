@@ -299,6 +299,27 @@ describe('RegistrationJigPanel', () => {
       expect(bounds.maxY - bounds.minY).toBeCloseTo(36);
     }
 
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Jig artwork width"]')?.value,
+    ).toBe('36');
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Jig artwork height"]')?.value,
+    ).toBe('36');
+    expect(container.textContent).toContain('AR locked');
+    const width = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Jig artwork width"]',
+    );
+    if (width === null) throw new Error('jig artwork width input not found');
+    setInputValue(width, '30');
+    click('Apply size to all 5');
+    for (const object of useStore
+      .getState()
+      .project.scene.objects.filter((candidate) => !isRegistrationBox(candidate))) {
+      const bounds = transformedBBox(object);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(30);
+      expect(bounds.maxY - bounds.minY).toBeCloseTo(30);
+    }
+
     click('Outline only');
     expect(container.textContent).toContain('all 5 JIG outlines');
     click('Artwork only');
