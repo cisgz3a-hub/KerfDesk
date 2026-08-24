@@ -1305,13 +1305,23 @@ authorization, Frame proof, controller command, or safety boundary.
    region, preserving aspect ratio, and one identical operation-preserving copy is
    centered in every remaining outline. Circle outlines use their inscribed-square
    fit region so the artwork remains inside the arc.
-3. Pick **Outline only**. Every registration outline is enabled and every artwork
+3. To use a different exact size, enter the desired **W** or **H** under **Artwork
+   size - all N copies**. **AR locked** is the default and updates the paired
+   dimension proportionally. Click **AR locked** to switch to **AR unlocked** when
+   W and H must be entered independently, then click **Apply size to all N**. Every
+   jig instance is resized around its centre and recentered in its own outline; the
+   grid spacing does not scale. A rotated selection cannot represent independent
+   canvas-axis scaling without shear, so its in-place warning tells the operator to
+   lock AR before applying the shared size.
+4. Pick **Outline only**. Every registration outline is enabled and every artwork
    operation is disabled; Frame, Preview, Save G-code, and Start therefore describe
    the complete physical fixture outline run.
-4. Put one blank inside each burned outline, then pick **Artwork only**. Every
+5. Put one blank inside each burned outline, then pick **Artwork only**. Every
    registration outline is disabled and every artwork copy on an enabled source
-   operation is included in the second run.
-5. Both runs use the combined bounds of the complete outline set as their one
+   operation is included in the second run. Output completes all enabled operations
+   for one physical jig instance before starting the next instance in grid order;
+   scanline fill does not sweep back and forth across separate jig outlines.
+6. Both runs use the combined bounds of the complete outline set as their one
    placement anchor. Moving or replacing the set changes that ordinary job evidence;
    the existing exact-job Frame rule remains the only Start guard.
 
@@ -1324,6 +1334,8 @@ authorization, Frame proof, controller command, or safety boundary.
    from Registration Jig; the existing provenance explanation remains in the panel.
 5. Repeating **Auto-fit + copy artwork to all N** replaces the generated copies
    instead of layering another set on the canvas.
+6. Reopened projects retain per-jig output order and shared-size controls because
+   the existing generated copy ids already bind each copy to its source and outline.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 

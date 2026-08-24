@@ -16,6 +16,7 @@ import { Button } from '../kit';
 import { useStore } from '../state';
 import { useUiStore, type FloatingPanelPosition } from '../state/ui-store';
 import { RegistrationJigOutlineControls } from './RegistrationJigOutlineControls';
+import { RegistrationJigArtworkSizeControls } from './RegistrationJigArtworkSizeControls';
 
 const PANEL_MARGIN_PX = 12;
 
@@ -90,6 +91,8 @@ export function RegistrationJigPanel(): JSX.Element | null {
           ? `Auto-fit + copy artwork to all ${boxes.length}`
           : 'Auto-fit artwork in outline'}
       </Button>
+
+      <RegistrationJigArtworkSizeControls />
 
       <BurnRunToggle
         state={runState}
@@ -342,7 +345,7 @@ function BurnRunToggle(props: {
 }
 
 function RegistrationJigHelp(props: { readonly outlineCount: number }): JSX.Element {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <div style={helpStyle}>
       <Button variant="ghost" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
@@ -364,8 +367,16 @@ function RegistrationJigHelp(props: { readonly outlineCount: number }): JSX.Elem
             </strong>
             . Auto-fit preserves proportions and leaves a 10% margin.
           </li>
+          {props.outlineCount > 1 && (
+            <li>
+              Enter a shared W or H under <strong>Artwork size</strong>. Keep{' '}
+              <strong>AR locked</strong> to preserve proportions, or click it to unlock independent
+              W and H. Then <strong>Apply size to all</strong>.
+            </li>
+          )}
           <li>
-            Pick <strong>Artwork only</strong>, then Start to burn every artwork copy.
+            Pick <strong>Artwork only</strong>, then Start. Each jig's artwork finishes before the
+            next jig begins.
           </li>
           <li style={helpNoteStyle}>
             Drag the outline onto your material to move it; Remove outline deletes it. On a

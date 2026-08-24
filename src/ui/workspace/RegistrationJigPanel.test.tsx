@@ -90,6 +90,18 @@ describe('RegistrationJigPanel', () => {
     expect(container.textContent).toContain('Create a jig outline below to begin');
   });
 
+  it('keeps How to use collapsed until the operator opens it', () => {
+    render();
+
+    expect(buttonByLabel('▸ How to use').getAttribute('aria-expanded')).toBe('false');
+    expect(container.textContent).not.toContain('Put one object inside each burned outline.');
+
+    click('▸ How to use');
+
+    expect(buttonByLabel('▾ How to use').getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('Put one object inside each burned outline.');
+  });
+
   it('flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked', () => {
     useStore.getState().addRegistrationBox(80, 40);
     addArt();
@@ -297,6 +309,27 @@ describe('RegistrationJigPanel', () => {
       const bounds = transformedBBox(object);
       expect(bounds.maxX - bounds.minX).toBeCloseTo(36);
       expect(bounds.maxY - bounds.minY).toBeCloseTo(36);
+    }
+
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Jig artwork width"]')?.value,
+    ).toBe('36');
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Jig artwork height"]')?.value,
+    ).toBe('36');
+    expect(container.textContent).toContain('AR locked');
+    const width = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Jig artwork width"]',
+    );
+    if (width === null) throw new Error('jig artwork width input not found');
+    setInputValue(width, '30');
+    click('Apply size to all 5');
+    for (const object of useStore
+      .getState()
+      .project.scene.objects.filter((candidate) => !isRegistrationBox(candidate))) {
+      const bounds = transformedBBox(object);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(30);
+      expect(bounds.maxY - bounds.minY).toBeCloseTo(30);
     }
 
     click('Outline only');

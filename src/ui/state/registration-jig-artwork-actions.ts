@@ -11,10 +11,57 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { fitSelectionToRegion } from '../../core/scene/fit-selection-to-region';
+import {
+  registrationJigArtworkInstances,
+  registrationJigCopyId,
+  registrationJigCopyPrefix,
+  registrationJigGroupCopyId,
+  registrationJigGroupCopyPrefix,
+} from '../../core/scene/registration-jig-artwork';
+import {
+  buildSelectionTransformEdit,
+  type SelectionTransformError,
+} from '../../core/scene/selection-transform';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 
 const REGISTRATION_JIG_ARTWORK_FIT_FRACTION = 0.9;
+
+export type RegistrationJigArtworkSizeInput = {
+  readonly widthMm: number;
+  readonly heightMm: number;
+  readonly drivingDimension: 'width' | 'height';
+  readonly preserveAspect: boolean;
+};
+
+export type RegistrationJigArtworkResizeResult =
+  | { readonly kind: 'ok' }
+  | { readonly kind: 'error'; readonly reason: SelectionTransformError | 'no-jig-artwork' };
+
+export type RegistrationJigArtworkActions = {
+  readonly resizeRegistrationJigArtwork: (
+    input: RegistrationJigArtworkSizeInput,
+  ) => RegistrationJigArtworkResizeResult;
+};
+
+type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+
+export function registrationJigArtworkActions(set: Setter): RegistrationJigArtworkActions {
+  return {
+    resizeRegistrationJigArtwork: (input) => {
+      let outcome: RegistrationJigArtworkResizeResult = {
+        kind: 'error',
+        reason: 'no-jig-artwork',
+      };
+      set((state) => {
+        const result = applyRegistrationJigArtworkSize(state, input);
+        outcome = result.outcome;
+        return result.state;
+      });
+      return outcome;
+    },
+  };
+}
 
 export function applyCenterArtworkInRegistrationJigSet(
   state: AppState,
@@ -84,6 +131,74 @@ export function applyCenterArtworkInRegistrationJigSet(
   };
 }
 
+export function applyRegistrationJigArtworkSize(
+  state: AppState,
+  input: RegistrationJigArtworkSizeInput,
+): {
+  readonly state: AppState | Partial<AppState>;
+  readonly outcome: RegistrationJigArtworkResizeResult;
+} {
+  const scene = state.project.scene;
+  const instances = registrationJigArtworkInstances(scene);
+  if (instances.length === 0) {
+    return { state, outcome: { kind: 'error', reason: 'no-jig-artwork' } };
+  }
+  const boxesById = new Map(findRegistrationBoxes(scene).map((box) => [box.id, box]));
+  const movedById = new Map<string, SceneObject>();
+  for (const instance of instances) {
+    const resized = buildSelectionTransformEdit(instance.objects, {
+      kind: 'resize',
+      anchor: 'c',
+      ...(input.preserveAspect
+        ? input.drivingDimension === 'width'
+          ? { width: input.widthMm }
+          : { height: input.heightMm }
+        : { width: input.widthMm, height: input.heightMm }),
+      preserveAspect: input.preserveAspect,
+    });
+    if (resized.kind === 'error') {
+      return { state, outcome: resized };
+    }
+    const resizedObjects = instance.objects.map((object) => {
+      const transform = resized.transforms.find(
+        (candidate) => candidate.id === object.id,
+      )?.transform;
+      return transform === undefined ? object : { ...object, transform };
+    });
+    const bounds = combinedBBox(resizedObjects);
+    const box = boxesById.get(instance.boxId);
+    if (bounds === null || box === undefined) {
+      return { state, outcome: { kind: 'error', reason: 'no-jig-artwork' } };
+    }
+    const sourceCenter = centerOf(bounds);
+    const targetCenter = centerOf(transformedBBox(box));
+    for (const object of resizedObjects) {
+      movedById.set(
+        object.id,
+        translatedObject(object, object.id, {
+          x: targetCenter.x - sourceCenter.x,
+          y: targetCenter.y - sourceCenter.y,
+        }),
+      );
+    }
+  }
+  return {
+    state: {
+      project: {
+        ...state.project,
+        scene: {
+          ...scene,
+          objects: scene.objects.map((object) => movedById.get(object.id) ?? object),
+        },
+      },
+      undoStack: pushUndo(state.project, state.undoStack),
+      redoStack: [],
+      dirty: true,
+    },
+    outcome: { kind: 'ok' },
+  };
+}
+
 function selectedArtwork(state: AppState): ReadonlyArray<SceneObject> {
   const ids = new Set([
     ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
@@ -136,22 +251,6 @@ function completeSelectedGroups(
 ): ReadonlyArray<SceneGroup> {
   const selectedIds = new Set(selected.map((object) => object.id));
   return (scene.groups ?? []).filter((group) => group.objectIds.every((id) => selectedIds.has(id)));
-}
-
-function registrationJigCopyPrefix(sourceId: string): string {
-  return `registration-jig-copy:${encodeURIComponent(sourceId)}:`;
-}
-
-function registrationJigCopyId(sourceId: string, boxId: string): string {
-  return `${registrationJigCopyPrefix(sourceId)}${encodeURIComponent(boxId)}`;
-}
-
-function registrationJigGroupCopyPrefix(sourceGroupId: string): string {
-  return `registration-jig-group-copy:${encodeURIComponent(sourceGroupId)}:`;
-}
-
-function registrationJigGroupCopyId(sourceGroupId: string, boxId: string): string {
-  return `${registrationJigGroupCopyPrefix(sourceGroupId)}${encodeURIComponent(boxId)}`;
 }
 
 function centerOf(bounds: {
