@@ -336,7 +336,7 @@ baseTest(
     await installFileSystemMocks(page);
     // Installed after the mocks so it wins: the page-backed route needs a real
     // on-disk file above the threshold, which an inlined base64 fixture cannot
-    // carry. Save still uses the mocked showSaveFilePicker above.
+    // carry. Save still uses the mocked directory picker above.
     await page.addInitScript(() => {
       Object.defineProperty(window, 'showOpenFilePicker', {
         configurable: true,
@@ -645,6 +645,7 @@ async function installFileSystemMocks(page: Page, pngBase64 = PNG_BASE64): Promi
       const fileWindow = window as unknown as Window & {
         showOpenFilePicker: (options?: PickerOptions) => Promise<readonly FileSystemFileHandle[]>;
         showSaveFilePicker: () => Promise<FileSystemFileHandle>;
+        showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
       };
       fileWindow.showOpenFilePicker = async (options) => {
         const extensions =
@@ -671,6 +672,25 @@ async function installFileSystemMocks(page: Page, pngBase64 = PNG_BASE64): Promi
             abort: async () => undefined,
           }),
         }) as FileSystemFileHandle;
+      fileWindow.showDirectoryPicker = async () =>
+        ({
+          kind: 'directory',
+          name: 'synthetic-output',
+          getFileHandle: async (name: string) =>
+            ({
+              kind: 'file',
+              name,
+              getFile: async () => new File([], name),
+              createWritable: async () => ({
+                write: async (data: string | Blob | BufferSource) => {
+                  (window as Window & { __e2eSaved?: string }).__e2eSaved =
+                    typeof data === 'string' ? data : 'binary';
+                },
+                close: async () => undefined,
+                abort: async () => undefined,
+              }),
+            }) as FileSystemFileHandle,
+        }) as FileSystemDirectoryHandle;
     },
     { svg: SVG, pngBase64 },
   );
