@@ -3398,6 +3398,23 @@ This amendment changes compilation grouping and scene transforms only. It does n
 change power, speed, passes, output toggles, placement evidence, transport, or machine
 authorization. The exact-job Frame permit remains the only Start guard.
 
+### Amendment (2026-08-25) — operator-controlled aspect lock
+
+The shared artwork-size control keeps proportional sizing as its default but makes
+the visible **AR locked** state an explicit toggle. In the locked state, editing W or
+H continues to derive the paired dimension and the store applies one uniform scale.
+In **AR unlocked**, each draft changes independently and **Apply size to all N**
+passes both exact dimensions through the existing selection-transform path, then
+recenters every instance in its own outline. This changes only artwork geometry;
+fixture spacing, operation bindings, output order, and the one-edit undo contract
+remain unchanged.
+
+The scene transform model has rotation plus local X/Y scale but no shear. An
+independent canvas-axis resize of rotated artwork is therefore not representable by
+that model; the existing `non-uniform-rotated-selection` integrity result is surfaced
+as an instruction to lock AR before applying. This is not a Start or output guard and
+does not change Frame, Preview, compilation, transport, or machine authorization.
+
 ### Consequences
 
 - The jig is a composition of existing machinery — reserved-id layer (ADR-005

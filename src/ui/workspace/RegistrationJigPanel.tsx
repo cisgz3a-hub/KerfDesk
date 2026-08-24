@@ -369,8 +369,9 @@ function RegistrationJigHelp(props: { readonly outlineCount: number }): JSX.Elem
           </li>
           {props.outlineCount > 1 && (
             <li>
-              Enter a shared W or H under <strong>Artwork size</strong>; AR stays locked to preserve
-              proportions. Then <strong>Apply size to all</strong>.
+              Enter a shared W or H under <strong>Artwork size</strong>. Keep{' '}
+              <strong>AR locked</strong> to preserve proportions, or click it to unlock independent
+              W and H. Then <strong>Apply size to all</strong>.
             </li>
           )}
           <li>

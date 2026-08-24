@@ -31,6 +31,7 @@ export type RegistrationJigArtworkSizeInput = {
   readonly widthMm: number;
   readonly heightMm: number;
   readonly drivingDimension: 'width' | 'height';
+  readonly preserveAspect: boolean;
 };
 
 export type RegistrationJigArtworkResizeResult =
@@ -148,10 +149,12 @@ export function applyRegistrationJigArtworkSize(
     const resized = buildSelectionTransformEdit(instance.objects, {
       kind: 'resize',
       anchor: 'c',
-      ...(input.drivingDimension === 'width'
-        ? { width: input.widthMm }
-        : { height: input.heightMm }),
-      preserveAspect: true,
+      ...(input.preserveAspect
+        ? input.drivingDimension === 'width'
+          ? { width: input.widthMm }
+          : { height: input.heightMm }
+        : { width: input.widthMm, height: input.heightMm }),
+      preserveAspect: input.preserveAspect,
     });
     if (resized.kind === 'error') {
       return { state, outcome: resized };
