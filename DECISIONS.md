@@ -3373,6 +3373,31 @@ permit remains the only Start guard; the amendment adds no refusal or confirmati
 Captured-board provenance remains exclusive to Place Board and cannot be replaced
 through the jig-set action.
 
+### Amendment (2026-08-24) — piece-complete output and shared sizing
+
+Generated jig copy ids already encode both the source artwork id and destination
+outline id. Treat that persisted identity as the jig-instance boundary; do not add
+a project field or schema migration. Laser compilation materializes each active
+instance separately and repeats its shared operations in project-layer order before
+advancing to the next outline in grid order. Line, scanline fill, Follow Shape,
+Island Fill, and Image output therefore retain their normal per-operation behavior,
+but geometry from separate jig instances cannot be merged into one cross-fixture
+scan or segment group. Ordinary artwork that merely shares an operation remains one
+machining unit outside the jig-instance groups; scenes without an active multi-jig
+set keep the existing compiler path unchanged.
+
+The Registration Jig panel exposes the first instance's exact width and height as
+the set's shared artwork size. **Apply size to all N** independently resizes each
+instance around its own centre with a fixed proportional aspect lock, then recenters
+it in the corresponding outline. Editing either exact dimension updates the other;
+this avoids inventing shear for rotated artwork. Group members scale as one layout so
+their internal spacing is preserved; fixture spacing never scales. The action is one
+undoable scene edit and survives save/reopen through the existing copy ids.
+
+This amendment changes compilation grouping and scene transforms only. It does not
+change power, speed, passes, output toggles, placement evidence, transport, or machine
+authorization. The exact-job Frame permit remains the only Start guard.
+
 ### Consequences
 
 - The jig is a composition of existing machinery — reserved-id layer (ADR-005
