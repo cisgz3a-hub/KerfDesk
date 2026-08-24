@@ -345,7 +345,7 @@ function BurnRunToggle(props: {
 }
 
 function RegistrationJigHelp(props: { readonly outlineCount: number }): JSX.Element {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <div style={helpStyle}>
       <Button variant="ghost" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
