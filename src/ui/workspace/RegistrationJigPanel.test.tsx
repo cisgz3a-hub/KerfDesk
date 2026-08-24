@@ -90,6 +90,18 @@ describe('RegistrationJigPanel', () => {
     expect(container.textContent).toContain('Create a jig outline below to begin');
   });
 
+  it('keeps How to use collapsed until the operator opens it', () => {
+    render();
+
+    expect(buttonByLabel('▸ How to use').getAttribute('aria-expanded')).toBe('false');
+    expect(container.textContent).not.toContain('Put one object inside each burned outline.');
+
+    click('▸ How to use');
+
+    expect(buttonByLabel('▾ How to use').getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('Put one object inside each burned outline.');
+  });
+
   it('flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked', () => {
     useStore.getState().addRegistrationBox(80, 40);
     addArt();
