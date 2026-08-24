@@ -89,6 +89,7 @@ describe('center artwork in a registration jig set', () => {
       widthMm: 30,
       heightMm: 15,
       drivingDimension: 'width',
+      preserveAspect: true,
     });
 
     expect(result).toEqual({ kind: 'ok' });
@@ -111,6 +112,7 @@ describe('center artwork in a registration jig set', () => {
       widthMm: 30,
       heightMm: 18,
       drivingDimension: 'height',
+      preserveAspect: true,
     });
 
     expect(result).toEqual({ kind: 'ok' });
@@ -191,6 +193,7 @@ describe('center artwork in a registration jig set', () => {
       widthMm: 40,
       heightMm: 10,
       drivingDimension: 'width',
+      preserveAspect: true,
     });
 
     expect(result).toEqual({ kind: 'ok' });

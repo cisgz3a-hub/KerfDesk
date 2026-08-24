@@ -1306,10 +1306,13 @@ authorization, Frame proof, controller command, or safety boundary.
    centered in every remaining outline. Circle outlines use their inscribed-square
    fit region so the artwork remains inside the arc.
 3. To use a different exact size, enter the desired **W** or **H** under **Artwork
-   size - all N copies**. The paired dimension updates under the fixed **AR locked**
-   proportional-size contract; click **Apply size to all N**. Every jig instance is
-   resized independently around its centre and recentered in its own outline; the
-   grid spacing does not scale.
+   size - all N copies**. **AR locked** is the default and updates the paired
+   dimension proportionally. Click **AR locked** to switch to **AR unlocked** when
+   W and H must be entered independently, then click **Apply size to all N**. Every
+   jig instance is resized around its centre and recentered in its own outline; the
+   grid spacing does not scale. A rotated selection cannot represent independent
+   canvas-axis scaling without shear, so its in-place warning tells the operator to
+   lock AR before applying the shared size.
 4. Pick **Outline only**. Every registration outline is enabled and every artwork
    operation is disabled; Frame, Preview, Save G-code, and Start therefore describe
    the complete physical fixture outline run.
