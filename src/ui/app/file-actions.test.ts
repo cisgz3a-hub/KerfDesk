@@ -18,6 +18,7 @@ import {
   handleSaveGcode,
   handleSaveProject,
 } from './file-actions';
+import { AUTOSAVE_FILE_CLEANUP_WARNING } from './autosave-file-cleanup';
 
 describe('file actions contextual failure handling', () => {
   it('keeps a no-dump controller readiness advisory non-blocking', async () => {
@@ -300,6 +301,43 @@ describe('file actions contextual failure handling', () => {
 
     expect(write).toHaveBeenCalledTimes(1);
     expect(markSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a completed save successful when recovery cleanup storage is blocked', async () => {
+    const write = vi.fn(async () => undefined);
+    const markSaved = vi.fn();
+    const toast = toasts();
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get: () => {
+        throw new DOMException('storage blocked', 'SecurityError');
+      },
+    });
+    try {
+      await expect(
+        handleSaveProject({
+          platform: mockPlatform({ save: async () => ({ displayName: 'safe.lf2', write }) }),
+          project: projectWithLine(),
+          savedName: null,
+          lastSaveTarget: null,
+          markSaved,
+          pushToast: toast.pushToast,
+        }),
+      ).resolves.toBe('saved');
+      await vi.waitFor(() => {
+        expect(toast.messages.at(-1)).toEqual({
+          message: AUTOSAVE_FILE_CLEANUP_WARNING,
+          variant: 'warning',
+        });
+      });
+    } finally {
+      if (descriptor !== undefined) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    }
+
+    expect(write).toHaveBeenCalledOnce();
+    expect(markSaved).toHaveBeenCalledOnce();
+    expect(toast.messages.some((entry) => entry.variant === 'error')).toBe(false);
   });
 
   it('reports error when the write itself fails', async () => {

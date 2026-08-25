@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304 plus ADR-292 Amendments 2-5 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, existing CAM/preview, manual persistence, and exact partial-edge substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304/305 plus ADR-292 Amendments 2-5 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, existing CAM/preview, manual persistence, exact partial-edge geometry, and atomic large-project autosave/recovery substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -587,6 +587,11 @@ the completed physical Frame is the spatial source of truth.
 - Requires the File System Access API (Chromium-only, per PROJECT.md "Delivery targets"). There is **no browser-download fallback and no IndexedDB fallback** — an unsupported browser fails clearly rather than creating a second persistence path outside the project/file contract (`web-adapter.ts`).
 - If the API is missing, the save fails with the error toast `Could not save project: File System Access API is required to save files in the web app.` There is **no** `Save needs file-system access. Re-prompt?` modal — that was never built.
 
+#### Edge — the document changes while a file write is pending
+- The captured project version still reaches the chosen file. The newer in-memory edits remain dirty
+  and recoverable, and a pending New/Open action stays stopped instead of treating the older captured
+  version as authorization to discard them.
+
 ---
 
 ### F-A12. Open Project (.lf2)
@@ -626,7 +631,8 @@ the completed physical Frame is the spatial source of truth.
 
 #### Edge — current project has unsaved changes
 1. Modal: `Save changes to <project-name>?` with `Save`, `Don't Save`, `Cancel`.
-2. `Save` → save flow F-A11, then new. `Don't Save` → discard, then new. `Cancel` → no action.
+2. `Save` → save flow F-A11, then new only if the saved version is still the current document.
+   `Don't Save` → discard, then new. `Cancel` → no action.
 
 ---
 
@@ -2498,11 +2504,11 @@ F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit height-map path. F-CNC47-F-CNC50 specify the approved
-ADR-291 expansion. Their bounded ADR-292/294/295/296/297/298/299/300/301/304 plus ADR-292 Amendments
+ADR-291 expansion. Their bounded ADR-292/294/295/296/297/298/299/300/301/304/305 plus ADR-292 Amendments
 2-5 schema, import, mapping, declared-source-meaning, recorded-source-detail, field-geometry,
 resolved-aspect-policy, canonical-Width-integrity, bounded exact Width re-factorization, and
-canonical-preview-authority substrate is current where explicitly marked below; the remaining
-controls and user-facing flows are planned.
+canonical-preview-authority plus atomic large-project autosave/recovery substrate is current where
+explicitly marked below; the remaining controls and user-facing flows are planned.
 
 ### F-CNC1. Switch to CNC mode and configure the machine
 
@@ -4127,7 +4133,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298/299/300/301/304; ADR-292 Amendments 2-5)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298/299/300/301/304/305; ADR-292 Amendments 2-5)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4252,7 +4258,12 @@ and lifts the command's CNC-only gate.)*
    exactly as U16 value `v * 257`; each 16-bit PNG sample keeps its numeric code
    while its network-order bytes are written in canonical little-endian order. Reopening validates the exact byte-length,
    source-authority, mapping, and digest contracts before preview or compilation.
-7. In CNC mode, the existing relief layer settings select the flat-end-mill
+7. Periodic recovery writes the complete validated project JSON to atomic
+   current/previous IndexedDB snapshots. A live second window receives its own
+   recovery session; an abandoned window becomes eligible after its ownership
+   lock is released. Accepting recovery re-homes the project before cleanup and
+   keeps it dirty until a successful manual Save.
+8. In CNC mode, the existing relief layer settings select the flat-end-mill
    roughing and optional ball-nose finishing tools. The existing relief CAM,
    tool changes, Job Review, Frame permit, preview, G-code, progress, and
    cancellation paths remain in force.
@@ -4312,7 +4323,7 @@ and lifts the command's CNC-only gate.)*
    emitted-precision cutter envelopes in roughing and finishing, but this does
    not prove included subpixel surface detail, holder clearance, controller
    tracking, material finish, or safe feeds for a particular physical setup.
-6. An exact zero object scale reports physical size and nominal source pitch as zero on that axis
+7. An exact zero object scale reports physical size and nominal source pitch as zero on that axis
    and identifies the axis as collapsed legacy compatibility. Existing CAM compatibility still
    plans the stored width before its cutter-center output collapses; that path has no qualified
    physical carving geometry on the collapsed axis. The existing editable **Width** remains
@@ -4321,16 +4332,22 @@ and lifts the command's CNC-only gate.)*
    itself changes no CAM, schema, state, mapping, output, Frame, or Start behavior. Width editing is
    separate: it follows item 5's resolved-aspect rules and may update canonical dimensions, bounds,
    and mapping policy before the existing zero-scale compatibility transform is applied.
+8. Large-field periodic recovery is qualified in Chrome across reload, not abrupt
+   process/power loss or packaged Electron restart. Project serialization still
+   runs in the renderer. The synchronous unload fallback can exceed localStorage,
+   so the recoverable state may be only the most recent successfully committed
+   IndexedDB interval snapshot; final edits immediately before closing are not
+   promised.
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-292 Amendments 2-5 and ADR-294/295/296/297/298/299/300/301/304
+> **Planned - not current UI.** P2R.1a plus ADR-292 Amendments 2-5 and ADR-294/295/296/297/298/299/300/301/304/305
 > supply schema-v4/U16LE storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha
 > import, simple transparency masks, exact input-endpoint mapping, exact inclusion-threshold and
 > outside-mask-meaning controls, read-only declared-source-meaning, recorded-source-detail,
 > field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact
-> Width re-factorization and preview authority, exact partial-edge geometry, and the existing
-> CAM/preview substrate. Large-project atomic autosave/recovery, gamma, and the creation modes and
+> Width re-factorization and preview authority, exact partial-edge geometry, atomic large-project
+> autosave/recovery, and the existing CAM/preview substrate. Gamma, the creation modes, and the
 > remaining controls below stay planned; use
 > F-CNC46's narrower **Import Height Map...** flow today.
 
@@ -4541,19 +4558,22 @@ and lifts the command's CNC-only gate.)*
    grain response, tear-out, or finish quality. The UI names those limits beside
    the simulation evidence.
 
-### F-CNC50. Save, review, Frame, and run a photo relief - planned (ADR-291 / P2R.4-P2R.6)
+### F-CNC50. Save, review, Frame, and run a photo relief - planned (ADR-291/293 / P2R.4-P2R.6)
 
-> **Planned - not current UI.** This flow adds relief-specific portability,
-> provenance, review, and qualification evidence without adding a Start guard.
+> **Partially current.** Self-contained manual Save and atomic whole-project
+> autosave/recovery are current under ADR-292/293. Relief-specific output
+> provenance, consolidated review, and machine/material qualification below
+> remain planned and add no Start guard.
 
 #### Success
 1. Manual **Save** writes a self-contained `.lf2` project. The canonical U16 field
    and mask include schema/encoding/endian declarations, exact dimensions and byte
    lengths, mapping, provenance, revision, and digest. The file can reopen in a new
    browser profile or computer without the original image or local database.
-2. Autosave may reference content-addressed IndexedDB blobs through an atomically
-   replaced manifest. Manual Save hydrates and embeds those blobs; display meshes,
-   histograms, toolpaths, and removal grids remain disposable caches.
+2. Current autosave stores complete validated project JSON in immutable IndexedDB
+   snapshots behind an atomically replaced per-session manifest. It retains current
+   and previous generations and writes an epoch tombstone on clear. Content-addressed
+   field blobs remain a future optimization; manual Save never depends on local data.
 3. **Preview output**, **Save G-code**, **Frame**, and **Start** use the exact same
    `prepareOutput` artifact. Deterministic inert comments identify source kind and
    digest, physical dimensions/resolution, mapping/depth/polarity, roughing and
@@ -4575,10 +4595,11 @@ and lifts the command's CNC-only gate.)*
    coupons are required before a profile can claim that material result.
 
 #### Error - persistence, preparation, or transport factually fails
-1. Autosave quota/write/digest failure leaves the previous manifest recoverable and
-   discloses that the newest state is not autosaved. Manual Save fails visibly if a
-   referenced blob cannot be hydrated or validated; it never writes a project whose
-   only relief authority is a local ID.
+1. Autosave quota/write/digest failure does not replace a previously committed
+   manifest; when one exists it remains eligible for recovery, and CurveDesk
+   discloses that the newest state is not autosaved. Manual Save validates and
+   writes the self-contained in-memory project; no relief authority exists only as
+   a local ID.
 2. Project load rejects corrupt schema/encoding/endian/length/digest declarations
    before allocation or CAM. The original file remains untouched and the error
    identifies the invalid field.
@@ -4607,6 +4628,10 @@ and lifts the command's CNC-only gate.)*
    fire risk, and material response remain operator/machine-system responsibilities.
    They are disclosed in review and qualification records, not represented as facts
    proved by CurveDesk's preview or G-code tests.
+5. Current large-field recovery evidence covers committed Chrome IndexedDB state
+   across reload and real two-window Web Locks. Abrupt process/power loss, packaged
+   Electron restart, target-device quota, peak memory, and renderer responsiveness
+   remain unqualified.
 
 ## Phase I flows — multi-controller (ADR-094..097)
 
