@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304 plus ADR-292 Amendment 2 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, existing CAM/preview, manual persistence, and exact partial-edge substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304 plus ADR-292 Amendments 2-3 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity and preview authority, existing CAM/preview, manual persistence, and exact partial-edge substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2498,10 +2498,10 @@ F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit height-map path. F-CNC47-F-CNC50 specify the approved
-ADR-291 expansion. Their bounded ADR-292/294/295/296/297/298/299/300/301/304 plus ADR-292 Amendment
-2 schema, import, mapping, declared-source-meaning, recorded-source-detail, field-geometry,
-resolved-aspect-policy, and canonical-Width-integrity substrate is current where explicitly marked
-below; the remaining controls and user-facing flows are planned.
+ADR-291 expansion. Their bounded ADR-292/294/295/296/297/298/299/300/301/304 plus ADR-292 Amendments
+2-3 schema, import, mapping, declared-source-meaning, recorded-source-detail, field-geometry,
+resolved-aspect-policy, canonical-Width-integrity, and canonical-preview-authority substrate is current
+where explicitly marked below; the remaining controls and user-facing flows are planned.
 
 ### F-CNC1. Switch to CNC mode and configure the machine
 
@@ -4126,7 +4126,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298/299/300/301/304; ADR-292 Amendment 2)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298/299/300/301/304; ADR-292 Amendments 2-3)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4209,6 +4209,13 @@ and lifts the command's CNC-only gate.)*
    its job. **View 3D...** targets 0.25 mm display cells; when the longest edge
    exceeds 64 mm, its non-blocking status names the effective cell size and the
    256-cell display-mesh budget. That display choice never changes CAM or G-code.
+   For a canonical heightfield with nonzero object X scale, the selected-property Width,
+   canvas heightfield target/resolution/cache identity, and Relief 3D title/display resolution all
+   derive their unscaled planning Width from canonical `reliefSource.physicalWidthMm`. A tolerated
+   `targetWidthMm` duplicate cannot select a different preview budget. At exact zero object X scale,
+   `targetWidthMm` remains the stored compatibility planning Width before residual collapse. Legacy
+   meshes continue to use their stored target Width. This authority repair mutates no project state,
+   does not change heightfield materialization, and adds no guard.
 6. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
    physical and pixel dimensions, optional U8 inclusion mask, mapping,
    provenance, revision, and digest. Eight-bit PNG sample `v` is represented
@@ -4287,13 +4294,13 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-292 Amendment 2 and ADR-294/295/296/297/298/299/300/301/304
+> **Planned - not current UI.** P2R.1a plus ADR-292 Amendments 2-3 and ADR-294/295/296/297/298/299/300/301/304
 > supply schema-v4/U16LE storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha
 > import, simple transparency masks, exact input-endpoint mapping, exact inclusion-threshold and
 > outside-mask-meaning controls, read-only declared-source-meaning, recorded-source-detail,
-> field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, exact
-> partial-edge geometry, and the existing CAM/preview substrate. Large-project atomic
-> autosave/recovery, gamma, and the creation modes and remaining controls below stay planned; use
+> field-geometry and resolved-aspect-policy disclosures, canonical Width integrity and preview
+> authority, exact partial-edge geometry, and the existing CAM/preview substrate. Large-project
+> atomic autosave/recovery, gamma, and the creation modes and remaining controls below stay planned; use
 > F-CNC46's narrower **Import Height Map...** flow today.
 
 #### Success
