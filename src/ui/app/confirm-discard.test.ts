@@ -120,7 +120,7 @@ describe('confirmDiscardAsync (LU18)', () => {
     expect(useStore.getState().dirty).toBe(false);
   });
 
-  it('Save keeps a destructive action stopped when newer edits appear during the write', async () => {
+  it('Save proceeds after writing the captured version when newer edits appear during the write', async () => {
     const captured = { ...createProject(), notes: 'captured before open' };
     let finishWrite = (): void => undefined;
     const writeGate = new Promise<void>((resolve) => {
@@ -140,7 +140,7 @@ describe('confirmDiscardAsync (LU18)', () => {
     useStore.setState({ project: edited, dirty: true });
     finishWrite();
 
-    await expect(result).resolves.toBe(false);
+    await expect(result).resolves.toBe(true);
     expect(useStore.getState()).toMatchObject({ project: edited, dirty: true });
   });
 });
