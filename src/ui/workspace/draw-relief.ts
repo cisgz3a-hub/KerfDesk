@@ -6,10 +6,7 @@
 import { type Heightmap } from '../../core/relief';
 // Deep imports: core/relief's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
-import type {
-  HeightfieldHeightmapOptions,
-  HeightfieldHeightmapResult,
-} from '../../core/relief/heightfield-to-heightmap';
+import type { HeightfieldHeightmapResult } from '../../core/relief/heightfield-to-heightmap';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import { transformedBBox } from '../../core/scene';
 import type { Layer, ReliefObject, SceneObject } from '../../core/scene';
@@ -19,14 +16,17 @@ import {
   prepareReliefHeightmapsOffThread,
 } from './cnc-removal-grid-worker-client';
 import { canvasTheme } from '../theme/canvas-theme';
-import { drawBitmapAtTransform } from './draw-raster';
+import {
+  drawReliefHeightfieldPreviewRequest,
+  type DrawReliefHeightfieldPreviewRequest,
+} from './draw-relief-heightfield-preview-request';
+import { drawPartialGridBitmapAtTransform } from './draw-raster';
+import { heightmapToCanvas } from './relief-heightmap-bitmap';
 import type { ViewTransform } from './view-transform';
 
 // Display sampling: enough cells to read the shape, cheap to rebuild.
 const DISPLAY_CELLS_ACROSS = 256;
 const TRANSIENT_RETRY_DELAY_MS = 500;
-const TOP_GRAY = 232;
-const FLOOR_GRAY = 64;
 const PREVIEW_FAILURE_PREFIX = '[!] Relief preview failed: ';
 const PREVIEW_FAILURE_FONT = '12px system-ui, sans-serif';
 const PREVIEW_FAILURE_PADDING_X_PX = 6;
@@ -37,23 +37,22 @@ const UNAVAILABLE_PREVIEW_CANVAS_REASON = 'Relief preview canvas is unavailable.
 
 // Relief objects are immutable snapshots — the cache never goes stale
 // (draw-raster.ts precedent for UI-side caches).
-let meshBitmapCache = new WeakMap<ReliefObject, HTMLCanvasElement | null>();
+let meshBitmapCache = new WeakMap<ReliefObject, HeightfieldPreview | null>();
 let heightfieldPreviewCache = new WeakMap<ReliefHeightfield, Map<string, HeightfieldPreview>>();
 
 type HeightfieldPreview =
-  | { readonly kind: 'ready'; readonly bitmap: HTMLCanvasElement }
+  | {
+      readonly kind: 'ready';
+      readonly bitmap: HTMLCanvasElement;
+      readonly heightmap: Heightmap;
+    }
   | { readonly kind: 'failed'; readonly reason: string };
+
+type HeightfieldPreviewItem = DrawReliefHeightfieldPreviewRequest;
 
 type PendingHeightfieldPreview = {
   readonly controller: AbortController;
   readonly items: ReadonlyArray<HeightfieldPreviewItem>;
-};
-
-type HeightfieldPreviewItem = {
-  readonly source: ReliefHeightfield;
-  readonly cacheKey: string;
-  readonly reliefDepthMm: number;
-  readonly options: HeightfieldHeightmapOptions;
 };
 
 let pendingHeightfieldPreview: PendingHeightfieldPreview | null = null;
@@ -122,7 +121,14 @@ export function drawReliefObject(
   const preview = previewFor(obj);
   if (preview?.kind === 'ready') {
     ctx.imageSmoothingEnabled = true;
-    drawBitmapAtTransform(ctx, preview.bitmap, obj.bounds, obj.transform, view);
+    drawPartialGridBitmapAtTransform(
+      ctx,
+      preview.bitmap,
+      preview.heightmap,
+      obj.bounds,
+      obj.transform,
+      view,
+    );
     return;
   }
   const box = transformedBBox(obj);
@@ -143,24 +149,25 @@ export function drawReliefObject(
 
 function previewFor(obj: ReliefObject): HeightfieldPreview | null {
   if (isHeightfieldRelief(obj)) {
-    const item = heightfieldPreviewItem(obj);
+    const item = drawReliefHeightfieldPreviewRequest(obj, DISPLAY_CELLS_ACROSS);
     return heightfieldPreviewCache.get(item.source)?.get(item.cacheKey) ?? null;
   }
   const cached = meshBitmapCache.get(obj);
-  if (cached !== undefined) return cached === null ? null : { kind: 'ready', bitmap: cached };
+  if (cached !== undefined) return cached;
   const built = buildMeshBitmap(obj);
   meshBitmapCache.set(obj, built);
-  return built === null ? null : { kind: 'ready', bitmap: built };
+  return built;
 }
 
-function buildMeshBitmap(obj: ReliefObject): HTMLCanvasElement | null {
+function buildMeshBitmap(obj: ReliefObject): HeightfieldPreview | null {
   const result = reliefObjectToHeightmap(obj, {
     targetWidthMm: obj.targetWidthMm,
     reliefDepthMm: obj.reliefDepthMm,
     mmPerCell: obj.targetWidthMm / DISPLAY_CELLS_ACROSS,
   });
   if (result.kind === 'error') return null;
-  return heightmapToCanvas(result.heightmap, obj.reliefDepthMm);
+  const bitmap = heightmapToCanvas(result.heightmap, obj.reliefDepthMm);
+  return bitmap === null ? null : { kind: 'ready', bitmap, heightmap: result.heightmap };
 }
 
 function uniqueMissingHeightfieldPreviews(
@@ -171,7 +178,7 @@ function uniqueMissingHeightfieldPreviews(
   for (const object of objects) {
     if (!isHeightfieldRelief(object)) continue;
     if (layerByColor.get(object.color)?.visible === false) continue;
-    const item = heightfieldPreviewItem(object);
+    const item = drawReliefHeightfieldPreviewRequest(object, DISPLAY_CELLS_ACROSS);
     const cache = heightfieldPreviewCache.get(item.source);
     if (cache?.has(item.cacheKey) === true) continue;
     if (items.some((candidate) => samePreviewItem(candidate, item))) continue;
@@ -182,22 +189,6 @@ function uniqueMissingHeightfieldPreviews(
 
 function isHeightfieldRelief(object: SceneObject): object is HeightfieldReliefObject {
   return object.kind === 'relief' && object.reliefSource.kind === 'heightfield-v1';
-}
-
-function heightfieldPreviewItem(relief: HeightfieldReliefObject): HeightfieldPreviewItem {
-  const heightMm = relief.reliefSource.physicalHeightMm;
-  const mmPerCell = Math.max(relief.targetWidthMm, heightMm) / DISPLAY_CELLS_ACROSS;
-  const options = {
-    targetWidthMm: relief.targetWidthMm,
-    reliefDepthMm: relief.reliefDepthMm,
-    mmPerCell,
-  };
-  return {
-    source: relief.reliefSource,
-    cacheKey: `${relief.targetWidthMm}:${relief.reliefDepthMm}:${mmPerCell}`,
-    reliefDepthMm: relief.reliefDepthMm,
-    options,
-  };
 }
 
 function samePreviewItems(
@@ -234,7 +225,7 @@ function previewFromHeightfieldResult(
   const bitmap = heightmapToCanvas(result.heightmap, reliefDepthMm);
   return bitmap === null
     ? { kind: 'failed', reason: UNAVAILABLE_PREVIEW_CANVAS_REASON }
-    : { kind: 'ready', bitmap };
+    : { kind: 'ready', bitmap, heightmap: result.heightmap };
 }
 
 function drawHeightfieldPreviewFailure(
@@ -262,26 +253,4 @@ export function resetReliefPreviewCachesForTests(): void {
   pendingHeightfieldPreview = null;
   meshBitmapCache = new WeakMap();
   heightfieldPreviewCache = new WeakMap();
-}
-
-function heightmapToCanvas(map: Heightmap, reliefDepthMm: number): HTMLCanvasElement | null {
-  const canvas = document.createElement('canvas');
-  canvas.width = map.widthCells;
-  canvas.height = map.heightCells;
-  const ctx = canvas.getContext('2d');
-  if (ctx === null) return null;
-  const image = ctx.createImageData(map.widthCells, map.heightCells);
-  const px = image.data;
-  const depthRange = Math.max(1e-9, reliefDepthMm);
-  for (let i = 0; i < map.depth.length; i += 1) {
-    const t = Math.min(1, Math.max(0, -(map.depth[i] ?? 0) / depthRange)); // 0 top → 1 floor
-    const gray = Math.round(TOP_GRAY + (FLOOR_GRAY - TOP_GRAY) * t);
-    const o = i * 4;
-    px[o] = gray;
-    px[o + 1] = gray;
-    px[o + 2] = gray;
-    px[o + 3] = map.inclusion?.[i] === 0 ? 0 : 255;
-  }
-  ctx.putImageData(image, 0, 0);
-  return canvas;
 }

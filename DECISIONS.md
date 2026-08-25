@@ -11,9 +11,9 @@
 
 ## Decision index
 
-> The index is numerically complete; gaps in the numbering are reserved blocks with no ADR body
-> (e.g. most of 054–091, reserved by the build plan). The body itself is in insertion order, not
-> numeric order — locate any ADR by searching `## ADR-NNN`.
+> This index is a historical, non-exhaustive navigation aid; it is not the ADR registry.
+> The `## ADR-NNN` decision bodies below are authoritative and remain in insertion order.
+> Locate any decision by searching `## ADR-NNN`; numbering gaps may be reserved or unused.
 
 | ID | Date | Status | Title |
 |---|---|---|---|
@@ -16535,8 +16535,7 @@ no toolpath-resolution context.
 - Dialog tests cover the legacy-mesh and canonical-heightfield arms, physical transform scale,
   materializer and surface-worker propagation, absence below the threshold, visible status above
   it, cancellation, failure fallback, and an available Close action.
-
-## ADR-295 - Large canonical relief autosave uses atomic whole-project IndexedDB snapshots (2026-08-09)
+## ADR-305 - Large canonical relief autosave uses atomic whole-project IndexedDB snapshots (2026-08-09)
 
 **Date:** 2026-08-09
 **Status:** Accepted and implemented as a bounded P2R.1 persistence slice; abrupt-process and packaged-Electron qualification remain open
@@ -16656,3 +16655,1515 @@ of renderer stalls. Those claims require separate runtime evidence.
   https://www.w3.org/TR/web-locks/
 - ADR-291, P2R.1 portable manual files and atomic autosave contract.
 - ADR-292, P2R.1a canonical heightfield substrate and its superseded large-autosave limitation.
+## ADR-293 - Saved user macros remain one-command Console invocations (2026-08-09)
+
+**Date:** 2026-08-09
+**Status:** Accepted for focused v1 by direct maintainer request; software verification required,
+hardware qualification excluded
+
+### Context
+
+KerfDesk already has one controller-specific Console path. The shared command deck prepares input
+with the active driver, obtains the existing persistent-setting confirmation when applicable,
+dispatches through the laser store's `sendConsoleCommand`, and records only successful dispatches in
+its local command history. The store rechecks live operation and Idle ownership, invalidates setup
+evidence according to the parsed command's state effect, and writes through `safeWrite`.
+
+A general macro language would not be a small extension of that path. Ordinary Console writes do
+not all await terminal acknowledgement, and a state-mutating first line immediately makes cached
+Idle and any Frame permit stale. Multiline sequencing would therefore need new acknowledgement,
+status, cancellation, and partial-execution ownership. It could also become a second program sender
+beside the exact-artifact Frame/Start flow governed by ADR-228, ADR-230, and ADR-232.
+
+### Decision
+
+1. **V1 stores one command per named macro.** A user macro contains a normalized display name, one
+   single-line controller-command template, and created/updated timestamps. The versioned collection
+   is app-local data, not `.lf2` project truth, controller storage, or a built-in command catalog.
+2. **Variables are numeric substitution, not scripting.** A template declares variables only as
+   `{{identifier}}`. Each run supplies one finite ordinary-decimal scalar per distinct name. Values
+   cannot contain whitespace, exponent notation, command words, braces, or control/newline bytes.
+   Expansion returns a structured error for malformed syntax or missing/invalid values and never
+   splits output into multiple commands.
+3. **The active driver remains the parser of record.** After expansion, the complete command is
+   passed to the current driver's existing `prepareConsoleCommand`. Macro code does not classify
+   firmware commands, duplicate persistent-write policy, or manufacture wire bytes.
+4. **Execution is exclusively the existing Console execution.** The macro panel is a child of the
+   shared `ConsoleCommandDeck` and invokes that deck's existing send model. Dispatch remains
+   `runConsoleCommand` -> `sendConsoleCommand` -> `writeConsoleCommand` -> `safeWrite`. V1 adds no
+   raw serial call, batch writer, stream, scheduler, connect/startup hook, or keyboard trigger.
+5. **History and confirmations keep their existing meaning.** The expanded normalized command enters
+   Arrow history only after the shared runner reports `sent`. Cancelled, invalid, storage-only, or
+   rejected attempts do not. A macro that expands to a persistent setting write uses the same
+   existing confirmation as manually typed input. Running a macro does not replace or clear unsent
+   manual Console text; that draft remains available before and after macro dispatch.
+6. **Provenance is explicit and truthful.** Successful macro dispatch marks the outbound transcript
+   source as `macro` and appends a macro-source message containing the saved name and expanded
+   command. The message says what KerfDesk dispatched through Console; it does not claim controller
+   acknowledgement, physical position, or machine execution.
+7. **Frame-first remains the only job authorization.** Macro modules do not import or call Frame,
+   `runStartJobFlow`, `startJob`, streamer creation, or permit helpers. A read-only macro preserves
+   existing evidence exactly like typed Console input. A state-mutating macro clears `framedRun`
+   before its asynchronous write through the existing Console state-effect path. No macro creates,
+   refreshes, claims, or consumes a permit, so ordinary Start still requires the single completed
+   exact-job Frame permit.
+8. **Storage changes are fail-soft and non-fabricating.** Invalid stored records are ignored. A
+   failed save, edit, or delete leaves the last persisted in-memory collection unchanged and reports
+   the failure inline. No account, sync, telemetry, import, or export path is added.
+
+### Consequences
+
+- Operators can name and reuse diagnostic, setup, and one-line manual motion commands without
+  retyping them. The UI labels them user-saved, local, and one-command so they cannot be mistaken for
+  KerfDesk-authored workflows or reviewed job artifacts.
+- Numeric-only placeholders cover coordinates, feeds, power, dwell, and controller settings while
+  preventing a variable value from injecting another G/M/$ command. Command vocabulary stays in the
+  operator-authored fixed template and the controller driver's existing parser.
+- V1 deliberately does not satisfy the older aspirational Console text about multiline macros.
+  Multiline or controller-resident programs require a separate decision and may not bypass the
+  ordinary Frame/Start path.
+- Running a saved motion or modal command has the same physical implications and evidence
+  invalidation as typing that exact line in Console. Automated tests cannot establish controller
+  response, physical motion, placement, beam state, or hardware safety.
+
+### Verification
+
+- Pure tests cover placeholder discovery, repeated values, decimal expansion, malformed templates,
+  missing values, injection attempts, and versioned storage validation/failure behavior.
+- Command-deck tests prove a macro uses the shared runner, carries provenance, preserves the unsent
+  manual Console draft, and records the expanded command in the existing success-only history.
+- Store tests prove macro-source writes use `safeWrite`, read-only macros cannot mint a permit,
+  state-mutating macros invalidate an existing permit before write, no streamer is created, and
+  transcript provenance is success-only.
+- Focused Console/controller tests plus typecheck, lint, formatting, the broader unit suite, web
+  build, and file-size checks remain required. Hardware operation and deployment are excluded.
+
+## ADR-294 - Relief grids preserve exact interior pitch with partial terminal cells (2026-08-09)
+
+**Date:** 2026-08-09
+**Status:** Accepted and implemented for relief CAM, simulation, canvas, and 3D software geometry; physical qualification remains open
+
+### Context
+
+ADR-292 deliberately kept an operator's requested relief cell spacing exact, but its ceil-rounded
+grid treated every cell as a full square. A non-divisible physical dimension therefore produced a
+larger computational domain than the declared relief. For a 10.1 x 2.1 mm field at 1 mm spacing,
+finishing centers reached 10.5 x 2.5 mm and roughing/stepped geometry reached 11 x 3 mm while the
+canvas compressed the same bitmap into 10.1 x 2.1 mm. A compiled 10 x 10 mm legacy-mesh relief at
+the default roughing pitch emitted X10.319. Frame remained truthful to that emitted centerline, but
+the relief object, source-mask bands, canvas, 3D meshes, and CAM did not describe one physical XY
+domain.
+
+Uniformly shrinking every cell would contain the output, but it would silently rewrite the exact
+operator request forbidden by ADR-292 clauses 5 and 8. A partial terminal cell is the smallest
+model that preserves both the requested interior pitch and the declared physical boundary.
+
+This decision supersedes ADR-292 decision 8 only for its ceil-grid outer-boundary limitation; every
+other ADR-292 evidence boundary remains in force.
+
+### Decision
+
+1. **Make exact physical extents first-class grid data.** `Heightmap` and `RemovalGrid` carry
+   `widthMm` and `heightMm`. The cell count is the least safe integer covering each positive finite
+   extent at the requested pitch. Full interior cells keep that pitch; only the final cell on an
+   axis may be shorter and always ends at the exact extent. An unrepresentable derived count remains
+   a factual materialization error, never a policy cap. If the finite extent/pitch quotient
+   underflows to zero, the domain remains one terminal cell and normalized raster sampling retains
+   its source midpoint rather than adding a new refusal.
+2. **Sample sources in the same physical domain.** Canonical heightfields map every target cell's
+   actual start/end footprint through crop into source pixels, keeping the highest overlapping
+   surface and requiring all overlapping mask coverage. Legacy meshes scale X and Y independently
+   and rasterize triangles at actual terminal-cell centers. Ordinary well-conditioned triangles on
+   exact regular grids retain their prior raster arithmetic and output; a partial grid whose nominal
+   scaling makes a represented nonzero triangle sub-threshold uses a translated unit frame so scale
+   alone does not erase it.
+3. **Use position-aware cutter geometry where the terminal cell can matter.** Finishing points use
+   actual centers and roughing's marching dual coordinates use actual edges and terminal midpoints.
+   Cutter dilation evaluates physical center distances near a partial edge; excluded coverage uses
+   distance to the exact cell rectangle plus the existing Float32 and emitted-XYZ clearance.
+   Removal stamping keeps current main's exact sub-cell cutter position and evaluates both ordinary
+   and shortened terminal-cell centers in that same physical-coordinate model.
+4. **Keep every preview consumer on those extents.** Stepped meshes, removal-grid
+   creation/downsampling/probing/stamping, Cut 3D labels, hover inversion, and worker handoffs carry
+   the exact logical domain. Smooth meshes remain contained, center-sampled interpolation surfaces;
+   their stock/envelope metadata is exact, but their vertices and omitted mask quads are not cell-edge
+   boundary evidence. Canvas divides a relief bitmap into at most four source regions so a short
+   terminal pixel row/column is drawn at its proportional physical size under translation, rotation,
+   scale, and mirror. The carved-wood shader maps physical positions cell-locally on a partial axis
+   so depth, normal, ambient-occlusion, and shadow texels stay registered.
+5. **Do not migrate durable project data.** The exact width/height already come from the relief
+   source, target geometry, and transform; the cell grid is derived transient state. Project schema
+   v4, canonical samples, digest, mapping, autosave, and manual file bytes therefore need no new
+   persisted field or migration.
+6. **Version the output change.** Relief coordinates can change whenever a dimension is not exactly
+   divisible by its CAM pitch, so exported metadata advances to
+   `adr-294-relief-partial-edge-grid`. Group order, tool selection, and divisible-grid motion
+   coordinates/toolpaths remain unchanged; the metadata header records the new emitter revision.
+7. **Keep the result informational and nonblocking.** This decision adds no policy rounding, clamp,
+   cap, refusal, delay, or confirmation. Factual validation/allocation errors and existing
+   display-only resolution selection remain unchanged. Frame remains the only ordinary Start guard;
+   Job Review and resolution evidence keep their existing warning-only roles.
+8. **Keep the numeric and physical evidence boundary explicit.** JavaScript's stored IEEE-754
+   values are authoritative. If `count * pitch` exceeds the stored extent by one representable ULP,
+   the terminal remainder stays distinct and source-footprint sampling remains conservative rather
+   than applying a hidden human-decimal tolerance.
+   Exactness here describes the logical Float64 grid/CAM domain. Float32 preview positions and shader
+   uniforms round to their nearest representable values at every scale and can overflow at astronomical
+   dimensions. At ordinary magnitudes where the existing `toFixed(3)` emitter produces fixed-decimal
+   text, emitted XY uses a 0.001 mm coordinate quantum and can differ from a stored edge by up to
+   0.0005 mm; astronomical G-code grammar and output remain unqualified. Frame remains the operational
+   review of the generated job, not evidence that those representations equal the object edge
+   bit-for-bit. This ADR also does not prove
+   included subpixel interpolation, the cutter footprint beyond an unmasked outer relief boundary,
+   holder clearance, controller tracking, tool runout, cutting forces, wood finish, dust control, or
+   safe parameters for a physical setup. Those limits remain disclosed qualification debt, never a
+   reason to clamp input.
+
+### Consequences
+
+- Logical relief CAM centerlines and the preview envelope no longer use the ceil-rounded padding
+  beyond the object. A source mask band occupies the same logical XY interval in canvas, stepped
+  meshes, simulation, and cutter planning; the contained smooth interpolation surface remains
+  center-sampled and omits every quad touching excluded coverage.
+- Partial grids pay position-aware cutter work near their terminal axes. Exactly divisible grids
+  retain the established indexed dilation fast paths, while removal stamping retains current main's
+  exact sub-cell physical-center behavior.
+- Extremely small representable remainders can conservatively include an adjacent source pixel.
+  That is the consequence of exact stored-input semantics, not silent spacing coarsening.
+- Hardware air cuts and representative wood coupons remain required before claiming physical edge
+  or finish accuracy.
+
+### Verification
+
+- Grid property tests cover least-covering counts, exact ends/centers, 0.07 / 0.01 count stability,
+  a one-ULP terminal remainder, one-cell axes, quotient underflow, stable maximum-finite midpoints,
+  and numeric-limit errors.
+- Heightfield and mesh tests cover physical source footprints, masks, nonuniform XY, terminal-center
+  interpolation, and regular-grid preservation.
+- CAM tests cover exact finishing centers, exact roughing dual edges, partial-center ball dilation,
+  terminal-cell mask adjacency, transformed emitted mask margins, and exact compiled job bounds.
+- Preview tests cover smooth/stepped meshes, downsampling, probing, position-aware stamping,
+  proportional canvas blits, Cut 3D dimensions, hover inversion, wood-shader texel coordinates, and
+  the initial scene-content handoff.
+- Focused tests, TypeScript, lint, formatting, file/export/ADR ratchets, full release checks, and an
+  independent whole-diff audit are required before publication. Browser screenshots, packaged
+  Electron, air cuts, and material coupons are not established by this decision.
+
+### References
+
+- ADR-289, transformed relief machine-space cutter-envelope semantics.
+- ADR-292, exact-input P2R.1a contract and the sampled-grid boundary this decision closes.
+
+## ADR-295 - Exact grayscale-16 PNG import preserves source codes in the canonical field (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a software-import slice; full photo-to-relief UI and physical qualification remain open
+
+### Context
+
+ADR-292 established a canonical U16 little-endian relief field but deliberately qualified only
+non-interlaced 8-bit grayscale PNG input. The durable schema, provenance, digest, project
+validation, worker protocol, persistence, preview, and CAM already accept exact U16 values. The
+remaining gap was the PNG boundary: the display-luma decoder treated one grayscale pixel as one
+byte, while PNG color type 0 at bit depth 16 stores one two-byte, network-order sample and applies
+filters to those bytes with a two-byte preceding-pixel displacement.
+
+Merely allowing the 16-bit header would read half of each scanline, apply the Sub/Average/Paeth
+predictors at the wrong displacement, and reduce the result through an 8-bit luma row. The import
+therefore needs an exact reconstructed-byte route rather than a relaxed header check.
+
+This decision supersedes ADR-290 decision 1 and ADR-292 decisions 2 and 7 only where they name
+16-bit PNG as unsupported or pending. Their remaining source, schema, worker, CAM, guard, and
+qualification boundaries stay in force.
+
+### Decision
+
+1. **Qualify only the explicit scalar format this workflow can preserve.** **Import Height Map...**
+   accepts non-interlaced PNG color type 0 at bit depth 8 or 16, with PNG compression and filter
+   method 0. RGB/RGBA, grayscale-alpha, palette, Adam7, and inferred photographic depth remain
+   outside this explicit scalar importer. The ordinary image-import luma decoder keeps its existing
+   8-bit qualification and output.
+2. **Reconstruct scanlines byte-for-byte before interpreting samples.** A shared filtered-row reader
+   applies PNG filters to bytes. Eight-bit grayscale uses one byte per pixel; 16-bit grayscale uses
+   two bytes per pixel, so Sub, Average, and Paeth refer to the byte two positions earlier. The exact
+   route emits the source-width rows without resize, luma conversion, gamma, auto-level, blur,
+   sharpening, or color management.
+3. **Preserve numeric codes in the existing canonical encoding.** Eight-bit code `v` remains U16
+   value `v * 257`, preserving all prior fields and digests. A 16-bit PNG sample arrives MSB first
+   and is written as the same numeric value in canonical U16 little-endian bytes. Provenance records
+   source bit depth 8 or 16. No project-schema, mapping, digest algorithm, worker message, CAM, or
+   G-code revision is added.
+4. **Match transparency before any precision change.** A grayscale `tRNS` chunk names one two-byte
+   sample. For 16-bit input, the entire 16-bit code must match; a shared low byte is insufficient.
+   For 8-bit input, the existing PNG-required masking of unused high bits and `v * 257` canonical
+   comparison remain unchanged. Matches become mask byte `0`; every other pixel remains `255`.
+5. **Keep execution and failure behavior unchanged.** Decode, byte-order conversion, canonical
+   base64, mask creation, and digest construction run in the existing import worker when available.
+   Worker cancellation, progress, replacement, stale-result handling, and the disclosed main-thread
+   fallback retain their current contracts. This decision broadens one supported input combination;
+   it adds no clamp, cap, delay, confirmation, import guard, Frame effect, or Start effect. Existing
+   qualified 8-bit malformed-file errors are unchanged; trailing content after `IEND` remains
+   inherited unqualified decoder behavior rather than a new refusal in this slice.
+6. **Keep the evidence boundary explicit.** Exact source codes, canonical bytes, masks, worker/main
+   parity, persistence compatibility, and software materialization are qualified. The import does not
+   establish that a source is metric depth, perceptually suitable, tool-reachable, physically safe,
+   or capable of producing a particular wood finish. Full alpha/mask controls, tonal/source-mode UI,
+   editing, AI inference, holder clearance, controller tracking, air cuts, and material coupons remain
+   separate work.
+
+### Consequences
+
+- A qualified 16-bit depth map no longer needs an external 8-bit reduction before KerfDesk import.
+  Intermediate codes such as `0x0001`, `0x00ff`, `0x0100`, `0x7fff`, and `0x8000` remain distinct.
+- The exact filtered-row reader is shared with the 8-bit luma path, but that path's qualification,
+  sampling arithmetic, and emitted bytes remain unchanged.
+- Canonical projects remain schema v4 and self-contained. Existing manual save, IndexedDB recovery,
+  preview, simulation, Job Review, Frame, and output behavior consume the same named heightfield
+  encoding.
+- The importer remains a deliberately narrow explicit-height-map decoder, not a claim of general PNG
+  decoder conformance.
+
+### Verification
+
+- Generated PNG fixtures cover all five PNG filters, one-byte stream chunking, arbitrary external
+  chunk boundaries, random U16 codes, and values whose high and low bytes differ.
+- A hard-coded 4 x 2 golden pins exact U16LE bytes, `tRNS` mask, source-bit-depth provenance, mapping,
+  aspect, and SHA-256 digest while the prior 8-bit golden remains unchanged.
+- A full-width `tRNS` fixture distinguishes `0x1234` from `0x1235` and `0x0034`.
+- Real Chrome loads the production bundled worker and deep-compares its structured-cloned PNG16
+  heightfield with direct main-thread preparation. Existing cancellation/replacement evidence remains
+  in force.
+- TypeScript, lint, formatting, focused import tests, project/persistence tests, and release checks are
+  required before publication. Browser visual quality, packaged Electron, controller behavior,
+  hardware air cuts, and wood coupons are not established by this ADR.
+
+### References
+
+- W3C, Portable Network Graphics (PNG) Specification, Third Edition, allowed IHDR combinations:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#11IHDR
+- W3C, PNG Third Edition, integer byte order and scanline serialization:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#7Integers-and-byte-order
+- W3C, PNG Third Edition, bytewise filter types:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#9Filter-types
+- W3C, PNG Third Edition, grayscale `tRNS` full-sample matching:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#11tRNS
+- ADR-290, the original explicit 8-bit height-map import.
+- ADR-292, the canonical U16 P2R.1a substrate and prior PNG16 limitation.
+
+## ADR-296 - Exact grayscale-alpha-8 PNG import preserves scalar and mask bytes (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a software-import slice; full mask controls, 16-bit alpha, and physical qualification remain open
+
+### Context
+
+ADR-295 qualified non-interlaced PNG color type 0 at bit depth 8 or 16 as explicit
+height-map input. The canonical heightfield already stores exact U16 scalar codes plus an optional
+U8 inclusion mask, and ADR-291 defines alpha as mask data rather than a color to composite. The
+remaining narrow gap is PNG color type 4 at bit depth 8: each pixel already contains exactly one
+8-bit grayscale scalar and one 8-bit alpha value that map losslessly into those existing fields.
+
+Treating the source as an ordinary RGBA image would incorrectly introduce color/luma conversion.
+Discarding or compositing alpha would erase source data. Accepting color type 4 at bit depth 16
+would also be untruthful because its 16-bit alpha channel cannot fit losslessly in the current U8
+mask. This decision therefore adds only the representation the existing canonical contract can
+preserve exactly.
+
+This decision supersedes ADR-295 decision 1 only where it names grayscale-alpha as unsupported.
+The scalar-only color-type-0 path and every other schema, worker, CAM, guard, output, and
+qualification boundary remain in force.
+
+### Decision
+
+1. **Qualify one additional exact source layout.** **Import Height Map...** accepts
+   non-interlaced PNG color type 4 at bit depth 8 with compression and filter method 0. Color type
+   4 at bit depth 16, RGB/RGBA, palette, Adam7, APNG behavior, sidecar masks, and inferred depth
+   remain outside this slice. The ordinary image-import luma route is unchanged.
+2. **Reconstruct grayscale and alpha as source bytes.** The shared filtered-row reader treats each
+   color-type-4/8 pixel as two bytes, so Sub, Average, and Paeth use a two-byte preceding-pixel
+   displacement. Grayscale byte `v` becomes canonical U16 value `v * 257`; the adjacent alpha byte
+   is copied unchanged into the U8 inclusion mask. No resizing, luma conversion, compositing,
+   gamma, auto-level, blur, sharpening, or color management is applied.
+3. **Always retain the alpha channel as mask data.** A color-type-4 import persists its mask even
+   when every alpha byte is `255`, preserving the exact supplied mask bytes and mask presence. The existing
+   mapping remains `inclusionThreshold: 255` and `outsideMask: 'excluded'`: only fully opaque cells
+   are included by default, while values `1..254` remain recoverable for future controls. This is
+   existing mapping behavior, not a new clamp, threshold rewrite, warning, or guard.
+4. **Keep PNG transparency rules explicit.** PNG forbids `tRNS` for a source that already has an
+   alpha channel. A parsed color-type-4 `tRNS` is therefore a factual malformed-source error for
+   this newly qualified route. Existing grayscale `tRNS` matching and ordinary image-import
+   behavior remain unchanged.
+5. **Reuse the existing durable and execution contracts.** The canonical schema remains v4,
+   provenance remains an 8-bit depth-map source, and the same mask bytes participate in the
+   existing heightfield digest. Worker protocol and lifecycle, progress, cancellation,
+   stale-result handling, persistence, preview, CAM, simulation, G-code, Job Review, Frame, and
+   Start receive no new contract or revision. The existing main-thread fallback runs the same
+   preparation path and therefore accepts this newly qualified input too.
+6. **Keep the evidence boundary explicit.** Exact grayscale codes, exact alpha bytes, canonical
+   samples/mask/digest, worker/main parity, and software materialization are qualified. This slice
+   does not establish mask editing, a user-selectable threshold, subpixel physical coverage,
+   16-bit alpha, general PNG conformance, metric source truth, tool reachability, controller
+   behavior, or wood-cut quality.
+
+### Consequences
+
+- A qualified grayscale-alpha PNG no longer loses alpha or requires an externally flattened mask
+  before import.
+- Partial alpha is preserved but, under the current explicit threshold-255 mapping, is excluded
+  from carving until a separately designed mask-control surface exists.
+- Fully opaque color-type-4 sources intentionally retain an all-`255` mask instead of being
+  normalized to an unmasked source.
+- Project schema, canonical encodings, digest algorithm, import-worker message shape, CAM, output,
+  and Frame/Start semantics remain unchanged.
+- This remains a narrow explicit-height-map decoder, not a claim that every PNG alpha layout is a
+  trustworthy or physically meaningful relief mask.
+
+### Verification
+
+- Generated color-type-4/8 fixtures cover all five PNG filters, one-byte stream chunking, random
+  grayscale/alpha pairs, and the required two-byte filter displacement.
+- A hard-coded canonical golden pins U16LE sample bytes, the exact U8 alpha mask, mapping,
+  provenance, and SHA-256 digest. A separate all-opaque fixture proves that the supplied mask is
+  retained.
+- Unsupported color-type-4/16, forbidden color-type-4 `tRNS`, palette, and interlace behavior are
+  pinned without broadening the ordinary display-luma importer.
+- Direct preparation, the application fallback path, and a real bundled-worker Chrome test compare
+  the complete structured-cloned result. Existing color-type-0/8 and color-type-0/16 goldens remain
+  unchanged.
+- Command help names the combined qualified non-interlaced layouts: grayscale at 8 or 16 bits and
+  grayscale-alpha at 8 bits. It does not imply support for color-type-4/16 or general PNG input.
+- TypeScript, lint, formatting, focused import/project tests, browser E2E, and release checks are
+  required before publication. Packaged Electron, abrupt process loss, controller behavior,
+  hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- W3C, PNG Third Edition, allowed color-type/bit-depth combinations:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#11IHDR
+- W3C, PNG Third Edition, alpha representation:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#6Alpha-representation
+- W3C, PNG Third Edition, bytewise filter types:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#9Filter-types
+- W3C, PNG Third Edition, `tRNS` prohibition for sources with alpha:
+  https://www.w3.org/TR/2025/REC-png-3-20250624/#11tRNS
+- ADR-291, the exact alpha-to-mask product contract.
+- ADR-292, the canonical U16-plus-U8-mask P2R.1a substrate.
+- ADR-295, exact grayscale-8/16 PNG import and its prior grayscale-alpha limitation.
+## ADR-297 - Relief properties exposes outside-mask meaning at the persisted threshold (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a mask-mapping slice; threshold editing, mask editing, 16-bit alpha, and physical qualification stay open
+
+### Context
+
+ADR-292 already persists an optional exact U8 inclusion mask, integer threshold, and one of three
+meanings for below-threshold cells: `excluded`, `stock-top`, or `relief-floor`. ADR-295 and ADR-296
+now import qualified transparency into that mask, with qualified import initializing the threshold
+to `255` and the outside meaning to `excluded`. Valid project data can retain another threshold in
+the already-supported `1..255` range. Relief properties exposes neither that stored threshold nor
+the outside meaning, so the current surface can hide material mapping facts.
+
+The three meanings are already validated, persisted, and consumed by the common heightfield
+materializer. Exposing only that enum is a smaller truthful boundary than implying that threshold,
+mask painting, or 16-bit alpha support exists. It adds no numeric range, cap, clamp, ordering rule,
+warning, confirmation, or Start guard.
+
+### Decision
+
+1. **Show the control only when a canonical mask exists.** A `heightfield-v1` relief with an
+   `inclusionMask` shows **Mask below N** after polarity, where `N` is the actual persisted threshold,
+   including when every stored mask byte is `255`. A canonical field without a mask and every
+   legacy mesh relief keep their existing properties surface unchanged. The threshold is read-only
+   in this slice; qualified imports initialize it to `255`, while a valid loaded project displays
+   its exact stored value rather than a hard-coded import default.
+2. **Expose exactly the three persisted meanings.** The selector offers **Excluded from carving**,
+   **Keep at stock top**, and **Carve to relief floor**. It does not edit the threshold, rewrite
+   mask bytes, composite alpha, infer source intent, or claim a full mask editor.
+3. **Change mapping state only.** A distinct selection updates only `mapping.outsideMask` and
+   advances the heightfield revision once. Samples, mask bytes, digest, provenance, physical and
+   pixel dimensions, bounds, transform, input levels, gamma, polarity, maximum depth, crop, aspect,
+   threshold, and `heightfield-map-v1` remain unchanged. A same-value patch and any legacy-mesh
+   patch are identity operations with no dirty or undo state.
+4. **Reuse the existing materialization semantics.** Below-threshold cells are omitted from CAM for
+   `excluded`, included at `Z = 0` for `stock-top`, or included at the declared maximum depth for
+   `relief-floor`. Preview, CAM, simulation, persistence, and output already consume this mapping;
+   this decision does not revise the schema, digest, worker protocol, materializer, mask-safety
+   geometry, CAM algorithms, or G-code metadata.
+5. **Keep the choice nonblocking and explicit.** A selection commits through the existing project
+   undo lifecycle. It adds no confirmation, warning, delay, Job Review item, Frame effect, or Start
+   effect. Frame remains the only ordinary Start guard. The operator's explicit mapping choice can
+   materially change which source regions are carved, and target preview remains the software view
+   of that chosen meaning.
+6. **Keep the evidence boundary narrow.** Tests can prove exact state identity, project
+   persistence, deterministic target materialization, and unchanged conservative excluded-mask
+   geometry. They do not prove that a chosen outside meaning is appropriate for a photograph,
+   physically safe for a particular setup, controller-accurate, or capable of a desired finish.
+   Threshold controls, mask painting, 16-bit alpha, histogram/cross-section views, controller
+   tracking, air cuts, and material coupons remain separate work.
+
+### Consequences
+
+- Operators can choose the already-durable treatment of transparent or partially covered source
+  cells without changing the source mask or its digest.
+- Qualified imports still initialize the threshold to exactly `255`; valid loaded non-default
+  thresholds remain exact and visible. This slice neither discards intermediate U8 alpha nor
+  exposes a misleading threshold or mask-editing surface.
+- Projects remain schema v4 and use the same `heightfield-map-v1` materialization. Saving and
+  reopening a non-default outside meaning preserves the enum without changing source content.
+- Full P2R.1 mask control remains incomplete: threshold editing, mask authoring, 16-bit alpha, and
+  source-mode-specific defaults are still planned.
+
+### Verification
+
+- State tests pin all three exact enum values, same-value and mesh no-ops, one revision increment,
+  and identity of samples, mask, digest, provenance, dimensions, bounds, transform, and every other
+  mapping field.
+- UI tests pin mask-present visibility, mask-absent and mesh omission, the actual persisted
+  threshold including a non-default value, exact option copy, and selection.
+- Existing project round-trip and materialization tests continue to pin non-default outside meaning,
+  threshold behavior, and the distinct excluded/stock-top/relief-floor surfaces.
+- TypeScript, lint, formatting, focused UI/state/project/materialization and mask-safety tests, and
+  release checks are required before publication. Perceptual comparison, packaged Electron,
+  controller behavior, hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, exact U8 mask, threshold, and outside-meaning product contract.
+- ADR-292, schema-v4 canonical field and shared materialization contract.
+- ADR-296, exact grayscale-alpha import into the existing U8 mask.
+## ADR-298 - Relief properties exposes exact U16 input endpoints without ordering policy (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a tonal-mapping slice; histogram, clipping percentages, auto-level, crop/aspect controls, and physical qualification stay open
+
+### Context
+
+ADR-292 already persists `mapping.inputLowCode` and `mapping.inputHighCode` as two independent U16
+integers. Project validation accepts each exact code from `0` through `65535` and deliberately adds
+no low-before-high rule. The common heightfield materializer applies those endpoints before the stored curve
+and polarity, but Relief properties does not expose them. Operators therefore cannot inspect or
+change a durable mapping fact without editing project data outside CurveDesk.
+
+The existing formula also defines two non-conventional but valid states. Crossed endpoints reverse
+the tonal response; equal endpoints resolve every included sample to normalized `0.5`. Hiding,
+swapping, or rejecting either state would rewrite an already accepted project contract. This slice
+exposes the two exact integer fields without claiming histogram, auto-level, or conventional image-
+editor Levels parity.
+
+### Decision
+
+1. **Show both stored endpoints only for canonical heightfields.** A `heightfield-v1` relief shows
+   **Input low** and **Input high** after Polarity and before the outside-mask control. Each field displays the exact
+   persisted U16 code. Legacy mesh reliefs keep their existing properties surface unchanged.
+2. **Commit only exact U16 integers without rewriting a draft.** The editor accepts every finite
+   integer from `0` through `65535`, including both endpoints. Blank, fractional, non-finite, or
+   out-of-domain drafts do not commit and restore the prior exact value on blur. The UI does not
+   clamp, round, swap, impose `low <= high`, delay the action behind confirmation, or add a warning
+   or Start guard.
+3. **Expose the existing mapping equation exactly.** When low and high differ, an included source
+   code `c` becomes `clamp((c - low) / (high - low), 0, 1)`. Low below high gives the conventional
+   increasing response; crossed endpoints deliberately reverse it. When low equals high, every
+   included code becomes normalized `0.5`. The stored curve is applied next and polarity last. Mask-outside
+   cells retain their existing separate meaning.
+4. **Change mapping state only.** A distinct endpoint edit updates only the selected
+   `mapping.inputLowCode` or `mapping.inputHighCode` value and advances the heightfield revision
+   once. Samples, mask bytes, digest, provenance, dimensions, bounds, transform, the other endpoint,
+   curve, polarity, maximum depth, crop, aspect, mask threshold, outside meaning, and algorithm
+   revision remain unchanged. A same-value edit, invalid runtime patch, or legacy-mesh patch is an
+   identity operation with no dirty or undo state.
+5. **Keep the product claim narrow.** This slice adds no histogram, clipped-low/high percentage,
+   auto-level, black/white-point picker, source-mode inference, crop/aspect editor, or source-byte
+   rewrite. It neither claims LightBurn parity nor silently narrows CurveDesk's accepted equal and
+   crossed endpoint states.
+6. **Keep the evidence boundary software-only.** Tests can prove state identity, persistence,
+   exact ordered/crossed/equal materialization, and UI draft behavior. They cannot prove a mapping
+   is visually suitable for a photograph, recover real depth, select safe physical depth, predict
+   controller following, or establish a material finish. Perceptual review, controller testing,
+   air cuts, and material coupons remain separate qualification.
+
+### Consequences
+
+- Operators can remap the lossless canonical U16 source range without rewriting samples, mask, or
+  digest.
+- Existing schema-v4 projects with equal or crossed endpoints remain representable and editable
+  exactly; no migration or normalization is introduced.
+- Project schema, import, worker protocol, materializer, preview, CAM algorithms, simulation,
+  G-code metadata, Job Review, Frame, and Start behavior remain unchanged.
+- Full tonal controls remain incomplete: histogram/clipping disclosure, auto-level as an explicit
+  operator action, curve editing, crop/aspect controls, and source modes stay planned.
+
+### Verification
+
+- State tests pin `0` and `65535`, ordered, crossed, equal, same-value, invalid, and mesh cases; a
+  distinct edit advances revision once while every unrelated source/object field keeps identity.
+- UI tests pin heightfield-only visibility, exact stored values, order after Polarity, endpoint and
+  crossed/equal commits, and blank/fractional/non-finite/out-of-domain restoration without commit.
+- Project round-trip tests preserve non-default crossed endpoints. Materialization tests pin the
+  ordered equation, crossed reversal, and equal flat midpoint before the stored curve and polarity.
+- TypeScript, lint, formatting, focused state/UI/project/materialization tests, and release checks
+  are required before publication. Browser perceptual comparison, packaged Electron, controller
+  behavior, hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, P2R.1 non-destructive tone-to-depth mapping and evidence boundaries.
+- ADR-292, schema-v4 canonical heightfield and shared materialization contract.
+- ADR-297, the preceding outside-mask-meaning slice.
+
+## ADR-299 - Relief properties exposes the exact persisted inclusion threshold (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a mask-mapping slice; mask authoring, histogram, 16-bit alpha, and physical qualification stay open
+
+### Context
+
+ADR-291 and the schema-v4 heightfield already persist `mapping.inclusionThreshold` as an integer
+from `1` through `255`. A mask byte at or above that value uses mapped relief depth; a lower byte
+uses the separately persisted outside-mask meaning. Qualified imports initialize the threshold to
+`255`, while existing valid projects may carry any other value in the accepted range. ADR-297 made
+that fact visible and exposed the outside meaning, but deliberately left the threshold read-only.
+
+The validators, project serializer, materializer, preview, and CAM already consume the stored
+threshold. Exposing the existing value is therefore a mapping-control slice, not a schema or CAM
+change. It must preserve exact integer input and cannot silently clamp, round, or rewrite source
+mask bytes.
+
+### Decision
+
+1. **Show the editor only when a canonical mask exists.** A `heightfield-v1` relief with an
+   `inclusionMask` shows **Mask threshold** after the input levels and before the below-threshold meaning.
+   Unmasked canonical fields and legacy mesh reliefs keep their existing properties surface.
+2. **Commit only exact integers from `1` through `255`.** The field accepts exact decimal integer
+   notation whose mathematical value is in the persisted domain, including both endpoints. Blank,
+   fractional, non-finite, or out-of-domain drafts do not commit and restore the current exact value
+   on blur. CurveDesk does not clamp, round, infer a replacement, add confirmation, or introduce a
+   warning or Start guard.
+3. **Keep the materialization rule explicit.** Mask bytes at or above the threshold use mapped
+   depth. Lower bytes use `excluded`, `stock-top`, or `relief-floor` according to the existing
+   selector. Editing the threshold reinterprets the exact stored mask; it does not alter any mask
+   byte, scalar sample, digest, or provenance.
+4. **Change mapping state only.** A distinct edit updates only `mapping.inclusionThreshold` and
+   advances the heightfield revision once. Samples, mask bytes, digest, provenance, physical and
+   pixel dimensions, bounds, transform, input levels, curve, polarity, maximum depth, crop, aspect,
+   outside meaning, and algorithm revision remain unchanged. Same-value, invalid-runtime, and
+   legacy-mesh patches are identity operations with no dirty or undo state.
+5. **Use the existing undo and debounce lifecycle.** A valid edit creates one ordinary project undo
+   step after the existing quiet period or on blur. Field identity includes the active project
+   document epoch and relief id, so a pending draft cannot cross selection or project replacement.
+   The edit adds no delay beyond that existing parameter-edit lifecycle and has no Frame or Start
+   effect. Frame remains the sole ordinary Start guard.
+6. **Keep the evidence boundary software-only.** Tests can prove exact parsing, state identity,
+   persistence, deterministic materialization, and UI reconciliation. They cannot prove that a
+   threshold is visually suitable for a photograph, physically safe for a setup, controller-
+   accurate, or capable of a desired finish. Histogram review, perceptual comparison, controller
+   tests, air cuts, and material coupons remain separate qualification.
+
+### Consequences
+
+- Operators can reinterpret preserved partial alpha/mask coverage without editing source bytes.
+- Qualified imports still initialize `255`; valid non-default project values stay exact and are now
+  editable without a migration or schema change.
+- Project schema, import, worker protocol, materializer, preview, CAM, simulation, G-code metadata,
+  Job Review, Frame, and Start behavior remain unchanged.
+- Full mask control remains incomplete: mask authoring, histogram and clipping disclosure, 16-bit
+  alpha, crop/aspect controls, and source-mode-specific defaults stay planned.
+
+### Verification
+
+- Parser tests pin both endpoints, exact decimal/scientific notation, invalid draft restoration,
+  and long compensated exponents without adding a fixed input cap.
+- State and UI-to-store tests pin one revision and undo step for a distinct edit, same-value and
+  invalid no-ops, mesh/unmasked omission, project-epoch timer cancellation, and identity of every
+  unrelated source/object field.
+- Existing project round-trip and materialization tests continue to pin non-default threshold
+  persistence and the exact at/above versus below-threshold surfaces for all outside meanings.
+- TypeScript, lint, formatting, focused UI/state/project/materialization tests, and release checks
+  are required before publication. Browser perceptual comparison, packaged Electron, controller
+  behavior, hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, exact U8 mask, threshold, and outside-meaning product contract.
+- ADR-292, schema-v4 canonical field and shared materialization contract.
+- ADR-296, exact grayscale-alpha import into the existing U8 mask.
+- ADR-297, the preceding read-only threshold and editable outside-meaning slice.
+
+## ADR-300 - Relief properties names the exact persisted declared source meaning (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a source-truth slice; source-mode creation, full provenance-detail UI, Job Review disclosure, and physical qualification stay open
+
+### Context
+
+ADR-291 defines five distinct meanings for canonical relief samples: declared scalar depth,
+artistic brightness emboss, externally estimated relative depth, operator-authored relief data,
+and an STL top projection. Schema v4 already persists exactly one of those meanings in
+`provenance.sourceKind`, and project validation accepts only the five named enum values. Source
+labels are part of technical correctness because artistic brightness must not be presented as
+recovered geometry and relative ordering must not be presented as millimetres.
+
+Relief properties currently shows the object source name, field dimensions, canonical precision,
+and optional source bit depth, but not the persisted source meaning. A valid loaded project can
+therefore carry truthful provenance that the operator cannot see. Exposing that existing enum is a
+display-only correction; it does not make the planned source-mode creation workflow current.
+
+### Decision
+
+1. **Show the exact source declaration for both relief arms.** In CNC mode, a selected
+   `heightfield-v1` relief displays a read-only **Declared source meaning** line from
+   `provenance.sourceKind`. A `legacy-mesh` has no
+   `provenance.sourceKind`, so it displays **STL top projection** from its own discriminated source
+   arm without fabricating provenance.
+2. **Map every persisted enum explicitly.** The five labels are **Depth map**, **Brightness
+   emboss**, **Relative-depth map**, **Editable relief map**, and **STL top projection**. The UI
+   exhaustively maps the validated enum rather than deriving meaning from a file extension, pixel
+   values, producer name, or current mapping controls. The legacy mesh arm reuses the truthful STL
+   top-projection label and boundary description.
+3. **Keep the semantic boundary visible.** Depth map is described as declared scalar data.
+   Brightness emboss says it is artistic and not recovered 3D geometry. Relative-depth map says it
+   is relative and not millimetres. Editable relief map says it is operator-authored scalar data.
+   STL top projection says relief interpretation uses only the top projected surface and does not
+   represent undercuts; the legacy mesh itself remains stored losslessly.
+4. **Make no persisted or derived change.** The disclosure is read-only. It does not edit or infer
+   `sourceKind`, rewrite provenance, samples, mask, digest, mapping, dimensions, bounds, transform,
+   algorithm revision, or heightfield revision, and it creates no dirty or undo state.
+5. **Keep the product claim narrow.** The current qualified PNG importer still writes exactly
+   `depth-map`. Valid projects carrying another accepted meaning display that stored fact, but this
+   slice adds no **Create Relief...** flow, source-mode selector, brightness conversion, relative-
+   depth inference, editable-map authoring, STL conversion, full source-name/source-polarity/
+   producer detail, histogram, crop/aspect control, or Job Review provenance surface.
+6. **Keep the evidence boundary software-only.** Tests can prove exact enum-to-copy mapping,
+   legacy-arm derivation, integration in Relief properties, and absence of state mutation. They cannot
+   prove that source metadata is honest, that artistic brightness recovers geometry, that relative
+   depth is metric, that an STL projection preserves undercuts, or that any result is physically
+   suitable for a machine or material.
+
+### Consequences
+
+- Operators can distinguish stored source declarations before changing mapping controls or interpreting a
+  relief preview.
+- Existing project schema, validation, migration, serialization, import, workers, digest,
+  materialization, preview, CAM, simulation, G-code, Job Review, Frame, and Start behavior remain
+  unchanged.
+- Full source interpretation remains incomplete: creation choices, remaining provenance detail,
+  histogram/clipping disclosure, crop/aspect controls, editable-map authoring, and physical
+  qualification stay planned.
+
+### Verification
+
+- Focused component tests pin all five persisted labels and semantic descriptions plus the
+  legacy-mesh STL-top-projection derivation.
+- A Relief-properties integration test pins the current imported `depth-map` disclosure alongside
+  existing dimensions, bit depth, polarity, input levels, and mask controls.
+- TypeScript, lint, formatting, focused UI tests, and release checks are required before
+  publication. Browser perceptual review, packaged Electron, controller behavior, hardware air
+  cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, source-mode meanings, source-truth requirements, and evidence boundaries.
+- ADR-292, schema-v4 canonical field and persisted provenance contract.
+- ADR-295 and ADR-296, qualified import paths that persist `depth-map` provenance.
+
+## ADR-301 - Relief properties shows recorded source details without authenticating them (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a source-truth slice; source-mode creation, output/Job Review provenance, and physical qualification stay open
+
+### Context
+
+ADR-300 exposes the exact persisted `provenance.sourceKind`, but the canonical heightfield also
+requires a string `sourceName` and permits optional `sourceBitDepth`, `sourcePolarity`, and producer
+name/model/version fields. Project validation constrains bit depth to `8` or `16`, constrains source
+polarity to `light-is-high` or `light-is-deep`, and requires strings for any present producer
+fields. It does not authenticate those declarations or forbid an empty string.
+
+Relief properties previously compressed source name and optional bit depth into its summary line
+while leaving source polarity and producer metadata invisible. More importantly,
+`provenance.sourcePolarity` records a declaration about the source, while `mapping.polarity` is the
+current editable tone-to-depth interpretation. Treating those fields as interchangeable would
+misreport a project after the operator changes its mapping.
+
+### Decision
+
+1. **Show recorded details only for canonical heightfields.** In CNC mode, a selected
+   `heightfield-v1` relief displays a read-only **Recorded source details** group. A `legacy-mesh`
+   carries no `ReliefHeightfieldProvenance`, so the group is omitted rather than inventing source
+   or producer metadata.
+2. **Expose the persisted fields explicitly.** The group shows source name, optional source bit
+   depth, optional recorded source polarity, and optional producer name, model, and version. It
+   reads values from `provenance` only; it does not derive them from the object name, file
+   extension, samples, source meaning, current mapping, or legacy mesh.
+3. **Name missing information honestly.** A blank source or producer string and every absent
+   optional field display **Not recorded**. The UI does not substitute a default producer, bit
+   depth, polarity, filename, or inferred value.
+4. **Separate source polarity from current mapping polarity.** **Recorded source polarity** renders
+   `provenance.sourcePolarity` as **Light is high** or **Light is deep**. It is inert metadata about
+   the recorded source declaration. The existing editable polarity control renders
+   `mapping.polarity` and continues to govern current materialization. The two values may differ;
+   neither is synchronized to or rewritten from the other.
+5. **Do not upgrade recorded metadata into evidence.** The disclosure states that the values are
+   recorded, not authenticated. Presence of a filename, bit depth, polarity, producer, model, or
+   version does not prove the source's origin, integrity, geometry, metric scale, model accuracy,
+   or physical suitability.
+6. **Make no persisted or execution change.** The group has no input or action and adds no guard,
+   cap, clamp, refusal, delay, or confirmation. It does not rewrite provenance, mapping,
+   samples, mask, digest, dimensions, bounds, transform, algorithm revision, or heightfield
+   revision, and it creates no dirty or undo state. Schema, validation, migration, serialization,
+   import, workers, application state, materialization, preview, CAM, simulation, G-code, Job
+   Review, Frame, and Start behavior remain unchanged.
+7. **Keep the product claim narrow.** This slice adds no source-mode creation, physical or
+   effective-cell creation disclosure, histogram or clipping surface, crop/aspect controls, mask
+   authoring, output/Job Review provenance, or physical qualification.
+
+### Consequences
+
+- Operators can inspect every source-detail field already stored by canonical heightfields without
+  confusing the original recorded polarity with the current editable mapping polarity.
+- Missing data stays visibly missing, and legacy meshes receive no fabricated heightfield
+  provenance.
+- Recorded producer and source declarations remain useful context, not authentication or machine-
+  readiness evidence.
+- Existing project and execution contracts are byte-for-byte unchanged by this display-only slice.
+
+### Verification
+
+- Focused component tests pin complete, partial, blank, and absent provenance displays; exact
+  polarity copy; the **Not recorded** fallback; the absence of controls; and omission for legacy
+  meshes.
+- A Relief-properties integration test pins canonical placement and proves rendering does not
+  change project, dirty, or undo references.
+- TypeScript, lint, formatting, focused UI tests, and release checks are required before
+  publication. Browser narrow-panel/perceptual review, packaged Electron, controller behavior,
+  hardware air cuts, and material coupons are not established by this ADR.
+
+### References
+
+- ADR-291, source-truth requirements, provenance boundaries, and planned output disclosure.
+- ADR-292, the canonical heightfield provenance and mapping contracts.
+- ADR-300, the preceding declared-source-meaning disclosure.
+
+---
+
+## ADR-302 - Remove the obsolete unsupported-raster-rotation preflight warning (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented; raster compile and emitted-byte behavior are unchanged
+
+### Context
+
+The raster compiler has a transformed sampler for non-identity object rotation modulo a full turn.
+Its focused tests pin
+90-degree content rotation, 180-degree equivalence to a double mirror, unburned axis-aligned
+bounding-box padding around a 45-degree rotation, and the streamed row-provider path. The preflight
+layer still carried an older `unsupported-raster-transform` issue that fired for every non-zero
+`rotationDeg` and told the operator to clear rotation because raster emit was axis-aligned.
+
+That warning no longer described the program CurveDesk actually compiles. It was advisory rather
+than a member of the factual compile-integrity refusal set, but it still presented false guidance
+for supported output rasters, including rasters routed through image sub-layers.
+
+### Decision
+
+1. **Delete the obsolete issue family.** Remove `unsupported-raster-transform` from
+   `PreflightCode`, remove its `runPreflight` appender, and remove the helper that emitted it for a
+   non-zero raster-image rotation.
+2. **Treat supported rotation as ordinary compiled output.** A rotated output raster, including one
+   assigned through an image sub-layer, receives the same remaining preflight checks as any other
+   compiled raster. Preflight does not tell the operator to clear a rotation the compiler supports.
+3. **Keep compiler and emitter executable logic unchanged.** This decision does not modify raster
+   sampling, transformed bounds, luma orientation, row streaming, power values, motion, ordering,
+   or emitted G-code bytes. Existing focused compiler tests remain the authority for rotation
+   behavior.
+4. **Do not widen another refusal or warning.** Bounds, no-go, non-finite-coordinate, layer-mode,
+   laser-off-travel, empty-output, factual compile-integrity, transport, handoff, Job Review, Frame,
+   and Start contracts remain unchanged. This correction adds no guard, cap, clamp, refusal, delay,
+   or confirmation. As the corrected `emit-gcode.ts` header now states, callers partition factual
+   compile-integrity issues from advisories and must not gate a write or Start on aggregate
+   `preflight.ok`; that source-comment correction changes no runtime behavior.
+5. **Correct only the matching workflow statement.** F-A10 records that supported object rotation
+   follows the compile path. Other known manual drift is separate work and is not bundled here.
+6. **Keep historical evidence in its time boundary.** ADR-029 amendment (i) §4 and older audit
+   records describe the raster-output rotation limitation that existed before transformed sampling
+   shipped. This ADR supersedes that runtime claim, not Convert to Bitmap's transform-bake behavior;
+   historical audit files remain records rather than the current workflow contract.
+
+### Consequences
+
+- Operators no longer receive a false instruction to clear a supported raster rotation.
+- Rotated rasters keep the same compiled program and emitted bytes they had before this decision;
+  only the obsolete advisory is removed.
+- Preflight still reports every unrelated issue produced by the same rotated job.
+- This decision makes no claim about arbitrary shear, perceptual fidelity, controller execution, or
+  physical burn quality.
+
+### Verification
+
+- A focused preflight regression proves that a rotated output raster routed through an image
+  sub-layer does not receive the removed warning.
+- The existing raster-rotation compiler suite is required to remain green to pin the supported
+  transformed-sampling paths without changing compiler or emitter executable logic.
+- TypeScript, scoped lint and formatting, the ADR policy gate, and the exact diff/size checks are
+  required before publication. Browser perceptual review, packaged Electron, controller behavior,
+  hardware air cuts, and material burns are not established by this ADR.
+
+### References
+
+- ADR-228, Frame-only guard and advisory-only Job Review policy.
+- ADR-029 amendment (i) §4, the historical pre-rotation-support runtime statement.
+- `src/core/job/compile-job-raster-rotation.test.ts`, supported raster-rotation behavior.
+- `src/core/preflight/preflight-raster.test.ts`, image-sub-layer preflight regression.
+
+---
+
+## ADR-303 - Align current Frame and Job Review guidance with the implemented Start sequence (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a workflow and control-copy correction; runtime behavior is unchanged
+
+### Context
+
+ADR-237 superseded ADR-230's review sequencing: an ordinary Frame prepares and physically traces
+the exact candidate without opening Job Review, clean completion issues a review-pending permit,
+and the next Start opens the single Job Review before claiming that permit and streaming. The
+current `runStartJobFlow` and Frame action implement that sequence, and focused tests pin both the
+dialog-free ordinary Frame and the Start-time review.
+
+Several current WORKFLOW passages still described the superseded pre-Frame review, including F-A10,
+F-B6, and CNC warnings/attestations that surface in the Start-time dialog. The two idle machine-rail
+button titles repeated the same reversal by promising review before the tool-off trace. F-A10 also
+lagged the canonical seven-code compile-integrity set and ADR-243's removal of predictive raster-size
+refusals. F-B4 and F-B6 retained a deleted policy refusal for stock-GRBL option `M`, although current
+runtime treats `M7` support as advisory and binds only the exact program's reviewed `M7` shape at
+handoff. Central framed-run, laser-store, Frame-completion, readiness, and Start-authorization
+comments likewise described exact candidates and completed permits as reviewed before Frame or
+claimed a live M7 capability recheck, despite adjacent runtime contracts saying otherwise. Together,
+those statements described a sequence and refusal CurveDesk does not run. The Start-evidence
+messages and option comment also called M7 capability a required proof or acknowledgement even
+though only `$30`/`$32` settings require that acknowledgement and the exact program carries only an
+M7-shape binding. Machine Setup zone help retained both the reversed review-before-Frame wording and
+a deleted G-code-export policy block, while one Start-flow test comment retained the reversed order.
+
+### Decision
+
+1. **State the ordinary sequence exactly.** Pressing Frame, or pressing Start without a live exact
+   permit, prepares the exact artifact and runs the physical tool-off Frame without a dialog. Only
+   clean trace-and-return completion issues the one-use review-pending permit. Pressing Start on that
+   permit opens Job Review; confirmation creates the review evidence, atomically claims the permit,
+   and streams its bound program subject only to the existing factual transport and handoff checks.
+2. **Keep the transient-camera exception explicit.** A transient camera-marker candidate is reviewed
+   before its Frame and is born with review evidence. Its completed permit streams without reopening
+   Job Review. This narrow exception does not change the ordinary laser or CNC sequence.
+3. **Preserve exact-artifact invalidation.** Cancelling the ordinary Start-time review streams
+   nothing and leaves the unchanged permit armed. An edit or evidence change that invalidates the
+   exact candidate requires a fresh completed Frame; no reviewed artifact may be substituted for the
+   one physically traced.
+4. **Correct the two idle control titles.** **Set up & Frame** says it prepares and Frames with the
+   tool off, then tells the operator to press Start again to review and run. **Frame job** says it
+   traces the generated motion envelope with the tool off, then tells the operator to press Start to
+   review and run. Exact-copy assertions pin both messages.
+5. **Correct only current workflow truth.** F-A10, F-B4, F-B6, F-CNC8, F-CNC39, F-CNC40,
+   F-CNC42, F-CNC43, and the adjacent current physical-bounds passages use the ADR-237 sequence.
+   F-A10 names seven canonical compile-integrity codes and records ADR-243's actual boundary: raster
+   preparation size is an advisory, while only an actual engine program-materialization failure is
+   compile integrity. F-B4 and F-B6 remove the stale option-`M` policy refusal while retaining the
+   factual exact-handoff check when the program changes whether `M7` is required after review.
+   The framed-run, laser-store, Frame-completion, readiness, and Start-authorization comments use
+   the same ordinary-versus-transient review distinction and advisory-only M7 capability boundary.
+   Machine Setup zone help locates findings in Start-time Job Review after a clean Frame and after a
+   successful G-code save, while retaining only the separate known-path jog block. The ordinary
+   laser-mode flow comment states the same two-press Frame-then-review sequence.
+   Historical decision text and unrelated physical pre-Frame-position wording remain untouched.
+6. **Supersede the stale option-`M` refusal.** This decision supersedes only ADR-236's decision to
+   refuse preparation or Start when stock-GRBL build evidence proves option `M` absent. Capability
+   observation remains advisory; the existing exact-handoff check still requires the reviewed and
+   streamed programs to agree on whether `M7` is present. Start-evidence copy names only the
+   acknowledgeable `$30`/`$32` settings and distinguishes that acknowledgement from the M7-shape
+   binding. All other ADR-236 decisions remain.
+7. **Add no executable policy.** This decision changes no Frame, Job Review, Start, preparation,
+   preflight, compiler, emitter, transport, permit, or invalidation logic. It adds no guard, refusal,
+   cap, clamp, delay, or confirmation, and changes no generated motion or emitted G-code bytes.
+
+### Consequences
+
+- The machine-rail help and current workflow manual now describe the same two-action ordinary flow
+  the application runs: clean tool-off Frame first, then Start-time review and execution.
+- CNC controller-state warnings and the exclusive-access attestation are correctly located in the
+  Start-time review without weakening their evidence binding or factual transport preconditions.
+- Stock-GRBL option `M` observations remain advisory-only even when the exact program uses `M7`;
+  changing the reviewed program's `M7` shape remains a factual handoff inconsistency, not an M7
+  capability proof or acknowledgement.
+- No-go findings remain advisories in Start-time Job Review and after successful G-code save; they
+  do not refuse Frame, Start, or export. The separate direct-jog known-path crossing block is
+  unchanged.
+- Large raster preparation remains visible as an advisory without being misdescribed as a pixel
+  budget that can predictively refuse output.
+- Existing runtime and hardware evidence is unchanged. This correction does not prove browser
+  rendering, packaged Electron behavior, controller execution, a hardware air cut, or a material run.
+
+### Verification
+
+- `JobControls-absolute-placement.test.tsx` asserts the exact unframed Start and Frame titles while
+  retaining its frame-first clickability and dispatch regression.
+- The existing `start-job-flow.review-at-start.test.ts`, `start-job-review-at-start.test.ts`, and
+  `use-frame-action.framed-run.test.ts` suites remain the source-backed behavioral checks for
+  review-pending permits, birth-reviewed transient permits, invalidation, and dialog-free Frame.
+- `laser-mode-start-acknowledgement.test.ts` pins proven-missing option `M` as non-refusing and a
+  changed post-review `M7` program shape as a handoff failure, and pins the prompt's advisory-only
+  M7 wording.
+- `laser-store-start-evidence-wire-guard.test.ts` pins the exact missing-evidence message and proves
+  that this factual handoff failure writes no job bytes.
+- `MachineSetupSafetyZones.test.tsx` pins zone warnings to Start-time review and successful-save
+  advisory surfaces without a G-code-export block; `start-job-laser-mode-flow.test.ts` retains the
+  two-press ordinary behavior regression with exact sequence commentary.
+- `framed-run.ts` and `laser-store.ts` state that ordinary bundles, controller snapshots, and
+  completed permits are reviewed at Start while transient-camera candidates may carry prior review
+  evidence.
+- `framed-run-readiness.ts` and `start-job-authorization.ts` state that build capability is advisory
+  and the wire boundary binds only reviewed evidence and the exact program's `M7` shape.
+- `laser-frame-status.ts` calls the completion input an exact prepared candidate rather than
+  fabricating ordinary pre-Frame review.
+- Focused tests, TypeScript, scoped lint and formatting, the ADR policy gate, exact diff review, and
+  file-size checks are required before publication.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-236, whose option-`M` policy refusal is superseded here while its other decisions remain.
+- ADR-237, Job Review at Start and dialog-free ordinary Frame.
+- ADR-243, streamed rasters and advisory-only predictive preparation budgets.
+- `src/ui/laser/start-job-flow.ts`, ordinary and birth-reviewed permit handling.
+- `src/ui/state/laser-start-program-assertions.ts`, advisory-only `M7` capability and exact-shape
+  handoff assertions.
+- `src/ui/state/laser-mode-start-evidence.ts`, `src/ui/state/laser-job-options.ts`, and
+  `src/ui/laser/laser-mode-start-acknowledgement.ts`, controller-setting acknowledgement and M7-shape
+  evidence copy.
+- `src/ui/state/framed-run.ts`, exact candidate and review-evidence type contracts.
+- `src/ui/state/laser-store.ts`, completed Frame-permit state contract.
+- `src/ui/state/laser-frame-status.ts`, clean-completion permit issuance contract.
+- `src/ui/laser/framed-run-readiness.ts` and `src/ui/laser/start-job-authorization.ts`, advisory
+  controller evidence and exact-handoff comments.
+- `src/ui/laser/MachineSetupSafetyZones.tsx`, operator-facing no-go-zone warning and jog boundary.
+- `src/ui/laser/JobControls.tsx`, machine-rail control labels and titles.
+
+---
+
+## ADR-016 Amendment 1 - Decision bodies, not the navigation index, are authoritative (2026-08-10)
+
+**Status:** Accepted amendment | **Date:** 2026-08-10
+
+### Context
+
+The Decision index claims numerical completeness, but its table ends at ADR-248 while accepted
+decision bodies continue through ADR-303. ADR-262 already records that the ADR-number gate does not
+check the index.
+
+### Decision
+
+`DECISIONS.md` remains the architecture-rationale source of truth. Its `## ADR-NNN` decision bodies
+are authoritative. The Decision index is a historical, non-exhaustive navigation aid; new ADR bodies
+do not require matching index rows. Locate a decision by searching `## ADR-NNN`. Numbering gaps may
+be reserved or unused and do not make the body set incomplete.
+
+### Consequences
+
+No index backfill or index-completeness gate is required. `scripts/check-adr-numbers.mjs` continues
+to enforce uniqueness of decision-body headings only.
+
+### Verification
+
+- `pnpm check:adr-numbers`
+- `pnpm exec prettier --check DECISIONS.md`
+- `git diff --check`
+
+---
+
+## ADR-304 - Selected canonical reliefs disclose relief-axis field geometry (2026-08-10)
+
+**Date:** 2026-08-10
+**Status:** Accepted and implemented as a bounded P2R.1a read-only disclosure; creation-surface geometry controls and physical qualification remain open
+
+### Context
+
+The canonical `heightfield-v1` source already stores positive pixel dimensions, declared physical
+width and height, a normalized crop, and an object transform. Relief properties showed source
+resolution and editable mapping controls but did not state how much physical relief-axis span the
+selected field currently occupies or the nominal physical pitch represented by one complete source
+cell inside the crop. Operators could therefore mistake source pixels, a preview mesh grid, a CAM
+heightmap request, emitted coordinate precision, and the rotated machine-axis envelope for one
+interchangeable resolution.
+
+The exact-zero-scale compatibility path needs a separate truth boundary. ADR-289 deliberately keeps
+legacy or hand-built zero-scale objects compilable: CAM plans a full-dimensional cutter path before
+the residual transform collapses its cutter centers. The existing Width editor consequently retains
+a recoverable planning value at zero scale, but that value is not a physical carved width on the
+collapsed axis.
+
+### Decision
+
+1. **Add one heightfield-only read-only block.** In CNC mode, the current Selected Relief properties
+   show **Field geometry** only for a selected `heightfield-v1` relief. Legacy mesh reliefs keep
+   their existing surface. The block has no input, action, persistence, or undo behavior.
+2. **Report relief-local physical magnitudes after absolute object scale.** For source fields
+   `physicalWidthMm` and `physicalHeightMm` and object scales `scaleX` and `scaleY`, define
+   `W = physicalWidthMm * abs(scaleX)` and
+   `H = physicalHeightMm * abs(scaleY)`. Rotation and explicit mirror flags change orientation,
+   not these magnitudes.
+3. **Name crop-aware source pitch as nominal full-cell pitch.** For positive source sample counts
+   `width` and `height` and normalized crop spans `crop.width` and `crop.height`, define
+   `pitchX = W / (width * crop.width)` and
+   `pitchY = H / (height * crop.height)`. These are the physical spans of complete source cells in
+   the relief-local X/Y sampling basis under the current crop, not a count or extent of CAM cells.
+   The readout combines the positive factors as an exact rational of their stored IEEE-754
+   significands before presentation, so a finite real-valued result is not mislabeled as binary64
+   `0` or `Infinity`. It rounds to six significant decimal digits and uses scientific notation for
+   very large or small finite results; display rounding never rewrites project state.
+4. **Disclose fractional boundary coverage.** A crop boundary may cut through a source cell, so the
+   first or last included source cell can cover less physical distance than the nominal full-cell
+   pitch. If a crop contains only a fraction of one source cell, its nominal full-cell pitch can be
+   larger than the displayed physical span. The UI states that fact rather than clamping the pitch
+   to the selected relief's size or relabelling it as effective target spacing.
+5. **Keep the evidence category narrow.** Field geometry describes durable source sampling. It is
+   not Relief 3D display-mesh spacing, a CAM target cell size or finishing-row request, emitted XYZ
+   precision, a machine-axis axis-aligned bounding box after rotation, continuous cutter coverage,
+   controller motion, or hardware/material evidence.
+6. **Name exact zero scale as collapsed legacy compatibility.** On a zero-scale axis, the reported
+   physical magnitude and nominal pitch are zero. The block discloses that the axis collapses after
+   planning and that physical carving geometry on it is not qualified. The existing editable Width
+   remains available as stored, recoverable planning state. Its zero-scale tooltip says
+   **Stored planning width** and does not call that value physical carved width. This is a UI-copy
+   correction; the field's commit behavior and the compatibility planner are unchanged. Outside
+   exact zero scale, canonical Width follows `physicalWidthMm`, heightmap CAM's source authority,
+   through the same native binary64 absolute X scale. It does not substitute the separately stored
+   `targetWidthMm` duplicate, which existing validation permits to differ within binding tolerance;
+   editing Width synchronizes both stored widths. If positive canonical source factors underflow to
+   zero or overflow to `Infinity` in the native representation, an informational note distinguishes
+   that value from the six-significant-digit source-factor readout and names CAM's existing factual
+   finite-positive-width error. The note does not rewrite either value or add a new refusal.
+7. **Change no stored-data or machining contract.** This decision adds no CAM, schema, validation, migration,
+   source mapping, object state, worker protocol, persistence, preview, simulation, output,
+   provenance, Frame, Job Review, Start, transport, refusal, guard, clamp, cap, delay, or
+   confirmation change. It emits no G-code and changes no machine command.
+8. **Keep creation-surface geometry planned.** F-CNC47's **Create Relief...** controls, pre-create
+   physical/effective-cell disclosure, crop/aspect editing, histogram, and source-mode selection
+   remain planned. A current selected-object readout does not make that creation workflow available.
+
+### Consequences
+
+- The selected canonical field now states its physical relief-axis span and source-sampling pitch
+  without conflating either with preview, CAM, emission, machine-axis, or hardware evidence.
+- Rotation, negative scale, and mirror changes remain distinguishable from magnitude changes.
+- Partial source-cell crops remain exact and can produce a nominal pitch larger than the displayed
+  span; the readout records the sampling model instead of hiding that edge case.
+- Positive finite factor combinations retain their magnitude category across binary64 result
+  overflow or underflow instead of appearing as `Infinity` or an undisclosed zero.
+- Zero-scale canonical heightfield compatibility objects remain recoverable and compilable exactly
+  as before, while the UI no longer presents their planning width as physical carved width.
+- Outside exact-zero compatibility, the adjacent editable Width follows the canonical source width
+  used by heightmap CAM through native binary64 scaling. Near-equal legacy target duplicates cannot
+  invert the note; editing Width synchronizes the two stored widths. When a positive source span
+  underflows or overflows, the panel visibly distinguishes native `0` or `Infinity` from the rounded
+  finite source-factor magnitude.
+- Legacy mesh properties, project bytes, prepared jobs, emitted bytes, Frame permits, and machine
+  behavior are unchanged.
+
+### Verification
+
+- `relief-field-geometry-display.test.ts` pins ordinary crop-aware calculation, six-significant-digit
+  presentation, binary64 result overflow/underflow, and exact zero-scale classification.
+- `ReliefFieldGeometry.test.tsx` pins full-crop physical size/pitch, crop-aware one-cell partial
+  coverage, absolute nonuniform scale, rotation/mirror invariance, finite extreme presentation,
+  read-only structure, and exact zero-scale disclosure.
+- `ReliefPlanningWidthDisclosure.test.tsx` pins ordinary native CAM Width copy, zero-scale
+  **Stored planning width** wording, canonical source-width authority, and the accepted
+  near-equal duplicate, positive-underflow, and overflow cases where Field geometry retains the
+  finite source-factor magnitude while native CAM planning loses it, plus legacy-mesh tooltip
+  preservation, without mutating state.
+- `SelectedReliefFieldGeometry.test.tsx` pins canonical rendering and legacy-mesh omission through
+  the heightfield-only integration seam.
+- Documentation gates are `pnpm exec prettier --check DECISIONS.md PROJECT.md WORKFLOW.md`,
+  `pnpm check:adr-numbers`, and `git diff --check`.
+- Not verified by this decision: browser perceptual layout, packaged Electron, CAM or emitted-byte
+  changes because none are made, controller behavior, an air cut, a material cut, source truth,
+  cutter reach, or finish quality.
+
+### References
+
+- ADR-289, relief scale factoring and exact-zero-scale compatibility.
+- ADR-291, canonical field and planned creation-surface geometry disclosure.
+- ADR-292, schema-v4 `heightfield-v1` and crop/mapping contract.
+- ADR-294, exact relief-grid extents and the separation between source and target cells.
+
+## ADR-292 Amendment 2 - Canonical Width edits keep source and bounds coherent through binary64 ratio extremes (2026-08-10)
+
+**Status:** Accepted and implemented as a bounded P2R.1a state-integrity repair; editable aspect controls and physical qualification remain open
+
+### Context
+
+Canonical heightfields persist physical width and height, natural bounds, a duplicate relief target
+width, and the resolved import/editor aspect policy. The Width action updated those authorities
+through two different native binary64 ratios: canonical height followed the source dimensions while
+bounds followed the tolerated duplicate bounds. A schema-valid field near the binding tolerance
+could therefore become internally inconsistent and fail manual-save or autosave preparation after
+an ordinary Width edit. At the representable extremes, dividing before multiplying could also
+produce `0` or `Infinity` even when a differently associated exact result was representable, or
+could write a derived height whose correctly rounded result was not positive finite into otherwise
+valid state.
+
+Rejecting, clamping, delaying, or confirming an accepted canonical Width patch would violate the
+exact-input and sole-Frame-guard contracts. Silently retaining height while continuing to label the
+mapping `preserve` would also make the stored resolved policy false.
+
+### Decision
+
+1. **Use the canonical field as the single heightfield geometry authority.** A real Width edit keeps
+   `targetWidthMm` and `reliefSource.physicalWidthMm` synchronized. Natural heightfield bounds are
+   rebuilt from the updated canonical `physicalWidthMm` and `physicalHeightMm`; tolerated duplicate
+   bounds do not supply a second aspect ratio. Legacy-mesh Width and bounds behavior is unchanged.
+2. **Honor the persisted resolved aspect policy.** For `aspect: 'preserve'`, derive intended height
+   as `newWidth * oldHeight / oldWidth`. Combine the exact stored IEEE-754 factors before one
+   correctly rounded binary64 result so intermediate overflow or underflow cannot change a
+   representable answer. For `aspect: 'stretch'`, Width and Height are independent and a Width edit
+   retains the current positive finite canonical height.
+3. **Resolve a zero or infinite rounded height without a guard.** If the exact preserve-aspect
+   result rounds to `0` or overflows to `Infinity`, keep the already-normalized positive finite
+   canonical Width patch unchanged, retain the prior positive finite Height, and persist
+   `aspect: 'stretch'`. Do not reject, clamp, cap, delay, or add confirmation. Input parsing and the
+   machine-space editor's existing conversion into stored Width are unchanged; this repair begins
+   after normalization retains a canonical Width patch. The selected canonical relief shows the
+   resolved policy read-only and explains that it records editor behavior rather than applying a
+   second CAM transform.
+4. **Keep state changes atomic and narrow.** One real Width edit advances the canonical revision
+   once and produces one existing undo/dirty transition. Samples, mask bytes, digest, provenance,
+   transform, tonal mapping, maximum depth, and crop remain unchanged. A same-value or invalid
+   input retains its existing behavior.
+5. **Keep machining algorithms and authorization rules unchanged.** Heightmap CAM continues to
+   consume the resolved physical dimensions directly and does not reapply `mapping.aspect`.
+   Corrected dimensions and bounds can legitimately change materialized geometry, emitted bytes,
+   and the exact bounds signature or Frame reachability after an affected edit. This amendment
+   changes no CAM or emitter algorithm, machine command, Frame/Job Review/Start policy, schema
+   version, migration, or worker protocol, and adds no refusal, warning gate, clamp, cap, delay, or
+   confirmation.
+
+### Consequences
+
+- A Width edit cannot make a previously valid canonical field unsaveable merely because accepted
+  duplicate bounds carried a slightly different aspect.
+- Ordinary representable `preserve` edits retain their existing result; for example, `100 x 50 mm`
+  edited to `200 mm` remains `200 x 100 mm`. Existing `stretch` fields retain Height when Width is
+  edited.
+- At the binary64 ratio extremes, the accepted canonical Width patch remains exact and the durable
+  mapping truthfully records the chosen positive-finite fallback instead of storing `0`, `Infinity`,
+  or a false `preserve` policy.
+- Crop editing, an editable aspect selector, source creation, CAM and emitter algorithms,
+  controller behavior, and physical qualification remain outside this repair. Downstream geometry,
+  bytes, and exact Frame signatures may reflect the corrected dimensions rather than the invalid or
+  incoherent pre-repair state.
+
+### Verification
+
+- `relief-heightfield-width-resolution.test.ts` covers ordinary preservation, false intermediate
+  overflow and underflow, nearest-even finite results, genuine zero/Infinity outcomes, existing
+  `stretch` behavior, and positive-finite identity properties. `positive-float64.test.ts` directly
+  pins the shared exact binary64 decomposition used by Width resolution and Field geometry.
+- `relief-width-bounds.test.ts` pins synchronized canonical/target Width, canonical bounds, one
+  revision and undo transition, source-byte identity, the zero/Infinity rounded-result `stretch`
+  fallback, and unchanged legacy-mesh bounds. Its production persistence regression starts from
+  validator-accepted duplicate bounds, performs the Width edit, and proves save preparation remains
+  valid.
+- `ReliefResolvedAspectDisclosure.test.tsx` pins both recorded aspect-policy explanations,
+  read-only structure, and project/undo/dirty identity. `SelectedReliefProperties.test.tsx` pins
+  selected canonical composition, while `SelectedReliefFieldGeometry.test.tsx` retains the
+  geometry-only integration and legacy-mesh omission.
+- TypeScript, focused Vitest, ESLint, Prettier, ADR-number, file-size, export-ratchet, diff, and the
+  full release gate are required before publication. Focused verification does not establish exact
+  compiled-program, emitted-byte, or Frame-signature deltas. Browser perceptual layout, packaged
+  Electron, controller behavior, air cuts, material cuts, and finish quality are not established
+  here.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-291, exact operator inputs and resolved heightfield mapping policy.
+- ADR-292, canonical schema-v4 field authority and non-guard contract.
+- ADR-304, selected canonical field geometry and Width representation disclosure.
+
+---
+
+## ADR-292 Amendment 3 - Canonical heightfield Width owns preview planning (2026-08-10)
+
+**Status:** Accepted and implemented as a bounded P2R.1a preview-authority repair; editable crop/aspect controls and physical qualification remain open
+
+### Context
+
+Schema-v4 heightfields persist canonical physical dimensions and a compatibility duplicate
+`targetWidthMm`. Project validation permits those Width values to differ within the existing binding
+tolerance. Heightmap materialization already uses canonical `reliefSource.physicalWidthMm`, and
+ADR-292 Amendment 2 makes that field the authority for accepted Width edits and natural bounds.
+However, the shared machine-space geometry readout still derived Width from the duplicate. Relief 3D
+used that result for its title and display-mesh resolution, while the canvas heightfield preview used
+the duplicate for its preview cell size and cache identity. A valid project could therefore machine
+the canonical field while two previews budgeted or labelled a slightly different Width.
+
+Exact-zero object scale is intentionally different. The compatibility path plans the stored target
+Width with scale magnitude `1`, then collapses the finished placement through the residual transform.
+Legacy meshes also have no canonical heightfield dimensions and continue to use their stored target
+Width.
+
+### Decision
+
+1. **Use one preview/planning Width authority.** For `heightfield-v1` with nonzero object X scale,
+   derive the unscaled planning Width from `reliefSource.physicalWidthMm`. Use that same authority in
+   machine-space geometry, the selected-property Width disclosure, the canvas heightfield preview's
+   target Width, cell-size choice and cache identity, and Relief 3D's title and display-resolution
+   choice. A tolerated `targetWidthMm` duplicate cannot select an alternate preview budget.
+2. **Preserve exact-zero compatibility and legacy meshes.** At exact zero object X scale, retain
+   `targetWidthMm` as the stored compatibility planning Width before residual collapse. A
+   `legacy-mesh` relief continues to derive planning Width from `targetWidthMm` at every scale.
+3. **Keep canonical materialization and machine authorization unchanged.** Heightfield
+   materialization continues to use canonical physical dimensions and scale directly. The compiler
+   continues to consume the existing machine-space scale magnitudes and residual transform; the
+   corrected Width field is preview/readout authority, not a second CAM transform. No schema,
+   migration, project mutation, emitter algorithm, machine command, Frame/Job Review/Start policy,
+   refusal, clamp, cap, delay, or confirmation is added.
+4. **Keep the evidence boundary explicit.** Focused tests must pin validator-tolerated duplicate
+   Widths, ordinary nonzero scale, exact-zero compatibility, and unchanged legacy-mesh behavior for
+   every affected preview/readout seam. Browser/WebGL appearance, exact emitted-byte parity,
+   controller behavior, air cuts, material cuts, and finish quality remain separate evidence.
+
+### Consequences
+
+- A schema-valid duplicate Width can no longer make Relief 3D or the canvas preview choose geometry
+  labels, cell size, or cache identity that disagrees with the canonical heightfield source.
+- Exact-zero compatibility and legacy-mesh planning keep their existing stored target authority.
+- Existing heightfield samples, mask, mapping, provenance, digest, transform, dimensions, bounds,
+  undo, dirty state, CAM materialization, and machine authorization are unchanged by merely opening
+  or drawing a preview.
+- ADR-292 Amendment 2 remains the authority for machine-space Width editor conversion across
+  extreme binary64 scale ratios; this amendment reuses its canonical source authority in previews.
+
+### Verification
+
+- `relief-machine-space-planning-width.test.ts` pins canonical nonzero Width, exact-zero
+  compatibility, and legacy-mesh machine-space geometry.
+- `ReliefPlanningWidthDisclosure.test.tsx`,
+  `draw-relief-heightfield-preview-request.test.ts`, and
+  `Relief3DViewerDialog/relief-3d-viewer-dialog-plan.test.ts` pin the common authority at the
+  selected-property, canvas-preview, cache/resolution, and Relief 3D seams.
+- TypeScript, focused Vitest, ESLint, Prettier, ADR-number, file-size, export-ratchet, diff, and the
+  full release gate are required before publication.
+- Focused verification does not establish browser/WebGL perceptual layout, packaged Electron,
+  bit-for-bit compiled or emitted output, controller behavior, an air cut, a material cut, or finish
+  quality.
+
+### References
+
+- ADR-289, relief scale factoring and exact-zero compatibility.
+- ADR-292, canonical schema-v4 heightfield authority.
+- ADR-292 Amendment 2, canonical Width edit and bounds integrity.
+- ADR-304, selected canonical field geometry and planning-Width disclosure.
+
+---
+
+## ADR-292 Amendment 4 - Exact common-factor Width rebasing preserves project-v4 persistence when representable (2026-08-10)
+
+**Status:** Accepted and implemented as a bounded P2R.1a persistence repair; an all-positive-finite intent representation remains planned
+
+### Context
+
+ADR-292 Amendment 2 made canonical heightfield dimensions and natural bounds move together after a
+Width edit. Project v4 separately retains its long-standing local-coordinate magnitude limit of
+`1,000,000 mm` and object-scale magnitude limit of `100,000`. A valid field with X scale `5e-7`
+can therefore accept a displayed Width of `1 mm`, resolve it to canonical Width `2,000,000 mm`, and
+immediately become invalid for manual save and autosave even though its machine-space width remains
+exactly `1 mm`.
+
+Removing the heightfield natural-bounds limit is not a validator-only repair. Very large finite
+physical dimensions can overflow transformed scene bounds; a `Number.MAX_VALUE`-wide Relief 3D
+display can keep a bounded cell count while Float32 surface coordinates become infinite, normals
+become `NaN`, and camera framing overflows. Widening the persisted bounds domain would therefore
+move the representation failure into canvas and 3D consumers. Rejecting, clamping, restoring, or
+confirming the accepted Width would violate the exact-input and sole-Frame-guard contracts.
+
+### Decision
+
+1. **Keep project-v4 numeric domains unchanged.** Generic coordinates, heightfield natural bounds,
+   object scales, legacy meshes, and project validation retain their existing limits. Do not add a
+   heightfield-only finite-bounds exemption.
+2. **Re-factor only when the representation is exact.** After the existing Width/aspect resolver
+   produces canonical dimensions, retain ordinary in-domain results unchanged. Otherwise choose
+   the smallest common power-of-two factor that brings both dimensions into the local-coordinate
+   domain. Divide canonical Width, canonical Height, duplicate target Width, and natural bounds by
+   that factor; multiply both object scale axes by the same factor. Independent X/Y factors are
+   outside this repair even when a Stretch object could encode them: they would change canonical
+   aspect and future Preserve-Width semantics, and they would change the canonical square-cell 2D
+   preview sampling budget.
+3. **Prove equivalence before adopting the candidate.** Both scale axes must be nonzero. Candidate
+   dimensions must remain positive finite and candidate scales must remain finite and inside the
+   existing scale domain. Multiplying each candidate dimension by the factor and dividing each
+   candidate scale by it must reproduce the prior binary64 value exactly. Native machine-space W
+   and H products must be exactly equal, and all four transformed corners must remain finite and
+   bit-identical. If any condition fails, report factorization as unavailable; never approximate,
+   clamp, cap, or relax validation.
+4. **Keep the state transition atomic.** An adopted factor changes only the internal local
+   representation: canonical dimensions, duplicate target Width, natural bounds, and both scale
+   axes. Scale signs, mirrors, rotation, translation, mapping, samples, mask, digest, provenance,
+   relief depth, and source algorithm remain unchanged. The existing Width edit still produces one
+   revision increment, one undo entry, and one dirty transition.
+5. **State the bounded evidence honestly.** This amendment fixes the concrete common-factor case
+   and other exactly representable common-power-of-two candidates. Exact-zero compatibility, transform-scale
+   exhaustion, non-reversible subnormal factors, non-finite transformed geometry, and Widths beyond
+   this bounded common-factor repair remain open. `scale-domain`, `zero-scale`, and related
+   unavailable results do not claim that every independent-axis v4 encoding is mathematically
+   impossible. The current caller retains its prior behavior when factorization is unavailable,
+   which can still leave such an exceptional edit unsaveable. A future schema must separate durable
+   positive-finite operator intent from the geometry that current Canvas, Float32 preview, and CAM
+   number representations can materialize.
+6. **Do not change machining or authorization policy.** An adopted exact factor preserves current
+   machine-space dimensions and transformed corners. No validator, schema version, migration, CAM
+   or emitter algorithm, machine command, Frame/Job Review/Start policy, refusal, clamp, delay, or
+   confirmation changes. Future extreme Preserve edits can encounter binary64 underflow at a
+   different canonical ratio after rebasing; all-positive-finite edit-sequence equivalence is not
+   claimed by this bounded repair.
+
+### Consequences
+
+- The reproduced `2,000,000 x 1,000,000` local result at scales `(5e-7, 1)` persists as the exactly
+  equivalent `1,000,000 x 500,000` result at scales `(1e-6, 2)`. Its transformed corners and
+  machine dimensions are unchanged, and both manual save and autosave preparation remain valid.
+- Factorization returns ordinary in-domain Width results unchanged, so their stored scene
+  representation is unaffected. Exact-zero heightfield compatibility and legacy-mesh Width behavior
+  are unchanged.
+- The selected Width tooltip no longer promises that every edit preserves object scale; it names
+  the possible exact bounded local re-factor.
+- This is a partial v4 integrity repair, not permission to add an input cap or a claim that every
+  positive-finite Width is saveable under the existing representation.
+
+### Verification
+
+- `relief-heightfield-width-factorization.test.ts` pins the concrete save/autosave regression,
+  common-factor geometry and materialization equality, negative scale and rotation, unchanged
+  in-domain identity, Stretch-policy retention, exact-zero and scale-domain unavailability,
+  subnormal reversibility, one revision/undo/dirty transition, and source-byte identity.
+- Existing Width-resolution, bounds, parameter-action, heightfield materialization, and
+  machine-space suites remain green. TypeScript, focused Vitest, ESLint, Prettier, ADR-number,
+  file-size, export-ratchet, diff, and full release gates are required before publication.
+- Browser perceptual layout, packaged Electron, exact compiled/emitted-byte parity, controller
+  behavior, an air cut, a material cut, and finish quality are not established.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-289, relief scale factoring and exact-zero compatibility.
+- ADR-292 and Amendment 2, canonical heightfield authority and Width resolution.
+- ADR-304, exact-factor field-geometry disclosure and native planning representation.
+
+---
+
+## ADR-292 Amendment 5 - Exact common-factor rebasing also preserves legacy-mesh Width persistence when representable (2026-08-10)
+
+**Status:** Accepted and implemented as a bounded P2R.1a legacy-integrity repair; the shared all-positive-finite displayed-Width contract remains planned
+
+### Context
+
+ADR-292 Amendment 4 repaired exactly representable oversized local Width results for canonical
+heightfields while deliberately leaving legacy-mesh behavior unchanged. The selected **Width**
+control is shared by both relief representations, however. For a valid legacy mesh at object scales
+`(5e-6, 5e-6)`, entering a displayed Width of `10 mm` resolves to stored target Width and natural
+bounds near `2,000,000 mm`. The live action records one undo/dirty transition; transformed natural
+bounds still describe `10 x 5 mm`, while CAM can separately prepare the intrinsic mesh's
+authoritative aspect. Both manual-save and autosave preparation nevertheless reject the new project
+because its local X bound exceeds project v4's unchanged `1,000,000 mm` coordinate domain. The
+newest recovery snapshot therefore cannot advance even though the materialized job is representable.
+
+The shared displayed-to-stored conversion has a separate boundary: native division can round a
+positive finite draft to `0` or `Infinity`, after which normalization retains no Width patch while
+the local input draft can remain visible. This amendment begins only after normalization has
+retained a positive finite stored Width. It does not claim to solve that broader input-truth defect
+or every positive-finite operator intent.
+
+### Decision
+
+1. **Apply the exact common-factor repair to both relief representations.** Keep ordinary in-domain
+   results unchanged. When a legacy-mesh Width edit produces target Width or natural-bound spans
+   outside the existing local-coordinate domain, choose the smallest common power-of-two factor
+   that brings the target Width and both natural-bound dimensions into that domain. Divide those
+   local values by the factor and multiply both signed object scale axes by the same factor.
+2. **Preserve both legacy aspects.** Stored natural-bounds aspect remains authoritative for canvas,
+   selection, and later Width edits. Intrinsic mesh XY extent remains authoritative for legacy CAM.
+   A candidate must therefore preserve both the native machine-space Width
+   `targetWidthMm * abs(scaleX)` and native mesh height
+   `(meshYExtent / meshXExtent) * targetWidthMm * abs(scaleY)` exactly; equality of scene bounds
+   alone is insufficient.
+3. **Adopt only an exact, persistable representation.** Both scales must be nonzero. Candidate
+   dimensions must be positive finite, candidate scales must remain inside the unchanged project-v4
+   scale domain, and multiplying or dividing by the selected factor must reproduce every prior
+   binary64 value exactly. All four transformed natural-bound corners must remain finite and
+   bit-identical. Mesh positions and their byte identity, empty-cell meaning, relief depth,
+   translation, rotation, mirrors, operation bindings, and residual placement remain unchanged.
+   Width/depth-only mesh patches retain the same relief-source owner so existing downstream mesh
+   conversion caches remain reusable. The intrinsic-aspect proof reads persisted array-like positions
+   with the same per-coordinate Float32 storage semantics used by CAM, and catches exceptional
+   indexed reads or non-finite Float32 results as unavailable `geometry-drift`; it does not allocate
+   a replacement Float32 mesh buffer.
+4. **Share arithmetic without merging source authority.** Heightfields retain canonical physical
+   dimensions and their existing exact machine-dimension proof. Legacy meshes retain target Width,
+   natural bounds, and intrinsic mesh extents. The common power-of-two/domain arithmetic is shared,
+   while representation-specific candidate construction and equivalence checks stay explicit. This
+   amendment supersedes only ADR-304's requirement that the legacy-mesh Width tooltip remain
+   unchanged: the tooltip may now disclose exact bounded local rebasing. ADR-304's heightfield-only
+   **Field geometry** block and every other legacy-mesh property-panel surface remain unchanged.
+5. **Keep unavailable cases truthful and open.** If any proof fails, retain the accepted original
+   edit exactly as before; do not reject, restore, clamp, cap, approximate, delay it behind a policy
+   surface, or confirm it.
+   Zero scale, scale-domain exhaustion, non-reversible subnormal values, non-positive or non-finite bounds-aspect
+   results, transformed-corner or intrinsic-CAM drift, independent-axis-only encodings, and intents
+   beyond every exact v4 representation remain outside this bounded repair. A future durable model
+   must separate positive-finite operator intent from materialized geometry.
+6. **Do not change machining or authorization policy.** An adopted legacy factor preserves the
+   materialized heightmap, prepared job, and exact Frame bounds signature. No schema version,
+   validator, migration, CAM or emitter algorithm, preview budget, machine command, Frame/Job
+   Review/Start policy, refusal, clamp, deliberate policy delay, or confirmation changes.
+
+### Consequences
+
+- The reproduced legacy result near `2,000,000 x 1,000,000` at scales
+  `(5e-6, 5e-6)` persists as the exactly equivalent result near
+  `1,000,000 x 500,000` at scales `(1e-5, 1e-5)`. Manual-save and autosave preparation remain valid
+  while transformed corners, materialized depth bytes, prepared-job JSON, and the Frame bounds
+  signature remain unchanged.
+- Ordinary legacy-mesh and heightfield Width edits retain their existing stored representation by
+  identity. The selected Width disclosure may name that an exact oversized local representation can
+  re-factor both scale axes without changing visible machine geometry.
+- Each oversized legacy candidate still requires a synchronous O(n) intrinsic-bounds scan. No
+  browser or packaged-Electron latency budget is established; persisted or shared intrinsic-bounds
+  metadata would be needed to remove that scan in a future representation.
+- The shared displayed-Width `0`/`Infinity` conversion defect is not repaired here. This amendment is
+  not permission to add an input limit and does not claim every accepted draft or positive-finite
+  intent is durable in project v4.
+
+### Verification
+
+- The exact legacy factorization sibling test pins the reproduced manual-save/autosave failure and
+  repaired persistence, smallest common factor, stored-bounds and intrinsic-mesh aspect, transformed
+  corners, materialized depth bytes, prepared-job JSON, Frame signature, source-byte identity, and
+  one undo/dirty transition.
+- Heightfield factorization regressions remain green and pin byte-identical behavior after the shared
+  arithmetic extraction. Existing relief parameter, bounds, mesh materialization, machine-space,
+  persistence, and Frame-signature suites remain green.
+- The core/legacy regressions pin Float32 rounding and overflow parity with CAM, relief-source
+  owner/cache identity, and an exceptional indexed-read fallback to unchanged `geometry-drift`.
+- TypeScript, focused Vitest, ESLint, Prettier, ADR-number, file-size, export-ratchet, diff, and full
+  release gates are required before publication.
+- Browser perceptual layout, packaged Electron, controller behavior, a physical Frame, air cut,
+  material cut, and finish quality are not established.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-289, relief scale factoring and exact-zero compatibility.
+- ADR-292 Amendments 2 and 4, canonical Width resolution and exact bounded heightfield rebasing.
+- ADR-304, exact-factor field-geometry disclosure and native planning representation; Amendment 5
+  supersedes only its legacy-mesh Width-tooltip-preservation statement.
+
+---

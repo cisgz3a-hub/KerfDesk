@@ -25,6 +25,8 @@ uniform mat3 normalMatrix;
 uniform sampler2D uCarveDepth;
 uniform vec2 uCarveSizeMm;
 uniform float uCarveCellMm;
+uniform vec2 uCarveCells;
+uniform vec2 uCarveHasPartialCell;
 uniform vec3 uCarveLightDir;
 uniform vec3 uGrainEarly;
 uniform vec3 uGrainLate;
@@ -57,16 +59,34 @@ export const WOOD_VERTEX_BODY_GLSL = `
 // shading against the geometry and the grain slides the wrong way when the
 // operator orbits.
 const SAMPLING_GLSL = `
-vec2 carveUv(vec2 localXy) {
+vec2 carveGridMm(vec2 localXy) {
   return vec2(
-    (localXy.x + uCarveSizeMm.x * 0.5) / uCarveSizeMm.x,
-    (uCarveSizeMm.y * 0.5 - localXy.y) / uCarveSizeMm.y
+    localXy.x + uCarveSizeMm.x * 0.5,
+    uCarveSizeMm.y * 0.5 - localXy.y
   );
 }
 
+float carveAxisUv(float coordinateMm, float extentMm, float cells, float hasPartialCell) {
+  if (hasPartialCell < 0.5) return coordinateMm / extentMm;
+  float terminalIndex = cells - 1.0;
+  float terminalStartMm = terminalIndex * uCarveCellMm;
+  float cellCoordinate = coordinateMm <= terminalStartMm
+    ? coordinateMm / uCarveCellMm
+    : terminalIndex +
+      (coordinateMm - terminalStartMm) / (extentMm - terminalStartMm);
+  return cellCoordinate / cells;
+}
+
 float carveDepthAt(vec2 localXy) {
-  vec2 uv = carveUv(localXy);
-  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 0.0;
+  vec2 gridMm = carveGridMm(localXy);
+  if (
+    gridMm.x < 0.0 || gridMm.x > uCarveSizeMm.x ||
+    gridMm.y < 0.0 || gridMm.y > uCarveSizeMm.y
+  ) return 0.0;
+  vec2 uv = vec2(
+    carveAxisUv(gridMm.x, uCarveSizeMm.x, uCarveCells.x, uCarveHasPartialCell.x),
+    carveAxisUv(gridMm.y, uCarveSizeMm.y, uCarveCells.y, uCarveHasPartialCell.y)
+  );
   return texture2D(uCarveDepth, uv).r;
 }
 `;

@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/293 schema, import, existing CAM/preview, manual-persistence, and autosave/recovery substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304/305 plus ADR-292 Amendments 2-5 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, existing CAM/preview, manual persistence, exact partial-edge geometry, and atomic large-project autosave/recovery substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -488,17 +488,21 @@ G-code**, a factual no-file outcome stops before the picker: placement cannot be
 resolved; selection, variable, registration, or output-snapshot preparation
 produces no program; the post-prepare emitter refuses the requested output (for
 example, rotary raster while its Labs permission is off); or emitted preflight
-contains one of the six codes in `COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
+contains one of the seven codes in `COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
 other preflight finding is an advisory reported after a successful save.
 
-For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232): the same six
-compile-integrity codes cover unproducible or unstreamable output. Calculated
-bed bounds, configured no-go zones, and live output-setting findings are carried
-into Job Review as warnings before the Frame trace; they do not refuse Frame.
-The actual controller outcome is authoritative: only a cleanly completed trace
-and return earns the exact-job permit. A Frame still cannot dispatch when
-transport cannot accept it or when the executable motion cannot be constructed.
-Start itself adds no policy gate.
+For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232, ADR-237): the same
+seven compile-integrity codes cover unproducible or unstreamable output. Pressing
+Frame, or pressing Start without a live exact permit, prepares the candidate and
+runs the physical tool-off Frame dialog-free. Calculated bed bounds, configured
+no-go zones, and live output-setting findings travel with that exact candidate;
+they surface as warnings when the operator presses Start on the review-pending
+permit after a clean Frame. They do not refuse Frame or Start. The actual
+controller outcome is authoritative: only a cleanly completed trace and return
+earns the exact-job permit. Confirming the Start-time Job Review creates the
+review evidence, claims that permit, and streams its bound program. A Frame still
+cannot dispatch when transport cannot accept it or when executable motion cannot
+be constructed. Start itself adds no policy gate.
 
 The authoritative list is the `PreflightCode` set in
 `src/core/preflight/preflight.ts` (laser + CNC shared codes) and
@@ -523,8 +527,12 @@ grouped by what each validates:
 
 **Mode / geometry consistency**
 11. **Layer mode matches its geometry** — a fill/offset needs closed contours.
-12. **Raster transform is emittable** — a rotation/shear the raster path cannot engrave is refused.
-13. **Raster output stays within the pixel budget.**
+12. **Raster rotation follows the compile path** — output rasters, including image sub-layers,
+    may use the supported object rotation; preflight does not claim that rotation is unsupported.
+13. **Raster size is advisory, not a predictive pixel-budget refusal.** Valid rasters stream
+    row-by-row at any pixel size. Live preview and estimate may pause above their preparation
+    budgets, and Job Review warns; only an actual engine program-materialization failure is
+    compile integrity.
 14. **Island-fill short-sweep risk** on the active machine profile is surfaced.
 15. **Relief objects appear only in CNC mode.**
 
@@ -544,7 +552,7 @@ grouped by what each validates:
     every calculated cut depth. Selecting a non-V-bit remains the established
     advisory-only wrong-kind path.
 
-For **Save G-code**, the six-code set controls the emitted-preflight partition;
+For **Save G-code**, the seven-code set controls the emitted-preflight partition;
 it is not an exhaustive list of reasons no file can exist. Factual
 placement/preparation failures and a post-prepare emission refusal return
 distinct non-writable outcomes before that partition. Calculated
@@ -774,10 +782,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Success
 1. User clicks **Frame job** while connected and the controller is Idle.
 2. Frame preparation compares the live controller output contract with the selected process.
-   Known, unknown, stale, or unavailable `$30`/`$32` values remain explicit Job Review advisories;
-   they do not refuse Frame. If the exact program contains `M7` and current stock-GRBL build info
-   proves option `M` absent, preparation refuses as a factual command incompatibility. Missing,
-   stale, or non-stock build evidence remains an acknowledged warning.
+   Known, unknown, stale, or unavailable `$30`/`$32` values and stock-GRBL option `M` observations
+   for an exact program containing `M7` remain explicit Start-time Job Review advisories; they do
+   not refuse Frame or Start. Exact-handoff evidence still binds whether the reviewed program uses
+   `M7`, so changing that program shape after review invalidates the handoff.
 3. App resolves placement once. For any serial Frame, if G55-G59 is active, preparation selects G54
    through an owned controller operation and waits for its terminal acknowledgement plus fresh
    position evidence. This changes only the active WCS selection; it does not erase the stored
@@ -866,85 +874,76 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B6. Start job
 
 #### Success
-1. User clicks **Start job** while connected and idle (toolbar button or Cmd/Ctrl+Return; Run
-   again and confirmed checkpoint replacement follow the same path).
-2. App runs the F-A10 preflight on the current project. If issues, surfaces the modal (same as Save G-code path).
-3. A laser controller that reports `$32=0` no longer refuses Start — frame-first (ADR-228)
-   demoted it to the Job Review `$32` acknowledgement banner, which the operator must
-   acknowledge inside the dialog before confirming.
-4. App compiles the project to G-code via `emitGcode`, then opens the **Job Review** dialog
-   (ADR-224, v2 look) built from the exact prepared program: five stat tiles (estimated time as
-   the accent hero tile with cut/travel split, job size and motion envelope, operations/cutters,
-   G-code lines and bytes, and a read-only Origin tile), a **collapsed amber "Warnings (N)"
-   dropdown** whose summary always shows the count (identical warnings arrive grouped — e.g. one
-   uncalibrated-defaults message naming the affected operations instead of one per layer), a CNC
-   **Material & stock** card (project material, stock footprint, stock origin, safe Z), the
-   **Artwork settings** table with the core numbers editable in place (laser: power / speed /
-   passes / air; CNC: depth, depth-per-pass, feed, plunge, spindle RPM) and a muted per-row
-   detail line carrying the mode-specific settings (kerf/tabs/hatch/dither; CNC passes,
-   stepover, direction, tabs, entry) plus the bound material chip, collapsible read-only
-   Controller ($32, $30 vs profile, travel, homing, units, WCS, overrides, position) and
-   Machine (bed, stock, bit, safe-Z, spindle, coolant, park, rotary, tool plan) fact sections
-   with counts, and the safety acknowledgement — the unverified-`$32` cable-loss/latched-output
-   prompt or the CNC workholding/exclusive-access attestation, verbatim. If preparation selected
-   G54 from G55-G59, the durable warning names the original WCS and says that the active selection
-   changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is **not**
-   editable in the review (it stays on the machine rail); the sticky footer echoes the resolved
-   origin ("Runs from …") beside Cancel and **Start job** (ADR-237: the review opens at Start for
-   the framed permit). Pressing Start job records the
-   same evidence objects the previous native confirms produced. For scan output, the review also
-   names each operation's effective direction/reason, exact pass-weighted runway coverage, requested
-   runway values, and any controlled laser-off seek policy warning.
-4. Editing a value inside the review commits through the normal layer/placement store actions and
-   re-runs the full prepare pipeline (debounced). The stat tiles dim behind "Recomputing…" until
-   the fresh program replaces the shown one — the artifact framed and later streamed is always the
-   one last shown. The **Approve settings** status identifies an editable value changed since the
-   review opened or was last approved. Clicking the always-available action marks the currently
-   synchronized main Artwork / Operations values approved and requests an immediate refresh when
-   needed. It never gates Start: **Start job** still approves the complete review in one click. If
-   the edit changed the exact framed artifact, the existing Frame-again requirement is shown and
-   remains the only ordinary Start guard.
-5. Frame traces the exact generated motion envelope with the tool off, then returns to the exact
+1. With no live exact permit, the ordinary primary action reads **Set up & Frame**. The user clicks
+   it while connected and idle (or invokes Cmd/Ctrl+Return). The separate **Frame job** button runs
+   the same dialog-free prepare-and-Frame path.
+2. App prepares the exact program and runs F-A10. A factual compile-integrity, construction-input,
+   or transport failure stops before Frame and reports its fix; policy findings do not. Job Review
+   does not open. Calculated bounds, no-go, controller-setting, and other advisory findings travel
+   with the exact candidate for the later Start-time review.
+3. Frame traces the exact generated motion envelope with the tool off, then returns to the exact
    preparation-time work position — the acknowledged G54 position when serial preparation began
    under G55-G59. Dispatch alone authorizes nothing: every Frame command must receive its terminal
-   acknowledgement and the controller must reach final clean Idle without interruption or reviewed
-   spatial session/origin drift. Advisory settings and build-info observations may refresh.
-6. Clean completion issues a one-run exact `FramedRunPermit`. The controls read **Ready to start —
-   framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
+   acknowledgement and the controller must reach final clean Idle without interruption or spatial
+   session/origin drift. Advisory settings and build-info observations may refresh.
+4. Clean completion issues a one-run, review-pending `FramedRunPermit`. The controls read **Ready to
+   start — framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
    one-use. Any project, output-scope, placement, registration, or rotary-raster edit, Jog, Home,
    origin/probe/reset/disconnect, or controller drift expires it. Camera-only UI state does not.
-7. User clicks **Start framed job**. Start atomically claims the permit and sends its cached G-code
-   without recompiling, reopening Job Review, or rerunning policy gates. Only live transport and
-   exact-handoff checks remain; a deterministic empty/comment-only or RX-oversized program was
-   already rejected before Frame. After queue fencing, an exact program containing `M7` is checked
-   once more against current stock-GRBL build evidence; a proven missing option `M` refuses before
-   permit consumption or streamer creation, while observation drift alone is not incompatibility.
-8. App builds the streamer and writes the first batch (as much as the RX window allows — default
+5. The user clicks **Start framed job**. The app opens the single **Job Review** dialog (ADR-224,
+   ADR-237) against the permit's exact prepared program plus current controller state; it neither
+   recompiles nor streams before confirmation. A laser controller that reports `$32=0` contributes
+   the `$32` acknowledgement banner rather than refusing Frame or Start.
+6. Job Review uses the v2 surface: five stat tiles (estimated time as the accent hero tile with
+   cut/travel split, job size and motion envelope, operations/cutters, G-code lines and bytes, and a
+   read-only Origin tile); a collapsed amber **Warnings (N)** dropdown whose summary always shows
+   the count and groups identical warnings; a CNC **Material & stock** card; the editable **Artwork
+   settings** table; collapsible read-only Controller and Machine fact sections; and the applicable
+   laser acknowledgement or CNC workholding/exclusive-access attestation. If Frame preparation
+   selected G54 from G55-G59, the durable warning names the original WCS and says the active
+   selection changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is
+   not editable in review; the sticky footer echoes the resolved origin beside Cancel and **Start
+   job**. Scan output also names effective direction/reason, exact pass-weighted runway coverage,
+   requested runway values, and any controlled laser-off seek warning.
+7. Editing a value in Job Review commits through the normal store actions and re-runs preparation.
+   The stat tiles dim behind **Recomputing…** while synchronized evidence refreshes. **Approve
+   settings** remains informational and never adds a Start gate. If the edit changes the exact
+   execution signature, or any other invalidation kills the permit, no job bytes stream and the
+   operator must complete Frame again for the changed artifact.
+8. Confirming **Start job** records the review evidence and acknowledgements, verifies that the same
+   permit is still current, then atomically claims it and hands its bound G-code to the streamer.
+   Only live transport and exact-handoff checks remain. Stock-GRBL option `M` observations for `M7`
+   remain advisory-only: missing, stale, or proven-absent support never refuses Start. The factual
+   handoff still stops if the exact program changes whether `M7` is required after review.
+9. Transient camera-marker Frames are the narrow exception: their candidates are reviewed before
+   dispatch and their completed permits carry review evidence from birth, so Start streams them
+   without reopening Job Review.
+10. App builds the streamer and writes the first batch (as much as the RX window allows — default
    120 bytes, per-profile `rxBufferBytes`). Every `ok` advances one line and progress reflects
    `completed / total`.
-9. While the job is active the app holds a screen wake lock so OS
+11. While the job is active the app holds a screen wake lock so OS
    display-sleep can't suspend the stream (ADR-117; re-acquired on tab
    visibility changes, released when the job ends). If the platform
    refuses the lock, one LaserLog line warns the operator to disable
    system sleep before long burns — the job itself always proceeds.
-10. During a CNC job the canvas motion overlay's head label and status badge
-    add the running depth pass and the passes remaining (`Pass k of N •
-    m remaining`), derived from the ADR-215 pass spans of the exact started
-    program and advancing only with route-reconciled motion (ADR-216). When
-    the mapping cannot be derived (e.g. a supervised recovery stream), the
-    counter is omitted rather than estimated.
-11. While any job is running, the status badge also shows the live
-    controller-reported feed rate (`N mm/min`, inch reports normalized),
-    taken from each status frame's `FS:` field (ADR-217). It appears only
-    while running and only when the controller reports feed; a held machine
-    or a controller that omits `FS:` shows no rate.
-12. For a running CNC job the badge additionally shows the live spindle
-    speed (`N rpm`) from the same `FS:` field (ADR-220). It is CNC-only —
-    a laser's `FS:` spindle slot is a power value, not RPM — and, like the
-    feed rate, appears only while running and only when reported.
-13. The badge also shows wall-clock elapsed time since Start (`5m 12s`,
-    same format as the pre-job ETA), counting through holds and tool
-    changes and freezing at the run's first terminal state — finished,
+12. During a CNC job the canvas motion overlay's head label and status badge
+     add the running depth pass and the passes remaining (`Pass k of N •
+     m remaining`), derived from the ADR-215 pass spans of the exact started
+     program and advancing only with route-reconciled motion (ADR-216). When
+     the mapping cannot be derived (e.g. a supervised recovery stream), the
+     counter is omitted rather than estimated.
+13. While any job is running, the status badge also shows the live
+     controller-reported feed rate (`N mm/min`, inch reports normalized),
+     taken from each status frame's `FS:` field (ADR-217). It appears only
+     while running and only when the controller reports feed; a held machine
+     or a controller that omits `FS:` shows no rate.
+14. For a running CNC job the badge additionally shows the live spindle
+     speed (`N rpm`) from the same `FS:` field (ADR-220). It is CNC-only —
+     a laser's `FS:` spindle slot is a power value, not RPM — and, like the
+     feed rate, appears only while running and only when reported.
+15. The badge also shows wall-clock elapsed time since Start (`5m 12s`,
+     same format as the pre-job ETA), counting through holds and tool
+     changes and freezing at the run's first terminal state — finished,
     stopped, errored, or disconnected — so the final duration stays
     readable (ADR-221). Runs without a recorded start show no timer.
 
@@ -972,11 +971,13 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    on the next re-prepare; one that introduces a warning brings it back.
 
 #### Edge — cancel the review
-1. **Cancel** or Escape sends no Frame/job bytes, stages no candidate, and issues no permit. Edits
-   already made in the review are ordinary project edits and are kept (undo applies as usual).
-2. If owned preparation selected G54 from an original G55-G59, cancellation does not restore the
-   prior selection: G54 remains active, while every stored G55-G59 offset remains intact. The
-   durable warning states both facts before cancellation is available.
+1. **Cancel** or Escape sends no job bytes. If the exact artifact and evidence remain current, the
+   review-pending permit stays armed so the operator may press **Start framed job** and review it
+   again. Edits already made in review are ordinary project edits and are kept (undo applies as
+   usual); an edit that changes the exact artifact invalidates the permit and requires Frame again.
+2. If Frame preparation selected G54 from an original G55-G59, cancelling the later Start-time
+   review does not restore the prior selection: G54 remains active, while every stored G55-G59
+   offset remains intact. The durable warning states both facts before cancellation is available.
 3. Recovery flows (supervised recovery, start-from-line, checkpoint resume) are untouched and keep
    their own review surfaces and confirms.
 
@@ -1180,7 +1181,8 @@ authorization, Frame proof, controller command, or safety boundary.
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
-2. Multiline input is rejected; persistent macros are deferred to a later lane.
+2. Multiline input is rejected. Saved user macros are single-command templates described in
+   F-B13b; multiline sequencing remains out of scope.
 3. Every accepted command carries a controller-specific state-effect tag.
    Ordinary motion/modal commands clear cached Idle/position and frame
    evidence until a fresh status report arrives. XY-only coordinate commands
@@ -1240,6 +1242,60 @@ authorization, Frame proof, controller command, or safety boundary.
 2. Search includes every displayed column. **Copy visible** produces escaped, timestamped TSV so
    embedded tabs/newlines cannot turn one controller entry into multiple rows.
 3. If clipboard access fails, the dialog exposes the exact TSV in a selectable nonblocking field.
+
+### F-B13b. Saved user macros v1 (ADR-293)
+
+#### Success - save a named one-command template
+1. The shared Console command deck shows **User macros** in both the docked and Super Console.
+2. User clicks **New macro**, enters a name and one controller-command template, then clicks
+   **Save macro**. The macro is labelled **User-saved / local / one Console command**.
+3. `{{variable_name}}` placeholders declare run-time finite-decimal values. Repeating the same
+   placeholder reuses one value. Fixed commands need no placeholder.
+4. KerfDesk persists the versioned macro collection in local application storage. Macros are not
+   project data, cloud data, controller-resident programs, or built-in KerfDesk commands.
+
+#### Success - run through the existing Console path
+1. User selects a saved macro, fills any variable fields, reviews the expanded-command preview,
+   and clicks **Run user macro**.
+2. KerfDesk expands exactly one command, then passes the complete result to the active controller
+   driver's existing `prepareConsoleCommand` parser.
+3. The shared command deck calls the existing `runConsoleCommand` -> `sendConsoleCommand` ->
+   `safeWrite` path. A persistent setting still uses the existing setting-write confirmation, and
+   the store still rechecks connection, operation ownership, and Idle at dispatch time.
+4. Only a successfully dispatched expanded command enters the existing Arrow Up / Arrow Down
+   history. The transcript marks the outbound source as `macro` and adds the saved macro name plus
+   expanded command as provenance without claiming controller acknowledgement or physical motion.
+
+#### Empty - no saved macros
+1. The selector says no user macros are saved. **New macro** remains available.
+2. Nothing runs and no controller bytes are sent until the user saves, selects, and explicitly runs
+   a macro.
+
+#### Error - invalid template, variable, or controller command
+1. Macro names must contain visible text. Templates must contain exactly one line and only complete
+   `{{identifier}}` placeholders; malformed placeholder syntax is reported inline and is not saved.
+2. Each variable value must be one finite decimal scalar. Missing values, command words, whitespace,
+   exponent notation, non-finite values, and control/newline injection produce an inline expansion
+   error and no send attempt.
+3. Expansion never substitutes a second command. The fully expanded command must still pass the
+   active driver's ordinary parser; its existing rejection text is shown unchanged.
+
+#### Error - local storage unavailable
+1. A failed save, edit, or delete reports that the local macro collection was not changed.
+2. The in-memory list remains at its last persisted state; the UI never claims an unsaved mutation
+   succeeded.
+
+#### Edge - Frame-first and operation ownership
+1. A macro is a named manual Console command, not a job. It has no Start callback, no streamer, no
+   automatic trigger, no keyboard shortcut, and no direct serial writer.
+2. Read-only commands preserve the existing Frame proof exactly as their manually typed equivalent.
+   Any state-mutating command invalidates `framedRun` before the asynchronous write, so a later job
+   still requires a fresh completed exact-job Frame and the ordinary one-use Start permit.
+3. Macros cannot create, refresh, claim, or consume a Frame permit. They cannot invoke Frame or
+   Start. Active job/motion/operation and Idle behavior remains the existing Console behavior.
+4. Multiline command lists, batched writes, acknowledgement sequencing, connect/startup hooks,
+   import/export, and controller-resident macro programs are outside v1.
+
 ### F-B14. Machine Settings read-only backup
 
 #### Success — read connected controller settings
@@ -1936,10 +1992,10 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    re-jogs and re-sets if they want the offset back.
 5. **Off-bed risk.** Operator sets origin near the bed edge, then
    runs a job whose scene-mm bounds *fit the bed* but extend off the
-   *machine* once the offset is applied. When WCO is known, Job Review
-   names the physical bounds (`job bounds + WCO`) and the out-of-bed
-   finding before Frame; it is a warning, not an ordinary Frame/Start
-   policy block. If no controller position/WCO has been observed yet,
+   *machine* once the offset is applied. When WCO is known, the Start-time
+   Job Review after a clean Frame names the physical bounds (`job bounds +
+   WCO`) and the out-of-bed finding; it is a warning, not an ordinary
+   Frame/Start policy block. If no controller position/WCO has been observed yet,
    the review says the physical extents are unproven. A genuinely
    unresolved placement remains a factual compile input and cannot
    produce the exact candidate.
@@ -2447,10 +2503,12 @@ profile, F-CNC14 tool-change job, F-CNC15 Z zeroing, F-CNC16 drill,
 F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
-F-CNC46 records the shipped ADR-290 explicit 8-bit grayscale height-map path.
-F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Their bounded ADR-292/293
-substrate is current where explicitly marked below; the remaining controls and
-user-facing flows are planned.
+F-CNC46 records the shipped ADR-290 explicit height-map path. F-CNC47-F-CNC50 specify the approved
+ADR-291 expansion. Their bounded ADR-292/294/295/296/297/298/299/300/301/304/305 plus ADR-292 Amendments
+2-5 schema, import, mapping, declared-source-meaning, recorded-source-detail, field-geometry,
+resolved-aspect-policy, canonical-Width-integrity, bounded exact Width re-factorization, and
+canonical-preview-authority plus atomic large-project autosave/recovery substrate is current where
+explicitly marked below; the remaining controls and user-facing flows are planned.
 
 ### F-CNC1. Switch to CNC mode and configure the machine
 
@@ -2599,9 +2657,10 @@ user-facing flows are planned.
 1. If the 0.5 mm allowance meets or exceeds the relief depth, only the
    shallowest levels produce regions (possibly none) — correct: there is
    nothing to rough without cutting into finishing stock.
-2. Roughing samples the physical heightmap at bit-diameter/8 cells (0.2 mm
-   floor), so compile stays bounded; the four-million-cell cap coarsens in
-   the final scaled metric for very large meshes.
+2. Roughing requests physical heightmap cells at exactly bit diameter / 8 in
+   the final scaled metric; CurveDesk attempts that exact derived allocation
+   with no 0.2 mm floor or four-million-cell coarsening, and reports an
+   unrepresentable or failed allocation as a factual materialization error.
 3. Each depth level emits at most 4,096 inward rings. A non-emitting next-inset
    probe distinguishes exact exhaustion, an offset-engine failure, and usable
    interior beyond that limit. The latter two are retained with the exact
@@ -2682,7 +2741,7 @@ user-facing flows are planned.
    part.
 
 #### Error — active bit is not a compatible angled cutter
-1. The layer panel and pre-Frame Job Review ask for a V-bit or angled
+1. The layer panel and Start-time Job Review ask for a V-bit or angled
    engraving bit.
    It is an ordinary Save/Frame/Start warning, not a gate. Output remains
    available for compatibility and can use the legacy 60-degree wrong-kind
@@ -2750,8 +2809,8 @@ user-facing flows are planned.
    round-trips the footprint.
 3. On Save G-code / Start job, toolpaths that leave the stock footprint
    raise a non-blocking advisory toast ("bit will cut air or clamps").
-   Physical bed bounds are likewise a Job Review warning before ordinary
-   Frame; Save G-code retains its separate export preflight.
+   Physical bed bounds are likewise a warning in the Start-time Job Review
+   after ordinary Frame; Save G-code retains its separate export preflight.
 
 #### Error — invalid dimension
 1. Width/height clamp to [1, 1500] mm; origin clamps to [-1500, 1500] mm;
@@ -3140,14 +3199,13 @@ and lifts the command's CNC-only gate.)*
    scallop field requests a planar-grid ridge-height target. Compile then emits the
    roughing group AND a finishing group cut with that bit (an M0 change
    separates them when the bits differ).
-2. Finishing rides the sampled max-plus tip surface in serpentine rows. A
-   ball nose requests 2·sqrt(c·(2r−c)) physical-XY spacing (flat bits request
-   40% of diameter); the grid refines when needed and its whole-row stride
-   rounds down so it does not overshoot that request. This qualifies finishing
-   sample vertices and planar cusp only when the four-million-cell cap has not
-   coarsened one cell past the request. It is not a continuous swept-volume or
-   true along-surface scallop proof; roughing contour vertices are also outside
-   the pointwise sampled-envelope qualification (ADR-289).
+2. Finishing rides the sampled max-plus tip surface in serpentine rows. A ball
+   nose uses `2*sqrt(c*(2r-c))` physical-XY spacing after bounding scallop `c`
+   to [0.001 mm, bit radius]; flat bits use the larger of 0.05 mm and 40% of
+   diameter. The grid attempts that resolved spacing and its whole-row stride
+   rounds down so it does not overshoot it. This qualifies sampled finishing
+   vertices and planar cusp, not a continuous included-surface sweep or true
+   along-surface scallop proof (ADR-292/294).
 3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
    pass); finishing consumes it down to the true surface.
 
@@ -3163,11 +3221,14 @@ and lifts the command's CNC-only gate.)*
 #### Edge — flat reliefs / tiny scallop
 1. A flat surface skims at exactly its depth; scallop clamps to
    [0.001 mm, bit radius]. Ball-nose spacing follows that clamped analytic
-   request; flat-tool row spacing retains its 0.05 mm floor.
+   request; flat-tool row spacing retains its 0.05 mm floor. The established
+   Stepover editor and planner range remains 10–85%.
 2. Uniform and nonuniform object scale are resolved before sampling, cutter
    dilation, and row spacing. Mirror/rotation/translation are residual
-   isometries. Subcell peaks, edge overhang, straight XYZ chords between
-   samples, and holder/shank clearance remain unqualified (ADR-289).
+   isometries. Partial terminal cells keep the exact requested interior pitch
+   while ending at the declared physical edge. Included subcell peaks, straight
+   XYZ chords between samples, the cutter footprint beyond an unmasked outer
+   relief boundary, and holder/shank clearance remain unqualified (ADR-294).
 
 ### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
 
@@ -3818,14 +3879,14 @@ and lifts the command's CNC-only gate.)*
    feedback must not be used as proof of measured physical RPM; each machine
    must be configured with the delay its spindle actually requires.
 
-### F-CNC39. Review controller overrides before CNC Frame — Phase H.11
+### F-CNC39. Review controller overrides at CNC Start — Phase H.11
 
 #### Success
 1. When the live GRBL `Ov:` cache is known, Job Review shows the exact feed,
    rapid, and spindle percentages. The 100/100/100 baseline is labelled verified.
 2. Reductions, increases, zero/invalid values, and missing evidence are named in
-   the warning list for the operator to acknowledge before Frame; none is an
-   ordinary Frame/Start policy gate.
+   the Start-time Job Review warning list after a clean Frame; none is an ordinary
+   Frame/Start policy gate.
 3. Once streaming begins, the operator may still adjust overrides deliberately
    through the existing in-job controls.
 
@@ -3842,7 +3903,7 @@ and lifts the command's CNC-only gate.)*
    external senders changing it remain outside the observation contract.
 2. No override value or missing observation blocks ordinary Frame/Start.
 
-### F-CNC40. Review live spindle and coolant state before CNC Frame - Phase H.11
+### F-CNC40. Review live spindle and coolant state at CNC Start - Phase H.11
 
 #### Success
 1. GRBL accessory reports decode clockwise spindle (`A:S`), counter-clockwise
@@ -3935,24 +3996,24 @@ and lifts the command's CNC-only gate.)*
    jobs (ADR-143/215) are a different feature from live Pause/Resume and remain as
    specified in their own flows. This amendment changes only same-session Resume.
 
-### F-CNC42. Attest exclusive controller access before CNC Frame - Phase H.11
+### F-CNC42. Attest exclusive controller access at CNC Start - Phase H.11
 
-#### Success - one pre-Frame Job Review acknowledgement
-1. After compile/readiness succeeds, Job Review names physical
-   workholding/clearance and every common competing command path: pendant/MPG,
-   WebUI/network, another sender app, PLC motion or spindle commands, controller
-   macros, and SD/file jobs.
-2. The operator confirms KerfDesk is the sole command owner while emergency-
+#### Success - one Start-time Job Review acknowledgement
+1. After a clean ordinary Frame issues the review-pending permit, pressing Start
+   opens Job Review. It names physical workholding/clearance and every common
+   competing command path: pendant/MPG, WebUI/network, another sender app, PLC
+   motion or spindle commands, controller macros, and SD/file jobs.
+2. The operator confirms CurveDesk is the sole command owner while emergency-
    stop, safety-door, and feed-hold circuits remain enabled.
-3. The resulting evidence is bound to the exact program fingerprint plus the
-   current trusted-position and work-Z-reference epochs before Frame.
+3. The resulting evidence is bound to the permit's exact program fingerprint plus
+   the current trusted-position and work-Z-reference epochs before claim/stream.
 
 #### Error - missing, incomplete, or stale evidence
-1. A missing acknowledgement keeps Job Review incomplete; there is no separate
-   post-Frame ordinary Start confirmation.
+1. A missing acknowledgement keeps the Start-time Job Review incomplete and no
+   job bytes stream. Cancelling keeps the unchanged review-pending permit armed.
 2. A reconnect, controller banner/reset, alarm/sleep, homing, origin/probe
    change, tool change, or other setup-trust invalidation expires the exact
-   candidate/permit and requires a new Job Review plus completed Frame.
+   permit and requires a newly completed Frame; the next Start opens a fresh review.
 
 #### Edge - declaration is not protocol ownership
 1. GRBL cannot identify a sender or grant an exclusive lease. The confirmation
@@ -3965,8 +4026,8 @@ and lifts the command's CNC-only gate.)*
 
 #### Success - explicit MPG release or no MPG telemetry
 1. `MPG:0` records that grblHAL released manual-pulse-generator ownership for
-   the current controller session. CNC continues through the ordinary pre-Frame
-   review and exact-artifact flow.
+   the current controller session. CNC continues through the ordinary dialog-free
+   Frame, Start-time Job Review, and exact-artifact flow.
 2. Controllers that do not implement the field remain unknown and use the
    operator exclusive-access contract in F-CNC42.
 
@@ -4072,50 +4133,149 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/293)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298/299/300/301/304/305; ADR-292 Amendments 2-5)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
    command is deliberately separate from **Import Image...**: it declares that
    tone is physical relief data rather than asking CurveDesk to infer 3D shape
    from a photograph.
-2. A qualified input is a lossless, non-interlaced, 8-bit grayscale PNG. The
-   import worker verifies the PNG structure and CRCs and retains one exact
-   grayscale sample per source pixel; it does not resize, auto-level, blur,
+2. A qualified input is a lossless, non-interlaced PNG containing either 8- or
+   16-bit grayscale samples, or 8-bit grayscale-plus-alpha samples. The
+   import worker verifies the supported PNG structure and every parsed chunk CRC
+   through `IEND`, then retains one exact
+   grayscale sample per source pixel; it does not resize, auto-level, composite, blur,
    sharpen, apply gamma, or run AI depth estimation. An optional grayscale
-   `tRNS` chunk maps pixels matching its transparent sample to mask byte `0`
-   and every other pixel to `255`; transparency is not composited.
+   `tRNS` chunk maps pixels matching its complete transparent sample code to mask byte `0`
+   and every other pixel to `255`. For 8-bit grayscale-plus-alpha, every grayscale
+   code becomes canonical U16 value `v * 257` and every alpha byte is copied unchanged
+   into the required U8 mask, including when every alpha value is `255`.
 3. Each file becomes a top-down relief at 100 mm wide and 5 mm deep. Height
    follows the pixel aspect ratio, **Light is high** is the declared default,
-   and the Relief properties panel shows the pixel dimensions and precision.
-4. Width, total depth, and polarity remain editable. **Light is deep** reverses
-   the full-range mapping without rewriting the embedded samples. Canvas,
+   and, in CNC mode when that relief is selected, the Relief properties panel shows the pixel
+   dimensions, precision, and persisted declared source meaning **Depth map**. A loaded canonical
+   project instead shows whichever of the five validated source meanings it actually stores;
+   CurveDesk does not infer or edit that value in this flow. **Recorded source details** separately
+   lists the persisted source name, optional source bit depth and source polarity, and optional
+   producer name/model/version. A blank or absent value reads **Not recorded**, and the panel says
+   the metadata is recorded, not authenticated. **Recorded source polarity** describes the source
+   declaration; the editable mapping below controls the current materialization and may differ. A
+   legacy-mesh relief has no canonical provenance object, so CurveDesk does not fabricate this group.
+4. For a selected canonical heightfield only, the CNC Relief properties panel shows a read-only
+   **Field geometry** block. If the stored field is `width` by `height`, its declared physical
+   dimensions are `physicalWidthMm` by `physicalHeightMm`, its object transform has scales
+   `scaleX` and `scaleY`, and its normalized crop has `crop.width` and `crop.height`, the block
+   reports relief-local magnitudes:
+   - `W = physicalWidthMm * abs(scaleX)` and
+     `H = physicalHeightMm * abs(scaleY)`;
+   - nominal full source-cell pitch
+     `pitchX = W / (width * crop.width)` and
+     `pitchY = H / (height * crop.height)`.
+   The readout rounds the exact stored factor magnitudes to six significant decimal digits. Very
+   large or small finite factor combinations remain visible in scientific notation instead of
+   being presented as an overflowed `Infinity` or an underflowed zero. Rotation and mirrors change
+   orientation, not those magnitudes. A fractional crop can cover only part of a source cell at
+   either boundary, so its physical coverage can be smaller than the nominal full-cell pitch; in a
+   one-cell partial crop, the nominal pitch can exceed the displayed physical span. These values
+   describe source sampling only: they are not preview or CAM target spacing, emitted coordinate
+   precision, a machine-axis bounding box, or hardware evidence. The block has no inputs and does
+   not mutate the project. Outside exact-zero compatibility, the adjacent editable **Width** follows
+   canonical `physicalWidthMm`, the source authority used by heightmap CAM, through native binary64
+   absolute X scale. Exact zero scale retains its stored target compatibility value. If positive
+   canonical factors underflow to `0` or overflow to `Infinity` in that native representation, an
+   informational note distinguishes it from the six-significant-digit Field geometry magnitude and
+   names the existing factual finite-positive materialization requirement; it adds no refusal.
+5. Width, total depth, polarity, and exact **Input low**/**Input high** U16 codes are editable. A
+   separate read-only **Resolved aspect policy** states how Width edits treat canonical Height; it
+   is recorded editor policy, not a second CAM transform. Under **Preserve**, the action derives
+   `newWidth * oldHeight / oldWidth` from the exact stored binary64 factors and rounds the final
+   result once. Under **Stretch**, Width and Height are independent, so Width retains the current
+   canonical Height. After the existing machine-space conversion yields an accepted positive finite
+   canonical Width patch, a derived Height that correctly rounds to `0` or `Infinity` does not
+   rewrite that patch: CurveDesk retains the prior Height and records **Stretch**. It neither rejects
+   nor clamps the accepted patch and adds no confirmation. This repair does not change the editor's
+   machine-space-to-stored-Width conversion. Every real heightfield Width edit synchronizes the
+   canonical and duplicate Width values and rebuilds natural bounds from the updated canonical
+   dimensions. A legacy mesh keeps its existing target-Width and stored-natural-bounds-aspect rule
+   before the separate exact bounded re-expression below.
+   If resolved heightfield dimensions exceed project v4's existing `1,000,000 mm` coordinate domain,
+   CurveDesk uses the smallest common power-of-two factor that can divide both canonical dimensions
+   and multiply both nonzero scale axes exactly. It adopts that internal re-factor only when the
+   dimensions and scales reverse exactly, remain inside the unchanged project domains, preserve both
+   native machine-space dimensions, and keep every finite transformed corner bit-identical.
+   The same persistence boundary applies to a legacy mesh after a positive finite stored Width patch
+   has been accepted. If target Width or either natural-bound span exceeds the coordinate domain,
+   CurveDesk chooses the smallest common power-of-two factor that brings all three local values into
+   range, divides target Width and both natural-bound dimensions by that factor, and multiplies both
+   signed scale axes by it. The candidate is adopted only when every multiply/divide reverses exactly,
+   scales remain inside their existing domain, all four transformed natural-bound corners stay finite
+   and bit-identical, and both materializer-order mesh dimensions remain exact:
+   `targetWidthMm * abs(scaleX)` and
+   `(meshYExtent / meshXExtent) * targetWidthMm * abs(scaleY)`. This preserves the stored-bounds
+   aspect used by canvas and later Width edits separately from the intrinsic mesh aspect used by CAM.
+   Mesh positions, empty-cell meaning, depth, mirrors, rotation, translation, materialized depth
+   bytes, prepared job, and the Frame bounds signature remain unchanged.
+   The legacy proof scans persisted array-like mesh positions only for an oversized candidate, using
+   the same per-coordinate Float32 storage semantics as CAM. It allocates no replacement mesh buffer,
+   and Width/depth-only edits retain the relief-source owner for downstream cache reuse. Exceptional
+   indexed reads or non-finite Float32 results make the factor unavailable without changing the edit.
+   The synchronous O(n) scan has no browser or packaged-Electron latency qualification in this slice.
+   Independent-axis-only encodings, exact-zero compatibility, scale exhaustion, non-reversible
+   subnormal factors, non-finite or drifting transformed geometry, and native division that rounds a
+   positive finite displayed Width to `0` or `Infinity` remain outside this bounded repair. CurveDesk
+   does not reject, restore, clamp, cap, approximate, delay, or confirm those edits; an exceptional
+   project can still remain outside the saveable v4 domain. Full durability requires a future
+   intent-versus-materialized-geometry representation. Corrected canonical dimensions can change
+   downstream materialized geometry, emitted bytes, and the exact Frame bounds signature compared
+   with an invalid or incoherent pre-repair result. CAM and emitter algorithms and Frame/Start
+   authorization rules are unchanged.
+   Each endpoint accepts an integer from `0` through `65535` without rounding, clamping, swapping,
+   or an ordering rule. With low below high, codes outside the interval clip to its ends; crossed
+   endpoints deliberately reverse that response. Equal endpoints produce one flat normalized value
+   of `0.5` before the stored curve and polarity. **Light is deep** reverses the resulting mapping
+   without rewriting embedded samples, mask bytes, digest, or provenance. When the source
+   carries a mask, **Mask threshold** exposes the exact persisted integer from `1` through `255`;
+   qualified imports initialize it to `255`. Blank, fractional, non-finite, or out-of-domain drafts
+   do not commit and restore the current value without rounding or clamping. Mask bytes at or above
+   the threshold use mapped depth. The operator can map lower bytes to **Excluded from carving**,
+   **Keep at stock top**, or **Carve to relief floor**. Either edit changes only persisted mapping
+   state and does not rewrite mask bytes. Canvas,
    **View 3D...**, and CAM use the same deterministic materialization rule and
    embedded samples; each consumer chooses the grid resolution appropriate to
    its job. **View 3D...** targets 0.25 mm display cells; when the longest edge
    exceeds 64 mm, its non-blocking status names the effective cell size and the
    256-cell display-mesh budget. That display choice never changes CAM or G-code.
-5. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
+   For a canonical heightfield with nonzero object X scale, the selected-property Width,
+   canvas heightfield target/resolution/cache identity, and Relief 3D title/display resolution all
+   derive their unscaled planning Width from canonical `reliefSource.physicalWidthMm`. A tolerated
+   `targetWidthMm` duplicate cannot select a different preview budget. At exact zero object X scale,
+   `targetWidthMm` remains the stored compatibility planning Width before residual collapse. Legacy
+   meshes continue to use their stored target Width. This authority repair mutates no project state,
+   does not change heightfield materialization, and adds no guard.
+6. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
    physical and pixel dimensions, optional U8 inclusion mask, mapping,
    provenance, revision, and digest. Eight-bit PNG sample `v` is represented
-   exactly as U16 value `v * 257`. Reopening validates the exact byte-length,
+   exactly as U16 value `v * 257`; each 16-bit PNG sample keeps its numeric code
+   while its network-order bytes are written in canonical little-endian order. Reopening validates the exact byte-length,
    source-authority, mapping, and digest contracts before preview or compilation.
-6. Periodic recovery writes the complete validated project JSON to atomic
+7. Periodic recovery writes the complete validated project JSON to atomic
    current/previous IndexedDB snapshots. A live second window receives its own
    recovery session; an abandoned window becomes eligible after its ownership
    lock is released. Accepting recovery re-homes the project before cleanup and
    keeps it dirty until a successful manual Save.
-7. In CNC mode, the existing relief layer settings select the flat-end-mill
+8. In CNC mode, the existing relief layer settings select the flat-end-mill
    roughing and optional ball-nose finishing tools. The existing relief CAM,
    tool changes, Job Review, Frame permit, preview, G-code, progress, and
    cancellation paths remain in force.
 
 #### Error - the PNG is not an explicit qualified height map
-1. RGB/RGBA, palette, 16-bit, or interlaced PNG input reports the unsupported
+1. RGB/RGBA, palette, 16-bit grayscale-alpha, other non-scalar sample layouts, or
+   interlaced PNG input reports the unsupported
    source contract for this slice and imports nothing for that file. It is not
    silently converted to grayscale and is never described as estimated depth.
 2. A malformed signature, chunk, CRC, row stream, base64 payload, dimension,
-   bit depth, byte-length declaration, or grayscale `tRNS` length/order/duplicate
+   bit depth, byte-length declaration, grayscale `tRNS` length/order/duplicate, or
+   forbidden grayscale-alpha `tRNS`
    reports a factual input-integrity error. Other files in the same selection continue.
 
 #### Empty
@@ -4133,22 +4293,46 @@ and lifts the command's CNC-only gate.)*
 3. Large files receive the existing non-blocking size advisory. Worker startup
    failure discloses the existing main-thread fallback; size never becomes an
    arbitrary import refusal.
-4. The durable model is canonical U16 little-endian (`u16le-base64-v1`), but this
-   decoder qualifies only exact 8-bit grayscale PNG and expands each input code
-   losslessly. A later 16-bit decoder can populate the same schema after its PNG
-   filtering, byte-order, worker-memory, and precision path is verified.
+4. The durable model is canonical U16 little-endian (`u16le-base64-v1`) with an
+   optional U8 inclusion mask. The exact height-map decoder qualifies color type 0
+   at 8 or 16 bits and color type 4 at 8 bits. It expands each 8-bit
+   code losslessly by `257`; it reconstructs 16-bit scanlines with a two-byte PNG
+   filter stride and converts each MSB-first source code to little-endian bytes
+   without luma conversion, resampling, or precision reduction. Color type 4 uses
+   a two-byte filter stride per pixel and preserves the second byte as mask data;
+   the existing threshold `255` means only fully opaque cells are included by default,
+   while partial alpha remains recoverable in the project. Ordinary image
+   import retains its separate existing 8-bit display-luma path.
 5. CAM requests its exact positive cell spacing and attempts the exact derived
    allocation; allocation failure is reported factually rather than silently
-   coarsening. When that spacing does not divide the declared physical width or
-   height, the current square grid uses ceil-rounded dimensions and can extend
-   by less than one cell. Exact relief-edge containment and 2D/CAM edge agreement
-   remain unqualified until an edge-cell model lands.
+   coarsening. When that spacing does not divide a declared physical dimension,
+   full interior cells retain the request and only the terminal row or column is
+   shorter. Canvas cell rectangles, stepped 3D cell quads, the simulation domain,
+   roughing, and finishing share that exact logical Float64 boundary. Smooth 3D
+   surfaces remain contained samples at actual cell centers, with exact stock-envelope
+   metadata; they are not cell-edge or mask-boundary evidence. Float32 preview
+   positions round to their nearest representable values. At ordinary magnitudes where
+   the existing `toFixed(3)` emitter produces fixed-decimal text, emitted coordinates use
+   a 0.001 mm quantum and may differ from the stored edge by up to 0.0005 mm;
+   astronomical G-code grammar and output remain unqualified. Frame reviews the generated
+   job rather than asserting bit-exact equality with the object edge. Exact IEEE-754 input
+   arithmetic remains authoritative, so a representable one-ULP remainder is a real
+   partial cell rather than a hidden tolerance rewrite.
 6. Coarser target cells use the highest overlapping source surface and require
-   all overlapping source-mask coverage. Excluded mask squares are protected by
+   all overlapping source-mask coverage. Excluded mask cell rectangles are protected by
    emitted-precision cutter envelopes in roughing and finishing, but this does
    not prove included subpixel surface detail, holder clearance, controller
    tracking, material finish, or safe feeds for a particular physical setup.
-7. Large-field periodic recovery is qualified in Chrome across reload, not abrupt
+7. An exact zero object scale reports physical size and nominal source pitch as zero on that axis
+   and identifies the axis as collapsed legacy compatibility. Existing CAM compatibility still
+   plans the stored width before its cutter-center output collapses; that path has no qualified
+   physical carving geometry on the collapsed axis. The existing editable **Width** remains
+   available as the stored, recoverable planning width, and its tooltip names that fact rather
+   than calling it physical carved width. The zero-scale Field geometry and tooltip disclosure
+   itself changes no CAM, schema, state, mapping, output, Frame, or Start behavior. Width editing is
+   separate: it follows item 5's resolved-aspect rules and may update canonical dimensions, bounds,
+   and mapping policy before the existing zero-scale compatibility transform is applied.
+8. Large-field periodic recovery is qualified in Chrome across reload, not abrupt
    process/power loss or packaged Electron restart. Project serialization still
    runs in the renderer. The synchronous unload fallback can exceed localStorage,
    so the recoverable state may be only the most recent successfully committed
@@ -4157,18 +4341,25 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-295 supply schema-v4/U16LE
-> storage, migration, qualified 8-bit grayscale import, simple transparency
-> masks, atomic large-project autosave/recovery, and the existing CAM/preview
-> substrate. The creation modes and controls below remain planned; use F-CNC46's
-> narrower **Import Height Map...** flow today.
+> **Planned - not current UI.** P2R.1a plus ADR-292 Amendments 2-5 and ADR-294/295/296/297/298/299/300/301/304/305
+> supply schema-v4/U16LE storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha
+> import, simple transparency masks, exact input-endpoint mapping, exact inclusion-threshold and
+> outside-mask-meaning controls, read-only declared-source-meaning, recorded-source-detail,
+> field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact
+> Width re-factorization and preview authority, exact partial-edge geometry, atomic large-project
+> autosave/recovery, and the existing CAM/preview substrate. Gamma, the creation modes, and the
+> remaining controls below stay planned; use
+> F-CNC46's narrower **Import Height Map...** flow today.
 
 #### Success
 1. Choose **Create Relief...** and select the source meaning before import:
    **Depth map**, **Brightness emboss**, **Relative-depth map**, **Editable relief
    map**, or **STL top projection**. **Blank editable map** is the creation option
    for a new **Editable relief map**. The canonical source meaning is persisted as
-   provenance and stays visible in Relief properties and Job Review.
+   provenance. Relief properties already shows that stored declaration and the
+   recorded source name/bit depth/polarity/producer details read-only; choosing
+   source meaning during creation and disclosing provenance in output and Job
+   Review remain part of this planned flow.
 2. **Depth map** accepts qualified 8- or 16-bit grayscale PNG samples as scalar
    data. It reports PNG gamma/color-space metadata without silently applying it.
    The operator sets polarity, input-low/input-high codes, maximum physical
@@ -4185,9 +4376,11 @@ and lifts the command's CNC-only gate.)*
    dimensions. **STL top projection** preserves the existing mesh unless the user
    explicitly chooses **Convert to editable relief map** and accepts the displayed
    field resolution as the new editable representation.
-6. A histogram, low/high clipping percentages, physical width/height, effective
-   millimetres per field cell, polarity, and outside-mask choice update with the
-   target preview. Outside-mask meaning is explicit: **stock top**, **relief
+6. The planned creation surface adds editable physical geometry controls and pre-create histogram,
+   low/high clipping percentages, physical width/height, effective millimetres per field cell,
+   polarity, crop/aspect placement, and outside-mask choice that update with the target preview.
+   This remains planned and is distinct from F-CNC46's current selected-object, read-only physical
+   span and nominal source-cell pitch. Outside-mask meaning is explicit: **stock top**, **relief
    floor**, or **excluded from carving**.
 7. **Create** adds a one-sided top-down relief whose canonical editable arm uses
    row-major U16 scalar codes, optional U8 inclusion mask, mapping/provenance/revision,
@@ -4216,22 +4409,32 @@ and lifts the command's CNC-only gate.)*
    physical and sample dimensions are shown before creation.
 
 #### Edge - alpha, flat ranges, large fields, and source truth
-1. An alpha-bearing source copies every alpha byte unchanged into the U8 mask:
+1. The current F-CNC46 color-type-4/8 importer copies every alpha byte unchanged
+   into the U8 mask and persists that mask even when it is fully opaque. The planned
+   creation surface generalizes the same contract to other explicitly qualified alpha-bearing sources:
    `0` is no coverage, `255` is full coverage, and `1..254` preserves partial
-   coverage. The visible default threshold is `255`, so any transparency is below
-   threshold and **excluded from carving**. The operator may change the threshold
-   or map below-threshold cells to stock top or relief floor before or after
-   creation. Alpha is never silently composited against black or white.
-2. When input-low equals input-high or every sample has one value, the preview is
-   flat and explains why; no auto-level operation is applied. Clipped samples and
-   unusually coarse effective cell size produce warnings, not hidden correction.
+   coverage. Qualified F-CNC46 imports initialize the threshold at `255`, so any transparency is
+   below threshold and **excluded from carving** by default. Relief properties displays the actual
+   persisted threshold exactly—including a valid non-default value loaded from a project—and can
+   edit it from `1` through `255` or map lower bytes to stock top or relief floor without changing
+   mask bytes. Mask authoring remains part of this planned creation surface. Alpha is never silently composited
+   against black or white.
+2. Current Relief properties already preserves equal input endpoints as a flat normalized `0.5`
+   and crossed endpoints as a deliberate reversed response; no auto-level or endpoint-order rule is
+   applied. The planned creation surface adds histogram and clipped-sample percentages. Unusually
+   coarse effective cell size remains disclosed rather than silently corrected.
 3. Large sources use worker decode with byte/row progress and cooperative Escape
    cancellation. Size and estimated memory are advisories. CurveDesk neither
    invents a policy ceiling nor silently downsamples; any operator-selected
    reduction displays the resulting dimensions and millimetres per cell.
-4. A source producer may be unknown. Missing provenance is displayed as unknown,
-   not fabricated. Relative-depth provenance never upgrades relative values to
-   metric depth.
+4. A canonical source name or any present producer string may be blank. Source
+   bit depth, source polarity, the producer object, and its optional model/version
+   may be absent. Current Relief properties shows each missing recorded value as
+   **Not recorded** rather than inferring it from the object name, file extension,
+   current mapping, or source contents. The values are recorded declarations, not
+   authenticated facts. A legacy mesh has no heightfield provenance, so it
+   receives no fabricated **Recorded source details**. Relative-depth provenance
+   never upgrades relative values to metric depth.
 
 ### F-CNC48. Edit the canonical relief field - planned (ADR-291 / P2R.2)
 

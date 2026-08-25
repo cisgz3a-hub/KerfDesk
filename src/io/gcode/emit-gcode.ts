@@ -1,7 +1,7 @@
 // emitGcode — runs the Phase A pipeline (compile → emit → preflight) over a
 // Project and returns the G-code string plus the preflight verdict. Pure: no
-// I/O. The UI / platform adapter decides whether to actually write the file
-// based on `preflight.ok`.
+// I/O. Callers partition factual compile-integrity issues from advisories; they
+// must not gate writes or Start on aggregate `preflight.ok`.
 
 import {
   findCncSecondaryToolFeedIssues,

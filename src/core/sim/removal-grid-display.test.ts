@@ -2,6 +2,7 @@
 // preservation, and the no-op fast path.
 
 import { describe, expect, it } from 'vitest';
+import { partialCellSize } from '../grid';
 import { createRemovalGrid, type RemovalGrid } from './removal-grid';
 import { downsampleRemovalGrid } from './removal-grid-display';
 
@@ -44,6 +45,24 @@ describe('downsampleRemovalGrid', () => {
     // factor 3 → 2×1 cells; the far corner's block still carries −4.
     expect(small.widthCells).toBe(2);
     expect(small.heightCells).toBe(1);
+    expect(small.depth[1]).toBe(-4);
+  });
+
+  it('preserves exact extents and partial terminal cells while coarsening', () => {
+    const grid = gridWithDepths(1, 0.5, 0.3);
+    grid.depth[grid.depth.length - 1] = -4;
+
+    const small = downsampleRemovalGrid(grid, 2);
+
+    expect(small).toMatchObject({
+      widthCells: 2,
+      heightCells: 1,
+      widthMm: 1,
+      heightMm: 0.5,
+      mmPerCell: 0.6,
+    });
+    expect(partialCellSize(small, 'x', 1)).toBeCloseTo(0.4, 10);
+    expect(partialCellSize(small, 'y', 0)).toBeCloseTo(0.5, 10);
     expect(small.depth[1]).toBe(-4);
   });
 

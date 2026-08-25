@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kernelForTool } from '../sim';
+import { kernelForTool, type ToolKernel } from '../sim';
 import type { CncTool } from '../scene';
 import type { Heightmap } from './heightmap';
 import { reliefFinishingPasses, scallopRowSpacingMm } from './relief-finishing';
@@ -12,12 +12,30 @@ const SMALL_BALL_NOSE: CncTool = {
   diameterMm: 0.1,
 };
 const END_MILL: CncTool = { id: 'em', name: 'flat', kind: 'end-mill', diameterMm: 3.175 };
-const POINT_KERNEL = { radiusCells: 0, offsets: [{ dx: 0, dy: 0, dz: 0 }] } as const;
+const POINT_KERNEL_BASE = kernelForTool(
+  { id: 'point', name: 'point', kind: 'end-mill', diameterMm: 0 },
+  1,
+);
+const POINT_OFFSETS = [{ dx: 0, dy: 0, dz: 0 }] as const;
+const POINT_KERNEL: ToolKernel = {
+  ...POINT_KERNEL_BASE,
+  radiusCells: 0,
+  surfaceCandidateSpanCells: 0,
+  offsets: POINT_OFFSETS,
+  maskCellOffsets: POINT_OFFSETS,
+  maskCellCandidateSpanCells: 0,
+  maskSweepCellOffsets: POINT_OFFSETS,
+  maskSweepCandidateSpanCells: 0,
+  maskPathUncertaintyMm: 0,
+  maskSweepPathUncertaintyMm: 0,
+};
 
 function flatMap(depthMm: number, widthCells = 20, heightCells = 20, mmPerCell = 0.5): Heightmap {
   return {
     widthCells,
     heightCells,
+    widthMm: widthCells * mmPerCell,
+    heightMm: heightCells * mmPerCell,
     mmPerCell,
     depth: new Float32Array(widthCells * heightCells).fill(depthMm),
   };
@@ -33,7 +51,14 @@ function pyramidMap(depthMm: number, cells = 40, mmPerCell = 0.5): Heightmap {
       depth[y * cells + x] = -depthMm * (1 - rimDistance);
     }
   }
-  return { widthCells: cells, heightCells: cells, mmPerCell, depth };
+  return {
+    widthCells: cells,
+    heightCells: cells,
+    widthMm: cells * mmPerCell,
+    heightMm: cells * mmPerCell,
+    mmPerCell,
+    depth,
+  };
 }
 
 function rowDirectionSign(
@@ -320,13 +345,7 @@ describe('reliefFinishingPasses', () => {
 
   it('does not claim a singleton cut when the tool-center envelope stays at stock top', () => {
     const map = { ...flatMap(-2, 2, 1, 1), inclusion: Uint8Array.from([1, 0]) };
-    const stockTopKernel = {
-      radiusCells: 1,
-      offsets: [
-        { dx: 0, dy: 0, dz: 0 },
-        { dx: 1, dy: 0, dz: 0 },
-      ],
-    } as const;
+    const stockTopKernel = kernelForTool(END_MILL, map.mmPerCell);
 
     expect(
       reliefFinishingPasses(map, {

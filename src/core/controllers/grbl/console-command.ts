@@ -29,8 +29,7 @@ export type ConsoleCommandResult =
   | { readonly ok: false; readonly reason: string };
 
 const EMPTY_REASON = 'Enter one GRBL or G-code command.';
-const MULTILINE_REASON =
-  'Console commands must be one line. Use macros later for multi-line commands.';
+const MULTILINE_REASON = 'Console commands and saved macros must contain exactly one line.';
 const BLOCKED_PERSISTENT_REASON =
   'This persistent controller command is blocked in the Console. Back up settings and use Machine Settings in a later lane.';
 

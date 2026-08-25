@@ -17,20 +17,22 @@ export type PngFixtureOptions = {
 
 export function makePng(options: PngFixtureOptions): Uint8Array {
   const colorType = options.colorType ?? 2;
-  const channels = colorType === 0 ? 1 : colorType === 6 ? 4 : 3;
+  const bitDepth = options.bitDepth ?? 8;
+  const channels = CHANNELS_BY_COLOR_TYPE[colorType] ?? 3;
+  const bytesPerPixel = channels * bytesPerSample(bitDepth);
   const rawRows: Uint8Array[] = [];
-  let previous = new Uint8Array(options.width * channels);
+  let previous = new Uint8Array(options.width * bytesPerPixel);
   for (let index = 0; index < options.rows.length; index += 1) {
     const row = Uint8Array.from(options.rows[index] ?? []);
     const filter = options.filters?.[index] ?? 0;
-    rawRows.push(Uint8Array.of(filter), filterRow(row, previous, channels, filter));
+    rawRows.push(Uint8Array.of(filter), filterRow(row, previous, bytesPerPixel, filter));
     previous = row;
   }
   const ihdr = new Uint8Array(13);
   const view = new DataView(ihdr.buffer);
   view.setUint32(0, options.width);
   view.setUint32(4, options.height);
-  ihdr[8] = options.bitDepth ?? 8;
+  ihdr[8] = bitDepth;
   ihdr[9] = colorType;
   ihdr[10] = 0;
   ihdr[11] = 0;
@@ -54,6 +56,20 @@ export function makePng(options: PngFixtureOptions): Uint8Array {
     ...transparency.afterIdat,
     chunk('IEND', new Uint8Array()),
   ]);
+}
+
+/** Replace only IHDR dimensions and its CRC so header-only boundary tests need no huge allocation. */
+export function withDeclaredPngDimensions(
+  png: Uint8Array,
+  width: number,
+  height: number,
+): Uint8Array {
+  const result = png.slice();
+  const view = new DataView(result.buffer, result.byteOffset, result.byteLength);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  view.setUint32(29, crc32(result.subarray(12, 29)));
+  return result;
 }
 
 function transparencyChunks(
@@ -95,6 +111,15 @@ export async function* chunksOf(bytes: Uint8Array, size: number): AsyncGenerator
 
 export function rgba(...values: number[]): number[] {
   return values;
+}
+
+/** Serialize numeric U16 samples in PNG network byte order. */
+export function u16beBytes(...values: number[]): number[] {
+  return values.flatMap((value) => [(value >>> 8) & 0xff, value & 0xff]);
+}
+
+function bytesPerSample(bitDepth: number): number {
+  return bitDepth === 16 ? 2 : 1;
 }
 
 function physicalDimensions(pixelsPerMetre: number): Uint8Array {
@@ -163,6 +188,8 @@ function concat(parts: ReadonlyArray<Uint8Array>): Uint8Array {
 }
 
 const CRC_TABLE = buildCrcTable();
+
+const CHANNELS_BY_COLOR_TYPE: Readonly<Record<number, number>> = { 0: 1, 4: 2, 6: 4 };
 
 function crc32(bytes: Uint8Array): number {
   let crc = 0xffffffff;

@@ -6,8 +6,10 @@
 // live by the playback slider.
 
 import type { ChiploadMaterial } from '../../core/cnc';
+import { IDENTITY_TRANSFORM } from '../../core/scene';
 import type { RemovalGrid } from '../../core/sim';
 import { materialAppearance } from '../theme/material-appearance';
+import { drawPartialGridBitmapAtTransform } from './draw-raster';
 import type { ViewTransform } from './view-transform';
 
 const SHALLOW_ALPHA = 110;
@@ -34,12 +36,18 @@ export function drawCncRemoval(
   if (bitmap === null) return;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(
+  drawPartialGridBitmapAtTransform(
+    ctx,
     bitmap,
-    view.offsetX + grid.originX * view.scale,
-    view.offsetY + grid.originY * view.scale,
-    grid.widthCells * grid.mmPerCell * view.scale,
-    grid.heightCells * grid.mmPerCell * view.scale,
+    grid,
+    {
+      minX: grid.originX,
+      minY: grid.originY,
+      maxX: grid.originX + grid.widthMm,
+      maxY: grid.originY + grid.heightMm,
+    },
+    IDENTITY_TRANSFORM,
+    view,
   );
   ctx.restore();
 }

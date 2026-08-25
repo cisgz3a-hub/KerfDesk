@@ -1,5 +1,7 @@
-const MAX_COORDINATE_MAGNITUDE_MM = 1_000_000;
-const MAX_TRANSFORM_SCALE = 100_000;
+/** Largest persisted local/scene coordinate magnitude accepted by project v4. */
+export const MAX_PROJECT_COORDINATE_MAGNITUDE_MM = 1_000_000;
+/** Largest persisted object-transform scale magnitude accepted by project v4. */
+export const MAX_PROJECT_TRANSFORM_SCALE = 100_000;
 
 export function validateArray(
   value: ReadonlyArray<unknown>,
@@ -46,14 +48,14 @@ export function requireNumber(obj: Record<string, unknown>, path: string): strin
 
 export function requireCoordinate(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
-  return isFiniteNumber(value) && Math.abs(value) <= MAX_COORDINATE_MAGNITUDE_MM
+  return isFiniteNumber(value) && Math.abs(value) <= MAX_PROJECT_COORDINATE_MAGNITUDE_MM
     ? null
     : `missing or invalid \`${path}\``;
 }
 
 export function requireScale(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
-  return isFiniteNumber(value) && Math.abs(value) <= MAX_TRANSFORM_SCALE
+  return isFiniteNumber(value) && Math.abs(value) <= MAX_PROJECT_TRANSFORM_SCALE
     ? null
     : `missing or invalid \`${path}\``;
 }

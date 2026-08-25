@@ -1,20 +1,26 @@
 // setReliefParams — edit a ReliefObject's carve parameters (width / depth /
 // source interpretation), the editor promised when H.5 roughing landed. Width edits
-// rescale the natural bounds by the source aspect ratio (bounds are always
-// (0,0)..(width, width·aspect)); the transform — and therefore the object's
-// placement — is untouched.
+// keep canonical heightfield bounds synchronized with their resolved physical
+// dimensions; legacy meshes retain stored natural-bounds aspect and intrinsic
+// mesh CAM. When an exact common factor exists, either representation re-expresses
+// local dimensions and scale together while keeping every transformed corner unchanged.
 
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import type { ReliefObject } from '../../core/scene';
-import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
+import type { MeshReliefObject } from '../../core/scene/relief';
+import {
+  applyHeightfieldReliefPatch,
+  hasReliefPatch,
+  isNoOpHeightfieldMappingPatch,
+  normalizeReliefPatch,
+  type ReliefParamPatch,
+} from './relief-heightfield-param-patch';
+import { factorReliefHeightfieldWidth } from './relief-heightfield-width-factorization';
+import { factorReliefLegacyWidth } from './relief-legacy-width-factorization';
+import { reliefWidthBounds } from './relief-width-bounds';
 
-export type ReliefParamPatch = {
-  targetWidthMm?: number;
-  reliefDepthMm?: number;
-  emptyCells?: 'floor' | 'top';
-  polarity?: 'light-is-high' | 'light-is-deep';
-};
+export type { ReliefParamPatch } from './relief-heightfield-param-patch';
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
@@ -27,9 +33,14 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
         let changed = false;
         const objects = s.project.scene.objects.map((obj) => {
           if (obj.id !== id || obj.kind !== 'relief') return obj;
+          if (isNoOpHeightfieldMappingPatch(obj, normalized)) return obj;
           changed = true;
           const next = applyReliefPatch(obj, normalized);
-          return { ...next, bounds: boundsForWidth(obj, next.targetWidthMm) };
+          if (normalized.targetWidthMm === undefined) return next;
+          const resized = { ...next, bounds: reliefWidthBounds(obj, next) };
+          return isMeshRelief(resized)
+            ? factorReliefLegacyWidth(resized).relief
+            : factorReliefHeightfieldWidth(resized).relief;
         });
         if (!changed) return s;
         return {
@@ -41,28 +52,6 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
       });
     },
   };
-}
-
-function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch {
-  const out: ReliefParamPatch = {};
-  if (positiveFinite(patch.targetWidthMm)) {
-    out.targetWidthMm = patch.targetWidthMm;
-  }
-  if (positiveFinite(patch.reliefDepthMm)) {
-    out.reliefDepthMm = patch.reliefDepthMm;
-  }
-  if (patch.emptyCells !== undefined) out.emptyCells = patch.emptyCells;
-  if (patch.polarity !== undefined) out.polarity = patch.polarity;
-  return out;
-}
-
-function hasReliefPatch(patch: ReliefParamPatch): boolean {
-  return (
-    patch.targetWidthMm !== undefined ||
-    patch.reliefDepthMm !== undefined ||
-    patch.emptyCells !== undefined ||
-    patch.polarity !== undefined
-  );
 }
 
 function applyReliefPatch(relief: ReliefObject, patch: ReliefParamPatch): ReliefObject {
@@ -85,56 +74,12 @@ function applyMeshReliefPatch(
   common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>>,
   patch: ReliefParamPatch,
 ): MeshReliefObject {
+  const emptyCells = patch.emptyCells;
   return {
     ...relief,
     ...common,
-    reliefSource: {
-      ...relief.reliefSource,
-      ...(patch.emptyCells === undefined ? {} : { emptyCells: patch.emptyCells }),
-    },
+    ...(emptyCells === undefined || emptyCells === relief.reliefSource.emptyCells
+      ? {}
+      : { reliefSource: { ...relief.reliefSource, emptyCells } }),
   };
-}
-
-function applyHeightfieldReliefPatch(
-  relief: HeightfieldReliefObject,
-  common: Partial<Pick<ReliefObject, 'targetWidthMm' | 'reliefDepthMm'>>,
-  patch: ReliefParamPatch,
-): HeightfieldReliefObject {
-  const nextWidthMm = patch.targetWidthMm ?? relief.targetWidthMm;
-  const aspect = relief.reliefSource.physicalHeightMm / relief.reliefSource.physicalWidthMm;
-  const nextDepthMm = patch.reliefDepthMm ?? relief.reliefDepthMm;
-  const nextPolarity = patch.polarity ?? relief.reliefSource.mapping.polarity;
-  const canonicalChanged =
-    nextWidthMm !== relief.reliefSource.physicalWidthMm ||
-    nextDepthMm !== relief.reliefSource.mapping.maxDepthMm ||
-    nextPolarity !== relief.reliefSource.mapping.polarity;
-  return {
-    ...relief,
-    ...common,
-    reliefSource: {
-      ...relief.reliefSource,
-      physicalWidthMm: nextWidthMm,
-      physicalHeightMm: nextWidthMm * aspect,
-      mapping: {
-        ...relief.reliefSource.mapping,
-        ...(patch.reliefDepthMm === undefined ? {} : { maxDepthMm: patch.reliefDepthMm }),
-        ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
-      },
-      revision: relief.reliefSource.revision + (canonicalChanged ? 1 : 0),
-    },
-  };
-}
-
-function boundsForWidth(
-  relief: { readonly bounds: { readonly maxX: number; readonly maxY: number } },
-  widthMm: number,
-): { minX: number; minY: number; maxX: number; maxY: number } {
-  // Natural relief bounds start at (0,0); the Y extent follows the source
-  // aspect ratio captured at import.
-  const aspect = relief.bounds.maxX > 0 ? relief.bounds.maxY / relief.bounds.maxX : 1;
-  return { minX: 0, minY: 0, maxX: widthMm, maxY: widthMm * aspect };
-}
-
-function positiveFinite(value: number | undefined): value is number {
-  return value !== undefined && Number.isFinite(value) && value > 0;
 }

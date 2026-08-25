@@ -1,66 +1,13 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { ReliefHeightfield, ReliefHeightfieldMapping } from '../scene/relief';
+import type { ReliefHeightfield } from '../scene/relief';
 import { decodeCanonicalBase64 } from './depth-map-base64';
 import { reliefHeightfieldDigest } from './heightfield-digest';
-import { createReliefHeightfield, u16ValuesToLittleEndian } from './relief-heightfield-factory';
+import { materialize, source } from './heightfield-to-heightmap-test-helpers';
 import {
   heightfieldToHeightmap,
   type HeightfieldMaterializationRuntime,
 } from './heightfield-to-heightmap';
-
-type SourceInput = {
-  readonly values: ReadonlyArray<number>;
-  readonly width?: number;
-  readonly height?: number;
-  readonly physicalWidthMm?: number;
-  readonly physicalHeightMm?: number;
-  readonly maxDepthMm?: number;
-  readonly mask?: ReadonlyArray<number>;
-  readonly mapping?: Partial<ReliefHeightfieldMapping>;
-};
-
-function source(input: SourceInput): ReliefHeightfield {
-  const width = input.width ?? input.values.length;
-  const height = input.height ?? 1;
-  const physicalWidthMm = input.physicalWidthMm ?? width;
-  const physicalHeightMm = input.physicalHeightMm ?? height;
-  const maxDepthMm = input.maxDepthMm ?? 5;
-  return createReliefHeightfield({
-    width,
-    height,
-    physicalWidthMm,
-    physicalHeightMm,
-    samples: u16ValuesToLittleEndian(input.values),
-    ...(input.mask === undefined ? {} : { inclusionMask: Uint8Array.from(input.mask) }),
-    mapping: {
-      polarity: 'light-is-high',
-      inputLowCode: 0,
-      inputHighCode: 0xffff,
-      curve: { kind: 'gamma-v1', gamma: 1 },
-      maxDepthMm,
-      crop: { kind: 'normalized-v1', x: 0, y: 0, width: 1, height: 1 },
-      aspect: 'preserve',
-      inclusionThreshold: 255,
-      outsideMask: 'excluded',
-      ...input.mapping,
-    },
-    provenance: {
-      sourceKind: 'depth-map',
-      sourceName: 'test.png',
-      sourceBitDepth: 16,
-      sourcePolarity: input.mapping?.polarity ?? 'light-is-high',
-    },
-  });
-}
-
-function materialize(field: ReliefHeightfield, mmPerCell = 1) {
-  return heightfieldToHeightmap(field, {
-    targetWidthMm: field.physicalWidthMm,
-    reliefDepthMm: field.mapping.maxDepthMm,
-    mmPerCell,
-  });
-}
 
 describe('heightfieldToHeightmap', () => {
   it('maps the full U16 range to physical depth with explicit polarity', () => {
@@ -105,16 +52,39 @@ describe('heightfieldToHeightmap', () => {
     expect(result.heightmap.depth[1]).toBeCloseTo(-10 * (1 - normalized ** 2), 6);
   });
 
+  it('preserves crossed input endpoints as a clipped reversed response', () => {
+    const result = materialize(
+      source({
+        values: [0, 0x4000, 0x8000, 0xc000, 0xffff],
+        width: 5,
+        mapping: { inputLowCode: 0xc000, inputHighCode: 0x4000 },
+      }),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect([...result.heightmap.depth]).toEqual([0, 0, -2.5, -5, -5]);
+    }
+  });
+
   it('defines equal input levels as a deterministic flat midpoint', () => {
     for (const polarity of ['light-is-high', 'light-is-deep'] as const) {
       const result = materialize(
         source({
           values: [0, 12345, 0xffff],
-          mapping: { polarity, inputLowCode: 1000, inputHighCode: 1000 },
+          mapping: {
+            polarity,
+            inputLowCode: 1000,
+            inputHighCode: 1000,
+            curve: { kind: 'gamma-v1', gamma: 2 },
+          },
         }),
       );
       expect(result.kind).toBe('ok');
-      if (result.kind === 'ok') expect([...result.heightmap.depth]).toEqual([-2.5, -2.5, -2.5]);
+      const expectedDepth = polarity === 'light-is-high' ? -3.75 : -1.25;
+      if (result.kind === 'ok') {
+        expect([...result.heightmap.depth]).toEqual([expectedDepth, expectedDepth, expectedDepth]);
+      }
     }
   });
 
@@ -173,6 +143,44 @@ describe('heightfieldToHeightmap', () => {
     expect([...full.heightmap.depth]).toEqual([0]);
     expect([...masked.heightmap.depth]).toEqual([0]);
     expect([...masked.heightmap.inclusion!]).toEqual([0]);
+  });
+
+  it('samples a terminal partial cell from its exact physical source footprint', () => {
+    const values = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10_000];
+    const field = source({
+      values,
+      width: values.length,
+      physicalWidthMm: 1,
+      physicalHeightMm: 0.3,
+    });
+    const result = materialize(field, 0.3);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.heightmap).toMatchObject({
+      widthCells: 4,
+      heightCells: 1,
+      widthMm: 1,
+      heightMm: 0.3,
+      mmPerCell: 0.3,
+    });
+    const expectedCodes = [3000, 6000, 9000, 10_000];
+    expectedCodes.forEach((code, index) => {
+      expect(result.heightmap.depth[index]).toBeCloseTo(-5 * (1 - code / 0xffff), 5);
+    });
+
+    const masked = materialize(
+      source({
+        values,
+        width: values.length,
+        mask: [255, 255, 255, 255, 255, 255, 255, 255, 255, 0],
+        physicalWidthMm: 1,
+        physicalHeightMm: 0.3,
+      }),
+      0.3,
+    );
+    expect(masked.kind).toBe('ok');
+    if (masked.kind === 'ok') expect([...masked.heightmap.inclusion!]).toEqual([1, 1, 1, 0]);
   });
 
   it('retains every U8 mask value and applies the declared threshold and outside meaning', () => {

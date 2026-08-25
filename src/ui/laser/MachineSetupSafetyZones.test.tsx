@@ -35,6 +35,19 @@ afterEach(() => {
 });
 
 describe('MachineSetupSafetyZones', () => {
+  it('locates zone warnings in the Start-time review after Frame', async () => {
+    const { host, unmount } = await renderPanel();
+    try {
+      expect(host.textContent).toContain(
+        'warn in the Start-time Job Review after a clean Frame and after a successful G-code save',
+      );
+      expect(host.textContent).not.toContain('Job Review for Frame and Start');
+      expect(host.textContent).not.toContain('block G-code export');
+    } finally {
+      await unmount();
+    }
+  });
+
   it('lets numeric fields be cleared while editing', async () => {
     useStore.getState().updateDeviceProfile({
       noGoZones: [
