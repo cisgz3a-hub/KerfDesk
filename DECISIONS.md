@@ -3409,11 +3409,14 @@ recenters every instance in its own outline. This changes only artwork geometry;
 fixture spacing, operation bindings, output order, and the one-edit undo contract
 remain unchanged.
 
-The scene transform model has rotation plus local X/Y scale but no shear. An
-independent canvas-axis resize of rotated artwork is therefore not representable by
-that model; the existing `non-uniform-rotated-selection` integrity result is surfaced
-as an instruction to lock AR before applying. This is not a Start or output guard and
-does not change Frame, Preview, compilation, transport, or machine authorization.
+The scene transform model has rotation plus local X/Y scale but no shear. Rotated jig
+artwork therefore measures and applies W/H in a selection-local frame aligned to the
+first artwork object's axes. The store scales positions and object X/Y scale in that
+frame, preserves every rotation, and recenters the resulting world bounds in each jig.
+The visible unlocked hint states the local-axis convention. Applying remains available
+for rotated artwork; no resize refusal, hidden input, or instruction to relock AR is
+introduced. This does not change Frame, Preview, compilation, transport, or machine
+authorization.
 
 ### Consequences
 

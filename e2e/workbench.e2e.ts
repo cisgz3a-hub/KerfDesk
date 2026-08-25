@@ -107,6 +107,7 @@ baseTest(
     await page.getByRole('tab', { name: 'Cuts / Layers' }).click();
 
     await page.getByRole('button', { name: 'Save G-code...' }).click();
+    await acceptGcodeFilename(page);
     await expect
       .poll(() =>
         page.evaluate(() => Boolean((window as Window & { __e2eSaved?: string }).__e2eSaved)),
@@ -466,6 +467,7 @@ async function runPageBackedImport(
       });
     });
     await page.getByRole('button', { name: 'Save G-code...' }).click();
+    await acceptGcodeFilename(page);
     await expect
       .poll(() =>
         page.evaluate(() => (window as Window & { __e2eSaved?: string }).__e2eSaved ?? ''),
@@ -704,6 +706,12 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+}
+
+async function acceptGcodeFilename(page: Page): Promise<void> {
+  const panel = page.getByRole('dialog', { name: 'Choose G-code filename' });
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: 'Save', exact: true }).click();
 }
 
 interface CanvasPixels {

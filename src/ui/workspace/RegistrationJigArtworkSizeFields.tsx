@@ -4,6 +4,7 @@ export function RegistrationJigArtworkSizeFields(props: {
   readonly count: number;
   readonly heightDraft: string;
   readonly isAspectLocked: boolean;
+  readonly usesArtworkAxes: boolean;
   readonly widthDraft: string;
   readonly onApply: () => void;
   readonly onHeightChange: (value: string) => void;
@@ -58,7 +59,11 @@ export function RegistrationJigArtworkSizeFields(props: {
           {props.isAspectLocked ? 'AR locked' : 'AR unlocked'}
         </Button>
         <span style={aspectHintStyle}>
-          {props.isAspectLocked ? 'proportions preserved' : 'W and H are independent'}
+          {props.isAspectLocked
+            ? 'proportions preserved'
+            : props.usesArtworkAxes
+              ? 'W and H are independent along the artwork axes'
+              : 'W and H are independent'}
         </span>
       </div>
       <Button onClick={props.onApply}>Apply size to all {props.count}</Button>

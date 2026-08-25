@@ -28,6 +28,7 @@ const AUTOSAVE_KEY_PREFIX = `${LEGACY_AUTOSAVE_KEY}:`;
 const AUTOSAVE_INDEX_KEY = 'lf2:autosave:index:v1';
 const AUTOSAVE_SESSION_KEY = 'lf2:autosave:session-id:v1';
 const AUTOSAVE_GENERATION_KEY = 'lf2:autosave:generation:v1';
+const AUTOSAVE_HISTORY_STATE_KEY = '__laserforgeAutosaveWindow';
 const AUTOSAVE_SCHEMA_VERSION = 1;
 export const AUTOSAVE_INTERVAL_MS = 30_000;
 
@@ -136,13 +137,15 @@ function readAutosaveAtKey(storageKey: string): AutosaveSnapshot | null {
 // Monotonic stamp of the slot's clear history: a memo about the slot's contents
 // is only still true if it was taken at the current generation.
 export function autosaveSlotGeneration(): number {
-  if (typeof sessionStorage === 'undefined') return 0;
-  try {
-    const value = Number(sessionStorage.getItem(AUTOSAVE_GENERATION_KEY) ?? '0');
-    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
-  } catch {
-    return 0;
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      const value = Number(sessionStorage.getItem(AUTOSAVE_GENERATION_KEY) ?? '0');
+      return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+    } catch {
+      /* fall through to per-window history state */
+    }
   }
+  return autosaveHistoryState()?.generation ?? 0;
 }
 
 export function clearAutosave(target: AutosaveScope | AutosaveSnapshot = {}): void {
@@ -150,12 +153,17 @@ export function clearAutosave(target: AutosaveScope | AutosaveSnapshot = {}): vo
   // Bump for any clear, including one aimed at another window session's key:
   // over-reporting costs a memoizing writer one redundant write, while
   // under-reporting leaves the slot empty and the operator's work unprotected.
+  let generationStored = false;
   if (typeof sessionStorage !== 'undefined') {
     try {
       sessionStorage.setItem(AUTOSAVE_GENERATION_KEY, String(autosaveSlotGeneration() + 1));
+      generationStored = true;
     } catch {
       /* the clear itself can still proceed */
     }
+  }
+  if (!generationStored) {
+    updateAutosaveHistoryState({ generation: autosaveSlotGeneration() + 1 });
   }
   const keys = 'storageKey' in target ? [target.storageKey] : keysForClearScope(target);
   for (const storageKey of keys) {
@@ -204,10 +212,65 @@ function autosaveSessionId(): string {
       sessionStorage.setItem(AUTOSAVE_SESSION_KEY, next);
       return next;
     } catch {
-      /* fall through to an unscoped recovery slot */
+      /* fall through to per-window history state */
     }
   }
-  return 'unscoped';
+  const historyState = autosaveHistoryState();
+  if (historyState?.sessionId !== undefined && historyState.sessionId !== '') {
+    return historyState.sessionId;
+  }
+  const next = createSessionId();
+  updateAutosaveHistoryState({ sessionId: next });
+  return next;
+}
+
+type AutosaveHistoryState = {
+  readonly sessionId?: string;
+  readonly generation?: number;
+};
+
+function autosaveHistoryState(): AutosaveHistoryState | null {
+  if (typeof history === 'undefined') return null;
+  try {
+    const state: unknown = history.state;
+    if (typeof state !== 'object' || state === null) return null;
+    const value = (state as Record<string, unknown>)[AUTOSAVE_HISTORY_STATE_KEY];
+    return readAutosaveHistoryValue(value);
+  } catch {
+    return null;
+  }
+}
+
+function readAutosaveHistoryValue(value: unknown): AutosaveHistoryState | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const sessionId = typeof record['sessionId'] === 'string' ? record['sessionId'] : undefined;
+  const generation = nonNegativeSafeInteger(record['generation']);
+  return {
+    ...(sessionId === undefined ? {} : { sessionId }),
+    ...(generation === undefined ? {} : { generation }),
+  };
+}
+
+function nonNegativeSafeInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+}
+
+function updateAutosaveHistoryState(update: AutosaveHistoryState): void {
+  if (typeof history === 'undefined') return;
+  try {
+    const state: unknown = history.state;
+    const root = typeof state === 'object' && state !== null ? state : {};
+    history.replaceState(
+      {
+        ...root,
+        [AUTOSAVE_HISTORY_STATE_KEY]: { ...autosaveHistoryState(), ...update },
+      },
+      '',
+    );
+  } catch {
+    /* localStorage write still reports its own result */
+  }
 }
 
 function createSessionId(): string {

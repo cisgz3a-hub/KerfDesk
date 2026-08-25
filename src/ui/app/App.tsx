@@ -3,7 +3,7 @@
 // and keyboard shortcuts live in dedicated hooks so this component stays a
 // thin layout shell.
 
-import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
+import { ConfirmSaveDialog, SaveFilenamePanel, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
@@ -82,6 +82,7 @@ export function App(): JSX.Element {
       <DesignLibraryDialog />
       <ImportImageDialog />
       <ConfirmSaveDialog />
+      <SaveFilenamePanel />
       <JobReviewDialog />
       <ImageEditorHost />
       <DesignStudioHost />

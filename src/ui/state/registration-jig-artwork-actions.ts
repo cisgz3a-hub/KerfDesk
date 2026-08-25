@@ -149,6 +149,7 @@ export function applyRegistrationJigArtworkSize(
     const resized = buildSelectionTransformEdit(instance.objects, {
       kind: 'resize',
       anchor: 'c',
+      frameRotationDeg: instance.objects[0]?.transform.rotationDeg ?? 0,
       ...(input.preserveAspect
         ? input.drivingDimension === 'width'
           ? { width: input.widthMm }

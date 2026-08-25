@@ -10,19 +10,19 @@ warnings in Job Review.
 
 | Finding | Remediation | Status | Verification |
 |---|---|---|---|
-| AUD-100-001 | Preserve an existing G-code target when preparation fails | implemented | web destination-reservation and file-action regressions pass; disposable native-picker qualification was attempted but the Windows automation helper could not start |
+| AUD-100-001 | Preserve an existing G-code target when preparation fails | verified | single-file saves retain an editable filename; tiled saves reserve one directory and create no file target before successful preparation; web adapter, file-action, and tiled-worker regressions pass |
 | AUD-100-002 | Re-land sub-cell cutter-position stamping | verified | exact sub-cell regression cases and simulator suite pass |
 | AUD-100-003 | Ignore hidden engraving tip-flat state for other tool kinds | verified | Add CNC bit form suite passes |
 | AUD-100-004 | Align V-carve AABB filtering with tolerant intersection domain | verified | near-endpoint deterministic regression passes |
 | AUD-100-005 | Re-land material-library streaming on current main | verified | streamed material and SVG import suites pass |
 | AUD-100-007 | Use the visible `Traced edges` term in the accessible name | verified | DOM accessible-name regression passes |
-| AUD-100-008 | Move autosave session/clear state out of mutable module globals | verified | autosave suite passes with session-scoped generation state |
+| AUD-100-008 | Move autosave session/clear state out of mutable module globals | verified | autosave suite passes with sessionStorage state and per-window history-state fallback; unavailable sessionStorage no longer collapses windows into one shared slot |
 | AUD-100-009 | Reconcile the orphan wood viewer with current main | superseded | current main already carries the later carved-wood material and shader architecture; obsolete standalone replacement was not reintroduced |
 | AUD-100-010 | Keep the open-path note scoped to its layer | verified | layer clarity suite passes |
 | AUD-100-011 | Use deterministic casing for fixed-English tooltip copy | verified | fixed-English implementation and TypeScript verification pass |
 | AUD-100-012 | Replace obsolete Start-blocking probe copy with warning truth | verified | reminder-only notice and readiness-policy suites pass |
 | AUD-100-013 | Replace custom-bit deletion refusal with assignment reset | verified | library UI/store action regressions pass |
-| AUD-100-014 | Preserve every positive Stepover value through planners | verified | 1%, 40%, and 200% pocket/rest/surfacing/relief cases pass |
+| AUD-100-014 | Preserve every positive Stepover value through planners | verified | 1%, 40%, and 200% pocket/rest/surfacing/relief cases pass; standalone surfacing pins a 1 mm bit at 1% to the requested 0.01 mm row step |
 
 ## Integration rules
 

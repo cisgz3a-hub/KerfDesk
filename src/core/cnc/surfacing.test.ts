@@ -55,6 +55,22 @@ describe('surfacingRowYs', () => {
 });
 
 describe('buildSurfacingProgram', () => {
+  it('preserves a positive stepover below the former 0.05 mm floor', () => {
+    const program = expectSurfacingProgram(
+      buildSurfacingProgram({
+        ...PARAMS,
+        heightMm: 0.025,
+        bitDiameterMm: 1,
+        stepoverPct: 1,
+      }),
+    );
+
+    expect(program.rowsPerPass).toBe(4);
+    expect(program.lines).toContain('G1 Y0.010 F2500.000');
+    expect(program.lines).toContain('G1 Y0.020 F2500.000');
+    expect(program.lines).toContain('G1 Y0.025 F2500.000');
+  });
+
   it('clears the touched surface before spin-up, brackets cutting with M5, and parks', () => {
     const program = expectSurfacingProgram(buildSurfacingProgram(PARAMS));
     const lines = program.lines;

@@ -23,6 +23,7 @@ import type { importLightBurnProject } from '../../io/lightburn';
 import { prepareProjectForPersistence } from '../../io/project';
 import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import { requestSaveFilename } from '../state/save-filename-store';
 import { clearAutosave } from '../state/autosave';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { handleSalvageExportProject } from './salvage-export';
@@ -180,15 +181,17 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   )) {
     ctx.pushToast(advisory, 'warning');
   }
-  // Web reserves only a directory during transient user activation. The file
+  // Web and the Electron renderer reserve only a directory during transient
+  // user activation, then retain the operator's editable filename. The file
   // handle and writable stream are created after successful preparation, so a
-  // compile failure cannot create or truncate the destination. Native dialogs
-  // already defer file creation until write and use the ordinary picker.
+  // compile failure cannot create or truncate the destination. A future native
+  // adapter may omit this method if its save dialog is already non-destructive.
   let target: SaveTarget | null;
   try {
     target = await pickGcodeDestination(ctx.platform, {
       suggestedName: suggestedGcodeName(ctx.savedName),
       extensions: ['.gcode', '.nc'],
+      chooseName: requestSaveFilename,
     });
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');

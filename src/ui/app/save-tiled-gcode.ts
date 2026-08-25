@@ -3,11 +3,10 @@
 // output Worker; the UI realm is limited to warnings and sequential pickers.
 
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
-import { tileFileNameForIndex } from '../../core/cnc/tile-plan';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
-import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import type { PlatformAdapter, SaveDirectoryTarget, SaveTarget } from '../../platform/types';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import {
   BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE,
@@ -44,14 +43,12 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
 
 async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   const options = ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope };
-  const costly = costlyCanvasPreparation(ctx.project, options.outputScope);
-  // Web file pickers consume transient user activation. Acquire the first
-  // destination before a costly Worker await; subsequent per-tile pickers are
-  // opened from the user's interaction with the preceding picker.
-  const firstTarget = costly
-    ? await pickTileTarget(ctx, suggestedFirstTileName(ctx.savedName))
-    : undefined;
-  if (firstTarget === null) return true;
+  // Web pickers consume transient user activation. Reserve one directory now,
+  // but do not mint a file target until every tile has prepared and preflighted.
+  // Adapters with a genuinely non-destructive native save dialog can omit the
+  // directory method and keep their post-preparation per-file picker flow.
+  const directory = await reserveTileDirectory(ctx);
+  if (directory === null) return true;
   const preparation = await prepareTiledOutput(ctx, options);
   if (preparation === null) {
     jobAwareAlert(`Cannot export tiles:\n\n• ${BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE}`);
@@ -88,7 +85,7 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   }
   pushWarnings(ctx, preparation.machineWarnings);
   pushWarnings(ctx, preparation.tileAdvisories);
-  const saved = await saveTileFiles(ctx, preparation.files, firstTarget);
+  const saved = await saveTileFiles(ctx, preparation.files, directory);
   ctx.pushToast(
     saved === preparation.files.length
       ? `Saved all ${saved} tile files. Cut them in index order, re-registering the stock between tiles.`
@@ -144,18 +141,18 @@ function pushWarnings(
   }
 }
 
-// Sequential save dialogs; cancelling a picker stops only the remaining files.
+// A reserved directory writes the whole generated set without touching any
+// target before successful preparation. Native adapters that omit it retain
+// sequential save dialogs; cancelling one stops only the remaining files.
 async function saveTileFiles(
   ctx: SaveTiledGcodeCtx,
   files: ReadonlyArray<TileFile>,
-  firstTarget?: SaveTarget,
+  directory?: SaveDirectoryTarget,
 ): Promise<number> {
   let saved = 0;
-  for (const [index, file] of files.entries()) {
-    const target =
-      index === 0 && firstTarget !== undefined
-        ? firstTarget
-        : await pickTileTarget(ctx, `${file.name}.nc`);
+  for (const file of files) {
+    const displayName = `${file.name}.nc`;
+    const target = directory?.file(displayName) ?? (await pickTileTarget(ctx, displayName));
     if (target === null) return saved;
     try {
       await target.write(file.gcode);
@@ -169,6 +166,21 @@ async function saveTileFiles(
     }
   }
   return saved;
+}
+
+async function reserveTileDirectory(
+  ctx: SaveTiledGcodeCtx,
+): Promise<SaveDirectoryTarget | null | undefined> {
+  if (ctx.platform.reserveSaveDirectory === undefined) return undefined;
+  try {
+    return await ctx.platform.reserveSaveDirectory();
+  } catch (error) {
+    ctx.pushToast(
+      `Could not save tiles: ${error instanceof Error ? error.message : String(error)}`,
+      'error',
+    );
+    return null;
+  }
 }
 
 async function pickTileTarget(
@@ -187,9 +199,4 @@ async function pickTileTarget(
     );
     return null;
   }
-}
-
-function suggestedFirstTileName(savedName: string | null): string {
-  const base = (savedName ?? 'job').replace(/\.(lf2|gcode|nc)$/i, '');
-  return `${tileFileNameForIndex(base, 0, 0)}.nc`;
 }

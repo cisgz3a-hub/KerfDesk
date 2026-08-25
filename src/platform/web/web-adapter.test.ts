@@ -43,7 +43,7 @@ describe('webAdapter save target', () => {
     await expect(webAdapter.pickFileForSave(saveRequest)).rejects.toThrow(/File System Access API/);
   });
 
-  it('reserves a directory without creating the destination until write', async () => {
+  it('keeps an operator-chosen filename without creating the destination until write', async () => {
     const writable = writableStreamMock();
     const createWritable = vi.fn(async () => writable as unknown as FileSystemWritableFileStream);
     const getFileHandle = vi.fn(async () => ({ name: 'out.gcode', createWritable }));
@@ -51,16 +51,32 @@ describe('webAdapter save target', () => {
       configurable: true,
       value: vi.fn(async () => ({ getFileHandle })),
     });
+    const chooseName = vi.fn(async () => 'custom-name.nc');
 
-    const target = await webAdapter.reserveFileForSave?.(saveRequest);
+    const target = await webAdapter.reserveFileForSave?.({ ...saveRequest, chooseName });
     if (target === null || target === undefined) throw new Error('expected reserved target');
+    expect(chooseName).toHaveBeenCalledWith('out.gcode');
     expect(getFileHandle).not.toHaveBeenCalled();
 
     await target.write('G21\n');
 
-    expect(getFileHandle).toHaveBeenCalledWith('out.gcode', { create: true });
+    expect(target.displayName).toBe('custom-name.nc');
+    expect(getFileHandle).toHaveBeenCalledWith('custom-name.nc', { create: true });
     expect(createWritable).toHaveBeenCalledOnce();
     expect(writable.write).toHaveBeenCalledWith('G21\n');
+  });
+
+  it('reserves a reusable directory without creating any tile target', async () => {
+    const getFileHandle = vi.fn();
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: vi.fn(async () => ({ getFileHandle })),
+    });
+
+    const directory = await webAdapter.reserveSaveDirectory?.();
+
+    expect(directory).not.toBeNull();
+    expect(getFileHandle).not.toHaveBeenCalled();
   });
 });
 
