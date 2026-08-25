@@ -23,6 +23,7 @@ import {
   reliefPlanningWidthTitle,
 } from './ReliefPlanningWidthDisclosure';
 import { ReliefRecordedSourceDetails } from './ReliefRecordedSourceDetails';
+import { ReliefResolvedAspectDisclosure } from './ReliefResolvedAspectDisclosure';
 import { SelectedReliefFieldGeometry } from './SelectedReliefFieldGeometry';
 import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
@@ -51,7 +52,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
         {relief.source} — {reliefMeta(relief)}
       </p>
       <ReliefSourceDisclosure relief={relief} />
-      <SelectedReliefFieldGeometry relief={relief} />
+      <ReliefGeometryDisclosures relief={relief} />
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
@@ -104,6 +105,17 @@ export function SelectedReliefProperties(): JSX.Element | null {
         </>
       )}
     </section>
+  );
+}
+
+function ReliefGeometryDisclosures(props: { readonly relief: ReliefObject }): JSX.Element {
+  return (
+    <>
+      <SelectedReliefFieldGeometry relief={props.relief} />
+      {props.relief.reliefSource.kind === 'heightfield-v1' ? (
+        <ReliefResolvedAspectDisclosure aspect={props.relief.reliefSource.mapping.aspect} />
+      ) : null}
+    </>
   );
 }
 

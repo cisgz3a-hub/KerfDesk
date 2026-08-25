@@ -1,8 +1,8 @@
 // setReliefParams — edit a ReliefObject's carve parameters (width / depth /
 // source interpretation), the editor promised when H.5 roughing landed. Width edits
-// rescale the natural bounds by the source aspect ratio (bounds are always
-// (0,0)..(width, width·aspect)); the transform — and therefore the object's
-// placement — is untouched.
+// keep canonical heightfield bounds synchronized with their resolved physical
+// dimensions; legacy meshes retain their natural bounds aspect. The transform —
+// and therefore the object's placement — is untouched.
 
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
@@ -15,6 +15,7 @@ import {
   normalizeReliefPatch,
   type ReliefParamPatch,
 } from './relief-heightfield-param-patch';
+import { reliefWidthBounds } from './relief-width-bounds';
 
 export type { ReliefParamPatch } from './relief-heightfield-param-patch';
 
@@ -33,9 +34,7 @@ export function reliefParamActions(set: Setter): Pick<AppState, 'setReliefParams
           changed = true;
           const next = applyReliefPatch(obj, normalized);
           const bounds =
-            normalized.targetWidthMm === undefined
-              ? obj.bounds
-              : boundsForWidth(obj, next.targetWidthMm);
+            normalized.targetWidthMm === undefined ? obj.bounds : reliefWidthBounds(obj, next);
           return { ...next, bounds };
         });
         if (!changed) return s;
@@ -78,14 +77,4 @@ function applyMeshReliefPatch(
       ...(patch.emptyCells === undefined ? {} : { emptyCells: patch.emptyCells }),
     },
   };
-}
-
-function boundsForWidth(
-  relief: { readonly bounds: { readonly maxX: number; readonly maxY: number } },
-  widthMm: number,
-): { minX: number; minY: number; maxX: number; maxY: number } {
-  // Natural relief bounds start at (0,0); the Y extent follows the source
-  // aspect ratio captured at import.
-  const aspect = relief.bounds.maxX > 0 ? relief.bounds.maxY / relief.bounds.maxX : 1;
-  return { minX: 0, minY: 0, maxX: widthMm, maxY: widthMm * aspect };
 }
