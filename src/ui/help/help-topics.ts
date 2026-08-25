@@ -158,7 +158,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   },
   'laser.console.input': {
     label: 'Console command',
-    tooltip: 'Enter one GRBL or G-code command; multi-line macros are not sent here.',
+    tooltip: 'Enter one GRBL or G-code command; saved macros also expand to one command.',
   },
   'laser.console.send': {
     label: 'Send console command',

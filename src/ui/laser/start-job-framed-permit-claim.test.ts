@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { selectControllerDriver } from '../../core/controllers';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
@@ -12,11 +13,7 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import {
-  connectWith,
-  makeConnection,
-  type FakeConnection,
-} from '../state/laser-store-motion-operation.test-support';
+import { connectWith, makeConnection } from '../state/laser-store-motion-operation.test-support';
 import { RecoveryRepository } from '../state/recovery';
 import {
   MemoryRecoveryGenerationStore,
@@ -26,6 +23,7 @@ import {
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { installFramedRunPermitForCurrentState } from './framed-run-testing';
+import { runConsoleCommand } from './console/run-console-command';
 import { useStartBlockerStore } from './start-blocker-store';
 import { runStartJobFlow } from './start-job-flow';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
@@ -90,14 +88,15 @@ function pauseNextArtifactStage(repository: RecoveryRepository) {
   return { stage, release };
 }
 
-async function startAcceptedFramedRun(): Promise<{
-  readonly connection: FakeConnection;
-  readonly verification: NonNullable<
-    ReturnType<typeof useLaserStore.getState>['frameVerification']
-  >;
-}> {
-  const connection = makeConnection(async () => undefined);
-  useLaserStore.setState({ ...initialLaserState(), startJob: originalStartJob });
+async function installConnectedFramedRun(
+  write: (data: string) => Promise<void> = async () => undefined,
+  startJob = originalStartJob,
+) {
+  const connection = makeConnection(write);
+  useLaserStore.setState({
+    ...initialLaserState(),
+    startJob,
+  });
   await connectWith(connection);
   const controllerSessionEpoch = useLaserStore.getState().controllerSessionEpoch;
   useLaserStore.setState({
@@ -113,6 +112,11 @@ async function startAcceptedFramedRun(): Promise<{
     },
   });
   const permit = await installFramedRunPermitForCurrentState();
+  return { connection, verification: permit.candidate.frameVerification };
+}
+
+async function startAcceptedFramedRun() {
+  const connected = await installConnectedFramedRun();
 
   await runStartJobFlow(recoveryRepository());
 
@@ -126,8 +130,8 @@ async function startAcceptedFramedRun(): Promise<{
     ].join('\n'),
   ).not.toBeNull();
   expect(useLaserStore.getState().framedRun).toBeNull();
-  expect(useLaserStore.getState().frameVerification).toBe(permit.candidate.frameVerification);
-  return { connection, verification: permit.candidate.frameVerification };
+  expect(useLaserStore.getState().frameVerification).toBe(connected.verification);
+  return connected;
 }
 
 beforeEach(async () => {
@@ -221,6 +225,41 @@ describe('ordinary framed Start permit claim', () => {
     expect(useStartBlockerStore.getState().messages.join(' ')).toContain(
       'Frame permit was consumed, replaced, or revoked',
     );
+  });
+
+  it('refuses Start when a mutating user macro revokes the permit during staging', async () => {
+    const writes: string[] = [];
+    const startJob = vi.fn(async () => undefined);
+    await installConnectedFramedRun(async (data) => void writes.push(data), startJob);
+    writes.length = 0;
+
+    try {
+      const repository = recoveryRepository();
+      const paused = pauseNextArtifactStage(repository);
+      const start = runStartJobFlow(repository);
+      await vi.waitFor(() => expect(paused.stage).toHaveBeenCalledTimes(1));
+      const state = useLaserStore.getState();
+      const driver = selectControllerDriver(state.activeControllerKind);
+
+      await expect(
+        runConsoleCommand(driver, 'G0 X2', state.sendConsoleCommand, {
+          kind: 'user-macro',
+          macroName: 'Nudge X',
+          macroTemplate: 'G0 X{{distance}}',
+        }),
+      ).resolves.toMatchObject({ status: 'sent', command: 'G0 X2' });
+      expect(useLaserStore.getState().framedRun).toBeNull();
+      paused.release();
+      await start;
+
+      expect(writes).toContain('G0 X2\n');
+      expect(startJob).not.toHaveBeenCalled();
+      expect(useStartBlockerStore.getState().messages.join(' ')).toContain(
+        'Frame permit was consumed, replaced, or revoked',
+      );
+    } finally {
+      await useLaserStore.getState().disconnect();
+    }
   });
 
   it('allows only one async owner to claim the same permit', async () => {

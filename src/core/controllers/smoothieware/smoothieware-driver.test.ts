@@ -54,6 +54,13 @@ describe('Smoothie command builders', () => {
 });
 
 describe('prepareSmoothieConsoleCommand', () => {
+  it('explains that Console and saved macros are both one-line commands', () => {
+    expect(prepareSmoothieConsoleCommand('G0 X0\nM3')).toEqual({
+      ok: false,
+      reason: 'Console commands and saved macros must contain exactly one line.',
+    });
+  });
+
   it('blocks config writes, allows queries and M999 without gating', () => {
     expect(prepareSmoothieConsoleCommand('config-set sd laser_module_enable true').ok).toBe(false);
     expect(prepareSmoothieConsoleCommand('config-load').ok).toBe(false);

@@ -1174,7 +1174,8 @@ authorization, Frame proof, controller command, or safety boundary.
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
-2. Multiline input is rejected; persistent macros are deferred to a later lane.
+2. Multiline input is rejected. Saved user macros are single-command templates described in
+   F-B13b; multiline sequencing remains out of scope.
 3. Every accepted command carries a controller-specific state-effect tag.
    Ordinary motion/modal commands clear cached Idle/position and frame
    evidence until a fresh status report arrives. XY-only coordinate commands
@@ -1234,6 +1235,60 @@ authorization, Frame proof, controller command, or safety boundary.
 2. Search includes every displayed column. **Copy visible** produces escaped, timestamped TSV so
    embedded tabs/newlines cannot turn one controller entry into multiple rows.
 3. If clipboard access fails, the dialog exposes the exact TSV in a selectable nonblocking field.
+
+### F-B13b. Saved user macros v1 (ADR-293)
+
+#### Success - save a named one-command template
+1. The shared Console command deck shows **User macros** in both the docked and Super Console.
+2. User clicks **New macro**, enters a name and one controller-command template, then clicks
+   **Save macro**. The macro is labelled **User-saved / local / one Console command**.
+3. `{{variable_name}}` placeholders declare run-time finite-decimal values. Repeating the same
+   placeholder reuses one value. Fixed commands need no placeholder.
+4. KerfDesk persists the versioned macro collection in local application storage. Macros are not
+   project data, cloud data, controller-resident programs, or built-in KerfDesk commands.
+
+#### Success - run through the existing Console path
+1. User selects a saved macro, fills any variable fields, reviews the expanded-command preview,
+   and clicks **Run user macro**.
+2. KerfDesk expands exactly one command, then passes the complete result to the active controller
+   driver's existing `prepareConsoleCommand` parser.
+3. The shared command deck calls the existing `runConsoleCommand` -> `sendConsoleCommand` ->
+   `safeWrite` path. A persistent setting still uses the existing setting-write confirmation, and
+   the store still rechecks connection, operation ownership, and Idle at dispatch time.
+4. Only a successfully dispatched expanded command enters the existing Arrow Up / Arrow Down
+   history. The transcript marks the outbound source as `macro` and adds the saved macro name plus
+   expanded command as provenance without claiming controller acknowledgement or physical motion.
+
+#### Empty - no saved macros
+1. The selector says no user macros are saved. **New macro** remains available.
+2. Nothing runs and no controller bytes are sent until the user saves, selects, and explicitly runs
+   a macro.
+
+#### Error - invalid template, variable, or controller command
+1. Macro names must contain visible text. Templates must contain exactly one line and only complete
+   `{{identifier}}` placeholders; malformed placeholder syntax is reported inline and is not saved.
+2. Each variable value must be one finite decimal scalar. Missing values, command words, whitespace,
+   exponent notation, non-finite values, and control/newline injection produce an inline expansion
+   error and no send attempt.
+3. Expansion never substitutes a second command. The fully expanded command must still pass the
+   active driver's ordinary parser; its existing rejection text is shown unchanged.
+
+#### Error - local storage unavailable
+1. A failed save, edit, or delete reports that the local macro collection was not changed.
+2. The in-memory list remains at its last persisted state; the UI never claims an unsaved mutation
+   succeeded.
+
+#### Edge - Frame-first and operation ownership
+1. A macro is a named manual Console command, not a job. It has no Start callback, no streamer, no
+   automatic trigger, no keyboard shortcut, and no direct serial writer.
+2. Read-only commands preserve the existing Frame proof exactly as their manually typed equivalent.
+   Any state-mutating command invalidates `framedRun` before the asynchronous write, so a later job
+   still requires a fresh completed exact-job Frame and the ordinary one-use Start permit.
+3. Macros cannot create, refresh, claim, or consume a Frame permit. They cannot invoke Frame or
+   Start. Active job/motion/operation and Idle behavior remains the existing Console behavior.
+4. Multiline command lists, batched writes, acknowledgement sequencing, connect/startup hooks,
+   import/export, and controller-resident macro programs are outside v1.
+
 ### F-B14. Machine Settings read-only backup
 
 #### Success — read connected controller settings

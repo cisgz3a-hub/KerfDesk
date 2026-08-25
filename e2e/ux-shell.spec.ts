@@ -43,11 +43,11 @@ test.describe('workspace shell acceptance', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
 
-    const consoleDetails = page
-      .locator('aside[aria-label="Laser controls"] details')
-      .filter({ hasText: 'Console' });
+    const consoleSummary = page.locator('aside[aria-label="Laser controls"] summary', {
+      hasText: /^Console$/,
+    });
+    const consoleDetails = consoleSummary.locator('..');
     await expect(consoleDetails).not.toHaveAttribute('open', '');
-    const consoleSummary = consoleDetails.locator('summary');
     await consoleSummary.focus();
     await page.keyboard.press('Enter');
     await expect(consoleDetails).toHaveAttribute('open', '');
