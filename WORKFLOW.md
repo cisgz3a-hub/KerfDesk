@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304 plus ADR-292 Amendments 2-3 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity and preview authority, existing CAM/preview, manual persistence, and exact partial-edge substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304 plus ADR-292 Amendments 2-4 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint and mask-threshold/outside-meaning controls, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, existing CAM/preview, manual persistence, and exact partial-edge substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2499,9 +2499,10 @@ F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit height-map path. F-CNC47-F-CNC50 specify the approved
 ADR-291 expansion. Their bounded ADR-292/294/295/296/297/298/299/300/301/304 plus ADR-292 Amendments
-2-3 schema, import, mapping, declared-source-meaning, recorded-source-detail, field-geometry,
-resolved-aspect-policy, canonical-Width-integrity, and canonical-preview-authority substrate is current
-where explicitly marked below; the remaining controls and user-facing flows are planned.
+2-4 schema, import, mapping, declared-source-meaning, recorded-source-detail, field-geometry,
+resolved-aspect-policy, canonical-Width-integrity, bounded exact Width re-factorization, and
+canonical-preview-authority substrate is current where explicitly marked below; the remaining
+controls and user-facing flows are planned.
 
 ### F-CNC1. Switch to CNC mode and configure the machine
 
@@ -4126,7 +4127,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298/299/300/301/304; ADR-292 Amendments 2-3)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298/299/300/301/304; ADR-292 Amendments 2-4)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
@@ -4189,10 +4190,23 @@ and lifts the command's CNC-only gate.)*
    nor clamps the accepted patch and adds no confirmation. This repair does not change the editor's
    machine-space-to-stored-Width conversion. Every real heightfield Width edit synchronizes the
    canonical and duplicate Width values and rebuilds natural bounds from the updated canonical
-   dimensions; legacy-mesh behavior is unchanged. Corrected dimensions can change downstream
-   materialized geometry, emitted bytes, and the exact Frame bounds signature compared with an
-   invalid or incoherent pre-repair result. CAM and emitter algorithms and Frame/Start authorization
-   rules are unchanged.
+   dimensions; legacy-mesh behavior is unchanged. If those resolved local dimensions exceed project
+   v4's existing `1,000,000 mm` coordinate domain, CurveDesk uses the smallest common power-of-two
+   factor that can divide both canonical dimensions and multiply both nonzero scale axes exactly. It
+   adopts that internal re-factor only when the dimensions and scales reverse exactly, remain inside
+   the unchanged project domains, preserve both native machine-space dimensions, and keep every
+   finite transformed corner bit-identical. The Width tooltip names that both scale axes may therefore
+   change while visible machine geometry stays fixed. Independent X/Y factors are outside this repair
+   because they would change canonical aspect/future Preserve-Width semantics and the square-cell 2D
+   preview sampling budget. Exact-zero compatibility, common-factor scale exhaustion, non-reversible
+   subnormal factors, and non-finite or drifting transformed geometry are not rewritten, refused,
+   clamped, or approximated; the existing v4 action can still leave those exceptional edits outside
+   the saveable project domain. An unavailable common-factor result does not claim every
+   independent-axis v4 encoding is mathematically impossible. Full durability for every
+   positive-finite Width needs a future intent-versus-materialized-geometry representation and is not
+   claimed here. Corrected dimensions can change downstream materialized geometry, emitted bytes, and
+   the exact Frame bounds signature compared with an invalid or incoherent pre-repair result. CAM and
+   emitter algorithms and Frame/Start authorization rules are unchanged.
    Each endpoint accepts an integer from `0` through `65535` without rounding, clamping, swapping,
    or an ordering rule. With low below high, codes outside the interval clip to its ends; crossed
    endpoints deliberately reverse that response. Equal endpoints produce one flat normalized value
@@ -4294,13 +4308,14 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CNC47. Interpret and create a photo-to-relief source - planned (ADR-291 / P2R.1)
 
-> **Planned - not current UI.** P2R.1a plus ADR-292 Amendments 2-3 and ADR-294/295/296/297/298/299/300/301/304
+> **Planned - not current UI.** P2R.1a plus ADR-292 Amendments 2-4 and ADR-294/295/296/297/298/299/300/301/304
 > supply schema-v4/U16LE storage, migration, qualified 8/16-bit grayscale and 8-bit grayscale-alpha
 > import, simple transparency masks, exact input-endpoint mapping, exact inclusion-threshold and
 > outside-mask-meaning controls, read-only declared-source-meaning, recorded-source-detail,
-> field-geometry and resolved-aspect-policy disclosures, canonical Width integrity and preview
-> authority, exact partial-edge geometry, and the existing CAM/preview substrate. Large-project
-> atomic autosave/recovery, gamma, and the creation modes and remaining controls below stay planned; use
+> field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact
+> Width re-factorization and preview authority, exact partial-edge geometry, and the existing
+> CAM/preview substrate. Large-project atomic autosave/recovery, gamma, and the creation modes and
+> remaining controls below stay planned; use
 > F-CNC46's narrower **Import Height Map...** flow today.
 
 #### Success
