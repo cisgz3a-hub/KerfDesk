@@ -21,10 +21,11 @@ type PreparedWireCommand = {
   readonly wire: string;
 };
 
-/**
- * Routes a prepared Console command to serial transport. Owned reads use the timeout-armed command
- * arbiter, while ordinary writes preserve the supplied transcript source through the safe writer.
- */
+// Route a prepared console command to the serial transport. Owned reads ($I
+// firmware identity, $$ settings dump) go through the timeout-armed command
+// arbiter so a silent or error-terminated controller rejects instead of
+// leaving the caller's operation marker stranded; everything else is a plain
+// fire-and-forget write.
 export function writeConsoleCommand(
   refs: ConsoleTransportRefs,
   write: ConsoleCommandWriteFn,

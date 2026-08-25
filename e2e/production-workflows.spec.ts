@@ -151,6 +151,7 @@ test('exports rotary raster through the opted-in machine-space transform', async
   ]);
   await page.getByRole('button', { name: 'Import Image...' }).click();
   await runMenuCommand(page, 'File', 'Save G-code...');
+  await acceptGcodeFilename(page);
 
   const gcode = await savedText(kerfdesk, '.gcode');
   const yValues = [...gcode.matchAll(/Y(-?\d+(?:\.\d+)?)/g)].map((match) => Number(match[1]));
@@ -210,6 +211,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await page.getByRole('button', { name: 'Apply registration' }).click();
 
   await runMenuCommand(page, 'File', 'Save G-code...');
+  await acceptGcodeFilename(page);
   const gcode = await savedText(kerfdesk, '.gcode');
   expect(gcode).toContain('X30.000');
   // Design Y=10 is registered to machine Y=40; front-left output then maps
@@ -227,6 +229,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
     void dialog.dismiss();
   });
   await runMenuCommand(page, 'File', 'Save G-code...');
+  await acceptGcodeFilename(page);
   await expect.poll(() => blockedMessage).toContain('registration is not valid');
   expect(fileSavedCount(await kerfdesk.events())).toBe(savedBefore);
 
@@ -694,6 +697,12 @@ async function fillAndCommit(page: Page, name: string, value: string): Promise<v
   await input.fill(value);
   await input.press('Tab');
   await expect(input).toHaveValue(value);
+}
+
+async function acceptGcodeFilename(page: Page): Promise<void> {
+  const panel = page.getByRole('dialog', { name: 'Choose G-code filename' });
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: 'Save', exact: true }).click();
 }
 
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {

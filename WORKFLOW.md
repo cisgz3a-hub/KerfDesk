@@ -457,24 +457,24 @@ Identical to F-A3 except:
 
 ### F-A9. Save G-code
 
-#### Success — desktop
+#### Success — web and packaged desktop
 1. User clicks `File → Save G-code` (`Cmd/Ctrl+Shift+E`).
-2. Pre-flight runs (F-A10).
-3. If pre-flight passes, OS native Save dialog opens.
-4. Default filename: `<project-name>.gcode` if project saved, else `untitled.gcode`.
-5. Default location: last G-code save location, or OS Documents on first save.
-6. On confirm, file is written.
-7. Toast: `Saved to <path>`.
-
-#### Success — web
-1. Same flow. The web app requires the File System Access API (Chromium-only, per PROJECT.md "Delivery targets") — there is **no browser-download fallback**. If the API is unavailable the save fails with the error toast `Could not save G-code: File System Access API is required to save files in the web app.`
-2. Toast same.
+2. The Chromium directory picker reserves a destination directory while the click still carries
+   user activation. It does not create or truncate the named file.
+3. A non-modal **Save G-code as** panel starts with `<project-name>.gcode` when the project has a
+   saved name, otherwise `untitled.gcode`. The filename remains editable and the live Stop controls
+   remain clickable while the panel is open.
+4. Pre-flight and background preparation run (F-A10). A failure creates no file.
+5. After preparation succeeds, the selected directory creates the named file and writes the bytes.
+6. Toast: `Saved G-code to <filename>`.
+7. The File System Access API is required (Chromium-only, per PROJECT.md "Delivery targets"); there
+   is **no browser-download fallback**. If unavailable, the save reports a clear error toast.
 
 #### Error — pre-flight failure
 - See F-A10.
 
 #### Error — file system error (disk full, permissions, etc.)
-- Modal: `Could not save G-code: <one-line reason>`. Project is unaffected.
+- Toast: `Could not save G-code: <one-line reason>`. Project is unaffected.
 
 #### Edge — save when no output-enabled layers exist
 - Save G-code button is disabled (see F-A7 edge).
@@ -1244,13 +1244,13 @@ authorization, Frame proof, controller command, or safety boundary.
    **Save macro**. The macro is labelled **User-saved / local / one Console command**.
 3. `{{variable_name}}` placeholders declare run-time finite-decimal values. Repeating the same
    placeholder reuses one value. Fixed commands need no placeholder.
-4. CurveDesk persists the versioned macro collection in local application storage. Macros are not
-   project data, cloud data, controller-resident programs, or built-in CurveDesk commands.
+4. KerfDesk persists the versioned macro collection in local application storage. Macros are not
+   project data, cloud data, controller-resident programs, or built-in KerfDesk commands.
 
 #### Success - run through the existing Console path
 1. User selects a saved macro, fills any variable fields, reviews the expanded-command preview,
    and clicks **Run user macro**.
-2. CurveDesk expands exactly one command, then passes the complete result to the active controller
+2. KerfDesk expands exactly one command, then passes the complete result to the active controller
    driver's existing `prepareConsoleCommand` parser.
 3. The shared command deck calls the existing `runConsoleCommand` -> `sendConsoleCommand` ->
    `safeWrite` path. A persistent setting still uses the existing setting-write confirmation, and
@@ -1349,6 +1349,48 @@ authorization, Frame proof, controller command, or safety boundary.
 1. No Position Laser physical move.
 2. No Move Laser to Selection physical move.
 3. No Set Start Point or node-level start ordering.
+
+### F-B15a. Burn a multi-outline registration jig set (ADR-057 amendment)
+
+1. Open **Registration Jig**, choose Rectangle or Circle, enter the outline size,
+   then enter rows, columns, and horizontal/vertical spacing. A 1 x 5 grid creates
+   five independently visible outlines as one fixture set.
+2. Select one artwork or artwork group and click **Auto-fit + copy artwork to all N**.
+   The original is proportionally fitted into 90% of the first outline's usable
+   region, preserving aspect ratio, and one identical operation-preserving copy is
+   centered in every remaining outline. Circle outlines use their inscribed-square
+   fit region so the artwork remains inside the arc.
+3. To use a different exact size, enter the desired **W** or **H** under **Artwork
+   size - all N copies**. **AR locked** is the default and updates the paired
+   dimension proportionally. Click **AR locked** to switch to **AR unlocked** when
+   W and H must be entered independently, then click **Apply size to all N**. Every
+   jig instance is resized around its centre and recentered in its own outline; the
+   grid spacing does not scale. For rotated artwork, W and H follow the artwork's
+   rotated local axes; the rotation is preserved and the shared resize remains
+   available without inventing shear or asking the operator to relock AR.
+4. Pick **Outline only**. Every registration outline is enabled and every artwork
+   operation is disabled; Frame, Preview, Save G-code, and Start therefore describe
+   the complete physical fixture outline run.
+5. Put one blank inside each burned outline, then pick **Artwork only**. Every
+   registration outline is disabled and every artwork copy on an enabled source
+   operation is included in the second run. Output completes all enabled operations
+   for one physical jig instance before starting the next instance in grid order;
+   scanline fill does not sweep back and forth across separate jig outlines.
+6. Both runs use the combined bounds of the complete outline set as their one
+   placement anchor. Moving or replacing the set changes that ordinary job evidence;
+   the existing exact-job Frame rule remains the only Start guard.
+
+#### Empty and edge cases
+
+1. A 1 x 1 grid preserves the original single-jig workflow and button wording.
+2. **Remove all outlines** deletes the complete set and its reserved operation.
+3. **Lock all outlines** applies one lock state to the complete fixture set.
+4. A captured-board outline remains owned by **Place Board** and is not replaced
+   from Registration Jig; the existing provenance explanation remains in the panel.
+5. Repeating **Auto-fit + copy artwork to all N** replaces the generated copies
+   instead of layering another set on the canvas.
+6. Reopened projects retain per-jig output order and shared-size controls because
+   the existing generated copy ids already bind each copy to its source and outline.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 
@@ -2608,6 +2650,12 @@ F-CNC47-F-CNC50 specify the approved ADR-291 expansion. Those four flows are
 2. Roughing samples the physical heightmap at bit-diameter/8 cells (0.2 mm
    floor), so compile stays bounded; the four-million-cell cap coarsens in
    the final scaled metric for very large meshes.
+3. Each depth level emits at most 4,096 inward rings. A non-emitting next-inset
+   probe distinguishes exact exhaustion, an offset-engine failure, and usable
+   interior beyond that limit. The latter two are retained with the exact
+   compiled/recovery Job and reach Job Review as warnings only; they never
+   refuse Frame, Start, preview, save, or G-code emission, and the probe never
+   adds a cutter move.
 
 ### F-CNC7. Import an STL relief — Phase H.4
 
@@ -4092,7 +4140,9 @@ and lifts the command's CNC-only gate.)*
    the full-range mapping without rewriting the embedded samples. Canvas,
    **View 3D...**, and CAM use the same deterministic materialization rule and
    embedded samples; each consumer chooses the grid resolution appropriate to
-   its job.
+   its job. **View 3D...** targets 0.25 mm display cells; when the longest edge
+   exceeds 64 mm, its non-blocking status names the effective cell size and the
+   256-cell display-mesh budget. That display choice never changes CAM or G-code.
 5. Saving embeds the schema-v4 `heightfield-v1`: exact U16 little-endian samples,
    physical and pixel dimensions, optional U8 inclusion mask, mapping,
    provenance, revision, and digest. Eight-bit PNG sample `v` is represented

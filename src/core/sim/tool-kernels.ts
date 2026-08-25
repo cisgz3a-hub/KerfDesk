@@ -41,6 +41,9 @@ export type ToolKernelOffset = {
 export type ToolKernel = {
   readonly radiusCells: number;
   readonly offsets: ReadonlyArray<ToolKernelOffset>;
+  readonly tool?: CncTool;
+  readonly radiusMm?: number;
+  readonly surfaceDzAtRadius?: (radiusMm: number) => number;
   // Mask cells represent square areas, not point samples. These offsets cover
   // every cell square intersected by the physical cutter plus the caller's
   // path-location uncertainty; dz is taken at the nearest possible point.
@@ -63,17 +66,21 @@ export function kernelForTool(
 ): ToolKernel {
   const radiusMm = Math.max(0, tool.diameterMm / 2);
   const radiusCells = Math.max(0, Math.ceil(radiusMm / mmPerCell));
+  const surfaceDzAtRadius = surfaceDzAtRadiusForTool(tool, radiusMm);
   const offsets: ToolKernelOffset[] = [];
   for (let dy = -radiusCells; dy <= radiusCells; dy += 1) {
     for (let dx = -radiusCells; dx <= radiusCells; dx += 1) {
       const dMm = Math.hypot(dx, dy) * mmPerCell;
       if (dMm > radiusMm) continue;
-      offsets.push({ dx, dy, dz: cuttingSurfaceDz(tool, dMm, radiusMm) });
+      offsets.push({ dx, dy, dz: surfaceDzAtRadius(dMm) });
     }
   }
   return {
     radiusCells,
     offsets,
+    tool,
+    radiusMm,
+    surfaceDzAtRadius,
     maskCellOffsets: maskCellOffsets(
       tool,
       radiusMm,
@@ -87,6 +94,29 @@ export function kernelForTool(
       mmPerCell / 2 + CNC_MASK_EMISSION_XY_CLEARANCE_MM,
     ),
   };
+}
+
+function surfaceDzAtRadiusForTool(
+  tool: CncTool,
+  toolRadiusMm: number,
+): (radiusMm: number) => number {
+  switch (tool.kind) {
+    case 'end-mill':
+      return () => 0;
+    case 'engraving':
+    case 'v-bit': {
+      const includedAngleDeg = vcarveIncludedAngleDeg(tool) ?? FALLBACK_V_TIP_ANGLE_DEG;
+      const envelope = conicalRadialEnvelope(tool, includedAngleDeg);
+      return envelope === null ? () => 0 : (radiusMm) => radialEnvelopeHeightMm(envelope, radiusMm);
+    }
+    case 'ball-nose':
+      return (radiusMm) => {
+        const inside = Math.max(0, toolRadiusMm * toolRadiusMm - radiusMm * radiusMm);
+        return toolRadiusMm - Math.sqrt(inside);
+      };
+    default:
+      return assertNever(tool.kind, 'CncToolKind');
+  }
 }
 
 function maskCellOffsets(

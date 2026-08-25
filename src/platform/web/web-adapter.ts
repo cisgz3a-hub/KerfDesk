@@ -10,6 +10,7 @@ import type {
   FileOpenRequest,
   FileSaveRequest,
   PlatformAdapter,
+  SaveDirectoryTarget,
   SaveTarget,
 } from '../types';
 import { webCamera } from './web-camera';
@@ -73,6 +74,42 @@ async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null>
   };
 }
 
+async function reserveFileForSave(req: FileSaveRequest): Promise<SaveTarget | null> {
+  const directory = await reserveSaveDirectory();
+  if (directory === null) return null;
+  const displayName =
+    req.chooseName === undefined ? req.suggestedName : await req.chooseName(req.suggestedName);
+  return displayName === null ? null : directory.file(displayName);
+}
+
+async function reserveSaveDirectory(): Promise<SaveDirectoryTarget | null> {
+  if (typeof window.showDirectoryPicker !== 'function') {
+    throw new Error('File System Access directory picker is required to save files safely.');
+  }
+  let directory: FileSystemDirectoryHandle;
+  try {
+    directory = await window.showDirectoryPicker({ mode: 'readwrite' });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') return null;
+    throw err;
+  }
+  return { file: (displayName) => directoryFileTarget(directory, displayName) };
+}
+
+function directoryFileTarget(
+  directory: FileSystemDirectoryHandle,
+  displayName: string,
+): SaveTarget {
+  return {
+    displayName,
+    write: async (data) => {
+      const handle = await directory.getFileHandle(displayName, { create: true });
+      const writable = await handle.createWritable();
+      await writeAndClose(writable, data);
+    },
+  };
+}
+
 async function writeAndClose(
   writable: FileSystemWritableFileStream,
   data: string | BufferSource | Blob,
@@ -100,6 +137,8 @@ export const webAdapter: PlatformAdapter = {
   id: 'web',
   pickFilesForOpen,
   pickFileForSave,
+  reserveFileForSave,
+  reserveSaveDirectory,
   serial: webSerial,
   camera: webCamera,
   cameraBridge: createHttpCameraBridge(),

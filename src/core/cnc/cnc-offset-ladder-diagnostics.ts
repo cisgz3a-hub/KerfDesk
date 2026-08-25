@@ -39,7 +39,7 @@ import {
 } from '../scene';
 import { collectLayerPolylines } from './collect-cnc-contours';
 import { resolveRestPocketOperation } from './cnc-rest-operation';
-import { reliefOffsetLadderFailed } from './compile-cnc-relief';
+import { reliefOffsetLadderDiagnostics } from './compile-cnc-relief';
 import { pocketRasterToolpaths, pocketRingToolpaths } from './pocket-paths';
 import { vcarveClearancePocket } from './vcarve-clearance';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
@@ -57,7 +57,7 @@ export function findCncOffsetLadderFailures(
 
 export type CncOffsetLadderDiagnostic = {
   readonly layerId: string;
-  readonly kind: 'geometry-failed' | 'pass-limit' | 'thin-detail-dropped';
+  readonly kind: 'geometry-failed' | 'pass-limit' | 'relief-pass-limit' | 'thin-detail-dropped';
 };
 
 // Keeps the end reason available to the advisory UI. Existing callers that
@@ -84,6 +84,7 @@ const CNC_OFFSET_DIAGNOSTIC_KIND_ORDER = [
   'geometry-failed',
   'thin-detail-dropped',
   'pass-limit',
+  'relief-pass-limit',
 ] as const satisfies ReadonlyArray<CncOffsetLadderDiagnostic['kind']>;
 
 function layerOffsetLadderDiagnostics(
@@ -107,14 +108,16 @@ function layerOffsetLadderDiagnostics(
           config,
           compiledVCarveEvidence(compiledJob, layer.id),
         );
-  const reliefFailed =
-    probeRelief && reliefOffsetLadderFailed(scene.objects, layer, settings, config);
+  const reliefStatus = probeRelief
+    ? reliefOffsetLadderDiagnostics(scene.objects, layer, settings, config)
+    : null;
   // A layer can carry both relief objects and vector shapes; either ladder
   // failing makes the layer's output incomplete.
   const kinds = new Set<CncOffsetLadderDiagnostic['kind']>([
     ...restCompletionDiagnosticKinds(restCompletion),
     ...vectorKinds,
-    ...(reliefFailed ? (['geometry-failed'] as const) : []),
+    ...(reliefStatus?.offsetFailed ? (['geometry-failed'] as const) : []),
+    ...(reliefStatus?.passLimited ? (['relief-pass-limit'] as const) : []),
   ]);
   return CNC_OFFSET_DIAGNOSTIC_KIND_ORDER.filter((kind) => kinds.has(kind)).map((kind) => ({
     layerId: layer.id,

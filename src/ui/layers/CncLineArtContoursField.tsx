@@ -43,7 +43,7 @@ export function CncLineArtContoursField(props: {
       <select
         value={props.settings.lineArtContours ?? 'inner'}
         onChange={(e) => props.onCommit({ lineArtContours: e.target.value as LineArtContourSide })}
-        aria-label={`Line art contours for ${props.layer.color}`}
+        aria-label={`Traced edges for ${props.layer.color}`}
         title="Separate from Cut type: this picks WHICH traced outline is cut, while Cut type picks which side of it the bit rides. Traced line drawings arrive as two nested outlines one stroke-width apart. Cut only the inner one (the drawn shape), only the outer, or both. Applies to traced and imported nested pairs closer than the bit diameter; anything wider always cuts, and text or shape outlines (like a letter's counter) always cut both."
         style={selectStyle}
       >

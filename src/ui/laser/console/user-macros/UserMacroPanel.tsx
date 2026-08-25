@@ -111,7 +111,7 @@ function MacroEditorForm(props: {
   const update = (patch: Partial<Pick<MacroEditor, 'name' | 'template'>>): void =>
     props.onChange({ ...props.editor, ...patch });
   return (
-    <div role="group" style={editorStyle} aria-label="User macro editor">
+    <div style={editorStyle} aria-label="User macro editor">
       <input
         aria-label="Macro name"
         title="Enter the local name shown for this user macro."
@@ -154,7 +154,7 @@ function MacroRunner(props: {
   readonly onRun: () => void;
 }): JSX.Element {
   return (
-    <div role="group" style={runnerStyle} aria-label={`Run user macro ${props.macro.name}`}>
+    <div style={runnerStyle} aria-label={`Run user macro ${props.macro.name}`}>
       {props.variables.map((variable) => (
         <label key={variable} style={variableStyle}>
           <span>{`{{${variable}}}`}</span>

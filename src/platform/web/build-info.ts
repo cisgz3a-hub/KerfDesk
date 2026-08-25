@@ -22,10 +22,14 @@ export type GitExec = (args: readonly string[]) => string;
 export const runGit: GitExec = (args) =>
   execFileSync('git', [...args], { encoding: 'utf8' }).trim();
 
-/** Short SHA of HEAD; `"dev"` when git history is unavailable. */
+const BUILD_GIT_SHA_LENGTH = 8;
+
+/** Stable eight-character SHA of HEAD; `"dev"` when git history is unavailable. */
 export function gitShortSha(gitExec: GitExec = runGit): string {
   try {
-    return gitExec(['rev-parse', '--short', 'HEAD']);
+    // Do not use `rev-parse --short`: its default abbreviation grows with the
+    // repository object database, changing an otherwise identical build.
+    return gitExec(['rev-parse', 'HEAD']).slice(0, BUILD_GIT_SHA_LENGTH);
   } catch {
     return DEV_SHA_FALLBACK;
   }

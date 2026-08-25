@@ -1,16 +1,11 @@
 import type { SerialTranscriptEntry, TranscriptSource } from './laser-transcript';
 
-const MACRO_DISPATCH_MESSAGE = (macroName: string, command: string): string =>
-  `User macro ${JSON.stringify(macroName)} dispatched through Console: ${command}`;
-
-/** Provenance attached when a saved one-command macro delegates to the existing Console path. */
 export type ConsoleCommandProvenance = {
   readonly kind: 'user-macro';
   readonly macroName: string;
   readonly macroTemplate: string;
 };
 
-/** Maps an optional saved-macro provenance record to the truthful transcript source label. */
 export function consoleCommandTranscriptSource(
   provenance: ConsoleCommandProvenance | undefined,
 ): TranscriptSource {
@@ -28,7 +23,7 @@ export function macroDispatchTranscriptEntry(
     id,
     at,
     direction: 'system',
-    raw: MACRO_DISPATCH_MESSAGE(provenance.macroName, command),
+    raw: `User macro ${JSON.stringify(provenance.macroName)} dispatched through Console: ${command}`,
     kind: 'message',
     source: 'macro',
   };

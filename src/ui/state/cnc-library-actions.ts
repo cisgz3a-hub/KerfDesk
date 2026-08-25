@@ -28,10 +28,7 @@ import {
   activeCncToolFeedIdentityChanged,
   mergeCncMachineProfileForCurrentProject,
 } from './cnc-machine-profile-merge';
-import {
-  blockingCncSecondaryToolReferences,
-  sceneWithoutDormantCncSecondaryToolReferences,
-} from './cnc-tool-references';
+import { sceneWithoutCncSecondaryToolReferences } from './cnc-tool-references';
 import { pushUndo } from './scene-mutations';
 import { nextProbeSetupState } from './probe-setup-history-identity';
 import type { AppState } from './store';
@@ -138,10 +135,7 @@ function catalogToolAlreadySaved(state: AppState, catalogId: string | undefined)
 }
 
 function stateAfterCustomToolDeletion(state: AppState, toolId: string): StatePatch {
-  // Active clearing/finishing/roughing stages have no safe implicit fallback.
-  // Keep this refusal below the UI so command callers cannot bypass it.
-  if (blockingCncSecondaryToolReferences(state.project.scene, toolId).length > 0) return state;
-  const preparedScene = sceneWithoutDormantCncSecondaryToolReferences(state.project.scene, toolId);
+  const preparedScene = sceneWithoutCncSecondaryToolReferences(state.project.scene, toolId);
   const library: CncLibrary = {
     ...state.cncLibrary,
     customTools: state.cncLibrary.customTools.filter((tool) => tool.id !== toolId),

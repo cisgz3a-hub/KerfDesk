@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CNC_LAYER_SETTINGS } from '../../core/scene';
 import type * as GcodeModule from '../../io/gcode';
-import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import type { PlatformAdapter, SaveDirectoryTarget, SaveTarget } from '../../platform/types';
 import type * as OutputWorkerModule from '../laser/output-preparation-worker-client';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 describe('costly tiled output isolation', () => {
-  it('acquires the first save target before awaiting the output worker', async () => {
+  it('reserves one directory before the worker and creates files only after preparation', async () => {
     const order: string[] = [];
     const suggestedNames: string[] = [];
     const target: SaveTarget = {
@@ -47,9 +47,19 @@ describe('costly tiled output isolation', () => {
       id: 'mock',
       pickFilesForOpen: async () => [],
       pickFileForSave: async (request) => {
-        order.push('picker');
+        order.push('fallback-picker');
         suggestedNames.push(request.suggestedName);
         return target;
+      },
+      reserveSaveDirectory: async (): Promise<SaveDirectoryTarget> => {
+        order.push('directory');
+        return {
+          file: (name) => {
+            order.push('file');
+            suggestedNames.push(name);
+            return target;
+          },
+        };
       },
       serial: { isSupported: () => false, requestPort: async () => null },
     };
@@ -72,9 +82,28 @@ describe('costly tiled output isolation', () => {
       pushToast: () => undefined,
     });
 
-    expect(order).toEqual(['picker', 'worker', 'write']);
-    expect(suggestedNames).toEqual(['mixed-tiles_tile-r1-c1.nc']);
+    expect(order).toEqual(['directory', 'worker', 'file', 'write']);
+    expect(suggestedNames).toEqual(['mixed-tiles-r1-c1.nc']);
     expect(mocks.prepareOutput).not.toHaveBeenCalled();
+  });
+
+  it('does not create a tile target when background preparation fails', async () => {
+    const file = vi.fn((): SaveTarget => ({ displayName: 'tile.nc', write: vi.fn() }));
+    const reserveSaveDirectory = vi.fn(async (): Promise<SaveDirectoryTarget> => ({ file }));
+    mocks.prepareTiledOutputOffThread.mockReturnValueOnce(Promise.reject(new Error('failed')));
+
+    await handleSaveTiledGcode({
+      platform: {
+        ...capturingPlatform([]),
+        reserveSaveDirectory,
+      },
+      project: costlyTiledProject(),
+      savedName: 'existing-tiles',
+      pushToast: () => undefined,
+    });
+
+    expect(reserveSaveDirectory).toHaveBeenCalledOnce();
+    expect(file).not.toHaveBeenCalled();
   });
 
   const cases: ReadonlyArray<readonly [string, () => null | Promise<never>]> = [

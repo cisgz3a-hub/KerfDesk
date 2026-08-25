@@ -19,6 +19,7 @@ import {
 } from '../../core/scene';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
+import { applyCenterArtworkInRegistrationJigSet } from './registration-jig-artwork-actions';
 
 export type SelectionTransformEdit = {
   readonly id: string;
@@ -31,8 +32,8 @@ export type SelectionTransformActions = {
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
   readonly nudgeSelection: (dx: number, dy: number) => void;
   readonly flipSelection: (axis: SelectionFlipAxis) => void;
-  // ADR-057: center the selected artwork on the registration jig box. The box is
-  // the alignment reference and never moves (it is locked).
+  // ADR-057: proportionally fit the selected artwork in the first jig outline,
+  // retaining it there and copying the fitted layout into every remaining outline.
   readonly centerSelectionInRegistrationBox: () => void;
   // ADR-124: snap the selected artwork to a corner (or the center) of the
   // captured-board outline — the registration box the operator built from jogged
@@ -54,7 +55,7 @@ export function selectionTransformActions(set: Setter): SelectionTransformAction
     nudgeSelection: (dx, dy) => set((state) => applySelectionNudgeToState(state, dx, dy)),
     flipSelection: (axis) => set((state) => applySelectionFlipToState(state, axis)),
     centerSelectionInRegistrationBox: () =>
-      set((state) => applyAnchorToRegistrationBoxToState(state, 'center')),
+      set((state) => applyCenterArtworkInRegistrationJigSet(state)),
     alignSelectionToRegistrationBox: (anchor) =>
       set((state) => applyAnchorToRegistrationBoxToState(state, anchor)),
     fitSelectionToBoard: () => set((state) => applyFitSelectionToBoardToState(state)),

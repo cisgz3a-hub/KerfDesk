@@ -130,7 +130,7 @@ describe('compileCncJob planning evidence', () => {
     ]);
   });
 
-  it('retains the stored Stepover while preserving current-main pocket planning', () => {
+  it('retains exact Stepover and reports bounded-work exhaustion', () => {
     const scene = sceneWith(
       [cncLayer('L1', '#ff0000', { cutType: 'pocket', stepoverPercent: 200 })],
       [squareObject('O1', '#ff0000', 20)],
@@ -150,13 +150,13 @@ describe('compileCncJob planning evidence', () => {
       dev,
       config,
     );
-    expect(limited.cncCompilation?.offsetLadderDiagnostics).not.toContainEqual({
+    expect(limited.cncCompilation?.offsetLadderDiagnostics).toContainEqual({
       layerId: 'limited',
       kind: 'pass-limit',
     });
   });
 
-  it('retains stored Stepover evidence from the female inlay planner', () => {
+  it('retains exact pass-limit evidence from the female inlay planner', () => {
     const job = compileCncJob(
       sceneWith(
         [
@@ -175,11 +175,11 @@ describe('compileCncJob planning evidence', () => {
     expect(job.cncCompilation?.stepoverOperations).toEqual([
       { layerId: 'inlay-limited', stepoverPercent: 0.001 },
     ]);
-    expect(job.cncCompilation?.offsetLadderDiagnostics).not.toContainEqual({
+    expect(job.cncCompilation?.offsetLadderDiagnostics).toContainEqual({
       layerId: 'inlay-limited',
       kind: 'pass-limit',
     });
-  });
+  }, 60_000);
 
   it('omits unused Stepover evidence for an adaptive-only pocket', () => {
     const job = compileCncJob(

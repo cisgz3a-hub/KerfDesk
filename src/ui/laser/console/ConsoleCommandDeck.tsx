@@ -30,26 +30,27 @@ export function ConsoleCommandDeck({
           quickCommands={model.driver.consoleQuickCommands}
           driver={model.driver}
           availabilityState={model.availabilityState}
-          sending={model.isSending}
-          onSend={(command) => void model.send(command, { kind: 'quick-command' })}
+          isSending={model.isSending}
+          onSend={(command) => void model.send({ kind: 'preserve-draft', input: command })}
         />
       ) : null}
       <ConsoleCommandForm
         autoFocus={autoFocus}
         command={model.command}
-        inputDisabled={model.isInputDisabled}
-        sending={model.isSending}
+        isInputDisabled={model.isInputDisabled}
+        isSending={model.isSending}
         sendDisabledReason={model.sendDisabledReason}
         onChange={model.changeCommand}
         onHistoryKey={model.handleHistoryKey}
-        onSend={() => void model.send(model.command, { kind: 'manual-draft' })}
+        onSend={() => void model.send({ kind: 'manual-draft', input: model.command })}
       />
       <UserMacroPanel
         isSending={model.isSending}
         isInputDisabled={model.isInputDisabled}
         onRun={(command, macro) =>
-          model.send(command, {
-            kind: 'user-macro',
+          model.send({
+            kind: 'preserve-draft',
+            input: command,
             provenance: {
               kind: 'user-macro',
               macroName: macro.name,
@@ -76,7 +77,7 @@ function QuickCommandRow(props: {
   readonly quickCommands: ReadonlyArray<ConsoleQuickCommand>;
   readonly driver: ControllerDriver;
   readonly availabilityState: ConsoleCommandAvailabilityState;
-  readonly sending: boolean;
+  readonly isSending: boolean;
   readonly onSend: (command: string) => void;
 }): JSX.Element {
   return (
@@ -91,7 +92,7 @@ function QuickCommandRow(props: {
           <button
             key={quick.command}
             type="button"
-            disabled={props.sending || disabledReason !== null}
+            disabled={props.isSending || disabledReason !== null}
             title={disabledReason ?? quick.hint}
             onClick={() => props.onSend(quick.command)}
           >
@@ -106,8 +107,8 @@ function QuickCommandRow(props: {
 function ConsoleCommandForm(props: {
   readonly autoFocus: boolean;
   readonly command: string;
-  readonly inputDisabled: boolean;
-  readonly sending: boolean;
+  readonly isInputDisabled: boolean;
+  readonly isSending: boolean;
   readonly sendDisabledReason: string | null;
   readonly onChange: (value: string) => void;
   readonly onHistoryKey: (event: KeyboardEvent<HTMLInputElement>) => void;
@@ -128,20 +129,20 @@ function ConsoleCommandForm(props: {
         onChange={(event) => props.onChange(event.target.value)}
         onKeyDown={props.onHistoryKey}
         placeholder="$I, $$, $G, G0 X0 Y0..."
-        disabled={props.inputDisabled}
+        disabled={props.isInputDisabled}
         title={props.sendDisabledReason ?? 'Send one controller command.'}
         style={inputStyle}
       />
       <button
         type="submit"
-        disabled={props.sending || props.sendDisabledReason !== null}
+        disabled={props.isSending || props.sendDisabledReason !== null}
         title={
-          props.sending
+          props.isSending
             ? 'Waiting for the command write to finish.'
             : (props.sendDisabledReason ?? '')
         }
       >
-        {props.sending ? 'Sending...' : 'Send'}
+        {props.isSending ? 'Sending...' : 'Send'}
       </button>
     </form>
   );

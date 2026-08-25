@@ -170,8 +170,7 @@ export function StepoverField(props: {
       label="Stepover"
       unit="%"
       value={props.settings.stepoverPercent}
-      min={10}
-      max={85}
+      positiveOnly
       step={5}
       title={
         props.hasReliefObjects

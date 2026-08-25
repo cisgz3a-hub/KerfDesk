@@ -47,7 +47,8 @@ export function useUserMacroLibrary(): {
   ): UserMacroLibraryMutationResult => {
     const write = writeUserMacros(next);
     if (write.kind !== 'ok') return { kind: 'error', message: storageWriteError(write) };
-    // The synchronous event reloads this hook and every other mounted Console surface once.
+    // The listener updates this instance and every other mounted Console from
+    // the exact persisted collection in one synchronous notification.
     window.dispatchEvent(new Event(USER_MACROS_CHANGED_EVENT));
     return { kind: 'ok', ...(macro === undefined ? {} : { macro }) };
   };

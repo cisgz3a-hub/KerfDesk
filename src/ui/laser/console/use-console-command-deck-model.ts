@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent } from 'react';
 import { selectControllerDriver, type ControllerDriver } from '../../../core/controllers';
-import type { ConsoleCommandProvenance } from '../../state';
-import { useLaserStore } from '../../state/laser-store';
+import type { ConsoleCommandProvenance } from '../../state/console-command-provenance';
+import { useLaserStore } from '../../state';
 import {
   consoleCommandDisabledReason,
   type ConsoleCommandAvailabilityState,
@@ -13,10 +13,13 @@ import {
 } from './console-command-history';
 import { runConsoleCommand } from './run-console-command';
 
-type ConsoleCommandSendMode =
-  | { readonly kind: 'manual-draft' }
-  | { readonly kind: 'quick-command' }
-  | { readonly kind: 'user-macro'; readonly provenance: ConsoleCommandProvenance };
+type ConsoleCommandSubmission =
+  | { readonly kind: 'manual-draft'; readonly input: string }
+  | {
+      readonly kind: 'preserve-draft';
+      readonly input: string;
+      readonly provenance?: ConsoleCommandProvenance;
+    };
 
 type ConsoleCommandDeckModel = {
   readonly availabilityState: ConsoleCommandAvailabilityState;
@@ -26,37 +29,28 @@ type ConsoleCommandDeckModel = {
   readonly isSending: boolean;
   readonly sendDisabledReason: string | null;
   readonly isInputDisabled: boolean;
-  readonly send: (input: string, mode: ConsoleCommandSendMode) => Promise<void>;
+  readonly send: (submission: ConsoleCommandSubmission) => Promise<void>;
   readonly handleHistoryKey: (event: KeyboardEvent<HTMLInputElement>) => void;
   readonly changeCommand: (value: string) => void;
 };
 
-/**
- * Builds the shared Console command-deck model, including optional successful-command history and
- * the callback invoked after the existing Console transport accepts a command.
- */
+/** Owns the shared Console draft, history, availability, and one-command dispatch state. */
 export function useConsoleCommandDeckModel(
   enableHistory: boolean,
   onCommandSent: ((command: string) => void) | undefined,
 ): ConsoleCommandDeckModel {
   const connection = useLaserStore((state) => state.connection);
-  const statusReport = useLaserStore((state) => state.statusReport);
-  const fireActive = useLaserStore((state) => state.fireActive);
-  const streamer = useLaserStore((state) => state.streamer);
-  const motionOperation = useLaserStore((state) => state.motionOperation);
-  const controllerOperation = useLaserStore((state) => state.controllerOperation);
-  const autofocusBusy = useLaserStore((state) => state.autofocusBusy);
   const activeControllerKind = useLaserStore((state) => state.activeControllerKind);
   const sendConsoleCommand = useLaserStore((state) => state.sendConsoleCommand);
   const driver = selectControllerDriver(activeControllerKind);
   const availabilityState: ConsoleCommandAvailabilityState = {
     connection,
-    statusReport,
-    fireActive,
-    streamer,
-    motionOperation,
-    controllerOperation,
-    autofocusBusy,
+    statusReport: useLaserStore((state) => state.statusReport),
+    fireActive: useLaserStore((state) => state.fireActive),
+    streamer: useLaserStore((state) => state.streamer),
+    motionOperation: useLaserStore((state) => state.motionOperation),
+    controllerOperation: useLaserStore((state) => state.controllerOperation),
+    autofocusBusy: useLaserStore((state) => state.autofocusBusy),
   };
   const [command, setCommand] = useState('');
   const [history, setHistory] = useState(createConsoleCommandHistory);
@@ -64,23 +58,30 @@ export function useConsoleCommandDeckModel(
   const [error, setError] = useState<string | null>(null);
   const sendDisabledReason = consoleCommandDisabledReason(driver, command, availabilityState);
 
-  const send = async (input: string, mode: ConsoleCommandSendMode): Promise<void> => {
+  const send = async (submission: ConsoleCommandSubmission): Promise<void> => {
     if (isSending) return;
     setIsSending(true);
     setError(null);
-    const provenance = mode.kind === 'user-macro' ? mode.provenance : undefined;
-    const result = await runConsoleCommand(driver, input, sendConsoleCommand, provenance);
-    setIsSending(false);
-    if (result.status === 'sent') {
-      setHistory((current) => recordSuccessfulConsoleCommand(current, result.command));
-      if (mode.kind === 'manual-draft') {
-        // A transport write can be slow. Preserve a new draft the operator
-        // typed while the submitted command was still in flight.
-        setCommand((current) => (current === input ? '' : current));
+    try {
+      const result = await runConsoleCommand(
+        driver,
+        submission.input,
+        sendConsoleCommand,
+        submission.kind === 'preserve-draft' ? submission.provenance : undefined,
+      );
+      if (result.status === 'sent') {
+        setHistory((current) => recordSuccessfulConsoleCommand(current, result.command));
+        if (submission.kind === 'manual-draft') {
+          // A transport write can be slow. Preserve a new draft the operator
+          // typed while the submitted command was still in flight.
+          setCommand((current) => (current === submission.input ? '' : current));
+        }
+        onCommandSent?.(result.command);
+      } else if (result.status === 'rejected') {
+        setError(result.reason);
       }
-      onCommandSent?.(result.command);
-    } else if (result.status === 'rejected') {
-      setError(result.reason);
+    } finally {
+      setIsSending(false);
     }
   };
 

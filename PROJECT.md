@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-292 implements the bounded P2R.1a substrate: project schema v4, a canonical U16LE heightfield, exact legacy migration, worker-backed qualified 8-bit grayscale import with simple transparency masks, and existing relief CAM/preview integration. The remaining P2R.1 product surface and P2R.2-P2R.6 stay planned. ADR-293 adds focused one-command CurveDesk user macros through the existing Console path. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 293. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-292 implements the bounded P2R.1a substrate: project schema v4, a canonical U16LE heightfield, exact legacy migration, worker-backed qualified 8-bit grayscale import with simple transparency masks, and existing relief CAM/preview integration. The remaining P2R.1 product surface and P2R.2-P2R.6 stay planned. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 293. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -81,7 +81,7 @@ Acceptance: see `WORKFLOW.md` Phase A flows + `DECISIONS.md` Phase A acceptance 
 
 Match LightBurn's core loop. Adds WebSerial-based GRBL controller, Laser window, Device Profile UI, Home/Frame/Jog/Start/Pause/Abort, alarm handling, job progress.
 
-Focused CurveDesk user macros v1 extends the existing Console under ADR-293: operators can save
+Focused KerfDesk user macros v1 extends the existing Console under ADR-293: operators can save
 named, local, single-command templates with finite-decimal variables. Every expansion reuses the
 current controller driver's parser, `sendConsoleCommand`, safe writer, transcript, and successful
 command-history model. Macros do not stream programs, run automatically, call Start, or create or

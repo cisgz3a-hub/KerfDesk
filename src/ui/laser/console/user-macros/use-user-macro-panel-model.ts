@@ -23,7 +23,29 @@ type MacroPanelState = {
   readonly error: string | null;
 };
 
-type MacroPanelActionsContext = {
+type MacroPanelActions = {
+  readonly select: (name: string) => void;
+  readonly beginNew: () => void;
+  readonly beginEdit: () => void;
+  readonly cancelEditor: () => void;
+  readonly saveEditor: () => void;
+  readonly removeSelected: () => void;
+  readonly setValue: (variable: string, value: string) => void;
+  readonly runSelected: () => void;
+};
+
+type UserMacroPanelModel = MacroPanelActions & {
+  readonly editor: MacroEditor | null;
+  readonly error: string | null;
+  readonly expansion: UserMacroExpansionResult | null;
+  readonly macros: ReadonlyArray<UserMacro>;
+  readonly selected: UserMacro | null;
+  readonly values: Readonly<Record<string, string>>;
+  readonly variables: ReadonlyArray<string>;
+  readonly setEditor: (editor: MacroEditor) => void;
+};
+
+type MacroPanelContext = {
   readonly state: MacroPanelState;
   readonly setState: Dispatch<SetStateAction<MacroPanelState>>;
   readonly selected: UserMacro | null;
@@ -32,17 +54,6 @@ type MacroPanelActionsContext = {
   readonly onRun: (command: string, macro: UserMacro) => Promise<void>;
 };
 
-type UserMacroPanelModel = {
-  readonly editor: MacroEditor | null;
-  readonly error: string | null;
-  readonly expansion: UserMacroExpansionResult | null;
-  readonly macros: ReturnType<typeof useUserMacroLibrary>['macros'];
-  readonly selected: UserMacro | null;
-  readonly values: Readonly<Record<string, string>>;
-  readonly variables: ReadonlyArray<string>;
-  readonly setEditor: (editor: MacroEditor) => void;
-} & ReturnType<typeof macroPanelActions>;
-
 const INITIAL_PANEL_STATE: MacroPanelState = {
   selectedName: '',
   editor: null,
@@ -50,7 +61,7 @@ const INITIAL_PANEL_STATE: MacroPanelState = {
   error: null,
 };
 
-/** Builds the saved-macro editor, selection, expansion, persistence, and Console-run model. */
+/** Derives the editor and runner state for one local saved-macro panel. */
 export function useUserMacroPanelModel(
   onRun: (command: string, macro: UserMacro) => Promise<void>,
 ): UserMacroPanelModel {
@@ -75,7 +86,7 @@ export function useUserMacroPanelModel(
   };
 }
 
-function macroPanelActions(context: MacroPanelActionsContext) {
+function macroPanelActions(context: MacroPanelContext): MacroPanelActions {
   const { state, setState, selected, expansion, library, onRun } = context;
   return {
     select: (name: string) => setState({ ...INITIAL_PANEL_STATE, selectedName: name }),

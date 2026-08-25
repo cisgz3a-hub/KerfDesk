@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  findRegistrationBoxes,
   IDENTITY_TRANSFORM,
+  isRegistrationBox,
+  operationIdsForObject,
   primaryOperationForObject,
   REGISTRATION_LAYER_ID,
 } from '../../core/scene';
@@ -45,6 +48,37 @@ describe('setRegistrationOutput', () => {
     expect(output[operationIdFor('art')]).toBe(true);
   });
 
+  it('applies Outline only and Artwork only to every member of a five-jig set', () => {
+    resetStore();
+    useStore.getState().replaceRegistrationJigSet({
+      outline: { kind: 'rectangle', widthMm: 40, heightMm: 30 },
+      rows: 1,
+      columns: 5,
+      spacingX: 5,
+      spacingY: 0,
+    });
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'set-art',
+        color: ART_COLOR,
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 0, y: 0 },
+      }),
+    );
+    useStore.getState().centerSelectionInRegistrationBox();
+
+    useStore.getState().setRegistrationOutput('box');
+    const outlineScene = useStore.getState().project.scene;
+    expect(findRegistrationBoxes(outlineScene)).toHaveLength(5);
+    expect(outputObjectCount(outlineScene, true)).toBe(5);
+    expect(outputObjectCount(outlineScene, false)).toBe(0);
+
+    useStore.getState().setRegistrationOutput('artwork');
+    const artworkScene = useStore.getState().project.scene;
+    expect(outputObjectCount(artworkScene, true)).toBe(0);
+    expect(outputObjectCount(artworkScene, false)).toBe(5);
+  });
+
   it('artwork scope restores only layers that were enabled before box scope', () => {
     useStore.getState().drawShape(
       createRectangle({
@@ -67,6 +101,19 @@ describe('setRegistrationOutput', () => {
     expect(output[REGISTRATION_LAYER_ID]).toBe(false);
     expect(output[artOperationId]).toBe(true);
     expect(output[disabledOperationId]).toBe(false);
+  });
+
+  it('enables all artwork after reopening a project saved in Outline-only mode', () => {
+    useStore.getState().setRegistrationOutput('box');
+    const savedProject = useStore.getState().project;
+    useStore.getState().setProject(savedProject);
+    expect(useStore.getState().registrationArtworkOutputSnapshot).toBeNull();
+
+    useStore.getState().setRegistrationOutput('artwork');
+
+    const output = outputById();
+    expect(output[REGISTRATION_LAYER_ID]).toBe(false);
+    expect(output[operationIdFor('art')]).toBe(true);
   });
 
   it('clears the temporary artwork-output snapshot on undo', () => {
@@ -92,4 +139,16 @@ function operationIdFor(objectId: string): string {
   const operation = object === undefined ? null : primaryOperationForObject(object, scene.layers);
   if (operation === null) throw new Error(`operation missing for ${objectId}`);
   return operation.id;
+}
+
+function outputObjectCount(
+  scene: ReturnType<typeof useStore.getState>['project']['scene'],
+  jig: boolean,
+): number {
+  const outputIds = new Set(scene.layers.filter((layer) => layer.output).map((layer) => layer.id));
+  return scene.objects.filter(
+    (object) =>
+      isRegistrationBox(object) === jig &&
+      operationIdsForObject(object, scene.layers).some((id) => outputIds.has(id)),
+  ).length;
 }

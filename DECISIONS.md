@@ -3346,6 +3346,78 @@ Two follow-ups refined the above after the maintainer tested it:
   start mode; in **Absolute** mode both runs emit at their true on-canvas positions,
   so a homed machine aligns the two runs with no Set-Origin step.
 
+### Amendment (2026-08-23) — multi-outline jig sets
+
+The single outline generalizes to one **jig set** containing a rectangular grid
+of one or more identical rectangle or circle outlines. Every outline remains a
+normal `ShapeObject` bound to the same reserved `registration` operation, so no
+scene union, project field, or schema version changes. Creating a set replaces
+the previous set atomically; rows, columns, and horizontal/vertical spacing define
+the layout, and the complete set can be moved or locked with ordinary scene tools.
+
+The two-run contract is set-wide. **Outline only** enables the one registration
+operation and therefore emits every outline. **Artwork only** disables that
+operation and restores the artwork operations, so every operation-preserving copy
+is emitted. **Auto-fit + copy artwork to all N** proportionally scales the selected
+artwork group into 90% of the first outline's usable region, preserving aspect ratio
+and internal group spacing, then duplicates that fitted layout into every remaining
+outline without creating new operations. Circle outlines use the existing inscribed-
+square fit region so axis-aligned artwork remains inside the arc. Repeating the action
+replaces its prior generated copies. The single-outline fit behavior is the N=1 case.
+
+Placement treats the combined compiled bounds of all registration outlines as one
+physical fixture anchor. Outline and artwork runs receive that same anchor, while
+Absolute Coordinates continues to emit at the true canvas positions. This is one
+fixture coordinate system, not multiple work origins. The existing exact-job Frame
+permit remains the only Start guard; the amendment adds no refusal or confirmation.
+Captured-board provenance remains exclusive to Place Board and cannot be replaced
+through the jig-set action.
+
+### Amendment (2026-08-24) — piece-complete output and shared sizing
+
+Generated jig copy ids already encode both the source artwork id and destination
+outline id. Treat that persisted identity as the jig-instance boundary; do not add
+a project field or schema migration. Laser compilation materializes each active
+instance separately and repeats its shared operations in project-layer order before
+advancing to the next outline in grid order. Line, scanline fill, Follow Shape,
+Island Fill, and Image output therefore retain their normal per-operation behavior,
+but geometry from separate jig instances cannot be merged into one cross-fixture
+scan or segment group. Ordinary artwork that merely shares an operation remains one
+machining unit outside the jig-instance groups; scenes without an active multi-jig
+set keep the existing compiler path unchanged.
+
+The Registration Jig panel exposes the first instance's exact width and height as
+the set's shared artwork size. **Apply size to all N** independently resizes each
+instance around its own centre with a fixed proportional aspect lock, then recenters
+it in the corresponding outline. Editing either exact dimension updates the other;
+this avoids inventing shear for rotated artwork. Group members scale as one layout so
+their internal spacing is preserved; fixture spacing never scales. The action is one
+undoable scene edit and survives save/reopen through the existing copy ids.
+
+This amendment changes compilation grouping and scene transforms only. It does not
+change power, speed, passes, output toggles, placement evidence, transport, or machine
+authorization. The exact-job Frame permit remains the only Start guard.
+
+### Amendment (2026-08-25) — operator-controlled aspect lock
+
+The shared artwork-size control keeps proportional sizing as its default but makes
+the visible **AR locked** state an explicit toggle. In the locked state, editing W or
+H continues to derive the paired dimension and the store applies one uniform scale.
+In **AR unlocked**, each draft changes independently and **Apply size to all N**
+passes both exact dimensions through the existing selection-transform path, then
+recenters every instance in its own outline. This changes only artwork geometry;
+fixture spacing, operation bindings, output order, and the one-edit undo contract
+remain unchanged.
+
+The scene transform model has rotation plus local X/Y scale but no shear. Rotated jig
+artwork therefore measures and applies W/H in a selection-local frame aligned to the
+first artwork object's axes. The store scales positions and object X/Y scale in that
+frame, preserves every rotation, and recenters the resulting world bounds in each jig.
+The visible unlocked hint states the local-axis convention. Applying remains available
+for rotated artwork; no resize refusal, hidden input, or instruction to relock AR is
+introduced. This does not change Frame, Preview, compilation, transport, or machine
+authorization.
+
 ### Consequences
 
 - The jig is a composition of existing machinery — reserved-id layer (ADR-005
@@ -3386,6 +3458,10 @@ Two follow-ups refined the above after the maintainer tested it:
   identical box-anchored offset; the box anchors to work-zero; the art lands at its
   offset relative to the box, not at the corner
   (`registration-placement.property.test.ts`).
+- **Jig-set coverage:** state and panel tests create five outlines, center and copy
+  one artwork into all five slots, prove both output choices apply set-wide, and
+  round-trip the complete set. Placement tests measure and anchor the combined
+  fixture bounds in both runs.
 - Full suite + `tsc --noEmit` + lint green; no existing G-code snapshot moves
   (non-jig placement unchanged).
 - **Hardware (gates "done"):** on the 4040, Set Origin, burn the box, place the
@@ -16418,6 +16494,47 @@ records its exact evidence and exclusions.
 - ADR-290, explicit 8-bit grayscale height-map import.
 - ADR-291, the complete phased photo-to-relief product contract.
 
+## ADR-292 Amendment 1 - Relief 3D discloses its viewer-owned display mesh budget (2026-08-09)
+
+### Context
+
+P2R.1a's Relief 3D dialog already sampled both canonical heightfields and legacy meshes at
+`max(0.25 mm, longest physical edge / 256)`. That bounded display mesh was silent, and the surface
+handoff replaced its provenance with equal requested/effective values and no reason. Calling
+0.25 mm a source, operator, or CAM request would also be false: the viewer owns that target and has
+no toolpath-resolution context.
+
+### Decision
+
+1. **Name 0.25 mm as the nominal Relief 3D display target.** The effective square-cell size remains
+   `max(0.25 mm, longest physical edge / 256)`. The evidence records the nominal target as
+   `requestedMmPerCell`, the selected spacing as `effectiveMmPerCell`, and
+   `display-mesh-cell-budget` only when the longest edge exceeds 64 mm.
+2. **Use one resolution result through the whole display path.** The same result drives exact
+   materialization, the removal-grid worker handoff, and the dialog status. At or below 64 mm no
+   status is rendered. Above it, the status names the nominal and effective spacing, the 256-cell
+   budget, and that the choice is preview-only and cannot change CAM or G-code.
+3. **Keep the disclosure informational.** It adds no control, clamp, refusal, delay, confirmation,
+   project mutation, Frame effect, or Start effect. Closing and cancellation retain their existing
+   behavior. Very large finite values remain finite in the message instead of overflowing during
+   decimal presentation.
+
+### Consequences
+
+- Existing display geometry and mesh budgets are unchanged; larger previews now preserve and show
+  the policy evidence they previously discarded.
+- Relief CAM continues to select its own tool- and operation-derived resolution. No setting or
+  emitted G-code depends on this viewer result.
+- This amendment does not qualify real WebGL fidelity, target-device performance, astronomical
+  Float32 mesh coordinates, exact ceil-rounded outer edges, or one-cell-axis surface topology.
+
+### Verification
+
+- Pure resolver tests cover the exact 64 mm boundary, a 100 x 50 mm adjusted case, truthful copy,
+  and a maximum-finite input without presentation overflow.
+- Dialog tests cover the legacy-mesh and canonical-heightfield arms, physical transform scale,
+  materializer and surface-worker propagation, absence below the threshold, visible status above
+  it, cancellation, failure fallback, and an available Close action.
 ## ADR-293 - Saved user macros remain one-command Console invocations (2026-08-09)
 
 **Date:** 2026-08-09
@@ -16426,7 +16543,7 @@ hardware qualification excluded
 
 ### Context
 
-CurveDesk already has one controller-specific Console path. The shared command deck prepares input
+KerfDesk already has one controller-specific Console path. The shared command deck prepares input
 with the active driver, obtains the existing persistent-setting confirmation when applicable,
 dispatches through the laser store's `sendConsoleCommand`, and records only successful dispatches in
 its local command history. The store rechecks live operation and Idle ownership, invalidates setup
@@ -16462,7 +16579,7 @@ beside the exact-artifact Frame/Start flow governed by ADR-228, ADR-230, and ADR
    manual Console text; that draft remains available before and after macro dispatch.
 6. **Provenance is explicit and truthful.** Successful macro dispatch marks the outbound transcript
    source as `macro` and appends a macro-source message containing the saved name and expanded
-   command. The message says what CurveDesk dispatched through Console; it does not claim controller
+   command. The message says what KerfDesk dispatched through Console; it does not claim controller
    acknowledgement, physical position, or machine execution.
 7. **Frame-first remains the only job authorization.** Macro modules do not import or call Frame,
    `runStartJobFlow`, `startJob`, streamer creation, or permit helpers. A read-only macro preserves
@@ -16478,7 +16595,7 @@ beside the exact-artifact Frame/Start flow governed by ADR-228, ADR-230, and ADR
 
 - Operators can name and reuse diagnostic, setup, and one-line manual motion commands without
   retyping them. The UI labels them user-saved, local, and one-command so they cannot be mistaken for
-  CurveDesk-authored workflows or reviewed job artifacts.
+  KerfDesk-authored workflows or reviewed job artifacts.
 - Numeric-only placeholders cover coordinates, feeds, power, dwell, and controller settings while
   preventing a variable value from injecting another G/M/$ command. Command vocabulary stays in the
   operator-authored fixed template and the controller driver's existing parser.

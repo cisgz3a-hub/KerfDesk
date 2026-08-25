@@ -37,6 +37,9 @@ export type SelectionTransformEdit =
       readonly width?: number;
       readonly height?: number;
       readonly preserveAspect: boolean;
+      /** Optional selection-local frame. Non-uniform scaling stays representable
+       * for rotated artwork by scaling along these axes instead of world X/Y. */
+      readonly frameRotationDeg?: number;
     }
   // Rotation always pivots about the selection centre, so it carries NO anchor:
   // the 9-dot anchor governs the X/Y reference and the resize corner only.
@@ -58,6 +61,25 @@ export type SelectionTransformResult =
 
 export function selectionMetrics(objects: ReadonlyArray<SceneObject>): SelectionMetrics | null {
   const bbox = combinedBBox(objects);
+  if (bbox === null) return null;
+  return {
+    bbox,
+    width: bbox.maxX - bbox.minX,
+    height: bbox.maxY - bbox.minY,
+    rotationDeg: objects.length === 1 ? normalizeDeg(objects[0]?.transform.rotationDeg ?? 0) : null,
+    count: objects.length,
+  };
+}
+
+/** Measures transformed object bounds after rotating the scene into a caller-
+ * supplied frame. A rotated single object therefore reports its local-axis W/H
+ * while its world placement and rotation remain untouched. */
+export function selectionMetricsInFrame(
+  objects: ReadonlyArray<SceneObject>,
+  frameRotationDeg: number,
+): SelectionMetrics | null {
+  if (!Number.isFinite(frameRotationDeg)) return null;
+  const bbox = combinedBBoxInFrame(objects, frameRotationDeg);
   if (bbox === null) return null;
   return {
     bbox,
@@ -142,29 +164,76 @@ function resizeSelection(
   metrics: SelectionMetrics,
   edit: Extract<SelectionTransformEdit, { readonly kind: 'resize' }>,
 ): SelectionTransformResult {
-  if (metrics.width <= MIN_DIMENSION_MM || metrics.height <= MIN_DIMENSION_MM) {
+  if (edit.frameRotationDeg !== undefined && !Number.isFinite(edit.frameRotationDeg)) {
+    return { kind: 'error', reason: 'invalid-number' };
+  }
+  const resizeMetrics = resizeMetricsForFrame(objects, metrics, edit.frameRotationDeg);
+  if (resizeMetrics === null || hasDegenerateDimensions(resizeMetrics)) {
     return { kind: 'error', reason: 'degenerate-selection' };
   }
-  if (
-    (edit.width !== undefined &&
-      (!Number.isFinite(edit.width) || edit.width <= MIN_DIMENSION_MM)) ||
-    (edit.height !== undefined &&
-      (!Number.isFinite(edit.height) || edit.height <= MIN_DIMENSION_MM))
-  ) {
+  if (hasInvalidResizeDimension(edit)) {
     return { kind: 'error', reason: 'invalid-dimension' };
   }
-  const factors = resizeFactors(metrics, edit);
-  if (!edit.preserveAspect && !isUniformScale(factors) && hasRotatedObject(objects)) {
+  const factors = resizeFactors(resizeMetrics, edit);
+  if (rejectsWorldAxisResize(objects, edit, factors)) {
     return { kind: 'error', reason: 'non-uniform-rotated-selection' };
   }
-  const anchor = anchorPointForBBox(metrics.bbox, edit.anchor);
+  const anchor = anchorPointForBBox(resizeMetrics.bbox, edit.anchor);
   return {
     kind: 'ok',
     transforms: objects.map((object) => ({
       id: object.id,
-      transform: scaleTransformAboutPoint(object.transform, anchor, factors.x, factors.y),
+      transform: resizeTransform(object.transform, anchor, factors, edit.frameRotationDeg),
     })),
   };
+}
+
+function resizeMetricsForFrame(
+  objects: ReadonlyArray<SceneObject>,
+  metrics: SelectionMetrics,
+  frameRotationDeg: number | undefined,
+): SelectionMetrics | null {
+  return frameRotationDeg === undefined
+    ? metrics
+    : selectionMetricsInFrame(objects, frameRotationDeg);
+}
+
+function hasDegenerateDimensions(metrics: SelectionMetrics): boolean {
+  return metrics.width <= MIN_DIMENSION_MM || metrics.height <= MIN_DIMENSION_MM;
+}
+
+function hasInvalidResizeDimension(
+  edit: Extract<SelectionTransformEdit, { readonly kind: 'resize' }>,
+): boolean {
+  return invalidDimension(edit.width) || invalidDimension(edit.height);
+}
+
+function invalidDimension(value: number | undefined): boolean {
+  return value !== undefined && (!Number.isFinite(value) || value <= MIN_DIMENSION_MM);
+}
+
+function rejectsWorldAxisResize(
+  objects: ReadonlyArray<SceneObject>,
+  edit: Extract<SelectionTransformEdit, { readonly kind: 'resize' }>,
+  factors: { readonly x: number; readonly y: number },
+): boolean {
+  return (
+    edit.frameRotationDeg === undefined &&
+    !edit.preserveAspect &&
+    !isUniformScale(factors) &&
+    hasRotatedObject(objects)
+  );
+}
+
+function resizeTransform(
+  transform: Transform,
+  anchor: Vec2,
+  factors: { readonly x: number; readonly y: number },
+  frameRotationDeg: number | undefined,
+): Transform {
+  return frameRotationDeg === undefined
+    ? scaleTransformAboutPoint(transform, anchor, factors.x, factors.y)
+    : scaleTransformInFrame(transform, anchor, factors.x, factors.y, frameRotationDeg);
 }
 
 function rotateSelection(
@@ -231,6 +300,57 @@ function scaleTransformAboutPoint(
     scaleX: transform.scaleX * factorX,
     scaleY: transform.scaleY * factorY,
   };
+}
+
+function scaleTransformInFrame(
+  transform: Transform,
+  frameAnchor: Vec2,
+  factorX: number,
+  factorY: number,
+  frameRotationDeg: number,
+): Transform {
+  const originInFrame = rotatePoint(transform, { x: 0, y: 0 }, -frameRotationDeg);
+  const scaledInFrame = {
+    x: frameAnchor.x + (originInFrame.x - frameAnchor.x) * factorX,
+    y: frameAnchor.y + (originInFrame.y - frameAnchor.y) * factorY,
+  };
+  const originInWorld = rotatePoint(scaledInFrame, { x: 0, y: 0 }, frameRotationDeg);
+  return {
+    ...transform,
+    x: originInWorld.x,
+    y: originInWorld.y,
+    scaleX: transform.scaleX * factorX,
+    scaleY: transform.scaleY * factorY,
+  };
+}
+
+function combinedBBoxInFrame(
+  objects: ReadonlyArray<SceneObject>,
+  frameRotationDeg: number,
+): AABB | null {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let any = false;
+  for (const object of objects) {
+    const corners = [
+      { x: object.bounds.minX, y: object.bounds.minY },
+      { x: object.bounds.maxX, y: object.bounds.minY },
+      { x: object.bounds.maxX, y: object.bounds.maxY },
+      { x: object.bounds.minX, y: object.bounds.maxY },
+    ];
+    for (const corner of corners) {
+      const world = applyTransform(corner, object.transform);
+      const framed = rotatePoint(world, { x: 0, y: 0 }, -frameRotationDeg);
+      minX = Math.min(minX, framed.x);
+      minY = Math.min(minY, framed.y);
+      maxX = Math.max(maxX, framed.x);
+      maxY = Math.max(maxY, framed.y);
+      any = true;
+    }
+  }
+  return any ? { minX, minY, maxX, maxY } : null;
 }
 
 function rotatePoint(point: Vec2, anchor: Vec2, deltaDeg: number): Vec2 {

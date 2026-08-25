@@ -16,6 +16,7 @@
 // review); this function only slices the sealed prepared Job.
 
 import type { CncGroup, Job } from '../job';
+import { retainedCncCompilationSidecar } from './cnc-retained-compilation-sidecar';
 
 export type CncPassResumeJob = {
   readonly kind: 'resume-job';
@@ -47,9 +48,11 @@ export function buildCncPassResumeJob(
     return { kind: 'error', reason: 'invalid-resume-index' };
   }
   const resumeGroup: CncGroup = { ...group, passes: group.passes.slice(passIndex) };
+  const groups = [resumeGroup, ...source.groups.slice(groupIndex + 1)];
+  const cncCompilation = retainedCncCompilationSidecar(source, groups);
   return {
     kind: 'resume-job',
-    job: { groups: [resumeGroup, ...source.groups.slice(groupIndex + 1)] },
+    job: cncCompilation === undefined ? { groups } : { groups, cncCompilation },
     omittedPassCount: countPassesBefore(source, groupIndex) + passIndex,
     totalPassCount: countPassesBefore(source, source.groups.length),
   };

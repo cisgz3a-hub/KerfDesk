@@ -87,8 +87,18 @@ describe('computeRemovalGrid — per-step bits', () => {
     // 60° v-bit: cone walls rising at d/tan(30°) from the tip, so the same
     // 2.5 mm offset is already back above the surface, and 0.5 mm out sits at
     // -2 + 0.5/tan(30) = -1.13.
-    expect(depthAt(grid, 30, 10)).toBeCloseTo(DEPTH, 2);
-    expect(depthAt(grid, 30.5, 10)).toBeCloseTo(DEPTH + 0.5 / Math.tan(Math.PI / 6), 2);
+    // The v-bit's tip runs along y = 10, which is a cell BOUNDARY, so no cell
+    // centre lies on the axis: the deepest sample sits half a cell out and
+    // reads that far up the cone. Before the sub-cell fix the stamper snapped
+    // the tool to the nearest cell centre and so reported the exact tip depth
+    // from anywhere inside that cell.
+    expect(depthAt(grid, 30, 10)).toBeCloseTo(DEPTH + CELL / 2 / Math.tan(Math.PI / 6), 2);
+    // Likewise 0.5 mm out: the sampled cell's centre sits at x = 30.55, so the
+    // true radial distance from the axis is 0.5 + CELL / 2.
+    expect(depthAt(grid, 30.5, 10)).toBeCloseTo(
+      DEPTH + (0.5 + CELL / 2) / Math.tan(Math.PI / 6),
+      2,
+    );
     expect(depthAt(grid, 32.5, 10)).toBeCloseTo(0, 2);
   });
 
@@ -117,7 +127,8 @@ describe('computeRemovalGrid — per-step bits', () => {
     if (half.kind !== 'ok') throw new Error(half.reason);
     expect(depthAt(half.grid, 10, 10)).toBeCloseTo(DEPTH, 2);
     expect(depthAt(half.grid, 30, 10)).toBeCloseTo(0, 2);
-    // And the finished grid still carves both.
-    expect(depthAt(full, 30, 10)).toBeCloseTo(DEPTH, 2);
+    // And the finished grid still carves both. Same half-cell offset as above:
+    // the v-bit's axis falls on a cell boundary.
+    expect(depthAt(full, 30, 10)).toBeCloseTo(DEPTH + CELL / 2 / Math.tan(Math.PI / 6), 2);
   });
 });

@@ -172,7 +172,7 @@ describe('ConsoleCommandDeck', () => {
     await enterCommand(variableInput, '1 M3');
     await clickButton(host, 'Run user macro');
     expect(sendConsoleCommand).toHaveBeenCalledTimes(1);
-    expect(requiredMacroPanel(host).querySelector('[role="alert"]')?.textContent).toContain(
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
       'one finite decimal number',
     );
     await unmount();
@@ -209,7 +209,7 @@ describe('ConsoleCommandDeck', () => {
     await clickButton(host, 'Save macro');
 
     expect(readUserMacros()).toEqual([]);
-    expect(requiredMacroPanel(host).querySelector('[role="alert"]')?.textContent).toContain(
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
       'saved collection was not changed',
     );
     await unmount();
@@ -246,15 +246,6 @@ function requiredInputByLabel(host: HTMLElement, label: string): HTMLInputElemen
   const input = host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
   if (input === null) throw new Error(`${label} input missing`);
   return input;
-}
-
-function requiredMacroPanel(host: HTMLElement): HTMLDetailsElement {
-  const summary = [...host.querySelectorAll('summary')].find((candidate) =>
-    candidate.textContent?.includes('User macros'),
-  );
-  const panel = summary?.closest('details');
-  if (panel === undefined || panel === null) throw new Error('user macro panel missing');
-  return panel;
 }
 
 async function enterCommand(input: HTMLInputElement, value: string): Promise<void> {

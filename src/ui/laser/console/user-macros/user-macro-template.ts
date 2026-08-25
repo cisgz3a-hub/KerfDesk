@@ -5,7 +5,6 @@ const ORDINARY_DECIMAL_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u;
 const C0_LAST_CODE_UNIT = 0x1f;
 const DELETE_CODE_UNIT = 0x7f;
 const C1_LAST_CODE_UNIT = 0x9f;
-const BRACE_DELIMITER_LENGTH = 2;
 
 export type UserMacroTemplateError =
   | { readonly kind: 'empty-template'; readonly message: string }
@@ -93,12 +92,12 @@ function parsePlaceholders(template: string): UserMacroTemplateResult {
     const braceIndex = nextBraceIndex(template, cursor);
     if (braceIndex < 0) break;
     if (!template.startsWith('{{', braceIndex)) return malformedPlaceholder(braceIndex);
-    const closeIndex = template.indexOf('}}', braceIndex + BRACE_DELIMITER_LENGTH);
+    const closeIndex = template.indexOf('}}', braceIndex + 2);
     if (closeIndex < 0) return malformedPlaceholder(braceIndex);
-    const identifier = template.slice(braceIndex + BRACE_DELIMITER_LENGTH, closeIndex);
+    const identifier = template.slice(braceIndex + 2, closeIndex);
     if (!IDENTIFIER_PATTERN.test(identifier)) return malformedPlaceholder(braceIndex);
     if (!variables.includes(identifier)) variables = [...variables, identifier];
-    cursor = closeIndex + BRACE_DELIMITER_LENGTH;
+    cursor = closeIndex + 2;
   }
   return { kind: 'ok', template, variables };
 }

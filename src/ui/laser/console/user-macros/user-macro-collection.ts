@@ -61,7 +61,7 @@ export function saveUserMacro(
   if (name === null) {
     return { kind: 'invalid-name', message: 'Enter a macro name containing visible text.' };
   }
-  if (!isValidTimestamp(request.now)) {
+  if (!isValidUserMacroTimestamp(request.now)) {
     return { kind: 'invalid-timestamp', message: 'The macro timestamp is invalid.' };
   }
   const template = parseUserMacroTemplate(request.template);
@@ -120,8 +120,8 @@ export function macroNameKey(name: string): string {
   return name.normalize('NFC').toLowerCase();
 }
 
-/** Returns whether a persisted macro timestamp is finite and non-negative. */
-export function isValidTimestamp(value: number): boolean {
+/** Reports whether a macro timestamp is a finite non-negative epoch value. */
+export function isValidUserMacroTimestamp(value: number): boolean {
   return Number.isFinite(value) && value >= 0;
 }
 

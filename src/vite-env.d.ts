@@ -33,6 +33,14 @@ interface FileSystemFileHandle {
   createWritable(): Promise<FileSystemWritableFileStream>;
 }
 
+interface FileSystemDirectoryHandle {
+  getFileHandle(name: string, options?: { create?: boolean }): Promise<FileSystemFileHandle>;
+}
+
+interface DirectoryPickerOptions {
+  mode?: 'read' | 'readwrite';
+}
+
 interface OpenFilePickerOptions {
   multiple?: boolean;
   excludeAcceptAllOption?: boolean;
@@ -48,6 +56,7 @@ interface SaveFilePickerOptions {
 interface Window {
   showOpenFilePicker(options?: OpenFilePickerOptions): Promise<FileSystemFileHandle[]>;
   showSaveFilePicker(options?: SaveFilePickerOptions): Promise<FileSystemFileHandle>;
+  showDirectoryPicker(options?: DirectoryPickerOptions): Promise<FileSystemDirectoryHandle>;
 }
 
 // Web Serial API — not in lib.dom.d.ts as of TypeScript 5.9. Minimal
