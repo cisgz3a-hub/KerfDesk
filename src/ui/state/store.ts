@@ -122,10 +122,10 @@ import {
   fitToSelectionAction,
   historyActions,
   interactionActions,
-  saveTrackingActions,
   sceneActions,
   viewActions,
 } from './store-actions';
+import { saveTrackingActions } from './store-save-tracking-actions';
 import { variableDataActions, type VariableDataActions } from './variable-data-actions';
 import { arrayActions, type ArrayActions } from './array-actions';
 import { nestActions, type NestActions } from './nest-actions';
@@ -353,7 +353,7 @@ export type AppState = ObjectPropertiesActions &
     readonly cancelInteraction: () => void;
     readonly applyObjectTransform: (id: string, transform: Transform) => void;
 
-    readonly markSaved: (target: SaveTarget) => void;
+    readonly markSaved: (target: SaveTarget, expectedProject?: Project) => boolean;
     readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
   };
 

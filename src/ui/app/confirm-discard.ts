@@ -21,7 +21,8 @@ export async function confirmDiscardAsync(
   const choice = await requestChoice(state.savedName ?? 'this project', action);
   if (choice === 'cancel') return false;
   if (choice === 'discard') return true;
-  return (await saveNow(platform)) === 'saved';
+  const outcome = await saveNow(platform);
+  return outcome === 'saved' || outcome === 'saved-with-newer-edits';
 }
 
 function requestChoice(projectName: string, action: string): Promise<ConfirmSaveChoice> {

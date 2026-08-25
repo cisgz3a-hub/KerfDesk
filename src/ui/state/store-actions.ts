@@ -267,15 +267,6 @@ export function interactionActions(
   };
 }
 
-export function saveTrackingActions(set: Setter): Pick<AppState, 'markSaved' | 'markLoaded'> {
-  return {
-    markSaved: (target) =>
-      set({ dirty: false, savedName: target.displayName, lastSaveTarget: target }),
-    markLoaded: (filename, options) =>
-      set({ dirty: options?.dirty ?? false, savedName: filename, lastSaveTarget: null }),
-  };
-}
-
 function mergeJobPlacement(
   jobPlacement: JobPlacementSettings,
   patch: Partial<JobPlacementSettings>,
