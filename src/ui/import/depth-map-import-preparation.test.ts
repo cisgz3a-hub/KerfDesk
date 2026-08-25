@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { decodeCanonicalBase64 } from '../../core/relief/depth-map-base64';
 import { prepareDepthMapPng, prepareReliefHeightfieldPng } from './depth-map-import-preparation';
-import { makePng, streamingBlob } from './png-incremental-decoder.test-support';
+import { makePng, streamingBlob, u16beBytes } from './png-incremental-decoder.test-support';
 
 describe('prepareDepthMapPng', () => {
   it('embeds every grayscale pixel without resampling', async () => {
@@ -121,5 +121,143 @@ describe('prepareDepthMapPng', () => {
     expect(decodedMask.kind === 'ok' ? [...decodedMask.bytes] : decodedMask).toEqual([
       255, 0, 255, 0,
     ]);
+  });
+
+  it('preserves PNG16 codes exactly as canonical U16LE with a pinned digest', async () => {
+    const codes = [0x0000, 0x0001, 0x00ff, 0x0100, 0x1234, 0x7fff, 0x8000, 0xffff];
+    const png = makePng({
+      width: 4,
+      height: 2,
+      colorType: 0,
+      bitDepth: 16,
+      rows: [u16beBytes(...codes.slice(0, 4)), u16beBytes(...codes.slice(4))],
+      filters: [1, 4],
+      transparency: Uint8Array.of(0x12, 0x34),
+    });
+
+    const result = await prepareReliefHeightfieldPng(streamingBlob(png), {
+      sourceName: 'exact-u16.png',
+      physicalWidthMm: 100,
+      maxDepthMm: 5,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.heightfield).toMatchObject({
+      width: 4,
+      height: 2,
+      physicalWidthMm: 100,
+      physicalHeightMm: 50,
+      samplesBase64: 'AAABAP8AAAE0Ev9/AID//w==',
+      inclusionMask: { encoding: 'u8-base64-v1', samplesBase64: '/////wD///8=' },
+      provenance: {
+        sourceKind: 'depth-map',
+        sourceName: 'exact-u16.png',
+        sourceBitDepth: 16,
+        sourcePolarity: 'light-is-high',
+      },
+      digest: 'sha256:c4f8f369dc15354d066ab2411b3a2dbc4e65c16b8ed914e1ca55c733448d8b8a',
+    });
+    const decoded = decodeCanonicalBase64(result.heightfield.samplesBase64);
+    expect(decoded.kind === 'ok' ? [...decoded.bytes] : decoded).toEqual([
+      0, 0, 1, 0, 255, 0, 0, 1, 52, 18, 255, 127, 0, 128, 255, 255,
+    ]);
+  });
+
+  it('matches grayscale-16 transparency against the entire source code', async () => {
+    const png = makePng({
+      width: 4,
+      height: 1,
+      colorType: 0,
+      bitDepth: 16,
+      rows: [u16beBytes(0x1234, 0x1235, 0x0034, 0x1234)],
+      transparency: Uint8Array.of(0x12, 0x34),
+    });
+
+    const result = await prepareReliefHeightfieldPng(streamingBlob(png), {
+      sourceName: 'transparent-u16.png',
+      physicalWidthMm: 100,
+      maxDepthMm: 5,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const decodedMask = decodeCanonicalBase64(
+      result.heightfield.inclusionMask?.samplesBase64 ?? '',
+    );
+    expect(decodedMask.kind === 'ok' ? [...decodedMask.bytes] : decodedMask).toEqual([
+      0, 255, 255, 0,
+    ]);
+  });
+
+  it('splits grayscale-alpha into exact samples and a required canonical mask', async () => {
+    const png = makePng({
+      width: 4,
+      height: 2,
+      colorType: 4,
+      rows: [
+        [0, 0, 1, 1, 127, 127, 255, 128],
+        [12, 254, 64, 255, 128, 200, 200, 42],
+      ],
+      filters: [1, 4],
+    });
+
+    const result = await prepareReliefHeightfieldPng(streamingBlob(png), {
+      sourceName: 'exact-alpha.png',
+      physicalWidthMm: 100,
+      maxDepthMm: 5,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.heightfield).toMatchObject({
+      width: 4,
+      height: 2,
+      physicalWidthMm: 100,
+      physicalHeightMm: 50,
+      samplesBase64: 'AAABAX9///8MDEBAgIDIyA==',
+      inclusionMask: { encoding: 'u8-base64-v1', samplesBase64: 'AAF/gP7/yCo=' },
+      mapping: { inclusionThreshold: 255, outsideMask: 'excluded' },
+      provenance: {
+        sourceKind: 'depth-map',
+        sourceName: 'exact-alpha.png',
+        sourceBitDepth: 8,
+        sourcePolarity: 'light-is-high',
+      },
+      digest: 'sha256:e4372aace9580e039467c5c6ef5303bcff2febe9d896891a83b43ba73f334b9f',
+    });
+    const decodedSamples = decodeCanonicalBase64(result.heightfield.samplesBase64);
+    const decodedMask = decodeCanonicalBase64(
+      result.heightfield.inclusionMask?.samplesBase64 ?? '',
+    );
+    expect(decodedSamples.kind === 'ok' ? [...decodedSamples.bytes] : decodedSamples).toEqual([
+      0, 0, 1, 1, 127, 127, 255, 255, 12, 12, 64, 64, 128, 128, 200, 200,
+    ]);
+    expect(decodedMask.kind === 'ok' ? [...decodedMask.bytes] : decodedMask).toEqual([
+      0, 1, 127, 128, 254, 255, 200, 42,
+    ]);
+  });
+
+  it('retains an explicit all-opaque alpha mask', async () => {
+    const png = makePng({
+      width: 2,
+      height: 1,
+      colorType: 4,
+      rows: [[17, 255, 240, 255]],
+    });
+
+    const result = await prepareReliefHeightfieldPng(streamingBlob(png), {
+      sourceName: 'opaque-alpha.png',
+      physicalWidthMm: 100,
+      maxDepthMm: 5,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.heightfield.samplesBase64).toBe('ERHw8A==');
+    expect(result.heightfield.inclusionMask).toEqual({
+      encoding: 'u8-base64-v1',
+      samplesBase64: '//8=',
+    });
   });
 });

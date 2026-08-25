@@ -15,8 +15,7 @@ import {
 } from './commands';
 
 const EMPTY_REASON = 'Enter one Marlin G-code or M-code command.';
-const MULTILINE_REASON =
-  'Console commands must be one line. Use macros later for multi-line commands.';
+const MULTILINE_REASON = 'Console commands and saved macros must contain exactly one line.';
 const BLOCKED_PERSISTENT_REASON =
   'M500/M502 write persistent firmware settings and are blocked in the Console.';
 

@@ -26,10 +26,10 @@
 
 import type { Toolpath, ToolpathStep } from '../job';
 import type { CncTool } from '../scene';
+import { partialCellCenter } from '../grid';
 import {
   createRemovalGrid,
   gridCellIndex,
-  gridCellOfPoint,
   type RemovalGrid,
   type RemovalGridResult,
   type RemovalGridSpec,
@@ -286,18 +286,9 @@ function stampSegment(
 // groove at all. The offsets stay as they are for roughing and finishing,
 // which dilate on the lattice and want exactly that model.
 //
-// One extra ring of cells is scanned because a tip anywhere inside the centre
-// cell can reach a cell whose centre sits just past the lattice radius.
+// Candidate bounds come from the cutter's physical radius; each cell then uses
+// its real center, including a shortened terminal cell.
 function stampTip(grid: RemovalGrid, kernel: ToolKernel, x: number, y: number, tipZ: number): void {
-  const { cx, cy } = gridCellOfPoint(grid, x, y);
-  if (
-    kernel.tool === undefined ||
-    kernel.radiusMm === undefined ||
-    kernel.surfaceDzAtRadius === undefined
-  ) {
-    stampLatticeTip(grid, kernel, cx, cy, tipZ);
-    return;
-  }
   const radiusMm = kernel.radiusMm;
   const surfaceDzAtRadius = kernel.surfaceDzAtRadius;
   const cuttingRadiusMm = activeCuttingRadiusMm(kernel.tool, radiusMm, tipZ, surfaceDzAtRadius);
@@ -310,8 +301,8 @@ function stampTip(grid: RemovalGrid, kernel: ToolKernel, x: number, y: number, t
     for (let col = minCol; col <= maxCol; col += 1) {
       const index = gridCellIndex(grid, col, row);
       if (index === null) continue;
-      const cellX = grid.originX + (col + 0.5) * grid.mmPerCell;
-      const cellY = grid.originY + (row + 0.5) * grid.mmPerCell;
+      const cellX = grid.originX + partialCellCenter(grid, 'x', col);
+      const cellY = grid.originY + partialCellCenter(grid, 'y', row);
       const dxMm = cellX - x;
       const dyMm = cellY - y;
       const distanceSquared = dxMm * dxMm + dyMm * dyMm;
@@ -333,10 +324,10 @@ function stampTip(grid: RemovalGrid, kernel: ToolKernel, x: number, y: number, t
 // surface law is monotonic, so a small fixed binary search gives a conservative
 // outer radius while retaining the exact per-cell surface calculation below.
 function activeCuttingRadiusMm(
-  tool: NonNullable<ToolKernel['tool']>,
+  tool: ToolKernel['tool'],
   radiusMm: number,
   tipZ: number,
-  surfaceDzAtRadius: NonNullable<ToolKernel['surfaceDzAtRadius']>,
+  surfaceDzAtRadius: ToolKernel['surfaceDzAtRadius'],
 ): number {
   if (tool.kind === 'end-mill' || surfaceDzAtRadius(radiusMm) < -tipZ) {
     return radiusMm;
@@ -349,19 +340,4 @@ function activeCuttingRadiusMm(
     else high = middle;
   }
   return high;
-}
-
-function stampLatticeTip(
-  grid: RemovalGrid,
-  kernel: ToolKernel,
-  cx: number,
-  cy: number,
-  tipZ: number,
-): void {
-  for (const offset of kernel.offsets) {
-    const index = gridCellIndex(grid, cx + offset.dx, cy + offset.dy);
-    if (index === null) continue;
-    const surfaceZ = tipZ + offset.dz;
-    if (surfaceZ < 0 && surfaceZ < (grid.depth[index] ?? 0)) grid.depth[index] = surfaceZ;
-  }
 }

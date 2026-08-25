@@ -25,6 +25,7 @@ export type TranscriptKind =
 export type TranscriptSource =
   | 'controller'
   | 'console'
+  | 'macro'
   | 'poll'
   | 'job'
   | 'motion'

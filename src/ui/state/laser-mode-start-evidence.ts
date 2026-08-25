@@ -29,13 +29,13 @@ export type LaserModeStartEvidence = LaserModeStartSnapshot & {
 };
 
 export const LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE =
-  'The exact job changed whether M7 is required while Start was being prepared. Start again so Job Review matches the program KerfDesk will send.';
+  'The exact job changed whether M7 is required while Start was being prepared. Start again so Job Review matches the program CurveDesk will send.';
 
 export const LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE =
-  'Laser Start requires reviewed controller evidence for $30, $32, and M7 support. Start again from Job Review. No job G-code was sent.';
+  'Laser Start requires reviewed $30/$32 controller evidence and an exact binding to whether this program uses M7. Start again from Job Review. No job G-code was sent.';
 
 const LASER_REQUIREMENTS_UNVERIFIED_AT_START_MESSAGE =
-  'Controller requirements are not verified for this Start. Start again and review the $30, $32, and M7 acknowledgement before sending job G-code.';
+  'Controller settings are not verified for this Start. Start again and review the $30/$32 acknowledgement before sending job G-code.';
 
 export function captureLaserModeStartSnapshot(
   source: LaserModeStartSnapshotSource,

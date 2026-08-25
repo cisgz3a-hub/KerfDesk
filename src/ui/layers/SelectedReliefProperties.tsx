@@ -12,7 +12,20 @@ import { machineKindOf, type ReliefObject } from '../../core/scene';
 import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
 import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
+import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
+import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
+import { ReliefMaskThresholdControl } from './ReliefMaskThresholdControl';
 import { useDebouncedCommit } from './use-debounced-commit';
+import {
+  ReliefPlanningWidthDisclosure,
+  reliefPropertyWidthMm,
+  reliefPropertyWidthSourceMm,
+  reliefPlanningWidthTitle,
+} from './ReliefPlanningWidthDisclosure';
+import { ReliefRecordedSourceDetails } from './ReliefRecordedSourceDetails';
+import { ReliefResolvedAspectDisclosure } from './ReliefResolvedAspectDisclosure';
+import { SelectedReliefFieldGeometry } from './SelectedReliefFieldGeometry';
+import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
 
@@ -30,12 +43,16 @@ export function SelectedReliefProperties(): JSX.Element | null {
   const [viewerOpen, setViewerOpen] = useState(false);
   if (relief === null) return null;
   const physical = reliefPhysicalDimensions(relief);
+  const widthSourceMm = reliefPropertyWidthSourceMm(relief);
+  const widthMm = reliefPropertyWidthMm(relief, physical.targetScaleX);
   return (
     <section aria-label="Relief properties" style={sectionStyle}>
       <h3 style={headingStyle}>Relief</h3>
       <p style={metaStyle}>
         {relief.source} — {reliefMeta(relief)}
       </p>
+      <ReliefSourceDisclosure relief={relief} />
+      <ReliefGeometryDisclosures relief={relief} />
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
@@ -55,12 +72,13 @@ export function SelectedReliefProperties(): JSX.Element | null {
         key={`${projectDocumentEpoch}:${relief.id}:width`}
         relief={relief}
         label="Width"
-        value={relief.targetWidthMm}
+        value={widthSourceMm}
         scale={physical.targetScaleX}
         step={1}
-        title="Relief surface planning width along its local X axis before rotation. Height also uses the current Y scale; a legacy zero-scale axis remains collapsed in output."
+        title={reliefPlanningWidthTitle(relief)}
         commitKey="targetWidthMm"
       />
+      <ReliefPlanningWidthDisclosure relief={relief} widthMm={widthMm} />
       <ReliefNumberField
         key={`${projectDocumentEpoch}:${relief.id}:depth`}
         relief={relief}
@@ -73,14 +91,52 @@ export function SelectedReliefProperties(): JSX.Element | null {
       {isMeshRelief(relief) ? (
         <BackgroundSelect relief={relief} />
       ) : (
-        <PolaritySelect relief={relief} />
+        <>
+          <PolaritySelect relief={relief} />
+          <ReliefInputLevelsControl
+            key={`${projectDocumentEpoch}:${relief.id}:input-levels`}
+            relief={relief}
+          />
+          <ReliefMaskThresholdControl
+            key={`${projectDocumentEpoch}:${relief.id}:mask-threshold`}
+            relief={relief}
+          />
+          <ReliefMaskOutsideMeaningControl relief={relief} />
+        </>
       )}
     </section>
   );
 }
 
+function ReliefGeometryDisclosures(props: { readonly relief: ReliefObject }): JSX.Element {
+  return (
+    <>
+      <SelectedReliefFieldGeometry relief={props.relief} />
+      {props.relief.reliefSource.kind === 'heightfield-v1' ? (
+        <ReliefResolvedAspectDisclosure aspect={props.relief.reliefSource.mapping.aspect} />
+      ) : null}
+    </>
+  );
+}
+
 function isMeshRelief(relief: ReliefObject): relief is MeshReliefObject {
   return relief.reliefSource.kind === 'legacy-mesh';
+}
+
+function ReliefSourceDisclosure(props: { readonly relief: ReliefObject }): JSX.Element {
+  const source = props.relief.reliefSource;
+  return (
+    <>
+      <ReliefSourceMeaning
+        sourceKind={
+          source.kind === 'legacy-mesh' ? 'stl-top-projection' : source.provenance.sourceKind
+        }
+      />
+      {source.kind === 'heightfield-v1' ? (
+        <ReliefRecordedSourceDetails provenance={source.provenance} />
+      ) : null}
+    </>
+  );
 }
 
 function reliefMeta(relief: ReliefObject): string {
@@ -155,7 +211,11 @@ function ReliefNumberInput(props: {
 const MAX_RELIEF_DIMENSION_DECIMALS = 6;
 function formatReliefValue(value: number): string {
   if (!Number.isFinite(value)) return '';
-  return value.toFixed(MAX_RELIEF_DIMENSION_DECIMALS).replace(/0+$/, '').replace(/\.$/, '');
+  const rounded = value
+    .toFixed(MAX_RELIEF_DIMENSION_DECIMALS)
+    .replace(/0+$/, '')
+    .replace(/\.$/, '');
+  return rounded === '0' && value !== 0 ? String(value) : rounded;
 }
 
 function positiveFinite(value: number): boolean {

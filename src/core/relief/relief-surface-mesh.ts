@@ -2,10 +2,13 @@
 // relief viewer (ADR-102). PURE: returns Float32Array/Uint32Array only, so
 // the viewer geometry is testable without WebGL; three.js consumes these at
 // the UI boundary (src/ui/relief-viewer/) and computes shading normals
-// itself. One vertex per heightmap cell center, two triangles per cell
-// quad; Y is the heightmap row axis and Z is depth (0 at the stock top,
-// −reliefDepthMm at the floor).
+// itself. Normally there is one vertex per heightmap cell center and two
+// triangles per cell quad. A one-cell axis is duplicated onto its two exact
+// physical edges so a narrow valid surface still has area to render. Y is the
+// heightmap row axis and Z is depth (0 at the stock top, −reliefDepthMm at the
+// floor).
 
+import { partialCellCenter } from '../grid';
 import type { Heightmap } from './heightmap';
 
 export type ReliefSurfaceMesh = {
@@ -28,13 +31,14 @@ const FLOATS_PER_VERTEX = 3;
 const INDICES_PER_CELL_QUAD = 6;
 
 export function reliefSurfaceMesh(map: Heightmap): ReliefSurfaceMesh {
-  const { widthCells, heightCells, mmPerCell } = map;
+  const { widthCells, heightCells } = map;
+  if (widthCells === 1 || heightCells === 1) return singleCellAxisSurfaceMesh(map);
   const positions = new Float32Array(widthCells * heightCells * FLOATS_PER_VERTEX);
   for (let row = 0; row < heightCells; row += 1) {
     for (let col = 0; col < widthCells; col += 1) {
       const vertex = (row * widthCells + col) * FLOATS_PER_VERTEX;
-      positions[vertex] = (col + 0.5) * mmPerCell;
-      positions[vertex + 1] = (row + 0.5) * mmPerCell;
+      positions[vertex] = partialCellCenter(map, 'x', col);
+      positions[vertex + 1] = partialCellCenter(map, 'y', row);
       positions[vertex + 2] = map.depth[row * widthCells + col] ?? 0;
     }
   }
@@ -61,9 +65,70 @@ export function reliefSurfaceMesh(map: Heightmap): ReliefSurfaceMesh {
   return {
     positions,
     indices,
-    widthMm: widthCells * mmPerCell,
-    heightMm: heightCells * mmPerCell,
+    widthMm: map.widthMm,
+    heightMm: map.heightMm,
   };
+}
+
+function singleCellAxisSurfaceMesh(map: Heightmap): ReliefSurfaceMesh {
+  const outputCols = Math.max(2, map.widthCells);
+  const outputRows = Math.max(2, map.heightCells);
+  const positions = new Float32Array(outputCols * outputRows * FLOATS_PER_VERTEX);
+  for (let row = 0; row < outputRows; row += 1) {
+    for (let col = 0; col < outputCols; col += 1) {
+      const sourceCol = Math.min(col, map.widthCells - 1);
+      const sourceRow = Math.min(row, map.heightCells - 1);
+      const vertex = (row * outputCols + col) * FLOATS_PER_VERTEX;
+      positions[vertex] =
+        map.widthCells === 1 ? col * map.widthMm : partialCellCenter(map, 'x', col);
+      positions[vertex + 1] =
+        map.heightCells === 1 ? row * map.heightMm : partialCellCenter(map, 'y', row);
+      positions[vertex + 2] = map.depth[sourceRow * map.widthCells + sourceCol] ?? 0;
+    }
+  }
+  const includedQuads = singleCellAxisIncludedQuadCount(map, outputCols, outputRows);
+  const indices = new Uint32Array(includedQuads * INDICES_PER_CELL_QUAD);
+  let write = 0;
+  for (let row = 0; row < outputRows - 1; row += 1) {
+    for (let col = 0; col < outputCols - 1; col += 1) {
+      if (!singleCellAxisQuadIncluded(map, col, row)) continue;
+      const a = row * outputCols + col;
+      const b = a + 1;
+      const c = a + outputCols;
+      const d = c + 1;
+      indices.set([a, c, b, b, c, d], write);
+      write += INDICES_PER_CELL_QUAD;
+    }
+  }
+  return { positions, indices, widthMm: map.widthMm, heightMm: map.heightMm };
+}
+
+function singleCellAxisIncludedQuadCount(
+  map: Heightmap,
+  outputCols: number,
+  outputRows: number,
+): number {
+  let count = 0;
+  for (let row = 0; row < outputRows - 1; row += 1) {
+    for (let col = 0; col < outputCols - 1; col += 1) {
+      if (singleCellAxisQuadIncluded(map, col, row)) count += 1;
+    }
+  }
+  return count;
+}
+
+function singleCellAxisQuadIncluded(map: Heightmap, col: number, row: number): boolean {
+  const sourceCol = Math.min(col, map.widthCells - 1);
+  const sourceRow = Math.min(row, map.heightCells - 1);
+  const nextCol = Math.min(col + 1, map.widthCells - 1);
+  const nextRow = Math.min(row + 1, map.heightCells - 1);
+  return quadIncluded(
+    map,
+    sourceRow * map.widthCells + sourceCol,
+    sourceRow * map.widthCells + nextCol,
+    nextRow * map.widthCells + sourceCol,
+    nextRow * map.widthCells + nextCol,
+  );
 }
 
 function includedQuadCount(map: Heightmap): number {

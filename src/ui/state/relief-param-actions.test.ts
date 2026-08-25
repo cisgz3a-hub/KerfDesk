@@ -162,6 +162,93 @@ describe('setReliefParams', () => {
     expect(updated.reliefSource.revision).toBe(field.revision);
   });
 
+  it.each([
+    ['excluded', 'stock-top'],
+    ['excluded', 'relief-floor'],
+    ['stock-top', 'excluded'],
+  ] as const)(
+    'updates only outside-mask meaning from %s to %s for an imported masked heightfield',
+    (initialOutsideMask, outsideMask) => {
+      const sourceWidth = 5;
+      const sourceHeight = 11;
+      const sampleCount = sourceWidth * sourceHeight;
+      const field = testReliefHeightfield({
+        width: sourceWidth,
+        height: sourceHeight,
+        physicalWidthMm: 100,
+        physicalHeightMm: 220,
+        maxDepthMm: 5,
+        samplesU8: Array.from({ length: sampleCount }, (_, index) => index),
+        inclusionMask: Array.from({ length: sampleCount }, (_, index) =>
+          index % 5 === 0 ? 0 : 255,
+        ),
+        mapping: {
+          polarity: 'light-is-deep',
+          curve: { kind: 'gamma-v1', gamma: 2.25 },
+          crop: { kind: 'normalized-v1', x: 0.1, y: 0.2, width: 0.8, height: 0.7 },
+          aspect: 'stretch',
+          inclusionThreshold: 128,
+          outsideMask: initialOutsideMask,
+        },
+        provenance: { sourceName: 'masked-source.png' },
+        revision: 4,
+      });
+      installHeightfieldRelief(field);
+      const before = storedRelief();
+
+      useStore.getState().setReliefParams('R1', { outsideMask });
+
+      const updated = storedRelief();
+      expect(updated.reliefSource.kind).toBe('heightfield-v1');
+      if (updated.reliefSource.kind !== 'heightfield-v1') return;
+      expect(updated).toEqual({
+        ...before,
+        reliefSource: {
+          ...field,
+          mapping: { ...field.mapping, outsideMask },
+          revision: 5,
+        },
+      });
+      expect(updated.reliefSource.inclusionMask).toBe(field.inclusionMask);
+      expect(updated.reliefSource.provenance).toBe(field.provenance);
+      expect(updated.reliefSource.mapping.curve).toBe(field.mapping.curve);
+      expect(updated.reliefSource.mapping.crop).toBe(field.mapping.crop);
+      expect(updated.bounds).toBe(before.bounds);
+      expect(updated.transform).toBe(before.transform);
+      expect(useStore.getState()).toMatchObject({ dirty: true });
+      expect(useStore.getState().undoStack).toHaveLength(1);
+    },
+  );
+
+  it('does nothing when outside-mask meaning is unchanged or the relief is a mesh', () => {
+    installHeightfieldRelief(testReliefHeightfieldFixture());
+    const beforeHeightfield = useStore.getState().project;
+
+    useStore.getState().setReliefParams('R1', { outsideMask: 'excluded' });
+
+    expect(useStore.getState().project).toBe(beforeHeightfield);
+    expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
+    installReliefProject();
+    const beforeMesh = useStore.getState().project;
+
+    useStore.getState().setReliefParams('R1', { outsideMask: 'stock-top' });
+
+    expect(useStore.getState().project).toBe(beforeMesh);
+    expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
+  });
+
+  it('ignores outside-mask values outside the exact persisted enum', () => {
+    installHeightfieldRelief(testReliefHeightfieldFixture());
+    const before = useStore.getState().project;
+
+    for (const outsideMask of ['floor', 'top', 'stock-top ', null, 0]) {
+      Reflect.apply(useStore.getState().setReliefParams, undefined, ['R1', { outsideMask }]);
+    }
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
+  });
+
   it('is a no-op for unknown ids and non-relief objects', () => {
     const before = useStore.getState().project;
     useStore.getState().setReliefParams('nope', { reliefDepthMm: 9 });
@@ -169,3 +256,44 @@ describe('setReliefParams', () => {
     expect(useStore.getState().undoStack).toHaveLength(0);
   });
 });
+
+function testReliefHeightfieldFixture(): ReturnType<typeof testReliefHeightfield> {
+  return testReliefHeightfield({
+    width: 2,
+    height: 1,
+    physicalWidthMm: 100,
+    physicalHeightMm: 50,
+    maxDepthMm: 5,
+    samplesU8: [0, 255],
+  });
+}
+
+function installHeightfieldRelief(field: ReturnType<typeof testReliefHeightfield>): void {
+  const current = useStore.getState().project;
+  useStore.setState({
+    project: {
+      ...current,
+      scene: {
+        ...current.scene,
+        objects: [
+          {
+            ...relief(),
+            source: 'depth.png',
+            targetWidthMm: field.physicalWidthMm,
+            reliefDepthMm: field.mapping.maxDepthMm,
+            bounds: {
+              minX: 0,
+              minY: 0,
+              maxX: field.physicalWidthMm,
+              maxY: field.physicalHeightMm,
+            },
+            reliefSource: field,
+          },
+        ],
+      },
+    },
+    dirty: false,
+    undoStack: [],
+    redoStack: [],
+  });
+}

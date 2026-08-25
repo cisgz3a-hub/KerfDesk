@@ -15,6 +15,7 @@ import type { MeshStandardMaterial } from 'three';
 import type { RemovalGrid } from '../../core/sim';
 import type { MaterialAppearance } from '../theme/material-appearance';
 import type { GrainAppearance } from '../theme/wood-grain-appearance';
+import { carveDepthTexturePartialAxes } from './viewer3d-depth-texture-coordinate';
 import { buildCarveDepthTexture } from './viewer3d-height-texture';
 import {
   WOOD_ALBEDO_BODY_GLSL,
@@ -58,6 +59,18 @@ function appendAfter(source: string, marker: string, addition: string): string |
   return source.replace(marker, marker + addition);
 }
 
+function carveGridUniforms(three: ThreeModule, grid: RemovalGrid) {
+  const partialAxes = carveDepthTexturePartialAxes(grid);
+  return {
+    cells: new three.Vector2(grid.widthCells, grid.heightCells),
+    partialAxes: new three.Vector2(partialAxes.x, partialAxes.y),
+  };
+}
+
+function carveLightDirection(three: ThreeModule, widthMm: number, heightMm: number) {
+  return new three.Vector3(widthMm, -heightMm, Math.max(widthMm, heightMm)).normalize();
+}
+
 /**
  * Creates the carved-timber surface material for a removal grid.
  *
@@ -73,6 +86,7 @@ export function createCarvedWoodMaterial(
 ): CarvedWoodMaterial {
   const { appearance, grain, grid, widthMm, heightMm } = input;
   const depth = buildCarveDepthTexture(three, grid);
+  const gridUniforms = carveGridUniforms(three, grid);
   // THREE.Color applies ColorManagement's sRGB -> linear conversion. Feeding
   // the packed values in raw renders every species as the same pale tan.
   const early = new three.Color(appearance.shallow);
@@ -80,8 +94,7 @@ export function createCarvedWoodMaterial(
     new three.Color(appearance.deep),
     grain.contrast,
   );
-  const span = Math.max(widthMm, heightMm);
-  const light = new three.Vector3(widthMm, -heightMm, span).normalize();
+  const light = carveLightDirection(three, widthMm, heightMm);
 
   const material = new three.MeshStandardMaterial({
     vertexColors: false,
@@ -121,6 +134,8 @@ export function createCarvedWoodMaterial(
     shader.uniforms.uCarveDepth = { value: depth.texture };
     shader.uniforms.uCarveSizeMm = { value: new three.Vector2(widthMm, heightMm) };
     shader.uniforms.uCarveCellMm = { value: grid.mmPerCell };
+    shader.uniforms.uCarveCells = { value: gridUniforms.cells };
+    shader.uniforms.uCarveHasPartialCell = { value: gridUniforms.partialAxes };
     shader.uniforms.uCarveLightDir = { value: light };
     shader.uniforms.uGrainEarly = { value: early };
     shader.uniforms.uGrainLate = { value: late };
@@ -140,7 +155,7 @@ export function createCarvedWoodMaterial(
   };
   // Without this three may hand the injected material a program compiled for a
   // plain MeshStandardMaterial with the same parameters.
-  material.customProgramCacheKey = () => 'kerfdesk-carved-wood';
+  material.customProgramCacheKey = () => 'kerfdesk-carved-wood-partial-cell-v1';
 
   return {
     material,

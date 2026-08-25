@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coarsenedCellSize, createRemovalGrid } from './removal-grid';
+import { coarsenedCellSize, createRemovalGrid, gridCellOfPoint } from './removal-grid';
 
 describe('createRemovalGrid', () => {
   it('reports an unchanged requested resolution explicitly', () => {
@@ -19,6 +19,8 @@ describe('createRemovalGrid', () => {
         reason: null,
       },
       grid: {
+        widthMm: 10,
+        heightMm: 10,
         resolution: {
           requestedMmPerCell: 0.2,
           effectiveMmPerCell: 0.2,
@@ -26,6 +28,27 @@ describe('createRemovalGrid', () => {
         },
       },
     });
+  });
+
+  it('keeps the requested pitch and stores an exact partial-edge domain', () => {
+    const result = createRemovalGrid({
+      originX: 10,
+      originY: 20,
+      widthMm: 1,
+      heightMm: 0.5,
+      mmPerCell: 0.3,
+    });
+    if (result.kind === 'error') throw new Error(result.reason);
+
+    expect(result.grid).toMatchObject({
+      widthCells: 4,
+      heightCells: 2,
+      widthMm: 1,
+      heightMm: 0.5,
+      mmPerCell: 0.3,
+    });
+    expect(gridCellOfPoint(result.grid, 10.95, 20.4)).toEqual({ cx: 3, cy: 1 });
+    expect(gridCellOfPoint(result.grid, 11.01, 20.4)).toEqual({ cx: -1, cy: 1 });
   });
 
   it('reports the minimum-cell floor instead of silently rewriting the request', () => {
