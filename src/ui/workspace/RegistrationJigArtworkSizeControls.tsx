@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { combinedBBox } from '../../core/scene';
+import type { SceneObject } from '../../core/scene';
+import { selectionMetricsInFrame } from '../../core/scene/selection-transform';
 import { registrationJigArtworkInstances } from '../../core/scene/registration-jig-artwork';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -12,7 +13,9 @@ export function RegistrationJigArtworkSizeControls(): JSX.Element | null {
   const resizeArtwork = useStore((state) => state.resizeRegistrationJigArtwork);
   const pushToast = useToastStore((state) => state.pushToast);
   const instances = useMemo(() => registrationJigArtworkInstances(scene), [scene]);
-  const dimensions = dimensionsFor(instances[0]?.objects ?? []);
+  const firstObjects = instances[0]?.objects ?? [];
+  const frameRotationDeg = firstObjects[0]?.transform.rotationDeg ?? 0;
+  const dimensions = dimensionsFor(firstObjects, frameRotationDeg);
   const [widthDraft, setWidthDraft] = useState('');
   const [heightDraft, setHeightDraft] = useState('');
   const [drivingDimension, setDrivingDimension] = useState<'width' | 'height'>('width');
@@ -63,6 +66,7 @@ export function RegistrationJigArtworkSizeControls(): JSX.Element | null {
       count={instances.length}
       heightDraft={heightDraft}
       isAspectLocked={isAspectLocked}
+      usesArtworkAxes={usesArtworkAxes(frameRotationDeg)}
       widthDraft={widthDraft}
       onApply={apply}
       onHeightChange={updateHeight}
@@ -72,15 +76,22 @@ export function RegistrationJigArtworkSizeControls(): JSX.Element | null {
   );
 }
 
-function dimensionsFor(objects: Parameters<typeof combinedBBox>[0]): {
+function dimensionsFor(
+  objects: ReadonlyArray<SceneObject>,
+  frameRotationDeg: number,
+): {
   readonly width: number;
   readonly height: number;
 } | null {
-  const bounds = combinedBBox(objects);
-  if (bounds === null) return null;
-  const width = bounds.maxX - bounds.minX;
-  const height = bounds.maxY - bounds.minY;
+  const metrics = selectionMetricsInFrame(objects, frameRotationDeg);
+  if (metrics === null) return null;
+  const { width, height } = metrics;
   return width > 0 && height > 0 ? { width, height } : null;
+}
+
+function usesArtworkAxes(rotationDeg: number): boolean {
+  const normalized = ((rotationDeg % 180) + 180) % 180;
+  return normalized > 0.000001;
 }
 
 function formatDimension(value: number | null): string {
@@ -91,9 +102,6 @@ function formatDimension(value: number | null): string {
 function messageForResizeError(reason: string): string {
   if (reason === 'invalid-dimension' || reason === 'invalid-number') {
     return 'Enter positive artwork width and height values.';
-  }
-  if (reason === 'non-uniform-rotated-selection') {
-    return 'Lock AR before resizing rotated jig artwork.';
   }
   return 'Create and copy jig artwork before applying a shared size.';
 }

@@ -55,19 +55,20 @@ async function renderWithPendingRemoval(element: JSX.Element): Promise<HTMLEleme
   return host;
 }
 
-function findConfirmButton(rendered: HTMLElement): HTMLButtonElement | undefined {
+function findDismissButton(rendered: HTMLElement): HTMLButtonElement | undefined {
   return [...rendered.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent === 'Confirm plate removed',
+    (candidate) => candidate.textContent === 'Dismiss reminder',
   );
 }
 
 describe('ProbePlateRemovalNotice', () => {
-  it('keeps a visible blocker until the operator confirms plate removal', async () => {
+  it('keeps a visible reminder until the operator dismisses it', async () => {
     const rendered = await renderWithPendingRemoval(<ProbePlateRemovalNotice />);
-    expect(rendered.textContent).toContain('spindle start is still blocked');
+    expect(rendered.textContent).toContain('remove the touch plate before machining');
+    expect(rendered.textContent).not.toContain('blocked');
     expect(rendered.textContent).toContain('Remove the touch plate and probe lead');
 
-    const button = findConfirmButton(rendered);
+    const button = findDismissButton(rendered);
     expect(button).toBeDefined();
     await act(async () => button?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
@@ -75,7 +76,7 @@ describe('ProbePlateRemovalNotice', () => {
       source: 'probe',
       probePlateRemoved: true,
     });
-    expect(rendered.textContent).not.toContain('spindle start is still blocked');
+    expect(rendered.textContent).not.toContain('remove the touch plate before machining');
   });
 
   // The probe->air-cut regression: while the confirmation lived inside the
@@ -84,7 +85,7 @@ describe('ProbePlateRemovalNotice', () => {
   // render OUTSIDE any <details> so a folded probe section cannot hide it.
   it('is hosted outside the collapsed probe details in the CNC setup panel', async () => {
     const rendered = await renderWithPendingRemoval(<CncSetupPanel />);
-    const button = findConfirmButton(rendered);
+    const button = findDismissButton(rendered);
     expect(button).toBeDefined();
     expect(button?.closest('details')).toBeNull();
   });

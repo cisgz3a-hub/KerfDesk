@@ -10,7 +10,6 @@ import {
 } from '../common/cnc-bit-change-advisory';
 import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
 import { useStore } from '../state';
-import { blockingCncSecondaryToolReferences } from '../state/cnc-tool-references';
 import { useToastStore } from '../state/toast-store';
 import { RailSection } from '../kit';
 import { AddCncBitForm } from './AddCncBitForm';
@@ -38,11 +37,6 @@ export function CncToolManager(props: { readonly machine: CncMachineConfig }): J
   const groups = groupCncTools(props.machine.tools);
   const deleteTool = (toolId: string): void => {
     const before = useStore.getState().project;
-    const blockingReference = blockingCncSecondaryToolReferences(before.scene, toolId)[0];
-    if (blockingReference !== undefined) {
-      pushToast(secondaryToolDeleteWarning(blockingReference), 'warning');
-      return;
-    }
     deleteCustomCncTool(toolId);
     if (hasRetainedFeedsAfterEffectiveToolChange(before, useStore.getState().project)) {
       pushToast(CNC_RETAINED_FEEDS_WARNING, 'warning');
@@ -93,7 +87,7 @@ function CncToolManagerRow(props: {
           type="button"
           onClick={props.onDelete}
           aria-label={`Delete bit ${props.tool.name}`}
-          title="Remove this custom bit. Primary assignments fall back to Active; visible clearing, finishing, or roughing assignments must be changed first."
+          title="Remove this custom bit. Primary and secondary assignments fall back to the active bit."
           style={deleteButtonStyle}
         >
           Delete
@@ -101,13 +95,6 @@ function CncToolManagerRow(props: {
       ) : null}
     </li>
   );
-}
-
-function secondaryToolDeleteWarning(reference: {
-  readonly layerColor: string;
-  readonly role: string;
-}): string {
-  return `Cannot delete this bit: ${reference.role} on layer ${reference.layerColor} still uses it. Change that layer's secondary bit setting first.`;
 }
 
 export function CncMachineProfilesRow(): JSX.Element {

@@ -224,8 +224,8 @@ describe('CncToolManager', () => {
   );
 
   it.each(SECONDARY_REFERENCE_CASES)(
-    'blocks deletion while $role actively uses the custom bit',
-    async ({ field, role, activePatch, relief }) => {
+    'deletes the custom bit and clears active $role assignments',
+    async ({ field, activePatch, relief }) => {
       useStore.setState({ project: createProject() });
       useStore.getState().setMachineKind('cnc');
       useStore
@@ -245,19 +245,18 @@ describe('CncToolManager', () => {
       try {
         const button = host.querySelector('[aria-label="Delete bit Staged custom"]');
         if (!(button instanceof HTMLButtonElement)) throw new Error('Delete button missing');
-        expect(button.title).toMatch(/Primary assignments fall back.*visible/i);
+        expect(button.title).toMatch(/Primary and secondary assignments fall back/i);
         await act(async () => button.click());
 
         expect(
           useStore.getState().cncLibrary.customTools.some((tool) => tool.id === customId),
-        ).toBe(true);
+        ).toBe(false);
         const afterMachine = useStore.getState().project.machine;
         if (afterMachine?.kind !== 'cnc') throw new Error('CNC machine missing');
-        expect(afterMachine.tools.some((tool) => tool.id === customId)).toBe(true);
-        const warning = useToastStore.getState().toasts.at(-1);
-        expect(warning).toMatchObject({ variant: 'warning' });
-        expect(warning?.message).toContain(role);
-        expect(warning?.message).toContain('#ff0000');
+        expect(afterMachine.tools.some((tool) => tool.id === customId)).toBe(false);
+        expect(
+          useStore.getState().project.scene.layers.some((layer) => layer.cnc?.[field] === customId),
+        ).toBe(false);
       } finally {
         await act(async () => root.unmount());
         host.remove();

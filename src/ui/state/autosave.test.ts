@@ -76,6 +76,36 @@ describe('writeAutosave / readAutosave round-trip', () => {
 
     expect(readAutosave()?.project.notes).toBe('first window');
   });
+
+  it('keeps fallback window sessions separate when sessionStorage is unavailable', () => {
+    const originalState = history.state;
+    const originalGetItem = Storage.prototype.getItem;
+    const originalSetItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key) {
+      if (this === sessionStorage) throw new DOMException('blocked', 'SecurityError');
+      return originalGetItem.call(this, key);
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (this === sessionStorage) throw new DOMException('blocked', 'SecurityError');
+      return originalSetItem.call(this, key, value);
+    });
+
+    try {
+      history.replaceState({}, 'window-a');
+      const first = writeAutosave({ ...createProject(), notes: 'first window' }, 100);
+      history.replaceState({}, 'window-b');
+      const second = writeAutosave({ ...createProject(), notes: 'second window' }, 200);
+
+      expect(first.kind).toBe('ok');
+      expect(second.kind).toBe('ok');
+      if (first.kind !== 'ok' || second.kind !== 'ok') return;
+      expect(first.storageKey).not.toBe(second.storageKey);
+      expect(localStorage.getItem(first.storageKey)).not.toBeNull();
+      expect(localStorage.getItem(second.storageKey)).not.toBeNull();
+    } finally {
+      history.replaceState(originalState, 'restore');
+    }
+  });
 });
 
 describe('clearAutosave', () => {

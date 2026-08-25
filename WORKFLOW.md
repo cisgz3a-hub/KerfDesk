@@ -457,24 +457,24 @@ Identical to F-A3 except:
 
 ### F-A9. Save G-code
 
-#### Success — desktop
+#### Success — web and packaged desktop
 1. User clicks `File → Save G-code` (`Cmd/Ctrl+Shift+E`).
-2. Pre-flight runs (F-A10).
-3. If pre-flight passes, OS native Save dialog opens.
-4. Default filename: `<project-name>.gcode` if project saved, else `untitled.gcode`.
-5. Default location: last G-code save location, or OS Documents on first save.
-6. On confirm, file is written.
-7. Toast: `Saved to <path>`.
-
-#### Success — web
-1. Same flow. The web app requires the File System Access API (Chromium-only, per PROJECT.md "Delivery targets") — there is **no browser-download fallback**. If the API is unavailable the save fails with the error toast `Could not save G-code: File System Access API is required to save files in the web app.`
-2. Toast same.
+2. The Chromium directory picker reserves a destination directory while the click still carries
+   user activation. It does not create or truncate the named file.
+3. A non-modal **Save G-code as** panel starts with `<project-name>.gcode` when the project has a
+   saved name, otherwise `untitled.gcode`. The filename remains editable and the live Stop controls
+   remain clickable while the panel is open.
+4. Pre-flight and background preparation run (F-A10). A failure creates no file.
+5. After preparation succeeds, the selected directory creates the named file and writes the bytes.
+6. Toast: `Saved G-code to <filename>`.
+7. The File System Access API is required (Chromium-only, per PROJECT.md "Delivery targets"); there
+   is **no browser-download fallback**. If unavailable, the save reports a clear error toast.
 
 #### Error — pre-flight failure
 - See F-A10.
 
 #### Error — file system error (disk full, permissions, etc.)
-- Modal: `Could not save G-code: <one-line reason>`. Project is unaffected.
+- Toast: `Could not save G-code: <one-line reason>`. Project is unaffected.
 
 #### Edge — save when no output-enabled layers exist
 - Save G-code button is disabled (see F-A7 edge).
@@ -1310,9 +1310,9 @@ authorization, Frame proof, controller command, or safety boundary.
    dimension proportionally. Click **AR locked** to switch to **AR unlocked** when
    W and H must be entered independently, then click **Apply size to all N**. Every
    jig instance is resized around its centre and recentered in its own outline; the
-   grid spacing does not scale. A rotated selection cannot represent independent
-   canvas-axis scaling without shear, so its in-place warning tells the operator to
-   lock AR before applying the shared size.
+   grid spacing does not scale. For rotated artwork, W and H follow the artwork's
+   rotated local axes; the rotation is preserved and the shared resize remains
+   available without inventing shear or asking the operator to relock AR.
 4. Pick **Outline only**. Every registration outline is enabled and every artwork
    operation is disabled; Frame, Preview, Save G-code, and Start therefore describe
    the complete physical fixture outline run.

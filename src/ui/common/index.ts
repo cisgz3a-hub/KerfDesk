@@ -1,4 +1,5 @@
 export { ConfirmSaveDialog } from './ConfirmSaveDialog';
+export { SaveFilenamePanel } from './SaveFilenamePanel';
 export { StatusBar } from './StatusBar';
 export { Toasts } from './Toasts';
 export { Toolbar } from './Toolbar';

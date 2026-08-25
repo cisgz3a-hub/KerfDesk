@@ -26,7 +26,6 @@ import { marchingSquares } from './marching-squares';
 export const DEFAULT_RELIEF_ALLOWANCE_MM = 0.5;
 const LEVEL_EPS = 1e-6;
 const MIN_STEPOVER_PERCENT = 10;
-const MAX_STEPOVER_PERCENT = 85;
 const MAX_RINGS_PER_LEVEL = 4096;
 const MIN_RING_POINTS = 3;
 // Exhausting the current 16-case marching-squares table, the farthest point on
@@ -94,10 +93,11 @@ export function reliefRoughingLadder(
 }
 
 function stepoverMm(stepoverPercent: number, toolDiameterMm: number): number {
-  const clamped = Number.isFinite(stepoverPercent)
-    ? Math.min(MAX_STEPOVER_PERCENT, Math.max(MIN_STEPOVER_PERCENT, stepoverPercent))
-    : MIN_STEPOVER_PERCENT;
-  return (clamped / 100) * toolDiameterMm;
+  const exact =
+    Number.isFinite(stepoverPercent) && stepoverPercent > 0
+      ? stepoverPercent
+      : MIN_STEPOVER_PERCENT;
+  return (exact / 100) * toolDiameterMm;
 }
 
 // Region at a level: dilated target at or below the level (the tool must
