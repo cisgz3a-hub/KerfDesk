@@ -65,7 +65,7 @@ export function frameCompletionPatch(args: {
   if (candidate === null) {
     // PR #288 compatibility: legacy callers attach only the verification
     // record. Preserve that proof after the richer terminal settlement, but
-    // never mint a Start permit without the exact reviewed-job candidate.
+    // never mint a Start permit without the exact prepared-job candidate.
     return completedFrame.verification === undefined
       ? {}
       : { frameVerification: completedFrame.verification };

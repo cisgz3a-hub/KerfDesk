@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import type { SessionObservationStamp } from './laser-controller-observation';
+import { LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE } from './laser-mode-start-evidence';
 import { useLaserStore } from './laser-store';
 import { resetStore } from './test-helpers';
 
@@ -126,7 +127,7 @@ describe('laser Start evidence at the queue fence', () => {
 
     const started = useLaserStore.getState().startJob(JOB_GCODE, { machineKind: 'laser' });
 
-    await expect(started).rejects.toThrow(/requires reviewed controller evidence/i);
+    await expect(started).rejects.toThrow(LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE);
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(writes.some((write) => write.includes(JOB_LINE))).toBe(false);
   });

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import { DEFAULT_CNC_MACHINE_CONFIG, createProject } from '../../core/scene';
 import {
+  LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE,
   LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE,
   createLaserModeStartEvidence,
   laserModeStartEvidenceIssue,
@@ -89,6 +90,10 @@ describe('laser Start acknowledgement', () => {
       buildInfoObservation: observation,
     };
     expect(laserModeStartAcknowledgementRequired(project, unsupported, gcode)).toBe(false);
+    expect(LASER_MODE_UNVERIFIED_START_PROMPT).toContain(
+      'M7 capability remains a separate Job Review advisory and never requires this acknowledgement.',
+    );
+    expect(LASER_MODE_UNVERIFIED_START_PROMPT).not.toContain('M7 support when this job uses M7');
   });
 
   it('never adds the laser acknowledgement to a CNC/router Start', () => {
@@ -136,9 +141,11 @@ describe('laser evidence at the first job-write boundary', () => {
   });
 
   it('refuses a laser Start without operator review evidence', () => {
-    expect(laserModeStartEvidenceIssue(undefined, '')).toMatch(
-      /requires reviewed controller evidence/i,
+    expect(laserModeStartEvidenceIssue(undefined, '')).toBe(
+      LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE,
     );
+    expect(LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE).toContain('exact binding');
+    expect(LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE).not.toContain('M7 support');
   });
 
   it('accepts unchanged verified evidence', () => {
@@ -148,9 +155,10 @@ describe('laser evidence at the first job-write boundary', () => {
   it('accepts unchanged unknown evidence only after informed acknowledgement', () => {
     const unknownSnapshot = { ...knownSnapshot, settingsObservation: null, maxPowerS: undefined };
     expect(laserModeStartEvidenceIssue(evidence(unknownSnapshot, true), '')).toBeNull();
-    expect(laserModeStartEvidenceIssue(evidence(unknownSnapshot, false), '')).toMatch(
-      /not verified/i,
-    );
+    const issue = laserModeStartEvidenceIssue(evidence(unknownSnapshot, false), '');
+    expect(issue).toMatch(/not verified/i);
+    expect(issue).toContain('$30/$32 acknowledgement');
+    expect(issue).not.toContain('M7 acknowledgement');
   });
 
   it('keeps live $30/$32 drift after review advisory, never a boundary refusal', () => {

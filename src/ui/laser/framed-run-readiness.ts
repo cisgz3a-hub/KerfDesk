@@ -30,8 +30,8 @@ export function framedRunReadinessIssue(
     !controllerStartPreparationStillCurrent(permit.controller, laser, {
       ...(options.ignoreControllerStatusState === true ? { ignoreStatusState: true } : {}),
       // $30/$32 and build-info observations may be refreshed after Frame.
-      // They are review evidence, not permit identity; current exact M7
-      // incompatibility is rechecked immediately before wire dispatch.
+      // They are advisory review evidence, not permit identity; wire dispatch
+      // later checks only that review evidence still binds the exact M7 shape.
       ignoreAdvisoryControllerEvidence: true,
     })
   ) {
