@@ -1,5 +1,6 @@
 import type { ControllerDriver } from '../../../core/controllers';
 import type { ConsoleCommandOptions } from '../../state/laser-console-actions';
+import type { ConsoleCommandProvenance } from '../../state/console-command-provenance';
 import { jobAwareConfirm } from '../../state/job-aware-dialogs';
 
 export type SendConsoleCommand = (
@@ -20,6 +21,7 @@ export async function runConsoleCommand(
   driver: ControllerDriver,
   input: string,
   sendConsoleCommand: SendConsoleCommand,
+  provenance?: ConsoleCommandProvenance,
 ): Promise<RunConsoleCommandResult> {
   const prepared = driver.prepareConsoleCommand(input);
   if (!prepared.ok) {
@@ -36,7 +38,12 @@ export async function runConsoleCommand(
 
   try {
     if (prepared.command.requiresConfirmation) {
-      await sendConsoleCommand(command, { confirmed: true });
+      await sendConsoleCommand(command, {
+        confirmed: true,
+        ...(provenance === undefined ? {} : { provenance }),
+      });
+    } else if (provenance !== undefined) {
+      await sendConsoleCommand(command, { provenance });
     } else {
       await sendConsoleCommand(command);
     }
