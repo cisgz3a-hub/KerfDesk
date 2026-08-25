@@ -76,6 +76,10 @@ export function deserializeMaterialLibrary(jsonText: string): DeserializeMateria
     return { kind: 'invalid', reason: `not valid JSON: ${message}` };
   }
 
+  return deserializeMaterialLibraryValue(raw);
+}
+
+export function deserializeMaterialLibraryValue(raw: unknown): DeserializeMaterialLibraryResult {
   if (!isRecord(raw)) {
     return { kind: 'invalid', reason: 'top-level value is not an object' };
   }

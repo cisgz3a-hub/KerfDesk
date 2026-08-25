@@ -1,7 +1,13 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { findRegistrationBoxes, IDENTITY_TRANSFORM, REGISTRATION_LAYER_ID } from '../../core/scene';
+import {
+  findRegistrationBoxes,
+  IDENTITY_TRANSFORM,
+  isRegistrationBox,
+  REGISTRATION_LAYER_ID,
+  transformedBBox,
+} from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -84,6 +90,18 @@ describe('RegistrationJigPanel', () => {
     expect(container.textContent).toContain('Create a jig outline below to begin');
   });
 
+  it('keeps How to use collapsed until the operator opens it', () => {
+    render();
+
+    expect(buttonByLabel('▸ How to use').getAttribute('aria-expanded')).toBe('false');
+    expect(container.textContent).not.toContain('Put one object inside each burned outline.');
+
+    click('▸ How to use');
+
+    expect(buttonByLabel('▾ How to use').getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('Put one object inside each burned outline.');
+  });
+
   it('flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked', () => {
     useStore.getState().addRegistrationBox(80, 40);
     addArt();
@@ -116,7 +134,7 @@ describe('RegistrationJigPanel', () => {
     addArt();
     render();
 
-    click('Create box');
+    click('Create outline');
 
     expect(container.textContent).toContain('your ARTWORK');
     expect(buttonByLabel('Artwork only').getAttribute('aria-pressed')).toBe('true');
@@ -139,7 +157,7 @@ describe('RegistrationJigPanel', () => {
     expect(diameter).not.toBeNull();
     if (diameter === null) throw new Error('diameter input not found');
     setInputValue(diameter, '64');
-    click('Create circle');
+    click('Create outline');
 
     const [circle] = findRegistrationBoxes(useStore.getState().project.scene);
     expect(circle?.spec).toEqual({ kind: 'ellipse', widthMm: 64, heightMm: 64 });
@@ -256,7 +274,7 @@ describe('RegistrationJigPanel', () => {
     const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
     if (checkbox === null) throw new Error('lock checkbox not found');
     expect(checkbox.disabled).toBe(true);
-    expect(buttonByLabel('Replace box').disabled).toBe(true);
+    expect(buttonByLabel('Replace outline').disabled).toBe(true);
     expect(container.textContent).toContain('captured board');
   });
 
@@ -267,7 +285,115 @@ describe('RegistrationJigPanel', () => {
     const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
     if (checkbox === null) throw new Error('lock checkbox not found');
     expect(checkbox.disabled).toBe(false);
-    expect(buttonByLabel('Replace box').disabled).toBe(false);
+    expect(buttonByLabel('Replace outline').disabled).toBe(false);
     expect(container.textContent).not.toContain('captured board');
+  });
+
+  it('creates five jigs, copies selected artwork to all, and toggles both runs set-wide', () => {
+    render();
+    const columns = container.querySelector<HTMLInputElement>('input[aria-label="Jig columns"]');
+    if (columns === null) throw new Error('jig columns input not found');
+    setInputValue(columns, '5');
+
+    click('Create 5 jigs');
+    expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(5);
+    expect(container.textContent).toContain('5 jigs on canvas');
+
+    addArt();
+    click('Auto-fit + copy artwork to all 5');
+    const artwork = useStore
+      .getState()
+      .project.scene.objects.filter((object) => !isRegistrationBox(object));
+    expect(artwork).toHaveLength(5);
+    for (const object of artwork) {
+      const bounds = transformedBBox(object);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(36);
+      expect(bounds.maxY - bounds.minY).toBeCloseTo(36);
+    }
+
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Jig artwork width"]')?.value,
+    ).toBe('36');
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Jig artwork height"]')?.value,
+    ).toBe('36');
+    expect(container.textContent).toContain('AR locked');
+    const width = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Jig artwork width"]',
+    );
+    if (width === null) throw new Error('jig artwork width input not found');
+    setInputValue(width, '30');
+    click('Apply size to all 5');
+    for (const object of useStore
+      .getState()
+      .project.scene.objects.filter((candidate) => !isRegistrationBox(candidate))) {
+      const bounds = transformedBBox(object);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(30);
+      expect(bounds.maxY - bounds.minY).toBeCloseTo(30);
+    }
+
+    click('Outline only');
+    expect(container.textContent).toContain('all 5 JIG outlines');
+    click('Artwork only');
+    expect(container.textContent).toContain('all ARTWORK copies');
+  });
+
+  it('reopens an existing rectangular set with its rows, columns, and spacing', () => {
+    useStore.getState().replaceRegistrationJigSet({
+      outline: { kind: 'rectangle', widthMm: 40, heightMm: 30 },
+      rows: 2,
+      columns: 3,
+      spacingX: 8,
+      spacingY: 6,
+    });
+    render();
+
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Jig rows"]')?.value).toBe(
+      '2',
+    );
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Jig columns"]')?.value,
+    ).toBe('3');
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Horizontal jig spacing"]')
+        ?.value,
+    ).toBe('8');
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Vertical jig spacing"]')?.value,
+    ).toBe('6');
+  });
+
+  it('refreshes saved grid geometry when a project opens while the panel is already mounted', () => {
+    useStore.getState().replaceRegistrationJigSet({
+      outline: { kind: 'rectangle', widthMm: 40, heightMm: 30 },
+      rows: 2,
+      columns: 3,
+      spacingX: 8,
+      spacingY: 6,
+    });
+    const savedProject = useStore.getState().project;
+    useStore.getState().newProject();
+    render();
+
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Jig rows"]')?.value).toBe(
+      '1',
+    );
+    act(() => {
+      useStore.getState().setProject(savedProject);
+    });
+
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Jig rows"]')?.value).toBe(
+      '2',
+    );
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Jig columns"]')?.value,
+    ).toBe('3');
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Horizontal jig spacing"]')
+        ?.value,
+    ).toBe('8');
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Vertical jig spacing"]')?.value,
+    ).toBe('6');
   });
 });

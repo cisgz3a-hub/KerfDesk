@@ -5,6 +5,7 @@ const RELIEF_3D_NOMINAL_CELL_MM = 0.25;
 const DISPLAY_BUDGET_REASON = 'display-mesh-cell-budget';
 const MM_FORMAT_SCALE = 1_000_000;
 
+/** Viewer-owned sampling metadata shared by the Relief 3D scene and removal grid. */
 export type Relief3DDisplayResolution = RemovalGridResolution;
 
 /** Viewer-owned display sampling policy; unrelated to source or CAM resolution. */

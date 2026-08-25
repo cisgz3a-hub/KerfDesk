@@ -13,8 +13,7 @@ import {
 } from './commands';
 
 const EMPTY_REASON = 'Enter one Smoothieware G-code or console command.';
-const MULTILINE_REASON =
-  'Console commands must be one line. Use macros later for multi-line commands.';
+const MULTILINE_REASON = 'Console commands and saved macros must contain exactly one line.';
 const BLOCKED_PERSISTENT_REASON =
   'config-set/config-load write persistent Smoothie configuration and are blocked in the Console.';
 

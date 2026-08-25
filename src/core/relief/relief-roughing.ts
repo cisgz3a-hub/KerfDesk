@@ -13,7 +13,7 @@
 // scale into that grid, so only its residual isometry and device origin remain.
 // Depth-major: every ring of one level before the next. Pure and deterministic.
 
-import { buildOffsetLadder } from '../geometry/offset-ladder';
+import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
 import { partialDualCoordinate } from '../grid';
 import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
@@ -27,7 +27,6 @@ import { marchingSquares } from './marching-squares';
 export const DEFAULT_RELIEF_ALLOWANCE_MM = 0.5;
 const LEVEL_EPS = 1e-6;
 const MIN_STEPOVER_PERCENT = 10;
-const MAX_STEPOVER_PERCENT = 85;
 const MAX_RINGS_PER_LEVEL = 4096;
 const MIN_RING_POINTS = 3;
 // Exhausting the current 16-case marching-squares table, the farthest point on
@@ -50,6 +49,9 @@ export type ReliefRoughingLadder = {
   // rather than on running out of interior: that level is under-cleared and
   // the finishing skim meets stock it expected gone. Advisory only (rule 7).
   readonly offsetFailed: boolean;
+  // True only when a diagnostic-only next inset proves usable interior still
+  // exists beyond the emitted ring budget. Advisory only (rule 7).
+  readonly passLimited: boolean;
 };
 
 export function reliefRoughingPasses(
@@ -66,7 +68,7 @@ export function reliefRoughingLadder(
   options: ReliefRoughingOptions,
 ): ReliefRoughingLadder {
   if (!(options.reliefDepthMm > 0) || !(options.tool.diameterMm > 0)) {
-    return { passes: [], offsetFailed: false };
+    return { passes: [], offsetFailed: false, passLimited: false };
   }
   const kernel: ToolKernel = kernelForTool(
     options.tool,
@@ -81,18 +83,22 @@ export function reliefRoughingLadder(
   const stepMm = stepoverMm(options.stepoverPercent, options.tool.diameterMm);
   const passes: CncContourPass[] = [];
   let offsetFailed = false;
+  let passLimited = false;
   for (const level of zPassDepths(options.reliefDepthMm, options.depthPerPassMm)) {
     const contours = levelContoursMm(map, dilated, level);
-    if (appendLevelRings(passes, contours, level, stepMm)) offsetFailed = true;
+    const completion = appendLevelRings(passes, contours, level, stepMm);
+    offsetFailed = offsetFailed || completion.offsetFailed;
+    passLimited = passLimited || completion.passLimited;
   }
-  return { passes, offsetFailed };
+  return { passes, offsetFailed, passLimited };
 }
 
 function stepoverMm(stepoverPercent: number, toolDiameterMm: number): number {
-  const clamped = Number.isFinite(stepoverPercent)
-    ? Math.min(MAX_STEPOVER_PERCENT, Math.max(MIN_STEPOVER_PERCENT, stepoverPercent))
-    : MIN_STEPOVER_PERCENT;
-  return (clamped / 100) * toolDiameterMm;
+  const exact =
+    Number.isFinite(stepoverPercent) && stepoverPercent > 0
+      ? stepoverPercent
+      : MIN_STEPOVER_PERCENT;
+  return (exact / 100) * toolDiameterMm;
 }
 
 // Region at a level: dilated target at or below the level (the tool must
@@ -120,16 +126,21 @@ function levelContoursMm(
   }));
 }
 
-// Returns true when this level's ladder was cut short by an offset-engine
-// failure (see offset-ladder.ts) rather than by the region running out.
+type ReliefLevelCompletion = {
+  readonly offsetFailed: boolean;
+  readonly passLimited: boolean;
+};
+
+// Keeps emitted rings fixed while distinguishing exact exhaustion, a failed
+// next inset, and usable interior beyond the bounded ring budget.
 function appendLevelRings(
   passes: CncContourPass[],
   contours: ReadonlyArray<Polyline>,
   levelZ: number,
   stepMm: number,
-): boolean {
+): ReliefLevelCompletion {
   const usable = contours.filter((c) => c.points.length >= MIN_RING_POINTS);
-  if (usable.length === 0) return false;
+  if (usable.length === 0) return { offsetFailed: false, passLimited: false };
   // Ring 0 = the dual-grid region boundary. The mask-aware dilation expands its
   // excluded-cell envelope by the exact worst displacement of this marching-
   // squares table, so every boundary segment remains inside the mask proof.
@@ -142,7 +153,15 @@ function appendLevelRings(
       passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
     }
   }
-  return ladder.offsetFailed;
+  if (ladder.offsetFailed) return { offsetFailed: true, passLimited: false };
+  if (!ladder.capped) return { offsetFailed: false, passLimited: false };
+
+  // buildOffsetLadder stops immediately after its last permitted non-empty
+  // ring. Probe the next inset once to classify the stop, but never append this
+  // result: warning evidence may change; emitted motion must not.
+  const lookahead = insetContoursChecked(usable, MAX_RINGS_PER_LEVEL * stepMm);
+  if (lookahead.offsetFailed) return { offsetFailed: true, passLimited: false };
+  return { offsetFailed: false, passLimited: lookahead.contours.length > 0 };
 }
 
 function closeRing(polyline: Polyline): ReadonlyArray<{ x: number; y: number }> {

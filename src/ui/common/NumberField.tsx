@@ -8,24 +8,29 @@
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
 import { NumberInput } from '../kit';
 
-export function NumberField(props: {
+type NumberFieldRange =
+  | { readonly positiveOnly: true; readonly min?: never; readonly max?: never }
+  | { readonly positiveOnly?: false; readonly min: number; readonly max: number };
+
+type NumberFieldProps = {
   readonly ariaLabel: string;
   readonly value: number;
-  readonly min: number;
-  readonly max: number;
   readonly step?: number;
   readonly title?: string;
   readonly onCommit: (value: number) => void;
   readonly style?: React.CSSProperties;
   // Local-state fields (no store undo) can pass 0 to commit valid input immediately.
   readonly debounceMs?: number;
-}): JSX.Element {
+} & NumberFieldRange;
+
+export function NumberField(props: NumberFieldProps): JSX.Element {
   const debounced = useDebouncedCommit<number>({
     value: props.value,
     commit: props.onCommit,
     parse: (input) => {
       const parsed = Number.parseFloat(input);
       if (!Number.isFinite(parsed)) return props.value;
+      if (props.positiveOnly === true) return parsed > 0 ? parsed : props.value;
       return Math.min(props.max, Math.max(props.min, parsed));
     },
     ...(props.debounceMs === undefined ? {} : { debounceMs: props.debounceMs }),
@@ -37,8 +42,7 @@ export function NumberField(props: {
       value={debounced.displayValue}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
-      min={props.min}
-      max={props.max}
+      {...(props.positiveOnly === true ? {} : { min: props.min, max: props.max })}
       step={props.step ?? 1}
       style={props.style}
     />

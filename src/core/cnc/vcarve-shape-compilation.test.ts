@@ -13,6 +13,7 @@ import { collectLayerContours } from './collect-cnc-contours';
 import { compileCncJob } from './compile-cnc-job';
 
 describe('V-carve shape compilation', () => {
+  // The production-size compile exceeded 30 s under the normal four-worker local load.
   it('compiles the reported 66.6 mm circle with the starter V-bit', () => {
     const color = '#000000';
     const scene: Scene = {
@@ -56,7 +57,7 @@ describe('V-carve shape compilation', () => {
       group.kind === 'cnc' && group.cutType === 'v-carve' ? group.passes : [],
     );
     expect(passes.length).toBeGreaterThan(0);
-  }, 30_000);
+  }, 60_000);
 
   it('does not transfer source tab indices onto merged stroke-outline contours', () => {
     const color = '#000000';

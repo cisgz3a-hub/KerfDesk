@@ -23,7 +23,8 @@ import type { importLightBurnProject } from '../../io/lightburn';
 import { prepareProjectForPersistence } from '../../io/project';
 import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
-import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
+import { requestSaveFilename } from '../state/save-filename-store';
+import { clearAutosave } from '../state/autosave';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { handleSalvageExportProject } from './salvage-export';
 import type { ImportOutcome } from '../state/store';
@@ -180,20 +181,17 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   )) {
     ctx.pushToast(advisory, 'warning');
   }
-  // The picker is opened BEFORE the program is emitted because
-  // showSaveFilePicker requires transient user activation, and that activation
-  // expires while an await runs (Chromium: ~5 s). Emitting first made every job
-  // whose compile outran the window impossible to save at all, failing with
-  // "Must be handling a user gesture to show a file picker" — a V-carve text
-  // layer measures ~13.7 s. Cost of this order: a compile that then fails
-  // leaves the file the picker already created at zero bytes. Nothing is
-  // written to it, and an empty file the operator can delete is recoverable
-  // where a save that cannot open a dialog at all is not.
+  // Web and the Electron renderer reserve only a directory during transient
+  // user activation, then retain the operator's editable filename. The file
+  // handle and writable stream are created after successful preparation, so a
+  // compile failure cannot create or truncate the destination. A future native
+  // adapter may omit this method if its save dialog is already non-destructive.
   let target: SaveTarget | null;
   try {
-    target = await ctx.platform.pickFileForSave({
+    target = await pickGcodeDestination(ctx.platform, {
       suggestedName: suggestedGcodeName(ctx.savedName),
       extensions: ['.gcode', '.nc'],
+      chooseName: requestSaveFilename,
     });
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
@@ -218,6 +216,13 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }
+}
+
+function pickGcodeDestination(
+  platform: PlatformAdapter,
+  request: Parameters<PlatformAdapter['pickFileForSave']>[0],
+): Promise<SaveTarget | null> {
+  return (platform.reserveFileForSave ?? platform.pickFileForSave)(request);
 }
 
 function advanceExportVariables(ctx: SaveGcodeCtx): void {
@@ -270,17 +275,14 @@ export type SaveProjectCtx = {
   readonly project: Project;
   readonly savedName: string | null;
   readonly lastSaveTarget: SaveTarget | null;
-  readonly markSaved: (target: SaveTarget, expectedProject: Project) => boolean | undefined;
+  readonly markSaved: (target: SaveTarget) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
 // LU18: the Save-before-discard flow needs to know whether the save
 // actually landed — a cancelled picker must abort the destructive action
 // that triggered it, not fall through to "discard anyway".
-export type SaveProjectOutcome = 'saved' | 'saved-with-newer-edits' | 'cancelled' | 'error';
-
-export const SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE =
-  'Saved the captured version; newer edits remain unsaved and recovery is preserved.';
+export type SaveProjectOutcome = 'saved' | 'cancelled' | 'error';
 
 // F-A11 Save vs Save As. Without `forceDialog`, Ctrl+S reuses the in-memory
 // SaveTarget from the last save (no dialog, toast just says "Saved").
@@ -316,15 +318,11 @@ export async function handleSaveProject(
   if (target === null) return 'cancelled';
   try {
     await target.write(prepared.json);
-    const savedCurrentProject = ctx.markSaved(target, ctx.project) !== false;
-    if (savedCurrentProject) {
-      // This exact project reached disk, so its recovery slot is redundant.
-      clearAutosaveAfterFileHandoff(ctx.pushToast);
-      ctx.pushToast(reuseTarget ? 'Saved' : `Saved project to ${target.displayName}`, 'success');
-    } else {
-      ctx.pushToast(SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE, 'warning');
-      return 'saved-with-newer-edits';
-    }
+    ctx.markSaved(target);
+    // Manual save succeeded → autosave slot is redundant. Drop it so
+    // the recovery prompt doesn't fire on the next boot.
+    clearAutosave();
+    ctx.pushToast(reuseTarget ? 'Saved' : `Saved project to ${target.displayName}`, 'success');
     return 'saved';
   } catch (err) {
     ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
@@ -399,7 +397,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     const loadResult = ctx.setProject(result.project);
     markCapabilityAwareLoad(ctx, file.name, loadResult);
     // Opening a real .lf2 makes any autosaved snapshot stale.
-    clearAutosaveAfterFileHandoff(ctx.pushToast);
+    clearAutosave();
     if (result.migratedFrom !== undefined) {
       ctx.pushToast(`Opened ${file.name} — migrated from schema v${result.migratedFrom}`, 'info');
     } else {
@@ -428,7 +426,7 @@ function openLightBurnMigration(
   }
   const loadResult = ctx.setProject(result.project);
   ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'), { dirty: true });
-  clearAutosaveAfterFileHandoff(ctx.pushToast);
+  clearAutosave();
   const unsupported = result.report.unsupportedShapeTypes.length;
   const warnings = result.report.warnings.length;
   ctx.pushToast(

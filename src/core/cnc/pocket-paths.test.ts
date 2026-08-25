@@ -56,15 +56,15 @@ describe('pocketToolpathRings', () => {
     expect(k).toBeCloseTo(Math.round(k), 6);
   });
 
-  it('preserves current-main normalization outside the established Stepover range', () => {
+  it('preserves 1% and 200% stepovers instead of rewriting them to legacy bounds', () => {
     const contours = [square(0, 0, 20)];
     const onePercent = pocketRingToolpaths(contours, TOOL_DIAMETER_MM, 1);
     const formerTenPercent = pocketRingToolpaths(contours, TOOL_DIAMETER_MM, 10);
     const twoHundredPercent = pocketRingToolpaths(contours, TOOL_DIAMETER_MM, 200);
     const formerEightyFivePercent = pocketRingToolpaths(contours, TOOL_DIAMETER_MM, 85);
 
-    expect(onePercent.toolpaths).toEqual(formerTenPercent.toolpaths);
-    expect(twoHundredPercent.toolpaths).toEqual(formerEightyFivePercent.toolpaths);
+    expect(onePercent.toolpaths.length).toBeGreaterThan(formerTenPercent.toolpaths.length);
+    expect(twoHundredPercent.toolpaths).not.toEqual(formerEightyFivePercent.toolpaths);
     expect(onePercent.passLimited).toBe(false);
     expect(twoHundredPercent.passLimited).toBe(false);
   });
@@ -168,19 +168,18 @@ describe('pocketToolpathRaster (ADR-105 G10)', () => {
     expect(first?.points.every((p) => Math.abs(p.x - (first.points[0]?.x ?? 0)) < 1e-6)).toBe(true);
   });
 
-  it('preserves current-main raster normalization below the established minimum', () => {
+  it('uses the exact positive CNC spacing below the legacy floor', () => {
     const result = pocketRasterToolpaths([square], 1, 1, 'x');
-    const establishedMinimum = pocketRasterToolpaths([square], 1, 10, 'x');
     const sweeps = result.toolpaths.filter((path) => !path.closed);
     const firstY = sweeps[0]?.points[0]?.y;
     const secondY = sweeps[1]?.points[0]?.y;
 
     expect(result.passLimited).toBe(false);
-    expect(result.toolpaths).toEqual(establishedMinimum.toolpaths);
+    expect(sweeps.length).toBeGreaterThan(100);
     expect(firstY).toBeDefined();
     expect(secondY).toBeDefined();
     if (firstY === undefined || secondY === undefined) return;
-    expect(secondY - firstY).toBeCloseTo(0.1, 12);
+    expect(secondY - firstY).toBeCloseTo(0.01, 12);
   });
 
   it('returns empty when the bit cannot fit', () => {

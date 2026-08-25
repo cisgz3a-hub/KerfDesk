@@ -3346,6 +3346,78 @@ Two follow-ups refined the above after the maintainer tested it:
   start mode; in **Absolute** mode both runs emit at their true on-canvas positions,
   so a homed machine aligns the two runs with no Set-Origin step.
 
+### Amendment (2026-08-23) — multi-outline jig sets
+
+The single outline generalizes to one **jig set** containing a rectangular grid
+of one or more identical rectangle or circle outlines. Every outline remains a
+normal `ShapeObject` bound to the same reserved `registration` operation, so no
+scene union, project field, or schema version changes. Creating a set replaces
+the previous set atomically; rows, columns, and horizontal/vertical spacing define
+the layout, and the complete set can be moved or locked with ordinary scene tools.
+
+The two-run contract is set-wide. **Outline only** enables the one registration
+operation and therefore emits every outline. **Artwork only** disables that
+operation and restores the artwork operations, so every operation-preserving copy
+is emitted. **Auto-fit + copy artwork to all N** proportionally scales the selected
+artwork group into 90% of the first outline's usable region, preserving aspect ratio
+and internal group spacing, then duplicates that fitted layout into every remaining
+outline without creating new operations. Circle outlines use the existing inscribed-
+square fit region so axis-aligned artwork remains inside the arc. Repeating the action
+replaces its prior generated copies. The single-outline fit behavior is the N=1 case.
+
+Placement treats the combined compiled bounds of all registration outlines as one
+physical fixture anchor. Outline and artwork runs receive that same anchor, while
+Absolute Coordinates continues to emit at the true canvas positions. This is one
+fixture coordinate system, not multiple work origins. The existing exact-job Frame
+permit remains the only Start guard; the amendment adds no refusal or confirmation.
+Captured-board provenance remains exclusive to Place Board and cannot be replaced
+through the jig-set action.
+
+### Amendment (2026-08-24) — piece-complete output and shared sizing
+
+Generated jig copy ids already encode both the source artwork id and destination
+outline id. Treat that persisted identity as the jig-instance boundary; do not add
+a project field or schema migration. Laser compilation materializes each active
+instance separately and repeats its shared operations in project-layer order before
+advancing to the next outline in grid order. Line, scanline fill, Follow Shape,
+Island Fill, and Image output therefore retain their normal per-operation behavior,
+but geometry from separate jig instances cannot be merged into one cross-fixture
+scan or segment group. Ordinary artwork that merely shares an operation remains one
+machining unit outside the jig-instance groups; scenes without an active multi-jig
+set keep the existing compiler path unchanged.
+
+The Registration Jig panel exposes the first instance's exact width and height as
+the set's shared artwork size. **Apply size to all N** independently resizes each
+instance around its own centre with a fixed proportional aspect lock, then recenters
+it in the corresponding outline. Editing either exact dimension updates the other;
+this avoids inventing shear for rotated artwork. Group members scale as one layout so
+their internal spacing is preserved; fixture spacing never scales. The action is one
+undoable scene edit and survives save/reopen through the existing copy ids.
+
+This amendment changes compilation grouping and scene transforms only. It does not
+change power, speed, passes, output toggles, placement evidence, transport, or machine
+authorization. The exact-job Frame permit remains the only Start guard.
+
+### Amendment (2026-08-25) — operator-controlled aspect lock
+
+The shared artwork-size control keeps proportional sizing as its default but makes
+the visible **AR locked** state an explicit toggle. In the locked state, editing W or
+H continues to derive the paired dimension and the store applies one uniform scale.
+In **AR unlocked**, each draft changes independently and **Apply size to all N**
+passes both exact dimensions through the existing selection-transform path, then
+recenters every instance in its own outline. This changes only artwork geometry;
+fixture spacing, operation bindings, output order, and the one-edit undo contract
+remain unchanged.
+
+The scene transform model has rotation plus local X/Y scale but no shear. Rotated jig
+artwork therefore measures and applies W/H in a selection-local frame aligned to the
+first artwork object's axes. The store scales positions and object X/Y scale in that
+frame, preserves every rotation, and recenters the resulting world bounds in each jig.
+The visible unlocked hint states the local-axis convention. Applying remains available
+for rotated artwork; no resize refusal, hidden input, or instruction to relock AR is
+introduced. This does not change Frame, Preview, compilation, transport, or machine
+authorization.
+
 ### Consequences
 
 - The jig is a composition of existing machinery — reserved-id layer (ADR-005
@@ -3386,6 +3458,10 @@ Two follow-ups refined the above after the maintainer tested it:
   identical box-anchored offset; the box anchors to work-zero; the art lands at its
   offset relative to the box, not at the corner
   (`registration-placement.property.test.ts`).
+- **Jig-set coverage:** state and panel tests create five outlines, center and copy
+  one artwork into all five slots, prove both output choices apply set-wide, and
+  round-trip the complete set. Placement tests measure and anchor the combined
+  fixture bounds in both runs.
 - Full suite + `tsc --noEmit` + lint green; no existing G-code snapshot moves
   (non-jig placement unchanged).
 - **Hardware (gates "done"):** on the 4040, Set Origin, burn the box, place the
@@ -16459,127 +16535,88 @@ no toolpath-resolution context.
 - Dialog tests cover the legacy-mesh and canonical-heightfield arms, physical transform scale,
   materializer and surface-worker propagation, absence below the threshold, visible status above
   it, cancellation, failure fallback, and an available Close action.
-
-## ADR-293 - Large canonical relief autosave uses atomic whole-project IndexedDB snapshots (2026-08-09)
+## ADR-293 - Saved user macros remain one-command Console invocations (2026-08-09)
 
 **Date:** 2026-08-09
-**Status:** Accepted and implemented as a bounded P2R.1 persistence slice; abrupt-process and packaged-Electron qualification remain open
+**Status:** Accepted for focused v1 by direct maintainer request; software verification required,
+hardware qualification excluded
 
 ### Context
 
-ADR-292 made canonical U16 reliefs self-contained in schema-v4 project JSON but left large-field
-autosave planned. A 2048 x 2048 U16 field carries 8,388,608 scalar bytes and 11,184,812 base64
-characters; the complete project exceeds the practical localStorage recovery path even though the
-same payload fits IndexedDB. The new persistence path must keep the previous complete recovery,
-prevent a late asynchronous writer from resurrecting data after Save/Open cleanup, distinguish live
-windows from abandoned sessions, and never turn cleanup trouble into a file-operation guard.
+KerfDesk already has one controller-specific Console path. The shared command deck prepares input
+with the active driver, obtains the existing persistent-setting confirmation when applicable,
+dispatches through the laser store's `sendConsoleCommand`, and records only successful dispatches in
+its local command history. The store rechecks live operation and Idle ownership, invalidates setup
+evidence according to the parsed command's state effect, and writes through `safeWrite`.
 
-ADR-291 permits content-addressed blobs but does not require them. The smallest contract-compatible
-slice is therefore one self-contained project JSON string per immutable snapshot. It closes the
-capacity and atomic-replacement gap without making manual `.lf2` files depend on browser storage or
-claiming that serialization cost has been solved.
+A general macro language would not be a small extension of that path. Ordinary Console writes do
+not all await terminal acknowledgement, and a state-mutating first line immediately makes cached
+Idle and any Frame permit stale. Multiline sequencing would therefore need new acknowledgement,
+status, cancellation, and partial-execution ownership. It could also become a second program sender
+beside the exact-artifact Frame/Start flow governed by ADR-228, ADR-230, and ADR-232.
 
 ### Decision
 
-1. **Store whole prepared project JSON in IndexedDB.** The interval autosave path writes the same
-   validated, self-contained project representation used by recovery into
-   `curvedesk-project-autosave-v1`. `manifests` holds the small per-session authority record and
-   `snapshots` holds immutable project JSON. Manual `.lf2` Save remains independently self-contained;
-   it never references or hydrates an IndexedDB-only relief blob.
-2. **Replace current and previous atomically.** One read/write transaction spans both stores. A
-   compare-and-swap `expectedEpoch` admits exactly one writer, adds the new snapshot, rotates current
-   to previous, deletes only the superseded older snapshot, and publishes the new manifest. Clear
-   deletes the referenced snapshots and writes an incremented empty-manifest tombstone in the same
-   atomic transaction, so a writer holding an earlier epoch conflicts instead of recreating cleared
-   data.
-3. **Serialize same-window writes and clears.** One service queue orders interval writes, recovery
-   re-homes, and Save/Open/import cleanup. A clear invalidates the synchronous interval generation
-   immediately and commits behind any in-flight write. A conflict identifies stale epoch knowledge;
-   the service refreshes that epoch, and a later interval tick may retry the then-current project
-   state without labeling the conflict as corruption.
-4. **Give each live window one owned session.** A Web Lock named from the autosave session ID is
-   acquired exclusively with `ifAvailable`. Contention rotates the new window to a different session
-   rather than queuing or sharing identity. Recovery excludes a live foreign session and repeats the
-   exclusive abandonment probe around destructive source cleanup. When Web Locks are unsupported or
-   fail, CurveDesk may copy a recovery but retains the foreign source because abandonment is unknown.
-5. **Recover without sacrificing the prior complete copy.** Startup ranks eligible snapshots by
-   save time, validates project JSON and its embedded heightfield digest, and falls back from an
-   invalid/missing current snapshot to the previous complete snapshot with a warning. A snapshot's
-   storage key, session identity, epoch, and save time must agree with its authoritative manifest,
-   whose current/previous references must also agree with its epoch and rotation order;
-   local fallback session identity must likewise agree with the session encoded by its physical key.
-   A malformed or inconsistent record is isolated to its slot and disclosed; it cannot hide other
-   valid sessions or impersonate the reading window for ownership classification.
-   Recovery rechecks that the active document identity is unchanged and the in-memory project is
-   still empty after asynchronous reads, re-homes an accepted project before source cleanup, and
-   marks the restored project dirty until manual Save. The asynchronous read is bound to the entry
-   document epoch, so a New/Open handoff to a different clean empty project cannot be overwritten by
-   a stale recovery continuation.
-6. **Keep localStorage as compatibility, not the large-field authority.** Normal interval writes are
-   IndexedDB-first. If IndexedDB is unavailable, the existing synchronous local slot remains a
-   best-effort fallback. Physical per-session keys are enumerated directly during recovery; the
-   shared compatibility index is advisory because localStorage read/modify/write is not atomic across
-   windows. `beforeunload` remains synchronous and local-only because the page cannot await an
-   IndexedDB transaction during teardown; an oversized project therefore recovers the last completed
-   interval snapshot, not necessarily its final unload-time edit.
-7. **Make failure and cleanup truthful but nonblocking.** If both write backends fail, one warning
-   tells the operator the newest project is not autosaved and to save `.lf2` manually. Save completion
-   marks the document clean and clears recovery only when the current project is the exact captured
-   project written to disk; edits made while a slow write is pending remain dirty and recoverable,
-   and that captured-version-only outcome cannot authorize a pending destructive New/Open flow.
-   Successful Save/Open/import handoff is never reclassified or delayed by recovery cleanup. Local or
-   IndexedDB clear failure produces a later warning that an older prompt may reappear; it adds no
-   confirmation, refusal, cap, clamp, Frame effect, or Start effect.
-8. **Defer content-addressed decomposition.** Separate heightfield blobs could reduce repeated JSON
-   serialization and structured-clone cost, but they are an optimization requiring hydration,
-   reachability, garbage-collection, and manual-file portability contracts. This slice does not
-   invent those contracts or claim background/off-main-thread serialization.
+1. **V1 stores one command per named macro.** A user macro contains a normalized display name, one
+   single-line controller-command template, and created/updated timestamps. The versioned collection
+   is app-local data, not `.lf2` project truth, controller storage, or a built-in command catalog.
+2. **Variables are numeric substitution, not scripting.** A template declares variables only as
+   `{{identifier}}`. Each run supplies one finite ordinary-decimal scalar per distinct name. Values
+   cannot contain whitespace, exponent notation, command words, braces, or control/newline bytes.
+   Expansion returns a structured error for malformed syntax or missing/invalid values and never
+   splits output into multiple commands.
+3. **The active driver remains the parser of record.** After expansion, the complete command is
+   passed to the current driver's existing `prepareConsoleCommand`. Macro code does not classify
+   firmware commands, duplicate persistent-write policy, or manufacture wire bytes.
+4. **Execution is exclusively the existing Console execution.** The macro panel is a child of the
+   shared `ConsoleCommandDeck` and invokes that deck's existing send model. Dispatch remains
+   `runConsoleCommand` -> `sendConsoleCommand` -> `writeConsoleCommand` -> `safeWrite`. V1 adds no
+   raw serial call, batch writer, stream, scheduler, connect/startup hook, or keyboard trigger.
+5. **History and confirmations keep their existing meaning.** The expanded normalized command enters
+   Arrow history only after the shared runner reports `sent`. Cancelled, invalid, storage-only, or
+   rejected attempts do not. A macro that expands to a persistent setting write uses the same
+   existing confirmation as manually typed input. Running a macro does not replace or clear unsent
+   manual Console text; that draft remains available before and after macro dispatch.
+6. **Provenance is explicit and truthful.** Successful macro dispatch marks the outbound transcript
+   source as `macro` and appends a macro-source message containing the saved name and expanded
+   command. The message says what KerfDesk dispatched through Console; it does not claim controller
+   acknowledgement, physical position, or machine execution.
+7. **Frame-first remains the only job authorization.** Macro modules do not import or call Frame,
+   `runStartJobFlow`, `startJob`, streamer creation, or permit helpers. A read-only macro preserves
+   existing evidence exactly like typed Console input. A state-mutating macro clears `framedRun`
+   before its asynchronous write through the existing Console state-effect path. No macro creates,
+   refreshes, claims, or consumes a permit, so ordinary Start still requires the single completed
+   exact-job Frame permit.
+8. **Storage changes are fail-soft and non-fabricating.** Invalid stored records are ignored. A
+   failed save, edit, or delete leaves the last persisted in-memory collection unchanged and reports
+   the failure inline. No account, sync, telemetry, import, or export path is added.
 
 ### Consequences
 
-- Large canonical fields no longer depend on localStorage capacity for periodic recovery. Current
-  and previous complete snapshots survive transactional aborts, and epoch tombstones prevent stale
-  resurrection after successful handoff cleanup.
-- Multiple live windows keep independent recovery slots. A closed window becomes eligible only after
-  its exclusive ownership lock is gone; unsupported ownership deliberately favors retention and can
-  cause a repeated prompt rather than silent deletion.
-- Preparing and serializing project JSON still runs in the renderer. IndexedDB removes the storage
-  ceiling demonstrated by localStorage; it does not prove absence of UI jank, bounded peak memory,
-  or a universal browser quota.
-- Manual saves, output preparation, Frame, Start, CAM, G-code, and hardware behavior are unchanged.
-  Frame remains the sole ordinary Start guard.
+- Operators can name and reuse diagnostic, setup, and one-line manual motion commands without
+  retyping them. The UI labels them user-saved, local, and one-command so they cannot be mistaken for
+  KerfDesk-authored workflows or reviewed job artifacts.
+- Numeric-only placeholders cover coordinates, feeds, power, dwell, and controller settings while
+  preventing a variable value from injecting another G/M/$ command. Command vocabulary stays in the
+  operator-authored fixed template and the controller driver's existing parser.
+- V1 deliberately does not satisfy the older aspirational Console text about multiline macros.
+  Multiline or controller-resident programs require a separate decision and may not bypass the
+  ordinary Frame/Start path.
+- Running a saved motion or modal command has the same physical implications and evidence
+  invalidation as typing that exact line in Console. Automated tests cannot establish controller
+  response, physical motion, placement, beam state, or hardware safety.
 
 ### Verification
 
-- Fake-IndexedDB tests cover current/previous rotation, transaction abort rollback, same-epoch writer
-  contention, persistent clear tombstones, per-session isolation, malformed-manifest isolation,
-  manifest/snapshot identity disagreement, impossible manifest reference order, local key/session
-  identity disagreement, corrupt-current fallback, queued clear-after-write ordering, and a commit
-  failure that falls back locally while clear is queued.
-- Storage failure tests cover IndexedDB-to-local fallback, both-backend failure, inaccessible or
-  throwing storage globals, failed local deletion, unindexed per-session fallback discovery, malformed
-  local disclosure, nonblocking file-handoff cleanup, slow-save project-version binding, destructive
-  flow retention, stale recovery/document-epoch binding, live foreign retention, abandoned cleanup,
-  unsupported ownership retention, and warning disclosure.
-- A deterministic 2048 x 2048 U16 fixture pins the 11,184,812-character payload and digest, then
-  round-trips the complete canonical source through the production durable service without a local
-  autosave write.
-- Real Chrome tests cover reload through the production recovery prompt and completed re-home write,
-  plus two-window exclusive-lock contention, session rotation, live exclusion, post-close recovery,
-  mutation-time retention, and exact source cleanup.
-
-These tests qualify committed Chrome IndexedDB state across reload. They do not qualify an abrupt
-browser/OS process kill, power loss, packaged Electron restart, all target-device quotas, or absence
-of renderer stalls. Those claims require separate runtime evidence.
-
-### References
-
-- W3C, Indexed Database API 3.0, transactions and object stores:
-  https://www.w3.org/TR/IndexedDB/
-- W3C, Web Locks API, exclusive locks and `ifAvailable`:
-  https://www.w3.org/TR/web-locks/
-- ADR-291, P2R.1 portable manual files and atomic autosave contract.
-- ADR-292, P2R.1a canonical heightfield substrate and its superseded large-autosave limitation.
+- Pure tests cover placeholder discovery, repeated values, decimal expansion, malformed templates,
+  missing values, injection attempts, and versioned storage validation/failure behavior.
+- Command-deck tests prove a macro uses the shared runner, carries provenance, preserves the unsent
+  manual Console draft, and records the expanded command in the existing success-only history.
+- Store tests prove macro-source writes use `safeWrite`, read-only macros cannot mint a permit,
+  state-mutating macros invalidate an existing permit before write, no streamer is created, and
+  transcript provenance is success-only.
+- Focused Console/controller tests plus typecheck, lint, formatting, the broader unit suite, web
+  build, and file-size checks remain required. Hardware operation and deployment are excluded.
 
 ## ADR-294 - Relief grids preserve exact interior pitch with partial terminal cells (2026-08-09)
 
@@ -16620,11 +16657,12 @@ other ADR-292 evidence boundary remains in force.
    exact regular grids retain their prior raster arithmetic and output; a partial grid whose nominal
    scaling makes a represented nonzero triangle sub-threshold uses a translated unit frame so scale
    alone does not erase it.
-3. **Use position-aware cutter geometry only where the terminal cell can matter.** Finishing points
-   use actual centers and roughing's marching dual coordinates use actual edges and terminal
-   midpoints. Cutter dilation evaluates physical center distances near a partial edge; excluded
-   coverage uses distance to the exact cell rectangle plus the existing Float32 and emitted-XYZ
-   clearance. The regular-grid indexed-kernel path remains unchanged.
+3. **Use position-aware cutter geometry where the terminal cell can matter.** Finishing points use
+   actual centers and roughing's marching dual coordinates use actual edges and terminal midpoints.
+   Cutter dilation evaluates physical center distances near a partial edge; excluded coverage uses
+   distance to the exact cell rectangle plus the existing Float32 and emitted-XYZ clearance.
+   Removal stamping keeps current main's exact sub-cell cutter position and evaluates both ordinary
+   and shortened terminal-cell centers in that same physical-coordinate model.
 4. **Keep every preview consumer on those extents.** Stepped meshes, removal-grid
    creation/downsampling/probing/stamping, Cut 3D labels, hover inversion, and worker handoffs carry
    the exact logical domain. Smooth meshes remain contained, center-sampled interpolation surfaces;
@@ -16667,8 +16705,9 @@ other ADR-292 evidence boundary remains in force.
   beyond the object. A source mask band occupies the same logical XY interval in canvas, stepped
   meshes, simulation, and cutter planning; the contained smooth interpolation surface remains
   center-sampled and omits every quad touching excluded coverage.
-- Partial grids pay position-aware cutter and stamping work near their terminal axes. Exactly
-  divisible grids retain the established indexed fast paths.
+- Partial grids pay position-aware cutter work near their terminal axes. Exactly divisible grids
+  retain the established indexed dilation fast paths, while removal stamping retains current main's
+  exact sub-cell physical-center behavior.
 - Extremely small representable remainders can conservatively include an adjacent source pixel.
   That is the consequence of exact stored-input semantics, not silent spacing coarsening.
 - Hardware air cuts and representative wood coupons remain required before claiming physical edge
@@ -16694,4 +16733,3 @@ other ADR-292 evidence boundary remains in force.
 
 - ADR-289, transformed relief machine-space cutter-envelope semantics.
 - ADR-292, exact-input P2R.1a contract and the sampled-grid boundary this decision closes.
-- ADR-293, large canonical relief autosave/recovery; unchanged by this transient grid model.

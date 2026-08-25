@@ -66,6 +66,13 @@ describe('Marlin command builders', () => {
 });
 
 describe('prepareMarlinConsoleCommand', () => {
+  it('explains that Console and saved macros are both one-line commands', () => {
+    expect(prepareMarlinConsoleCommand('G0 X0\nM3')).toEqual({
+      ok: false,
+      reason: 'Console commands and saved macros must contain exactly one line.',
+    });
+  });
+
   it('blocks persistent writes, allows queries without idle, never gates M112', () => {
     expect(prepareMarlinConsoleCommand('M500').ok).toBe(false);
     expect(prepareMarlinConsoleCommand('M502').ok).toBe(false);

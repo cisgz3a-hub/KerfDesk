@@ -58,7 +58,7 @@ describe('planRestPocketToolpaths', () => {
     }
   });
 
-  it('preserves current-main Stepover normalization for rest finishing', () => {
+  it('preserves 1% and 200% finishing stepovers instead of legacy clamp values', () => {
     const contours = [square(0, 0, 100)];
     const onePercent = planRestPocketToolpaths(contours, 30, 1, 1);
     const formerTenPercent = planRestPocketToolpaths(contours, 30, 1, 10);
@@ -77,8 +77,8 @@ describe('planRestPocketToolpaths', () => {
     ) {
       return;
     }
-    expect(onePercent.toolpaths).toEqual(formerTenPercent.toolpaths);
-    expect(twoHundredPercent.toolpaths).toEqual(formerEightyFivePercent.toolpaths);
+    expect(onePercent.toolpaths.length).toBeGreaterThan(formerTenPercent.toolpaths.length);
+    expect(twoHundredPercent.toolpaths).not.toEqual(formerEightyFivePercent.toolpaths);
   });
 
   it('refuses invalid tool ordering, open contours, and an oversized rougher', () => {

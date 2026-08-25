@@ -42,6 +42,7 @@ import type { CutSegment, Group, Job, JobDiagnostic } from './job';
 import { offsetFillDiagnostics } from './offset-fill-diagnostics';
 import { commonVectorGroupFields } from './vector-group-fields';
 import { resolveFillScanDirection } from './scan-direction-policy';
+import { registrationJigCompilationRuns } from './registration-jig-compilation-runs';
 
 // Groups plus anything the operator should be told about them. Threaded up
 // rather than logged, because src/core/ has no logger and a warning that never
@@ -72,27 +73,62 @@ function vectorCompilation(parts: ReadonlyArray<VectorCompilation>): VectorCompi
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
   const groups: Group[] = [];
   const diagnostics: JobDiagnostic[] = [];
+  const jigRuns = registrationJigCompilationRuns(scene);
+  if (jigRuns !== null) {
+    for (const run of jigRuns) {
+      appendOperationCompilation(
+        { groups, diagnostics },
+        run.vectorObjects,
+        run.rasterObjects,
+        run.layer,
+        device,
+        run.priorityObjectId,
+        scene.objects,
+      );
+    }
+    return diagnostics.length === 0 ? { groups } : { groups, diagnostics };
+  }
   const orderedObjects = orderedArtworkObjects(scene);
   for (const { layer, priorityObjectId } of artworkOperationRuns(scene)) {
-    for (const operationLayer of outputOperationLayers(layer)) {
-      if (operationLayer.mode !== 'image') {
-        const vector = compileVectorGroupsForLayer(
-          scene.objects,
-          operationLayer,
-          device,
-          priorityObjectId,
-        );
-        groups.push(...vector.groups);
-        diagnostics.push(...vector.diagnostics);
-      }
-      const raster = compileRasterGroupsForLayer(orderedObjects, operationLayer, device, {
-        sceneObjects: scene.objects,
-      });
-      groups.push(...raster.groups);
-      diagnostics.push(...raster.diagnostics);
-    }
+    appendOperationCompilation(
+      { groups, diagnostics },
+      scene.objects,
+      orderedObjects,
+      layer,
+      device,
+      priorityObjectId,
+      scene.objects,
+    );
   }
   return diagnostics.length === 0 ? { groups } : { groups, diagnostics };
+}
+
+function appendOperationCompilation(
+  output: { readonly groups: Group[]; readonly diagnostics: JobDiagnostic[] },
+  vectorObjects: ReadonlyArray<SceneObject>,
+  rasterObjects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+  priorityObjectId: string,
+  completeSceneObjects: ReadonlyArray<SceneObject>,
+): void {
+  for (const operationLayer of outputOperationLayers(layer)) {
+    if (operationLayer.mode !== 'image') {
+      const vector = compileVectorGroupsForLayer(
+        vectorObjects,
+        operationLayer,
+        device,
+        priorityObjectId,
+      );
+      output.groups.push(...vector.groups);
+      output.diagnostics.push(...vector.diagnostics);
+    }
+    const raster = compileRasterGroupsForLayer(rasterObjects, operationLayer, device, {
+      sceneObjects: completeSceneObjects,
+    });
+    output.groups.push(...raster.groups);
+    output.diagnostics.push(...raster.diagnostics);
+  }
 }
 
 function compileVectorGroupsForLayer(

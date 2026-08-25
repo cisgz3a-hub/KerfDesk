@@ -30,7 +30,14 @@ export function AddCncBitForm(): JSX.Element {
   // Only an engraving bit has a flat land at the tip; a v-bit comes to a point
   // by definition, which is the physical difference between the two kinds.
   const needsTipDiameter = kind === 'engraving';
-  const error = bitFormError({ name, diameter, tipAngle, tipDiameter, needsAngle });
+  const error = bitFormError({
+    name,
+    diameter,
+    tipAngle,
+    tipDiameter,
+    needsAngle,
+    needsTipDiameter,
+  });
 
   const handleAdd = (): void => {
     setHasSubmitted(true);
@@ -174,6 +181,7 @@ function bitFormError(input: {
   readonly tipAngle: string;
   readonly tipDiameter: string;
   readonly needsAngle: boolean;
+  readonly needsTipDiameter: boolean;
 }): string | null {
   if (input.name.trim() === '') return 'Enter a bit name.';
   const diameterMm = Number(input.diameter);
@@ -189,7 +197,7 @@ function bitFormError(input: {
   if (input.needsAngle && (input.tipAngle.trim() === '' || !isValidCncTipAngleDeg(tipAngleDeg))) {
     return `Enter the actual included angle from ${MIN_CNC_TIP_ANGLE_DEG} to ${MAX_CNC_TIP_ANGLE_DEG} degrees.`;
   }
-  return tipDiameterError(input.tipDiameter, diameterMm);
+  return input.needsTipDiameter ? tipDiameterError(input.tipDiameter, diameterMm) : null;
 }
 
 // Blank is valid — it means the bit comes to a point. A land at or past the

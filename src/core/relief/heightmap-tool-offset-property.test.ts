@@ -135,6 +135,7 @@ describe('partial-edge dilation equivalence', () => {
       radiusCells: 1,
       surfaceCandidateSpanCells: 2,
       offsets: [{ dx: 0, dy: 0, dz: 0 }],
+      surfaceDzAtRadius: () => 0,
       maskCellCandidateSpanCells: 0,
       maskSweepCandidateSpanCells: 0,
       maskPathUncertaintyMm: 0,

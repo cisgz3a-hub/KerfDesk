@@ -124,6 +124,17 @@ function installFilePickers() {
     record('picker-save', { name });
     return saveHandle(name);
   };
+  window.showDirectoryPicker = async () => {
+    record('picker-directory');
+    return {
+      kind: 'directory',
+      name: 'e2e-output',
+      getFileHandle: async (name, options) => {
+        record('picker-directory-file', { name, create: options?.create === true });
+        return saveHandle(name);
+      },
+    };
+  };
 }
 
 function fileHandle(file) {

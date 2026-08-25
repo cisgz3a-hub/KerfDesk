@@ -62,6 +62,7 @@ import {
   buildCncCompilationSidecar,
   hasVCarveOperation,
   offsetDiagnosticsForStatus,
+  reliefOffsetDiagnosticsForStatus,
 } from './cnc-compilation-sidecar';
 import { compiledInlayGroups, secondaryClearingGroups } from './compile-cnc-operation-groups';
 
@@ -232,9 +233,9 @@ function compileCncOperation(
     reliefPlans: relief.evidence.plans,
     offsetLadderDiagnostics: [
       ...vectorGroups.offsetLadderDiagnostics,
-      ...offsetDiagnosticsForStatus(layer.id, {
+      ...reliefOffsetDiagnosticsForStatus(layer.id, {
         offsetFailed: relief.evidence.offsetFailed,
-        passLimited: false,
+        passLimited: relief.evidence.passLimited,
       }),
     ],
     ...(usesStepover

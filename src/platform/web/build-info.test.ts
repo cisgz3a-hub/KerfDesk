@@ -63,8 +63,10 @@ describe('buildTimeIso', () => {
 });
 
 describe('gitShortSha', () => {
-  it('returns the short SHA from git', () => {
-    expect(gitShortSha(gitStub({ 'rev-parse --short HEAD': 'abc1234' }))).toBe('abc1234');
+  it('returns exactly eight characters without Git object-database abbreviation drift', () => {
+    expect(
+      gitShortSha(gitStub({ 'rev-parse HEAD': 'abc1234567890abc1234567890abc1234567890a' })),
+    ).toBe('abc12345');
   });
 
   it('falls back to "dev" when git is unavailable', () => {

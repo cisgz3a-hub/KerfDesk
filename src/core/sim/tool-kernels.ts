@@ -46,10 +46,10 @@ export type ToolKernel = {
   readonly radiusMm: number;
   readonly mmPerCell: number;
   readonly radiusCells: number;
-  // Candidate square used only by position-aware consumers. The ordinary
-  // `offsets` array remains the byte-compatible uniform-grid fast path.
+  // Candidate square used by position-aware consumers near a partial edge.
   readonly surfaceCandidateSpanCells: number;
   readonly offsets: ReadonlyArray<ToolKernelOffset>;
+  readonly surfaceDzAtRadius: (radiusMm: number) => number;
   // Mask cells represent physical areas, not point samples. These offsets cover
   // every regular cell square intersected by the physical cutter plus the
   // caller's path-location uncertainty; partial-edge consumers evaluate the
@@ -77,6 +77,7 @@ export function kernelForTool(
 ): ToolKernel {
   const radiusMm = Math.max(0, tool.diameterMm / 2);
   const radiusCells = Math.max(0, Math.ceil(radiusMm / mmPerCell));
+  const surfaceDzAtRadius = surfaceDzAtRadiusForTool(tool, radiusMm);
   const maskCellUncertaintyMm = maskPathUncertaintyMm + CNC_MASK_EMISSION_XY_CLEARANCE_MM;
   const maskSweepPathUncertaintyMm = mmPerCell / 2 + CNC_MASK_EMISSION_XY_CLEARANCE_MM;
   const offsets: ToolKernelOffset[] = [];
@@ -84,7 +85,7 @@ export function kernelForTool(
     for (let dx = -radiusCells; dx <= radiusCells; dx += 1) {
       const dMm = Math.hypot(dx, dy) * mmPerCell;
       if (dMm > radiusMm) continue;
-      offsets.push({ dx, dy, dz: cuttingSurfaceDz(tool, dMm, radiusMm) });
+      offsets.push({ dx, dy, dz: surfaceDzAtRadius(dMm) });
     }
   }
   return {
@@ -94,6 +95,7 @@ export function kernelForTool(
     radiusCells,
     surfaceCandidateSpanCells: radiusCells + 1,
     offsets,
+    surfaceDzAtRadius,
     maskCellOffsets: maskCellOffsets(tool, radiusMm, mmPerCell, maskCellUncertaintyMm),
     maskCellCandidateSpanCells: maskCellSpanCells(radiusMm, mmPerCell, maskCellUncertaintyMm),
     maskSweepCellOffsets: maskCellOffsets(tool, radiusMm, mmPerCell, maskSweepPathUncertaintyMm),
@@ -101,6 +103,29 @@ export function kernelForTool(
     maskPathUncertaintyMm: maskCellUncertaintyMm,
     maskSweepPathUncertaintyMm,
   };
+}
+
+function surfaceDzAtRadiusForTool(
+  tool: CncTool,
+  toolRadiusMm: number,
+): (radiusMm: number) => number {
+  switch (tool.kind) {
+    case 'end-mill':
+      return () => 0;
+    case 'engraving':
+    case 'v-bit': {
+      const includedAngleDeg = vcarveIncludedAngleDeg(tool) ?? FALLBACK_V_TIP_ANGLE_DEG;
+      const envelope = conicalRadialEnvelope(tool, includedAngleDeg);
+      return envelope === null ? () => 0 : (radiusMm) => radialEnvelopeHeightMm(envelope, radiusMm);
+    }
+    case 'ball-nose':
+      return (radiusMm) => {
+        const inside = Math.max(0, toolRadiusMm * toolRadiusMm - radiusMm * radiusMm);
+        return toolRadiusMm - Math.sqrt(inside);
+      };
+    default:
+      return assertNever(tool.kind, 'CncToolKind');
+  }
 }
 
 function maskCellOffsets(

@@ -128,7 +128,7 @@ describe('computeRemovalGrid — properties', () => {
 });
 
 describe('computeRemovalGrid - partial terminal cells', () => {
-  it('keeps the established indexed kernel on exact regular grids', () => {
+  it('keeps current main exact sub-cell stamping on regular grids', () => {
     const toolpath: Toolpath = {
       steps: [
         {
@@ -149,7 +149,12 @@ describe('computeRemovalGrid - partial terminal cells', () => {
       ),
     );
 
-    expect(grid.depth[0]).toBeCloseTo(-0.3, 6);
+    const radiusMm = PARTIAL_GRID_BALL_TOOL.diameterMm / 2;
+    const centerDistanceMm = Math.hypot(0.15 - 0.01, 0.15 - 0.01);
+    expect(grid.depth[0]).toBeCloseTo(
+      -0.3 + radiusMm - Math.sqrt(radiusMm ** 2 - centerDistanceMm ** 2),
+      6,
+    );
   });
 
   it('evaluates tool depth from the axis to exact terminal-cell centers', () => {

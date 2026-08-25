@@ -154,26 +154,22 @@ describe('custom bits (F-CNC11)', () => {
   });
 
   it.each(SECONDARY_REFERENCE_CASES)(
-    'refuses to delete a bit used by the active $field stage',
+    'deletes a bit and clears the active $field stage assignment',
     ({ field, activePatch, relief }) => {
       useStore.getState().setMachineKind('cnc');
       useStore.getState().addCustomCncTool({ name: 'Staged bit', kind: 'end-mill', diameterMm: 4 });
       const id = useStore.getState().cncLibrary.customTools[0]?.id;
       if (id === undefined) throw new Error('custom tool missing');
       installSecondaryReference(field, id, activePatch, relief);
-      const before = useStore.getState();
-
-      before.deleteCustomCncTool(id);
+      useStore.getState().deleteCustomCncTool(id);
 
       const after = useStore.getState();
-      expect(after.project).toBe(before.project);
-      expect(after.cncLibrary).toBe(before.cncLibrary);
-      expect(after.cncLibrary.customTools.some((tool) => tool.id === id)).toBe(true);
+      expect(after.cncLibrary.customTools.some((tool) => tool.id === id)).toBe(false);
       const machine = after.project.machine;
       if (machine?.kind !== 'cnc') throw new Error('cnc machine missing');
-      expect(machine.tools.some((tool) => tool.id === id)).toBe(true);
-      expect(after.undoStack).toBe(before.undoStack);
-      expect(after.dirty).toBe(before.dirty);
+      expect(machine.tools.some((tool) => tool.id === id)).toBe(false);
+      expect(after.project.scene.layers.some((layer) => layer.cnc?.[field] === id)).toBe(false);
+      expect(after.dirty).toBe(true);
     },
   );
 

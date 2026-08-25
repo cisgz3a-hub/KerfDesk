@@ -18,11 +18,6 @@ import type { Project } from '../../core/scene';
 import { AUTOSAVE_INTERVAL_MS, autosaveSlotGeneration, writeAutosave } from './autosave';
 import type { AutosaveWriteFailure, AutosaveWriteResult } from './autosave';
 
-type AutosaveLoopWriteResult = AutosaveWriteResult | { readonly kind: 'superseded' };
-type AutosaveLoopWriter = (
-  project: Project,
-) => AutosaveLoopWriteResult | Promise<AutosaveLoopWriteResult>;
-
 export type AutosaveSnapshotFn = () => {
   readonly project: Project;
   readonly dirty: boolean;
@@ -85,10 +80,8 @@ export function startAutosaveLoop(
   getSnapshot: AutosaveSnapshotFn,
   intervalMs: number = AUTOSAVE_INTERVAL_MS,
   onWriteFailure?: (failure: AutosaveWriteFailure) => void,
-  writer: AutosaveLoopWriter = writeAutosave,
 ): () => void {
   let memo: AutosaveTickMemo = { kind: 'no-attempt' };
-  let inFlight = false;
   const handle = setInterval(() => {
     const snap = getSnapshot();
     if (!snap.dirty) return;
@@ -97,33 +90,9 @@ export function startAutosaveLoop(
     // both stamped with the same slot generation.
     const generation = autosaveSlotGeneration();
     if (isTickRedundant(memo, snap.project, generation)) return;
-    if (inFlight) return;
-    inFlight = true;
-    const finish = (result: AutosaveLoopWriteResult): void => {
-      if (result.kind !== 'superseded') {
-        memo = nextTickMemo(memo, { project: snap.project, generation }, result);
-        if (result.kind !== 'ok') onWriteFailure?.(result);
-      }
-      inFlight = false;
-    };
-    try {
-      const result = writer(snap.project);
-      if (isPromiseLike(result)) {
-        void result.then(finish, (error: unknown) =>
-          finish({ kind: 'failed', reason: 'storage-error', error }),
-        );
-      } else {
-        finish(result);
-      }
-    } catch (error) {
-      finish({ kind: 'failed', reason: 'storage-error', error });
-    }
+    const result = writeAutosave(snap.project);
+    memo = nextTickMemo(memo, { project: snap.project, generation }, result);
+    if (result.kind !== 'ok') onWriteFailure?.(result);
   }, intervalMs);
   return () => clearInterval(handle);
-}
-
-function isPromiseLike(
-  value: AutosaveLoopWriteResult | Promise<AutosaveLoopWriteResult>,
-): value is Promise<AutosaveLoopWriteResult> {
-  return typeof (value as Promise<AutosaveLoopWriteResult>).then === 'function';
 }

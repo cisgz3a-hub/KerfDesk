@@ -107,6 +107,7 @@ baseTest(
     await page.getByRole('tab', { name: 'Cuts / Layers' }).click();
 
     await page.getByRole('button', { name: 'Save G-code...' }).click();
+    await acceptGcodeFilename(page);
     await expect
       .poll(() =>
         page.evaluate(() => Boolean((window as Window & { __e2eSaved?: string }).__e2eSaved)),
@@ -336,7 +337,7 @@ baseTest(
     await installFileSystemMocks(page);
     // Installed after the mocks so it wins: the page-backed route needs a real
     // on-disk file above the threshold, which an inlined base64 fixture cannot
-    // carry. Save still uses the mocked showSaveFilePicker above.
+    // carry. Save still uses the mocked directory picker above.
     await page.addInitScript(() => {
       Object.defineProperty(window, 'showOpenFilePicker', {
         configurable: true,
@@ -466,6 +467,7 @@ async function runPageBackedImport(
       });
     });
     await page.getByRole('button', { name: 'Save G-code...' }).click();
+    await acceptGcodeFilename(page);
     await expect
       .poll(() =>
         page.evaluate(() => (window as Window & { __e2eSaved?: string }).__e2eSaved ?? ''),
@@ -645,6 +647,7 @@ async function installFileSystemMocks(page: Page, pngBase64 = PNG_BASE64): Promi
       const fileWindow = window as unknown as Window & {
         showOpenFilePicker: (options?: PickerOptions) => Promise<readonly FileSystemFileHandle[]>;
         showSaveFilePicker: () => Promise<FileSystemFileHandle>;
+        showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
       };
       fileWindow.showOpenFilePicker = async (options) => {
         const extensions =
@@ -671,6 +674,25 @@ async function installFileSystemMocks(page: Page, pngBase64 = PNG_BASE64): Promi
             abort: async () => undefined,
           }),
         }) as FileSystemFileHandle;
+      fileWindow.showDirectoryPicker = async () =>
+        ({
+          kind: 'directory',
+          name: 'synthetic-output',
+          getFileHandle: async (name: string) =>
+            ({
+              kind: 'file',
+              name,
+              getFile: async () => new File([], name),
+              createWritable: async () => ({
+                write: async (data: string | Blob | BufferSource) => {
+                  (window as Window & { __e2eSaved?: string }).__e2eSaved =
+                    typeof data === 'string' ? data : 'binary';
+                },
+                close: async () => undefined,
+                abort: async () => undefined,
+              }),
+            }) as FileSystemFileHandle,
+        }) as FileSystemDirectoryHandle;
     },
     { svg: SVG, pngBase64 },
   );
@@ -684,6 +706,12 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+}
+
+async function acceptGcodeFilename(page: Page): Promise<void> {
+  const panel = page.getByRole('dialog', { name: 'Choose G-code filename' });
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: 'Save', exact: true }).click();
 }
 
 interface CanvasPixels {

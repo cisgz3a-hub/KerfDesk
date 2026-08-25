@@ -30,17 +30,18 @@ export function writeConsoleCommand(
   refs: ConsoleTransportRefs,
   write: ConsoleCommandWriteFn,
   command: PreparedWireCommand,
+  source: TranscriptSource = 'console',
 ): Promise<unknown> {
   if (isOwnedControllerIdentityCommand(refs, command)) {
     return startControllerCommand(
       refs,
-      (line, action, source) => write(line, action, source ?? 'console'),
+      (line, action, writeSource) => write(line, action, writeSource ?? source),
       {
         kind: 'controller-identity',
         label: 'Read controller firmware identity',
         command: command.wire,
         action: actionForConsoleCommand(command.kind),
-        source: 'console',
+        source,
       },
     );
   }
@@ -53,17 +54,17 @@ export function writeConsoleCommand(
     // settings collector still fills the table on the terminal ok.
     return startControllerCommand(
       refs,
-      (line, action, source) => write(line, action, source ?? 'console'),
+      (line, action, writeSource) => write(line, action, writeSource ?? source),
       {
         kind: 'interactive-command',
         label: SETTINGS_READ_COMMAND_LABEL,
         command: command.wire,
         action: actionForConsoleCommand(command.kind),
-        source: 'console',
+        source,
       },
     );
   }
-  return write(command.wire, actionForConsoleCommand(command.kind), 'console');
+  return write(command.wire, actionForConsoleCommand(command.kind), source);
 }
 
 export function isOwnedControllerIdentityCommand(

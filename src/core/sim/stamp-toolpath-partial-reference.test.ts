@@ -1,11 +1,11 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { partialCellCenter, partialGridHasPartialCell } from '../grid';
+import { partialCellCenter } from '../grid';
 import type { Toolpath } from '../job';
 import type { CncTool } from '../scene';
 import { createRemovalGrid, type RemovalGrid, type RemovalGridSpec } from './removal-grid';
 import { computeRemovalGrid } from './stamp-toolpath';
-import { cuttingSurfaceDz, kernelForTool, type ToolKernel } from './tool-kernels';
+import { kernelForTool, type ToolKernel } from './tool-kernels';
 
 const PITCH_MM = 0.3;
 const TIP_Z_MM = -1;
@@ -69,8 +69,8 @@ describe.each(PARTIAL_GRIDS)('partial stamp hybrid reference - $name', ({ spec }
   });
 });
 
-describe('regular-grid stamp parity', () => {
-  it.each(TOOLS)('$kind retains the indexed-kernel result across generated points', (tool) => {
+describe('regular-grid exact stamp parity', () => {
+  it.each(TOOLS)('$kind retains the physical-center result across generated points', (tool) => {
     fc.assert(
       fc.property(pointArbitrary(REGULAR_SPEC), (point) =>
         assertMatchesReference(REGULAR_SPEC, tool, point),
@@ -164,11 +164,9 @@ function referencePlunge(
   const created = createRemovalGrid(spec);
   if (created.kind === 'error') throw new Error(created.reason);
   const grid = created.grid;
-  const cx = Math.floor((point.x - grid.originX) / grid.mmPerCell);
-  const cy = Math.floor((point.y - grid.originY) / grid.mmPerCell);
   for (let row = 0; row < grid.heightCells; row += 1) {
     for (let col = 0; col < grid.widthCells; col += 1) {
-      const surfaceZ = referenceSurfaceZ(grid, kernel, point, cx, cy, col, row);
+      const surfaceZ = referenceSurfaceZ(grid, kernel, point, col, row);
       if (surfaceZ < 0) grid.depth[row * grid.widthCells + col] = surfaceZ;
     }
   }
@@ -179,26 +177,13 @@ function referenceSurfaceZ(
   grid: RemovalGrid,
   kernel: ToolKernel,
   point: { readonly x: number; readonly y: number },
-  cx: number,
-  cy: number,
   col: number,
   row: number,
 ): number {
-  const terminalCellIsInRange =
-    (partialGridHasPartialCell(grid, 'x') &&
-      Math.abs(cx - (grid.widthCells - 1)) <= kernel.surfaceCandidateSpanCells) ||
-    (partialGridHasPartialCell(grid, 'y') &&
-      Math.abs(cy - (grid.heightCells - 1)) <= kernel.surfaceCandidateSpanCells);
-  if (!terminalCellIsInRange) {
-    const offset = kernel.offsets.find((item) => item.dx === col - cx && item.dy === row - cy);
-    return offset === undefined ? 0 : TIP_Z_MM + offset.dz;
-  }
   const centerX = grid.originX + partialCellCenter(grid, 'x', col);
   const centerY = grid.originY + partialCellCenter(grid, 'y', row);
   const distanceMm = Math.hypot(centerX - point.x, centerY - point.y);
-  return distanceMm > kernel.radiusMm
-    ? 0
-    : TIP_Z_MM + cuttingSurfaceDz(kernel.tool, distanceMm, kernel.radiusMm);
+  return distanceMm > kernel.radiusMm ? 0 : TIP_Z_MM + kernel.surfaceDzAtRadius(distanceMm);
 }
 
 function explicitPoints(

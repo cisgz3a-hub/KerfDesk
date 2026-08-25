@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { webAdapter } from './web-adapter';
 
 const originalSavePickerDescriptor = Object.getOwnPropertyDescriptor(window, 'showSaveFilePicker');
+const originalDirectoryPickerDescriptor = Object.getOwnPropertyDescriptor(
+  window,
+  'showDirectoryPicker',
+);
 
 const saveRequest = { suggestedName: 'out.gcode', extensions: ['.gcode'] };
 
@@ -10,6 +14,11 @@ afterEach(() => {
     Reflect.deleteProperty(window, 'showSaveFilePicker');
   } else {
     Object.defineProperty(window, 'showSaveFilePicker', originalSavePickerDescriptor);
+  }
+  if (originalDirectoryPickerDescriptor === undefined) {
+    Reflect.deleteProperty(window, 'showDirectoryPicker');
+  } else {
+    Object.defineProperty(window, 'showDirectoryPicker', originalDirectoryPickerDescriptor);
   }
   vi.restoreAllMocks();
 });
@@ -32,6 +41,42 @@ describe('webAdapter save target', () => {
     Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined });
 
     await expect(webAdapter.pickFileForSave(saveRequest)).rejects.toThrow(/File System Access API/);
+  });
+
+  it('keeps an operator-chosen filename without creating the destination until write', async () => {
+    const writable = writableStreamMock();
+    const createWritable = vi.fn(async () => writable as unknown as FileSystemWritableFileStream);
+    const getFileHandle = vi.fn(async () => ({ name: 'out.gcode', createWritable }));
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: vi.fn(async () => ({ getFileHandle })),
+    });
+    const chooseName = vi.fn(async () => 'custom-name.nc');
+
+    const target = await webAdapter.reserveFileForSave?.({ ...saveRequest, chooseName });
+    if (target === null || target === undefined) throw new Error('expected reserved target');
+    expect(chooseName).toHaveBeenCalledWith('out.gcode');
+    expect(getFileHandle).not.toHaveBeenCalled();
+
+    await target.write('G21\n');
+
+    expect(target.displayName).toBe('custom-name.nc');
+    expect(getFileHandle).toHaveBeenCalledWith('custom-name.nc', { create: true });
+    expect(createWritable).toHaveBeenCalledOnce();
+    expect(writable.write).toHaveBeenCalledWith('G21\n');
+  });
+
+  it('reserves a reusable directory without creating any tile target', async () => {
+    const getFileHandle = vi.fn();
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: vi.fn(async () => ({ getFileHandle })),
+    });
+
+    const directory = await webAdapter.reserveSaveDirectory?.();
+
+    expect(directory).not.toBeNull();
+    expect(getFileHandle).not.toHaveBeenCalled();
   });
 });
 

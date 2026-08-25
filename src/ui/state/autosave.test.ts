@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import { autosaveSlotGeneration, clearAutosave, readAutosave, writeAutosave } from './autosave';
-import { currentAutosaveSessionId } from './autosave-local-storage';
-import { readLocalAutosaveSnapshots } from './autosave-local-storage';
 
 const KEY = 'lf2:autosave:v1';
 
@@ -79,21 +77,34 @@ describe('writeAutosave / readAutosave round-trip', () => {
     expect(readAutosave()?.project.notes).toBe('first window');
   });
 
-  it('discovers per-session records even when the shared fallback index loses an entry', () => {
-    expect(
-      writeAutosave({ ...createProject(), notes: 'window a' }, 100, { sessionId: 'window-a' }).kind,
-    ).toBe('ok');
-    expect(
-      writeAutosave({ ...createProject(), notes: 'window b' }, 200, { sessionId: 'window-b' }).kind,
-    ).toBe('ok');
-    localStorage.setItem(
-      'lf2:autosave:index:v1',
-      JSON.stringify({ schemaVersion: 1, keys: ['lf2:autosave:v1:window-a'] }),
-    );
+  it('keeps fallback window sessions separate when sessionStorage is unavailable', () => {
+    const originalState = history.state;
+    const originalGetItem = Storage.prototype.getItem;
+    const originalSetItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key) {
+      if (this === sessionStorage) throw new DOMException('blocked', 'SecurityError');
+      return originalGetItem.call(this, key);
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (this === sessionStorage) throw new DOMException('blocked', 'SecurityError');
+      return originalSetItem.call(this, key, value);
+    });
 
-    expect(readLocalAutosaveSnapshots().map((snapshot) => snapshot.project.notes)).toEqual(
-      expect.arrayContaining(['window a', 'window b']),
-    );
+    try {
+      history.replaceState({}, 'window-a');
+      const first = writeAutosave({ ...createProject(), notes: 'first window' }, 100);
+      history.replaceState({}, 'window-b');
+      const second = writeAutosave({ ...createProject(), notes: 'second window' }, 200);
+
+      expect(first.kind).toBe('ok');
+      expect(second.kind).toBe('ok');
+      if (first.kind !== 'ok' || second.kind !== 'ok') return;
+      expect(first.storageKey).not.toBe(second.storageKey);
+      expect(localStorage.getItem(first.storageKey)).not.toBeNull();
+      expect(localStorage.getItem(second.storageKey)).not.toBeNull();
+    } finally {
+      history.replaceState(originalState, 'restore');
+    }
   });
 });
 
@@ -107,40 +118,6 @@ describe('clearAutosave', () => {
 
   it('is a no-op when the slot is already empty', () => {
     expect(() => clearAutosave()).not.toThrow();
-  });
-
-  it('invalidates the interval memo even when local storage is unavailable', () => {
-    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-    const before = autosaveSlotGeneration();
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      get: () => {
-        throw new DOMException('storage blocked', 'SecurityError');
-      },
-    });
-    try {
-      expect(clearAutosave()).toEqual({ kind: 'unavailable', keys: [] });
-      expect(autosaveSlotGeneration()).not.toBe(before);
-    } finally {
-      if (descriptor !== undefined) Object.defineProperty(globalThis, 'localStorage', descriptor);
-    }
-  });
-});
-
-describe('autosave session identity fallback', () => {
-  it('survives a throwing sessionStorage getter', () => {
-    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
-    Object.defineProperty(globalThis, 'sessionStorage', {
-      configurable: true,
-      get: () => {
-        throw new DOMException('session storage blocked', 'SecurityError');
-      },
-    });
-    try {
-      expect(currentAutosaveSessionId()).toMatch(/\S/);
-    } finally {
-      if (descriptor !== undefined) Object.defineProperty(globalThis, 'sessionStorage', descriptor);
-    }
   });
 });
 

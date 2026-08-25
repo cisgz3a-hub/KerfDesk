@@ -9,7 +9,7 @@ export type SurfacingParams = {
   readonly widthMm: number;
   readonly heightMm: number;
   readonly bitDiameterMm: number;
-  /** Row spacing as a percentage of bit diameter (10–100). */
+  /** Positive row spacing as a percentage of bit diameter. */
   readonly stepoverPct: number;
   readonly depthPerPassMm: number;
   readonly totalDepthMm: number;
@@ -38,13 +38,11 @@ export const SURFACING_DEFAULT_STEPOVER_PCT = 40;
 export const SURFACING_DEFAULT_DEPTH_PER_PASS_MM = 0.5;
 export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
 
-const MIN_STEPOVER_PCT = 10;
-const MAX_STEPOVER_PCT = 100;
-const MIN_STEP_MM = 0.05;
-// Hard ceiling on serpentine rows / depth passes so a pathological but finite
-// height or total depth (e.g. 1e12 mm) cannot exhaust memory building the
-// arrays. 100k rows is ~a 5 m area at the 0.05 mm minimum step — far beyond
-// any real bed — so no valid job is affected. Checked before allocation.
+const MIN_DEPTH_INCREMENT_MM = 0.05;
+// Hard ceiling on materialized serpentine rows / depth passes so a pathological
+// but finite request cannot exhaust memory building the arrays. It never changes
+// the requested positive step; requests beyond the materialized-program limit
+// return their exact row/pass-count failure before allocation.
 const MAX_SURFACING_ITERATIONS = 100_000;
 const POSITIVE_FINITE_REASON = 'must be a positive finite number.';
 
@@ -73,8 +71,7 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   const paramReason = validateSurfacingParams(params);
   if (paramReason !== null) return { ok: false, reason: paramReason };
 
-  const stepover = Math.min(MAX_STEPOVER_PCT, Math.max(MIN_STEPOVER_PCT, params.stepoverPct));
-  const stepMm = Math.max(MIN_STEP_MM, (params.bitDiameterMm * stepover) / 100);
+  const stepMm = (params.bitDiameterMm * params.stepoverPct) / 100;
   const rowResult = surfacingRowYs(params.heightMm, stepMm);
   if (!rowResult.ok) return rowResult;
   const { rows } = rowResult;
@@ -83,7 +80,7 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   const { depths } = depthResult;
   const lines: string[] = [
     '; KerfDesk spoilboard surfacing',
-    `; area ${fmt(params.widthMm)} x ${fmt(params.heightMm)} mm, bit ${fmt(params.bitDiameterMm)} mm, stepover ${stepover}%`,
+    `; area ${fmt(params.widthMm)} x ${fmt(params.heightMm)} mm, bit ${fmt(params.bitDiameterMm)} mm, stepover ${params.stepoverPct}%`,
     '; zero X/Y at the front-left corner of the area, Z0 on the surface to face',
     'G21',
     'G90',
@@ -119,8 +116,8 @@ type DepthLadderResult =
   | { readonly ok: false; readonly reason: string };
 
 function depthLadder(perPassMm: number, totalMm: number): DepthLadderResult {
-  const step = Math.max(MIN_STEP_MM, perPassMm);
-  const total = Math.max(MIN_STEP_MM, totalMm);
+  const step = Math.max(MIN_DEPTH_INCREMENT_MM, perPassMm);
+  const total = Math.max(MIN_DEPTH_INCREMENT_MM, totalMm);
   const capReason = iterationCapReason('depth pass', total, step);
   if (capReason !== null) return { ok: false, reason: capReason };
   const depths: number[] = [];

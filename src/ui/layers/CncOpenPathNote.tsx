@@ -56,9 +56,8 @@ export function CncOpenPathNote(props: {
   return (
     <p role="note" style={noteStyle}>
       Every shape on this layer is an open path. {cutTypeLabel(settings.cutType)} works on closed
-      outlines only, so this layer produces no toolpath and the job comes out empty. Single-line
-      fonts and traced centerlines are open by nature — cut them with “Engrave (trace path)” or “On
-      path”, or close the shapes.
+      outlines only, so this layer contributes no toolpath. Single-line fonts and traced centerlines
+      are open by nature — cut them with “Engrave (trace path)” or “On path”, or close the shapes.
     </p>
   );
 }
