@@ -102,7 +102,6 @@ function CncToolManagerRow(props: {
         <input
           type="number"
           min={1}
-          max={MAX_TOOL_FLUTES}
           step={1}
           value={props.tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT}
           onChange={(event) => {
@@ -134,8 +133,6 @@ function CncToolManagerRow(props: {
   );
 }
 
-const MAX_TOOL_FLUTES = 16;
-
 function isValidFluteCount(fluteCount: number): boolean {
-  return Number.isInteger(fluteCount) && fluteCount >= 1 && fluteCount <= MAX_TOOL_FLUTES;
+  return Number.isInteger(fluteCount) && fluteCount >= 1;
 }

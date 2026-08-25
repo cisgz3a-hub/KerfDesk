@@ -16624,9 +16624,11 @@ problem. The settings need one writable owner per scope.
 9. **Add no guard or confirmation.** Startup Setup does not become mandatory before import, preview,
    save, Frame, or Start. Muted references do not disable operation editing. This decision adds no
    refusal, clamp, cap, automatic rewrite, controller command, warning acknowledgement, or
-   confirmation. A committed job-affecting edit continues to invalidate an exact Frame permit under
-   the existing handoff-consistency contract; Frame remains the sole ordinary Start guard and Job
-   Review remains the single warning surface.
+   confirmation. Flute-count editing and persistence accept every positive whole number; the former
+   metadata-only ceiling of 16 is removed rather than copied into the new writable surface. A
+   committed job-affecting edit continues to invalidate an exact Frame permit under the existing
+   handoff-consistency contract; Frame remains the sole ordinary Start guard and Job Review remains
+   the single warning surface.
 
 ### Supersession scope
 

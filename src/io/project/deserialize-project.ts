@@ -224,7 +224,6 @@ function normalizeStockOriginOffset(
 // contract as coolantModeOrOff).
 const CNC_TOOL_KINDS = ['end-mill', 'ball-nose', 'v-bit', 'engraving'] as const;
 const MAX_TOOL_METADATA_LENGTH = 120;
-const MAX_TOOL_FLUTES = 16;
 
 function normalizeCncTools(raw: unknown): Array<CncTool> {
   if (!Array.isArray(raw)) return DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
@@ -278,9 +277,7 @@ function normalizeCncToolMetadata(tool: Record<string, unknown>): Record<string,
 }
 
 function validFluteCount(value: unknown): value is number {
-  return (
-    typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_TOOL_FLUTES
-  );
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
 function boundedToolString(value: unknown): string | null {

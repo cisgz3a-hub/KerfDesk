@@ -3746,7 +3746,8 @@ and lifts the command's CNC-only gate.)*
 #### Edge — full flute/RPM control
 1. A bit without stored flute evidence starts from the displayed two-flute assumption. Set the
    actual cutter count in **Startup Setup > Manage bits**; set operation RPM with the editable
-   **Artwork spindle speed**. The Artwork calculator reads both and does not duplicate either input.
+   **Artwork spindle speed**. The flute count accepts every positive whole number without an
+   artificial upper cap. The Artwork calculator reads both and does not duplicate either input.
 
 ### F-CNC32. Edit operation values beside read-only setup references — ADR-111 #4 / ADR-306
 

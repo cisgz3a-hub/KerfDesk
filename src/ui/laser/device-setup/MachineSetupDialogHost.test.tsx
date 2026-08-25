@@ -219,11 +219,13 @@ describe('MachineSetupDialogHost', () => {
     const view = await renderHost();
     try {
       await act(async () => openMachineSetup({ kind: 'cnc', field: 'tool-plan' }));
-      await changeInput(view.host, `Flute count for ${existing.name}`, '3');
+      const existingFlutes = input(view.host, `Flute count for ${existing.name}`);
+      expect(existingFlutes.max).toBe('');
+      await changeInput(view.host, `Flute count for ${existing.name}`, '17');
       await act(async () =>
         buttonByAria(view.host, `Add ${catalog.tool.name} from catalog`).click(),
       );
-      await changeInput(view.host, `Flute count for ${catalog.tool.name}`, '4');
+      await changeInput(view.host, `Flute count for ${catalog.tool.name}`, '18');
 
       expect(
         cncMachine().tools.find((tool) => tool.id === existing.id)?.fluteCount,
@@ -237,20 +239,20 @@ describe('MachineSetupDialogHost', () => {
       ).toBeUndefined();
 
       await act(async () => openMachineSetup({ kind: 'cnc', field: 'tool-plan' }));
-      await changeInput(view.host, `Flute count for ${existing.name}`, '3');
+      await changeInput(view.host, `Flute count for ${existing.name}`, '17');
       await act(async () =>
         buttonByAria(view.host, `Add ${catalog.tool.name} from catalog`).click(),
       );
-      await changeInput(view.host, `Flute count for ${catalog.tool.name}`, '4');
+      await changeInput(view.host, `Flute count for ${catalog.tool.name}`, '18');
       await act(async () => stepButton(view.host, 7, 'Review & save').click());
       await act(async () => button(view.host, 'Save CNC startup setup').click());
 
-      expect(cncMachine().tools.find((tool) => tool.id === existing.id)?.fluteCount).toBe(3);
+      expect(cncMachine().tools.find((tool) => tool.id === existing.id)?.fluteCount).toBe(17);
       expect(useStore.getState().cncLibrary.customTools).toContainEqual(
-        expect.objectContaining({ catalogId: catalog.id, fluteCount: 4 }),
+        expect.objectContaining({ catalogId: catalog.id, fluteCount: 18 }),
       );
       expect(cncMachine().tools).toContainEqual(
-        expect.objectContaining({ catalogId: catalog.id, fluteCount: 4 }),
+        expect.objectContaining({ catalogId: catalog.id, fluteCount: 18 }),
       );
     } finally {
       await view.unmount();

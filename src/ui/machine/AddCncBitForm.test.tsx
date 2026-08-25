@@ -52,7 +52,7 @@ async function add(host: HTMLElement): Promise<void> {
 }
 
 describe('AddCncBitForm', () => {
-  it('requires a physical whole-number flute count in the persisted range', async () => {
+  it('requires a physical positive whole-number flute count', async () => {
     const { host, root } = await renderForm();
     try {
       await setInput(host, 'New bit name', 'Bad flute count');
@@ -62,8 +62,26 @@ describe('AddCncBitForm', () => {
 
       expect(useStore.getState().cncLibrary.customTools).toEqual([]);
       expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-        'actual flute count from 1 to 16',
+        'actual flute count as a positive whole number',
       );
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('does not impose an artificial upper cap on a positive whole-number flute count', async () => {
+    const { host, root } = await renderForm();
+    try {
+      await setInput(host, 'New bit name', 'Many-flute cutter');
+      await setInput(host, 'New bit diameter (mm)', '3');
+      await setInput(host, 'New bit flute count', '17');
+      await add(host);
+
+      expect(useStore.getState().cncLibrary.customTools[0]?.fluteCount).toBe(17);
+      const fluteInput = host.querySelector('[aria-label="New bit flute count"]');
+      expect(fluteInput).toBeInstanceOf(HTMLInputElement);
+      expect((fluteInput as HTMLInputElement).max).toBe('');
     } finally {
       await act(async () => root.unmount());
       host.remove();

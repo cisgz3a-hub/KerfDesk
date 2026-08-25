@@ -18,7 +18,6 @@ const TOOL_KIND_OPTIONS: ReadonlyArray<{ readonly value: CncToolKind; readonly l
 
 const MAX_TOOL_DIAMETER_MM = 50;
 const MIN_TOOL_DIAMETER_MM = 0.1;
-const MAX_TOOL_FLUTES = 16;
 
 export function AddCncBitForm(
   props: {
@@ -162,7 +161,6 @@ function BitFields(props: BitFieldsProps): JSX.Element {
         value={props.flutes}
         onChange={(event) => props.onFlutesChange(event.target.value)}
         min={1}
-        max={MAX_TOOL_FLUTES}
         step={1}
         placeholder="Flutes"
         aria-label="New bit flute count"
@@ -222,7 +220,7 @@ function bitFormError(input: {
   }
   const fluteCount = Number(input.flutes);
   if (isInvalidFluteCount(input.flutes, fluteCount)) {
-    return `Enter the actual flute count from 1 to ${MAX_TOOL_FLUTES}.`;
+    return 'Enter the actual flute count as a positive whole number.';
   }
   const tipAngleDeg = Number(input.tipAngle);
   if (input.needsAngle && (input.tipAngle.trim() === '' || !isValidCncTipAngleDeg(tipAngleDeg))) {
@@ -232,12 +230,7 @@ function bitFormError(input: {
 }
 
 function isInvalidFluteCount(rawValue: string, fluteCount: number): boolean {
-  return (
-    rawValue.trim() === '' ||
-    !Number.isInteger(fluteCount) ||
-    fluteCount < 1 ||
-    fluteCount > MAX_TOOL_FLUTES
-  );
+  return rawValue.trim() === '' || !Number.isInteger(fluteCount) || fluteCount < 1;
 }
 
 // Blank is valid — it means the bit comes to a point. A land at or past the
