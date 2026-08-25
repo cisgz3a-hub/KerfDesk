@@ -54,6 +54,15 @@ describe('createDebouncer', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  it('acknowledge cancels a pending commit superseded by the canonical store value', () => {
+    const commit = vi.fn<(n: number) => void>();
+    const d = createDebouncer({ initial: 30, debounceMs: 300, commit });
+    d.schedule(50);
+    d.acknowledge(75);
+    vi.advanceTimersByTime(400);
+    expect(commit).not.toHaveBeenCalled();
+  });
+
   it('cancel drops a pending commit', () => {
     const commit = vi.fn<(n: number) => void>();
     const d = createDebouncer({ initial: 30, debounceMs: 300, commit });
