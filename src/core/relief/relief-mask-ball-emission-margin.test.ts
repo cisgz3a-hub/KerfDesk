@@ -9,7 +9,8 @@ import {
   type Transform,
   type Vec2,
 } from '../scene';
-import { cuttingSurfaceDz, kernelForTool } from '../sim/tool-kernels';
+import { kernelForTool } from '../sim';
+import { cuttingSurfaceDz } from '../sim/cutting-surface';
 import type { Heightmap } from './heightmap';
 import { reliefFinishingPasses } from './relief-finishing';
 
@@ -79,6 +80,8 @@ function isolatedIncludedCellMap(): Heightmap {
   return {
     widthCells: 4,
     heightCells: 1,
+    widthMm: 0.8,
+    heightMm: 0.2,
     mmPerCell: 0.2,
     depth: new Float32Array(4).fill(-0.6),
     inclusion: Uint8Array.from([0, 0, 0, 1]),

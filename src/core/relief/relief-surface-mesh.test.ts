@@ -7,6 +7,8 @@ function heightmap(widthCells: number, heightCells: number, depths: number[]): H
   return {
     widthCells,
     heightCells,
+    widthMm: widthCells * 2,
+    heightMm: heightCells * 2,
     mmPerCell: 2,
     depth: Float32Array.from(depths),
   };
@@ -25,6 +27,24 @@ describe('reliefSurfaceMesh', () => {
     expect(mesh.heightMm).toBe(4);
   });
 
+  it('places terminal vertices at partial-cell centers and reports exact extents', () => {
+    const map: Heightmap = {
+      widthCells: 4,
+      heightCells: 2,
+      widthMm: 1,
+      heightMm: 0.5,
+      mmPerCell: 0.3,
+      depth: new Float32Array(8),
+    };
+
+    const mesh = reliefSurfaceMesh(map);
+
+    expect(mesh.positions[9]).toBeCloseTo(0.95, 6);
+    expect(mesh.positions[22]).toBeCloseTo(0.4, 6);
+    expect(mesh.widthMm).toBe(1);
+    expect(mesh.heightMm).toBe(0.5);
+  });
+
   it('triangulates each cell quad into two triangles with valid indices', () => {
     const mesh = reliefSurfaceMesh(heightmap(3, 2, [0, 0, 0, 0, 0, 0]));
 
@@ -41,10 +61,28 @@ describe('reliefSurfaceMesh', () => {
     }
   });
 
-  it('handles degenerate single-row heightmaps without indices', () => {
+  it('duplicates a single-row heightmap onto its exact Y edges so it remains renderable', () => {
     const mesh = reliefSurfaceMesh(heightmap(3, 1, [0, -1, 0]));
-    expect(mesh.positions).toHaveLength(9);
-    expect(mesh.indices).toHaveLength(0);
+    expect(mesh.positions).toHaveLength(18);
+    expect(mesh.indices).toHaveLength(12);
+    expect([...mesh.positions.slice(0, 9)]).toEqual([1, 0, 0, 3, 0, -1, 5, 0, 0]);
+    expect([...mesh.positions.slice(9, 18)]).toEqual([1, 2, 0, 3, 2, -1, 5, 2, 0]);
+  });
+
+  it('renders a single partial cell as one exact physical quad', () => {
+    const mesh = reliefSurfaceMesh({
+      widthCells: 1,
+      heightCells: 1,
+      widthMm: 1.4,
+      heightMm: 0.6,
+      mmPerCell: 2,
+      depth: new Float32Array([-1]),
+    });
+
+    expect([...mesh.positions]).toEqual([
+      ...Float32Array.from([0, 0, -1, 1.4, 0, -1, 0, 0.6, -1, 1.4, 0.6, -1]),
+    ]);
+    expect([...mesh.indices]).toEqual([0, 2, 1, 1, 2, 3]);
   });
 
   it('omits every preview quad that touches an excluded cell', () => {

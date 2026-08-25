@@ -1,7 +1,9 @@
-// RemovalGrid — a uniform depth field over the stock footprint recording how
+// RemovalGrid — a depth field over the exact stock footprint recording how
 // deep the cutter has been at every XY cell (Phase H.2, ADR-098). 0 = the
 // untouched stock top; values go negative as material is removed. Row-major
 // Float32, deterministic by construction (indexed loops only).
+
+import { partialCellCount, partialCellIndex } from '../grid';
 
 export type RemovalGridResolutionReason =
   | 'minimum-cell-size'
@@ -20,6 +22,10 @@ export type RemovalGridResolution = {
 export type RemovalGrid = {
   readonly widthCells: number;
   readonly heightCells: number;
+  // Exact physical domain. Interior cells retain mmPerCell; the terminal cell
+  // on either axis ends at this dimension and may therefore be shorter.
+  readonly widthMm: number;
+  readonly heightMm: number;
   readonly mmPerCell: number;
   // Machine-coordinate min corner of cell (0, 0).
   readonly originX: number;
@@ -79,9 +85,13 @@ export function createRemovalGrid(spec: RemovalGridSpec): RemovalGridResult {
   const size = coarsenedCellSize(spec.widthMm, spec.heightMm, selected);
   if (size.kind === 'error') return size;
   const { mmPerCell } = size;
-  const widthCells = Math.max(1, Math.ceil(spec.widthMm / mmPerCell));
-  const heightCells = Math.max(1, Math.ceil(spec.heightMm / mmPerCell));
-  if (!Number.isFinite(widthCells * heightCells)) {
+  const widthCells = partialCellCount(spec.widthMm, mmPerCell);
+  const heightCells = partialCellCount(spec.heightMm, mmPerCell);
+  if (
+    widthCells === null ||
+    heightCells === null ||
+    !Number.isSafeInteger(widthCells * heightCells)
+  ) {
     return { kind: 'error', reason: 'Removal grid dimensions exceed numeric limits.' };
   }
   const resolution: RemovalGridResolution = {
@@ -94,6 +104,8 @@ export function createRemovalGrid(spec: RemovalGridSpec): RemovalGridResult {
   const grid: RemovalGrid = {
     widthCells,
     heightCells,
+    widthMm: spec.widthMm,
+    heightMm: spec.heightMm,
     mmPerCell,
     originX: spec.originX,
     originY: spec.originY,
@@ -170,7 +182,7 @@ export function gridCellOfPoint(
   y: number,
 ): { cx: number; cy: number } {
   return {
-    cx: Math.floor((x - grid.originX) / grid.mmPerCell),
-    cy: Math.floor((y - grid.originY) / grid.mmPerCell),
+    cx: partialCellIndex(grid, 'x', x - grid.originX) ?? -1,
+    cy: partialCellIndex(grid, 'y', y - grid.originY) ?? -1,
   };
 }
