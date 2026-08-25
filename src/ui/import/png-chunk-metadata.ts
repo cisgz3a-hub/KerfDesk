@@ -35,6 +35,16 @@ export function validatePaletteForColorType(type: string, colorType: number): vo
   throw new Error(`PNG PLTE is not permitted for grayscale color type ${colorType}.`);
 }
 
+/** Reject tRNS only where the exact heightfield lane already receives an alpha channel. */
+export function validateHeightfieldTransparencyForColorType(
+  type: string,
+  colorType: number,
+  isHeightfieldRoute: boolean,
+): void {
+  if (!isHeightfieldRoute || type !== 'tRNS' || colorType !== 4) return;
+  throw new Error('PNG tRNS is not permitted for grayscale-alpha color type 4.');
+}
+
 /** Resolve a pre-IDAT pHYs chunk into the existing normalized DPI metadata. */
 export function densityFromChunk(
   type: string,

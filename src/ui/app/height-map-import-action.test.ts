@@ -251,6 +251,48 @@ describe('importHeightMapFiles', () => {
     });
   });
 
+  it('preserves exact grayscale-alpha samples and mask through the main-thread fallback', async () => {
+    vi.mocked(prepareReliefHeightfieldPngOffThread).mockReturnValue(null);
+    const importObject = vi.fn();
+    const pushToast = vi.fn();
+    const png = makePng({
+      width: 4,
+      height: 2,
+      colorType: 4,
+      rows: [
+        [0, 0, 1, 1, 127, 127, 255, 128],
+        [12, 254, 64, 255, 128, 200, 200, 42],
+      ],
+      filters: [1, 4],
+    });
+
+    await importHeightMapFiles([streamingFile(png, 'fallback-alpha.png')], {
+      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+      importObject,
+      pushToast,
+    });
+
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringMatching(/background worker could not start.*main thread/i),
+      'warning',
+    );
+    expect(importObject).toHaveBeenCalledOnce();
+    expect(importObject.mock.calls[0]?.[0]).toMatchObject({
+      kind: 'relief',
+      source: 'fallback-alpha.png',
+      reliefSource: {
+        kind: 'heightfield-v1',
+        width: 4,
+        height: 2,
+        samplesBase64: 'AAABAX9///8MDEBAgIDIyA==',
+        inclusionMask: { encoding: 'u8-base64-v1', samplesBase64: 'AAF/gP7/yCo=' },
+        mapping: { inclusionThreshold: 255, outsideMask: 'excluded' },
+        provenance: { sourceBitDepth: 8 },
+        digest: 'sha256:e4372aace9580e039467c5c6ef5303bcff2febe9d896891a83b43ba73f334b9f',
+      },
+    });
+  });
+
   it('reports worker cancellation as a warning and leaves the scene unchanged', async () => {
     const cancelled = new Error('cancelled');
     cancelled.name = 'AbortError';

@@ -1,11 +1,13 @@
-import { pngSamplingTarget, type QualifiedPngHeader } from './png-row-luma-sampler';
+import { pngSamplingTarget } from './png-row-luma-sampler';
 import {
   densityFromChunk,
   grayscaleTransparencyFromChunk,
+  validateHeightfieldTransparencyForColorType,
   validatePaletteForColorType,
 } from './png-chunk-metadata';
 import {
   consumeDecodedPngRows,
+  pngDecodeFallbackReason,
   type PngRowDecodeMode as DecodeMode,
 } from './png-decoded-row-consumer';
 import {
@@ -52,6 +54,9 @@ export type IncrementalPngOptions = {
 /** Streaming callbacks for exact source-sized grayscale sample rows. */
 export type IncrementalGrayscalePngOptions = Omit<IncrementalPngOptions, 'maxEdge' | 'maxPixels'>;
 
+/** Streaming callbacks for exact source-sized grayscale or grayscale-alpha rows. */
+export type IncrementalHeightfieldPngOptions = Omit<IncrementalPngOptions, 'maxEdge' | 'maxPixels'>;
+
 export type IncrementalPngHeaderResult = Omit<
   Extract<IncrementalPngResult, { readonly kind: 'ok' }>,
   'densityDpi'
@@ -78,6 +83,18 @@ export async function decodeIncrementalPngToGrayscaleSamples(
   );
 }
 
+/** Decode exact non-interlaced heightfield rows without luma conversion or resampling. */
+export async function decodeIncrementalPngToHeightfieldSamples(
+  chunks: AsyncIterable<Uint8Array>,
+  options: IncrementalHeightfieldPngOptions,
+): Promise<IncrementalPngResult> {
+  return decodeIncrementalPng(
+    chunks,
+    { ...options, maxEdge: Number.MAX_SAFE_INTEGER, maxPixels: Number.MAX_SAFE_INTEGER },
+    'exact-heightfield',
+  );
+}
+
 async function decodeIncrementalPng(
   chunks: AsyncIterable<Uint8Array>,
   options: IncrementalPngOptions,
@@ -95,15 +112,11 @@ async function decodeIncrementalPng(
   }
   const ihdr = await readChunkData(reader, first);
   const header = parseHeader(ihdr);
-  const fallback = fallbackReason(header, mode);
+  const fallback = pngDecodeFallbackReason(header, mode);
   if (fallback !== null) return { kind: 'legacy-fallback', reason: fallback };
-  const qualified: QualifiedPngHeader = {
-    width: header.width,
-    height: header.height,
-    channels: header.colorType === 0 ? 1 : header.colorType === 6 ? 4 : 3,
-  };
+  const source = { width: header.width, height: header.height };
   const target =
-    mode === 'exact-grayscale'
+    mode !== 'luma-u8'
       ? { width: header.width, height: header.height }
       : pngSamplingTarget(header.width, header.height, options.maxEdge, options.maxPixels);
   await options.onHeader?.({
@@ -115,12 +128,12 @@ async function decodeIncrementalPng(
     bitDepth: header.bitDepth,
     colorType: header.colorType,
   });
-  return decodeIdat(reader, qualified, target, header, options, mode);
+  return decodeIdat(reader, source, target, header, options, mode);
 }
 
 async function decodeIdat(
   reader: PngStreamReader,
-  header: QualifiedPngHeader,
+  source: { readonly width: number; readonly height: number },
   target: { readonly width: number; readonly height: number },
   format: Pick<PngHeader, 'bitDepth' | 'colorType'>,
   options: IncrementalPngOptions,
@@ -132,7 +145,7 @@ async function decodeIdat(
   const decompressor = new DecompressionStream('deflate');
   const writer = decompressor.writable.getWriter();
   const rows = settledRows(
-    consumeDecodedPngRows(decompressor.readable, header, target, format.bitDepth, options, mode),
+    consumeDecodedPngRows(decompressor.readable, source, target, format, options, mode),
   );
   let sawIdat = false;
   let idatEnded = false;
@@ -151,6 +164,11 @@ async function decodeIdat(
       if (sawIdat) idatEnded = true;
       const data = await readChunkData(reader, chunk);
       validatePaletteForColorType(chunk.type, format.colorType);
+      validateHeightfieldTransparencyForColorType(
+        chunk.type,
+        format.colorType,
+        mode === 'exact-heightfield',
+      );
       transparentGraySample = await grayscaleTransparencyFromChunk(
         chunk,
         format,
@@ -174,8 +192,8 @@ async function decodeIdat(
     if (!rowResult.ok) throw rowResult.error;
     return {
       kind: 'ok',
-      width: header.width,
-      height: header.height,
+      width: source.width,
+      height: source.height,
       sampledWidth: target.width,
       sampledHeight: target.height,
       bitDepth: format.bitDepth,
@@ -259,26 +277,6 @@ function parseHeader(bytes: Uint8Array): PngHeader {
     filter: bytes[11] ?? 0,
     interlace: bytes[12] ?? 0,
   };
-}
-
-function fallbackReason(header: PngHeader, mode: DecodeMode): string | null {
-  if (mode === 'exact-grayscale') {
-    if (header.colorType !== 0) return `PNG color type ${header.colorType} is not qualified`;
-    if (header.bitDepth !== 8 && header.bitDepth !== 16) {
-      return `PNG bit depth ${header.bitDepth} is not qualified`;
-    }
-  } else {
-    if (header.bitDepth !== 8) return `PNG bit depth ${header.bitDepth} is not yet qualified`;
-    if (header.colorType !== 0 && header.colorType !== 2 && header.colorType !== 6) {
-      return `PNG color type ${header.colorType} is not yet qualified`;
-    }
-  }
-  if (header.compression !== 0) {
-    return `PNG compression method ${header.compression} is not qualified`;
-  }
-  if (header.filter !== 0) return `PNG filter method ${header.filter} is not qualified`;
-  if (header.interlace !== 0) return 'interlaced PNG is not yet qualified';
-  return null;
 }
 
 function assertSignature(actual: Uint8Array): void {

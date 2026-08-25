@@ -189,4 +189,75 @@ describe('prepareDepthMapPng', () => {
       0, 255, 255, 0,
     ]);
   });
+
+  it('splits grayscale-alpha into exact samples and a required canonical mask', async () => {
+    const png = makePng({
+      width: 4,
+      height: 2,
+      colorType: 4,
+      rows: [
+        [0, 0, 1, 1, 127, 127, 255, 128],
+        [12, 254, 64, 255, 128, 200, 200, 42],
+      ],
+      filters: [1, 4],
+    });
+
+    const result = await prepareReliefHeightfieldPng(streamingBlob(png), {
+      sourceName: 'exact-alpha.png',
+      physicalWidthMm: 100,
+      maxDepthMm: 5,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.heightfield).toMatchObject({
+      width: 4,
+      height: 2,
+      physicalWidthMm: 100,
+      physicalHeightMm: 50,
+      samplesBase64: 'AAABAX9///8MDEBAgIDIyA==',
+      inclusionMask: { encoding: 'u8-base64-v1', samplesBase64: 'AAF/gP7/yCo=' },
+      mapping: { inclusionThreshold: 255, outsideMask: 'excluded' },
+      provenance: {
+        sourceKind: 'depth-map',
+        sourceName: 'exact-alpha.png',
+        sourceBitDepth: 8,
+        sourcePolarity: 'light-is-high',
+      },
+      digest: 'sha256:e4372aace9580e039467c5c6ef5303bcff2febe9d896891a83b43ba73f334b9f',
+    });
+    const decodedSamples = decodeCanonicalBase64(result.heightfield.samplesBase64);
+    const decodedMask = decodeCanonicalBase64(
+      result.heightfield.inclusionMask?.samplesBase64 ?? '',
+    );
+    expect(decodedSamples.kind === 'ok' ? [...decodedSamples.bytes] : decodedSamples).toEqual([
+      0, 0, 1, 1, 127, 127, 255, 255, 12, 12, 64, 64, 128, 128, 200, 200,
+    ]);
+    expect(decodedMask.kind === 'ok' ? [...decodedMask.bytes] : decodedMask).toEqual([
+      0, 1, 127, 128, 254, 255, 200, 42,
+    ]);
+  });
+
+  it('retains an explicit all-opaque alpha mask', async () => {
+    const png = makePng({
+      width: 2,
+      height: 1,
+      colorType: 4,
+      rows: [[17, 255, 240, 255]],
+    });
+
+    const result = await prepareReliefHeightfieldPng(streamingBlob(png), {
+      sourceName: 'opaque-alpha.png',
+      physicalWidthMm: 100,
+      maxDepthMm: 5,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.heightfield.samplesBase64).toBe('ERHw8A==');
+    expect(result.heightfield.inclusionMask).toEqual({
+      encoding: 'u8-base64-v1',
+      samplesBase64: '//8=',
+    });
+  });
 });
