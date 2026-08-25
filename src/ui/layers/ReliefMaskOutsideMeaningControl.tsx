@@ -12,7 +12,7 @@ export function ReliefMaskOutsideMeaningControl(props: {
   const threshold = props.relief.reliefSource.mapping.inclusionThreshold;
   return (
     <label style={rowStyle}>
-      <span style={labelStyle}>Mask below {threshold}</span>
+      <span style={labelStyle}>Below threshold</span>
       <span style={controlStyle}>
         <select
           value={props.relief.reliefSource.mapping.outsideMask}
@@ -29,8 +29,7 @@ export function ReliefMaskOutsideMeaningControl(props: {
           <option value="relief-floor">Carve to relief floor</option>
         </select>
         <span style={thresholdStyle}>
-          Stored mask threshold: {threshold} (read-only here). Bytes at or above {threshold} use
-          mapped depth; lower bytes use this meaning.
+          Mask bytes below {threshold} use this selected outside meaning.
         </span>
       </span>
     </label>

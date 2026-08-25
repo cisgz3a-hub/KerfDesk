@@ -14,6 +14,7 @@ import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
 import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
 import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
+import { ReliefMaskThresholdControl } from './ReliefMaskThresholdControl';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
@@ -79,6 +80,10 @@ export function SelectedReliefProperties(): JSX.Element | null {
           <PolaritySelect relief={relief} />
           <ReliefInputLevelsControl
             key={`${projectDocumentEpoch}:${relief.id}:input-levels`}
+            relief={relief}
+          />
+          <ReliefMaskThresholdControl
+            key={`${projectDocumentEpoch}:${relief.id}:mask-threshold`}
             relief={relief}
           />
           <ReliefMaskOutsideMeaningControl relief={relief} />
