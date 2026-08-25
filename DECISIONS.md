@@ -17939,3 +17939,111 @@ confirming the accepted Width would violate the exact-input and sole-Frame-guard
 - ADR-304, exact-factor field-geometry disclosure and native planning representation.
 
 ---
+
+## ADR-292 Amendment 5 - Exact common-factor rebasing also preserves legacy-mesh Width persistence when representable (2026-08-10)
+
+**Status:** Accepted and implemented as a bounded P2R.1a legacy-integrity repair; the shared all-positive-finite displayed-Width contract remains planned
+
+### Context
+
+ADR-292 Amendment 4 repaired exactly representable oversized local Width results for canonical
+heightfields while deliberately leaving legacy-mesh behavior unchanged. The selected **Width**
+control is shared by both relief representations, however. For a valid legacy mesh at object scales
+`(5e-6, 5e-6)`, entering a displayed Width of `10 mm` resolves to stored target Width and natural
+bounds near `2,000,000 mm`. The live action records one undo/dirty transition; transformed natural
+bounds still describe `10 x 5 mm`, while CAM can separately prepare the intrinsic mesh's
+authoritative aspect. Both manual-save and autosave preparation nevertheless reject the new project
+because its local X bound exceeds project v4's unchanged `1,000,000 mm` coordinate domain. The
+newest recovery snapshot therefore cannot advance even though the materialized job is representable.
+
+The shared displayed-to-stored conversion has a separate boundary: native division can round a
+positive finite draft to `0` or `Infinity`, after which normalization retains no Width patch while
+the local input draft can remain visible. This amendment begins only after normalization has
+retained a positive finite stored Width. It does not claim to solve that broader input-truth defect
+or every positive-finite operator intent.
+
+### Decision
+
+1. **Apply the exact common-factor repair to both relief representations.** Keep ordinary in-domain
+   results unchanged. When a legacy-mesh Width edit produces target Width or natural-bound spans
+   outside the existing local-coordinate domain, choose the smallest common power-of-two factor
+   that brings the target Width and both natural-bound dimensions into that domain. Divide those
+   local values by the factor and multiply both signed object scale axes by the same factor.
+2. **Preserve both legacy aspects.** Stored natural-bounds aspect remains authoritative for canvas,
+   selection, and later Width edits. Intrinsic mesh XY extent remains authoritative for legacy CAM.
+   A candidate must therefore preserve both the native machine-space Width
+   `targetWidthMm * abs(scaleX)` and native mesh height
+   `(meshYExtent / meshXExtent) * targetWidthMm * abs(scaleY)` exactly; equality of scene bounds
+   alone is insufficient.
+3. **Adopt only an exact, persistable representation.** Both scales must be nonzero. Candidate
+   dimensions must be positive finite, candidate scales must remain inside the unchanged project-v4
+   scale domain, and multiplying or dividing by the selected factor must reproduce every prior
+   binary64 value exactly. All four transformed natural-bound corners must remain finite and
+   bit-identical. Mesh positions and their byte identity, empty-cell meaning, relief depth,
+   translation, rotation, mirrors, operation bindings, and residual placement remain unchanged.
+   Width/depth-only mesh patches retain the same relief-source owner so existing downstream mesh
+   conversion caches remain reusable. The intrinsic-aspect proof reads persisted array-like positions
+   with the same per-coordinate Float32 storage semantics used by CAM, and catches exceptional
+   indexed reads or non-finite Float32 results as unavailable `geometry-drift`; it does not allocate
+   a replacement Float32 mesh buffer.
+4. **Share arithmetic without merging source authority.** Heightfields retain canonical physical
+   dimensions and their existing exact machine-dimension proof. Legacy meshes retain target Width,
+   natural bounds, and intrinsic mesh extents. The common power-of-two/domain arithmetic is shared,
+   while representation-specific candidate construction and equivalence checks stay explicit. This
+   amendment supersedes only ADR-304's requirement that the legacy-mesh Width tooltip remain
+   unchanged: the tooltip may now disclose exact bounded local rebasing. ADR-304's heightfield-only
+   **Field geometry** block and every other legacy-mesh property-panel surface remain unchanged.
+5. **Keep unavailable cases truthful and open.** If any proof fails, retain the accepted original
+   edit exactly as before; do not reject, restore, clamp, cap, approximate, delay it behind a policy
+   surface, or confirm it.
+   Zero scale, scale-domain exhaustion, non-reversible subnormal values, non-positive or non-finite bounds-aspect
+   results, transformed-corner or intrinsic-CAM drift, independent-axis-only encodings, and intents
+   beyond every exact v4 representation remain outside this bounded repair. A future durable model
+   must separate positive-finite operator intent from materialized geometry.
+6. **Do not change machining or authorization policy.** An adopted legacy factor preserves the
+   materialized heightmap, prepared job, and exact Frame bounds signature. No schema version,
+   validator, migration, CAM or emitter algorithm, preview budget, machine command, Frame/Job
+   Review/Start policy, refusal, clamp, deliberate policy delay, or confirmation changes.
+
+### Consequences
+
+- The reproduced legacy result near `2,000,000 x 1,000,000` at scales
+  `(5e-6, 5e-6)` persists as the exactly equivalent result near
+  `1,000,000 x 500,000` at scales `(1e-5, 1e-5)`. Manual-save and autosave preparation remain valid
+  while transformed corners, materialized depth bytes, prepared-job JSON, and the Frame bounds
+  signature remain unchanged.
+- Ordinary legacy-mesh and heightfield Width edits retain their existing stored representation by
+  identity. The selected Width disclosure may name that an exact oversized local representation can
+  re-factor both scale axes without changing visible machine geometry.
+- Each oversized legacy candidate still requires a synchronous O(n) intrinsic-bounds scan. No
+  browser or packaged-Electron latency budget is established; persisted or shared intrinsic-bounds
+  metadata would be needed to remove that scan in a future representation.
+- The shared displayed-Width `0`/`Infinity` conversion defect is not repaired here. This amendment is
+  not permission to add an input limit and does not claim every accepted draft or positive-finite
+  intent is durable in project v4.
+
+### Verification
+
+- The exact legacy factorization sibling test pins the reproduced manual-save/autosave failure and
+  repaired persistence, smallest common factor, stored-bounds and intrinsic-mesh aspect, transformed
+  corners, materialized depth bytes, prepared-job JSON, Frame signature, source-byte identity, and
+  one undo/dirty transition.
+- Heightfield factorization regressions remain green and pin byte-identical behavior after the shared
+  arithmetic extraction. Existing relief parameter, bounds, mesh materialization, machine-space,
+  persistence, and Frame-signature suites remain green.
+- The core/legacy regressions pin Float32 rounding and overflow parity with CAM, relief-source
+  owner/cache identity, and an exceptional indexed-read fallback to unchanged `geometry-drift`.
+- TypeScript, focused Vitest, ESLint, Prettier, ADR-number, file-size, export-ratchet, diff, and full
+  release gates are required before publication.
+- Browser perceptual layout, packaged Electron, controller behavior, a physical Frame, air cut,
+  material cut, and finish quality are not established.
+
+### References
+
+- ADR-228, Frame as the sole ordinary Start guard.
+- ADR-289, relief scale factoring and exact-zero compatibility.
+- ADR-292 Amendments 2 and 4, canonical Width resolution and exact bounded heightfield rebasing.
+- ADR-304, exact-factor field-geometry disclosure and native planning representation; Amendment 5
+  supersedes only its legacy-mesh Width-tooltip-preservation statement.
+
+---
