@@ -2649,9 +2649,10 @@ user-facing flows are planned.
 1. If the 0.5 mm allowance meets or exceeds the relief depth, only the
    shallowest levels produce regions (possibly none) — correct: there is
    nothing to rough without cutting into finishing stock.
-2. Roughing samples the physical heightmap at bit-diameter/8 cells (0.2 mm
-   floor), so compile stays bounded; the four-million-cell cap coarsens in
-   the final scaled metric for very large meshes.
+2. Roughing requests physical heightmap cells at exactly bit diameter / 8 in
+   the final scaled metric; CurveDesk attempts that exact derived allocation
+   with no 0.2 mm floor or four-million-cell coarsening, and reports an
+   unrepresentable or failed allocation as a factual materialization error.
 3. Each depth level emits at most 4,096 inward rings. A non-emitting next-inset
    probe distinguishes exact exhaustion, an offset-engine failure, and usable
    interior beyond that limit. The latter two are retained with the exact
