@@ -15,7 +15,6 @@ describe('relief finishing mask sweep safety', () => {
       tool,
       kernel: kernelForTool(tool, map.mmPerCell),
       scallopMm: 0.025,
-      stepoverPercent: 40,
     });
     const horizontal = passes.find((pass) => !isVerticalPass(pass));
     if (horizontal?.kind !== 'path3d') throw new Error('interior finishing row expected');
@@ -34,7 +33,6 @@ describe('relief finishing mask sweep safety', () => {
       tool,
       kernel,
       scallopMm: 0.025,
-      stepoverPercent: 40,
     });
     const verticalBoundaryPasses = passes.filter(
       (pass) => isVerticalPass(pass) && passTouchesExcluded(pass, map, kernel),
@@ -70,7 +68,6 @@ describe('relief finishing mask sweep safety', () => {
       tool,
       kernel,
       scallopMm: 0.025,
-      stepoverPercent: 40,
     });
 
     expect(passes.some(isRightToLeftPass)).toBe(true);

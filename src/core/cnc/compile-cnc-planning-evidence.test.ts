@@ -121,7 +121,7 @@ describe('compileCncJob planning evidence', () => {
           toolKind: 'ball-nose',
           toolDiameterMm: 3.175,
           scallopMm: 2,
-          rowSpacingMm: 3.175 * 0.4,
+          rowSpacingMm: 3.175,
         }),
       ]),
     );
@@ -130,7 +130,7 @@ describe('compileCncJob planning evidence', () => {
     ]);
   });
 
-  it('retains the exact positive Stepover used by a compiled pocket', () => {
+  it('retains exact Stepover and reports bounded-work exhaustion', () => {
     const scene = sceneWith(
       [cncLayer('L1', '#ff0000', { cutType: 'pocket', stepoverPercent: 200 })],
       [squareObject('O1', '#ff0000', 20)],
@@ -156,7 +156,7 @@ describe('compileCncJob planning evidence', () => {
     });
   });
 
-  it('retains exact pass-limit evidence from the female inlay planner that generated the paths', () => {
+  it('retains exact pass-limit evidence from the female inlay planner', () => {
     const job = compileCncJob(
       sceneWith(
         [

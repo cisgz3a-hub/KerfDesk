@@ -11,6 +11,8 @@
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
+// Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import type { CncReliefPlanningEvidence } from '../job/job';
 import { DEFAULT_RELIEF_SCALLOP_MM, reliefFinishingPasses, scallopRowSpacingMm } from '../relief';
 // Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
@@ -36,6 +38,7 @@ import {
 import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
 import { cncGroupProvenance } from './cnc-group-provenance';
+import { zPassArrayMaterializationError } from './depth-passes';
 import { parkFields } from './motion-polish';
 import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
 
@@ -173,7 +176,7 @@ function reliefFinishingGroup(
   const finishTool = config.tools.find((tool) => tool.id === settings.reliefFinishToolId);
   if (finishTool === undefined) return { kind: 'compiled', group: null, plans: [] };
   const scallopMm = settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM;
-  const rowSpacingMm = scallopRowSpacingMm(finishTool, scallopMm, settings.stepoverPercent);
+  const rowSpacingMm = scallopRowSpacingMm(finishTool, scallopMm);
   const passes: CncPass[] = [];
   const plans: CncReliefPlanningEvidence[] = [];
   for (const relief of reliefs) {
@@ -205,7 +208,6 @@ function reliefFinishingGroup(
       tool: finishTool,
       kernel,
       scallopMm,
-      stepoverPercent: settings.stepoverPercent,
     })) {
       if (pass.kind !== 'path3d') continue;
       passes.push({
@@ -257,6 +259,13 @@ function reliefLadderFor(
       readonly plan: ReliefPlanEvidence;
     }
   | ReliefMaterializationFailure {
+  const passArrayError = zPassArrayMaterializationError(
+    relief.reliefDepthMm,
+    settings.depthPerPassMm,
+  );
+  if (passArrayError !== null) {
+    return reliefMaterializationFailure(relief.source, passArrayError);
+  }
   const machineSpace = reliefMachineSpaceGeometry(relief);
   const heightmap = reliefObjectToHeightmap(relief, {
     targetWidthMm: relief.targetWidthMm,
@@ -294,14 +303,14 @@ function reliefLadderFor(
  * short by an offset-engine failure rather than by the level running out of
  * area? Advisory input only — the caller warns, never refuses (rule 7).
  */
-export function reliefOffsetLadderStatus(
+export function reliefOffsetLadderDiagnostics(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   settings: CncLayerSettings,
   config: CncMachineConfig,
-): { readonly offsetFailed: boolean; readonly passLimited: boolean } {
+): { readonly offsetFailed: boolean; readonly passLimited: boolean } | null {
   const reliefs = reliefObjectsForLayer(objects, layer);
-  if (reliefs.length === 0) return { offsetFailed: false, passLimited: false };
+  if (reliefs.length === 0) return null;
   const tool = layerCncTool(config, settings);
   let offsetFailed = false;
   let passLimited = false;
@@ -309,11 +318,20 @@ export function reliefOffsetLadderStatus(
     const result = reliefLadderFor(relief, settings, tool);
     // Diagnostics inform only. Compile owns the named integrity failure and
     // must not replace it with a warning-path exception.
-    if (result.kind === 'relief-materialization-failed') continue;
-    if (result.ladder.offsetFailed) offsetFailed = true;
-    if (result.ladder.passLimited) passLimited = true;
+    if (result.kind === 'relief-materialization-failed') return null;
+    offsetFailed = offsetFailed || result.ladder.offsetFailed;
+    passLimited = passLimited || result.ladder.passLimited;
   }
   return { offsetFailed, passLimited };
+}
+
+export function reliefOffsetLadderFailed(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+): boolean {
+  return reliefOffsetLadderDiagnostics(objects, layer, settings, config)?.offsetFailed ?? false;
 }
 
 function appendReliefPasses(

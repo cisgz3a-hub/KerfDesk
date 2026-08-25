@@ -1,21 +1,11 @@
-import { useState, type KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
+import { type ConsoleQuickCommand, type ControllerDriver } from '../../../core/controllers';
 import {
-  selectControllerDriver,
-  type ConsoleQuickCommand,
-  type ControllerDriver,
-} from '../../../core/controllers';
-import { useLaserStore } from '../../state/laser-store';
-import {
-  consoleCommandDisabledReason,
   consoleQuickCommandDisabledReason,
   type ConsoleCommandAvailabilityState,
 } from './console-command-availability';
-import {
-  createConsoleCommandHistory,
-  navigateConsoleCommandHistory,
-  recordSuccessfulConsoleCommand,
-} from './console-command-history';
-import { runConsoleCommand } from './run-console-command';
+import { UserMacroPanel } from './user-macros/UserMacroPanel';
+import { useConsoleCommandDeckModel } from './use-console-command-deck-model';
 
 export type ConsoleCommandDeckProps = {
   readonly ariaLabel?: string;
@@ -40,19 +30,34 @@ export function ConsoleCommandDeck({
           quickCommands={model.driver.consoleQuickCommands}
           driver={model.driver}
           availabilityState={model.availabilityState}
-          sending={model.sending}
-          onSend={(command) => void model.send(command, false)}
+          isSending={model.isSending}
+          onSend={(command) => void model.send({ kind: 'preserve-draft', input: command })}
         />
       ) : null}
       <ConsoleCommandForm
         autoFocus={autoFocus}
         command={model.command}
-        inputDisabled={model.inputDisabled}
-        sending={model.sending}
+        isInputDisabled={model.isInputDisabled}
+        isSending={model.isSending}
         sendDisabledReason={model.sendDisabledReason}
         onChange={model.changeCommand}
         onHistoryKey={model.handleHistoryKey}
-        onSend={() => void model.send(model.command, true)}
+        onSend={() => void model.send({ kind: 'manual-draft', input: model.command })}
+      />
+      <UserMacroPanel
+        isSending={model.isSending}
+        isInputDisabled={model.isInputDisabled}
+        onRun={(command, macro) =>
+          model.send({
+            kind: 'preserve-draft',
+            input: command,
+            provenance: {
+              kind: 'user-macro',
+              macroName: macro.name,
+              macroTemplate: macro.template,
+            },
+          })
+        }
       />
       {model.error !== null ? (
         <div role="alert" style={errorStyle}>
@@ -68,91 +73,11 @@ export function ConsoleCommandDeck({
   );
 }
 
-function useConsoleCommandDeckModel(
-  enableHistory: boolean,
-  onCommandSent: ((command: string) => void) | undefined,
-) {
-  const connection = useLaserStore((state) => state.connection);
-  const statusReport = useLaserStore((state) => state.statusReport);
-  const fireActive = useLaserStore((state) => state.fireActive);
-  const streamer = useLaserStore((state) => state.streamer);
-  const motionOperation = useLaserStore((state) => state.motionOperation);
-  const controllerOperation = useLaserStore((state) => state.controllerOperation);
-  const autofocusBusy = useLaserStore((state) => state.autofocusBusy);
-  const activeControllerKind = useLaserStore((state) => state.activeControllerKind);
-  const sendConsoleCommand = useLaserStore((state) => state.sendConsoleCommand);
-  const driver = selectControllerDriver(activeControllerKind);
-  const availabilityState: ConsoleCommandAvailabilityState = {
-    connection,
-    statusReport,
-    fireActive,
-    streamer,
-    motionOperation,
-    controllerOperation,
-    autofocusBusy,
-  };
-  const [command, setCommand] = useState('');
-  const [history, setHistory] = useState(createConsoleCommandHistory);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const sendDisabledReason = consoleCommandDisabledReason(driver, command, availabilityState);
-
-  const send = async (input: string, clearInput: boolean): Promise<void> => {
-    if (sending) return;
-    setSending(true);
-    setError(null);
-    const result = await runConsoleCommand(driver, input, sendConsoleCommand);
-    setSending(false);
-    if (result.status === 'sent') {
-      setHistory((current) => recordSuccessfulConsoleCommand(current, result.command));
-      if (clearInput) {
-        // A transport write can be slow. Preserve a new draft the operator
-        // typed while the submitted command was still in flight.
-        setCommand((current) => (current === input ? '' : current));
-      }
-      onCommandSent?.(result.command);
-    } else if (result.status === 'rejected') {
-      setError(result.reason);
-    }
-  };
-
-  const handleHistoryKey = (event: KeyboardEvent<HTMLInputElement>): void => {
-    if (!enableHistory || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
-    const navigation = navigateConsoleCommandHistory(
-      history,
-      command,
-      event.key === 'ArrowUp' ? 'older' : 'newer',
-    );
-    if (!navigation.handled) return;
-    event.preventDefault();
-    setHistory(navigation.history);
-    setCommand(navigation.value);
-    setError(null);
-  };
-
-  return {
-    availabilityState,
-    command,
-    driver,
-    error,
-    sending,
-    sendDisabledReason,
-    inputDisabled: connection.kind !== 'connected' || !driver.capabilities.console,
-    send,
-    handleHistoryKey,
-    changeCommand: (value: string) => {
-      setCommand(value);
-      setHistory((current) => ({ ...current, cursor: null, draft: '' }));
-      setError(null);
-    },
-  };
-}
-
 function QuickCommandRow(props: {
   readonly quickCommands: ReadonlyArray<ConsoleQuickCommand>;
   readonly driver: ControllerDriver;
   readonly availabilityState: ConsoleCommandAvailabilityState;
-  readonly sending: boolean;
+  readonly isSending: boolean;
   readonly onSend: (command: string) => void;
 }): JSX.Element {
   return (
@@ -167,7 +92,7 @@ function QuickCommandRow(props: {
           <button
             key={quick.command}
             type="button"
-            disabled={props.sending || disabledReason !== null}
+            disabled={props.isSending || disabledReason !== null}
             title={disabledReason ?? quick.hint}
             onClick={() => props.onSend(quick.command)}
           >
@@ -182,8 +107,8 @@ function QuickCommandRow(props: {
 function ConsoleCommandForm(props: {
   readonly autoFocus: boolean;
   readonly command: string;
-  readonly inputDisabled: boolean;
-  readonly sending: boolean;
+  readonly isInputDisabled: boolean;
+  readonly isSending: boolean;
   readonly sendDisabledReason: string | null;
   readonly onChange: (value: string) => void;
   readonly onHistoryKey: (event: KeyboardEvent<HTMLInputElement>) => void;
@@ -204,20 +129,20 @@ function ConsoleCommandForm(props: {
         onChange={(event) => props.onChange(event.target.value)}
         onKeyDown={props.onHistoryKey}
         placeholder="$I, $$, $G, G0 X0 Y0..."
-        disabled={props.inputDisabled}
+        disabled={props.isInputDisabled}
         title={props.sendDisabledReason ?? 'Send one controller command.'}
         style={inputStyle}
       />
       <button
         type="submit"
-        disabled={props.sending || props.sendDisabledReason !== null}
+        disabled={props.isSending || props.sendDisabledReason !== null}
         title={
-          props.sending
+          props.isSending
             ? 'Waiting for the command write to finish.'
             : (props.sendDisabledReason ?? '')
         }
       >
-        {props.sending ? 'Sending...' : 'Send'}
+        {props.isSending ? 'Sending...' : 'Send'}
       </button>
     </form>
   );

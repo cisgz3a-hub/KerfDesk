@@ -65,14 +65,8 @@ describe('pocketToolpathRings', () => {
 
     expect(onePercent.toolpaths.length).toBeGreaterThan(formerTenPercent.toolpaths.length);
     expect(twoHundredPercent.toolpaths).not.toEqual(formerEightyFivePercent.toolpaths);
-  });
-
-  it('reports when an exact microscopic stepover exhausts the ring budget', () => {
-    const result = pocketRingToolpaths([square(0, 0, 20)], 1, 0.001);
-
-    expect(result.offsetFailed).toBe(false);
-    expect(result.passLimited).toBe(true);
-    expect(result.toolpaths.length).toBeGreaterThanOrEqual(4096);
+    expect(onePercent.passLimited).toBe(false);
+    expect(twoHundredPercent.passLimited).toBe(false);
   });
 
   it('produces multiple clearing rings for a pocket larger than the bit', () => {
@@ -174,7 +168,7 @@ describe('pocketToolpathRaster (ADR-105 G10)', () => {
     expect(first?.points.every((p) => Math.abs(p.x - (first.points[0]?.x ?? 0)) < 1e-6)).toBe(true);
   });
 
-  it('uses the exact positive CNC spacing below the legacy laser floor', () => {
+  it('uses the exact positive CNC spacing below the legacy floor', () => {
     const result = pocketRasterToolpaths([square], 1, 1, 'x');
     const sweeps = result.toolpaths.filter((path) => !path.closed);
     const firstY = sweeps[0]?.points[0]?.y;
@@ -186,14 +180,6 @@ describe('pocketToolpathRaster (ADR-105 G10)', () => {
     expect(secondY).toBeDefined();
     if (firstY === undefined || secondY === undefined) return;
     expect(secondY - firstY).toBeCloseTo(0.01, 12);
-  });
-
-  it('reports when exact CNC raster spacing exhausts the scanline budget', () => {
-    const result = pocketRasterToolpaths([square], 1, 0.001, 'x');
-
-    expect(result.offsetFailed).toBe(false);
-    expect(result.passLimited).toBe(true);
-    expect(result.toolpaths.filter((path) => !path.closed)).toHaveLength(4096);
   });
 
   it('returns empty when the bit cannot fit', () => {

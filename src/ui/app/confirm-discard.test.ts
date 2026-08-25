@@ -5,7 +5,6 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
-import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { useStore } from '../state';
 import { useConfirmSaveStore } from '../state/confirm-save-store';
@@ -118,29 +117,5 @@ describe('confirmDiscardAsync (LU18)', () => {
     expect(write).toHaveBeenCalledTimes(1);
     // handleSaveProject ran markSaved — the project is clean again.
     expect(useStore.getState().dirty).toBe(false);
-  });
-
-  it('Save keeps a destructive action stopped when newer edits appear during the write', async () => {
-    const captured = { ...createProject(), notes: 'captured before open' };
-    let finishWrite = (): void => undefined;
-    const writeGate = new Promise<void>((resolve) => {
-      finishWrite = resolve;
-    });
-    const write = vi.fn(async () => writeGate);
-    useStore.setState({
-      project: captured,
-      dirty: true,
-      lastSaveTarget: { displayName: 'captured.lf2', write },
-    });
-
-    const result = confirmDiscardAsync(neverPick, 'open another project');
-    useConfirmSaveStore.getState().choose('save');
-    await vi.waitFor(() => expect(write).toHaveBeenCalledOnce());
-    const edited = { ...captured, notes: 'edited while disk write pending' };
-    useStore.setState({ project: edited, dirty: true });
-    finishWrite();
-
-    await expect(result).resolves.toBe(false);
-    expect(useStore.getState()).toMatchObject({ project: edited, dirty: true });
   });
 });

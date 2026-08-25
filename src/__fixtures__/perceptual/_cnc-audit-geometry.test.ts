@@ -203,7 +203,6 @@ it.runIf(RUN)('1.11 — relief finishing reaches the far-Y edge', () => {
       tool: END_MILL,
       kernel: kernelForTool(END_MILL, 0.5),
       scallopMm: 0.025,
-      stepoverPercent: 40,
     },
   );
   write('1.11-relief-far-edge', 'Relief finishing rows — last row must sit on the far-Y edge', [

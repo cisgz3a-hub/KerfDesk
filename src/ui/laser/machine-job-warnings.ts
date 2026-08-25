@@ -1,8 +1,8 @@
 // detectMachineJobWarnings — selects the machine-appropriate advisory set for
 // the Save G-code and Start job paths: CNC projects get stock-footprint
 // advisories (H.2) plus dropped-raster advisories (ADR-101 §4); laser
-// projects get the job-intent warnings (H12). Keeps the machine-kind branch
-// in ONE place so both call sites stay simple.
+// projects get dropped-relief plus job-intent warnings. Keeps the machine-kind
+// branch in ONE place so both call sites stay simple.
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
@@ -21,6 +21,7 @@ import { detectCncReliefPlanningWarnings } from './cnc-relief-planning-warnings'
 import { detectCncStockWarnings } from './cnc-stock-warnings';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
 import { detectJobIntentWarnings } from './job-intent-warnings';
+import { detectLaserReliefWarnings } from './laser-relief-warnings';
 import { detectLaserMachineLimitWarnings } from './laser-machine-limit-warnings';
 
 // controllerSettings is the connected machine's live `$$` snapshot (null when
@@ -54,6 +55,7 @@ export function detectMachineJobWarnings(
             : detectCompiledReliefDepthWarningsForJob(project, prepared.job)),
         ]
       : [
+          ...detectLaserReliefWarnings(project),
           ...detectJobIntentWarnings(project, prepared?.job),
           ...detectLaserMachineLimitWarnings(project, controllerSettings),
         ];

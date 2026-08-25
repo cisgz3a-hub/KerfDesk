@@ -50,7 +50,7 @@ export type FileCtx = {
   readonly settingsCapability: ReadinessSettingsCapability;
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   readonly lastSaveTarget: SaveTarget | null;
-  readonly markSaved: (target: SaveTarget, expectedProject?: Project) => boolean | undefined;
+  readonly markSaved: (target: SaveTarget) => void;
   readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;

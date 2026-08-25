@@ -50,17 +50,16 @@ function prepared(project: Project, job: Job) {
 }
 
 describe('CNC relief planning warnings', () => {
-  it('retains exact out-of-range Stepover as an advisory, never a refusal', () => {
+  it('discloses stored out-of-range Stepover normalization without a new refusal', () => {
     const low = detectCncReliefPlanningWarnings(pocketProject(1));
     const high = detectCncReliefPlanningWarnings(pocketProject(200));
 
     expect(low).toHaveLength(1);
     expect(low[0]).toContain('is 1%');
-    expect(low[0]).toContain('keeps the exact value without clamping it');
-    expect(low[0]).toContain('route or ring limits');
+    expect(low[0]).toContain('use 10%');
     expect(high).toHaveLength(1);
     expect(high[0]).toContain('is 200%');
-    expect(high[0]).toContain('can leave uncut lanes');
+    expect(high[0]).toContain('use 85%');
     expect(detectCncReliefPlanningWarnings(pocketProject(40))).toEqual([]);
   });
 
@@ -176,7 +175,9 @@ describe('CNC relief planning warnings', () => {
     expect(warnings).toContainEqual(
       expect.stringContaining('outside the minor-sagitta cusp domain'),
     );
-    expect(warnings).toContainEqual(expect.stringContaining("uses the layer's exact Stepover"));
+    expect(warnings).toContainEqual(
+      expect.stringContaining('limits the cusp calculation to the cutter radius'),
+    );
   });
 
   it('discloses a source ball-nose target before compiled evidence is available', () => {
@@ -224,7 +225,7 @@ describe('CNC relief planning warnings', () => {
     expect(warnings).toContainEqual(
       expect.stringContaining('outside the minor-sagitta cusp domain'),
     );
-    expect(warnings).toContainEqual(expect.stringContaining('1.27 mm row spacing'));
+    expect(warnings).toContainEqual(expect.stringContaining('3.175 mm row spacing'));
   });
 
   it('accepts a ball-nose scallop exactly equal to the cutter radius', () => {

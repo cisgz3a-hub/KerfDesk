@@ -40,7 +40,6 @@ describe('relief partial terminal cells', () => {
       tool: POINT_TOOL,
       kernel: kernelForTool(POINT_TOOL, map.mmPerCell),
       scallopMm: 0.025,
-      stepoverPercent: 100,
     });
 
     expect(passes).toHaveLength(1);
@@ -60,7 +59,6 @@ describe('relief partial terminal cells', () => {
       tool: POINT_TOOL,
       kernel: kernelForTool(POINT_TOOL, map.mmPerCell),
       scallopMm: 0.025,
-      stepoverPercent: 100,
     });
 
     const pass = passes[0];

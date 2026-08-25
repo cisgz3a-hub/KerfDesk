@@ -24,13 +24,26 @@ export async function openReadyCut3D(page: Page): Promise<OpenCut3D> {
   await expect(dialog).toBeVisible();
   await expect(canvas).toBeVisible();
   const worker = await started;
+  await expect(dialog).toHaveAttribute('aria-modal', 'true');
+  await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused();
+  await expect(canvas).toHaveAttribute('tabindex', '0');
   await expect(canvas).toHaveAttribute('data-scene-state', 'ready', {
     timeout: WORKER_TIMEOUT_MS,
   });
   await expect(
-    dialog.getByText('Drag to orbit, scroll to zoom. Depth is true to scale.'),
+    dialog.getByText(/Left-drag to pan, right-drag to orbit.+Shift\+Arrow keys to orbit/u),
   ).toBeVisible();
   return { dialog, canvas, worker };
+}
+
+export async function exerciseCut3DKeyboardControls(opened: OpenCut3D): Promise<void> {
+  await opened.dialog.getByRole('button', { name: 'Close' }).press('Tab');
+  await expect(opened.canvas).toBeFocused();
+  for (const key of ['ArrowLeft', 'Shift+ArrowRight', 'Shift+Equal', 'Minus']) {
+    const previousRevision = await frameRevision(opened.canvas);
+    await opened.canvas.press(key);
+    await expect.poll(() => frameRevision(opened.canvas)).toBeGreaterThan(previousRevision);
+  }
 }
 
 export async function exerciseCut3DControlsAndResize(
@@ -81,8 +94,10 @@ export async function cancelThenRemountCut3D(
   const previousHandle = await previousCanvas.elementHandle();
   if (previousHandle === null) throw new Error('Previous Cut 3D canvas handle is missing.');
   const previousDialog = page.getByRole('dialog', { name: 'Cut 3D preview' });
-  await previousDialog.getByRole('button', { name: 'Close' }).click();
+  await previousCanvas.focus();
+  await previousCanvas.press('Escape');
   await expect(previousDialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open 3D cut preview' })).toBeFocused();
   const started = waitForCut3DWorker(page);
   await page.getByRole('button', { name: 'Open 3D cut preview' }).click();
   const cancellingDialog = page.getByRole('dialog', { name: 'Cut 3D preview' });

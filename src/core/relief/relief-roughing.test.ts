@@ -195,7 +195,7 @@ describe('reliefRoughingPasses', () => {
     );
   });
 
-  it('reports a valid microscopic stepover that exhausts the ring budget', () => {
+  it('preserves current-main Stepover normalization before the ring planner', () => {
     const ladder = reliefRoughingLadder(
       {
         widthCells: 3,
@@ -216,7 +216,6 @@ describe('reliefRoughingPasses', () => {
 
     expect(ladder.passes).not.toHaveLength(0);
     expect(ladder.offsetFailed).toBe(false);
-    expect(ladder.passLimited).toBe(true);
   });
 });
 

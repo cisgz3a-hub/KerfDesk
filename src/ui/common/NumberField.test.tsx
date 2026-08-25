@@ -65,10 +65,10 @@ describe('NumberField (clearable)', () => {
       const input = field(host);
       input.value = '';
       await act(async () => Simulate.change(input));
-      input.value = '200';
+      input.value = '20';
       await act(async () => Simulate.change(input));
       await act(async () => vi.advanceTimersByTime(400));
-      expect(onCommit).toHaveBeenCalledWith(100);
+      expect(onCommit).toHaveBeenCalledWith(20);
     } finally {
       await act(async () => root.unmount());
       host.remove();

@@ -1,15 +1,15 @@
 // Viewer3DDialogShell — shared chrome for the ADR-102 3D viewers (relief
-// surface, cut preview): backdrop dialog, canvas, loading / ready / failed
+// surface, cut preview): accessible dialog, canvas, loading / ready / failed
 // state machine, and scene lifecycle (cancel + dispose on unmount).
-// Extracted from Relief3DViewerDialog when the H.11 cut preview became the
-// second consumer.
 
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
+import { Dialog } from '../kit';
 import {
   useViewerDialogScene,
   type ViewerDialogSceneBuilder,
   type ViewerDialogState,
 } from './use-viewer-dialog-scene';
+import './viewer3d-dialog.css';
 
 export type { ViewerDialogSceneBuilder, ViewerDialogSceneResult } from './use-viewer-dialog-scene';
 
@@ -32,6 +32,7 @@ export function Viewer3DDialogShell(props: {
   readonly canvasKey?: number;
 }): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const hintId = useId();
   const { buildScene } = props;
   const state = useViewerDialogScene(buildScene, canvasRef);
 
@@ -45,83 +46,64 @@ export function Viewer3DDialogShell(props: {
         : { kind: 'loading' };
 
   return (
-    <div role="dialog" aria-label={props.ariaLabel} style={backdropStyle}>
-      <div style={panelStyle}>
-        <div style={headerStyle}>
-          <h3 style={titleStyle}>{props.title}</h3>
-          <button type="button" onClick={props.onClose} title="Close the 3D viewer">
-            Close
-          </button>
-        </div>
-        <canvas
-          key={props.canvasKey}
-          ref={canvasRef}
-          width={VIEWER_CANVAS_WIDTH_PX}
-          height={VIEWER_CANVAS_HEIGHT_PX}
-          aria-label={props.canvasAriaLabel}
-          style={canvasStyle}
-        />
-        {props.notice === undefined ? null : (
-          <p style={noticeStyle} role="status">
-            {props.notice}
-          </p>
-        )}
-        {visibleState.kind === 'loading' ? <p style={hintStyle}>Building the 3D surface…</p> : null}
-        {visibleState.kind === 'failed' ? (
-          <p style={hintStyle} role="alert">
-            3D view unavailable: {visibleState.reason}
-          </p>
-        ) : null}
-        {visibleState.kind === 'ready' ? (
-          <p style={hintStyle}>Drag to orbit, scroll to zoom. Depth is true to scale.</p>
-        ) : null}
+    <Dialog
+      ariaLabel={props.ariaLabel}
+      size="xl"
+      panelClassName="lf-dialog--viewer3d"
+      onClose={props.onClose}
+    >
+      <div className="lf-viewer3d-dialog__header">
+        <h2 className="lf-viewer3d-dialog__title">{props.title}</h2>
+        <button type="button" onClick={props.onClose} title="Close the 3D viewer">
+          Close
+        </button>
       </div>
-    </div>
+      <canvas
+        key={props.canvasKey}
+        ref={canvasRef}
+        width={VIEWER_CANVAS_WIDTH_PX}
+        height={VIEWER_CANVAS_HEIGHT_PX}
+        aria-label={props.canvasAriaLabel}
+        aria-describedby={hintId}
+        aria-busy={visibleState.kind === 'loading'}
+        tabIndex={0}
+        className="lf-viewer3d-dialog__canvas"
+      />
+      {props.notice === undefined ? null : (
+        <p className="lf-viewer3d-dialog__hint" role="status" style={noticeStyle}>
+          {props.notice}
+        </p>
+      )}
+      <ViewerStateHint id={hintId} state={visibleState} />
+    </Dialog>
   );
 }
 
-const backdropStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'var(--lf-backdrop)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 40,
-};
-const panelStyle: React.CSSProperties = {
-  background: 'var(--lf-bg-1)',
-  color: 'var(--lf-text)',
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  padding: 12,
-  maxWidth: 'calc(100vw - 48px)',
-};
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  marginBottom: 8,
-};
-const titleStyle: React.CSSProperties = {
-  fontSize: 13,
-  margin: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
-const canvasStyle: React.CSSProperties = {
-  display: 'block',
-  maxWidth: '100%',
-  borderRadius: 4,
-};
-const hintStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  margin: '8px 0 0 0',
-};
+function ViewerStateHint(props: {
+  readonly id: string;
+  readonly state: ViewerDialogState;
+}): JSX.Element {
+  if (props.state.kind === 'loading') {
+    return (
+      <p id={props.id} className="lf-viewer3d-dialog__hint" role="status" aria-live="polite">
+        Building the 3D surface…
+      </p>
+    );
+  }
+  if (props.state.kind === 'failed') {
+    return (
+      <p id={props.id} className="lf-viewer3d-dialog__hint" role="alert">
+        3D view unavailable: {props.state.reason}
+      </p>
+    );
+  }
+  return (
+    <p id={props.id} className="lf-viewer3d-dialog__hint">
+      Left-drag to pan, right-drag to orbit, or scroll to zoom. Keyboard: focus the preview, use
+      Arrow keys to pan, Shift+Arrow keys to orbit, and + or - to zoom. Depth is true to scale.
+    </p>
+  );
+}
 const noticeStyle: React.CSSProperties = {
-  ...hintStyle,
   color: 'var(--lf-warning)',
 };

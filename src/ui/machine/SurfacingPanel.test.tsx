@@ -65,12 +65,10 @@ function mockPlatform(cancelPicker = false): {
 async function clickSave(
   platform: PlatformAdapter,
   noGoZones: ReadonlyArray<NoGoZone> = [],
-  inputValues: Partial<Record<SurfacingInputLabel, string>> = {},
-  machine: typeof DEFAULT_CNC_MACHINE_CONFIG = DEFAULT_CNC_MACHINE_CONFIG,
 ): Promise<void> {
   const project = {
     ...createProject({ ...DEFAULT_DEVICE_PROFILE, maxFeed: 500, noGoZones }),
-    machine,
+    machine: DEFAULT_CNC_MACHINE_CONFIG,
   };
   useStore.setState({ project });
   useLaserStore.setState({ controllerSettings: null });
@@ -81,21 +79,10 @@ async function clickSave(
   await act(async () => {
     root?.render(
       <PlatformProvider adapter={platform}>
-        <SurfacingPanel machine={machine} />
+        <SurfacingPanel machine={DEFAULT_CNC_MACHINE_CONFIG} />
       </PlatformProvider>,
     );
   });
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-  if (setter === undefined) throw new Error('Native input value setter missing');
-  for (const [label, value] of Object.entries(inputValues)) {
-    const input = host.querySelector(`input[aria-label="${label}"]`);
-    if (!(input instanceof HTMLInputElement)) throw new Error(`${label} input missing`);
-    await act(async () => {
-      setter.call(input, value);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-    });
-  }
   const saveButton = [...host.querySelectorAll('button')].find((button) =>
     button.textContent?.includes('Save surfacing G-code'),
   );
@@ -106,49 +93,7 @@ async function clickSave(
   });
 }
 
-type SurfacingInputLabel =
-  | 'Surfacing width'
-  | 'Surfacing height'
-  | 'Surfacing stepover %'
-  | 'Surfacing total depth';
-
 describe('SurfacingPanel stock tracking', () => {
-  it('retains exact finite-positive inputs without surfacing policy min/max rewrites', async () => {
-    const { platform } = mockPlatform();
-    const machine = DEFAULT_CNC_MACHINE_CONFIG;
-    useStore.setState({ project: { ...createProject(DEFAULT_DEVICE_PROFILE), machine } });
-    host = document.createElement('div');
-    document.body.appendChild(host);
-    root = createRoot(host);
-    await act(async () =>
-      root?.render(
-        <PlatformProvider adapter={platform}>
-          <SurfacingPanel machine={machine} />
-        </PlatformProvider>,
-      ),
-    );
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-    if (setter === undefined) throw new Error('Native input value setter missing');
-    const values = [
-      ['Surfacing width', '6000'],
-      ['Surfacing height', '0.01'],
-      ['Surfacing stepover %', '0.001'],
-      ['Surfacing total depth', '0.025'],
-    ] as const;
-    for (const [label, value] of values) {
-      const input = host.querySelector(`input[aria-label="${label}"]`);
-      if (!(input instanceof HTMLInputElement)) throw new Error(`${label} input missing`);
-      expect(input.getAttribute('min')).toBeNull();
-      expect(input.getAttribute('max')).toBeNull();
-      await act(async () => {
-        setter.call(input, value);
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-      });
-      expect(input.value).toBe(value);
-    }
-  });
-
   // The panel prefills the facing area from the stock footprint. Seeded once
   // with useState, it kept the mount-time numbers after the operator changed
   // stock size (or opened another project) and silently faced the wrong area.
@@ -234,107 +179,6 @@ describe('SurfacingPanel save path', () => {
     expect(data.indexOf('G0 Z3.810')).toBeLessThan(data.indexOf('M3 S12000'));
     expect(data).toContain('F500.000');
     expect(data).not.toContain('F2500.000');
-  });
-
-  it('writes incomplete coverage metadata and reports a bounded partial save', async () => {
-    const baseTool = DEFAULT_CNC_MACHINE_CONFIG.tools[0];
-    if (baseTool === undefined) throw new Error('default CNC tool missing');
-    const machine = {
-      ...DEFAULT_CNC_MACHINE_CONFIG,
-      stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, heightMm: 50 },
-      tools: [
-        {
-          ...baseTool,
-          id: 'surfacing-25.4',
-          name: '25.4 mm surfacing bit',
-          diameterMm: 25.4,
-        },
-      ],
-      toolId: 'surfacing-25.4',
-    };
-    const { platform, write } = mockPlatform();
-    const observedToastMessages: string[] = [];
-    const unsubscribe = useToastStore.subscribe((state) => {
-      observedToastMessages.push(...state.toasts.map((toast) => toast.message));
-    });
-
-    try {
-      await clickSave(platform, [], { 'Surfacing stepover %': '0.001' }, machine);
-    } finally {
-      unsubscribe();
-    }
-
-    expect(write).toHaveBeenCalledOnce();
-    const data = write.mock.calls[0]?.[0];
-    expect(typeof data).toBe('string');
-    if (typeof data !== 'string') throw new Error('expected text output');
-    expect(data).toContain(
-      '; *** INCOMPLETE SURFACING PROGRAM: PASS LIMIT REACHED + OUTPUT VALUES DIFFER ***',
-    );
-    expect(data).toContain('; requested Y coverage: 50.000 mm; achieved Y coverage: 25.400 mm');
-    expect(data).toContain('; requested depth: 0.500 mm; achieved depth: 0.500 mm');
-    expect(
-      observedToastMessages.some((message) =>
-        message.includes('route-row work limit before completing the requested area height'),
-      ),
-    ).toBe(true);
-    expect(
-      observedToastMessages.some((message) =>
-        message.includes('Surfacing output differs from accepted positive inputs in Y coordinates'),
-      ),
-    ).toBe(true);
-    const toasts = useToastStore.getState().toasts;
-    expect(toasts).toContainEqual(
-      expect.objectContaining({
-        variant: 'success',
-        message: expect.stringContaining(
-          'Saved a bounded partial surfacing program with disclosed output differences (INCOMPLETE)',
-        ),
-      }),
-    );
-    expect(toasts).toContainEqual(
-      expect.objectContaining({
-        variant: 'success',
-        message: expect.stringContaining(
-          'requested Y coverage 50.000 mm; achieved Y coverage 25.400 mm',
-        ),
-      }),
-    );
-  }, 30_000);
-
-  it('saves sub-quantum depth with persisted evidence and truthful success wording', async () => {
-    const { platform, write } = mockPlatform();
-    const observedToastMessages: string[] = [];
-    const unsubscribe = useToastStore.subscribe((state) => {
-      observedToastMessages.push(...state.toasts.map((toast) => toast.message));
-    });
-
-    try {
-      await clickSave(platform, [], { 'Surfacing total depth': '0.0001' });
-    } finally {
-      unsubscribe();
-    }
-
-    expect(write).toHaveBeenCalledOnce();
-    const data = write.mock.calls[0]?.[0];
-    expect(typeof data).toBe('string');
-    if (typeof data !== 'string') throw new Error('expected text output');
-    expect(data).toContain('; *** INCOMPLETE SURFACING PROGRAM: OUTPUT VALUES DIFFER ***');
-    expect(data).toContain('; output depth: planned 0.0001 mm; achieved 0.000 mm');
-    expect(data).toContain('G1 Z0.000 F500.000');
-    expect(
-      observedToastMessages.some((message) =>
-        message.includes('Surfacing output differs from accepted positive inputs in depth levels'),
-      ),
-    ).toBe(true);
-    expect(useToastStore.getState().toasts).toContainEqual(
-      expect.objectContaining({
-        variant: 'success',
-        message: expect.stringContaining(
-          'Saved a surfacing program with disclosed output differences (INCOMPLETE): depth levels',
-        ),
-      }),
-    );
   });
 
   // Rule 7 / ADR-228: `no-go-zone-collision` and `out-of-bed` are the two

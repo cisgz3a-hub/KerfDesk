@@ -35,7 +35,6 @@ describe('ball-nose relief mask margin after emitted-coordinate rounding', () =>
       tool: TOOL,
       kernel: kernelForTool(TOOL, map.mmPerCell),
       scallopMm: 0.025,
-      stepoverPercent: 40,
     });
     expect(passes).toHaveLength(1);
 

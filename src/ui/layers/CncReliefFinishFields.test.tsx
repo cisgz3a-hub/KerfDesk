@@ -1,6 +1,5 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, DEFAULT_CNC_LAYER_SETTINGS } from '../../core/scene';
 import { useStore } from '../state';
@@ -15,7 +14,6 @@ import { ReliefLayerRows } from './CncLayerToolFields';
 const LAYER = createLayer({ id: 'relief-layer', color: '#ff0000' });
 
 afterEach(() => {
-  vi.useRealTimers();
   for (const toast of useToastStore.getState().toasts) {
     useToastStore.getState().dismissToast(toast.id);
   }
@@ -23,46 +21,6 @@ afterEach(() => {
 });
 
 describe('ReliefLayerRows', () => {
-  it('retains a sub-floor positive ball-nose cusp without policy min/max attributes', async () => {
-    vi.useFakeTimers();
-    useStore.setState({
-      project: { ...createProject(), scene: { objects: [], layers: [LAYER] } },
-    });
-    useStore.getState().setMachineKind('cnc');
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const onCommit = vi.fn();
-    await act(async () => {
-      root.render(
-        <ReliefLayerRows
-          layer={LAYER}
-          settings={DEFAULT_CNC_LAYER_SETTINGS}
-          onCommit={onCommit}
-          onCommitSettings={vi.fn()}
-        />,
-      );
-    });
-    try {
-      const input = host.querySelector<HTMLInputElement>(
-        'input[aria-label="Ball-nose relief scallop height for #ff0000"]',
-      );
-      if (input === null) throw new Error('ball-nose cusp input missing');
-      expect(input.getAttribute('min')).toBeNull();
-      expect(input.getAttribute('max')).toBeNull();
-      expect(input.value).toBe('0.025');
-      expect(host.textContent).toContain('mm cusp (ball nose)');
-
-      input.value = '0.0001';
-      await act(async () => Simulate.change(input));
-      await act(async () => vi.advanceTimersByTimeAsync(350));
-      expect(onCommit).toHaveBeenLastCalledWith({ reliefScallopMm: 0.0001 });
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-    }
-  });
-
   it('warns that a secondary finishing bit retains the layer cutting values', async () => {
     useStore.setState({
       project: { ...createProject(), scene: { objects: [], layers: [LAYER] } },

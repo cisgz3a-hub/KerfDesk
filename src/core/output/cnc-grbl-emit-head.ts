@@ -3,6 +3,8 @@
 // last COMMANDED position at emit precision so the emitters can skip
 // zero-length moves and redundant retracts by construction.
 
+// Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import { CNC_COORDINATE_DECIMAL_PLACES } from '../cnc/cnc-output-precision';
 
 const MIN_FEED_MM_PER_MIN = 1;

@@ -103,10 +103,7 @@ import {
   selectionTransformActions,
   type SelectionTransformActions,
 } from './selection-transform-actions';
-import {
-  registrationOutputActions,
-  type RegistrationOutputActions,
-} from './registration-output-actions';
+import { registrationActions, type RegistrationActions } from './registration-actions';
 import { boardCaptureActions } from './board-capture-actions';
 import { boardTileActions, type BoardTileActions } from './board-tile-actions';
 import {
@@ -126,11 +123,11 @@ import {
   fitToSelectionAction,
   historyActions,
   interactionActions,
+  saveTrackingActions,
   sceneActions,
   type MachineSetupReplacementResult,
   viewActions,
 } from './store-actions';
-import { saveTrackingActions } from './store-save-tracking-actions';
 import { variableDataActions, type VariableDataActions } from './variable-data-actions';
 import { arrayActions, type ArrayActions } from './array-actions';
 import { nestActions, type NestActions } from './nest-actions';
@@ -163,7 +160,7 @@ export type AppState = ObjectPropertiesActions &
   ProjectOptimizationActions &
   ProjectNotesActions &
   SelectionTransformActions &
-  RegistrationOutputActions &
+  RegistrationActions &
   PathNodeEditActions &
   PathNodeCurveCommandActions &
   BreakApartActions &
@@ -359,7 +356,7 @@ export type AppState = ObjectPropertiesActions &
     readonly cancelInteraction: () => void;
     readonly applyObjectTransform: (id: string, transform: Transform) => void;
 
-    readonly markSaved: (target: SaveTarget, expectedProject?: Project) => boolean;
+    readonly markSaved: (target: SaveTarget) => void;
     readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
   };
 
@@ -459,7 +456,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...projectOptimizationActions(set),
   ...projectNotesActions(set),
   ...selectionTransformActions(set),
-  ...registrationOutputActions(set),
+  ...registrationActions(set),
   ...boardCaptureActions(set),
   ...boardTileActions(set),
   ...pathNodeEditActions(set),

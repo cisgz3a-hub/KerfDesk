@@ -75,15 +75,14 @@ describe('buildOffsetLadder', () => {
     expect(ladder.offsetFailed).toBe(true);
   });
 
-  it('does not call an exact natural ending at maxSteps pass-limited', () => {
-    offsetsReturning(ok([SQUARE]), ok([SQUARE]), ok([SQUARE]), ok([]));
+  it('stops at maxSteps without calling that a failure', () => {
+    offsetsReturning(ok([SQUARE]), ok([SQUARE]), ok([SQUARE]), ok([SQUARE]));
 
     const ladder = buildOffsetLadder([SQUARE], 3, (step) => step);
 
     expect(ladder.rings).toHaveLength(3);
     expect(ladder.offsetFailed).toBe(false);
-    expect(ladder.capped).toBe(false);
-    expect(offsetChecked).toHaveBeenCalledTimes(4);
+    expect(offsetChecked).toHaveBeenCalledTimes(3);
   });
 
   // Insets are POSITIVE distances inward; the engine takes a signed offset.
@@ -126,16 +125,5 @@ describe('insetContoursChecked', () => {
     expect(ladder.rings).toHaveLength(3);
     expect(ladder.offsetFailed).toBe(false);
     expect(ladder.capped).toBe(true);
-    expect(offsetChecked).toHaveBeenCalledTimes(4);
-  });
-
-  it('reports an engine failure on the non-emitting budget lookahead', () => {
-    offsetsReturning(ok([SQUARE]), ok([SQUARE]), ok([SQUARE]), engineFailure());
-
-    const ladder = buildOffsetLadder([SQUARE], 3, (step) => step + 1);
-
-    expect(ladder.rings).toHaveLength(3);
-    expect(ladder.offsetFailed).toBe(true);
-    expect(ladder.capped).toBe(false);
   });
 });

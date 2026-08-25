@@ -1,4 +1,6 @@
 import { artworkOperationRuns } from '../artwork-order';
+// Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import type {
   CncCompilationSidecar,
   CncOffsetLadderCompilationEvidence,
@@ -16,6 +18,16 @@ export function offsetDiagnosticsForStatus(
   return [
     ...(status.offsetFailed ? ([{ layerId, kind: 'geometry-failed' }] as const) : []),
     ...(status.passLimited ? ([{ layerId, kind: 'pass-limit' }] as const) : []),
+  ];
+}
+
+export function reliefOffsetDiagnosticsForStatus(
+  layerId: string,
+  status: { readonly offsetFailed: boolean; readonly passLimited: boolean },
+): ReadonlyArray<CncOffsetLadderCompilationEvidence> {
+  return [
+    ...(status.offsetFailed ? ([{ layerId, kind: 'geometry-failed' }] as const) : []),
+    ...(status.passLimited ? ([{ layerId, kind: 'relief-pass-limit' }] as const) : []),
   ];
 }
 

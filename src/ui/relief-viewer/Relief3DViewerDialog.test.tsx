@@ -90,13 +90,22 @@ describe('Relief3DViewerDialog', () => {
     try {
       await act(async () => {
         root = createRoot(host);
+        const tinyWidthRelief = {
+          ...relief(),
+          transform: { ...IDENTITY_TRANSFORM, scaleX: 0.0025 },
+        };
         root.render(
-          <Relief3DViewerDialog relief={relief()} stockThicknessMm={6.35} onClose={onClose} />,
+          <Relief3DViewerDialog
+            relief={tinyWidthRelief}
+            stockThicknessMm={6.35}
+            onClose={onClose}
+          />,
         );
       });
 
       expect(host.querySelector('[role="dialog"]')).not.toBeNull();
       expect(host.textContent).toContain('model.stl');
+      expect(host.textContent).toContain('0.25 mm wide');
       expect(host.textContent).toContain(
         'Relief 3D preview uses 0.390625 mm display cells (0.25 mm nominal target)',
       );
@@ -131,18 +140,55 @@ describe('Relief3DViewerDialog', () => {
     }
   }, 30_000);
 
+  it('does not show a display-budget notice at the nominal target', async () => {
+    worker.prepare.mockResolvedValue({
+      kind: 'ok',
+      heightmap: {
+        widthCells: 2,
+        heightCells: 1,
+        mmPerCell: 0.25,
+        depth: new Float32Array([-5, 0]),
+      },
+      widthMm: 50,
+      heightMm: 25,
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => {
+        root.render(
+          <Relief3DViewerDialog
+            relief={depthMapRelief()}
+            stockThicknessMm={6.35}
+            onClose={vi.fn()}
+          />,
+        );
+      });
+      await vi.waitFor(() => expect(worker.prepareSurface).toHaveBeenCalledOnce());
+      expect(host.textContent).not.toContain('Relief 3D preview uses');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('materializes depth maps in the shared worker and aborts when the dialog closes', async () => {
+    const transformedRelief = {
+      ...depthMapRelief(),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 0.5, scaleY: 20 },
+    };
     worker.prepare.mockReturnValue(
       Promise.resolve({
         kind: 'ok',
         heightmap: {
           widthCells: 2,
           heightCells: 1,
-          mmPerCell: 25,
+          mmPerCell: 500 / 256,
           depth: new Float32Array([-5, 0]),
         },
-        widthMm: 50,
-        heightMm: 25,
+        widthMm: 25,
+        heightMm: 500,
       }),
     );
     const surface = deferred<{
@@ -159,17 +205,26 @@ describe('Relief3DViewerDialog', () => {
     await act(async () => {
       root.render(
         <Relief3DViewerDialog
-          relief={depthMapRelief()}
+          relief={transformedRelief}
           stockThicknessMm={6.35}
           onClose={vi.fn()}
         />,
       );
     });
-    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(host.textContent).toContain(
+      'Relief 3D preview uses 1.953125 mm display cells (0.25 mm nominal target)',
+    );
 
     await vi.waitFor(() => {
       expect(worker.prepare).toHaveBeenCalledOnce();
       expect(worker.prepareSurface).toHaveBeenCalledOnce();
+    });
+    expect(host.textContent).toContain('25 mm wide');
+    expect(worker.prepare.mock.calls[0]?.[1]).toMatchObject({
+      targetWidthMm: 50,
+      targetScaleX: 0.5,
+      targetScaleY: 20,
+      mmPerCell: 500 / 256,
     });
     const signal = worker.prepare.mock.calls[0]?.[2] as AbortSignal | undefined;
     expect(signal?.aborted).toBe(false);

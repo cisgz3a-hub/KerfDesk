@@ -165,15 +165,15 @@ function ReliefFinishRow(props: {
         <CncToolOptions tools={tools} />
       </select>
       <ClearableNumberField
-        positiveOnly
+        min={0.005}
+        max={1}
         step={0.005}
         value={props.settings.reliefScallopMm ?? 0.025}
         onCommit={(mm) => props.onCommit({ reliefScallopMm: mm })}
-        ariaLabel={`Ball-nose relief scallop height for ${props.layer.color}`}
-        title="Ball-nose flat-plane cusp target (mm) — smaller = finer finishing rows, longer job. A target above the ball radius cannot define a cusp, so finishing uses the layer's exact Stepover and Job Review explains the fallback. Non-ball finishing also uses Stepover."
+        ariaLabel={`Relief scallop height for ${props.layer.color}`}
+        title="Scallop height target (mm) — smaller = finer finishing rows, longer job."
         style={scallopInputStyle}
       />
-      <span style={rampUnitStyle}>mm cusp (ball nose)</span>
     </Row>
   );
 }

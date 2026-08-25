@@ -16,6 +16,8 @@ import {
   type RemovalGrid,
   type ToolProfilePoint,
 } from '../../core/sim';
+// Deep imports: core/sim's public barrel is hard-capped at 20 exports by its
+// index contract, so these display-resolution symbols remain on leaf paths.
 import { removalGridDisplayResolution } from '../../core/sim/removal-grid-display';
 import type { RemovalGridResolution } from '../../core/sim/removal-grid';
 import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';

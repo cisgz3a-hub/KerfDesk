@@ -3,6 +3,8 @@ import {
   type ReliefSurfaceMeshWithNormals,
 } from '../../core/relief/relief-surface-mesh';
 import { downsampleRemovalGrid, type RemovalGrid } from '../../core/sim';
+// Deep imports: core/sim's public barrel is hard-capped at 20 exports by its
+// index contract, so these display-resolution symbols remain on leaf paths.
 import { removalGridDisplayResolution } from '../../core/sim/removal-grid-display';
 import type { RemovalGridResolution } from '../../core/sim/removal-grid';
 

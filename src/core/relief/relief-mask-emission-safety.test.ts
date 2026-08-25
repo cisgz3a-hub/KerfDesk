@@ -39,11 +39,16 @@ type MaskEmissionCase = {
 const MASK_EMISSION_CASES: ReadonlyArray<MaskEmissionCase> = [
   {
     name: 'fractional end-mill grid with sub-quantum translation',
-    tool: { id: 'mask-flat-2', name: '2 mm end mill', kind: 'end-mill', diameterMm: 2 },
+    tool: {
+      id: 'mask-flat-fractional',
+      name: 'fractional end mill',
+      kind: 'end-mill',
+      diameterMm: (1.0001 / 5.5) * 10,
+    },
     cellMm: 1.0001 / 5.5,
     columns: 24,
     includedColumns: 20,
-    stepoverPercent: (1.0001 / 5.5 / 2) * 100,
+    stepoverPercent: 10,
     scallopMm: 0.025,
     transform: { ...IDENTITY_TRANSFORM, x: 0.0006, y: 20.0004 },
   },

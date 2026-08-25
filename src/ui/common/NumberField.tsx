@@ -1,6 +1,6 @@
 // NumberField - a clearable numeric input. Shows your keystrokes (including an
-// empty box while you retype), commits either a bounded value or an exact
-// finite-positive value, and restores the last committed value on blur. Wraps the
+// empty box while you retype), commits a clamped number once a valid one is
+// typed, and restores the last committed value on blur if left blank. Wraps the
 // shared useDebouncedCommit so every ad-hoc numeric input can adopt the same
 // clear-to-retype behaviour instead of re-implementing parse-and-commit - the
 // source of the "can't erase the box" bug across the app.

@@ -120,7 +120,8 @@ export function vcarveChordInsideRegion(
   const chordMinY = Math.min(from.y, to.y);
   const chordMaxY = Math.max(from.y, to.y);
   for (const boundary of segments) {
-    if (boxMissesBox(boundary, chordMinX, chordMinY, chordMaxX, chordMaxY, 0)) continue;
+    if (boxMissesBox(boundary, chordMinX, chordMinY, chordMaxX, chordMaxY, GEOMETRY_EPSILON_MM))
+      continue;
     const intersection = segmentIntersectionParameters(from, to, boundary.a, boundary.b);
     if (intersection.kind === 'overlap') return false;
     if (

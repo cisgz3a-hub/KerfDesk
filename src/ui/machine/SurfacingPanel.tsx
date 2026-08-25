@@ -23,12 +23,6 @@ import { RailSection } from '../kit';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
-import {
-  surfacingCoverageWarning,
-  surfacingOutputPrecisionWarning,
-  surfacingPlanningWarning,
-  surfacingSaveSuccessMessage,
-} from './surfacing-artifact-messages';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
 const DEFAULT_FEED_MM_PER_MIN = 2500;
@@ -154,12 +148,6 @@ async function saveSurfacingProgram({
     return;
   }
   const { program } = result;
-  const planningWarning = surfacingPlanningWarning(program.planning);
-  if (planningWarning !== null) pushToast(planningWarning, 'warning');
-  const coverageWarning = surfacingCoverageWarning(program.coverage);
-  if (coverageWarning !== null) pushToast(coverageWarning, 'warning');
-  const outputWarning = surfacingOutputPrecisionWarning(program.outputPrecision);
-  if (outputWarning !== null) pushToast(outputWarning, 'warning');
   const emitted = emitStandaloneCncGcode(project, program.lines.join('\n'), buildGcodeMetadata());
   // Rule 7 / ADR-228: this read `preflight.ok`, which is false for ANY issue,
   // so runStandaloneCncPreflight's heuristic findings — out-of-bed and
@@ -194,7 +182,10 @@ async function saveSurfacingProgram({
     });
     if (target === null) return;
     await target.write(emitted.gcode);
-    pushToast(surfacingSaveSuccessMessage(program, tool.name), 'success');
+    pushToast(
+      `Saved preflighted surfacing program: ${program.passes} pass(es) × ${program.rowsPerPass} rows with the ${tool.name}. Zero X/Y at the area's front-left corner and Z on the surface before running; the file lifts to safe Z before spindle start.`,
+      'success',
+    );
   } catch (err) {
     pushToast(
       `Could not save the surfacing program: ${err instanceof Error ? err.message : String(err)}`,

@@ -26,7 +26,7 @@
 
 import type { Toolpath, ToolpathStep } from '../job';
 import type { CncTool } from '../scene';
-import { partialGridHasPartialCell } from '../grid';
+import { partialCellCenter } from '../grid';
 import {
   createRemovalGrid,
   gridCellIndex,
@@ -34,7 +34,6 @@ import {
   type RemovalGridResult,
   type RemovalGridSpec,
 } from './removal-grid';
-import { stampPartialToolTip } from './stamp-partial-tool';
 import { kernelForTool, type ToolKernel } from './tool-kernels';
 
 export type ComputeRemovalOptions = {
@@ -275,46 +274,70 @@ function stampSegment(
   return false;
 }
 
+// Measures the cutting surface from the tool's REAL position, not from the
+// centre of the cell it lands in.
+//
+// `kernel.offsets` carries a height precomputed from a whole-cell distance, so
+// using it here quietly moved the bit to the nearest cell centre before
+// cutting. On a 30 degree v-bit at 0.2 mm cells that is up to
+// 0.1 / tan(15 deg) = 0.373 mm of depth error, and because the error is locked
+// to the cell lattice it survives as a regular field of uncut spikes standing
+// inside a groove — visible the moment the grid is fine enough to resolve a
+// groove at all. The offsets stay as they are for roughing and finishing,
+// which dilate on the lattice and want exactly that model.
+//
+// Candidate bounds come from the cutter's physical radius; each cell then uses
+// its real center, including a shortened terminal cell.
 function stampTip(grid: RemovalGrid, kernel: ToolKernel, x: number, y: number, tipZ: number): void {
-  // Use the nominal lattice even outside stock: an edge-centred cutter can
-  // still overlap interior cells. Probe lookup deliberately remains stricter.
-  const cx = Math.floor((x - grid.originX) / grid.mmPerCell);
-  const cy = Math.floor((y - grid.originY) / grid.mmPerCell);
-  if (!hasTerminalCellInSurfaceRange(grid, kernel, cx, cy)) {
-    stampUniformTip(grid, kernel, cx, cy, tipZ);
-    return;
+  const radiusMm = kernel.radiusMm;
+  const surfaceDzAtRadius = kernel.surfaceDzAtRadius;
+  const cuttingRadiusMm = activeCuttingRadiusMm(kernel.tool, radiusMm, tipZ, surfaceDzAtRadius);
+  const radiusSquared = cuttingRadiusMm * cuttingRadiusMm;
+  const minCol = Math.floor((x - cuttingRadiusMm - grid.originX) / grid.mmPerCell);
+  const maxCol = Math.floor((x + cuttingRadiusMm - grid.originX) / grid.mmPerCell);
+  const minRow = Math.floor((y - cuttingRadiusMm - grid.originY) / grid.mmPerCell);
+  const maxRow = Math.floor((y + cuttingRadiusMm - grid.originY) / grid.mmPerCell);
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      const index = gridCellIndex(grid, col, row);
+      if (index === null) continue;
+      const cellX = grid.originX + partialCellCenter(grid, 'x', col);
+      const cellY = grid.originY + partialCellCenter(grid, 'y', row);
+      const dxMm = cellX - x;
+      const dyMm = cellY - y;
+      const distanceSquared = dxMm * dxMm + dyMm * dyMm;
+      if (distanceSquared > radiusSquared) continue;
+      const surfaceZ =
+        kernel.tool.kind === 'end-mill'
+          ? tipZ
+          : tipZ + surfaceDzAtRadius(Math.sqrt(distanceSquared));
+      if (surfaceZ >= 0) continue;
+      const current = grid.depth[index] ?? 0;
+      if (surfaceZ < current) grid.depth[index] = surfaceZ;
+    }
   }
-  stampPartialToolTip(grid, kernel, cx, cy, x, y, tipZ);
 }
 
-function hasTerminalCellInSurfaceRange(
-  grid: RemovalGrid,
-  kernel: ToolKernel,
-  cx: number,
-  cy: number,
-): boolean {
-  const span = kernel.surfaceCandidateSpanCells;
-  const terminalX = grid.widthCells - 1;
-  const terminalY = grid.heightCells - 1;
-  return (
-    (partialGridHasPartialCell(grid, 'x') && Math.abs(cx - terminalX) <= span) ||
-    (partialGridHasPartialCell(grid, 'y') && Math.abs(cy - terminalY) <= span)
-  );
-}
-
-function stampUniformTip(
-  grid: RemovalGrid,
-  kernel: ToolKernel,
-  cx: number,
-  cy: number,
+// Conical and ball tools only touch stock out to the radius where their
+// surface rises back to z=0. Scanning the full physical radius at every
+// shallow path sample is both unnecessary and very expensive. The shared
+// surface law is monotonic, so a small fixed binary search gives a conservative
+// outer radius while retaining the exact per-cell surface calculation below.
+function activeCuttingRadiusMm(
+  tool: ToolKernel['tool'],
+  radiusMm: number,
   tipZ: number,
-): void {
-  for (const offset of kernel.offsets) {
-    const index = gridCellIndex(grid, cx + offset.dx, cy + offset.dy);
-    if (index === null) continue;
-    const surfaceZ = tipZ + offset.dz;
-    if (surfaceZ >= 0) continue;
-    const current = grid.depth[index] ?? 0;
-    if (surfaceZ < current) grid.depth[index] = surfaceZ;
+  surfaceDzAtRadius: ToolKernel['surfaceDzAtRadius'],
+): number {
+  if (tool.kind === 'end-mill' || surfaceDzAtRadius(radiusMm) < -tipZ) {
+    return radiusMm;
   }
+  let low = 0;
+  let high = radiusMm;
+  for (let iteration = 0; iteration < 20; iteration += 1) {
+    const middle = (low + high) / 2;
+    if (tipZ + surfaceDzAtRadius(middle) < 0) low = middle;
+    else high = middle;
+  }
+  return high;
 }

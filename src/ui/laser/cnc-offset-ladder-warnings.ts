@@ -36,7 +36,6 @@ export function detectCncOffsetLadderWarnings(
             project.device,
             machine,
             compiledJob,
-            undefined,
             false,
           );
   return diagnostics.map((diagnostic) => ladderWarningFor(project, diagnostic));
@@ -76,6 +75,8 @@ function ladderWarningFor(project: Project, diagnostic: CncOffsetLadderDiagnosti
   switch (diagnostic.kind) {
     case 'pass-limit':
       return passLimitWarning(layerName);
+    case 'relief-pass-limit':
+      return reliefPassLimitWarning(layerName);
     case 'geometry-failed':
       return offsetLadderWarning(layerName);
     case 'thin-detail-dropped':
@@ -83,6 +84,16 @@ function ladderWarningFor(project: Project, diagnostic: CncOffsetLadderDiagnosti
     default:
       return assertNever(diagnostic.kind, 'CncOffsetLadderDiagnostic kind');
   }
+}
+
+function reliefPassLimitWarning(layerName: string): string {
+  return (
+    `Relief roughing on layer "${layerName}" reached its bounded inward-ring limit at one or ` +
+    'more depth levels while usable interior remained. The generated roughing passes still cut, ' +
+    'but the affected levels can leave an uncleared core that a later finishing pass may meet. ' +
+    'Check the roughing preview before running; a larger roughing cutter or greater roughing ' +
+    'stepover requires fewer inward rings.'
+  );
 }
 
 function layerNameFor(project: Project, layerId: string): string {

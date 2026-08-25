@@ -1,16 +1,13 @@
 // importStlFiles — drag-and-drop STL → ReliefObject (Phase H.4, ADR-098).
-// CNC-only: relief carving has no laser meaning, so drops in laser mode get
-// a clear toast instead of a silent no-op. Imports land at a default size
-// (100 mm wide × 5 mm deep, background carved away) on a dedicated relief
-// layer color; width/depth/background are edited afterwards in the Relief
-// properties panel (SelectedReliefProperties).
+// Relief geometry persists in either machine mode; every import discloses that
+// CNC alone produces its output. Imports land at a default size (100 mm wide
+// × 5 mm deep, background carved away) on a dedicated relief layer color;
+// width/depth/background are edited afterwards in the Relief properties panel.
 
 import {
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
-  machineKindOf,
   RELIEF_EMBED_TRIANGLE_LIMIT,
-  type Project,
   type SceneObject,
 } from '../../core/scene';
 import type { MeshReliefObject } from '../../core/scene/relief';
@@ -29,6 +26,8 @@ import { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-impor
 export { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
 // Coarse probe cell — only validates the mesh and derives the aspect ratio.
 const PROBE_CELL_MM = 1;
+const CNC_OUTPUT_NOTE =
+  ' It is stored in either machine mode; output geometry is generated only in CNC mode.';
 const STL_PREPARATION_OPTIONS: StlImportPreparationOptions = {
   targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
   reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
@@ -42,19 +41,11 @@ export function isStlFile(file: File): boolean {
 export async function importStlFiles(
   files: ReadonlyArray<File>,
   ctx: {
-    readonly project: Project;
     readonly importObject: (obj: SceneObject, batchIdx?: number) => unknown;
     readonly pushToast: (message: string, variant?: ToastVariant) => void;
   },
 ): Promise<void> {
   if (files.length === 0) return;
-  if (machineKindOf(ctx.project.machine) !== 'cnc') {
-    ctx.pushToast(
-      'STL relief import needs CNC mode — flip the Laser/CNC toggle in the layers panel first.',
-      'error',
-    );
-    return;
-  }
   let successIdx = 0;
   for (const file of files) {
     const sizeAdvisory = importSourceSizeAdvisory(file, 'stl');
@@ -79,7 +70,7 @@ export async function importStlFiles(
       successIdx += 1;
       ctx.pushToast(
         `Imported relief "${file.name}" (${triangles} triangles) at ` +
-          `${DEFAULT_RELIEF_WIDTH_MM} mm wide × ${DEFAULT_RELIEF_DEPTH_MM} mm deep.`,
+          `${DEFAULT_RELIEF_WIDTH_MM} mm wide × ${DEFAULT_RELIEF_DEPTH_MM} mm deep.${CNC_OUTPUT_NOTE}`,
         'success',
       );
     } catch (err) {

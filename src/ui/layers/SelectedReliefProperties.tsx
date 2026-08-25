@@ -5,7 +5,9 @@
 // panel is the mirror case — ADR-101 §3).
 
 import { useState } from 'react';
-import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
+// Deep import: core/relief's public barrel is a ratcheted over-cap legacy
+// barrel and may only shrink; keep the established exports intact.
+import { reliefPhysicalDimensions } from '../../core/relief/relief-physical-dimensions';
 import { machineKindOf, type ReliefObject } from '../../core/scene';
 import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene/relief';
 import { Relief3DViewerDialog } from '../relief-viewer';
@@ -24,9 +26,10 @@ export function SelectedReliefProperties(): JSX.Element | null {
   const stockThicknessMm = useStore((s) =>
     s.project.machine?.kind === 'cnc' ? s.project.machine.stock.thicknessMm : 0,
   );
+  const projectDocumentEpoch = useStore((s) => s.projectDocumentEpoch);
   const [viewerOpen, setViewerOpen] = useState(false);
   if (relief === null) return null;
-  const physical = reliefMachineSpaceGeometry(relief);
+  const physical = reliefPhysicalDimensions(relief);
   return (
     <section aria-label="Relief properties" style={sectionStyle}>
       <h3 style={headingStyle}>Relief</h3>
@@ -49,17 +52,17 @@ export function SelectedReliefProperties(): JSX.Element | null {
         />
       ) : null}
       <ReliefNumberField
-        key={`${relief.id}:width`}
+        key={`${projectDocumentEpoch}:${relief.id}:width`}
         relief={relief}
         label="Width"
-        value={physical.widthMm}
+        value={relief.targetWidthMm}
+        scale={physical.targetScaleX}
         step={1}
-        title="Carved width on the stock after object scale. Editing preserves the current scale."
+        title="Relief surface planning width along its local X axis before rotation. Height also uses the current Y scale; a legacy zero-scale axis remains collapsed in output."
         commitKey="targetWidthMm"
-        toStoredValue={(value) => value / physical.targetScaleX}
       />
       <ReliefNumberField
-        key={`${relief.id}:depth`}
+        key={`${projectDocumentEpoch}:${relief.id}:depth`}
         relief={relief}
         label="Depth"
         value={relief.reliefDepthMm}
@@ -93,22 +96,41 @@ function ReliefNumberField(props: {
   readonly relief: ReliefObject;
   readonly label: string;
   readonly value: number;
+  readonly scale?: number;
   readonly step: number;
   readonly title: string;
   readonly commitKey: 'targetWidthMm' | 'reliefDepthMm';
-  readonly toStoredValue?: (value: number) => number;
+}): JSX.Element {
+  // A scale change remounts the input so cleanup cancels a pending commit
+  // parsed under the old authored-to-physical mapping.
+  return <ReliefNumberInput key={props.scale ?? 1} {...props} />;
+}
+
+function ReliefNumberInput(props: {
+  readonly relief: ReliefObject;
+  readonly label: string;
+  readonly value: number;
+  readonly scale?: number;
+  readonly step: number;
+  readonly title: string;
+  readonly commitKey: 'targetWidthMm' | 'reliefDepthMm';
 }): JSX.Element {
   const setReliefParams = useStore((s) => s.setReliefParams);
+  const scale = props.scale ?? 1;
+  const canonicalDisplay = formatReliefValue(props.value * scale);
   const debounced = useDebouncedCommit<number>({
     value: props.value,
-    commit: (value) =>
-      setReliefParams(props.relief.id, {
-        [props.commitKey]: props.toStoredValue?.(value) ?? value,
-      }),
+    commit: (value) => setReliefParams(props.relief.id, { [props.commitKey]: value }),
+    reconcileKey: scale,
     parse: (input) => {
-      const parsed = Number.parseFloat(input);
+      // Preserve the exact authored value when the untouched canonical display
+      // is rounded. Otherwise blur could create an undo frame and subtly alter
+      // bounds at irrational transform scales.
+      if (input.trim() === canonicalDisplay) return props.value;
+      const parsed = Number.parseFloat(input) / scale;
       return positiveFinite(parsed) ? parsed : props.value;
     },
+    format: (value) => formatReliefValue(value * scale),
   });
   return (
     <label style={rowStyle}>
@@ -128,6 +150,12 @@ function ReliefNumberField(props: {
       </span>
     </label>
   );
+}
+
+const MAX_RELIEF_DIMENSION_DECIMALS = 6;
+function formatReliefValue(value: number): string {
+  if (!Number.isFinite(value)) return '';
+  return value.toFixed(MAX_RELIEF_DIMENSION_DECIMALS).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function positiveFinite(value: number): boolean {

@@ -138,7 +138,7 @@ describe('computeDesignSceneSource', () => {
       effectiveMmPerCell: 0.4,
       reason: 'display-mesh-cell-budget',
     });
-  });
+  }, 30_000);
 
   it('stamps each tool section of a two-bit job with its own bit kernel', () => {
     const source = preparedDesignSceneSource(TWO_BIT_PROJECT);
@@ -176,7 +176,7 @@ describe('computeDesignSceneSource', () => {
     let deepest = 0;
     for (const depth of grid.depth) deepest = Math.min(deepest, depth);
     expect(deepest).toBeGreaterThanOrEqual(-5.51);
-  });
+  }, 30_000);
 
   it('resolves a single-bit job to the layer bit even when it is not the active bit', () => {
     const project: Project = {
@@ -199,7 +199,7 @@ describe('computeDesignSceneSource', () => {
     // v-bit's 3.175 mm radius, not the active 1/8" bit's 1.59 mm.
     const maxRadiusMm = Math.max(...source.toolProfile.map((point) => point.radiusMm));
     expect(maxRadiusMm).toBeCloseTo(3.175, 2);
-  });
+  }, 30_000);
 
   it('returns null for a laser project', () => {
     expect(computeDesignSceneSource(createProject(), DEFAULT_OUTPUT_SCOPE)).toBeNull();

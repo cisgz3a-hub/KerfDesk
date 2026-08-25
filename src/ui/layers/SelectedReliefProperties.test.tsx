@@ -116,7 +116,7 @@ describe('SelectedReliefProperties', () => {
       const depth = host.querySelector('input[aria-label="Relief depth (mm)"]');
       if (!(depth instanceof HTMLInputElement)) throw new Error('depth input missing');
       await act(async () => {
-        depth.value = '8';
+        depth.value = '0.05';
         Simulate.change(depth);
       });
       await act(async () => {
@@ -124,36 +124,200 @@ describe('SelectedReliefProperties', () => {
       });
 
       const stored = useStore.getState().project.scene.objects[0];
-      expect(stored?.kind === 'relief' && stored.reliefDepthMm).toBe(8);
+      expect(stored?.kind === 'relief' && stored.reliefDepthMm).toBe(0.05);
     } finally {
       await act(async () => root.unmount());
       host.remove();
     }
   });
 
-  it('displays and edits the physical width after object scale', async () => {
-    installProject('cnc', {
-      ...relief(),
-      transform: { ...IDENTITY_TRANSFORM, scaleX: -0.5, scaleY: 2 },
-    });
+  it('reports and edits physical width without rewriting an untouched rounded value', async () => {
+    const object = {
+      ...depthRelief(),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 0.36, scaleY: 2 },
+    };
+    installProject('cnc', object);
+    useStore.setState({ dirty: false, undoStack: [], redoStack: [] });
     const { host, root } = await render();
     try {
       const width = host.querySelector('input[aria-label="Relief width (mm)"]');
       if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
-      expect(width.value).toBe('50');
+      expect(width.value).toBe('36');
+      expect(width.min).toBe('');
+      expect(width.max).toBe('');
+      expect(width.title).toMatch(/local X axis.*current Y scale/i);
+
+      await act(async () => Simulate.blur(width));
+      let stored = useStore.getState().project.scene.objects[0];
+      if (stored?.kind !== 'relief') throw new Error('relief missing');
+      expect(stored.targetWidthMm).toBe(100);
+      expect(stored.bounds).toEqual({ minX: 0, minY: 0, maxX: 100, maxY: 50 });
+      expect(useStore.getState().dirty).toBe(false);
+      expect(useStore.getState().undoStack).toHaveLength(0);
 
       await act(async () => {
-        width.value = '75';
+        width.value = '720';
+        Simulate.change(width);
+      });
+      await act(async () => Simulate.blur(width));
+      stored = useStore.getState().project.scene.objects[0];
+      if (stored?.kind !== 'relief') throw new Error('relief missing');
+      expect(stored.targetWidthMm).toBe(2000);
+      expect(stored.targetWidthMm * Math.abs(stored.transform.scaleX)).toBe(720);
+      expect(stored.bounds).toEqual({ minX: 0, minY: 0, maxX: 2000, maxY: 1000 });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('does not round-trip an untouched physical width back into authored bounds', async () => {
+    const object = {
+      ...depthRelief(),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 1 / 3 },
+    };
+    installProject('cnc', object);
+    useStore.setState({ dirty: false, undoStack: [], redoStack: [] });
+    const { host, root } = await render();
+    try {
+      const width = host.querySelector('input[aria-label="Relief width (mm)"]');
+      if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
+      expect(width.value).toBe('33.333333');
+      await act(async () => Simulate.blur(width));
+
+      const stored = useStore.getState().project.scene.objects[0];
+      if (stored?.kind !== 'relief') throw new Error('relief missing');
+      expect(stored.targetWidthMm).toBe(100);
+      expect(stored.bounds).toEqual({ minX: 0, minY: 0, maxX: 100, maxY: 50 });
+      expect(useStore.getState().dirty).toBe(false);
+      expect(useStore.getState().undoStack).toHaveLength(0);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it.each([
+    { name: 'negative', scaleX: -2, initial: '200', edited: '300', targetWidthMm: 150 },
+    { name: 'legacy zero', scaleX: 0, initial: '100', edited: '125', targetWidthMm: 125 },
+  ])('keeps $name X scale semantics while editing physical width', async (fixture) => {
+    const object = {
+      ...depthRelief(),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: fixture.scaleX },
+    };
+    installProject('cnc', object);
+    const { host, root } = await render();
+    try {
+      const width = host.querySelector('input[aria-label="Relief width (mm)"]');
+      if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
+      expect(width.value).toBe(fixture.initial);
+      await act(async () => {
+        width.value = fixture.edited;
         Simulate.change(width);
       });
       await act(async () => Simulate.blur(width));
 
       const stored = useStore.getState().project.scene.objects[0];
-      expect(stored?.kind === 'relief' ? stored.targetWidthMm : null).toBe(150);
-      expect(stored?.transform.scaleX).toBe(-0.5);
+      if (stored?.kind !== 'relief') throw new Error('relief missing');
+      expect(stored.targetWidthMm).toBe(fixture.targetWidthMm);
+      expect(stored.transform.scaleX).toBe(fixture.scaleX);
     } finally {
       await act(async () => root.unmount());
       host.remove();
+    }
+  });
+
+  it('cancels a pending width commit when an external resize changes scale', async () => {
+    vi.useFakeTimers();
+    installProject('cnc', depthRelief());
+    const { host, root } = await render();
+    try {
+      const width = host.querySelector('input[aria-label="Relief width (mm)"]');
+      if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
+      await act(async () => {
+        width.value = '125';
+        Simulate.change(width);
+      });
+      const object = useStore.getState().project.scene.objects[0];
+      if (object?.kind !== 'relief') throw new Error('relief missing');
+      await act(async () =>
+        useStore
+          .getState()
+          .applySelectionTransforms([
+            { id: object.id, transform: { ...object.transform, scaleX: 2 } },
+          ]),
+      );
+      await act(async () => vi.advanceTimersByTime(350));
+
+      const stored = useStore.getState().project.scene.objects[0];
+      if (stored?.kind !== 'relief') throw new Error('relief missing');
+      expect(stored.targetWidthMm).toBe(100);
+      expect(stored.transform.scaleX).toBe(2);
+      const refreshed = host.querySelector('input[aria-label="Relief width (mm)"]');
+      if (!(refreshed instanceof HTMLInputElement)) throw new Error('width input missing');
+      expect(refreshed.value).toBe('200');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels a pending width commit when authored width changes externally', async () => {
+    vi.useFakeTimers();
+    installProject('cnc', depthRelief());
+    const { host, root } = await render();
+    try {
+      const width = host.querySelector('input[aria-label="Relief width (mm)"]');
+      if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
+      await act(async () => {
+        width.value = '125';
+        Simulate.change(width);
+      });
+      await act(async () => useStore.getState().setReliefParams('R1', { targetWidthMm: 140 }));
+      await act(async () => vi.advanceTimersByTime(350));
+
+      const stored = useStore.getState().project.scene.objects[0];
+      expect(stored?.kind === 'relief' ? stored.targetWidthMm : null).toBe(140);
+      const refreshed = host.querySelector('input[aria-label="Relief width (mm)"]');
+      if (!(refreshed instanceof HTMLInputElement)) throw new Error('width input missing');
+      expect(refreshed.value).toBe('140');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels a pending edit when a new document reuses the relief id', async () => {
+    vi.useFakeTimers();
+    installProject('cnc', depthRelief());
+    const { host, root } = await render();
+    try {
+      const width = host.querySelector('input[aria-label="Relief width (mm)"]');
+      if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
+      await act(async () => {
+        width.value = '125';
+        Simulate.change(width);
+      });
+      await act(async () => {
+        useStore.setState((state) => ({
+          project: {
+            ...state.project,
+            scene: { ...state.project.scene, objects: [depthRelief()] },
+          },
+          projectDocumentEpoch: state.projectDocumentEpoch + 1,
+          selectedObjectId: 'R1',
+        }));
+      });
+      await act(async () => vi.advanceTimersByTime(350));
+
+      const stored = useStore.getState().project.scene.objects[0];
+      expect(stored?.kind === 'relief' ? stored.targetWidthMm : null).toBe(100);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      vi.useRealTimers();
     }
   });
 

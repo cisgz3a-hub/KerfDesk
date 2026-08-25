@@ -23,6 +23,12 @@ export type SaveTarget = {
   readonly write: (data: string | Blob) => Promise<void>;
 };
 
+/** A picked directory that can mint named targets later. Merely reserving the
+ * directory never creates or truncates a file. */
+export type SaveDirectoryTarget = {
+  readonly file: (displayName: string) => SaveTarget;
+};
+
 export type FileOpenRequest = {
   readonly accept: ReadonlyArray<string>; // e.g. ['.svg'] or ['.lf2']
   readonly multiple: boolean;
@@ -31,6 +37,9 @@ export type FileOpenRequest = {
 export type FileSaveRequest = {
   readonly suggestedName: string;
   readonly extensions: ReadonlyArray<string>; // e.g. ['.gcode', '.nc']
+  /** Optional non-blocking filename surface supplied by the UI. Web directory
+   * reservations use this instead of a renderer-blocking native prompt. */
+  readonly chooseName?: (suggestedName: string) => Promise<string | null>;
 };
 
 // --- Serial port (Phase B) ---
@@ -207,6 +216,13 @@ export type PlatformAdapter = {
   // Show a file-save picker. Resolves to a SaveTarget the caller writes
   // through, or `null` if the user cancels.
   readonly pickFileForSave: (req: FileSaveRequest) => Promise<SaveTarget | null>;
+  /** Reserve a destination during user activation without creating or
+   * truncating the file. Web uses a directory handle plus an editable filename;
+   * native adapters can omit this and keep their non-destructive save dialog. */
+  readonly reserveFileForSave?: (req: FileSaveRequest) => Promise<SaveTarget | null>;
+  /** Reserve one directory for a generated multi-file export. The caller names
+   * each file only after every output has prepared successfully. */
+  readonly reserveSaveDirectory?: () => Promise<SaveDirectoryTarget | null>;
 
   // Phase B: serial port access for connecting to the laser controller.
   readonly serial: SerialAdapter;

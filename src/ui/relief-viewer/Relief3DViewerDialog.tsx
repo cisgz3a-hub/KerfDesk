@@ -5,9 +5,11 @@
 // jsdom tests assert).
 
 import { useCallback, useMemo } from 'react';
-import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
 import { heightmapCellSize, type Heightmap } from '../../core/relief';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
+// Deep import: core/relief's public barrel is a ratcheted over-cap legacy
+// barrel and may only shrink; keep the established exports intact.
+import { reliefPhysicalDimensions } from '../../core/relief/relief-physical-dimensions';
 import type { ReliefObject } from '../../core/scene';
 import {
   prepareCncCut3DSurfaceOffThread,
@@ -27,10 +29,10 @@ export function Relief3DViewerDialog(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const { relief, stockThicknessMm } = props;
-  const physical = reliefMachineSpaceGeometry(relief);
+  const dimensions = reliefPhysicalDimensions(relief);
   const resolution = useMemo(
-    () => relief3dDisplayResolution(physical.widthMm, physical.heightMm),
-    [physical.heightMm, physical.widthMm],
+    () => relief3dDisplayResolution(dimensions.widthMm, dimensions.heightMm),
+    [dimensions.heightMm, dimensions.widthMm],
   );
   const resolutionNotice = relief3dDisplayResolutionNotice(resolution);
   const buildScene = useCallback(
@@ -42,7 +44,7 @@ export function Relief3DViewerDialog(props: {
     <Viewer3DDialogShell
       ariaLabel="Relief 3D viewer"
       canvasAriaLabel="Relief 3D preview"
-      title={`${relief.source} — ${physical.widthMm.toFixed(0)} mm wide × ${relief.reliefDepthMm.toFixed(1)} mm deep`}
+      title={`${relief.source} — ${formatMm(dimensions.widthMm)} mm wide × ${formatMm(relief.reliefDepthMm)} mm deep`}
       {...(resolutionNotice === undefined ? {} : { notice: resolutionNotice })}
       onClose={props.onClose}
       buildScene={buildScene}
@@ -58,10 +60,10 @@ async function buildReliefScene(
   signal: AbortSignal,
 ): Promise<Awaited<ReturnType<typeof createReliefThreeScene>>> {
   try {
-    const physical = reliefMachineSpaceGeometry(relief);
+    const dimensions = reliefPhysicalDimensions(relief);
     const displayCellSize = heightmapCellSize(
-      physical.widthMm,
-      physical.heightMm,
+      dimensions.widthMm,
+      dimensions.heightMm,
       resolution.effectiveMmPerCell,
     );
     if (displayCellSize.kind === 'error') {
@@ -70,8 +72,8 @@ async function buildReliefScene(
     const options = {
       targetWidthMm: relief.targetWidthMm,
       reliefDepthMm: relief.reliefDepthMm,
-      targetScaleX: physical.targetScaleX,
-      targetScaleY: physical.targetScaleY,
+      targetScaleX: dimensions.targetScaleX,
+      targetScaleY: dimensions.targetScaleY,
       mmPerCell: displayCellSize.mmPerCell,
     };
     const offThread =
@@ -110,4 +112,9 @@ function removalGridFrom(map: Heightmap, resolution: Relief3DDisplayResolution) 
     originY: 0,
     resolution,
   };
+}
+
+function formatMm(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  return value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
 }

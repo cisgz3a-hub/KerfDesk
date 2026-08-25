@@ -62,7 +62,6 @@ export type HatchPolyline = Polyline & {
   readonly reverse: boolean;
 };
 
-/** Exact-spacing hatch output plus bounded-planner completion evidence. */
 export type HatchPlan = {
   readonly hatches: ReadonlyArray<Polyline>;
   readonly passLimited: boolean;
@@ -85,7 +84,6 @@ export function fillHatchingWithMetadata(input: HatchInput): ReadonlyArray<Hatch
   ).hatches;
 }
 
-/** Plans exact positive spacing up to `maxScanlines` without coarsening it. */
 export function fillHatchingExactWithBudget(input: HatchInput, maxScanlines: number): HatchPlan {
   if (!Number.isFinite(input.hatchSpacingMm) || !(input.hatchSpacingMm > 0)) {
     return { hatches: [], passLimited: true };
@@ -130,8 +128,6 @@ function planHatching(input: HatchInput, spacing: number, maxScanlines: number):
   // drift doesn't decide whether the last scanline sits exactly on the top
   // boundary (which the half-open rule would then reject anyway). The
   // integer count is also rotation-invariant for equal-height polygons.
-  // The edge rule is half-open at maxY, so an exactly aligned top-boundary
-  // scanline is not work and must not make an exact-sized budget look capped.
   const lastInteriorY = yBounds.maxY - SCANLINE_EPS;
   const requestedScanCount = Math.max(0, Math.floor((lastInteriorY - yStart) / spacing) + 1);
   const scanCount = Math.min(requestedScanCount, maxScanlines);

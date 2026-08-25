@@ -27,6 +27,7 @@ export type RestPocketPlan =
   | { readonly ok: false; readonly reason: string };
 
 const MIN_POINTS = 3;
+const MIN_STEPOVER_PERCENT = 10;
 const MAX_RINGS = 4096;
 const PRECISION_DECIMALS = 3;
 const EPSILON = 1e-9;
@@ -128,7 +129,11 @@ function centerRegionRings(
   toolDiameterMm: number,
   stepoverPercent: number,
 ): CenterRegionRings {
-  const stepMm = (stepoverPercent / 100) * toolDiameterMm;
+  const exactStepover =
+    Number.isFinite(stepoverPercent) && stepoverPercent > 0
+      ? stepoverPercent
+      : MIN_STEPOVER_PERCENT;
+  const stepMm = (exactStepover / 100) * toolDiameterMm;
   const levels: PathsD[] = [];
   let completion: RestPocketCompletion = 'pass-limit';
   for (let index = 0; index < MAX_RINGS; index += 1) {

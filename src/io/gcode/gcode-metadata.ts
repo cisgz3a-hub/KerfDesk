@@ -33,7 +33,8 @@ export type GcodeMetadata = {
  * rescue stage, ADR-285's certified vector-medial V-carve planner, and
  * ADR-286's non-zero resolution of a text object's own glyphs, ADR-287's
  * flat-tip V-carve radial envelope, ADR-289's transformed-relief machine-space
- * cutter envelope, and ADR-294's exact partial terminal-cell relief geometry.
+ * cutter envelope, finish-only relief output when roughing has no passes, and
+ * ADR-294's exact partial terminal-cell relief geometry.
  */
 export const EMITTER_REVISION = 'adr-294-relief-partial-edge-grid';
 

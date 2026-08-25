@@ -108,14 +108,22 @@ describe('partial-cell-grid', () => {
   });
 
   it('retains an exact one-ULP terminal remainder', () => {
-    const floatingIntegral = {
-      widthCells: 3,
+    const widthMm = 0.3000000000000001;
+    const floatingIntegral: PartialCellGrid = {
+      widthCells: 4,
       heightCells: 1,
-      widthMm: 0.3,
+      widthMm,
       heightMm: 0.1,
       mmPerCell: 0.1,
     };
+    expect(partialCellCount(widthMm, floatingIntegral.mmPerCell)).toBe(4);
     expect(partialGridHasPartialCell(floatingIntegral, 'x')).toBe(true);
-    expect(partialGridHasPartialCell(PARTIAL_GRID, 'x')).toBe(true);
+    expect(partialCellStart(floatingIntegral, 'x', 3)).toBe(0.30000000000000004);
+    expect(partialCellEnd(floatingIntegral, 'x', 3)).toBe(widthMm);
+    // The mathematical midpoint is between adjacent doubles and rounds back to
+    // the terminal start; the cell still exists and retains its exact far edge.
+    expect(partialCellCenter(floatingIntegral, 'x', 3)).toBe(
+      partialCellStart(floatingIntegral, 'x', 3),
+    );
   });
 });

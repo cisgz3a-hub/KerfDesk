@@ -21,8 +21,9 @@ import type { Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
 
 const MIN_CLOSED_POINTS = 3;
-// Fixed work budgets bound exact microscopic stepovers. Exhaustion is carried
-// as advisory evidence instead of changing the operator's requested value.
+const MIN_STEPOVER_PERCENT = 10;
+// Existing backstop against degenerate inputs (huge pocket + microscopic
+// effective stepover). This slice preserves current-main planner semantics.
 const MAX_POCKET_RINGS = 4096;
 const MAX_POCKET_RASTER_SCANLINES = 4096;
 // Bisection for the innermost ring: 24 halvings resolve any bed-sized span to
@@ -36,8 +37,9 @@ export type PocketToolpaths = {
   // on running out of interior: the pocket is truncated and material is still
   // standing in it. Surfaced as a Job Review warning, never a refusal (rule 7).
   readonly offsetFailed: boolean;
-  // Exact spacing exhausted a fixed ring or scanline planning budget. Partial
-  // toolpaths remain available; callers surface this as an advisory.
+  // The inherited ring planner exhausted its fixed ladder budget. This field
+  // only exposes existing behavior; this slice does not create partial raster
+  // output or expand microscopic-Stepover reach.
   readonly passLimited: boolean;
   // True only when this invocation reached the spacing-dependent planner.
   // Compile evidence uses this instead of inferring consumption from settings.
@@ -69,7 +71,7 @@ export function pocketRingToolpaths(
   const contours = pocketContours(polylines);
   if (contours.length === 0 || !(toolDiameterMm > 0)) return NO_POCKET_TOOLPATHS;
   const radius = toolDiameterMm / 2;
-  const stepMm = (stepoverPercent / 100) * toolDiameterMm;
+  const stepMm = (positiveStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
 
   const ladder = buildOffsetLadder(contours, MAX_POCKET_RINGS, (step) => radius + step * stepMm);
   const core = coreRing(contours, ladder.rings, radius, stepMm);
@@ -152,6 +154,12 @@ function pocketContours(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Polyl
   );
 }
 
+function positiveStepoverPercent(stepoverPercent: number): number {
+  return Number.isFinite(stepoverPercent) && stepoverPercent > 0
+    ? stepoverPercent
+    : MIN_STEPOVER_PERCENT;
+}
+
 // Raster pocket clearing (ADR-105 G10) — Easel's Fill Method raster X/Y.
 // The region reachable by the bit CENTER is the contour inset by one radius;
 // serpentine sweeps at the stepover spacing clear it, then the inset
@@ -176,7 +184,7 @@ export function pocketRasterToolpaths(
 ): PocketToolpaths {
   const contours = pocketContours(polylines);
   if (contours.length === 0 || !(toolDiameterMm > 0)) return NO_POCKET_TOOLPATHS;
-  const stepMm = (stepoverPercent / 100) * toolDiameterMm;
+  const stepMm = (positiveStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
   const wall = insetContoursChecked(contours, toolDiameterMm / 2);
   if (wall.contours.length === 0) {
     return {

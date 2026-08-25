@@ -23,6 +23,12 @@ describe('heightfieldToHeightmap', () => {
     expect([...deep.heightmap.depth]).toEqual([0, -5]);
   });
 
+  it('rejects a declared depth that overflows the Float32 heightmap', () => {
+    const result = materialize(source({ values: [0], maxDepthMm: Number.MAX_VALUE }));
+
+    expect(result).toMatchObject({ kind: 'error', reason: expect.stringMatching(/finite/) });
+  });
+
   it('applies input levels, gamma, and normalized crop before physical depth', () => {
     const field = source({
       values: [0, 0x4000, 0x8000, 0xffff],

@@ -70,6 +70,12 @@ export function heightfieldToHeightmap(
   if (materialized.kind === 'allocation-error') {
     return { kind: 'error', reason: 'Relief heightfield does not fit in this runtime.' };
   }
+  if (materialized.kind === 'sample-error') {
+    return {
+      kind: 'error',
+      reason: 'Relief heightfield samples must materialize to finite Float32 depths.',
+    };
+  }
   return {
     kind: 'ok',
     heightmap: materialized.heightmap,
@@ -212,7 +218,8 @@ function heightfieldTarget(
 
 type MaterializedHeightmapResult =
   | { readonly kind: 'ok'; readonly heightmap: Heightmap }
-  | { readonly kind: 'allocation-error' };
+  | { readonly kind: 'allocation-error' }
+  | { readonly kind: 'sample-error' };
 
 function materializeHeightmap(
   source: ReliefHeightfield,
@@ -232,8 +239,9 @@ function materializeHeightmap(
     for (let x = 0; x < grid.widthCells; x += 1) {
       const targetIndex = y * grid.widthCells + x;
       const sampled = sampleTargetCell(source, decoded, grid, x, y);
-      depth[targetIndex] = sampled.depth;
-      if (inclusion !== undefined && sampled.included) inclusion[targetIndex] = 1;
+      if (!storeMaterializedCell(depth, inclusion, targetIndex, sampled)) {
+        return { kind: 'sample-error' };
+      }
     }
   }
   return {
@@ -244,6 +252,18 @@ function materializeHeightmap(
       ...(inclusion === undefined ? {} : { inclusion }),
     },
   };
+}
+
+function storeMaterializedCell(
+  depth: Float32Array,
+  inclusion: Uint8Array | undefined,
+  targetIndex: number,
+  sampled: { readonly included: boolean; readonly depth: number },
+): boolean {
+  depth[targetIndex] = sampled.depth;
+  if (!Number.isFinite(depth[targetIndex])) return false;
+  if (inclusion !== undefined && sampled.included) inclusion[targetIndex] = 1;
+  return true;
 }
 
 function allocateTypedArray<T extends { readonly length: number }>(

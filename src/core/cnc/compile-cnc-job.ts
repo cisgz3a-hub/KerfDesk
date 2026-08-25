@@ -21,6 +21,8 @@ import {
   type Scene,
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
+// Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import type {
   CncOffsetLadderCompilationEvidence,
   CncReliefPlanningEvidence,
@@ -60,6 +62,7 @@ import {
   buildCncCompilationSidecar,
   hasVCarveOperation,
   offsetDiagnosticsForStatus,
+  reliefOffsetDiagnosticsForStatus,
 } from './cnc-compilation-sidecar';
 import { compiledInlayGroups, secondaryClearingGroups } from './compile-cnc-operation-groups';
 
@@ -230,7 +233,10 @@ function compileCncOperation(
     reliefPlans: relief.evidence.plans,
     offsetLadderDiagnostics: [
       ...vectorGroups.offsetLadderDiagnostics,
-      ...offsetDiagnosticsForStatus(layer.id, relief.evidence),
+      ...reliefOffsetDiagnosticsForStatus(layer.id, {
+        offsetFailed: relief.evidence.offsetFailed,
+        passLimited: relief.evidence.passLimited,
+      }),
     ],
     ...(usesStepover
       ? { stepoverOperation: { layerId: layer.id, stepoverPercent: settings.stepoverPercent } }

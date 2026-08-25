@@ -228,43 +228,40 @@ describe('detectCncOffsetLadderWarnings', () => {
     expect(warnings[0]).toContain('still cut');
   });
 
-  it.each(['offset', 'raster-x'] as const)(
-    'reaches Job Review when an exact microscopic %s pocket exhausts its plan budget',
-    (pocketStrategy) => {
-      restOperation.mockReturnValue({ kind: 'not-requested' });
-      offsetChecked.mockReset();
-      offsetChecked.mockImplementation((_polylines: unknown, offsetMm: number) =>
-        ringAt(Math.abs(offsetMm)),
-      );
-      const base = pocketProject();
-      const [layer] = base.scene.layers;
-      if (layer === undefined) throw new Error('fixture must have a layer');
-      const project: Project = {
-        ...base,
-        scene: {
-          ...base.scene,
-          layers: [
-            {
-              ...layer,
-              cnc: {
-                ...DEFAULT_CNC_LAYER_SETTINGS,
-                cutType: 'pocket',
-                pocketStrategy,
-                stepoverPercent: 0.001,
-              },
+  it('reaches Job Review when the inherited offset-pocket ring budget is exhausted', () => {
+    restOperation.mockReturnValue({ kind: 'not-requested' });
+    offsetChecked.mockReset();
+    offsetChecked.mockImplementation((_polylines: unknown, offsetMm: number) =>
+      ringAt(Math.abs(offsetMm)),
+    );
+    const base = pocketProject();
+    const [layer] = base.scene.layers;
+    if (layer === undefined) throw new Error('fixture must have a layer');
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        layers: [
+          {
+            ...layer,
+            cnc: {
+              ...DEFAULT_CNC_LAYER_SETTINGS,
+              cutType: 'pocket',
+              pocketStrategy: 'offset',
+              stepoverPercent: 0.001,
             },
-          ],
-        },
-      };
+          },
+        ],
+      },
+    };
 
-      const warnings = detectCncOffsetLadderWarnings(project);
+    const warnings = detectCncOffsetLadderWarnings(project);
 
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toContain(LAYER_NAME);
-      expect(warnings[0]).toContain('route/ring limits');
-      expect(warnings[0]).toContain('still cut');
-    },
-  );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(LAYER_NAME);
+    expect(warnings[0]).toContain('route/ring limits');
+    expect(warnings[0]).toContain('still cut');
+  });
 
   it('reaches Job Review when a flat engraving tip cannot reach artwork detail', () => {
     restOperation.mockReturnValue({ kind: 'not-requested' });

@@ -8,7 +8,7 @@ import {
   partialCellStart,
   partialGridHasPartialCell,
 } from '../grid';
-import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/cnc-output-precision';
+import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/precision';
 import type { ToolKernel } from '../sim';
 import { cuttingSurfaceDz } from '../sim/cutting-surface';
 import type { Heightmap } from './heightmap';

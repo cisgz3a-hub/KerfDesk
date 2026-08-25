@@ -1,10 +1,13 @@
-// Nonblocking CNC planning disclosures for exact Stepover and relief grids.
+// Nonblocking CNC planning disclosures for stored Stepover and relief grids.
 // These strings feed the single Job Review warning surface. They never alter,
 // cap, refuse, or authorize a plan.
 
 import type { Job } from '../../core/job';
-import { MAX_HEIGHTMAP_CELLS } from '../../core/relief/heightmap';
-import { DEFAULT_RELIEF_SCALLOP_MM } from '../../core/relief/relief-finishing';
+import {
+  DEFAULT_RELIEF_SCALLOP_MM,
+  MAX_HEIGHTMAP_CELLS,
+  scallopRowSpacingMm,
+} from '../../core/relief';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   sceneObjectUsesOperation,
@@ -162,7 +165,7 @@ function sourceReliefScallopWarnings(project: Project): ReadonlyArray<string> {
               layer.name,
               scallopMm,
               finishTool.diameterMm,
-              (finishTool.diameterMm * settings.stepoverPercent) / 100,
+              scallopRowSpacingMm(finishTool, scallopMm),
             ),
           ]
         : [],
@@ -177,16 +180,16 @@ function stepoverWarning(layerName: string, stepoverPercent: number): ReadonlyAr
   ) {
     return [];
   }
-  const coverage =
-    stepoverPercent > 100
-      ? ' This spacing exceeds the cutter diameter and can leave uncut lanes.'
-      : stepoverPercent < RECOMMENDED_STEPOVER_MIN_PERCENT
-        ? ' Very small values can hit bounded route or ring limits on large regions.'
-        : '';
+  const effectiveStepover = Math.min(
+    RECOMMENDED_STEPOVER_MAX_PERCENT,
+    Math.max(RECOMMENDED_STEPOVER_MIN_PERCENT, stepoverPercent),
+  );
   return [
-    `Stepover on layer "${layerName}" is ${format(stepoverPercent)}%, outside the usual ` +
-      `${RECOMMENDED_STEPOVER_MIN_PERCENT}-${RECOMMENDED_STEPOVER_MAX_PERCENT}% range. ` +
-      `CurveDesk keeps the exact value without clamping it.${coverage} Check the preview before running.`,
+    `Stored Stepover on layer "${layerName}" is ${format(stepoverPercent)}%, outside the established ` +
+      `${RECOMMENDED_STEPOVER_MIN_PERCENT}-${RECOMMENDED_STEPOVER_MAX_PERCENT}% shared-planner range. ` +
+      `Pocket, rest-machining, V-carve clearing, and relief roughing use ${format(
+        effectiveStepover,
+      )}%. The stored value remains in the project. Check the preview before running.`,
   ];
 }
 
@@ -201,7 +204,7 @@ function scallopWarning(
     `Relief "${source}" on layer "${layerName}" requests a ${format(
       scallopMm,
     )} mm ball-nose scallop target, above the ${format(toolDiameterMm / 2)} mm cutter radius. ` +
-    `That target is outside the minor-sagitta cusp domain: CurveDesk retains it and uses the layer's exact Stepover, ${format(
+    `That target is outside the minor-sagitta cusp domain. The established planner retains the stored value, limits the cusp calculation to the cutter radius, and uses ${format(
       rowSpacingMm,
     )} mm row spacing. Check the finishing preview before running.`
   );

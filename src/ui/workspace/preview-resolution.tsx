@@ -1,3 +1,5 @@
+// Deep type import: core/sim's public barrel is hard-capped at 20 exports by
+// its index contract, so these display-resolution types remain on a leaf path.
 import type {
   RemovalGridResolution,
   RemovalGridResolutionReason,

@@ -1,4 +1,4 @@
-import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/cnc-output-precision';
+import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/precision';
 import { partialCellCenter, partialCellEnd, partialCellStart } from '../grid';
 import type { ToolKernel, ToolKernelOffset } from '../sim';
 import { cuttingSurfaceDz } from '../sim/cutting-surface';

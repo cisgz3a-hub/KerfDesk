@@ -8,7 +8,6 @@
 // entire source on the UI thread.
 
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_CNC_MACHINE_CONFIG, createProject } from '../../core/scene';
 import type { FileHandle, PlatformAdapter } from '../../platform/types';
 import { handleOpenProject } from './file-actions';
 import { handleOpenGcodePreview } from './gcode-open-action';
@@ -101,7 +100,6 @@ describe('oversize imports proceed', () => {
     const pushToast = vi.fn();
 
     await importStlFiles([file], {
-      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
       importObject: vi.fn(),
       pushToast,
     });

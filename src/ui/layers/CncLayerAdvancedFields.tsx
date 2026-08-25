@@ -174,8 +174,8 @@ export function StepoverField(props: {
       step={5}
       title={
         props.hasReliefObjects
-          ? 'Positive spacing as a percentage of the bit diameter. Non-ball relief finishing uses the exact value; pocket clearing and relief roughing retain their existing CAM semantics.'
-          : 'Requested positive pocket ring spacing as a percentage of the bit diameter.'
+          ? 'Relief roughing and pocket ring spacing as a percentage of the bit diameter.'
+          : 'Pocket ring spacing as a percentage of the bit diameter.'
       }
       onCommit={(stepoverPercent) => props.onCommit({ stepoverPercent })}
     />

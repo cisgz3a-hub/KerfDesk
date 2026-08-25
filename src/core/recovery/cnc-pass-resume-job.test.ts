@@ -96,6 +96,35 @@ describe('buildCncPassResumeJob', () => {
     expect(result.omittedPassCount).toBe(4);
   });
 
+  it('preserves only compiled evidence for layers retained by the resume job', () => {
+    const evidenced: Job = {
+      groups: [
+        { ...source.groups[0]!, layerId: 'first-layer' },
+        { ...source.groups[1]!, layerId: 'kept-layer' },
+      ],
+      cncCompilation: {
+        vcarveOperations: [
+          vcarveEvidence('first-layer', 0),
+          vcarveEvidence('kept-layer', 1),
+          vcarveEvidence('omitted-layer', 2),
+        ],
+        offsetLadderDiagnostics: [
+          reliefEvidence('first-layer', 0),
+          reliefEvidence('kept-layer', 1),
+          reliefEvidence('omitted-layer', 2),
+        ],
+      },
+    };
+
+    const result = buildCncPassResumeJob(evidenced, 1, 1);
+
+    if (result.kind !== 'resume-job') throw new Error(result.reason);
+    expect(result.job.cncCompilation).toEqual({
+      vcarveOperations: [vcarveEvidence('kept-layer', 1)],
+      offsetLadderDiagnostics: [reliefEvidence('kept-layer', 1)],
+    });
+  });
+
   it('refuses out-of-range and non-integer indices', () => {
     expect(buildCncPassResumeJob(source, 2, 0)).toEqual({
       kind: 'error',
@@ -240,3 +269,19 @@ describe('buildCncPassResumeJob', () => {
     }
   });
 });
+
+function vcarveEvidence(layerId: string, operationIndex: number) {
+  return {
+    operationIndex,
+    layerId,
+    entryIssue: null,
+    offsetFailed: false,
+    thinResidual: false,
+    passLimited: false,
+  } as const;
+}
+
+function reliefEvidence(layerId: string, operationIndex: number) {
+  void operationIndex;
+  return { layerId, kind: 'relief-pass-limit' } as const;
+}

@@ -1,3 +1,5 @@
+// Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import { createReliefHeightfield } from '../../core/relief/relief-heightfield-factory';
 import type { ReliefDepthMap, ReliefHeightfield } from '../../core/scene/relief';
 import { bytesToBase64 } from './base64-bytes';

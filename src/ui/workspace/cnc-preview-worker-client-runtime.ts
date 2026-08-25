@@ -1,3 +1,5 @@
+// Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import type {
   HeightfieldHeightmapOptions,
   HeightfieldHeightmapResult,

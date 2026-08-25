@@ -12,6 +12,8 @@
 // never inflates at the heightmap edge.
 
 import type { ToolKernel } from '../sim';
+// Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/cnc-output-precision';
 import type { Heightmap } from './heightmap';
 import {

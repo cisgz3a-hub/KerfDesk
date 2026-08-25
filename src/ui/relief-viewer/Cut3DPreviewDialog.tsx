@@ -9,8 +9,7 @@ import { useMemo } from 'react';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { RemovalGrid } from '../../core/sim';
 import { formatDisplayMillimetres } from '../format-display-millimetres';
-import { cncCut3dDisplayResolution } from '../workspace/cnc-cut3d-surface';
-import { previewResolutionMessage } from '../workspace/preview-resolution';
+import { cncCut3dDisplayResolution, previewResolutionMessage } from '../workspace/preview';
 import { createCut3DOffscreenCoordinator } from './cut3d-offscreen-worker-client';
 import { Viewer3DDialogShell } from './Viewer3DDialogShell';
 

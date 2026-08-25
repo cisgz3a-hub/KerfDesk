@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-292 implements the bounded P2R.1a substrate: project schema v4, a canonical U16LE heightfield, exact legacy migration, worker-backed qualified grayscale import with simple transparency masks, and existing relief CAM/preview integration. ADR-293 adds atomic whole-project IndexedDB autosave/recovery for large canonical reliefs while preserving self-contained manual files; current runtime evidence covers committed Chrome state across reload, not abrupt process loss or packaged Electron restart. ADR-294 gives non-divisible relief grids an exact logical physical boundary without rewriting the requested interior spacing and discloses preview/emitter representation limits. ADR-295 qualifies exact non-interlaced grayscale PNG at 8 or 16 bits without changing the canonical schema, ordinary image import, or CAM. The remaining P2R.1 product surface and P2R.2-P2R.6 stay planned. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 295. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. ADR-292 implements the bounded P2R.1a substrate: project schema v4, a canonical U16LE heightfield, exact legacy migration, worker-backed qualified grayscale import with simple transparency masks, and existing relief CAM/preview integration. The remaining P2R.1 product surface and P2R.2-P2R.6 stay planned. ADR-293 adds focused one-command KerfDesk user macros through the existing Console path. ADR-294 gives non-divisible relief grids an exact logical physical boundary without rewriting the requested interior spacing and discloses preview/emitter representation limits. ADR-295 qualifies exact non-interlaced grayscale PNG at 8 or 16 bits without changing the canonical schema, ordinary image import, or CAM. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 295. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -80,6 +80,12 @@ Acceptance: see `WORKFLOW.md` Phase A flows + `DECISIONS.md` Phase A acceptance 
 ### Phase B — v0.2 "Real MVP — streams to laser" [MVP]
 
 Match LightBurn's core loop. Adds WebSerial-based GRBL controller, Laser window, Device Profile UI, Home/Frame/Jog/Start/Pause/Abort, alarm handling, job progress.
+
+Focused KerfDesk user macros v1 extends the existing Console under ADR-293: operators can save
+named, local, single-command templates with finite-decimal variables. Every expansion reuses the
+current controller driver's parser, `sendConsoleCommand`, safe writer, transcript, and successful
+command-history model. Macros do not stream programs, run automatically, call Start, or create or
+claim a Frame permit.
 
 Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT) as protocol reference for GRBL streaming and alarm-code mapping. **Not adopted as a dependency** — too large for our needs; just a reference.
 
@@ -171,7 +177,7 @@ artistic brightness, externally estimated relative order, hand edits, or an STL 
 | Slice | Delivers | Status |
 | --- | --- | --- |
 | P2R.0 | Architecture, product scope, evidence boundaries, phased acceptance, and F-CNC47-F-CNC50 user-flow contracts | Accepted by ADR-291; documentation only |
-| P2R.1 | Schema-v4 canonical U16 field; lossless legacy migration; 8/16-bit grayscale, alpha/mask, tonal mapping, external-relative input; self-contained manual save and atomic autosave | In progress — P2R.1a built under ADR-292/293/294/295: schema v4/U16LE, v3 migration, manual-file persistence, worker-backed exact 8/16-bit grayscale plus simple `tRNS` mask, logical partial-edge CAM with disclosed preview/emitter precision, and atomic whole-project IndexedDB autosave/recovery qualified for committed Chrome state across reload. Abrupt-process and packaged-Electron recovery, full alpha/mask UI, and tonal/source-mode UI remain planned |
+| P2R.1 | Schema-v4 canonical U16 field; lossless legacy migration; 8/16-bit grayscale, alpha/mask, tonal mapping, external-relative input; self-contained manual save and atomic autosave | In progress — P2R.1a built under ADR-292/294/295: schema v4/U16LE, v3 migration, manual-file persistence, worker-backed exact 8/16-bit grayscale plus simple `tRNS` mask, logical partial-edge CAM with disclosed preview/emitter precision, and existing CAM/previews. Large atomic autosave, full alpha/mask UI, and tonal/source-mode UI remain planned |
 | P2R.2 | Relief Map Studio with deterministic U16 height/mask editing, undo, histogram, cross-section, and target 2D/3D previews | Planned |
 | P2R.3 | Independent rough/finish tools and parameters, explicit rough stock-to-leave, nominal ball-cusp or linear stepover, reach metadata, worker routing, and tool simulation/residual maps | Planned |
 | P2R.4 | Deterministic output provenance, exact prepared-artifact handoff, Job Review warnings, and full software release verification | Planned |
@@ -634,7 +640,8 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   those reservations is an open maintainer item. Broader boolean / node editing
   and advanced fill-pattern systems, node/graph-based operation editors, and plugin
   operation pipelines remain out of scope.
-- Macros, scripting, command palette, plugins, extensions.
+- Multi-command macros, scripting, command palette, plugins, extensions, macro import/export,
+  automatic macro triggers, and controller-program streaming outside the ordinary Start flow.
 - ~~Variable text (CSV / counter / date).~~ **Bounded offline fields shipped**; bounded offline sheet
   imposition is adopted for staged implementation (ADR-279). Live databases and barcode/QR
   generation remain deferred (ADR-164).

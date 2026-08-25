@@ -13,9 +13,7 @@
 // of sampled rows no greater than that request. The CNC compiler materializes
 // an exact grid no coarser than that spacing; for an externally supplied coarser
 // map, one row is irreducible and the requested scallop is not qualified.
-// A stored cusp above the ball radius is outside that relation's minor-sagitta
-// domain and therefore falls back to the layer's explicit linear Stepover.
-// Non-ball tools use the layer's explicit linear stepover percentage. Rows
+// Flat bits use the established fixed fraction of their diameter. Rows
 // alternate direction (serpentine).
 
 import type { ToolKernel } from '../sim';
@@ -26,12 +24,13 @@ import { dilateHeightmapByToolWithMaskEvidence } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
 
 export const DEFAULT_RELIEF_SCALLOP_MM = 0.025;
+const FLAT_TOOL_STEPOVER_FRACTION = 0.4;
+const MIN_FLAT_ROW_SPACING_MM = 0.05;
 
 export type ReliefFinishingOptions = {
   readonly tool: CncTool;
   readonly kernel: ToolKernel;
   readonly scallopMm: number;
-  readonly stepoverPercent: number;
 };
 
 type FinishingPoint = { readonly x: number; readonly y: number; readonly z: number };
@@ -44,11 +43,7 @@ export function reliefFinishingPasses(
   if (widthCells < 1 || heightCells < 1) return [];
   const dilation = dilateHeightmapByToolWithMaskEvidence(map, options.kernel, 0);
   const tip = dilation.tipDepth;
-  const rowSpacingMm = scallopRowSpacingMm(
-    options.tool,
-    options.scallopMm,
-    options.stepoverPercent,
-  );
+  const rowSpacingMm = scallopRowSpacingMm(options.tool, options.scallopMm);
   const rowStep = Math.max(1, Math.floor(rowSpacingMm / mmPerCell));
   if (map.inclusion !== undefined) {
     return maskedFinishingPasses(map, tip, rowStep, map.inclusion, dilation.touchesExcluded);
@@ -197,19 +192,11 @@ function appendFinishingRun(passes: CncPass[], points: ReadonlyArray<FinishingPo
   }
 }
 
-export function scallopRowSpacingMm(
-  tool: CncTool,
-  scallopMm: number,
-  stepoverPercent: number,
-): number {
+export function scallopRowSpacingMm(tool: CncTool, scallopMm: number): number {
   if (tool.kind === 'ball-nose') {
     const radius = tool.diameterMm / 2;
-    // The minor-sagitta cusp relation is defined through the radius. A larger
-    // stored target remains editable, but cannot define a unique physical cusp;
-    // use the layer's explicit linear Stepover and disclose that fallback.
-    if (scallopMm > radius) return tool.diameterMm * (stepoverPercent / 100);
-    if (scallopMm === radius) return 2 * radius;
-    return 2 * Math.sqrt(scallopMm * (2 * radius - scallopMm));
+    const scallop = Math.min(Math.max(scallopMm, 0.001), radius);
+    return 2 * Math.sqrt(scallop * (2 * radius - scallop));
   }
-  return tool.diameterMm * (stepoverPercent / 100);
+  return Math.max(MIN_FLAT_ROW_SPACING_MM, tool.diameterMm * FLAT_TOOL_STEPOVER_FRACTION);
 }

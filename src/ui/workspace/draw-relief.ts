@@ -4,6 +4,8 @@
 // raster objects so rotation and both mirror channels agree with relief CAM.
 
 import { type Heightmap } from '../../core/relief';
+// Deep imports: core/relief's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import type {
   HeightfieldHeightmapOptions,
   HeightfieldHeightmapResult,

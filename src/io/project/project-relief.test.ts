@@ -174,6 +174,25 @@ describe('.lf2 canonical heightfield round-trip', () => {
     if (result.kind === 'ok') expect(result.project.scene.objects[0]).toEqual(heightfieldRelief());
   });
 
+  it('preserves an existing authored-width and transform pair byte-for-byte', () => {
+    const base = reliefProject();
+    const transformed = {
+      ...heightfieldRelief(),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: -0.36, scaleY: 2 },
+    };
+    const serialized = serializeProject({
+      ...base,
+      scene: { ...base.scene, objects: [transformed], groups: [] },
+    });
+
+    const result = deserializeProject(serialized);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.scene.objects[0]).toEqual(transformed);
+    expect(serializeProject(result.project)).toBe(serialized);
+  });
+
   it('rejects a payload length that disagrees with declared dimensions', () => {
     const base = reliefProject();
     const project: Project = {

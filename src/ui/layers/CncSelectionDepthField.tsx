@@ -87,7 +87,7 @@ function CompatibleCncSelectionDepthField(props: {
           onBlur={debounced.onBlur}
           style={inputStyle}
           aria-label={`${label} for selected operations`}
-          title={`Set one ${label.toLocaleLowerCase()} across the selected independent operations`}
+          title={`Set one ${label.toLowerCase()} across the selected independent operations`}
         />
         <span style={unitStyle}>mm</span>
       </Row>

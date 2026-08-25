@@ -334,7 +334,7 @@ export type CncVCarveCompilationEvidence = {
 /** Exact nonblocking end-state retained for one bounded CNC planner. */
 export type CncOffsetLadderCompilationEvidence = {
   readonly layerId: string;
-  readonly kind: 'geometry-failed' | 'pass-limit' | 'thin-detail-dropped';
+  readonly kind: 'geometry-failed' | 'pass-limit' | 'relief-pass-limit' | 'thin-detail-dropped';
 };
 
 /** Exact positive Stepover consumed by a compiled operation layer. */

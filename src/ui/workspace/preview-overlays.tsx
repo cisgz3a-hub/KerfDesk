@@ -6,6 +6,8 @@
 
 import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
+// Deep type import: core/sim's public barrel is hard-capped at 20 exports by
+// its index contract, so this display-resolution type remains on a leaf path.
 import type { RemovalGridResolution } from '../../core/sim/removal-grid';
 import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore, type PreviewPlaybackSpeed } from '../state/ui-store';

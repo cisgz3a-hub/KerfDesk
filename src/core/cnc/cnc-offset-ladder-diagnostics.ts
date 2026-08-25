@@ -24,6 +24,8 @@
 
 import type { DeviceProfile } from '../devices';
 import type { Job } from '../job';
+// Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
 import type { CncVCarveCompilationEvidence } from '../job/job';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -37,7 +39,7 @@ import {
 } from '../scene';
 import { collectLayerPolylines } from './collect-cnc-contours';
 import { resolveRestPocketOperation } from './cnc-rest-operation';
-import { reliefOffsetLadderStatus } from './compile-cnc-relief';
+import { reliefOffsetLadderDiagnostics } from './compile-cnc-relief';
 import { pocketRasterToolpaths, pocketRingToolpaths } from './pocket-paths';
 import { vcarveClearancePocket } from './vcarve-clearance';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
@@ -55,12 +57,7 @@ export function findCncOffsetLadderFailures(
 
 export type CncOffsetLadderDiagnostic = {
   readonly layerId: string;
-  readonly kind: 'geometry-failed' | 'pass-limit' | 'thin-detail-dropped';
-};
-
-type ReliefOffsetLadderStatus = {
-  readonly offsetFailed: boolean;
-  readonly passLimited: boolean;
+  readonly kind: 'geometry-failed' | 'pass-limit' | 'relief-pass-limit' | 'thin-detail-dropped';
 };
 
 // Keeps the end reason available to the advisory UI. Existing callers that
@@ -71,22 +68,13 @@ export function findCncOffsetLadderDiagnostics(
   device: DeviceProfile,
   config: CncMachineConfig,
   compiledJob?: Job,
-  compiledReliefStatus?: ReadonlyMap<string, ReliefOffsetLadderStatus>,
   probeRelief = true,
 ): ReadonlyArray<CncOffsetLadderDiagnostic> {
   const diagnostics: CncOffsetLadderDiagnostic[] = [];
   for (const layer of scene.layers) {
     if (!layer.output) continue;
     diagnostics.push(
-      ...layerOffsetLadderDiagnostics(
-        scene,
-        layer,
-        device,
-        config,
-        compiledJob,
-        compiledReliefStatus,
-        probeRelief,
-      ),
+      ...layerOffsetLadderDiagnostics(scene, layer, device, config, compiledJob, probeRelief),
     );
   }
   return diagnostics;
@@ -96,6 +84,7 @@ const CNC_OFFSET_DIAGNOSTIC_KIND_ORDER = [
   'geometry-failed',
   'thin-detail-dropped',
   'pass-limit',
+  'relief-pass-limit',
 ] as const satisfies ReadonlyArray<CncOffsetLadderDiagnostic['kind']>;
 
 function layerOffsetLadderDiagnostics(
@@ -104,7 +93,6 @@ function layerOffsetLadderDiagnostics(
   device: DeviceProfile,
   config: CncMachineConfig,
   compiledJob: Job | undefined,
-  compiledReliefStatus: ReadonlyMap<string, ReliefOffsetLadderStatus> | undefined,
   probeRelief: boolean,
 ): ReadonlyArray<CncOffsetLadderDiagnostic> {
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
@@ -120,20 +108,16 @@ function layerOffsetLadderDiagnostics(
           config,
           compiledVCarveEvidence(compiledJob, layer.id),
         );
-  const reliefStatus = layerReliefOffsetStatus(
-    scene,
-    layer,
-    settings,
-    config,
-    compiledReliefStatus,
-    probeRelief,
-  );
+  const reliefStatus = probeRelief
+    ? reliefOffsetLadderDiagnostics(scene.objects, layer, settings, config)
+    : null;
   // A layer can carry both relief objects and vector shapes; either ladder
   // failing makes the layer's output incomplete.
   const kinds = new Set<CncOffsetLadderDiagnostic['kind']>([
     ...restCompletionDiagnosticKinds(restCompletion),
     ...vectorKinds,
-    ...reliefOffsetDiagnosticKinds(reliefStatus),
+    ...(reliefStatus?.offsetFailed ? (['geometry-failed'] as const) : []),
+    ...(reliefStatus?.passLimited ? (['relief-pass-limit'] as const) : []),
   ]);
   return CNC_OFFSET_DIAGNOSTIC_KIND_ORDER.filter((kind) => kinds.has(kind)).map((kind) => ({
     layerId: layer.id,
@@ -141,33 +125,10 @@ function layerOffsetLadderDiagnostics(
   }));
 }
 
-function layerReliefOffsetStatus(
-  scene: Scene,
-  layer: Layer,
-  settings: CncLayerSettings,
-  config: CncMachineConfig,
-  compiledReliefStatus: ReadonlyMap<string, ReliefOffsetLadderStatus> | undefined,
-  probeRelief: boolean,
-): ReliefOffsetLadderStatus {
-  const compiled = compiledReliefStatus?.get(layer.id);
-  if (compiled !== undefined) return compiled;
-  if (!probeRelief) return { offsetFailed: false, passLimited: false };
-  return reliefOffsetLadderStatus(scene.objects, layer, settings, config);
-}
-
 function restCompletionDiagnosticKinds(
   completion: 'complete' | 'geometry-failed' | 'pass-limit',
 ): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
   return completion === 'complete' ? [] : [completion];
-}
-
-function reliefOffsetDiagnosticKinds(
-  status: ReliefOffsetLadderStatus,
-): ReadonlyArray<CncOffsetLadderDiagnostic['kind']> {
-  return [
-    ...(status.offsetFailed ? (['geometry-failed'] as const) : []),
-    ...(status.passLimited ? (['pass-limit'] as const) : []),
-  ];
 }
 
 function vectorLadderDiagnosticKinds(

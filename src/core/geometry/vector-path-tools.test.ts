@@ -54,6 +54,36 @@ describe('vector path tools', () => {
     ]);
   });
 
+  it('scales trusted round-stroke width with a baked uniform transform', () => {
+    const artwork: ImportedSvg = {
+      kind: 'imported-svg',
+      id: 'trusted-stroke',
+      source: 'trusted.svg',
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 2, scaleY: 2 },
+      paths: [{ color: '#111111', strokeWidthMm: 0.5, polylines: [square(0, 0, 1)] }],
+    };
+
+    const materialized = materializeVectorObject(artwork);
+
+    expect(materialized.paths[0]?.strokeWidthMm).toBe(1);
+  });
+
+  it('drops round-stroke provenance that a baked non-uniform transform cannot represent', () => {
+    const artwork: ImportedSvg = {
+      kind: 'imported-svg',
+      id: 'stretched-stroke',
+      source: 'stretched.svg',
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 2, scaleY: 3 },
+      paths: [{ color: '#111111', strokeWidthMm: 0.5, polylines: [square(0, 0, 1)] }],
+    };
+
+    const materialized = materializeVectorObject(artwork);
+
+    expect(materialized.paths[0]?.strokeWidthMm).toBeUndefined();
+  });
+
   it('welds selected closed vector contours by color into one baked path object', () => {
     const left: ShapeObject = {
       kind: 'shape',

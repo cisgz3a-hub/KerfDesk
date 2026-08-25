@@ -1,11 +1,11 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { partialCellCenter, partialGridHasPartialCell } from '../grid';
+import { partialCellCenter } from '../grid';
 import type { Toolpath } from '../job';
 import type { CncTool } from '../scene';
 import { createRemovalGrid, type RemovalGrid, type RemovalGridSpec } from './removal-grid';
 import { computeRemovalGrid } from './stamp-toolpath';
-import { cuttingSurfaceDz, kernelForTool, type ToolKernel } from './tool-kernels';
+import { kernelForTool, type ToolKernel } from './tool-kernels';
 
 const PITCH_MM = 0.3;
 const TIP_Z_MM = -1;
@@ -69,14 +69,62 @@ describe.each(PARTIAL_GRIDS)('partial stamp hybrid reference - $name', ({ spec }
   });
 });
 
-describe('regular-grid stamp parity', () => {
-  it.each(TOOLS)('$kind retains the indexed-kernel result across generated points', (tool) => {
+describe('regular-grid exact stamp parity', () => {
+  it.each(TOOLS)('$kind retains the physical-center result across generated points', (tool) => {
     fc.assert(
       fc.property(pointArbitrary(REGULAR_SPEC), (point) =>
         assertMatchesReference(REGULAR_SPEC, tool, point),
       ),
       { numRuns: 50 },
     );
+  });
+});
+
+describe('shifted terminal-cell cutter reach', () => {
+  it('stamps a reachable regular cell beside a short terminal column', () => {
+    const pitchMm = 1;
+    const spec: RemovalGridSpec = {
+      originX: 0,
+      originY: 0,
+      widthMm: 3.1,
+      heightMm: 3,
+      mmPerCell: pitchMm,
+    };
+    const tool: CncTool = {
+      id: 'terminal-reach-end',
+      name: 'terminal reach end mill',
+      kind: 'end-mill',
+      diameterMm: 1.5,
+    };
+    const point = { x: 3.05, y: 1.5 };
+    const kernel = kernelForTool(tool, pitchMm);
+    const actual = removalForPlunge(spec, kernel, point);
+
+    expect([...actual.depth]).toEqual([...referencePlunge(spec, kernel, point).depth]);
+    expect(actual.depth[6]).toBe(TIP_Z_MM);
+  });
+
+  it('stamps a reachable regular cell from a cutter center outside the short edge', () => {
+    const pitchMm = 1;
+    const spec: RemovalGridSpec = {
+      originX: 0,
+      originY: 0,
+      widthMm: 3.1,
+      heightMm: 3,
+      mmPerCell: pitchMm,
+    };
+    const tool: CncTool = {
+      id: 'outside-terminal-reach-end',
+      name: 'outside terminal reach end mill',
+      kind: 'end-mill',
+      diameterMm: 3.2,
+    };
+    const point = { x: 4.05, y: 1.5 };
+    const kernel = kernelForTool(tool, pitchMm);
+    const actual = removalForPlunge(spec, kernel, point);
+
+    expect([...actual.depth]).toEqual([...referencePlunge(spec, kernel, point).depth]);
+    expect(actual.depth[6]).toBe(TIP_Z_MM);
   });
 });
 
@@ -116,11 +164,9 @@ function referencePlunge(
   const created = createRemovalGrid(spec);
   if (created.kind === 'error') throw new Error(created.reason);
   const grid = created.grid;
-  const cx = Math.floor((point.x - grid.originX) / grid.mmPerCell);
-  const cy = Math.floor((point.y - grid.originY) / grid.mmPerCell);
   for (let row = 0; row < grid.heightCells; row += 1) {
     for (let col = 0; col < grid.widthCells; col += 1) {
-      const surfaceZ = referenceSurfaceZ(grid, kernel, point, cx, cy, col, row);
+      const surfaceZ = referenceSurfaceZ(grid, kernel, point, col, row);
       if (surfaceZ < 0) grid.depth[row * grid.widthCells + col] = surfaceZ;
     }
   }
@@ -131,24 +177,13 @@ function referenceSurfaceZ(
   grid: RemovalGrid,
   kernel: ToolKernel,
   point: { readonly x: number; readonly y: number },
-  cx: number,
-  cy: number,
   col: number,
   row: number,
 ): number {
-  const isTerminal =
-    (partialGridHasPartialCell(grid, 'x') && col === grid.widthCells - 1) ||
-    (partialGridHasPartialCell(grid, 'y') && row === grid.heightCells - 1);
-  if (!isTerminal) {
-    const offset = kernel.offsets.find((item) => item.dx === col - cx && item.dy === row - cy);
-    return offset === undefined ? 0 : TIP_Z_MM + offset.dz;
-  }
   const centerX = grid.originX + partialCellCenter(grid, 'x', col);
   const centerY = grid.originY + partialCellCenter(grid, 'y', row);
   const distanceMm = Math.hypot(centerX - point.x, centerY - point.y);
-  return distanceMm > kernel.radiusMm
-    ? 0
-    : TIP_Z_MM + cuttingSurfaceDz(kernel.tool, distanceMm, kernel.radiusMm);
+  return distanceMm > kernel.radiusMm ? 0 : TIP_Z_MM + kernel.surfaceDzAtRadius(distanceMm);
 }
 
 function explicitPoints(
