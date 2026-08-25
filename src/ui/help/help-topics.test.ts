@@ -31,6 +31,12 @@ describe('help topics', () => {
     expect(weak).toEqual([]);
   });
 
+  it('describes every currently qualified explicit height-map PNG layout', () => {
+    expect(COMMAND_HELP['file.import-height-map'].tooltip).toBe(
+      'Import a qualified non-interlaced grayscale PNG (8-bit, 16-bit, or 8-bit with alpha) as an explicit top-down CNC relief height map.',
+    );
+  });
+
   it('keeps command help families aligned with the command menu families', () => {
     const families = new Set(Object.values(COMMAND_HELP).map((topic) => topic.family));
 

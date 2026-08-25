@@ -16910,6 +16910,8 @@ qualification boundary remain in force.
 - Direct preparation, the application fallback path, and a real bundled-worker Chrome test compare
   the complete structured-cloned result. Existing color-type-0/8 and color-type-0/16 goldens remain
   unchanged.
+- Command help names the combined qualified non-interlaced layouts: grayscale at 8 or 16 bits and
+  grayscale-alpha at 8 bits. It does not imply support for color-type-4/16 or general PNG input.
 - TypeScript, lint, formatting, focused import/project tests, browser E2E, and release checks are
   required before publication. Packaged Electron, abrupt process loss, controller behavior,
   hardware air cuts, and material coupons are not established by this ADR.
