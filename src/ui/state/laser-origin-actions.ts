@@ -10,7 +10,6 @@ import { inferCurrentMachinePosition } from './infer-machine-position';
 import { useStore } from './store';
 import { captureWorkZZeroEvidence, selectedCncToolId } from './work-z-zero-evidence';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
-import { type ControllerLifecycleRefs } from './laser-interactive-command';
 import {
   runOriginTransaction,
   unknownOriginPatch,
@@ -31,6 +30,8 @@ import {
   pushLog,
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import type { LiveRefs } from './laser-store';
+import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -40,7 +41,21 @@ type SafeWriteFn = OriginSafeWrite;
 
 // Every origin action requires a known stationary controller and exclusive
 // acknowledgement ownership before it may start a transaction.
-function assertOriginActionReady(set: SetFn, get: GetFn, refs: ControllerLifecycleRefs): void {
+async function assertOriginActionReady(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  assertOriginActionReadyNow(set, get, refs);
+  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'origin' }).catch(
+    (error: unknown) =>
+      blockOriginAction(set, get, error instanceof Error ? error.message : String(error)),
+  );
+  assertOriginActionReadyNow(set, get, refs);
+}
+
+function assertOriginActionReadyNow(set: SetFn, get: GetFn, refs: LiveRefs): void {
   assertAutofocusIdle(get());
   assertNoActiveJob(get());
   const state = get();
@@ -86,7 +101,7 @@ function blockOriginAction(set: SetFn, get: GetFn, message: string): never {
 export function originActions(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Pick<
   LaserState,
@@ -110,10 +125,10 @@ export function originActions(
 async function setOriginHere(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
-  assertOriginActionReady(set, get, refs);
+  await assertOriginActionReady(set, get, refs, safeWrite);
   let sawFreshWcoFrame = true;
   await runOriginTransaction(
     set,
@@ -135,7 +150,12 @@ async function setOriginHere(
         sawFreshWcoFrame = await waitForOriginWcoFrame(get);
       }
       const { statusReport, wcoCache } = get();
-      return transientXyOriginPatch(inferCurrentMachinePosition(statusReport, wcoCache), wcoCache);
+      return transientXyOriginPatch(
+        // wcoCache intentionally stores the controller's reported units; the
+        // canonical millimetre selector is used at every consumer boundary.
+        inferCurrentMachinePosition(statusReport, wcoCache),
+        wcoCache,
+      );
     },
     { changesXyOrigin: true },
   );
@@ -152,10 +172,10 @@ async function setOriginHere(
 async function zeroZHere(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
-  assertOriginActionReady(set, get, refs);
+  await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
     refs,
@@ -175,10 +195,10 @@ async function zeroZHere(
 async function resetOrigin(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
-  assertOriginActionReady(set, get, refs);
+  await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
     refs,
@@ -196,10 +216,10 @@ async function resetOrigin(
 async function setPersistentOriginHere(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
-  assertOriginActionReady(set, get, refs);
+  await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
     refs,
@@ -214,10 +234,10 @@ async function setPersistentOriginHere(
 async function clearPersistentOrigin(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
-  assertOriginActionReady(set, get, refs);
+  await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
     refs,
@@ -232,10 +252,10 @@ async function clearPersistentOrigin(
 async function releaseMotors(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
-  assertOriginActionReady(set, get, refs);
+  await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
     refs,

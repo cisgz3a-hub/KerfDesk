@@ -168,18 +168,28 @@ function ensureWorker(): Worker | null {
     };
     worker.onerror = () => {
       if (workerInstance === worker) {
-        void rejectAllPendingAfterCleanup('PNG import worker errored');
+        void recoverFromWorkerFailure('PNG import worker errored');
       }
     };
     worker.onmessageerror = () => {
       if (workerInstance === worker) {
-        void rejectAllPendingAfterCleanup('PNG import worker returned an unreadable response');
+        void recoverFromWorkerFailure('PNG import worker returned an unreadable response');
       }
     };
     return worker;
   } catch {
     return null;
   }
+}
+
+async function recoverFromWorkerFailure(message: string): Promise<void> {
+  const id = activeRequestId;
+  if (id === null) {
+    retireWorker();
+    startNext();
+    return;
+  }
+  await terminateActiveAfterCleanup(id, new Error(message));
 }
 
 async function terminateActiveAfterCleanup(id: number, error: Error): Promise<void> {

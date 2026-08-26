@@ -26,7 +26,7 @@ import {
   type TracedImage,
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
-import { duplicateArtworkWithOperations } from './duplicate-artwork';
+import { duplicateSceneSelection } from './duplicate-scene-selection';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
@@ -133,39 +133,34 @@ export function resolveRasterLayerColor(
 // Empty selection → no-op; the caller's `set((s) => ...)` should fall
 // through without changing state (the undefined return signals that).
 export function applyDuplicate(
-  s: StateSlice & {
-    readonly selectedObjectId: string | null;
-    readonly additionalSelectedIds: ReadonlySet<string>;
-  },
+  s: DuplicateState,
   newIdFor: (oldId: string) => string,
 ): (MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> }) | null {
-  const ids: string[] = [
-    ...(s.selectedObjectId !== null ? [s.selectedObjectId] : []),
-    ...s.additionalSelectedIds,
-  ];
+  const ids = selectedDuplicateIds(s);
   if (ids.length === 0) return null;
-  let scene = s.project.scene;
-  const newIds: string[] = [];
-  for (const oldId of ids) {
-    const original = scene.objects.find((o) => o.id === oldId);
-    if (original === undefined) continue;
-    // Duplicate places the clone exactly over the source (LightBurn parity); the
-    // operator then moves it. Fresh imports (applyFreshImport) and paste keep
-    // their own stagger — only Duplicate is in place.
-    const duplicated = duplicateArtworkWithOperations(scene, original, newIdFor(oldId));
-    scene = duplicated.scene;
-    newIds.push(duplicated.object.id);
-  }
-  if (newIds.length === 0) return null;
-  const [first, ...rest] = newIds;
+  const duplicated = duplicateSceneSelection(s.project.scene, ids, newIdFor);
+  if (duplicated.selectedIds.length === 0) return null;
+  const [first, ...rest] = duplicated.selectedIds;
   return {
-    project: { ...s.project, scene },
+    project: { ...s.project, scene: duplicated.scene },
     selectedObjectId: first ?? '',
     additionalSelectedIds: new Set(rest),
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,
   };
+}
+
+type DuplicateState = StateSlice & {
+  readonly selectedObjectId: string | null;
+  readonly additionalSelectedIds: ReadonlySet<string>;
+};
+
+function selectedDuplicateIds(state: DuplicateState): ReadonlyArray<string> {
+  return [
+    ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
+    ...state.additionalSelectedIds,
+  ];
 }
 
 // Drop layers whose color isn't referenced by any remaining object.

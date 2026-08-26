@@ -7,6 +7,7 @@ import {
   sceneObjectUsesOperation,
   type Layer,
   type Scene,
+  type SceneGroup,
   type SceneObject,
 } from '../../core/scene';
 import { cloneLayerSubLayers } from '../../core/scene/layer';
@@ -19,6 +20,7 @@ const PASTE_OFFSET_MM = 10;
 export type SceneClipboard = {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly layers: ReadonlyArray<Layer>;
+  readonly groups?: ReadonlyArray<SceneGroup>;
 };
 
 export type SceneClipboardActions = {
@@ -63,10 +65,14 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
           state.project.scene,
           clipboard.layers,
           clipboard.objects,
+          clipboard.groups ?? [],
         );
         const pasted = prepared.objects;
         let scene = prepared.scene;
         for (const object of pasted) scene = addObject(scene, object);
+        if (prepared.groups.length > 0) {
+          scene = { ...scene, groups: [...(scene.groups ?? []), ...prepared.groups] };
+        }
         const [primary, ...rest] = pasted.map((object) => object.id);
         return {
           project: { ...state.project, scene },
@@ -88,12 +94,28 @@ function clipboardFromSelection(
     ...state.additionalSelectedIds,
   ];
   if (ids.length === 0) return null;
-  const objects = ids
+  const selected = ids
     .map((id) => state.project.scene.objects.find((object) => object.id === id))
-    .filter((object): object is SceneObject => object !== undefined)
+    .filter((object): object is SceneObject => object !== undefined);
+  const closureIds = new Set(selected.map((object) => object.id));
+  for (const object of selected) {
+    if (object.kind === 'raster-image' && object.imageMaskId !== undefined) {
+      closureIds.add(object.imageMaskId);
+    }
+  }
+  const objects = state.project.scene.objects
+    .filter((object) => closureIds.has(object.id))
     .map(cloneSceneObject);
   if (objects.length === 0) return null;
-  return { objects, layers: copiedLayersForObjects(state.project.scene, objects) };
+  const copiedIds = new Set(objects.map((object) => object.id));
+  const groups = (state.project.scene.groups ?? [])
+    .map((group) => ({
+      ...group,
+      objectIds: group.objectIds.filter((id) => copiedIds.has(id)),
+    }))
+    .filter((group) => group.objectIds.length >= 2)
+    .map((group) => structuredClone(group) as SceneGroup);
+  return { objects, layers: copiedLayersForObjects(state.project.scene, objects), groups };
 }
 
 function copiedLayersForObjects(
@@ -110,24 +132,30 @@ function cloneClipboardObjects(
   objects: ReadonlyArray<SceneObject>,
   sourceOperations: ReadonlyArray<Layer>,
   operationIdMap: ReadonlyMap<string, string>,
-): ReadonlyArray<SceneObject> {
+): {
+  readonly objects: ReadonlyArray<SceneObject>;
+  readonly idMap: ReadonlyMap<string, string>;
+} {
   const idMap = new Map(objects.map((object) => [object.id, crypto.randomUUID()] as const));
-  return objects.map((object) => {
-    const clone = {
-      ...cloneSceneObject(object),
-      id: idMap.get(object.id) ?? crypto.randomUUID(),
-      transform: {
-        ...object.transform,
-        x: object.transform.x + PASTE_OFFSET_MM,
-        y: object.transform.y + PASTE_OFFSET_MM,
-      },
-    } as SceneObject;
-    return remapSceneObjectOperationBindings(
-      remapClipboardReferences(clone, idMap),
-      sourceOperations,
-      operationIdMap,
-    );
-  });
+  return {
+    idMap,
+    objects: objects.map((object) => {
+      const clone = {
+        ...cloneSceneObject(object),
+        id: idMap.get(object.id) ?? crypto.randomUUID(),
+        transform: {
+          ...object.transform,
+          x: object.transform.x + PASTE_OFFSET_MM,
+          y: object.transform.y + PASTE_OFFSET_MM,
+        },
+      } as SceneObject;
+      return remapSceneObjectOperationBindings(
+        remapClipboardReferences(clone, idMap),
+        sourceOperations,
+        operationIdMap,
+      );
+    }),
+  };
 }
 
 function remapClipboardReferences(
@@ -143,7 +171,12 @@ function prepareClipboardPaste(
   scene: Scene,
   copiedLayers: ReadonlyArray<Layer>,
   objects: ReadonlyArray<SceneObject>,
-): { readonly scene: Scene; readonly objects: ReadonlyArray<SceneObject> } {
+  groups: ReadonlyArray<SceneGroup> = [],
+): {
+  readonly scene: Scene;
+  readonly objects: ReadonlyArray<SceneObject>;
+  readonly groups: ReadonlyArray<SceneGroup>;
+} {
   let out = scene;
   const operationIdMap = new Map<string, string>();
   for (const source of copiedLayers) {
@@ -163,9 +196,18 @@ function prepareClipboardPaste(
     operationIdMap.set(source.id, operation.id);
     out = addLayer(out, operation);
   }
+  const cloned = cloneClipboardObjects(objects, copiedLayers, operationIdMap);
   return {
     scene: out,
-    objects: cloneClipboardObjects(objects, copiedLayers, operationIdMap),
+    objects: cloned.objects,
+    groups: groups.map((group) => ({
+      ...structuredClone(group),
+      id: crypto.randomUUID(),
+      objectIds: group.objectIds.flatMap((id) => {
+        const mapped = cloned.idMap.get(id);
+        return mapped === undefined ? [] : [mapped];
+      }),
+    })),
   };
 }
 

@@ -133,17 +133,15 @@ describe('ReliefMaskThresholdControl', () => {
     }
   });
 
-  it('commits an exact decimal integer without rewriting it', async () => {
+  it('rejects exponent notation with explicit English-decimal feedback', async () => {
     const setReliefParams = vi.fn();
     useStore.setState({ setReliefParams });
     const { host, root } = await render(heightfieldRelief());
     try {
       await changeAndBlur(thresholdInput(host), '6.4e1');
-      expect(setReliefParams).toHaveBeenCalledOnce();
-      expect(setReliefParams).toHaveBeenCalledWith('heightfield-relief', {
-        inclusionThreshold: 64,
-      });
-      expect(thresholdInput(host).value).toBe('64');
+      expect(setReliefParams).not.toHaveBeenCalled();
+      expect(thresholdInput(host).value).toBe('6.4e1');
+      expect(thresholdInput(host).validationMessage).toMatch(/English digits.*decimal point/i);
     } finally {
       await unmount(root, host);
     }

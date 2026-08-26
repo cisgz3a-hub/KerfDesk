@@ -221,4 +221,48 @@ describe('buildEffectiveOperationReview', () => {
       'effective override: Offset fill · 0.35 mm hatch at 45° · one-way · cross-hatch',
     );
   });
+
+  it('maps a named artwork from its requested operation to the exact effective override', () => {
+    const base = createLayer({ id: 'base', color: '#000000', mode: 'line' });
+    const effective = captureLayerOperationSettings({ ...base, mode: 'fill', fillStyle: 'offset' });
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'base',
+          sourceObjectId: 'art',
+          color: '#000000',
+          power: 30,
+          speed: 1000,
+          passes: 1,
+          airAssist: false,
+          operationSettings: effective,
+          overscanMm: 5,
+          segments: [],
+        },
+      ],
+    };
+    const object = {
+      kind: 'imported-svg' as const,
+      id: 'art',
+      source: 'named-artwork.svg',
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+      transform: {
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+        rotationDeg: 0,
+        mirrorX: false,
+        mirrorY: false,
+      },
+      paths: [],
+    };
+
+    expect(
+      buildEffectiveOperationReview(job, { objects: [object], layers: [base] })[0]?.summaries[0],
+    ).toContain(
+      'named-artwork — Fill · 30% power · 1,000 mm/min · 1 pass · air off · requested Operation; effective artwork override: Offset fill',
+    );
+  });
 });

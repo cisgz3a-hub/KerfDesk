@@ -7,7 +7,6 @@ import {
   applyTransform,
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-  flattenColoredPathCurves,
   isClosedEnough,
   outputOperationLayers,
   pathUsesOperation,
@@ -19,6 +18,7 @@ import {
   type Transform,
   type Vec2,
 } from '../scene';
+import { flattenColoredPathCurvesForTransform } from '../scene/curve-path';
 import { sceneHasVCarveOutputLayer } from './vcarve-preparation-complexity';
 
 export const PREPARATION_RAW_VECTOR_SEGMENT_BUDGET = 100_000;
@@ -61,7 +61,8 @@ export function countOutputVectorSegments(scene: Scene): number {
       if (effectiveLayer(layer, obj).mode === 'image') continue;
       for (const path of vectorPaths(obj)) {
         if (!pathUsesOperation(obj, path, layer)) continue;
-        count += countPathSegments(path);
+        const transform = vectorTransform(obj);
+        if (transform !== null) count += countPathSegments(path, transform);
       }
     }
   }
@@ -94,7 +95,8 @@ function laserVectorPreparationWorkUnits(scene: Scene): number {
       const passes = laserPassCount(operation.passes);
       for (const path of vectorPaths(obj)) {
         if (!pathUsesOperation(obj, path, layer)) continue;
-        count += countPathSegments(path) * passes;
+        const transform = vectorTransform(obj);
+        if (transform !== null) count += countPathSegments(path, transform) * passes;
         if (count >= PREPARATION_RAW_VECTOR_SEGMENT_BUDGET) return count;
       }
     }
@@ -132,7 +134,8 @@ function cncVectorPreparationWorkUnits(scene: Scene): number {
     for (const obj of scene.objects) {
       for (const path of vectorPaths(obj)) {
         if (!pathUsesOperation(obj, path, layer)) continue;
-        count += countPathSegments(path) * depthPasses;
+        const transform = vectorTransform(obj);
+        if (transform !== null) count += countPathSegments(path, transform) * depthPasses;
         if (count >= PREPARATION_RAW_VECTOR_SEGMENT_BUDGET) return count;
       }
     }
@@ -196,8 +199,8 @@ function vectorTransform(obj: SceneObject): Transform | null {
   }
 }
 
-function countPathSegments(path: ColoredPath): number {
-  const flattened = flattenColoredPathCurves(path, {
+function countPathSegments(path: ColoredPath, transform: Transform): number {
+  const flattened = flattenColoredPathCurvesForTransform(path, transform, {
     toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
     segmentBudget: PREPARATION_RAW_VECTOR_SEGMENT_BUDGET,
   });

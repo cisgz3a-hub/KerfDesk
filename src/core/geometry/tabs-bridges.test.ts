@@ -63,6 +63,32 @@ describe('automatic tabs / bridges geometry', () => {
     ]);
   });
 
+  it('skips only strict full containment, never partial overlap or touching', () => {
+    const outer: Polyline = { closed: true, points: squarePoints(0, 0, 20) };
+    const partial: Polyline = { closed: true, points: squarePoints(15, 5, 10) };
+    const touching: Polyline = { closed: true, points: squarePoints(15, 5, 5) };
+
+    for (const subject of [partial, touching]) {
+      const result = applyAutomaticTabsToPolylines([outer, subject], SETTINGS);
+      expect(result.every((segment) => segment.closed === false)).toBe(true);
+      expect(result).toHaveLength(8);
+    }
+  });
+
+  it('is invariant to the cyclic start vertex of a strictly contained shape', () => {
+    const outer: Polyline = { closed: true, points: squarePoints(0, 0, 20) };
+    const innerPoints = squarePoints(5, 5, 5);
+    for (let start = 0; start < innerPoints.length; start += 1) {
+      const rotated = [...innerPoints.slice(start), ...innerPoints.slice(0, start)];
+      const result = applyAutomaticTabsToPolylines(
+        [outer, { closed: true, points: rotated }],
+        SETTINGS,
+      );
+      expect(result.filter((segment) => segment.closed)).toHaveLength(1);
+      expect(result.filter((segment) => !segment.closed)).toHaveLength(4);
+    }
+  });
+
   it('projects physical tab anchors onto a contour with a different start vertex', () => {
     const roughing: Polyline = { closed: true, points: squarePoints(0, 0, 20) };
     const finishing: Polyline = {

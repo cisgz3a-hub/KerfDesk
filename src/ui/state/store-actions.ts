@@ -12,6 +12,7 @@ import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
 import type { AppState } from './store';
 import { projectAfterDeviceProfileChange } from './cnc-machine-setup-scene';
+import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
 import { machineSetupActions } from './machine-setup-actions';
 import {
   nextProbeSetupState,
@@ -66,6 +67,7 @@ export function sceneActions(
       }),
     updateDeviceProfile: (patch) =>
       set((s) => {
+        captureSetupHistoryContext(s.project, s);
         const nextDevice = deviceProfileWithInteractivePatch(s.project.device, patch);
         return {
           project: projectAfterDeviceProfileChange(s.project, nextDevice, s.cncLiveCaps),
@@ -77,6 +79,7 @@ export function sceneActions(
       }),
     replaceDeviceProfile: (profile) =>
       set((s) => {
+        captureSetupHistoryContext(s.project, s);
         return {
           ...nextProbeSetupState(
             projectAfterDeviceProfileChange(s.project, profile, s.cncLiveCaps),
@@ -118,6 +121,8 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
       set((s) => {
         const prev = s.undoStack[s.undoStack.length - 1];
         if (prev === undefined) return s;
+        const context = setupHistoryContextFor(prev);
+        if (context !== null) captureSetupHistoryContext(s.project, s);
         return {
           project: prev,
           probeSetupEpoch: probeSetupEpochAfterHistoryRestore(s, prev),
@@ -131,12 +136,15 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           selectedPathNodes: [],
           registrationArtworkOutputSnapshot: null,
           dirty: true,
+          ...(context ?? {}),
         };
       }),
     redo: () =>
       set((s) => {
         const next = s.redoStack[s.redoStack.length - 1];
         if (next === undefined) return s;
+        const context = setupHistoryContextFor(next);
+        if (context !== null) captureSetupHistoryContext(s.project, s);
         return {
           project: next,
           probeSetupEpoch: probeSetupEpochAfterHistoryRestore(s, next),
@@ -149,6 +157,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           selectedPathNodes: [],
           registrationArtworkOutputSnapshot: null,
           dirty: true,
+          ...(context ?? {}),
         };
       }),
   };
@@ -239,21 +248,41 @@ export function interactionActions(
   | 'applyObjectTransform'
 > {
   return {
-    beginInteraction: () => set((s) => ({ pendingUndo: s.project })),
+    beginInteraction: () =>
+      set((s) => ({
+        pendingUndo: {
+          project: s.project,
+          undoStack: s.undoStack,
+          redoStack: s.redoStack,
+          dirty: s.dirty,
+          selectedObjectId: s.selectedObjectId,
+          additionalSelectedIds: new Set(s.additionalSelectedIds),
+          selectedPathNode: s.selectedPathNode,
+          selectedPathNodes: s.selectedPathNodes,
+        },
+      })),
     setObjectTransform: (id, transform) =>
       set((s) => ({ project: applyTransformToScene(s.project, id, transform), dirty: true })),
     // Esc mid-drag: restore the pre-interaction project snapshot and drop it,
     // pushing no undo entry (the drag never happened). No-op if nothing was
     // snapshotted (audit C4).
     cancelInteraction: () =>
-      set((s) => (s.pendingUndo === null ? {} : { project: s.pendingUndo, pendingUndo: null })),
+      set((s) =>
+        s.pendingUndo === null
+          ? {}
+          : {
+              ...s.pendingUndo,
+              additionalSelectedIds: new Set(s.pendingUndo.additionalSelectedIds),
+              pendingUndo: null,
+            },
+      ),
     endInteraction: () =>
       set((s) => {
         if (s.pendingUndo === null) return s;
-        if (s.pendingUndo === s.project) return { pendingUndo: null };
+        if (s.pendingUndo.project === s.project) return { pendingUndo: null };
         return {
           pendingUndo: null,
-          undoStack: pushUndo(s.pendingUndo, s.undoStack),
+          undoStack: pushUndo(s.pendingUndo.project, s.pendingUndo.undoStack),
           redoStack: [],
           dirty: true,
         };

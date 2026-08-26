@@ -196,12 +196,23 @@ function ensureWorker(): Worker | null {
       if (workerInstance === worker) handleMessage(event);
     };
     worker.onerror = () => {
-      if (workerInstance === worker) rejectAllPending('document import worker errored');
+      if (workerInstance === worker) failActiveAndRestart('document import worker errored');
     };
     return worker;
   } catch {
     return null;
   }
+}
+
+function failActiveAndRestart(message: string): void {
+  const id = activeRequestId;
+  retireWorker();
+  if (id === null) {
+    startNext();
+    return;
+  }
+  pendingById.get(id)?.reject(new Error(message));
+  finish(id);
 }
 
 function rejectAllPending(message: string): void {

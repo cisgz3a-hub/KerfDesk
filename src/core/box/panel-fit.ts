@@ -17,6 +17,7 @@
 import { differenceD, FillRule, type PathD, type PathsD } from 'clipper2-ts';
 import type { Polyline, Vec2 } from '../scene';
 import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
+import { normalizeClosedPolylineTreeEvenOddChecked } from '../geometry/polygon-difference';
 import { pathDToPolyline, polylineToPathD, tryVectorOp } from '../geometry/vector-path-tools';
 import type { BoxRelief } from './box-spec';
 
@@ -56,6 +57,17 @@ export function applyPanelFit(rings: PanelRings, args: PanelFitArgs): PanelFitRe
 function offsetRings(rings: PanelRings, clearanceMm: number): PanelFitResult {
   if (clearanceMm === 0) return { kind: 'fitted', ...rings };
   const operation = `clearance ${clearanceMm} mm`;
+  const topology = normalizeClosedPolylineTreeEvenOddChecked([rings.outline, ...rings.cutouts]);
+  if (topology.kind === 'error') return { kind: 'degenerate', detail: `${operation} failed` };
+  const roots = topology.value.filter((node) => node.parentIndex === null);
+  const holes = topology.value.filter((node) => node.isHole && node.parentIndex !== null);
+  if (
+    topology.value.length !== rings.cutouts.length + 1 ||
+    roots.length !== 1 ||
+    holes.length !== rings.cutouts.length
+  ) {
+    return { kind: 'degenerate', detail: `${operation} severed the panel` };
+  }
   // Checked: the unchecked variant flattens a clipper failure to an empty list,
   // which classifyRings can only read as "consumed the panel" — and generate-box
   // puts that detail straight in front of the operator, so if it ever fires it

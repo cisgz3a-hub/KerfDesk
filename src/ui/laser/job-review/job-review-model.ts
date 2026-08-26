@@ -110,7 +110,10 @@ export function buildJobReviewModel(args: {
       args.project.scene.layers,
       args.project.device.scanningOffsets,
     ),
-    effectiveOperations: buildEffectiveOperationReview(args.prepared.prepared.job),
+    effectiveOperations: buildEffectiveOperationReview(
+      args.prepared.prepared.job,
+      args.project.scene,
+    ),
   };
 }
 

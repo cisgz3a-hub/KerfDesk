@@ -101,6 +101,19 @@ describe('JobReviewLayersTable', () => {
     expect(storedLayer('red').airAssist).toBe(true);
   });
 
+  it('rejects non-decimal English number syntax with accessible feedback and preserves the value', async () => {
+    const layer = createLayer({ id: 'red', color: '#ff0000' });
+    seedLayers([layer], 'laser');
+    await render('laser');
+    const input = numberInput(`Power % for ${layer.name}`);
+
+    await typeAndBlur(input, '1e2');
+
+    expect(storedLayer('red').power).toBe(layer.power);
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(host.textContent).toContain('decimal point');
+  });
+
   it('shows only output-enabled operations', async () => {
     const on = createLayer({ id: 'on', color: '#ff0000' });
     const off = { ...createLayer({ id: 'off', color: '#00ff00' }), output: false };

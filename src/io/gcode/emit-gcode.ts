@@ -17,6 +17,7 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
+import { gcodeCoordinateFailure } from '../../core/job/job-coordinate-encodability';
 import {
   emitCncJobWithPassSpans,
   finishOptionsForJobOrigin,
@@ -106,6 +107,24 @@ export function emitPreparedGcodeWithCncPassSpans(
     return { gcode: '', preflight: rotaryStage.preflight, spans: null };
   }
   const job = rotaryStage.job;
+  const coordinateFailure = gcodeCoordinateFailure(job);
+  if (coordinateFailure !== null) {
+    return {
+      gcode: '',
+      preflight: {
+        ok: false,
+        issues: [
+          {
+            code: 'coordinate-unencodable',
+            message:
+              `Compiled coordinate ${coordinateFailure.path} (${String(coordinateFailure.value)}) ` +
+              'cannot be represented as fixed-decimal G-code. No output bytes were produced.',
+          },
+        ],
+      },
+      spans: null,
+    };
+  }
   // CNC router projects always emit through the Z-aware GRBL strategy; laser
   // projects pick their controller dialect via the ADR-094 driver seam. Both
   // receive the current-position finish so a head-relative job parks back at

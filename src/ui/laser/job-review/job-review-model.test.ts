@@ -177,7 +177,7 @@ describe('buildJobReviewModel', () => {
       {
         layerId: 'red',
         summaries: [
-          'Line · 20% power · 1,234 mm/min · 2 passes · air off · effective override: Kerf 0 mm · stored contour entry target 5 mm · tabs off · min power 0%',
+          'line — Line · 20% power · 1,234 mm/min · 2 passes · air off · requested Operation; effective artwork override: Kerf 0 mm · stored contour entry target 5 mm · tabs off · min power 0%',
         ],
       },
     ]);

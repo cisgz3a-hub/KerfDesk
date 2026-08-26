@@ -58,5 +58,9 @@ function describeRdEncodeError(error: RdEncodeError): string {
       return `Layer ${error.layerId} uses Fill/Image raster output, which the experimental .rd encoder does not support yet. Use Line mode layers for Ruida export.`;
     case 'too-many-layers':
       return `The job has ${error.count} layers; Ruida files support at most 100.`;
+    case 'coordinate-out-of-range':
+      return `Compiled coordinate ${error.path} (${error.valueUm} µm) is outside Ruida's signed 35-bit range (${error.minUm}..${error.maxUm} µm). No output bytes were produced.`;
+    case 'speed-out-of-range':
+      return `Layer ${error.layerId} speed (${error.valueUmPerSec} µm/s) is outside Ruida's signed 35-bit representation (${error.minUmPerSec}..${error.maxUmPerSec} µm/s). No output bytes were produced.`;
   }
 }

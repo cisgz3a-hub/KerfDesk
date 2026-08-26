@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
+import {
+  currentWorkZMm,
+  inferCurrentMachinePosition,
+  reportedFeedMmPerMin,
+  reportedWorkOffsetMm,
+} from './infer-machine-position';
 
 describe('currentWorkZMm', () => {
   it('reads WPos.z directly when reported', () => {
@@ -26,6 +31,21 @@ describe('currentWorkZMm', () => {
 });
 
 describe('inferCurrentMachinePosition', () => {
+  it('makes imperial and metric controller reports behaviorally equivalent', () => {
+    const metric = { mPos: { x: 25.4, y: 50.8, z: 76.2 }, wPos: null } as never;
+    const imperial = { mPos: { x: 1, y: 2, z: 3 }, wPos: null } as never;
+    const imperialMm = inferCurrentMachinePosition(imperial, null, true);
+    const metricMm = inferCurrentMachinePosition(metric, null, false);
+    expect(imperialMm?.x).toBeCloseTo(metricMm?.x ?? NaN, 12);
+    expect(imperialMm?.y).toBeCloseTo(metricMm?.y ?? NaN, 12);
+    expect(imperialMm?.z).toBeCloseTo(metricMm?.z ?? NaN, 12);
+    expect(reportedWorkOffsetMm({ x: 1, y: 2, z: 3 }, true)).toEqual({
+      x: 25.4,
+      y: 50.8,
+      z: 76.19999999999999,
+    });
+    expect(reportedFeedMmPerMin({ feed: 100 } as never, true)).toBe(2540);
+  });
   it('prefers MPos when reported', () => {
     expect(
       inferCurrentMachinePosition({ mPos: { x: 5, y: 6, z: 7 }, wPos: null } as never, {

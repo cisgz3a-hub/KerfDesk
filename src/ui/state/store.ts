@@ -91,6 +91,7 @@ import {
   type SceneClipboard,
   type SceneClipboardActions,
 } from './scene-clipboard-actions';
+import type { InteractionHistorySnapshot } from './interaction-history-snapshot';
 import { sceneGroupActions, type SceneGroupActions } from './scene-group-actions';
 import { sceneLockActions, type SceneLockActions } from './scene-lock-actions';
 import { generatedSceneActions } from './generated-scene-actions';
@@ -209,7 +210,7 @@ export type AppState = ObjectPropertiesActions &
     readonly closeExternalGcodePreview: () => void;
     readonly undoStack: ReadonlyArray<Project>;
     readonly redoStack: ReadonlyArray<Project>;
-    readonly pendingUndo: Project | null;
+    readonly pendingUndo: InteractionHistorySnapshot | null;
     // Cursor position over the workspace canvas in scene-mm coords, or null
     // when the pointer isn't over the canvas. Updated at mousemove cadence;
     // only the StatusBar subscribes to it, so re-render fan-out is bounded.

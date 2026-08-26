@@ -166,6 +166,79 @@ describe('emitGcode', () => {
     expect(preflight.issues.some((i) => i.code === 'no-output-layer')).toBe(true);
   });
 
+  it('returns a typed integrity failure before fixed-decimal G-code would use exponent notation', () => {
+    const base = createProject();
+    const hugeObject: SceneObject = {
+      ...sampleObject,
+      id: 'huge',
+      bounds: { minX: 1e21, minY: 0, maxX: 1e21, maxY: 1 },
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              points: [
+                { x: 1e21, y: 0 },
+                { x: 1e21, y: 1 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    const project = {
+      ...base,
+      scene: addLayer(
+        addObject(base.scene, hugeObject),
+        createLayer({ id: 'L1', color: '#ff0000' }),
+      ),
+    };
+
+    const result = emitGcode(project);
+
+    expect(result.gcode).toBe('');
+    expect(result.preflight.issues).toEqual([
+      expect.objectContaining({ code: 'coordinate-unencodable' }),
+    ]);
+  });
+
+  it('still emits large coordinates that have an exact fixed-decimal representation', () => {
+    const base = createProject();
+    const x = 1e20;
+    const largeObject: SceneObject = {
+      ...sampleObject,
+      id: 'large-fixed',
+      bounds: { minX: x, minY: 0, maxX: x, maxY: 1 },
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              points: [
+                { x, y: 0 },
+                { x, y: 1 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    const project = {
+      ...base,
+      scene: addLayer(
+        addObject(base.scene, largeObject),
+        createLayer({ id: 'L1', color: '#ff0000' }),
+      ),
+    };
+
+    const result = emitGcode(project);
+
+    expect(result.gcode).toContain('X100000000000000000000.000');
+    expect(result.gcode).not.toMatch(/X[^\s]*e/iu);
+  });
+
   it('warns when an exact CNC artifact uses shared layer values with a secondary cutter', () => {
     const base = createProject();
     const project = {

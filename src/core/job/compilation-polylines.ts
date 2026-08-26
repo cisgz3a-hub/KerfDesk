@@ -4,17 +4,21 @@
 
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-  flattenColoredPathCurves,
   type ColoredPath,
   type Polyline,
+  type Transform,
 } from '../scene';
+import { flattenColoredPathCurvesForTransform } from '../scene/curve-path';
 
 // Matches the raw-vector budget the preparation gate uses, so flattening here
 // cannot exceed what preparation already accepted for the same scene.
 const COMPILATION_SEGMENT_BUDGET = 100_000;
 
-export function compilationPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
-  const flattened = flattenColoredPathCurves(path, {
+export function compilationPolylines(
+  path: ColoredPath,
+  transform: Transform,
+): ReadonlyArray<Polyline> {
+  const flattened = flattenColoredPathCurvesForTransform(path, transform, {
     toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
     segmentBudget: COMPILATION_SEGMENT_BUDGET,
   });

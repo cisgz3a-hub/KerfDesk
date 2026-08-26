@@ -281,7 +281,7 @@ describe('Dancing Script Drive V-carve regression', () => {
     expect(
       passes.every((pass) => pass.kind === 'path3d' && pass.lateralFeed === 'z-rate-capped'),
     ).toBe(true);
-    expect(passes.map(path3dMinX)).toEqual([150, 179.792, 197.373, 205.084, 210.114, 229.454]);
+    expect(passes.map(path3dMinX)).toEqual([150, 179.792, 197.354, 205.491, 210.112, 229.28]);
   });
 
   it('uses the cutting feed on flat V-carve motion while capping descending Z rate', async () => {

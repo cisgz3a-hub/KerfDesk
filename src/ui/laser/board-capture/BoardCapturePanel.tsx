@@ -20,6 +20,7 @@ export function BoardCapturePanel(): JSX.Element | null {
   const close = useUiStore((state) => state.closeBoardCapturePanel);
   const statusReport = useLaserStore((state) => state.statusReport);
   const wcoCache = useLaserStore((state) => state.wcoCache);
+  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
   const controllerSessionEpoch = useLaserStore((state) => state.controllerSessionEpoch);
   const trustedPositionEpoch = useLaserStore((state) => state.trustedPositionEpoch ?? 0);
   const workOriginVersion = useLaserStore((state) => state.workOriginVersion ?? 0);
@@ -32,7 +33,7 @@ export function BoardCapturePanel(): JSX.Element | null {
   const capture = useBoardCapture();
   const { connected, disabled } = useCaptureGating();
   const currentEpoch = { controllerSessionEpoch, trustedPositionEpoch, workOriginVersion };
-  const livePosition = inferCurrentMachinePosition(statusReport, wcoCache);
+  const livePosition = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
   const feed = Math.min(device.maxFeed, BOARD_JOG_FEED_MM_PER_MIN);
   const { geometry, registrationEpoch, outlineId, committed } = capture.state;
   const outlineValid = useStore((state) =>

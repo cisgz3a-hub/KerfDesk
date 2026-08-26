@@ -67,21 +67,7 @@ export function useDialogA11y(ref: RefObject<HTMLElement>, onClose: () => void):
         return;
       }
       if (e.key !== 'Tab') return;
-      const focusables = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-        (el) => !el.hasAttribute('aria-hidden') && el.offsetParent !== null,
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (first === undefined || last === undefined) return;
-      const active = document.activeElement as HTMLElement | null;
-      if (e.shiftKey && active === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      }
+      trapTabWithin(node, e);
     };
 
     node.addEventListener('keydown', onKeyDown);
@@ -99,4 +85,23 @@ export function useDialogA11y(ref: RefObject<HTMLElement>, onClose: () => void):
     // once for the dialog's lifetime. onClose is read via onCloseRef so its
     // changing identity never re-triggers this (see the ref above).
   }, [ref]);
+}
+
+function trapTabWithin(node: HTMLElement, event: KeyboardEvent): void {
+  const focusables = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) => !element.hasAttribute('aria-hidden') && element.offsetParent !== null,
+  );
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (first === undefined || last === undefined) return;
+  const active = document.activeElement as HTMLElement | null;
+  if (event.shiftKey && (active === first || active === node)) {
+    event.preventDefault();
+    last.focus();
+    return;
+  }
+  if (!event.shiftKey && (active === node || active === last)) {
+    event.preventDefault();
+    first.focus();
+  }
 }

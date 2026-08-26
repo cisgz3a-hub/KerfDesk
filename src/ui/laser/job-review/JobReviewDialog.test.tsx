@@ -9,6 +9,7 @@ import {
 } from '../../../core/scene';
 import { MANUAL_FEEDS_LABEL } from '../../common/cnc-material-vocabulary';
 import { useStore } from '../../state';
+import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
 import { useUiStore } from '../../state/ui-store';
 import { useMachineSetupDialogStore } from '../device-setup/machine-setup-dialog-store';
@@ -59,6 +60,10 @@ beforeEach(() => {
   });
   useJobReviewStore.getState().close();
   useMachineSetupDialogStore.getState().close();
+  useLaserStore.setState({
+    controllerSettings: null,
+    controllerSettingsObservation: null,
+  });
   host = document.createElement('div');
   document.body.appendChild(host);
 });
@@ -70,6 +75,10 @@ afterEach(async () => {
   useJobReviewStore.getState().close();
   useMachineSetupDialogStore.getState().close();
   resetStore();
+  useLaserStore.setState({
+    controllerSettings: null,
+    controllerSettingsObservation: null,
+  });
 });
 
 async function render(): Promise<void> {
@@ -224,6 +233,22 @@ describe('JobReviewDialog', () => {
 
     const backdrop = host.querySelector('.lf-dialog-backdrop');
     expect(document.activeElement).toBe(backdrop);
+  });
+
+  it('requests an immediate rebuild when same-session $30/$32 evidence changes', async () => {
+    useJobReviewStore.getState().open(model);
+    await render();
+    const sessionEpoch = useLaserStore.getState().controllerSessionEpoch;
+
+    await act(async () => {
+      useLaserStore.setState({
+        controllerSettings: { maxPowerS: 1000, laserModeEnabled: true },
+        controllerSettingsObservation: { sessionEpoch, observedAt: Date.now() },
+      });
+    });
+
+    expect(useJobReviewStore.getState().pendingSignal).toBe('rebuild');
+    expect(buttonByText('Start job').disabled).toBe(false);
   });
 
   it('renders the CNC variant: attestation, machine facts, and the tool plan', async () => {

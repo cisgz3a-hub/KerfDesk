@@ -191,7 +191,7 @@ describe('PNG import worker client', () => {
     await expect(second).resolves.toMatchObject({ reason: 'second' });
   });
 
-  it('cleans active staging before rejecting queued work after an abrupt worker error', async () => {
+  it('cleans and rejects only active staging, then resumes queued work after a crash', async () => {
     const first = request('crashed');
     const second = request('queued');
     const worker = latest();
@@ -199,9 +199,16 @@ describe('PNG import worker client', () => {
     worker.fail();
 
     await expect(first).rejects.toThrow('PNG import worker errored');
-    await expect(second).rejects.toThrow('PNG import worker errored');
     expect(worker.terminated).toBe(true);
     expect(abortAsset.mock.calls).toEqual([['crashed'], ['crashed-luma']]);
+    const replacement = latest();
+    expect(replacement).not.toBe(worker);
+    replacement.reply({
+      id: replacement.posted[0]?.id ?? -1,
+      kind: 'complete',
+      result: { kind: 'legacy-fallback', reason: 'queued survived' },
+    });
+    await expect(second).resolves.toMatchObject({ reason: 'queued survived' });
   });
 
   it('does not disguise failed cancellation cleanup as an ordinary AbortError', async () => {

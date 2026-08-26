@@ -11,6 +11,7 @@ import {
 import { cncMachineWithCustomTools } from './machine-actions';
 import { nextProbeSetupState } from './probe-setup-history-identity';
 import { pushUndo } from './scene-mutations';
+import { captureSetupHistoryContext } from './setup-history-context';
 import type { AppState } from './store';
 
 type Setter = (
@@ -66,6 +67,7 @@ function replacementState(
   retainedMachine?: MachineConfig,
   startup?: CncStartupSetupReplacement,
 ): Partial<AppState> {
+  captureSetupHistoryContext(state.project, state);
   const customTools = startup?.customTools ?? state.cncLibrary.customTools;
   const nextMachine = machineWithTools(machine, customTools);
   const retainedCnc = retainedCncForSetup(state, nextMachine, retainedMachine);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   artworkOperationName,
   isRegistrationBox,
@@ -187,10 +187,18 @@ function PowerScaleInput(props: {
   const objectIds = props.objects.map((object) => object.id);
   const commonValue = commonPowerScale(props.objects);
   const mixed = commonValue === null;
+  const selectionKey = props.objects
+    .map((object) => `${object.id}:${object.powerScale ?? DEFAULT_POWER_SCALE_PERCENT}`)
+    .join('|');
+  const explicitlyEdited = useRef(false);
+  useEffect(() => {
+    explicitlyEdited.current = false;
+  }, [selectionKey]);
   const debounced = useDebouncedCommit<number>({
     value: commonValue ?? DEFAULT_POWER_SCALE_PERCENT,
     commit: (powerScale) => setObjectsPowerScale(objectIds, powerScale),
     parse: (input) => clampPowerScale(Number(input)),
+    reconcileKey: selectionKey,
   });
   return (
     <label style={rowStyle}>
@@ -208,12 +216,29 @@ function PowerScaleInput(props: {
           }
           placeholder={mixed ? 'Mixed' : undefined}
           data-mixed={mixed ? 'true' : undefined}
-          onChange={debounced.onChange}
-          onBlur={debounced.onBlur}
+          aria-valuetext={mixed ? 'Mixed' : undefined}
+          aria-invalid={debounced.errorMessage === null ? undefined : true}
+          aria-describedby={
+            debounced.errorMessage === null ? undefined : 'selected-power-scale-error'
+          }
+          lang="en"
+          onChange={(event) => {
+            explicitlyEdited.current = true;
+            debounced.onChange(event);
+          }}
+          onBlur={(event) => {
+            if (mixed && !explicitlyEdited.current) return;
+            debounced.onBlur(event);
+          }}
           aria-label={`Power scale for ${props.selectionActive ? 'selected objects' : 'inspected artwork'}`}
           title="Scale laser power for this artwork context without changing its operation setting."
           style={inputStyle}
         />
+        {debounced.errorMessage === null ? null : (
+          <span id="selected-power-scale-error" role="alert" style={unitStyle}>
+            {debounced.errorMessage}
+          </span>
+        )}
         <span style={unitStyle}>%</span>
       </span>
     </label>

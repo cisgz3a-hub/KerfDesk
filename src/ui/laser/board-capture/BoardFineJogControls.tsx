@@ -31,6 +31,7 @@ export function BoardFineJogControls(props: BoardFineJogControlsProps): JSX.Elem
   const jog = useLaserStore((state) => state.jog);
   const statusReport = useLaserStore((state) => state.statusReport);
   const wcoCache = useLaserStore((state) => state.wcoCache);
+  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const stepMm = fineJogStep(preferredStep);
@@ -40,7 +41,7 @@ export function BoardFineJogControls(props: BoardFineJogControlsProps): JSX.Elem
       : FINE_JOG_FEED_CAP_MM_PER_MIN;
   const feed = clampJogFeed(safeRequestedFeed, device.maxFeed);
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
-  const position = inferCurrentMachinePosition(statusReport, wcoCache);
+  const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
 
   const clearError = useCallback((): void => {
     setLocalError(null);

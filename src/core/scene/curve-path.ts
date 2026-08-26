@@ -6,6 +6,7 @@ import type {
   EllipticalArcPathSegment,
   PathSegment,
   Polyline,
+  Transform,
   Vec2,
 } from './scene-object';
 
@@ -96,6 +97,25 @@ export function flattenColoredPathCurves(
     segmentCount += result.segmentCount;
   }
   return { kind: 'ok', polylines, segmentCount };
+}
+
+/**
+ * Flatten a path so the deviation contract is expressed in transformed
+ * physical millimetres. Rotation and mirrors preserve distance; the largest
+ * absolute axis scale is the affine upper bound for uniform and non-uniform
+ * scaling, including negative scale components.
+ */
+export function flattenColoredPathCurvesForTransform(
+  path: ColoredPath,
+  transform: Transform,
+  options: FlattenCurveOptions,
+): FlattenColoredPathResult {
+  const largestScale = Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY));
+  const localTolerance =
+    largestScale > 0 && Number.isFinite(largestScale)
+      ? options.toleranceMm / largestScale
+      : options.toleranceMm;
+  return flattenColoredPathCurves(path, { ...options, toleranceMm: localTolerance });
 }
 
 export function polylineToCurveSubpath(polyline: Polyline): CurveSubpath {

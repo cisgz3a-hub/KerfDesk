@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { CurveSubpath } from './scene-object';
+import type { CurveSubpath, Transform } from './scene-object';
+import { applyTransform } from './transform';
 import {
   curveSubpathBounds,
   flattenColoredPathCurves,
+  flattenColoredPathCurvesForTransform,
   flattenCurveSubpath,
   polylineToCurveSubpath,
   transformCurveSubpathUniform,
@@ -151,6 +153,50 @@ describe('curve path geometry', () => {
       maximumDeviation = Math.max(
         maximumDeviation,
         distanceToPolyline(point, result.polyline.points),
+      );
+    }
+    expect(maximumDeviation).toBeLessThanOrEqual(toleranceMm);
+  });
+
+  it('keeps the deviation contract in transformed physical space', () => {
+    const curve: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      segments: [
+        {
+          kind: 'cubic',
+          control1: { x: 0, y: 20 },
+          control2: { x: 20, y: 20 },
+          to: { x: 20, y: 0 },
+        },
+      ],
+      closed: false,
+    };
+    const transform: Transform = {
+      x: 17,
+      y: -4,
+      scaleX: -12,
+      scaleY: 3,
+      rotationDeg: 37,
+      mirrorX: true,
+      mirrorY: false,
+    };
+    const toleranceMm = 0.025;
+    const result = flattenColoredPathCurvesForTransform(
+      { color: '#000000', polylines: [], curves: [curve] },
+      transform,
+      { toleranceMm },
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const physicalPolyline = (result.polylines[0]?.points ?? []).map((point) =>
+      applyTransform(point, transform),
+    );
+    let maximumDeviation = 0;
+    for (let sample = 0; sample <= 4_000; sample += 1) {
+      const physicalPoint = applyTransform(cubicPoint(sample / 4_000, curve), transform);
+      maximumDeviation = Math.max(
+        maximumDeviation,
+        distanceToPolyline(physicalPoint, physicalPolyline),
       );
     }
     expect(maximumDeviation).toBeLessThanOrEqual(toleranceMm);

@@ -89,4 +89,35 @@ describe('useDialogA11y', () => {
       host.remove();
     }
   });
+
+  it('cycles Shift+Tab from a dialog-surface initial focus to the last control', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<FocusHarness tick={0} />);
+      });
+      const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+      const inputs = host.querySelectorAll<HTMLInputElement>('input');
+      const last = inputs[1];
+      if (dialog === null || last === undefined) throw new Error('focus fixtures missing');
+      for (const input of inputs) {
+        Object.defineProperty(input, 'offsetParent', { configurable: true, value: dialog });
+      }
+      dialog.focus();
+
+      await act(async () => {
+        dialog.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }),
+        );
+      });
+
+      expect(document.activeElement).toBe(last);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 });

@@ -22,7 +22,7 @@ function closedSquareObj(args: {
   readonly y?: number;
   readonly size: number;
   readonly transform?: Transform;
-}): SceneObject {
+}): Extract<SceneObject, { readonly kind: 'imported-svg' }> {
   const x = args.x ?? 0;
   const y = args.y ?? 0;
   const points = [
@@ -39,6 +39,15 @@ function closedSquareObj(args: {
     transform: args.transform ?? IDENTITY_TRANSFORM,
     paths: [{ color: args.color, polylines: [{ points, closed: true }] }],
   };
+}
+
+function squarePointsForFill(x: number, y: number, size: number) {
+  return [
+    { x, y },
+    { x: x + size, y },
+    { x: x + size, y: y + size },
+    { x, y: y + size },
+  ];
 }
 
 function segmentsAtMachineY(
@@ -115,6 +124,47 @@ describe('compileJob fill hatching', () => {
     for (const segment of row) {
       expect(segment.length).toBeLessThan(7);
     }
+  });
+
+  it('resolves text nonzero per object without changing an unrelated vector donut', () => {
+    const layer = fillLayer();
+    const donut: SceneObject = {
+      ...closedSquareObj({ id: 'donut', color: '#ff0000', size: 20 }),
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            { closed: true, points: squarePointsForFill(0, 0, 20) },
+            { closed: true, points: squarePointsForFill(5, 5, 10) },
+          ],
+        },
+      ],
+    };
+    const text: SceneObject = {
+      kind: 'text',
+      id: 'text',
+      content: 'A',
+      fontKey: 'fixture-font',
+      sizeMm: 10,
+      alignment: 'left',
+      lineHeight: 1.2,
+      letterSpacing: 0,
+      color: '#ff0000',
+      bounds: { minX: 30, minY: 0, maxX: 35, maxY: 5 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [{ closed: true, points: squarePointsForFill(30, 0, 5) }],
+        },
+      ],
+    };
+
+    const withoutText = firstFillGroup(compileJob({ objects: [donut], layers: [layer] }, dev));
+    const withText = firstFillGroup(compileJob({ objects: [donut, text], layers: [layer] }, dev));
+    expect(
+      segmentsAtMachineY(withText, dev.bedHeight - 10).filter((segment) => segment.maxX <= 20),
+    ).toEqual(segmentsAtMachineY(withoutText, dev.bedHeight - 10));
   });
 
   it('aggregates separate same-layer partial overlaps without double engraving the overlap', () => {

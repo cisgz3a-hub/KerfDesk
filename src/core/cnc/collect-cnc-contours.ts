@@ -3,7 +3,6 @@ import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   applyTransform,
   assertNever,
-  flattenColoredPathCurves,
   pathUsesOperation,
   type ColoredPath,
   type Layer,
@@ -11,6 +10,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../scene';
+import { flattenColoredPathCurvesForTransform } from '../scene/curve-path';
 import { cncTabAnchorPosition } from './cnc-tab-anchors';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 import { mergeTextObjectContours } from './vcarve-text-union';
@@ -71,7 +71,7 @@ function appendObjectContours(
 ): void {
   object.paths.forEach((path, pathIndex) => {
     if (!pathUsesOperation(object, path, layer)) return;
-    const flattened = flattenColoredPathCurves(path, {
+    const flattened = flattenColoredPathCurvesForTransform(path, object.transform, {
       toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
       segmentBudget: 100_000,
     });

@@ -1,25 +1,42 @@
 import type { StatusReport } from '../../core/controllers/grbl';
-import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
+import {
+  normalizeReportedFeedRateToMm,
+  normalizeReportedMPosToMm,
+} from '../../core/controllers/grbl/machine-envelope';
 import type { WorkCoordinateOffset } from './origin-actions';
 
 export function inferCurrentMachinePosition(
   report: StatusReport | null,
   wcoCache: WorkCoordinateOffset | null,
+  reportInches = false,
 ): WorkCoordinateOffset | null {
-  if (report?.mPos !== null && report?.mPos !== undefined) return report.mPos;
+  if (report?.mPos !== null && report?.mPos !== undefined)
+    return axisToMm(report.mPos, reportInches);
   if (report?.wPos !== null && report?.wPos !== undefined) {
     // Prefer THIS frame's own WCO over the cache: a just-applied G92/G10 can
     // leave wcoCache a report behind the fresh WPos (C7). Mirrors
     // currentWorkPosition in job-placement.ts so the two never diverge.
     const offset = report.wco ?? wcoCache;
     if (offset === null) return null;
-    return {
-      x: report.wPos.x + offset.x,
-      y: report.wPos.y + offset.y,
-      z: report.wPos.z + offset.z,
-    };
+    const work = axisToMm(report.wPos, reportInches);
+    const offsetMm = axisToMm(offset, reportInches);
+    return { x: work.x + offsetMm.x, y: work.y + offsetMm.y, z: work.z + offsetMm.z };
   }
   return null;
+}
+
+export function reportedWorkOffsetMm(
+  wcoCache: WorkCoordinateOffset | null,
+  reportInches: boolean,
+): WorkCoordinateOffset | null {
+  return wcoCache === null ? null : axisToMm(wcoCache, reportInches);
+}
+
+export function reportedFeedMmPerMin(
+  report: Pick<StatusReport, 'feed'> | null,
+  reportInches: boolean,
+): number | null {
+  return normalizeReportedFeedRateToMm(report?.feed ?? null, reportInches);
 }
 
 /**
@@ -45,4 +62,9 @@ export function currentWorkZMm(
 
 function positionUnitToMm(value: number, reportInches: boolean): number {
   return normalizeReportedMPosToMm([0, 0, value], reportInches)[2];
+}
+
+function axisToMm(axis: WorkCoordinateOffset, reportInches: boolean): WorkCoordinateOffset {
+  const [x, y, z] = normalizeReportedMPosToMm([axis.x, axis.y, axis.z], reportInches);
+  return { x, y, z };
 }

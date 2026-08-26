@@ -6,6 +6,11 @@ import {
 } from './cnc-compiled-depth-warnings';
 
 const ROTARY_RASTER_REFUSAL_CODE = 'rotary-raster-unsupported';
+const FACTUAL_EMISSION_REFUSAL_CODES = new Set([
+  ROTARY_RASTER_REFUSAL_CODE,
+  'coordinate-unencodable',
+  'program-materialization-failed',
+]);
 
 /**
  * Tagged Save emission result. Callers must branch on `kind`;
@@ -55,10 +60,10 @@ export function emitSavePreparedOutput(
     };
   }
   const emitted = emitPreparedGcode(prepared, options);
-  const isRotaryRasterRefusal =
+  const isFactualEmissionRefusal =
     emitted.gcode === '' &&
-    emitted.preflight.issues.some((issue) => issue.code === ROTARY_RASTER_REFUSAL_CODE);
-  if (isRotaryRasterRefusal) {
+    emitted.preflight.issues.some((issue) => FACTUAL_EMISSION_REFUSAL_CODES.has(issue.code));
+  if (isFactualEmissionRefusal) {
     return { kind: 'emission-refused', ...emitted, gcode: '' };
   }
   return {

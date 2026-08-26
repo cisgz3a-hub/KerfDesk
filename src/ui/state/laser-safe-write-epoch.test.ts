@@ -238,6 +238,7 @@ describe('safe-write transport epochs', () => {
     const zeroFailure = (async () => {
       await expect(zeroing).rejects.toThrow(/serial session changed|controller rebooted/i);
     })();
+    await flush();
     expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
     const previousEpoch = useLaserStore.getState().workZReferenceEpoch;
 
