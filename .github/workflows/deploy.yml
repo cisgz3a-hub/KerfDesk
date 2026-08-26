@@ -98,7 +98,7 @@ jobs:
           CI_STATE: ${{ github.event_name == 'workflow_run' && 'passed' || steps.release_check.outcome }}
           DEPLOY_STATE: ${{ steps.publish.outcome }}
         run: >-
-          pnpm report:release-readiness --
+          pnpm report:release-readiness
           --state=ci=${CI_STATE}
           --state=browser=not-run
           --state=deploy=${DEPLOY_STATE}

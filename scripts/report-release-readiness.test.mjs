@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   buildReadinessReport,
@@ -28,4 +29,19 @@ test('keeps all readiness lanes separate and explicitly nonblocking', () => {
 
 test('rejects unknown states instead of guessing', () => {
   assert.throws(() => normalizeReadinessState('green-ish'), /unsupported readiness state/);
+});
+
+test('workflows do not forward a standalone pnpm separator to the readiness CLI', async () => {
+  const workflows = [
+    '.github/workflows/ci.yml',
+    '.github/workflows/deploy.yml',
+    '.github/workflows/e2e.yml',
+    '.github/workflows/packaged-native-smoke.yml',
+  ];
+
+  for (const path of workflows) {
+    const source = await readFile(path, 'utf8');
+    assert.match(source, /pnpm report:release-readiness\s*\n\s*--state=/);
+    assert.doesNotMatch(source, /pnpm report:release-readiness --/);
+  }
 });

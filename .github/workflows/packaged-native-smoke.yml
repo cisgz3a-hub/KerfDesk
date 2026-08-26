@@ -50,7 +50,7 @@ jobs:
       - name: Record SHA-correlated readiness lanes
         if: always()
         run: >-
-          pnpm report:release-readiness --
+          pnpm report:release-readiness
           --state=ci=not-run
           --state=browser=not-run
           --state=deploy=not-run
