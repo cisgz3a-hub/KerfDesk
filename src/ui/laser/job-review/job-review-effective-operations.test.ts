@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../core/job';
+import { captureLayerOperationSettings, createLayer } from '../../../core/scene';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
 
 describe('buildEffectiveOperationReview', () => {
@@ -143,5 +144,81 @@ describe('buildEffectiveOperationReview', () => {
     const review = buildEffectiveOperationReview(job)[0];
     expect(review?.summaries[0]).toContain('Actual max depth 4.25 mm');
     expect(review?.cncActualMaxDepthMm).toBeUndefined();
+  });
+
+  it('discloses the requested feed when compilation caps the emitted feed', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'material-test-row-0',
+          color: '#100000',
+          power: 30,
+          speed: 2000,
+          requestedSpeed: 3000,
+          passes: 1,
+          airAssist: false,
+          overscanMm: 5,
+          segments: [],
+        },
+      ],
+    };
+
+    expect(buildEffectiveOperationReview(job)[0]?.summaries[0]).toContain(
+      '2,000 mm/min effective (3,000 requested)',
+    );
+  });
+
+  it('reports the effective compiled contour-entry target', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'cut',
+          layerId: 'outline',
+          color: '#000000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          airAssist: false,
+          entryRunwayMm: 2,
+          segments: [],
+        },
+      ],
+    };
+
+    expect(buildEffectiveOperationReview(job)[0]?.summaries[0]).toContain(
+      'contour entry 2 mm effective (laser off)',
+    );
+  });
+
+  it('reports effective object-local fill facts instead of only the base operation', () => {
+    const operationSettings = captureLayerOperationSettings({
+      ...createLayer({ id: 'base', color: '#000000', mode: 'fill' }),
+      fillStyle: 'offset',
+      hatchSpacingMm: 0.35,
+      hatchAngleDeg: 45,
+      fillBidirectional: false,
+      fillCrossHatch: true,
+    });
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'base',
+          color: '#000000',
+          power: 30,
+          speed: 1200,
+          passes: 1,
+          airAssist: false,
+          operationSettings,
+          overscanMm: 5,
+          segments: [],
+        },
+      ],
+    };
+
+    expect(buildEffectiveOperationReview(job)[0]?.summaries[0]).toContain(
+      'effective override: Offset fill · 0.35 mm hatch at 45° · one-way · cross-hatch',
+    );
   });
 });

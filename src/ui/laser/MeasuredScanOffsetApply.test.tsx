@@ -1,15 +1,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { resetStore } from '../state/test-helpers';
 import { MeasuredScanOffsetApply } from './MeasuredScanOffsetApply';
-
-vi.mock('../state/job-aware-dialogs', () => ({
-  jobAwareConfirm: vi.fn(() => true),
-}));
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -37,7 +32,6 @@ async function renderMeasuredApply(): Promise<{
 
 afterEach(() => {
   resetStore();
-  vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
 });
 
 describe('MeasuredScanOffsetApply', () => {
@@ -73,24 +67,39 @@ describe('MeasuredScanOffsetApply', () => {
     const second = await renderMeasuredApply();
     try {
       expect(second.host.textContent).toContain('Verification pending');
-      expect(button(second.host, 'Mark verification burn passed')).toBeTruthy();
+      expect(button(second.host, 'Mark verified')).toBeTruthy();
     } finally {
       await second.unmount();
     }
   });
 
-  it('requires explicit confirmation before marking a real verification burn passed', async () => {
+  it('records verified provenance through an explicit nonblocking action', async () => {
     useStore.getState().updateDeviceProfile({
       scanningOffsets: [{ speedMmPerMin: 2000, offsetMm: 0.1 }],
       scanOffsetCalibrationStatus: 'pending',
     });
     const { host, unmount } = await renderMeasuredApply();
     try {
-      await act(async () => button(host, 'Mark verification burn passed').click());
+      await act(async () => button(host, 'Mark verified').click());
 
-      expect(jobAwareConfirm).toHaveBeenCalledWith(expect.stringContaining('Only continue after'));
       expect(useStore.getState().project.device.scanOffsetCalibrationStatus).toBe('verified');
-      expect(host.textContent).toContain('Verification burn passed');
+      expect(host.textContent).toContain('Verification recorded');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('warns about legacy statusless provenance and offers pending or verified actions', async () => {
+    useStore.getState().updateDeviceProfile({
+      scanningOffsets: [{ speedMmPerMin: 2000, offsetMm: 0.1 }],
+      scanOffsetCalibrationStatus: undefined,
+    });
+    const { host, unmount } = await renderMeasuredApply();
+    try {
+      expect(host.textContent).toContain('Legacy/statusless table');
+      expect(host.textContent).toContain('remains active for compatibility');
+      await act(async () => button(host, 'Mark pending').click());
+      expect(useStore.getState().project.device.scanOffsetCalibrationStatus).toBe('pending');
     } finally {
       await unmount();
     }

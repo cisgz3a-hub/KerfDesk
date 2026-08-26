@@ -5,6 +5,7 @@ import { importByteSize, resolveImportBlob, type BlobSourceFile } from '../impor
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
+import { claimImportSuccessIndex } from './import-success-index';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import {
   describeImportError,
@@ -16,6 +17,7 @@ export async function importSvgFiles(
   files: ReadonlyArray<BlobSourceFile>,
   importObject: (object: SceneObject, batchIndex?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
+  options: { readonly nextSuccessIndex?: () => number } = {},
 ): Promise<void> {
   let successIndex = 0;
   for (const file of files) {
@@ -27,8 +29,9 @@ export async function importSvgFiles(
       if (advisory !== null) pushToast(advisory, 'warning');
       const result = await parseFile(file, blob, controls.options, pushToast);
       if (result.object !== null) {
-        const outcome = importObject(result.object, successIndex);
-        successIndex += 1;
+        const claimed = claimImportSuccessIndex(options.nextSuccessIndex, successIndex);
+        successIndex = claimed.nextLocalIndex;
+        const outcome = importObject(result.object, claimed.batchIndex);
         if (outcome.kind === 'replaced') {
           const toast = describeReimportOutcome(outcome);
           pushToast(toast.message, toast.variant);

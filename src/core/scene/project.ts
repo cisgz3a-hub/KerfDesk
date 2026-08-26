@@ -31,6 +31,27 @@ export type ProjectOptimizationSettings = {
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
 };
 
+export type ProjectJobSetup = {
+  readonly placement: {
+    readonly startFrom: 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
+    readonly anchor:
+      | 'front-left'
+      | 'front-center'
+      | 'front-right'
+      | 'center-left'
+      | 'center'
+      | 'center-right'
+      | 'back-left'
+      | 'back-center'
+      | 'back-right';
+  };
+  readonly outputScope: {
+    readonly cutSelectedGraphics: boolean;
+    readonly useSelectionOrigin: boolean;
+    readonly selectedObjectIds: ReadonlyArray<string>;
+  };
+};
+
 export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {
   reduceTravelMoves: true,
   travelPolicy: 'nearest-neighbor',
@@ -45,6 +66,7 @@ export type Project = {
   readonly device: DeviceProfile;
   readonly workspace: Workspace;
   readonly optimization: ProjectOptimizationSettings;
+  readonly jobSetup: ProjectJobSetup;
   readonly variables?: ProjectVariableData;
   readonly printAndCutTargets?: PrintAndCutDesignTargets;
   readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
@@ -60,6 +82,17 @@ export function createProject(device: DeviceProfile = DEFAULT_DEVICE_PROFILE): P
     device,
     workspace: { width: device.bedWidth, height: device.bedHeight, units: 'mm' },
     optimization: DEFAULT_PROJECT_OPTIMIZATION,
+    jobSetup: {
+      placement: {
+        startFrom: device.homing.enabled ? 'absolute' : 'user-origin',
+        anchor: 'front-left',
+      },
+      outputScope: {
+        cutSelectedGraphics: false,
+        useSelectionOrigin: false,
+        selectedObjectIds: [],
+      },
+    },
     notes: '',
     scene: EMPTY_SCENE,
   };

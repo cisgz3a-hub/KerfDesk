@@ -58,6 +58,7 @@ import { runConfirmedPauseJob, runConfirmedResumeJob } from './laser-job-pause-r
 import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
 import { originUnknownAfterControllerReset } from './laser-status-line';
+import { refreshLaserLiveStartState } from './laser-live-start-readiness';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -205,6 +206,15 @@ async function prepareStartBoundary(
   }
   assertStartReservation(get, setupEpoch);
   await refreshCncLiveStartState(set, get, safeWrite, driver, machineKind);
+  await refreshLaserLiveStartState({
+    set,
+    get,
+    refs,
+    safeWrite,
+    driver,
+    machineKind,
+    permit: options.framedRunPermit,
+  });
   assertStartAllowed(set, get, true);
   assertCncLiveStartReady(set, get, machineKind);
   assertStartReservation(get, setupEpoch);

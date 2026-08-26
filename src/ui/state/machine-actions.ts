@@ -20,7 +20,6 @@ import {
 import type { CncMachinePreset } from '../../core/cnc';
 import type { CncMachineStarterLiveCaps } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
-import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
 import {
   jobPlacementAfterDeviceChange,
   jobPlacementAfterProfileSelection,
@@ -56,8 +55,7 @@ const PROJECT_BACKFILL_CNC_TOOL_IDS: ReadonlySet<string> = new Set([
 
 export type MachineKindSelectionResult =
   | { readonly kind: 'selected'; readonly machineKind: MachineKind }
-  | { readonly kind: 'unchanged'; readonly machineKind: MachineKind }
-  | { readonly kind: 'blocked-by-capability'; readonly requestedKind: MachineKind };
+  | { readonly kind: 'unchanged'; readonly machineKind: MachineKind };
 
 export type CncMachinePatch = {
   readonly toolId?: string;
@@ -125,9 +123,6 @@ export function machineActions(set: MachineSet, get: MachineGet): MachineActions
   return {
     setMachineKind: (kind) => {
       const state = get();
-      if (!deviceSupportsMachineKind(state.project.device, kind)) {
-        return { kind: 'blocked-by-capability', requestedKind: kind };
-      }
       if ((state.project.machine?.kind ?? 'laser') === kind) {
         return { kind: 'unchanged', machineKind: kind };
       }

@@ -84,6 +84,8 @@ export type EmitRasterInput = {
   readonly layerId?: string;
   readonly color?: string;
   readonly powerPercent?: number;
+  /** Deterministic compiler-owned facts for an object-local operation override. */
+  readonly effectiveOperationComment?: string;
 };
 
 export function emitRasterGroup(input: EmitRasterInput): string {
@@ -287,6 +289,9 @@ function headerComment(input: EmitRasterInput): string {
     `; image layer ${layer} color ${color} power ${power}%`,
     `; ${input.width} × ${input.height} px, ${fmt(input.bounds.maxX - input.bounds.minX)} × ${fmt(input.bounds.maxY - input.bounds.minY)} mm`,
     `; feed ${Math.round(input.feedMmPerMin)} mm/min, overscan ${fmt(input.overscanMm)} mm, dot width correction ${fmt(input.dotWidthCorrectionMm ?? 0)} mm`,
+    ...(input.effectiveOperationComment === undefined
+      ? []
+      : [`; ${input.effectiveOperationComment}`]),
   ].join(LINE_END);
 }
 

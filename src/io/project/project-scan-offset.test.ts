@@ -12,7 +12,7 @@ import { serializeProject } from './serialize-project';
 describe('project scan-offset IO', () => {
   it('back-fills missing scan-offset table on old .lf2 files', () => {
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION,
+      schemaVersion: PROJECT_SCHEMA_VERSION - 1,
       device: {
         name: 'Old Profile',
         bedWidth: 300,

@@ -31,7 +31,7 @@ describe('decodeIncrementalPngToLuma', () => {
       sampledHeight: 2,
       bitDepth: 8,
       colorType: 2,
-      densityDpi: null,
+      density: null,
     });
     expect(rows.map((row) => [...row])).toEqual([
       [76, 150],
@@ -57,7 +57,7 @@ describe('decodeIncrementalPngToLuma', () => {
       },
     );
 
-    expect(result).toMatchObject({ kind: 'ok', densityDpi: 300 });
+    expect(result).toMatchObject({ kind: 'ok', density: { xDpi: 300, yDpi: 300 } });
   });
 
   it('box-samples RGBA over white into bounded output rows', async () => {

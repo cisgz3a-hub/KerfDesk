@@ -27,6 +27,7 @@ export type LaserSafetyAction =
   | 'jog'
   | 'home'
   | 'probe'
+  | 'autofocus'
   | 'air-assist'
   | 'fire'
   | 'unlock'

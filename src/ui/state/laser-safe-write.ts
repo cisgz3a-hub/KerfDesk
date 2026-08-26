@@ -41,6 +41,7 @@ const MOTION_TRANSCRIPT_ACTIONS: ReadonlyArray<LaserSafetyAction | undefined> = 
   'jog',
   'home',
   'probe',
+  'autofocus',
 ];
 
 type SetFn = (

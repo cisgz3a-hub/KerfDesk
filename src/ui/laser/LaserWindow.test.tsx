@@ -119,7 +119,7 @@ describe('LaserWindow autofocus busy controls', () => {
     }
   });
 
-  it('disables motion, origin, and disconnect controls while autofocus is active', async () => {
+  it('disables motion and origin controls but keeps Disconnect available during autofocus', async () => {
     useStore.setState({
       project: createProject({
         ...DEFAULT_DEVICE_PROFILE,
@@ -145,7 +145,7 @@ describe('LaserWindow autofocus busy controls', () => {
         );
       });
 
-      expect(button(host, 'Disconnect').disabled).toBe(true);
+      expect(button(host, 'Disconnect').disabled).toBe(false);
       expect(button(host, 'Home').disabled).toBe(true);
       expect(button(host, 'Auto-focus').disabled).toBe(true);
       expect(button(host, 'Frame job').disabled).toBe(true);

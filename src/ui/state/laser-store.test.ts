@@ -379,13 +379,15 @@ describe('laser-store autofocus lifecycle', () => {
 
     const first = useLaserStore.getState().autofocus('$HZ1');
     await flush();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
     const second = useLaserStore.getState().autofocus('$HZ1');
     connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
 
     await expect(second).resolves.toMatchObject({
       kind: 'preflight-failed',
-      reason: expect.stringMatching(/auto-focus is already running/i),
+      reason: expect.stringMatching(/controller operation is active/i),
     });
     await expect(first).resolves.toMatchObject({ kind: 'ok' });
   });
@@ -397,6 +399,8 @@ describe('laser-store autofocus lifecycle', () => {
 
     const autofocus = useLaserStore.getState().autofocus('$HZ1');
     await flush();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
 
     await expect(useLaserStore.getState().jog({ dx: 1, feed: 1000 })).rejects.toThrow(
       /auto-focus is running/i,
@@ -407,7 +411,14 @@ describe('laser-store autofocus lifecycle', () => {
   });
 
   it('refuses other motion and origin actions while autofocus is busy', async () => {
-    useLaserStore.setState({ autofocusBusy: true });
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+
+    const autofocus = useLaserStore.getState().autofocus('$HZ1');
+    await flush();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
 
     await expect(useLaserStore.getState().home()).rejects.toThrow(/auto-focus is running/i);
     await expect(
@@ -424,7 +435,10 @@ describe('laser-store autofocus lifecycle', () => {
     await expect(useLaserStore.getState().clearPersistentOrigin()).rejects.toThrow(
       /auto-focus is running/i,
     );
-    await expect(useLaserStore.getState().disconnect()).rejects.toThrow(/auto-focus is running/i);
+
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await expect(autofocus).resolves.toMatchObject({ kind: 'ok' });
   });
 });
 

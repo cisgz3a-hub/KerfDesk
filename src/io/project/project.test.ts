@@ -301,7 +301,7 @@ describe('deserializeProject', () => {
     // files predate them. Treating missing as the LAYER_DEFAULTS values
     // keeps the schema additive without bumping schemaVersion.
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION,
+      schemaVersion: 3,
       device: {
         name: 'Default',
         bedWidth: 300,
@@ -356,7 +356,7 @@ describe('deserializeProject', () => {
     // missing the field; normalizeSceneObject must fill it with the
     // default (0 = natural spacing) so the renderer doesn't see NaN.
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION,
+      schemaVersion: 3,
       device: {
         name: 'Default',
         bedWidth: 300,
@@ -404,7 +404,7 @@ describe('deserializeProject', () => {
     // normalize step in deserializeProject fills sensible defaults so
     // the planner doesn't get NaN/undefined and crash.
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION,
+      schemaVersion: 3,
       device: {
         name: 'Old Profile',
         bedWidth: 300,

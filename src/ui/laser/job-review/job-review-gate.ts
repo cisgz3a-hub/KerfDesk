@@ -11,6 +11,7 @@
 import type { JobCheckpoint } from '../../../core/recovery';
 import { machineKindOf } from '../../../core/scene';
 import { useStore } from '../../state';
+import { currentOutputScope } from '../../state/output-scope-state';
 import { useCameraStore } from '../../state/camera-store';
 import type { CncSetupAttestation } from '../../state/cnc-setup-attestation';
 import {
@@ -111,6 +112,7 @@ function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReview
     prepared: bundle.prepared,
     laserModeStartSnapshot: bundle.laserModeStartSnapshot,
     overrides: bundle.laser.ovCache,
+    outputScope: currentOutputScope(bundle.app),
   });
   // FluidNC disclosures need the live identities, not just the profile, so
   // they join here rather than inside buildJobReviewModel. Advisory only.

@@ -10,6 +10,7 @@ import {
   type SceneObject,
 } from '../../../core/scene';
 import { useStore } from '../../state';
+import { currentOutputScope } from '../../state/output-scope-state';
 import { useCameraStore } from '../../state/camera-store';
 import { CNC_SETUP_ATTESTATION_PROMPT } from '../../state/cnc-setup-attestation';
 import { captureLaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
@@ -105,6 +106,7 @@ async function buildModelFromCurrentStores(): Promise<JobReviewModel> {
     prepared,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     overrides: laser.ovCache,
+    outputScope: currentOutputScope(app),
   });
 }
 
@@ -119,6 +121,7 @@ describe('buildJobReviewModel', () => {
       'Operations',
       'G-code',
       'Origin',
+      'Output scope',
     ]);
     expect(model.stats[1]?.value).toBe('8 × 8 mm');
     expect(model.stats[2]?.value).toBe('1 operation');
@@ -127,9 +130,29 @@ describe('buildJobReviewModel', () => {
     // The origin tile is word-valued: it must ask for the text treatment.
     expect(model.stats[4]?.emphasis).toBe('text');
     expect(model.stats[4]?.value.length).toBeGreaterThan(0);
+    expect(model.stats[5]).toMatchObject({
+      label: 'Output scope',
+      value: 'Entire job',
+      detail: 'All visible, enabled artwork is included',
+    });
     expect(model.acknowledgement).toEqual({ kind: 'laser-verified' });
     expect(model.resolvedOriginLabel.length).toBeGreaterThan(0);
     expect(new Set(model.warnings).size).toBe(model.warnings.length);
+  });
+
+  it('discloses selected-artwork-only output and its selected-object count', async () => {
+    useStore.setState({
+      selectedObjectId: lineObject.id,
+      additionalSelectedIds: new Set(['second-object']),
+      outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
+    });
+
+    const model = await buildModelFromCurrentStores();
+
+    expect(model.stats.find((tile) => tile.label === 'Output scope')).toMatchObject({
+      value: 'Selected artwork only',
+      detail: '2 selected objects included',
+    });
   });
 
   it('reports object overrides and power scaling from the exact compiled job', async () => {
@@ -153,7 +176,9 @@ describe('buildJobReviewModel', () => {
     expect(model.effectiveOperations).toEqual([
       {
         layerId: 'red',
-        summaries: ['Line · 20% power · 1,234 mm/min · 2 passes · air off'],
+        summaries: [
+          'Line · 20% power · 1,234 mm/min · 2 passes · air off · effective override: Kerf 0 mm · stored contour entry target 5 mm · tabs off · min power 0%',
+        ],
       },
     ]);
   });

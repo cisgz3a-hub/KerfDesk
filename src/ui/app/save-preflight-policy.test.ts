@@ -61,6 +61,7 @@ describe('partitionSavePreflight', () => {
   // paths can drift apart again — which is the defect this replaced.
   it('is keyed off the canonical compile-integrity set', () => {
     expect([...COMPILE_INTEGRITY_PREFLIGHT_CODES].sort()).toEqual([
+      'cnc-machine-params-invalid',
       'cnc-tool-geometry-invalid',
       'empty-output',
       'no-output-layer',

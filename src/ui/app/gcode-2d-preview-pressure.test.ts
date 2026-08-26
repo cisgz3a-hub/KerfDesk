@@ -24,9 +24,12 @@ describe('annotateGcode2dPreviewPressure', () => {
     expect(annotated.steps).toBe(toolpath.steps);
     expect(annotated.totalLength).toBe(6);
     expect(annotated.previewIssue).toEqual({
-      kind: 'render-pressure',
+      kind: 'display-decimated',
       threshold: 2,
-      observed: 3,
+      sourceSteps: 3,
+      drawnSteps: 2,
+      sourceSegments: 3,
+      drawnSegments: 2,
     });
   });
 });

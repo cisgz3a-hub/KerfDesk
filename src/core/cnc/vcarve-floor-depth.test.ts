@@ -14,6 +14,7 @@
 // and a regression that makes it WORSE fails loudly.
 
 import { describe, expect, it } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
 import { buildToolpath } from '../job';
 import { computeRemovalGrid, kernelForTool } from '../sim';
@@ -101,72 +102,76 @@ function distToBoundary(p: Vec2, polygon: ReadonlyArray<Vec2>): number {
 }
 
 describe('v-carve floor DEPTH, not just coverage', () => {
-  it('never leaves more than one ring pitch of material above the analytic groove', () => {
-    const polygon = [
-      { x: AT, y: AT },
-      { x: AT + SIZE, y: AT },
-      { x: AT + SIZE, y: AT + SIZE },
-      { x: AT, y: AT + SIZE },
-    ].map((point) => toMachineCoords(point, DEFAULT_DEVICE_PROFILE));
-    const xs = polygon.map((point) => point.x);
-    const ys = polygon.map((point) => point.y);
-    const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
-    const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
+  it(
+    'never leaves more than one ring pitch of material above the analytic groove',
+    () => {
+      const polygon = [
+        { x: AT, y: AT },
+        { x: AT + SIZE, y: AT },
+        { x: AT + SIZE, y: AT + SIZE },
+        { x: AT, y: AT + SIZE },
+      ].map((point) => toMachineCoords(point, DEFAULT_DEVICE_PROFILE));
+      const xs = polygon.map((point) => point.x);
+      const ys = polygon.map((point) => point.y);
+      const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
+      const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
 
-    const job = compileCncJob(squareScene(), DEFAULT_DEVICE_PROFILE, {
-      ...DEFAULT_CNC_MACHINE_CONFIG,
-      tools: [VBIT_90],
-      toolId: VBIT_90.id,
-    });
-    const result = computeRemovalGrid(
-      buildToolpath(job),
-      {
-        originX: minX - 1,
-        originY: minY - 1,
-        widthMm: maxX - minX + 2,
-        heightMm: maxY - minY + 2,
-        mmPerCell: CELL_MM,
-      },
-      kernelForTool(VBIT_90, CELL_MM),
-    );
-    if (result.kind === 'error') throw new Error(result.reason);
-    const grid = result.grid;
+      const job = compileCncJob(squareScene(), DEFAULT_DEVICE_PROFILE, {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        tools: [VBIT_90],
+        toolId: VBIT_90.id,
+      });
+      const result = computeRemovalGrid(
+        buildToolpath(job),
+        {
+          originX: minX - 1,
+          originY: minY - 1,
+          widthMm: maxX - minX + 2,
+          heightMm: maxY - minY + 2,
+          mmPerCell: CELL_MM,
+        },
+        kernelForTool(VBIT_90, CELL_MM),
+      );
+      if (result.kind === 'error') throw new Error(result.reason);
+      const grid = result.grid;
 
-    const ringPitchMm = vcarveResolutionMm(0, VBIT_90.diameterMm);
-    let worstUnderCutMm = 0;
-    let worstOverCutMm = 0;
-    let interiorCells = 0;
-    let interiorCut = 0;
-    for (let cy = 0; cy < grid.heightCells; cy += 1) {
-      for (let cx = 0; cx < grid.widthCells; cx += 1) {
-        const x = grid.originX + (cx + 0.5) * grid.mmPerCell;
-        const y = grid.originY + (cy + 0.5) * grid.mmPerCell;
-        if (x < minX || x > maxX || y < minY || y > maxY) continue;
-        const analyticMm = Math.min(distToBoundary({ x, y }, polygon), MAX_DEPTH_MM);
-        const cutMm = -(grid.depth[cy * grid.widthCells + cx] ?? 0);
-        worstUnderCutMm = Math.max(worstUnderCutMm, analyticMm - cutMm);
-        worstOverCutMm = Math.max(worstOverCutMm, cutMm - analyticMm);
-        // The near-edge band is legitimately shallower than one cell can show.
-        if (analyticMm < GRID_SLACK_MM) continue;
-        interiorCells += 1;
-        if (cutMm > 0) interiorCut += 1;
+      const ringPitchMm = vcarveResolutionMm(0, VBIT_90.diameterMm);
+      let worstUnderCutMm = 0;
+      let worstOverCutMm = 0;
+      let interiorCells = 0;
+      let interiorCut = 0;
+      for (let cy = 0; cy < grid.heightCells; cy += 1) {
+        for (let cx = 0; cx < grid.widthCells; cx += 1) {
+          const x = grid.originX + (cx + 0.5) * grid.mmPerCell;
+          const y = grid.originY + (cy + 0.5) * grid.mmPerCell;
+          if (x < minX || x > maxX || y < minY || y > maxY) continue;
+          const analyticMm = Math.min(distToBoundary({ x, y }, polygon), MAX_DEPTH_MM);
+          const cutMm = -(grid.depth[cy * grid.widthCells + cx] ?? 0);
+          worstUnderCutMm = Math.max(worstUnderCutMm, analyticMm - cutMm);
+          worstOverCutMm = Math.max(worstOverCutMm, cutMm - analyticMm);
+          // The near-edge band is legitimately shallower than one cell can show.
+          if (analyticMm < GRID_SLACK_MM) continue;
+          interiorCells += 1;
+          if (cutMm > 0) interiorCut += 1;
+        }
       }
-    }
 
-    expect(interiorCells).toBeGreaterThan(0);
-    // Companion check only — a few corner cells fall inside the analytic shape
-    // but outside the rasterized cone. Coverage is what the sibling probes
-    // already assert; the depth bound below is this file's subject.
-    expect(interiorCut / interiorCells).toBeGreaterThanOrEqual(0.999);
-    // The bound, and the reason this file exists: coverage above says "carved
-    // everywhere", while the floor is up to one ring pitch proud of the
-    // requested depth. Tightening it needs a clearing tool, not a finer ladder.
-    expect(worstUnderCutMm).toBeLessThanOrEqual(ringPitchMm + GRID_SLACK_MM);
-    expect(worstUnderCutMm).toBeGreaterThan(0);
-    // The gouging direction, which nothing measured before: an undercut-only
-    // bound is equally satisfied by a floor cut arbitrarily too DEEP. Under an
-    // explicit flat cap the emitted floor must not dive past the analytic
-    // groove by more than grid discretization.
-    expect(worstOverCutMm).toBeLessThanOrEqual(GRID_SLACK_MM);
-  }, 120000);
+      expect(interiorCells).toBeGreaterThan(0);
+      // Companion check only — a few corner cells fall inside the analytic shape
+      // but outside the rasterized cone. Coverage is what the sibling probes
+      // already assert; the depth bound below is this file's subject.
+      expect(interiorCut / interiorCells).toBeGreaterThanOrEqual(0.999);
+      // The bound, and the reason this file exists: coverage above says "carved
+      // everywhere", while the floor is up to one ring pitch proud of the
+      // requested depth. Tightening it needs a clearing tool, not a finer ladder.
+      expect(worstUnderCutMm).toBeLessThanOrEqual(ringPitchMm + GRID_SLACK_MM);
+      expect(worstUnderCutMm).toBeGreaterThan(0);
+      // The gouging direction, which nothing measured before: an undercut-only
+      // bound is equally satisfied by a floor cut arbitrarily too DEEP. Under an
+      // explicit flat cap the emitted floor must not dive past the analytic
+      // groove by more than grid discretization.
+      expect(worstOverCutMm).toBeLessThanOrEqual(GRID_SLACK_MM);
+    },
+    ciBudgetMs(120_000, 150_000),
+  );
 });

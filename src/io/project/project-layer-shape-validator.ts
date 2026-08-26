@@ -9,6 +9,7 @@ import {
   optionalPercent,
   optionalPositiveInteger,
   optionalPositiveNumber,
+  optionalString,
   requireBoolean,
   requireLiteral,
   requirePercent,
@@ -64,6 +65,7 @@ function validateMaterialBinding(value: unknown, path: string): string | null {
   return firstError([
     requireString(value, `${path}.libraryId`),
     requireString(value, `${path}.presetId`),
+    optionalString(value, `${path}.presetRevision`),
     validateLayerOperationSettings(value['lastResolved'], `${path}.lastResolved`),
   ]);
 }

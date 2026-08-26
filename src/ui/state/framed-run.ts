@@ -119,6 +119,12 @@ export const FRAME_CONTROLLER_CHANGED_MESSAGE =
   'Controller or machine setup changed during Frame. No Start permit was issued; review the setup and Frame again.';
 export const FRAME_RETURN_POSITION_CHANGED_MESSAGE =
   'The machine did not return to its pre-Frame work position. No Start permit was issued; inspect the machine and Frame again.';
+export const FRAME_START_SESSION_CHANGED_MESSAGE =
+  'The controller session changed after Frame. Frame the exact job again before starting.';
+export const FRAME_START_ORIGIN_CHANGED_MESSAGE =
+  'The work origin changed after Frame. Frame the exact job again before starting.';
+export const FRAME_START_POSITION_CHANGED_MESSAGE =
+  'The machine moved after Frame. Return to the framed work position or Frame the exact job again before starting.';
 
 export function framedRunControllerSnapshot(
   source: FramedRunControllerSource,
@@ -167,6 +173,24 @@ export function framedRunCompletionIssue(
   return null;
 }
 
+/** Final wire-boundary comparison for an ordinary Start. Advisory controller
+ * settings are intentionally excluded; only session, origin identity, and the
+ * freshly reported work position bind the completed Frame to these bytes. */
+export function framedRunStartHandoffIssue(
+  permit: FramedRunPermit,
+  source: FramedRunControllerSource,
+): string | null {
+  const current = framedRunControllerSnapshot(source);
+  if (current.controllerSessionEpoch !== permit.controller.controllerSessionEpoch) {
+    return FRAME_START_SESSION_CHANGED_MESSAGE;
+  }
+  if (!sameStartOrigin(permit.controller, current)) return FRAME_START_ORIGIN_CHANGED_MESSAGE;
+  if (!sameReportedWorkPosition(permit.controller, current)) {
+    return FRAME_START_POSITION_CHANGED_MESSAGE;
+  }
+  return null;
+}
+
 function sameControllerSetup(
   before: FramedRunControllerSnapshot,
   completed: FramedRunControllerSnapshot,
@@ -183,6 +207,18 @@ function sameControllerSetup(
     before.trustedPositionEpoch === completed.trustedPositionEpoch &&
     before.workZReferenceEpoch === completed.workZReferenceEpoch &&
     before.workZZeroEvidence === completed.workZZeroEvidence
+  );
+}
+
+function sameStartOrigin(
+  framed: FramedRunControllerSnapshot,
+  current: FramedRunControllerSnapshot,
+): boolean {
+  return (
+    sameAxes(framed.wcoCache, current.wcoCache) &&
+    framed.workOriginActive === current.workOriginActive &&
+    framed.workOriginSource === current.workOriginSource &&
+    framed.trustedPositionEpoch === current.trustedPositionEpoch
   );
 }
 

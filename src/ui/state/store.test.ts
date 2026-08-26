@@ -213,7 +213,7 @@ describe('useStore', () => {
     expect(s.project.workspace).toEqual({ width: 300, height: 200, units: 'mm' });
   });
 
-  it('setJobPlacement updates the start mode and anchor without marking the project dirty', () => {
+  it('setJobPlacement persists the project-owned setup and marks the project dirty', () => {
     useStore.setState({ dirty: false });
 
     useStore.getState().setJobPlacement({ startFrom: 'user-origin', anchor: 'center' });
@@ -222,21 +222,36 @@ describe('useStore', () => {
       startFrom: 'user-origin',
       anchor: 'center',
     });
-    expect(useStore.getState().dirty).toBe(false);
+    expect(useStore.getState().project.jobSetup.placement).toEqual({
+      startFrom: 'user-origin',
+      anchor: 'center',
+    });
+    expect(useStore.getState().dirty).toBe(true);
   });
 });
 
-describe('useStore — SVG re-import (Phase C #7)', () => {
+describe('useStore — explicit selected-target SVG re-import', () => {
   beforeEach(() => {
     reset();
   });
 
-  it('returns { kind: "replaced" } when an object with the same source already exists', () => {
+  it('fresh same-name imports append instead of replacing by filename', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
     const replacement: ImportedSvg = { ...svgObj('NEW-id', ['#ff0000']), source: 'O1.svg' };
     const outcome = useStore.getState().importSvgObject(replacement);
-    expect(outcome.kind).toBe('replaced');
-    if (outcome.kind === 'replaced') {
+    expect(outcome.kind).toBe('added');
+    expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
+      'O1',
+      'NEW-id',
+    ]);
+  });
+
+  it('returns replacement facts only when an exact target id is explicit', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
+    const replacement: ImportedSvg = { ...svgObj('NEW-id', ['#ff0000']), source: 'O1.svg' };
+    const outcome = useStore.getState().reimportSvgObject('O1', replacement);
+    expect(outcome?.kind).toBe('replaced');
+    if (outcome?.kind === 'replaced') {
       expect(outcome.source).toBe('O1.svg');
       expect(outcome.kept).toBe(1); // red survived
       expect(outcome.removed).toBe(1); // blue dropped
@@ -248,7 +263,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const original = useStore.getState().project.scene.objects[0];
     const replacement: ImportedSvg = { ...svgObj('different-id', ['#ff0000']), source: 'O1.svg' };
-    useStore.getState().importSvgObject(replacement);
+    useStore.getState().reimportSvgObject('O1', replacement);
     const after = useStore.getState().project.scene.objects[0];
     expect(after?.id).toBe(original?.id);
     expect(useStore.getState().project.scene.objects).toHaveLength(1);
@@ -261,7 +276,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
     if (orig === undefined) throw new Error('expected object');
     useStore.getState().setObjectTransform(orig.id, { ...orig.transform, x: 123, y: 45 });
     const replacement: ImportedSvg = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
-    useStore.getState().importSvgObject(replacement);
+    useStore.getState().reimportSvgObject('O1', replacement);
     const after = useStore.getState().project.scene.objects[0];
     expect(after?.transform.x).toBe(123);
     expect(after?.transform.y).toBe(45);
@@ -273,7 +288,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
     if (operationId === undefined) throw new Error('operation missing');
     useStore.getState().setLayerParam(operationId, { power: 85, speed: 1234, passes: 3 });
     const replacement: ImportedSvg = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
-    useStore.getState().importSvgObject(replacement);
+    useStore.getState().reimportSvgObject('O1', replacement);
     const operation = useStore
       .getState()
       .project.scene.layers.find((candidate) => candidate.id === operationId);
@@ -289,12 +304,12 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
       ...svgObj('new', ['#ff0000', '#00ff00']),
       source: 'O1.svg',
     };
-    const outcome = useStore.getState().importSvgObject(replacement);
+    const outcome = useStore.getState().reimportSvgObject('O1', replacement);
     const operationIds = operationIdsFor('O1');
     expect(operationIds).toHaveLength(2);
     expect(operationIds).toContain(existingOperationId);
     expect(useStore.getState().project.scene.layers).toHaveLength(2);
-    if (outcome.kind === 'replaced') {
+    if (outcome?.kind === 'replaced') {
       expect(outcome.added).toBe(1);
       expect(outcome.kept).toBe(1);
     }

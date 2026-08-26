@@ -7,6 +7,7 @@
 // (ADR-261 §2), so they hold under every origin convention.
 
 import { describe, expect, it } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import { toSceneCoords } from '../../core/devices';
 import {
   createLayer,
@@ -123,83 +124,95 @@ const TWO_BIT_PROJECT: Project = {
 };
 
 describe('computeDesignSceneSource', () => {
-  it('retains the request and discloses the bounded pane display resolution', () => {
-    const source = preparedDesignSceneSource(TWO_BIT_PROJECT);
-    expect(source).not.toBeNull();
-    if (source === null) return;
+  it(
+    'retains the request and discloses the bounded pane display resolution',
+    () => {
+      const source = preparedDesignSceneSource(TWO_BIT_PROJECT);
+      expect(source).not.toBeNull();
+      if (source === null) return;
 
-    expect(source.grid.resolution).toEqual({
-      requestedMmPerCell: 0.2,
-      effectiveMmPerCell: 0.2,
-      reason: null,
-    });
-    expect(cnc3dPaneDisplayResolution(source.grid)).toEqual({
-      requestedMmPerCell: 0.2,
-      effectiveMmPerCell: 0.4,
-      reason: 'display-mesh-cell-budget',
-    });
-  }, 30_000);
+      expect(source.grid.resolution).toEqual({
+        requestedMmPerCell: 0.2,
+        effectiveMmPerCell: 0.2,
+        reason: null,
+      });
+      expect(cnc3dPaneDisplayResolution(source.grid)).toEqual({
+        requestedMmPerCell: 0.2,
+        effectiveMmPerCell: 0.4,
+        reason: 'display-mesh-cell-budget',
+      });
+    },
+    ciBudgetMs(30_000, 120_000),
+  );
 
-  it('stamps each tool section of a two-bit job with its own bit kernel', () => {
-    const source = preparedDesignSceneSource(TWO_BIT_PROJECT);
-    expect(source).not.toBeNull();
-    if (source === null) return;
-    const { grid } = source;
+  it(
+    'stamps each tool section of a two-bit job with its own bit kernel',
+    () => {
+      const source = preparedDesignSceneSource(TWO_BIT_PROJECT);
+      expect(source).not.toBeNull();
+      if (source === null) return;
+      const { grid } = source;
 
-    // The 1/4" end mill's pocket: a flat floor at exactly its 4 mm depth.
-    expect(probeDepth(grid, S0.x + 25, S0.y + 25)).toBeCloseTo(-4, 1);
+      // The 1/4" end mill's pocket: a flat floor at exactly its 4 mm depth.
+      expect(probeDepth(grid, S0.x + 25, S0.y + 25)).toBeCloseTo(-4, 1);
 
-    // The vee wall 0.9 mm inside the border slopes at the 60° cone:
-    // −0.9/tan(30°) ≈ −1.56 (± ring spacing and cell discretization). The
-    // active-bit kernel read the nearest tip line's full depth (≈ −3) here.
-    const wall = probeDepth(grid, VEE_X + 0.9, VEE_EDGE_Y);
-    expect(wall).toBeLessThan(-0.7);
-    expect(wall).toBeGreaterThan(-2.4);
+      // The vee wall 0.9 mm inside the border slopes at the 60° cone:
+      // −0.9/tan(30°) ≈ −1.56 (± ring spacing and cell discretization). The
+      // active-bit kernel read the nearest tip line's full depth (≈ −3) here.
+      const wall = probeDepth(grid, VEE_X + 0.9, VEE_EDGE_Y);
+      expect(wall).toBeLessThan(-0.7);
+      expect(wall).toBeGreaterThan(-2.4);
 
-    // Just outside the border the cone has exactly reached z = 0 — untouched
-    // stock. The flat 3.175 mm kernel bled ≈ 1.6 mm past the border at the
-    // near-border tips' depth (≈ −1), which is the slot the operator saw.
-    expect(probeDepth(grid, VEE_X - 0.9, VEE_EDGE_Y)).toBeGreaterThan(-0.2);
+      // Just outside the border the cone has exactly reached z = 0 — untouched
+      // stock. The flat 3.175 mm kernel bled ≈ 1.6 mm past the border at the
+      // near-border tips' depth (≈ −1), which is the slot the operator saw.
+      expect(probeDepth(grid, VEE_X - 0.9, VEE_EDGE_Y)).toBeGreaterThan(-0.2);
 
-    // Flowing V-carve ignores the generic 3 mm layer depth and reaches the
-    // selected 6.35 mm / 60° bit's modeled cone height (about 5.499 mm).
-    let veeDeepest = 0;
-    for (let x = VEE_X + 1; x <= VEE_X + VEE_SIZE - 1; x += 0.5) {
-      for (let y = VEE_Y + 1; y <= VEE_Y + VEE_SIZE - 1; y += 0.5) {
-        veeDeepest = Math.min(veeDeepest, probeDepth(grid, x, y));
+      // Flowing V-carve ignores the generic 3 mm layer depth and reaches the
+      // selected 6.35 mm / 60° bit's modeled cone height (about 5.499 mm).
+      let veeDeepest = 0;
+      for (let x = VEE_X + 1; x <= VEE_X + VEE_SIZE - 1; x += 0.5) {
+        for (let y = VEE_Y + 1; y <= VEE_Y + VEE_SIZE - 1; y += 0.5) {
+          veeDeepest = Math.min(veeDeepest, probeDepth(grid, x, y));
+        }
       }
-    }
-    expect(veeDeepest).toBeLessThan(-5.4);
-    expect(veeDeepest).toBeGreaterThanOrEqual(-5.51);
+      expect(veeDeepest).toBeLessThan(-5.4);
+      expect(veeDeepest).toBeGreaterThanOrEqual(-5.51);
 
-    // Nothing anywhere cuts past that modeled cone height.
-    let deepest = 0;
-    for (const depth of grid.depth) deepest = Math.min(deepest, depth);
-    expect(deepest).toBeGreaterThanOrEqual(-5.51);
-  }, 30_000);
+      // Nothing anywhere cuts past that modeled cone height.
+      let deepest = 0;
+      for (const depth of grid.depth) deepest = Math.min(deepest, depth);
+      expect(deepest).toBeGreaterThanOrEqual(-5.51);
+    },
+    ciBudgetMs(30_000, 120_000),
+  );
 
-  it('resolves a single-bit job to the layer bit even when it is not the active bit', () => {
-    const project: Project = {
-      ...TWO_BIT_PROJECT,
-      scene: {
-        objects: [squareObject('vee-square', '#dc2626', VEE_X, VEE_Y, VEE_SIZE)],
-        layers: [layerWith('#dc2626', VEE_SETTINGS)],
-      },
-    };
-    const source = preparedDesignSceneSource(project);
-    expect(source).not.toBeNull();
-    if (source === null) return;
-    // Single section — stamped from the same toolpath the moves draw, with
-    // the layer's v-bit, not the machine's active flat bit.
-    expect(probeDepth(source.grid, VEE_X - 0.9, VEE_EDGE_Y)).toBeGreaterThan(-0.2);
-    const wall = probeDepth(source.grid, VEE_X + 0.9, VEE_EDGE_Y);
-    expect(wall).toBeLessThan(-0.7);
-    expect(wall).toBeGreaterThan(-2.4);
-    // The drawn silhouette is the bit that stamped the grid: the 6.35 mm
-    // v-bit's 3.175 mm radius, not the active 1/8" bit's 1.59 mm.
-    const maxRadiusMm = Math.max(...source.toolProfile.map((point) => point.radiusMm));
-    expect(maxRadiusMm).toBeCloseTo(3.175, 2);
-  }, 30_000);
+  it(
+    'resolves a single-bit job to the layer bit even when it is not the active bit',
+    () => {
+      const project: Project = {
+        ...TWO_BIT_PROJECT,
+        scene: {
+          objects: [squareObject('vee-square', '#dc2626', VEE_X, VEE_Y, VEE_SIZE)],
+          layers: [layerWith('#dc2626', VEE_SETTINGS)],
+        },
+      };
+      const source = preparedDesignSceneSource(project);
+      expect(source).not.toBeNull();
+      if (source === null) return;
+      // Single section — stamped from the same toolpath the moves draw, with
+      // the layer's v-bit, not the machine's active flat bit.
+      expect(probeDepth(source.grid, VEE_X - 0.9, VEE_EDGE_Y)).toBeGreaterThan(-0.2);
+      const wall = probeDepth(source.grid, VEE_X + 0.9, VEE_EDGE_Y);
+      expect(wall).toBeLessThan(-0.7);
+      expect(wall).toBeGreaterThan(-2.4);
+      // The drawn silhouette is the bit that stamped the grid: the 6.35 mm
+      // v-bit's 3.175 mm radius, not the active 1/8" bit's 1.59 mm.
+      const maxRadiusMm = Math.max(...source.toolProfile.map((point) => point.radiusMm));
+      expect(maxRadiusMm).toBeCloseTo(3.175, 2);
+    },
+    ciBudgetMs(30_000, 120_000),
+  );
 
   it('returns null for a laser project', () => {
     expect(computeDesignSceneSource(createProject(), DEFAULT_OUTPUT_SCOPE)).toBeNull();

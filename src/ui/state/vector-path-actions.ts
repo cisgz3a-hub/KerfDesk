@@ -22,6 +22,7 @@ import {
   type Scene,
   type SceneObject,
 } from '../../core/scene';
+import { cloneLayerSubLayers } from '../../core/scene/layer';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
@@ -241,7 +242,7 @@ function prepareIndependentArtwork(
           id: seed.operation.id,
           name: seed.operation.name,
           color: seed.operation.color,
-          subLayers: [],
+          subLayers: cloneLayerSubLayers(sourceOperation.subLayers),
         };
   return {
     scene: addLayer(scene, operation),

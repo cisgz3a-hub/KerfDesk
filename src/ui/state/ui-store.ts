@@ -179,6 +179,11 @@ export type UiState = ArtworkRunOrderUiState &
     readonly convertBitmapDialogOpen: boolean;
     readonly openConvertBitmapDialog: () => void;
     readonly closeConvertBitmapDialog: () => void;
+    // Transactional G-code export prepares bytes before a separate,
+    // user-activated destination-selection click.
+    readonly gcodeSaveDialogOpen: boolean;
+    readonly openGcodeSaveDialog: () => void;
+    readonly closeGcodeSaveDialog: () => void;
     // Phase G drawing tool-mode (ADR-051).
     readonly toolMode: ToolMode;
     readonly setToolMode: (next: ToolMode) => void;
@@ -242,6 +247,9 @@ function uiDialogSlice(
   | 'convertBitmapDialogOpen'
   | 'openConvertBitmapDialog'
   | 'closeConvertBitmapDialog'
+  | 'gcodeSaveDialogOpen'
+  | 'openGcodeSaveDialog'
+  | 'closeGcodeSaveDialog'
 > {
   return {
     textDialog: null,
@@ -259,6 +267,9 @@ function uiDialogSlice(
     convertBitmapDialogOpen: false,
     openConvertBitmapDialog: () => set({ convertBitmapDialogOpen: true }),
     closeConvertBitmapDialog: () => set({ convertBitmapDialogOpen: false }),
+    gcodeSaveDialogOpen: false,
+    openGcodeSaveDialog: () => set({ gcodeSaveDialogOpen: true }),
+    closeGcodeSaveDialog: () => set({ gcodeSaveDialogOpen: false }),
   };
 }
 

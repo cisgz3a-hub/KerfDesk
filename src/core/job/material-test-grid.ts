@@ -30,6 +30,8 @@ export type MaterialTestGridOptions = {
   readonly speedMax: number;
   readonly powerMin: number;
   readonly powerMax: number;
+  /** Active profile compile ceiling. Omit only for profile-agnostic callers. */
+  readonly maxFeedMmPerMin?: number;
   readonly cellWidthMm: number;
   readonly cellHeightMm: number;
   readonly gapMm?: number;
@@ -44,7 +46,10 @@ export type MaterialTestCell = {
   readonly column: number;
   readonly objectId: string;
   readonly layerId: string;
+  /** Feed the compiler will emit for this cell. */
   readonly speed: number;
+  readonly requestedSpeed: number;
+  readonly effectiveSpeed: number;
   readonly power: number;
   readonly powerScale: number;
   readonly bounds: Bounds;
@@ -86,23 +91,21 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
   );
   const gap = Math.max(0, clampFinite(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM));
   const origin = options.origin ?? DEFAULT_ORIGIN;
-  const speeds = linspace(speedHigh, speedLow, rows);
+  const requestedSpeeds = linspace(speedHigh, speedLow, rows);
+  const effectiveSpeeds = requestedSpeeds.map((speed) =>
+    effectiveCalibrationSpeed(speed, options.maxFeedMmPerMin),
+  );
   const powers = linspace(powerLow, powerHigh, columns);
-  const layout = materialTestLayout({ origin, cellWidth, cellHeight, gap, speeds, powers });
-
-  const layers: Layer[] = speeds.map((speed, row) => {
-    const color = materialTestLayerColor(row);
-    return {
-      ...createLayer({
-        id: `material-test-row-${row}`,
-        name: `Material test ${formatCalibrationNumber(speed)} mm/min`,
-        color,
-        mode: 'fill',
-      }),
-      power: powerHigh,
-      speed,
-    };
+  const layout = materialTestLayout({
+    origin,
+    cellWidth,
+    cellHeight,
+    gap,
+    speeds: effectiveSpeeds,
+    powers,
   });
+
+  const layers = materialTestLayers(requestedSpeeds, effectiveSpeeds, powerHigh);
   const objects: ImportedSvg[] = [];
   const cells: MaterialTestCell[] = [];
 
@@ -111,6 +114,8 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
     if (layer === undefined) continue;
     for (let column = 0; column < columns; column += 1) {
       const power = powers[column] ?? powerLow;
+      const requestedSpeed = requestedSpeeds[row] ?? speedLow;
+      const effectiveSpeed = effectiveSpeeds[row] ?? requestedSpeed;
       const powerScale = powerHigh > 0 ? (power / powerHigh) * 100 : 100;
       const x = cellX(layout, column);
       const y = cellY(layout, row);
@@ -132,7 +137,9 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
         column,
         objectId,
         layerId: layer.id,
-        speed: layer.speed,
+        speed: effectiveSpeed,
+        requestedSpeed,
+        effectiveSpeed,
         power,
         powerScale,
         bounds: { minX: x, minY: y, maxX: x + cellWidth, maxY: y + cellHeight },
@@ -145,6 +152,29 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
   layers.push(labelLayer);
 
   return { scene: { objects, layers }, cells };
+}
+
+function materialTestLayers(
+  requestedSpeeds: ReadonlyArray<number>,
+  effectiveSpeeds: ReadonlyArray<number>,
+  power: number,
+): Layer[] {
+  return requestedSpeeds.map((requestedSpeed, row) => {
+    const effectiveSpeed = effectiveSpeeds[row] ?? requestedSpeed;
+    const color = materialTestLayerColor(row);
+    return {
+      ...createLayer({
+        id: `material-test-row-${row}`,
+        name:
+          `Material test ${formatCalibrationNumber(requestedSpeed)} requested / ` +
+          `${formatCalibrationNumber(effectiveSpeed)} effective mm/min`,
+        color,
+        mode: 'fill',
+      }),
+      power,
+      speed: requestedSpeed,
+    };
+  });
 }
 
 function materialTestLayout(args: {
@@ -277,4 +307,10 @@ function clampPower(value: number): number {
 
 function clampFinite(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
+}
+
+function effectiveCalibrationSpeed(requested: number, maxFeedMmPerMin: number | undefined): number {
+  return maxFeedMmPerMin !== undefined && Number.isFinite(maxFeedMmPerMin) && maxFeedMmPerMin > 0
+    ? Math.min(requested, maxFeedMmPerMin)
+    : requested;
 }

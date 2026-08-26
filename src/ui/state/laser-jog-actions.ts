@@ -90,7 +90,7 @@ async function runJogToMachinePosition(
   assertMotionQueueSettled(set, get, 'moving to a machine position');
   assertCncPointMoveWorkZReady(set, get);
   const params = { dx, dy, feed };
-  assertJogMotionSafe(set, get, params);
+  warnJogMotionPolicy(set, get, params);
   const operation = startSettledJogOperation(refs);
   set({ motionOperation: operation, frameVerification: null, framedRun: null });
   // CNC: after readiness is proven, lift Z to the configured safe height
@@ -123,7 +123,7 @@ async function runJog(
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'jogging');
-  assertJogMotionSafe(set, get, params);
+  warnJogMotionPolicy(set, get, params);
   // Any deliberate head move consumes the placement proof even if the
   // head later returns to numerically identical coordinates.
   const operation = startSettledJogOperation(context.refs);
@@ -305,16 +305,18 @@ function assertJogFrameReady(set: SetFn, get: GetFn): void {
 }
 
 // Direct manual jogs share one destination resolver so configured machine
-// bounds and keep-out zones evaluate the same physical segment. A jog with no
-// known machine position cannot be resolved and keeps the legacy controller-
-// guarded behavior; board-point moves always require a live position upstream.
-// Configured bounds are warn-only (rule 7 / ADR-232); only the ADR-129 no-go
-// zone check may refuse the move.
-function assertJogMotionSafe(set: SetFn, get: GetFn, params: JogParams): void {
+// bounds and keep-out zones evaluate the same physical segment. These are
+// policy findings, not transport facts: warn prominently and send the exact
+// requested jog unchanged. Board-point moves still require a live position
+// because the host factually cannot derive their relative controller command.
+function warnJogMotionPolicy(set: SetFn, get: GetFn, params: JogParams): void {
   const path = resolveJogXyPath(get, params);
-  if (path === null) return;
+  if (path === null) {
+    warnUnresolvedJogXyPath(set, get, params);
+    return;
+  }
   warnJogTargetOutsideConfiguredBounds(set, get, path.target);
-  assertJogClearsNoGoZones(set, get, path);
+  warnJogNoGoZoneCrossing(set, get, path);
 }
 
 function resolveJogXyPath(get: GetFn, params: JogParams): JogXyPath | null {
@@ -355,22 +357,36 @@ function warnJogTargetOutsideConfiguredBounds(
     `Jog target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} is outside the ` +
     `configured machine bounds X${bounds.minX.toFixed(3)}..${bounds.maxX.toFixed(3)}, ` +
     `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}. Controller limits still apply.`;
-  useToastStore.getState().pushToast(message, 'warning');
-  set({ log: pushLog(get(), `[lf2] ${message}`) });
+  publishJogPolicyWarning(set, get, message);
 }
 
-// DEV-04: refuse a direct manual jog whose straight path would drive the head
-// through an enabled no-go/keep-out zone. Framed-job review reports those zones
-// as warnings instead of treating them as a second Start-authorization gate.
-function assertJogClearsNoGoZones(set: SetFn, get: GetFn, path: JogXyPath): void {
-  // Testing a degenerate start==end segment would wrongly block a safe no-op
-  // whenever the head is parked inside a zone (DEV-04 audit).
+function warnUnresolvedJogXyPath(set: SetFn, get: GetFn, params: JogParams): void {
+  if (params.dx === undefined && params.dy === undefined) return;
+  publishJogPolicyWarning(
+    set,
+    get,
+    'The current machine XY position is unresolved, so KerfDesk cannot compare this jog path with configured bounds or no-go zones. The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.',
+  );
+}
+
+// DEV-04 / ADR-232: configured no-go zones are operator guidance. Frame is the
+// sole ordinary policy guard, so a direct jog crossing produces the same
+// prominent warning as other configured-envelope findings and never rewrites
+// or refuses the requested controller command.
+function warnJogNoGoZoneCrossing(set: SetFn, get: GetFn, path: JogXyPath): void {
   if (path.start.x === path.target.x && path.start.y === path.target.y) return;
   const zones = useStore.getState().project.device.noGoZones;
   if (zones === undefined || zones.length === 0) return;
   const zone = firstZoneCrossedBySegment(path.start, path.target, zones);
   if (zone === null) return;
-  const message = `Jog blocked: this move would cross the no-go zone "${zone.name}". Jog around it, or disable the zone in Machine Setup → Safety Zones.`;
-  set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
-  throw new Error(message);
+  publishJogPolicyWarning(
+    set,
+    get,
+    `This jog path crosses the configured no-go zone "${zone.name}". The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.`,
+  );
+}
+
+function publishJogPolicyWarning(set: SetFn, get: GetFn, message: string): void {
+  useToastStore.getState().pushToast(message, 'warning');
+  set({ log: pushLog(get(), `[lf2] ${message}`) });
 }

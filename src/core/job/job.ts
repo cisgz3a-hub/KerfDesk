@@ -16,6 +16,7 @@ import {
   type CncCutType,
   type CncToolKind,
   type LayerFillStyle,
+  type LayerOperationSettings,
   type Vec2,
 } from '../scene';
 import type { CncFeedSource } from '../scene/cnc-feed-source';
@@ -48,6 +49,11 @@ export type CutGroup = {
   readonly power: number; // 0..100 (percent)
   readonly powerMode?: 'constant' | 'dynamic';
   readonly speed: number; // mm/min; already capped to device.maxFeed
+  /** Present when compilation capped the requested layer speed. This is
+   * operator-facing provenance only; `speed` remains the emitted feed. */
+  readonly requestedSpeed?: number;
+  /** Exact inherited-plus-object-override settings for an override-derived group. */
+  readonly operationSettings?: LayerOperationSettings;
   readonly passes: number; // integer ≥ 1
   readonly airAssist: boolean;
   // ADR-239: length (mm) of the tangential laser-off G1 entry each contour
@@ -83,6 +89,10 @@ export type RasterGroup = {
   readonly color: string;
   readonly power: number; // 0..100 (percent)
   readonly speed: number; // mm/min; already capped to device.maxFeed
+  /** Present when compilation capped the requested layer speed. */
+  readonly requestedSpeed?: number;
+  /** Exact inherited-plus-object-override settings for an override-derived group. */
+  readonly operationSettings?: LayerOperationSettings;
   readonly passes: number; // integer â‰¥ 1
   readonly airAssist: boolean;
   // S-values per pixel, already scaled by power %. Row-major.

@@ -14,6 +14,7 @@ import { isGcodeDialectSelection } from './gcode-dialects';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
 import { isStreamingModeCompatible } from './controller-streaming-mode';
 import { validateScanOffsetProfile } from './scan-offset-profile';
+import { cncSubProfileIssues } from './cnc-sub-profile-validation';
 
 export const PROFILE_CATALOG_VERSION = '2026-06-17';
 
@@ -322,6 +323,7 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   }
   errors.push(...validateScanOffsetProfile(profile));
   appendLaserSubProfileErrors(profile.laserSubProfile, errors);
+  errors.push(...cncSubProfileIssues(profile.cncSubProfile));
   appendCameraCapabilityErrors(profile, errors);
   appendCameraProfileErrors(profile.cameraProfile, errors);
   for (const zone of profile.noGoZones) appendNoGoZoneErrors(zone, errors);

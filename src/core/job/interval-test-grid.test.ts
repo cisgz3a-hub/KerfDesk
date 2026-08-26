@@ -66,11 +66,39 @@ describe('generateIntervalTestGrid', () => {
       .filter((object) => sourceOf(object).startsWith('calibration-label:'))
       .map((object) => sourceOf(object).replace('calibration-label:', ''));
 
-    expect(labels).toEqual(['0.20', '0.15', '0.10']);
+    expect(labels).toEqual(['0.20', '0.15', '0.10', '1800']);
     expect(
       grid.scene.objects.find((object) => object.id === 'interval-test-label-1'),
     ).toMatchObject({
       source: 'calibration-label:0.15',
+    });
+  });
+
+  it('burns the effective feed and preserves requested-versus-effective facts', () => {
+    const grid = generateIntervalTestGrid({
+      steps: 2,
+      speed: 2400,
+      power: 30,
+      maxFeedMmPerMin: 1200,
+      intervalMinMm: 0.1,
+      intervalMaxMm: 0.2,
+      swatchSizeMm: 8,
+    });
+
+    expect(grid.cells[0]).toMatchObject({
+      speed: 1200,
+      requestedSpeed: 2400,
+      effectiveSpeed: 1200,
+    });
+    expect(
+      grid.scene.objects.find((object) => object.id === 'interval-test-effective-speed-label'),
+    ).toMatchObject({ source: 'calibration-label:1200' });
+    expect(grid.scene.layers[0]?.name).toContain('2400 requested / 1200 effective mm/min');
+
+    const device = { ...DEFAULT_DEVICE_PROFILE, maxFeed: 1200 };
+    expect(compileJob(grid.scene, device).groups[0]).toMatchObject({
+      speed: 1200,
+      requestedSpeed: 2400,
     });
   });
 

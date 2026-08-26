@@ -195,6 +195,7 @@ describe('handleSaveTiledGcode', () => {
     const base = tiledCncProject();
     const written: string[] = [];
     const messages: string[] = [];
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
 
     await handleSaveTiledGcode({
       platform: capturingPlatform(written),
@@ -210,8 +211,11 @@ describe('handleSaveTiledGcode', () => {
       pushToast: (message) => messages.push(message),
     });
 
-    expect(written.length).toBeGreaterThan(0);
-    expect(messages.filter((m) => m.includes('spin-up delay'))).toHaveLength(1);
+    expect(written).toEqual([]);
+    expect(messages).toEqual([]);
+    expect(alert).toHaveBeenCalledWith(
+      expect.stringContaining('spindleSpinupSec must be non-negative'),
+    );
   });
 
   it('writes every tile and warns once for retained secondary-cutter values', async () => {

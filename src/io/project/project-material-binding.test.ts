@@ -42,6 +42,7 @@ describe('linked material binding persistence', () => {
             materialBinding: {
               libraryId: 'shop-library',
               presetId: 'birch-cut',
+              presetRevision: 'rev-3',
               lastResolved: snapshot,
             },
           },
@@ -54,6 +55,32 @@ describe('linked material binding persistence', () => {
       expect(result.project.scene.layers[0]?.materialBinding).toEqual(
         project.scene.layers[0]?.materialBinding,
       );
+    }
+  });
+
+  it('keeps legacy bindings without a recorded revision editable', () => {
+    const layer = createLayer({ id: '#ff0000', color: '#ff0000' });
+    const project = {
+      ...createProject(),
+      scene: {
+        objects: [],
+        groups: [],
+        layers: [
+          {
+            ...layer,
+            materialBinding: {
+              libraryId: 'legacy-library',
+              presetId: 'legacy-preset',
+              lastResolved: layer,
+            },
+          },
+        ],
+      },
+    };
+    const result = deserializeProject(serializeProject(project));
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.project.scene.layers[0]?.materialBinding?.presetRevision).toBeUndefined();
     }
   });
 });

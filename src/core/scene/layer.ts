@@ -50,6 +50,8 @@ export type LayerOperationSettings = {
 export type LinkedMaterialBinding = {
   readonly libraryId: string;
   readonly presetId: string;
+  /** Missing only on legacy projects written before linked-revision tracking. */
+  readonly presetRevision?: string;
   readonly lastResolved: LayerOperationSettings;
 };
 
@@ -225,7 +227,7 @@ export function createLayerSubLayer(
 
 export function layerFromSubLayer(layer: Layer, subLayer: LayerSubLayer): Layer {
   return {
-    id: `${layer.id}:${subLayer.id}`,
+    id: layerSubLayerOperationId(layer.id, subLayer.id),
     name: subLayer.label,
     color: layer.color,
     bindingOperationId: layer.id,
@@ -234,6 +236,19 @@ export function layerFromSubLayer(layer: Layer, subLayer: LayerSubLayer): Layer 
     ...subLayer.settings,
     subLayers: [],
   };
+}
+
+export function layerSubLayerOperationId(layerId: string, subLayerId: string): string {
+  return `${layerId}:${subLayerId}`;
+}
+
+export function cloneLayerSubLayers(
+  subLayers: ReadonlyArray<LayerSubLayer>,
+): ReadonlyArray<LayerSubLayer> {
+  return subLayers.map((subLayer) => ({
+    ...subLayer,
+    settings: { ...subLayer.settings },
+  }));
 }
 
 export function outputOperationLayers(layer: Layer): ReadonlyArray<Layer> {

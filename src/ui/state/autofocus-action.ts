@@ -28,12 +28,14 @@ export type AutofocusResult =
   | { readonly kind: 'rejected'; readonly errorCode: number | null; readonly raw: string }
   | { readonly kind: 'alarm'; readonly alarmCode: number | null }
   | { readonly kind: 'timeout' }
+  | { readonly kind: 'motion-uncertain'; readonly reason: string }
   | { readonly kind: 'preflight-failed'; readonly reason: string };
 
 export type RunAutofocusArgs = {
   readonly connected: boolean;
-  readonly statusReport: StatusReport | null;
   readonly command: string;
+  readonly confirmFreshIdle: () => Promise<StatusReport>;
+  readonly onDispatch?: () => void;
   readonly refs: ControllerLifecycleRefs;
   readonly write: (
     line: string,
@@ -48,7 +50,10 @@ export async function runAutofocus(args: RunAutofocusArgs): Promise<AutofocusRes
   if (preflight !== null) return preflight;
   const command = args.command.trim();
   const timeoutMs = args.timeoutMs ?? AUTOFOCUS_TIMEOUT_MS;
+  const freshIdle = await confirmFreshIdle(args);
+  if (freshIdle.kind !== 'ok') return freshIdle;
   try {
+    args.onDispatch?.();
     await startControllerCommand(args.refs, args.write, {
       kind: 'autofocus',
       label: 'Auto-focus',
@@ -77,13 +82,24 @@ function checkPreflight(args: RunAutofocusArgs): AutofocusResult | null {
       reason: 'Autofocus command must be a single line',
     };
   }
-  if (args.statusReport !== null && args.statusReport.state.toLowerCase() !== 'idle') {
+  return null;
+}
+
+async function confirmFreshIdle(args: RunAutofocusArgs): Promise<AutofocusResult> {
+  try {
+    const report = await args.confirmFreshIdle();
+    return report.state.toLowerCase() === 'idle'
+      ? { kind: 'ok' }
+      : {
+          kind: 'preflight-failed',
+          reason: `Machine must be freshly Idle to auto-focus (currently ${report.state})`,
+        };
+  } catch (error) {
     return {
       kind: 'preflight-failed',
-      reason: `Machine must be Idle to auto-focus (currently ${args.statusReport.state})`,
+      reason: error instanceof Error ? error.message : String(error),
     };
   }
-  return null;
 }
 
 function autofocusFailureResult(err: unknown): AutofocusResult {
@@ -99,7 +115,8 @@ function autofocusFailureResult(err: unknown): AutofocusResult {
   if (response.kind === 'alarm') return { kind: 'alarm', alarmCode: response.code };
   if (/\balarm\b/i.test(message)) return { kind: 'alarm', alarmCode: null };
   if (/timed out/i.test(message)) return { kind: 'timeout' };
-  return { kind: 'preflight-failed', reason: message };
+  if (/disconnected|cancelled/i.test(message)) return { kind: 'preflight-failed', reason: message };
+  return { kind: 'motion-uncertain', reason: message };
 }
 
 // Map an AutofocusResult to a user-friendly toast message + variant.
@@ -137,6 +154,11 @@ export function describeAutofocusResult(result: AutofocusResult): {
     case 'timeout':
       return {
         message: `Auto-focus timed out after ${Math.round(AUTOFOCUS_TIMEOUT_MS / 1000)}s. The machine may still be moving; use the physical stop or power cutoff now if unsafe.`,
+        variant: 'warning',
+      };
+    case 'motion-uncertain':
+      return {
+        message: `Auto-focus command receipt is uncertain: ${result.reason} The machine may still be moving; use the physical stop or power cutoff now if unsafe.`,
         variant: 'warning',
       };
     case 'preflight-failed':

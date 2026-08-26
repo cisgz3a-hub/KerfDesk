@@ -76,6 +76,11 @@ overrides:
   # the vulnerable range. One catch-all forces every path — including the 1.x
   # and 2.x consumers under minimatch/glob — onto the patched line.
   brace-expansion@<5.0.8: 5.0.8
+  # glob 10.5 resolves minimatch 9, whose CommonJS build expects the removed
+  # brace-expansion default export. Keep this one parent edge on minimatch 10,
+  # which natively consumes the patched brace-expansion 5 API; otherwise the
+  # Vitest V8 provider crashes while enumerating untested files.
+  'glob@10.5.0>minimatch': 10.2.5
   fast-uri@<3.1.4: 3.1.4
   sharp@<0.35.0: 0.35.0
   undici@>=6.0.0 <6.27.0: 6.27.0

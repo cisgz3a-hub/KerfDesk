@@ -43,9 +43,11 @@ function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
     fillOverscanMm: 2,
     fillStyle: 'scanline',
     fillBidirectional: false,
+    allowUncalibratedBidirectionalScan: false,
     fillCrossHatch: true,
     ditherAlgorithm: 'stucki',
     linesPerMm: 11,
+    imageBidirectional: true,
     negativeImage: true,
     passThrough: false,
     dotWidthCorrectionMm: 0.04,
@@ -115,6 +117,35 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
 }
 
 describe('MaterialLibraryPanel preset management', () => {
+  it('surfaces stale linked revision truth and refreshes it explicitly', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setMaterialLibrary(library([preset({ revision: 'rev-1' })]));
+    const layerId = useStore.getState().project.scene.layers[0]?.id;
+    if (layerId === undefined) throw new Error('target layer missing');
+    expect(useStore.getState().linkMaterialPresetToLayer(layerId, 'birch-3mm-cut')).toBe(true);
+    useStore
+      .getState()
+      .setMaterialLibrary(library([preset({ revision: 'rev-2', recipe: recipe({ power: 77 }) })]));
+
+    const { host, root } = await renderPanel();
+    try {
+      expect(host.textContent).toContain('Linked preset is stale');
+      expect(host.textContent).toContain('revision rev-1');
+      expect(host.textContent).toContain('revision rev-2');
+      const refresh = button(host, 'Refresh linked material preset');
+      expect(refresh.disabled).toBe(false);
+
+      await act(async () => refresh.click());
+
+      const layer = useStore.getState().project.scene.layers[0];
+      expect(layer?.power).toBe(77);
+      expect(layer?.materialBinding?.presetRevision).toBe('rev-2');
+      expect(host.textContent).toContain('Linked preset is current at revision rev-2');
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
   it('deletes a selected material preset after confirmation', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore

@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { Toolpath } from '../../core/job';
-import { createProject } from '../../core/scene';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
 import { useUiStore } from '../state/ui-store';
 import {
   PreviewControlsPanel,
@@ -139,6 +139,58 @@ describe('PreviewStatusOverlays', () => {
     expect(host.textContent).toContain('Raster output requires 5,000,000 burn pixels.');
     expect(host.textContent).not.toContain('Nothing to preview');
   });
+
+  it('discloses display-only raster downsampling after output compilation', async () => {
+    const project = createProject();
+    const largeRasterProject: Project = {
+      ...project,
+      scene: {
+        layers: [createLayer({ id: 'image', color: '#808080', mode: 'image' })],
+        objects: [
+          {
+            kind: 'raster-image',
+            id: 'large-raster',
+            source: 'large.png',
+            dataUrl: 'data:image/png;base64,unused',
+            pixelWidth: 1,
+            pixelHeight: 1,
+            bounds: { minX: 0, minY: 0, maxX: 300, maxY: 250 },
+            transform: IDENTITY_TRANSFORM,
+            color: '#808080',
+            dither: 'threshold',
+            linesPerMm: 10,
+            lumaBase64: 'AA==',
+          },
+        ],
+      },
+    };
+    const host = await renderStatus(toolpath, undefined, largeRasterProject);
+
+    expect(host.textContent).toContain(
+      'Raster display resolution reduced after output compilation',
+    );
+    expect(host.textContent).toContain('3,000 × 2,500');
+    expect(host.textContent).toContain('Emitted S-values and G-code are unchanged');
+  });
+
+  it('states source and drawn counts when route display is decimated', async () => {
+    const host = await renderStatus({
+      ...toolpath,
+      previewIssue: {
+        kind: 'display-decimated',
+        threshold: 120_000,
+        sourceSteps: 300_000,
+        drawnSteps: 100_001,
+        sourceSegments: 300_000,
+        drawnSegments: 100_001,
+      },
+    } as Toolpath & { readonly previewIssue: PreviewIssue });
+
+    expect(host.textContent).toContain('Route display decimated');
+    expect(host.textContent).toContain('100,001 of 300,000 steps');
+    expect(host.textContent).toContain('100,001 of 300,000 XY segments');
+    expect(host.textContent).not.toContain('all 300,000 parsed steps are shown');
+  });
 });
 
 describe('PreviewRouteControls', () => {
@@ -222,6 +274,7 @@ async function renderPanel(
 async function renderStatus(
   toolpathValue: Toolpath,
   resolution?: React.ComponentProps<typeof PreviewStatusOverlays>['resolution'],
+  project: Project = createProject(),
 ): Promise<HTMLDivElement> {
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -230,7 +283,7 @@ async function renderStatus(
     root = createRoot(host);
     root.render(
       <PreviewStatusOverlays
-        project={createProject()}
+        project={project}
         toolpath={toolpathValue}
         {...(resolution === undefined ? {} : { resolution })}
       />,

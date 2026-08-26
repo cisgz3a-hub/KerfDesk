@@ -90,6 +90,28 @@ describe('project device profile metadata persistence', () => {
     });
   });
 
+  it('loads malformed persisted CNC profile fields into disclosed editable defaults', () => {
+    const raw = JSON.parse(serializeProject(createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE)));
+    raw.device.cncSubProfile.coolant = 'liquid-nitrogen';
+    raw.device.cncSubProfile.parkXMm = 'left';
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.cncSubProfile).toMatchObject({
+      coolant: 'off',
+      safeZMm: 3.81,
+      spindleMaxRpm: 12000,
+    });
+    expect(result.project.device.cncSubProfile).not.toHaveProperty('parkXMm');
+    expect(result.project.device.evidence?.at(-1)).toMatchObject({
+      label: 'CNC settings recovery',
+      status: 'unverified',
+    });
+    expect(result.project.device.evidence?.at(-1)?.note).toContain('review Device Setup');
+  });
+
   it('rejects malformed preview timing calibration factors', () => {
     const raw = JSON.parse(serializeProject(createProject()));
     raw.device.estimateCutTimeScale = 0;

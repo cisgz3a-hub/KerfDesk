@@ -139,7 +139,7 @@ function WorkspaceReview(props: {
       <ReviewRow label="Origin" value={state.draft.origin} />
       <ReviewRow label="Homing" value={homing} />
       <ReviewRow
-        label="Max / frame feed"
+        label="Output max / requested Frame feed"
         value={`${state.draft.maxFeed} / ${state.draft.framingFeedMmPerMin} mm/min`}
       />
     </ReviewSection>

@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import { createLayer, IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../scene';
+import { grblStrategy } from '../output';
 import { compileJob } from './compile-job';
 import { compileRasterGroupsForLayer } from './compile-job-raster';
 import type { Job, RasterGroup } from './job';
@@ -126,6 +127,34 @@ describe('compileJob raster image groups', () => {
     const job = compileJob({ objects: [rasterObject('AP//AA==')], layers: [layer] }, dev);
 
     expect(firstRasterGroup(job)?.bidirectional).toBe(false);
+  });
+
+  it('compiles image overrides and retains their effective negative/dither/direction facts', () => {
+    const image = {
+      ...rasterObject('AP//AA=='),
+      operationOverride: {
+        mode: 'image' as const,
+        negativeImage: true,
+        ditherAlgorithm: 'stucki' as const,
+        linesPerMm: 2,
+        imageBidirectional: false,
+      },
+    };
+    const job = compileJob({ objects: [image], layers: [imageLayer()] }, dev);
+
+    expect(firstRasterGroup(job)).toMatchObject({
+      bidirectional: false,
+      operationSettings: {
+        mode: 'image',
+        negativeImage: true,
+        ditherAlgorithm: 'stucki',
+        linesPerMm: 2,
+        imageBidirectional: false,
+      },
+    });
+    expect(grblStrategy.emit(job, dev)).toContain(
+      '; effective override: mode image; dither stucki; lines 2/mm; direction one-way; negative on',
+    );
   });
 
   it('falls back to one-way for an uncalibrated 4040 image and permits the expert override', () => {

@@ -140,6 +140,27 @@ describe('RegistrationJigPanel', () => {
     expect(buttonByLabel('Artwork only').getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('edits the registration outline operation instead of leaving generic defaults hidden', () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    render();
+
+    expect(container.textContent).toContain('Jig outline laser settings');
+    const power = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Power for registration jig outline"]',
+    );
+    if (power === null) throw new Error('jig outline power input not found');
+    setInputValue(power, '18');
+    act(() => {
+      power.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+
+    const registration = useStore
+      .getState()
+      .project.scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID);
+    expect(registration?.power).toBe(18);
+    expect(buttonByLabel('Advanced outline settings').disabled).toBe(false);
+  });
+
   it('offers a circle outline for round blanks', () => {
     render();
 

@@ -17,10 +17,7 @@ export function MaterialLibraryRecipeControls(props: {
   readonly onDelete: () => boolean;
   readonly onStatus: (message: string) => void;
 }): JSX.Element {
-  const applyDisabled =
-    props.activeLayerId === '' ||
-    props.activePresetId === '' ||
-    props.activePresetOption?.isAssignable === false;
+  const applyDisabled = props.activeLayerId === '' || props.activePresetId === '';
   const deleteDisabled = props.activePresetOption === null;
   return (
     <>
@@ -30,14 +27,6 @@ export function MaterialLibraryRecipeControls(props: {
           title="Apply the selected material preset to the selected layer."
           disabled={applyDisabled}
           onClick={() => {
-            // ADR-045: apply-on-warning (e.g. a device mismatch) is allowed but
-            // confirmed, so the operator sees why before it lands. A clean match
-            // (no warnings) applies directly; 'unsupported' is disabled above.
-            const warnings = props.activePresetOption?.warnings ?? [];
-            if (warnings.length > 0 && !jobAwareConfirm(`${warnings.join(' ')} Apply it anyway?`)) {
-              props.onStatus('Preset not applied.');
-              return;
-            }
             props.onStatus(props.onAssign() ? 'Applied to layer.' : 'Preset was not applied.');
           }}
         >

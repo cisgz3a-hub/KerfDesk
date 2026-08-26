@@ -8,6 +8,7 @@ import {
 } from './paged-asset-stager';
 import { decodeIncrementalPngToLuma, type IncrementalPngProgress } from './png-incremental-decoder';
 import { PngThumbnailBuilder, type PngImportThumbnail } from './png-thumbnail';
+import type { ImageDensity } from '../common/image-density';
 
 export type PngPagedImportProgress =
   | (Omit<PagedAssetProgress, 'phase'> & { readonly phase: 'persisting-source' })
@@ -38,7 +39,7 @@ export type PngPagedImportResult =
       readonly height: number;
       readonly sampledWidth: number;
       readonly sampledHeight: number;
-      readonly densityDpi: number | null;
+      readonly density: ImageDensity | null;
       readonly sourceManifest: PagedAssetManifest;
       readonly lumaManifest: PagedAssetManifest;
       readonly thumbnail: PngImportThumbnail;

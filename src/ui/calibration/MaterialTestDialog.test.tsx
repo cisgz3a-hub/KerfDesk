@@ -21,7 +21,9 @@ async function renderDialog(
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<MaterialTestDialog onCancel={onCancel} onGenerate={onGenerate} />);
+    root.render(
+      <MaterialTestDialog onCancel={onCancel} onGenerate={onGenerate} maxFeedMmPerMin={3000} />,
+    );
   });
   return { host, root, onGenerate, onCancel };
 }
@@ -36,6 +38,7 @@ describe('MaterialTestDialog', () => {
     const { host, root, onGenerate } = await renderDialog();
     try {
       expect(host.textContent).toContain('Material Test');
+      expect(host.textContent).toContain('effective 1,000–3,000 mm/min');
       const rows = input(host, 'Rows');
       const speedMax = input(host, 'Max speed');
       await act(async () => {
@@ -44,6 +47,8 @@ describe('MaterialTestDialog', () => {
         speedMax.value = '3500';
         Simulate.change(speedMax);
       });
+      expect(host.textContent).toContain('Requested 1,000–3,500 mm/min');
+      expect(host.textContent).toContain('Burned row labels show effective feed');
 
       const generate = [...host.querySelectorAll('button')].find((button) =>
         button.textContent?.includes('Generate'),

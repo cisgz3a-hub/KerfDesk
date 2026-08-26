@@ -1,16 +1,17 @@
 import {
+  applyMaterialRecipe,
+  captureMaterialRecipe,
   MATERIAL_RECIPE_FIELDS,
   materialRecipePatch,
-  rankMaterialRecipeCandidates,
   type MaterialRecipe,
 } from '../../core/material-library';
 import {
   captureLayerOperationSettings,
-  updateLayer,
   type Layer,
   type Project,
+  type Scene,
 } from '../../core/scene';
-import type { MaterialLibraryDocument, MaterialPreset } from '../../io/material-library';
+import type { MaterialLibraryDocument } from '../../io/material-library';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 export const MATERIAL_LIBRARY_STATE_DEFAULTS = {
@@ -70,7 +71,6 @@ export function materialLibraryActions(set: MaterialLibrarySet): MaterialLibrary
         if (state.materialLibrary === null) return {};
         const preset = state.materialLibrary.entries.find((entry) => entry.id === presetId);
         if (preset === undefined) return {};
-        if (!canAssignPreset(state.project, preset)) return {};
         const target = state.project.scene.layers.find((layer) => layer.id === layerId);
         if (target === undefined) return {};
         if (recipeMatchesLayer(target, preset.recipe)) return {};
@@ -79,7 +79,7 @@ export function materialLibraryActions(set: MaterialLibrarySet): MaterialLibrary
         return {
           project: {
             ...state.project,
-            scene: updateLayer(state.project.scene, layerId, materialRecipePatch(preset.recipe)),
+            scene: replaceLayer(state.project.scene, applyMaterialRecipe(target, preset.recipe)),
           },
           undoStack: pushUndo(state.project, state.undoStack),
           redoStack: [],
@@ -108,22 +108,26 @@ function applyLinkedPreset(
     const linkedPresetId = refresh ? target.materialBinding?.presetId : presetId;
     if (linkedPresetId === undefined || linkedPresetId === null) return {};
     const preset = state.materialLibrary.entries.find((entry) => entry.id === linkedPresetId);
-    if (preset === undefined || !canAssignPreset(state.project, preset)) return {};
+    if (preset === undefined) return {};
     const recipe = materialRecipePatch(preset.recipe);
+    const materialBinding = {
+      libraryId: state.materialLibrary.libraryId,
+      presetId: preset.id,
+      presetRevision: preset.revision,
+      lastResolved: { ...captureLayerOperationSettings(target), ...recipe },
+    };
+    if (recipeMatchesLayer(target, preset.recipe) && bindingMatches(target, materialBinding)) {
+      return {};
+    }
     const next = {
-      ...target,
-      ...recipe,
-      materialBinding: {
-        libraryId: state.materialLibrary.libraryId,
-        presetId: preset.id,
-        lastResolved: { ...captureLayerOperationSettings(target), ...recipe },
-      },
+      ...applyMaterialRecipe(target, preset.recipe),
+      materialBinding,
     };
     applied = true;
     return {
       project: {
         ...state.project,
-        scene: updateLayer(state.project.scene, layerId, next),
+        scene: replaceLayer(state.project.scene, next),
       },
       undoStack: pushUndo(state.project, state.undoStack),
       redoStack: [],
@@ -149,15 +153,30 @@ function deleteMaterialPreset(set: MaterialLibrarySet, presetId: string): boolea
   return deleted;
 }
 
-function canAssignPreset(project: Project, preset: MaterialPreset): boolean {
-  const [match] = rankMaterialRecipeCandidates(project.device, [preset]);
-  // ADR-045: a device MISMATCH (no match at all) is warn-not-block, so allow it —
-  // the recipe patch applies correctly regardless of device. Only a matched
-  // preset the machine flags 'unsupported' is a hard safety block.
-  return match === undefined || match.confidence !== 'unsupported';
-}
-
 function recipeMatchesLayer(layer: Layer, recipe: MaterialRecipe): boolean {
   const patch = materialRecipePatch(recipe);
-  return MATERIAL_RECIPE_FIELDS.every((field) => layer[field] === patch[field]);
+  const current = materialRecipePatch(captureMaterialRecipe(layer));
+  return MATERIAL_RECIPE_FIELDS.every((field) => current[field] === patch[field]);
+}
+
+function bindingMatches(
+  layer: Layer,
+  expected: Pick<
+    NonNullable<Layer['materialBinding']>,
+    'libraryId' | 'presetId' | 'presetRevision'
+  >,
+): boolean {
+  const binding = layer.materialBinding;
+  return (
+    binding?.libraryId === expected.libraryId &&
+    binding.presetId === expected.presetId &&
+    binding.presetRevision === expected.presetRevision
+  );
+}
+
+function replaceLayer(scene: Scene, next: Layer): Scene {
+  return {
+    ...scene,
+    layers: scene.layers.map((layer) => (layer.id === next.id ? next : layer)),
+  };
 }

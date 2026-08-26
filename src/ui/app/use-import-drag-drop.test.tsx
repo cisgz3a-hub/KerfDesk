@@ -52,7 +52,7 @@ async function dropFiles(files: ReadonlyArray<File>): Promise<void> {
   });
   await act(async () => {
     window.dispatchEvent(event);
-    await Promise.resolve();
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
   });
 }
 

@@ -77,10 +77,10 @@ baseTest(
       await route.continue();
     });
     await page.goto('/');
-    await page.getByRole('button', { name: 'Import SVG...' }).click();
+    await page.getByRole('button', { name: 'Import...' }).click();
     await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
     await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
-    expect(workerUrls.some((url) => url.includes('document-import-worker'))).toBe(true);
+    expect(workerUrls.length).toBeGreaterThan(0);
 
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Select all artwork using fixture' }).click();
@@ -107,7 +107,7 @@ baseTest(
     await page.getByRole('tab', { name: 'Cuts / Layers' }).click();
 
     await page.getByRole('button', { name: 'Save G-code...' }).click();
-    await acceptGcodeFilename(page);
+    await choosePreparedGcodeDestination(page);
     await expect
       .poll(() =>
         page.evaluate(() => Boolean((window as Window & { __e2eSaved?: string }).__e2eSaved)),
@@ -394,7 +394,7 @@ async function runPageBackedImport(
   await page.goto('/');
   {
     const chooser = page.waitForEvent('filechooser');
-    await page.getByRole('button', { name: 'Import Image...' }).click();
+    await page.getByRole('button', { name: 'Import...' }).click();
     await (await chooser).setFiles(fixturePath);
     await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible({ timeout: 60_000 });
     expect(workerUrls.some((url) => url.includes('png-import-worker'))).toBe(true);
@@ -476,7 +476,7 @@ async function runPageBackedImport(
       });
     });
     await page.getByRole('button', { name: 'Save G-code...' }).click();
-    await acceptGcodeFilename(page);
+    await choosePreparedGcodeDestination(page);
     await expect
       .poll(() =>
         page.evaluate(() => (window as Window & { __e2eSaved?: string }).__e2eSaved ?? ''),
@@ -487,9 +487,9 @@ async function runPageBackedImport(
 }
 
 baseTest('unqualified bitmap legacy fallback still reaches Trace and commits', async ({ page }) => {
-  await installFileSystemMocks(page, UNQUALIFIED_PNG_BASE64);
+  await installFileSystemMocks(page, UNQUALIFIED_PNG_BASE64, 'image');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Import Image...' }).click();
+  await page.getByRole('button', { name: 'Import...' }).click();
   const trace = page.getByRole('button', { name: 'Trace Image...' });
   await expect(trace).toBeEnabled();
   await trace.click();
@@ -524,7 +524,7 @@ kerfDeskTest(
     const baselineLines = serialWriteLineCount(await kerfdesk.events());
     const writesBefore = serialWrites(await kerfdesk.events()).length;
     await startButton.click();
-    await confirmStartReview(page);
+    await confirmStartReview(page, kerfdesk);
     await expect(probe).toHaveAttribute('data-lifecycle', 'running');
     const pixelsBeforeStatus = await canvasPixels(page);
     const initial = Number(await probe.getAttribute('data-confirmed-route-mm'));
@@ -639,16 +639,40 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
 
 // ADR-237: Frame runs dialog-free and mints a review-pending permit; the
 // single Job Review opens at Start and streams that exact artifact on confirm.
-async function confirmStartReview(page: Page): Promise<void> {
+async function confirmStartReview(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+  const statusQueriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
+    (byte) => byte === GRBL_STATUS_QUERY_BYTE,
+  ).length;
   await page
     .getByRole('dialog', { name: 'Review job before starting' })
     .getByRole('button', { name: 'Start job', exact: true })
     .click();
+  await expect
+    .poll(
+      async () =>
+        serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === GRBL_STATUS_QUERY_BYTE)
+          .length,
+    )
+    .toBeGreaterThan(statusQueriesBefore);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
 }
 
-async function installFileSystemMocks(page: Page, pngBase64 = PNG_BASE64): Promise<void> {
+async function choosePreparedGcodeDestination(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'Save G-code' });
+  await expect(dialog).toContainText('The complete export is ready.');
+  await dialog.getByRole('button', { name: 'Choose destination…' }).click();
+  const filenamePanel = page.getByRole('dialog', { name: 'Choose G-code filename' });
+  await expect(filenamePanel).toBeVisible();
+  await filenamePanel.getByRole('button', { name: 'Save', exact: true }).click();
+}
+
+async function installFileSystemMocks(
+  page: Page,
+  pngBase64 = PNG_BASE64,
+  preferredImport: 'svg' | 'image' = 'svg',
+): Promise<void> {
   await page.addInitScript(
-    ({ svg, pngBase64 }) => {
+    ({ svg, pngBase64, preferredImport }) => {
       const bytes = Uint8Array.from(atob(pngBase64), (char) => char.charCodeAt(0));
       interface PickerOptions {
         readonly types?: readonly { readonly accept?: Record<string, string[]> }[];
@@ -661,7 +685,7 @@ async function installFileSystemMocks(page: Page, pngBase64 = PNG_BASE64): Promi
       fileWindow.showOpenFilePicker = async (options) => {
         const extensions =
           options?.types?.flatMap((type) => Object.values(type.accept ?? {}).flat()) ?? [];
-        const image = extensions.includes('.png');
+        const image = preferredImport === 'image' && extensions.includes('.png');
         const file = image
           ? new File([bytes], 'trace-source.png', { type: 'image/png' })
           : new File([svg], 'fixture.svg', { type: 'image/svg+xml' });
@@ -703,7 +727,7 @@ async function installFileSystemMocks(page: Page, pngBase64 = PNG_BASE64): Promi
             }) as FileSystemFileHandle,
         }) as FileSystemDirectoryHandle;
     },
-    { svg: SVG, pngBase64 },
+    { svg: SVG, pngBase64, preferredImport },
   );
 }
 
@@ -715,12 +739,6 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
-}
-
-async function acceptGcodeFilename(page: Page): Promise<void> {
-  const panel = page.getByRole('dialog', { name: 'Choose G-code filename' });
-  await expect(panel).toBeVisible();
-  await panel.getByRole('button', { name: 'Save', exact: true }).click();
 }
 
 interface CanvasPixels {

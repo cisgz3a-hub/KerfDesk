@@ -24,6 +24,26 @@ afterEach(() => {
 });
 
 describe('project save version binding', () => {
+  it('marks the live project clean when a derived persistence snapshot reaches disk', async () => {
+    const live = { ...createProject(), notes: 'live project' };
+    const persisted = { ...live };
+    useStore.setState({ project: live, dirty: true });
+    const target = { displayName: 'derived.lf2', write: vi.fn(async () => undefined) };
+
+    await expect(
+      handleSaveProject({
+        platform: mockPlatform({ save: async () => target }),
+        project: persisted,
+        expectedProject: live,
+        savedName: null,
+        lastSaveTarget: null,
+        markSaved: useStore.getState().markSaved,
+        pushToast: toasts().pushToast,
+      }),
+    ).resolves.toBe('saved');
+    expect(useStore.getState().dirty).toBe(false);
+  });
+
   it('keeps newer edits dirty and recoverable when an older disk write finishes', async () => {
     const captured = { ...createProject(), notes: 'captured by save' };
     useStore.setState({ project: captured, dirty: true });

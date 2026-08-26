@@ -7,6 +7,11 @@ import { SavedLibrariesButton } from '../material-library/SavedLibrariesButton';
 import { MaterialPresetWizardLauncher } from '../material-library/wizard';
 import { useStore } from '../state';
 import { buildStarterLibrary } from './material-library-builders';
+import {
+  materialBindingStatus,
+  materialBindingStatusText,
+  type MaterialBindingStatus,
+} from './material-binding-status';
 import { MaterialLibraryRecipeControls } from './MaterialLibraryRecipeControls';
 import {
   materialLibraryPresetOptions,
@@ -74,6 +79,7 @@ function LoadedMaterialLibraryPanel(props: {
   const layers = useStore((state) => state.project.scene.layers);
   const assignMaterialPresetToLayer = useStore((state) => state.assignMaterialPresetToLayer);
   const linkMaterialPresetToLayer = useStore((state) => state.linkMaterialPresetToLayer);
+  const refreshLinkedMaterialLayer = useStore((state) => state.refreshLinkedMaterialLayer);
   const deleteMaterialPreset = useStore((state) => state.deleteMaterialPreset);
   const [targetLayerId, setTargetLayerId] = useState('');
   const [presetId, setPresetId] = useState('');
@@ -90,7 +96,7 @@ function LoadedMaterialLibraryPanel(props: {
   const activePresetOption =
     presetOptions.find((option) => option.preset.id === activePresetId) ?? null;
   const activeLayer = layers.find((layer) => layer.id === activeLayerId) ?? null;
-  const linkStatus = materialLinkStatus(activeLayer, props.library);
+  const bindingStatus = materialBindingStatus(activeLayer?.materialBinding, props.library);
   return (
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
@@ -116,22 +122,51 @@ function LoadedMaterialLibraryPanel(props: {
         onDelete={() => deleteMaterialPreset(activePresetId)}
         onStatus={setStatus}
       />
+      <LinkedMaterialRefresh
+        binding={activeLayer?.materialBinding}
+        status={bindingStatus}
+        onRefresh={() => {
+          const refreshed = refreshLinkedMaterialLayer(activeLayerId);
+          setStatus(
+            refreshed
+              ? 'Linked preset refreshed from the current library revision.'
+              : 'Linked preset is already current or could not be refreshed from this library.',
+          );
+        }}
+      />
       {status !== '' ? <p style={statusStyle}>{status}</p> : null}
-      {linkStatus !== null ? <p style={statusStyle}>{linkStatus}</p> : null}
+      {activeLayer?.materialBinding !== undefined && bindingStatus !== null ? (
+        <p role="status" style={statusStyle}>
+          {materialBindingStatusText(activeLayer.materialBinding, bindingStatus)}
+        </p>
+      ) : null}
     </section>
   );
 }
 
-function materialLinkStatus(layer: Layer | null, library: MaterialLibraryDocument): string | null {
-  const binding = layer?.materialBinding;
-  if (binding === undefined) return null;
-  if (binding.libraryId !== library.libraryId) {
-    return 'Linked material library is unavailable. Using the last-resolved settings snapshot.';
-  }
-  if (!library.entries.some((entry) => entry.id === binding.presetId)) {
-    return 'Linked material preset is missing. Using the last-resolved settings snapshot.';
-  }
-  return 'Layer is linked to the selected material library.';
+function LinkedMaterialRefresh(props: {
+  readonly binding: Layer['materialBinding'];
+  readonly status: MaterialBindingStatus | null;
+  readonly onRefresh: () => void;
+}): JSX.Element | null {
+  if (props.binding === undefined || props.status === null) return null;
+  const sourceAvailable = props.status.entry !== null;
+  return (
+    <div style={buttonRowStyle}>
+      <Button
+        aria-label="Refresh linked material preset"
+        title={
+          sourceAvailable
+            ? 'Explicitly copy the current linked preset revision onto this layer.'
+            : 'Reload the linked material library or restore the missing preset before refreshing.'
+        }
+        disabled={!sourceAvailable}
+        onClick={props.onRefresh}
+      >
+        Refresh linked preset
+      </Button>
+    </div>
+  );
 }
 
 function MaterialLibrarySelectors(props: {

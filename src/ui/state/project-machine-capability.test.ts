@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import {
-  DEFAULT_CNC_MACHINE_CONFIG,
-  LASER_MACHINE_CONFIG,
-  createProject,
-  type CncTool,
-} from '../../core/scene';
+import { DEFAULT_CNC_MACHINE_CONFIG, createProject, type CncTool } from '../../core/scene';
 import { resolveProjectMachineCapability } from './project-machine-capability';
 
 const BACKFILLED_STARTER_IDS = ['vb-90-6350-hobby', 'vb-90-12700-hobby'] as const;
 
 describe('project machine capability resolution', () => {
-  it('repairs a laser-only project that was previously switched into CNC mode', () => {
+  it('preserves a laser-only-labelled project already in CNC mode and warns', () => {
     const project = {
       ...createProject({ ...DEFAULT_DEVICE_PROFILE, capabilities: ['laser-output'] }),
       machine: DEFAULT_CNC_MACHINE_CONFIG,
@@ -19,17 +14,15 @@ describe('project machine capability resolution', () => {
 
     const resolved = resolveProjectMachineCapability(project, []);
 
-    expect(resolved.project.machine).toEqual(LASER_MACHINE_CONFIG);
-    expect(resolved.cachedCncMachine).toEqual(DEFAULT_CNC_MACHINE_CONFIG);
+    expect(resolved.project.machine).toEqual(DEFAULT_CNC_MACHINE_CONFIG);
+    expect(resolved.cachedCncMachine).toBeNull();
     expect(resolved.loadResult).toEqual({
-      kind: 'capability-repaired',
-      previousKind: 'cnc',
-      activeKind: 'laser',
-      preservedCnc: true,
+      kind: 'capability-warning',
+      activeKind: 'cnc',
     });
   });
 
-  it('starts a CNC-only project with its persisted physical CNC settings', () => {
+  it('does not silently switch a CNC-only-labelled opened project', () => {
     const cncSubProfile = { ...DEFAULT_CNC_MACHINE_CONFIG.params, safeZMm: 17 };
     const project = createProject({
       ...DEFAULT_DEVICE_PROFILE,
@@ -39,9 +32,8 @@ describe('project machine capability resolution', () => {
 
     const resolved = resolveProjectMachineCapability(project, []);
 
-    expect(resolved.project.machine?.kind).toBe('cnc');
-    if (resolved.project.machine?.kind !== 'cnc') throw new Error('expected CNC machine');
-    expect(resolved.project.machine.params).toEqual(cncSubProfile);
+    expect(resolved.project.machine).toBeUndefined();
+    expect(resolved.loadResult).toEqual({ kind: 'capability-warning', activeKind: 'laser' });
   });
 
   it('honors a preferred CNC mode for a new hybrid project', () => {

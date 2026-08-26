@@ -1,0 +1,70 @@
+name: Packaged desktop native smoke
+
+# Report-only Windows runtime evidence. This workflow is deliberately separate
+# from CI, deploy, installer permissions, serial devices, and hardware release qualification.
+on:
+  schedule:
+    - cron: '19 5 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-native-smoke:
+    name: Windows packaged launch/import/save
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build renderer and Electron main
+        run: pnpm build:web && pnpm build:electron-main
+
+      - name: Package disposable unpacked Preview
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: pnpm exec electron-builder --win --x64 --dir --config electron-builder.preview.yml --publish never
+
+      - name: Run isolated packaged native smoke
+        id: native_smoke
+        shell: pwsh
+        run: |
+          $executable = (Resolve-Path 'release/0.1.0/win-unpacked/KerfDesk.exe').Path
+          pnpm smoke:desktop:native -- $executable
+
+      - name: Record SHA-correlated readiness lanes
+        if: always()
+        run: >-
+          pnpm report:release-readiness
+          --state=ci=not-run
+          --state=browser=not-run
+          --state=deploy=not-run
+          --state=packaged-runtime=${{ steps.native_smoke.outcome }}
+          --state=perceptual-reference-cam=not-run
+          --state=hardware=not-run
+
+      - name: Upload native smoke and readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaged-native-smoke-${{ github.sha }}
+          path: |
+            artifacts/native-smoke/
+            artifacts/release-readiness/
+          if-no-files-found: warn
+          retention-days: 30

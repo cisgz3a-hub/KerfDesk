@@ -1,7 +1,7 @@
 // The single canonical set of preflight codes that may refuse an action.
 //
 // Rule 7 / ADR-228: a preflight finding may warn, but only a *factual* inability
-// to produce the program may refuse. These seven are rule-7 category (b) compile
+// to produce the program may refuse. These are rule-7 category (b) compile
 // integrity — the program cannot be materialized at all:
 //   - non-finite-coordinate / empty-output: nothing emittable was produced.
 //   - cnc-tool-geometry-invalid: V-carve depth cannot be calculated without
@@ -14,6 +14,8 @@
 //     program string (RangeError, ADR-243) — not a predictive size cap.
 //   - relief-materialization-failed: an attempted relief compile could not
 //     reconstruct a heightmap from the exact stored source data.
+//   - cnc-machine-params-invalid: malformed persisted/imported machine values
+//     cannot be formatted into truthful, streamable CNC bytes.
 //
 // Every other code is a heuristic policy judgment (out-of-bed, no-go-zone
 // collision, plunged travel, speed/power range, settings validity, ...). Those
@@ -36,5 +38,6 @@ export const COMPILE_INTEGRITY_PREFLIGHT_CODES: ReadonlySet<PreflightCode> = new
     'no-output-layer',
     'program-materialization-failed',
     'relief-materialization-failed',
+    'cnc-machine-params-invalid',
   ],
 );

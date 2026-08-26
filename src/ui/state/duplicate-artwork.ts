@@ -9,6 +9,7 @@ import {
   type Scene,
   type SceneObject,
 } from '../../core/scene';
+import { cloneLayerSubLayers } from '../../core/scene/layer';
 
 export function duplicateArtworkWithOperations(
   scene: Scene,
@@ -43,7 +44,7 @@ export function duplicateArtworkWithOperations(
       id: seed.id,
       name: seed.name,
       color: seed.color,
-      subLayers: [],
+      subLayers: cloneLayerSubLayers(source.subLayers),
     };
     operationIdMap.set(source.id, operation.id);
     nextScene = addLayer(nextScene, operation);

@@ -18,9 +18,15 @@ export type MaterialRecipe = {
   readonly fillOverscanMm: number;
   readonly fillStyle?: Layer['fillStyle'];
   readonly fillBidirectional: boolean;
+  /** Optional only so schema-v1 libraries written before this field still migrate on load. */
+  readonly allowUncalibratedBidirectionalScan?: boolean;
+  /** Undefined means use the active profile table; a finite number is an explicit override. */
+  readonly bidirectionalScanOffsetMm?: number;
   readonly fillCrossHatch: boolean;
   readonly ditherAlgorithm: DitherAlgorithm;
   readonly linesPerMm: number;
+  /** Optional only for legacy schema-v1 input; canonical recipes always write a boolean. */
+  readonly imageBidirectional?: boolean;
   readonly negativeImage: boolean;
   readonly passThrough: boolean;
   readonly dotWidthCorrectionMm: number;
@@ -44,9 +50,12 @@ export const MATERIAL_RECIPE_FIELDS = [
   'fillOverscanMm',
   'fillStyle',
   'fillBidirectional',
+  'allowUncalibratedBidirectionalScan',
+  'bidirectionalScanOffsetMm',
   'fillCrossHatch',
   'ditherAlgorithm',
   'linesPerMm',
+  'imageBidirectional',
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
@@ -77,9 +86,14 @@ export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
     fillOverscanMm: layer.fillOverscanMm,
     fillStyle: layer.fillStyle,
     fillBidirectional: layer.fillBidirectional,
+    allowUncalibratedBidirectionalScan: layer.allowUncalibratedBidirectionalScan === true,
+    ...(layer.bidirectionalScanOffsetMm !== undefined
+      ? { bidirectionalScanOffsetMm: layer.bidirectionalScanOffsetMm }
+      : {}),
     fillCrossHatch: layer.fillCrossHatch,
     ditherAlgorithm: layer.ditherAlgorithm,
     linesPerMm: layer.linesPerMm,
+    imageBidirectional: layer.imageBidirectional,
     negativeImage: layer.negativeImage,
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
@@ -91,8 +105,9 @@ export function materialRecipePatch(recipe: MaterialRecipe): MaterialRecipe {
 }
 
 export function applyMaterialRecipe(layer: Layer, recipe: MaterialRecipe): Layer {
+  const { bidirectionalScanOffsetMm: _existingOffset, ...withoutLocalOffset } = layer;
   return {
-    ...layer,
+    ...withoutLocalOffset,
     ...materialRecipePatch(recipe),
   };
 }
@@ -118,9 +133,12 @@ export function normalizeMaterialRecipe(recipe: MaterialRecipe): MaterialRecipe 
     fillOverscanMm: Math.max(0, finiteOr(recipe.fillOverscanMm, 0)),
     fillStyle: isFillStyle(recipe.fillStyle) ? recipe.fillStyle : 'scanline',
     fillBidirectional: recipe.fillBidirectional,
+    allowUncalibratedBidirectionalScan: recipe.allowUncalibratedBidirectionalScan === true,
+    ...optionalScanOffset(recipe.bidirectionalScanOffsetMm),
     fillCrossHatch: recipe.fillCrossHatch,
     ditherAlgorithm: recipe.ditherAlgorithm,
     linesPerMm: Math.max(MIN_SPACING, finiteOr(recipe.linesPerMm, MIN_SPACING)),
+    imageBidirectional: recipe.imageBidirectional !== false,
     negativeImage: recipe.negativeImage,
     passThrough: recipe.passThrough,
     dotWidthCorrectionMm: Math.max(0, finiteOr(recipe.dotWidthCorrectionMm, 0)),
@@ -198,12 +216,31 @@ function hasRasterNumbers(value: Record<string, unknown>): boolean {
 }
 
 function hasRecipeBooleans(value: Record<string, unknown>): boolean {
+  return hasFillBooleans(value) && hasOptionalOperationBooleans(value) && hasImageBooleans(value);
+}
+
+function hasFillBooleans(value: Record<string, unknown>): boolean {
   return (
     typeof value.fillBidirectional === 'boolean' &&
     typeof value.fillCrossHatch === 'boolean' &&
+    (value.allowUncalibratedBidirectionalScan === undefined ||
+      typeof value.allowUncalibratedBidirectionalScan === 'boolean')
+  );
+}
+
+function hasOptionalOperationBooleans(value: Record<string, unknown>): boolean {
+  return (
     (value.airAssist === undefined || typeof value.airAssist === 'boolean') &&
     (value.tabsEnabled === undefined || typeof value.tabsEnabled === 'boolean') &&
-    (value.tabSkipInnerShapes === undefined || typeof value.tabSkipInnerShapes === 'boolean') &&
+    (value.tabSkipInnerShapes === undefined || typeof value.tabSkipInnerShapes === 'boolean')
+  );
+}
+
+function hasImageBooleans(value: Record<string, unknown>): boolean {
+  return (
+    (value.bidirectionalScanOffsetMm === undefined ||
+      isFiniteNumber(value.bidirectionalScanOffsetMm)) &&
+    (value.imageBidirectional === undefined || typeof value.imageBidirectional === 'boolean') &&
     typeof value.negativeImage === 'boolean' &&
     typeof value.passThrough === 'boolean'
   );
@@ -235,4 +272,10 @@ function clampFinite(value: number, min: number, max: number): number {
 
 function finiteOr(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
+}
+
+function optionalScanOffset(
+  value: number | undefined,
+): { readonly bidirectionalScanOffsetMm: number } | Record<string, never> {
+  return value !== undefined && Number.isFinite(value) ? { bidirectionalScanOffsetMm: value } : {};
 }

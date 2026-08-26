@@ -64,6 +64,7 @@ export type PreflightCode =
   | 'variable-evaluation-failed'
   | 'print-and-cut-registration-invalid'
   | 'cnc-settings-invalid'
+  | 'cnc-machine-params-invalid'
   | 'cnc-helix-entry-invalid'
   | 'cnc-vcarve-entry-fallback'
   | 'cnc-rest-machining-invalid'

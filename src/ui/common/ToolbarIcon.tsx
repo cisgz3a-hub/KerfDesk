@@ -25,6 +25,7 @@ const TOOLBAR_ICONS: Partial<Readonly<Record<ToolbarIconKey, string>>> = {
   'file.open': folderOpen,
   'file.save': save,
   'file.save-as': saveAll,
+  'file.import': fileCode,
   'file.import-svg': fileCode,
   'file.import-image': imagePlus,
   'tools.add-text': typeIcon,

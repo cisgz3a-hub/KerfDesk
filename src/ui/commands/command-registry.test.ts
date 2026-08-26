@@ -89,12 +89,13 @@ describe('buildAppCommands', () => {
       (command) => command.family === 'file',
     );
 
-    expect(commands).toHaveLength(11);
+    expect(commands).toHaveLength(12);
     for (const command of commands) {
       expect(command.enabled, command.id).toBe(true);
       expect(command.disabledReason, command.id).toBeUndefined();
       expect(runCommand(command), command.id).toBe(true);
     }
+    expect(commandById(commands, 'file.import').id).toBe('file.import');
     expect(commandById(commands, 'file.import-height-map').id).toBe('file.import-height-map');
     expect(importHeightMap).toHaveBeenCalledOnce();
   });

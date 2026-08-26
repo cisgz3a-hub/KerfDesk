@@ -11,7 +11,7 @@ import { serializeProject } from './serialize-project';
 describe('project cut-planner settings', () => {
   it('back-fills defaults on older .lf2 files', () => {
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION,
+      schemaVersion: PROJECT_SCHEMA_VERSION - 1,
       device: {
         name: 'Default',
         bedWidth: 300,
@@ -75,5 +75,24 @@ describe('project cut-planner settings', () => {
     if (typedResult.kind === 'invalid') {
       expect(typedResult.reason).toMatch(/optimization\.pathDirection/);
     }
+  });
+
+  it('round-trips bypassed planner values while Keep source order is active', () => {
+    const project: Project = {
+      ...createProject(),
+      optimization: {
+        reduceTravelMoves: false,
+        travelPolicy: 'source-order',
+        insideFirst: false,
+        layerPriority: 'reverse-project-order',
+        pathDirection: 'preserve',
+        startPoint: 'job-center',
+      },
+    };
+
+    const result = deserializeProject(serializeProject(project));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') expect(result.project.optimization).toEqual(project.optimization);
   });
 });

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { describeImportedImageSize, rasterImportGeometry } from './image-import';
+import {
+  describeImportedImageSize,
+  describeImportDensity,
+  rasterImportGeometry,
+} from './image-import';
 
 describe('describeImportedImageSize', () => {
   it('reports the natural size when the decode was not capped', () => {
@@ -22,13 +26,13 @@ describe('rasterImportGeometry', () => {
       naturalHeight: 2000,
       sampledWidth: 1024,
       sampledHeight: 512,
-      dpi: 96,
+      density: { xDpi: 96, yDpi: 192 },
     });
     expect(geometry.bounds).toEqual({
       minX: 0,
       minY: 0,
       maxX: (4000 / 96) * 25.4,
-      maxY: (2000 / 96) * 25.4,
+      maxY: (2000 / 192) * 25.4,
     });
     expect(geometry.pixelWidth).toBe(1024);
     expect(geometry.pixelHeight).toBe(512);
@@ -45,10 +49,29 @@ describe('rasterImportGeometry', () => {
         naturalHeight: 2000,
         sampledWidth: 1024,
         sampledHeight: 512,
-        dpi,
+        density: { xDpi: dpi, yDpi: dpi },
       });
       expect(Number.isFinite(geometry.bounds.maxX)).toBe(true);
       expect(geometry.bounds.maxX).toBeCloseTo(fallback, 6);
     }
+  });
+
+  it('discloses embedded anisotropic density and metadata fallback', () => {
+    const embedded = rasterImportGeometry({
+      naturalWidth: 300,
+      naturalHeight: 300,
+      sampledWidth: 300,
+      sampledHeight: 300,
+      density: { xDpi: 300, yDpi: 150 },
+    });
+    expect(describeImportDensity(embedded)).toBe('embedded density 300 × 150 DPI (X × Y)');
+    const fallback = rasterImportGeometry({
+      naturalWidth: 300,
+      naturalHeight: 300,
+      sampledWidth: 300,
+      sampledHeight: 300,
+      density: null,
+    });
+    expect(describeImportDensity(fallback)).toBe('default 254 DPI — no usable embedded density');
   });
 });

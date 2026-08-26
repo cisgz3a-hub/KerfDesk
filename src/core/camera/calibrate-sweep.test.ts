@@ -80,15 +80,19 @@ describe('calibrateWithFocalSweep', () => {
     },
   );
 
-  it('is a single plain run when the caller supplies a measured focal', { timeout: 30000 }, () => {
-    const views = observations();
-    const options = {
-      initialGuess: { imageWidth: 320, imageHeight: 240, fx: 180, fy: 180 },
-      distortionModel: 'k1k2',
-      maxIterations: 200,
-    } as const;
-    expect(calibrateWithFocalSweep(views, options)).toEqual(calibrate(views, options));
-  });
+  it(
+    'is a single plain run when the caller supplies a measured focal',
+    { timeout: ciBudgetMs(30_000, 120_000) },
+    () => {
+      const views = observations();
+      const options = {
+        initialGuess: { imageWidth: 320, imageHeight: 240, fx: 180, fy: 180 },
+        distortionModel: 'k1k2',
+        maxIterations: 200,
+      } as const;
+      expect(calibrateWithFocalSweep(views, options)).toEqual(calibrate(views, options));
+    },
+  );
 
   it('propagates typed failures', () => {
     expect(

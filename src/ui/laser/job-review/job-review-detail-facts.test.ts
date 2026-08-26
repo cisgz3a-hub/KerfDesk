@@ -16,7 +16,9 @@ const baseLayer = createLayer({ id: 'a', color: '#ff0000' });
 
 describe('laserOperationDetail', () => {
   it('summarizes a line operation: kerf, tabs, min power', () => {
-    expect(laserOperationDetail(baseLayer)).toBe('Kerf 0 mm · tabs off · min power 0%');
+    expect(laserOperationDetail(baseLayer)).toBe(
+      'Kerf 0 mm · stored contour entry target 5 mm · tabs off · min power 0%',
+    );
   });
 
   it('adds tabs, pass-through, and power mode when set on a line operation', () => {
@@ -30,7 +32,7 @@ describe('laserOperationDetail', () => {
       powerMode: 'dynamic',
     };
     expect(laserOperationDetail(layer)).toBe(
-      'Kerf 0.2 mm · tabs 3 × 0.5 mm · pass-through · min power 0% · dynamic power',
+      'Kerf 0.2 mm · stored contour entry target 5 mm · tabs 3 × 0.5 mm · pass-through · min power 0% · dynamic power',
     );
   });
 
@@ -180,8 +182,8 @@ describe('boundMaterialLabel', () => {
   const library = {
     libraryId: 'lib-1',
     entries: [
-      { id: 'p1', materialName: 'Basswood', thicknessMm: 3 },
-      { id: 'p2', materialName: 'Acrylic', title: 'Cast acrylic — engrave' },
+      { id: 'p1', materialName: 'Basswood', thicknessMm: 3, revision: 'rev-2' },
+      { id: 'p2', materialName: 'Acrylic', title: 'Cast acrylic — engrave', revision: 'rev-4' },
     ],
     // Only the fields the resolver reads matter for this test double.
   } as unknown as MaterialLibraryDocument;
@@ -191,10 +193,24 @@ describe('boundMaterialLabel', () => {
   });
 
   it('resolves material name plus thickness, preferring an explicit title', () => {
-    const binding = { libraryId: 'lib-1', presetId: 'p1', lastResolved: baseLayer };
-    expect(boundMaterialLabel(binding, library)).toBe('Basswood 3 mm');
-    const titled = { libraryId: 'lib-1', presetId: 'p2', lastResolved: baseLayer };
-    expect(boundMaterialLabel(titled, library)).toBe('Cast acrylic — engrave');
+    const binding = {
+      libraryId: 'lib-1',
+      presetId: 'p1',
+      presetRevision: 'rev-2',
+      lastResolved: baseLayer,
+    };
+    expect(boundMaterialLabel(binding, library)).toBe(
+      'Basswood 3 mm — linked current (revision rev-2)',
+    );
+    const titled = {
+      libraryId: 'lib-1',
+      presetId: 'p2',
+      presetRevision: 'rev-3',
+      lastResolved: baseLayer,
+    };
+    expect(boundMaterialLabel(titled, library)).toBe(
+      'Cast acrylic — engrave — linked stale (saved rev-3; current rev-4)',
+    );
   });
 
   it('says so when the library or preset is unavailable', () => {

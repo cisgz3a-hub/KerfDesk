@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe('MachineSetupSafetyZones', () => {
-  it('locates zone warnings in the Start-time review after Frame', async () => {
+  it('locates zone warnings in review and explains unchanged direct jogs', async () => {
     const { host, unmount } = await renderPanel();
     try {
       expect(host.textContent).toContain(
@@ -43,6 +43,8 @@ describe('MachineSetupSafetyZones', () => {
       );
       expect(host.textContent).not.toContain('Job Review for Frame and Start');
       expect(host.textContent).not.toContain('block G-code export');
+      expect(host.textContent).toMatch(/sent unchanged with a prominent warning/i);
+      expect(host.textContent).not.toMatch(/block G-code export|direct jog.*block/i);
     } finally {
       await unmount();
     }

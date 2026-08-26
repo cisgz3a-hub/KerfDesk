@@ -101,6 +101,64 @@ describe('MomentaryFireControl', () => {
     expect(setFireActive).toHaveBeenLastCalledWith(false);
   });
 
+  it('hard-offs on global keyup after acknowledgement disables the focused button', async () => {
+    const setFireActive = vi.fn(async (active: boolean) => {
+      useLaserStore.setState(
+        active
+          ? { fireActive: true, pendingUntrackedAcks: 1 }
+          : { fireActive: false, pendingUntrackedAcks: 0 },
+      );
+    });
+    useLaserStore.setState({ setFireActive });
+    const button = await renderControl();
+    button?.focus();
+
+    await act(async () =>
+      button?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })),
+    );
+    expect(button?.disabled).toBe(true);
+
+    await act(async () => window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' })));
+
+    expect(setFireActive).toHaveBeenLastCalledWith(false);
+  });
+
+  it('hard-offs when the held Fire control loses focus', async () => {
+    const setFireActive = vi.fn(async (active: boolean) => {
+      useLaserStore.setState({ fireActive: active });
+    });
+    useLaserStore.setState({ setFireActive });
+    const button = await renderControl();
+    button?.focus();
+    await act(async () =>
+      button?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })),
+    );
+
+    await act(async () => button?.dispatchEvent(new FocusEvent('blur', { bubbles: true })));
+
+    expect(setFireActive).toHaveBeenLastCalledWith(false);
+  });
+
+  it('coalesces simultaneous fail-off signals when laser-off is rejected', async () => {
+    const setFireActive = vi.fn(async (active: boolean) => {
+      if (!active) throw new Error('Port write failed.');
+      useLaserStore.setState({ fireActive: true });
+    });
+    useLaserStore.setState({ setFireActive });
+    const button = await renderControl();
+    await act(async () =>
+      button?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })),
+    );
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+      window.dispatchEvent(new Event('blur'));
+    });
+
+    expect(setFireActive.mock.calls.filter(([active]) => active === false)).toHaveLength(1);
+    expect(useLaserStore.getState().fireActive).toBe(true);
+  });
+
   it('does not mount without the Labs opt-in', async () => {
     useExperimentalLaserFeatures.getState().setFeature('lowPowerFire', false);
     expect(await renderControl()).toBeNull();

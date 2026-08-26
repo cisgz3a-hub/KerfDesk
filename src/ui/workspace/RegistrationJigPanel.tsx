@@ -17,6 +17,7 @@ import { useStore } from '../state';
 import { useUiStore, type FloatingPanelPosition } from '../state/ui-store';
 import { RegistrationJigOutlineControls } from './RegistrationJigOutlineControls';
 import { RegistrationJigArtworkSizeControls } from './RegistrationJigArtworkSizeControls';
+import { RegistrationJigOperationSettings } from './RegistrationJigOperationSettings';
 
 const PANEL_MARGIN_PX = 12;
 
@@ -77,6 +78,8 @@ export function RegistrationJigPanel(): JSX.Element | null {
       <NextBurnBanner state={runState} outlineCount={boxes.length} />
 
       <RegistrationJigOutlineControls key={projectDocumentEpoch} />
+
+      <RegistrationJigOperationSettings />
 
       <Button
         onClick={centerInBox}

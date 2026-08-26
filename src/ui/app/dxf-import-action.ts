@@ -13,6 +13,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { describeReimportOutcome } from './import-toasts';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
+import { claimImportSuccessIndex } from './import-success-index';
 
 // Minimal file shape shared by DataTransfer Files and the platform
 // pickFilesForOpen handles.
@@ -32,6 +33,7 @@ export async function importDxfFiles(
   ctx: {
     readonly importObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
     readonly pushToast: (message: string, variant?: ToastVariant) => void;
+    readonly nextSuccessIndex?: () => number;
   },
 ): Promise<void> {
   let successIdx = 0;
@@ -51,8 +53,9 @@ export async function importDxfFiles(
         ctx.pushToast(emptyImportMessage(file.name, result.skippedSummary), 'warning');
         continue;
       }
-      const outcome = ctx.importObject(result.object, successIdx);
-      successIdx += 1;
+      const claimed = claimImportSuccessIndex(ctx.nextSuccessIndex, successIdx);
+      successIdx = claimed.nextLocalIndex;
+      const outcome = ctx.importObject(result.object, claimed.batchIndex);
       if (outcome.kind === 'replaced') {
         const toast = describeReimportOutcome(outcome);
         ctx.pushToast(toast.message, toast.variant);

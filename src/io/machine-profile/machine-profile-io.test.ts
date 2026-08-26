@@ -221,6 +221,32 @@ describe('LaserForge machine profile documents', () => {
     expect(result.document.profile.cncSubProfile).toEqual(profile.cncSubProfile);
   });
 
+  it('keeps a malformed imported CNC sub-profile reviewable with disclosed editable recovery', () => {
+    const result = deserializeProfilePatch({
+      cncSubProfile: {
+        safeZMm: 7,
+        spindleMaxRpm: 18000,
+        spindleSpinupSec: 2,
+        coolant: 'liquid-nitrogen',
+        parkXMm: 'left',
+        parkYMm: 390,
+      },
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.document.profile.cncSubProfile).toEqual({
+      safeZMm: 7,
+      spindleMaxRpm: 18000,
+      spindleSpinupSec: 2,
+      coolant: 'off',
+      parkYMm: 390,
+    });
+    expect(result.document.reviewNotes.join(' ')).toContain('profile.cncSubProfile.coolant');
+    expect(result.document.reviewNotes.join(' ')).toContain('profile.cncSubProfile.parkXMm');
+    expect(result.document.reviewNotes.join(' ')).toContain('Review in Device Setup');
+  });
+
   it('backfills legacy machine profiles without explicit streaming settings', () => {
     const profile = profileWithCalibration();
     const {

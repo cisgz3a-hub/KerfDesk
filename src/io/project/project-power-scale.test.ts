@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROJECT_SCHEMA_VERSION } from '../../core/scene';
+import { createProject, PROJECT_SCHEMA_VERSION } from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
 
 function rawProject(objects: readonly Record<string, unknown>[]): string {
@@ -16,6 +16,7 @@ function rawProject(objects: readonly Record<string, unknown>[]): string {
       autofocusCommand: '',
     },
     workspace: { width: 300, height: 300, units: 'mm' },
+    jobSetup: createProject().jobSetup,
     scene: {
       objects,
       layers: [

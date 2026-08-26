@@ -47,9 +47,11 @@ function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
     fillOverscanMm: 2,
     fillStyle: 'scanline',
     fillBidirectional: false,
+    allowUncalibratedBidirectionalScan: false,
     fillCrossHatch: true,
     ditherAlgorithm: 'stucki',
     linesPerMm: 11,
+    imageBidirectional: true,
     negativeImage: true,
     passThrough: false,
     dotWidthCorrectionMm: 0.04,
@@ -264,7 +266,7 @@ describe('MaterialLibraryPanel', () => {
     }
   });
 
-  it('blocks unsupported recipe assignment and surfaces the recipe warning', async () => {
+  it('keeps unsupported recipe assignment available and surfaces the recipe warning', async () => {
     useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setMaterialLibrary(
@@ -282,7 +284,12 @@ describe('MaterialLibraryPanel', () => {
     try {
       expect(host.textContent).toContain('Unsupported recipe.');
       expect(host.textContent).toContain('Clear acrylic is not supported');
-      expect(button(host, 'Apply selected material preset to layer').disabled).toBe(true);
+      const apply = button(host, 'Apply selected material preset to layer');
+      expect(apply.disabled).toBe(false);
+      const confirm = vi.spyOn(window, 'confirm');
+      await act(async () => apply.click());
+      expect(confirm).not.toHaveBeenCalled();
+      expect(useStore.getState().project.scene.layers[0]?.power).toBe(55);
     } finally {
       await unmount(root, host);
     }

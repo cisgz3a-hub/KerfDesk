@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import { DEFAULT_DEVICE_PROFILE, type NoGoZone } from '../../core/devices';
+import { grblDriver } from '../../core/controllers';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 import { useStore } from './store';
+import { useToastStore } from './toast-store';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
@@ -74,6 +76,7 @@ async function flush(): Promise<void> {
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
   setZone(CLAMP);
+  useToastStore.setState({ toasts: [] });
 });
 
 afterEach(async () => {
@@ -89,18 +92,23 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe('jog no-go zone guard (DEV-04)', () => {
-  it('refuses a jog whose path crosses an enabled zone and sends nothing', async () => {
+describe('jog no-go zone warnings (DEV-04)', () => {
+  it('dispatches an unchanged jog whose path crosses an enabled zone and warns', async () => {
     const writes: string[] = [];
     await connectIdleAtOrigin(makeConnection(async (data) => void writes.push(data)));
     writes.length = 0;
 
     // From (0,0) toward (50,50): the straight path cuts through the clamp (20..40).
-    await expect(useLaserStore.getState().jogToMachinePosition(50, 50, 1000)).rejects.toThrow(
-      /no-go zone "Left clamp"/i,
-    );
-    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([]);
-    expect(useLaserStore.getState().lastWriteError).toMatch(/Left clamp/);
+    await useLaserStore.getState().jogToMachinePosition(50, 50, 1000);
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      `${grblDriver.commands.buildJog({ dx: 50, dy: 50, feed: 1000 })}\n`,
+    ]);
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      variant: 'warning',
+      message: expect.stringMatching(/no-go zone "Left clamp".*sent unchanged/i),
+    });
+    expect(useLaserStore.getState().lastWriteError).toBeNull();
   });
 
   it('allows a jog that stays clear of the zone', async () => {
@@ -143,9 +151,37 @@ describe('jog no-go zone guard (DEV-04)', () => {
     await settleTestGrblHandshake();
     writes.length = 0;
 
-    await expect(
-      useLaserStore.getState().jog({ dx: 10, dy: 10, feed: 1000, relative: false }),
-    ).rejects.toThrow(/no-go zone "Left clamp"/i);
-    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([]);
+    const params = { dx: 10, dy: 10, feed: 1000, relative: false } as const;
+    await useLaserStore.getState().jog(params);
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      `${grblDriver.commands.buildJog(params)}\n`,
+    ]);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/Left clamp.*sent unchanged/i);
+  });
+
+  it('dispatches an unchanged relative XY jog with an unresolved path and warns', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => void writes.push(data));
+    await useLaserStore.getState().connect(makeAdapter(connection));
+    connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|FS:0,0>');
+    await flush();
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|FS:0,0>');
+    await settleTestGrblHandshake();
+    writes.length = 0;
+    const params = { dx: 5, dy: -2, feed: 800 } as const;
+
+    await useLaserStore.getState().jog(params);
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      `${grblDriver.commands.buildJog(params)}\n`,
+    ]);
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      variant: 'warning',
+      message: expect.stringMatching(/XY position is unresolved.*sent unchanged/i),
+    });
+    expect(useLaserStore.getState().lastWriteError).toBeNull();
   });
 });

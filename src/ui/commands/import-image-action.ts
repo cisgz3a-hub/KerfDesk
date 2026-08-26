@@ -8,7 +8,12 @@ import {
 } from '../trace/image-loader';
 import type { ToastVariant } from '../state/toast-store';
 import { readImageDensity } from '../common/image-density';
-import { describeImportedImageSize, rasterImportGeometry } from '../common/image-import';
+import {
+  describeImportedImageSize,
+  describeImportDensity,
+  rasterImportGeometry,
+} from '../common/image-import';
+import type { ImageDensity } from '../common/image-density';
 import { largeImportAdvisory } from '../app/import-size-advisory';
 import { shouldPageBackPng, tryDecodeQualifiedPng } from '../import/qualified-png-raster';
 import type { PngImportWorkerProgress } from '../import/png-import-worker-client';
@@ -32,14 +37,14 @@ export async function importImageFile(
   try {
     const loaded = await loadImageSamples(file, pageBacked, controls?.options);
     rollback = loaded.kind === 'paged' ? loaded.rollback : null;
-    const object = await importedRasterObject(file, loaded);
-    importRasterImage(object);
+    const imported = await importedRasterObject(file, loaded);
+    importRasterImage(imported.object);
     rollback = null;
     pushToast(
-      `Added image: ${file.name} (${describeImportedImageSize(loaded.natural, loaded.sampled)})`,
+      `Added image: ${file.name} (${describeImportedImageSize(loaded.natural, loaded.sampled)} · ${describeImportDensity(imported.geometry)})`,
       'success',
     );
-    return object;
+    return imported.object;
   } catch (err) {
     return handleFailedImport(file.name, err, rollback, pushToast);
   } finally {
@@ -62,24 +67,30 @@ type LoadedImageSamples =
       readonly imageAsset: NonNullable<
         Extract<SceneObject, { readonly kind: 'raster-image' }>['imageAsset']
       >;
-      readonly densityDpi: number | null;
+      readonly density: ImageDensity | null;
       readonly rollback: () => Promise<string | null>;
     };
 
-async function importedRasterObject(file: File, loaded: LoadedImageSamples): Promise<SceneObject> {
-  const density = loaded.kind === 'paged' ? loaded.densityDpi : await readImageDensity(file);
+async function importedRasterObject(
+  file: File,
+  loaded: LoadedImageSamples,
+): Promise<{
+  readonly object: SceneObject;
+  readonly geometry: ReturnType<typeof rasterImportGeometry>;
+}> {
+  const density = loaded.kind === 'paged' ? loaded.density : await readImageDensity(file);
   const geometry = rasterImportGeometry({
     naturalWidth: loaded.natural.width,
     naturalHeight: loaded.natural.height,
     sampledWidth: loaded.sampled.width,
     sampledHeight: loaded.sampled.height,
-    ...(density === null ? {} : { dpi: density }),
+    density,
   });
   const source =
     loaded.kind === 'paged'
       ? { imageAsset: loaded.imageAsset }
       : { dataUrl: await readFileAsDataUrl(file), lumaBase64: loaded.lumaBase64 };
-  return {
+  const object: SceneObject = {
     kind: 'raster-image',
     id: crypto.randomUUID(),
     source: file.name,
@@ -92,6 +103,7 @@ async function importedRasterObject(file: File, loaded: LoadedImageSamples): Pro
     dither: 'floyd-steinberg',
     linesPerMm: 10,
   };
+  return { object, geometry };
 }
 
 async function handleFailedImport(

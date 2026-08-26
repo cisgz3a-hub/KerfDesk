@@ -35,6 +35,16 @@ afterEach(() => {
 });
 
 describe('SafetyZonesPanel', () => {
+  it('describes direct-jog findings as nonblocking warnings', async () => {
+    const { host, unmount } = await renderPanel();
+    try {
+      expect(host.textContent).toMatch(/warning without changing the command/i);
+      expect(host.textContent).not.toMatch(/checked by Start, Frame/i);
+    } finally {
+      await unmount();
+    }
+  });
+
   it('lets numeric fields be cleared while editing', async () => {
     useStore.getState().updateDeviceProfile({
       noGoZones: [

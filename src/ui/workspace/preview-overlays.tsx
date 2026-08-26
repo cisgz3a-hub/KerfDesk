@@ -11,9 +11,11 @@ import type { Project } from '../../core/scene';
 import type { RemovalGridResolution } from '../../core/sim/removal-grid';
 import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore, type PreviewPlaybackSpeed } from '../state/ui-store';
-import { hasOutOfBoundsObjects } from './out-of-bounds';
 import { PreviewResolutionBanner } from './preview-resolution';
-import { previewHasBurnableContent, previewIssueFor, type PreviewIssue } from './preview-status';
+import type { PreviewIssue } from './preview-status';
+import { RasterPreviewDisplayBanner } from './RasterPreviewDisplayBanner';
+import { RoutePreviewDisplayBanner } from './RoutePreviewDisplayBanner';
+import { previewStatusOverlayModel } from './preview-status-overlay-model';
 
 function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX.Element | null {
   if (props.issue?.kind === 'too-complex') {
@@ -21,15 +23,6 @@ function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX
       <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
         Route preview is too large to draw safely. Simplify the trace or reduce detail, then preview
         again.
-      </div>
-    );
-  }
-  if (props.issue?.kind === 'render-pressure') {
-    return (
-      <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
-        Large 2D preview: all {props.issue.observed.toLocaleString()} parsed steps are shown.
-        Drawing more than {props.issue.threshold.toLocaleString()} steps can use substantial memory
-        and may respond slowly.
       </div>
     );
   }
@@ -63,23 +56,25 @@ export function PreviewStatusOverlays(props: {
   readonly toolpath: Toolpath;
   readonly resolution?: RemovalGridResolution;
 }): JSX.Element | null {
-  const issue = previewIssueFor(props.toolpath);
-  // Any preview issue (too-complex, placement failure) already explains the
-  // blank route, so the scope-oriented "enable Output" hint must not fire.
-  const empty = issue === null && !previewHasBurnableContent(props.project, props.toolpath);
-  const outOfBounds = hasOutOfBoundsObjects(props.project);
+  const model = previewStatusOverlayModel(props.project, props.toolpath);
   const hasResolutionNotice = props.resolution !== undefined && props.resolution.reason !== null;
-  if (issue === null && !empty && !outOfBounds && !hasResolutionNotice) return null;
+  if (!model.visible && !hasResolutionNotice) return null;
   return (
     <div style={stackStyle}>
-      <PreviewIssueBanner issue={issue} />
+      <PreviewIssueBanner issue={model.primaryIssue} />
       <PreviewResolutionBanner label="2D cut shading" resolution={props.resolution} />
-      {empty ? (
+      {model.displayDecimation !== null ? (
+        <RoutePreviewDisplayBanner decimation={model.displayDecimation} style={bannerStyle} />
+      ) : null}
+      {model.rasterDisplay !== null ? (
+        <RasterPreviewDisplayBanner advisory={model.rasterDisplay} style={bannerStyle} />
+      ) : null}
+      {model.empty ? (
         <div className="lf-chip" style={hintStyle} role="status">
           Nothing to preview — enable Output on at least one layer with objects.
         </div>
       ) : null}
-      {outOfBounds ? (
+      {model.outOfBounds ? (
         <div className="lf-banner lf-banner--danger" style={bannerStyle} role="alert">
           Some objects extend past the bed (red dashed outlines). This is a warning, not a block —
           it appears in Job Review and after a save, and the physical Frame decides.

@@ -28,9 +28,11 @@ function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
     fillOverscanMm: 3,
     fillStyle: 'scanline',
     fillBidirectional: false,
+    allowUncalibratedBidirectionalScan: false,
     fillCrossHatch: true,
     ditherAlgorithm: 'atkinson',
     linesPerMm: 12,
+    imageBidirectional: true,
     negativeImage: true,
     passThrough: false,
     dotWidthCorrectionMm: 0.05,
@@ -199,6 +201,7 @@ describe('material library store actions', () => {
     expect(targetLayer().materialBinding).toMatchObject({
       libraryId: 'shop-library',
       presetId: 'birch-3mm-clean-cut',
+      presetRevision: 'rev-1',
       lastResolved: { power: 44 },
     });
 
@@ -208,13 +211,8 @@ describe('material library store actions', () => {
     expect(useStore.getState().refreshLinkedMaterialLayer(targetLayer().id)).toBe(false);
   });
 
-  // (The old "blocks recipes for incompatible device profiles" test was removed:
-  // ADR-045 says device mismatch is warn-not-block, now asserted by the
-  // device-mismatch apply test above. The 'unsupported' safety block below stays.)
-
-  it('assignMaterialPresetToLayer blocks unsupported recipes', () => {
+  it('assignMaterialPresetToLayer applies unsupported recipes without a policy refusal', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const originalRecipe = captureMaterialRecipe(targetLayer());
     useStore.getState().setMaterialLibrary(
       library([
         preset({
@@ -228,10 +226,10 @@ describe('material library store actions', () => {
 
     expect(
       useStore.getState().assignMaterialPresetToLayer(targetLayer().id, 'birch-3mm-clean-cut'),
-    ).toBe(false);
-    expect(captureMaterialRecipe(targetLayer())).toEqual(originalRecipe);
-    expect(useStore.getState().dirty).toBe(false);
-    expect(useStore.getState().undoStack).toHaveLength(0);
+    ).toBe(true);
+    expect(captureMaterialRecipe(targetLayer()).power).toBe(99);
+    expect(useStore.getState().dirty).toBe(true);
+    expect(useStore.getState().undoStack).toHaveLength(1);
   });
 
   it('assignMaterialPresetToLayer no-ops for missing or identical recipes', () => {

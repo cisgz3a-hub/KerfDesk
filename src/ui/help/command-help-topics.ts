@@ -22,6 +22,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'file',
     tooltip: 'Save the current project as a new file.',
   },
+  'file.import': {
+    family: 'file',
+    tooltip: 'Import SVG, DXF, PNG, JPG, or STL artwork through one ordered picker.',
+  },
   'file.import-svg': {
     family: 'file',
     tooltip: 'Import vector artwork from an SVG file.',

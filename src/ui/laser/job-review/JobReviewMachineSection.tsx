@@ -5,6 +5,7 @@
 
 import type { MachineKind } from '../../../core/scene';
 import { useStore } from '../../state';
+import { useLaserStore } from '../../state/laser-store';
 import { buildMachineReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import {
   detailsStyle,
@@ -22,7 +23,11 @@ export function JobReviewMachineSection(props: {
   readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
 }): JSX.Element {
   const project = useStore((s) => s.project);
-  const facts = [...buildMachineReviewFacts(project), ...props.outputQualityFacts];
+  const controllerSettings = useLaserStore((s) => s.controllerSettings);
+  const facts = [
+    ...buildMachineReviewFacts(project, controllerSettings),
+    ...props.outputQualityFacts,
+  ];
   return (
     <details style={detailsStyle}>
       <summary

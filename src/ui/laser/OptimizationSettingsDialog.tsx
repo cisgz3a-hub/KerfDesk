@@ -40,6 +40,10 @@ function PlannerFields(props: {
   readonly update: (patch: Partial<ProjectOptimizationSettings>) => void;
 }): JSX.Element {
   const { settings, update } = props;
+  const keepsSourceOrder = settings.travelPolicy === 'source-order';
+  const orderingControlTitle = keepsSourceOrder
+    ? 'Keep source order bypasses this setting. Switch Travel policy to Reduce travel to use it.'
+    : undefined;
   return (
     <>
       <PlannerSelect
@@ -60,7 +64,8 @@ function PlannerFields(props: {
           type="checkbox"
           className="lf-checkbox"
           checked={settings.insideFirst}
-          title="Cut enclosed paths before their containing paths."
+          disabled={keepsSourceOrder}
+          title={orderingControlTitle ?? 'Cut enclosed paths before their containing paths.'}
           onChange={(event) => update({ insideFirst: event.currentTarget.checked })}
         />
         <span>Inside paths first</span>
@@ -81,6 +86,8 @@ function PlannerFields(props: {
         label="Path direction"
         name="pathDirection"
         value={settings.pathDirection}
+        disabled={keepsSourceOrder}
+        {...(orderingControlTitle === undefined ? {} : { title: orderingControlTitle })}
         onChange={(pathDirection) =>
           update({ pathDirection: pathDirection as ProjectOptimizationSettings['pathDirection'] })
         }
@@ -93,6 +100,8 @@ function PlannerFields(props: {
         label="Planning start"
         name="startPoint"
         value={settings.startPoint}
+        disabled={keepsSourceOrder}
+        {...(orderingControlTitle === undefined ? {} : { title: orderingControlTitle })}
         onChange={(startPoint) =>
           update({ startPoint: startPoint as ProjectOptimizationSettings['startPoint'] })
         }
@@ -102,7 +111,18 @@ function PlannerFields(props: {
           ['job-center', 'Job center'],
         ]}
       />
+      {keepsSourceOrder ? <SourceOrderPrecedenceNote /> : null}
     </>
+  );
+}
+
+function SourceOrderPrecedenceNote(): JSX.Element {
+  return (
+    <p style={precedenceNoteStyle} role="status">
+      Keep source order preserves path sequence and direction inside each operation. Inside paths
+      first, Path direction, and Planning start are saved but bypassed. Layer priority still
+      applies.
+    </p>
   );
 }
 
@@ -112,6 +132,8 @@ function PlannerSelect(props: {
   readonly value: string;
   readonly options: ReadonlyArray<readonly [value: string, label: string]>;
   readonly onChange: (value: string) => void;
+  readonly disabled?: boolean;
+  readonly title?: string;
 }): JSX.Element {
   return (
     <label style={selectRowStyle}>
@@ -119,8 +141,9 @@ function PlannerSelect(props: {
       <select
         name={props.name}
         value={props.value}
+        disabled={props.disabled === true}
         onChange={(event) => props.onChange(event.currentTarget.value)}
-        title={`Choose ${props.label.toLowerCase()}.`}
+        title={props.title ?? `Choose ${props.label.toLowerCase()}.`}
       >
         {props.options.map(([value, label]) => (
           <option key={value} value={value}>
@@ -144,4 +167,10 @@ const selectRowStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 8,
   fontSize: 13,
+};
+
+const precedenceNoteStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  lineHeight: 1.4,
 };

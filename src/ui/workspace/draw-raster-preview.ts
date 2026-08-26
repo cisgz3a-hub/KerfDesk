@@ -8,7 +8,10 @@
 // Only output-enabled image-mode layers render. `layer.visible` is ignored:
 // preview shows what burns, not what is merely visible.
 
-import type { DeviceProfile } from '../../core/devices';
+import { toSceneCoords, type DeviceProfile } from '../../core/devices';
+import { rasterBoundsInMachineCoords, type RasterMachineBounds } from '../../core/job';
+import { compileRasterGroupsForLayer } from '../../core/job/compile-job-raster';
+import { pixelExtentForMm } from '../../core/raster';
 import {
   outputOperationLayers,
   sceneObjectUsesOperation,
@@ -17,15 +20,15 @@ import {
   type RasterImage,
   type SceneObject,
 } from '../../core/scene';
+import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { IndexedDbPagedAssetRepository } from '../import/paged-asset-indexeddb';
-import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
 
 // One shared reader for every preview hydration. Each repository instance
 // caches its own IDBDatabase and never closes it, so letting hydration default
 // to a fresh instance leaked an open connection on every preview cache miss.
 const previewAssetRepository = new IndexedDbPagedAssetRepository();
 import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
-import { drawBitmapAtTransform } from './draw-raster';
+import { compiledRasterPreview, displayDimensions } from './compiled-raster-preview';
 import {
   lookupPreviewCanvas,
   rasterContentToken,
@@ -66,17 +69,18 @@ export function drawRasterPreview(
   pruneRasterPreviewBuilds(liveRasterIds);
   for (const layer of project.scene.layers) {
     for (const operationLayer of outputOperationLayers(layer)) {
-      if (operationLayer.mode !== 'image') continue;
       for (const obj of project.scene.objects) {
         if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, operationLayer)) continue;
         if (obj.role === 'trace-source') continue;
+        const effectiveOperation = effectiveOperationForObject(operationLayer, obj);
+        if (effectiveOperation.mode !== 'image') continue;
         drawOnePreview(
           ctx,
           obj,
-          operationLayer,
+          effectiveOperation,
           project.device,
           view,
-          imageMaskObjectFor(project, obj),
+          project.scene.objects,
           options,
         );
       }
@@ -99,14 +103,14 @@ function drawOnePreview(
   layer: Layer,
   device: DeviceProfile,
   view: ViewTransform,
-  maskObject: SceneObject | null,
+  sceneObjects: ReadonlyArray<SceneObject>,
   options: DrawRasterPreviewOptions,
 ): void {
-  const canvas = previewCanvasFor(obj, layer, device, maskObject, options);
+  const canvas = previewCanvasFor(obj, layer, device, sceneObjects, options);
   if (canvas === null) return;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  drawBitmapAtTransform(ctx, canvas, obj.bounds, obj.transform, view);
+  drawMachineRasterBitmap(ctx, canvas, rasterBoundsInMachineCoords(obj, device), device, view);
   ctx.restore();
 }
 
@@ -114,15 +118,15 @@ function previewCanvasFor(
   obj: RasterImage,
   layer: Layer,
   device: DeviceProfile,
-  maskObject: SceneObject | null,
+  sceneObjects: ReadonlyArray<SceneObject>,
   options: DrawRasterPreviewOptions,
 ): HTMLCanvasElement | null {
   const { pixelWidth, pixelHeight } = obj;
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
-  const key = previewSettingsKey(obj, layer, device, maskObject);
+  const key = previewSettingsKey(obj, layer, device, imageMaskObjectFor(sceneObjects, obj));
   const cached = lookupPreviewCanvas(obj, key);
   if (cached.kind === 'hit') return cached.canvas;
-  schedulePreviewCanvasBuild(key, obj, layer, device, maskObject, options);
+  schedulePreviewCanvasBuild(key, obj, layer, device, sceneObjects, options);
   // A synchronous scheduler fills the cache before returning; an asynchronous
   // one leaves this frame without a preview and repaints when it lands.
   const built = lookupPreviewCanvas(obj, key);
@@ -136,8 +140,8 @@ function previewSettingsKey(
   device: DeviceProfile,
   maskObject: SceneObject | null,
 ): string {
-  const { width, height } = processedRasterDimensions(obj, layer);
-  return `${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${width}x${height}|${maskCacheKey(maskObject)}`;
+  const dimensions = compiledGridDimensions(obj, layer, device);
+  return `${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${dimensions.width}x${dimensions.height}|${transformCacheKey(obj, device)}|${maskCacheKey(maskObject)}`;
 }
 
 function schedulePreviewCanvasBuild(
@@ -145,7 +149,7 @@ function schedulePreviewCanvasBuild(
   obj: RasterImage,
   layer: Layer,
   device: DeviceProfile,
-  maskObject: SceneObject | null,
+  sceneObjects: ReadonlyArray<SceneObject>,
   options: DrawRasterPreviewOptions,
 ): void {
   if (isBuildInFlight(obj, key)) return;
@@ -155,7 +159,7 @@ function schedulePreviewCanvasBuild(
     let completedSynchronously = false;
     const cancel = scheduleBuild(() => {
       clearPendingBuild(obj, key, ownBuild);
-      const canvas = buildPreviewCanvas(obj, layer, device, maskObject);
+      const canvas = buildPreviewCanvas(obj, layer, device, sceneObjects);
       storePreviewCanvas(obj, key, canvas);
       if (canvas !== null) options.onRasterPreviewReady?.();
       completedSynchronously = true;
@@ -173,7 +177,7 @@ function schedulePreviewCanvasBuild(
     void hydratePagedRasterImage(obj, previewAssetRepository, controller.signal)
       .then((hydrated) => {
         if (cancelled) return;
-        const canvas = buildPreviewCanvas(hydrated, layer, device, maskObject);
+        const canvas = buildPreviewCanvas(hydrated, layer, device, sceneObjects);
         storePreviewCanvas(obj, key, canvas);
         if (canvas !== null) options.onRasterPreviewReady?.();
       })
@@ -230,10 +234,12 @@ function buildPreviewCanvas(
   obj: RasterImage,
   layer: Layer,
   device: DeviceProfile,
-  maskObject: SceneObject | null,
+  sceneObjects: ReadonlyArray<SceneObject>,
 ): HTMLCanvasElement | null {
-  const bitmap = buildProcessedRasterBitmap(obj, layer, device, { maskObject, maxEdge: 2048 });
-  if (bitmap.kind === 'too-large') return null;
+  const compilation = compileRasterGroupsForLayer([obj], layer, device, { sceneObjects });
+  const group = compilation.groups[0];
+  if (group === undefined) return null;
+  const bitmap = compiledRasterPreview(group, device);
   const canvas = document.createElement('canvas');
   canvas.width = bitmap.width;
   canvas.height = bitmap.height;
@@ -248,9 +254,12 @@ function scheduleRasterPreviewBuild(work: () => void): () => void {
   return () => window.clearTimeout(id);
 }
 
-function imageMaskObjectFor(project: Project, obj: RasterImage): SceneObject | null {
+function imageMaskObjectFor(
+  sceneObjects: ReadonlyArray<SceneObject>,
+  obj: RasterImage,
+): SceneObject | null {
   if (obj.imageMaskId === undefined) return null;
-  return project.scene.objects.find((candidate) => candidate.id === obj.imageMaskId) ?? null;
+  return sceneObjects.find((candidate) => candidate.id === obj.imageMaskId) ?? null;
 }
 
 function maskCacheKey(maskObject: SceneObject | null): string {
@@ -270,15 +279,114 @@ function adjustmentKey(obj: RasterImage): string {
   return `${obj.brightness ?? 0}:${obj.contrast ?? 0}:${obj.gamma ?? 1}`;
 }
 
+function transformCacheKey(obj: RasterImage, device: DeviceProfile): string {
+  return JSON.stringify({
+    bounds: obj.bounds,
+    scaleX: obj.transform.scaleX,
+    scaleY: obj.transform.scaleY,
+    mirrorX: obj.transform.mirrorX,
+    mirrorY: obj.transform.mirrorY,
+    rotationDeg: obj.transform.rotationDeg,
+    origin: device.origin,
+    bedWidth: device.bedWidth,
+    bedHeight: device.bedHeight,
+  });
+}
+
+function compiledGridDimensions(
+  obj: RasterImage,
+  layer: Layer,
+  device: DeviceProfile,
+): { readonly width: number; readonly height: number } {
+  if (layer.passThrough) return { width: obj.pixelWidth, height: obj.pixelHeight };
+  const bounds = rasterBoundsInMachineCoords(obj, device);
+  return {
+    width: pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm),
+    height: pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm),
+  };
+}
+
+function drawMachineRasterBitmap(
+  ctx: CanvasRenderingContext2D,
+  bitmap: CanvasImageSource,
+  bounds: RasterMachineBounds,
+  device: DeviceProfile,
+  view: ViewTransform,
+): void {
+  const start = toSceneCoords({ x: bounds.minX, y: bounds.minY }, device);
+  const end = toSceneCoords({ x: bounds.maxX, y: bounds.maxY }, device);
+  ctx.save();
+  ctx.translate(view.offsetX + start.x * view.scale, view.offsetY + start.y * view.scale);
+  ctx.scale(Math.sign(end.x - start.x) * view.scale, Math.sign(end.y - start.y) * view.scale);
+  ctx.drawImage(bitmap, 0, 0, Math.abs(end.x - start.x), Math.abs(end.y - start.y));
+  ctx.restore();
+}
+
+export type RasterPreviewDisplayAdvisory = {
+  readonly objectCount: number;
+  readonly largestSourceWidth: number;
+  readonly largestSourceHeight: number;
+  readonly largestDisplayWidth: number;
+  readonly largestDisplayHeight: number;
+};
+
+export function rasterPreviewDisplayAdvisory(
+  project: Project,
+): RasterPreviewDisplayAdvisory | null {
+  const facts: Array<{
+    readonly sourceWidth: number;
+    readonly sourceHeight: number;
+    readonly displayWidth: number;
+    readonly displayHeight: number;
+  }> = [];
+  for (const layer of project.scene.layers) {
+    for (const operationLayer of outputOperationLayers(layer)) {
+      for (const obj of project.scene.objects) {
+        if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, operationLayer)) continue;
+        if (obj.role === 'trace-source') continue;
+        const effectiveOperation = effectiveOperationForObject(operationLayer, obj);
+        if (effectiveOperation.mode !== 'image') continue;
+        const source = compiledGridDimensions(obj, effectiveOperation, project.device);
+        const display = displayDimensions(source.width, source.height);
+        if (source.width === display.width && source.height === display.height) continue;
+        facts.push({
+          sourceWidth: source.width,
+          sourceHeight: source.height,
+          displayWidth: display.width,
+          displayHeight: display.height,
+        });
+      }
+    }
+  }
+  if (facts.length === 0) return null;
+  const largest = facts.reduce((current, candidate) =>
+    candidate.sourceWidth * candidate.sourceHeight > current.sourceWidth * current.sourceHeight
+      ? candidate
+      : current,
+  );
+  return {
+    objectCount: facts.length,
+    largestSourceWidth: largest.sourceWidth,
+    largestSourceHeight: largest.sourceHeight,
+    largestDisplayWidth: largest.displayWidth,
+    largestDisplayHeight: largest.displayHeight,
+  };
+}
+
 function livePreviewRasterIds(project: Project): Set<string> {
-  const imageOperations = project.scene.layers
-    .flatMap((layer) => outputOperationLayers(layer))
-    .filter((layer) => layer.mode === 'image');
   const live = new Set<string>();
   for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image') continue;
     if (obj.role === 'trace-source') continue;
-    if (imageOperations.some((operation) => sceneObjectUsesOperation(obj, operation))) {
+    if (
+      project.scene.layers
+        .flatMap((layer) => outputOperationLayers(layer))
+        .some(
+          (operation) =>
+            sceneObjectUsesOperation(obj, operation) &&
+            effectiveOperationForObject(operation, obj).mode === 'image',
+        )
+    ) {
       live.add(obj.id);
     }
   }

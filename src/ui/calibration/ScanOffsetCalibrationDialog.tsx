@@ -58,11 +58,10 @@ export function ScanOffsetCalibrationDialog(props: {
 }): JSX.Element {
   const [draft, setDraft] = useState(() => initialDraft(props.maxFeedMmPerMin));
   const [mode, setMode] = useState<CalibrationMode>('baseline');
-  const [expertOverrideAccepted, setExpertOverrideAccepted] = useState(false);
-  const errors = validationMessages(
+  const errors = validationMessages(draft, mode);
+  const warnings = qualificationWarnings(
     draft,
     mode,
-    expertOverrideAccepted,
     props.maxFeedMmPerMin,
     props.hasCalibratedOffsets ?? false,
   );
@@ -84,18 +83,13 @@ export function ScanOffsetCalibrationDialog(props: {
       }}
       size="sm"
     >
-      <CalibrationPurpose
-        mode={mode}
-        expertOverrideAccepted={expertOverrideAccepted}
-        setMode={setMode}
-        setExpertOverrideAccepted={setExpertOverrideAccepted}
-      />
+      <CalibrationPurpose mode={mode} setMode={setMode} />
       <strong style={stepLabelStyle}>2. Coupon geometry and burn settings</strong>
       <ScanOffsetCalibrationFields draft={draft} setField={setField} />
-      <CalibrationFeedback errors={errors} />
+      <CalibrationFeedback errors={errors} warnings={warnings} />
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
-        <Button type="submit" variant="primary" disabled={errors.length > 0}>
+        <Button type="submit" variant="primary">
           {mode === 'baseline' ? 'Generate uncorrected baseline' : 'Generate verification coupon'}
         </Button>
       </DialogActions>
@@ -105,9 +99,7 @@ export function ScanOffsetCalibrationDialog(props: {
 
 function CalibrationPurpose(props: {
   readonly mode: CalibrationMode;
-  readonly expertOverrideAccepted: boolean;
   readonly setMode: (mode: CalibrationMode) => void;
-  readonly setExpertOverrideAccepted: (accepted: boolean) => void;
 }): JSX.Element {
   return (
     <>
@@ -127,42 +119,44 @@ function CalibrationPurpose(props: {
       <p style={guidanceStyle}>
         {props.mode === 'baseline'
           ? 'Baseline forces 0 mm scan correction and deliberately permits bidirectional rows, even on an uncalibrated 4040. Use low power on scrap after checking belts, focus, and optics.'
-          : 'Verification keeps the active profile scan-offset table. Generate it only after applying measured values, then compare alternating edges physically.'}
+          : 'Verification keeps the active profile scan-offset table. If no measured values are saved, the coupon remains a valid uncorrected comparison; inspect alternating edges physically.'}
       </p>
-      {props.mode === 'baseline' ? (
-        <label style={acknowledgementStyle}>
-          <input
-            type="checkbox"
-            aria-label="Accept uncorrected bidirectional calibration override"
-            title="Allow this baseline coupon to use uncorrected bidirectional rows despite the protective one-way fallback."
-            checked={props.expertOverrideAccepted}
-            onChange={(event) => props.setExpertOverrideAccepted(event.target.checked)}
-          />
-          <span>
-            I understand this test intentionally bypasses the protective one-way fallback and burns
-            uncorrected bidirectional rows.
-          </span>
-        </label>
-      ) : null}
     </>
   );
 }
 
-function CalibrationFeedback(props: { readonly errors: ReadonlyArray<string> }): JSX.Element {
-  if (props.errors.length === 0) {
-    return (
-      <p style={guidanceStyle}>
-        After burning: measure the full signed forward-versus-reverse separation. Do not divide the
-        measurement in half. KerfDesk moves reverse rows only.
-      </p>
-    );
-  }
+function CalibrationFeedback(props: {
+  readonly errors: ReadonlyArray<string>;
+  readonly warnings: ReadonlyArray<string>;
+}): JSX.Element {
   return (
-    <ul role="alert" style={errorStyle}>
-      {props.errors.map((error) => (
-        <li key={error}>{error}</li>
-      ))}
-    </ul>
+    <>
+      {props.warnings.length > 0 ? (
+        <div role="status" style={warningStyle}>
+          <strong>Qualification warning — generation remains available</strong>
+          <ul style={feedbackListStyle}>
+            {props.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {props.errors.length > 0 ? (
+        <div role="alert" style={errorStyle}>
+          <strong>Cannot produce a valid coupon from these values</strong>
+          <ul style={feedbackListStyle}>
+            {props.errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p style={guidanceStyle}>
+          After burning: measure the full signed forward-versus-reverse separation. Do not divide
+          the measurement in half. KerfDesk moves reverse rows only.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -217,18 +211,40 @@ function initialDraft(maxFeedMmPerMin: number | undefined): ScanOffsetCalibratio
 function validationMessages(
   draft: ScanOffsetCalibrationDraft,
   mode: CalibrationMode,
-  expertOverrideAccepted: boolean,
-  maxFeedMmPerMin: number | undefined,
-  hasCalibratedOffsets: boolean,
 ): ReadonlyArray<string> {
   const options = parseDraft(draft, mode);
   return [
     ...validateSteps(options),
-    ...validateSpeeds(options, maxFeedMmPerMin),
+    ...validateSpeeds(options),
     ...validatePower(options),
     ...validateGeometry(options),
-    ...validatePurpose(mode, expertOverrideAccepted, hasCalibratedOffsets),
   ];
+}
+
+function qualificationWarnings(
+  draft: ScanOffsetCalibrationDraft,
+  mode: CalibrationMode,
+  maxFeedMmPerMin: number | undefined,
+  hasCalibratedOffsets: boolean,
+): ReadonlyArray<string> {
+  const options = parseDraft(draft, mode);
+  const warnings: string[] = [];
+  if (mode === 'baseline') {
+    warnings.push(
+      'This baseline intentionally emits uncorrected bidirectional rows. Use low power on scrap and verify belts, focus, and optics before interpreting the result.',
+    );
+  }
+  if (mode === 'verification' && !hasCalibratedOffsets) {
+    warnings.push(
+      'The active profile has no measured scan-offset points. This coupon will be an uncorrected comparison, not proof of calibrated alignment.',
+    );
+  }
+  if (isFinitePositive(maxFeedMmPerMin) && options.speedMax > maxFeedMmPerMin) {
+    warnings.push(
+      `Requested maximum speed ${options.speedMax} mm/min exceeds the profile ceiling of ${maxFeedMmPerMin} mm/min; compiled output will disclose and use its effective capped feed.`,
+    );
+  }
+  return warnings;
 }
 
 function validateSteps(options: ScanOffsetCalibrationPatternOptions): ReadonlyArray<string> {
@@ -238,18 +254,12 @@ function validateSteps(options: ScanOffsetCalibrationPatternOptions): ReadonlyAr
   return [];
 }
 
-function validateSpeeds(
-  options: ScanOffsetCalibrationPatternOptions,
-  maxFeedMmPerMin: number | undefined,
-): ReadonlyArray<string> {
+function validateSpeeds(options: ScanOffsetCalibrationPatternOptions): ReadonlyArray<string> {
   if (!isFinitePositive(options.speedMin) || !isFinitePositive(options.speedMax)) {
     return ['Minimum and maximum speed must be positive numbers.'];
   }
   if (options.speedMin > options.speedMax) {
     return ['Minimum speed cannot exceed maximum speed.'];
-  }
-  if (isFinitePositive(maxFeedMmPerMin) && options.speedMax > maxFeedMmPerMin) {
-    return [`Maximum speed cannot exceed this profile's ${maxFeedMmPerMin} mm/min limit.`];
   }
   return [];
 }
@@ -266,21 +276,6 @@ function validateGeometry(options: ScanOffsetCalibrationPatternOptions): Readonl
   if (!isFinitePositive(options.hatchSpacingMm)) errors.push('Line interval must be positive.');
   if ((options.overscanMm ?? 0) < 0 || (options.gapMm ?? 0) < 0) {
     errors.push('Overscan and gap cannot be negative.');
-  }
-  return errors;
-}
-
-function validatePurpose(
-  mode: CalibrationMode,
-  expertOverrideAccepted: boolean,
-  hasCalibratedOffsets: boolean,
-): ReadonlyArray<string> {
-  const errors: string[] = [];
-  if (mode === 'baseline' && !expertOverrideAccepted) {
-    errors.push('Acknowledge the intentional uncorrected bidirectional override.');
-  }
-  if (mode === 'verification' && !hasCalibratedOffsets) {
-    errors.push('Apply at least one measured scan-offset point before generating verification.');
   }
   return errors;
 }
@@ -306,17 +301,21 @@ const guidanceStyle: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.45,
 };
-const acknowledgementStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  gap: 8,
-  fontSize: 12,
-  lineHeight: 1.4,
-};
 const stepLabelStyle: React.CSSProperties = { fontSize: 12 };
 const errorStyle: React.CSSProperties = {
   margin: 0,
-  paddingLeft: 18,
+  padding: 10,
+  border: '1px solid color-mix(in srgb, var(--lf-danger) 55%, transparent)',
+  borderRadius: 6,
   color: 'var(--lf-danger)',
   fontSize: 12,
 };
+const warningStyle: React.CSSProperties = {
+  margin: 0,
+  padding: 10,
+  border: '1px solid color-mix(in srgb, var(--lf-warning) 65%, transparent)',
+  borderRadius: 6,
+  color: 'var(--lf-warning)',
+  fontSize: 12,
+};
+const feedbackListStyle: React.CSSProperties = { margin: '4px 0 0', paddingLeft: 18 };

@@ -21,9 +21,13 @@ const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const MIN_VALID_DPI = 10;
 const MAX_VALID_DPI = 10_000;
 
-export function densityFromBytes(bytes: Uint8Array): number | null {
-  const dpi = pngDensity(bytes) ?? jpegDensity(bytes);
-  return normalizeImageDensity(dpi);
+export type ImageDensity = {
+  readonly xDpi: number;
+  readonly yDpi: number;
+};
+
+export function densityFromBytes(bytes: Uint8Array): ImageDensity | null {
+  return pngDensity(bytes) ?? jpegDensity(bytes);
 }
 
 export function normalizeImageDensity(dpi: number | null): number | null {
@@ -31,7 +35,7 @@ export function normalizeImageDensity(dpi: number | null): number | null {
   return dpi;
 }
 
-export async function readImageDensity(file: File): Promise<number | null> {
+export async function readImageDensity(file: File): Promise<ImageDensity | null> {
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
     return densityFromBytes(bytes);
@@ -46,7 +50,7 @@ function viewOf(bytes: Uint8Array): DataView {
 
 // PNG pHYs. Chunks are [len:u32][type:4][data:len][crc:4] after the 8-byte
 // signature. pHYs always precedes IDAT, so stop scanning at the first IDAT/IEND.
-function pngDensity(bytes: Uint8Array): number | null {
+function pngDensity(bytes: Uint8Array): ImageDensity | null {
   if (bytes.length < 8) return null;
   const view = viewOf(bytes);
   for (let i = 0; i < 8; i += 1) {
@@ -60,9 +64,10 @@ function pngDensity(bytes: Uint8Array): number | null {
     if (type === 'pHYs') {
       if (dataStart + 9 > bytes.length) return null;
       const ppuX = view.getUint32(dataStart, false);
+      const ppuY = view.getUint32(dataStart + 4, false);
       const unit = view.getUint8(dataStart + 8);
       // unit 1 = metre; 0 = unitless aspect ratio (no real DPI).
-      return unit === 1 && ppuX > 0 ? Math.round(ppuX * 0.0254) : null;
+      return unit === 1 ? normalizedDensity(ppuX * 0.0254, ppuY * 0.0254) : null;
     }
     if (type === 'IDAT' || type === 'IEND') return null;
     offset = dataStart + length + 4;
@@ -84,7 +89,7 @@ function chunkType(view: DataView, offset: number): string {
 // often carry no JFIF at all — the EXIF APP1 (FFE1) TIFF IFD (XResolution +
 // ResolutionUnit). 0xFF fill bytes can pad between segments; skip them rather
 // than mis-reading one as a marker with a garbage length.
-function jpegDensity(bytes: Uint8Array): number | null {
+function jpegDensity(bytes: Uint8Array): ImageDensity | null {
   if (bytes.length < 4) return null;
   const view = viewOf(bytes);
   if (view.getUint8(0) !== 0xff || view.getUint8(1) !== 0xd8) return null;
@@ -112,7 +117,7 @@ function segmentDensity(
   view: DataView,
   dataStart: number,
   byteLength: number,
-): number | null {
+): ImageDensity | null {
   if (marker === 0xe0) return jfifDensity(view, dataStart, byteLength);
   if (marker === 0xe1) return exifDensity(view, dataStart, byteLength);
   return null;
@@ -120,13 +125,13 @@ function segmentDensity(
 
 // Extract DPI from a JFIF APP0 segment body (kept separate so jpegDensity stays
 // under the complexity cap). units 1 = DPI, 2 = dots/cm, 0 = aspect-ratio only.
-function jfifDensity(view: DataView, dataStart: number, byteLength: number): number | null {
+function jfifDensity(view: DataView, dataStart: number, byteLength: number): ImageDensity | null {
   if (dataStart + 12 > byteLength || !isJfif(view, dataStart)) return null;
   const units = view.getUint8(dataStart + 7);
   const xDensity = view.getUint16(dataStart + 8, false);
-  if (xDensity <= 0) return null;
-  if (units === 1) return xDensity;
-  if (units === 2) return Math.round(xDensity * 2.54);
+  const yDensity = view.getUint16(dataStart + 10, false);
+  if (units === 1) return normalizedDensity(xDensity, yDensity);
+  if (units === 2) return normalizedDensity(xDensity * 2.54, yDensity * 2.54);
   return null;
 }
 
@@ -143,7 +148,7 @@ function isJfif(view: DataView, o: number): boolean {
 // EXIF APP1: 'Exif\0\0' then a TIFF block (byte-order header + IFD0). DPI comes
 // from XResolution (tag 0x011A, RATIONAL) scaled by ResolutionUnit (tag 0x0128:
 // 2 = inch, 3 = cm). Endianness is per-file ('II' little, 'MM' big).
-function exifDensity(view: DataView, dataStart: number, byteLength: number): number | null {
+function exifDensity(view: DataView, dataStart: number, byteLength: number): ImageDensity | null {
   if (dataStart + 8 > byteLength || !isExif(view, dataStart)) return null;
   const tiff = dataStart + 6;
   const little = view.getUint16(tiff, false) === 0x4949; // 'II' = little-endian
@@ -170,9 +175,10 @@ function resolutionFromIfd(
   ifd0: number,
   little: boolean,
   byteLength: number,
-): number | null {
+): ImageDensity | null {
   const count = view.getUint16(ifd0, little);
   let xRes: number | null = null;
+  let yRes: number | null = null;
   let unit = 2; // EXIF default = inches
   for (let i = 0; i < count; i += 1) {
     const entry = ifd0 + 2 + i * 12;
@@ -180,12 +186,24 @@ function resolutionFromIfd(
     const tag = view.getUint16(entry, little);
     if (tag === 0x011a) {
       xRes = rationalAt(view, tiff + view.getUint32(entry + 8, little), little, byteLength);
+    } else if (tag === 0x011b) {
+      yRes = rationalAt(view, tiff + view.getUint32(entry + 8, little), little, byteLength);
     } else if (tag === 0x0128) {
       unit = view.getUint16(entry + 8, little);
     }
   }
-  if (xRes === null || xRes <= 0) return null;
-  return unit === 3 ? Math.round(xRes * 2.54) : Math.round(xRes);
+  if (xRes === null) return null;
+  // Some legacy encoders omit YResolution. Preserve their square-density
+  // meaning explicitly; when Y is present it remains independent.
+  const resolvedY = yRes ?? xRes;
+  const scale = unit === 3 ? 2.54 : 1;
+  return normalizedDensity(xRes * scale, resolvedY * scale);
+}
+
+function normalizedDensity(xDpi: number, yDpi: number): ImageDensity | null {
+  const x = normalizeImageDensity(Math.round(xDpi));
+  const y = normalizeImageDensity(Math.round(yDpi));
+  return x === null || y === null ? null : { xDpi: x, yDpi: y };
 }
 
 function rationalAt(

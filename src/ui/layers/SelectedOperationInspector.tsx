@@ -7,6 +7,7 @@ import {
   type LayerMode,
   type SceneObject,
 } from '../../core/scene';
+import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { useStore } from '../state';
 import { CncLayerFields } from './CncLayerFields';
 import { CncSelectionDepthField } from './CncSelectionDepthField';
@@ -89,6 +90,15 @@ function SelectedOperationEditor(props: {
     operationIdsForObject(object, layers).includes(props.active.id),
   ).length;
   const objectIds = props.objects.map((object) => object.id);
+  const activeObjects = props.objects.filter((object) =>
+    operationIdsForObject(object, layers).includes(props.active.id),
+  );
+  const overrideEditing =
+    props.selectionActive && activeObjects.some((object) => object.operationOverride !== undefined);
+  const effectiveOperation =
+    overrideEditing && activeObjects[0] !== undefined
+      ? effectiveOperationForObject(props.active, activeObjects[0])
+      : props.active;
   return (
     <section
       aria-label={props.selectionActive ? 'Selected artwork operation' : 'Artwork operation'}
@@ -109,58 +119,88 @@ function SelectedOperationEditor(props: {
           onChange={props.onSelect}
         />
       ) : null}
-      <div style={contextRowStyle}>
-        <span>
-          Affects {affected} artwork{affected === 1 ? '' : 's'}
-        </span>
-        {affected > selectedUsingActive ? (
-          <button
-            type="button"
-            title="Give only the selected artwork a copy of these operation settings"
-            onClick={() => makeUnique(objectIds, props.active.id)}
-          >
-            Make unique
-          </button>
-        ) : null}
-        <button
-          type="button"
-          title="Add another process operation to the selected artwork"
-          onClick={() => addOperation(objectIds)}
-        >
-          Add operation
-        </button>
-      </div>
+      <OperationContextActions
+        affected={affected}
+        selectedUsingActive={selectedUsingActive}
+        onMakeUnique={() => makeUnique(objectIds, props.active.id)}
+        onAdd={() => addOperation(objectIds)}
+      />
       <OperationToggles operation={props.active} />
       {props.machineKind === 'cnc' ? (
         <CncLayerFields layer={props.active} />
       ) : (
         <LaserOperationFields
-          operation={props.active}
+          operation={effectiveOperation}
+          baseOperation={props.active}
+          editObjectOverride={overrideEditing}
           ariaContext={props.selectionActive ? 'selected objects' : 'inspected artwork'}
         />
       )}
+      {overrideEditing ? (
+        <p style={advisoryStyle}>
+          Effective artwork override — these values drive the editor, preview, Job Review, and
+          emitted operation facts for the selected artwork.
+        </p>
+      ) : null}
       <CompatibilityNote
         objects={props.objects}
-        operation={props.active}
+        operation={effectiveOperation}
         machineKind={props.machineKind}
       />
     </section>
   );
 }
 
+function OperationContextActions(props: {
+  readonly affected: number;
+  readonly selectedUsingActive: number;
+  readonly onMakeUnique: () => void;
+  readonly onAdd: () => void;
+}): JSX.Element {
+  return (
+    <div style={contextRowStyle}>
+      <span>
+        Affects {props.affected} artwork{props.affected === 1 ? '' : 's'}
+      </span>
+      {props.affected > props.selectedUsingActive ? (
+        <button
+          type="button"
+          title="Give only the selected artwork a copy of these operation settings"
+          onClick={props.onMakeUnique}
+        >
+          Make unique
+        </button>
+      ) : null}
+      <button
+        type="button"
+        title="Add another process operation to the selected artwork"
+        onClick={props.onAdd}
+      >
+        Add operation
+      </button>
+    </div>
+  );
+}
+
 function LaserOperationFields(props: {
   readonly operation: Layer;
+  readonly baseOperation: Layer;
+  readonly editObjectOverride: boolean;
   readonly ariaContext: string;
 }): JSX.Element {
   const setLayerParam = useStore((state) => state.setLayerParam);
+  const setOverride = useStore((state) => state.setSelectedObjectsOperationOverride);
   const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
     useCutSettingsLauncher();
+  const commit = (patch: Partial<ReturnType<typeof captureLayerOperationSettings>>): void => {
+    if (props.editObjectOverride) setOverride(patch);
+    else setLayerParam(props.baseOperation.id, patch);
+  };
   const target = {
     settings: captureLayerOperationSettings(props.operation),
     selectedObjectCount: 0,
     ariaContext: props.ariaContext,
-    commit: (patch: Partial<ReturnType<typeof captureLayerOperationSettings>>) =>
-      setLayerParam(props.operation.id, patch),
+    commit,
   };
   return (
     <>
@@ -170,9 +210,7 @@ function LaserOperationFields(props: {
           value={props.operation.mode}
           aria-label={`Mode for ${props.ariaContext}`}
           title="Choose how the laser processes the selected artwork"
-          onChange={(event) =>
-            setLayerParam(props.operation.id, { mode: event.target.value as LayerMode })
-          }
+          onChange={(event) => commit({ mode: event.target.value as LayerMode })}
         >
           <option value="line">Line</option>
           <option value="fill">Fill</option>
@@ -186,9 +224,7 @@ function LaserOperationFields(props: {
           checked={props.operation.airAssist}
           aria-label="Air assist for selected operation"
           title="Turn job-controlled air assist on for this operation"
-          onChange={(event) =>
-            setLayerParam(props.operation.id, { airAssist: event.target.checked })
-          }
+          onChange={(event) => commit({ airAssist: event.target.checked })}
         />{' '}
         Air assist
       </label>
@@ -201,7 +237,11 @@ function LaserOperationFields(props: {
         Advanced cut settings
       </button>
       {settingsOpen ? (
-        <LayerRowCutSettings layer={props.operation} onClose={closeSettings} />
+        <LayerRowCutSettings
+          layer={props.operation}
+          onClose={closeSettings}
+          {...(props.editObjectOverride ? { onApply: setOverride } : {})}
+        />
       ) : null}
     </>
   );

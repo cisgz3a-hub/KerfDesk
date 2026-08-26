@@ -19,7 +19,10 @@ type Setter = (
 
 export type MachineSetupReplacementResult =
   | { readonly kind: 'applied' }
-  | { readonly kind: 'blocked-by-capability'; readonly requestedKind: MachineConfig['kind'] };
+  | {
+      readonly kind: 'applied-with-capability-warning';
+      readonly requestedKind: MachineConfig['kind'];
+    };
 
 export type CncStartupSetupReplacement = {
   readonly operationDrafts: ReadonlyArray<CncStartupOperationDraft>;
@@ -42,18 +45,16 @@ export type MachineSetupActions = {
 export function machineSetupActions(set: Setter): MachineSetupActions {
   return {
     replaceMachineSetup: (profile, machine, retainedMachine) => {
-      if (!deviceSupportsMachineKind(profile, machine.kind)) {
-        return { kind: 'blocked-by-capability', requestedKind: machine.kind };
-      }
       set((state) => replacementState(state, profile, machine, retainedMachine));
-      return { kind: 'applied' };
+      return deviceSupportsMachineKind(profile, machine.kind)
+        ? { kind: 'applied' }
+        : { kind: 'applied-with-capability-warning', requestedKind: machine.kind };
     },
     replaceCncStartupSetup: (profile, machine, retainedMachine, startup) => {
-      if (!deviceSupportsMachineKind(profile, machine.kind)) {
-        return { kind: 'blocked-by-capability', requestedKind: machine.kind };
-      }
       set((state) => replacementState(state, profile, machine, retainedMachine, startup));
-      return { kind: 'applied' };
+      return deviceSupportsMachineKind(profile, machine.kind)
+        ? { kind: 'applied' }
+        : { kind: 'applied-with-capability-warning', requestedKind: machine.kind };
     },
   };
 }

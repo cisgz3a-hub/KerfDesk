@@ -4,8 +4,8 @@ import { serializeProject } from '../../io/project';
 import type { PlatformAdapter } from '../../platform/types';
 import { handleOpenProject } from './file-actions';
 
-describe('project file machine capability repair', () => {
-  it('keeps an automatically repaired load dirty and explains the repair', async () => {
+describe('project file machine capability disclosure', () => {
+  it('keeps a mismatched mode unchanged and explains the warning', async () => {
     const markLoaded = vi.fn();
     const pushToast = vi.fn();
     const project = {
@@ -30,19 +30,46 @@ describe('project file machine capability repair', () => {
     await handleOpenProject({
       platform,
       setProject: vi.fn(() => ({
-        kind: 'capability-repaired' as const,
-        previousKind: 'cnc' as const,
-        activeKind: 'laser' as const,
-        preservedCnc: true,
+        kind: 'capability-warning' as const,
+        activeKind: 'cnc' as const,
       })),
       markLoaded,
       pushToast,
     });
 
-    expect(markLoaded).toHaveBeenCalledWith('contradictory.lf2', { dirty: true });
+    expect(markLoaded).toHaveBeenCalledWith('contradictory.lf2');
     expect(pushToast).toHaveBeenCalledWith(
-      'This project was switched to Laser mode because its machine profile is set to Laser only. The previous CNC setup was preserved. Open Machine Setup and choose Laser + CNC to enable both modes.',
+      'This project remains in CNC mode even though its saved capability label does not include that mode. Review Machine Setup; no machine mode or saved settings were silently rewritten.',
       'warning',
     );
+  });
+
+  it('keeps a canonicalized saved workspace dirty for explicit reconciliation', async () => {
+    const markLoaded = vi.fn();
+    const project = createProject();
+    const platform: PlatformAdapter = {
+      id: 'mock',
+      pickFilesForOpen: async () => [
+        {
+          name: 'mismatched-bed.lf2',
+          text: async () =>
+            serializeProject({
+              ...project,
+              workspace: { ...project.workspace, width: project.workspace.width - 10 },
+            }),
+        },
+      ],
+      pickFileForSave: async () => null,
+      serial: { isSupported: () => false, requestPort: async () => null },
+    };
+
+    await handleOpenProject({
+      platform,
+      setProject: vi.fn(() => ({ kind: 'loaded' as const, projectBedReconciled: true })),
+      markLoaded,
+      pushToast: vi.fn(),
+    });
+
+    expect(markLoaded).toHaveBeenCalledWith('mismatched-bed.lf2', { dirty: true });
   });
 });

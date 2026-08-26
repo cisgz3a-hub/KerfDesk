@@ -30,12 +30,11 @@ import { handleSalvageExportProject } from './salvage-export';
 import type { ImportOutcome } from '../state/store';
 import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { ToastVariant } from '../state/toast-store';
-import { repairedMachineCapabilityMessage } from '../machine/machine-capability-messages';
+import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
 import {
-  DEFAULT_JOB_PLACEMENT,
-  resolveExportJobPlacement,
   type JobPlacementSettings,
   type MachinePlacementSnapshot,
+  type resolveExportJobPlacement,
 } from '../job-placement';
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
@@ -46,6 +45,14 @@ import { detectCompiledVCarveDepthWarnings } from '../laser/cnc-compiled-depth-w
 import { parseOpenedProjectFile, type OpenProjectFile } from './project-open-parser';
 import { importSvgFiles } from './svg-import-action';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
+import { saveGcodePlacement, type PrebuiltGcodeSave } from './transactional-gcode-save';
+import { describeOpenResult, errorMessage, suggestedGcodeName } from './file-action-formatters';
+
+export {
+  ordinaryGcodeSaveUsesPrebuiltDialog,
+  prebuildGcodeSave,
+  type PrebuiltGcodeSave,
+} from './transactional-gcode-save';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -61,7 +68,7 @@ export async function handleImportDxf(
   try {
     files = await platform.pickFilesForOpen({ accept: ['.dxf'], multiple: true });
   } catch (err) {
-    pushToast(`Could not import DXF: ${errMsg(err)}`, 'error');
+    pushToast(`Could not import DXF: ${errorMessage(err)}`, 'error');
     return;
   }
   await importDxfFiles(files, { importObject: importSvgObject, pushToast });
@@ -81,7 +88,7 @@ export async function handleImportSvg(
   try {
     files = await platform.pickFilesForOpen({ accept: ['.svg'], multiple: true });
   } catch (err) {
-    pushToast(`Could not import SVG: ${errMsg(err)}`, 'error');
+    pushToast(`Could not import SVG: ${errorMessage(err)}`, 'error');
     return;
   }
   await importSvgFiles(files, importSvgObject, pushToast);
@@ -123,7 +130,10 @@ function optionalActiveWcs(
   return activeWcs === undefined ? {} : { activeWcs };
 }
 
-export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
+export async function handleSaveGcode(
+  ctx: SaveGcodeCtx,
+  options: { readonly prebuilt?: PrebuiltGcodeSave } = {},
+): Promise<void> {
   // H.10: tiling-enabled CNC projects export one file per tile instead
   // (whole-job bed bounds don't apply; each tile preflights individually).
   if (
@@ -148,17 +158,15 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   // Export placement, not Start placement: a file save must stay possible
   // with no connected machine or active origin (only Current Position bakes
   // live state into the bytes — see resolveExportJobPlacement).
-  const placement = resolveExportJobPlacement(ctx.jobPlacement ?? DEFAULT_JOB_PLACEMENT, {
-    statusReport: null,
-    workOriginActive: false,
-    wcoCache: null,
-    ...ctx.machine,
-  });
-  if (!placement.ok) {
-    const lines = placement.messages.map((message) => `• ${message}`).join('\n');
-    jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
+  if (options.prebuilt !== undefined && options.prebuilt.project !== ctx.project) {
+    ctx.pushToast(
+      'Could not save G-code: the prepared artifact no longer matches this project.',
+      'error',
+    );
     return;
   }
+  const placement = options.prebuilt?.placement ?? saveGcodePlacement(ctx);
+  if (placement === null) return;
   // File-only transports export a binary job instead of G-code text (ADR-097:
   // Ruida .rd today). Route on the driver capability, not `controllerKind ===
   // 'ruida'` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling gate
@@ -170,6 +178,14 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     await handleSaveRd(ctx, placement);
     return;
   }
+  await saveOrdinaryGcode(ctx, placement, options.prebuilt);
+}
+
+async function saveOrdinaryGcode(
+  ctx: SaveGcodeCtx,
+  placement: Extract<ReturnType<typeof resolveExportJobPlacement>, { readonly ok: true }>,
+  prebuilt: PrebuiltGcodeSave | undefined,
+): Promise<void> {
   // Rule 7 / ADR-228: stated HERE, where the deleted confirm stood, rather than
   // with the post-save advisories. The confirm was raised on every save
   // ATTEMPT, so reporting it only after a successful write would tell the
@@ -181,11 +197,12 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   )) {
     ctx.pushToast(advisory, 'warning');
   }
-  // Web and the Electron renderer reserve only a directory during transient
-  // user activation, then retain the operator's editable filename. The file
-  // handle and writable stream are created after successful preparation, so a
-  // compile failure cannot create or truncate the destination. A future native
-  // adapter may omit this method if its save dialog is already non-destructive.
+  // Production calls this from the Choose destination button with a prebuilt
+  // artifact, so the picker is invoked synchronously inside that fresh user
+  // gesture. Direct/test callers without an artifact prepare first: factual
+  // failure must never create, open, truncate, or modify a final target.
+  const prepared = prebuilt?.prepared ?? (await prepareGcodeSave(ctx, placement));
+  if (prepared.kind === 'failed') return;
   let target: SaveTarget | null;
   try {
     target = await pickGcodeDestination(ctx.platform, {
@@ -194,15 +211,10 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
       chooseName: requestSaveFilename,
     });
   } catch (err) {
-    ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not save G-code: ${errorMessage(err)}`, 'error');
     return;
   }
   if (target === null) return;
-  // prepareGcodeSave owns factual non-writable preparation/emission outcomes
-  // plus the Rule 7 / ADR-228 blocking-vs-advisory split for emitted output.
-  // Advisory findings remain available for post-save toasts.
-  const prepared = await prepareGcodeSave(ctx, placement);
-  if (prepared.kind === 'failed') return;
   try {
     await target.write(prepared.gcode);
     advanceExportVariables(ctx);
@@ -214,7 +226,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
       prepared.machineWarnings,
     );
   } catch (err) {
-    ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not save G-code: ${errorMessage(err)}`, 'error');
   }
 }
 
@@ -273,6 +285,7 @@ function outputScopedWarningProject(ctx: SaveGcodeCtx): Project {
 export type SaveProjectCtx = {
   readonly platform: PlatformAdapter;
   readonly project: Project;
+  readonly expectedProject?: Project;
   readonly savedName: string | null;
   readonly lastSaveTarget: SaveTarget | null;
   readonly markSaved: (target: SaveTarget, expectedProject: Project) => boolean | undefined;
@@ -315,13 +328,13 @@ export async function handleSaveProject(
           extensions: ['.lf2'],
         });
   } catch (err) {
-    ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not save project: ${errorMessage(err)}`, 'error');
     return 'error';
   }
   if (target === null) return 'cancelled';
   try {
     await target.write(prepared.json);
-    const savedCurrentProject = ctx.markSaved(target, ctx.project) !== false;
+    const savedCurrentProject = ctx.markSaved(target, ctx.expectedProject ?? ctx.project) !== false;
     if (savedCurrentProject) {
       // This exact project reached disk, so its recovery slot is redundant.
       clearAutosaveAfterFileHandoff(ctx.pushToast);
@@ -332,7 +345,7 @@ export async function handleSaveProject(
     }
     return 'saved';
   } catch (err) {
-    ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not save project: ${errorMessage(err)}`, 'error');
     return 'error';
   }
 }
@@ -370,7 +383,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
       multiple: false,
     });
   } catch (err) {
-    ctx.pushToast(`Could not open project: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not open project: ${errorMessage(err)}`, 'error');
     return;
   }
   const file = files[0];
@@ -393,7 +406,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     ctx.pushToast(
       isImportCancellation(err)
         ? `${file.name}: open cancelled.`
-        : `Could not open ${file.name}: ${errMsg(err)}`,
+        : `Could not open ${file.name}: ${errorMessage(err)}`,
       isImportCancellation(err) ? 'warning' : 'error',
     );
     return;
@@ -419,7 +432,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     );
     return;
   }
-  ctx.pushToast(`Could not open ${file.name}: ${describeResult(result)}`, 'error');
+  ctx.pushToast(`Could not open ${file.name}: ${describeOpenResult(result)}`, 'error');
 }
 
 function openLightBurnMigration(
@@ -447,8 +460,8 @@ function reportMachineCapabilityRepair(
   result: ProjectMachineCapabilityLoadResult,
   pushToast: OpenProjectCtx['pushToast'],
 ): void {
-  if (result.kind !== 'capability-repaired') return;
-  pushToast(repairedMachineCapabilityMessage(result.activeKind, result.preservedCnc), 'warning');
+  if (result.kind !== 'capability-warning') return;
+  pushToast(loadedMachineCapabilityWarningMessage(result.activeKind), 'warning');
 }
 
 function markCapabilityAwareLoad(
@@ -456,28 +469,7 @@ function markCapabilityAwareLoad(
   filename: string,
   result: ProjectMachineCapabilityLoadResult,
 ): void {
-  if (result.kind === 'capability-repaired') ctx.markLoaded(filename, { dirty: true });
-  else ctx.markLoaded(filename);
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-// Derive a default G-code filename from the last-saved .lf2 name when
-// possible (so saving a job from "logo.lf2" suggests "logo.gcode"), else
-// fall back to "untitled.gcode".
-function suggestedGcodeName(savedName: string | null): string {
-  if (savedName === null) return 'untitled.gcode';
-  const stem = savedName.replace(/\.(lf2|json)$/i, '');
-  return `${stem}.gcode`;
-}
-
-function describeResult(
-  result: Exclude<ReturnType<typeof deserializeProject>, { kind: 'ok' }>,
-): string {
-  if (result.kind === 'invalid') return result.reason;
-  if (result.kind === 'schema-too-new') return `unsupported version ${result.sawVersion}`;
-  if (result.kind === 'schema-too-old') return `legacy version ${result.sawVersion}`;
-  return 'unknown error';
+  if (result.projectBedReconciled === true) {
+    ctx.markLoaded(filename, { dirty: true });
+  } else ctx.markLoaded(filename);
 }

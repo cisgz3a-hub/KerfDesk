@@ -11,6 +11,7 @@ import { useStore } from '../state';
 import { useConfirmSaveStore, type ConfirmSaveChoice } from '../state/confirm-save-store';
 import { useToastStore } from '../state/toast-store';
 import { handleSaveProject, type SaveProjectOutcome } from './file-actions';
+import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 
 export async function confirmDiscardAsync(
   platform: PlatformAdapter,
@@ -38,7 +39,8 @@ async function saveNow(platform: PlatformAdapter): Promise<SaveProjectOutcome> {
   const state = useStore.getState();
   return handleSaveProject({
     platform,
-    project: state.project,
+    project: projectWithCurrentJobSetup(state),
+    expectedProject: state.project,
     savedName: state.savedName,
     lastSaveTarget: state.lastSaveTarget,
     markSaved: state.markSaved,

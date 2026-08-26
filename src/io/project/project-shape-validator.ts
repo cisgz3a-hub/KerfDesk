@@ -16,6 +16,8 @@ import { validateProjectScanOffsetProfile } from './project-scan-offset-validato
 import { validateTracedImageMetadata } from './project-trace-shape-validator';
 import * as reliefField from './project-relief-heightfield-validator';
 import { validateSingleReliefSource } from './project-relief-source-authority';
+import { validateProjectJobSetup } from './project-job-setup-validator';
+import { validateOperationIds } from './project-operation-id-validator';
 import {
   firstError,
   isObject,
@@ -58,6 +60,7 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     validateDevice(device),
     validateWorkspace(workspace),
     validateOptimization(raw['optimization']),
+    validateProjectJobSetup(raw['jobSetup']),
     validateProjectVariables(raw['variables']),
     validatePrintAndCutTargets(raw['printAndCutTargets']),
     validateEmbeddedFonts(raw['embeddedFonts']),
@@ -398,8 +401,9 @@ function validateTransform(value: unknown, path: string): string | null {
 }
 
 function validateColoredPaths(value: unknown, path: string): string | null {
-  if (!Array.isArray(value)) return `missing or invalid \`${path}\``;
-  return validateArray(value, path, validateColoredPath);
+  return Array.isArray(value)
+    ? validateArray(value, path, validateColoredPath)
+    : `missing or invalid \`${path}\``;
 }
 
 function validateColoredPath(value: unknown, path: string): string | null {
@@ -411,14 +415,6 @@ function validateColoredPath(value: unknown, path: string): string | null {
     validatePolylines(value['polylines'], `${path}.polylines`),
     validateCurveSubpaths(value['curves'], `${path}.curves`),
   ]);
-}
-
-function validateOperationIds(value: unknown, path: string): string | null {
-  if (value === undefined) return null;
-  if (!Array.isArray(value)) return `missing or invalid \`${path}\``;
-  return validateArray(value, path, (id, idPath) =>
-    typeof id === 'string' && id.length > 0 ? null : `missing or invalid \`${idPath}\``,
-  );
 }
 
 function validatePolylines(value: unknown, path: string): string | null {

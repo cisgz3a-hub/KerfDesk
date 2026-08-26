@@ -30,7 +30,8 @@ import { startAutosaveLoop } from '../state/autosave-loop';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { repairedMachineCapabilityMessage } from '../machine/machine-capability-messages';
+import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
+import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
   'Autosave could not preserve the newest project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
@@ -62,7 +63,7 @@ function snapshotForAutosave(): {
   const streamer = ls.streamer;
   const isStreaming =
     streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
-  return { project: s.project, dirty: s.dirty, isStreaming };
+  return { project: projectWithCurrentJobSetup(s), dirty: s.dirty, isStreaming };
 }
 
 export function useAutosave(): void {
@@ -139,13 +140,10 @@ export async function runAutosaveRecovery(
   );
   if (ok) {
     const loadResult = s.setProject(record.project);
-    if (loadResult.kind === 'capability-repaired') {
+    if (loadResult.kind === 'capability-warning') {
       useToastStore
         .getState()
-        .pushToast(
-          repairedMachineCapabilityMessage(loadResult.activeKind, loadResult.preservedCnc),
-          'warning',
-        );
+        .pushToast(loadedMachineCapabilityWarningMessage(loadResult.activeKind), 'warning');
     }
     // M15 (AUDIT-2026-06-10): the restored project's ONLY durable copy is
     // the autosave slot. Mark it dirty so the 30 s loop, the beforeunload

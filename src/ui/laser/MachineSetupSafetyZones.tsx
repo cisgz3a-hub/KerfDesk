@@ -33,9 +33,10 @@ export function SafetyZonesPanel(
       {zones.length === 0 ? <p style={mutedStyle}>No safety zones configured.</p> : null}
       <p style={mutedStyle}>
         Enabled zones appear on the canvas, warn in the Start-time Job Review after a clean Frame
-        and after a successful G-code save, and block a direct jog whose known path would cross
-        them. A continuous or keyboard jog with no known machine position, and homing, are not
-        checked — keep the head clear of these areas by hand.
+        and after a successful G-code save. A direct jog whose known path crosses a zone — or whose
+        XY path cannot be resolved — is sent unchanged with a prominent warning. Homing is not
+        checked against configured zones; watch every tool-off Frame or jog and keep the physical
+        stop available.
       </p>
       {zones.map((zone, index) => (
         <ZoneEditor

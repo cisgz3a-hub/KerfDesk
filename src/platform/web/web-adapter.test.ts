@@ -24,6 +24,18 @@ afterEach(() => {
 });
 
 describe('webAdapter save target', () => {
+  it('does not open or truncate the file until prepared data is written', async () => {
+    const writable = writableStreamMock();
+    const createWritable = installSavePicker(writable);
+
+    const target = await webAdapter.pickFileForSave(saveRequest);
+    if (target === null) throw new Error('expected save target');
+    expect(createWritable).not.toHaveBeenCalled();
+
+    await target.write('G21\n');
+    expect(createWritable).toHaveBeenCalledOnce();
+  });
+
   it('aborts the writable stream when a save write fails', async () => {
     const writable = writableStreamMock({ writeError: new Error('disk full') });
     installSavePicker(writable);
@@ -105,17 +117,19 @@ describe('webAdapter open picker', () => {
   });
 });
 
-function installSavePicker(writable: WritableMock): void {
+function installSavePicker(writable: WritableMock): ReturnType<typeof vi.fn> {
+  const createWritable = vi.fn(async () => writable as unknown as FileSystemWritableFileStream);
   const handle = {
     kind: 'file',
     name: 'out.gcode',
     getFile: vi.fn(async () => new File([], 'out.gcode')),
-    createWritable: vi.fn(async () => writable as unknown as FileSystemWritableFileStream),
+    createWritable,
   } as unknown as FileSystemFileHandle;
   Object.defineProperty(window, 'showSaveFilePicker', {
     configurable: true,
     value: vi.fn(async () => handle),
   });
+  return createWritable;
 }
 
 type WritableMock = {

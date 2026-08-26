@@ -28,11 +28,9 @@ import {
   type Vec2,
   withClosingPoint,
 } from '../scene';
+import { effectiveOperationForObject } from '../scene/effective-operation';
 import { compileRasterGroupsForLayer } from './compile-job-raster';
-import {
-  layerWithObjectOverride,
-  sharedObjectPowerScalePercent,
-} from './compile-job-object-policy';
+import { sharedObjectPowerScalePercent } from './compile-job-object-policy';
 import { compilationPolylines } from './compilation-polylines';
 import { contourEntryRunwayMm } from './contour-entry';
 import { hasExecutableFillSweep } from './fill-group-emission';
@@ -168,11 +166,12 @@ function vectorGroupsForObjects(
   }
   const sharedScale = sharedObjectPowerScalePercent(matchingObjects);
   if (sharedScale !== undefined) {
+    const overrideSource = matchingObjects.find((object) => object.operationOverride !== undefined);
     return vectorGroupsForLayer(
       sourceObjects,
       layer,
       device,
-      { powerScale: sharedScale },
+      overrideSource ?? { powerScale: sharedScale },
       priorityObjectId,
     );
   }
@@ -188,7 +187,7 @@ function vectorObjectBucketsForLayer(
   const buckets: Array<{ layer: Layer; objects: SceneObject[] }> = [];
   for (const obj of objects) {
     if (!vectorObjectMatchesLayer(obj, layer)) continue;
-    const effectiveLayer = layerWithObjectOverride(layer, obj);
+    const effectiveLayer = effectiveOperationForObject(layer, obj);
     if (effectiveLayer.mode === 'image') continue;
     const bucket = buckets.find((candidate) =>
       layerOperationSettingsEqual(candidate.layer, effectiveLayer),

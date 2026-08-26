@@ -48,6 +48,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     openProject: vi.fn(),
     saveProject: vi.fn(),
     saveProjectAs: vi.fn(),
+    importArtwork: vi.fn(),
     importSvg: vi.fn(),
     importDxf: vi.fn(),
     openGcodePreview: vi.fn(),
@@ -136,6 +137,20 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
 }
 
 describe('lock commands', () => {
+  it('routes the primary Import command to the unified import action', () => {
+    const importArtwork = vi.fn();
+    const commands = buildAppCommands(baseCtx({ importArtwork }));
+
+    const command = commandById(commands, 'file.import');
+    expect(command.label).toBe('Import...');
+    expect(command.shortcut).toBe('Ctrl+I');
+    expect(runCommand(command)).toBe(true);
+    expect(importArtwork).toHaveBeenCalledTimes(1);
+    expect(commands.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining(['file.import-svg', 'file.import-dxf', 'file.import-image']),
+    );
+  });
+
   it('gates Lock Selection and Unlock All from selection and locked object state', () => {
     const lockSelection = vi.fn();
     const unlockAllObjects = vi.fn();

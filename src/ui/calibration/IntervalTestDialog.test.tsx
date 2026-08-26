@@ -21,7 +21,9 @@ async function renderDialog(
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<IntervalTestDialog onCancel={onCancel} onGenerate={onGenerate} />);
+    root.render(
+      <IntervalTestDialog onCancel={onCancel} onGenerate={onGenerate} maxFeedMmPerMin={1000} />,
+    );
   });
   return { host, root, onGenerate, onCancel };
 }
@@ -36,6 +38,8 @@ describe('IntervalTestDialog', () => {
     const { host, root, onGenerate } = await renderDialog();
     try {
       expect(host.textContent).toContain('Interval Test');
+      expect(host.textContent).toContain('Requested 1,500 mm/min; effective 1,000 mm/min');
+      expect(host.textContent).toContain('burned speed label shows effective feed');
       const steps = input(host, 'Steps');
       const intervalMax = input(host, 'Max interval');
       await act(async () => {

@@ -48,6 +48,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     openProject: vi.fn(),
     saveProject: vi.fn(),
     saveProjectAs: vi.fn(),
+    importArtwork: vi.fn(),
     importSvg: vi.fn(),
     importDxf: vi.fn(),
     openGcodePreview: vi.fn(),

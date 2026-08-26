@@ -3,12 +3,15 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLayer,
+  createLayerSubLayer,
+  createRegistrationLayer,
   createProject,
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
   EMPTY_SCENE,
   type Layer,
 } from '../../../core/scene';
+import { createRectangle } from '../../../core/shapes/primitives';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
 import type { JobReviewEffectiveOperation } from './job-review-effective-operations';
@@ -162,7 +165,33 @@ describe('JobReviewLayersTable', () => {
     await render('laser');
 
     expect(host.textContent).toContain('Artwork settings');
-    expect(host.textContent).toContain('Kerf 0 mm · tabs off · min power 0%');
+    expect(host.textContent).toContain(
+      'Kerf 0 mm · stored contour entry target 5 mm · tabs off · min power 0%',
+    );
+  });
+
+  it('identifies the registration jig outline operation and its exact outline count', async () => {
+    const registration = createRegistrationLayer();
+    const first = {
+      ...createRectangle({
+        id: 'jig-1',
+        color: registration.color,
+        spec: { widthMm: 80, heightMm: 40, cornerRadiusMm: 0 },
+      }),
+      operationIds: [registration.id],
+    };
+    const second = { ...first, id: 'jig-2' };
+    seedLayers([registration], 'laser');
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: { ...state.project.scene, objects: [first, second] },
+      },
+    }));
+    await render('laser');
+
+    expect(host.textContent).toContain('Registration jig outline operation (2 outlines)');
+    expect(numberInput('Power % for Registration jig').value).toBe(String(registration.power));
   });
 
   it('keeps editable base values while disclosing every exact compiled variant', async () => {
@@ -181,6 +210,21 @@ describe('JobReviewLayersTable', () => {
     expect(numberInput(`Power % for ${layer.name}`).value).toBe('30');
     expect(host.textContent).toContain('Exact compiled output: Line · 15% power');
     expect(host.textContent).toContain('Line · 30% power');
+  });
+
+  it('matches sublayer review summaries by the compiler canonical operation id', async () => {
+    const base = createLayer({ id: 'red', color: '#ff0000' });
+    const subLayer = createLayerSubLayer(base, { id: 'sub-1', label: 'Second pass' });
+    seedLayers([{ ...base, subLayers: [subLayer] }], 'laser');
+    await render('laser', [
+      {
+        layerId: 'red:sub-1',
+        summaries: ['Line · 21% power · 900 mm/min · 1 pass · air off · constant power'],
+      },
+    ]);
+
+    expect(host.textContent).toContain('Second pass');
+    expect(host.textContent).toContain('Exact compiled output: Line · 21% power');
   });
 
   it('shows the strategy detail line under a CNC operation', async () => {

@@ -13,6 +13,7 @@ import {
   type Vec2,
   validateOutputScope,
 } from '../../core/scene';
+import { resolveVisibleOperationForPath } from '../../core/scene/visibility';
 import {
   buildToolpath,
   EMPTY_JOB,
@@ -31,7 +32,6 @@ import {
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { costlyCanvasPreparation } from './canvas-preparation-policy';
 import { buildDisplayPolylines } from './display-polylines';
-import { strideForSegmentBudget } from './draw-complexity';
 import { strokePolylinesBatched } from './draw-vector-strokes';
 import {
   previewRouteForDrawing,
@@ -40,6 +40,7 @@ import {
 import type { PreviewIssue, PreviewToolpath } from './preview-status';
 import { mapToolpathToScene } from './preview-scene-frame';
 import type { ViewTransform } from './view-transform';
+import { displayPolylinePointIndices, displayStepIndices } from './preview-display-decimation';
 
 type FaintVectorObject = Extract<
   SceneObject,
@@ -89,21 +90,10 @@ function drawObjectPolylinesFaint(
 ): void {
   if (!hasFaintVectorGeometry(obj)) return;
   for (const path of obj.paths) {
-    const operationIds = path.operationIds ?? obj.operationIds;
-    const colorLayer = layerByColor.get(path.color);
-    const bound =
-      operationIds === undefined
-        ? colorLayer === undefined
-          ? []
-          : [colorLayer]
-        : operationIds.flatMap((id) => layerByColor.get(id) ?? []);
-    // Artwork stays on canvas while ANY bound operation is visible — the old
-    // first-binding pick hid the object when operation 1 was hidden even
-    // though a visible operation 2 still ran it (audit 2026-07-17-0815 P3-1).
-    const layer = bound.find((candidate) => candidate.visible);
-    if (layer === undefined) continue;
-    ctx.strokeStyle = layer.color;
-    ctx.lineWidth = layer.output ? 1.5 : 0.75;
+    const resolution = resolveVisibleOperationForPath(obj, path, layerByColor);
+    if (!resolution.visible) continue;
+    ctx.strokeStyle = resolution.operation?.color ?? path.color;
+    ctx.lineWidth = resolution.operation?.output === false ? 0.75 : 1.5;
     const display = buildDisplayPolylines(path.polylines);
     strokePolylinesBatched(ctx, obj, display.polylines, view);
   }
@@ -294,24 +284,10 @@ function drawWholeSteps(
   view: ViewTransform,
   showTravel: boolean,
 ): void {
-  const stride = strideForSegmentBudget(steps.length);
-  if (stride <= 1) {
-    for (const step of steps) drawStep(ctx, step, view, showTravel);
-    return;
-  }
-
-  let lastDrawnIndex = -1;
-  for (let i = 0; i < steps.length; i += stride) {
-    const step = steps[i];
+  for (const index of displayStepIndices(steps.length)) {
+    const step = steps[index];
     if (step === undefined) continue;
     drawStep(ctx, step, view, showTravel);
-    lastDrawnIndex = i;
-  }
-
-  const finalIndex = steps.length - 1;
-  if (finalIndex > lastDrawnIndex) {
-    const finalStep = steps[finalIndex];
-    if (finalStep !== undefined) drawStep(ctx, finalStep, view, showTravel);
   }
 }
 
@@ -389,24 +365,15 @@ function drawCut(
   ctx.strokeStyle = canvasTheme.previewCut;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  const stride = strideForSegmentBudget(Math.max(0, polyline.length - 1));
-  if (stride > 1) {
-    for (let i = 1; i < polyline.length; i += stride) {
-      const from = polyline[i - 1];
-      const to = polyline[i];
-      if (from === undefined || to === undefined) continue;
-      ctx.moveTo(view.offsetX + from.x * view.scale, view.offsetY + from.y * view.scale);
-      ctx.lineTo(view.offsetX + to.x * view.scale, view.offsetY + to.y * view.scale);
-    }
-  } else {
-    for (let i = 0; i < polyline.length; i += 1) {
-      const p = polyline[i];
-      if (p === undefined) continue;
-      const cx = view.offsetX + p.x * view.scale;
-      const cy = view.offsetY + p.y * view.scale;
-      if (i === 0) ctx.moveTo(cx, cy);
-      else ctx.lineTo(cx, cy);
-    }
+  let first = true;
+  for (const index of displayPolylinePointIndices(polyline.length)) {
+    const point = polyline[index];
+    if (point === undefined) continue;
+    const x = view.offsetX + point.x * view.scale;
+    const y = view.offsetY + point.y * view.scale;
+    if (first) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+    first = false;
   }
   ctx.stroke();
 }

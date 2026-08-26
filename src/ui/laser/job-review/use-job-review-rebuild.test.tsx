@@ -126,4 +126,20 @@ describe('useJobReviewRebuildTrigger', () => {
       { numRuns: PROPERTY_RUNS },
     );
   });
+
+  it('requests a rebuild when selected-only artwork selection changes', async () => {
+    root = createRoot(host);
+    await act(async () => root?.render(<RebuildHarness />));
+    useStore.setState({
+      outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
+      selectedObjectId: 'first',
+      additionalSelectedIds: new Set(),
+    });
+    useJobReviewStore.getState().open(model);
+
+    act(() => useStore.setState({ selectedObjectId: 'second' }));
+    await act(async () => vi.advanceTimersByTimeAsync(250));
+
+    expect(useJobReviewStore.getState().pendingSignal).toBe('rebuild');
+  });
 });

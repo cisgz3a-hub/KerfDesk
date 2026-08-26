@@ -38,6 +38,7 @@ export function MomentaryFireControl(): JSX.Element | null {
         press();
       }}
       onPointerLeave={release}
+      onBlur={release}
       onKeyDown={(event) => {
         if (isFireKey(event.key) && !event.repeat) {
           event.preventDefault();
@@ -61,22 +62,34 @@ function useMomentaryRelease(setFireActive: LaserState['setFireActive']): {
   readonly release: () => void;
 } {
   const held = useRef(false);
+  const releasePending = useRef(false);
   const release = useCallback(() => {
+    if (releasePending.current) return;
     if (!held.current && !useLaserStore.getState().fireActive) return;
     held.current = false;
-    void setFireActive(false).catch(() => undefined);
+    releasePending.current = true;
+    void setFireActive(false)
+      .catch(() => undefined)
+      .finally(() => {
+        releasePending.current = false;
+      });
   }, [setFireActive]);
 
   useEffect(() => {
     const onVisibilityChange = (): void => {
       if (document.visibilityState !== 'visible') release();
     };
+    const onKeyUp = (event: KeyboardEvent): void => {
+      if (isFireKey(event.key)) release();
+    };
     window.addEventListener('blur', release);
+    window.addEventListener('keyup', onKeyUp);
     window.addEventListener('pointerup', release);
     window.addEventListener('pointercancel', release);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.removeEventListener('blur', release);
+      window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('pointerup', release);
       window.removeEventListener('pointercancel', release);
       document.removeEventListener('visibilitychange', onVisibilityChange);

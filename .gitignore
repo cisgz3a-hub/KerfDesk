@@ -11,6 +11,7 @@ out/
 # Vite / Vitest
 .vite/
 coverage/
+artifacts/
 
 # Playwright browser artifacts
 test-results/

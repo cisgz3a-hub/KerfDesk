@@ -48,13 +48,14 @@ describe('ScanOffsetCalibrationDialog', () => {
         Simulate.change(speedMax);
         swatchWidth.value = '20';
         Simulate.change(swatchWidth);
-        checkbox(host, 'Accept uncorrected bidirectional calibration override').click();
       });
 
       const generate = [...host.querySelectorAll('button')].find((button) =>
         button.textContent?.includes('Generate'),
       );
       if (!(generate instanceof HTMLButtonElement)) throw new Error('Generate button missing');
+      expect(generate.disabled).toBe(false);
+      expect(host.textContent).toContain('generation remains available');
       await act(async () => {
         generate.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
@@ -72,7 +73,7 @@ describe('ScanOffsetCalibrationDialog', () => {
     }
   });
 
-  it('generates a profile-corrected verification coupon only when offsets exist', async () => {
+  it('generates a profile-corrected verification coupon when offsets exist', async () => {
     const { host, root, onGenerate } = await renderDialog(vi.fn(), vi.fn(), {
       hasCalibratedOffsets: true,
     });
@@ -94,16 +95,56 @@ describe('ScanOffsetCalibrationDialog', () => {
       await act(async () => root.unmount());
     }
   });
+
+  it('warns but still generates verification without measured offsets', async () => {
+    const { host, root, onGenerate } = await renderDialog();
+    try {
+      const purpose = host.querySelector('select[aria-label="Coupon purpose"]');
+      if (!(purpose instanceof HTMLSelectElement)) throw new Error('Purpose select missing');
+      await act(async () => {
+        purpose.value = 'verification';
+        Simulate.change(purpose);
+      });
+      expect(host.textContent).toContain('no measured scan-offset points');
+      expect(host.textContent).toContain('not proof of calibrated alignment');
+      const generate = [...host.querySelectorAll('button')].find((button) =>
+        button.textContent?.includes('Generate verification coupon'),
+      );
+      if (!(generate instanceof HTMLButtonElement)) throw new Error('Generate button missing');
+      expect(generate.disabled).toBe(false);
+      await act(async () => generate.click());
+      expect(onGenerate).toHaveBeenCalledWith(expect.objectContaining({ mode: 'verification' }));
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('warns instead of disabling when requested speed exceeds the profile ceiling', async () => {
+    const { host, root, onGenerate } = await renderDialog(vi.fn(), vi.fn(), {
+      maxFeedMmPerMin: 3000,
+    });
+    try {
+      const speedMax = input(host, 'Max speed');
+      await act(async () => {
+        speedMax.value = '5000';
+        Simulate.change(speedMax);
+      });
+      expect(host.textContent).toContain('exceeds the profile ceiling');
+      const generate = [...host.querySelectorAll('button')].find((button) =>
+        button.textContent?.includes('Generate uncorrected baseline'),
+      );
+      if (!(generate instanceof HTMLButtonElement)) throw new Error('Generate button missing');
+      expect(generate.disabled).toBe(false);
+      await act(async () => generate.click());
+      expect(onGenerate).toHaveBeenCalledWith(expect.objectContaining({ speedMax: 5000 }));
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
 });
 
 function input(host: HTMLElement, label: string): HTMLInputElement {
   const element = host.querySelector(`input[aria-label="${label}"]`);
   if (!(element instanceof HTMLInputElement)) throw new Error(`${label} input missing`);
-  return element;
-}
-
-function checkbox(host: HTMLElement, label: string): HTMLInputElement {
-  const element = host.querySelector(`input[aria-label="${label}"]`);
-  if (!(element instanceof HTMLInputElement)) throw new Error(`${label} checkbox missing`);
   return element;
 }

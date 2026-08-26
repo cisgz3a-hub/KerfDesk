@@ -71,6 +71,11 @@ describe('compileJob ADR-239 contour entry wiring', () => {
     expect(group?.kind === 'cut' ? group.entryRunwayMm : undefined).toBe(5);
   });
 
+  it('preserves a custom shared contour-entry value below the cap', () => {
+    const group = compileFirstGroup({ ...lineLayer(), fillOverscanMm: 2 });
+    expect(group?.kind === 'cut' ? group.entryRunwayMm : undefined).toBe(2);
+  });
+
   it('keeps generic profiles on legacy contour groups', () => {
     const group = compileFirstGroup(lineLayer(), DEFAULT_DEVICE_PROFILE);
     expect(group?.kind).toBe('cut');
