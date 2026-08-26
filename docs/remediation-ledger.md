@@ -5,7 +5,8 @@ Implementation worktree: `C:\Users\Asus\.codex\worktrees\ab91\LaserForge-2.0`
 Current-main integration worktree:
 `C:\Users\Asus\.codex\worktrees\remediation-37-integration\LaserForge-2.0`, branch
 `codex/laserforge-audit-remediation-37`, based on
-`a6a4ba4885507fbac8320417708b9fcc6a0748b2`.
+`a6a4ba4885507fbac8320417708b9fcc6a0748b2`. The verified 37-item source integration commit is
+`b4c2726543533bc425bb3ce0592f48a1526d07bf`.
 
 Audited base: detached `9209fcb33f4807ebfc1f7a55780069b6a7b0e23c`, inheriting the
 original checkout's nine modified tracked files and four untracked files. The original checkout is
@@ -127,6 +128,7 @@ re-inspected.
 | Release integrity | `pnpm test:release-integrity` — 28/28 passed. |
 | Builds | `pnpm build:web` and `pnpm build:electron-main` exited 0; the web build retained its nonfatal 1,275.95 kB `ui-workbench` chunk advisory. |
 | Authoritative wrapper | Final `pnpm release:check` exited 0 on this current-main integration tree. It reran typecheck, full source and Electron lint, repo-wide Prettier, ADR numbering, production-license policy, the ordinary Vitest suite, 28/28 release-integrity tests, web and Electron-main builds, raw and report-only soft file-size scans, and the legacy public-export no-growth ratchet. |
+| SHA-correlated readiness | `pnpm report:release-readiness` emitted a nonblocking report for source commit `b4c2726543533bc425bb3ce0592f48a1526d07bf`: browser and packaged-runtime passed; hosted CI, deploy, perceptual/reference-CAM, and hardware remained not run. `browserGatesDeploy` is false. |
 | Native runtime | `pnpm exec electron-builder --win --x64 --dir --config electron-builder.preview.yml --publish never` succeeded with electron-builder 26.15.3 and Electron 42.3.0. `node scripts/verify-windows-packaged-native-smoke.mjs <win-unpacked\\KerfDesk.exe> --output=artifacts/native-smoke-current-main --timeout-ms=60000` exited 0 with `NATIVE_SMOKE_OK=true`: packaged and isolated user/session data, ready-to-show, import, 4,439-byte save, app URL, and clean idle shutdown all passed. Two nonfatal GPU shutdown diagnostics remained. |
 | Explicitly not verified | Hosted CI/checks and reviews have not run; no PR is open and nothing is merged or deployed. Installer/OS-picker permissions, reproducibility across independent build hosts, human perceptual review, reference-CAM parity, serial hardware, laser/spindle/motion, air-cut, and burn qualification remain unverified. |
 
@@ -161,8 +163,10 @@ re-inspected.
   snapshot: `FDE16BEA...E83C` (audit ledger), `7BD2BD52...C3BE` (program parse reason),
   `CF6C7C71...3CC0` (V-carve note test), and `6F5ABFEC...C8F8` (V-carve note source).
 - The original checkout therefore retained the audited dirty feature state unchanged. The isolated
-  worktree contains those same inherited files plus the remediation delta; nothing was staged,
-  committed, pushed, merged, deployed, or written to the original checkout.
+  implementation snapshot contains those same inherited files plus the remediation delta. The
+  current-main integration was committed only in the separate integration worktree; nothing was
+  staged, committed, or written in the original checkout, and nothing was pushed, merged, or
+  deployed at this evidence point.
 
 ## Integration rules
 
