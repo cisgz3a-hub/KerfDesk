@@ -51,6 +51,16 @@ jobs:
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$(git rev-parse HEAD)" refs/remotes/origin/main
 
+      - name: Require the explicitly approved release commit
+        env:
+          APPROVED_RELEASE_SHA: ${{ vars.STABLE_APPROVED_RELEASE_SHA }}
+        run: |
+          if [ -z "${APPROVED_RELEASE_SHA}" ]; then
+            echo 'STABLE_APPROVED_RELEASE_SHA must name the reviewed release commit.' >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "${APPROVED_RELEASE_SHA}"
+
   build-windows:
     name: Build Windows installer
     needs: validate-stable-tag
@@ -98,6 +108,19 @@ jobs:
         env:
           KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm release:check
+
+      - name: Require a clean packaged-runtime dependency graph
+        shell: bash
+        run: |
+          mkdir -p artifacts/dependency-audit
+          pnpm audit --json > artifacts/dependency-audit/full.json || true
+          pnpm audit --prod --json > artifacts/dependency-audit/runtime.json || true
+          pnpm report:dependency-audit \
+            --full=artifacts/dependency-audit/full.json \
+            --runtime=artifacts/dependency-audit/runtime.json \
+            --output=artifacts/dependency-audit
+          runtime_count=$(node -p "require('./artifacts/dependency-audit/report.json').runtimeCount")
+          test "${runtime_count}" = '0'
 
       - name: Require tag-release signing credentials
         if: github.event_name == 'push' && github.ref_type == 'tag'
@@ -153,6 +176,21 @@ jobs:
           & ./scripts/verify-windows-package-identity.ps1 -Executable $executable
           "Verified publisher: $($signature.SignerCertificate.Subject)"
 
+      - name: Record checksums, SBOM, and normalized build provenance
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          pnpm list --prod --json --depth Infinity > "release/${VERSION}/runtime-dependencies.json"
+          node scripts/generate-release-evidence.mjs \
+            --release-dir="release/${VERSION}" \
+            --version="${VERSION}" \
+            --source-sha="${GITHUB_SHA}" \
+            --dependency-json="release/${VERSION}/runtime-dependencies.json" \
+            --package-file=package.json
+          (cd "release/${VERSION}" && sha256sum --check checksums.sha256)
+
       - name: Upload installer + update feed as workflow artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -161,6 +199,9 @@ jobs:
             release/${{ steps.version.outputs.version }}/*.exe
             release/${{ steps.version.outputs.version }}/*.exe.blockmap
             release/${{ steps.version.outputs.version }}/latest.yml
+            release/${{ steps.version.outputs.version }}/checksums.sha256
+            release/${{ steps.version.outputs.version }}/release-sbom.spdx.json
+            release/${{ steps.version.outputs.version }}/release-provenance.json
           if-no-files-found: error
 
       # Publish to the self-hosted electron-updater feed on Cloudflare R2
@@ -184,21 +225,79 @@ jobs:
           exe="KerfDesk-${VERSION}-windows-x64-setup.exe"
           immutable="public, max-age=31536000, immutable"
 
-          # Versioned installer + blockmap are content-addressed → cache forever.
+          stage="desktop/releases/${VERSION}"
+          verify_dir="${RUNNER_TEMP}/stable-verify-${VERSION}"
+          mkdir -p "${verify_dir}"
+
+          # Stage every release fact at an immutable versioned prefix first.
+          pnpm exec wrangler r2 object put "${bucket}/${stage}/${exe}" \
+            --file "${dir}/${exe}" --content-type application/octet-stream \
+            --cache-control "${immutable}" --remote
+          pnpm exec wrangler r2 object put "${bucket}/${stage}/${exe}.blockmap" \
+            --file "${dir}/${exe}.blockmap" --content-type application/octet-stream \
+            --cache-control "${immutable}" --remote
+          pnpm exec wrangler r2 object put "${bucket}/${stage}/checksums.sha256" \
+            --file "${dir}/checksums.sha256" --content-type text/plain \
+            --cache-control "${immutable}" --remote
+          for evidence in release-sbom.spdx.json release-provenance.json; do
+            pnpm exec wrangler r2 object put "${bucket}/${stage}/${evidence}" \
+              --file "${dir}/${evidence}" --content-type application/json \
+              --cache-control "${immutable}" --remote
+          done
+
+          # Download the staged binaries and verify their exact local release hashes.
+          pnpm exec wrangler r2 object get "${bucket}/${stage}/${exe}" \
+            --file "${verify_dir}/${exe}" --remote
+          pnpm exec wrangler r2 object get "${bucket}/${stage}/${exe}.blockmap" \
+            --file "${verify_dir}/${exe}.blockmap" --remote
+          for evidence in checksums.sha256 release-sbom.spdx.json release-provenance.json; do
+            pnpm exec wrangler r2 object get "${bucket}/${stage}/${evidence}" \
+              --file "${verify_dir}/${evidence}" --remote
+            cmp "${dir}/${evidence}" "${verify_dir}/${evidence}"
+          done
+          node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(p.sourceSha!==process.env.GITHUB_SHA||p.version!==process.env.VERSION) process.exit(1)' \
+            "${verify_dir}/release-provenance.json"
+          node -e 'const fs=require("fs"); const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(s.spdxVersion!=="SPDX-2.3"||!Array.isArray(s.packages)) process.exit(1)' \
+            "${verify_dir}/release-sbom.spdx.json"
+          grep "  ${exe}$\|  ${exe}.blockmap$" "${dir}/checksums.sha256" \
+            > "${verify_dir}/checksums.sha256"
+          (cd "${verify_dir}" && sha256sum --check checksums.sha256)
+
+          # Publish immutable root objects needed by electron-updater, then verify
+          # them before the one-object feed pointer moves.
           pnpm exec wrangler r2 object put "${bucket}/desktop/${exe}" \
             --file "${dir}/${exe}" --content-type application/octet-stream \
             --cache-control "${immutable}" --remote
           pnpm exec wrangler r2 object put "${bucket}/desktop/${exe}.blockmap" \
             --file "${dir}/${exe}.blockmap" --content-type application/octet-stream \
             --cache-control "${immutable}" --remote
+          pnpm exec wrangler r2 object get "${bucket}/desktop/${exe}" \
+            --file "${verify_dir}/root-${exe}" --remote
+          test "$(sha256sum "${verify_dir}/root-${exe}" | cut -d' ' -f1)" = \
+            "$(sha256sum "${dir}/${exe}" | cut -d' ' -f1)"
+          VERIFY_EXE_PATH="${verify_dir}/root-${exe}" pwsh -NoProfile -Command \
+            '$signature = Get-AuthenticodeSignature -LiteralPath $env:VERIFY_EXE_PATH; if ($signature.Status -ne "Valid") { throw "Remote installer signature invalid: $($signature.StatusMessage)" }'
 
-          # The updater feed moves each release → must revalidate, never cache.
-          pnpm exec wrangler r2 object put "${bucket}/desktop/latest.yml" \
-            --file "${dir}/latest.yml" --content-type text/yaml \
-            --cache-control "no-cache" --remote
+          # Preserve the previous feed as an explicit rollback object when one
+          # exists. R2 object replacement is atomic, so latest.yml is the final
+          # feed switch only after every referenced byte has been verified.
+          if pnpm exec wrangler r2 object get "${bucket}/desktop/latest.yml" \
+            --file "${verify_dir}/previous-latest.yml" --remote; then
+            pnpm exec wrangler r2 object put \
+              "${bucket}/desktop/rollback/latest-before-${VERSION}.yml" \
+              --file "${verify_dir}/previous-latest.yml" --content-type text/yaml \
+              --cache-control "${immutable}" --remote
+          fi
 
           # Stable filename for the /download page's first-time link (also moves
           # each release, so short cache).
           pnpm exec wrangler r2 object put "${bucket}/desktop/kerfdesk-latest-x64-setup.exe" \
             --file "${dir}/${exe}" --content-type application/octet-stream \
             --cache-control "public, max-age=300" --remote
+
+          # Atomic feed pointer is deliberately the final write. If any stage,
+          # evidence, signature, or stable-link step fails, the previous feed
+          # remains active and the rollback object above identifies it exactly.
+          pnpm exec wrangler r2 object put "${bucket}/desktop/latest.yml" \
+            --file "${dir}/latest.yml" --content-type text/yaml \
+            --cache-control "no-cache" --remote

@@ -212,15 +212,13 @@ function pickAccessories(
 function pickOverrides(fields: ReadonlyArray<string>): OverrideValues | null {
   for (const f of fields) {
     if (!f.startsWith('Ov:')) continue;
-    const [feed, rapid, spindle] = f.slice('Ov:'.length).split(',').map(Number);
-    if (
-      feed !== undefined &&
-      rapid !== undefined &&
-      spindle !== undefined &&
-      Number.isFinite(feed) &&
-      Number.isFinite(rapid) &&
-      Number.isFinite(spindle)
-    ) {
+    const parts = f.slice('Ov:'.length).split(',');
+    if (parts.length !== 3) return null;
+    const [feedToken, rapidToken, spindleToken] = parts;
+    const feed = parseCanonicalStatusNumber(feedToken);
+    const rapid = parseCanonicalStatusNumber(rapidToken);
+    const spindle = parseCanonicalStatusNumber(spindleToken);
+    if (feed !== null && rapid !== null && spindle !== null) {
       return { feed, rapid, spindle };
     }
     return null;
@@ -259,19 +257,13 @@ function pickAxisField(
 ): { x: number; y: number; z: number } | null {
   for (const f of fields) {
     if (!f.startsWith(`${label}:`)) continue;
-    const parts = f
-      .slice(label.length + 1)
-      .split(',')
-      .map(Number);
-    const [x, y, z] = parts;
-    if (
-      x !== undefined &&
-      y !== undefined &&
-      z !== undefined &&
-      Number.isFinite(x) &&
-      Number.isFinite(y) &&
-      Number.isFinite(z)
-    ) {
+    const parts = f.slice(label.length + 1).split(',');
+    if (parts.length !== 3) return null;
+    const [xToken, yToken, zToken] = parts;
+    const x = parseCanonicalStatusNumber(xToken);
+    const y = parseCanonicalStatusNumber(yToken);
+    const z = parseCanonicalStatusNumber(zToken);
+    if (x !== null && y !== null && z !== null) {
       return { x, y, z };
     }
     return null;
@@ -289,10 +281,14 @@ function pickFsValue(fields: ReadonlyArray<string>, index: 0 | 1): number | null
     // hardware-verified).
     if (index === 1 && !isFs) return null;
     const body = f.slice(f.indexOf(':') + 1);
-    const parts = body.split(',').map(Number);
-    const v = parts[index];
-    if (v === undefined) return null;
-    return Number.isFinite(v) ? v : null;
+    const token = body.split(',')[index];
+    return parseCanonicalStatusNumber(token);
   }
   return null;
+}
+
+function parseCanonicalStatusNumber(token: string | undefined): number | null {
+  if (token === undefined || !/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(token)) return null;
+  const value = Number(token);
+  return Number.isFinite(value) ? value : null;
 }

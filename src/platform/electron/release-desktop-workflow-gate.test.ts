@@ -35,7 +35,7 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     expect(dryRunWorkflow).not.toContain('WIN_CSC_KEY_PASSWORD');
     expect(dryRunWorkflow).not.toContain('wrangler r2 object put');
     expect(dryRunWorkflow).not.toContain('gh release');
-    expect(dryRunWorkflow).toContain('actions/upload-artifact@v7');
+    expect(dryRunWorkflow).toMatch(/uses: actions\/upload-artifact@[0-9a-f]{40} # v7/u);
     expect(dryRunWorkflow).toContain('VERSION="0.0.0-dispatch.${GITHUB_RUN_NUMBER}"');
     expect(dryRunWorkflow).toContain('--config.extraMetadata.kerfdeskUpdateChannelTrusted=false');
     expect(dryRunWorkflow).toContain('--config.forceCodeSigning=false');
@@ -152,7 +152,7 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
   });
 
   it('uses the actual tag-push predicate on every production-sensitive step', () => {
-    expect(workflow.split(tagPushPredicate)).toHaveLength(6);
+    expect(workflow.split(tagPushPredicate)).toHaveLength(7);
   });
 
   it('embeds update trust only in signed tag-push builds and reads it fail-closed', () => {

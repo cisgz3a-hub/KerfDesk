@@ -23,6 +23,7 @@ import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './las
 import { useStore } from './store';
 import { useToastStore } from './toast-store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
+import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -74,7 +75,16 @@ async function runJogToMachinePosition(
   feed: number,
 ): Promise<void> {
   const { set, get, refs, safeWrite } = context;
-  const current = inferCurrentMachinePosition(get().statusReport, get().wcoCache);
+  assertAutofocusIdle(get());
+  assertJogFrameReady(set, get);
+  assertMotionQueueSettled(set, get, 'moving to a machine position');
+  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'jog' });
+  assertJogFrameReady(set, get);
+  const current = inferCurrentMachinePosition(
+    get().statusReport,
+    get().wcoCache,
+    get().controllerSettings?.reportInches === true,
+  );
   if (current === null) {
     const message = 'Jog to point needs a live machine position. Wait for an Idle status report.';
     set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
@@ -85,9 +95,6 @@ async function runJogToMachinePosition(
   // Already there (within a step GRBL would round to zero): nothing to do,
   // and an all-zero jog would be rejected as a no-axis command.
   if (Math.abs(dx) < JOG_TO_POINT_EPSILON_MM && Math.abs(dy) < JOG_TO_POINT_EPSILON_MM) return;
-  assertAutofocusIdle(get());
-  assertJogFrameReady(set, get);
-  assertMotionQueueSettled(set, get, 'moving to a machine position');
   assertCncPointMoveWorkZReady(set, get);
   const params = { dx, dy, feed };
   warnJogMotionPolicy(set, get, params);
@@ -119,10 +126,12 @@ async function runJog(
   context: JogActionContext,
   params: Parameters<LaserState['jog']>[0],
 ): Promise<void> {
-  const { set, get } = context;
+  const { set, get, refs, safeWrite } = context;
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'jogging');
+  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'jog' });
+  assertJogFrameReady(set, get);
   warnJogMotionPolicy(set, get, params);
   // Any deliberate head move consumes the placement proof even if the
   // head later returns to numerically identical coordinates.
@@ -168,6 +177,8 @@ async function runFrame(
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'framing again');
+  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'frame' });
+  assertJogFrameReady(set, get);
   set({ frameVerification: null, framedRun: null });
   const plan = buildFrameDispatchPlan(refs, get, bounds, feed, candidate);
   if (plan.kind === 'blocked') {
@@ -323,7 +334,11 @@ function resolveJogXyPath(get: GetFn, params: JogParams): JogXyPath | null {
   const hasX = params.dx !== undefined;
   const hasY = params.dy !== undefined;
   if (!hasX && !hasY) return null;
-  const start = inferCurrentMachinePosition(get().statusReport, get().wcoCache);
+  const start = inferCurrentMachinePosition(
+    get().statusReport,
+    get().wcoCache,
+    get().controllerSettings?.reportInches === true,
+  );
   if (start === null) return null;
   const relative = params.relative !== false;
   const target = relative

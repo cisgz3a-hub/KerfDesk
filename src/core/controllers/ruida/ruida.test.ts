@@ -5,7 +5,14 @@ import { decodeRdStream } from '../../../__fixtures__/controllers/ruida-decoder'
 import { ruidaDriver } from './driver';
 import { encodeRdJob } from './rd-encoder';
 import { layerColor } from './rd-commands';
-import { decodeCoord35, decodePower14, encodeCoord35, encodePower14 } from './rd-numbers';
+import {
+  decodeCoord35,
+  decodePower14,
+  encodeCoord35,
+  encodePower14,
+  RUIDA_COORD35_MAX,
+  RUIDA_COORD35_MIN,
+} from './rd-numbers';
 import {
   createRuidaSession,
   frameDatagram,
@@ -75,7 +82,17 @@ describe('ruida swizzle', () => {
 
 describe('ruida number encodings', () => {
   it('round-trips 35-bit coordinates including negatives', () => {
-    for (const value of [0, 1, 12345, 900000, -1, -50000, 2 ** 30]) {
+    for (const value of [
+      RUIDA_COORD35_MIN,
+      0,
+      1,
+      12345,
+      900000,
+      -1,
+      -50000,
+      2 ** 30,
+      RUIDA_COORD35_MAX,
+    ]) {
       expect(decodeCoord35([...encodeCoord35(value)])).toBe(value);
     }
   });
@@ -133,6 +150,65 @@ describe('encodeRdJob', () => {
       RUIDA_DEVICE,
     );
     expect(!raster.ok && raster.error.kind).toBe('raster-unsupported');
+  });
+
+  it('round-trips exact signed 35-bit boundary coordinates in the emitted stream', () => {
+    const boundaryJob: Job = {
+      groups: [
+        {
+          ...(JOB.groups[0] as Extract<Job['groups'][number], { readonly kind: 'cut' }>),
+          kind: 'cut',
+          segments: [
+            {
+              polyline: [
+                { x: RUIDA_COORD35_MIN / 1000, y: 0 },
+                { x: RUIDA_COORD35_MAX / 1000, y: 1 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    const encoded = encodeRdJob(boundaryJob, RUIDA_DEVICE);
+    if (!encoded.ok) throw new Error(`encode failed: ${encoded.error.kind}`);
+    const events = decodeRdStream(encoded.bytes);
+    expect(events.find((event) => event.kind === 'move')).toMatchObject({
+      xMm: RUIDA_COORD35_MIN / 1000,
+      yMm: 0,
+    });
+    expect(events.find((event) => event.kind === 'cut')).toMatchObject({
+      xMm: RUIDA_COORD35_MAX / 1000,
+      yMm: 1,
+    });
+  });
+
+  it('returns typed range failures and no byte array beyond either signed 35-bit boundary', () => {
+    for (const valueUm of [RUIDA_COORD35_MIN - 1, RUIDA_COORD35_MAX + 1]) {
+      const invalidJob: Job = {
+        groups: [
+          {
+            ...(JOB.groups[0] as Extract<Job['groups'][number], { readonly kind: 'cut' }>),
+            kind: 'cut',
+            segments: [
+              {
+                polyline: [
+                  { x: valueUm / 1000, y: 0 },
+                  { x: 1, y: 1 },
+                ],
+                closed: false,
+              },
+            ],
+          },
+        ],
+      };
+      const encoded = encodeRdJob(invalidJob, RUIDA_DEVICE);
+      expect(encoded).toEqual({
+        ok: false,
+        error: expect.objectContaining({ kind: 'coordinate-out-of-range', valueUm }),
+      });
+      expect('bytes' in encoded).toBe(false);
+    }
   });
 });
 

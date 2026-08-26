@@ -99,8 +99,7 @@ function useCircleCenterController(props: CircleCenterConfirmationProps): Circle
 
   const createAtCurrentPosition = (): void => {
     if (!settled || saving) return;
-    const laser = useLaserStore.getState();
-    const currentPosition = inferCurrentMachinePosition(laser.statusReport, laser.wcoCache);
+    const currentPosition = currentMachinePosition();
     if (currentPosition === null) {
       setError('A fresh machine position is not available yet. Wait for Idle and try again.');
       return;
@@ -126,6 +125,15 @@ function useCircleCenterController(props: CircleCenterConfirmationProps): Circle
     cancelMove,
     createAtCurrentPosition,
   };
+}
+
+function currentMachinePosition(): Vec2 | null {
+  const laser = useLaserStore.getState();
+  return inferCurrentMachinePosition(
+    laser.statusReport,
+    laser.wcoCache,
+    laser.controllerSettings?.reportInches === true,
+  );
 }
 
 function CircleFitSummary({ fit }: { readonly fit: BestFitCircle }): JSX.Element {

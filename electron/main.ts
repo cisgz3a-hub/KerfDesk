@@ -57,6 +57,11 @@ import {
   type ElectronSerialPortSummary,
 } from './serial-port-choice.js';
 import {
+  serialPortDiscoveryDiagnostic,
+  serialPortSelectionDiagnostic,
+  type SerialDiagnosticPolicy,
+} from './serial-port-diagnostics.js';
+import {
   resolveRendererRuntime,
   shouldAllowNavigation,
   shouldAllowWindowOpen,
@@ -260,15 +265,14 @@ async function chooseSerialPortId(
 }
 
 function logSerialPorts(portList: ReadonlyArray<ElectronSerialPort>): void {
-  console.log(
-    `[serial] select-serial-port fired; ${portList.length} port(s) visible to OS:`,
-    portList.map((p) => ({
-      portId: p.portId,
-      portName: p.portName,
-      vendorId: p.vendorId,
-      productId: p.productId,
-    })),
-  );
+  console.log(...serialPortDiscoveryDiagnostic(portList, serialDiagnosticPolicy()));
+}
+
+function serialDiagnosticPolicy(): SerialDiagnosticPolicy {
+  return {
+    isPackaged: app.isPackaged,
+    detailedOptIn: process.env.KERFDESK_DETAILED_SERIAL_DIAGNOSTICS === '1',
+  };
 }
 
 function handleSelectSerialPort(
@@ -281,9 +285,7 @@ function handleSelectSerialPort(
   logSerialPorts(portList);
   void chooseSerialPortId(webContents, portList)
     .then((chosen) => {
-      console.log(
-        chosen === '' ? '[serial] Port selection cancelled.' : `[serial] Selected port: ${chosen}`,
-      );
+      console.log(serialPortSelectionDiagnostic(chosen, serialDiagnosticPolicy()));
       callback(chosen);
     })
     .catch((err: unknown) => {

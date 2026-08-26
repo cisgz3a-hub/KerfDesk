@@ -1,11 +1,12 @@
 import type { Project, RasterImage, SceneObject } from '../../core/scene';
+import type { InteractionHistorySnapshot } from '../state/interaction-history-snapshot';
 import { IndexedDbPagedAssetLeaseRepository } from './paged-asset-indexeddb-leases';
 
 export type PagedRasterOwnershipState = {
   readonly project: Project;
   readonly undoStack: ReadonlyArray<Project>;
   readonly redoStack: ReadonlyArray<Project>;
-  readonly pendingUndo: Project | null;
+  readonly pendingUndo: InteractionHistorySnapshot | null;
   readonly sceneClipboard: { readonly objects: ReadonlyArray<SceneObject> } | null;
 };
 
@@ -92,7 +93,7 @@ function projectsIn(state: PagedRasterOwnershipState): ReadonlyArray<Project> {
     state.project,
     ...state.undoStack,
     ...state.redoStack,
-    ...(state.pendingUndo === null ? [] : [state.pendingUndo]),
+    ...(state.pendingUndo === null ? [] : [state.pendingUndo.project]),
   ];
 }
 

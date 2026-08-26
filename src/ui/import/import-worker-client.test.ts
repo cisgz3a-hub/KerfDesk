@@ -245,14 +245,23 @@ describe('import worker client', () => {
     await expect(promise).rejects.toThrow(/answered 'gcode' for a 'stl' request/);
   });
 
-  it('rejects every in-flight request and retires the worker when it errors', async () => {
+  it('rejects only the active request, restarts, and preserves queued work FIFO on crash', async () => {
     const promise = parseDxfOffThread(blob(), 'a', 'a.dxf');
+    const queued = parseGcodeOffThread(blob());
     const worker = latest();
 
     worker.onerror?.();
 
     await expect(promise).rejects.toThrow('import worker errored');
     expect(worker.terminated).toBe(true);
+    const replacement = latest();
+    expect(replacement).not.toBe(worker);
+    replacement.reply({
+      id: replacement.posted[0]?.id ?? -1,
+      kind: 'gcode',
+      result: { kind: 'error', reason: 'queued survived' },
+    });
+    await expect(queued).resolves.toMatchObject({ reason: 'queued survived' });
   });
 
   it('retires a postMessage failure before advancing queued work', async () => {

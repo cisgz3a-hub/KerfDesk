@@ -32,6 +32,7 @@ import type { PreflightCode } from './preflight';
 export const COMPILE_INTEGRITY_PREFLIGHT_CODES: ReadonlySet<PreflightCode> = new Set<PreflightCode>(
   [
     'non-finite-coordinate',
+    'coordinate-unencodable',
     'cnc-tool-geometry-invalid',
     'empty-output',
     'relief-needs-cnc',

@@ -118,7 +118,9 @@ describe('Cloudflare production deploy gate', () => {
 
     expect(packageJson.scripts['release:check']).not.toContain('audit');
     expect(packageJson.scripts['audit:deps']).toBe('pnpm audit --audit-level=low');
-    expect(auditWorkflow).toContain('pnpm audit:deps');
+    expect(auditWorkflow).toContain('pnpm audit --json');
+    expect(auditWorkflow).toContain('pnpm audit --prod --json');
+    expect(auditWorkflow).toContain('pnpm report:dependency-audit');
     expect(auditWorkflow).toContain('cron:');
   });
 

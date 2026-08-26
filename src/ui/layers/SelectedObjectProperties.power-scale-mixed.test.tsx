@@ -30,6 +30,12 @@ describe('SelectedObjectProperties mixed power scale', () => {
       expect(input.value).toBe('');
       expect(input.placeholder).toBe('Mixed');
       expect(input.dataset.mixed).toBe('true');
+      expect(input.getAttribute('aria-valuetext')).toBe('Mixed');
+
+      await act(async () => Simulate.blur(input));
+      expect(useStore.getState().project.scene.objects.map((object) => object.powerScale)).toEqual([
+        50, 80,
+      ]);
 
       await act(async () => {
         input.value = '60';

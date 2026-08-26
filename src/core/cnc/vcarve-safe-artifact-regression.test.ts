@@ -38,15 +38,15 @@ const SAFE_SPINDLE_RPM = 12_000;
 const EXPECTED_REGIONS = 4;
 const EXPECTED_PASSES = 16;
 const MAX_OUTPUT_BYTES = 450_000;
-const MAX_OUTPUT_LINES = 16_000;
-const MAX_XYZ_BLOCKS = 16_000;
+const MAX_OUTPUT_LINES = 17_000;
+const MAX_XYZ_BLOCKS = 17_000;
 const GRBL_PLANNER_WINDOW_BLOCKS = 16;
 const EXPECTED_MAX_DEPTH_MM = 5.924;
 const EXPECTED_REGION_POINT_COUNTS = [
-  [743, 801, 889, 930],
-  [536, 584, 655, 717],
-  [722, 774, 904, 1052],
-  [374, 440, 557, 690],
+  [1306, 1324, 1438, 1539],
+  [802, 859, 960, 1065],
+  [918, 1000, 1166, 1388],
+  [505, 580, 730, 879],
 ] as const;
 
 type SafeCompilation = Awaited<ReturnType<typeof compileSafe>>;

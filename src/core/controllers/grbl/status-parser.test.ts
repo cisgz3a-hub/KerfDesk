@@ -103,6 +103,26 @@ describe('parseStatusReport — happy paths', () => {
     expect(r?.mPos).toEqual({ x: 1, y: 2, z: 0 });
     expect(r?.feed).toBe(0);
   });
+
+  it('rejects blank and noncanonical numeric components without fabricating zero', () => {
+    const blank = parseStatusReport(
+      '<Idle|MPos:1.000,,3.000|WCO:0.000,2.000,0.000|FS:1200,|Ov:100,,100>',
+    );
+    expect(blank?.mPos).toBeNull();
+    expect(blank?.wco).toEqual({ x: 0, y: 2, z: 0 });
+    expect(blank?.feed).toBe(1200);
+    expect(blank?.spindle).toBeNull();
+    expect(blank?.ov).toBeNull();
+
+    const noncanonical = parseStatusReport(
+      '<Idle|MPos:1e2,2,3|WCO:1,2,3|FS:+10,0|Ov:100,100,0x10>',
+    );
+    expect(noncanonical?.mPos).toBeNull();
+    expect(noncanonical?.wco).toEqual({ x: 1, y: 2, z: 3 });
+    expect(noncanonical?.feed).toBeNull();
+    expect(noncanonical?.spindle).toBe(0);
+    expect(noncanonical?.ov).toBeNull();
+  });
 });
 
 describe('parseStatusReport — Pn pins (ADR-053 P3)', () => {

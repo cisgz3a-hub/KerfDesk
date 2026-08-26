@@ -17,6 +17,7 @@ import { compilationPolylines } from './compilation-polylines';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { fillRunwayPolicyForDevice } from './fill-runway-policy';
+import { normalizeClosedPolylinesNonZeroChecked } from '../geometry/polygon-difference';
 import { groupFillContoursIntoIslands } from './island-fill';
 import { islandFillMotionPolicyForDevice } from './island-fill-motion';
 import type { FillSegment, Group } from './job';
@@ -184,10 +185,11 @@ function appendFillPathContours(
   device: DeviceProfile,
   out: Polyline[],
 ): void {
+  const objectContours: Polyline[] = [];
   for (const path of object.paths) {
     if (!pathUsesOperation(object, path, layer)) continue;
-    for (const polyline of compilationPolylines(path)) {
-      out.push({
+    for (const polyline of compilationPolylines(path, object.transform)) {
+      objectContours.push({
         points: polyline.points.map((p) =>
           toMachineCoords(applyTransform(p, object.transform), device),
         ),
@@ -195,4 +197,19 @@ function appendFillPathContours(
       });
     }
   }
+  if (object.kind !== 'text') {
+    out.push(...objectContours);
+    return;
+  }
+  const closed = objectContours.filter((polyline) => polyline.closed);
+  const open = objectContours.filter((polyline) => !polyline.closed);
+  if (closed.length < 2) {
+    out.push(...objectContours);
+    return;
+  }
+  const resolved = normalizeClosedPolylinesNonZeroChecked(closed);
+  out.push(
+    ...(resolved.kind === 'ok' && resolved.value.length > 0 ? resolved.value : closed),
+    ...open,
+  );
 }

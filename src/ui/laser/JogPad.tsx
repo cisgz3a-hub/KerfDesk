@@ -38,10 +38,11 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
   const statusReport = useLaserStore((s) => s.statusReport);
   const wcoCache = useLaserStore((s) => s.wcoCache);
+  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   const feed = clampJogFeed(selectedFeed, maxFeed);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
-  const position = inferCurrentMachinePosition(statusReport, wcoCache);
+  const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
   const focusReady = focusJogReady(device, machineKind);
 
   const sendVector = useCallback(

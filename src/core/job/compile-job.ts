@@ -366,7 +366,7 @@ function appendPathSegments(
   for (const path of object.paths) {
     if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: Polyline[] = [];
-    for (const polyline of compilationPolylines(path)) {
+    for (const polyline of compilationPolylines(path, object.transform)) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, object.transform), device),
       );

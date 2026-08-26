@@ -384,16 +384,16 @@ describe('jogToMachinePosition', () => {
     expect(useLaserStore.getState().motionOperation).toBeNull();
   });
 
-  it('errors without a live machine position', async () => {
+  it('reports missing fresh status before attempting a position-based move', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
     useLaserStore.setState({ statusReport: null, statusObservation: null });
     // No status report emitted → no known position.
 
     await expect(useLaserStore.getState().jogToMachinePosition(10, 10, 1000)).rejects.toThrow(
-      /live machine position/i,
+      /status is not known/i,
     );
-    expect(useLaserStore.getState().lastWriteError).toMatch(/live machine position/i);
+    expect(useLaserStore.getState().lastWriteError).toMatch(/status is not known/i);
   });
 });
 

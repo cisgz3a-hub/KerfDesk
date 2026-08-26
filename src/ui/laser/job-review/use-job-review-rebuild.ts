@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../../state';
+import { useLaserStore } from '../../state/laser-store';
 import { useJobReviewStore } from './job-review-store';
 
 const REBUILD_DEBOUNCE_MS = 250;
@@ -38,8 +39,22 @@ export function useJobReviewRebuildTrigger(): () => void {
         requestRebuildNow();
       }, REBUILD_DEBOUNCE_MS);
     });
+    const unsubscribeLaser = useLaserStore.subscribe((current, previous) => {
+      if (
+        current.controllerSessionEpoch === previous.controllerSessionEpoch &&
+        current.controllerSettings === previous.controllerSettings &&
+        current.controllerSettingsObservation === previous.controllerSettingsObservation
+      ) {
+        return;
+      }
+      // $30/$32 truth and same-session provenance are part of the reviewed
+      // acknowledgement. Rebuild immediately so the live rows, prompt, and
+      // evidence recorded by Confirm cannot disagree.
+      requestRebuildNow();
+    });
     return (): void => {
       unsubscribe();
+      unsubscribeLaser();
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     };
   }, [requestRebuildNow]);

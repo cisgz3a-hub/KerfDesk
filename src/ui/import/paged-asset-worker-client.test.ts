@@ -171,6 +171,25 @@ describe('paged asset worker client', () => {
     await expect(first).rejects.toThrow('done');
   });
 
+  it('rejects only active staging and continues queued work on a fresh worker after crash', async () => {
+    const first = stage(new Blob(['first']), 'first');
+    const queued = stage(new Blob(['queued']), 'queued');
+    const failed = latest();
+
+    failed.onerror?.();
+
+    await expect(first).rejects.toThrow('paged asset worker errored');
+    expect(failed.terminated).toBe(true);
+    const replacement = latest();
+    expect(replacement).not.toBe(failed);
+    replacement.reply({
+      id: replacement.posted[0]?.id ?? -1,
+      kind: 'error',
+      message: 'queued survived',
+    });
+    await expect(queued).rejects.toThrow('queued survived');
+  });
+
   it('returns null when the production Worker API is unavailable', () => {
     vi.stubGlobal('Worker', undefined);
 

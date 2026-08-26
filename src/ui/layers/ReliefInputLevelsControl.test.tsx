@@ -302,7 +302,6 @@ describe('ReliefInputLevelsControl', () => {
     { draft: '1.5' },
     { draft: '1.0000000000000001' },
     { draft: '65535.0000000000000001' },
-    { draft: '1e-324' },
     { draft: '-1' },
     { draft: '65536' },
     { draft: '1e309' },
@@ -332,4 +331,25 @@ describe('ReliefInputLevelsControl', () => {
       }
     },
   );
+
+  it('keeps exponent notation visible with explicit English-decimal feedback', async () => {
+    const setReliefParams = vi.fn();
+    useStore.setState({ setReliefParams });
+    const { host, root } = await render(heightfieldRelief(12345, 54321));
+    try {
+      const low = input(host, 'low');
+      await act(async () => {
+        low.value = '1e-324';
+        Simulate.change(low);
+        vi.advanceTimersByTime(400);
+      });
+      await act(async () => Simulate.blur(low));
+      expect(setReliefParams).not.toHaveBeenCalled();
+      expect(input(host, 'low').value).toBe('1e-324');
+      expect(input(host, 'low').validationMessage).toMatch(/English digits.*decimal point/i);
+      expect(input(host, 'high').value).toBe('54321');
+    } finally {
+      await unmount(root, host);
+    }
+  });
 });

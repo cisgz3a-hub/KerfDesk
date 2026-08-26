@@ -1,4 +1,3 @@
-import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import { rotaryAppliesTo, type JobOriginPlacement } from '../../core/job';
 import type { ExecutablePlanV1 } from '../../core/execution-plan';
 import type { ControllerSettingsSnapshot, PreflightOptions } from '../../core/preflight';
@@ -40,10 +39,10 @@ export function initialMachinePositionOption(machine: MachineStartSnapshot): {
   const raw = inferCurrentMachinePosition(
     machine.statusReport,
     machine.wcoCache ?? machine.statusReport?.wco ?? null,
+    machine.reportInches === true,
   );
   if (raw === null) return {};
-  const [x, y] = normalizeReportedMPosToMm([raw.x, raw.y, raw.z], machine.reportInches === true);
-  return { preflightInitialMachinePosition: { x, y } };
+  return { preflightInitialMachinePosition: { x: raw.x, y: raw.y } };
 }
 
 export function okPreparation(

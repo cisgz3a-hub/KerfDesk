@@ -158,7 +158,19 @@ function state(
     project,
     undoStack: options.undoStack ?? [],
     redoStack: [],
-    pendingUndo: options.pendingUndo ?? null,
+    pendingUndo:
+      options.pendingUndo === undefined || options.pendingUndo === null
+        ? null
+        : {
+            project: options.pendingUndo,
+            undoStack: [],
+            redoStack: [],
+            dirty: false,
+            selectedObjectId: null,
+            additionalSelectedIds: new Set(),
+            selectedPathNode: null,
+            selectedPathNodes: [],
+          },
     sceneClipboard:
       options.clipboardObjects === undefined ? null : { objects: options.clipboardObjects },
   };

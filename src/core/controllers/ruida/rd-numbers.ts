@@ -6,6 +6,8 @@
 
 const COORD_BYTES = 5;
 const COORD_BITS = 35;
+export const RUIDA_COORD35_MIN = -(2 ** (COORD_BITS - 1));
+export const RUIDA_COORD35_MAX = 2 ** (COORD_BITS - 1) - 1;
 const POWER_MAX_14 = 16383;
 
 /** Encode an absolute coordinate in µm as 5 × 7-bit bytes (two's complement
@@ -18,6 +20,12 @@ export function encodeCoord35(valueUm: number): ReadonlyArray<number> {
     out.push(Math.floor(wrapped / 128 ** i) % 128);
   }
   return out;
+}
+
+export function isCoord35Encodable(valueUm: number): boolean {
+  return (
+    Number.isSafeInteger(valueUm) && valueUm >= RUIDA_COORD35_MIN && valueUm <= RUIDA_COORD35_MAX
+  );
 }
 
 export function decodeCoord35(bytes: ReadonlyArray<number>): number {

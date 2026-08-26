@@ -9,13 +9,21 @@
 // would flicker between "machine 0,0" and "custom" 29 frames out of 30.
 
 import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
+import {
+  inferCurrentMachinePosition,
+  reportedFeedMmPerMin,
+  reportedWorkOffsetMm,
+} from '../state/infer-machine-position';
 
 export function StatusDisplay(): JSX.Element {
   const report = useLaserStore((s) => s.statusReport);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
+  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   if (report === null) return <div style={dimStyle}>State: —</div>;
-  const pos = report.mPos ?? report.wPos;
+  const pos = inferCurrentMachinePosition(report, wcoCache, reportInches);
+  const wcoMm = reportedWorkOffsetMm(wcoCache, reportInches);
+  const feedMmPerMin = reportedFeedMmPerMin(report, reportInches);
   const label = report.subState === null ? report.state : `${report.state}:${report.subState}`;
   // workOriginActive covers a deliberately-set origin whose offset happens to be
   // zero (hand-set at machine 0,0 on a no-homing machine) — hasCustomOrigin(wco)
@@ -33,13 +41,13 @@ export function StatusDisplay(): JSX.Element {
       )}
       <div style={customOrigin ? originCustomStyle : originDefaultStyle}>
         <strong>Origin:</strong>{' '}
-        {customOrigin && wcoCache !== null
-          ? `X ${wcoCache.x.toFixed(3)} Y ${wcoCache.y.toFixed(3)} (custom)`
+        {customOrigin && wcoMm !== null
+          ? `X ${wcoMm.x.toFixed(3)} Y ${wcoMm.y.toFixed(3)} (custom)`
           : 'machine 0,0'}
       </div>
-      {report.feed !== null && (
+      {feedMmPerMin !== null && (
         <div style={feedRowStyle}>
-          <strong>F:</strong> {report.feed} mm/min <strong>S:</strong> {report.spindle ?? 0}
+          <strong>F:</strong> {feedMmPerMin} mm/min <strong>S:</strong> {report.spindle ?? 0}
         </div>
       )}
     </div>

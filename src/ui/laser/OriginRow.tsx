@@ -10,6 +10,7 @@ import { actionGridStyle, gridFullRowStyle, sectionCaptionStyle } from './JobCon
 import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
+import { reportedWorkOffsetMm } from '../state/infer-machine-position';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset that clears G92), so confirm and spell out the correct order:
@@ -204,19 +205,23 @@ function GoToWorkZeroButton(props: {
 }): JSX.Element {
   const jogToMachinePosition = useLaserStore((state) => state.jogToMachinePosition);
   const wcoCache = useLaserStore((state) => state.wcoCache);
+  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
   const idle = useLaserStore((state) => state.statusReport?.state === 'Idle');
   const maxFeed = useStore((state) => state.project.device.maxFeed);
   const requestedFeed = useJogControlPreferences((state) => state.requestedFeedMmPerMin);
   const pushToast = useToastStore((state) => state.pushToast);
   const ready = !props.busy && props.hasCustom && wcoCache !== null && idle;
   const onGo = (): void => {
-    if (wcoCache === null) return;
-    void jogToMachinePosition(wcoCache.x, wcoCache.y, clampJogFeed(requestedFeed, maxFeed)).catch(
-      (error: unknown) => {
-        const reason = error instanceof Error ? error.message : String(error);
-        pushToast(`Cannot move to work zero: ${reason}`, 'warning');
-      },
-    );
+    const workOffsetMm = reportedWorkOffsetMm(wcoCache, reportInches);
+    if (workOffsetMm === null) return;
+    void jogToMachinePosition(
+      workOffsetMm.x,
+      workOffsetMm.y,
+      clampJogFeed(requestedFeed, maxFeed),
+    ).catch((error: unknown) => {
+      const reason = error instanceof Error ? error.message : String(error);
+      pushToast(`Cannot move to work zero: ${reason}`, 'warning');
+    });
   };
   return (
     <button

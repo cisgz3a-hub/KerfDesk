@@ -63,6 +63,7 @@ describe('partitionSavePreflight', () => {
     expect([...COMPILE_INTEGRITY_PREFLIGHT_CODES].sort()).toEqual([
       'cnc-machine-params-invalid',
       'cnc-tool-geometry-invalid',
+      'coordinate-unencodable',
       'empty-output',
       'no-output-layer',
       'non-finite-coordinate',

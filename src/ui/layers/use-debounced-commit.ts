@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createDebouncer, type Debouncer } from './debouncer';
+import { validateEnglishDecimalInput } from './english-decimal-input';
 
 const DEFAULT_DEBOUNCE_MS = 300;
 
@@ -26,12 +27,14 @@ export type UseDebouncedCommitArgs<T> = {
   // scale) here; leave unset for fields whose display is a pure function of
   // `value`.
   readonly reconcileKey?: unknown;
+  readonly validate?: (input: string) => string | null;
 };
 
 export type DebouncedCommit = {
   readonly displayValue: string;
   readonly onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  readonly onBlur: () => void;
+  readonly onBlur: (event?: React.FocusEvent<HTMLInputElement>) => void;
+  readonly errorMessage: string | null;
 };
 
 export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): DebouncedCommit {
@@ -40,6 +43,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   const debounceMs = args.debounceMs ?? DEFAULT_DEBOUNCE_MS;
 
   const [draft, setDraft] = useState<string>(() => format(value));
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Mirror callbacks + draft via refs so the reconcile-effect below can
   // depend only on `value` (the deliberate trigger) without the
   // exhaustive-deps rule flagging the closure-captures as missing
@@ -53,6 +57,13 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   formatRef.current = format;
   const commitRef = useRef(commit);
   commitRef.current = commit;
+  const validateRef = useRef(args.validate);
+  validateRef.current = args.validate;
+  const validationError = (input: string): string | null => {
+    const validate = validateRef.current;
+    if (validate !== undefined) return validate(input);
+    return typeof value === 'number' ? validateEnglishDecimalInput(input) : null;
+  };
 
   const debouncerRef = useRef<Debouncer<T>>();
   if (debouncerRef.current === undefined) {
@@ -86,6 +97,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     // baseline, or its stale timer can overwrite undo/toolbar/document changes.
     debouncerRef.current?.cancel();
     debouncerRef.current?.acknowledge(value);
+    setErrorMessage(null);
     if (parseRef.current(draftRef.current) !== value) {
       setDraft(formatRef.current(value));
     }
@@ -99,43 +111,93 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     };
   }, []);
 
+  const handlerContext: DebouncedHandlerContext<T> = {
+    value,
+    draft,
+    debounceMs,
+    parse,
+    format,
+    validationError,
+    debouncer: debouncerRef.current,
+    setDraft,
+    setErrorMessage,
+  };
   return {
     displayValue: draft,
-    onChange: (e) => {
-      const nextText = e.target.value;
-      setDraft(nextText);
-      // A blank field is a legitimate transient editing state — the operator is
-      // clearing the box to retype. Do NOT schedule a commit: parse('') returns
-      // a fallback number (old value / min / 0), and committing it snaps the
-      // field back under the user, so the whole box can never be erased. Hold
-      // the empty text; committing resumes on the next real keystroke or blur.
-      if (nextText.trim() === '') {
-        debouncerRef.current?.cancel();
-        return;
-      }
-      const parsed = parse(nextText);
-      if (debounceMs <= 0) {
-        debouncerRef.current?.flush(parsed);
-        return;
-      }
-      debouncerRef.current?.schedule(parsed);
-    },
-    onBlur: () => {
-      // Left blank on blur → nothing to commit; restore the last committed
-      // value (LightBurn behavior) rather than writing a fallback number.
-      if (draft.trim() === '') {
-        debouncerRef.current?.cancel();
-        setDraft(format(value));
-        return;
-      }
-      const committed = parse(draft);
-      debouncerRef.current?.flush(committed);
-      // Snap even when the clamped value equals the already-committed value
-      // (flush may skip the commit callback then, but the text can still be
-      // out of range — e.g. 9999 typed while the store already holds 6000).
-      setDraft(format(committed));
-    },
+    errorMessage,
+    onChange: createChangeHandler(handlerContext),
+    onBlur: createBlurHandler(handlerContext),
   };
+}
+
+type DebouncedHandlerContext<T> = {
+  readonly value: T;
+  readonly draft: string;
+  readonly debounceMs: number;
+  readonly parse: (input: string) => T;
+  readonly format: (value: T) => string;
+  readonly validationError: (input: string) => string | null;
+  readonly debouncer: Debouncer<T> | undefined;
+  readonly setDraft: (value: string) => void;
+  readonly setErrorMessage: (value: string | null) => void;
+};
+
+function createChangeHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCommit['onChange'] {
+  return (event): void => {
+    const nextText = event.target.value;
+    context.setDraft(nextText);
+    // Blank is a valid transient edit, but never a value to commit.
+    if (nextText.trim() === '') {
+      context.debouncer?.cancel();
+      context.setErrorMessage(null);
+      setInputValidity(event.target, '');
+      return;
+    }
+    const error = context.validationError(nextText);
+    context.setErrorMessage(error);
+    setInputValidity(event.target, error ?? '');
+    if (error !== null) {
+      context.debouncer?.cancel();
+      return;
+    }
+    const parsed = context.parse(nextText);
+    if (context.debounceMs <= 0) context.debouncer?.flush(parsed);
+    else context.debouncer?.schedule(parsed);
+  };
+}
+
+function createBlurHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCommit['onBlur'] {
+  return (event): void => {
+    if (context.draft.trim() === '') {
+      context.debouncer?.cancel();
+      context.setDraft(context.format(context.value));
+      context.setErrorMessage(null);
+      setInputValidity(event?.currentTarget, '');
+      return;
+    }
+    const error = context.validationError(context.draft);
+    if (error !== null) {
+      context.debouncer?.cancel();
+      context.setErrorMessage(error);
+      setInputValidity(event?.currentTarget, error, true);
+      return;
+    }
+    const committed = context.parse(context.draft);
+    context.debouncer?.flush(committed);
+    // Reconcile clamped text even when the canonical value did not change.
+    context.setDraft(context.format(committed));
+    context.setErrorMessage(null);
+    setInputValidity(event?.currentTarget, '');
+  };
+}
+
+function setInputValidity(
+  input: HTMLInputElement | undefined,
+  message: string,
+  report = false,
+): void {
+  input?.setCustomValidity?.(message);
+  if (report) input?.reportValidity?.();
 }
 
 function defaultFormat<T>(v: T): string {

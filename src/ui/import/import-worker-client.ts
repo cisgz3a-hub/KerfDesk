@@ -232,13 +232,25 @@ function ensureWorker(): Worker | null {
     };
     worker.onerror = () => {
       if (workerInstance === worker) {
-        rejectAllPendingAndRetireWorker('import worker errored');
+        failActiveAndRestart('import worker errored');
       }
     };
     return worker;
   } catch {
     return null;
   }
+}
+
+function failActiveAndRestart(message: string): void {
+  const id = activeRequestId;
+  retireWorker();
+  if (id === null) {
+    startNextRequest();
+    return;
+  }
+  const pending = pendingByRequestId.get(id);
+  pending?.reject(new Error(message));
+  finishRequest(id);
 }
 
 function rejectAllPendingAndRetireWorker(message: string): void {

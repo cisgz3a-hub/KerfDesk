@@ -74,4 +74,44 @@ describe('prepareProjectForAutosave', () => {
     if (result.kind !== 'invalid') return;
     expect(result.reason.length).toBeGreaterThan(0);
   });
+
+  it(
+    'preserves already-valid geometry above the former 250k-point cap in manual save and autosave',
+    { timeout: 30_000 },
+    () => {
+      const base = createProject();
+      const points = Array.from({ length: 250_001 }, (_, index) => ({
+        x: index / 1000,
+        y: (index % 17) / 1000,
+      }));
+      const dense: SceneObject = {
+        kind: 'imported-svg',
+        id: 'dense-svg',
+        source: 'dense.svg',
+        bounds: { minX: 0, minY: 0, maxX: 250, maxY: 0.016 },
+        transform: IDENTITY_TRANSFORM,
+        paths: [{ color: '#000000', polylines: [{ points, closed: false }] }],
+      };
+      const project: Project = {
+        ...base,
+        scene: { ...base.scene, objects: [dense] },
+      };
+
+      const autosaved = prepareProjectForAutosave(project);
+      const saved = prepareProjectForPersistence(project);
+      expect(autosaved.kind).toBe('ok');
+      expect(saved.kind).toBe('ok');
+      if (autosaved.kind !== 'ok' || saved.kind !== 'ok') return;
+
+      for (const json of [autosaved.json, saved.json]) {
+        const reopened = deserializeProject(json);
+        expect(reopened.kind).toBe('ok');
+        if (reopened.kind !== 'ok') continue;
+        const object = reopened.project.scene.objects[0];
+        expect(object?.kind).toBe('imported-svg');
+        if (object?.kind !== 'imported-svg') continue;
+        expect(object.paths[0]?.polylines[0]?.points).toEqual(points);
+      }
+    },
+  );
 });

@@ -1,13 +1,14 @@
 import type { DeviceProfile } from '../devices';
-import { sceneObjectUsesOperation, type Layer, type SceneObject } from '../scene';
+import type { Layer, SceneObject } from '../scene';
 import type { HatchFillRule } from './fill-hatching';
 
 export function fillRuleForLayer(objects: ReadonlyArray<SceneObject>, layer: Layer): HatchFillRule {
-  return objects.some((obj) => textObjectMatchesLayer(obj, layer)) ? 'nonzero' : 'evenodd';
-}
-
-function textObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {
-  return obj.kind === 'text' && sceneObjectUsesOperation(obj, layer);
+  void objects;
+  void layer;
+  // Text geometry is resolved per object under non-zero semantics before the
+  // layer is pooled. The pooled layer must remain even-odd so one text object
+  // cannot alter unrelated SVG/shape donut topology.
+  return 'evenodd';
 }
 
 export function layerFillCacheKey(

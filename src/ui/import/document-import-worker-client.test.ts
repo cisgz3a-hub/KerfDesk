@@ -107,4 +107,22 @@ describe('document import worker client', () => {
     });
     await expect(second).resolves.toMatchObject({ reason: 'second' });
   });
+
+  it('rejects only the active document request after a crash and keeps FIFO work', async () => {
+    const first = parseProjectOffThread(new Blob(['{}']));
+    const queued = parseProjectOffThread(new Blob(['{}']));
+    const failed = latest();
+
+    failed.onerror?.();
+
+    await expect(first).rejects.toThrow('document import worker errored');
+    expect(failed.terminated).toBe(true);
+    const replacement = latest();
+    replacement.reply({
+      id: replacement.posted[0]?.id ?? -1,
+      kind: 'project',
+      result: { kind: 'invalid', reason: 'queued survived' },
+    });
+    await expect(queued).resolves.toMatchObject({ reason: 'queued survived' });
+  });
 });

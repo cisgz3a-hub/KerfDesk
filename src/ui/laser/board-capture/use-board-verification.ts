@@ -308,7 +308,11 @@ export function boardVerificationTargetLabel(target: BoardVerificationTarget): s
 
 function currentMachinePosition(): Vec2 | null {
   const laser = useLaserStore.getState();
-  return inferCurrentMachinePosition(laser.statusReport, laser.wcoCache);
+  return inferCurrentMachinePosition(
+    laser.statusReport,
+    laser.wcoCache,
+    laser.controllerSettings?.reportInches === true,
+  );
 }
 
 function currentRegistrationEpoch(): BoardRegistrationEpoch {

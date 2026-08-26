@@ -5,6 +5,7 @@
 
 import { NumberInput } from '../../kit';
 import { useDebouncedCommit } from '../../layers/use-debounced-commit';
+import { parseEnglishDecimalInput } from '../../layers/english-decimal-input';
 import { cellInputStyle, tableCellStyle } from './job-review-table.styles';
 
 export function ReviewNumberCell(props: {
@@ -21,6 +22,7 @@ export function ReviewNumberCell(props: {
     commit: props.onCommit,
     parse: (input) => parseReviewNumber(input, props.value, props),
   });
+  const errorId = `review-number-error-${props.label.replace(/[^a-z0-9]+/giu, '-').toLowerCase()}`;
   return (
     <td style={tableCellStyle}>
       <NumberInput
@@ -31,8 +33,16 @@ export function ReviewNumberCell(props: {
         min={props.min}
         {...(props.max === undefined ? {} : { max: props.max })}
         step={props.step ?? 1}
+        lang="en"
+        aria-invalid={field.errorMessage === null ? undefined : true}
+        aria-describedby={field.errorMessage === null ? undefined : errorId}
         style={cellInputStyle}
       />
+      {field.errorMessage === null ? null : (
+        <span id={errorId} role="alert">
+          {field.errorMessage}
+        </span>
+      )}
     </td>
   );
 }
@@ -42,8 +52,8 @@ function parseReviewNumber(
   fallback: number,
   range: { readonly min: number; readonly max?: number; readonly isInteger?: boolean },
 ): number {
-  const parsed = Number(input);
-  if (!Number.isFinite(parsed)) return fallback;
+  const parsed = parseEnglishDecimalInput(input);
+  if (parsed === null) return fallback;
   const stepped = range.isInteger === true ? Math.floor(parsed) : parsed;
   const lowClamped = Math.max(range.min, stepped);
   return range.max === undefined ? lowClamped : Math.min(range.max, lowClamped);
