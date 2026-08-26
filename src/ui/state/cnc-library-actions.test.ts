@@ -437,7 +437,7 @@ describe('persistence codec', () => {
       }),
     );
     expect(parsed?.customTools).toEqual([
-      { id: 'x', name: 'still valid', kind: 'end-mill', diameterMm: 2 },
+      { id: 'x', name: 'still valid', kind: 'end-mill', diameterMm: 2, fluteCount: 17 },
     ]);
   });
 });

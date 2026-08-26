@@ -1,6 +1,6 @@
 // CncLayerPrimitives — the shared row + labelled-number-input controls and
-// styles used across the CNC layer card (CncLayerFields, CncLayerAdvancedFields,
-// CncMaterialRow). Extracted so those field groups stay under the file-size cap
+// styles used across the CNC layer card (CncLayerFields and CncLayerAdvancedFields).
+// Extracted so those field groups stay under the file-size cap
 // and share one visual language.
 
 import type { Layer } from '../../core/scene';

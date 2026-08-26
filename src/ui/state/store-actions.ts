@@ -1,12 +1,7 @@
-import type { DeviceProfile } from '../../core/devices';
 import { deviceProfileWithInteractivePatch } from '../../core/devices/device-profile-patch';
-import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
 import {
   moveLayer as moveSceneLayer,
   sceneObjectHasVisibleLayer,
-  type CncMachineConfig,
-  type CncTool,
-  type MachineConfig,
   type Project,
   type Transform,
   updateLayer,
@@ -20,8 +15,8 @@ import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
 import type { AppState, OutputScopeSettings } from './store';
-import { cncMachineWithCustomTools } from './machine-actions';
-import { projectAfterDeviceProfileChange, sceneAfterMachineSetup } from './cnc-machine-setup-scene';
+import { projectAfterDeviceProfileChange } from './cnc-machine-setup-scene';
+import { machineSetupActions } from './machine-setup-actions';
 import {
   nextProbeSetupState,
   projectsShareProbeSetupIdentity,
@@ -30,10 +25,6 @@ import {
 type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
 ) => void;
-
-export type MachineSetupReplacementResult =
-  | { readonly kind: 'applied' }
-  | { readonly kind: 'blocked-by-capability'; readonly requestedKind: MachineConfig['kind'] };
 
 export function sceneActions(
   set: Setter,
@@ -44,6 +35,7 @@ export function sceneActions(
   | 'updateDeviceProfile'
   | 'replaceDeviceProfile'
   | 'replaceMachineSetup'
+  | 'replaceCncStartupSetup'
 > {
   return {
     setLayerParam: (layerId, patch) =>
@@ -99,101 +91,8 @@ export function sceneActions(
           dirty: true,
         };
       }),
-    ...replaceMachineSetupAction(set),
+    ...machineSetupActions(set),
   };
-}
-
-function replaceMachineSetupAction(set: Setter): Pick<AppState, 'replaceMachineSetup'> {
-  return {
-    replaceMachineSetup: (
-      profile: DeviceProfile,
-      machine: MachineConfig,
-      retainedMachine?: MachineConfig,
-    ) => {
-      if (!deviceSupportsMachineKind(profile, machine.kind)) {
-        return { kind: 'blocked-by-capability', requestedKind: machine.kind };
-      }
-      set((s) => replacementMachineSetupState(s, profile, machine, retainedMachine));
-      return { kind: 'applied' };
-    },
-  };
-}
-
-function replacementMachineSetupState(
-  state: AppState,
-  profile: DeviceProfile,
-  machine: MachineConfig,
-  retainedMachine?: MachineConfig,
-): Partial<AppState> {
-  const nextMachine = machineWithCustomTools(machine, state.cncLibrary.customTools);
-  const retainedCnc = retainedCncForSetup(state, nextMachine, retainedMachine);
-  const nextCachedCnc = cachedCncWithCustomTools(retainedCnc, state.cncLibrary.customTools);
-  const nextProfile = profileWithCncSettings(profile, nextCachedCnc);
-  const scene = sceneAfterMachineSetup(
-    state.project.scene,
-    state.project.machine,
-    nextProfile,
-    nextMachine,
-    state.cncLiveCaps,
-  );
-  return {
-    ...nextProbeSetupState(
-      {
-        ...state.project,
-        scene,
-        device: nextProfile,
-        machine: nextMachine,
-        workspace: {
-          ...state.project.workspace,
-          width: nextProfile.bedWidth,
-          height: nextProfile.bedHeight,
-        },
-      },
-      state.probeSetupEpoch,
-    ),
-    jobPlacement: jobPlacementAfterProfileSelection(
-      state.jobPlacement,
-      state.project.device,
-      nextProfile,
-    ),
-    cachedCncMachine: nextCachedCnc,
-    undoStack: pushUndo(state.project, state.undoStack),
-    redoStack: [],
-    dirty: true,
-  };
-}
-
-function machineWithCustomTools(
-  machine: MachineConfig,
-  customTools: ReadonlyArray<CncTool>,
-): MachineConfig {
-  return machine.kind === 'cnc' ? cncMachineWithCustomTools(machine, customTools) : machine;
-}
-
-function retainedCncForSetup(
-  state: AppState,
-  nextMachine: MachineConfig,
-  retainedMachine?: MachineConfig,
-): CncMachineConfig | null {
-  if (nextMachine.kind === 'cnc') return nextMachine;
-  if (retainedMachine?.kind === 'cnc') return retainedMachine;
-  if (state.project.machine?.kind === 'cnc') return state.project.machine;
-  return state.cachedCncMachine;
-}
-
-function cachedCncWithCustomTools(
-  machine: CncMachineConfig | null,
-  customTools: ReadonlyArray<CncTool>,
-): CncMachineConfig | null {
-  return machine === null ? null : cncMachineWithCustomTools(machine, customTools);
-}
-
-function profileWithCncSettings(
-  profile: DeviceProfile,
-  cachedCnc: CncMachineConfig | null,
-): DeviceProfile {
-  if (profile.capabilities?.includes('cnc-output') !== true || cachedCnc === null) return profile;
-  return { ...profile, cncSubProfile: { ...cachedCnc.params } };
 }
 
 export function duplicateAction(set: Setter): Pick<AppState, 'duplicateSelection'> {

@@ -1,4 +1,10 @@
-// Public surface of the device-setup module: LaserWindow mounts
-// DeviceSetupControls, which owns the wizard, the passive nudge, and the Machine
-// Setup entry. The wizard, pure helpers, and step components stay internal.
-export { DeviceSetupControls, type DeviceSetupOpenRequest } from './DeviceSetupControls';
+// Public setup surface: rail controls open one App-level dialog host, while
+// other UI can deep-link to an exact CNC Startup Setup field.
+export { DeviceSetupControls } from './DeviceSetupControls';
+export { MachineSetupDialogHost } from './MachineSetupDialogHost';
+export {
+  closeMachineSetup,
+  openMachineSetup,
+  type CncStartupSetupField,
+  type MachineSetupTarget,
+} from './machine-setup-dialog-store';

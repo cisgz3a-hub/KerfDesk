@@ -1,5 +1,5 @@
 // ProbeControls — the reusable touch-plate probing body (mode / corner / plate
-// / bit + Run), extracted from ProbePanel so both the CNC Material & Bit panel
+// / bit + Run), extracted from ProbePanel so both the CNC Machine rail
 // and the Device-Setup wizard can host it (F-CNC20) without duplicating the
 // G38.2 logic. CNC-only (null otherwise); the caller supplies the chrome.
 

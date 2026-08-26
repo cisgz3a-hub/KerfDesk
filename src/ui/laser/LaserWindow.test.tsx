@@ -10,6 +10,7 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { LaserWindow } from './LaserWindow';
+import { MachineSetupDialogHost } from './device-setup';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -55,7 +56,10 @@ describe('LaserWindow autofocus busy controls', () => {
         root = createRoot(host);
         root.render(
           <PlatformProvider adapter={mockPlatform}>
-            <LaserWindow />
+            <>
+              <LaserWindow />
+              <MachineSetupDialogHost />
+            </>
           </PlatformProvider>,
         );
       });
@@ -92,7 +96,10 @@ describe('LaserWindow autofocus busy controls', () => {
         root = createRoot(host);
         root.render(
           <PlatformProvider adapter={mockPlatform}>
-            <LaserWindow />
+            <>
+              <LaserWindow />
+              <MachineSetupDialogHost />
+            </>
           </PlatformProvider>,
         );
       });

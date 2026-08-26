@@ -1,7 +1,6 @@
 // LaserWindow — Phase B controller panel. Connection, status, jog, job
 // controls. Renders alongside the Cuts/Layers panel on the right rail.
 
-import { useState } from 'react';
 import { describeAlarm } from '../../core/controllers/grbl';
 import type { MachineKind } from '../../core/scene';
 import { CollapsedRail, RailPanelHeading } from '../common';
@@ -13,12 +12,13 @@ import {
 } from '../state/laser-store-helpers';
 import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
 import { machineControlsLabel, machineDisplayName } from '../machine/machine-labels';
+import { CncUtilitiesPanel } from '../machine/CncUtilitiesPanel';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
 import { ControllerConnectionControls } from './ControllerConnectionControls';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
-import type { DeviceSetupOpenRequest } from './device-setup';
+import { openMachineSetup } from './device-setup';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
@@ -30,7 +30,6 @@ import { clearStartBlockers } from './start-blocker-invalidation';
 import { useToastStore } from '../state/toast-store';
 
 export function LaserWindow(): JSX.Element {
-  const [machineSetupRequest, setMachineSetupRequest] = useState<DeviceSetupOpenRequest>();
   const machinePanel = useMachineRailVisibility();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
@@ -49,7 +48,7 @@ export function LaserWindow(): JSX.Element {
   const connected = connection.kind === 'connected';
   // Homing lives on the Confirm settings step, which is not collapsed, so the
   // deep-link needs no section highlight.
-  const openHomingSetup = (): void => setMachineSetupRequest({ initialStep: 'confirm' });
+  const openHomingSetup = (): void => openMachineSetup({ kind: 'step', step: 'confirm' });
   if (!machinePanel.isExpanded) {
     return <CollapsedMachineRail machineKind={machineKind} onExpand={machinePanel.toggle} />;
   }
@@ -67,7 +66,6 @@ export function LaserWindow(): JSX.Element {
         autofocusBusy={autofocusBusy}
         motionOperation={motionOperation}
         controllerOperation={controllerOperation}
-        openRequest={machineSetupRequest}
         onForget={confirmForgetController}
       />
       {controllerDisplay.showAlarmBanner && (
@@ -93,10 +91,11 @@ export function LaserWindow(): JSX.Element {
         )}
       />
       <ProbePanel />
+      <CncUtilitiesPanel />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onConfigureAutofocus={() =>
-          setMachineSetupRequest({ initialStep: 'options', highlight: 'autofocus' })
+          openMachineSetup({ kind: 'step', step: 'options', highlight: 'autofocus' })
         }
         onConfigureHoming={openHomingSetup}
         onStartJob={() => void runStartJobFlow()}

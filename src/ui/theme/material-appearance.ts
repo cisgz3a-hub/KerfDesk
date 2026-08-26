@@ -1,6 +1,6 @@
 // material-appearance — how each stock material looks in the previews.
 //
-// The stock material is already chosen once per job in the Material & Bit
+// The stock material is already chosen once per job in CNC Startup Setup
 // panel (ADR-112, CncStock.materialKey), but both previews drew every job as
 // the same brown board. Acrylic looking like walnut is a small lie that costs
 // the operator a beat every time they check they loaded the right stock.

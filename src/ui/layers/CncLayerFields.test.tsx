@@ -95,6 +95,13 @@ describe('CncLayerFields relief contract', () => {
     try {
       expect(stepoverInput(host, layer.color)).not.toBeNull();
       expect(host.textContent).toContain('total depth comes from the relief');
+      expect(
+        host.querySelector(`select[aria-label="Relief finishing bit for ${layer.color}"]`),
+      ).toBeNull();
+      expect(host.querySelector('button[aria-label^="Relief finishing bit:"]')).not.toBeNull();
+      expect(
+        host.querySelector(`input[aria-label="Relief scallop height for ${layer.color}"]`),
+      ).not.toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -157,17 +164,25 @@ describe('CncLayerFields always-visible Advanced section', () => {
     };
   }
 
-  it('shows the core cut params + material + cut depth', async () => {
+  it('shows operation cut parameters and setup-owned references', async () => {
     const layer = profileLayer();
     installProject(layer, false);
     const { host, root } = await render(layer);
     try {
-      for (const field of ['Cut depth', 'Depth per pass', 'Feed', 'Plunge', 'Spindle']) {
+      for (const field of [
+        'Cut depth',
+        'Depth per pass',
+        'Feed',
+        'Plunge',
+        'Artwork spindle speed',
+      ]) {
         expect(
           host.querySelector(`input[aria-label="${field} for ${layer.color}"]`),
         ).not.toBeNull();
       }
-      expect(host.querySelector(`select[aria-label="Material for ${layer.color}"]`)).not.toBeNull();
+      expect(host.querySelector(`select[aria-label="Material for ${layer.color}"]`)).toBeNull();
+      expect(host.querySelector('button[aria-label^="Material:"]')).not.toBeNull();
+      expect(host.querySelector('button[aria-label^="Machine maximum:"]')).not.toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -280,7 +295,7 @@ describe('CncLayerFields always-visible Advanced section', () => {
     }
   });
 
-  it('enables pocket helical entry and removes a conflicting along-path ramp', async () => {
+  it('enables pocket helical entry without replacing the Startup roughing bit', async () => {
     const layer: Layer = {
       ...createLayer({ id: '#00aa00', color: '#00aa00' }),
       cnc: {
@@ -295,10 +310,11 @@ describe('CncLayerFields always-visible Advanced section', () => {
     try {
       const checkbox = host.querySelector(`input[aria-label="Helical entry for ${layer.color}"]`);
       if (!(checkbox instanceof HTMLInputElement)) throw new Error('Helical entry toggle missing');
+      expect(checkbox.title).toContain('edit Startup Setup');
       await act(async () => checkbox.click());
       const settings = useStore.getState().project.scene.layers[0]?.cnc;
       expect(settings?.rampEntryDeg).toBeUndefined();
-      expect(settings?.pocketRoughToolId).toBeUndefined();
+      expect(settings?.pocketRoughToolId).toBe('em-6350');
       expect(settings?.helixEntry).toEqual({
         minDiameterMm: 2,
         maxDiameterMm: 8,
@@ -310,30 +326,69 @@ describe('CncLayerFields always-visible Advanced section', () => {
     }
   });
 
-  it('selects a larger roughing bit and removes a conflicting helix', async () => {
+  it('shows how to resolve the helical and Startup roughing-bit compile conflict', async () => {
     const layer: Layer = {
       ...createLayer({ id: '#00aa00', color: '#00aa00' }),
       cnc: {
         ...DEFAULT_CNC_LAYER_SETTINGS,
         cutType: 'pocket',
-        toolId: 'em-1588',
+        pocketRoughToolId: 'em-6350',
         helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
       },
     };
     installProject(layer, false);
     const { host, root } = await render(layer);
     try {
-      const select = host.querySelector(
-        `select[aria-label="Pocket roughing bit for ${layer.color}"]`,
-      );
-      if (!(select instanceof HTMLSelectElement)) throw new Error('Roughing bit selector missing');
-      await act(async () => {
-        select.value = 'em-6350';
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-      const settings = useStore.getState().project.scene.layers[0]?.cnc;
-      expect(settings?.pocketRoughToolId).toBe('em-6350');
-      expect(settings?.helixEntry).toBeUndefined();
+      expect(host.textContent).toContain('cannot compile while a pocket roughing bit is assigned');
+      expect(host.textContent).toContain('Startup Setup > Tool Plan');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('shows the Startup pocket roughing bit read-only without another selector', async () => {
+    const layer: Layer = {
+      ...createLayer({ id: '#00aa00', color: '#00aa00' }),
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'pocket',
+        toolId: 'em-1588',
+        pocketRoughToolId: 'em-6350',
+      },
+    };
+    installProject(layer, false);
+    const { host, root } = await render(layer);
+    try {
+      expect(
+        host.querySelector(`select[aria-label="Pocket roughing bit for ${layer.color}"]`),
+      ).toBeNull();
+      const reference = host.querySelector('button[aria-label^="Pocket roughing bit:"]');
+      expect(reference).not.toBeNull();
+      expect(reference?.getAttribute('aria-label')).toContain('6.35 mm');
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.pocketRoughToolId).toBe('em-6350');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('shows a V-carve floor-clearing assignment only as a Startup reference', async () => {
+    const layer: Layer = {
+      ...createLayer({ id: '#00aa00', color: '#00aa00' }),
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'v-carve',
+        vCarveFlatDepthEnabled: true,
+        vClearToolId: 'em-3175',
+      },
+    };
+    installProject(layer, false);
+    const { host, root } = await render(layer);
+    try {
+      expect(host.querySelector(`select[aria-label="Clearing bit for ${layer.color}"]`)).toBeNull();
+      expect(host.querySelector('button[aria-label^="Floor clearing bit:"]')).not.toBeNull();
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.vClearToolId).toBe('em-3175');
     } finally {
       await act(async () => root.unmount());
       host.remove();

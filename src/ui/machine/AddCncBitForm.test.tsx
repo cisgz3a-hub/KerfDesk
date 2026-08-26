@@ -52,6 +52,42 @@ async function add(host: HTMLElement): Promise<void> {
 }
 
 describe('AddCncBitForm', () => {
+  it('requires a physical positive whole-number flute count', async () => {
+    const { host, root } = await renderForm();
+    try {
+      await setInput(host, 'New bit name', 'Bad flute count');
+      await setInput(host, 'New bit diameter (mm)', '3');
+      await setInput(host, 'New bit flute count', '1.5');
+      await add(host);
+
+      expect(useStore.getState().cncLibrary.customTools).toEqual([]);
+      expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+        'actual flute count as a positive whole number',
+      );
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('does not impose an artificial upper cap on a positive whole-number flute count', async () => {
+    const { host, root } = await renderForm();
+    try {
+      await setInput(host, 'New bit name', 'Many-flute cutter');
+      await setInput(host, 'New bit diameter (mm)', '3');
+      await setInput(host, 'New bit flute count', '17');
+      await add(host);
+
+      expect(useStore.getState().cncLibrary.customTools[0]?.fluteCount).toBe(17);
+      const fluteInput = host.querySelector('[aria-label="New bit flute count"]');
+      expect(fluteInput).toBeInstanceOf(HTMLInputElement);
+      expect((fluteInput as HTMLInputElement).max).toBe('');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('does not prefill geometry or accept an angle-driven bit without its actual angle', async () => {
     const { host, root } = await renderForm();
     try {
@@ -86,12 +122,13 @@ describe('AddCncBitForm', () => {
     }
   });
 
-  it('stores the entered 3 mm / 90 degree geometry and clears it after Add', async () => {
+  it('stores geometry and flute count in the Startup-owned bit definition', async () => {
     const { host, root } = await renderForm();
     try {
       await setInput(host, 'New bit name', '90 degree 3 mm V-bit');
       await selectKind(host, 'v-bit');
       await setInput(host, 'New bit diameter (mm)', '3');
+      await setInput(host, 'New bit flute count', '3');
       await setInput(host, 'New bit included angle (deg)', '90');
       await add(host);
 
@@ -99,6 +136,7 @@ describe('AddCncBitForm', () => {
         name: '90 degree 3 mm V-bit',
         kind: 'v-bit',
         diameterMm: 3,
+        fluteCount: 3,
         tipAngleDeg: 90,
       });
       expect((host.querySelector('[aria-label="New bit name"]') as HTMLInputElement).value).toBe(
@@ -111,6 +149,9 @@ describe('AddCncBitForm', () => {
         (host.querySelector('[aria-label="New bit included angle (deg)"]') as HTMLInputElement)
           .value,
       ).toBe('');
+      expect(
+        (host.querySelector('[aria-label="New bit flute count"]') as HTMLInputElement).value,
+      ).toBe('2');
     } finally {
       await act(async () => root.unmount());
       host.remove();

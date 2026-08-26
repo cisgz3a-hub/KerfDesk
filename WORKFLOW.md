@@ -266,12 +266,22 @@ Identical to F-A3 except:
 ### F-A7. Artwork Operations panel
 
 #### Layout
-- The top **Artwork settings** inspector is the canonical detailed settings surface and remains
+- The top **Artwork settings** inspector is the canonical detailed artwork-operation surface and remains
   present whenever editable artwork exists. A canvas selection takes priority and shows that
   artwork's shape, image, and named laser/CNC operation fields. Clearing the canvas selection keeps
   the last inspected artwork available without reselecting it; with several unselected artworks, a
   single **Artwork** selector chooses which one the inspector edits. The selector is UI-only and
   does not change selected-only output, canvas handles, grouping, or machine order.
+- In CNC mode, Artwork settings owns operation cutting behavior: cut type, cut/insert depth,
+  depth per pass, feed, plunge, **Artwork spindle speed**, tabs, and specialist CAM controls.
+  Startup-owned material, resolved cutter, stock, machine maximum RPM, spin-up, coolant, safe Z,
+  and park values appear only as muted read-only references. A reference remains keyboard-focusable;
+  activating it explains its scope and offers a direct **Edit in Startup Setup** route to the exact
+  field. It is not a disabled input and does not add a confirmation before editing.
+- Importing, placing, or selecting artwork never opens Startup Setup and never asks for material or
+  bit again. New CNC operations inherit the committed current-job defaults. Mixed material/tool
+  assignments remain explicit in **Startup Setup > Tool Plan** rather than becoming a second set of
+  writable controls in Artwork settings.
 - The inspector renders only one detailed settings context at a time. A real multi-selection keeps
   the existing combined/common-operation workflow; unselected artworks are switched through the
   **Artwork** selector rather than expanding one settings card per shape.
@@ -958,16 +968,17 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 1. The persistent blocker surface and error toast show the compile/transport reason. No Frame or job
    bytes are sent and Job Review does not open. Policy findings do not enter this path.
 
-#### Error — re-prepare refused inside the review
-1. An in-review edit that makes the job unpreparable (an alarm arrives, the output empties, or
+#### Error — laser re-prepare refused inside the review
+1. A laser in-review edit that makes the job unpreparable (an alarm arrives, the output empties, or
    program identity is lost under Run again / checkpoint replacement) shows
    the exact refusal messages in a red banner, keeps the last good stats dimmed, and disables the
-   review's Start button. Fields stay editable — fixing the value recovers in place. No bytes sent.
+   review's Start button. Laser fields stay editable — fixing the value recovers in place. CNC uses
+   the read-only review and returns to Artwork or Startup Setup for changes. No bytes are sent.
 
 #### Empty — nothing to warn or acknowledge
 1. With no warnings the amber dropdown is absent entirely (no "Warnings (0)"); a laser whose
    `$32=1` is verified this session shows a one-line verified note instead of an
-   acknowledgement prompt. An in-review edit that fixes the last warning removes the dropdown
+   acknowledgement prompt. A laser in-review edit that fixes the last warning removes the dropdown
    on the next re-prepare; one that introduces a warning brings it back.
 
 #### Edge — cancel the review
@@ -1561,9 +1572,11 @@ clone/hash runs after the first controller bytes are accepted.
 ### F-C7. Unified Machine Setup
 
 The single beginner-facing machine configuration surface. The Laser/CNC rail exposes one **Machine
-Setup** button; old `MachineSetupDialog` callers resolve to the same flow rather than a competing
-live-edit tab dialog. Every edit remains in one `DeviceProfile` + `MachineConfig` draft until **Save
-machine setup**, which commits the complete configuration as one undoable project change.
+Setup** button; its CNC-facing job page is labeled **Startup Setup**. Old `MachineSetupDialog`
+callers and deep links from read-only Artwork references resolve to the same global flow rather than
+a competing live-edit dialog. Every edit remains in one `DeviceProfile` + `MachineConfig` +
+current-job CNC draft until **Save machine setup**, which commits the complete configuration as one
+undoable project change.
 
 Machine capability is an enforced physical-output contract (ADR-210), not descriptive metadata:
 
@@ -1582,8 +1595,9 @@ Machine capability is an enforced physical-output contract (ADR-210), not descri
 - The final atomic setup action independently refuses a profile/machine mismatch, so another caller
   cannot persist a single-output capability beside the opposite active mode.
 
-The six steps are always visible and always ordered (ADR-240; supersedes the seven-step
-enumeration of ADR-186/ADR-205):
+The six machine pages remain ordered as ADR-240 defined. A draft whose active output is CNC inserts
+one **Startup Setup** (`cnc-setup`) page between Confirm settings and Options, so CNC has seven visible pages and
+laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page composition):
 
 1. **Machine type** — Laser only / CNC only / Laser + CNC, and for hybrids the active mode after
    Save. Nothing else competes with this choice.
@@ -1597,16 +1611,23 @@ enumeration of ADR-186/ADR-205):
 3. **Connect & detect** — connect with the reviewed driver/baud, run that controller family's
    read-only identity/settings commands, and optionally **Use detected values** (Ruida correctly
    presents file-only behavior). This page only observes and copies; it edits no field directly.
-4. **Confirm settings** — name, usable bed, max/frame feed, origin, homing policy, and the
-   machine-output contract (laser S range/air/Fire or CNC safe Z/spindle/dwell/coolant/park) on
-   one flat page. Stock, material, and bit remain job-specific in Material & Bit.
-5. **Options & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, and the
+4. **Confirm settings** — name, usable bed, max/frame feed, origin, homing policy, and the laser
+   output contract (S range/air/Fire) on one flat page. CNC machine-output and current-job settings
+   live together on the next page instead of being split across this page and Material & Bit.
+5. **Startup Setup** (`cnc-setup`, CNC active only) — three plainly labeled sections on one page:
+   **Machine limits** owns safe Z, spindle maximum, spin-up delay, coolant, and park;
+   **Current job** owns project material, default/active bit, stock dimensions/origin, and tiling;
+   **Tool Plan** owns each operation's material and primary/secondary cutter assignments, including
+   an explicit reset to the current-job default. Material browsing remains non-mutating until the
+   existing **Apply [material] preset** or **Use manual feeds** action updates the draft. Manage bits
+   and saved CNC profiles remain reachable from this page without creating another settings owner.
+6. **Options & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, and the
    laser-only scan-offset + optional controlled laser-off seek feed, auto-focus, rotary, and
    camera-status groups (hidden for CNC-only machines). Every group is collapsed by default and
    its summary row shows its live one-line state (zone counts, configured/not-configured,
    calibration pending) without opening it; no group nests another collapsible. The auto-focus
    deep-link opens its section explicitly.
-6. **Review & save** — firmware comparison first (controller-specific configuration location and
+7. **Review & save** — firmware comparison first (controller-specific configuration location and
    write policy; GRBL/grblHAL can queue common per-setting writes only after read + backup
    acknowledgement; FluidNC, Marlin, Smoothieware, and Ruida never receive numeric GRBL setup
    writes; queuing is draft-only and Cancel sends nothing), then the software-consistency cards and
@@ -1620,9 +1641,27 @@ enumeration of ADR-186/ADR-205):
 2. Supported numeric readback values can be copied into the draft with **Use detected values**; in
    CNC mode `$30` routes to the spindle ceiling rather than laser-power fields. The live project
    remains unchanged.
-3. On the last step, **Save machine setup** commits device, workspace, machine config, job placement,
-   CNC cache, and any spindle-ceiling clamp through one store action and one undo entry. Only after
-   that commit does it execute and exactly re-read any explicitly queued common firmware writes.
+3. On the last step, **Save machine setup** commits device, workspace, machine config, current-job
+   material/bit/stock/tiling, the operation material/tool plan, job placement, CNC cache, and
+   existing spindle-ceiling effects through one store action and one undo entry. **Cancel** leaves
+   the live project, dirty state, undo/redo history, and controller unchanged. Only after Save does
+   the flow execute and exactly re-read any explicitly queued common firmware writes.
+
+#### Success — configure CNC defaults before artwork exists
+
+1. Open **Machine > Machine Setup > Startup Setup**, choose current-job material, default bit, and
+   stock, explicitly Apply the material preset in the draft, then Save machine setup.
+2. Import or place artwork. Its new operation inherits those committed defaults without opening a
+   dialog or presenting another Material/Bit selector.
+3. Artwork settings shows the resolved setup values as read-only references and exposes only the
+   operation cutting values for editing.
+
+#### Edge — legacy mixed-material or multi-tool project
+
+1. Existing per-operation material and cutter ids load unchanged and appear as explicit overrides
+   in **Startup Setup > Tool Plan**. Nothing silently flattens them to the current-job defaults.
+2. Saving without changing those assignments preserves project serialization and compiled output.
+   Resetting an override to the job default is a deliberate draft edit.
 
 #### Error — read times out or the controller has no mapped settings
 
@@ -2514,11 +2553,15 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 
 #### Success
 1. User clicks **CNC** on the machine-mode toggle atop the Cuts/Layers panel.
-2. The CNC setup panel appears: bit selector (8 starter tools), stock
-   thickness, safe Z, spindle max RPM, spin-up delay. The Material Library
-   hides (laser power/speed recipes have no CNC meaning).
-3. Layer rows swap laser fields for CNC fields. The change is undoable and
-   marks the project dirty; `.lf2` save round-trips the machine config.
+2. No bottom Material & Bit card appears. **Machine > Machine Setup > Startup Setup** is the single
+   writable route for machine limits, current-job material/default bit/stock, and Tool Plan. It does
+   not open automatically merely because CNC mode or artwork was selected.
+3. Artwork rows swap laser fields for CNC operation fields. Setup-owned values are read-only
+   references there; activating one explains the value and deep-links to its exact Startup Setup
+   field. The compact canvas **Stock** chip is also read-only: it expands to the saved dimensions
+   and origin, contains no inputs, and routes **Edit in Startup Setup** to the exact stock fields.
+   Saving Startup Setup is one undoable project edit and `.lf2` round-trips the same machine, stock,
+   material, and tool-assignment data.
 4. Toggling back to **Laser** restores laser fields; the CNC config is
    cached in the session and restored if the user toggles again.
 
@@ -2540,7 +2583,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 #### Success
 1. User selects artwork, then picks a CNC operation: Outside / Inside / On path, Pocket,
    or Engrave. Each artwork starts with its own operation; a multi-selection can intentionally share.
-2. Depth, depth-per-pass, feed, plunge, and spindle RPM accept typed values;
+2. Cut type, depth, depth-per-pass, feed, plunge, and **Artwork spindle speed** accept typed values;
+   project material, resolved bit, and **Machine maximum** remain read-only references beside them.
    Pocket additionally shows stepover %, profile cut types show the tabs
    group (enabled, height, width, count). Outline and Engrave operations show
    a **Line art** selector (inner / outer / both, default inner): a traced
@@ -2551,6 +2595,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    engraves first, then profiles inner-before-outer).
 4. Artwork run controls set priority inside each safe phase. The compiler never moves a profile
    ahead of remaining clearing work or splits a contiguous tool section merely to satisfy priority.
+5. To change an operation's material or cutter assignment, use **Startup Setup > Tool Plan**. The
+   Artwork reference routes there directly; it does not expose a duplicate select.
 
 #### Warning — depth exceeds stock
 1. Preflight (F-CNC3) surfaces depth > stock thickness as a Job Review warning.
@@ -2706,8 +2752,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 ### F-CNC6. V-carve a layer — Phase H.3
 
 #### Success
-1. With a V-bit or angled engraving bit active in Material & Bit, the user sets
-   a layer's cut type to **V-carve (angled bit)**. New operations default to flowing depth:
+1. With a V-bit or angled engraving bit resolved from **Startup Setup > Tool Plan**, the user sets
+   an operation's cut type to **V-carve (angled bit)**. New operations default to flowing depth:
    **Flat depth** is off, and groove depth follows artwork width plus the
    selected bit's included angle and cutting diameter. **Detail** controls the
    vector boundary-sampling target (0 = automatic) and any necessary
@@ -2741,8 +2787,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    part.
 
 #### Error — active bit is not a compatible angled cutter
-1. The layer panel and Start-time Job Review ask for a V-bit or angled
-   engraving bit.
+1. The read-only Artwork reference and Start-time Job Review identify the mismatch and direct the
+   operator to **Startup Setup > Tool Plan** for a V-bit or angled engraving bit.
    It is an ordinary Save/Frame/Start warning, not a gate. Output remains
    available for compatibility and can use the legacy 60-degree wrong-kind
    fallback, so the operator is told to select a compatible angled cutter.
@@ -2752,7 +2798,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    60-degree fallback is permitted.
 3. While **Flat depth** is on, the optional flat-floor clearing bit must be a flat end mill. An older
    project that assigned a ball-nose or engraving cutter keeps that selection
-   visible as a disabled diagnostic choice instead of silently changing it. If
+   visible in Tool Plan as a disabled diagnostic choice instead of silently changing it. If
    the selected geometry would emit a clearing pocket, prepared output refuses
    it and names the incompatible cutter; the direct compiler also omits the
    clearing group. A contour with no flat floor adds no refusal because that
@@ -2760,7 +2806,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 4. While **Flat depth** is on, a missing configured clearing bit follows the same compile-integrity rule:
    it remains visible as an unavailable choice, prepared output refuses it only
    when a flat-floor stage can contribute, and direct compile omits that stage.
-5. Turning **Flat depth** off makes the clearing-bit selection inactive; it
+5. Turning **Flat depth** off makes the Tool Plan clearing-bit assignment inactive; it
    neither emits a second tool section nor participates in preflight. ADR-280
    does not widen either clearing-bit refusal. The eligibility probe
    retains its established requested-depth footprint, while valid executable
@@ -2802,11 +2848,11 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 ### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
 
 #### Success
-1. In CNC mode, the Material & Bit panel offers stock width, height, and
-   origin X/Y alongside thickness. Defaults: 400 × 400 mm at the machine
-   origin (the 4040 bed).
-2. Committing a value is undoable and marks the project dirty; `.lf2` save
-   round-trips the footprint.
+1. In CNC mode, **Startup Setup > Current job** offers stock width, height, origin X/Y, and
+   thickness beside material and default bit. Defaults: 400 × 400 mm at the machine origin
+   (the 4040 bed).
+2. The fields edit the setup draft. **Save machine setup** commits the complete draft as one
+   undoable change and marks the project dirty; `.lf2` save round-trips the footprint.
 3. On Save G-code / Start job, toolpaths that leave the stock footprint
    raise a non-blocking advisory toast ("bit will cut air or clamps").
    Physical bed bounds are likewise a warning in the Start-time Job Review
@@ -2916,9 +2962,9 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC11. Manage the bit library — Phase H.7
 
 #### Success
-1. Material & Bit → Manage bits lists every bit (starters + custom),
+1. **Startup Setup > Manage bits** lists every bit (starters + custom),
    grouped by cutter family. The manual add form takes name, kind (end
-   mill / ball nose / v-bit / engraving), diameter, included angle
+   mill / ball nose / v-bit / engraving), diameter, flute count, included angle
    (v/engraving only), and optional engraving tip-flat diameter. Geometry
    fields start blank and return to blank after each successful Add so a prior
    cutter's geometry cannot be reused accidentally.
@@ -2936,21 +2982,23 @@ and lifts the command's CNC-only gate.)*
    built in or saved. Unsupported
    entries remain visible with their source and the reason they are
    reference-only; they have no Add action.
-3. An added bit is selectable immediately (machine bit list and every
-   per-layer Bit select) and persists app-level in localStorage — it
-   merges into the tool list whenever a CNC project is opened, across
-   projects. Existing project copies win an ID or catalog-identity match, so
-   opening a project never replaces its saved ID or metadata with a library
-   alias.
+3. An added bit is selectable immediately inside the Startup Setup draft (the current-job default
+   and every Tool Plan cutter assignment). **Save machine setup** commits the bit library, project
+   machine, and Tool Plan together; **Cancel** discards all three draft changes. The committed bit
+   persists app-level in localStorage and merges into the tool list whenever a CNC project is
+   opened, across projects. Existing project copies win an ID or catalog-identity match, so opening
+   a project never replaces its saved ID or metadata with a library alias.
 4. Catalog family, optional evidenced shank/flute metadata, engraving tip-flat
    diameter, and stable catalog identity survive both app-library persistence
    and `.lf2` project round-trips. Generic non-O-flute envelopes carry no trusted flute count and
    make no automatic-feed claim. An explicit single/double O-flute family
-   count becomes the default for material-feed calculations; the operator can
-   still override it in the Feeds calculator.
-5. Deleting a custom bit removes it from the saved library and, when
-   present, from the open machine. The open-project machine edit is
-   undoable; project Undo does not restore the app-level library entry.
+   count becomes the default for material-feed calculations. Every selectable bit shows its
+   effective flute count in Startup Setup; changing it there updates the draft bit metadata used by
+   the read-only Artwork calculator. Final Save refreshes material-recipe values for operations
+   resolved through that cutter; manual numeric values remain exact.
+5. Deleting a custom bit stages its removal from the saved library, open machine, and Tool Plan.
+   Final **Save machine setup** commits that removal as the same project undo entry; **Cancel** keeps
+   the live library and project unchanged.
    If the bit is still assigned to an active V-carve clearing, non-adaptive
    pocket roughing, or bound relief-finishing stage, deletion is refused and
    the warning names the role and layer that must be changed first. Starters
@@ -3012,22 +3060,18 @@ and lifts the command's CNC-only gate.)*
    bit remain unchanged.
 
 #### Edge — layers referencing a deleted bit
-1. Deleting the active bit selects a surviving bit. If no bit survives, the
-   shared default tool list and default active bit are restored.
-2. Inherited automatic material recipes recalculate for the new active bit.
-   An automatic material-recipe layer pinned to the deleted bit loses that pin
-   and recalculates against the fallback. Automatic layers pinned to another
-   surviving bit and manual/legacy numeric settings retain their intent.
-3. A manual/legacy primary `toolId` may remain stale; `layerCncTool` resolves
-   it to the active bit during compile, so output does not reference a missing
-   primary bit.
-4. Deletion is refused while an active V-clear, relief-finish, or
-   pocket-roughing stage uses the bit. Dormant hidden secondary-tool bindings
-   are cleared as part of deletion rather than becoming unreachable stale
-   state.
-5. If deletion changes an output operation's effective cutter while its manual
+1. Deleting the current-job default bit selects a surviving bit inside the draft. If no bit
+   survives, the shared default tool list and default active bit are restored in that draft.
+2. Every Tool Plan primary or secondary assignment that names the deleted bit is reset to its
+   current-job default in the same draft; no stale hidden assignment remains.
+3. On final Save, inherited automatic material recipes recalculate for the new effective bit.
+   Automatic layers pinned to another surviving bit and manual/legacy numeric settings retain their
+   intent. Cancel leaves every live binding and library entry unchanged.
+4. Deletion is never another guard or refusal. Startup Setup names the affected operation bindings
+   and stages their reset; the final review shows the resulting plan before Save.
+5. If the committed deletion changes an output operation's effective cutter while its manual
    feed, plunge, spindle RPM, and depth-per-pass values remain exact, the same
-   retained-values warning used by the bit selectors is shown. A successfully
+   retained-values warning used by Tool Plan is shown. A successfully
    recalculated material recipe remains silent.
 
 ### F-CNC12. Save and apply feeds/speeds presets — Phase H.7
@@ -3053,7 +3097,7 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC13. Save and apply CNC machine profiles — Phase H.7
 
 #### Success
-1. Material & Bit → Machine profiles: Save snapshots the whole CNC
+1. **Startup Setup > Saved CNC profiles**: Save snapshots the whole CNC
    setup (stock, bit list, active bit, safe Z, spindle, park, tiling)
    under a name. Apply restores the profile's machine settings and
    active-bit intent while merging its tool list with the current project;
@@ -3087,7 +3131,7 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC14. Run a multi-bit job (M0 tool change) — Phase H.7
 
 #### Success
-1. Layers may each pick their own bit (Bit select). Compile orders the
+1. **Startup Setup > Tool Plan** may assign each operation its own bit. Compile orders the
    job into contiguous per-bit sections — one change per bit — with
    profile-carrying sections last, so a freed part is never
    re-machined.
@@ -3105,9 +3149,9 @@ and lifts the command's CNC-only gate.)*
 1. All layers on one bit → no M0 blocks; output is byte-identical to a
    single-tool job.
 
-#### Edge — unknown per-layer bit id
+#### Edge — unknown per-operation bit id
 1. Falls back to the machine's active bit at compile time.
-2. Changing a layer Bit keeps existing manual or machine-starter feed, plunge,
+2. Changing an operation's Tool Plan bit keeps existing manual or machine-starter feed, plunge,
    spindle RPM, and depth-per-pass values. A warning names that retention and
    asks the operator to verify the numbers for the newly selected cutter.
    Material-recipe settings are recalculated for the new cutter instead.
@@ -3195,8 +3239,8 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC17. Finish a relief (ball-nose skim) — Phase H.8
 
 #### Success
-1. A relief layer's "Finish with" select names the finishing bit; the
-   scallop field requests a planar-grid ridge-height target. Compile then emits the
+1. **Startup Setup > Tool Plan** names the relief finishing bit; Artwork's editable scallop field
+   requests a planar-grid ridge-height target. Compile then emits the
    roughing group AND a finishing group cut with that bit (an M0 change
    separates them when the bits differ).
 2. Finishing rides the sampled max-plus tip surface in serpentine rows. A ball
@@ -3276,7 +3320,7 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 
 #### Success
-1. Material & Bit → Tiling: enable, set tile size, overlap, and
+1. **Startup Setup > Current job > Tiling**: enable, set tile size, overlap, and
    registration holes. Save G-code then exports ONE FILE PER TILE
    (sequential save dialogs, names carry the index: job_tile-r1-c2.nc).
 2. Each tile's file contains only the motion inside its rectangle
@@ -3467,12 +3511,13 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC24. Calculate feeds & speeds from chipload — Phase H.11 (ADR-103 G5)
 
 #### Success
-1. Every CNC layer card has a "Feeds calculator": pick the material
-   family and flute count; the bit diameter comes from the layer's own
-   bit and RPM from the layer's spindle setting. The row shows the live
+1. Every CNC Artwork settings card has a **Feeds calculator**. Its material, resolved cutter,
+   diameter, and flute evidence come read-only from Startup Setup; RPM comes from the editable
+   Artwork spindle speed. To change a calculation input owned by setup, its reference deep-links
+   to Current job or Tool Plan instead of presenting another selector. The row shows the live
    result — feed = RPM × flutes × chipload, plunge as a material
    percentage, depth-per-pass as a fraction of bit diameter.
-2. "Apply to layer" writes feed / plunge / depth-per-pass / spindle in
+2. **Apply to artwork** writes feed / plunge / depth-per-pass / spindle in
    one undoable patch. Cut type, depth, and tabs stay put. The values
    compose with H.7 presets (calculate once, save as a preset). The applied
    values carry material, flute-count, and automatic-source provenance.
@@ -3484,8 +3529,9 @@ and lifts the command's CNC-only gate.)*
    120 mm/min plunge, 12000 RPM, and 0.75 mm/pass rather than the generic result.
 
 #### Error — none (inputs are bounded)
-1. Material and flutes are selects; tiny results floor at 50 mm/min feed
-   / 0.1 mm per pass rather than emitting zeros.
+1. Tiny results floor at 50 mm/min feed / 0.1 mm per pass rather than emitting zeros. When no
+   material recipe or usable flute evidence is assigned, the calculator names the missing Startup
+   Setup input and routes there; it does not invent a value.
 
 #### Empty
 1. The row renders only in CNC mode (laser layers have no feeds).
@@ -3496,14 +3542,14 @@ and lifts the command's CNC-only gate.)*
    so rather than pretending precision.
 2. For a V-bit or engraving bit, the calculator shows the exact stored
    diameter and included angle and states that the diameter band is used while
-   included angle and depth-dependent cutting engagement are not modeled. Material,
-   flute, and Apply controls remain enabled and the numeric result is unchanged;
+   included angle and depth-dependent cutting engagement are not modeled. Apply remains available
+   when Startup Setup provides the required material and flute evidence; the numeric result is unchanged;
    the operator is directed to the cutter maker's data and a scrap test.
 
 ### F-CNC25. Surface the spoilboard — Phase H.11 (ADR-103 G8)
 
 #### Success
-1. Material & Bit → "Surface spoilboard": width/height (prefilled from
+1. **Machine > CNC Utilities > Surface spoilboard**: width/height (prefilled from
    the stock), stepover % of the active bit, total depth. Save writes a
    provenance-stamped standalone .nc: serpentine rows per 0.5 mm depth
    step, spindle-off safe-Z lift before M3/spin-up, park at the origin
@@ -3677,46 +3723,50 @@ and lifts the command's CNC-only gate.)*
    apply directly; pocketing requires closed shapes (draw or import
    filled artwork instead).
 
-### F-CNC31. Auto-fill feeds from a material — ADR-111 #1
+### F-CNC31. Auto-fill operation feeds from a material — ADR-111 #1, amended by ADR-306
 
 #### Success
-1. Every CNC layer card has a grouped "Material" select at the top (Manual +
-   common Softwood and Hardwood species / Plywood-MDF / Acrylic / Aluminium).
-   Picking one fills feed, plunge, and depth-per-pass in a single undoable
-   patch from the chipload engine, using the layer's own bit and a 2-flute
-   assumption. A named wood keeps its species identity but uses its researched
-   family starting model; a recognized machine starter and live limits can
-   lower those automatic values. Cut type, depth, bit, and tabs stay put.
+1. **Startup Setup > Tool Plan** has a grouped material assignment for each operation (Use job
+   material / Manual + common Softwood and Hardwood species / Plywood-MDF / Acrylic / Aluminium).
+   Applying an override fills that operation's feed, plunge, and depth-per-pass in the setup draft
+   from the chipload engine, using its resolved bit and flute evidence. A named wood keeps its
+   species identity but uses its researched family starting model; a recognized machine starter
+   and live limits can lower those automatic values. Cut type, depth, cutter assignment, and tabs
+   stay put. **Save machine setup** commits the complete draft as one undoable edit.
 2. The choice and automatic-source provenance are remembered on the layer and
    round-trip in the .lf2 file; they are display-only and do not change compiled
    output beyond the persisted numeric settings themselves.
-3. When the layer uses a V-bit or engraving bit, the row names the cutter's
+3. When the operation uses a V-bit or engraving bit, Tool Plan names the cutter's
    stored diameter and included angle and discloses that the automatic model
    uses the diameter band but not depth-dependent cutting engagement. The
-   material select remains enabled and applies the same bounded numeric patch.
+   Tool Plan material assignment remains available and applies the same bounded numeric patch.
 
 #### Error — none (bounded)
 1. Material is a select; the engine floors tiny results (feed / per-pass)
    rather than emitting zeros, same as the advanced Feeds calculator.
 
 #### Empty
-1. The row renders only in CNC mode. "Manual" clears material and automatic
-   provenance while leaving the current numeric values untouched for hand-tuning.
+1. Tool Plan renders only when CNC is active. "Manual" clears the operation material and automatic
+   provenance in the draft while leaving current numeric values untouched for hand-tuning.
 
 #### Edge — full flute/RPM control
-1. The one-click fill assumes 2 flutes; operators who need a different
-   flute count or RPM use the advanced Feeds calculator, which composes
-   with H.7 presets.
+1. A bit without stored flute evidence starts from the displayed two-flute assumption. Set the
+   actual cutter count in **Startup Setup > Manage bits**; set operation RPM with the editable
+   **Artwork spindle speed**. The flute count accepts every positive whole number without an
+   artificial upper cap. The Artwork calculator reads both and does not duplicate either input.
 
-### F-CNC32. Review core and Advanced layer settings together — ADR-111 #4 amended
+### F-CNC32. Edit operation values beside read-only setup references — ADR-111 #4 / ADR-306
 
 #### Success
-1. CNC layer cards lead with Material, followed by
-   Cut type, Bit, Cut depth, Depth per pass, Feed, Plunge, Spindle, and Tabs.
-   The core machining values stay visible for review. A labeled **Advanced**
+1. CNC Artwork settings lead with a compact **Setup references** group: project/effective material,
+   resolved bit, stock summary, and machine output contract. These values are muted, read-only,
+   keyboard-focusable controls that explain their scope and deep-link to Startup Setup.
+2. The editable core follows with Cut type, Cut depth, Depth per pass, Feed, Plunge,
+   **Artwork spindle speed**, and Tabs. **Machine maximum** is shown adjacent to Artwork spindle
+   speed so an RPM ceiling cannot be confused with the requested operation speed. A labeled **Advanced**
    section immediately follows with helpers and specialist controls (presets,
    calculator, stepover, pocket fill, and cut-type tails). It is always visible.
-2. Cut depth carries a one-click "Set to stock thickness (N mm)" button. It
+3. Cut depth carries a one-click "Set to stock thickness (N mm)" button. It
    sets the exact measured thickness without silently adding spoilboard
    overcut; any verified overcut remains an explicit operator edit.
 
@@ -3733,23 +3783,24 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC33. Fill machine settings from the connected controller — ADR-111 #3a
 
 #### Success
-1. When a controller is connected and its `$$` snapshot differs from the
-   current setup, a "Machine reports …" banner appears atop Material &
-   Bit. "Apply" writes the reported spindle max (GRBL $30) to the machine
-   and the reported travel ($130/$131) to the bed, then the banner clears.
+1. When a controller is connected and its `$$` snapshot differs from the current setup,
+   **Machine Setup > Connect & detect** shows the detected values. **Use detected values** copies
+   the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup draft;
+   **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
    in laser mode it is a PWM scale and is not relabeled as RPM.
 
 #### Error — none (opt-in)
-1. Nothing changes until Apply is clicked; ignoring the banner is safe.
+1. Nothing changes until **Use detected values** updates the draft and **Save machine setup**
+   commits it; leaving or cancelling the flow changes neither project nor controller.
 
 #### Empty
-1. No connection, or reported values that already match, means no banner.
+1. No connection, or reported values that already match, means no detected-difference prompt.
 
 #### Edge — bed vs stock
 1. Travel fills the machine BED (work envelope), never the stock — the
    workpiece footprint stays whatever the operator set. Spindle max is the
-   RPM ceiling; manual per-layer values are unchanged, while provenance-confirmed
+   RPM ceiling; manual operation values are unchanged, while provenance-confirmed
    automatic values may refresh against the explicitly applied ceiling.
 
 ### F-CNC34. See stock/feed advisories against machine limits — ADR-111 #3b
@@ -3777,21 +3828,22 @@ and lifts the command's CNC-only gate.)*
    and depth/pass values plus the diameter-band model limitation. Manual and
    machine-starter values do not claim that material-recipe calculation.
 
-### F-CNC35. Set the project material once (Easel-style) — ADR-112
+### F-CNC35. Set the project material once — ADR-112/264, amended by ADR-306
 
 #### Success
-1. The Material & Bit panel shows a grouped "Material" dropdown (above Bit)
-   the moment you switch to CNC — no design needed. Softwoods and Hardwoods
+1. **Startup Setup > Current job** shows a grouped Material picker beside the default bit and stock;
+   it is available before a design exists. Softwoods and Hardwoods
    expose common species such as Pine, Cedar, Oak, Hard maple, and Walnut.
    Choosing an entry previews its family model without changing the job;
-   **Apply [material] preset** then fills every layer's feed / plunge /
-   depth-per-pass (each layer's own bit + spindle) in one undoable step.
-2. New layers inherit it: add a layer or import an SVG after choosing the
+   **Apply [material] preset** then fills every operation's feed / plunge /
+   depth-per-pass (each operation's resolved bit + Artwork spindle speed) in the draft.
+   **Save machine setup** commits the complete setup as one undoable step.
+2. New operations inherit it: add artwork or import an SVG after choosing the
    material and the fresh layers come in with those feeds (not the generic
    1000 / 1.5 default). Set material first, then import — the Easel order.
 3. Before Apply, each distinct angled cutter used by the project is disclosed
    with its stored geometry and the same rough-guide model boundary. Apply
-   remains available and recalculates the same values as the per-layer path.
+   remains available and recalculates the same values as a Tool Plan material override.
 
 #### Error — none (bounded select)
 1. Unknown saved keys are dropped during project normalization. Known species
@@ -3799,13 +3851,13 @@ and lifts the command's CNC-only gate.)*
    minimums.
 
 #### Empty
-1. The dropdown shows in CNC mode only. Choosing "Custom" changes nothing
+1. The picker shows on the CNC Startup Setup page only. Choosing "Custom" changes nothing
    until **Use manual feeds** is clicked; that clears the project material and
    leaves current feeds untouched for hand-tuning.
 
-#### Edge — per-layer override and other object types
-1. A layer's own Material picker (F-CNC31) overrides the project material for
-   that layer. Fresh text, drawn shapes, raster/trace conversions, fill-isolated
+#### Edge — per-operation override and other object types
+1. An operation's explicit **Tool Plan** material assignment (F-CNC31) overrides the project
+   material. Fresh text, drawn shapes, raster/trace conversions, fill-isolated
    operations, and generated box operations use the same new-operation resolver.
 
 ### F-CNC36. Initialize new operations from the selected machine — ADR-233
@@ -3813,8 +3865,9 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. With the Neotronics 4040 profile active, a fresh CNC operation starts with
    the revisioned 3.175 mm two-flute engineering starter: 300 mm/min feed,
-   250 mm/min plunge, 12000 RPM, and 0.75 mm/pass. The layer card and Job Review
-   identify the starter and revision; the numbers remain fully editable.
+   250 mm/min plunge, 12000 RPM, and 0.75 mm/pass. Artwork settings identifies the starter and
+   revision and keeps the operation numbers editable; Job Review reports the resolved values
+   read-only from the exact prepared job.
 2. A selected project material outranks the machine starter. An operator-saved
    per-color or all-color layer default outranks both and is copied exactly.
 3. A completed `$$` observation can lower only automatic settings: the slower
@@ -4561,7 +4614,7 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC50. Save, review, Frame, and run a photo relief - planned (ADR-291/293 / P2R.4-P2R.6)
 
 > **Partially current.** Self-contained manual Save and atomic whole-project
-> autosave/recovery are current under ADR-292/293. Relief-specific output
+> autosave/recovery are current under ADR-292/305. Relief-specific output
 > provenance, consolidated review, and machine/material qualification below
 > remain planned and add no Start guard.
 
@@ -6077,15 +6130,16 @@ the edge it sits on, and a midpoint over the same edge.
    new layer becomes active immediately.
 2. New shapes land on the ACTIVE layer; the 2D canvas strokes each shape in its
    layer's color so the drawing, the panel, and the 3D view tell one story.
-3. Click a row to make it active. The row reads back the layer's cut type, bit,
+3. Click a row to make it active. The row reads back the layer's cut type, read-only bit reference,
    shape count, and either its fixed depth or **flowing depth** for an ordinary
    V-carve.
 4. The active layer's settings edit below the list: name, cut type
-   (profile outside/inside/on-path, pocket, engrave, v-carve, drill), the bit,
-   and the operation-specific depth controls. Fixed-depth operations show depth
+   (profile outside/inside/on-path, pocket, engrave, v-carve, drill),
+   and the operation-specific depth controls. Its primary and optional clearing bit are muted
+   read-only references with an **Edit in Startup Setup > Tool Plan** action. Fixed-depth operations show depth
    with a **Through** helper that sets the stock thickness. V-carve instead shows
    a **Flat depth** switch: off follows the geometry-derived medial depth; on
-   exposes the flat-floor depth and optional clearing bit. V-carve does not
+   exposes the flat-floor depth and any saved clearing-bit reference. V-carve does not
    show the fixed-depth operations' **Through** shortcut.
 5. Select shapes and press **Assign** to move them onto the active layer.
 6. Layer edits ride the sketch history: Ctrl+Z walks them like drawing steps.
@@ -6145,13 +6199,16 @@ the edge it sits on, and a midpoint over the same edge.
    its corners touched the stock. A ray that misses the plane (aimed at the
    sky) simply does nothing.
 
-### F-DS12. Apply layers → a multi-bit job (DS-8)
+### F-DS12. Apply layers → an operation plan (DS-8)
 
 1. **Apply** commits each contributing layer as ONE scene operation carrying
-   the layer's name, color, cut type, depth, and bit; feeds, passes, and tabs
-   take the operator's defaults. One project undo entry removes the whole
-   apply, as before.
-2. The job pipeline is unchanged: layers with different bits become contiguous
+   the layer's name, color, cut type, and depth; feeds, passes, tabs, material, and bits take the
+   committed job defaults. One project undo entry removes the whole apply, as before.
+2. A legacy saved design may still carry its exact historical primary/clearing bit ids into the
+   created operations as read-only compatibility data; applying it does not reinterpret or flatten
+   those ids. New designs do not create bit overrides. Change every resulting assignment in
+   **Startup Setup > Tool Plan**.
+3. The job pipeline is unchanged: operations with different bits become contiguous
    per-bit tool sections (profile sections last), and each boundary emits the
    labelled M0 tool-change hold — jog, swap the bit, re-zero Z, Continue.
 

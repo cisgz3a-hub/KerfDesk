@@ -23,6 +23,9 @@ export type CncAutoSeedContext = {
   // A machine-bit selection invalidates the inherited tool's flute-derived
   // recipe. Other machine edits preserve an explicit calculator override.
   readonly activeToolChanged?: boolean;
+  // Startup-owned flute metadata refreshes only recipes resolved through a
+  // cutter whose stored flute count actually changed.
+  readonly fluteCountChangedToolIds?: ReadonlySet<string>;
 };
 
 // Call only for an operation proven fresh by its mutation boundary. Existing
@@ -107,8 +110,10 @@ function refreshMaterialRecipeLayer(
   context: CncAutoSeedContext,
 ): Layer {
   const tool = layerCncTool(context.machine, settings);
+  const resolvedToolFlutesChanged = context.fluteCountChangedToolIds?.has(tool.id) === true;
   const fluteCount =
-    context.activeToolChanged === true && settingsFollowActiveTool(settings, context.machine)
+    resolvedToolFlutesChanged ||
+    (context.activeToolChanged === true && settingsFollowActiveTool(settings, context.machine))
       ? (tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT)
       : source.fluteCount;
   const patch = resolveCncMaterialFeedPatch({

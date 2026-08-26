@@ -1,4 +1,4 @@
-// Researched CNC bit catalog for the Material & Bit panel. Addable generic
+// Researched CNC bit catalog for the CNC Startup Setup bit library. Addable generic
 // entries are operator-matched nominal envelopes that map to a current
 // cutting-envelope kernel; unsupported specialty geometry and motion remain
 // visible as reference-only instead of being mislabeled as a flat end mill.

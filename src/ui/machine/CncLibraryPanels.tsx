@@ -1,9 +1,8 @@
-// CNC library panels (Phase H.7, F-CNC11/13): the bit manager (add/delete
-// custom bits) and the named machine-profile row, both mounted inside the
-// Material & Bit card. App-level data — see cnc-library-persistence.
+// CNC library panel (Phase H.7, F-CNC11/13): the bit manager now mounted only
+// inside CNC Startup Setup. App-level data lives in cnc-library-persistence.
 
-import { useState } from 'react';
-import type { CncMachineConfig } from '../../core/scene';
+import type { CncMachineConfig, CncTool } from '../../core/scene';
+import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
 import {
   CNC_RETAINED_FEEDS_WARNING,
   hasRetainedFeedsAfterEffectiveToolChange,
@@ -15,12 +14,10 @@ import { RailSection } from '../kit';
 import { AddCncBitForm } from './AddCncBitForm';
 import { CncBitCatalogPanel } from './CncBitCatalogPanel';
 import {
-  addFormStyle,
   deleteButtonStyle,
-  kindSelectStyle,
+  fluteInputStyle,
   listItemStyle,
   listStyle,
-  nameInputStyle,
   toolGroupHeadingStyle,
   toolGroupListStyle,
   toolGroupStyle,
@@ -28,14 +25,24 @@ import {
 } from './CncLibraryPanels.styles';
 import { groupCncTools } from './CncToolOptions';
 
-export function CncToolManager(props: { readonly machine: CncMachineConfig }): JSX.Element {
+export function CncToolManager(props: {
+  readonly machine: CncMachineConfig;
+  readonly customTools?: ReadonlyArray<CncTool>;
+  readonly onAddTool?: (tool: Omit<CncTool, 'id'>) => void;
+  readonly onDeleteTool?: (toolId: string) => void;
+  readonly onChangeFluteCount?: (toolId: string, fluteCount: number) => void;
+}): JSX.Element {
   const deleteCustomCncTool = useStore((state) => state.deleteCustomCncTool);
   const pushToast = useToastStore((state) => state.pushToast);
-  const customToolIds = useStore(
-    (state) => new Set(state.cncLibrary.customTools.map((tool) => tool.id)),
-  );
+  const storedCustomTools = useStore((state) => state.cncLibrary.customTools);
+  const customTools = props.customTools ?? storedCustomTools;
+  const customToolIds = new Set(customTools.map((tool) => tool.id));
   const groups = groupCncTools(props.machine.tools);
   const deleteTool = (toolId: string): void => {
+    if (props.onDeleteTool !== undefined) {
+      props.onDeleteTool(toolId);
+      return;
+    }
     const before = useStore.getState().project;
     deleteCustomCncTool(toolId);
     if (hasRetainedFeedsAfterEffectiveToolChange(before, useStore.getState().project)) {
@@ -58,15 +65,22 @@ export function CncToolManager(props: { readonly machine: CncMachineConfig }): J
                   key={tool.id}
                   tool={tool}
                   custom={customToolIds.has(tool.id)}
+                  draftControlled={props.onDeleteTool !== undefined}
                   onDelete={() => deleteTool(tool.id)}
+                  {...(props.onChangeFluteCount === undefined
+                    ? {}
+                    : { onChangeFluteCount: props.onChangeFluteCount })}
                 />
               ))}
             </ul>
           </li>
         ))}
       </ul>
-      <CncBitCatalogPanel />
-      <AddCncBitForm />
+      <CncBitCatalogPanel
+        customTools={customTools}
+        {...(props.onAddTool === undefined ? {} : { onAdd: props.onAddTool })}
+      />
+      <AddCncBitForm {...(props.onAddTool === undefined ? {} : { onAdd: props.onAddTool })} />
     </RailSection>
   );
 }
@@ -74,7 +88,9 @@ export function CncToolManager(props: { readonly machine: CncMachineConfig }): J
 function CncToolManagerRow(props: {
   readonly tool: CncMachineConfig['tools'][number];
   readonly custom: boolean;
+  readonly draftControlled: boolean;
   readonly onDelete: () => void;
+  readonly onChangeFluteCount?: (toolId: string, fluteCount: number) => void;
 }): JSX.Element {
   const label = `${cncToolGeometryLabel(props.tool)} — ${props.tool.name}`;
   return (
@@ -82,12 +98,32 @@ function CncToolManagerRow(props: {
       <span style={toolNameStyle} title={label} aria-label={label}>
         {label}
       </span>
+      {props.onChangeFluteCount === undefined ? null : (
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={props.tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT}
+          onChange={(event) => {
+            const fluteCount = Number(event.target.value);
+            if (!isValidFluteCount(fluteCount)) return;
+            props.onChangeFluteCount?.(props.tool.id, fluteCount);
+          }}
+          aria-label={`Flute count for ${props.tool.name}`}
+          title="Set this cutter's actual number of cutting flutes. This Startup Setup change is saved with the job."
+          style={fluteInputStyle}
+        />
+      )}
       {props.custom ? (
         <button
           type="button"
           onClick={props.onDelete}
           aria-label={`Delete bit ${props.tool.name}`}
-          title="Remove this custom bit. Primary and secondary assignments fall back to the active bit."
+          title={
+            props.draftControlled
+              ? 'Remove this custom bit from the saved library and stage its Tool Plan assignments to use their defaults. The project changes on final Save.'
+              : 'Remove this custom bit. Primary and secondary assignments fall back to the active bit.'
+          }
           style={deleteButtonStyle}
         >
           Delete
@@ -97,94 +133,6 @@ function CncToolManagerRow(props: {
   );
 }
 
-export function CncMachineProfilesRow(): JSX.Element {
-  const profiles = useStore((state) => state.cncLibrary.machineProfiles);
-  const applyCncMachineProfile = useStore((state) => state.applyCncMachineProfile);
-  const deleteCncMachineProfile = useStore((state) => state.deleteCncMachineProfile);
-  const pushToast = useToastStore((state) => state.pushToast);
-  const [selectedId, setSelectedId] = useState('');
-  const applyProfile = (): void => {
-    const before = useStore.getState().project;
-    applyCncMachineProfile(selectedId);
-    if (hasRetainedFeedsAfterEffectiveToolChange(before, useStore.getState().project)) {
-      pushToast(CNC_RETAINED_FEEDS_WARNING, 'warning');
-    }
-  };
-  return (
-    <RailSection
-      label="Machine profiles"
-      badge={String(profiles.length)}
-      hint="Save the current stock/bit/spindle setup under a name and re-apply it on any project."
-    >
-      <div style={addFormStyle}>
-        <select
-          value={selectedId}
-          onChange={(event) => setSelectedId(event.target.value)}
-          aria-label="Saved machine profile"
-          title="Pick a saved CNC machine profile."
-          style={kindSelectStyle}
-        >
-          <option value="">Choose profile…</option>
-          {profiles.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          disabled={selectedId === ''}
-          onClick={applyProfile}
-          aria-label="Apply machine profile"
-          title="Replace the current CNC setup with the saved profile (undoable)."
-        >
-          Apply
-        </button>
-        <button
-          type="button"
-          disabled={selectedId === ''}
-          onClick={() => {
-            deleteCncMachineProfile(selectedId);
-            setSelectedId('');
-          }}
-          aria-label="Delete machine profile"
-          title="Remove the saved profile."
-        >
-          Delete
-        </button>
-      </div>
-      <SaveMachineProfileControls />
-    </RailSection>
-  );
-}
-
-function SaveMachineProfileControls(): JSX.Element {
-  const saveCncMachineProfile = useStore((state) => state.saveCncMachineProfile);
-  const [saveName, setSaveName] = useState('');
-  const saveProfile = (): void => {
-    if (saveName.trim() === '') return;
-    saveCncMachineProfile(saveName.trim());
-    setSaveName('');
-  };
-  return (
-    <div style={addFormStyle}>
-      <input
-        type="text"
-        value={saveName}
-        onChange={(event) => setSaveName(event.target.value)}
-        placeholder="Profile name"
-        aria-label="New machine profile name"
-        title="Name for snapshotting the current CNC setup as a profile."
-        style={nameInputStyle}
-      />
-      <button
-        type="button"
-        onClick={saveProfile}
-        aria-label="Save machine profile"
-        title="Snapshot the current stock/bit/spindle setup under this name."
-      >
-        Save
-      </button>
-    </div>
-  );
+function isValidFluteCount(fluteCount: number): boolean {
+  return Number.isInteger(fluteCount) && fluteCount >= 1;
 }

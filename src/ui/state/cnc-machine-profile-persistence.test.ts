@@ -98,7 +98,13 @@ describe('CNC machine profile persistence', () => {
         fluteCount: 2,
         catalogId: 'ball-m300',
       },
-      { id: 'bounded-tool', name: 'Bounded tool', kind: 'end-mill', diameterMm: 2 },
+      {
+        id: 'bounded-tool',
+        name: 'Bounded tool',
+        kind: 'end-mill',
+        diameterMm: 2,
+        fluteCount: 17,
+      },
     ]);
     expect(machine.toolId).toBe('catalog-tool');
     expect(machine.params).toEqual({ ...DEFAULT_CNC_MACHINE_CONFIG.params, parkYMm: 42 });

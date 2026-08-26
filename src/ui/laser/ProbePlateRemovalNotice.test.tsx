@@ -4,9 +4,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
-import { CncSetupPanel } from '../machine/CncSetupPanel';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
+import { ProbePanel } from './ProbePanel';
 import { ProbePlateRemovalNotice } from './ProbePlateRemovalNotice';
 
 const mockPlatform: PlatformAdapter = {
@@ -83,8 +83,8 @@ describe('ProbePlateRemovalNotice', () => {
   // collapsed "Set work zero (probe)" details, operators never saw it and
   // unblocked Start with Zero Z at the parked height instead. The notice must
   // render OUTSIDE any <details> so a folded probe section cannot hide it.
-  it('is hosted outside the collapsed probe details in the CNC setup panel', async () => {
-    const rendered = await renderWithPendingRemoval(<CncSetupPanel />);
+  it('is hosted outside the collapsed Machine-rail probe details', async () => {
+    const rendered = await renderWithPendingRemoval(<ProbePanel />);
     const button = findDismissButton(rendered);
     expect(button).toBeDefined();
     expect(button?.closest('details')).toBeNull();

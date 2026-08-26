@@ -119,7 +119,6 @@ function arrayOf<T>(raw: unknown, parse: (item: unknown) => T | null): ReadonlyA
 
 const TOOL_KINDS: ReadonlyArray<CncToolKind> = ['end-mill', 'ball-nose', 'v-bit', 'engraving'];
 const MAX_TOOL_METADATA_LENGTH = 120;
-const MAX_TOOL_FLUTES = 16;
 
 function parseTool(raw: unknown): CncTool | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -176,9 +175,7 @@ function parseToolMetadata(record: Record<string, unknown>): Partial<CncTool> {
 }
 
 function validFluteCount(value: unknown): value is number {
-  return (
-    typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_TOOL_FLUTES
-  );
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
 function boundedString(value: unknown): string | null {

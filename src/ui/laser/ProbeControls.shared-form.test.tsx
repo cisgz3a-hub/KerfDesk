@@ -1,4 +1,4 @@
-// ProbeControls is mounted in three places (the CNC Material & Bit rail, the
+// ProbeControls is mounted in three places (the CNC machine rail, the
 // Device-Setup wizard step, ProbePanel). With the form in component state each
 // mount kept a private copy, so plate geometry and probe depths dialled in one
 // were absent from the other — which then probed with defaults and zeroed Z at

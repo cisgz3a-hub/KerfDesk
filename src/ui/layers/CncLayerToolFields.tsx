@@ -1,28 +1,9 @@
-// Per-layer bit selectors (Phase H.7 multi-tool). LayerBitSelect assigns
-// the bit a layer cuts with (default = the machine's active bit);
-// VClearToolSelect arms the two-stage v-carve's flat-floor clearing bit.
-// Split from CncLayerFields.tsx, which sits near the file-size cap.
+// Operation-owned relief, entry, and motion-polish fields for CNC artwork.
+// All cutter assignments live in Startup Setup's Tool Plan.
 
-import {
-  layerCncTool,
-  sceneObjectUsesOperation,
-  type CncLayerSettings,
-  type CncTool,
-  type Layer,
-} from '../../core/scene';
-import {
-  CNC_SECONDARY_RETAINED_FEEDS_WARNING,
-  CNC_SECONDARY_RETAINED_RELIEF_FEEDS_WARNING,
-} from '../common/cnc-bit-change-advisory';
-import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
+import { sceneObjectUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
-import { CncToolOptions } from '../machine/CncToolOptions';
 import { useStore } from '../state';
-import { useToastStore } from '../state/toast-store';
-import { useCncTools } from './CncLayerBitSelect';
-
-export { LayerBitSelect } from './CncLayerBitSelect';
-export { useCncTools };
 
 // Relief roughing (H.5) reads depth-per-pass + stepover from the layer but
 // takes total depth from the relief object — CncLayerFields keys its
@@ -35,72 +16,12 @@ export function useLayerHasReliefObjects(layer: Layer): boolean {
   );
 }
 
-export function VClearToolSelect(props: {
-  readonly layer: Layer;
-  readonly settings: CncLayerSettings;
-  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-  readonly onCommitSettings: (settings: CncLayerSettings) => void;
-}): JSX.Element {
-  const tools = useCncTools();
-  const machine = useStore((state) => state.project.machine);
-  const pushToast = useToastStore((state) => state.pushToast);
-  const primaryToolId =
-    machine?.kind === 'cnc' ? layerCncTool(machine, props.settings).id : undefined;
-  // Floor clearing emits ordinary constant-Z pocket passes. Only the flat
-  // end-mill kernel can truthfully leave that floor; ball/core-box tools and
-  // legacy engraving geometry must not be offered here.
-  const flatTools = tools.filter((tool) => tool.kind === 'end-mill');
-  const currentClearTool = tools.find((tool) => tool.id === props.settings.vClearToolId);
-  const unavailableClearToolId =
-    props.settings.vClearToolId !== undefined &&
-    !flatTools.some((tool) => tool.id === props.settings.vClearToolId)
-      ? props.settings.vClearToolId
-      : null;
-  return (
-    <Row label="Clear floors">
-      <select
-        value={props.settings.vClearToolId ?? ''}
-        onChange={(e) => {
-          if (e.target.value === '') {
-            const { vClearToolId: _removed, ...rest } = props.settings;
-            props.onCommitSettings(rest);
-          } else {
-            props.onCommit({ vClearToolId: e.target.value });
-            if (e.target.value !== primaryToolId) {
-              pushToast(CNC_SECONDARY_RETAINED_FEEDS_WARNING, 'warning');
-            }
-          }
-        }}
-        aria-label={`Clearing bit for ${props.layer.color}`}
-        title="Two-stage v-carve: pocket the flat floors (regions wider than the v-bit reaches) with this bit first, then run the v-bit."
-        style={selectStyle}
-      >
-        <option value="">Single stage (v-bit only)</option>
-        {unavailableClearToolId === null ? null : (
-          <option value={unavailableClearToolId} disabled>
-            {unavailableClearToolLabel(unavailableClearToolId, currentClearTool)}
-          </option>
-        )}
-        <CncToolOptions tools={flatTools} />
-      </select>
-    </Row>
-  );
-}
-
-function unavailableClearToolLabel(toolId: string, tool: CncTool | undefined): string {
-  const prefix = 'Current unsupported clearing bit (choose a flat end mill)';
-  return tool === undefined
-    ? `${prefix} — missing ${toolId}`
-    : `${prefix} — ${cncToolGeometryLabel(tool)} — ${tool.name}`;
-}
-
 // The relief block for layers carrying relief objects: the honest-card
 // hint (which fields drive roughing) plus the H.8 finishing controls.
 export function ReliefLayerRows(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-  readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   return (
     <>
@@ -109,61 +30,20 @@ export function ReliefLayerRows(props: {
         relief&apos;s own Depth (select the relief to edit it). Cut depth applies to the other
         shapes only.
       </div>
-      <ReliefFinishRow
-        layer={props.layer}
-        settings={props.settings}
-        onCommit={props.onCommit}
-        onCommitSettings={props.onCommitSettings}
-      />
+      <ReliefScallopRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
     </>
   );
 }
 
-// Relief finishing controls (H.8): the skim bit + scallop target. Rendered
-// only for layers that carry relief objects.
-function ReliefFinishRow(props: {
+// Cutter assignment lives in Startup Setup; the operation still owns its
+// finishing scallop target.
+function ReliefScallopRow(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-  readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
-  const tools = useCncTools();
-  const machine = useStore((state) => state.project.machine);
-  const pushToast = useToastStore((state) => state.pushToast);
-  const primaryToolId =
-    machine?.kind === 'cnc' ? layerCncTool(machine, props.settings).id : undefined;
-  const unavailableFinishToolId =
-    props.settings.reliefFinishToolId !== undefined &&
-    !tools.some((tool) => tool.id === props.settings.reliefFinishToolId)
-      ? props.settings.reliefFinishToolId
-      : null;
   return (
-    <Row label="Finish with">
-      <select
-        value={props.settings.reliefFinishToolId ?? ''}
-        onChange={(e) => {
-          if (e.target.value === '') {
-            const { reliefFinishToolId: _removed, ...rest } = props.settings;
-            props.onCommitSettings(rest);
-          } else {
-            props.onCommit({ reliefFinishToolId: e.target.value });
-            if (e.target.value !== primaryToolId) {
-              pushToast(CNC_SECONDARY_RETAINED_RELIEF_FEEDS_WARNING, 'warning');
-            }
-          }
-        }}
-        aria-label={`Relief finishing bit for ${props.layer.color}`}
-        title="H.8 finishing: after roughing, skim the true surface with this bit (ball nose recommended). None = roughing only."
-        style={selectStyle}
-      >
-        <option value="">Roughing only</option>
-        {unavailableFinishToolId === null ? null : (
-          <option value={unavailableFinishToolId} disabled>
-            Current missing finishing bit — {unavailableFinishToolId}
-          </option>
-        )}
-        <CncToolOptions tools={tools} />
-      </select>
+    <Row label="Finish scallop">
       <ClearableNumberField
         min={0.005}
         max={1}
@@ -171,9 +51,10 @@ function ReliefFinishRow(props: {
         value={props.settings.reliefScallopMm ?? 0.025}
         onCommit={(mm) => props.onCommit({ reliefScallopMm: mm })}
         ariaLabel={`Relief scallop height for ${props.layer.color}`}
-        title="Scallop height target (mm) — smaller = finer finishing rows, longer job."
+        title="Scallop height target (mm) for the relief finishing bit assigned in Startup Setup — smaller = finer finishing rows, longer job."
         style={scallopInputStyle}
       />
+      <span style={rampUnitStyle}>mm</span>
     </Row>
   );
 }
@@ -271,21 +152,23 @@ export function HelicalEntryRows(props: {
               props.onCommitSettings(rest);
               return;
             }
-            const {
-              rampEntryDeg: _removed,
-              pocketRoughToolId: _removedRougher,
-              ...rest
-            } = props.settings;
+            const { rampEntryDeg: _removed, ...rest } = props.settings;
             props.onCommitSettings({
               ...rest,
               helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
             });
           }}
           aria-label={`Helical entry for ${props.layer.color}`}
-          title="Descend into offset pockets with native G2/G3 circles instead of plunging."
+          title="Descend into offset pockets with native G2/G3 circles instead of plunging. If a pocket roughing bit is assigned, edit Startup Setup > Tool Plan and choose Single bit because the two operations cannot currently compile together."
         />
         <span style={helixLabelStyle}>Use circular ramp</span>
       </Row>
+      {helix !== undefined && props.settings.pocketRoughToolId !== undefined ? (
+        <p role="note" style={helixConflictStyle}>
+          Helical entry cannot compile while a pocket roughing bit is assigned. Edit Startup Setup
+          &gt; Tool Plan and choose Single bit for this artwork.
+        </p>
+      ) : null}
       {helix === undefined ? null : (
         <>
           <HelixNumberRow
@@ -383,7 +266,6 @@ const valueStyle: React.CSSProperties = {
   gap: 4,
   minWidth: 0,
 };
-const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 12, padding: '2px 4px' };
 const scallopInputStyle: React.CSSProperties = { width: 64, padding: '2px 6px' };
 const directionSelectStyle: React.CSSProperties = {
   flex: 1,
@@ -394,6 +276,12 @@ const directionSelectStyle: React.CSSProperties = {
 const rampInputStyle: React.CSSProperties = { width: 52, padding: '2px 6px' };
 const helixInputStyle: React.CSSProperties = { width: 72, padding: '2px 6px' };
 const helixLabelStyle: React.CSSProperties = { fontSize: 12 };
+const helixConflictStyle: React.CSSProperties = {
+  margin: '0 0 4px 104px',
+  fontSize: 11,
+  lineHeight: 1.35,
+  color: 'var(--lf-warning-fg)',
+};
 const rampUnitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
 const reliefHintStyle: React.CSSProperties = {
   fontSize: 11,

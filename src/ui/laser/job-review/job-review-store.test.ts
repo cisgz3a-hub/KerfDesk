@@ -105,4 +105,12 @@ describe('useJobReviewStore', () => {
     expect(useJobReviewStore.getState().pendingSignal).toBeNull();
     expect(useJobReviewStore.getState().waiter).toBeNull();
   });
+
+  it('closes immediately for owner navigation without losing the cancel signal', async () => {
+    useJobReviewStore.getState().open(model);
+    useJobReviewStore.getState().cancelAndClose();
+
+    expect(useJobReviewStore.getState().state.kind).toBe('idle');
+    await expect(useJobReviewStore.getState().nextSignal()).resolves.toBe('cancel');
+  });
 });
