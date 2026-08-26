@@ -44,7 +44,7 @@ describe('project scene groups IO', () => {
 
   it('backfills old projects without scene.groups to an empty array', () => {
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION,
+      schemaVersion: PROJECT_SCHEMA_VERSION - 1,
       device: createProject().device,
       workspace: createProject().workspace,
       scene: { objects: [], layers: [] },

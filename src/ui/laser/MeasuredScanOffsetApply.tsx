@@ -7,7 +7,6 @@ import {
   type ScanOffsetPoint,
 } from '../../core/devices/scan-offset-profile';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import {
   buttonRowStyle,
   inlineLabelStyle,
@@ -81,15 +80,8 @@ export function MeasuredScanOffsetApply(): JSX.Element {
       <p style={mutedStyle}>{summaryText(validation)}</p>
       <CalibrationLifecycleStatus
         status={calibrationStatus}
-        onMarkVerified={() => {
-          if (
-            jobAwareConfirm(
-              'Mark this scan-offset table verified?\n\nOnly continue after burning and inspecting a corrected “Verify saved table” coupon on this machine. This enables bidirectional 4040 production jobs.',
-            )
-          ) {
-            updateDeviceProfile({ scanOffsetCalibrationStatus: 'verified' });
-          }
-        }}
+        onMarkPending={() => updateDeviceProfile({ scanOffsetCalibrationStatus: 'pending' })}
+        onMarkVerified={() => updateDeviceProfile({ scanOffsetCalibrationStatus: 'verified' })}
       />
       <p style={mutedStyle}>
         Safety limit: |offset| must be at most {offsetLimitMm} mm (1% of the shorter bed axis,
@@ -135,33 +127,53 @@ function MeasurementActions(props: {
 
 function CalibrationLifecycleStatus(props: {
   readonly status: ReturnType<typeof effectiveScanOffsetCalibrationStatus>;
+  readonly onMarkPending: () => void;
   readonly onMarkVerified: () => void;
 }): JSX.Element | null {
   if (props.status === 'uncalibrated') return null;
   if (props.status === 'pending') {
     return (
       <div role="status" style={verificationStyle}>
-        Verification pending: the table is saved, but physical alignment is not proven. Normal 4040
-        production jobs remain one-way. Generate “Verify saved table” from Scan Offset Test, inspect
-        the burned coupon, then explicitly accept it.
+        Verification pending: the table is saved, but physical alignment is not proven. Generate
+        “Verify saved table” from Scan Offset Test, inspect the burned coupon, then explicitly mark
+        it verified. The table remains available; this warning does not disable output.
         <div style={buttonRowStyle}>
           <button
             type="button"
-            title="Confirm that the physical verification coupon passed and enable this table for bidirectional 4040 output."
+            title="Record that the physical verification coupon passed. This is provenance, not an output gate."
             onClick={props.onMarkVerified}
           >
-            Mark verification burn passed
+            Mark verified
           </button>
         </div>
       </div>
     );
   }
+  const legacy = props.status === 'legacy-verified';
   return (
-    <p role="status" style={verifiedStyle}>
-      {props.status === 'verified'
-        ? 'Verification burn passed: this saved table is approved for bidirectional 4040 output.'
-        : 'Legacy calibrated table: treated as verified for backward compatibility.'}
-    </p>
+    <div role="status" style={legacy ? verificationStyle : verifiedStyle}>
+      {legacy
+        ? 'Legacy/statusless table: its source and verification burn were not recorded. It remains active for compatibility; review the values and record the truthful state.'
+        : 'Verification recorded: this saved table is marked verified for this profile.'}
+      <div style={buttonRowStyle}>
+        <button
+          type="button"
+          title="Record that this table still needs a physical verification coupon. The table remains available."
+          onClick={props.onMarkPending}
+        >
+          Mark pending
+        </button>
+        {legacy ? (
+          <button
+            type="button"
+            title="Record that the physical verification coupon passed. This is provenance, not an output gate."
+            onClick={props.onMarkVerified}
+          >
+            Mark verified
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

@@ -90,7 +90,7 @@ describe('raster-image import resolution', () => {
       return {
         natural: { width: 9000, height: 4500 },
         sampled: { width: 4000, height: 2000 },
-        densityDpi: 300,
+        density: { xDpi: 300, yDpi: 150 },
         imageAsset: {
           schemaVersion: 1,
           repository: 'curvedesk-import-assets-v1',
@@ -151,7 +151,7 @@ describe('raster-image import resolution', () => {
     pngImport.tryDecodeQualifiedPng.mockResolvedValue({
       natural: { width: 2, height: 1 },
       sampled: { width: 2, height: 1 },
-      densityDpi: null,
+      density: null,
       imageAsset: {
         schemaVersion: 1,
         repository: 'curvedesk-import-assets-v1',

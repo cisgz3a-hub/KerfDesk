@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, profileCatalogEntryById, resolveGrblDialect } from '../devices';
 import { type Job, EMPTY_JOB } from '../job';
+import { captureLayerOperationSettings, createLayer } from '../scene';
 import { grblStrategy } from './grbl-strategy';
 
 const dev = DEFAULT_DEVICE_PROFILE;
@@ -50,6 +51,8 @@ describe('grblStrategy single-segment job', () => {
       },
     ],
   };
+  const cutGroup = job.groups[0];
+  if (cutGroup?.kind !== 'cut') throw new Error('expected cut fixture');
 
   it('emits a deterministic G-code body (snapshot-compared by equality)', () => {
     expect(emit(job)).toBe(
@@ -76,6 +79,31 @@ describe('grblStrategy single-segment job', () => {
     const out = grblStrategy.emit(job, dev255);
     // 50% × 255 = 127.5 → rounds to 128
     expect(out).toContain('S128');
+  });
+
+  it('records requested and effective feed when compilation capped a laser group', () => {
+    const output = emit({ groups: [{ ...cutGroup, speed: 2000, requestedSpeed: 3000 }] });
+
+    expect(output).toContain(
+      '; layer L1 color #ff0000 power 50% speed 2000 mm/min effective (requested 3000 mm/min)',
+    );
+    expect(output).toContain('F2000');
+  });
+
+  it('records exact effective fill override facts in emitted comments', () => {
+    const operationSettings = captureLayerOperationSettings({
+      ...createLayer({ id: 'L1', color: '#ff0000', mode: 'fill' }),
+      fillStyle: 'offset',
+      hatchSpacingMm: 0.35,
+      hatchAngleDeg: 45,
+      fillBidirectional: false,
+      fillCrossHatch: true,
+    });
+    const output = emit({ groups: [{ ...cutGroup, operationSettings }] });
+
+    expect(output).toContain(
+      '; effective override: mode fill; style offset; interval 0.35 mm; angle 45 deg; direction one-way; cross-hatch on',
+    );
   });
 });
 

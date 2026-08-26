@@ -26,7 +26,9 @@ export function useJobReviewRebuildTrigger(): () => void {
       if (
         current.project === previous.project &&
         current.jobPlacement === previous.jobPlacement &&
-        current.outputScopeSettings === previous.outputScopeSettings
+        current.outputScopeSettings === previous.outputScopeSettings &&
+        current.selectedObjectId === previous.selectedObjectId &&
+        current.additionalSelectedIds === previous.additionalSelectedIds
       ) {
         return;
       }

@@ -2316,8 +2316,9 @@ KerfDesk choice — LightBurn documents no default), every inked
 pixel at the chosen brightness on white. The source's transform
 (scale/mirror/rotation) is **baked into the pixels**: the result
 carries the transformed axis-aligned bounds with an IDENTITY
-transform, so it lands exactly where the vector was and stays safe
-for the raster output path (which does not rotate bitmaps).
+transform, so it lands exactly where the vector was. Later object rotation is
+also supported by the raster compiler's transformed machine-grid sampler;
+baking simply leaves the conversion result with no residual transform.
 **The source vector is deleted** (LightBurn discards the original);
 the swap is one undo entry, so Ctrl+Z restores the vector — replacing
 LightBurn's manual "duplicate first" guidance.
@@ -2456,7 +2457,7 @@ share them as files.
    (quota), a single warning toast points the operator at **Save...**;
    editing continues unaffected.
 
-### F-ML2. Create / edit a material preset (guided wizard) [Planned — ADR-093]
+### F-ML2. Create / edit a material preset (guided wizard) [Shipped — ADR-093]
 
 **Operator intent.** Make a reusable material preset by typing its
 details directly — name, thickness, then cut settings — without first
@@ -2477,7 +2478,10 @@ on the final Save, so Cancel/Escape at any step discards it.
 3. **Mode details.** Only the chosen mode's fields — Line (kerf,
    tabs/bridges), Fill (interval/LPI, angle, overscan, cross-hatch,
    direction, style), or Image (dither, DPI/interval, dot width,
-   negative, pass-through).
+   negative, pass-through, image direction, uncalibrated-direction intent,
+   and optional local scan-offset override). Saving a recipe records those
+   effective image fields; applying a recipe without a local offset clears a
+   target-only offset instead of silently inheriting it.
 4. **Review & Save.** A summary, the device-hint compatibility note,
    and a plain "test on scrap; these are starting points" reminder.
    Save adds (or replaces, when editing) the preset and the library
@@ -2497,7 +2501,7 @@ on the final Save, so Cancel/Escape at any step discards it.
   (the old "Create from Layer" shortcut), still fully editable before
   Save.
 
-### F-ML3. Saved Libraries — in-app, auto-saved, browsable [Planned — ADR-093]
+### F-ML3. Saved Libraries — in-app, auto-saved, browsable [Shipped — ADR-093]
 
 **Operator intent.** Keep several material libraries, switch between
 them, and never lose presets — without managing files by hand.
@@ -2530,6 +2534,39 @@ last updated.
 - **Edge (quota / corrupt slot).** A failed auto-save warns once and
   points at Export...; a corrupt collection slot is discarded silently
   rather than failing every boot.
+
+### F-ML4. Apply, link, stale disclosure, and explicit refresh [Shipped]
+
+1. **Apply to layer** copies the selected recipe onto the selected operation. Device mismatch,
+   unsupported qualification, and preset warnings remain visible in **Preset Match**, but they do
+   not disable Apply/Link and do not add another confirmation. They are starting-point evidence,
+   not factual compile or transport failures.
+2. **Link to layer** copies the recipe and persists the library ID, preset ID, preset revision, and
+   last-resolved settings snapshot in the project. Ordinary layer editing remains available.
+3. The panel and Job Review distinguish **linked current**, **linked stale**, a legacy link whose
+   revision was not recorded, an unavailable library, and a missing preset. A stale or unavailable
+   source never silently rewrites the layer; the last-resolved settings stay active.
+4. **Refresh linked preset** is the only production refresh invocation. It explicitly copies the
+   current recipe and revision onto the layer and is undoable. If the library/preset is unavailable,
+   the control explains the factual recovery instead of pretending a refresh occurred.
+5. None of these qualification states creates a Start path or Start guard. The ordinary Frame →
+   Job Review → Start flow remains authoritative; Job Review warnings inform without refusing.
+
+### F-SO1. Generate and verify a scan-offset coupon [Shipped; physical calibration pending]
+
+1. Tools → **Scan Offset Test** offers **Uncorrected baseline** and **Verify saved table**. Baseline
+   intentionally emits uncorrected bidirectional rows. Verification retains the active profile
+   table; with no saved points it remains a useful uncorrected comparison, not proof of calibration.
+2. Qualification concerns are prominent warnings. No acknowledgement checkbox is required and
+   missing measured points or a requested speed above the profile ceiling does not disable
+   Generate. The emitted job discloses requested/effective feed through the normal compile path.
+3. Malformed geometry, non-finite values, invalid power, and invalid step counts remain factual
+   generation-integrity failures because no valid coupon can be produced from them.
+4. After the physical burn, measure the full signed forward-versus-reverse separation (do not
+   halve it), apply measured points, and mark the profile pending or verified truthfully. Legacy
+   statusless tables remain active with provenance warnings until the operator records a state.
+5. Source tests do not qualify belts, focus, optics, firmware timing, or the physical coupon. Frame
+   remains the only ordinary Start guard and Job Review remains the warning surface.
 
 ## Phase H flows (CNC router mode — ADR-098)
 

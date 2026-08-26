@@ -1,5 +1,4 @@
 import { CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM } from '../common/fill-diagnostics';
-import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { registrationJigCommand } from './registration-command-family';
 import { cameraCommand } from './camera-command-family';
@@ -11,6 +10,8 @@ import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
 import { printAndCutCommand } from './print-cut-command-family';
 import { gcodeInspectorCommands } from './gcode-command-family';
+
+export { connectionHelpCommand, helpCommand, safetyHelpCommand } from './help-command-family';
 
 export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -36,7 +37,15 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.saveProjectAs,
       'Ctrl+Shift+S',
     ),
-    enabled('file.import-svg', 'file', 'Import SVG...', 'Import SVG file', ctx.importSvg, 'Ctrl+I'),
+    enabled(
+      'file.import',
+      'file',
+      'Import...',
+      'Import SVG, DXF, PNG, JPG, or STL artwork',
+      ctx.importArtwork,
+      'Ctrl+I',
+    ),
+    enabled('file.import-svg', 'file', 'Import SVG...', 'Import SVG file', ctx.importSvg),
     enabled('file.import-dxf', 'file', 'Import DXF...', 'Import DXF drawing', ctx.importDxf),
     enabled(
       'file.import-image',
@@ -386,34 +395,4 @@ export function windowCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       ctx.undoHistory,
     ),
   ];
-}
-
-export function helpCommand(ctx: AppCommandContext): AppCommand {
-  return enabled(
-    'help.about',
-    'help',
-    `About ${APP_DISPLAY_NAME}`,
-    'Show build information',
-    ctx.showAbout,
-  );
-}
-
-export function connectionHelpCommand(ctx: AppCommandContext): AppCommand {
-  return enabled(
-    'help.connection',
-    'help',
-    "Can't connect? (Troubleshooting)",
-    'Show connection and USB driver troubleshooting steps',
-    ctx.showConnectionHelp,
-  );
-}
-
-export function safetyHelpCommand(ctx: AppCommandContext): AppCommand {
-  return enabled(
-    'help.safety',
-    'help',
-    'Safety & liability',
-    'Show machine-safety and liability information — read before running a job',
-    ctx.showSafety,
-  );
 }

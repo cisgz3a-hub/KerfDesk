@@ -11,6 +11,11 @@ export type LaserControllerOperation =
       readonly idleReports: number;
     }
   | {
+      readonly kind: 'autofocus';
+      readonly phase: 'preflight' | 'command' | 'motion-uncertain';
+      readonly idleReports: number;
+    }
+  | {
       readonly kind: 'post-job-settle';
       readonly phase: 'dwell' | 'awaiting-idle';
       readonly idleReports: number;
@@ -63,6 +68,9 @@ export function describeControllerOperation(operation: LaserControllerOperation 
   if (operation?.kind === 'connection-handshake') {
     return describeConnectionHandshake(operation.phase);
   }
+  if (operation?.kind === 'autofocus') {
+    return describeAutofocusOperation(operation.phase);
+  }
   return describeEstablishedControllerOperation(operation);
 }
 
@@ -73,7 +81,10 @@ function describeConnectionHandshake(phase: 'waiting-controller' | 'settings'): 
 }
 
 function describeEstablishedControllerOperation(
-  operation: Exclude<LaserControllerOperation, { readonly kind: 'connection-handshake' }> | null,
+  operation: Exclude<
+    LaserControllerOperation,
+    { readonly kind: 'connection-handshake' } | { readonly kind: 'autofocus' }
+  > | null,
 ): string {
   if (operation === null) return 'Controller ready';
   if (operation.kind === 'home') {
@@ -99,6 +110,14 @@ function describeEstablishedControllerOperation(
       : 'Reading CNC work offsets';
   }
   return operation.label;
+}
+
+function describeAutofocusOperation(
+  phase: Extract<LaserControllerOperation, { kind: 'autofocus' }>['phase'],
+): string {
+  if (phase === 'preflight') return 'Checking fresh Idle before auto-focus';
+  if (phase === 'command') return 'Auto-focus motion is active';
+  return 'Auto-focus motion is uncertain — waiting for fresh Idle, reset, or disconnect';
 }
 
 function describePostJobSettle(phase: 'dwell' | 'awaiting-idle'): string {

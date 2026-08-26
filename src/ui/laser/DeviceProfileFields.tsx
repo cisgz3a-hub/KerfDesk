@@ -144,13 +144,14 @@ export function OriginCornerRow(props: DeviceRowsProps): JSX.Element {
   );
 }
 
-// Two related feed knobs: machine hardware ceiling + dedicated frame speed. Sit
-// next to each other so the relationship (one caps the other) is legible.
+// Two distinct feed knobs: the profile output ceiling and the requested Frame
+// speed. Frame preserves the request unless live per-axis controller limits are
+// known, so the help text must not imply maxFeed is a hardware fact or Frame cap.
 export function FeedRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
     <>
-      <Row label="Max feed">
+      <Row label="Output max feed">
         <ClearableNumberField
           min={1}
           max={MAX_FEED_MM_PER_MIN}
@@ -158,8 +159,8 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
           value={device.maxFeed}
           onCommit={(maxFeed) => update({ maxFeed })}
           style={numInputStyle}
-          ariaLabel="Max feed (mm/min)"
-          title="Hardware ceiling on commanded feed — the planner clamps every move to this."
+          ariaLabel="Output max feed (mm/min)"
+          title="Profile ceiling used when compiling cut, engrave, and CNC output. It is not a verified hardware limit and does not cap Frame motion."
         />
         <span style={unitStyle}>mm/min</span>
       </Row>
@@ -172,7 +173,7 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
           onCommit={(framingFeedMmPerMin) => update({ framingFeedMmPerMin })}
           style={numInputStyle}
           ariaLabel="Framing feed (mm/min)"
-          title="Feed used by the Frame button. Independent of cut/engrave speeds — capped at Max feed at emit time."
+          title="Requested feed used by Frame. Known live X/Y controller limits cap the emitted Frame; when those limits are unknown, the full requested feed is sent."
         />
         <span style={unitStyle}>mm/min</span>
       </Row>

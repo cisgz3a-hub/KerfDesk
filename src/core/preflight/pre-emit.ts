@@ -14,10 +14,12 @@ import type { PreflightIssue, PreflightResult } from './preflight';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
 import { controlledLaserOffTravelFeedIssue } from './laser-off-motion-policy';
 import { operationScanOffsetIssues } from './scan-offset-policy';
+import { cncMachineParamIssues } from './cnc-machine-params';
 
 export function runPreEmitPreflight(project: Project): PreflightResult {
   const issues: PreflightIssue[] = [];
   if (project.machine?.kind === 'cnc') {
+    issues.push(...cncMachineParamIssues(project.machine));
     issues.push(...findInvalidCncToolGeometry(project.scene, project.machine, project.device));
   }
   const controlledFeed = project.device.controlledLaserOffTravelFeedMmPerMin;

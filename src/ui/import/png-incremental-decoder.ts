@@ -1,6 +1,5 @@
 import { pngSamplingTarget } from './png-row-luma-sampler';
 import {
-  densityFromChunk,
   grayscaleTransparencyFromChunk,
   validateHeightfieldTransparencyForColorType,
   validatePaletteForColorType,
@@ -17,6 +16,7 @@ import {
   throwIfAborted,
   updatePngCrc,
 } from './png-stream-reader';
+import { normalizeImageDensity, type ImageDensity } from '../common/image-density';
 
 export type IncrementalPngProgress = {
   readonly phase: 'decoding';
@@ -37,7 +37,7 @@ export type IncrementalPngResult =
       readonly sampledHeight: number;
       readonly bitDepth: number;
       readonly colorType: number;
-      readonly densityDpi: number | null;
+      readonly density: ImageDensity | null;
     }
   | { readonly kind: 'legacy-fallback'; readonly reason: string };
 
@@ -59,7 +59,7 @@ export type IncrementalHeightfieldPngOptions = Omit<IncrementalPngOptions, 'maxE
 
 export type IncrementalPngHeaderResult = Omit<
   Extract<IncrementalPngResult, { readonly kind: 'ok' }>,
-  'densityDpi'
+  'density'
 >;
 
 const SIGNATURE = Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10);
@@ -149,8 +149,8 @@ async function decodeIdat(
   );
   let sawIdat = false;
   let idatEnded = false;
-  let densityDpi: number | null = null;
   let transparentGraySample: number | undefined;
+  let density: ImageDensity | null = null;
   try {
     while (true) {
       throwIfAborted(options.signal);
@@ -177,7 +177,7 @@ async function decodeIdat(
         transparentGraySample,
         options.onTransparency,
       );
-      densityDpi = densityFromChunk(chunk.type, sawIdat, data, densityDpi);
+      density = densityFromChunk(chunk.type, sawIdat, data, density);
       if (chunk.type === 'IEND') {
         if (chunk.length !== 0) throw new Error('PNG IEND chunk must be empty.');
         if (!sawIdat) throw new Error('PNG is missing IDAT image data.');
@@ -198,7 +198,7 @@ async function decodeIdat(
       sampledHeight: target.height,
       bitDepth: format.bitDepth,
       colorType: format.colorType,
-      densityDpi,
+      density,
     };
   } catch (error) {
     await writer.abort(error).catch(() => undefined);
@@ -216,6 +216,22 @@ function settledRows(rows: Promise<void>): Promise<SettledRows> {
   );
 }
 
+function densityFromChunk(
+  type: string,
+  afterImageData: boolean,
+  bytes: Uint8Array,
+  current: ImageDensity | null,
+): ImageDensity | null {
+  return type === 'pHYs' && !afterImageData ? pngDensity(bytes) : current;
+}
+
+function pngDensity(bytes: Uint8Array): ImageDensity | null {
+  if (bytes.byteLength !== 9 || bytes[8] !== 1) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const xDpi = normalizeImageDensity(Math.round(view.getUint32(0) * 0.0254));
+  const yDpi = normalizeImageDensity(Math.round(view.getUint32(4) * 0.0254));
+  return xDpi === null || yDpi === null ? null : { xDpi, yDpi };
+}
 type PngHeader = {
   readonly width: number;
   readonly height: number;

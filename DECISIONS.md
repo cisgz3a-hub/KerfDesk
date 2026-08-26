@@ -1324,13 +1324,22 @@ Preview mode (F-A8) rendered nothing for raster (image-mode) layers: an image-on
 
 LightBurn's Preview "shades according to power" — darker pixel = more laser power = deeper burn (LIGHTBURN-STUDY.md §1.4). Under ADR-027 a blank raster preview is a **divergence/defect**, not a missing feature: the engrave object exists and compiles to G-code, but the operator can't see what it will burn.
 
-`RasterGroup.sValues` (dithered **and** power-scaled) is exactly that signal, but `RasterGroup.bounds` is a machine-coord AABB with the front-left origin's Y-flip already applied and **no rotation** (`compile-job.ts` `rasterBoundsInMachineCoords`). Rendering the preview from those bounds would mis-register and drop object rotation/mirror.
+`RasterGroup.sValues` (dithered **and** power-scaled) is exactly that signal. The current compiler
+samples rotated/mirrored content into the machine-coordinate AABB, so Preview must consume that
+compiled grid and map its bounds back to scene coordinates instead of reprocessing the source
+bitmap.
 
 ### Decision
 
-1. **Reuse the compile path for WYSIWYG.** Preview calls core `dither()` then a new pure `rasterPreviewRgba()` (the reserved `core/raster` F.2.c "preview-data" slot) — the same `dither()` call `compileRasterGroup` makes, with the same `sMax = round(clamp(power,0,100)/100 × maxPowerS)` and the same `layer.ditherAlgorithm` (layer wins over per-image settings). The preview is therefore byte-for-byte the schedule that gets emitted. This mirrors `drawFillHatches`, which already calls core `fillHatching` directly for the fill preview.
+1. **Reuse the compiled grid for WYSIWYG.** Preview compiles the same `RasterGroup` consumed by
+   output and converts those materialized or streamed S-values through `rasterPreviewRgba()`. It
+   never performs a second dither. A grid above the display edge limit is max-pooled only after
+   compilation and is disclosed with emitted/displayed dimensions.
 
-2. **Render in scene space, not machine space.** `drawRasterPreview` (`src/ui/workspace/draw-raster-preview.ts`) blits the grayscale-sim bitmap through `drawBitmapAtTransform` (extracted from `drawRasterImage`), so it registers pixel-for-pixel with the on-canvas bitmap and honours rotation/mirror. The machine-coord Y-flip stays confined to the G-code path. `imageSmoothingEnabled = false` keeps threshold/Floyd dots crisp under upscale.
+2. **Render the compiled machine grid in scene space.** `drawRasterPreview`
+   (`src/ui/workspace/draw-raster-preview.ts`) maps the compiled machine bounds through
+   `toSceneCoords`, including device-origin axis direction, and blits with smoothing disabled.
+   Rotation and mirror are already represented in the compiled sampling grid.
 
 3. **Same gate as compile.** Only output-enabled, image-mode layers render, matched to rasters by `obj.color === layer.color` — exactly `compileJob`'s filter. `layer.visible` is intentionally ignored: preview shows *what burns*, not what's shown on the design canvas.
 
@@ -2467,7 +2476,7 @@ TraceOptions instead of the removed presets.
 
 ## ADR-044 - Minimal Material/Interval Test calibration workflow
 
-**Status:** Accepted; scope approved, implementation staged. | **Date:** 2026-06-09
+**Status:** Accepted; implemented and superseded in scope by ADR-045/093. | **Date:** 2026-06-09
 
 ### Context
 
@@ -2504,15 +2513,16 @@ Promote a minimal calibration workflow to Phase F.5:
 4. Add UI after the pure generator has tests. The UI may live under a
    LightBurn-style Laser Tools menu entry, but the generated scene is the source
    of truth.
-5. Keep full Material Library storage deferred. LightBurn's library supports
+5. At this ADR's implementation boundary, keep full Material Library storage deferred. LightBurn's library supports
    saved material/thickness presets, Assign vs Link behavior, shared library
    files, and multi-device library switching. LaserForge should add that only
    after generated calibration grids are useful on hardware.
 
 ### Consequences
 
-- `PROJECT.md` now scopes minimal Material Test and Interval Test generators,
-  while full Material Library storage and linked presets remain out of scope.
+- `PROJECT.md` initially scoped minimal Material Test and Interval Test generators while deferring
+  full Material Library storage and linked presets. ADR-045/093 and the 2026-08-25 amendment later
+  shipped both the full native UI and revisioned explicit-refresh links.
 - The next implementation slice must be pure-core and test-first. No hardware
   control should be added until generated project output is deterministic and
   preview/save/start-compatible.
@@ -2538,7 +2548,7 @@ Promote a minimal calibration workflow to Phase F.5:
 
 ## ADR-045 - Native Material Library IO foundation
 
-**Status:** Accepted; implementation staged. | **Date:** 2026-06-09
+**Status:** Accepted; implemented and amended through 2026-08-25. | **Date:** 2026-06-09
 
 ### Context
 
@@ -2569,9 +2579,11 @@ Add a native deterministic Material Library document format:
   deserialization errors, duplicate-ID rejection, and deterministic merge that
   preserves the base library while reporting skipped duplicate IDs.
 
-Keep `.clb` import/export deferred until fixture-based research proves a stable
-and safe compatibility path. Keep Link deferred until `.lf2` schema, missing
-library UX, read-only layer controls, and preset revision handling exist.
+Keep `.clb` export deferred until fixture-based research proves a stable and
+safe compatibility path. Bounded `.clb` import and native Link have since
+shipped: a binding stores library/preset identity, preset revision, and a
+last-resolved settings snapshot; stale/current truth is visible and refresh is
+an explicit undoable action.
 
 ### Consequences
 
@@ -2581,8 +2593,14 @@ library UX, read-only layer controls, and preset revision handling exist.
   a recipe still happens through the layer model in later UI/store work.
 - Device hints are advisory safety metadata. Later UI can warn when the active
   machine differs, but this ADR does not block cross-machine reuse.
-- Full Material Library UI, LightBurn `.clb` compatibility, manufacturer
-  profiles, and linked presets remain out of scope.
+- Full Material Library UI, bounded `.clb` import, and revisioned linked presets
+  shipped under ADR-093 and later implementation amendments. `.clb` export,
+  manufacturer profile packs, and LightBurn `LinkPath` synchronization remain
+  out of scope.
+- Device/qualification warnings never disable Apply/Link or add an extra
+  confirmation. Under ADR-228/232, those facts inform the operator without
+  becoming a second guard; only malformed recipe data may fail factual
+  deserialization/compile integrity.
 
 ### Sources
 
@@ -3017,7 +3035,7 @@ reload / address-bar defaults in the web build (acceptable on a CAD surface).
 
 ## ADR-052 — Scanning offset compensation: a per-speed table cancels the bidirectional zipper
 
-**Status:** Accepted; core model, emitters, bounds, IO, tests, and opt-in UI landed. Calibration workflow pending. | **Date:** 2026-06-17
+**Status:** Accepted; model, emitters, bounds, IO, calibration UI, and provenance status shipped; physical calibration pending. | **Date:** 2026-06-17
 
 ### Context
 
@@ -3077,9 +3095,12 @@ Delivered in reviewable slices (CLAUDE.md "tight leash"):
    compensated output extents;
 5. the device-settings table UI.
 
-The calibration-pattern workflow and machine-specific default tables remain
-future work. The Neotronics 4040 profile still ships with `[]` rather than a
-guessed default.
+The calibration-pattern workflow has shipped. It can generate an intentionally
+uncorrected baseline or a verification coupon using the active table. Missing
+points, legacy/statusless provenance, and requested feed above a profile ceiling
+are warnings rather than acknowledgement/Generate guards; malformed numeric
+coupon data remains a factual generation-integrity failure. The Neotronics 4040
+profile still ships with `[]` rather than a guessed default.
 
 ### Consequences
 
@@ -3091,8 +3112,10 @@ guessed default.
 - One shared transform for fill + raster avoids the duplication raygeo carries
   (direction handling baked into each `rasterize_*`).
 - Requires a per-machine calibration burn; an uncalibrated or mis-measured table
-  can *worsen* registration, so the UI must ship with the test pattern and the
-  feature stays opt-in. A wrong table is a user-visible regression, not a crash.
+  can *worsen* registration. The UI ships the test pattern and records
+  pending/verified provenance while leaving legacy tables active with warnings.
+  Qualification uncertainty does not create a second guard (ADR-228/232). A
+  wrong table is a user-visible regression, not a crash.
 
 ### Alternatives rejected
 
@@ -3725,7 +3748,7 @@ amendment changes no controller command, transport precondition, Frame permit, o
 
 ## ADR-093 — In-app multi-library Material Library UI: create/edit wizard, Saved Libraries browser, auto-save
 
-**Status:** Accepted; staged in small PRs. | **Date:** 2026-06-26
+**Status:** Accepted; implemented and amended through 2026-08-25. | **Date:** 2026-06-26
 
 > Numbering note: ADR-092 is the previous highest. The active build plan reserves
 > ADR-054..091 for its tickets, so this independent, maintainer-requested feature takes the
@@ -3797,8 +3820,12 @@ working.
 - Operators author materials the obvious way (type the numbers) and can keep per-machine or
   per-material-family libraries that survive reloads without touching files.
 - This advances past ADR-045's "Full Material Library UI ... out of scope" line and the matching
-  PROJECT.md scope entry; both are updated. LightBurn `.clb` compatibility, manufacturer profiles,
-  and linked presets ("Link", ADR-045's deferral) remain out of scope.
+  PROJECT.md scope entry; both are updated. Bounded LightBurn `.clb` import and revisioned native
+  links have since shipped. `.clb` export, manufacturer profile packs, and LightBurn `LinkPath`
+  synchronization remain out of scope.
+- Native links record revision with library/preset identity, surface current/stale/legacy-untracked
+  truth, and refresh only on an explicit production action. Unsupported or device-mismatched
+  qualification remains a warning; Apply/Link is not disabled and no extra confirmation is added.
 - The new wizard fields and the layer Cut Settings dialog now share field components; a change to a
   field control affects both surfaces. Acceptable and intended (single source of truth for recipe
   inputs).
@@ -6827,6 +6854,16 @@ The check is skipped (motion allowed) when there is no known machine position fo
 ### Consequences
 
 A jog that would cross a keep-out is refused before any byte is sent, closing the gap between jogging and the job/frame/export paths. Pure core stays pure (returns the zone or null, no throw for control flow). No G-code or snapshot change. NOT hardware-verified - the geometry and the refusal are unit- and integration-tested (core segment cases + a connected-store jog that crosses a clamp sends nothing), but on-machine behavior is CLAIMED.
+
+### 2026-08-25 Frame-only governance amendment
+
+ADR-232 supersedes the refusal in the original decision. Configured no-go zones are policy
+guidance, not a factual transport precondition: a known crossing and an unresolved XY path now
+produce a prominent warning toast and log entry while the exact requested jog command is sent
+unchanged. Disconnected, unknown-status, non-Idle, MPG-owned, or already-owned motion still refuses
+because the controller cannot factually accept the jog. The pure segment/zone resolver remains the
+shared evidence source. Automated tests prove warning/byte behavior only; no hardware jog is
+qualified.
 
 ### 2026-07-15 audit amendment
 

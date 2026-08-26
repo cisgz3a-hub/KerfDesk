@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "sha": "9209fcb33f4807ebfc1f7a55780069b6a7b0e23c",
+  "scope": "Audited base SHA plus the uncommitted remediation worktree state measured on 2026-08-26",
+  "totals": {
+    "lines": {
+      "total": 171894,
+      "covered": 152756,
+      "pct": 88.86
+    },
+    "branches": {
+      "total": 49621,
+      "covered": 42248,
+      "pct": 85.14
+    },
+    "functions": {
+      "total": 12042,
+      "covered": 10883,
+      "pct": 90.37
+    },
+    "statements": {
+      "total": 171894,
+      "covered": 152756,
+      "pct": 88.86
+    }
+  }
+}

@@ -16,8 +16,7 @@ export function moreWorkspaceContextCommands(
 
 const EMPTY_PRIMARY_COMMANDS: ReadonlyArray<CommandId> = [
   'edit.paste',
-  'file.import-svg',
-  'file.import-image',
+  'file.import',
   'tools.add-text',
   'window.toggle-preview',
   'window.fit-view',
@@ -29,7 +28,9 @@ const EMPTY_MORE_COMMANDS: ReadonlyArray<CommandId> = [
   'file.save',
   'file.save-as',
   'file.save-gcode',
+  'file.import-svg',
   'file.import-dxf',
+  'file.import-image',
   'tools.multi-file-trace',
 ];
 

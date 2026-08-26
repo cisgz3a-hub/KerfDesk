@@ -6,8 +6,8 @@ import { resetStore } from './test-helpers';
 beforeEach(() => resetStore());
 afterEach(() => resetStore());
 
-describe('machine mode capability enforcement', () => {
-  it('rejects CNC mode for a laser-only machine without mutating project state', () => {
+describe('machine mode capability warnings', () => {
+  it('selects CNC mode for a laser-only-labelled machine without a policy refusal', () => {
     useStore.setState((state) => ({
       project: {
         ...state.project,
@@ -21,15 +21,13 @@ describe('machine mode capability enforcement', () => {
     const result = before.setMachineKind('cnc');
 
     const after = useStore.getState();
-    expect(result).toEqual({ kind: 'blocked-by-capability', requestedKind: 'cnc' });
-    expect(after.project).toBe(before.project);
-    expect(after.undoStack).toBe(before.undoStack);
-    expect(after.redoStack).toBe(before.redoStack);
-    expect(after.cachedCncMachine).toBe(before.cachedCncMachine);
-    expect(after.dirty).toBe(false);
+    expect(result).toEqual({ kind: 'selected', machineKind: 'cnc' });
+    expect(after.project.machine?.kind).toBe('cnc');
+    expect(after.undoStack).toHaveLength(1);
+    expect(after.dirty).toBe(true);
   });
 
-  it('rejects Laser mode for a CNC-only machine', () => {
+  it('selects Laser mode for a CNC-only-labelled machine', () => {
     useStore.setState((state) => ({
       project: {
         ...state.project,
@@ -44,8 +42,8 @@ describe('machine mode capability enforcement', () => {
 
     const result = useStore.getState().setMachineKind('laser');
 
-    expect(result).toEqual({ kind: 'blocked-by-capability', requestedKind: 'laser' });
-    expect(useStore.getState().project.machine).toEqual(DEFAULT_CNC_MACHINE_CONFIG);
+    expect(result).toEqual({ kind: 'selected', machineKind: 'laser' });
+    expect(useStore.getState().project.machine).toEqual(LASER_MACHINE_CONFIG);
   });
 
   it('allows both directions for a hybrid machine', () => {
@@ -71,7 +69,7 @@ describe('machine mode capability enforcement', () => {
     });
   });
 
-  it('refuses an inconsistent atomic Machine Setup replacement', () => {
+  it('applies an inconsistent atomic Machine Setup replacement with a warning result', () => {
     const before = useStore.getState();
     const laserOnlyProfile = {
       ...before.project.device,
@@ -80,8 +78,8 @@ describe('machine mode capability enforcement', () => {
 
     const result = before.replaceMachineSetup(laserOnlyProfile, DEFAULT_CNC_MACHINE_CONFIG);
 
-    expect(result).toEqual({ kind: 'blocked-by-capability', requestedKind: 'cnc' });
-    expect(useStore.getState().project).toBe(before.project);
-    expect(useStore.getState().undoStack).toBe(before.undoStack);
+    expect(result).toEqual({ kind: 'applied-with-capability-warning', requestedKind: 'cnc' });
+    expect(useStore.getState().project.machine?.kind).toBe('cnc');
+    expect(useStore.getState().undoStack).toHaveLength(1);
   });
 });

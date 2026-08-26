@@ -22,16 +22,13 @@ import type { PathNodeRef } from '../state/path-node-edit-actions';
 import type { ImportOutcome } from '../state/store';
 import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { ToastVariant } from '../state/toast-store';
-import {
-  handleImportSvg,
-  handleOpenProject,
-  handleSaveGcode,
-  handleSaveProject,
-} from './file-actions';
+import { handleOpenProject, handleSaveProject } from './file-actions';
+import { handleUnifiedArtworkImport } from './import-dispatch';
 import { useStore } from '../state';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { finishPen } from '../workspace/pen-tool';
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 
 const NUDGE_MM = 1;
 const NUDGE_BIG_MM = 10;
@@ -40,6 +37,7 @@ export type FileCtx = {
   readonly platform: PlatformAdapter;
   readonly project: Project;
   readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
+  readonly importRasterImage: (obj: SceneObject, batchIdx?: number) => void;
   readonly setProject: (p: Project) => ProjectMachineCapabilityLoadResult;
   readonly newProject: () => void;
   readonly savedName: string | null;
@@ -132,13 +130,20 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
   s: (c) =>
     void handleSaveProject({
       platform: c.platform,
-      project: c.project,
+      project: projectForPersistence(c),
+      expectedProject: c.project,
       savedName: c.savedName,
       lastSaveTarget: c.lastSaveTarget,
       markSaved: c.markSaved,
       pushToast: c.pushToast,
     }),
-  i: (c) => void handleImportSvg(c.platform, c.importSvgObject, c.pushToast),
+  i: (c) =>
+    void handleUnifiedArtworkImport(c.platform, {
+      project: c.project,
+      importSvgObject: c.importSvgObject,
+      importRasterImage: c.importRasterImage,
+      pushToast: c.pushToast,
+    }),
 };
 
 export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
@@ -149,7 +154,8 @@ export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
     void handleSaveProject(
       {
         platform: ctx.platform,
-        project: ctx.project,
+        project: projectForPersistence(ctx),
+        expectedProject: ctx.project,
         savedName: ctx.savedName,
         lastSaveTarget: ctx.lastSaveTarget,
         markSaved: ctx.markSaved,
@@ -163,21 +169,7 @@ export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
   // tool — LightBurn parity, ADR-051 B7).
   if (e.shiftKey && e.key.toLowerCase() === 'e') {
     e.preventDefault();
-    void handleSaveGcode({
-      platform: ctx.platform,
-      project: ctx.project,
-      savedName: ctx.savedName,
-      jobPlacement: ctx.jobPlacement,
-      outputScope: ctx.outputScope,
-      machine: ctx.machine,
-      controllerSettings: ctx.controllerSettings,
-      settingsCapability: ctx.settingsCapability,
-      activeWcs: ctx.activeWcs ?? null,
-      ...(ctx.advanceVariablesAfter === undefined
-        ? {}
-        : { advanceVariablesAfter: ctx.advanceVariablesAfter }),
-      pushToast: ctx.pushToast,
-    });
+    useUiStore.getState().openGcodeSaveDialog();
     return true;
   }
   if (e.shiftKey) return false;
@@ -186,6 +178,20 @@ export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
   e.preventDefault();
   FILE_DISPATCH[key]?.(ctx);
   return true;
+}
+
+function projectForPersistence(ctx: FileCtx): Project {
+  const [selectedObjectId, ...additionalSelectedIds] = ctx.outputScope.selectedObjectIds;
+  return projectWithCurrentJobSetup({
+    project: ctx.project,
+    jobPlacement: ctx.jobPlacement,
+    outputScopeSettings: {
+      cutSelectedGraphics: ctx.outputScope.cutSelectedGraphics,
+      useSelectionOrigin: ctx.outputScope.useSelectionOrigin,
+    },
+    selectedObjectId: selectedObjectId ?? null,
+    additionalSelectedIds: new Set(additionalSelectedIds),
+  });
 }
 
 type EditBinding = {

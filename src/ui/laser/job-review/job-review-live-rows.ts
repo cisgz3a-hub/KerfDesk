@@ -16,12 +16,16 @@ import {
   type MachineKind,
   type Project,
 } from '../../../core/scene';
+import { layerSubLayerOperationId } from '../../../core/scene/layer';
+import { effectiveScanOffsetCalibrationStatus } from '../../../core/devices/scan-offset-profile';
 import {
   describeOverrides,
   formatMm,
   formatOnOff,
   overridesAreBaseline,
 } from './job-review-format';
+import { frameMotionFeeds } from '../../state/frame-feed-limits';
+import { buildContourEntryReviewFacts } from './job-review-contour-entry-facts';
 
 export type JobReviewFact = {
   readonly label: string;
@@ -74,13 +78,18 @@ export function buildControllerReviewFacts(
   ];
 }
 
-export function buildMachineReviewFacts(project: Project): ReadonlyArray<JobReviewFact> {
+export function buildMachineReviewFacts(
+  project: Project,
+  controllerSettings: ControllerSettingsSnapshot | null = null,
+): ReadonlyArray<JobReviewFact> {
   const device = project.device;
   const shared: JobReviewFact[] = [
     fact('Bed', `${formatMm(device.bedWidth)} × ${formatMm(device.bedHeight)} mm`),
     fact('Machine origin', device.origin.split('-').join(' ')),
-    fact('Max feed', `${formatMm(device.maxFeed)} mm/min`),
+    fact('Output max feed', `${formatMm(device.maxFeed)} mm/min (profile compile ceiling)`),
+    frameFeedFact(project, controllerSettings),
     fact('G-code dialect', device.gcodeDialect.dialectId),
+    scanOffsetProvenanceFact(project),
   ];
   const machine = project.machine;
   if (machineKindOf(machine) === 'cnc' && machine?.kind === 'cnc') {
@@ -91,6 +100,7 @@ export function buildMachineReviewFacts(project: Project): ReadonlyArray<JobRevi
         `${formatMm(machine.stock.widthMm)} × ${formatMm(machine.stock.heightMm)} × ${formatMm(machine.stock.thicknessMm)} mm`,
       ),
       fact('Active bit', activeCncTool(machine).name),
+      poweredZAssumptionFact(project),
       fact('Safe Z', `${formatMm(machine.params.safeZMm)} mm above stock top`),
       fact(
         'Spindle',
@@ -123,12 +133,69 @@ export function buildMachineReviewFacts(project: Project): ReadonlyArray<JobRevi
   ];
 }
 
+function poweredZAssumptionFact(project: Project): JobReviewFact {
+  const travel = project.device.zTravelMm;
+  const recorded = travel === undefined ? 'no travel recorded' : `${formatMm(travel)} mm recorded`;
+  return fact(
+    'Powered Z assumption',
+    `CNC assumes installed powered Z · ${recorded} (informational, not hardware proof)`,
+    'warning',
+  );
+}
+
+function scanOffsetProvenanceFact(project: Project): JobReviewFact {
+  const status = effectiveScanOffsetCalibrationStatus(project.device);
+  const count = project.device.scanningOffsets.length;
+  if (status === 'uncalibrated') return fact('Scan offsets', 'No saved table');
+  if (status === 'pending') {
+    return fact(
+      'Scan offsets',
+      `${count} point(s) · verification pending; table remains available`,
+      'warning',
+    );
+  }
+  if (status === 'legacy-verified') {
+    return fact(
+      'Scan offsets',
+      `${count} legacy/statusless point(s) · source and verification not recorded`,
+      'warning',
+    );
+  }
+  return fact('Scan offsets', `${count} point(s) · verification recorded`);
+}
+
+function frameFeedFact(
+  project: Project,
+  controllerSettings: ControllerSettingsSnapshot | null,
+): JobReviewFact {
+  const requested = project.device.framingFeedMmPerMin;
+  const effective = frameMotionFeeds(requested, controllerSettings).xyMmPerMin;
+  const xLimit = liveLimitLabel(controllerSettings?.maxFeedX);
+  const yLimit = liveLimitLabel(controllerSettings?.maxFeedY);
+  const hasUnknownLimit = xLimit === 'unknown' || yLimit === 'unknown';
+  return fact(
+    'Frame feed',
+    `requested ${formatMm(requested)} · effective XY ${formatMm(effective)} mm/min · live X ${xLimit}, Y ${yLimit}`,
+    hasUnknownLimit || effective !== requested ? 'warning' : 'default',
+  );
+}
+
+function liveLimitLabel(value: number | undefined): string {
+  return value === undefined || !Number.isFinite(value) || value <= 0
+    ? 'unknown'
+    : `${formatMm(value)} mm/min`;
+}
+
 export function buildOutputQualityReviewFacts(
   job: Job,
   layers: ReadonlyArray<Layer>,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint> = [],
 ): ReadonlyArray<JobReviewFact> {
-  return [...buildFillRunwayFacts(job, scanningOffsets), ...buildScanDirectionFacts(job, layers)];
+  return [
+    ...buildContourEntryReviewFacts(job, layers),
+    ...buildFillRunwayFacts(job, scanningOffsets),
+    ...buildScanDirectionFacts(job, layers),
+  ];
 }
 
 function buildFillRunwayFacts(
@@ -205,7 +272,9 @@ function operationName(layerId: string, layers: ReadonlyArray<Layer>): string {
   const direct = layers.find((layer) => layer.id === layerId);
   if (direct !== undefined) return direct.name;
   for (const layer of layers) {
-    const subLayer = layer.subLayers.find((candidate) => `${layer.id}:${candidate.id}` === layerId);
+    const subLayer = layer.subLayers.find(
+      (candidate) => layerSubLayerOperationId(layer.id, candidate.id) === layerId,
+    );
     if (subLayer !== undefined) return `${layer.name} / ${subLayer.label}`;
   }
   return layerId;

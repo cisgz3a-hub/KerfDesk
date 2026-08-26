@@ -15,6 +15,7 @@ import {
   type ProfileCapability,
   type ProfileEvidenceStatus,
 } from '../../core/devices';
+import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
 import { isScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import {
   normalizeCameraAlignment,
@@ -55,12 +56,23 @@ export function validateMachineProfileShape(value: Record<string, unknown>): str
     validateProfileOptionalZ(value) ??
     validateProfileCapabilities(value['capabilities']) ??
     validateProfileEvidence(value['evidence']) ??
-    validateLaserSubProfile(value['laserSubProfile']) ??
+    validateToolheadProfiles(value) ??
     validateCameraProfile(value['cameraProfile']) ??
     validateCameraCalibration(value['cameraCalibration']) ??
     validateCameraAlignment(value['cameraAlignment']) ??
     validateLaserFireControl(value['fireControl'])
   );
+}
+
+function validateToolheadProfiles(value: Record<string, unknown>): string | null {
+  return (
+    validateLaserSubProfile(value['laserSubProfile']) ??
+    validateCncSubProfile(value['cncSubProfile'])
+  );
+}
+
+function validateCncSubProfile(value: unknown): string | null {
+  return cncSubProfileIssues(value, 'profile.cncSubProfile')[0] ?? null;
 }
 
 function validateScanOffsetCalibrationLifecycle(value: Record<string, unknown>): string | null {

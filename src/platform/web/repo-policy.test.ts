@@ -142,6 +142,6 @@ describe('repository policy enforcement contract', () => {
   it('pre-bundles cold document-worker dependencies before the first import', () => {
     const viteConfig = repoFile('vite.config.ts');
 
-    expect(viteConfig).toContain("include: ['linkedom/worker', 'saxes']");
+    expect(viteConfig).toContain("include: ['linkedom/worker', 'saxes', 'opentype.js']");
   });
 });

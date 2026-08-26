@@ -68,7 +68,9 @@ describe('Library insertion identity', () => {
 
     expect(useStore.getState().importSvgObject(ordinary).kind).toBe('added');
     expect(useStore.getState().importSvgObject(library).kind).toBe('added');
-    expect(useStore.getState().importSvgObject(ordinaryRevision).kind).toBe('replaced');
+    expect(useStore.getState().reimportSvgObject(ordinary.id, ordinaryRevision)?.kind).toBe(
+      'replaced',
+    );
     expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
       'ordinary-first',
       'library-first',

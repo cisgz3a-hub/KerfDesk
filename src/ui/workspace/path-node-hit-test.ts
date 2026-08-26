@@ -9,6 +9,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../../core/scene';
+import { resolveVisibleOperationForPath } from '../../core/scene/visibility';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 
 export const PATH_NODE_HIT_RADIUS_PX = 8;
@@ -49,12 +50,7 @@ function hitObjectPathNode(
   for (let pathIndex = 0; pathIndex < object.paths.length; pathIndex += 1) {
     const path = object.paths[pathIndex];
     if (path === undefined) continue;
-    const operationIds = path.operationIds ?? object.operationIds;
-    const visible =
-      operationIds === undefined
-        ? layerByColor.get(path.color)?.visible !== false
-        : operationIds.some((id) => layerByColor.get(id)?.visible !== false);
-    if (!visible) continue;
+    if (!resolveVisibleOperationForPath(object, path, layerByColor).visible) continue;
     const hit = hitPathNodes(object, path, pathIndex, point, maxDistanceSq, selectedNodes);
     if (hit === null) continue;
     if (best !== null && hit.distanceSq >= best.distanceSq) continue;

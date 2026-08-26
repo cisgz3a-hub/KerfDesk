@@ -9,6 +9,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import {
   createLayer,
   createProject,
@@ -168,7 +169,7 @@ async function clickFrameJob(project: Project): Promise<ReturnType<typeof vi.fn>
   return frame;
 }
 
-const LARGE_RASTER_TEST_TIMEOUT_MS = 30_000;
+const LARGE_RASTER_TEST_TIMEOUT_MS = ciBudgetMs(30_000, 120_000);
 
 describe('over-budget rasters compile and frame (ADR-243)', () => {
   it(

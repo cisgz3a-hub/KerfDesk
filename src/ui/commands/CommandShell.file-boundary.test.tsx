@@ -47,16 +47,16 @@ afterEach(() => {
 });
 
 describe('CommandShell file boundaries', () => {
-  it('routes image import and batch trace pickers through PlatformAdapter', async () => {
+  it('routes unified import and batch trace pickers through PlatformAdapter', async () => {
     const platform = mockPlatform();
     const { host, root } = await renderShell(platform);
     try {
       expect(host.querySelector('input[type="file"]')).toBeNull();
 
-      await clickButton(host, 'Import Image...');
+      await clickButton(host, 'Import...');
       expect(platform.pickFilesForOpen).toHaveBeenLastCalledWith({
-        accept: ['.png', '.jpg', '.jpeg'],
-        multiple: false,
+        accept: ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.stl'],
+        multiple: true,
       });
 
       await clickMenuCommand(host, 'Tools', 'Multi-File Trace...');

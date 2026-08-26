@@ -10,7 +10,7 @@ import type { Scene } from './scene';
 import type { Bounds, ColoredPath, Polyline, SceneObject, Transform, Vec2 } from './scene-object';
 import { applyTransform } from './transform';
 import { flattenColoredPathCurves } from './curve-path';
-import { sceneObjectHasVisibleLayerFromMap } from './visibility';
+import { resolveVisibleOperationForPath, sceneObjectHasVisibleLayerFromMap } from './visibility';
 
 const VECTOR_STROKE_HIT_TOLERANCE_MM = 2;
 
@@ -66,8 +66,9 @@ function hitVectorObject(
   let hasPolyline = false;
   let lineInteriorArea: number | null = null;
   for (const path of paths) {
-    const layer = operationForPath(obj, path, layerByColor);
-    if (layer?.visible === false) continue;
+    const resolution = resolveVisibleOperationForPath(obj, path, layerByColor);
+    if (!resolution.visible) continue;
+    const layer = resolution.operation;
     const mode = effectiveLayerMode(obj, layer);
     for (const polyline of hitTestPolylines(path)) {
       if (polyline.points.length === 0) continue;
@@ -82,20 +83,6 @@ function hitVectorObject(
   }
   if (!hasPolyline && pointInObjectBBox(point, obj)) return { kind: 'primary' };
   return lineInteriorArea === null ? NO_HIT : { kind: 'line-interior', area: lineInteriorArea };
-}
-
-function operationForPath(
-  object: SceneObject,
-  path: ColoredPath,
-  lookup: ReadonlyMap<string, Layer>,
-): Layer | undefined {
-  const ids = path.operationIds ?? object.operationIds;
-  if (ids === undefined) return lookup.get(path.color);
-  for (const id of ids) {
-    const operation = lookup.get(id);
-    if (operation !== undefined) return operation;
-  }
-  return undefined;
 }
 
 function hitTestPolylines(path: ColoredPath): ReadonlyArray<Polyline> {

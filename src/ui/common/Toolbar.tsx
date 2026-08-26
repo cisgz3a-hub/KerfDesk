@@ -150,7 +150,7 @@ function toolbarTitle(command: AppCommand): string {
 // import/create/trace/export into one run of seven buttons.
 const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['file.new', 'file.open', 'file.save', 'file.save-as'],
-  ['file.import-svg', 'file.import-image'],
+  ['file.import'],
   [
     'tools.add-text',
     'tools.registration-jig',
@@ -171,6 +171,7 @@ const ICON_ONLY_TOOLBAR_COMMANDS = new Set<CommandId>([
   'file.open',
   'file.save',
   'file.save-as',
+  'file.import',
   'file.import-svg',
   'file.import-image',
   'file.save-gcode',

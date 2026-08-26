@@ -6,7 +6,7 @@ import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
 import { machineKindOf, type MachineKind } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
-import { blockedMachineModeMessage } from './machine-capability-messages';
+import { machineCapabilityWarningMessage } from './machine-capability-messages';
 
 export function MachineModeToggle(): JSX.Element {
   const kind = useStore((s) => machineKindOf(s.project.machine));
@@ -14,9 +14,9 @@ export function MachineModeToggle(): JSX.Element {
   const setMachineKind = useStore((s) => s.setMachineKind);
   const pushToast = useToastStore((s) => s.pushToast);
   const select = (machineKind: MachineKind): void => {
-    const result = setMachineKind(machineKind);
-    if (result.kind === 'blocked-by-capability') {
-      pushToast(blockedMachineModeMessage(result.requestedKind), 'warning');
+    setMachineKind(machineKind);
+    if (!deviceSupportsMachineKind(device, machineKind)) {
+      pushToast(machineCapabilityWarningMessage(machineKind), 'warning');
     }
   };
   return (
@@ -49,12 +49,14 @@ function SegButton(props: {
   readonly available: boolean;
   readonly onSelect: () => void;
 }): JSX.Element {
-  const title = props.available ? props.title : blockedMachineModeMessage(props.machineKind);
+  const title = props.available
+    ? props.title
+    : `${props.title} ${machineCapabilityWarningMessage(props.machineKind)}`;
   return (
     <button
       type="button"
       aria-pressed={props.active}
-      aria-disabled={!props.available}
+      data-capability-warning={!props.available ? 'true' : undefined}
       onClick={props.onSelect}
       title={title}
       style={!props.available ? unavailableSegStyle : props.active ? activeSegStyle : segStyle}
@@ -88,7 +90,6 @@ const activeSegStyle: React.CSSProperties = {
 };
 const unavailableSegStyle: React.CSSProperties = {
   ...segStyle,
-  color: 'var(--lf-text-muted)',
-  cursor: 'not-allowed',
-  opacity: 0.45,
+  color: 'var(--lf-warning-text)',
+  boxShadow: 'inset 0 -2px 0 var(--lf-warning-border)',
 };

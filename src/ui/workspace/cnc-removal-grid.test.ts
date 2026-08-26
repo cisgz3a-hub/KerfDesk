@@ -6,6 +6,7 @@
 // hold under every origin convention.
 
 import { describe, expect, it } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import { compileCncJob } from '../../core/cnc';
 import { toSceneCoords } from '../../core/devices';
 import { buildToolpath } from '../../core/job';
@@ -134,49 +135,57 @@ describe('computeCncRemovalGrid', () => {
     expect(grid?.widthCells).toBe(1_000);
   });
 
-  it('shades a two-bit job with each section its own bit', () => {
-    const grid = computeCncRemovalGrid(DEVICE, MACHINE, sceneToolpath(TWO_BIT_SCENE), 1);
-    expect(grid).not.toBeNull();
-    if (grid === null) return;
+  it(
+    'shades a two-bit job with each section its own bit',
+    () => {
+      const grid = computeCncRemovalGrid(DEVICE, MACHINE, sceneToolpath(TWO_BIT_SCENE), 1);
+      expect(grid).not.toBeNull();
+      if (grid === null) return;
 
-    // The 1/4" end mill's pocket: a flat floor at exactly its 4 mm depth.
-    expect(probeDepth(grid, S0.x + 25, S0.y + 25)).toBeCloseTo(-4, 1);
+      // The 1/4" end mill's pocket: a flat floor at exactly its 4 mm depth.
+      expect(probeDepth(grid, S0.x + 25, S0.y + 25)).toBeCloseTo(-4, 1);
 
-    // The v-bit's cone wall 0.9 mm inside the border: -0.9/tan(30) ~ -1.56
-    // (+/- ring spacing and cell discretization). The active flat kernel read
-    // the nearest tip line's full depth here instead.
-    const wall = probeDepth(grid, VEE_X + 0.9, VEE_EDGE_Y);
-    expect(wall).toBeLessThan(-0.7);
-    expect(wall).toBeGreaterThan(-2.4);
+      // The v-bit's cone wall 0.9 mm inside the border: -0.9/tan(30) ~ -1.56
+      // (+/- ring spacing and cell discretization). The active flat kernel read
+      // the nearest tip line's full depth here instead.
+      const wall = probeDepth(grid, VEE_X + 0.9, VEE_EDGE_Y);
+      expect(wall).toBeLessThan(-0.7);
+      expect(wall).toBeGreaterThan(-2.4);
 
-    // Just outside the border the cone has reached z = 0 — untouched stock.
-    // The flat 3.175 mm kernel bled past the border at the near-border tips'
-    // depth, which is the phantom slot the operator saw shaded.
-    expect(probeDepth(grid, VEE_X - 0.9, VEE_EDGE_Y)).toBeGreaterThan(-0.2);
+      // Just outside the border the cone has reached z = 0 — untouched stock.
+      // The flat 3.175 mm kernel bled past the border at the near-border tips'
+      // depth, which is the phantom slot the operator saw shaded.
+      expect(probeDepth(grid, VEE_X - 0.9, VEE_EDGE_Y)).toBeGreaterThan(-0.2);
 
-    // Nothing anywhere cuts past the deepest programmed pass (pocket, -4).
-    let deepest = 0;
-    for (const depth of grid.depth) deepest = Math.min(deepest, depth);
-    expect(deepest).toBeGreaterThanOrEqual(-4.01);
-  });
+      // Nothing anywhere cuts past the deepest programmed pass (pocket, -4).
+      let deepest = 0;
+      for (const depth of grid.depth) deepest = Math.min(deepest, depth);
+      expect(deepest).toBeGreaterThanOrEqual(-4.01);
+    },
+    ciBudgetMs(30_000, 120_000),
+  );
 
-  it('scrubs along the one ordered path, not per bit section', () => {
-    const path = sceneToolpath(TWO_BIT_SCENE);
-    const early = computeCncRemovalGrid(DEVICE, MACHINE, path, 0.05);
-    const full = computeCncRemovalGrid(DEVICE, MACHINE, path, 1);
-    expect(early).not.toBeNull();
-    expect(full).not.toBeNull();
-    if (early === null || full === null) return;
-    // Monotone: an early scrub can never be deeper than the finished cut.
-    let violations = 0;
-    for (let i = 0; i < full.depth.length; i += 1) {
-      if ((early.depth[i] ?? 0) < (full.depth[i] ?? 0)) violations += 1;
-    }
-    expect(violations).toBe(0);
-    // And it really is partial — the finished grid removes strictly more.
-    const removed = (grid: RemovalGrid) => [...grid.depth].filter((d) => d < 0).length;
-    expect(removed(early)).toBeLessThan(removed(full));
-  });
+  it(
+    'scrubs along the one ordered path, not per bit section',
+    () => {
+      const path = sceneToolpath(TWO_BIT_SCENE);
+      const early = computeCncRemovalGrid(DEVICE, MACHINE, path, 0.05);
+      const full = computeCncRemovalGrid(DEVICE, MACHINE, path, 1);
+      expect(early).not.toBeNull();
+      expect(full).not.toBeNull();
+      if (early === null || full === null) return;
+      // Monotone: an early scrub can never be deeper than the finished cut.
+      let violations = 0;
+      for (let i = 0; i < full.depth.length; i += 1) {
+        if ((early.depth[i] ?? 0) < (full.depth[i] ?? 0)) violations += 1;
+      }
+      expect(violations).toBe(0);
+      // And it really is partial — the finished grid removes strictly more.
+      const removed = (grid: RemovalGrid) => [...grid.depth].filter((d) => d < 0).length;
+      expect(removed(early)).toBeLessThan(removed(full));
+    },
+    ciBudgetMs(30_000, 120_000),
+  );
 
   it('keys a two-stage v-carve by BIT, which its shared layerId cannot do', () => {
     // Clearance pocket + vee ladder compile to two groups on ONE layer with

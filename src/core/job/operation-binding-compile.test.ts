@@ -63,6 +63,23 @@ describe('operation-bound compilation', () => {
     expect(cnc.groups).toHaveLength(1);
     expect(cnc.groups[0]).toMatchObject({ layerId: 'johann-op', feedMmPerMin: 700 });
   });
+
+  it('compiles every operation bound to one path even when the first is hidden', () => {
+    const object = {
+      ...artwork('shared', 'johann-op', 0),
+      operationIds: ['johann-op', 'box-op'],
+    };
+    const scene: Scene = {
+      objects: [object],
+      layers: [{ ...firstOperation, visible: false }, secondOperation],
+      groups: [],
+    };
+
+    expect(compileJob(scene, DEFAULT_DEVICE_PROFILE).groups.map((group) => group.layerId)).toEqual([
+      'johann-op',
+      'box-op',
+    ]);
+  });
 });
 
 function independentScene(): Scene {

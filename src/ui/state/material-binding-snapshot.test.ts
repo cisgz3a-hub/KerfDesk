@@ -43,7 +43,8 @@ describe('linked material snapshots', () => {
     useStore.getState().importSvgObject(svgObj('O1', [SOURCE_COLOR]));
     useStore.getState().setMaterialLibrary(library());
     expect(useStore.getState().linkMaterialPresetToLayer(targetLayer().id, PRESET_ID)).toBe(true);
-    expect(useStore.getState().refreshLinkedMaterialLayer(targetLayer().id)).toBe(true);
+    expect(targetLayer().materialBinding?.presetRevision).toBe('rev-1');
+    expect(useStore.getState().refreshLinkedMaterialLayer(targetLayer().id)).toBe(false);
 
     expect(targetLayer().materialBinding?.lastResolved).not.toHaveProperty('materialBinding');
   });

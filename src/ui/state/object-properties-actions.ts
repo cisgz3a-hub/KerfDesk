@@ -171,11 +171,11 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setBoolean(out, 'airAssist', patch.airAssist);
   setFiniteNumber(out, 'kerfOffsetMm', patch.kerfOffsetMm);
   setBoolean(out, 'tabsEnabled', patch.tabsEnabled);
-  setPositiveNumber(out, 'tabSizeMm', patch.tabSizeMm);
+  setMinimumNumber(out, 'tabSizeMm', patch.tabSizeMm, 0.01);
   setPositiveInteger(out, 'tabsPerShape', patch.tabsPerShape);
   setBoolean(out, 'tabSkipInnerShapes', patch.tabSkipInnerShapes);
   setFiniteNumber(out, 'hatchAngleDeg', patch.hatchAngleDeg);
-  setPositiveNumber(out, 'hatchSpacingMm', patch.hatchSpacingMm);
+  setMinimumNumber(out, 'hatchSpacingMm', patch.hatchSpacingMm, 0.05);
   setNonNegativeNumber(out, 'fillOverscanMm', patch.fillOverscanMm);
   if (
     patch.fillStyle === 'scanline' ||
@@ -204,6 +204,15 @@ function setPositiveNumber(
   value: number | undefined,
 ): void {
   if (value !== undefined && Number.isFinite(value)) out[key] = Math.max(1, value);
+}
+
+function setMinimumNumber(
+  out: Record<string, unknown>,
+  key: string,
+  value: number | undefined,
+  minimum: number,
+): void {
+  if (value !== undefined && Number.isFinite(value)) out[key] = Math.max(minimum, value);
 }
 
 function setPositiveInteger(

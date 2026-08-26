@@ -1,13 +1,23 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ciBudgetMs } from './ci-budget';
 
 const ORIGINAL_CI = process.env.CI;
+const ORIGINAL_COVERAGE = process.env.KERFDESK_COVERAGE;
+
+beforeEach(() => {
+  delete process.env.KERFDESK_COVERAGE;
+});
 
 afterEach(() => {
   if (ORIGINAL_CI === undefined) {
     delete process.env.CI;
   } else {
     process.env.CI = ORIGINAL_CI;
+  }
+  if (ORIGINAL_COVERAGE === undefined) {
+    delete process.env.KERFDESK_COVERAGE;
+  } else {
+    process.env.KERFDESK_COVERAGE = ORIGINAL_COVERAGE;
   }
 });
 
@@ -28,5 +38,12 @@ describe('ciBudgetMs', () => {
     process.env.CI = '';
 
     expect(ciBudgetMs(40_000, 240_000)).toBe(40_000);
+  });
+
+  it('uses an instrumentation allowance during report-only coverage runs', () => {
+    delete process.env.CI;
+    process.env.KERFDESK_COVERAGE = '1';
+
+    expect(ciBudgetMs(40_000, 240_000)).toBe(480_000);
   });
 });

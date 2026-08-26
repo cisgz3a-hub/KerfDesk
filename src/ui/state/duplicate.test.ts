@@ -67,4 +67,22 @@ describe('useStore — duplicateSelection (Cmd+D)', () => {
     expect(cloneIds.some((id) => sourceIds.includes(id))).toBe(false);
     expect(layers).toHaveLength(4);
   });
+
+  it('preserves every sublayer on duplicated operations with independent settings objects', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const sourceId = useStore.getState().project.scene.layers[0]?.id;
+    if (sourceId === undefined) throw new Error('source operation missing');
+    useStore.getState().addLayerSubLayer(sourceId);
+    useStore.getState().selectObject('O1');
+
+    useStore.getState().duplicateSelection();
+
+    const { objects, layers } = useStore.getState().project.scene;
+    const cloneId = operationIdsForObject(objects[1]!, layers)[0];
+    const source = layers.find((layer) => layer.id === sourceId);
+    const clone = layers.find((layer) => layer.id === cloneId);
+    expect(clone?.subLayers).toEqual(source?.subLayers);
+    expect(clone?.subLayers).not.toBe(source?.subLayers);
+    expect(clone?.subLayers[0]?.settings).not.toBe(source?.subLayers[0]?.settings);
+  });
 });

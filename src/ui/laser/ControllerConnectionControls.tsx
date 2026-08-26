@@ -38,12 +38,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
     <>
       <SafetyNoticeBanner
         onReconnect={connect}
-        reconnectDisabled={
-          !supportsSerial ||
-          props.autofocusBusy ||
-          props.motionOperation !== null ||
-          isFileOnlyProfile
-        }
+        reconnectDisabled={!supportsSerial || props.motionOperation !== null || isFileOnlyProfile}
       />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
       <DeviceSetupControls />
@@ -58,11 +53,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         onReconnectQualification={() => void reconnect().catch(() => undefined)}
         disabled={
           !supportsSerial ||
-          connectionControlsBusy(
-            props.autofocusBusy,
-            props.motionOperation,
-            props.controllerOperation,
-          ) ||
+          connectionControlsBusy(props.motionOperation, props.controllerOperation) ||
           isFileOnlyProfile
         }
       />
@@ -102,14 +93,14 @@ function isFileOnlyController(
 // Connection management is the escape hatch for a stale reset or startup
 // handshake. Keep Disconnect/Reconnect available for those controller-owned
 // operations while motion and autofocus retain their stricter lockout.
-function connectionControlsBusy(
-  autofocusBusy: boolean,
+export function connectionControlsBusy(
   motionOperation: unknown,
   controllerOperation: ReturnType<typeof useLaserStore.getState>['controllerOperation'],
 ): boolean {
-  if (autofocusBusy || motionOperation !== null) return true;
+  if (motionOperation !== null) return true;
   return (
     controllerOperation !== null &&
+    controllerOperation.kind !== 'autofocus' &&
     controllerOperation.kind !== 'recovery' &&
     controllerOperation.kind !== 'connection-handshake'
   );

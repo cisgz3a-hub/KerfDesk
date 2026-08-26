@@ -22,11 +22,19 @@ function isCi(): boolean {
   return flag != null && flag !== '';
 }
 
+function isCoverage(): boolean {
+  return process.env.KERFDESK_COVERAGE === '1';
+}
+
 /**
  * Pick a wall-clock budget in milliseconds: the tight `localMs` on a dev box, the
  * generous `ciMs` on a CI runner. Use for vitest per-test `{ timeout }` options
  * and perf-regression budgets that must not flake on slow shared CI runners.
  */
 export function ciBudgetMs(localMs: number, ciMs: number): number {
+  // V8 instrumentation makes the geometry, trace, and camera reference suites
+  // substantially slower than either an ordinary local or shared-CI run. The
+  // assertions still verify the result; only their wall-clock ceilings expand.
+  if (isCoverage()) return ciMs * 2;
   return isCi() ? ciMs : localMs;
 }

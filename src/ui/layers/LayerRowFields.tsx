@@ -55,6 +55,16 @@ export function LayerRowSettingsFields(props: {
       <FieldRow label="Passes">
         <PassesInput layer={layer} operationTarget={operationTarget} />
       </FieldRow>
+      {settings.mode === 'line' && (
+        <FieldRow label="Contour entry">
+          <SharedRunwayInput
+            layer={layer}
+            operationTarget={operationTarget}
+            purpose="contour entry"
+          />
+          <span style={unitStyle}>mm</span>
+        </FieldRow>
+      )}
       {settings.mode === 'fill' && <FillFields layer={layer} operationTarget={operationTarget} />}
       {settings.mode === 'image' && (
         <LayerImageFields
@@ -96,7 +106,11 @@ function FillFields(props: {
         <span style={unitStyle}>mm</span>
       </FieldRow>
       <FieldRow label="Overscan">
-        <FillOverscanInput layer={layer} operationTarget={operationTarget} />
+        <SharedRunwayInput
+          layer={layer}
+          operationTarget={operationTarget}
+          purpose="fill overscan"
+        />
         <span style={unitStyle}>mm</span>
         {operationTarget.settings.fillStyle === 'scanline' &&
         operationTarget.settings.fillOverscanMm <= 0 ? (
@@ -180,11 +194,12 @@ function HatchSpacingInput(props: {
   );
 }
 
-function FillOverscanInput(props: {
+function SharedRunwayInput(props: {
   readonly layer: Layer;
   readonly operationTarget: LayerOperationControlTarget;
+  readonly purpose: 'contour entry' | 'fill overscan';
 }): JSX.Element {
-  const { layer, operationTarget } = props;
+  const { layer, operationTarget, purpose } = props;
   const debounced = useDebouncedCommit<number>({
     value: operationTarget.settings.fillOverscanMm,
     commit: (fillOverscanMm) => operationTarget.commit({ fillOverscanMm }),
@@ -200,10 +215,18 @@ function FillOverscanInput(props: {
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Fill overscan for ${targetAriaContext(layer, operationTarget)}`}
-      title="Extra travel beyond fill edges so the laser reaches speed before firing."
+      aria-label={`${capitalize(purpose)} for ${targetAriaContext(layer, operationTarget)}`}
+      title={
+        purpose === 'contour entry'
+          ? 'Shared with Fill overscan. On 4040-safe, Line contours use up to 5 mm of laser-off feed-matched entry; other profiles may not apply it.'
+          : 'Extra travel beyond fill edges so the laser reaches speed before firing. This stored value is also the Line contour-entry target.'
+      }
     />
   );
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function PowerInput(props: {

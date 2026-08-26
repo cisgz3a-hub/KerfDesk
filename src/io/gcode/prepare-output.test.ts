@@ -5,6 +5,7 @@ import {
   addObject,
   createLayer,
   createProject,
+  DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
   type OutputScope,
   type Project,
@@ -127,6 +128,38 @@ describe('prepareOutput', () => {
     const prepared = prepareOutput(vectorProject());
     expect(prepared.ok).toBe(true);
     if (prepared.ok) expect(prepared.job.groups.length).toBeGreaterThan(0);
+  });
+
+  it('returns structured compile-integrity issues before malformed CNC params reach output', () => {
+    const base = vectorProject();
+    const project = {
+      ...base,
+      machine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        params: {
+          ...DEFAULT_CNC_MACHINE_CONFIG.params,
+          coolant: 'liquid-nitrogen',
+          parkXMm: 'left',
+        },
+      },
+    } as unknown as Project;
+
+    const prepared = prepareOutput(project);
+
+    expect(prepared.ok).toBe(false);
+    if (prepared.ok) return;
+    expect(prepared.preflight.issues).toEqual([
+      {
+        code: 'cnc-machine-params-invalid',
+        message:
+          'machine.params.coolant must be off, mist, or flood. Correct it in Machine Setup before preparing output.',
+      },
+      {
+        code: 'cnc-machine-params-invalid',
+        message:
+          'machine.params.parkXMm must be finite. Correct it in Machine Setup before preparing output.',
+      },
+    ]);
   });
 
   it('defaults to reducing travel moves inside cut groups', () => {

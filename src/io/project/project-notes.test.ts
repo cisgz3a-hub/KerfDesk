@@ -17,7 +17,7 @@ describe('project notes .lf2 IO', () => {
 
   it('back-fills missing project notes on older .lf2 files', () => {
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION,
+      schemaVersion: PROJECT_SCHEMA_VERSION - 1,
       device: {
         name: 'Default',
         bedWidth: 300,

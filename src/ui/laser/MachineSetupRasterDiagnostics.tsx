@@ -184,18 +184,24 @@ function scanOffsetWarnings(
   project: Project,
   bidirectionalLayerCount: number,
 ): ReadonlyArray<string> {
-  if (bidirectionalLayerCount === 0) return [];
   const status = effectiveScanOffsetCalibrationStatus(project.device);
+  if (status === 'legacy-verified') {
+    return [
+      'The scan-offset table is legacy/statusless: its source and verification burn were not recorded. It remains active; use the calibration panel to mark its truthful state.',
+    ];
+  }
+  if (status === 'pending') {
+    return [
+      'The saved scan-offset table has no recorded verification burn. It remains available; inspect a verification coupon and mark its truthful state.',
+    ];
+  }
+  if (bidirectionalLayerCount === 0) return [];
   if (status === 'uncalibrated') {
     return [
       'Bidirectional raster or fill is active without scan-offset calibration. This can show up as double or fat small text on one machine while another machine burns cleanly.',
     ];
   }
-  return status === 'pending'
-    ? [
-        'The saved scan-offset table is awaiting a real verification burn. Normal 4040 output remains one-way until the operator marks that coupon passed.',
-      ]
-    : [];
+  return [];
 }
 
 function rasterWarnings(args: {

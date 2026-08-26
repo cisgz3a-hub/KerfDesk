@@ -16,6 +16,8 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import { resolveVisibleOperationForPath } from '../../core/scene/visibility';
 import { drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawMeasurement } from './draw-measurement';
 import { drawNoGoZones } from './draw-no-go-zones';
@@ -338,10 +340,18 @@ function drawObjectPolylines(
   }
   let simplified = false;
   for (const path of obj.paths) {
-    const layer = operationForPath(obj, path, layerByColor);
-    if (layer === undefined || !layer.visible) continue;
-    const effectiveLayer =
-      obj.operationOverride === undefined ? layer : { ...layer, ...obj.operationOverride };
+    const resolution = resolveVisibleOperationForPath(obj, path, layerByColor);
+    if (!resolution.visible) continue;
+    const layer = resolution.operation;
+    if (layer === undefined) {
+      ctx.strokeStyle = path.color;
+      ctx.lineWidth = 1.5;
+      const display = displayPathFor(path, obj, view, displayPolylineCache);
+      simplified = includesSimplifiedDisplay(simplified, display);
+      strokePolylinesBatched(ctx, obj, display.polylines, view);
+      continue;
+    }
+    const effectiveLayer = effectiveOperationForObject(layer, obj);
     if (effectiveLayer.mode === 'fill') {
       const display = displayPathFor(path, obj, view, displayPolylineCache);
       simplified = includesSimplifiedDisplay(simplified, display);
@@ -369,22 +379,6 @@ function operationLookup(layers: ReadonlyArray<Layer>): Map<string, Layer> {
     if (!lookup.has(layer.color)) lookup.set(layer.color, layer);
   }
   return lookup;
-}
-
-function operationForPath(
-  object: SceneObject,
-  path: ColoredPath,
-  lookup: ReadonlyMap<string, Layer>,
-): Layer | undefined {
-  const operationIds = path.operationIds ?? object.operationIds;
-  if (operationIds !== undefined) {
-    for (const id of operationIds) {
-      const operation = lookup.get(id);
-      if (operation !== undefined) return operation;
-    }
-    return undefined;
-  }
-  return lookup.get(path.color);
 }
 
 function displayPathFor(

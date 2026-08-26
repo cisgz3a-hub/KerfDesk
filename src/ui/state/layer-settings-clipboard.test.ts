@@ -11,6 +11,7 @@ describe('operation settings clipboard', () => {
     const [sourceId] = operationIdsFor('O1');
     if (sourceId === undefined) throw new Error('source operation missing');
     configureSource(sourceId);
+    useStore.getState().addLayerSubLayer(sourceId);
     useStore.setState({ dirty: false, undoStack: [] });
 
     useStore.getState().copyLayerSettings(sourceId);
@@ -45,6 +46,7 @@ describe('operation settings clipboard', () => {
       fillCrossHatch: true,
       cnc: { cutType: 'pocket', depthMm: 4, feedMmPerMin: 777 },
     });
+    expect(operation(targetId)?.subLayers).toEqual(operation(sourceId)?.subLayers);
     expect(useStore.getState().undoStack).toHaveLength(1);
     expect(useStore.getState().dirty).toBe(true);
   });

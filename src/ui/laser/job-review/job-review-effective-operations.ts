@@ -1,5 +1,6 @@
-import type { Group, Job } from '../../../core/job';
+import type { CncGroup, Group, Job } from '../../../core/job';
 import { cncGroupMaximumDepthMm } from '../../../core/job/job';
+import { laserOperationDetail } from './job-review-detail-facts';
 
 export type JobReviewEffectiveOperation = {
   readonly layerId: string;
@@ -34,37 +35,60 @@ export function buildEffectiveOperationReview(
 }
 
 function effectiveGroupSummary(group: Group): string {
-  if (group.kind === 'cnc') {
-    const tool = group.toolName ?? group.toolId ?? 'active bit';
-    const coolant =
-      group.coolant === undefined || group.coolant === 'off'
-        ? 'coolant off'
-        : `${group.coolant} coolant`;
-    const actualDepth = reportsGeometryDerivedDepth(group.cutType)
-      ? `Actual max depth ${formatNumber(cncGroupMaximumDepthMm(group))} mm · `
-      : '';
-    return (
-      actualDepth +
-      `${tool} · ${group.passes.length} ${plural(group.passes.length, 'pass', 'passes')}` +
-      ` · ${formatNumber(group.feedMmPerMin)} mm/min feed` +
-      ` · ${formatNumber(group.plungeMmPerMin)} mm/min plunge` +
-      ` · ${formatNumber(group.spindleRpm)} RPM · ${coolant}`
-    );
-  }
+  return group.kind === 'cnc' ? cncGroupSummary(group) : laserGroupSummary(group);
+}
 
+function cncGroupSummary(group: CncGroup): string {
+  const tool = group.toolName ?? group.toolId ?? 'active bit';
+  const coolant =
+    group.coolant === undefined || group.coolant === 'off'
+      ? 'coolant off'
+      : `${group.coolant} coolant`;
+  const actualDepth = reportsGeometryDerivedDepth(group.cutType)
+    ? `Actual max depth ${formatNumber(cncGroupMaximumDepthMm(group))} mm · `
+    : '';
+  return (
+    actualDepth +
+    `${tool} · ${group.passes.length} ${plural(group.passes.length, 'pass', 'passes')}` +
+    ` · ${formatNumber(group.feedMmPerMin)} mm/min feed` +
+    ` · ${formatNumber(group.plungeMmPerMin)} mm/min plunge` +
+    ` · ${formatNumber(group.spindleRpm)} RPM · ${coolant}`
+  );
+}
+
+function laserGroupSummary(group: Exclude<Group, CncGroup>): string {
   const kind = group.kind === 'cut' ? 'Line' : group.kind === 'fill' ? 'Fill' : 'Image';
   const powerMode =
     group.kind !== 'raster' && group.powerMode !== undefined ? ` · ${group.powerMode} power` : '';
+  const speed =
+    group.requestedSpeed === undefined
+      ? `${formatNumber(group.speed)} mm/min`
+      : `${formatNumber(group.speed)} mm/min effective (${formatNumber(group.requestedSpeed)} requested)`;
+  const overrideFacts =
+    group.operationSettings === undefined
+      ? ''
+      : ` · effective override: ${laserOperationDetail(group.operationSettings)}`;
+  const contourEntry = contourEntrySummary(group);
   return (
     `${kind} · ${formatNumber(group.power)}% power` +
-    ` · ${formatNumber(group.speed)} mm/min` +
+    ` · ${speed}` +
     ` · ${group.passes} ${plural(group.passes, 'pass', 'passes')}` +
-    ` · air ${group.airAssist ? 'on' : 'off'}${powerMode}`
+    ` · air ${group.airAssist ? 'on' : 'off'}${powerMode}${contourEntry}${overrideFacts}`
   );
 }
 
 function reportsGeometryDerivedDepth(cutType: string): boolean {
   return cutType === 'v-carve' || cutType === 'relief-rough' || cutType === 'relief-finish';
+}
+
+function contourEntrySummary(group: Exclude<Group, CncGroup>): string {
+  if (
+    (group.kind === 'cut' || (group.kind === 'fill' && group.fillStyle === 'offset')) &&
+    group.entryRunwayMm !== undefined
+  ) {
+    return ` · contour entry ${formatNumber(group.entryRunwayMm)} mm effective (laser off)`;
+  }
+  return '';
 }
 
 function formatNumber(value: number): string {

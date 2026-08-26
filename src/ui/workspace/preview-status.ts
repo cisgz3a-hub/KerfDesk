@@ -11,9 +11,12 @@ import type { ExecutablePlanPreviewCarrier } from './executable-plan-preview-rou
 export type PreviewIssue =
   | { readonly kind: 'too-complex' }
   | {
-      readonly kind: 'render-pressure';
+      readonly kind: 'display-decimated';
       readonly threshold: number;
-      readonly observed: number;
+      readonly sourceSteps: number;
+      readonly drawnSteps: number;
+      readonly sourceSegments: number;
+      readonly drawnSegments: number;
     }
   // The scene is over the responsiveness budget and the ADR-244 preparation
   // worker is computing the real toolpath in the background.

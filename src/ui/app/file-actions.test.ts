@@ -384,8 +384,7 @@ describe('handleSaveGcode rotary raster emission', () => {
       advanceVariablesAfter,
     });
 
-    // Picker-before-emission (transient user activation): the refusal still
-    // writes nothing and advances nothing, it just no longer precedes the dialog.
+    expect(pickFileForSave).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
     expect(advanceVariablesAfter).not.toHaveBeenCalled();
     expect(pushToast).not.toHaveBeenCalledWith(expect.any(String), 'success');
@@ -394,7 +393,7 @@ describe('handleSaveGcode rotary raster emission', () => {
     );
   });
 
-  it('does not create or truncate the reserved destination when preparation fails', async () => {
+  it('does not reserve, create, or truncate the destination when preparation fails', async () => {
     const target: SaveTarget = { displayName: 'existing.gcode', write: vi.fn() };
     const reserveFileForSave = vi.fn(async () => target);
     const pickFileForSave = vi.fn(async () => {
@@ -409,7 +408,7 @@ describe('handleSaveGcode rotary raster emission', () => {
       pushToast: vi.fn(),
     });
 
-    expect(reserveFileForSave).toHaveBeenCalledOnce();
+    expect(reserveFileForSave).not.toHaveBeenCalled();
     expect(pickFileForSave).not.toHaveBeenCalled();
     expect(target.write).not.toHaveBeenCalled();
   });

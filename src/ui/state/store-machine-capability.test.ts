@@ -20,7 +20,7 @@ describe('project lifecycle machine capability', () => {
     expect(useStore.getState().projectDocumentEpoch).toBe(2);
   });
 
-  it('keeps a CNC-only profile in CNC mode after New Project', () => {
+  it('keeps the current Laser mode after New Project despite a CNC-only capability label', () => {
     const device = {
       ...useStore.getState().project.device,
       capabilities: ['cnc-output'] as const,
@@ -30,13 +30,11 @@ describe('project lifecycle machine capability', () => {
 
     useStore.getState().newProject();
 
-    const machine = useStore.getState().project.machine;
-    expect(machine?.kind).toBe('cnc');
-    if (machine?.kind !== 'cnc') throw new Error('expected CNC machine');
-    expect(machine.params.safeZMm).toBe(13);
+    expect(useStore.getState().project.machine).toBeUndefined();
+    expect(useStore.getState().project.device.cncSubProfile?.safeZMm).toBe(13);
   });
 
-  it('repairs and preserves CNC state when opening a contradictory laser-only project', () => {
+  it('preserves CNC state and warns when opening a contradictory laser-only-labelled project', () => {
     const cnc = {
       ...DEFAULT_CNC_MACHINE_CONFIG,
       params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, safeZMm: 21 },
@@ -52,14 +50,13 @@ describe('project lifecycle machine capability', () => {
     const result = useStore.getState().setProject(project);
 
     expect(result).toMatchObject({
-      kind: 'capability-repaired',
-      previousKind: 'cnc',
-      activeKind: 'laser',
-      preservedCnc: true,
+      kind: 'capability-warning',
+      activeKind: 'cnc',
     });
-    expect(useStore.getState().project.machine?.kind).toBe('laser');
-    expect(useStore.getState().cachedCncMachine?.params.safeZMm).toBe(21);
-    expect(useStore.getState().dirty).toBe(true);
+    const loadedMachine = useStore.getState().project.machine;
+    expect(loadedMachine?.kind).toBe('cnc');
+    expect(loadedMachine?.kind === 'cnc' ? loadedMachine.params.safeZMm : 0).toBe(21);
+    expect(useStore.getState().dirty).toBe(false);
   });
 
   it('enriches an opened matching CNC project from the app library without marking it repaired', () => {

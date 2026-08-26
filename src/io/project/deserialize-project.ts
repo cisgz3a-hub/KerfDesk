@@ -33,6 +33,8 @@ import { migrateToCurrent } from './migrations';
 import { normalizeLayer } from './normalize-layer';
 import { normalizeLibraryAssetProvenance } from './project-library-provenance-normalizer';
 import { validateProjectShape } from './project-shape-validator';
+import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
+import { normalizeProjectJobSetup } from './project-job-setup-normalizer';
 
 export type DeserializeResult =
   | { readonly kind: 'ok'; readonly project: Project; readonly migratedFrom?: number }
@@ -103,6 +105,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
     ...raw,
     device: normalizeDevice(dev),
     optimization: normalizeOptimization(raw['optimization']),
+    jobSetup: normalizeProjectJobSetup(raw['jobSetup']),
     notes: typeof raw['notes'] === 'string' ? raw['notes'] : '',
     scene: {
       ...scene,
@@ -316,6 +319,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     rxBufferBytes: normalizeGrblRxBufferBytes(dev['rxBufferBytes']),
     gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
     scanningOffsets,
+    ...recoveredCncDevicePatch(dev),
     scanOffsetCalibrationStatus: normalizeScanOffsetCalibrationStatus(
       dev['scanOffsetCalibrationStatus'],
       scanningOffsets,

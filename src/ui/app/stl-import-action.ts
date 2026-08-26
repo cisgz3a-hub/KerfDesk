@@ -22,6 +22,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { importSourceSizeAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
+import { claimImportSuccessIndex } from './import-success-index';
 
 export { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
 // Coarse probe cell — only validates the mesh and derives the aspect ratio.
@@ -34,16 +35,19 @@ const STL_PREPARATION_OPTIONS: StlImportPreparationOptions = {
   mmPerCell: PROBE_CELL_MM,
 };
 
+type StlImportContext = {
+  readonly importObject: (obj: SceneObject, batchIdx?: number) => unknown;
+  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly nextSuccessIndex?: () => number;
+};
+
 export function isStlFile(file: File): boolean {
   return file.name.toLowerCase().endsWith('.stl');
 }
 
 export async function importStlFiles(
   files: ReadonlyArray<File>,
-  ctx: {
-    readonly importObject: (obj: SceneObject, batchIdx?: number) => unknown;
-    readonly pushToast: (message: string, variant?: ToastVariant) => void;
-  },
+  ctx: StlImportContext,
 ): Promise<void> {
   if (files.length === 0) return;
   let successIdx = 0;
@@ -66,8 +70,9 @@ export async function importStlFiles(
       const triangles = relief.reliefSource.meshPositions.length / 9;
       const denseAdvisory = denseMeshAdvisory(file.name, triangles);
       if (denseAdvisory !== null) ctx.pushToast(denseAdvisory, 'warning');
-      ctx.importObject(relief, successIdx);
-      successIdx += 1;
+      const claimed = claimImportSuccessIndex(ctx.nextSuccessIndex, successIdx);
+      successIdx = claimed.nextLocalIndex;
+      ctx.importObject(relief, claimed.batchIndex);
       ctx.pushToast(
         `Imported relief "${file.name}" (${triangles} triangles) at ` +
           `${DEFAULT_RELIEF_WIDTH_MM} mm wide × ${DEFAULT_RELIEF_DEPTH_MM} mm deep.${CNC_OUTPUT_NOTE}`,

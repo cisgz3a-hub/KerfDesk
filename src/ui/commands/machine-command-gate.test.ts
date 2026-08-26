@@ -13,6 +13,7 @@ import { baseCtx } from './command-registry-test-helpers';
 // left CNC able to trace a bitmap but unable to crop or mask it first.
 const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
   'file.new',
+  'file.import',
   'file.import-svg',
   'file.import-image',
   'file.save-gcode',

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
 import type { CncTool } from '../../../core/scene';
 import { cncRetainedFeedAdvisoriesAfterSetupChange } from '../../common/cnc-bit-change-advisory';
-import { blockedMachineModeMessage } from '../../machine/machine-capability-messages';
+import { machineCapabilityWarningMessage } from '../../machine/machine-capability-messages';
 import { useStore } from '../../state';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
 import { useLaserStore } from '../../state/laser-store';
@@ -45,8 +45,8 @@ export function useMachineSetupSave(input: {
             materialApplyRequested: input.materialApplyRequested,
           })
         : replaceMachineSetup(profile, input.state.draftMachine, input.state.cncDraft);
-    if (replacement.kind === 'blocked-by-capability') {
-      throw new Error(blockedMachineModeMessage(replacement.requestedKind));
+    if (replacement.kind === 'applied-with-capability-warning') {
+      pushToast(machineCapabilityWarningMessage(replacement.requestedKind), 'warning');
     }
     for (const advisory of cncRetainedFeedAdvisoriesAfterSetupChange(
       before,

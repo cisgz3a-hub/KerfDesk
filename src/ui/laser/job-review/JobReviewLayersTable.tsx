@@ -9,11 +9,13 @@ import {
   activeCncTool,
   DEFAULT_CNC_LAYER_SETTINGS,
   cutTypeLabel,
+  isRegistrationLayer,
   operationArtworkCount,
   type CncMachineConfig,
   type Layer,
   type MachineKind,
 } from '../../../core/scene';
+import { layerSubLayerOperationId } from '../../../core/scene/layer';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { useStore } from '../../state';
 import {
@@ -120,7 +122,7 @@ function LaserLayersTable(props: {
             <OperationDetailRow
               colSpan={LASER_COLUMNS.length}
               chip={materialChip(layer, materialLibrary)}
-              text={laserOperationDetail(layer)}
+              text={laserOperationReviewDetail(layer, operationArtworkCount(objects, layer))}
             />
             <JobReviewEffectiveOperationRow
               colSpan={LASER_COLUMNS.length}
@@ -151,7 +153,7 @@ function LaserLayersTable(props: {
                   />
                   <JobReviewEffectiveOperationRow
                     colSpan={LASER_COLUMNS.length}
-                    layerId={subLayer.id}
+                    layerId={layerSubLayerOperationId(layer.id, subLayer.id)}
                     effectiveOperations={props.effectiveOperations}
                   />
                 </Fragment>
@@ -161,6 +163,12 @@ function LaserLayersTable(props: {
       </tbody>
     </table>
   );
+}
+
+function laserOperationReviewDetail(layer: Layer, artworkCount: number): string {
+  const detail = laserOperationDetail(layer);
+  if (!isRegistrationLayer(layer)) return detail;
+  return `Registration jig outline operation (${artworkCount} ${artworkCount === 1 ? 'outline' : 'outlines'}) · ${detail}`;
 }
 
 function CncLayersTable(props: {

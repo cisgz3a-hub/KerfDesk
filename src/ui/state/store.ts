@@ -25,11 +25,12 @@ import {
 } from '../../core/scene';
 import type { Toolpath } from '../../core/job';
 import type { SaveTarget } from '../../platform/types';
-import { defaultJobPlacementForDevice, type JobPlacementSettings } from '../job-placement';
+import type { JobPlacementSettings } from '../job-placement';
 import { imageImportActions } from './import-actions';
 import { machineActions, type MachineActions } from './machine-actions';
-import type { ProjectMachineCapabilityLoadResult } from './project-machine-capability';
-import { projectActions } from './project-actions';
+import { projectActions, type ProjectActions } from './project-actions';
+import type { ProjectBedReconciliationNotice } from './project-bed-reconciliation';
+import { initialProjectWorkspaceState } from './store-initial-project-state';
 import { breakApartActions, type BreakApartActions } from './break-apart-actions';
 import {
   rasterAdjustmentActions,
@@ -181,7 +182,8 @@ export type AppState = ObjectPropertiesActions &
   CncLiveCapsActions &
   MachineActions &
   BoardTileActions &
-  AirAssistDefaultActions & {
+  AirAssistDefaultActions &
+  ProjectActions & {
     readonly project: Project;
     // Session-only identity for the active project document. Incremented only
     // by Open/New replacement, not ordinary immutable project edits.
@@ -189,6 +191,7 @@ export type AppState = ObjectPropertiesActions &
     // Last CNC machine setup, kept when toggling back to laser so the
     // choice of bit/stock survives a round-trip within the session.
     readonly cachedCncMachine: CncMachineConfig | null;
+    readonly projectBedReconciliation: ProjectBedReconciliationNotice | null;
     readonly selectedObjectId: string | null;
     readonly selectedPathNode: PathNodeRef | null;
     readonly selectedPathNodes: ReadonlyArray<PathNodeRef>;
@@ -226,8 +229,6 @@ export type AppState = ObjectPropertiesActions &
     readonly sceneClipboard: SceneClipboard | null;
     readonly layerDefaults: LayerDefaultsState;
 
-    readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
-    readonly newProject: () => void;
     readonly replaceSceneWithGeneratedScene: (scene: Scene) => void;
 
     // batchOffsetIdx (default 0) shifts the imported object by 10mm × N to the
@@ -235,11 +236,14 @@ export type AppState = ObjectPropertiesActions &
     // the second passes 1, etc., so a 3-file drop produces a stagger instead
     // of fully-overlapping designs.
     //
-    // Returns an ImportOutcome so callers can toast the diff (Phase C
-    // re-import). For a fresh add the outcome is `{ kind: 'added' }`;
-    // for a re-import (existing object with matching source filename
-    // found) it's `{ kind: 'replaced', kept, added, removed }`.
+    // Fresh imports always append, even when another object has the same
+    // display filename. Explicit re-import is a separate selected-target
+    // action so filename collisions cannot silently replace artwork.
     readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
+    readonly reimportSvgObject: (
+      targetObjectId: string,
+      object: SceneObject,
+    ) => ImportOutcome | null;
     // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
     readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
     // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
@@ -365,6 +369,7 @@ function initialState(
   | 'projectDocumentEpoch'
   | 'probeSetupEpoch'
   | 'cachedCncMachine'
+  | 'projectBedReconciliation'
   | 'cncLiveCaps'
   | 'selectedObjectId'
   | 'selectedPathNode'
@@ -390,29 +395,8 @@ function initialState(
   ReturnType<typeof currentMaterialLibraryState> &
   ReturnType<typeof currentSavedLibrariesState> {
   return {
-    project,
-    projectDocumentEpoch: 0,
-    cachedCncMachine: null,
-    cncLiveCaps: null,
-    selectedObjectId: null,
-    selectedPathNode: null,
-    selectedPathNodes: [],
-    additionalSelectedIds: new Set(),
-    previewMode: false,
+    ...initialProjectWorkspaceState(project),
     ...CNC_LIBRARY_STATE_DEFAULTS,
-    externalGcodePreview: null,
-    undoStack: [],
-    redoStack: [],
-    pendingUndo: null,
-    cursorMm: null,
-    jobPlacement: defaultJobPlacementForDevice(project.device),
-    outputScopeSettings: DEFAULT_OUTPUT_SCOPE_SETTINGS,
-    registrationArtworkOutputSnapshot: null,
-    dirty: false,
-    savedName: null,
-    lastSaveTarget: null,
-    copiedLayerSettings: null,
-    sceneClipboard: null,
     layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
     ...MATERIAL_LIBRARY_STATE_DEFAULTS,
     ...SAVED_LIBRARIES_STATE_DEFAULTS,

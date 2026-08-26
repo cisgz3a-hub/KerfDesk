@@ -10,11 +10,17 @@ import {
 } from '../raster';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
-import { sceneObjectUsesOperation, type Layer, type RasterImage, type SceneObject } from '../scene';
+import {
+  captureLayerOperationSettings,
+  sceneObjectUsesOperation,
+  type Layer,
+  type RasterImage,
+  type SceneObject,
+} from '../scene';
+import { effectiveOperationForObject } from '../scene/effective-operation';
 import type { JobDiagnostic, RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
-import { layerWithObjectOverride } from './compile-job-object-policy';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
 import { rasterBoundsInMachineCoords, type RasterMachineBounds } from './raster-bounds';
 import { decodeRasterLuma } from './raster-luma-decode';
@@ -56,7 +62,7 @@ export function compileRasterGroupsForLayer(
   for (const obj of objects) {
     if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, layer)) continue;
     if (obj.role === 'trace-source') continue;
-    const effectiveLayer = layerWithObjectOverride(layer, obj);
+    const effectiveLayer = effectiveOperationForObject(layer, obj);
     if (effectiveLayer.mode !== 'image') continue;
     const sourceLumaOverride = options.sourceLumaByObjectId?.get(obj.id);
     const group = compileRasterGroup(obj, effectiveLayer, device, {
@@ -102,42 +108,19 @@ function compileRasterGroup(
     : pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
   const lineIntervalMm = (bounds.maxY - bounds.minY) / pixelHeight;
   const maskObject = imageMaskObjectFor(obj, options.objects);
-  // Streaming works for every dither algorithm and for masked images
-  // (ADR-243), so the only decision left is size: small rasters keep the
-  // one-shot materialized dither, large ones hold O(width) state instead.
-  const streamRows = pixelWidth * pixelHeight > STREAMED_RASTER_PIXEL_THRESHOLD;
-  const rasterValues = streamRows
-    ? {
-        sValues: new Uint16Array(0),
-        rowProvider: streamedRasterRowProvider({
-          sourceLuma: preparedLuma,
-          sourceWidth: obj.pixelWidth,
-          sourceHeight: obj.pixelHeight,
-          pixelWidth,
-          pixelHeight,
-          obj,
-          maskObject,
-          device,
-          bounds,
-          algorithm: layer.ditherAlgorithm,
-          sMax,
-          sMin,
-        }),
-      }
-    : {
-        sValues: materializedRasterValues({
-          preparedLuma,
-          obj,
-          layer,
-          device,
-          bounds,
-          maskObject,
-          pixelWidth,
-          pixelHeight,
-          sMax,
-          sMin,
-        }),
-      };
+  const rasterInput = {
+    preparedLuma,
+    obj,
+    layer,
+    device,
+    bounds,
+    maskObject,
+    pixelWidth,
+    pixelHeight,
+    sMax,
+    sMin,
+  };
+  const rasterValues = rasterValuesFor(rasterInput);
   return {
     kind: 'raster',
     layerId: layer.id,
@@ -146,6 +129,10 @@ function compileRasterGroup(
     color: layer.color,
     power: powerPercent,
     speed: Math.min(layer.speed, device.maxFeed),
+    ...(layer.speed <= device.maxFeed ? {} : { requestedSpeed: layer.speed }),
+    ...(obj.operationOverride === undefined
+      ? {}
+      : { operationSettings: captureLayerOperationSettings(layer) }),
     passes: Math.max(1, Math.floor(layer.passes)),
     airAssist: layer.airAssist,
     ...rasterValues,
@@ -157,6 +144,33 @@ function compileRasterGroup(
     bidirectional: scanDirection.bidirectional,
     scanDirection,
     ...(bidirectionalScanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm }),
+  };
+}
+
+function rasterValuesFor(
+  input: MaterializedRasterInput,
+): Pick<RasterGroup, 'sValues' | 'rowProvider'> {
+  // Streaming works for every dither algorithm and mask (ADR-243); only size
+  // chooses between one-shot materialization and an O(width) row provider.
+  if (input.pixelWidth * input.pixelHeight <= STREAMED_RASTER_PIXEL_THRESHOLD) {
+    return { sValues: materializedRasterValues(input) };
+  }
+  return {
+    sValues: new Uint16Array(0),
+    rowProvider: streamedRasterRowProvider({
+      sourceLuma: input.preparedLuma,
+      sourceWidth: input.obj.pixelWidth,
+      sourceHeight: input.obj.pixelHeight,
+      pixelWidth: input.pixelWidth,
+      pixelHeight: input.pixelHeight,
+      obj: input.obj,
+      maskObject: input.maskObject,
+      device: input.device,
+      bounds: input.bounds,
+      algorithm: input.layer.ditherAlgorithm,
+      sMax: input.sMax,
+      sMin: input.sMin,
+    }),
   };
 }
 

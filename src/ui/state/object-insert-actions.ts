@@ -29,7 +29,6 @@ import {
   applyFreshImport,
   applyReimport,
   applyUpsertText,
-  findReimportTarget,
   type ImportOutcome,
 } from './scene-mutations';
 import { applyDrawShape } from './draw-shape-mutation';
@@ -49,6 +48,7 @@ export function objectInsertActions(
 ): Pick<
   AppState,
   | 'importSvgObject'
+  | 'reimportSvgObject'
   | 'upsertTextObject'
   | 'drawShape'
   | 'insertBoxPanels'
@@ -60,6 +60,7 @@ export function objectInsertActions(
 > {
   return {
     importSvgObject: importSvgObjectAction(set, get),
+    reimportSvgObject: reimportSvgObjectAction(set, get),
     upsertTextObject: upsertTextObjectAction(set),
     drawShape: drawShapeAction(set),
     insertBoxPanels: insertBoxPanelsAction(set),
@@ -108,19 +109,7 @@ export function objectInsertActions(
 
 function importSvgObjectAction(set: Setter, get: Getter): AppState['importSvgObject'] {
   return (object: SceneObject, batchOffsetIdx = 0): ImportOutcome => {
-    const existing = findReimportTarget(get().project.scene, object);
-    let outcome: ImportOutcome = { kind: 'added' };
     set((state) => {
-      if (existing !== null && object.kind === 'imported-svg') {
-        const next = applyReimport(state, existing, object);
-        outcome = next.outcome;
-        return applyLayerDefaultsToFreshLayers(
-          state.project.scene.layers,
-          next.state,
-          state.layerDefaults,
-          state.cncLiveCaps,
-        );
-      }
       return applyLayerDefaultsToFreshLayers(
         state.project.scene.layers,
         applyFreshImport(state, object, batchOffsetIdx),
@@ -130,6 +119,35 @@ function importSvgObjectAction(set: Setter, get: Getter): AppState['importSvgObj
     });
     // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
     fitAllObjects(get);
+    return { kind: 'added' };
+  };
+}
+
+function reimportSvgObjectAction(set: Setter, get: Getter): AppState['reimportSvgObject'] {
+  return (targetObjectId, object) => {
+    let outcome: ImportOutcome | null = null;
+    set((state) => {
+      const target = state.project.scene.objects.find(
+        (candidate) => candidate.id === targetObjectId,
+      );
+      if (
+        target === undefined ||
+        target.kind !== 'imported-svg' ||
+        target.libraryProvenance !== undefined ||
+        object.kind !== 'imported-svg'
+      ) {
+        return state;
+      }
+      const next = applyReimport(state, target, object);
+      outcome = next.outcome;
+      return applyLayerDefaultsToFreshLayers(
+        state.project.scene.layers,
+        next.state,
+        state.layerDefaults,
+        state.cncLiveCaps,
+      );
+    });
+    if (outcome !== null) fitAllObjects(get);
     return outcome;
   };
 }

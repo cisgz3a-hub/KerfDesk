@@ -25,14 +25,17 @@ export function DeviceSetupCncMachineStep(props: {
         <strong>CNC machine limits</strong>
         <span>
           These machine-owned values control retracts, spindle output, dwell, coolant commands, and
-          end or tool-change parking. Artwork chooses its running spindle speed separately.
+          end or tool-change parking. CNC mode assumes an installed, powered Z axis; choosing CNC
+          does not prove Z hardware or direction. Recorded Z travel is informational. Artwork
+          chooses its running spindle speed separately.
         </span>
       </div>
       <CncParameterRows machine={props.machine} updateParams={updateParams} />
       <div style={warningStyle}>
-        <strong>Hardware check required:</strong> confirm Z-positive moves away from the stock, Safe
-        Z clears clamps, M3/S reaches the expected RPM, the dwell is long enough, and M7/M8 drives
-        only the intended coolant output.
+        <strong>Hardware check required:</strong> confirm a powered Z is installed, Z-positive moves
+        away from the stock, Safe Z clears clamps, M3/S reaches the expected RPM, the dwell is long
+        enough, and M7/M8 drives only the intended coolant output. These are warnings, not a mode or
+        Start gate.
       </div>
     </section>
   );

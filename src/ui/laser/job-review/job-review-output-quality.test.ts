@@ -4,6 +4,36 @@ import type { Job } from '../../../core/job';
 import { buildOutputQualityReviewFacts } from './job-review-live-rows';
 
 describe('buildOutputQualityReviewFacts', () => {
+  it('names a custom effective Line contour-entry target without gating output', () => {
+    const layer = {
+      ...createLayer({ id: 'outline', color: '#000000', mode: 'line' }),
+      name: 'Outline',
+    };
+    const job: Job = {
+      groups: [
+        {
+          kind: 'cut',
+          layerId: layer.id,
+          color: layer.color,
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          airAssist: false,
+          entryRunwayMm: 2,
+          segments: [],
+        },
+      ],
+    };
+
+    expect(buildOutputQualityReviewFacts(job, [layer])).toEqual([
+      {
+        label: 'Contour entry — Outline',
+        value: '2 mm effective target at operation feed · laser off',
+        tone: 'default',
+      },
+    ]);
+  });
+
   it('shows exact runway coverage and the effective 4040 fallback reason', () => {
     const layer = {
       ...createLayer({ id: 'small-text', color: '#000000', mode: 'fill' }),

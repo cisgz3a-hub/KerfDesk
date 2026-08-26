@@ -1,13 +1,13 @@
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 import { parseGcodeWord } from '../invariants';
 import { DEFAULT_OVERSCAN_MM } from '../job';
-import { layerWithObjectOverride } from '../job/compile-job-object-policy';
 import {
   outputOperationLayers,
   sceneObjectUsesOperation,
   type Project,
   type Scene,
 } from '../scene';
+import { effectiveOperationForObject } from '../scene/effective-operation';
 import type { DeviceProfile } from '../devices';
 
 // Laser G-code coordinates are emitted to three decimal places. Rounding both
@@ -44,7 +44,7 @@ export function maxOutputOverscanMm(scene: Scene): number {
       outputLayers.flatMap((layer) => {
         if (object.kind === 'raster-image' || object.kind === 'relief') return [];
         if (!sceneObjectUsesOperation(object, layer)) return [];
-        const effectiveLayer = layerWithObjectOverride(layer, object);
+        const effectiveLayer = effectiveOperationForObject(layer, object);
         return effectiveLayer.mode === 'fill' ? [Math.max(0, effectiveLayer.fillOverscanMm)] : [];
       }),
     ),

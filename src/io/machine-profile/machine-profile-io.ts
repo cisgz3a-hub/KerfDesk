@@ -12,6 +12,8 @@ import {
   type NoGoZone,
   type Origin,
 } from '../../core/devices';
+import { recoverCncSubProfile } from '../../core/devices/cnc-sub-profile-validation';
+import { DEFAULT_CNC_MACHINE_PARAMS } from '../../core/scene';
 import {
   normalizeCameraAlignment,
   normalizeCameraCalibration,
@@ -104,7 +106,7 @@ export function deserializeMachineProfileDocument(
       schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
       profile: profile.profile,
       source: source.source,
-      reviewNotes: reviewNotes.reviewNotes,
+      reviewNotes: [...reviewNotes.reviewNotes, ...profile.recoveryNotes],
     }),
   };
 }
@@ -151,10 +153,12 @@ function parseReviewNotes(
   return { kind: 'ok', reviewNotes: value };
 }
 
-function parseProfile(
-  value: unknown,
-):
-  | { readonly kind: 'ok'; readonly profile: DeviceProfile }
+function parseProfile(value: unknown):
+  | {
+      readonly kind: 'ok';
+      readonly profile: DeviceProfile;
+      readonly recoveryNotes: ReadonlyArray<string>;
+    }
   | { readonly kind: 'invalid'; readonly reason: string } {
   if (!isRecord(value)) {
     return { kind: 'invalid', reason: 'profile must be an object' };
@@ -162,7 +166,16 @@ function parseProfile(
   if (value['scanningOffsets'] !== undefined && !isScanOffsetTable(value['scanningOffsets'])) {
     return { kind: 'invalid', reason: 'profile.scanningOffsets is invalid' };
   }
-  const profileShapeError = validateMachineProfileShape(value);
+  const cncRecovery = recoverCncSubProfile(
+    value['cncSubProfile'],
+    DEFAULT_CNC_MACHINE_PARAMS,
+    'profile.cncSubProfile',
+  );
+  const recoveredValue: Record<string, unknown> = {
+    ...value,
+    ...(value['cncSubProfile'] === undefined ? {} : { cncSubProfile: cncRecovery.value }),
+  };
+  const profileShapeError = validateMachineProfileShape(recoveredValue);
   if (profileShapeError !== null) return { kind: 'invalid', reason: profileShapeError };
   const noGoZones = parseNoGoZones(value['noGoZones']);
   if (noGoZones.kind === 'invalid') return noGoZones;
@@ -170,15 +183,15 @@ function parseProfile(
   // junk-typed rotary (e.g. mmPerRotation as a string) rejects instead of
   // silently disabling scaling while the dialog shows it enabled (review R10).
   // Reuse the .lf2 validators — io imports io.
-  const optionalFieldError = firstError([optionalRotarySetup(value, 'rotary')]);
+  const optionalFieldError = firstError([optionalRotarySetup(recoveredValue, 'rotary')]);
   if (optionalFieldError !== null) return { kind: 'invalid', reason: optionalFieldError };
 
   const profile = canonicalProfile({
-    ...validatedDeviceProfile(value),
-    gcodeDialect: normalizeGcodeDialectSelection(value['gcodeDialect']),
-    streamingMode: normalizeGrblStreamingMode(value['streamingMode']),
-    rxBufferBytes: normalizeGrblRxBufferBytes(value['rxBufferBytes']),
-    scanningOffsets: normalizeScanOffsetTable(value['scanningOffsets']),
+    ...validatedDeviceProfile(recoveredValue),
+    gcodeDialect: normalizeGcodeDialectSelection(recoveredValue['gcodeDialect']),
+    streamingMode: normalizeGrblStreamingMode(recoveredValue['streamingMode']),
+    rxBufferBytes: normalizeGrblRxBufferBytes(recoveredValue['rxBufferBytes']),
+    scanningOffsets: normalizeScanOffsetTable(recoveredValue['scanningOffsets']),
     noGoZones: noGoZones.noGoZones,
   });
   const validationErrors = validateMachineProfile(profile);
@@ -191,7 +204,13 @@ function parseProfile(
   if (!isAirAssistCommand(profile.airAssistCommand)) {
     return { kind: 'invalid', reason: 'profile.airAssistCommand is invalid' };
   }
-  return { kind: 'ok', profile };
+  return {
+    kind: 'ok',
+    profile,
+    recoveryNotes: cncRecovery.issues.map(
+      (issue) => `CNC settings recovery: ${issue}; a default was applied. Review in Device Setup.`,
+    ),
+  };
 }
 
 function validatedDeviceProfile(value: Record<string, unknown>): DeviceProfile {

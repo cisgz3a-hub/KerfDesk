@@ -1,10 +1,4 @@
 import { useState } from 'react';
-import {
-  generateIntervalTestGrid,
-  generateMaterialTestGrid,
-  type IntervalTestGridOptions,
-  type MaterialTestGridOptions,
-} from '../../core/job';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { primaryOperationForObject } from '../../core/scene';
 import { CONNECTION_HELP_TEXT } from '../help/connection-help';
@@ -16,8 +10,6 @@ import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { BoxGeneratorHost } from '../box/BoxGeneratorHost';
 import { BoxFitTestHost } from '../box/BoxFitTestHost';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
-import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
-import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
 import { LabsSettingsDialog } from '../laser/LabsSettingsDialog';
 import { RotarySetupHost } from '../laser/RotarySetupHost';
@@ -51,6 +43,8 @@ import { ArrayDialogHost } from './ArrayDialogHost';
 import { QuickNestDialogHost } from './QuickNestDialogHost';
 import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
 import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
+import { IntervalDialog, MaterialDialog } from './CalibrationGridDialogs';
+import { GcodeSaveDialog } from '../app/GcodeSaveDialog';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -75,8 +69,7 @@ export function CommandShell(): JSX.Element {
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
-  const gcodeInspector = useGcodeInspectorSlot();
-  useImportDragDrop(gcodeInspector.open);
+  const gcodeInspector = useCommandShellGcodeInspector();
   const selectedConvertibles = useSelectedConvertibles();
   const selectedRaster = useSelectedRaster();
   const onImagePick = useImagePickHandler();
@@ -137,9 +130,22 @@ export function CommandShell(): JSX.Element {
       {closeToleranceDialogOpen ? (
         <CloseOpenFillContoursPanel onClose={() => setCloseToleranceDialogOpen(false)} />
       ) : null}
+      <GcodeSaveDialogHost />
       {gcodeInspector.element}
     </>
   );
+}
+
+function useCommandShellGcodeInspector(): ReturnType<typeof useGcodeInspectorSlot> {
+  const inspector = useGcodeInspectorSlot();
+  useImportDragDrop(inspector.open);
+  return inspector;
+}
+
+function GcodeSaveDialogHost(): JSX.Element | null {
+  const open = useUiStore((state) => state.gcodeSaveDialogOpen);
+  const close = useUiStore((state) => state.closeGcodeSaveDialog);
+  return open ? <GcodeSaveDialog onClose={close} /> : null;
 }
 
 function SettingsDialogHost(props: {
@@ -253,30 +259,6 @@ function OptimizationDialog(props: { readonly onClose: () => void }): JSX.Elemen
       }}
     />
   );
-}
-
-function IntervalDialog(props: { readonly onClose: () => void }): JSX.Element {
-  const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const onGenerate = (options: IntervalTestGridOptions): void => {
-    const grid = generateIntervalTestGrid(options);
-    replaceSceneWithGeneratedScene(grid.scene);
-    props.onClose();
-    pushToast(`Generated interval test grid (${grid.cells.length} swatches).`, 'success');
-  };
-  return <IntervalTestDialog onCancel={props.onClose} onGenerate={onGenerate} />;
-}
-
-function MaterialDialog(props: { readonly onClose: () => void }): JSX.Element {
-  const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const onGenerate = (options: MaterialTestGridOptions): void => {
-    const grid = generateMaterialTestGrid(options);
-    replaceSceneWithGeneratedScene(grid.scene);
-    props.onClose();
-    pushToast(`Generated material test grid (${grid.cells.length} cells).`, 'success');
-  };
-  return <MaterialTestDialog onCancel={props.onClose} onGenerate={onGenerate} />;
 }
 
 function ConvertDialog(props: {

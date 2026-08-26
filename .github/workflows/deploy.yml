@@ -74,9 +74,11 @@ jobs:
         run: pnpm guard:repo
 
       - name: Release verification gate
+        id: release_check
         run: pnpm release:check
 
       - name: Publish to Cloudflare Pages
+        id: publish
         # cloudflare/wrangler-action is the official Cloudflare action.
         # v4 installs Wrangler CLI v4 by default (matches this repo's
         # wrangler ^4.100.0); the apiToken/accountId/command inputs are
@@ -89,3 +91,25 @@ jobs:
           # The 'laserforge' Pages project serves the canonical release URL
           # https://kerfdesk.com (Pages default fallback: laserforge-2fj.pages.dev).
           command: pages deploy dist/web --project-name=laserforge --branch=main
+
+      - name: Record SHA-correlated readiness lanes
+        if: always()
+        env:
+          CI_STATE: ${{ github.event_name == 'workflow_run' && 'passed' || steps.release_check.outcome }}
+          DEPLOY_STATE: ${{ steps.publish.outcome }}
+        run: >-
+          pnpm report:release-readiness --
+          --state=ci=${CI_STATE}
+          --state=browser=not-run
+          --state=deploy=${DEPLOY_STATE}
+          --state=packaged-runtime=not-run
+          --state=perceptual-reference-cam=not-run
+          --state=hardware=not-run
+
+      - name: Upload readiness report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-readiness-deploy-${{ github.sha }}
+          path: artifacts/release-readiness/
+          retention-days: 30

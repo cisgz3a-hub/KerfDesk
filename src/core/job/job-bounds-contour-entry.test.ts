@@ -36,6 +36,11 @@ describe('job bounds with ADR-239 contour entries', () => {
     expect(computeJobMotionBounds(job)).toEqual({ minX: 5, minY: 10, maxX: 20, maxY: 20 });
   });
 
+  it('extends the motion envelope by a custom compiled distance', () => {
+    const job: Job = { groups: [{ ...lineGroup, entryRunwayMm: 2 }] };
+    expect(computeJobMotionBounds(job)).toEqual({ minX: 8, minY: 10, maxX: 20, maxY: 20 });
+  });
+
   it('covers Follow Shape (offset) fill entries the same way', () => {
     const offset: FillGroup = {
       ...lineGroup,

@@ -35,7 +35,7 @@ test('Image Studio keeps transparent text transforms from covering the bitmap', 
   await page.setViewportSize({ width: 1280, height: 900 });
   await installImageOpenPicker(page);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Import Image...' }).click();
+  await page.getByRole('button', { name: 'Import...' }).click();
   await page.getByRole('button', { name: /^Edit Image/ }).click();
 
   const editor = page.getByRole('dialog', { name: /^Image Studio/ });

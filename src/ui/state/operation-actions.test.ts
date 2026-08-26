@@ -34,6 +34,7 @@ describe('artwork operation actions', () => {
     useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
     useStore.getState().importSvgObject(svgObj('Box', ['#000000']));
     const firstOperationId = useStore.getState().project.scene.layers[0]!.id;
+    useStore.getState().addLayerSubLayer(firstOperationId);
     useStore.setState({ selectedObjectId: 'Johann', additionalSelectedIds: new Set(['Box']) });
     useStore.getState().useOperationForSelection(firstOperationId);
 
@@ -54,6 +55,9 @@ describe('artwork operation actions', () => {
     expect(ids[0]).toEqual([firstOperationId]);
     expect(ids[1]).toHaveLength(1);
     expect(ids[1]).not.toEqual(ids[0]);
+    const unique = state.project.scene.layers.find((layer) => layer.id === ids[1]?.[0]);
+    expect(unique?.subLayers).toEqual(state.project.scene.layers[0]?.subLayers);
+    expect(unique?.subLayers).not.toBe(state.project.scene.layers[0]?.subLayers);
   });
 
   it('sets one CNC depth across independent operations as one undoable mutation', () => {
@@ -150,11 +154,15 @@ describe('artwork operation actions', () => {
 
   it('adds a second first-class operation to selected artwork', () => {
     useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
+    const sourceId = useStore.getState().project.scene.layers[0]?.id;
+    if (sourceId === undefined) throw new Error('source operation missing');
+    useStore.getState().addLayerSubLayer(sourceId);
     useStore.getState().addOperationForSelection();
     const { objects, layers } = useStore.getState().project.scene;
     expect(layers).toHaveLength(2);
     expect(operationIdsForObject(objects[0]!, layers)).toHaveLength(2);
-    expect(layers.every((layer) => layer.subLayers.length === 0)).toBe(true);
+    expect(layers.every((layer) => layer.subLayers.length === 1)).toBe(true);
+    expect(layers[1]?.subLayers).not.toBe(layers[0]?.subLayers);
   });
 
   it('keeps operation names unique when the operator renames them', () => {

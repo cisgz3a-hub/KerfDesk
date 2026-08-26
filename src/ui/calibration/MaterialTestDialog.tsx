@@ -57,6 +57,7 @@ const FIELD_SPECS: ReadonlyArray<MaterialTestField> = [
 export function MaterialTestDialog(props: {
   readonly onCancel: () => void;
   readonly onGenerate: (options: MaterialTestGridOptions) => void;
+  readonly maxFeedMmPerMin: number;
 }): JSX.Element {
   const [draft, setDraft] = useState(() =>
     restoreCalibrationDraft(MATERIAL_TEST_DRAFT_KEY, DEFAULT_DRAFT, MATERIAL_TEST_DRAFT_FIELDS),
@@ -82,6 +83,11 @@ export function MaterialTestDialog(props: {
       size="sm"
     >
       <MaterialTestFields draft={draft} setField={setField} />
+      <CalibrationFeedDisclosure
+        speedMin={numberValue(draft.speedMin)}
+        speedMax={numberValue(draft.speedMax)}
+        maxFeedMmPerMin={props.maxFeedMmPerMin}
+      />
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
         <Button type="submit" variant="primary">
@@ -89,6 +95,24 @@ export function MaterialTestDialog(props: {
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function CalibrationFeedDisclosure(props: {
+  readonly speedMin: number;
+  readonly speedMax: number;
+  readonly maxFeedMmPerMin: number;
+}): JSX.Element {
+  const requestedLow = Math.min(props.speedMin, props.speedMax);
+  const requestedHigh = Math.max(props.speedMin, props.speedMax);
+  const effectiveLow = Math.min(requestedLow, props.maxFeedMmPerMin);
+  const effectiveHigh = Math.min(requestedHigh, props.maxFeedMmPerMin);
+  return (
+    <p role="status" style={{ margin: '12px 0 0', color: 'var(--lf-text-muted)', fontSize: 12 }}>
+      Requested {formatFeed(requestedLow)}–{formatFeed(requestedHigh)} mm/min; effective{' '}
+      {formatFeed(effectiveLow)}–{formatFeed(effectiveHigh)} mm/min with the active profile ceiling
+      of {formatFeed(props.maxFeedMmPerMin)} mm/min. Burned row labels show effective feed.
+    </p>
   );
 }
 
@@ -132,4 +156,8 @@ function parseDraft(draft: MaterialTestDraft): MaterialTestGridOptions {
 function numberValue(value: string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatFeed(value: number): string {
+  return Number.isFinite(value) ? value.toLocaleString('en-US', { maximumFractionDigits: 3 }) : '0';
 }

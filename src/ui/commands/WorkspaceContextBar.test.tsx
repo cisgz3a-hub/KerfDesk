@@ -32,8 +32,7 @@ describe('WorkspaceContextBar', () => {
     const menu = h.querySelector('[aria-label="Workspace quick actions"]');
 
     expect(h.textContent).toContain('Paste');
-    expect(h.textContent).toContain('Import SVG...');
-    expect(h.textContent).toContain('Import Image...');
+    expect(h.textContent).toContain('Import...');
     expect(h.textContent).toContain('Text...');
     expect(h.textContent).toContain('Preview');
     expect(h.textContent).toContain('Fit View');
@@ -178,6 +177,7 @@ const COMMAND_IDS: ReadonlyArray<CommandId> = [
   'edit.unlock-all',
   'edit.duplicate',
   'edit.delete',
+  'file.import',
   'file.import-svg',
   'file.import-image',
   'tools.add-text',
@@ -206,6 +206,7 @@ const COMMAND_LABELS: Partial<Record<CommandId, string>> = {
   'edit.unlock-all': 'Unlock All',
   'edit.duplicate': 'Duplicate',
   'edit.delete': 'Delete',
+  'file.import': 'Import...',
   'file.import-svg': 'Import SVG...',
   'file.import-image': 'Import Image...',
   'tools.add-text': 'Text...',

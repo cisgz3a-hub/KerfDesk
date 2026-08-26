@@ -7,6 +7,7 @@ import { CHIPLOAD_MATERIALS, isProfileCutType, zPassDepths } from '../../../core
 import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
 import type { CncLayerSettings, Layer, LayerOperationSettings } from '../../../core/scene';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
+import { materialBindingStatus } from '../../layers/material-binding-status';
 import { formatMm } from './job-review-format';
 
 const FILL_STYLE_LABELS: Readonly<Record<LayerOperationSettings['fillStyle'], string>> = {
@@ -32,6 +33,7 @@ export function laserOperationDetail(settings: LayerOperationSettings): string {
 function lineDetail(settings: LayerOperationSettings): string {
   return [
     `Kerf ${formatMm(settings.kerfOffsetMm)} mm`,
+    `stored contour entry target ${formatMm(settings.fillOverscanMm)} mm`,
     laserTabsPart(settings),
     ...(settings.passThrough ? ['pass-through'] : []),
     `min power ${settings.minPower}%`,
@@ -42,12 +44,16 @@ function lineDetail(settings: LayerOperationSettings): string {
 function fillDetail(settings: LayerOperationSettings): string {
   return [
     `${FILL_STYLE_LABELS[settings.fillStyle]} fill`,
-    `${formatMm(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
+    `${formatIntervalMm(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
     `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
     ...powerModePart(settings),
   ].join(SEPARATOR);
+}
+
+function formatIntervalMm(value: number): string {
+  return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
 }
 
 function imageDetail(settings: LayerOperationSettings): string {
@@ -139,9 +145,17 @@ export function boundMaterialLabel(
   }
   const entry = library.entries.find((preset) => preset.id === binding.presetId);
   if (entry === undefined) return 'Linked material (preset missing)';
-  if (entry.title !== undefined) return entry.title;
-  const thickness = entry.thicknessMm === undefined ? '' : ` ${formatMm(entry.thicknessMm)} mm`;
-  return `${entry.materialName}${thickness}`;
+  const label =
+    entry.title ??
+    `${entry.materialName}${entry.thicknessMm === undefined ? '' : ` ${formatMm(entry.thicknessMm)} mm`}`;
+  const status = materialBindingStatus(binding, library);
+  if (status?.kind === 'current') {
+    return `${label} — linked current (revision ${entry.revision})`;
+  }
+  if (status?.kind === 'stale') {
+    return `${label} — linked stale (saved ${binding.presetRevision ?? 'untracked'}; current ${entry.revision})`;
+  }
+  return `${label} — linked revision untracked`;
 }
 
 // Cut direction only reaches the toolpath for cut types with a defined material

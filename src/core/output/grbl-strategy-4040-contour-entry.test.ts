@@ -54,7 +54,19 @@ describe('4040 contour entry emission (ADR-239)', () => {
       ].join('\n'),
     );
     expect(out).not.toContain('G0 ');
+    expect(out).toContain('contour-entry 5.000 mm effective laser-off feed');
     expect(findLaserOnTravelIssues(out)).toEqual([]);
+  });
+
+  it('emits and labels a custom effective entry distance', () => {
+    const out = grblStrategy.emit(
+      { groups: [{ ...lineGroup, entryRunwayMm: 2 }] },
+      NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+    );
+
+    expect(out).toContain('contour-entry 2.000 mm effective laser-off feed');
+    expect(out).toContain('G1 X8.000 Y10.000 F800 S0 ; kerfdesk:laser-off-motion');
+    expect(out).toContain('G1 X10.000 Y10.000 F1500 S0 ; kerfdesk:laser-off-motion');
   });
 
   it('gives every Follow Shape loop its own tangential entry', () => {

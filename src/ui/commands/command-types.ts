@@ -23,6 +23,7 @@ export type CommandId =
   | 'file.open'
   | 'file.save'
   | 'file.save-as'
+  | 'file.import'
   | 'file.import-svg'
   | 'file.import-dxf'
   | 'file.import-image'
@@ -162,6 +163,7 @@ export type AppCommandContext = {
   readonly openProject: () => void;
   readonly saveProject: () => void;
   readonly saveProjectAs: () => void;
+  readonly importArtwork: () => void;
   readonly importSvg: () => void;
   readonly importDxf: () => void;
   readonly importImage: () => void;

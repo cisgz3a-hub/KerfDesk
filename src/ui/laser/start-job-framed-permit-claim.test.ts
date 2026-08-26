@@ -13,7 +13,11 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import { connectWith, makeConnection } from '../state/laser-store-motion-operation.test-support';
+import {
+  connectWith,
+  makeConnection,
+  type FakeConnection,
+} from '../state/laser-store-motion-operation.test-support';
 import { RecoveryRepository } from '../state/recovery';
 import {
   MemoryRecoveryGenerationStore,
@@ -89,10 +93,19 @@ function pauseNextArtifactStage(repository: RecoveryRepository) {
 }
 
 async function installConnectedFramedRun(
-  write: (data: string) => Promise<void> = async () => undefined,
+  write?: (data: string) => Promise<void>,
   startJob = originalStartJob,
 ) {
-  const connection = makeConnection(write);
+  const connection: FakeConnection = makeConnection(
+    write ??
+      (async (data) => {
+        if (data === '?') {
+          setTimeout(() => {
+            connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+          }, 0);
+        }
+      }),
+  );
   useLaserStore.setState({
     ...initialLaserState(),
     startJob,
@@ -316,7 +329,7 @@ describe('ordinary framed Start permit claim', () => {
     );
   });
 
-  it('keeps the permit live through the final assertion and consumes it before streaming', async () => {
+  it('retains the permit when final status transport is unavailable before authorization', async () => {
     const permit = useLaserStore.getState().framedRun;
     if (permit === null) throw new Error('Expected a framed-run permit.');
     const laserModeStartEvidence = permit.candidate.review?.laserModeStartEvidence;
@@ -336,8 +349,8 @@ describe('ordinary framed Start permit claim', () => {
       }),
     ).rejects.toThrow('No active serial connection');
 
-    expect(finalAssertion).toHaveBeenCalledTimes(1);
-    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(finalAssertion).not.toHaveBeenCalled();
+    expect(useLaserStore.getState().framedRun).toBe(permit);
   });
 
   it('retains verification after a real accepted Start for recovery and completed-replay preparation', async () => {

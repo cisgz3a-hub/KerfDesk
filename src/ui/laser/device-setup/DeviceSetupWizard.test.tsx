@@ -181,6 +181,8 @@ describe('DeviceSetupWizard', () => {
       await act(async () => button(view.host, 'Next').click()); // confirm settings
       await act(async () => button(view.host, 'Next').click()); // CNC Startup Setup
       expect(view.host.textContent).toContain('CNC machine limits');
+      expect(view.host.textContent).toContain('assumes an installed, powered Z axis');
+      expect(view.host.textContent).toContain('Recorded Z travel is informational');
       expect(view.host.textContent).not.toContain('Laser output and accessories');
       expect(input(view.host, 'Spindle maximum').value).toBe('10000');
       await changeInput(view.host, 'Safe Z', '9');

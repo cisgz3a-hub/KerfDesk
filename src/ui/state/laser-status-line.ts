@@ -57,6 +57,7 @@ export function handleStatusLine(
   const queuedFrameDispatch = nextFrameDispatch(operation, motionObservation);
   const nextOperation = queuedFrameDispatch?.operation ?? observedOperation;
   const operationPatch = operation === nextOperation ? {} : { motionOperation: nextOperation };
+  const autofocusRecoveryPatch = recoverUncertainAutofocus(state, report);
   // Release the job lock once GRBL settles to Idle for BOTH a clean finish
   // ('done') and a rejected line ('errored'). Idle means physical motion has
   // stopped, so it is as safe to clear here as the 'done' case. Without the
@@ -102,6 +103,7 @@ export function handleStatusLine(
     ...statusObservationPatch(state, nextSequence, positionInvalidated),
     ...mpgOwnershipPatch(report, state),
     ...operationPatch,
+    ...autofocusRecoveryPatch,
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
     ...liveCanvasStatusCompletionPatch(state, report, streamer, jobOverAtIdle),
@@ -119,6 +121,15 @@ export function handleStatusLine(
       queuedFrameDispatch.line,
       queuedFrameDispatch.operation.operationId,
     );
+}
+
+function recoverUncertainAutofocus(
+  state: LaserState,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'controllerOperation' | 'lastWriteError'>> {
+  const operation = state.controllerOperation;
+  if (operation?.kind !== 'autofocus' || operation.phase !== 'motion-uncertain') return {};
+  return report.state === 'Idle' ? { controllerOperation: null, lastWriteError: null } : {};
 }
 
 function observeStatusConsumers(

@@ -22,7 +22,7 @@ These are behavioral norms for *how* to work in this repo. Unlike the coding rul
 
 1. **Tight leash — small, individually-verified diffs.** Make the smallest reviewable change that advances the goal, verify it, and let the maintainer review each diff before continuing. No large unreviewed rewrites, no multi-concern diffs, no batching unrelated fixes. When **auditing, report findings and let the maintainer choose what to fix — do not auto-fix.**
 
-2. **Verify perceptually — green tests are NOT proof a feature works.** The suite asserts *structure and determinism* (SVG prefixes, path counts, byte-identical G-code over fuzz seeds), never *fidelity* (does the trace / fill / engrave look like the input?). Output can be geometrically wrong and still pass everything. Never call a trace/fill/engrave/raster feature "working" because `pnpm test` is green. Render it and compare to the source — the perceptual harness (`src/__fixtures__/perceptual/`, ADR-025), a rendered preview, or a golden-image diff — and **state plainly what was NOT verified.** When unsure, say "I have not verified the output looks correct," not "it works."
+2. **Verify perceptually — green tests are NOT proof a feature works.** Most of the suite asserts *structure and determinism* (SVG prefixes, path counts, byte-identical G-code over fuzz seeds). The dedicated perceptual harness also scores analytic trace/fill/CNC fixtures and raster/image G-code energy fields, including decoded PNG and continuous-tone cases. Those metrics still cannot prove screen appearance, sub-cell dither texture, material response, beam physics, or LightBurn parity. Never call a trace/fill/engrave/raster feature "working" because `pnpm test` is green. Render it and compare to the source — the perceptual harness (`src/__fixtures__/perceptual/`, ADR-025), a rendered preview, or a golden-image diff — and **state plainly what was NOT verified.** When unsure, say "I have not verified the output looks correct," not "it works."
 
 3. **LightBurn is the reference for every behavior.** For any behavior, UX, default, layer/cut semantics, mode (Line/Fill/Image), or G-code decision, match LightBurn unless the maintainer says otherwise. State the LightBurn behavior and check ours against it; call divergences bugs, not choices. Baseline semantics: Line = vector outline cut; Fill/Scan = hatch-fill interior; Image = dithered/grayscale raster engrave of a bitmap (not vectors). Layers are keyed by color; a layer's mode applies to every object on it; hiding a layer hides its objects on the canvas.
 
@@ -193,7 +193,7 @@ PR review rejects PRs that:
 - Modify source without modifying or adding tests, except for pure refactors flagged as such.
 - Modify the G-code snapshot without an explicit acknowledgment line in the PR description: `Snapshot change acknowledged: <reason>`.
 
-(These are review conventions, not CI-mechanical gates — `release:check` runs lint, typecheck, format, license, audit, tests, builds, and file-size, none of which inspect test-file presence or the PR description. See "Session hygiene" below and PROJECT.md #16.)
+(These are review conventions, not CI-mechanical gates — `release:check` runs lint, typecheck, format, license, tests, builds, and file-size/export checks, none of which inspect test-file presence or the PR description. Dependency audit is a separate scheduled report under ADR-254, not part of `release:check`. See "Session hygiene" below and PROJECT.md #16.)
 
 ---
 

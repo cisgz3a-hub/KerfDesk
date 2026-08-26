@@ -2,14 +2,17 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_PROJECT_OPTIMIZATION } from '../../core/scene';
+import { DEFAULT_PROJECT_OPTIMIZATION, type ProjectOptimizationSettings } from '../../core/scene';
 import { OptimizationSettingsDialog } from './OptimizationSettingsDialog';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-async function renderDialog(onApply = vi.fn()): Promise<{
+async function renderDialog(
+  onApply = vi.fn(),
+  settings: ProjectOptimizationSettings = DEFAULT_PROJECT_OPTIMIZATION,
+): Promise<{
   readonly host: HTMLDivElement;
   readonly root: Root;
   readonly onApply: typeof onApply;
@@ -19,11 +22,7 @@ async function renderDialog(onApply = vi.fn()): Promise<{
   const root = createRoot(host);
   await act(async () => {
     root.render(
-      <OptimizationSettingsDialog
-        settings={DEFAULT_PROJECT_OPTIMIZATION}
-        onCancel={vi.fn()}
-        onApply={onApply}
-      />,
+      <OptimizationSettingsDialog settings={settings} onCancel={vi.fn()} onApply={onApply} />,
     );
   });
   return { host, root, onApply };
@@ -48,6 +47,20 @@ describe('OptimizationSettingsDialog', () => {
         travelPolicy.value = 'source-order';
         Simulate.change(travelPolicy);
       });
+      expect(host.querySelector<HTMLInputElement>('input[name="insideFirst"]')?.disabled).toBe(
+        true,
+      );
+      expect(host.querySelector<HTMLSelectElement>('select[name="pathDirection"]')?.disabled).toBe(
+        true,
+      );
+      expect(host.querySelector<HTMLSelectElement>('select[name="startPoint"]')?.disabled).toBe(
+        true,
+      );
+      expect(host.querySelector<HTMLSelectElement>('select[name="layerPriority"]')?.disabled).toBe(
+        false,
+      );
+      expect(host.textContent).toContain('saved but bypassed');
+      expect(host.textContent).toContain('Layer priority still applies');
       await act(async () => {
         const form = host.querySelector('form');
         if (!(form instanceof HTMLFormElement)) throw new Error('form missing');
@@ -59,6 +72,29 @@ describe('OptimizationSettingsDialog', () => {
         reduceTravelMoves: false,
         travelPolicy: 'source-order',
       });
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('preserves bypassed settings so switching back to Reduce travel restores them', async () => {
+    const sourceOrder = {
+      ...DEFAULT_PROJECT_OPTIMIZATION,
+      travelPolicy: 'source-order' as const,
+      reduceTravelMoves: false,
+      insideFirst: false,
+      pathDirection: 'preserve' as const,
+      startPoint: 'job-center' as const,
+    };
+    const { host, root, onApply } = await renderDialog(vi.fn(), sourceOrder);
+    try {
+      await act(async () => {
+        const form = host.querySelector('form');
+        if (!(form instanceof HTMLFormElement)) throw new Error('form missing');
+        Simulate.submit(form);
+      });
+
+      expect(onApply).toHaveBeenCalledWith(sourceOrder);
     } finally {
       await act(async () => root.unmount());
     }

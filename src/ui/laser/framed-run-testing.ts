@@ -86,6 +86,7 @@ async function buildFramedRunPermitForCurrentState(
     prepared,
     laserModeStartSnapshot: laserSnapshot,
     overrides: laser.ovCache,
+    outputScope: currentOutputScope(app),
   });
   const position = reportedWorkPositionMm(laser, laser.controllerSettings?.reportInches === true);
   if (position === null) {

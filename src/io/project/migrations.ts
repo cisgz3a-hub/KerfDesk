@@ -26,8 +26,34 @@ export type MigrationResult =
 const MIGRATORS: Readonly<Record<number, Migrator>> = {
   1: migrateV1ToV2,
   2: migrateV2OperationBindings,
-  3: migrateV3ReliefSources,
+  3: migrateV3ToV4,
 };
+
+function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {
+  const reliefMigrated = migrateV3ReliefSources(raw);
+  if (isMigrationFailure(reliefMigrated)) return reliefMigrated;
+  return migrateV3JobSetup(reliefMigrated);
+}
+
+function migrateV3JobSetup(raw: RawProject): RawProject {
+  const device = record(raw['device']);
+  const homing = record(device?.['homing']);
+  return {
+    ...raw,
+    schemaVersion: 4,
+    jobSetup: {
+      placement: {
+        startFrom: homing?.['enabled'] === true ? 'absolute' : 'user-origin',
+        anchor: 'front-left',
+      },
+      outputScope: {
+        cutSelectedGraphics: false,
+        useSelectionOrigin: false,
+        selectedObjectIds: [],
+      },
+    },
+  };
+}
 
 function migrateV1ToV2(raw: RawProject): RawProject {
   const scene = record(raw['scene']);

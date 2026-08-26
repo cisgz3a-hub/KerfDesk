@@ -17,9 +17,10 @@ describe('desktop identity continuity', () => {
   it('pins both data paths before ready and uses the public window title', () => {
     const main = readFileSync(join(process.cwd(), 'electron', 'main.ts'), 'utf8');
     const ready = main.indexOf('.whenReady()');
-    expect(main.indexOf("app.setPath('userData', LEGACY_DESKTOP_DATA_PATH)")).toBeLessThan(ready);
-    expect(main.indexOf("app.setPath('sessionData', LEGACY_DESKTOP_DATA_PATH)")).toBeLessThan(
-      ready,
+    expect(main.indexOf("app.setPath('userData', DESKTOP_DATA_PATH)")).toBeLessThan(ready);
+    expect(main.indexOf("app.setPath('sessionData', DESKTOP_DATA_PATH)")).toBeLessThan(ready);
+    expect(main).toContain(
+      'const DESKTOP_DATA_PATH = NATIVE_SMOKE_CONFIG?.userDataPath ?? LEGACY_DESKTOP_DATA_PATH',
     );
     expect(main).toContain('title: DESKTOP_PRODUCT_NAME');
   });

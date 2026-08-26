@@ -7,6 +7,7 @@ import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
+import { useUiStore } from '../state/ui-store';
 import type { AppCommand } from './command-registry';
 import { useAppCommands, type CommandShellCallbacks } from './use-app-commands';
 
@@ -22,6 +23,7 @@ let latest: ReadonlyArray<AppCommand> = [];
 beforeEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState(initialLaserState());
+  useUiStore.getState().closeGcodeSaveDialog();
   renders = 0;
   latest = [];
 });
@@ -33,6 +35,7 @@ afterEach(() => {
   host = null;
   useStore.getState().newProject();
   useLaserStore.setState(initialLaserState());
+  useUiStore.getState().closeGcodeSaveDialog();
 });
 
 describe('useAppCommands store subscriptions', () => {
@@ -84,6 +87,12 @@ describe('useAppCommands store subscriptions', () => {
     for (const command of fileCommands) {
       expect(command.enabled, command.id).toBe(true);
     }
+  });
+
+  it('routes Save G-code through the transactional prebuild dialog', () => {
+    render();
+    latest.find((command) => command.id === 'file.save-gcode')?.invoke();
+    expect(useUiStore.getState().gcodeSaveDialogOpen).toBe(true);
   });
 });
 

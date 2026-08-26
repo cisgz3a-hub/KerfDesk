@@ -94,7 +94,7 @@ test('imports SVG through the real picker and creates a circular array', async (
       text: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><path d="M0 10 C10 0 30 20 40 10" fill="none" stroke="#00ff00"/></svg>',
     },
   ]);
-  await page.getByRole('button', { name: 'Import SVG...' }).click();
+  await page.getByRole('button', { name: 'Import...' }).click();
   await selectAll(page);
   await runMenuCommand(page, 'Arrange', 'Array...');
   await page.getByRole('tab', { name: 'Circular' }).click();
@@ -149,9 +149,9 @@ test('exports rotary raster through the opted-in machine-space transform', async
   await kerfdesk.setOpenFiles([
     { name: 'rotary-raster.png', kind: 'png-fixture', width: 16, height: 16 },
   ]);
-  await page.getByRole('button', { name: 'Import Image...' }).click();
+  await page.getByRole('button', { name: 'Import...' }).click();
   await runMenuCommand(page, 'File', 'Save G-code...');
-  await acceptGcodeFilename(page);
+  await choosePreparedGcodeDestination(page);
 
   const gcode = await savedText(kerfdesk, '.gcode');
   const yValues = [...gcode.matchAll(/Y(-?\d+(?:\.\d+)?)/g)].map((match) => Number(match[1]));
@@ -211,7 +211,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await page.getByRole('button', { name: 'Apply registration' }).click();
 
   await runMenuCommand(page, 'File', 'Save G-code...');
-  await acceptGcodeFilename(page);
+  await choosePreparedGcodeDestination(page);
   const gcode = await savedText(kerfdesk, '.gcode');
   expect(gcode).toContain('X30.000');
   // Design Y=10 is registered to machine Y=40; front-left output then maps
@@ -229,9 +229,11 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
     void dialog.dismiss();
   });
   await runMenuCommand(page, 'File', 'Save G-code...');
-  await acceptGcodeFilename(page);
   await expect.poll(() => blockedMessage).toContain('registration is not valid');
   expect(fileSavedCount(await kerfdesk.events())).toBe(savedBefore);
+  const failedSave = page.getByRole('dialog', { name: 'Save G-code' });
+  await expect(failedSave).toContainText('No final file was selected or modified');
+  await failedSave.getByRole('button', { name: 'Cancel' }).click();
 
   await page.getByRole('button', { name: 'Save As...' }).click();
 
@@ -258,7 +260,8 @@ test('imports a CLB library and links its preset to a cut layer', async ({ page,
     'Birch',
   );
   await page.getByRole('button', { name: 'Link selected material preset to layer' }).click();
-  await expect(page.getByText('Layer is linked to the selected material library.')).toBeVisible();
+  await expect(page.getByText('Linked preset to layer.', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Linked preset is current at revision/)).toBeVisible();
 });
 
 test('builds bounded variable text sequences with wrap, reverse, and reset', async ({
@@ -425,7 +428,7 @@ test('imports a generated bitmap and traces it through the production worker wor
   await kerfdesk.setOpenFiles([
     { name: 'trace-square.png', kind: 'png-fixture', width: 64, height: 64 },
   ]);
-  await page.getByRole('button', { name: 'Import Image...' }).click();
+  await page.getByRole('button', { name: 'Import...' }).click();
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Trace Image...' })).toBeEnabled();
   await page.getByRole('button', { name: 'Trace Image...' }).click();
@@ -481,7 +484,7 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
-  await confirmJobReview(page);
+  await confirmJobReview(page, kerfdesk);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await page.getByRole('button', { name: 'Pause' }).click();
   await expect.poll(async () => serialWriteBytes(await kerfdesk.events())).toContain(0x84);
@@ -523,7 +526,7 @@ test('shows controller-reported canvas progress without treating acknowledgement
   page.on('dialog', (dialog) => void dialog.accept());
   const writesBefore = serialWrites(await kerfdesk.events()).length;
   await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
-  await confirmJobReview(page);
+  await confirmJobReview(page, kerfdesk);
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
   const beforeAck = Number(await probe.getAttribute('data-confirmed-route-mm'));
 
@@ -582,7 +585,7 @@ test('keeps the finished route and confirms it only after the stream settles Idl
   page.on('dialog', (dialog) => void dialog.accept());
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
   await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
-  await confirmJobReview(page);
+  await confirmJobReview(page, kerfdesk);
   const probe = page.getByTestId('canvas-motion-probe');
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
   await drainHeldSerialWrites(page, kerfdesk, baselineLines);
@@ -604,7 +607,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
 
   await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
-  await confirmJobReview(page);
+  await confirmJobReview(page, kerfdesk);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await expect
     .poll(async () => serialWriteLineCount(await kerfdesk.events()))
@@ -678,11 +681,27 @@ async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Promise<v
 
 // ADR-224: every Start now opens the Job Review dialog; its single Start
 // button is the acknowledgement that absorbed the old native confirms.
-async function confirmJobReview(page: Page): Promise<void> {
+async function confirmJobReview(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+  const statusQueriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
+    (byte) => byte === 0x3f,
+  ).length;
   await page
     .getByRole('dialog', { name: 'Review job before starting' })
     .getByRole('button', { name: 'Start job' })
     .click();
+  await expect
+    .poll(
+      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
+    )
+    .toBeGreaterThan(statusQueriesBefore);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+}
+
+async function choosePreparedGcodeDestination(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'Save G-code' });
+  await expect(dialog).toContainText('The complete export is ready.');
+  await dialog.getByRole('button', { name: 'Choose destination…' }).click();
+  await acceptGcodeFilename(page);
 }
 
 async function dismissNotifications(page: Page): Promise<void> {

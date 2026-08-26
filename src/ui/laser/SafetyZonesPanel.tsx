@@ -11,8 +11,8 @@ export function SafetyZonesPanel(): JSX.Element {
     <div style={stackStyle}>
       <p style={copyStyle}>
         Rectangular no-go zones are machine-coordinate keep-outs for clamps, fixtures, and blocked
-        travel. They are not scene objects and are checked by Start, Frame, and G-code export
-        preflight.
+        travel. They are not scene objects: the canvas and Job Review disclose them, while direct
+        jog crossings or unresolved XY paths produce a warning without changing the command.
       </p>
       <Button
         onClick={() =>

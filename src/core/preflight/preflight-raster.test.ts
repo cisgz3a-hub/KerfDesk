@@ -148,7 +148,7 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
     expect(codes).not.toContain('layer-mode-mismatch');
   });
 
-  it('does not warn for a rotated output raster through an image sub-layer', () => {
+  it('accepts supported raster rotation through image sub-layers', () => {
     const baseLayer = createLayer({ id: 'L-gray', color: '#808080' });
     const imageSubLayer = createLayerSubLayer(baseLayer, {
       id: 'image-op',
@@ -168,6 +168,20 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
         ],
         layers: [{ ...baseLayer, subLayers: [imageSubLayer] }],
       },
+    };
+    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
+    expect(codes).not.toContain('unsupported-raster-transform');
+  });
+
+  it('accepts a rotated raster image because compile samples the machine grid', () => {
+    const imageLayer = createLayer({ id: 'L-gray', color: '#808080', mode: 'image' });
+    const rotatedRaster: SceneObject = {
+      ...grayRaster,
+      transform: { ...IDENTITY_TRANSFORM, rotationDeg: 45 },
+    };
+    const project: Project = {
+      ...createProject(),
+      scene: { ...EMPTY_SCENE, objects: [rotatedRaster], layers: [imageLayer] },
     };
     const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
     expect(codes).not.toContain('unsupported-raster-transform');

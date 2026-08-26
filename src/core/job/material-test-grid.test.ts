@@ -86,6 +86,43 @@ describe('generateMaterialTestGrid', () => {
     });
   });
 
+  it('burns effective speed labels and preserves requested-versus-effective feed facts', () => {
+    const grid = generateMaterialTestGrid({
+      rows: 2,
+      columns: 1,
+      speedMin: 1000,
+      speedMax: 3000,
+      powerMin: 20,
+      powerMax: 20,
+      maxFeedMmPerMin: 2000,
+      cellWidthMm: 5,
+      cellHeightMm: 4,
+    });
+
+    expect(
+      grid.cells.map(({ speed, requestedSpeed, effectiveSpeed }) => ({
+        speed,
+        requestedSpeed,
+        effectiveSpeed,
+      })),
+    ).toEqual([
+      { speed: 2000, requestedSpeed: 3000, effectiveSpeed: 2000 },
+      { speed: 1000, requestedSpeed: 1000, effectiveSpeed: 1000 },
+    ]);
+    expect(
+      grid.scene.objects
+        .filter((object) => object.id.startsWith('material-test-speed-'))
+        .map(sourceOf),
+    ).toEqual(['calibration-label:2000', 'calibration-label:1000']);
+    expect(grid.scene.layers[0]?.name).toContain('3000 requested / 2000 effective mm/min');
+
+    const device = { ...DEFAULT_DEVICE_PROFILE, maxFeed: 2000 };
+    expect(compileJob(grid.scene, device).groups[0]).toMatchObject({
+      speed: 2000,
+      requestedSpeed: 3000,
+    });
+  });
+
   it('orders rows fastest-to-slowest and columns lowest-to-highest power', () => {
     const grid = generateMaterialTestGrid({
       rows: 2,

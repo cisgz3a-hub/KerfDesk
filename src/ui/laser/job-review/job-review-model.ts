@@ -9,7 +9,13 @@ import {
   type Job,
   type ScanOffsetPoint,
 } from '../../../core/job';
-import { machineKindOf, type MachineKind, type Project } from '../../../core/scene';
+import {
+  DEFAULT_OUTPUT_SCOPE,
+  machineKindOf,
+  type MachineKind,
+  type OutputScope,
+  type Project,
+} from '../../../core/scene';
 import type { CncToolPlanEntry } from '../../state/cnc-tool-plan';
 import type { LaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
 import { cncSetupAttestationPrompt } from '../cnc-setup-acknowledgement';
@@ -67,13 +73,21 @@ export function buildJobReviewModel(args: {
   readonly prepared: PreparedCurrentStart;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly overrides: OverrideValues | null;
+  readonly outputScope?: OutputScope;
 }): JobReviewModel {
   const machineKind = machineKindOf(args.project.machine);
+  const outputScope = args.outputScope ?? DEFAULT_OUTPUT_SCOPE;
   return {
     machineKind,
-    stats: buildStatTiles(args.prepared, machineKind, args.project.device.scanningOffsets),
-    // prepared.warnings already carries controller/readiness/WCS/override and
-    // intent warnings from the exact outer-worker preparation.
+    stats: buildStatTiles(
+      args.prepared,
+      machineKind,
+      args.project.device.scanningOffsets,
+      outputScope,
+    ),
+    // prepared.warnings already carries controller/readiness/WCS/override
+    // warnings; the intent set (raster upsample, trace-as-vector, fill heat)
+    // was previously only a transient toast, so it joins the review here.
     // The M7 check runs against the exact prepared program, not the settings.
     warnings: dedupe([
       ...args.prepared.warnings,
@@ -111,6 +125,7 @@ function buildStatTiles(
   prepared: PreparedCurrentStart,
   machineKind: MachineKind,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
+  outputScope: OutputScope,
 ): ReadonlyArray<JobReviewStatTile> {
   const job = prepared.prepared.job;
   return [
@@ -120,7 +135,26 @@ function buildStatTiles(
     ...fillRunwayTiles(job, scanningOffsets),
     gcodeTile(prepared.gcode),
     originTile(prepared.jobOrigin),
+    outputScopeTile(outputScope),
   ];
+}
+
+function outputScopeTile(outputScope: OutputScope): JobReviewStatTile {
+  if (!outputScope.cutSelectedGraphics) {
+    return {
+      label: 'Output scope',
+      value: 'Entire job',
+      detail: 'All visible, enabled artwork is included',
+      emphasis: 'text',
+    };
+  }
+  const selectedCount = new Set(outputScope.selectedObjectIds).size;
+  return {
+    label: 'Output scope',
+    value: 'Selected artwork only',
+    detail: `${formatCount(selectedCount)} selected object${selectedCount === 1 ? '' : 's'} included`,
+    emphasis: 'text',
+  };
 }
 
 function fillRunwayTiles(

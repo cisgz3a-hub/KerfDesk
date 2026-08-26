@@ -12,12 +12,11 @@ import {
 import { cncMachineWithReusableTools } from './machine-actions';
 
 export type ProjectMachineCapabilityLoadResult =
-  | { readonly kind: 'loaded' }
+  | { readonly kind: 'loaded'; readonly projectBedReconciled?: boolean }
   | {
-      readonly kind: 'capability-repaired';
-      readonly previousKind: MachineKind;
+      readonly kind: 'capability-warning';
       readonly activeKind: MachineKind;
-      readonly preservedCnc: boolean;
+      readonly projectBedReconciled?: boolean;
     };
 
 export type ProjectMachineCapabilityResolution = {
@@ -32,25 +31,15 @@ export function resolveProjectMachineCapability(
   preferredKind: MachineKind = machineKindOf(project.machine),
 ): ProjectMachineCapabilityResolution {
   const currentKind = machineKindOf(project.machine);
-  const explicitKinds = explicitMachineKindsForProfile(project.device);
-  const activeKind =
-    explicitKinds.length === 1 ? (explicitKinds[0] ?? preferredKind) : preferredKind;
-  const hasMatchingMachine =
-    currentKind === activeKind && (activeKind === 'laser' || project.machine?.kind === 'cnc');
-  if (hasMatchingMachine) {
-    return loadedProjectResolution(project, customTools);
-  }
-  const cachedCncMachine = project.machine?.kind === 'cnc' ? project.machine : null;
-  return {
-    project: { ...project, machine: machineForKind(project.device, activeKind, customTools) },
-    cachedCncMachine,
-    loadResult: {
-      kind: 'capability-repaired',
-      previousKind: currentKind,
-      activeKind,
-      preservedCnc: cachedCncMachine !== null,
-    },
-  };
+  const selectedProject =
+    preferredKind === currentKind
+      ? project
+      : { ...project, machine: machineForKind(project.device, preferredKind, customTools) };
+  const selectedKind = machineKindOf(selectedProject.machine);
+  const explicitKinds = explicitMachineKindsForProfile(selectedProject.device);
+  const resolved = loadedProjectResolution(selectedProject, customTools);
+  if (explicitKinds.length === 0 || explicitKinds.includes(selectedKind)) return resolved;
+  return { ...resolved, loadResult: { kind: 'capability-warning', activeKind: selectedKind } };
 }
 
 function loadedProjectResolution(

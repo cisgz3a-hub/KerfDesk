@@ -42,6 +42,8 @@ const recipe: MaterialRecipe = {
   negativeImage: false,
   passThrough: false,
   dotWidthCorrectionMm: 0,
+  imageBidirectional: true,
+  allowUncalibratedBidirectionalScan: false,
 };
 
 function preset(patch: Partial<MaterialPreset> = {}): MaterialPreset {

@@ -71,6 +71,7 @@ import {
 } from './rtsp-camera-bridge.js';
 import { configureAutoUpdater } from './auto-update.js';
 import { DESKTOP_PRODUCT_NAME, legacyDesktopDataPath } from './desktop-identity.js';
+import { installPackagedNativeSmoke, readNativeSmokeConfig } from './native-smoke.js';
 import {
   canonicalOfficialDesktopDownloadUrl,
   isOfficialDesktopDownloadUrl,
@@ -92,9 +93,11 @@ const __dirname = path.dirname(__filename);
 // Public rename without a data migration: pin both Chromium/application roots
 // before Electron's ready event so existing projects and recovery state remain.
 const LEGACY_DESKTOP_DATA_PATH = legacyDesktopDataPath(app.getPath('appData'));
+const NATIVE_SMOKE_CONFIG = readNativeSmokeConfig(process.argv);
+const DESKTOP_DATA_PATH = NATIVE_SMOKE_CONFIG?.userDataPath ?? LEGACY_DESKTOP_DATA_PATH;
 app.setName(DESKTOP_PRODUCT_NAME);
-app.setPath('userData', LEGACY_DESKTOP_DATA_PATH);
-app.setPath('sessionData', LEGACY_DESKTOP_DATA_PATH);
+app.setPath('userData', DESKTOP_DATA_PATH);
+app.setPath('sessionData', DESKTOP_DATA_PATH);
 
 function installApplicationMenu(): void {
   const template = desktopApplicationMenuTemplate(process.platform);
@@ -387,6 +390,7 @@ function installDevTools(window: BrowserWindow): void {
 
 async function createWindow(): Promise<void> {
   const window = createMainWindow();
+  installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
 
   // F-9 audit fix: set Content-Security-Policy via webRequest headers
@@ -482,7 +486,7 @@ void app
     // which fails fast if this handler isn't installed yet.
     const distRoot = path.join(__dirname, '..', 'dist', 'web');
     protocol.handle('app', makeAppProtocolHandler(distRoot));
-    await startCameraBridgeSafely();
+    if (NATIVE_SMOKE_CONFIG === null) await startCameraBridgeSafely();
     // Background auto-update against our self-hosted feed (ADR-024/135). This is
     // inert until production artifacts are code-signed; once trusted, updates
     // install on quit and never mid-burn. Check errors are never fatal to startup.

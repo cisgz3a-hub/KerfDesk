@@ -1,4 +1,5 @@
 import type { Bounds } from '../../core/scene';
+import type { ImageDensity } from './image-density';
 
 const MM_PER_INCH = 25.4;
 // ADR-048: a metadata-less bitmap imports at LightBurn's reference 254 DPI
@@ -12,13 +13,15 @@ export type RasterImportGeometryInput = {
   readonly naturalHeight: number;
   readonly sampledWidth: number;
   readonly sampledHeight: number;
-  readonly dpi?: number;
+  readonly density?: ImageDensity | null;
 };
 
 export type RasterImportGeometry = {
   readonly bounds: Bounds;
   readonly pixelWidth: number;
   readonly pixelHeight: number;
+  readonly density: ImageDensity;
+  readonly densitySource: 'embedded' | 'default';
 };
 
 // The import success toast must report the source image's real pixel size, not
@@ -38,15 +41,28 @@ export function rasterImportGeometry(input: RasterImportGeometryInput): RasterIm
   // Defense in depth: a non-positive or non-finite dpi (poison metadata, a 0
   // that slipped past the density parser) would make widthMm Infinity/NaN and
   // poison every downstream save. Fall back to the default rather than emit it.
-  const dpi =
-    input.dpi !== undefined && Number.isFinite(input.dpi) && input.dpi > 0
-      ? input.dpi
-      : DEFAULT_DPI;
-  const widthMm = (input.naturalWidth / dpi) * MM_PER_INCH;
-  const heightMm = (input.naturalHeight / dpi) * MM_PER_INCH;
+  const xDpi = validDpi(input.density?.xDpi) ?? DEFAULT_DPI;
+  const yDpi = validDpi(input.density?.yDpi) ?? DEFAULT_DPI;
+  const embedded = validDpi(input.density?.xDpi) !== null && validDpi(input.density?.yDpi) !== null;
+  const widthMm = (input.naturalWidth / xDpi) * MM_PER_INCH;
+  const heightMm = (input.naturalHeight / yDpi) * MM_PER_INCH;
   return {
     bounds: { minX: 0, minY: 0, maxX: widthMm, maxY: heightMm },
     pixelWidth: input.sampledWidth,
     pixelHeight: input.sampledHeight,
+    density: { xDpi, yDpi },
+    densitySource: embedded ? 'embedded' : 'default',
   };
+}
+
+export function describeImportDensity(geometry: RasterImportGeometry): string {
+  const { xDpi, yDpi } = geometry.density;
+  const axes = xDpi === yDpi ? `${xDpi} DPI` : `${xDpi} × ${yDpi} DPI (X × Y)`;
+  return geometry.densitySource === 'embedded'
+    ? `embedded density ${axes}`
+    : `default ${axes} — no usable embedded density`;
+}
+
+function validDpi(value: number | undefined): number | null {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : null;
 }

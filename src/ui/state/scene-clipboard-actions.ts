@@ -9,6 +9,7 @@ import {
   type Scene,
   type SceneObject,
 } from '../../core/scene';
+import { cloneLayerSubLayers } from '../../core/scene/layer';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
 import type { AppState } from './store';
@@ -157,7 +158,7 @@ function prepareClipboardPaste(
       id: seed.id,
       name: seed.name,
       color: seed.color,
-      subLayers: [],
+      subLayers: cloneLayerSubLayers(source.subLayers),
     };
     operationIdMap.set(source.id, operation.id);
     out = addLayer(out, operation);

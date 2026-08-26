@@ -6,6 +6,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import { useLaserStore } from '../state/laser-store';
 import type { ImportOutcome } from '../state/store';
+import { useUiStore } from '../state/ui-store';
 import { handleFileShortcut, type FileCtx } from './shortcuts';
 
 function contextForFileShortcut(platform: PlatformAdapter): FileCtx {
@@ -13,6 +14,7 @@ function contextForFileShortcut(platform: PlatformAdapter): FileCtx {
     platform,
     project: projectWithLine(),
     importSvgObject: vi.fn((): ImportOutcome => ({ kind: 'added' })),
+    importRasterImage: vi.fn(),
     setProject: vi.fn(() => ({ kind: 'loaded' as const })),
     newProject: vi.fn(),
     savedName: null,
@@ -40,6 +42,7 @@ describe('File shortcuts while a job is active', () => {
     useLaserStore.setState({ streamer: null } as Partial<
       ReturnType<typeof useLaserStore.getState>
     >);
+    useUiStore.getState().closeGcodeSaveDialog();
   });
 
   it.each([
@@ -47,8 +50,8 @@ describe('File shortcuts while a job is active', () => {
     ['Open', { key: 'o', ctrlKey: true }, 'open'],
     ['Save', { key: 's', ctrlKey: true }, 'save'],
     ['Save As', { key: 's', ctrlKey: true, shiftKey: true }, 'save'],
-    ['Import SVG', { key: 'i', ctrlKey: true }, 'open'],
-    ['Save G-code', { key: 'e', ctrlKey: true, shiftKey: true }, 'save'],
+    ['Import artwork', { key: 'i', ctrlKey: true }, 'open'],
+    ['Save G-code', { key: 'e', ctrlKey: true, shiftKey: true }, 'dialog'],
   ] as const)(
     'keeps %s available without an active-job refusal',
     async (_label, init, expectedEffect) => {
@@ -73,8 +76,11 @@ describe('File shortcuts while a job is active', () => {
         expect(context.confirmDiscard).toHaveBeenCalled();
       } else if (expectedEffect === 'open') {
         await vi.waitFor(() => expect(pickFilesForOpen).toHaveBeenCalled());
-      } else {
+      } else if (expectedEffect === 'save') {
         await vi.waitFor(() => expect(pickFileForSave).toHaveBeenCalled());
+      } else {
+        expect(useUiStore.getState().gcodeSaveDialogOpen).toBe(true);
+        expect(pickFileForSave).not.toHaveBeenCalled();
       }
     },
   );

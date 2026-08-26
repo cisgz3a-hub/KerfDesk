@@ -234,6 +234,22 @@ describe('DeviceSettings air assist command', () => {
 });
 
 describe('DeviceSettings controlled seek feed', () => {
+  it('labels output max feed separately from the live-capped requested Frame feed', async () => {
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const outputMax = host.querySelector('input[aria-label="Output max feed (mm/min)"]');
+      const frameFeed = host.querySelector('input[aria-label="Framing feed (mm/min)"]');
+      expect(outputMax?.getAttribute('title')).toMatch(
+        /not a verified hardware limit.*does not cap Frame/i,
+      );
+      expect(frameFeed?.getAttribute('title')).toMatch(
+        /Known live X\/Y.*full requested feed is sent/i,
+      );
+    } finally {
+      await unmount();
+    }
+  });
+
   it('caps the editor at the machine feed ceiling and ignores larger values', async () => {
     useStore.getState().updateDeviceProfile({
       maxFeed: 1000,

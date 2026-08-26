@@ -37,8 +37,8 @@ function makeHarness(write?: (line: string) => Promise<void>): AutofocusHarness 
     },
     args: (overrides = {}) => ({
       connected: true,
-      statusReport: idleStatus(),
       command: '$HZ1',
+      confirmFreshIdle: async () => idleStatus(),
       refs,
       write: sharedWrite,
       ...overrides,
@@ -81,7 +81,7 @@ describe('runAutofocus — preflight', () => {
   it('rejects when controller is not Idle', async () => {
     const harness = makeHarness();
     const result = await runAutofocus(
-      harness.args({ statusReport: { ...idleStatus(), state: 'Run' } }),
+      harness.args({ confirmFreshIdle: async () => ({ ...idleStatus(), state: 'Run' }) }),
     );
     expect(result.kind).toBe('preflight-failed');
     if (result.kind === 'preflight-failed') expect(result.reason).toMatch(/Idle/i);
@@ -95,6 +95,28 @@ describe('runAutofocus — shared response ownership', () => {
   it('sends the command through the shared write function', async () => {
     const harness = makeHarness();
     const pending = runAutofocus(harness.args());
+    await flush();
+    expect(harness.written).toEqual(['$HZ1\n']);
+    harness.emit('ok');
+    harness.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+    expect((await pending).kind).toBe('ok');
+  });
+
+  it('does not dispatch until a fresh Idle confirmation resolves', async () => {
+    const harness = makeHarness();
+    let confirm: ((report: StatusReport) => void) | undefined;
+    const pending = runAutofocus(
+      harness.args({
+        confirmFreshIdle: () =>
+          new Promise<StatusReport>((resolve) => {
+            confirm = resolve;
+          }),
+      }),
+    );
+    await flush();
+    expect(harness.written).toEqual([]);
+
+    confirm?.(idleStatus());
     await flush();
     expect(harness.written).toEqual(['$HZ1\n']);
     harness.emit('ok');
@@ -218,7 +240,7 @@ describe('runAutofocus — shared response ownership', () => {
       throw new Error('USB write failed');
     });
     expect(await runAutofocus(harness.args())).toEqual({
-      kind: 'preflight-failed',
+      kind: 'motion-uncertain',
       reason: 'USB write failed',
     });
     expect(harness.refs.controllerCommand).toBeNull();

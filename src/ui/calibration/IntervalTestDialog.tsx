@@ -51,6 +51,7 @@ const FIELD_SPECS: ReadonlyArray<IntervalTestField> = [
 export function IntervalTestDialog(props: {
   readonly onCancel: () => void;
   readonly onGenerate: (options: IntervalTestGridOptions) => void;
+  readonly maxFeedMmPerMin: number;
 }): JSX.Element {
   const [draft, setDraft] = useState(() =>
     restoreCalibrationDraft(INTERVAL_TEST_DRAFT_KEY, DEFAULT_DRAFT, INTERVAL_TEST_DRAFT_FIELDS),
@@ -76,6 +77,10 @@ export function IntervalTestDialog(props: {
       size="sm"
     >
       <IntervalTestFields draft={draft} setField={setField} />
+      <CalibrationFeedDisclosure
+        requestedSpeed={numberValue(draft.speed)}
+        maxFeedMmPerMin={props.maxFeedMmPerMin}
+      />
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
         <Button type="submit" variant="primary">
@@ -83,6 +88,20 @@ export function IntervalTestDialog(props: {
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function CalibrationFeedDisclosure(props: {
+  readonly requestedSpeed: number;
+  readonly maxFeedMmPerMin: number;
+}): JSX.Element {
+  const effectiveSpeed = Math.min(props.requestedSpeed, props.maxFeedMmPerMin);
+  return (
+    <p role="status" style={{ margin: '12px 0 0', color: 'var(--lf-text-muted)', fontSize: 12 }}>
+      Requested {formatFeed(props.requestedSpeed)} mm/min; effective {formatFeed(effectiveSpeed)}{' '}
+      mm/min with the active profile ceiling of {formatFeed(props.maxFeedMmPerMin)} mm/min. The
+      burned speed label shows effective feed.
+    </p>
   );
 }
 
@@ -124,4 +143,8 @@ function parseDraft(draft: IntervalTestDraft): IntervalTestGridOptions {
 function numberValue(value: string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatFeed(value: number): string {
+  return Number.isFinite(value) ? value.toLocaleString('en-US', { maximumFractionDigits: 3 }) : '0';
 }

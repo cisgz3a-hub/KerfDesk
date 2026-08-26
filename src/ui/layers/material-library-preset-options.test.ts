@@ -29,11 +29,12 @@ describe('materialLibraryPresetOptions', () => {
     expect(option?.statusText).toBe('not compatible');
   });
 
-  it('keeps a matched-but-unsupported preset not assignable (a distinct safety block)', () => {
+  it('keeps a matched-but-unsupported preset assignable with its qualification warning', () => {
     const [option] = materialLibraryPresetOptions(DEFAULT_DEVICE_PROFILE, [
       preset({ id: 'unsupported', confidence: 'unsupported' }),
     ]);
 
-    expect(option?.isAssignable).toBe(false);
+    expect(option?.isAssignable).toBe(true);
+    expect(option?.warnings).toContain('Unsupported recipe.');
   });
 });

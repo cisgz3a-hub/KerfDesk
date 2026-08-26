@@ -90,6 +90,26 @@ describe('scene clipboard actions', () => {
     expect(state.dirty).toBe(true);
   });
 
+  it('preserves sublayers when copied artwork is pasted into another project', () => {
+    useStore.getState().importSvgObject(svgObj('with-sublayer', ['#ff0000']));
+    const sourceId = useStore.getState().project.scene.layers[0]?.id;
+    if (sourceId === undefined) throw new Error('source operation missing');
+    useStore.getState().addLayerSubLayer(sourceId);
+    useStore.getState().selectObject('with-sublayer');
+    useStore.getState().copySelection();
+    useStore.setState({
+      project: createProject(),
+      selectedObjectId: null,
+      additionalSelectedIds: new Set(),
+    });
+
+    useStore.getState().pasteClipboard();
+
+    const [pasted] = useStore.getState().project.scene.layers;
+    expect(pasted?.subLayers).toHaveLength(1);
+    expect(pasted?.subLayers[0]?.label).toBe('Sub-layer 1');
+  });
+
   it('cut copies the selection, removes it as one undoable edit, and can paste it back', () => {
     useStore.setState({ project: projectWithVariants(), dirty: false, undoStack: [] });
     useStore.getState().selectObjects(['svg-1', 'raster-1']);

@@ -337,9 +337,11 @@ metrics cover what IoU cannot see: chamfer distance, centerline deviation/gap/fr
 chord sagitta for faceting. The instruments are themselves unit-tested before being trusted.
 
 It runs as part of `pnpm test`, and it covers the trace engine, SVG import, scanline fill, the box
-generator and CNC V-carve. For laser fill it closes the loop all the way to the controller text:
-the emitted GRBL output is **re-parsed back into an ink mask** and scored against the source
-geometry.
+generator, CNC V-carve, and laser raster/image burn. For laser fill it closes the loop all the way
+to controller text: emitted GRBL is **re-parsed back into an ink mask** and scored against source
+geometry. Raster/image fixtures similarly compile real bitmaps through G-code, reconstruct a
+cell-scale energy field, and compare position, orientation, tone, and power modulation against
+analytic, continuous-tone, and decoded-PNG truth.
 
 Be precise about its limits, because they matter:
 
@@ -347,7 +349,9 @@ Be precise about its limits, because they matter:
   an annulus and a cross-hatched square. No traced or imported artwork is ever scored through
   emitted G-code.
 - The trace tests score trace **geometry**, not G-code.
-- **Raster/image engrave has no perceptual coverage at all.**
+- Raster/image coverage is cell-scale and energy-based. It cannot see within-cell dot arrangement,
+  dither banding/worming/moiré, beam width, scan-line overlap, material response, or the appearance
+  of a physical burn.
 - The rasteriser is power-blind (any `G1` with `S>0` inks at full strength) and understands only
   `G0`/`G1` — no arcs, no Z. It measures geometric coverage, nothing else.
 - IoU is blind to waviness and to the outline-vs-centerline gap.

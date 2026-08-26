@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import type { Polyline } from '../scene';
 import { planAdaptivePocket, type AdaptivePocketPlan } from './adaptive-pocket';
 import { verifyAdaptivePocket } from './adaptive-pocket-verifier';
@@ -187,7 +188,7 @@ describe('verifyAdaptivePocket', () => {
       expect(plan).toMatchObject({ ok: true });
       expect(verifyAdaptivePocket(contours, 4, plan)).toMatchObject({ ok: true });
     },
-    20_000,
+    ciBudgetMs(20_000, 60_000),
   );
 
   it('uses the canonical union boundary for edge-touching contours', () => {

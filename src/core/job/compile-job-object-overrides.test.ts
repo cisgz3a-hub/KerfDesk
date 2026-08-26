@@ -80,5 +80,10 @@ describe('compileJob object operation overrides', () => {
     expect(job.groups[0]?.kind).toBe('fill');
     expect((job.groups[0] as FillGroup).fillStyle).toBe('offset');
     expect((job.groups[0] as FillGroup).segments.length).toBeGreaterThan(0);
+    expect((job.groups[0] as FillGroup).operationSettings).toMatchObject({
+      mode: 'fill',
+      fillStyle: 'offset',
+      hatchSpacingMm: 1,
+    });
   });
 });

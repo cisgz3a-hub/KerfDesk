@@ -12,6 +12,7 @@ import {
   createCalibrationLabelLayer,
   createCalibrationLabelObject,
   formatCalibrationInterval,
+  formatCalibrationNumber,
 } from './calibration-labels';
 
 const MIN_STEPS = 1;
@@ -29,6 +30,8 @@ export type IntervalTestGridOptions = {
   readonly steps: number;
   readonly speed: number;
   readonly power: number;
+  /** Active profile compile ceiling. Omit only for profile-agnostic callers. */
+  readonly maxFeedMmPerMin?: number;
   readonly intervalMinMm: number;
   readonly intervalMaxMm: number;
   readonly swatchSizeMm: number;
@@ -43,7 +46,10 @@ export type IntervalTestCell = {
   readonly step: number;
   readonly objectId: string;
   readonly layerId: string;
+  /** Feed the compiler will emit for this swatch. */
   readonly speed: number;
+  readonly requestedSpeed: number;
+  readonly effectiveSpeed: number;
   readonly power: number;
   readonly intervalMm: number;
   readonly bounds: Bounds;
@@ -56,7 +62,8 @@ export type IntervalTestGrid = {
 
 export function generateIntervalTestGrid(options: IntervalTestGridOptions): IntervalTestGrid {
   const steps = clampInteger(options.steps, MIN_STEPS, MAX_STEPS);
-  const speed = clampFinite(options.speed, MIN_SPEED_MM_MIN);
+  const requestedSpeed = clampFinite(options.speed, MIN_SPEED_MM_MIN);
+  const effectiveSpeed = effectiveCalibrationSpeed(requestedSpeed, options.maxFeedMmPerMin);
   const power = clampPower(options.power);
   const [intervalLow, intervalHigh] = orderedPair(
     clampInterval(options.intervalMinMm),
@@ -77,7 +84,13 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
 
   for (let step = 0; step < steps; step += 1) {
     const intervalMm = intervals[step] ?? intervalHigh;
-    const layer = intervalLayer({ step, speed, power, intervalMm });
+    const layer = intervalLayer({
+      step,
+      requestedSpeed,
+      effectiveSpeed,
+      power,
+      intervalMm,
+    });
     const x = origin.x + step * (swatchSize + gap);
     const y = origin.y;
     const objectId = `interval-test-cell-${step}`;
@@ -96,7 +109,9 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
       step,
       objectId,
       layerId: layer.id,
-      speed,
+      speed: effectiveSpeed,
+      requestedSpeed,
+      effectiveSpeed,
       power,
       intervalMm,
       bounds: { minX: x, minY: y, maxX: x + swatchSize, maxY: y + swatchSize },
@@ -105,16 +120,15 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
 
   const labelLayer = createCalibrationLabelLayer('interval-test-labels');
   objects.push(
-    ...cells.map((cell) => {
-      const label = formatCalibrationInterval(cell.intervalMm);
-      return createCalibrationLabelObject({
-        id: `interval-test-label-${cell.step}`,
-        operationId: labelLayer.id,
-        text: label,
-        x: cell.bounds.minX + centerOffset(swatchSize, calibrationLabelWidthMm(label, labelSize)),
-        y: cell.bounds.maxY + labelGap,
-        sizeMm: labelSize,
-      });
+    ...intervalTestLabelObjects({
+      cells,
+      labelLayerId: labelLayer.id,
+      swatchSize,
+      labelSize,
+      labelGap,
+      effectiveSpeed,
+      originX: origin.x,
+      gridWidth: steps * swatchSize + Math.max(0, steps - 1) * gap,
     }),
   );
   layers.push(labelLayer);
@@ -122,9 +136,47 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
   return { scene: { objects, layers }, cells };
 }
 
+function intervalTestLabelObjects(args: {
+  readonly cells: ReadonlyArray<IntervalTestCell>;
+  readonly labelLayerId: string;
+  readonly swatchSize: number;
+  readonly labelSize: number;
+  readonly labelGap: number;
+  readonly effectiveSpeed: number;
+  readonly originX: number;
+  readonly gridWidth: number;
+}): ReadonlyArray<ImportedSvg> {
+  const intervalLabels = args.cells.map((cell) => {
+    const text = formatCalibrationInterval(cell.intervalMm);
+    return createCalibrationLabelObject({
+      id: `interval-test-label-${cell.step}`,
+      operationId: args.labelLayerId,
+      text,
+      x:
+        cell.bounds.minX +
+        centerOffset(args.swatchSize, calibrationLabelWidthMm(text, args.labelSize)),
+      y: cell.bounds.maxY + args.labelGap,
+      sizeMm: args.labelSize,
+    });
+  });
+  const text = formatCalibrationNumber(args.effectiveSpeed);
+  return [
+    ...intervalLabels,
+    createCalibrationLabelObject({
+      id: 'interval-test-effective-speed-label',
+      operationId: args.labelLayerId,
+      text,
+      x: args.originX + centerOffset(args.gridWidth, calibrationLabelWidthMm(text, args.labelSize)),
+      y: (args.cells[0]?.bounds.maxY ?? 0) + args.labelGap + args.labelSize + args.labelGap,
+      sizeMm: args.labelSize,
+    }),
+  ];
+}
+
 function intervalLayer(args: {
   readonly step: number;
-  readonly speed: number;
+  readonly requestedSpeed: number;
+  readonly effectiveSpeed: number;
   readonly power: number;
   readonly intervalMm: number;
 }): Layer {
@@ -132,11 +184,14 @@ function intervalLayer(args: {
   return {
     ...createLayer({
       id: `interval-test-step-${args.step}`,
-      name: `Interval ${formatCalibrationInterval(args.intervalMm)} mm`,
+      name:
+        `Interval ${formatCalibrationInterval(args.intervalMm)} mm · ` +
+        `${formatCalibrationNumber(args.requestedSpeed)} requested / ` +
+        `${formatCalibrationNumber(args.effectiveSpeed)} effective mm/min`,
       color,
       mode: 'fill',
     }),
-    speed: args.speed,
+    speed: args.requestedSpeed,
     power: args.power,
     hatchSpacingMm: args.intervalMm,
   };
@@ -215,4 +270,10 @@ function clampFinite(value: number, fallback: number): number {
 
 function roundMm(value: number): number {
   return Number(value.toFixed(6));
+}
+
+function effectiveCalibrationSpeed(requested: number, maxFeedMmPerMin: number | undefined): number {
+  return maxFeedMmPerMin !== undefined && Number.isFinite(maxFeedMmPerMin) && maxFeedMmPerMin > 0
+    ? Math.min(requested, maxFeedMmPerMin)
+    : requested;
 }

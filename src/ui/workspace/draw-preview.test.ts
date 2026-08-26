@@ -209,6 +209,7 @@ describe('drawPreview', () => {
     drawPreview(ctx, toolpath, view, 1);
 
     expect(calls.lineTo).toBeLessThan(120_000);
+    expect(calls.moveTo).toBe(1);
     expect(pointReads).toBeLessThan(readBudget);
   });
 
@@ -288,6 +289,7 @@ describe('drawPreview', () => {
 
     expect(calls.moveTo).toBeGreaterThan(0);
     expect(calls.lineTo).toBeGreaterThan(0);
+    expect(calls.strokeStyleValues).toContain('#222222');
   });
 
   it('hides multi-operation artwork only when every bound operation is hidden', () => {

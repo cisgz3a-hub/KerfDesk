@@ -40,7 +40,6 @@ import {
 } from './laser-disconnect-safety';
 import { disconnectedStatePatch } from './laser-disconnected-state';
 import {
-  assertAutofocusIdle,
   buildPortClosePatch,
   detectStreamStall,
   disconnectStopCommands,
@@ -259,7 +258,6 @@ async function runDisconnect(
   safeWrite: SafeWriteFn,
   forgetDevice: boolean,
 ): Promise<void> {
-  assertAutofocusIdle(get());
   const connection = refs.connection;
   if (connection === null) {
     teardownConnectionRefs(refs);

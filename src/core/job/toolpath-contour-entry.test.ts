@@ -51,4 +51,15 @@ describe('toolpath preview with ADR-239 contour entries', () => {
     expect(seek !== undefined && 'motion' in seek ? seek.motion : undefined).toBeUndefined();
     expect(cut).toMatchObject({ kind: 'cut' });
   });
+
+  it('previews a custom compiled entry distance exactly', () => {
+    const toolpath = buildToolpath(
+      { groups: [{ ...baseGroup, entryRunwayMm: 2 }] },
+      { startPoint: { x: 0, y: 0 } },
+    );
+
+    expect(toolpath.steps[0]).toMatchObject({ to: { x: 8, y: 10 } });
+    expect(toolpath.steps[1]).toMatchObject({ from: { x: 8, y: 10 }, to: { x: 10, y: 10 } });
+    expect(toolpath.steps[1]?.length).toBeCloseTo(2, 9);
+  });
 });

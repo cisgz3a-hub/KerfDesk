@@ -2,11 +2,12 @@ import type { RasterImage } from '../../core/scene';
 import { BURN_MAX_EDGE_PX, BURN_MAX_SOURCE_PIXELS } from '../trace/image-loader';
 import { IndexedDbPagedAssetRepository } from './paged-asset-indexeddb';
 import { importPngOffThread, type PngImportWorkerProgress } from './png-import-worker-client';
+import type { ImageDensity } from '../common/image-density';
 
 export type QualifiedPngRaster = {
   readonly natural: { readonly width: number; readonly height: number };
   readonly sampled: { readonly width: number; readonly height: number };
-  readonly densityDpi: number | null;
+  readonly density: ImageDensity | null;
   readonly imageAsset: NonNullable<RasterImage['imageAsset']>;
   readonly rollback: () => Promise<string | null>;
 };
@@ -65,7 +66,7 @@ export async function tryDecodeQualifiedPng(
     return {
       natural: { width: result.width, height: result.height },
       sampled: { width: result.sampledWidth, height: result.sampledHeight },
-      densityDpi: result.densityDpi,
+      density: result.density,
       imageAsset: {
         schemaVersion: 1,
         repository: 'curvedesk-import-assets-v1',

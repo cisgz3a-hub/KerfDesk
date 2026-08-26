@@ -35,7 +35,9 @@ function matchedOption(match: MaterialRecipeMatch<MaterialPreset>): MaterialLibr
     label: `${presetLabel(match.candidate)} - ${statusText}`,
     statusText,
     warnings: match.warnings,
-    isAssignable: match.confidence !== 'unsupported',
+    // Confidence is qualification evidence, not an operation-integrity fact.
+    // Preserve the preset exactly and keep assignment available with warnings.
+    isAssignable: true,
   };
 }
 
@@ -45,10 +47,7 @@ function unmatchedOption(preset: MaterialPreset): MaterialLibraryPresetOption {
     label: `${presetLabel(preset)} - not compatible`,
     statusText: 'not compatible',
     warnings: [INCOMPATIBLE_WARNING],
-    // ADR-045: device hints "do not block cross-machine reuse" — a device
-    // mismatch is warn-not-block, so it stays assignable (the warning above is
-    // surfaced and Apply prompts a confirm). Only a matched-but-'unsupported'
-    // preset (matchedOption) is a hard block, a distinct safety axis.
+    // Device hints and qualification confidence inform without blocking reuse.
     isAssignable: true,
   };
 }

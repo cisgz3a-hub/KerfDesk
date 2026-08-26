@@ -11,6 +11,7 @@ import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import type { ImportOutcome } from '../state/store';
 import { projectWithLine } from '../../__fixtures__/file-actions';
 import { projectWithObject, shapeObject } from './shortcuts-test-helpers';
+import { useUiStore } from '../state/ui-store';
 
 const mockPlatform: PlatformAdapter = {
   id: 'mock',
@@ -29,6 +30,7 @@ function fileCtx(
     platform: mockPlatform,
     project: createProject(),
     importSvgObject: vi.fn((): ImportOutcome => ({ kind: 'added' })),
+    importRasterImage: vi.fn(),
     setProject: vi.fn(() => ({ kind: 'loaded' as const })),
     newProject: vi.fn(),
     savedName: null,
@@ -48,6 +50,7 @@ function fileCtx(
 
 describe('handleFileShortcut - LightBurn-compatible Save G-code binding', () => {
   it('leaves Ctrl+E free and handles Ctrl+Shift+E as Save G-code', () => {
+    useUiStore.getState().closeGcodeSaveDialog();
     const plainEvent = fakeKeydown({ key: 'e', ctrlKey: true });
     expect([handleFileShortcut(plainEvent, fileCtx()), plainEvent.defaultPrevented]).toEqual([
       false,
@@ -60,9 +63,11 @@ describe('handleFileShortcut - LightBurn-compatible Save G-code binding', () => 
       true,
       true,
     ]);
+    expect(useUiStore.getState().gcodeSaveDialogOpen).toBe(true);
+    useUiStore.getState().closeGcodeSaveDialog();
   });
 
-  it('keeps a no-dump readiness advisory non-blocking for Ctrl+Shift+E', async () => {
+  it('opens the prebuild dialog before any picker for Ctrl+Shift+E', () => {
     const [pickFileForSave, pushToast] = [vi.fn(async () => null), vi.fn()];
     const context = fileCtx({
       project: projectWithLine(),
@@ -73,11 +78,10 @@ describe('handleFileShortcut - LightBurn-compatible Save G-code binding', () => 
     expect(
       handleFileShortcut(fakeKeydown({ key: 'e', ctrlKey: true, shiftKey: true }), context),
     ).toBe(true);
-    await vi.waitFor(() => expect(pickFileForSave).toHaveBeenCalledOnce());
-    expect(pushToast).toHaveBeenCalledWith(
-      expect.stringContaining('does not report GRBL $-settings'),
-      'warning',
-    );
+    expect(useUiStore.getState().gcodeSaveDialogOpen).toBe(true);
+    expect(pickFileForSave).not.toHaveBeenCalled();
+    expect(pushToast).not.toHaveBeenCalled();
+    useUiStore.getState().closeGcodeSaveDialog();
   });
 });
 

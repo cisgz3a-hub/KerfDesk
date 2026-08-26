@@ -6,21 +6,22 @@ import {
   type Transform,
   updateLayer,
 } from '../../core/scene';
-import {
-  jobPlacementAfterDeviceChange,
-  jobPlacementAfterProfileSelection,
-  type JobPlacementSettings,
-} from '../job-placement';
+import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from '../job-placement';
 import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
-import type { AppState, OutputScopeSettings } from './store';
+import type { AppState } from './store';
 import { projectAfterDeviceProfileChange } from './cnc-machine-setup-scene';
 import { machineSetupActions } from './machine-setup-actions';
 import {
   nextProbeSetupState,
   projectsShareProbeSetupIdentity,
 } from './probe-setup-history-identity';
+import {
+  jobPlacementProjectPatch,
+  outputScopeProjectPatch,
+  scopedSelectionProjectPatch,
+} from './project-job-setup';
 
 type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -174,19 +175,19 @@ export function viewActions(
 > {
   return {
     selectObject: (id) =>
-      set((s) =>
-        id === null
-          ? {
-              selectedObjectId: null,
-              selectedPathNode: null,
-              selectedPathNodes: [],
-              additionalSelectedIds: new Set(),
-            }
-          : { ...selectionFromIds(s, [id], false), selectedPathNode: null, selectedPathNodes: [] },
-      ),
+      set((s) => ({
+        ...scopedSelectionProjectPatch(
+          s,
+          id === null
+            ? { selectedObjectId: null, additionalSelectedIds: new Set() }
+            : selectionFromIds(s, [id], false),
+        ),
+        selectedPathNode: null,
+        selectedPathNodes: [],
+      })),
     toggleSelectObject: (id) =>
       set((s) => ({
-        ...toggleSelectionFromId(s, id),
+        ...scopedSelectionProjectPatch(s, toggleSelectionFromId(s, id)),
         selectedPathNode: null,
         selectedPathNodes: [],
       })),
@@ -198,15 +199,17 @@ export function viewActions(
           .map((o) => o.id);
         const [primary, ...rest] = ids;
         return {
-          selectedObjectId: primary ?? null,
+          ...scopedSelectionProjectPatch(s, {
+            selectedObjectId: primary ?? null,
+            additionalSelectedIds: new Set(rest),
+          }),
           selectedPathNode: null,
           selectedPathNodes: [],
-          additionalSelectedIds: new Set(rest),
         };
       }),
     selectObjects: (ids, options = {}) =>
       set((s) => ({
-        ...selectionFromIds(s, ids, options.additive === true),
+        ...scopedSelectionProjectPatch(s, selectionFromIds(s, ids, options.additive === true)),
         selectedPathNode: null,
         selectedPathNodes: [],
       })),
@@ -219,10 +222,8 @@ export function viewActions(
         selectedPathNode: null,
         selectedPathNodes: [],
       })),
-    setJobPlacement: (patch) =>
-      set((s) => ({ jobPlacement: mergeJobPlacement(s.jobPlacement, patch) })),
-    setOutputScopeSettings: (patch) =>
-      set((s) => ({ outputScopeSettings: mergeOutputScope(s.outputScopeSettings, patch) })),
+    setJobPlacement: (patch) => set((s) => jobPlacementProjectPatch(s, patch)),
+    setOutputScopeSettings: (patch) => set((s) => outputScopeProjectPatch(s, patch)),
     setCursorMm: (cursor) => set({ cursorMm: cursor }),
   };
 }
@@ -264,24 +265,6 @@ export function interactionActions(
         redoStack: [],
         dirty: true,
       })),
-  };
-}
-
-function mergeJobPlacement(
-  jobPlacement: JobPlacementSettings,
-  patch: Partial<JobPlacementSettings>,
-): JobPlacementSettings {
-  return { ...jobPlacement, ...patch };
-}
-
-function mergeOutputScope(
-  outputScopeSettings: OutputScopeSettings,
-  patch: Partial<OutputScopeSettings>,
-): OutputScopeSettings {
-  const next = { ...outputScopeSettings, ...patch };
-  return {
-    ...next,
-    useSelectionOrigin: next.cutSelectedGraphics ? next.useSelectionOrigin : false,
   };
 }
 

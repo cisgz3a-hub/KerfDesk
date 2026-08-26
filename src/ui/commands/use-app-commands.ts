@@ -13,7 +13,6 @@ import {
 import {
   inspectCurrentGcodeAction,
   openGcodeInspectorAction,
-  saveGcodeAction,
   type GcodeActionDeps,
 } from './gcode-command-actions';
 import { connectOptionsForDevice } from './connect-options';
@@ -25,6 +24,8 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
+import { projectWithCurrentJobSetup } from '../state/project-job-setup';
+import { handleUnifiedArtworkImport } from '../app/import-dispatch';
 import {
   selectedCloseableOpenFillContourCount,
   selectedOpenFillContourCount,
@@ -211,6 +212,7 @@ function fileCommandContext(
   | 'openProject'
   | 'saveProject'
   | 'saveProjectAs'
+  | 'importArtwork'
   | 'importSvg'
   | 'importDxf'
   | 'importImage'
@@ -237,6 +239,13 @@ function fileCommandContext(
     openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
     saveProject: () => saveProject(platform, useStore.getState(), pushToast, false),
     saveProjectAs: () => saveProject(platform, useStore.getState(), pushToast, true),
+    importArtwork: () =>
+      void handleUnifiedArtworkImport(platform, {
+        project: () => useStore.getState().project,
+        importSvgObject: app.importSvgObject,
+        importRasterImage: app.importRasterImage,
+        pushToast,
+      }),
     importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
     importDxf: () => void handleImportDxf(platform, app.importSvgObject, pushToast),
     importImage: callbacks.requestImportImage,
@@ -248,7 +257,7 @@ function fileCommandContext(
         pushToast,
       });
     },
-    saveGcode: () => saveGcodeAction(gcodeDeps())(),
+    saveGcode: () => useUiStore.getState().openGcodeSaveDialog(),
     openGcodePreview: () => openGcodeInspectorAction(gcodeDeps())(),
     inspectCurrentGcode: () => inspectCurrentGcodeAction(gcodeDeps())(),
   };
@@ -383,7 +392,8 @@ function saveProject(
   void handleSaveProject(
     {
       platform,
-      project: app.project,
+      project: projectWithCurrentJobSetup(app),
+      expectedProject: app.project,
       savedName: app.savedName,
       lastSaveTarget: app.lastSaveTarget,
       markSaved: app.markSaved,

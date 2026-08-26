@@ -10,6 +10,7 @@ import {
 import { useStore } from '../state';
 import { SelectedImageAdjustments } from './SelectedImageAdjustments';
 import { SelectedOperationInspector } from './SelectedOperationInspector';
+import { SelectedSourceReimportControl } from './SelectedSourceReimportControl';
 import {
   isParametricShapeObject,
   SelectedShapeGeometryFields,
@@ -97,6 +98,11 @@ function ArtworkPropertiesInspector(props: {
       {props.isCncMachine ? null : (
         <PowerScaleInput objects={context.objects} selectionActive={context.selectionActive} />
       )}
+      <SelectedSourceReimportControl
+        object={
+          context.selectionActive && context.objects.length === 1 ? context.primaryObject : null
+        }
+      />
       <SelectedOperationInspector
         objects={context.objects}
         selectionActive={context.selectionActive}
@@ -179,9 +185,10 @@ function PowerScaleInput(props: {
 }): JSX.Element {
   const setObjectsPowerScale = useStore((s) => s.setObjectsPowerScale);
   const objectIds = props.objects.map((object) => object.id);
-  const value = commonPowerScale(props.objects);
+  const commonValue = commonPowerScale(props.objects);
+  const mixed = commonValue === null;
   const debounced = useDebouncedCommit<number>({
-    value,
+    value: commonValue ?? DEFAULT_POWER_SCALE_PERCENT,
     commit: (powerScale) => setObjectsPowerScale(objectIds, powerScale),
     parse: (input) => clampPowerScale(Number(input)),
   });
@@ -194,7 +201,13 @@ function PowerScaleInput(props: {
           min={MIN_POWER_SCALE_PERCENT}
           max={MAX_POWER_SCALE_PERCENT}
           step={1}
-          value={debounced.displayValue}
+          value={
+            mixed && debounced.displayValue === String(DEFAULT_POWER_SCALE_PERCENT)
+              ? ''
+              : debounced.displayValue
+          }
+          placeholder={mixed ? 'Mixed' : undefined}
+          data-mixed={mixed ? 'true' : undefined}
           onChange={debounced.onChange}
           onBlur={debounced.onBlur}
           aria-label={`Power scale for ${props.selectionActive ? 'selected objects' : 'inspected artwork'}`}
@@ -250,11 +263,11 @@ function selectedSceneObjects(
   return objects.filter((object) => ids.has(object.id));
 }
 
-function commonPowerScale(objects: ReadonlyArray<SceneObject>): number {
+function commonPowerScale(objects: ReadonlyArray<SceneObject>): number | null {
   const first = objects[0]?.powerScale ?? DEFAULT_POWER_SCALE_PERCENT;
   return objects.every((object) => (object.powerScale ?? DEFAULT_POWER_SCALE_PERCENT) === first)
     ? first
-    : DEFAULT_POWER_SCALE_PERCENT;
+    : null;
 }
 
 function clampPowerScale(value: number): number {

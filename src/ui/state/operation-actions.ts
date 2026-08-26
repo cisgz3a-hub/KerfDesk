@@ -12,6 +12,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { cloneLayerSubLayers } from '../../core/scene/layer';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 
 type OperationActionState = StateSlice & {
@@ -177,7 +178,7 @@ function cloneOperationForObjects(
     id: seed.operation.id,
     name: seed.operation.name,
     color: nextOperationColor(state.project.scene.layers),
-    subLayers: [],
+    subLayers: cloneLayerSubLayers(source.subLayers),
   };
   const objects = state.project.scene.objects.map((object) => {
     if (!objectIds.has(object.id)) return object;

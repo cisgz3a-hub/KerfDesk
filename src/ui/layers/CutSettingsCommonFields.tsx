@@ -78,6 +78,18 @@ export function CutSettingsCommonFields(props: {
 function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
   return (
     <>
+      <Field label="Contour entry">
+        <NumberInput
+          name="fillOverscanMm"
+          value={props.layer.fillOverscanMm}
+          min={0}
+          max={25}
+          step={0.5}
+          label="contour entry"
+          title="Shared with Fill overscan. On 4040-safe, Line contours use up to 5 mm of laser-off feed-matched entry; other profiles may not apply it."
+        />
+        <span className="lf-field-unit">mm</span>
+      </Field>
       <Field label="Kerf Offset">
         <NumberInput
           name="kerfOffsetMm"

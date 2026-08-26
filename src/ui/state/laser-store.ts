@@ -19,7 +19,7 @@ import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { MachineKind } from '../../core/scene';
 import type { SerialConnection, SerialPortIdentity } from '../../platform/types';
-import { runAutofocus } from './autofocus-action';
+import { autofocusActions } from './laser-autofocus-actions';
 import { consoleActions } from './laser-console-actions';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserControllerOperation } from './laser-controller-operation';
@@ -59,7 +59,7 @@ import type {
   SessionObservationStamp,
 } from './laser-controller-observation';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
-import { createSafeWrite, type SafeWrite } from './laser-safe-write';
+import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
 import { fireActions } from './laser-fire-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
@@ -324,61 +324,6 @@ type SetFn = (
 ) => void;
 type GetFn = () => LaserState;
 
-function autofocusActions(
-  set: SetFn,
-  get: GetFn,
-  refs: LiveRefs,
-  write: SafeWrite,
-): Pick<LaserState, 'autofocus' | 'unlockAlarm'> {
-  return {
-    autofocus: async (command) => {
-      const activeJobBlock = activeJobCommandBlockMessage(get());
-      if (activeJobBlock !== null) return { kind: 'preflight-failed', reason: activeJobBlock };
-      const motionOperationBlock = motionOperationCommandBlockMessage(get());
-      if (motionOperationBlock !== null) {
-        return { kind: 'preflight-failed', reason: motionOperationBlock };
-      }
-      if (get().autofocusBusy) {
-        return { kind: 'preflight-failed', reason: 'Auto-focus is already running.' };
-      }
-      const state = get();
-      if (
-        state.pendingUntrackedAcks > 0 ||
-        (state.pendingTransportWrites ?? 0) > 0 ||
-        refs.controllerCommand !== null ||
-        refs.controllerIdleWait !== null
-      ) {
-        return {
-          kind: 'preflight-failed',
-          reason: 'Wait for the previous controller command to finish before auto-focusing.',
-        };
-      }
-      // Auto-focus/probe is physical machine activity after Frame. Expire the
-      // one-run permit before the vendor command can move or refocus anything;
-      // returning to the same reported coordinates must not resurrect it.
-      set({ autofocusBusy: true, framedRun: null, frameVerification: null });
-      try {
-        return await runAutofocus({
-          connected: refs.connection !== null,
-          statusReport: get().statusReport,
-          command,
-          refs,
-          write,
-        });
-      } finally {
-        set({ autofocusBusy: false });
-      }
-    },
-    unlockAlarm: async () => {
-      assertNoMotionOperation(set, get);
-      const unlock = refs.driver.commands.unlock;
-      if (unlock === null) throw new Error('This controller has no unlock command.');
-      await safeWrite(set, get, `${unlock}\n`, 'unlock');
-      set({ alarmCode: null, homingState: 'unknown' });
-    },
-  };
-}
-
 function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssistEnabled'> {
   return {
     setAirAssistEnabled: async (enabled) => {
@@ -435,16 +380,6 @@ function airAssistCommandBlockMessage(state: LaserState): string | null {
     return `Machine must be Idle before toggling manual air (currently ${state.statusReport.state}).`;
   }
   return null;
-}
-
-function assertNoMotionOperation(set: SetFn, get: GetFn): void {
-  const blockedMessage = motionOperationCommandBlockMessage(get());
-  if (blockedMessage === null) return;
-  set({
-    lastWriteError: blockedMessage,
-    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
-  });
-  throw new Error(blockedMessage);
 }
 
 function detectedSettingsActions(

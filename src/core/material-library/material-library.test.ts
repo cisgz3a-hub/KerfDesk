@@ -40,6 +40,8 @@ describe('material library recipes', () => {
       fillOverscanMm: 2.5,
       fillStyle: 'offset',
       fillBidirectional: false,
+      allowUncalibratedBidirectionalScan: true,
+      bidirectionalScanOffsetMm: 0.18,
       fillCrossHatch: true,
     });
 
@@ -68,6 +70,8 @@ describe('material library recipes', () => {
       fillOverscanMm: 2.5,
       fillStyle: 'offset',
       fillBidirectional: false,
+      allowUncalibratedBidirectionalScan: true,
+      bidirectionalScanOffsetMm: 0.18,
       fillCrossHatch: true,
     });
   });
@@ -77,6 +81,9 @@ describe('material library recipes', () => {
       mode: 'image',
       ditherAlgorithm: 'atkinson',
       linesPerMm: 14,
+      imageBidirectional: false,
+      allowUncalibratedBidirectionalScan: true,
+      bidirectionalScanOffsetMm: -0.14,
       negativeImage: true,
       passThrough: true,
       dotWidthCorrectionMm: 0.06,
@@ -86,6 +93,9 @@ describe('material library recipes', () => {
       mode: 'image',
       ditherAlgorithm: 'atkinson',
       linesPerMm: 14,
+      imageBidirectional: false,
+      allowUncalibratedBidirectionalScan: true,
+      bidirectionalScanOffsetMm: -0.14,
       negativeImage: true,
       passThrough: true,
       dotWidthCorrectionMm: 0.06,
@@ -118,9 +128,12 @@ describe('material library recipes', () => {
       fillOverscanMm: 1.5,
       fillStyle: 'offset',
       fillBidirectional: false,
+      allowUncalibratedBidirectionalScan: true,
+      bidirectionalScanOffsetMm: 0.12,
       fillCrossHatch: true,
       ditherAlgorithm: 'jarvis',
       linesPerMm: 12,
+      imageBidirectional: false,
       negativeImage: true,
       passThrough: false,
       dotWidthCorrectionMm: 0.04,
@@ -133,6 +146,9 @@ describe('material library recipes', () => {
     expect(updated.color).toBe('#00ff00');
     expect(updated.visible).toBe(false);
     expect(updated.output).toBe(false);
+    expect(updated.imageBidirectional).toBe(false);
+    expect(updated.allowUncalibratedBidirectionalScan).toBe(true);
+    expect(updated.bidirectionalScanOffsetMm).toBe(0.12);
   });
 
   it('returns a normalized layer patch without session fields', () => {
@@ -198,6 +214,8 @@ describe('material library recipes', () => {
     expect(isMaterialRecipe({ ...valid, minPower: 36 })).toBe(false);
     expect(isMaterialRecipe({ ...valid, passes: 0 })).toBe(false);
     expect(isMaterialRecipe({ ...valid, airAssist: 'on' })).toBe(false);
+    expect(isMaterialRecipe({ ...valid, imageBidirectional: 'yes' })).toBe(false);
+    expect(isMaterialRecipe({ ...valid, bidirectionalScanOffsetMm: Number.NaN })).toBe(false);
     expect(isMaterialRecipe({ ...valid, linesPerMm: Number.POSITIVE_INFINITY })).toBe(false);
   });
 
@@ -239,6 +257,28 @@ describe('material library recipes', () => {
       tabsPerShape: 4,
       tabSkipInnerShapes: true,
     });
+  });
+
+  it('defaults legacy image-direction fields and clears target-local scan-offset inheritance', () => {
+    const {
+      imageBidirectional: _imageBidirectional,
+      allowUncalibratedBidirectionalScan: _allowUncalibratedBidirectionalScan,
+      bidirectionalScanOffsetMm: _bidirectionalScanOffsetMm,
+      ...legacyRecipe
+    } = captureMaterialRecipe(makeLayer({ mode: 'image' }));
+    const target = makeLayer({
+      mode: 'image',
+      imageBidirectional: false,
+      allowUncalibratedBidirectionalScan: true,
+      bidirectionalScanOffsetMm: 0.25,
+    });
+
+    expect(isMaterialRecipe(legacyRecipe)).toBe(true);
+    expect(applyMaterialRecipe(target, legacyRecipe)).toMatchObject({
+      imageBidirectional: true,
+      allowUncalibratedBidirectionalScan: false,
+    });
+    expect(applyMaterialRecipe(target, legacyRecipe).bidirectionalScanOffsetMm).toBeUndefined();
   });
 
   it('normalizes recipe numbers for safe assignment', () => {
