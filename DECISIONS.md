@@ -214,8 +214,6 @@
 | ADR-247 | 2026-07-22 | Accepted | Public MIT baseline and future-license boundary |
 | ADR-248 | 2026-07-22 | Accepted | Unsigned Windows and macOS Preview distribution |
 
----
-
 ## ADR-001 — Adopt LightBurn workflow as the product model
 
 **Status:** Accepted | **Date:** 2026-05-26
@@ -233,8 +231,6 @@ Adopt LightBurn's user-facing workflow and naming: workspace with bed dimensions
 
 ### Verification
 A LightBurn user completes Phase A's primary flow on first launch without docs.
-
----
 
 ## ADR-002 — Fully clean rewrite — no port from LF1
 
@@ -18419,5 +18415,175 @@ behavior is reconstructed on current main instead of merging that branch.
 - ADR-151, bounded Quick Nest (a separate operation and budget contract).
 - ADR-228 and ADR-232, Frame-only guard and physical Frame authority.
 - ADR-279, transient variable-text imposition that consumes Grid placement.
+
+---
+
+## ADR-308 - Relief properties exposes the persisted non-destructive gamma mapping (2026-08-28)
+
+**Status:** Accepted and implemented; deterministic state/UI evidence complete, human perceptual
+and physical qualification excluded
+
+### Context
+
+Schema-v4 canonical heightfields already persist a positive finite `mapping.curve.gamma`, qualified
+import initializes it to `1`, project loading validates it, and materialization applies the exponent
+to normalized source samples before polarity. Current main exposes polarity, input endpoints, mask
+threshold, and outside-mask meaning but lost the Gamma editor that stale PR #670 introduced before
+later component refactors.
+
+### Decision
+
+1. Selected canonical heightfields expose a unitless **Gamma** field after Polarity; legacy mesh
+   reliefs do not.
+2. Every positive finite value is retained exactly. The field has no minimum, maximum, cap, or
+   clamp. Blank, zero, negative, and non-finite drafts cannot replace the positive-finite schema
+   value and reconcile to the stored value on blur.
+3. A distinct value updates only `mapping.curve.gamma` and advances the heightfield revision once.
+   Samples, mask bytes, digest, provenance, physical dimensions, crop, aspect, input endpoints,
+   threshold, polarity, and maximum depth retain their identities and values.
+4. The editor is keyed to the selected relief and project epoch, so pending debounced input cannot
+   write into another selection or a replacement document.
+5. Preview, CAM, persistence, and output continue to use the existing materialization algorithm.
+   This decision adds no warning, confirmation, output path, Frame effect, Start effect, or guard.
+
+### Consequences
+
+- Operators can edit the already-durable gamma mapping from Relief properties without modifying
+  imported source data.
+- Very small or large positive exponents may concentrate mapped values near an endpoint; CurveDesk
+  does not silently rewrite the requested value.
+- The project remains schema v4. This control does not claim that an exponent is perceptually
+  suitable, tool-reachable, or physically qualified for a material.
+
+### Verification
+
+- State tests cover positive-finite extremes, invalid and same-value no-ops, legacy-mesh omission,
+  one revision increment, one undo entry, and source-data identity.
+- UI tests cover heightfield-only placement, absent min/max attributes, exact large-value commit,
+  invalid-draft restoration, and selection-bound cancellation.
+- Existing materialization and project round-trip tests retain the `normalized ** gamma` and durable
+  mapping contracts. Typecheck, lint, formatting, focused tests, release gates, and hosted required
+  checks remain required before merge.
+- Human perceptual comparison, reference-CAM comparison, packaged runtime interaction, controller
+  operation, air cuts, and material coupons are not established by this change.
+
+### References
+
+- ADR-291 and ADR-292, the P2R.1 mapping model and schema-v4 canonical heightfield.
+- ADR-297 through ADR-301, the adjacent selected-relief mapping and source disclosures.
+- ADR-228 and ADR-232, Frame-only ordinary Start authorization.
+
+---
+
+## ADR-309 - Finite legacy relief coordinates retain a materializable representation (2026-08-28)
+
+**Status:** Accepted and implemented; deterministic parser, persistence, and materialization
+evidence complete, physical output qualification excluded
+
+### Context
+
+Schema-v4 legacy meshes persist coordinates as finite JavaScript numbers. The runtime previously
+converted every reopened mesh and every ASCII STL to `Float32Array`. A finite coordinate above the
+Float32 range therefore became infinity before bounds and relief sampling. Extreme Z could then
+enter the Float32 max-Z grid and produce non-finite depth cells. Stale PR #686 proposed refusing
+that newly non-finite representation, but the standing Frame-only contract forbids widening a
+compile refusal without explicit prior permission.
+
+The source coordinate is valid binary64 data. Preserving it avoids both the lossy conversion and a
+new refusal.
+
+### Decision
+
+1. Ordinary persisted and ASCII meshes retain the existing compact Float32 representation when
+   every finite source coordinate fits. If and only if Float32 conversion would overflow a finite
+   coordinate, the runtime stores that mesh in a `Float64Array` instead.
+2. Binary STL remains Float32 because the format stores its vertex fields as IEEE-754 binary32.
+   ASCII parsing, streamed ASCII parsing, worker transfer, the live legacy-mesh source, manual save,
+   and reopen all support the exceptional Float64 representation. `.lf2` remains schema-v4 JSON and
+   writes the original finite number values.
+3. Mesh bounds read the typed representation without another `Math.fround` narrowing step. Normal
+   Float32-backed meshes therefore retain their established bounds and materialization behavior.
+4. When finite Z bounds exceed Float32 or their binary64 span overflows, vertices are affinely
+   normalized before max-Z accumulation and then mapped to the requested relief depth. A finite,
+   flat extreme-Z mesh keeps the established stock-top surface. No value is capped or clamped.
+5. Existing factual errors for empty geometry, flat X/Y, non-finite X/Y extent, impossible target
+   grids, invalid dimensions, and runtime allocation remain unchanged. This decision adds no
+   refusal, warning, confirmation, Frame effect, Start effect, or guard.
+
+### Consequences
+
+- A finite schema-valid or ASCII coordinate no longer becomes infinity merely because a runtime
+  cache chose Float32.
+- Only the exceptional mesh pays the Float64 storage cost. Ordinary imported and reopened meshes
+  remain Float32 and retain existing output behavior.
+- This does not make an extreme physical aspect or unallocatable grid feasible, authenticate STL
+  scale, or qualify a tool, controller, material, or finished surface.
+
+### Verification
+
+- Conversion tests pin ordinary Float32 identity, finite-overflow Float64 preservation, and
+  owner/source cache identity.
+- Parser and streamed-parser tests retain ordinary Float32 behavior and preserve a finite `1e39`
+  ASCII coordinate in Float64.
+- Persistence tests serialize Float64 without invoking its iterator and reopen the exact finite JSON
+  values.
+- Bounds and materialization tests cover `Number.MAX_VALUE` X/Z, finite output depth, normalized
+  surface parity, overflowed binary64 Z span, flat extreme Z, and all existing mesh heightmap cases.
+  Focused adjacent evidence is 73/73 green, including finite emitted G-code from the persisted
+  overflow reproduction.
+- Browser appearance, packaged Electron import, reference-CAM comparison, controller execution,
+  physical Frame, air cut, material cut, and surface quality are not established.
+
+### References
+
+- ADR-098, STL parsing and legacy mesh relief materialization.
+- ADR-289, physical-axis relief rasterization.
+- ADR-292, schema-v4 durable relief source authority.
+- ADR-228 and ADR-232, Frame-only ordinary Start authorization and refusal boundaries.
+
+---
+
+## ADR-288 Amendment 2 - Browser microtask scheduling preserves the global receiver (2026-08-28)
+
+**Status:** Accepted and implemented correction; installed-Chrome reproduction and deterministic
+unit evidence complete, packaged runtime evidence excluded
+
+### Context
+
+ADR-288 requires a closing Cut 3D dialog to dispose its OffscreenCanvas session and terminate the
+dedicated Worker. The shared runtime deferred that disposal through a dependency property containing
+the browser's bare `queueMicrotask` function. Calling the stored Web API as an object method supplied
+the dependency object as its receiver. The installed Chrome reproduced `TypeError: Illegal
+invocation` instead of queuing cleanup.
+
+### Decision
+
+1. The production dependency uses a receiver-safe wrapper that invokes `queueMicrotask(callback)`
+   as a global Web API operation. Injected schedulers retain the same callback-only contract.
+2. StrictMode lease replay and real-unmount disposal remain deferred by exactly one microtask. The
+   change does not alter rendering, CAM, preview data, output, Frame, Job Review, Start, or any guard.
+
+### Consequences
+
+- Closing Cut 3D can schedule the existing reference-counted disposal instead of throwing before
+  the cleanup callback is queued.
+- The wrapper is a testable browser-boundary seam; no fallback renderer or new lifecycle path is
+  introduced.
+
+### Verification
+
+- An installed headless Chrome invocation of
+  `({ scheduleMicrotask: queueMicrotask }).scheduleMicrotask(callback)` reproduces `TypeError:
+  Illegal invocation`.
+- `schedule-browser-microtask.test.ts` uses a receiver-sensitive scheduler to pin the wrapper call.
+- `cut3d-offscreen-worker-client.test.ts` retains StrictMode lease reuse and real-unmount Worker
+  termination coverage.
+- Typecheck, scoped lint/formatting, focused tests, release gates, and hosted required checks remain
+  required before merge. Packaged Electron, real GPU/WebGL disposal, controller operation, and
+  hardware output are not established.
+
+### References
+
+- ADR-288, globally bounded worker preparation and Cut 3D OffscreenCanvas lifecycle.
 
 ---

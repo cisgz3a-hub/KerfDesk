@@ -85,7 +85,9 @@ async function parseAsciiBlob(
   const counted = countPass.finish();
   if (!counted.sawFacet) return null;
   if (counted.error !== null) return { kind: 'error', reason: counted.error };
-  const positions = new Float32Array(counted.vertexCount * 3);
+  const positions = counted.requiresFloat64
+    ? new Float64Array(counted.vertexCount * 3)
+    : new Float32Array(counted.vertexCount * 3);
   const fillPass = createAsciiTokenPass(positions);
   await readBlobLines(blob, fillPass.pushLine, ({ bytesRead }) => {
     onProgress?.({ bytesRead: blob.size + bytesRead, totalBytes: blob.size * 2 });
@@ -99,9 +101,10 @@ type AsciiPassOutcome = {
   readonly error: string | null;
   readonly sawFacet: boolean;
   readonly vertexCount: number;
+  readonly requiresFloat64: boolean;
 };
 
-function createAsciiTokenPass(output?: Float32Array): {
+function createAsciiTokenPass(output?: Float32Array | Float64Array): {
   readonly pushLine: (line: string) => void;
   readonly finish: () => AsciiPassOutcome;
 } {
@@ -110,6 +113,7 @@ function createAsciiTokenPass(output?: Float32Array): {
   let coordinateTokens: string[] = [];
   let vertexCount = 0;
   let sawFacet = false;
+  let requiresFloat64 = false;
   let error: string | null = null;
 
   const pushToken = (token: string): void => {
@@ -120,11 +124,16 @@ function createAsciiTokenPass(output?: Float32Array): {
         const values = coordinateTokens.map((value) => Number.parseFloat(value));
         if (values.some((value) => !Number.isFinite(value))) {
           error = `Non-numeric vertex near token ${vertexToken}.`;
-        } else if (output !== undefined) {
-          const at = vertexCount * 3;
-          output[at] = values[0] as number;
-          output[at + 1] = values[1] as number;
-          output[at + 2] = values[2] as number;
+        } else {
+          if (values.some((value) => !Number.isFinite(Math.fround(value)))) {
+            requiresFloat64 = true;
+          }
+          if (output !== undefined) {
+            const at = vertexCount * 3;
+            output[at] = values[0] as number;
+            output[at + 1] = values[1] as number;
+            output[at + 2] = values[2] as number;
+          }
         }
         vertexCount += 1;
         vertexToken = null;
@@ -151,7 +160,7 @@ function createAsciiTokenPass(output?: Float32Array): {
     if (error === null && vertexCount % VERTICES_PER_FACET !== 0) {
       error = `ASCII STL has a partial facet: ${vertexCount} vertices is not a multiple of 3.`;
     }
-    return { error, sawFacet, vertexCount };
+    return { error, sawFacet, vertexCount, requiresFloat64 };
   };
   return { pushLine, finish };
 }

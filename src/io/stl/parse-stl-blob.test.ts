@@ -54,6 +54,19 @@ describe('parseStlBlob', () => {
     });
   });
 
+  it('uses a finite-preserving buffer for streamed ASCII overflow coordinates', async () => {
+    const text =
+      'solid x\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\n' +
+      'vertex 2 0 1e39\nvertex 0 3 4\nendloop\nendfacet\nendsolid x\n';
+
+    const result = await parseStlBlob(new NodeBlob([text]) as unknown as Blob);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.mesh.positions).toBeInstanceOf(Float64Array);
+    expect(Array.from(result.mesh.positions)).toEqual([0, 0, 0, 2, 0, 1e39, 0, 3, 4]);
+  });
+
   it('preserves the binary size-integrity diagnosis before allocating positions', async () => {
     const truncated = binaryStl(2).slice(0, -10);
 

@@ -57,6 +57,16 @@ describe('parseStl', () => {
     expect([...result.mesh.positions]).toEqual(TRI_A);
   });
 
+  it('preserves finite ASCII coordinates beyond the Float32 range', () => {
+    const source = [0, 0, 0, 2, 0, 1e39, 0, 1.5, 0];
+    const bytes = new TextEncoder().encode(asciiStl([source])).buffer as ArrayBuffer;
+    const result = parseStl(bytes);
+
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    expect(result.mesh.positions).toBeInstanceOf(Float64Array);
+    expect(Array.from(result.mesh.positions)).toEqual(source);
+  });
+
   it('treats a binary file whose header starts with "solid" as binary (the trap)', () => {
     const result = parseStl(binaryStl([TRI_A], 'solid but actually binary'));
     if (result.kind !== 'ok') throw new Error(result.reason);

@@ -9,7 +9,7 @@
 
 export type TriangleMesh = {
   // length = triangleCount * 9
-  readonly positions: Float32Array;
+  readonly positions: Float32Array | Float64Array;
 };
 
 export const FLOATS_PER_TRIANGLE = 9;
@@ -32,6 +32,7 @@ type MeshBoundsSource = { readonly positions: ArrayLike<number> };
 export function meshBounds(mesh: MeshBoundsSource): MeshBounds | null {
   const p = mesh.positions;
   if (p.length < FLOATS_PER_TRIANGLE) return null;
+  const retainBinary64 = p instanceof Float64Array;
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let minZ = Number.POSITIVE_INFINITY;
@@ -39,9 +40,9 @@ export function meshBounds(mesh: MeshBoundsSource): MeshBounds | null {
   let maxY = Number.NEGATIVE_INFINITY;
   let maxZ = Number.NEGATIVE_INFINITY;
   for (let i = 0; i + 2 < p.length; i += 3) {
-    const x = Math.fround(p[i] ?? 0);
-    const y = Math.fround(p[i + 1] ?? 0);
-    const z = Math.fround(p[i + 2] ?? 0);
+    const x = meshCoordinate(p[i] ?? 0, retainBinary64);
+    const y = meshCoordinate(p[i + 1] ?? 0, retainBinary64);
+    const z = meshCoordinate(p[i + 2] ?? 0, retainBinary64);
     minX = Math.min(minX, x);
     minY = Math.min(minY, y);
     minZ = Math.min(minZ, z);
@@ -50,4 +51,8 @@ export function meshBounds(mesh: MeshBoundsSource): MeshBounds | null {
     maxZ = Math.max(maxZ, z);
   }
   return { minX, minY, minZ, maxX, maxY, maxZ };
+}
+
+function meshCoordinate(value: number, retainBinary64: boolean): number {
+  return retainBinary64 ? value : Math.fround(value);
 }

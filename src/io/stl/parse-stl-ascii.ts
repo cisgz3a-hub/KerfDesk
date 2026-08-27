@@ -13,6 +13,7 @@
 // is a hard error — silently dropping geometry would carve the wrong relief.
 
 import type { TriangleMesh } from '../../core/relief';
+import { finitePreservingFloatArray } from '../../core/util';
 
 export type AsciiStlResult =
   | { readonly kind: 'ok'; readonly mesh: TriangleMesh }
@@ -50,7 +51,7 @@ export function parseAsciiStl(text: string): AsciiStlResult {
       reason: `ASCII STL has a partial facet: ${coords.length / 3} vertices is not a multiple of 3.`,
     };
   }
-  return { kind: 'ok', mesh: { positions: Float32Array.from(coords) } };
+  return { kind: 'ok', mesh: { positions: finitePreservingFloatArray(coords) } };
 }
 
 function readVertex(

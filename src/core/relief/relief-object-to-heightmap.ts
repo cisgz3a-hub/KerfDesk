@@ -1,5 +1,5 @@
 import type { ReliefObject } from '../scene';
-import { cachedFloat32Array } from '../util';
+import { cachedFinitePreservingFloatArray } from '../util';
 import {
   heightfieldToHeightmap,
   type HeightfieldHeightmapOptions,
@@ -22,7 +22,10 @@ export function reliefObjectToHeightmap(
   }
   return meshToHeightmap(
     {
-      positions: cachedFloat32Array(relief.reliefSource, relief.reliefSource.meshPositions),
+      positions: cachedFinitePreservingFloatArray(
+        relief.reliefSource,
+        relief.reliefSource.meshPositions,
+      ),
     },
     { ...options, emptyCells: relief.reliefSource.emptyCells },
   );

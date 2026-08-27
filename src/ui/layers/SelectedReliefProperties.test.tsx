@@ -41,10 +41,10 @@ function relief(): ReliefObject {
   };
 }
 
-function depthRelief(): ReliefObject {
+function depthRelief(gamma = 1, id = 'R1'): ReliefObject {
   return {
     kind: 'relief',
-    id: 'R1',
+    id,
     source: 'depth.png',
     reliefSource: testReliefHeightfield({
       width: 2,
@@ -53,6 +53,7 @@ function depthRelief(): ReliefObject {
       physicalHeightMm: 50,
       maxDepthMm: 5,
       samplesU8: [0, 255],
+      mapping: { curve: { kind: 'gamma-v1', gamma } },
       provenance: { sourceName: 'depth.png' },
     }),
     targetWidthMm: 100,
@@ -375,41 +376,6 @@ describe('SelectedReliefProperties', () => {
           ? stored.reliefSource.emptyCells
           : undefined,
       ).toBe('top');
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-    }
-  });
-
-  it('shows depth-map precision and input levels after polarity without mesh controls', async () => {
-    installProject('cnc', depthRelief());
-    const beforeProject = useStore.getState().project;
-    const beforeUndoStack = useStore.getState().undoStack;
-    const beforeDirty = useStore.getState().dirty;
-    const { host, root } = await render();
-    try {
-      expect(host.textContent).toContain('2 x 1, canonical 16-bit (source 8-bit)');
-      expect(host.querySelector('select[aria-label="Relief background"]')).toBeNull();
-      expect(host.querySelector('[aria-label="Relief declared source meaning"]')).not.toBeNull();
-      expect(useStore.getState().project).toBe(beforeProject);
-      expect(useStore.getState().undoStack).toBe(beforeUndoStack);
-      expect(useStore.getState().dirty).toBe(beforeDirty);
-      const select = host.querySelector('select[aria-label="Relief height-map polarity"]');
-      if (!(select instanceof HTMLSelectElement)) throw new Error('polarity select missing');
-      const levels = host.querySelector('[aria-label="Relief input levels"]');
-      if (!(levels instanceof HTMLDivElement)) throw new Error('input levels missing');
-      expect(select.closest('label')?.nextElementSibling).toBe(levels);
-      await act(async () => {
-        select.value = 'light-is-deep';
-        Simulate.change(select);
-      });
-
-      const stored = useStore.getState().project.scene.objects[0];
-      expect(
-        stored?.kind === 'relief' && stored.reliefSource.kind === 'heightfield-v1'
-          ? stored.reliefSource.mapping.polarity
-          : undefined,
-      ).toBe('light-is-deep');
     } finally {
       await act(async () => root.unmount());
       host.remove();

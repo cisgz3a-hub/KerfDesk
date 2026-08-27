@@ -225,19 +225,27 @@ will be updated in place as each slice lands. None of these items changes the Fr
 | Packaged native runtime | `electron-builder --win --x64 --dir --config electron-builder.preview.yml --publish never` succeeded with Electron 42.5.1. `pnpm smoke:desktop:native -- <win-unpacked\\KerfDesk.exe>` exited 0 with `NATIVE_SMOKE_OK=true`: packaged/isolated user and session data, ready-to-show, import, 4,439-byte save, `app://app/index.html`, and clean idle shutdown all passed with no recorded load or console failures. |
 | Explicitly not verified | No hardware, serial device, motion, air-cut, laser/spindle firing, calibration, material burn, independent reference-CAM, or human perceptual qualification was performed. Installer/OS-picker permissions and independent-host reproducibility remain unverified. The stable lane remains inactive. Credential rotation and provider least-scope changes were outside authorization. The native smoke covers launch/import/save/idle only. |
 
-## Current open-PR reconciliation (2026-08-27)
+## Current open-PR reconciliation (2026-08-28)
 
-This reconciliation starts from current `origin/main` `5705421a22c4de02dc1cf74feff259907df254dd`.
+This reconciliation starts from current `origin/main` `73d7fa69c3f9fe6fd1cf517cd17eb805cf1c6e8a`.
 The earlier 37-item remediation and all 24 independently confirmed third-pass findings are already
 in main through merge commits `78ea8c86309c2d7c1ff2b54d900bdddcf2d71261` (PR #699) and
 `5705421a22c4de02dc1cf74feff259907df254dd` (PR #700). The former `ab91` donor worktree is no
 longer present; retained donor trees are read-only evidence and are not integration authority.
+Point Rotation reconciliation is in main through merge commit
+`73d7fa69c3f9fe6fd1cf517cd17eb805cf1c6e8a` (PR #701). Its exact head
+`4f06f2ecb0adb9da78f1b8c6b48da21fbb2314ca` passed repository CI and the 78-test browser smoke;
+the Cloudflare preview deployment failed separately and was not treated as repository verification.
+The combined relief replacement passed the full local `pnpm release:check`: typecheck, repository
+and Electron lint, formatting, ADR/action/license policy, all 1,789 Vitest files, 33/33 release-integrity
+tests, web and Electron builds, raw and soft file-size checks, and the public-export no-growth ratchet
+(`scene` 207). Hosted exact-head checks remain pending.
 
 | PR | Current-main classification | Reconciliation status | Evidence boundary |
 |---|---|---|---|
-| #651 Point Rotation arrays | source-confirmed unique behavior, but stale branch retains a forbidden 500-placement policy cap and unrelated stacked history | reconstructed on current main under ADR-307; focused 13/13 tests, typecheck, and deterministic rosette IoU/precision/recall 1.0000 are green; hosted PR checks pending | no live-browser save/reopen or human perceptual review; no hardware relevance |
-| #670 Relief gamma mapping | source-confirmed unique UI behavior was present in earlier ancestry but is absent from current main | pending a current-main-native replacement | browser interaction and relief-render appearance remain unverified |
-| #686 Non-finite legacy relief materialization | source-confirmed Float32 overflow defect, but the proposed new refusal widens compile-integrity policy without current-chat permission | pending a representation-preserving replacement rather than the refusal | reference-CAM and material output remain unverified |
-| #687 Relief Width intent/schema v5 | unique draft representation work, dependent on #686 and carrying failing required checks | pending exact source/contract reconciliation | schema migration, project roundtrip, and UI extremes require fresh evidence |
-| #689 Mixed integration branch | duplicate/superseded history plus #651 intent | close only after legitimate #651 intent is in main | no unique branch history will be merged |
+| #651 Point Rotation arrays | source-confirmed unique behavior, but stale branch retains a forbidden 500-placement policy cap and unrelated stacked history | reconstructed without the cap under ADR-307 and merged through replacement PR #701; exact-head repository CI and 78-test browser smoke are green; deterministic rosette IoU/precision/recall is 1.0000 | no human perceptual review; no hardware relevance |
+| #670 Relief gamma mapping | source-confirmed unique UI behavior was present in earlier ancestry but is absent from current main | reconstructed under ADR-308 with an uncapped positive-finite control, exact mapping-only revision updates, keyed cancellation, focused 57/57 tests, and the combined local release gate green; hosted PR checks pending | browser interaction and relief-render appearance remain unverified |
+| #686 Non-finite legacy relief materialization | source-confirmed Float32 overflow defect, but the proposed new refusal widens compile-integrity policy without current-chat permission | replaced under ADR-309 by finite-preserving Float32/Float64 selection, exact ASCII/project persistence, and pre-raster extreme-Z normalization; focused adjacent 73/73 tests, finite G-code emission, and the combined local release gate are green; hosted PR checks pending | normal Float32 behavior is retained; reference-CAM, packaged import, and material output remain unverified |
+| #687 Relief Width intent/schema v5 plus Cut 3D cleanup | the schema-v5 Width intent is a policy/product proposal already recorded as a planned representation gap, not a current-main defect; the head commit's bare-`queueMicrotask` receiver bug is source-confirmed unique behavior | schema-v5 work remains planned and is not merged; the Cut 3D cleanup wrapper is reconstructed under ADR-288 Amendment 2, with installed-Chrome reproduction, focused tests, and the combined local release gate green; hosted PR checks pending | browser reproduction establishes the thrown scheduling call, not packaged Electron/WebGL cleanup or GPU appearance |
+| #689 Mixed integration branch | duplicate/superseded history plus #651 intent | legitimate Point Rotation intent is in main through replacement PR #701; obsolete branch is ready to close | no unique branch history will be merged |
 | #690 Mixed relief integration branch | duplicate/superseded history plus #670/#686/#687 intent | close only after legitimate relief intent is reconciled | no unique branch history will be merged |

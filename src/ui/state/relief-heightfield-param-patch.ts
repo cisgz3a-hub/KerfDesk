@@ -8,6 +8,7 @@ export type ReliefParamPatch = {
   reliefDepthMm?: number;
   emptyCells?: 'floor' | 'top';
   polarity?: 'light-is-high' | 'light-is-deep';
+  gamma?: number;
   inputLowCode?: number;
   inputHighCode?: number;
   inclusionThreshold?: number;
@@ -21,6 +22,7 @@ export function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch 
   if (positiveFinite(patch.reliefDepthMm)) out.reliefDepthMm = patch.reliefDepthMm;
   if (patch.emptyCells !== undefined) out.emptyCells = patch.emptyCells;
   if (patch.polarity !== undefined) out.polarity = patch.polarity;
+  if (positiveFinite(patch.gamma)) out.gamma = patch.gamma;
   if (isU16Code(patch.inputLowCode)) out.inputLowCode = patch.inputLowCode;
   if (isU16Code(patch.inputHighCode)) out.inputHighCode = patch.inputHighCode;
   if (isInclusionThreshold(patch.inclusionThreshold)) {
@@ -37,6 +39,7 @@ export function hasReliefPatch(patch: ReliefParamPatch): boolean {
     patch.reliefDepthMm !== undefined ||
     patch.emptyCells !== undefined ||
     patch.polarity !== undefined ||
+    patch.gamma !== undefined ||
     patch.inputLowCode !== undefined ||
     patch.inputHighCode !== undefined ||
     patch.inclusionThreshold !== undefined ||
@@ -54,6 +57,7 @@ export function isNoOpHeightfieldMappingPatch(
     patch.inputHighCode,
     patch.inclusionThreshold,
     patch.outsideMask,
+    patch.gamma,
   ].some(isDefined);
   const hasOtherPatch = [
     patch.targetWidthMm,
@@ -68,7 +72,8 @@ export function isNoOpHeightfieldMappingPatch(
     isUnchanged(patch.inputLowCode, mapping.inputLowCode) &&
     isUnchanged(patch.inputHighCode, mapping.inputHighCode) &&
     isUnchanged(patch.inclusionThreshold, mapping.inclusionThreshold) &&
-    isUnchanged(patch.outsideMask, mapping.outsideMask)
+    isUnchanged(patch.outsideMask, mapping.outsideMask) &&
+    isUnchanged(patch.gamma, mapping.curve.gamma)
   );
 }
 
@@ -101,6 +106,9 @@ export function applyHeightfieldReliefPatch(
         ...(widthResolution === undefined ? {} : { aspect: widthResolution.aspect }),
         ...(patch.reliefDepthMm === undefined ? {} : { maxDepthMm: patch.reliefDepthMm }),
         ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
+        ...(patch.gamma === undefined
+          ? {}
+          : { curve: { ...relief.reliefSource.mapping.curve, gamma: patch.gamma } }),
         ...(patch.inputLowCode === undefined ? {} : { inputLowCode: patch.inputLowCode }),
         ...(patch.inputHighCode === undefined ? {} : { inputHighCode: patch.inputHighCode }),
         ...(patch.inclusionThreshold === undefined
@@ -118,20 +126,16 @@ function mappingPatchChangesSource(
   patch: ReliefParamPatch,
 ): boolean {
   const mapping = relief.reliefSource.mapping;
-  const nextDepthMm = patch.reliefDepthMm ?? relief.reliefDepthMm;
-  const nextPolarity = patch.polarity ?? mapping.polarity;
-  const nextInputLowCode = patch.inputLowCode ?? mapping.inputLowCode;
-  const nextInputHighCode = patch.inputHighCode ?? mapping.inputHighCode;
-  const nextInclusionThreshold = patch.inclusionThreshold ?? mapping.inclusionThreshold;
-  const nextOutsideMask = patch.outsideMask ?? mapping.outsideMask;
-  return (
-    nextDepthMm !== mapping.maxDepthMm ||
-    nextPolarity !== mapping.polarity ||
-    nextInputLowCode !== mapping.inputLowCode ||
-    nextInputHighCode !== mapping.inputHighCode ||
-    nextInclusionThreshold !== mapping.inclusionThreshold ||
-    nextOutsideMask !== mapping.outsideMask
-  );
+  const comparisons: ReadonlyArray<readonly [unknown, unknown]> = [
+    [patch.reliefDepthMm ?? relief.reliefDepthMm, mapping.maxDepthMm],
+    [patch.polarity ?? mapping.polarity, mapping.polarity],
+    [patch.gamma ?? mapping.curve.gamma, mapping.curve.gamma],
+    [patch.inputLowCode ?? mapping.inputLowCode, mapping.inputLowCode],
+    [patch.inputHighCode ?? mapping.inputHighCode, mapping.inputHighCode],
+    [patch.inclusionThreshold ?? mapping.inclusionThreshold, mapping.inclusionThreshold],
+    [patch.outsideMask ?? mapping.outsideMask, mapping.outsideMask],
+  ];
+  return comparisons.some(([next, current]) => next !== current);
 }
 
 function widthPatchChangesSource(

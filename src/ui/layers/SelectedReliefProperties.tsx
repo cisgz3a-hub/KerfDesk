@@ -13,6 +13,7 @@ import type { HeightfieldReliefObject, MeshReliefObject } from '../../core/scene
 import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
 import { ReliefInputLevelsControl } from './ReliefInputLevelsControl';
+import { ReliefGammaControl } from './ReliefGammaControl';
 import { ReliefMaskOutsideMeaningControl } from './ReliefMaskOutsideMeaningControl';
 import { ReliefMaskThresholdControl } from './ReliefMaskThresholdControl';
 import { useDebouncedCommit } from './use-debounced-commit';
@@ -93,6 +94,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
       ) : (
         <>
           <PolaritySelect relief={relief} />
+          <ReliefGammaControl key={`${projectDocumentEpoch}:${relief.id}:gamma`} relief={relief} />
           <ReliefInputLevelsControl
             key={`${projectDocumentEpoch}:${relief.id}:input-levels`}
             relief={relief}
