@@ -242,9 +242,10 @@ tests, web and Electron builds, raw and soft file-size checks, and the public-ex
 (`scene` 207). Replacement PR #702 merged as
 `653e2a7963a6b67459fa8ecb9355661049afed66`; its exact head
 `b624fbc6f1a646601077a5b578662d4c81d0ad45` passed repository CI in 27m16s and the 78-test browser
-smoke in 9m15s. The separate Cloudflare preview deployment failed and no manual deployment was
-performed. Stale PRs #651, #670, #686, #687, #689, and #690 were closed only after their legitimate
-unique intent reached main. The final open-PR count is zero.
+smoke in 9m15s. Hosted Vitest reported 1,775 files passed, 14 skipped, 11,145 tests passed, and 22
+skipped. The separate Cloudflare preview deployment failed and no manual deployment was performed.
+Stale PRs #651, #670, #686, #687, #689, and #690 were closed only after their legitimate unique
+intent reached main. The final open-PR count is zero.
 
 | PR | Current-main classification | Reconciliation status | Evidence boundary |
 |---|---|---|---|
