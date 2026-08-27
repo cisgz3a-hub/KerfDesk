@@ -232,8 +232,6 @@ Adopt LightBurn's user-facing workflow and naming: workspace with bed dimensions
 ### Verification
 A LightBurn user completes Phase A's primary flow on first launch without docs.
 
----
-
 ## ADR-002 — Fully clean rewrite — no port from LF1
 
 **Status:** Accepted | **Date:** 2026-05-26
@@ -18542,5 +18540,50 @@ new refusal.
 - ADR-289, physical-axis relief rasterization.
 - ADR-292, schema-v4 durable relief source authority.
 - ADR-228 and ADR-232, Frame-only ordinary Start authorization and refusal boundaries.
+
+---
+
+## ADR-288 Amendment 2 - Browser microtask scheduling preserves the global receiver (2026-08-28)
+
+**Status:** Accepted and implemented correction; installed-Chrome reproduction and deterministic
+unit evidence complete, packaged runtime evidence excluded
+
+### Context
+
+ADR-288 requires a closing Cut 3D dialog to dispose its OffscreenCanvas session and terminate the
+dedicated Worker. The shared runtime deferred that disposal through a dependency property containing
+the browser's bare `queueMicrotask` function. Calling the stored Web API as an object method supplied
+the dependency object as its receiver. The installed Chrome reproduced `TypeError: Illegal
+invocation` instead of queuing cleanup.
+
+### Decision
+
+1. The production dependency uses a receiver-safe wrapper that invokes `queueMicrotask(callback)`
+   as a global Web API operation. Injected schedulers retain the same callback-only contract.
+2. StrictMode lease replay and real-unmount disposal remain deferred by exactly one microtask. The
+   change does not alter rendering, CAM, preview data, output, Frame, Job Review, Start, or any guard.
+
+### Consequences
+
+- Closing Cut 3D can schedule the existing reference-counted disposal instead of throwing before
+  the cleanup callback is queued.
+- The wrapper is a testable browser-boundary seam; no fallback renderer or new lifecycle path is
+  introduced.
+
+### Verification
+
+- An installed headless Chrome invocation of
+  `({ scheduleMicrotask: queueMicrotask }).scheduleMicrotask(callback)` reproduces `TypeError:
+  Illegal invocation`.
+- `schedule-browser-microtask.test.ts` uses a receiver-sensitive scheduler to pin the wrapper call.
+- `cut3d-offscreen-worker-client.test.ts` retains StrictMode lease reuse and real-unmount Worker
+  termination coverage.
+- Typecheck, scoped lint/formatting, focused tests, release gates, and hosted required checks remain
+  required before merge. Packaged Electron, real GPU/WebGL disposal, controller operation, and
+  hardware output are not established.
+
+### References
+
+- ADR-288, globally bounded worker preparation and Cut 3D OffscreenCanvas lifecycle.
 
 ---
