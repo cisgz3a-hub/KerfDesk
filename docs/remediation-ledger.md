@@ -225,9 +225,9 @@ will be updated in place as each slice lands. None of these items changes the Fr
 | Packaged native runtime | `electron-builder --win --x64 --dir --config electron-builder.preview.yml --publish never` succeeded with Electron 42.5.1. `pnpm smoke:desktop:native -- <win-unpacked\\KerfDesk.exe>` exited 0 with `NATIVE_SMOKE_OK=true`: packaged/isolated user and session data, ready-to-show, import, 4,439-byte save, `app://app/index.html`, and clean idle shutdown all passed with no recorded load or console failures. |
 | Explicitly not verified | No hardware, serial device, motion, air-cut, laser/spindle firing, calibration, material burn, independent reference-CAM, or human perceptual qualification was performed. Installer/OS-picker permissions and independent-host reproducibility remain unverified. The stable lane remains inactive. Credential rotation and provider least-scope changes were outside authorization. The native smoke covers launch/import/save/idle only. |
 
-## Current open-PR reconciliation (2026-08-28)
+## Final open-PR reconciliation (2026-08-28)
 
-This reconciliation starts from current `origin/main` `73d7fa69c3f9fe6fd1cf517cd17eb805cf1c6e8a`.
+This reconciliation ends at current `origin/main` `653e2a7963a6b67459fa8ecb9355661049afed66`.
 The earlier 37-item remediation and all 24 independently confirmed third-pass findings are already
 in main through merge commits `78ea8c86309c2d7c1ff2b54d900bdddcf2d71261` (PR #699) and
 `5705421a22c4de02dc1cf74feff259907df254dd` (PR #700). The former `ab91` donor worktree is no
@@ -239,13 +239,19 @@ the Cloudflare preview deployment failed separately and was not treated as repos
 The combined relief replacement passed the full local `pnpm release:check`: typecheck, repository
 and Electron lint, formatting, ADR/action/license policy, all 1,789 Vitest files, 33/33 release-integrity
 tests, web and Electron builds, raw and soft file-size checks, and the public-export no-growth ratchet
-(`scene` 207). Hosted exact-head checks remain pending.
+(`scene` 207). Replacement PR #702 merged as
+`653e2a7963a6b67459fa8ecb9355661049afed66`; its exact head
+`b624fbc6f1a646601077a5b578662d4c81d0ad45` passed repository CI in 27m16s and the 78-test browser
+smoke in 9m15s. Hosted Vitest reported 1,775 files passed, 14 skipped, 11,145 tests passed, and 22
+skipped. The separate Cloudflare preview deployment failed and no manual deployment was performed.
+Stale PRs #651, #670, #686, #687, #689, and #690 were closed only after their legitimate unique
+intent reached main. The final open-PR count is zero.
 
 | PR | Current-main classification | Reconciliation status | Evidence boundary |
 |---|---|---|---|
-| #651 Point Rotation arrays | source-confirmed unique behavior, but stale branch retains a forbidden 500-placement policy cap and unrelated stacked history | reconstructed without the cap under ADR-307 and merged through replacement PR #701; exact-head repository CI and 78-test browser smoke are green; deterministic rosette IoU/precision/recall is 1.0000 | no human perceptual review; no hardware relevance |
-| #670 Relief gamma mapping | source-confirmed unique UI behavior was present in earlier ancestry but is absent from current main | reconstructed under ADR-308 with an uncapped positive-finite control, exact mapping-only revision updates, keyed cancellation, focused 57/57 tests, and the combined local release gate green; hosted PR checks pending | browser interaction and relief-render appearance remain unverified |
-| #686 Non-finite legacy relief materialization | source-confirmed Float32 overflow defect, but the proposed new refusal widens compile-integrity policy without current-chat permission | replaced under ADR-309 by finite-preserving Float32/Float64 selection, exact ASCII/project persistence, and pre-raster extreme-Z normalization; focused adjacent 73/73 tests, finite G-code emission, and the combined local release gate are green; hosted PR checks pending | normal Float32 behavior is retained; reference-CAM, packaged import, and material output remain unverified |
-| #687 Relief Width intent/schema v5 plus Cut 3D cleanup | the schema-v5 Width intent is a policy/product proposal already recorded as a planned representation gap, not a current-main defect; the head commit's bare-`queueMicrotask` receiver bug is source-confirmed unique behavior | schema-v5 work remains planned and is not merged; the Cut 3D cleanup wrapper is reconstructed under ADR-288 Amendment 2, with installed-Chrome reproduction, focused tests, and the combined local release gate green; hosted PR checks pending | browser reproduction establishes the thrown scheduling call, not packaged Electron/WebGL cleanup or GPU appearance |
-| #689 Mixed integration branch | duplicate/superseded history plus #651 intent | legitimate Point Rotation intent is in main through replacement PR #701; obsolete branch is ready to close | no unique branch history will be merged |
-| #690 Mixed relief integration branch | duplicate/superseded history plus #670/#686/#687 intent | close only after legitimate relief intent is reconciled | no unique branch history will be merged |
+| #651 Point Rotation arrays | source-confirmed unique behavior, but stale branch retains a forbidden 500-placement policy cap and unrelated stacked history | reconstructed without the cap under ADR-307, merged through replacement PR #701, then closed as superseded; exact-head repository CI and 78-test browser smoke are green; deterministic rosette IoU/precision/recall is 1.0000 | no human perceptual review; no hardware relevance |
+| #670 Relief gamma mapping | source-confirmed unique UI behavior was present in earlier ancestry but is absent from the pre-reconciliation main | reconstructed under ADR-308 with an uncapped positive-finite control, exact mapping-only revision updates, keyed cancellation, and focused 57/57 tests; merged through replacement PR #702, then closed as superseded | browser interaction and relief-render appearance remain unverified |
+| #686 Non-finite legacy relief materialization | source-confirmed Float32 overflow defect, but the proposed new refusal widens compile-integrity policy without current-chat permission | replaced under ADR-309 by finite-preserving Float32/Float64 selection, exact ASCII/project persistence, and pre-raster extreme-Z normalization; focused adjacent 73/73 tests and finite G-code emission are green; merged through PR #702, then closed as superseded | normal Float32 behavior is retained; reference-CAM, packaged import, and material output remain unverified |
+| #687 Relief Width intent/schema v5 plus Cut 3D cleanup | the schema-v5 Width intent is a policy/product proposal already recorded as a planned representation gap, not a current-main defect; the head commit's bare-`queueMicrotask` receiver bug is source-confirmed unique behavior | schema-v5 work remains planned and is not merged; the Cut 3D cleanup wrapper merged through PR #702 under ADR-288 Amendment 2 after installed-Chrome reproduction and focused tests; stale draft closed as superseded | browser reproduction establishes the thrown scheduling call, not packaged Electron/WebGL cleanup or GPU appearance |
+| #689 Mixed integration branch | duplicate/superseded history plus #651 intent | legitimate Point Rotation intent merged through replacement PR #701; mixed branch closed as superseded | no unique branch history was merged |
+| #690 Mixed relief integration branch | duplicate/superseded history plus #670/#686/#687 intent | legitimate relief intent merged through replacement PR #702; mixed branch closed as superseded | no unique branch history was merged |
