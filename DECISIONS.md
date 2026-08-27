@@ -14796,9 +14796,10 @@ sources and barcode/QR generation remain deferred.
 - The full feature needs policy-matched artifact advancement and recovery tests before release. A
   visual grid alone is incomplete because it could silently skip or double-consume production
   records.
-- The existing grid array generator currently yields one through 500 placements. That inherited
-  behavior does not establish acceptable interactive performance; async materialization and a
-  measured 500-placement pressure fixture are still required. Imposition adds no second size rule.
+- ADR-307 removes the inherited 500-placement policy cap, so Grid materializes every valid
+  requested placement. That does not establish acceptable interactive performance for extreme
+  counts; async materialization and measured pressure fixtures remain future work. Imposition adds
+  no second size rule.
 
 ### Verification
 
@@ -18352,5 +18353,71 @@ or every positive-finite operator intent.
 - ADR-292 Amendments 2 and 4, canonical Width resolution and exact bounded heightfield rebasing.
 - ADR-304, exact-factor field-geometry disclosure and native planning representation; Amendment 5
   supersedes only its legacy-mesh Width-tooltip-preservation statement.
+
+---
+
+## ADR-307 - Point Rotation is transient and array placement has no policy count cap (2026-08-27)
+
+**Status:** Accepted and implemented; software geometry/dialog/perceptual fixtures verified,
+live-browser save/reopen and hardware evidence excluded
+
+### Context
+
+The existing Array command materialized Grid and Circular placements as ordinary scene objects in
+one undoable mutation. It had no Point Rotation mode, and its core silently truncated otherwise
+valid requested Grid/Circular results to 500 placements. The truncation was a policy cap under
+CLAUDE.md rule 7 and ADR-228, not a compile-integrity or transport fact.
+
+Point Rotation needs one explicit contract for count, endpoint distribution, multi-object pivot,
+identity, persistence, and downstream output authority. The stale PR #651 supplied useful tests and
+editor intent but retained the forbidden cap and was stacked on unrelated history, so its unique
+behavior is reconstructed on current main instead of merging that branch.
+
+### Decision
+
+1. `PointRotationArraySpec` is a transient `ArraySpec` arm with `count` and signed
+   `totalAngleDeg`. The project stores only the resulting ordinary scene objects.
+2. Count includes the original. Instance `i` uses `i * totalAngleDeg / count`; four over 360 degrees
+   are 0, 90, 180, and 270 degrees. Negative and partial totals use the same exclusive endpoint.
+3. The pivot is the transformed combined selection-bounds center. Every selected object rotates
+   around that shared scene-space point, and its existing rotation composes with the placement.
+4. The first instance retains original object/group identities. Later objects and complete copied
+   groups receive fresh IDs. Apply selects the result, clears redo, marks dirty, and records one undo.
+5. Grid, Circular, and Point Rotation materialize every valid requested placement. The former
+   500-copy cap and its public constant are removed; no replacement cap, confirmation, or warning is
+   introduced.
+6. The Array dialog exposes Grid, Point Rotation, and Circular tabs. Point Rotation shows
+   **Copies (includes original)** and **Total angle (deg)**. Cancel/Escape retain the existing
+   no-mutation close path.
+7. Preview, estimate, project save, output preparation, Frame, and Start consume the resulting
+   ordinary scene objects through the existing exact-artifact path. Frame remains the only ordinary
+   Start guard; this decision changes no machine, preflight, or emitter policy.
+
+### Consequences
+
+- Operators can create rosettes and rigid multi-object rotational patterns without translating the
+  source onto a ring or overlaying a duplicate 360-degree endpoint.
+- Large valid arrays are no longer silently rewritten. Their memory and interaction cost follows the
+  operator's requested document size; this ADR does not claim a performance budget for extreme
+  counts.
+- Reopening a saved project preserves materialized objects, not editable generator settings.
+
+### Verification
+
+- Placement tests cover full, negative, partial, identity-only, Grid, Circular, malformed direct
+  calls, and a 501-copy regression proving the policy cap is absent.
+- State tests cover rigid grouped rotation, fresh object/group IDs, source-rotation composition, and
+  a single undo action. Dialog tests cover the third tab, signed-angle submission, and cancellation.
+- An independently constructed eight-arrow mask must match production placement at IoU, precision,
+  and recall 1.0000. This is deterministic raster evidence, not a live-browser appearance claim.
+- Typecheck, lint, Electron lint, formatting, focused tests, repository release checks, and hosted
+  required checks remain required before merge. No hardware evidence is relevant to this
+  editor-only transform.
+
+### References
+
+- ADR-151, bounded Quick Nest (a separate operation and budget contract).
+- ADR-228 and ADR-232, Frame-only guard and physical Frame authority.
+- ADR-279, transient variable-text imposition that consumes Grid placement.
 
 ---

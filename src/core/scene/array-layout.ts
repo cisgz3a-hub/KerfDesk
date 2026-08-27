@@ -1,6 +1,4 @@
-import type { Bounds } from './scene-object';
-
-export const MAX_ARRAY_COPIES = 500;
+import { assertNever, type Bounds } from './scene-object';
 
 export type GridArraySpec = {
   readonly kind: 'grid';
@@ -20,28 +18,41 @@ export type CircularArraySpec = {
   readonly rotateCopies: boolean;
 };
 
-export type ArraySpec = GridArraySpec | CircularArraySpec;
+export type PointRotationArraySpec = {
+  readonly kind: 'point-rotation';
+  readonly count: number;
+  readonly totalAngleDeg: number;
+};
+
+export type ArraySpec = GridArraySpec | CircularArraySpec | PointRotationArraySpec;
 
 export type ArrayPlacement = {
   readonly dx: number;
   readonly dy: number;
   readonly rotationDeg: number;
-  // Scene-space point the copy must rotate ABOUT — its destination ring point.
-  // applyTransform rotates about the object's local origin, so a caller that
-  // only adds rotationDeg swings the copy off the ring; rotating its origin
-  // about this pivot keeps the copy centred where dx/dy put it. Present only
-  // when rotationDeg is non-zero.
+  // Scene-space point the copy rotates about. Circular arrays use the
+  // destination ring point; Point Rotation uses the combined selection centre.
+  // Present only when rotationDeg is non-zero.
   readonly pivot?: { readonly x: number; readonly y: number };
 };
 
 export function arrayPlacements(bounds: Bounds, spec: ArraySpec): ReadonlyArray<ArrayPlacement> {
-  return spec.kind === 'grid' ? gridPlacements(bounds, spec) : circularPlacements(bounds, spec);
+  switch (spec.kind) {
+    case 'grid':
+      return gridPlacements(bounds, spec);
+    case 'circular':
+      return circularPlacements(bounds, spec);
+    case 'point-rotation':
+      return pointRotationPlacements(bounds, spec);
+    default:
+      return assertNever(spec, 'ArraySpec');
+  }
 }
 
 function gridPlacements(bounds: Bounds, spec: GridArraySpec): ReadonlyArray<ArrayPlacement> {
   const rows = positiveCount(spec.rows);
   const columns = positiveCount(spec.columns);
-  const copyCount = Math.min(MAX_ARRAY_COPIES, rows * columns);
+  const copyCount = rows * columns;
   const stepX = span(bounds.minX, bounds.maxX) + finiteNonNegative(spec.spacingX);
   const stepY = span(bounds.minY, bounds.maxY) + finiteNonNegative(spec.spacingY);
   const placements: ArrayPlacement[] = [];
@@ -59,7 +70,7 @@ function circularPlacements(
   bounds: Bounds,
   spec: CircularArraySpec,
 ): ReadonlyArray<ArrayPlacement> {
-  const count = Math.min(MAX_ARRAY_COPIES, positiveCount(spec.count));
+  const count = positiveCount(spec.count);
   const radius = finiteNonNegative(spec.radius);
   const sourceCenter = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
   const start = finite(spec.startAngleDeg) * (Math.PI / 180);
@@ -75,6 +86,27 @@ function circularPlacements(
       dy: target.y - sourceCenter.y,
       rotationDeg: spec.rotateCopies ? angleDeg + 90 : 0,
       ...(spec.rotateCopies ? { pivot: target } : {}),
+    };
+  });
+}
+
+function pointRotationPlacements(
+  bounds: Bounds,
+  spec: PointRotationArraySpec,
+): ReadonlyArray<ArrayPlacement> {
+  const count = positiveCount(spec.count);
+  const pivot = {
+    x: (finite(bounds.minX) + finite(bounds.maxX)) / 2,
+    y: (finite(bounds.minY) + finite(bounds.maxY)) / 2,
+  };
+  const stepDeg = finite(spec.totalAngleDeg) / count;
+  return Array.from({ length: count }, (_, index) => {
+    const rotationDeg = index === 0 ? 0 : index * stepDeg;
+    return {
+      dx: 0,
+      dy: 0,
+      rotationDeg,
+      ...(rotationDeg === 0 ? {} : { pivot }),
     };
   });
 }

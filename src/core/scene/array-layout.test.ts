@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_ARRAY_COPIES, arrayPlacements } from './array-layout';
+import { arrayPlacements } from './array-layout';
 
 const bounds = { minX: 10, minY: 20, maxX: 30, maxY: 30 };
 
@@ -36,15 +36,51 @@ describe('arrayPlacements', () => {
     expect(placements[1]?.dy).toBeCloseTo(95);
   });
 
-  it('clamps pathological counts and non-finite inputs', () => {
+  it('rotates copies in place over a full turn without duplicating the endpoint', () => {
+    expect(
+      arrayPlacements(bounds, { kind: 'point-rotation', count: 4, totalAngleDeg: 360 }),
+    ).toEqual([
+      { dx: 0, dy: 0, rotationDeg: 0 },
+      { dx: 0, dy: 0, rotationDeg: 90, pivot: { x: 20, y: 25 } },
+      { dx: 0, dy: 0, rotationDeg: 180, pivot: { x: 20, y: 25 } },
+      { dx: 0, dy: 0, rotationDeg: 270, pivot: { x: 20, y: 25 } },
+    ]);
+  });
+
+  it('supports a signed partial point rotation and an identity-only count', () => {
+    expect(
+      arrayPlacements(bounds, { kind: 'point-rotation', count: 4, totalAngleDeg: -180 }).map(
+        (placement) => placement.rotationDeg,
+      ),
+    ).toEqual([0, -45, -90, -135]);
+    expect(
+      arrayPlacements(bounds, { kind: 'point-rotation', count: 1, totalAngleDeg: 360 }),
+    ).toEqual([{ dx: 0, dy: 0, rotationDeg: 0 }]);
+  });
+
+  it('materializes every requested placement without a policy cap', () => {
+    expect(
+      arrayPlacements(bounds, {
+        kind: 'circular',
+        count: 501,
+        centerX: 100,
+        centerY: 100,
+        radius: 20,
+        startAngleDeg: 0,
+        rotateCopies: false,
+      }),
+    ).toHaveLength(501);
+  });
+
+  it('normalizes malformed direct-call inputs without fabricating non-finite placements', () => {
     const placements = arrayPlacements(bounds, {
       kind: 'grid',
       rows: Number.POSITIVE_INFINITY,
-      columns: 10000,
+      columns: 3,
       spacingX: Number.NaN,
       spacingY: -2,
     });
-    expect(placements).toHaveLength(MAX_ARRAY_COPIES);
+    expect(placements).toHaveLength(3);
     expect(placements.every((placement) => Number.isFinite(placement.dx))).toBe(true);
   });
 });

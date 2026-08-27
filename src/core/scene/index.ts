@@ -165,7 +165,6 @@ export {
   type TileOffset,
 } from './tile-into-region';
 export {
-  MAX_ARRAY_COPIES,
   arrayPlacements,
   type ArrayPlacement,
   type ArraySpec,
