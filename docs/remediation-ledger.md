@@ -224,3 +224,20 @@ will be updated in place as each slice lands. None of these items changes the Fr
 | Authoritative wrapper | The final local `pnpm release:check` attempt completed all tests, release-integrity checks, and builds, then found unintended barrel-export growth (`scene` 209 vs 208; `job` 88 vs 85). That integration-only issue was corrected with direct imports. The affected tests, typecheck, lint, format, both builds, file-size checks, and the export ratchet then all passed independently. An exact post-fix wrapper rerun is deferred to hosted PR CI rather than claiming the earlier terminal result was green. |
 | Packaged native runtime | `electron-builder --win --x64 --dir --config electron-builder.preview.yml --publish never` succeeded with Electron 42.5.1. `pnpm smoke:desktop:native -- <win-unpacked\\KerfDesk.exe>` exited 0 with `NATIVE_SMOKE_OK=true`: packaged/isolated user and session data, ready-to-show, import, 4,439-byte save, `app://app/index.html`, and clean idle shutdown all passed with no recorded load or console failures. |
 | Explicitly not verified | No hardware, serial device, motion, air-cut, laser/spindle firing, calibration, material burn, independent reference-CAM, or human perceptual qualification was performed. Installer/OS-picker permissions and independent-host reproducibility remain unverified. The stable lane remains inactive. Credential rotation and provider least-scope changes were outside authorization. The native smoke covers launch/import/save/idle only. |
+
+## Current open-PR reconciliation (2026-08-27)
+
+This reconciliation starts from current `origin/main` `5705421a22c4de02dc1cf74feff259907df254dd`.
+The earlier 37-item remediation and all 24 independently confirmed third-pass findings are already
+in main through merge commits `78ea8c86309c2d7c1ff2b54d900bdddcf2d71261` (PR #699) and
+`5705421a22c4de02dc1cf74feff259907df254dd` (PR #700). The former `ab91` donor worktree is no
+longer present; retained donor trees are read-only evidence and are not integration authority.
+
+| PR | Current-main classification | Reconciliation status | Evidence boundary |
+|---|---|---|---|
+| #651 Point Rotation arrays | source-confirmed unique behavior, but stale branch retains a forbidden 500-placement policy cap and unrelated stacked history | reconstructed on current main under ADR-307; focused 13/13 tests, typecheck, and deterministic rosette IoU/precision/recall 1.0000 are green; hosted PR checks pending | no live-browser save/reopen or human perceptual review; no hardware relevance |
+| #670 Relief gamma mapping | source-confirmed unique UI behavior was present in earlier ancestry but is absent from current main | pending a current-main-native replacement | browser interaction and relief-render appearance remain unverified |
+| #686 Non-finite legacy relief materialization | source-confirmed Float32 overflow defect, but the proposed new refusal widens compile-integrity policy without current-chat permission | pending a representation-preserving replacement rather than the refusal | reference-CAM and material output remain unverified |
+| #687 Relief Width intent/schema v5 | unique draft representation work, dependent on #686 and carrying failing required checks | pending exact source/contract reconciliation | schema migration, project roundtrip, and UI extremes require fresh evidence |
+| #689 Mixed integration branch | duplicate/superseded history plus #651 intent | close only after legitimate #651 intent is in main | no unique branch history will be merged |
+| #690 Mixed relief integration branch | duplicate/superseded history plus #670/#686/#687 intent | close only after legitimate relief intent is reconciled | no unique branch history will be merged |

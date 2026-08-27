@@ -263,6 +263,25 @@ Identical to F-A3 except:
 
 ---
 
+### F-A6a. Array selected artwork — grid, point rotation, circular (ADR-307)
+
+1. Select one or more visible, unlocked artwork objects and choose **Arrange → Array...**.
+2. Choose **Grid**, **Point Rotation**, or **Circular**. Grid and Circular retain their existing
+   placement fields; every valid requested placement is materialized without a policy count cap.
+3. For **Point Rotation**, enter **Copies (includes original)** and **Total angle (deg)**. The original
+   selection is the zero-degree instance. Instance `i` rotates by `i * total angle / copies`, so a
+   360-degree array stops before a duplicate endpoint.
+4. Negative totals reverse direction. Partial totals use the same exclusive-endpoint distribution.
+5. Point Rotation uses the transformed combined selection center as one rigid pivot. Original IDs
+   remain on the first instance; later objects and copied complete groups receive fresh IDs.
+6. **Create array** commits one undo entry and selects all instances. **Cancel** or Escape leaves the
+   project unchanged.
+7. Array settings remain transient. Preview, save, compilation, Frame, and Start consume the
+   resulting ordinary scene objects through the existing exact-artifact path. This mode creates no
+   new output path or guard.
+
+---
+
 ### F-A7. Artwork Operations panel
 
 #### Layout
@@ -1748,8 +1767,8 @@ ADR-279.*
 
 - The batch sequences ordered slot indices independently of final geometry. The original grid rows,
   columns, and spacing remain available until every slot has been measured; only then are final
-  placements calculated. The existing grid layout currently returns one through 500 placements;
-  imposition adds no second size rule.
+  placements calculated. Grid layout materializes every valid requested placement without a policy
+  count cap; imposition adds no second size rule.
 - Date/time values use one captured clock for the whole batch.
 - Phase one is transient and offline. It does not add live databases, barcode/QR generation,
   camera-detected placement, persisted imposition schema, or a new machine policy gate.
