@@ -10,7 +10,7 @@ export type StlImportPreparationOptions = {
 export type PreparedStlImportResult =
   | {
       readonly kind: 'ok';
-      readonly positions: Float32Array;
+      readonly positions: Float32Array | Float64Array;
       readonly widthMm: number;
       readonly heightMm: number;
       readonly format: 'binary' | 'ascii';

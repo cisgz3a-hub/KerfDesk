@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304/305/308 plus ADR-292 Amendments 2-5 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint, mask-threshold/outside-meaning, and positive-finite gamma controls, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, existing CAM/preview, manual persistence, exact partial-edge geometry, and atomic large-project autosave/recovery substrate explicitly marked current below.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304/305/308/309 plus ADR-292 Amendments 2-5 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint, mask-threshold/outside-meaning, and positive-finite gamma controls, finite-preserving legacy-mesh import/persistence/materialization, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, existing CAM/preview, manual persistence, exact partial-edge geometry, and atomic large-project autosave/recovery substrate explicitly marked current below.
 >
 > **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
 > job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
@@ -2599,7 +2599,7 @@ F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
 F-CNC19 tiling.
 
 F-CNC46 records the shipped ADR-290 explicit height-map path. F-CNC47-F-CNC50 specify the approved
-ADR-291 expansion. Their bounded ADR-292/294/295/296/297/298/299/300/301/304/305/308 plus ADR-292 Amendments
+ADR-291 expansion. Their bounded ADR-292/294/295/296/297/298/299/300/301/304/305/308/309 plus ADR-292 Amendments
 2-5 schema, import, mapping, declared-source-meaning, recorded-source-detail, field-geometry,
 resolved-aspect-policy, canonical-Width-integrity, bounded exact Width re-factorization, and
 canonical-preview-authority plus atomic large-project autosave/recovery substrate is current where
@@ -2770,7 +2770,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    refuse Frame, Start, preview, save, or G-code emission, and the probe never
    adds a cutter move.
 
-### F-CNC7. Import an STL relief — Phase H.4
+### F-CNC7. Import an STL relief — Phase H.4 (ADR-098/309)
 
 #### Success
 1. In either machine mode, the user drags an `.stl` file onto the workspace. Both
@@ -2787,6 +2787,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    top, dark = floor. It selects, moves, and saves/loads like any object;
    `.lf2` embeds the mesh as the existing JSON number-array schema so
    projects stay self-contained and older saved projects still reopen.
+   Ordinary binary and ASCII meshes stay Float32-backed. If Float32 would turn a finite ASCII or
+   reopened coordinate into infinity, that mesh stays Float64-backed and save/reopen preserves the
+   finite JSON value. Extreme finite Z is normalized before Float32 max-height accumulation without
+   changing ordinary mesh results, adding a cap, or adding a refusal.
 4. The success toast explains in either mode that the relief stays stored while
    only CNC generates its output geometry. In CNC mode, roughing toolpaths compile
    from it starting with H.5; in laser mode, no relief toolpath is emitted. When
@@ -4242,7 +4246,7 @@ and lifts the command's CNC-only gate.)*
    and Z-zeroed (confirmed via the tool checklist item); later groups keep
    their ordinary M0 tool-change blocks.
 
-### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298/299/300/301/304/305/308; ADR-292 Amendments 2-5)
+### F-CNC46. Import an explicit top-down height map - Phase H.4 / P2R.1a (ADR-290/292/294/295/296/297/298/299/300/301/304/305/308/309; ADR-292 Amendments 2-5)
 
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This

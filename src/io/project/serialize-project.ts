@@ -21,7 +21,8 @@ function hasTypedRelief(project: Project): boolean {
     (object) =>
       object.kind === 'relief' &&
       object.reliefSource.kind === 'legacy-mesh' &&
-      object.reliefSource.meshPositions instanceof Float32Array,
+      (object.reliefSource.meshPositions instanceof Float32Array ||
+        object.reliefSource.meshPositions instanceof Float64Array),
   );
 }
 

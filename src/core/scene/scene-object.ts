@@ -421,7 +421,7 @@ type ReliefObjectCommon = ObjectPowerScale & {
 export type MeshReliefObject = ReliefObjectCommon & {
   readonly reliefSource: {
     readonly kind: 'legacy-mesh';
-    readonly meshPositions: ReadonlyArray<number> | Float32Array;
+    readonly meshPositions: ReadonlyArray<number> | Float32Array | Float64Array;
     readonly emptyCells: 'floor' | 'top';
   };
 };

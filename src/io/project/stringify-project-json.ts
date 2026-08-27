@@ -66,17 +66,18 @@ function writePreparedValue(
   if (ancestors.has(value)) throw new TypeError('Converting circular structure to JSON');
   ancestors.add(value);
   try {
-    if (value instanceof Float32Array) writeFloat32Array(writer, value, depth, ancestors);
-    else if (Array.isArray(value)) writeArray(writer, value, depth, ancestors);
+    if (value instanceof Float32Array || value instanceof Float64Array) {
+      writeFloatArray(writer, value, depth, ancestors);
+    } else if (Array.isArray(value)) writeArray(writer, value, depth, ancestors);
     else writeObject(writer, value as Record<string, unknown>, depth, ancestors);
   } finally {
     ancestors.delete(value);
   }
 }
 
-function writeFloat32Array(
+function writeFloatArray(
   writer: JsonTextWriter,
-  values: Float32Array,
+  values: Float32Array | Float64Array,
   depth: number,
   ancestors: Set<object>,
 ): void {
@@ -101,7 +102,7 @@ function writeFloat32Array(
   writer.append(']');
 }
 
-function allFinite(values: Float32Array): boolean {
+function allFinite(values: Float32Array | Float64Array): boolean {
   return values.every((value) => Number.isFinite(value));
 }
 

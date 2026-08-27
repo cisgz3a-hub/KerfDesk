@@ -214,8 +214,6 @@
 | ADR-247 | 2026-07-22 | Accepted | Public MIT baseline and future-license boundary |
 | ADR-248 | 2026-07-22 | Accepted | Unsigned Windows and macOS Preview distribution |
 
----
-
 ## ADR-001 — Adopt LightBurn workflow as the product model
 
 **Status:** Accepted | **Date:** 2026-05-26
@@ -18476,5 +18474,73 @@ later component refactors.
 - ADR-291 and ADR-292, the P2R.1 mapping model and schema-v4 canonical heightfield.
 - ADR-297 through ADR-301, the adjacent selected-relief mapping and source disclosures.
 - ADR-228 and ADR-232, Frame-only ordinary Start authorization.
+
+---
+
+## ADR-309 - Finite legacy relief coordinates retain a materializable representation (2026-08-28)
+
+**Status:** Accepted and implemented; deterministic parser, persistence, and materialization
+evidence complete, physical output qualification excluded
+
+### Context
+
+Schema-v4 legacy meshes persist coordinates as finite JavaScript numbers. The runtime previously
+converted every reopened mesh and every ASCII STL to `Float32Array`. A finite coordinate above the
+Float32 range therefore became infinity before bounds and relief sampling. Extreme Z could then
+enter the Float32 max-Z grid and produce non-finite depth cells. Stale PR #686 proposed refusing
+that newly non-finite representation, but the standing Frame-only contract forbids widening a
+compile refusal without explicit prior permission.
+
+The source coordinate is valid binary64 data. Preserving it avoids both the lossy conversion and a
+new refusal.
+
+### Decision
+
+1. Ordinary persisted and ASCII meshes retain the existing compact Float32 representation when
+   every finite source coordinate fits. If and only if Float32 conversion would overflow a finite
+   coordinate, the runtime stores that mesh in a `Float64Array` instead.
+2. Binary STL remains Float32 because the format stores its vertex fields as IEEE-754 binary32.
+   ASCII parsing, streamed ASCII parsing, worker transfer, the live legacy-mesh source, manual save,
+   and reopen all support the exceptional Float64 representation. `.lf2` remains schema-v4 JSON and
+   writes the original finite number values.
+3. Mesh bounds read the typed representation without another `Math.fround` narrowing step. Normal
+   Float32-backed meshes therefore retain their established bounds and materialization behavior.
+4. When finite Z bounds exceed Float32 or their binary64 span overflows, vertices are affinely
+   normalized before max-Z accumulation and then mapped to the requested relief depth. A finite,
+   flat extreme-Z mesh keeps the established stock-top surface. No value is capped or clamped.
+5. Existing factual errors for empty geometry, flat X/Y, non-finite X/Y extent, impossible target
+   grids, invalid dimensions, and runtime allocation remain unchanged. This decision adds no
+   refusal, warning, confirmation, Frame effect, Start effect, or guard.
+
+### Consequences
+
+- A finite schema-valid or ASCII coordinate no longer becomes infinity merely because a runtime
+  cache chose Float32.
+- Only the exceptional mesh pays the Float64 storage cost. Ordinary imported and reopened meshes
+  remain Float32 and retain existing output behavior.
+- This does not make an extreme physical aspect or unallocatable grid feasible, authenticate STL
+  scale, or qualify a tool, controller, material, or finished surface.
+
+### Verification
+
+- Conversion tests pin ordinary Float32 identity, finite-overflow Float64 preservation, and
+  owner/source cache identity.
+- Parser and streamed-parser tests retain ordinary Float32 behavior and preserve a finite `1e39`
+  ASCII coordinate in Float64.
+- Persistence tests serialize Float64 without invoking its iterator and reopen the exact finite JSON
+  values.
+- Bounds and materialization tests cover `Number.MAX_VALUE` X/Z, finite output depth, normalized
+  surface parity, overflowed binary64 Z span, flat extreme Z, and all existing mesh heightmap cases.
+  Focused adjacent evidence is 73/73 green, including finite emitted G-code from the persisted
+  overflow reproduction.
+- Browser appearance, packaged Electron import, reference-CAM comparison, controller execution,
+  physical Frame, air cut, material cut, and surface quality are not established.
+
+### References
+
+- ADR-098, STL parsing and legacy mesh relief materialization.
+- ADR-289, physical-axis relief rasterization.
+- ADR-292, schema-v4 durable relief source authority.
+- ADR-228 and ADR-232, Frame-only ordinary Start authorization and refusal boundaries.
 
 ---

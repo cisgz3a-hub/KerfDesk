@@ -49,6 +49,8 @@ const DEFAULT_RUNTIME: MeshHeightmapRuntime = {
 
 const MIN_EXTENT = 1e-9;
 
+type ZRasterMode = 'native' | 'normalized' | 'flat-normalized';
+
 export function meshToHeightmap(
   mesh: TriangleMesh,
   options: MeshHeightmapOptions,
@@ -64,6 +66,7 @@ export function meshToHeightmap(
   if (!Number.isFinite(xExtent) || !Number.isFinite(yExtent)) {
     return { kind: 'error', reason: 'Mesh bounds must be finite.' };
   }
+  const zRasterMode = resolveZRasterMode(bounds);
   const targetMetrics = targetSize(options, yExtent / xExtent);
   if (targetMetrics.kind === 'error') return targetMetrics;
   const { widthMm, heightMm } = targetMetrics;
@@ -84,12 +87,13 @@ export function meshToHeightmap(
     bounds,
     cellsPerModelUnit(grid, 'x', xExtent),
     cellsPerModelUnit(grid, 'y', yExtent),
+    zRasterMode,
   );
   const depth = allocateFloat32(runtime, cellCount);
   if (depth === null) {
     return { kind: 'error', reason: 'Relief mesh heightmap does not fit in this runtime.' };
   }
-  normalizeDepths(maxZ, depth, bounds, options);
+  normalizeDepths(maxZ, depth, bounds, options, zRasterMode);
   return {
     kind: 'ok',
     heightmap: { ...grid, depth },
@@ -178,6 +182,7 @@ function rasterizeMesh(
   bounds: NonNullable<ReturnType<typeof meshBounds>>,
   cellsPerModelX: number,
   cellsPerModelY: number,
+  zRasterMode: ZRasterMode,
 ): void {
   const p = mesh.positions;
   for (let t = 0; t + FLOATS_PER_TRIANGLE <= p.length; t += FLOATS_PER_TRIANGLE) {
@@ -185,13 +190,13 @@ function rasterizeMesh(
       target,
       ((p[t] ?? 0) - bounds.minX) * cellsPerModelX,
       ((p[t + 1] ?? 0) - bounds.minY) * cellsPerModelY,
-      p[t + 2] ?? 0,
+      rasterZ(p[t + 2] ?? 0, bounds, zRasterMode),
       ((p[t + 3] ?? 0) - bounds.minX) * cellsPerModelX,
       ((p[t + 4] ?? 0) - bounds.minY) * cellsPerModelY,
-      p[t + 5] ?? 0,
+      rasterZ(p[t + 5] ?? 0, bounds, zRasterMode),
       ((p[t + 6] ?? 0) - bounds.minX) * cellsPerModelX,
       ((p[t + 7] ?? 0) - bounds.minY) * cellsPerModelY,
-      p[t + 8] ?? 0,
+      rasterZ(p[t + 8] ?? 0, bounds, zRasterMode),
     );
   }
 }
@@ -201,12 +206,54 @@ function normalizeDepths(
   depth: Float32Array,
   bounds: NonNullable<ReturnType<typeof meshBounds>>,
   options: MeshHeightmapOptions,
+  zRasterMode: ZRasterMode,
 ): void {
   const zExtent = bounds.maxZ - bounds.minZ;
   const scale = zExtent < MIN_EXTENT ? 0 : options.reliefDepthMm / zExtent;
   const emptyDepth = (options.emptyCells ?? 'floor') === 'floor' ? -options.reliefDepthMm : 0;
   for (let i = 0; i < maxZ.length; i += 1) {
     const z = maxZ[i] ?? Number.NEGATIVE_INFINITY;
-    depth[i] = z === Number.NEGATIVE_INFINITY ? emptyDepth : (z - bounds.maxZ) * scale;
+    depth[i] = normalizedDepth(z, emptyDepth, scale, options.reliefDepthMm, bounds, zRasterMode);
   }
+}
+
+function resolveZRasterMode(bounds: NonNullable<ReturnType<typeof meshBounds>>): ZRasterMode {
+  if (!Number.isFinite(bounds.minZ) || !Number.isFinite(bounds.maxZ)) return 'native';
+  const zExtent = bounds.maxZ - bounds.minZ;
+  if (
+    Number.isFinite(Math.fround(bounds.minZ)) &&
+    Number.isFinite(Math.fround(bounds.maxZ)) &&
+    Number.isFinite(zExtent)
+  ) {
+    return 'native';
+  }
+  return zExtent < MIN_EXTENT ? 'flat-normalized' : 'normalized';
+}
+
+function rasterZ(
+  z: number,
+  bounds: NonNullable<ReturnType<typeof meshBounds>>,
+  mode: ZRasterMode,
+): number {
+  if (mode === 'native') return z;
+  if (mode === 'flat-normalized') return 0;
+  const scale = Math.max(Math.abs(bounds.minZ), Math.abs(bounds.maxZ));
+  if (scale === 0) return 0;
+  const normalizedMin = bounds.minZ / scale;
+  const normalizedSpan = bounds.maxZ / scale - normalizedMin;
+  return normalizedSpan === 0 ? 0 : (z / scale - normalizedMin) / normalizedSpan;
+}
+
+function normalizedDepth(
+  z: number,
+  emptyDepth: number,
+  nativeScale: number,
+  reliefDepthMm: number,
+  bounds: NonNullable<ReturnType<typeof meshBounds>>,
+  mode: ZRasterMode,
+): number {
+  if (z === Number.NEGATIVE_INFINITY) return emptyDepth;
+  if (mode === 'normalized') return (z - 1) * reliefDepthMm;
+  if (mode === 'flat-normalized') return 0;
+  return (z - bounds.maxZ) * nativeScale;
 }

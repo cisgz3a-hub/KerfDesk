@@ -46,21 +46,21 @@ function reliefSourceAspect(relief: ReliefObject): number {
 
 const meshAspectByPositions = new WeakMap<object, number>();
 
-function meshSourceAspect(positions: ReadonlyArray<number> | Float32Array): number {
+function meshSourceAspect(positions: ReadonlyArray<number> | Float32Array | Float64Array): number {
   const cached = meshAspectByPositions.get(positions);
   if (cached !== undefined) return cached;
 
-  // meshToHeightmap computes its bounds after the durable JSON numbers have
-  // been converted to Float32. Mirror that precision without allocating a
-  // second full mesh on the browser thread. Cache by the immutable positions
-  // array so width edits that rebuild the ReliefObject do not rescan it.
+  // meshToHeightmap keeps ordinary durable JSON numbers in Float32 but promotes
+  // the whole mesh when any finite coordinate would overflow. Mirror that
+  // precision without allocating a second full mesh on the browser thread.
+  const retainBinary64 = retainsBinary64Coordinates(positions);
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
   for (let i = 0; i + 2 < positions.length; i += 3) {
-    const x = Math.fround(positions[i] ?? 0);
-    const y = Math.fround(positions[i + 1] ?? 0);
+    const x = meshCoordinate(positions[i] ?? 0, retainBinary64);
+    const y = meshCoordinate(positions[i + 1] ?? 0, retainBinary64);
     minX = Math.min(minX, x);
     minY = Math.min(minY, y);
     maxX = Math.max(maxX, x);
@@ -78,4 +78,19 @@ function meshSourceAspect(positions: ReadonlyArray<number> | Float32Array): numb
       : 1;
   meshAspectByPositions.set(positions, aspect);
   return aspect;
+}
+
+function retainsBinary64Coordinates(
+  positions: ReadonlyArray<number> | Float32Array | Float64Array,
+): boolean {
+  if (positions instanceof Float64Array) return true;
+  if (positions instanceof Float32Array) return false;
+  for (const value of positions) {
+    if (Number.isFinite(value) && !Number.isFinite(Math.fround(value))) return true;
+  }
+  return false;
+}
+
+function meshCoordinate(value: number, retainBinary64: boolean): number {
+  return retainBinary64 ? value : Math.fround(value);
 }

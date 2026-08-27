@@ -96,6 +96,31 @@ describe('reliefPhysicalDimensions', () => {
     });
   });
 
+  it('matches finite-preserving materialization beyond the Float32 range', () => {
+    const meshPositions = [0, 0, 0, 1e39, 0, Number.MAX_VALUE, 0, 5e38, 0];
+    const relief: ReliefObject = {
+      kind: 'relief',
+      id: 'M3',
+      source: 'finite-overflow.stl',
+      targetWidthMm: 100,
+      reliefDepthMm: 5,
+      reliefSource: { kind: 'legacy-mesh', meshPositions, emptyCells: 'floor' },
+      color: '#a0522d',
+      bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
+      transform: IDENTITY_TRANSFORM,
+    };
+    const materialized = meshToHeightmap(
+      { positions: Float64Array.from(meshPositions) },
+      { targetWidthMm: 100, reliefDepthMm: 5, mmPerCell: 25 },
+    );
+    if (materialized.kind !== 'ok') throw new Error(materialized.reason);
+
+    expect(reliefPhysicalDimensions(relief)).toMatchObject({
+      widthMm: materialized.widthMm,
+      heightMm: materialized.heightMm,
+    });
+  });
+
   it('preserves the legacy zero and non-finite planning fallback', () => {
     expect(reliefPlanningScale(0)).toBe(1);
     expect(reliefPlanningScale(Number.NaN)).toBe(1);
