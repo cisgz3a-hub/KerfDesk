@@ -18421,3 +18421,60 @@ behavior is reconstructed on current main instead of merging that branch.
 - ADR-279, transient variable-text imposition that consumes Grid placement.
 
 ---
+
+## ADR-308 - Relief properties exposes the persisted non-destructive gamma mapping (2026-08-28)
+
+**Status:** Accepted and implemented; deterministic state/UI evidence complete, human perceptual
+and physical qualification excluded
+
+### Context
+
+Schema-v4 canonical heightfields already persist a positive finite `mapping.curve.gamma`, qualified
+import initializes it to `1`, project loading validates it, and materialization applies the exponent
+to normalized source samples before polarity. Current main exposes polarity, input endpoints, mask
+threshold, and outside-mask meaning but lost the Gamma editor that stale PR #670 introduced before
+later component refactors.
+
+### Decision
+
+1. Selected canonical heightfields expose a unitless **Gamma** field after Polarity; legacy mesh
+   reliefs do not.
+2. Every positive finite value is retained exactly. The field has no minimum, maximum, cap, or
+   clamp. Blank, zero, negative, and non-finite drafts cannot replace the positive-finite schema
+   value and reconcile to the stored value on blur.
+3. A distinct value updates only `mapping.curve.gamma` and advances the heightfield revision once.
+   Samples, mask bytes, digest, provenance, physical dimensions, crop, aspect, input endpoints,
+   threshold, polarity, and maximum depth retain their identities and values.
+4. The editor is keyed to the selected relief and project epoch, so pending debounced input cannot
+   write into another selection or a replacement document.
+5. Preview, CAM, persistence, and output continue to use the existing materialization algorithm.
+   This decision adds no warning, confirmation, output path, Frame effect, Start effect, or guard.
+
+### Consequences
+
+- Operators can edit the already-durable gamma mapping from Relief properties without modifying
+  imported source data.
+- Very small or large positive exponents may concentrate mapped values near an endpoint; CurveDesk
+  does not silently rewrite the requested value.
+- The project remains schema v4. This control does not claim that an exponent is perceptually
+  suitable, tool-reachable, or physically qualified for a material.
+
+### Verification
+
+- State tests cover positive-finite extremes, invalid and same-value no-ops, legacy-mesh omission,
+  one revision increment, one undo entry, and source-data identity.
+- UI tests cover heightfield-only placement, absent min/max attributes, exact large-value commit,
+  invalid-draft restoration, and selection-bound cancellation.
+- Existing materialization and project round-trip tests retain the `normalized ** gamma` and durable
+  mapping contracts. Typecheck, lint, formatting, focused tests, release gates, and hosted required
+  checks remain required before merge.
+- Human perceptual comparison, reference-CAM comparison, packaged runtime interaction, controller
+  operation, air cuts, and material coupons are not established by this change.
+
+### References
+
+- ADR-291 and ADR-292, the P2R.1 mapping model and schema-v4 canonical heightfield.
+- ADR-297 through ADR-301, the adjacent selected-relief mapping and source disclosures.
+- ADR-228 and ADR-232, Frame-only ordinary Start authorization.
+
+---

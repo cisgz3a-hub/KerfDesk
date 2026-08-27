@@ -99,6 +99,20 @@ describe('relief heightfield parameter patches', () => {
     expect(hasReliefPatch(crossed)).toBe(true);
   });
 
+  it('retains every positive finite gamma without imposing a range', () => {
+    expect(normalizeReliefPatch({ gamma: Number.MAX_VALUE })).toEqual({
+      gamma: Number.MAX_VALUE,
+    });
+    expect(hasReliefPatch({ gamma: Number.MIN_VALUE })).toBe(true);
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'drops invalid gamma %s',
+    (gamma) => {
+      expect(normalizeReliefPatch({ gamma })).toEqual({});
+    },
+  );
+
   it.each([
     -1,
     MAX_U16_CODE + 1,
@@ -140,7 +154,25 @@ describe('relief heightfield parameter patches', () => {
     expect(isNoOpHeightfieldMappingPatch(relief, { inputLowCode: 200 })).toBe(false);
     expect(isNoOpHeightfieldMappingPatch(relief, { inclusionThreshold: 128 })).toBe(true);
     expect(isNoOpHeightfieldMappingPatch(relief, { inclusionThreshold: 255 })).toBe(false);
+    expect(isNoOpHeightfieldMappingPatch(relief, { gamma: 1 })).toBe(true);
+    expect(isNoOpHeightfieldMappingPatch(relief, { gamma: 2.75 })).toBe(false);
     expect(isNoOpHeightfieldMappingPatch(meshRelief(), { inputLowCode: 200 })).toBe(true);
     expect(isNoOpHeightfieldMappingPatch(meshRelief(), { inclusionThreshold: 64 })).toBe(true);
+    expect(isNoOpHeightfieldMappingPatch(meshRelief(), { gamma: 2.75 })).toBe(true);
+  });
+
+  it('updates only gamma and the canonical revision', () => {
+    const relief = heightfieldRelief();
+    const field = relief.reliefSource;
+    const updated = applyHeightfieldReliefPatch(relief, {}, { gamma: 2.75 });
+
+    expect(updated.reliefSource).toEqual({
+      ...field,
+      mapping: { ...field.mapping, curve: { ...field.mapping.curve, gamma: 2.75 } },
+      revision: 5,
+    });
+    expect(updated.reliefSource.samplesBase64).toBe(field.samplesBase64);
+    expect(updated.reliefSource.inclusionMask).toBe(field.inclusionMask);
+    expect(updated.reliefSource.provenance).toBe(field.provenance);
   });
 });

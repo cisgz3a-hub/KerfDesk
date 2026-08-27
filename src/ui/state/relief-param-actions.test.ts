@@ -162,6 +162,43 @@ describe('setReliefParams', () => {
     expect(updated.reliefSource.revision).toBe(field.revision);
   });
 
+  it('updates gamma exactly without rebuilding imported source data', () => {
+    const field = testReliefHeightfieldFixture();
+    installHeightfieldRelief(field);
+    const before = storedRelief();
+
+    useStore.getState().setReliefParams('R1', { gamma: 123456.75 });
+
+    const updated = storedRelief();
+    expect(updated.reliefSource.kind).toBe('heightfield-v1');
+    if (updated.reliefSource.kind !== 'heightfield-v1') return;
+    expect(updated.reliefSource.mapping.curve.gamma).toBe(123456.75);
+    expect(updated.reliefSource.revision).toBe(field.revision + 1);
+    expect(updated.reliefSource.samplesBase64).toBe(field.samplesBase64);
+    expect(updated.reliefSource.inclusionMask).toBe(field.inclusionMask);
+    expect(updated.reliefSource.provenance).toBe(field.provenance);
+    expect(updated.bounds).toBe(before.bounds);
+    expect(updated.transform).toBe(before.transform);
+    expect(useStore.getState()).toMatchObject({ dirty: true });
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it('does nothing for unchanged, invalid, or legacy-mesh gamma patches', () => {
+    installHeightfieldRelief(testReliefHeightfieldFixture());
+    const beforeHeightfield = useStore.getState().project;
+    for (const gamma of [1, 0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      useStore.getState().setReliefParams('R1', { gamma });
+    }
+    expect(useStore.getState().project).toBe(beforeHeightfield);
+    expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
+
+    installReliefProject();
+    const beforeMesh = useStore.getState().project;
+    useStore.getState().setReliefParams('R1', { gamma: 2 });
+    expect(useStore.getState().project).toBe(beforeMesh);
+    expect(useStore.getState()).toMatchObject({ dirty: false, undoStack: [] });
+  });
+
   it.each([
     ['excluded', 'stock-top'],
     ['excluded', 'relief-floor'],
