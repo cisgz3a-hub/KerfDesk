@@ -1,15 +1,18 @@
 import type { JobOriginPlacement } from '../../core/job';
-import type { OutputScope, Project } from '../../core/scene';
+import type { OutputScope, Project, Vec2 } from '../../core/scene';
 import type { SimilarityTransform } from '../../core/registration';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from '../../io/gcode';
 import { estimateLiveJobFromPrepared, type LiveJobEstimate } from '../laser/live-job-estimate';
 import { buildPreviewToolpathFromPrepared } from './draw-preview';
 import { serializeExecutablePlanPreviewRoute } from './executable-plan-preview-route';
 import type { PreviewToolpath } from './preview-status';
+import { registerPreviewJobOriginOffset } from './preview-scene-frame';
 
 export type LargeJobPreparation = {
   readonly toolpath: PreviewToolpath;
   readonly estimate: LiveJobEstimate;
+  /** Clone-safe carrier restored into the process-local preview association. */
+  readonly jobOriginOffset?: Vec2;
 };
 
 export type LargeJobPreparationOptions = {
@@ -54,8 +57,12 @@ export function largeJobPreparationFromPrepared(
   const toolpath = buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
     executablePlan: true,
   });
+  const serializedToolpath = serializeExecutablePlanPreviewRoute(toolpath);
+  const jobOriginOffset = prepared.ok ? prepared.jobOriginOffset : { x: 0, y: 0 };
+  registerPreviewJobOriginOffset(serializedToolpath, jobOriginOffset);
   return {
-    toolpath: serializeExecutablePlanPreviewRoute(toolpath),
+    toolpath: serializedToolpath,
+    jobOriginOffset,
     estimate: estimateLiveJobFromPrepared(prepared, options.jobOrigin, { unbounded: true }),
   };
 }

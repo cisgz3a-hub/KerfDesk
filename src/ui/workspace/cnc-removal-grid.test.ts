@@ -120,6 +120,18 @@ function probeDepth(grid: RemovalGrid, x: number, y: number): number {
 }
 
 describe('computeCncRemovalGrid', () => {
+  it('maps physical stock into the artwork-relative frame after job placement', () => {
+    const grid = computeCncRemovalGrid(DEVICE, MACHINE, sceneToolpath(TWO_BIT_SCENE), 1, {
+      x: 150,
+      y: 0,
+    });
+
+    expect(grid).not.toBeNull();
+    expect(grid?.originX).toBeCloseTo(-150);
+    expect(grid?.widthMm).toBeCloseTo(100);
+    expect(probeRemovalGrid(grid as RemovalGrid, { x: 25, y: 25 }).kind).toBe('outside');
+  });
+
   it('discloses the interactive preview cell budget without changing the bounded grid', () => {
     const wideMachine: CncMachineConfig = {
       ...MACHINE,

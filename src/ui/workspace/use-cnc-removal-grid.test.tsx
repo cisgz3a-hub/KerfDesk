@@ -5,6 +5,7 @@ import { createProject, DEFAULT_CNC_MACHINE_CONFIG, type Project } from '../../c
 import type { RemovalGrid } from '../../core/sim';
 import type { Toolpath } from '../../core/job';
 import { useCncRemovalGrid } from './use-cnc-removal-grid';
+import { registerPreviewJobOriginOffset } from './preview-scene-frame';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -35,6 +36,7 @@ const TOOLPATH: Toolpath = {
     },
   ],
 };
+registerPreviewJobOriginOffset(TOOLPATH, { x: 150, y: 25 });
 const GRID: RemovalGrid = {
   widthCells: 1,
   heightCells: 1,
@@ -69,6 +71,9 @@ describe('useCncRemovalGrid', () => {
     workerMocks.prepare.mockResolvedValueOnce(GRID);
     await render(true);
     expect(workerMocks.prepare).toHaveBeenCalledOnce();
+    expect(workerMocks.prepare.mock.calls[0]?.[0]).toMatchObject({
+      jobOriginOffset: { x: 150, y: 25 },
+    });
     expect(observed).toBe(GRID);
   });
 

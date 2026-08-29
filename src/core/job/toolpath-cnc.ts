@@ -7,7 +7,13 @@
 
 import { circularArcLengthMm, sampleCircularArcPoints } from '../geometry/circular-arc';
 import { assertNever, type Vec2 } from '../scene';
-import { cncPassEntryDepthMm, cncPassXyPoints, type CncGroup, type CncPass } from './job';
+import {
+  cncHelicalContourPoints,
+  cncPassEntryDepthMm,
+  cncPassXyPoints,
+  type CncGroup,
+  type CncPass,
+} from './job';
 import { dist, polylineLength } from './toolpath-math';
 import type { ToolpathStep } from './toolpath-types';
 
@@ -165,6 +171,7 @@ function cutStepForPass(
         passIndex,
       };
     case 'helical-contour': {
+      const points = cncHelicalContourPoints(pass);
       const radius = Math.hypot(pass.start.x - pass.center.x, pass.start.y - pass.center.y);
       const helixLength = Math.hypot(
         Math.PI * 2 * radius * Math.max(1, Math.floor(pass.revolutions)),
@@ -177,6 +184,7 @@ function cutStepForPass(
         polyline: xy,
         length: helixLength + dist(pass.start, first) + polylineLength(pass.polyline),
         z: { from: pass.startZMm, to: pass.zMm },
+        zs: points.map((point) => point.z),
         groupId: group.layerId,
         passIndex,
       };

@@ -8,6 +8,7 @@
 // positions, so dowel pins re-index the stock physically.
 
 import { cncPassXyPoints, type CncGroup, type CncPass, type Job } from '../job';
+import { cncHelicalContourPoints } from '../job/job';
 import type { CncTiling } from '../scene';
 import type { CncTile, TiledJob } from './cnc-tile';
 import type { TiledJobsResult } from './tile-plan-result';
@@ -146,7 +147,7 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
         passes.push(clippedPath3dPass(pass, piece));
       }
     } else if (pass.kind === 'helical-contour') {
-      for (const piece of clipPointsToRect(helicalXyzPoints(pass), tile.rect, false)) {
+      for (const piece of clipPointsToRect(cncHelicalContourPoints(pass), tile.rect, false)) {
         passes.push({ kind: 'path3d', closed: false, points: piece });
       }
     } else {
@@ -188,26 +189,6 @@ function hasEntryRamp(group: CncGroup): boolean {
     group.rampEntryDeg !== undefined &&
     group.passes.some((pass) => pass.kind === 'path3d' && pass.entryRamp === true)
   );
-}
-
-function helicalXyzPoints(pass: Extract<CncPass, { readonly kind: 'helical-contour' }>): Xyz[] {
-  const circle = cncPassXyPoints(pass).slice(0, -pass.polyline.length);
-  const revolutions = Math.max(1, Math.floor(pass.revolutions));
-  const points: Xyz[] = [];
-  for (let revolution = 0; revolution < revolutions; revolution += 1) {
-    for (let index = 0; index < circle.length; index += 1) {
-      const point = circle[index];
-      if (point === undefined || (revolution > 0 && index === 0)) continue;
-      const progress = (revolution + index / Math.max(1, circle.length - 1)) / revolutions;
-      points.push({
-        x: point.x,
-        y: point.y,
-        z: pass.startZMm + (pass.zMm - pass.startZMm) * progress,
-      });
-    }
-  }
-  points.push(...pass.polyline.map((point) => ({ ...point, z: pass.zMm })));
-  return points;
 }
 
 type Xyz = { readonly x: number; readonly y: number; readonly z: number };

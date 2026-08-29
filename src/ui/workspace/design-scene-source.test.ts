@@ -124,6 +124,39 @@ const TWO_BIT_PROJECT: Project = {
 };
 
 describe('computeDesignSceneSource', () => {
+  it('maps physical stock into the relative pane frame after resolved placement', () => {
+    const prepared = prepareOutput(TWO_BIT_PROJECT, {
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      jobOrigin: {
+        startFrom: 'current-position',
+        anchor: 'front-left',
+        currentPosition: { x: 150, y: 50 },
+      },
+    });
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    const source = computeDesignSceneSourceFromPrepared(TWO_BIT_PROJECT, prepared);
+    expect(source).not.toBeNull();
+    if (source === null) return;
+    const expectedA = toSceneCoords(
+      {
+        x: STOCK.originOffset.x - prepared.jobOriginOffset.x,
+        y: STOCK.originOffset.y - prepared.jobOriginOffset.y,
+      },
+      DEVICE,
+    );
+    const expectedB = toSceneCoords(
+      {
+        x: STOCK.originOffset.x + STOCK.widthMm - prepared.jobOriginOffset.x,
+        y: STOCK.originOffset.y + STOCK.heightMm - prepared.jobOriginOffset.y,
+      },
+      DEVICE,
+    );
+
+    expect(source.grid.originX).toBeCloseTo(Math.min(expectedA.x, expectedB.x));
+    expect(source.grid.originY).toBeCloseTo(Math.min(expectedA.y, expectedB.y));
+  });
+
   it(
     'retains the request and discloses the bounded pane display resolution',
     () => {

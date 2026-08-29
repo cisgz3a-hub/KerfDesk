@@ -246,4 +246,42 @@ describe('findNoGoZoneCollisions motion path coverage', () => {
 
     expect(collisions).toEqual([]);
   });
+
+  it('expands each CNC motion by the cutter radius from its tool comment', () => {
+    const clamp = { ...zone, x: 0, y: 10, width: 20, height: 10 };
+    const sixMillimetre = findNoGoZoneCollisions(
+      ['; cnc tool: end-mill; diameter-mm: 6.000', 'G0 X0 Y8', 'G1 X20 Y8'].join('\n'),
+      [clamp],
+      bed,
+    );
+    const twoMillimetre = findNoGoZoneCollisions(
+      ['; cnc tool: end-mill; diameter-mm: 2.000', 'G0 X0 Y8', 'G1 X20 Y8'].join('\n'),
+      [clamp],
+      bed,
+    );
+
+    expect(sixMillimetre).toEqual([{ lineNumber: 3, zone: clamp, cutterRadiusMm: 3 }]);
+    expect(twoMillimetre).toEqual([]);
+  });
+
+  it('switches cutter envelopes between multi-tool sections', () => {
+    const clamp = { ...zone, x: 0, y: 10, width: 20, height: 10 };
+    const collisions = findNoGoZoneCollisions(
+      [
+        '; cnc tool: end-mill; diameter-mm: 2.000',
+        'G0 X0 Y8',
+        'G1 X20 Y8',
+        '; cnc tool: end-mill; diameter-mm: 6.000',
+        'G0 X0 Y8',
+        'G1 X20 Y8',
+      ].join('\n'),
+      [clamp],
+      bed,
+    );
+
+    expect(collisions).toEqual([
+      { lineNumber: 5, zone: clamp, cutterRadiusMm: 3 },
+      { lineNumber: 6, zone: clamp, cutterRadiusMm: 3 },
+    ]);
+  });
 });

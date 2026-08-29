@@ -1,6 +1,12 @@
 # Audit remediation ledger
 
-Implementation worktree: `C:\Users\Asus\.codex\worktrees\ab91\LaserForge-2.0`
+Historical 37-item implementation worktree:
+`C:\Users\Asus\.codex\worktrees\ab91\LaserForge-2.0` (no longer present).
+
+Current advanced-CNC remediation worktree:
+`C:\Users\Asus\.codex\worktrees\ade9\LaserForge-2.0`, branch
+`codex/remediate-advanced-cnc-audit-20260829`, based on
+`55a2438fa2b240d8a739d10c282b68519ce09a30`.
 
 Current-main integration worktree:
 `C:\Users\Asus\.codex\worktrees\remediation-37-integration\LaserForge-2.0`, branch
@@ -255,3 +261,27 @@ intent reached main. The final open-PR count is zero.
 | #687 Relief Width intent/schema v5 plus Cut 3D cleanup | the schema-v5 Width intent is a policy/product proposal already recorded as a planned representation gap, not a current-main defect; the head commit's bare-`queueMicrotask` receiver bug is source-confirmed unique behavior | schema-v5 work remains planned and is not merged; the Cut 3D cleanup wrapper merged through PR #702 under ADR-288 Amendment 2 after installed-Chrome reproduction and focused tests; stale draft closed as superseded | browser reproduction establishes the thrown scheduling call, not packaged Electron/WebGL cleanup or GPU appearance |
 | #689 Mixed integration branch | duplicate/superseded history plus #651 intent | legitimate Point Rotation intent merged through replacement PR #701; mixed branch closed as superseded | no unique branch history was merged |
 | #690 Mixed relief integration branch | duplicate/superseded history plus #670/#686/#687 intent | legitimate relief intent merged through replacement PR #702; mixed branch closed as superseded | no unique branch history was merged |
+
+## Advanced CNC audit remediation (2026-08-29)
+
+The completed advanced-toolpath audit was rechecked against current main before edits. All five
+delegated findings remain source-confirmed and unique. This local branch adds no Start refusal,
+confirmation, or policy gate: Frame remains the sole ordinary physical Start permit, and clamp/
+no-go findings remain Job Review advisories through the existing preflight partition.
+
+| ID | Current-main reproduction | Remediation status | Focused evidence | Remaining qualification limit |
+|---|---|---|---|---|
+| ACNC-1 shallow surfacing | Positive totals below 0.05 mm were floored to 0.05 mm before emission | implemented: validated positive depth-per-pass and total-depth values are preserved exactly; final pass is the requested total | 0.001, 0.010, 0.049, 0.050, and 0.051 mm regressions pass | No spindle, cutter, spoilboard, or surface-finish test |
+| ACNC-2 physical stock placement | Prepared physical bounds were unplaced before the stock advisory; 2D/3D removal stock stayed fixed while the route was artwork-relative | implemented: prepared warnings use physical output bounds; preview/pane stock is mapped into the same placement-relative scene frame as the route | X150–170 outside-stock warning, worker placement carrier, 2D grid, and 3D pane placement regressions pass | No browser perceptual review or physical stock/fixture alignment |
+| ACNC-3 global release order | Tool-major bucketing could emit an A profile before remaining B clearing | implemented: clearing is globally phase-first, followed by profiles; tools are contiguous inside each phase and may recur | A-clear, B-clear, A-profile, B-profile regression passes | Repeated tool changes are intentional and have no controller/operator qualification |
+| ACNC-4 helix parity | Preview sampled one circle while emitted G-code produced every descending revolution | implemented: one shared XYZ expansion drives preview, removal, and tiled derivatives | 1/2/23-turn, clockwise/counter-clockwise seam-depth tests and a two-turn removal-depth test pass | No reference-CAM, WebGL perceptual, air-cut, or material-cut comparison |
+| ACNC-5 cutter envelope warnings | No-go collision scanning checked only cutter centerlines | implemented: generated tool comments switch the active radius per section; advisory rectangles expand by that radius and disclose holder/stickout/fixture-height/Z unknowns | 2 mm clear vs 6 mm overlap, multi-tool switching, and CNC warning-copy regressions pass | Holder geometry, stickout, fixture height, Z clearance, and hardware remain unknown |
+
+Local verification: the primary focused matrix passed 110/110 tests; the removal/pane/warning matrix
+passed 42/42; and the preview-carrier structural-parity matrix passed 29/29. A clean
+`pnpm release:check` exited 0: typecheck, full source/Electron lint, format, ADR numbering, action
+pinning, license closure, 1,775 Vitest files with 11,162 passing tests (14 files/22 tests skipped),
+release-integrity tests, production web build, Electron TypeScript build, file-size policy, and the
+public-export ratchet all passed. Browser interaction, packaged runtime, hosted CI, review, merge,
+deployment, hardware, reference-CAM, and human perceptual evidence remain separate and are not
+claimed here.

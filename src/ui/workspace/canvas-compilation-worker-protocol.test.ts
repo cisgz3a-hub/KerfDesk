@@ -26,6 +26,7 @@ describe('canvas compilation relief task', () => {
       },
       toolpath: { steps: [], totalLength: 0 },
       scrubFraction: 1,
+      jobOriginOffset: { x: 0, y: 0 },
     });
 
     if (result.kind !== 'cnc-removal-grid' || result.output === null) {

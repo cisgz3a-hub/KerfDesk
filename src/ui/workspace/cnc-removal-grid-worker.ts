@@ -73,6 +73,7 @@ function tasksFor(request: WorkRequest): ReadonlyArray<WorkerTask> {
           machine: request.machine,
           toolpath: request.toolpath,
           scrubFraction: request.scrubFraction,
+          jobOriginOffset: request.jobOriginOffset,
         },
       },
     ];

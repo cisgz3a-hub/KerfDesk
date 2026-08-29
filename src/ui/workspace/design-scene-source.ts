@@ -64,7 +64,7 @@ export function computeDesignSceneSourceFromPrepared(
   // surface share one frame, as ADR-261 §2 requires.
   const toolpath = buildPreviewToolpathFromPrepared(project, prepared);
   if (toolpath.totalLength <= 0) return null;
-  const spec = paneGridSpec(project, machine);
+  const spec = paneGridSpec(project, machine, prepared.jobOriginOffset);
   const tools = toolpathToolsByToolKey(machine, toolpath);
   const result = computeRemovalGrid(
     toolpath,
@@ -84,11 +84,24 @@ export function computeDesignSceneSourceFromPrepared(
   };
 }
 
-function paneGridSpec(project: Project, machine: CncMachineConfig): RemovalGridSpec {
+function paneGridSpec(
+  project: Project,
+  machine: CncMachineConfig,
+  jobOriginOffset: { readonly x: number; readonly y: number },
+): RemovalGridSpec {
   const stock = machine.stock;
-  const a = toSceneCoords(stock.originOffset, project.device);
+  const a = toSceneCoords(
+    {
+      x: stock.originOffset.x - jobOriginOffset.x,
+      y: stock.originOffset.y - jobOriginOffset.y,
+    },
+    project.device,
+  );
   const b = toSceneCoords(
-    { x: stock.originOffset.x + stock.widthMm, y: stock.originOffset.y + stock.heightMm },
+    {
+      x: stock.originOffset.x + stock.widthMm - jobOriginOffset.x,
+      y: stock.originOffset.y + stock.heightMm - jobOriginOffset.y,
+    },
     project.device,
   );
   const widthMm = Math.abs(b.x - a.x);

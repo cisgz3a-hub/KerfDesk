@@ -18,7 +18,7 @@ import {
   type HeightfieldHeightmapOptions,
   type HeightfieldHeightmapResult,
 } from '../../core/relief/heightfield-to-heightmap';
-import type { CncMachineConfig } from '../../core/scene';
+import type { CncMachineConfig, Vec2 } from '../../core/scene';
 import type { ReliefHeightfield } from '../../core/scene/relief';
 import type { RemovalGrid } from '../../core/sim';
 import { prepareCncCut3DSurface } from './cnc-cut3d-surface';
@@ -37,6 +37,7 @@ export type CanvasCompilationTaskPayload =
       readonly machine: CncMachineConfig;
       readonly toolpath: Toolpath;
       readonly scrubFraction: number;
+      readonly jobOriginOffset: Vec2;
     }
   | {
       readonly kind: 'cnc-cut3d-surface';
@@ -117,7 +118,13 @@ export function executeCanvasCompilationTask(
     case 'cnc-removal-grid':
       return {
         kind: task.kind,
-        output: computeCncRemovalGrid(task.device, task.machine, task.toolpath, task.scrubFraction),
+        output: computeCncRemovalGrid(
+          task.device,
+          task.machine,
+          task.toolpath,
+          task.scrubFraction,
+          task.jobOriginOffset,
+        ),
       };
     case 'cnc-cut3d-surface':
       return { kind: task.kind, output: prepareCncCut3DSurface(task.grid) };

@@ -324,5 +324,6 @@ function request(): Omit<
       ],
     },
     scrubFraction: 1,
+    jobOriginOffset: { x: 0, y: 0 },
   };
 }

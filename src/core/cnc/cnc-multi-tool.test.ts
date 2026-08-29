@@ -139,6 +139,43 @@ describe('compileCncJob multi-tool', () => {
     expect(isProfileCutType(cnc.at(-1)?.cutType ?? 'pocket')).toBe(true);
   });
 
+  it('finishes every tool clearing section before any multi-tool profile section', () => {
+    const scene = sceneOf(
+      [
+        squareObject('A', '#111111', 10, 20),
+        squareObject('B', '#222222', 40, 20),
+        squareObject('C', '#333333', 70, 20),
+        squareObject('D', '#444444', 100, 20),
+      ],
+      [
+        layerWith('#111111', { cutType: 'pocket', toolId: 'em-3175', depthMm: 2 }),
+        layerWith('#222222', { cutType: 'pocket', toolId: 'em-6350', depthMm: 2 }),
+        layerWith('#333333', {
+          cutType: 'profile-outside',
+          toolId: 'em-3175',
+          depthMm: 2,
+        }),
+        layerWith('#444444', {
+          cutType: 'profile-outside',
+          toolId: 'em-6350',
+          depthMm: 2,
+        }),
+      ],
+    );
+
+    const cnc = compileCncJob(scene, DEVICE, MACHINE).groups.filter(
+      (group) => group.kind === 'cnc',
+    );
+    expect(cnc.map((group) => [group.toolId, group.cutType])).toEqual([
+      ['em-3175', 'pocket'],
+      ['em-6350', 'pocket'],
+      ['em-3175', 'profile-outside'],
+      ['em-6350', 'profile-outside'],
+    ]);
+    const firstProfile = cnc.findIndex((group) => isProfileCutType(group.cutType));
+    expect(cnc.slice(firstProfile).every((group) => isProfileCutType(group.cutType))).toBe(true);
+  });
+
   it('drill groups pin the cut feed to the plunge feed', () => {
     const scene = sceneOf(
       [squareObject('A', '#111111', 10, 20)],

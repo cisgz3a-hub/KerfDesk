@@ -3,12 +3,11 @@
 // preflight ERROR; leaving the stock is only an advisory because cutting into
 // an offcut edge or jig is often intentional — the operator decides.
 //
-// Bounds are compile-time machine coordinates (the same frame the CNC
-// pipeline emits in); job-placement offsets applied at save/start time are
-// intentionally not modeled here — this is a heads-up, not a gate.
+// A supplied prepared job is already in the physical output coordinate frame,
+// including its resolved placement. This is a heads-up, never a gate.
 
 import { compileCncJob } from '../../core/cnc';
-import { computeJobBounds, type JobBounds } from '../../core/job';
+import { computeJobBounds } from '../../core/job';
 import type { Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 
@@ -21,7 +20,7 @@ export function detectCncStockWarnings(
   const bounds =
     prepared === undefined
       ? computeJobBounds(compileCncJob(project.scene, project.device, machine))
-      : unplacedPreparedBounds(prepared);
+      : computeJobBounds(prepared.job);
   if (bounds === null) return [];
 
   const stock = machine.stock;
@@ -39,18 +38,4 @@ export function detectCncStockWarnings(
       `${stock.widthMm} × ${stock.heightMm} mm stock at (${minX}, ${minY}). ` +
       'The bit will cut air or your clamps/spoilboard — check the stock size and position.',
   ];
-}
-
-function unplacedPreparedBounds(
-  prepared: Extract<PreparedOutput, { readonly ok: true }>,
-): JobBounds | null {
-  const bounds = computeJobBounds(prepared.job);
-  if (bounds === null) return null;
-  const offset = prepared.jobOriginOffset;
-  return {
-    minX: bounds.minX - offset.x,
-    minY: bounds.minY - offset.y,
-    maxX: bounds.maxX - offset.x,
-    maxY: bounds.maxY - offset.y,
-  };
 }

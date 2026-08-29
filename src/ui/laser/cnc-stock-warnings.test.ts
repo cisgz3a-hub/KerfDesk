@@ -9,6 +9,7 @@ import {
   type ImportedSvg,
   type Project,
 } from '../../core/scene';
+import { prepareOutput } from '../../io/gcode';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
 
 function squareObject(color: string, size: number, at: number): ImportedSvg {
@@ -66,6 +67,24 @@ describe('detectCncStockWarnings', () => {
     );
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('30 × 30 mm stock');
+  });
+
+  it('checks the resolved physical placement instead of the unplaced artwork bounds', () => {
+    const project = cncProject({ widthMm: 100, heightMm: 100, originOffset: { x: 0, y: 0 } });
+    const prepared = prepareOutput(project, {
+      jobOrigin: {
+        startFrom: 'current-position',
+        anchor: 'front-left',
+        currentPosition: { x: 150, y: 50 },
+      },
+    });
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+
+    const warnings = detectCncStockWarnings(project, prepared);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('150.0–170.0');
+    expect(warnings[0]).toContain('100 × 100 mm stock');
   });
 
   it('returns nothing for a laser project', () => {

@@ -28,7 +28,12 @@ import {
   type MotionBoundsOffset,
 } from '../invariants';
 import type { CncMachineConfig, Layer, Project } from '../scene';
-import { DEFAULT_CNC_LAYER_SETTINGS, layerCncTool, type CncLayerSettings } from '../scene';
+import {
+  activeCncTool,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  layerCncTool,
+  type CncLayerSettings,
+} from '../scene';
 import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-preflight';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
 import { findNoGoZoneCollisions } from './no-go-zones';
@@ -68,7 +73,7 @@ export function runCncPreflight(
   appendSourceGeometryIssues(project, config, options, issues);
   issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));
   appendNonFiniteCoordIssues(gcode, issues);
-  appendNoGoZoneIssues(project, gcode, options, issues);
+  appendNoGoZoneIssues(project, config, gcode, options, issues);
   appendPlungedTravelIssues(gcode, config, issues);
 
   appendEmptyOutputIssue(gcode, issues);
@@ -239,6 +244,7 @@ function appendNonFiniteCoordIssues(gcode: string, issues: PreflightIssue[]): vo
 
 function appendNoGoZoneIssues(
   project: Project,
+  config: CncMachineConfig,
   gcode: string,
   options: CncPreflightOptions,
   issues: PreflightIssue[],
@@ -256,6 +262,7 @@ function appendNoGoZoneIssues(
     return;
   }
   const collisionOptions = {
+    defaultCutterRadiusMm: activeCncTool(config).diameterMm / 2,
     ...(options.motionOffset === undefined ? {} : { motionOffset: options.motionOffset }),
     ...(options.initialMachinePosition === undefined
       ? {}
@@ -270,7 +277,10 @@ function appendNoGoZoneIssues(
   for (const collision of collisions.slice(0, MAX_REPORTED_ISSUES)) {
     issues.push({
       code: 'no-go-zone-collision',
-      message: `Line ${collision.lineNumber}: motion crosses no-go zone "${collision.zone.name}".`,
+      message:
+        `Line ${collision.lineNumber}: the cutter envelope crosses no-go zone ` +
+        `"${collision.zone.name}" (cutter radius ${(collision.cutterRadiusMm ?? 0).toFixed(3)} mm included). ` +
+        'Holder, stickout, fixture height, and Z clearance remain unknown; verify them in Job Review.',
     });
   }
 }
