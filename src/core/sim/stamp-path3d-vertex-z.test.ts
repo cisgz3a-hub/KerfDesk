@@ -59,6 +59,34 @@ function lengthBeforeFirstCut(toolpath: Toolpath): number {
 }
 
 describe('computeRemovalGrid — path3d per-vertex Z', () => {
+  it('stamps a two-revolution helix at the emitted depth of each revolution', () => {
+    const helix: CncPass = {
+      kind: 'helical-contour',
+      start: { x: 5, y: 0 },
+      center: { x: 0, y: 0 },
+      clockwise: false,
+      startZMm: 0,
+      zMm: -2,
+      revolutions: 2,
+      polyline: [
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+      ],
+      closed: false,
+    };
+    const toolpath = buildToolpath(jobOf([helix]), { startPoint: helix.start });
+    const spec = { originX: -7, originY: -7, widthMm: 20, heightMm: 20, mmPerCell: 0.1 };
+    const grid = expectGrid(
+      computeRemovalGrid(toolpath, spec, kernelForTool(FLAT_TOOL, spec.mmPerCell)),
+    );
+
+    // The second revolution's opposite point is emitted at Z-1.5. A preview
+    // collapsed to one circle cannot reproduce this depth at that location.
+    expect(depthAt(grid, -5, 0)).toBeLessThan(-1.4);
+    expect(depthAt(grid, -5, 0)).toBeGreaterThanOrEqual(-1.65);
+    expect(Math.min(...grid.depth)).toBeGreaterThanOrEqual(-2 - 1e-6);
+  });
+
   it('stamps a non-monotone valley exactly at its vertices, linear between', () => {
     // Feed from (5,15) at the surface down to −2 at (15,15) and back up to
     // the surface at (25,15). The endpoint Z span is 0 → 0, which the old

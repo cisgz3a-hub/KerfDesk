@@ -38,7 +38,6 @@ export const SURFACING_DEFAULT_STEPOVER_PCT = 40;
 export const SURFACING_DEFAULT_DEPTH_PER_PASS_MM = 0.5;
 export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
 
-const MIN_DEPTH_INCREMENT_MM = 0.05;
 // Hard ceiling on materialized serpentine rows / depth passes so a pathological
 // but finite request cannot exhaust memory building the arrays. It never changes
 // the requested positive step; requests beyond the materialized-program limit
@@ -116,8 +115,11 @@ type DepthLadderResult =
   | { readonly ok: false; readonly reason: string };
 
 function depthLadder(perPassMm: number, totalMm: number): DepthLadderResult {
-  const step = Math.max(MIN_DEPTH_INCREMENT_MM, perPassMm);
-  const total = Math.max(MIN_DEPTH_INCREMENT_MM, totalMm);
+  // Both values were already validated as positive and finite. Preserve them
+  // exactly: flooring either one silently turns a shallow facing request into
+  // a deeper physical cut than the operator entered.
+  const step = perPassMm;
+  const total = totalMm;
   const capReason = iterationCapReason('depth pass', total, step);
   if (capReason !== null) return { ok: false, reason: capReason };
   const depths: number[] = [];

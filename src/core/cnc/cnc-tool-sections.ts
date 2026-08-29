@@ -1,10 +1,9 @@
 // orderGroupsIntoToolSections — multi-tool job ordering (Phase H.7). The
-// compiler's safety order (clearing work first, profiles last,
-// inner-before-outer) holds WITHIN each bit; across bits the job becomes
-// contiguous per-bit sections so the operator changes each bit exactly
-// once. Sections without profile cuts run before sections with them — a
-// profile can free the part, and a freed part must never be re-machined by
-// a later bit.
+// compiler's release order (all clearing work first, then profiles,
+// inner-before-outer) holds globally. Each phase is grouped into contiguous
+// per-bit sections, so a tool may appear once in clearing and again in the
+// profile phase. That repeat is necessary: no profile may free a part while
+// any later clearing operation remains.
 
 import type { CncGroup } from '../job';
 import { isProfileCutType } from './compile-cnc-helpers';
@@ -15,6 +14,12 @@ const IMPLICIT_TOOL_KEY = '';
 export function orderGroupsIntoToolSections(
   groups: ReadonlyArray<CncGroup>,
 ): ReadonlyArray<CncGroup> {
+  const clearing = groups.filter((group) => !isProfileCutType(group.cutType));
+  const profiles = groups.filter((group) => isProfileCutType(group.cutType));
+  return [...groupPhaseIntoToolSections(clearing), ...groupPhaseIntoToolSections(profiles)];
+}
+
+function groupPhaseIntoToolSections(groups: ReadonlyArray<CncGroup>): ReadonlyArray<CncGroup> {
   const sections = new Map<string, CncGroup[]>();
   for (const group of groups) {
     const key = group.toolId ?? IMPLICIT_TOOL_KEY;
@@ -23,15 +28,5 @@ export function orderGroupsIntoToolSections(
     else bucket.push(group);
   }
   if (sections.size <= 1) return groups;
-  const ordered = [...sections.values()];
-  // Stable partition: profile-free sections keep their relative order and
-  // run first; profile-carrying sections follow in their relative order.
-  return [
-    ...ordered.filter((section) => !sectionHasProfile(section)),
-    ...ordered.filter((section) => sectionHasProfile(section)),
-  ].flat();
-}
-
-function sectionHasProfile(section: ReadonlyArray<CncGroup>): boolean {
-  return section.some((group) => isProfileCutType(group.cutType));
+  return [...sections.values()].flat();
 }

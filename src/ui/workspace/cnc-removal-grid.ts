@@ -13,6 +13,7 @@
 import { toSceneCoords, type DeviceProfile } from '../../core/devices';
 import type { Toolpath } from '../../core/job';
 import { activeCncTool, type CncMachineConfig } from '../../core/scene';
+import type { Vec2 } from '../../core/scene';
 import {
   computeRemovalGrid,
   DEFAULT_CELL_MM,
@@ -34,6 +35,7 @@ const UI_TARGET_CELLS_PER_AXIS = 1000;
  * @param device The device profile, for the stock rect's scene mapping.
  * @param machine The project's CNC machine config; supplies stock and bits.
  * @param toolpath The preview toolpath, already in scene frame.
+ * @param jobOriginOffset Physical placement removed from the preview route.
  * @param scrubFraction How much of the program to stamp, 0..1.
  * @returns The removal grid, or null when the stock rect cannot hold one.
  */
@@ -42,8 +44,9 @@ export function computeCncRemovalGrid(
   machine: CncMachineConfig,
   toolpath: Toolpath,
   scrubFraction: number,
+  jobOriginOffset: Vec2 = { x: 0, y: 0 },
 ): RemovalGrid | null {
-  const spec = overlayGridSpec(device, machine);
+  const spec = overlayGridSpec(device, machine, jobOriginOffset);
   const result = computeRemovalGrid(
     toolpath,
     spec,
@@ -56,11 +59,28 @@ export function computeCncRemovalGrid(
   return result.kind === 'ok' ? result.grid : null;
 }
 
-function overlayGridSpec(device: DeviceProfile, machine: CncMachineConfig): RemovalGridSpec {
+function overlayGridSpec(
+  device: DeviceProfile,
+  machine: CncMachineConfig,
+  jobOriginOffset: Vec2,
+): RemovalGridSpec {
   const stock = machine.stock;
-  const a = toSceneCoords(stock.originOffset, device);
+  // The preview route is artwork-relative: map the physical stock into that
+  // same frame by removing the resolved output placement from its machine
+  // coordinates. This retains artwork registration while making the material
+  // removal surface describe where the job will physically land.
+  const a = toSceneCoords(
+    {
+      x: stock.originOffset.x - jobOriginOffset.x,
+      y: stock.originOffset.y - jobOriginOffset.y,
+    },
+    device,
+  );
   const b = toSceneCoords(
-    { x: stock.originOffset.x + stock.widthMm, y: stock.originOffset.y + stock.heightMm },
+    {
+      x: stock.originOffset.x + stock.widthMm - jobOriginOffset.x,
+      y: stock.originOffset.y + stock.heightMm - jobOriginOffset.y,
+    },
     device,
   );
   const widthMm = Math.abs(b.x - a.x);

@@ -17,7 +17,7 @@ import {
   prepareLargeJobOffThread,
   type LargeJobPreparationOptions,
 } from './preparation-worker-client';
-import { mapToolpathToScene } from './preview-scene-frame';
+import { mapToolpathToScene, registerPreviewJobOriginOffset } from './preview-scene-frame';
 import type { PreviewToolpath } from './preview-status';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
@@ -99,9 +99,13 @@ function runScheduledPreviewBuild(args: {
 }): void {
   if (args.isCancelled()) return;
   if (args.externalGcodePreview !== null) {
-    args.setToolpath(
-      mapToolpathToScene(args.externalGcodePreview.toolpath, ZERO_OFFSET, args.project.device),
+    const external = mapToolpathToScene(
+      args.externalGcodePreview.toolpath,
+      ZERO_OFFSET,
+      args.project.device,
     );
+    registerPreviewJobOriginOffset(external, ZERO_OFFSET);
+    args.setToolpath(external);
     return;
   }
   const resolved = args.placement;
@@ -192,7 +196,9 @@ function settleBuiltToolpath(args: {
   setToolpath({ ...built, previewIssue: { kind: 'preparing-large-job' } });
   offThread.then(
     (prepared) => {
-      if (!args.isCancelled()) setToolpath(prepared.toolpath);
+      if (args.isCancelled()) return;
+      registerPreviewJobOriginOffset(prepared.toolpath, prepared.jobOriginOffset ?? ZERO_OFFSET);
+      setToolpath(prepared.toolpath);
     },
     (error: unknown) => {
       // Superseded means a newer preparation already replaced this one, so the

@@ -12,6 +12,8 @@ import {
 export type NoGoZoneCollision = {
   readonly lineNumber: number;
   readonly zone: NoGoZone;
+  /** Cutter envelope used for this motion; absent preserves centerline callers. */
+  readonly cutterRadiusMm?: number;
 };
 
 type Point = {
@@ -51,6 +53,7 @@ export function findNoGoZoneCollisions(
   options: {
     readonly motionOffset?: MotionBoundsOffset | undefined;
     readonly initialMachinePosition?: Point | undefined;
+    readonly defaultCutterRadiusMm?: number | undefined;
   } = {},
 ): ReadonlyArray<NoGoZoneCollision> {
   const activeZones = zones
@@ -64,8 +67,10 @@ export function findNoGoZoneCollisions(
   let current: Point | null = options.initialMachinePosition ?? null;
   let absolute = true;
   let motion: GcodeMotionMode | null = 0;
+  let cutterRadiusMm = validRadius(options.defaultCutterRadiusMm);
 
   for (const [index, raw] of asGcodeLines(gcode).entries()) {
+    cutterRadiusMm = cutterRadiusFromToolComment(raw) ?? cutterRadiusMm;
     const stripped = stripComment(raw);
     if (stripped === '') continue;
     absolute = absoluteModeAfterLine(stripped, absolute);
@@ -74,7 +79,16 @@ export function findNoGoZoneCollisions(
     if (!scanned.isMotion || motion === null) continue;
     const next = nextPoint(stripped, current, absolute, offset, motion);
     if (next === null) continue;
-    appendCollision(collisions, current, next, stripped, motion, activeZones, index + 1);
+    appendCollision(
+      collisions,
+      current,
+      next,
+      stripped,
+      motion,
+      activeZones,
+      index + 1,
+      cutterRadiusMm,
+    );
     current = next;
   }
 
@@ -112,12 +126,40 @@ function appendCollision(
   motion: GcodeMotionMode,
   activeZones: ReadonlyArray<ActiveZone>,
   lineNumber: number,
+  cutterRadiusMm: number,
 ): void {
   if (current === null) return;
   const hit = activeZones.find(({ rect }) =>
-    motionIntersectsRect(current, next, line, motion, rect),
+    motionIntersectsRect(current, next, line, motion, expandRect(rect, cutterRadiusMm)),
   );
-  if (hit !== undefined) collisions.push({ lineNumber, zone: hit.zone });
+  if (hit !== undefined) {
+    collisions.push({
+      lineNumber,
+      zone: hit.zone,
+      ...(cutterRadiusMm > 0 ? { cutterRadiusMm } : {}),
+    });
+  }
+}
+
+function cutterRadiusFromToolComment(line: string): number | null {
+  const match = /^\s*;\s*cnc tool:.*\bdiameter-mm:\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i.exec(line);
+  if (match === null) return null;
+  const diameterMm = Number(match[1]);
+  return Number.isFinite(diameterMm) && diameterMm > 0 ? diameterMm / 2 : null;
+}
+
+function validRadius(value: number | undefined): number {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function expandRect(rect: Rect, radiusMm: number): Rect {
+  if (radiusMm <= 0) return rect;
+  return {
+    minX: rect.minX - radiusMm,
+    minY: rect.minY - radiusMm,
+    maxX: rect.maxX + radiusMm,
+    maxY: rect.maxY + radiusMm,
+  };
 }
 
 function motionIntersectsRect(

@@ -15,6 +15,18 @@ import type { DeviceProfile } from '../../core/devices';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import type { Vec2 } from '../../core/scene';
 
+const previewPlacementCache = new WeakMap<Toolpath, Vec2>();
+
+/** Associate physical placement without changing the legacy Toolpath shape. */
+export function registerPreviewJobOriginOffset(toolpath: Toolpath, offset: Vec2): void {
+  previewPlacementCache.set(toolpath, offset);
+}
+
+/** Physical placement removed while mapping this preview into artwork space. */
+export function previewJobOriginOffset(toolpath: Toolpath): Vec2 {
+  return previewPlacementCache.get(toolpath) ?? { x: 0, y: 0 };
+}
+
 export function mapToolpathToScene(
   toolpath: Toolpath,
   jobOriginOffset: Vec2,

@@ -38,7 +38,7 @@ import {
   registerExecutablePlanPreviewRoute,
 } from './executable-plan-preview-route';
 import type { PreviewIssue, PreviewToolpath } from './preview-status';
-import { mapToolpathToScene } from './preview-scene-frame';
+import { mapToolpathToScene, registerPreviewJobOriginOffset } from './preview-scene-frame';
 import type { ViewTransform } from './view-transform';
 import { displayPolylinePointIndices, displayStepIndices } from './preview-display-decimation';
 
@@ -232,6 +232,7 @@ export function buildPreviewToolpathFromPrepared(
     prepared.jobOriginOffset,
     project.device,
   );
+  registerPreviewJobOriginOffset(previewToolpath, prepared.jobOriginOffset);
   if (options.executablePlan === true) {
     registerExecutablePlanPreviewRoute({
       previewToolpath,

@@ -171,8 +171,9 @@ function compileCncSnapshot(
       stepoverOperations.push(operation.stepoverOperation);
     }
   }
-  // H.7 multi-tool: contiguous per-bit sections (one change per bit),
-  // profile-carrying sections last so freed parts are never re-machined.
+  // Multi-tool release ordering: all clearing phases finish before any
+  // profile can free material. Tools remain contiguous within each phase and
+  // may recur in the profile phase when physical ordering requires it.
   const groups = orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]);
   const cncCompilation = buildCncCompilationSidecar(
     vcarveLayers,

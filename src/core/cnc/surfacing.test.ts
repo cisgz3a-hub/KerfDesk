@@ -99,6 +99,25 @@ describe('buildSurfacingProgram', () => {
     expect(plunges).toEqual(['G1 Z-0.500 F600.000', 'G1 Z-1.000 F600.000', 'G1 Z-1.200 F600.000']);
   });
 
+  it.each([0.001, 0.01, 0.049, 0.05, 0.051])(
+    'never cuts deeper than a shallow requested total of %s mm',
+    (totalDepthMm) => {
+      const program = expectSurfacingProgram(
+        buildSurfacingProgram({
+          ...PARAMS,
+          depthPerPassMm: totalDepthMm / 2,
+          totalDepthMm,
+        }),
+      );
+      const depths = program.lines
+        .filter((line) => line.startsWith('G1 Z-'))
+        .map((line) => Math.abs(Number(/Z(-?[\d.]+)/.exec(line)?.[1])));
+
+      expect(depths.at(-1)).toBeCloseTo(totalDepthMm, 3);
+      expect(Math.max(...depths)).toBeLessThanOrEqual(totalDepthMm + 0.0005);
+    },
+  );
+
   it('serpentines: alternating X targets, monotonic Y steps', () => {
     const program = expectSurfacingProgram(buildSurfacingProgram(PARAMS));
     const plungeIndex = program.lines.indexOf('G1 Z-0.500 F600.000');

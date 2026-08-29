@@ -191,6 +191,31 @@ export type CncHelicalContourPass = {
 
 export type CncPass = CncContourPass | CncPath3dPass | CncArcPass | CncHelicalContourPass;
 
+/**
+ * Sample the exact multi-revolution descent and final contour that the GRBL
+ * emitter outputs. The per-vertex Z profile is shared by preview, material
+ * removal, and tiling so none can collapse an N-turn helix to one circle.
+ */
+export function cncHelicalContourPoints(pass: CncHelicalContourPass): ReadonlyArray<Vec3> {
+  const circle = sampleCircularArcPoints({ ...pass, end: pass.start });
+  const revolutions = Math.max(1, Math.floor(pass.revolutions));
+  const points: Vec3[] = [];
+  for (let revolution = 0; revolution < revolutions; revolution += 1) {
+    for (let index = 0; index < circle.length; index += 1) {
+      const point = circle[index];
+      if (point === undefined || (revolution > 0 && index === 0)) continue;
+      const progress = (revolution + index / Math.max(1, circle.length - 1)) / revolutions;
+      points.push({
+        x: point.x,
+        y: point.y,
+        z: pass.startZMm + (pass.zMm - pass.startZMm) * progress,
+      });
+    }
+  }
+  points.push(...pass.polyline.map((point) => ({ ...point, z: pass.zMm })));
+  return points;
+}
+
 // XY projection of a pass — for bounds, origin translation, and the 2D
 // preview. Vec3 is structurally assignable to Vec2, so path3d points pass
 // through unchanged.
@@ -203,7 +228,7 @@ export function cncPassXyPoints(pass: CncPass): ReadonlyArray<Vec2> {
     case 'arc':
       return sampleCircularArcPoints(pass);
     case 'helical-contour':
-      return [...sampleCircularArcPoints({ ...pass, end: pass.start }), ...pass.polyline];
+      return cncHelicalContourPoints(pass);
     default:
       return assertNever(pass, 'CncPass');
   }

@@ -376,7 +376,8 @@ Identical to F-A3 except:
 4. The displayed position updates without changing canvas stacking, geometry, operation settings,
    visibility, output flags, or automatic colours.
 5. Laser output follows the numbered run-unit order exactly. Each row reports its output step(s).
-6. CNC preserves clearing-before-profile safety and contiguous tool sections. Each row shows both
+6. CNC preserves global clearing-before-profile order and contiguous tool sections within each
+   clearing/profile phase. Each row shows both
    its requested run number and the exact effective CNC step(s), so any necessary difference is
    visible before output.
 7. Undo restores the previous machine priority.
@@ -3191,10 +3192,11 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC14. Run a multi-bit job (M0 tool change) — Phase H.7
 
 #### Success
-1. **Startup Setup > Tool Plan** may assign each operation its own bit. Compile orders the
-   job into contiguous per-bit sections — one change per bit — with
-   profile-carrying sections last, so a freed part is never
-   re-machined.
+1. **Startup Setup > Tool Plan** may assign each operation its own bit. Compile completes every
+   clearing section before beginning any profile section. Tool work stays contiguous within each
+   phase, but a bit used for both clearing and profiling appears once in each phase and therefore
+   requires a repeated change. This prevents a profile from freeing the part while later clearing
+   remains.
 2. Between sections the G-code retracts, stops the spindle (M5), parks,
    and pauses on M0 with comments naming the next bit. GRBL holds until
    cycle start; the streaming UI's Resume continues the job.
@@ -3206,8 +3208,7 @@ and lifts the command's CNC-only gate.)*
    V-bit with invalid included angle is the separate compile-integrity refusal.
 
 #### Empty
-1. All layers on one bit → no M0 blocks; output is byte-identical to a
-   single-tool job.
+1. All layers on one bit → no M0 blocks; output is byte-identical to a single-tool job.
 
 #### Edge — unknown per-operation bit id
 1. Falls back to the machine's active bit at compile time.

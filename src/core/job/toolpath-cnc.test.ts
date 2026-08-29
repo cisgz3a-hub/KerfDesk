@@ -139,7 +139,46 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     const helicalLength = Math.hypot(4 * Math.PI * 5, 2);
     expect(cut.length).toBeCloseTo(helicalLength + 5 + 10, 9);
     expect(cut.z).toEqual({ from: 0, to: -2 });
+    expect(cut.zs).toHaveLength(cut.polyline.length);
+    expect(cut.zs?.at(-1)).toBe(-2);
   });
+
+  it.each([
+    [1, false],
+    [2, false],
+    [23, false],
+    [2, true],
+  ] as const)(
+    'preserves every emitted helix revolution in preview/removal (%i turns, clockwise=%s)',
+    (revolutions, clockwise) => {
+      const helix: CncPass = {
+        kind: 'helical-contour',
+        start: { x: 5, y: 0 },
+        center: { x: 0, y: 0 },
+        clockwise,
+        startZMm: 0,
+        zMm: -revolutions,
+        revolutions,
+        polyline: [
+          { x: 10, y: 0 },
+          { x: 10, y: 10 },
+        ],
+        closed: false,
+      };
+      const toolpath = buildToolpath({ groups: [group([helix])] });
+      const cut = toolpath.steps.find((step) => step.kind === 'cut');
+      if (cut?.kind !== 'cut' || cut.zs === undefined) throw new Error('expected sampled helix');
+      const seamDepths = cut.polyline.flatMap((point, index) =>
+        Math.abs(point.x - helix.start.x) < 1e-9 && Math.abs(point.y - helix.start.y) < 1e-9
+          ? [cut.zs?.[index]]
+          : [],
+      );
+
+      expect(seamDepths).toHaveLength(revolutions + 1);
+      seamDepths.forEach((depth, index) => expect(depth).toBeCloseTo(-index, 9));
+      expect(cut.zs.slice(-helix.polyline.length)).toEqual(helix.polyline.map(() => helix.zMm));
+    },
+  );
 });
 
 // ── Emitter agreement property ──────────────────────────────────────────────

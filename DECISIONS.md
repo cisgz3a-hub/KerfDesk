@@ -15499,8 +15499,8 @@ to the next, while retaining tool-major sections for real multi-tool jobs.
    emitted before the next region. Disconnected components still require safe-Z entries; adjacent
    components from the same source glyph retain source order. Pocket, helical pocket, rest-pocket,
    adaptive pocket, V-clearance, and female straight-inlay clearing adopt the same
-   source-region-major order. Multi-tool jobs remain tool-major, so the contract applies within
-   each tool section and does not create repeated tool-change prompts.
+   source-region-major order. ADR-310 narrowly supersedes the former tool-major sentence for jobs
+   that combine clearing and profile phases across multiple tools.
 5. **Routing and refinement are bounded and deterministic.** Medial edge cover is iterative, not
    recursive. Boundary sampling is capped at 4,096 samples per normalized region, scales lower when
    original segment count would exceed the exact sample-segment work budget, and preserves stable
@@ -18585,5 +18585,50 @@ invocation` instead of queuing cleanup.
 ### References
 
 - ADR-288, globally bounded worker preparation and Cut 3D OffscreenCanvas lifecycle.
+
+---
+
+## ADR-310 - Multi-tool CNC completes global clearing before profiles (2026-08-29)
+
+**Status:** Accepted and implemented in local remediation; software verification in progress,
+hardware qualification excluded
+
+### Context
+
+The compiler first collected all clearing groups before all profile groups, but its final tool-major
+bucket could reorder `[A-clear, B-clear, A-profile, B-profile]` into
+`[A-clear, A-profile, B-clear, B-profile]`. The A profile can physically free material before the B
+clearing pass. That contradicts the existing clearing-before-profile release contract even though it
+minimizes tool changes.
+
+### Decision
+
+1. CNC compilation keeps two global phases: all non-profile groups, then all profile groups.
+2. Groups remain stable and contiguous by tool inside each phase. A tool used in both phases may
+   therefore require a second tool-change prompt; minimizing prompts cannot move a profile ahead of
+   unfinished clearing.
+3. Source-region-major ordering inside each operation remains unchanged. Single-tool output remains
+   unchanged.
+4. This is emitted-motion ordering, not a new guard. It adds no refusal, cap, clamp, confirmation,
+   Frame condition, Start condition, or hardware claim.
+
+### Consequences
+
+- A profile cannot free a part while another tool still has clearing work.
+- Multi-tool jobs can contain repeated tool sections and M0 prompts when one tool participates in
+  both global phases.
+- Job Review continues to show the compiled effective steps and warnings remain nonblocking.
+
+### Verification
+
+- A focused four-operation fixture pins `A-clear, B-clear, A-profile, B-profile`.
+- Existing multi-tool, tool-change, compile, and emitter tests remain required before integration.
+- Controller pause/resume behavior, operator tool changes, workholding, air cuts, and material cuts
+  are not established by the software tests.
+
+### References
+
+- ADR-285, source-region-major CNC sequencing; only its former tool-major sentence is superseded.
+- ADR-228 and ADR-232, Frame-only ordinary Start authorization and warning-only policy.
 
 ---

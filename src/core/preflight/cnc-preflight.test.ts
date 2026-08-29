@@ -74,6 +74,18 @@ describe('runCncPreflight no-go zones (G20)', () => {
     const zoneIssue = result.issues.find((issue) => issue.code === 'no-go-zone-collision');
     expect(zoneIssue?.message).toMatch(/perimeter Frame does not prove/i);
   });
+
+  it('reports a cutter-envelope-only clamp overlap as an explicit warning with unknown limits', () => {
+    const project = projectWithCncZone();
+    const gcode = ['G21', 'G90', 'G0 Z3.810', 'G0 X0 Y18.5', 'G1 X50 Y18.5 F1000'].join('\n');
+    const result = runCncPreflight(project, config, gcode);
+    const zoneIssue = result.issues.find((issue) => issue.code === 'no-go-zone-collision');
+
+    expect(zoneIssue?.message).toContain('cutter radius 1.587 mm included');
+    expect(zoneIssue?.message).toContain(
+      'Holder, stickout, fixture height, and Z clearance remain unknown',
+    );
+  });
 });
 
 describe('runCncPreflight', () => {

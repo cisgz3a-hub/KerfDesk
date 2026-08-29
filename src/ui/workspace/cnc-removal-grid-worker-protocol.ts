@@ -7,7 +7,7 @@ import type {
   HeightfieldHeightmapOptions,
   HeightfieldHeightmapResult,
 } from '../../core/relief/heightfield-to-heightmap';
-import type { CncMachineConfig } from '../../core/scene';
+import type { CncMachineConfig, Vec2 } from '../../core/scene';
 import type { ReliefHeightfield } from '../../core/scene/relief';
 import type { RemovalGrid } from '../../core/sim';
 
@@ -37,6 +37,7 @@ export type CncRemovalGridWorkerRequest =
       readonly machine: CncMachineConfig;
       readonly toolpath: Toolpath;
       readonly scrubFraction: number;
+      readonly jobOriginOffset: Vec2;
     }
   | {
       readonly id: number;
