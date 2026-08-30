@@ -4,7 +4,7 @@ import { useExperimentalLaserFeatures } from './experimental-laser-features';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
-import { isActiveJob, pushLog } from './laser-store-helpers';
+import { isActiveJob, mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
 import { useStore } from './store';
 
@@ -99,10 +99,9 @@ async function activateFire(
       lastWriteError: null,
       log: pushLog(get(), `[lf2] Momentary Fire on (S${powerS}).`),
     });
-  } catch (error) {
-    if (token === runtime.requestToken) set({ fireActive: false });
-    throw error;
   } finally {
+    // A rejected M3 transport promise deliberately propagates through this
+    // finally without clearing the uncertain-on fail-off latch.
     runtime.activationPending = false;
   }
 }
@@ -132,6 +131,8 @@ function fireFeatureBlockMessage(state: LaserState): string | null {
 
 function fireControllerStateBlockMessage(state: LaserState): string | null {
   if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
+  const mpgBlock = mpgCommandBlockMessage(state);
+  if (mpgBlock !== null) return mpgBlock;
   if (state.alarmCode !== null) return 'Clear the controller alarm before using Fire.';
   if (state.statusReport === null) {
     return 'Controller status is not known yet. Wait for an Idle position report.';

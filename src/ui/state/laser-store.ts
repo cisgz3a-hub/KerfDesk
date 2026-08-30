@@ -70,6 +70,7 @@ import {
   activeJobCommandBlockMessage,
   assertAutofocusIdle,
   initialLaserState,
+  mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
   type StallProbe,
@@ -328,7 +329,7 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
   return {
     setAirAssistEnabled: async (enabled) => {
       assertAutofocusIdle(get());
-      assertAirAssistReady(set, get);
+      assertAirAssistReady(set, get, enabled);
       const command = enabled ? useStore.getState().project.device.airAssistCommand : 'M9';
       if (command === 'none') {
         const message =
@@ -341,10 +342,23 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
       }
       // Clear before the serial write yields so a concurrent Start cannot
       // trust the previous accessory observation after M7/M8/M9 was sent.
+      // Enabling also latches on before the write: until a compensating M9 is
+      // accepted, the accessory outcome is potentially active.
       set((state) => ({
         accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
+        ...(enabled ? { airAssistOn: true } : {}),
       }));
+      // A rejected transport promise cannot prove M7/M8 was not accepted. The
+      // uncertain-on latch therefore survives so the operator retains M9.
       await safeWrite(set, get, `${command}\n`, 'air-assist', 'console');
+      if (enabled && mpgCommandBlockMessage(get()) !== null) {
+        const offAccepted = await safeWrite(set, get, 'M9\n', 'air-assist', 'console').then(
+          () => true,
+          () => false,
+        );
+        if (offAccepted) set({ airAssistOn: false });
+        return;
+      }
       set({
         airAssistOn: enabled,
         lastWriteError: null,
@@ -354,11 +368,20 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
   };
 }
 
-function assertAirAssistReady(set: SetFn, get: GetFn): void {
+function assertAirAssistReady(set: SetFn, get: GetFn, enabling: boolean): void {
   const state = get();
+  const takeoverFailOff = !enabling && state.mpgActive === true;
   const blockedMessage =
-    airAssistCommandBlockMessage(state) ??
-    controllerOperationCommandBlockMessage(state.controllerOperation);
+    state.connection.kind !== 'connected'
+      ? 'Connect to the laser first.'
+      : takeoverFailOff
+        ? null
+        : enabling
+          ? (mpgCommandBlockMessage(state) ??
+            airAssistCommandBlockMessage(state) ??
+            controllerOperationCommandBlockMessage(state.controllerOperation))
+          : (airAssistCommandBlockMessage(state) ??
+            controllerOperationCommandBlockMessage(state.controllerOperation));
   if (blockedMessage === null) return;
   set({
     lastWriteError: blockedMessage,
@@ -424,9 +447,10 @@ export const useLaserStore = create<LaserState>((set, get) => {
       (line) => safeWrite(set, get, line),
       () => get().capabilities.overrides,
       () =>
-        get().controllerOperation?.kind === 'probe'
+        mpgCommandBlockMessage(get()) ??
+        (get().controllerOperation?.kind === 'probe'
           ? 'Realtime overrides are locked during a probe transaction.'
-          : null,
+          : null),
     ),
     ...jobActions(
       set,

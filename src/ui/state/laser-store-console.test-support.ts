@@ -6,7 +6,10 @@ export type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
 };
 
-export function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
+export function makeConnection(
+  write: (data: string) => Promise<void>,
+  options: { readonly autoRespondToStatusQuery?: boolean } = {},
+): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const emit = (line: string): void => {
     for (const handler of lineHandlers) handler(line);
@@ -15,6 +18,16 @@ export function makeConnection(write: (data: string) => Promise<void>): FakeConn
     write: async (data) => {
       await write(data);
       respondToStockGrblHandshakeQuery(data, emit);
+      if (data === '?' && options.autoRespondToStatusQuery === true) {
+        // The production transport delivers the reply asynchronously. Two
+        // microtask turns ensure confirmFreshManualMotionIdle has recorded its
+        // post-write stamp and installed the fresh-status waiter first.
+        void Promise.resolve().then(() =>
+          Promise.resolve().then(() => {
+            emit('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+          }),
+        );
+      }
     },
     onLine: (handler) => {
       lineHandlers.add(handler);

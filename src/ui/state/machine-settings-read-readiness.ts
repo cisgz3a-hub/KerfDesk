@@ -5,6 +5,7 @@ import {
   FIRE_ACTIVE_COMMAND_MESSAGE,
   MOTION_OPERATION_ACTIVE_MESSAGE,
   isActiveJob,
+  mpgCommandBlockMessage,
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
@@ -24,7 +25,8 @@ export function machineSettingsReadBlockReason(
   state: LaserState,
   options: MachineSettingsReadReadinessOptions = {},
 ): string | null {
-  if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
+  const transportBlock = machineSettingsTransportBlockReason(state);
+  if (transportBlock !== null) return transportBlock;
   if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
   if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
   if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
@@ -45,4 +47,9 @@ export function machineSettingsReadBlockReason(
     return 'Machine settings are already being read. Wait for the current $$ response to finish.';
   }
   return null;
+}
+
+function machineSettingsTransportBlockReason(state: LaserState): string | null {
+  if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
+  return mpgCommandBlockMessage(state);
 }

@@ -13,20 +13,17 @@ import {
   type ConsoleStateEffect,
 } from '../../core/controllers/console-state-effect';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
-import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import {
+  consoleCommandBlockReason,
+  consoleCommandNeedsFreshIdle,
+} from './console-command-readiness';
 import { isOwnedControllerIdentityCommand, writeConsoleCommand } from './console-command-transport';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
-import {
-  ACTIVE_JOB_COMMAND_MESSAGE,
-  FIRE_ACTIVE_COMMAND_MESSAGE,
-  MOTION_OPERATION_ACTIVE_MESSAGE,
-  UNKNOWN_IDLE_STATUS_MESSAGE,
-  isActiveJob,
-  pushLog,
-} from './laser-store-helpers';
+import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
 import { appendTranscript, systemTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import { useStore } from './store';
 import {
@@ -76,8 +73,19 @@ export function consoleActions(
       if (prepared.command.requiresConfirmation && options.confirmed !== true) {
         return block(set, get, refs, 'This persistent setting write needs confirmation.');
       }
+      // Expire stale handoff evidence before the first async boundary. A
+      // status-query round trip must never leave a prior Frame permit usable
+      // while a mutating Console command is being prepared.
+      invalidateConsoleCommandEvidence(set, prepared.command);
+      if (consoleCommandNeedsFreshIdle(prepared.command)) {
+        await confirmFreshConsoleIdle(set, get, refs, write);
+      }
       const idleBlocked = consoleCommandBlockReason(get(), prepared.command, true);
       if (idleBlocked !== null) return block(set, get, refs, idleBlocked);
+      const refreshedOwnershipBlocked = consoleOwnershipBlockReason(get(), refs, prepared.command);
+      if (refreshedOwnershipBlocked !== null) {
+        return block(set, get, refs, refreshedOwnershipBlocked);
+      }
       await dispatchPreparedConsoleCommand(
         set,
         get,
@@ -96,43 +104,54 @@ export function consoleActions(
         set((state) => ({ transcript: appendTranscript(state.transcript, entry) }));
       }
     },
-    selectPrimaryWcsForFrame: async () => {
-      const prepared = refs.driver.prepareConsoleCommand('G54');
-      if (!prepared.ok) throw new Error(prepared.reason);
-      const stateEffect = prepared.command.stateEffect;
-      if (stateEffect === 'read-only') {
-        throw new Error('The active controller cannot own a G54 Frame selection.');
-      }
-      const blocked = consoleCommandBlockReason(get(), prepared.command, false);
-      if (blocked !== null) throw new Error(blocked);
-      const ownershipBlocked = consoleOwnershipBlockReason(get(), refs, prepared.command);
-      if (ownershipBlocked !== null) throw new Error(ownershipBlocked);
-      const idleBlocked = consoleCommandBlockReason(get(), prepared.command, true);
-      if (idleBlocked !== null) throw new Error(idleBlocked);
-      // Expire any older authorization before the async boundary. The owned
-      // command rejects on error/Resend, so G54 is never assumed from transport
-      // acceptance alone.
-      set({ framedRun: null });
-      await startControllerCommand(
-        refs,
-        (line, action, source) => write(line, action, source ?? 'system'),
-        {
-          kind: 'interactive-command',
-          label: 'Select G54 for Frame',
-          command: prepared.command.wire,
-          action: 'console',
-          source: 'system',
-        },
-      );
-      set((state) => ({
-        ...consoleStateEffectPatch(state, stateEffect, prepared.command.normalized),
-        activeWcs: 'G54',
-      }));
-    },
+    selectPrimaryWcsForFrame: () => selectPrimaryWcsForFrame(set, get, refs, write),
     // Both retained histories, not just the displayed one: `log` is a parallel
     // 200-line ring buffer that Clear used to leave untouched.
     clearTranscript: () => set({ transcript: [], log: [] }),
   };
+}
+
+async function selectPrimaryWcsForFrame(
+  set: SetFn,
+  get: GetFn,
+  refs: ConsoleActionRefs,
+  write: ConsoleWriteFn,
+): Promise<void> {
+  const prepared = refs.driver.prepareConsoleCommand('G54');
+  if (!prepared.ok) throw new Error(prepared.reason);
+  const stateEffect = prepared.command.stateEffect;
+  if (stateEffect === 'read-only') {
+    throw new Error('The active controller cannot own a G54 Frame selection.');
+  }
+  const blocked = consoleCommandBlockReason(get(), prepared.command, false);
+  if (blocked !== null) throw new Error(blocked);
+  const ownershipBlocked = consoleOwnershipBlockReason(get(), refs, prepared.command);
+  if (ownershipBlocked !== null) throw new Error(ownershipBlocked);
+  invalidateConsoleCommandEvidence(set, prepared.command);
+  if (consoleCommandNeedsFreshIdle(prepared.command)) {
+    await confirmFreshConsoleIdle(set, get, refs, write);
+  }
+  const idleBlocked = consoleCommandBlockReason(get(), prepared.command, true);
+  if (idleBlocked !== null) throw new Error(idleBlocked);
+  const refreshedOwnershipBlocked = consoleOwnershipBlockReason(get(), refs, prepared.command);
+  if (refreshedOwnershipBlocked !== null) throw new Error(refreshedOwnershipBlocked);
+  // The owned command rejects on error/Resend, so G54 is never assumed
+  // from transport acceptance alone.
+  await startControllerCommand(
+    refs,
+    (line, action, source) => write(line, action, source ?? 'system'),
+    {
+      kind: 'interactive-command',
+      label: 'Select G54 for Frame',
+      command: prepared.command.wire,
+      action: 'console',
+      source: 'system',
+    },
+  );
+  set((state) => ({
+    ...consoleStateEffectPatch(state, stateEffect, prepared.command.normalized),
+    activeWcs: 'G54',
+  }));
 }
 
 async function dispatchPreparedConsoleCommand(
@@ -144,7 +163,6 @@ async function dispatchPreparedConsoleCommand(
   source: TranscriptSource,
 ): Promise<void> {
   beginConsoleSettingsRead(set, get, refs, command);
-  invalidateConsoleCommandEvidence(set, command);
   try {
     await writeConsoleCommand(refs, write, command, source);
   } catch (error) {
@@ -240,31 +258,23 @@ function consoleSettingWriteBlockReason(
   return `${driver.label} does not accept numeric $ setting writes from the app. Configure the controller with its own tools.`;
 }
 
-function consoleCommandBlockReason(
-  state: LaserState,
-  command: { readonly requiresIdle: boolean; readonly requiresNoActiveOperation: boolean },
-  checkIdle: boolean,
-): string | null {
-  if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
-  if (command.requiresNoActiveOperation) {
-    if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
-    if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
-    if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
-    const controllerOperationMessage = controllerOperationCommandBlockMessage(
-      state.controllerOperation,
-    );
-    if (controllerOperationMessage !== null) return controllerOperationMessage;
-    if (state.autofocusBusy) {
-      return 'Auto-focus is running. Wait for it to finish before sending console commands.';
-    }
+async function confirmFreshConsoleIdle(
+  set: SetFn,
+  get: GetFn,
+  refs: ConsoleActionRefs,
+  write: ConsoleWriteFn,
+): Promise<void> {
+  try {
+    await confirmFreshManualMotionIdle({
+      get,
+      refs,
+      write,
+      action: 'console',
+      source: 'system',
+    });
+  } catch (error) {
+    block(set, get, refs, error instanceof Error ? error.message : String(error));
   }
-  if (checkIdle && command.requiresIdle) {
-    if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
-    if (state.statusReport.state !== 'Idle') {
-      return `Machine must be Idle before sending this console command (currently ${state.statusReport.state}).`;
-    }
-  }
-  return null;
 }
 
 function trackConsoleWcsSelection(set: SetFn, normalized: string): void {

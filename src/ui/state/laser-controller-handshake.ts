@@ -17,7 +17,7 @@ import {
   readControllerBuildInfo,
 } from './laser-controller-build-info';
 import type { LaserState, LiveRefs } from './laser-store';
-import { pushLog } from './laser-store-helpers';
+import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { appendSystemNotice } from './laser-system-notice';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -85,8 +85,10 @@ export async function runControllerHandshake(
   }
   await settleAfterControllerLine(guard.sawWelcomeBoundary);
   if (!guard.acceptControllerLineEpoch()) return;
+  if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await waitForHandshakeIdle(get, refs, safeWrite);
   if (!guard.acceptControllerLineEpoch()) return;
+  if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await qualifyConnectedController(set, get, refs, safeWrite, connection, guard);
 }
 
@@ -196,6 +198,7 @@ async function qualifyConnectedController(
     lastSettingsReadAt: null,
   });
   beginSettingsCollection(refs, qualificationEpoch);
+  if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await startControllerCommand(refs, safeWrite, {
     kind: 'connection-handshake',
     label: 'controller settings query',
@@ -203,6 +206,7 @@ async function qualifyConnectedController(
     source: 'system',
   });
   if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
+  if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   if (!qualificationCompleted(get(), qualificationEpoch)) {
     refs.settingsCollector = idleCollector();
     refs.settingsCollectorSessionEpoch = null;
@@ -217,7 +221,9 @@ async function qualifyConnectedController(
         ),
   );
   if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
+  if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await refreshHandshakeBuildInfo(set, get, refs, safeWrite, connection, guard, qualificationEpoch);
+  if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   // After qualification, ask the controller for its modal state ($G) so a
   // non-G54 frame left active by a $N startup block or an external session
   // becomes visible to the placement-mismatch advisory (C6) with no operator
@@ -226,7 +232,9 @@ async function qualifyConnectedController(
   // re-qualification); called inline — not through a wrapper — to keep the
   // handshake's microtask depth unchanged.
   if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
+  if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await requestActiveWcsReadback(get, refs.driver, safeWrite, guard.expectedSessionEpoch);
+  parkHandshakeForMpg(set, get, refs, connection, guard);
 }
 
 async function refreshHandshakeBuildInfo(
@@ -248,7 +256,8 @@ async function refreshHandshakeBuildInfo(
       sessionEpoch: qualificationEpoch,
       isCurrent: () =>
         handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch) &&
-        get().controllerSessionEpoch === qualificationEpoch,
+        get().controllerSessionEpoch === qualificationEpoch &&
+        mpgCommandBlockMessage(get()) === null,
       source: 'system',
     });
     if (evidence === null) return;
@@ -271,6 +280,35 @@ async function refreshHandshakeBuildInfo(
       ),
     }));
   }
+}
+
+function parkHandshakeForMpg(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  connection: NonNullable<LiveRefs['connection']>,
+  guard: HandshakeEpochGuard,
+): boolean {
+  if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return true;
+  const state = get();
+  if (state.controllerSessionEpoch !== guard.expectedSessionEpoch) return true;
+  const message = mpgCommandBlockMessage(state);
+  if (message === null) return false;
+  refs.settingsCollector = idleCollector();
+  refs.settingsCollectorSessionEpoch = null;
+  set((current) => {
+    if (current.controllerSessionEpoch !== guard.expectedSessionEpoch) return {};
+    return {
+      ...failedControllerQualificationPatch(current, guard.expectedSessionEpoch, message),
+      controllerOperation:
+        current.controllerOperation?.kind === 'connection-handshake'
+          ? null
+          : current.controllerOperation,
+      lastWriteError: message,
+      log: pushLog(current, `[lf2] Controller handshake parked: ${message}`),
+    };
+  });
+  return true;
 }
 
 function qualificationCompleted(state: LaserState, expectedEpoch: number): boolean {

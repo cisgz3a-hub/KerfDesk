@@ -37,6 +37,8 @@ export const FIRE_ACTIVE_COMMAND_MESSAGE =
   'Release the momentary Fire control before sending another machine command.';
 export const MPG_ACTIVE_MOTION_MESSAGE =
   'Jog and Frame are unavailable while grblHAL reports MPG mode active. Return motion control from the pendant/MPG to KerfDesk and wait for an MPG:0 report.';
+export const MPG_ACTIVE_COMMAND_MESSAGE =
+  'This machine command is unavailable while grblHAL reports MPG mode active. Return control from the pendant/MPG to KerfDesk and wait for an MPG:0 report.';
 export const TOOL_CHANGE_NOT_IDLE_MESSAGE =
   'Waiting for the machine to reach the tool-change position. Jog, probe, and Zero Z unlock once it reports Idle.';
 export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
@@ -121,6 +123,8 @@ export function toolChangeHoldEntryPatch(
 // established Z zero before the emitted spindle-off clearance move can be
 // trusted to target the configured safe height.
 export function toolChangeContinueBlockMessage(state: LaserState): string | null {
+  const mpgBlock = mpgCommandBlockMessage(state);
+  if (mpgBlock !== null) return mpgBlock;
   if (!toolChangeReady(state)) return TOOL_CHANGE_NOT_IDLE_MESSAGE;
   if (
     !isWorkZEvidenceCurrentForStart(
@@ -170,6 +174,16 @@ export function motionOperationCommandBlockMessage(state: LaserState): string | 
 
 export function setupCommandBlockMessage(state: LaserState): string | null {
   return activeJobCommandBlockMessage(state) ?? motionOperationCommandBlockMessage(state);
+}
+
+/**
+ * The grblHAL MPG field is an authoritative, latched competing-owner signal.
+ * Missing later fields do not release it; only MPG:0 or a new session does.
+ * Call this at every app-owned machine-command boundary while keeping
+ * status, emergency/recovery, and fail-off traffic explicitly exempt.
+ */
+export function mpgCommandBlockMessage(state: LaserState): string | null {
+  return state.mpgActive === true ? MPG_ACTIVE_COMMAND_MESSAGE : null;
 }
 
 export function jogFrameCommandBlockMessage(state: LaserState): string | null {

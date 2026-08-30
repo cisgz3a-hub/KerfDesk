@@ -27,7 +27,7 @@ import {
   type LaserSafetyAction,
 } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
-import { pushLog } from './laser-store-helpers';
+import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 
 type SetFn = (
@@ -114,6 +114,7 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
 }
 
 export async function runConfirmedResumeJob(context: PauseResumeContext): Promise<void> {
+  assertResumeCommandOwnership(context);
   assertNoPauseResumeTransition(context);
   // ADR-180 amendment 2 (2026-07-25): Resume is door-confirmed whenever the
   // driver has a door byte, for CNC as well as laser — Pause parked via Door, so
@@ -132,6 +133,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
   let finishedWithoutRefill = false;
 
   await runOwnedPauseResumeTransition(context, 'resume', timeoutMessage, async (token) => {
+    assertResumeCommandOwnership(context);
     if (resumeByte !== null && confirmedDoorResume) {
       await sendRealtimeAndConfirmPauseResume(context, {
         token,
@@ -150,6 +152,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
         action: 'resume',
       });
     }
+    assertResumeCommandOwnership(context);
     finishedWithoutRefill = await refillResumedStream(context, {
       token,
       liveness: !laserJob && confirmedDoorResume ? 'cnc-door' : 'none',
@@ -242,9 +245,21 @@ function assertCurrentPauseConfirmation(context: PauseResumeContext, requireProo
 }
 
 function assertCurrentResumeConfirmation(context: PauseResumeContext): void {
+  assertResumeCommandOwnership(context);
   const state = context.get().statusReport?.state;
   if (state === 'Run' || state === 'Idle') return;
   throw new Error(RESUME_CONFIRMATION_TIMEOUT_MESSAGE);
+}
+
+function assertResumeCommandOwnership(context: PauseResumeContext): void {
+  const state = context.get();
+  const blocked = mpgCommandBlockMessage(state);
+  if (blocked === null) return;
+  context.set({
+    lastWriteError: blocked,
+    log: pushLog(state, `[lf2] Resume blocked: ${blocked}`),
+  });
+  throw new Error(blocked);
 }
 
 function accessoriesAreOff(

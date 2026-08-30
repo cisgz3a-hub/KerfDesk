@@ -90,6 +90,73 @@ afterEach(async () => {
 });
 
 describe('home command timeout', () => {
+  it.each(['Run', 'Hold', 'Jog'] as const)(
+    'writes no Home command while the controller is known %s',
+    async (controllerState) => {
+      const writes: string[] = [];
+      let rejectUnexpectedWrite = false;
+      const connection = makeConnection(async (data) => {
+        writes.push(data);
+        if (rejectUnexpectedWrite) throw new Error(`unexpected wire write: ${data}`);
+      });
+      await connectWith(connection);
+      writes.length = 0;
+      rejectUnexpectedWrite = true;
+      useLaserStore.setState({
+        statusReport: {
+          ...useLaserStore.getState().statusReport,
+          state: controllerState,
+        } as NonNullable<ReturnType<typeof useLaserStore.getState>['statusReport']>,
+      });
+
+      await expect(useLaserStore.getState().home()).rejects.toThrow(/Idle or Alarm/i);
+
+      expect(writes).toEqual([]);
+      expect(useLaserStore.getState().controllerOperation).toBeNull();
+    },
+  );
+
+  it('retains intentional Home-from-Alarm recovery', async () => {
+    const writes: string[] = [];
+    let rejectCapturedHome = false;
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (rejectCapturedHome && data === '$H\n') throw new Error('captured Alarm recovery Home');
+    });
+    await connectWith(connection);
+    writes.length = 0;
+    rejectCapturedHome = true;
+    useLaserStore.setState({
+      alarmCode: 1,
+      statusReport: {
+        ...useLaserStore.getState().statusReport,
+        state: 'Alarm',
+      } as NonNullable<ReturnType<typeof useLaserStore.getState>['statusReport']>,
+    });
+
+    await expect(useLaserStore.getState().home()).rejects.toThrow('captured Alarm recovery Home');
+
+    expect(writes).toEqual(['$H\n']);
+  });
+
+  it('writes no Home command before any controller status or Alarm evidence exists', async () => {
+    const writes: string[] = [];
+    let rejectUnexpectedWrite = false;
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (rejectUnexpectedWrite) throw new Error(`unexpected wire write: ${data}`);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+    rejectUnexpectedWrite = true;
+    useLaserStore.setState({ statusReport: null, statusObservation: null, alarmCode: null });
+
+    await expect(useLaserStore.getState().home()).rejects.toThrow(/known Idle or Alarm/i);
+
+    expect(writes).toEqual([]);
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+  });
+
   it('writes no Home command while an older terminal acknowledgement is owed', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {

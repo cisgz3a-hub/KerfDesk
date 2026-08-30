@@ -4,6 +4,7 @@
 
 import {
   cancel as cancelStreamer,
+  pause as pauseStreamer,
   wipeInFlight,
   type StatusReport,
   type StreamerState,
@@ -24,6 +25,7 @@ import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './liv
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
 import { frameStatusFailurePatch, jogMpgInterruptionPatch } from './frame-status-failure';
+import { isActiveJob, MPG_ACTIVE_COMMAND_MESSAGE, pushLog } from './laser-store-helpers';
 
 export function handleStatusLine(
   set: SetFn,
@@ -111,6 +113,7 @@ export function handleStatusLine(
     ...frameFailurePatch,
     ...permitInterruptionPatch,
     ...jogMpgInterruption,
+    ...mpgJobInterruptionPatch(state, report),
   });
   observeStatusConsumers(set, refs, state, nextSequence, report);
   if (queuedFrameDispatch !== null)
@@ -121,6 +124,22 @@ export function handleStatusLine(
       queuedFrameDispatch.line,
       queuedFrameDispatch.operation.operationId,
     );
+}
+
+function mpgJobInterruptionPatch(
+  state: LaserState,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'streamer' | 'liveCanvasRun' | 'lastWriteError' | 'log'>> {
+  if (report.mpgActive !== true || state.mpgActive === true || !isActiveJob(state.streamer)) {
+    return {};
+  }
+  const message = `Job streaming paused: ${MPG_ACTIVE_COMMAND_MESSAGE}`;
+  return {
+    streamer: state.streamer === null ? null : pauseStreamer(state.streamer),
+    ...liveCanvasLifecyclePatch(state, 'paused'),
+    lastWriteError: message,
+    log: pushLog(state, `[lf2] ${message}`),
+  };
 }
 
 function recoverUncertainAutofocus(
@@ -168,7 +187,12 @@ function handleInvalidatingStatus(
     wcoCache: null,
     ovCache: null,
     accessoryCache: null,
-    mpgActive: null,
+    // Alarm/Sleep does not create a new transport session, so a sparse status
+    // frame cannot clear an existing MPG latch. An explicit field remains
+    // authoritative, and first acquisition applies the ordinary ownership
+    // invalidations before Home-from-Alarm can dispatch.
+    mpgActive: state.mpgActive ?? null,
+    ...mpgOwnershipPatch(report, state),
     ...originUnknownAfterControllerReset(state),
     motionOperation: null,
     controllerOperation: null,

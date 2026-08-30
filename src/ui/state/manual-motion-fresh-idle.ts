@@ -7,9 +7,10 @@ import type { TranscriptSource } from './laser-transcript';
 type GetFn = () => LaserState;
 type WriteFn = (
   line: string,
-  action?: LaserSafetyAction,
-  source?: TranscriptSource,
+  action: LaserSafetyAction | undefined,
+  source: TranscriptSource,
 ) => Promise<void>;
+type ManualMotionRefs = Pick<LiveRefs, 'driver' | 'controllerStatusWait'>;
 
 export const MANUAL_MOTION_STATUS_MAX_AGE_MS = 1_000;
 export const MANUAL_MOTION_STATUS_TIMEOUT_MESSAGE =
@@ -17,9 +18,10 @@ export const MANUAL_MOTION_STATUS_TIMEOUT_MESSAGE =
 
 export async function confirmFreshManualMotionIdle(args: {
   readonly get: GetFn;
-  readonly refs: LiveRefs;
+  readonly refs: ManualMotionRefs;
   readonly write: WriteFn;
-  readonly action: Extract<LaserSafetyAction, 'jog' | 'frame' | 'origin'>;
+  readonly action: Extract<LaserSafetyAction, 'jog' | 'frame' | 'origin' | 'console'>;
+  readonly source?: TranscriptSource;
   readonly timeoutMs?: number;
   readonly now?: () => number;
 }): Promise<StatusReport> {
@@ -31,7 +33,7 @@ export async function confirmFreshManualMotionIdle(args: {
 
   const query = args.refs.driver.realtime.statusQuery;
   if (query === null) throw new Error(MANUAL_MOTION_STATUS_TIMEOUT_MESSAGE);
-  await args.write(query, args.action, 'motion');
+  await args.write(query, args.action, args.source ?? 'motion');
   const afterWrite = args.get();
   const stamp = {
     sessionEpoch: afterWrite.controllerSessionEpoch,

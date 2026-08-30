@@ -41,6 +41,7 @@ import {
 import {
   assertAutofocusIdle,
   isActiveJob,
+  mpgCommandBlockMessage,
   pushLog,
   setupCommandBlockMessage,
   toolChangeContinueBlockMessage,
@@ -436,6 +437,11 @@ async function runContinueToolChange(
   if (toSend.length > 0) {
     try {
       await safeWrite(toSend, 'resume');
+      const mpgBlock = mpgCommandBlockMessage(get());
+      if (mpgBlock !== null) {
+        set({ lastWriteError: mpgBlock });
+        return;
+      }
       set((state) => liveCanvasExecutionAcceptedPatch(state));
     } catch (err) {
       containActiveStreamWriteFailure(set, refs, safeWrite, 'resume');

@@ -8,6 +8,7 @@ import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { SerialConnection } from '../../platform/types';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import {
+  mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   setupBlockingJobCommandBlockMessage,
 } from './laser-store-helpers';
@@ -113,6 +114,8 @@ function probeStateBlockReason(state: LaserState, refs: ProbePolicyRefs): string
   if (activeJobBlock !== null) return activeJobBlock;
   const motionBlock = motionOperationCommandBlockMessage(state);
   if (motionBlock !== null) return motionBlock;
+  const mpgBlock = mpgCommandBlockMessage(state);
+  if (mpgBlock !== null) return mpgBlock;
   if (state.autofocusBusy) return 'Auto-focus is running.';
   if (state.probeBusy) return 'A probe cycle is already running.';
   if (state.pendingUntrackedAcks > 0 || refs.controllerCommand !== null) {

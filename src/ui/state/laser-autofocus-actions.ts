@@ -4,6 +4,7 @@ import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
 import {
   activeJobCommandBlockMessage,
+  mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
 } from './laser-store-helpers';
@@ -74,6 +75,8 @@ function autofocusBlockMessage(state: LaserState, refs: LiveRefs): string | null
   const commandBlock =
     activeJobCommandBlockMessage(state) ?? motionOperationCommandBlockMessage(state);
   if (commandBlock !== null) return commandBlock;
+  const mpgBlock = mpgCommandBlockMessage(state);
+  if (mpgBlock !== null) return mpgBlock;
   if (state.autofocusBusy) return 'Auto-focus is already running.';
   if (
     state.pendingUntrackedAcks > 0 ||

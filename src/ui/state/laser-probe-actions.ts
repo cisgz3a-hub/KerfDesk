@@ -17,7 +17,7 @@ import {
 import { failProbeTransaction } from './laser-probe-recovery';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { invalidProbeEvidence, probeLines, probePreflight } from './laser-probe-policy';
-import { pushLog } from './laser-store-helpers';
+import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { useStore } from './store';
@@ -72,13 +72,15 @@ async function runProbe(
   try {
     for (let index = 0; index < lines.length; index += 1) {
       pendingLine = lines[index] ?? '';
+      assertProbeWireOwnership(get(), refs, connection, transactionId, pendingLine);
       await sendProbeLine(refs, safeWrite, pendingLine, `probe line ${index + 1}`, 'motion');
-      assertCurrentProbe(get(), refs, connection, transactionId);
+      assertProbeWireOwnership(get(), refs, connection, transactionId, pendingLine);
     }
     setProbePhase(set, transactionId, 'settling');
     pendingLine = refs.driver.commands.settleDwell;
+    assertProbeWireOwnership(get(), refs, connection, transactionId, pendingLine);
     await sendProbeLine(refs, safeWrite, pendingLine, 'probe settle marker', 'system');
-    assertCurrentProbe(get(), refs, connection, transactionId);
+    assertProbeWireOwnership(get(), refs, connection, transactionId, pendingLine);
     setProbePhase(set, transactionId, 'awaiting-idle');
     pendingLine = 'fresh Idle after probe';
     await waitForFreshIdle(refs, {
@@ -164,6 +166,20 @@ function assertCurrentProbe(
   if (refs.connection !== connection || !isCurrentProbe(state, transactionId)) {
     throw new Error('Probe transaction lost controller ownership.');
   }
+}
+
+function assertProbeWireOwnership(
+  state: LaserState,
+  refs: ProbeRefs,
+  connection: SerialConnection,
+  transactionId: number,
+  line: string,
+): void {
+  assertCurrentProbe(state, refs, connection, transactionId);
+  const normalized = line.trim().toUpperCase();
+  if (normalized === 'M5' || normalized === 'M9') return;
+  const mpgBlock = mpgCommandBlockMessage(state);
+  if (mpgBlock !== null) throw new Error(mpgBlock);
 }
 
 function isCurrentProbe(state: LaserState, transactionId: number): boolean {

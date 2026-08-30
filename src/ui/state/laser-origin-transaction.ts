@@ -2,12 +2,13 @@ import { type LaserControllerOperation } from './laser-controller-operation';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
-import { pushLog } from './laser-store-helpers';
+import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
+type GetFn = () => LaserState;
 
 export type OriginSafeWrite = (
   line: string,
@@ -19,6 +20,7 @@ export type OriginCommandWriter = (write: (line: string) => Promise<void>) => Pr
 
 export async function runOriginTransaction(
   set: SetFn,
+  get: GetFn,
   refs: ControllerLifecycleRefs,
   safeWrite: OriginSafeWrite,
   label: string,
@@ -36,6 +38,7 @@ export async function runOriginTransaction(
   try {
     await writeCommands(async (line) => {
       pendingLine = line;
+      assertOriginWireOwnership(get);
       await startControllerCommand(refs, safeWrite, {
         kind: 'interactive-command',
         label,
@@ -43,6 +46,7 @@ export async function runOriginTransaction(
         action: 'origin',
         source: 'origin',
       });
+      assertOriginWireOwnership(get);
     });
     // successPatch may await a fresh controller frame — Set Origin waits for the
     // post-G92 work-offset report so it never records a location-unknown origin.
@@ -75,6 +79,11 @@ export async function runOriginTransaction(
     }));
     throw error instanceof Error ? error : new Error(message);
   }
+}
+
+function assertOriginWireOwnership(get: GetFn): void {
+  const mpgBlock = mpgCommandBlockMessage(get());
+  if (mpgBlock !== null) throw new Error(mpgBlock);
 }
 
 export function unknownOriginPatch(): Partial<LaserState> {

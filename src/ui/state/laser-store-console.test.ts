@@ -178,7 +178,9 @@ describe('laser-store console commands', () => {
   });
 
   it('requires fresh position after console motion without discarding work-zero authority', async () => {
-    const connection = makeConnection(async () => undefined);
+    const connection = makeConnection(async () => undefined, {
+      autoRespondToStatusQuery: true,
+    });
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,5.000|WCO:12.000,34.000,5.000|FS:0,0>');
     useLaserStore.setState({
@@ -251,7 +253,9 @@ describe('laser-store console commands', () => {
   });
 
   it('invalidates only XY setup truth for an XY-only console origin command', async () => {
-    const connection = makeConnection(async () => undefined);
+    const connection = makeConnection(async () => undefined, {
+      autoRespondToStatusQuery: true,
+    });
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,5.000|WCO:12.000,34.000,5.000|FS:0,0>');
     useLaserStore.setState({
@@ -283,7 +287,9 @@ describe('laser-store console commands', () => {
   });
 
   it('invalidates Z truth but preserves XY authority for a console tool-length change', async () => {
-    const connection = makeConnection(async () => undefined);
+    const connection = makeConnection(async () => undefined, {
+      autoRespondToStatusQuery: true,
+    });
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,5.000|WCO:12.000,34.000,5.000|FS:0,0>');
     useLaserStore.setState({
@@ -332,18 +338,24 @@ describe('laser-store console commands', () => {
 
   it('requires confirmation and Idle state while preserving position for non-positional settings', async () => {
     const writes: string[] = [];
-    const connection = makeConnection(async (data) => {
-      writes.push(data);
-    });
+    const connection = makeConnection(
+      async (data) => {
+        writes.push(data);
+      },
+      { autoRespondToStatusQuery: true },
+    );
     await connectWith(connection);
+    writes.length = 0;
     useLaserStore.setState({ statusReport: null, statusObservation: null });
 
     await expect(useLaserStore.getState().sendConsoleCommand('$32=1')).rejects.toThrow(
       /confirmation/i,
     );
-    await expect(
-      useLaserStore.getState().sendConsoleCommand('$32=1', { confirmed: true }),
-    ).rejects.toThrow(/Idle status report/i);
+    await useLaserStore.getState().sendConsoleCommand('$32=1', { confirmed: true });
+    expect(writes.slice(-2)).toEqual(['?', '$32=1\n']);
+    connection.emitLine('ok');
+    await flushConnect();
+    writes.length = 0;
 
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     useLaserStore.setState({

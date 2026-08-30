@@ -419,9 +419,14 @@ function handleAlarmLine(
       : {};
   set({
     alarmCode: code,
+    // ALARM:N supersedes any prior Run/Hold report. Clearing it lets the
+    // numbered alarm itself be the exact recovery evidence for Home.
+    statusReport: null,
     wcoCache: null,
     accessoryCache: null,
-    mpgActive: null,
+    // ALARM:N is not a new transport session, so it cannot clear a latched
+    // pendant owner. Only explicit MPG:0 or session replacement may do that.
+    mpgActive: prev.mpgActive ?? null,
     ...originUnknownAfterControllerReset(prev),
     motionOperation: null,
     controllerOperation: null,

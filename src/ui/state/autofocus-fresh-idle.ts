@@ -5,6 +5,7 @@ import {
 } from './laser-controller-status-wait';
 import type { LiveRefs, LaserState } from './laser-store';
 import type { LaserSafetyAction } from './laser-safety-notice';
+import { mpgCommandBlockMessage } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
 
 type GetFn = () => LaserState;
@@ -38,6 +39,8 @@ export async function confirmFreshAutofocusIdle(args: {
   if (args.get().controllerSessionEpoch !== afterWrite.sessionEpoch) {
     throw new Error('Controller session changed before auto-focus could start.');
   }
+  const mpgBlock = mpgCommandBlockMessage(args.get());
+  if (mpgBlock !== null) throw new Error(mpgBlock);
   return report;
 }
 

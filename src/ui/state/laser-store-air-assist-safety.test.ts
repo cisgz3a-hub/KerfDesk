@@ -70,6 +70,14 @@ async function flushConnect(): Promise<void> {
   for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
+function deferredVoid(): { readonly promise: Promise<void>; readonly resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -120,6 +128,67 @@ describe('laser store air assist safety cleanup', () => {
 
     expect(write).toHaveBeenCalledWith('M9\n');
     expect(useLaserStore.getState().airAssistOn).toBe(false);
+  });
+
+  it('fails air off when MPG ownership arrives while the on write is pending', async () => {
+    const activation = deferredVoid();
+    const write = vi.fn<(data: string) => Promise<void>>(async (data) => {
+      if (data === 'M8\n') await activation.promise;
+    });
+    const connection = makeConnection(write);
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
+    await connectWith(connection);
+
+    write.mockClear();
+    const pending = useLaserStore.getState().setAirAssistEnabled(true);
+    await vi.waitFor(() => expect(write).toHaveBeenCalledWith('M8\n'));
+    expect(useLaserStore.getState().airAssistOn).toBe(true);
+
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:1>');
+    activation.resolve();
+    await pending;
+
+    expect(write.mock.calls.map(([line]) => line)).toEqual(['M8\n', 'M9\n']);
+    expect(useLaserStore.getState().mpgActive).toBe(true);
+    expect(useLaserStore.getState().airAssistOn).toBe(false);
+  });
+
+  it('retains the uncertain air-on latch when MPG takeover cleanup fails', async () => {
+    const activation = deferredVoid();
+    const write = vi.fn<(data: string) => Promise<void>>(async (data) => {
+      if (data === 'M8\n') await activation.promise;
+      if (data === 'M9\n') throw new Error('cleanup transport failed');
+    });
+    const connection = makeConnection(write);
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
+    await connectWith(connection);
+
+    write.mockClear();
+    const pending = useLaserStore.getState().setAirAssistEnabled(true);
+    await vi.waitFor(() => expect(write).toHaveBeenCalledWith('M8\n'));
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:1>');
+    activation.resolve();
+    await pending;
+
+    expect(write.mock.calls.map(([line]) => line)).toEqual(['M8\n', 'M9\n']);
+    expect(useLaserStore.getState().airAssistOn).toBe(true);
+  });
+
+  it('retains the uncertain air-on latch when the activation write rejects', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async (data) => {
+      if (data === 'M8\n') throw new Error('ambiguous activation write');
+    });
+    const connection = makeConnection(write);
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
+    await connectWith(connection);
+
+    write.mockClear();
+    await expect(useLaserStore.getState().setAirAssistEnabled(true)).rejects.toThrow(
+      'ambiguous activation write',
+    );
+
+    expect(write).toHaveBeenCalledWith('M8\n');
+    expect(useLaserStore.getState().airAssistOn).toBe(true);
   });
 
   it('blocks manual air assist on when Device Profile has no air output command', async () => {

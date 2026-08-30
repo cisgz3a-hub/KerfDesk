@@ -140,6 +140,26 @@ describe('laser-store machine settings', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
+  it('emits no build-info or modal continuation after MPG takeover during a settings read', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    const read = useLaserStore.getState().readMachineSettings();
+    await flush();
+    expect(writes).toEqual(['$$\n']);
+    connection.emitLine('$30=900');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:1>');
+    connection.emitLine('ok');
+
+    await expect(read).rejects.toThrow(/MPG|pulse generator/i);
+    expect(writes).toEqual(['$$\n']);
+    expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
+  });
+
   it('re-reads the active WCS once a post-reset settings re-qualification completes (C6)', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
@@ -275,6 +295,30 @@ describe('laser-store machine settings', () => {
     connection.emitLine('ok');
     await write;
 
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+  });
+
+  it('emits no verification query after MPG takeover during a setting write', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({
+      statusReport: idleStatus(),
+      grblSettingsRows: settingsMapToRows(new Map([[30, '900']])),
+      lastSettingsReadAt: Date.now(),
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    writes.length = 0;
+
+    const write = useLaserStore.getState().writeGrblSetting(30, '1000');
+    await flush();
+    expect(writes).toEqual(['$30=1000\n']);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:1>');
+    connection.emitLine('ok');
+
+    await expect(write).rejects.toThrow(/MPG|pulse generator/i);
+    expect(writes).toEqual(['$30=1000\n']);
     expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
