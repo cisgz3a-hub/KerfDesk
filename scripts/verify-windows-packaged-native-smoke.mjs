@@ -16,6 +16,7 @@ export function validateNativeSmokeResult(result, expectedUserData) {
     ...(result?.isolated === true ? [] : ['profile was not isolated']),
     ...(normalizedPath(result?.userData) === expected ? [] : ['userData path mismatch']),
     ...(normalizedPath(result?.sessionData) === expected ? [] : ['sessionData path mismatch']),
+    ...(result?.windowVisible === true ? [] : ['window did not become visible']),
     ...(failures.length === 0 ? [] : [`runtime failures: ${failures.join(' / ')}`]),
     ...(renderer?.readyToShow === true ? [] : ['ready-to-show was not reached']),
     ...(renderer?.imported === true ? [] : ['SVG import was not observed']),

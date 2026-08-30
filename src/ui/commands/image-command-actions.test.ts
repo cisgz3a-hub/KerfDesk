@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createProject,
   IDENTITY_TRANSFORM,
@@ -6,7 +6,17 @@ import {
   type RasterImage,
   type TracedImage,
 } from '../../core/scene';
-import { retraceOriginalAction, traceSourceForTracedImage } from './image-command-actions';
+import { createRectangle } from '../../core/shapes/primitives';
+import { cropMaskedRasterImage } from '../raster/crop-image';
+import { useStore } from '../state';
+import { resetStore } from '../state/test-helpers';
+import {
+  cropImageAction,
+  retraceOriginalAction,
+  traceSourceForTracedImage,
+} from './image-command-actions';
+
+vi.mock('../raster/crop-image', () => ({ cropMaskedRasterImage: vi.fn() }));
 
 function raster(): RasterImage {
   return {
@@ -60,6 +70,19 @@ function projectWith(...objects: Project['scene']['objects']): Project {
   return { ...base, scene: { ...base.scene, objects } };
 }
 
+function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+beforeEach(() => {
+  resetStore();
+  vi.mocked(cropMaskedRasterImage).mockReset();
+});
+
 describe('retraceOriginalAction', () => {
   it('finds the original raster for a trace by traceSourceId', () => {
     const source = raster();
@@ -103,5 +126,110 @@ describe('retraceOriginalAction', () => {
       'Original raster for logo.png is missing. Re-trace needs the kept source image.',
       'error',
     );
+  });
+});
+
+describe('cropImageAction document ownership', () => {
+  it('does not publish a delayed crop into a replacement project with the same ids', async () => {
+    const imageA = raster();
+    const maskA = createRectangle({
+      id: 'M1',
+      color: '#000000',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    });
+    const maskedA = { ...imageA, imageMaskId: maskA.id };
+    const imageB = { ...raster(), source: 'project-b.png', imageMaskId: maskA.id };
+    const maskB = { ...maskA };
+    const projectA = projectWith(maskedA, maskA);
+    const projectB = projectWith(imageB, maskB);
+    const pending = deferred<RasterImage>();
+    const cropImage = vi.fn();
+    const pushToast = vi.fn();
+    vi.mocked(cropMaskedRasterImage).mockReturnValue(pending.promise);
+    useStore.setState({ project: projectA, projectDocumentEpoch: 20 });
+
+    cropImageAction(
+      {
+        project: projectA,
+        projectDocumentEpoch: 20,
+        applyImageMask: vi.fn(),
+        cropImage,
+        removeImageMask: vi.fn(),
+      },
+      maskedA,
+      pushToast,
+    )();
+    useStore.setState({ project: projectB, projectDocumentEpoch: 21 });
+    pending.resolve({ ...imageA, source: 'cropped-project-a.png' });
+    await pending.promise;
+    await Promise.resolve();
+
+    expect(cropImage).not.toHaveBeenCalled();
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it('does not publish when the masked source identity changes inside the same document', async () => {
+    const mask = createRectangle({
+      id: 'M1',
+      color: '#000000',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    });
+    const source = { ...raster(), imageMaskId: mask.id };
+    const replacement = { ...source, source: 'replacement.png' };
+    const projectA = projectWith(source, mask);
+    const pending = deferred<RasterImage>();
+    const cropImage = vi.fn();
+    vi.mocked(cropMaskedRasterImage).mockReturnValue(pending.promise);
+    useStore.setState({ project: projectA, projectDocumentEpoch: 25 });
+
+    cropImageAction(
+      {
+        project: projectA,
+        projectDocumentEpoch: 25,
+        applyImageMask: vi.fn(),
+        cropImage,
+        removeImageMask: vi.fn(),
+      },
+      source,
+      vi.fn(),
+    )();
+    useStore.setState({ project: projectWith(replacement, mask), projectDocumentEpoch: 25 });
+    pending.resolve({ ...source, source: 'cropped.png' });
+    await pending.promise;
+    await Promise.resolve();
+
+    expect(cropImage).not.toHaveBeenCalled();
+  });
+
+  it('publishes a crop while the initiating image and mask still own the document', async () => {
+    const mask = createRectangle({
+      id: 'M1',
+      color: '#000000',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    });
+    const source = { ...raster(), imageMaskId: mask.id };
+    const cropped = { ...source, source: 'cropped.png' };
+    const project = projectWith(source, mask);
+    const cropImage = vi.fn();
+    const pushToast = vi.fn();
+    vi.mocked(cropMaskedRasterImage).mockResolvedValue(cropped);
+    useStore.setState({ project, projectDocumentEpoch: 26 });
+
+    cropImageAction(
+      {
+        project,
+        projectDocumentEpoch: 26,
+        applyImageMask: vi.fn(),
+        cropImage,
+        removeImageMask: vi.fn(),
+      },
+      source,
+      pushToast,
+    )();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(cropImage).toHaveBeenCalledWith(source.id, cropped);
+    expect(pushToast).toHaveBeenCalledWith(`Cropped image: ${source.source}`, 'success');
   });
 });

@@ -11,7 +11,7 @@ function cleanSession() {
 }
 
 beforeEach(() => {
-  useImageEditorStore.setState({ session: null, isApplying: false });
+  useImageEditorStore.setState({ session: null, isApplying: false, applyRequest: null });
   vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(() => undefined);
 });
 

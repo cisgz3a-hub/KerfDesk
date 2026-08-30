@@ -63,7 +63,14 @@ function selectedCount(): number {
 
 beforeEach(() => {
   appliedComposite.data = null;
-  useImageEditorStore.setState({ session: null, transform: null, stash: {} });
+  useImageEditorStore.setState({
+    session: null,
+    sessionOwner: null,
+    isApplying: false,
+    applyRequest: null,
+    transform: null,
+    stash: {},
+  });
 });
 
 describe('wandAt', () => {

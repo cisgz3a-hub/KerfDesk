@@ -11,6 +11,7 @@ test('accepts only packaged, isolated, ready/imported/saved results', () => {
     isolated: true,
     userData,
     sessionData: userData,
+    windowVisible: true,
     failures: [],
     renderer: {
       readyToShow: true,
@@ -21,6 +22,33 @@ test('accepts only packaged, isolated, ready/imported/saved results', () => {
     },
   };
   assert.equal(validateNativeSmokeResult(result, userData), result);
+});
+
+test('rejects readiness evidence when the packaged window never became visible', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  assert.throws(
+    () =>
+      validateNativeSmokeResult(
+        {
+          ok: true,
+          isPackaged: true,
+          isolated: true,
+          userData,
+          sessionData: userData,
+          windowVisible: false,
+          failures: [],
+          renderer: {
+            readyToShow: true,
+            imported: true,
+            saved: true,
+            savedBytes: 2048,
+            url: 'app://app/index.html',
+          },
+        },
+        userData,
+      ),
+    /window did not become visible/,
+  );
 });
 
 test('rejects a legacy or mismatched profile before accepting UI evidence', () => {

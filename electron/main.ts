@@ -392,6 +392,10 @@ function installDevTools(window: BrowserWindow): void {
 
 async function createWindow(): Promise<void> {
   const window = createMainWindow();
+  // `ready-to-show` is a one-shot event and can precede did-finish-load.
+  // Attach before starting renderer loading so fast packaged loads cannot
+  // leave the initially hidden window invisible forever.
+  window.once('ready-to-show', () => window.show());
   installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
 
@@ -467,8 +471,6 @@ async function createWindow(): Promise<void> {
   // can see errors without having to open DevTools manually. Removed in the
   // packaged build via the app.isPackaged guard.
   installDevTools(window);
-
-  window.once('ready-to-show', () => window.show());
 }
 
 async function startCameraBridgeSafely(): Promise<void> {

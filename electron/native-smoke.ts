@@ -1,6 +1,7 @@
 import type { App, BrowserWindow } from 'electron';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
+import { createNativeSmokeTerminalClaim } from './native-smoke-terminal-claim.js';
 
 const USER_DATA_ARG = '--kerfdesk-native-smoke-user-data=';
 const RESULT_ARG = '--kerfdesk-native-smoke-result=';
@@ -31,10 +32,10 @@ export function installPackagedNativeSmoke(input: {
 }): void {
   if (input.config === null) return;
   const failures: string[] = [];
-  let finished = false;
+  const claimTerminal = createNativeSmokeTerminalClaim();
   const timeout = setTimeout(() => {
-    finished = true;
-    void finishNativeSmoke(input, failures, { readyToShow: false }, false, 'ready timeout');
+    if (!claimTerminal()) return;
+    void finishNativeSmoke(input, failures, { readyToShow: false }, false, false, 'ready timeout');
   }, SMOKE_TIMEOUT_MS);
 
   input.window.webContents.on('did-fail-load', (_event, code, description, url) => {
@@ -44,21 +45,21 @@ export function installPackagedNativeSmoke(input: {
     if (level >= 3) failures.push(`console ${source}:${line}: ${message}`);
   });
   input.window.once('ready-to-show', () => {
-    if (finished) return;
     void runRendererSmoke(input.window)
       .then((renderer) => {
-        finished = true;
+        if (!claimTerminal()) return;
         clearTimeout(timeout);
-        return finishNativeSmoke(input, failures, renderer, true);
+        return finishNativeSmoke(input, failures, renderer, true, input.window.isVisible());
       })
       .catch((error: unknown) => {
-        finished = true;
+        if (!claimTerminal()) return;
         clearTimeout(timeout);
         return finishNativeSmoke(
           input,
           failures,
           { readyToShow: true },
           false,
+          input.window.isVisible(),
           error instanceof Error ? error.message : String(error),
         );
       });
@@ -74,6 +75,7 @@ async function finishNativeSmoke(
   failures: ReadonlyArray<string>,
   renderer: unknown,
   rendererOk: boolean,
+  windowVisible: boolean,
   error?: string,
 ): Promise<void> {
   const config = input.config;
@@ -82,9 +84,10 @@ async function finishNativeSmoke(
     input.app.getPath('userData') === config.userDataPath &&
     input.app.getPath('sessionData') === config.userDataPath;
   const result = {
-    ok: rendererOk && input.app.isPackaged && isolated && failures.length === 0,
+    ok: rendererOk && windowVisible && input.app.isPackaged && isolated && failures.length === 0,
     isPackaged: input.app.isPackaged,
     isolated,
+    windowVisible,
     userData: input.app.getPath('userData'),
     sessionData: input.app.getPath('sessionData'),
     failures,
