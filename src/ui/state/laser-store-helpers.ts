@@ -37,6 +37,7 @@ export const FIRE_ACTIVE_COMMAND_MESSAGE =
   'Release the momentary Fire control before sending another machine command.';
 export const MPG_ACTIVE_MOTION_MESSAGE =
   'Jog and Frame are unavailable while grblHAL reports MPG mode active. Return motion control from the pendant/MPG to KerfDesk and wait for an MPG:0 report.';
+/** Operator guidance for a command rejected while grblHAL MPG owns transport control. */
 export const MPG_ACTIVE_COMMAND_MESSAGE =
   'This machine command is unavailable while grblHAL reports MPG mode active. Return control from the pendant/MPG to KerfDesk and wait for an MPG:0 report.';
 export const TOOL_CHANGE_NOT_IDLE_MESSAGE =

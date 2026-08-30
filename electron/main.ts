@@ -91,6 +91,7 @@ import {
   readDesktopUpdateChannelTrust,
   resolveDesktopUpdateModes,
 } from './update-channel-trust.js';
+import { installWindowReadinessPolicy } from './window-readiness-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -392,10 +393,7 @@ function installDevTools(window: BrowserWindow): void {
 
 async function createWindow(): Promise<void> {
   const window = createMainWindow();
-  // `ready-to-show` is a one-shot event and can precede did-finish-load.
-  // Attach before starting renderer loading so fast packaged loads cannot
-  // leave the initially hidden window invisible forever.
-  window.once('ready-to-show', () => window.show());
+  installWindowReadinessPolicy(window);
   installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
 

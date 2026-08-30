@@ -1,17 +1,14 @@
 # Audit remediation ledger
 
-Historical 37-item implementation worktree:
-`C:\Users\Asus\.codex\worktrees\ab91\LaserForge-2.0` (no longer present).
+Historical 37-item implementation donor worktree: no longer present.
 
-Current independent Ultra-audit remediation worktree:
-`C:\Users\Asus\.codex\worktrees\ade9\LaserForge-2.0`, branch
+Current independent Ultra-audit remediation worktree: isolated review worktree, branch
 `codex/remediate-ultra-audit-20260830`, audited from exact `origin/main`
 `c26c9ca96a42ca26a883b968a5f539bc473cee5e` (tree
 `21ed530c3f712abde7ab07acab61fff65fb0e7d4`). The preceding advanced-CNC remediation is in that
 base through merged PR #704.
 
-Current-main integration worktree:
-`C:\Users\Asus\.codex\worktrees\remediation-37-integration\LaserForge-2.0`, branch
+Current-main integration worktree: historical isolated integration worktree, branch
 `codex/laserforge-audit-remediation-37`, based on
 `a6a4ba4885507fbac8320417708b9fcc6a0748b2`. The verified 37-item source integration commit is
 `b4c272654b18fc167762a46bc491a626c880bba1`.
@@ -28,7 +25,7 @@ source and automated-test evidence.
 ## Preserved last-100-PR audit history
 
 The following history is retained from `codex/pr100-remediation` rather than overwritten. Its source
-audit is `C:\Users\Asus\KerfDesk-pr-audits\2026-08-23-221807\audit-findings.md`.
+is the retained last-100-PR evidence report, `audit-findings.md`.
 
 | Finding | Remediation | Status | Verification |
 |---|---|---|---|
@@ -314,6 +311,15 @@ status traffic and schedule-bounded recovery/fail-off traffic remain available.
 | UA-R4 browser/release coverage | P2 test gap | browser smoke served only Vite development output; desktop package jobs installed a browser they never used | implemented: the independent Browser workflow adds a real `dist/web` build-and-preview smoke; package jobs remove unused browser provisioning; discovery keeps production smoke out of the default suite | production-bundle Playwright test, discovery/typecheck, workflow policy tests | One narrow production smoke is not perceptual review or full built-bundle E2E coverage |
 | UA-R5 coverage provenance | P3 | coverage Markdown dropped the checked-in baseline's explicit dirty-remediation scope | implemented: report JSON/Markdown preserves `baselineScope` | coverage-report unit regression | The historical mixed-state baseline remains non-reproducible from a commit alone |
 
+PR #705's exact-head review then exposed two additional UA-M4 schedules. A completed streamer could
+be cleared at Idle and immediately overwritten back to paused when that same report first carried
+`MPG:1`; and Probe could accept its final fresh-Idle proof after MPG takeover because the last check
+validated only transaction identity. Both deterministic regressions failed before their source fixes.
+They now pass in `laser-status-line.test.ts` and `laser-probe-actions.test.ts`: terminal Idle release
+wins without suppressing the MPG latch, and Probe rechecks factual wire ownership immediately before
+publishing Work-Z evidence. The 27-test focused set and 67 adjacent MPG/Frame/post-job/session tests
+passed under independent read-only review; no Start or warning policy changed.
+
 Source anchors for the table above:
 
 - **UA-M1 through UA-M5:** `src/ui/state/laser-store-helpers.ts`,
@@ -337,7 +343,7 @@ Source anchors for the table above:
   release-desktop-dry-run,release-desktop-preview,release-desktop-stable}.yml`,
   `scripts/resolve-web-deploy-identity.mjs`, `report-release-readiness.mjs`,
   `generate-release-evidence.mjs`, `report-coverage-trend.mjs`,
-  `check-playwright-discovery.mjs`, `playwright.production.config.ts`, and
+  `check-playwright-discovery.mjs`, `playwright-production.config.ts`, and
   `e2e/production-bundle.spec.ts`, with unit/structural contracts beside each script and under
   `src/platform/{web,electron}/`.
 
@@ -348,6 +354,14 @@ Source anchors for the table above:
   warning-only no-go/fixture analysis. No additional compile, preview, placement, or emission defect
   survived reconciliation.
 - **Policy-only:** browser trigger documentation drift is corrected with ADR-311; no runtime change.
+- **Review-refuted / tooling drift:** current GitHub Actions documentation explicitly supports
+  `concurrency.queue: max`; the older actionlint bundled with the review did not. The production
+  Playwright scenario also retains `.spec.ts`, matching the configured E2E convention and existing
+  browser suite rather than unit-test sibling naming.
+- **Review hygiene:** public-ledger paths were redacted, Electron window readiness was extracted to a
+  source-matching module/test, the production Playwright config and module constants were renamed to
+  repository conventions, ownership tests were placed beside their tested source, and the Fire latch
+  contract/JSDoc/test scheduler were corrected without changing product policy.
 - **External qualification:** the stable desktop lane remains deliberately inactive and requires a
   repository `STABLE_APPROVED_RELEASE_SHA` variable plus the protected environment/secrets before
   any authorized stable tag.
@@ -357,14 +371,16 @@ Source anchors for the table above:
 
 ### Integration verification state
 
-Recorded local verification milestones are revision-bounded; the first full gate preceded the late
-independent-review fixes above, so it is not exact-final-tree evidence:
+Recorded local verification milestones are revision-bounded:
 
 - the terminal post-review machine/Frame matrix: 24 files and 247 tests passed in 45.22 s, with
   typecheck and diff checks green; Frame/Start contracts were included and remained unchanged;
 - initial focused document/Electron regressions: 6 files and 36 tests passed;
 - the later Image Studio Apply/stash ownership slice: 6 files and 38 tests passed, with scoped
   ESLint, Prettier, typecheck, and diff checks green;
+- exact-head review reconciliation: 11 directly affected files and 76 tests passed, including the
+  two before/after machine-race regressions; 27 focused plus 67 adjacent machine ownership tests
+  independently passed, and scoped ESLint/Prettier/diff checks were green;
 - release-integrity contracts: 41 of 41 Node tests passed;
 - an earlier `pnpm release:check`: typecheck, lint, Electron lint, format, ADR numbering, action pinning,
   license closure (52 production packages across 8 licenses), 1,778 Vitest files and 11,202 tests,
@@ -374,7 +390,12 @@ independent-review fixes above, so it is not exact-final-tree evidence:
   suite; the production `dist/web` bundle smoke passed 1 of 1 in Chromium; and
 - `git diff --check` passed.
 
-The documentation reconciliation separately passed scoped Prettier, ADR-number, and diff checks.
-An exact-final-tree `pnpm release:check`, hosted exact-head CI, hosted browser evidence,
+The review-remediated source tree then passed an exact-final `pnpm release:check`: typecheck, full
+source and Electron lint, repo-wide Prettier, ADR numbering, seven pinned-action checks, license
+closure for 52 production packages across eight licenses, the full 1,796-file Vitest schedule with
+no failures, 41 of 41 release-integrity tests, the 2,360-module production web build, Electron-main
+build, both file-size policies, and the public-export no-growth ratchet all exited zero. This terminal
+evidence note is the only post-gate documentation mutation and is covered by the scoped Prettier and
+diff checks recorded with the integration commit. Hosted exact-head CI, hosted browser evidence,
 mergeability, review threads, automatic post-merge Pages publication, and final main ancestry remain
 separate states until their own terminal evidence is recorded.

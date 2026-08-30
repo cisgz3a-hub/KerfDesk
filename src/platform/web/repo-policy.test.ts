@@ -133,7 +133,7 @@ describe('repository policy enforcement contract', () => {
 
     expect(packageJson.scripts?.['test:e2e']).toBe('playwright test');
     expect(packageJson.scripts?.['test:e2e:production-bundle']).toContain(
-      '--config=playwright.production.config.ts',
+      '--config=playwright-production.config.ts',
     );
     expect(packageJson.scripts?.['typecheck:e2e']).toBe('tsc --noEmit -p e2e/tsconfig.json');
     expect(packageJson.scripts?.['release:check']).not.toContain('pnpm test:e2e');
@@ -143,8 +143,8 @@ describe('repository policy enforcement contract', () => {
     expect(repoFile('playwright.config.ts')).toContain(
       "testIgnore: ['**/production-bundle.spec.ts']",
     );
-    expect(repoFile('playwright.production.config.ts')).toContain('pnpm exec vite preview');
-    expect(repoFile('playwright.production.config.ts')).toContain('production-bundle.spec.ts');
+    expect(repoFile('playwright-production.config.ts')).toContain('pnpm exec vite preview');
+    expect(repoFile('playwright-production.config.ts')).toContain('production-bundle.spec.ts');
     expect(ciWorkflow).not.toContain('playwright install');
     expect(deployWorkflow).not.toContain('playwright install');
   });

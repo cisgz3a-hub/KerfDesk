@@ -25,7 +25,7 @@ const expectedFiles = browserTestFiles(e2eRoot)
 verifyDiscovery({ expectedFiles, args: [], label: 'default browser' });
 verifyDiscovery({
   expectedFiles: productionFiles,
-  args: ['--config=playwright.production.config.ts'],
+  args: ['--config=playwright-production.config.ts'],
   label: 'production bundle',
 });
 

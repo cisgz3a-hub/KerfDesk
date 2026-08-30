@@ -10,6 +10,10 @@ import {
   mpgCommandBlockMessage,
 } from './laser-store-helpers';
 
+const CONSOLE_RESET_COMMANDS = new Set<string>(['M112', 'M999']);
+const CONSOLE_FAIL_OFF_SEQUENCE_PATTERN = /^(?:M5|M9)(?:\s+(?:M5|M9))*$/;
+
+/** Returns the factual transport or operation precondition blocking a console command. */
 export function consoleCommandBlockReason(
   state: LaserState,
   command: Pick<
@@ -45,6 +49,7 @@ function consoleOperationBlockForCommand(
   return command.requiresNoActiveOperation ? consoleOperationBlockReason(state) : null;
 }
 
+/** Identifies console commands that need a fresh same-session Idle observation. */
 export function consoleCommandNeedsFreshIdle(command: PreparedConsoleCommand): boolean {
   return command.requiresIdle && !isConsoleRecoveryCommand(command);
 }
@@ -75,6 +80,6 @@ function isConsoleRecoveryCommand(
 ): boolean {
   if (command.kind === 'unlock') return true;
   const normalized = command.normalized.trim().toUpperCase();
-  if (normalized === 'M112' || normalized === 'M999') return true;
-  return /^(?:M5|M9)(?:\s+(?:M5|M9))*$/.test(normalized);
+  if (CONSOLE_RESET_COMMANDS.has(normalized)) return true;
+  return CONSOLE_FAIL_OFF_SEQUENCE_PATTERN.test(normalized);
 }

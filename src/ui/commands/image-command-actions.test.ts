@@ -201,6 +201,40 @@ describe('cropImageAction document ownership', () => {
     expect(cropImage).not.toHaveBeenCalled();
   });
 
+  it('does not publish when the exact mask identity changes inside the same document', async () => {
+    const mask = createRectangle({
+      id: 'M1',
+      color: '#000000',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    });
+    const source = { ...raster(), imageMaskId: mask.id };
+    const project = projectWith(source, mask);
+    const pending = deferred<RasterImage>();
+    const cropImage = vi.fn();
+    const pushToast = vi.fn();
+    vi.mocked(cropMaskedRasterImage).mockReturnValue(pending.promise);
+    useStore.setState({ project, projectDocumentEpoch: 60 });
+
+    cropImageAction(
+      {
+        project,
+        projectDocumentEpoch: 60,
+        applyImageMask: vi.fn(),
+        cropImage,
+        removeImageMask: vi.fn(),
+      },
+      source,
+      pushToast,
+    )();
+    useStore.setState({ project: projectWith(source, { ...mask }), projectDocumentEpoch: 60 });
+    pending.resolve({ ...source, source: 'cropped.png' });
+    await pending.promise;
+    await Promise.resolve();
+
+    expect(cropImage).not.toHaveBeenCalled();
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
   it('publishes a crop while the initiating image and mask still own the document', async () => {
     const mask = createRectangle({
       id: 'M1',

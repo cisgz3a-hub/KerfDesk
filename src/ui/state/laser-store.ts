@@ -107,8 +107,9 @@ export type LaserState = LaserStoreActions &
     // Jobs may still emit their own M7/M8/M9 sequence; Stop/Disconnect force this
     // false after sending the driver's coolant-off cleanup.
     readonly airAssistOn: boolean;
-    // True while a guarded momentary Fire request is active, including its
-    // in-flight serial write. Every exit path clears this before the final M5.
+    // True while a guarded momentary Fire request may still own beam state. An
+    // uncertain or rejected M3 retains this latch so Fire-off remains reachable;
+    // accepted M5 and controller/session invalidation cleanup clear it.
     readonly fireActive: boolean;
     // P0-B: operator-facing safety alert raised when the store cannot guarantee
     // the machine is safe — a failed Stop/Pause/Resume/Disconnect write, or a USB

@@ -87,7 +87,7 @@ async function runProbe(
       kind: 'probe',
       requiredReports: PROBE_STABLE_IDLE_REPORTS,
     });
-    assertCurrentProbe(get(), refs, connection, transactionId);
+    assertProbeWireOwnership(get(), refs, connection, transactionId, pendingLine);
     completeProbe(set, transactionId, toolId);
     return { kind: 'ok' };
   } catch (error) {

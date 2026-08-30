@@ -12,10 +12,13 @@ type WriteFn = (
 ) => Promise<void>;
 type ManualMotionRefs = Pick<LiveRefs, 'driver' | 'controllerStatusWait'>;
 
+/** Maximum age accepted for a same-session cached Idle observation. */
 export const MANUAL_MOTION_STATUS_MAX_AGE_MS = 1_000;
+/** Operator guidance when a fresh status query cannot prove manual-motion readiness. */
 export const MANUAL_MOTION_STATUS_TIMEOUT_MESSAGE =
   'Manual motion could not obtain a fresh same-session controller status after its status query. Check the connection and try again.';
 
+/** Proves same-session fresh Idle immediately before an app-owned manual motion command. */
 export async function confirmFreshManualMotionIdle(args: {
   readonly get: GetFn;
   readonly refs: ManualMotionRefs;

@@ -113,7 +113,7 @@ export function handleStatusLine(
     ...frameFailurePatch,
     ...permitInterruptionPatch,
     ...jogMpgInterruption,
-    ...mpgJobInterruptionPatch(state, report),
+    ...(jobOverAtIdle ? {} : mpgJobInterruptionPatch(state, report)),
   });
   observeStatusConsumers(set, refs, state, nextSequence, report);
   if (queuedFrameDispatch !== null)

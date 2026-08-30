@@ -31,6 +31,6 @@
     "coverage",
     "e2e",
     "playwright.config.ts",
-    "playwright.production.config.ts"
+    "playwright-production.config.ts"
   ]
 }

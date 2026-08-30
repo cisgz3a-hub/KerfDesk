@@ -28,7 +28,7 @@
     "report:coverage": "node scripts/report-coverage-trend.mjs",
     "report:release-readiness": "node scripts/report-release-readiness.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:production-bundle": "pnpm build:web && playwright test --config=playwright.production.config.ts",
+    "test:e2e:production-bundle": "pnpm build:web && playwright test --config=playwright-production.config.ts",
     "test:e2e:cold": "node scripts/run-playwright-cold-start.mjs",
     "check:e2e-discovery": "node scripts/check-playwright-discovery.mjs",
     "test:e2e:install": "playwright install chrome",
