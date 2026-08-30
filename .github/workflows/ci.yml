@@ -55,14 +55,18 @@ jobs:
 
       - name: Record SHA-correlated readiness lanes
         if: always()
+        env:
+          CI_STATE: ${{ steps.release_check.outcome }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: >-
           pnpm report:release-readiness
-          --state=ci=${{ steps.release_check.outcome }}
+          --state=ci=${CI_STATE}
           --state=browser=not-run
           --state=deploy=not-run
           --state=packaged-runtime=not-run
           --state=perceptual-reference-cam=not-run
           --state=hardware=not-run
+          "--evidence=ci=1 release:check gate; result=${CI_STATE}; run=${WORKFLOW_RUN_URL}"
 
       - name: Upload readiness report
         if: always()

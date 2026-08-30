@@ -5,6 +5,7 @@ import {
   buildReadinessReport,
   normalizeReadinessState,
   readinessMarkdown,
+  resolveReadinessSha,
 } from './report-release-readiness.mjs';
 
 test('keeps all readiness lanes separate and explicitly nonblocking', () => {
@@ -31,6 +32,26 @@ test('rejects unknown states instead of guessing', () => {
   assert.throws(() => normalizeReadinessState('green-ish'), /unsupported readiness state/);
 });
 
+test('uses the checked-out commit instead of workflow event GITHUB_SHA', () => {
+  const checkoutSha = '2'.repeat(40);
+  assert.equal(
+    resolveReadinessSha({
+      explicitSha: undefined,
+      checkoutSha,
+      environmentSha: '1'.repeat(40),
+    }),
+    checkoutSha,
+  );
+  assert.equal(
+    resolveReadinessSha({
+      explicitSha: '3'.repeat(40),
+      checkoutSha,
+      environmentSha: '1'.repeat(40),
+    }),
+    '3'.repeat(40),
+  );
+});
+
 test('workflows do not forward a standalone pnpm separator to the readiness CLI', async () => {
   const workflows = [
     '.github/workflows/ci.yml',
@@ -41,7 +62,8 @@ test('workflows do not forward a standalone pnpm separator to the readiness CLI'
 
   for (const path of workflows) {
     const source = await readFile(path, 'utf8');
-    assert.match(source, /pnpm report:release-readiness\s*\n\s*--state=/);
+    assert.match(source, /pnpm report:release-readiness\s*\n(?:\s*--sha=.*\n)?\s*--state=/);
     assert.doesNotMatch(source, /pnpm report:release-readiness --/);
+    assert.match(source, /--evidence=/);
   }
 });

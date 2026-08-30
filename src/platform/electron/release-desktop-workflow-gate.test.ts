@@ -13,6 +13,7 @@ function repoFile(path: string): string {
 describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
   const workflow = repoFile('.github/workflows/release-desktop-stable.yml');
   const dryRunWorkflow = repoFile('.github/workflows/release-desktop-dry-run.yml');
+  const previewWorkflow = repoFile('.github/workflows/release-desktop-preview.yml');
   const deployWorkflow = repoFile('.github/workflows/deploy.yml');
   const packageJson = JSON.parse(repoFile('package.json')) as {
     readonly author?: { readonly name?: string };
@@ -85,6 +86,62 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     expect(mergeBase).toBeLessThan(buildJob);
     expect(validationBlock).not.toContain('${{ secrets.');
     expect(validationBlock).not.toContain('environment:');
+  });
+
+  it('requires the exact approved SHA and a clean runtime audit before packaging', () => {
+    const approval = workflow.indexOf('STABLE_APPROVED_RELEASE_SHA');
+    const environment = workflow.indexOf('environment: desktop-production');
+    const runtimeAudit = workflow.indexOf('Require a clean packaged-runtime dependency graph');
+    const packageBuild = workflow.indexOf('Build signed Windows installer + update feed');
+
+    expect(approval).toBeGreaterThanOrEqual(0);
+    expect(approval).toBeLessThan(environment);
+    expect(workflow).toContain('pnpm audit --prod --json');
+    expect(workflow).toContain('test "${runtime_count}" = \'0\'');
+    expect(runtimeAudit).toBeGreaterThan(environment);
+    expect(runtimeAudit).toBeLessThan(packageBuild);
+  });
+
+  it('stages and verifies the complete checksummed updater set before moving pointers', () => {
+    const stageExe = workflow.indexOf('"${bucket}/${stage}/${exe}"');
+    const stageBlockmap = workflow.indexOf('"${bucket}/${stage}/${exe}.blockmap"');
+    const stageFeed = workflow.indexOf('"${bucket}/${stage}/latest.yml"');
+    const fullChecksumVerification = workflow.indexOf(
+      '(cd "${verify_dir}" && sha256sum --check checksums.sha256)',
+    );
+    const rootExe = workflow.indexOf('"${bucket}/desktop/${exe}"');
+    const rootBlockmap = workflow.indexOf('"${bucket}/desktop/${exe}.blockmap"');
+    const rootBlockmapReadback = workflow.indexOf(
+      '--file "${verify_dir}/root-${exe}.blockmap" --remote',
+    );
+    const rootBlockmapHash = workflow.indexOf('sha256sum "${verify_dir}/root-${exe}.blockmap"');
+    const rollback = workflow.indexOf('"${bucket}/desktop/rollback/latest-before-${VERSION}.yml"');
+    const stableDownload = workflow.indexOf('"${bucket}/desktop/kerfdesk-latest-x64-setup.exe"');
+    const finalFeed = workflow.lastIndexOf('"${bucket}/desktop/latest.yml"');
+
+    expect(stageExe).toBeGreaterThanOrEqual(0);
+    expect(stageBlockmap).toBeGreaterThan(stageExe);
+    expect(stageFeed).toBeGreaterThan(stageBlockmap);
+    expect(fullChecksumVerification).toBeGreaterThan(stageFeed);
+    expect(rootExe).toBeGreaterThan(fullChecksumVerification);
+    expect(rootBlockmap).toBeGreaterThan(rootExe);
+    expect(rootBlockmapReadback).toBeGreaterThan(rootBlockmap);
+    expect(rootBlockmapHash).toBeGreaterThan(rootBlockmapReadback);
+    expect(rollback).toBeGreaterThan(rootBlockmapHash);
+    expect(stableDownload).toBeGreaterThan(rollback);
+    expect(finalFeed).toBeGreaterThan(stableDownload);
+    expect(workflow).not.toContain('grep "  ${exe}$\\|  ${exe}.blockmap$"');
+    expect(workflow.match(/--artifact=/gu)).toHaveLength(3);
+    expect(workflow).toContain('--artifact="KerfDesk-${VERSION}-windows-x64-setup.exe"');
+    expect(workflow).toContain('--artifact="KerfDesk-${VERSION}-windows-x64-setup.exe.blockmap"');
+    expect(workflow).toContain('--artifact=latest.yml');
+  });
+
+  it('does not install browsers in desktop workflows that run no browser tests', () => {
+    for (const source of [workflow, dryRunWorkflow, previewWorkflow]) {
+      expect(source).not.toContain('playwright install');
+      expect(source).not.toContain('playwright test');
+    }
   });
 
   it('rejects non-stable or lightweight tags before signing and R2 publication', () => {

@@ -7608,8 +7608,9 @@ an otherwise verified production build and duplicate the same expensive work dur
 ### Decision
 
 - Keep Playwright as the real-browser smoke framework and type-check its suite explicitly.
-- Run browser smoke in a dedicated pull-request and manually dispatched workflow with its own
-  concurrency cancellation and failure artifacts.
+- Run browser smoke in a dedicated pull-request, main-push, and manually dispatched workflow with
+  its own concurrency cancellation and failure artifacts. The ordinary suite exercises the Vite
+  development runtime; ADR-311 adds one narrow production `dist/web` build-and-preview smoke.
 - Remove Playwright installation and execution from `release:check`, the core CI workflow, and the
   Cloudflare deploy workflow. Deployment continues to require a successful core CI revision.
 - Browser smoke remains an enforceable review signal when branch protection requires its named
@@ -18630,5 +18631,141 @@ minimizes tool changes.
 
 - ADR-285, source-region-major CNC sequencing; only its former tool-major sentence is superseded.
 - ADR-228 and ADR-232, Frame-only ordinary Start authorization and warning-only policy.
+
+---
+
+## ADR-311 - Exact owners govern machine commands, async documents, and release publication (2026-08-30)
+
+**Status:** Accepted and implemented in audit remediation; focused software verification recorded,
+exact-final repository and hosted verification pending, external qualification excluded
+
+### Context
+
+The independent audit after ADR-310 found one common failure shape across otherwise separate
+subsystems: a later action could act on evidence or content owned by an earlier state. Latched
+grblHAL `MPG:1` ownership fenced Start and Jog/Frame but not every app-owned machine command; Home
+could send from Run; and motion/modal Console commands trusted cached Idle. Independent review also
+showed that an initial ownership check was insufficient: a handshake, Probe, Origin, Settings,
+Work-Z query, Resume/Continue, or stream refill could cross an awaited boundary after `MPG:1`
+arrived. Alarm/Sleep/`ALARM:N` paths also discarded the latch without an explicit `MPG:0` or a new
+transport session. Separately, ambiguous Fire and Air activation-write failures could clear or omit
+the only UI latch that kept fail-off reachable. Image Studio, Convert-to-Bitmap, and Crop could
+publish delayed work by persisted object ID after the document or source object had changed; a
+single global Apply flag also let an unresolved request retain unrelated editor liveness and stash
+resources. The packaged Electron window registered its one-shot production `ready-to-show`
+listener after renderer loading, and its native smoke timeout and late renderer completion lacked
+one terminal owner. Finally, a successful historical main-CI rerun had actually published an
+obsolete SHA to the production Pages branch, while readiness reports and stable-release asset
+evidence did not always identify or close over the bytes they described.
+
+These are ownership and evidence-integrity defects. They do not authorize a second ordinary Start
+guard, a policy refusal, or a physical-output claim.
+
+### Decision
+
+1. **Machine command ownership.** A latched explicit `MPG:1` is a factual competing-transport-owner
+   precondition for Home, Probe, Autofocus, Origin/manual motion, mutating Console commands and
+   macros, machine-settings traffic, Work-Z recovery, realtime overrides, Air-on, and Fire-on.
+   Ownership is checked both at entry and around awaited continuation boundaries. A connection
+   handshake parks before settings/build-info/modal queries; Probe may complete only its exact
+   `M5`/`M9` fail-off prefix; multi-line Origin, Settings, active-WCS readback, and Work-Z stop before
+   later traffic and do not publish stale evidence. First takeover during an active job pauses host
+   streaming; acknowledgements may settle accounting but cannot step/refill the queue, and Resume,
+   tool-change Continue, refill, and override traffic wait for explicit `MPG:0`. Pause, Abort,
+   and status query remain available. During a known takeover after host refill is paused, exact
+   unlock/reset/emergency and zero-power/fail-off `M5`/`M9`, Fire-off, and Air-off traffic may bypass
+   the app-operation fence; ordinary active streaming without takeover retains its existing
+   operation exclusion. Fire and Air latch potentially-on before activation dispatch, retain that
+   uncertain-on latch after an ambiguous transport rejection, and let the explicit off action clear
+   it only after an accepted fail-off write.
+   Sparse Alarm/Sleep and numbered Alarm cannot clear a prior MPG latch; explicit `MPG:0` or a new
+   controller/transport session can. Home requires known Idle or explicit Alarm evidence; numbered
+   Alarm clears a stale Run/Hold report while retaining exact Home-from-Alarm recovery evidence.
+   Non-recovery Console commands that require Idle use a same-session fresh-status observation
+   immediately before dispatch. Frame remains the sole ordinary Start guard; these are factual
+   transport preconditions already bounded by ADR-228/232.
+2. **Asynchronous document ownership.** Image Studio open/stash/decode/Apply, Convert-to-Bitmap,
+   and Crop bind their completion to the initiating `projectDocumentEpoch` and exact source-object
+   identity; Crop also binds its exact mask object. Apply additionally has one exact request/session
+   token: closing A releases unrelated image B, while late A completion cannot publish or clear B's
+   request. Stashes purge owners from older document epochs while same-document reopen remains
+   resumable. A stale completion or stale failure silently no-ops. It does not prompt, refuse a
+   replacement document, or add a confirmation surface.
+3. **Packaged-window ownership.** The production `ready-to-show` listener is attached before any
+   renderer load. Packaged native smoke reports success only when the hidden main window actually
+   became visible in addition to the existing isolated launch/import/save observations. Timeout,
+   renderer success, and renderer failure compete for one terminal claim, so a late promise cannot
+   write a second result or request a second exit.
+4. **Pages publication ownership.** A successful `workflow_run` candidate may publish only while its
+   validated SHA equals the fetched current `main` tip. The freshness resolver comes from the
+   protected-main workflow revision, never from a potentially pre-fix candidate checkout; freshness
+   is checked before build and immediately before the provider command. All production candidates
+   share a serialized queue: an obsolete historical rerun cannot cancel or replace an eligible
+   current-main publication before classification, and provider commands cannot overlap. Historical
+   successful reruns and candidates overtaken during a build become explicit provider-free no-ops.
+   Manual dispatch has no historical-ref input and checks out current main. Browser smoke remains an
+   independent review/observability lane rather than a Pages gate.
+5. **Release evidence identity.** Readiness defaults to checked-out HEAD, and each hosted lane records
+   available run/result evidence. Deploy checkout, report, and artifact names share one SHA. The
+   stable evidence generator requires an explicit published-asset list (installer, blockmap, and
+   `latest.yml`), fails closed if one is missing, excludes builder inputs/diagnostics, stages and
+   downloads the complete checksummed set, verifies the full manifest, and reads back/hash-compares
+   both root installer and root blockmap before mutable metadata moves. Stable remains inactive
+   until separately authorized and provisioned.
+6. **Coverage and browser scope.** The independent Browser workflow adds one production
+   `dist/web` build-and-preview smoke while retaining the full development-runtime suite. Desktop
+   package jobs do not install a browser they never execute. Coverage reports preserve the
+   checked-in baseline's scope rather than presenting its commit as independently reproducible.
+
+### Consequences
+
+- Known external MPG ownership cannot receive competing app-owned motion, beam-on, accessory-on,
+  settings, recovery-readback, override, or stream-refill traffic. A takeover freezes further host
+  queue dispatch while Abort/Pause and exact recovery/fail-off paths remain available. That
+  takeover exception does not weaken the ordinary active-job operation owner, and ambiguous
+  Fire/Air activation retains a fail-off affordance without claiming the accessory is physically on.
+- Same-ID content in a replacement project cannot receive an earlier document's pixels or raster
+  conversion result; valid same-document Image Studio resume remains intact, unrelated Apply work
+  is not held by an abandoned request, and old-document editor stashes are released on lifecycle
+  boundaries.
+- A fast packaged renderer cannot outrun the only production show listener, native evidence no
+  longer equates `ready-to-show` with visible UI, and one smoke run has exactly one terminal owner.
+- An old green CI rerun cannot roll the production Pages branch backward. The automatically triggered
+  current-main deployment remains the only normal publication path; no manual deployment is added.
+- Stable evidence names exactly the release assets it verifies. This strengthens an inactive lane
+  without claiming signing, R2, installer, updater, or provider qualification.
+
+### Verification
+
+- Machine regressions cover zero writes for initially MPG-owned command paths, explicit
+  recovery/fail-off exemptions, known Home states, fresh Console Idle versus Run, MPG takeover at
+  asynchronous command boundaries, active-stream pause/no-refill, Resume/Continue/override, and
+  Work-Z publication ownership. They also cover sparse/explicit Alarm/Sleep, numbered Alarm and Home
+  recovery evidence, ambiguous Fire/Air activation, takeover fail-off, and ordinary active-job
+  exclusion.
+- Document regressions cover same persisted IDs across document epochs, exact source/mask
+  replacement, delayed success/error, valid same-document completion, unresolved A versus B Apply,
+  and old-document stash release.
+- Electron ordering, native validator, single terminal claim, deployment resolver/workflow, stable
+  publication ordering/readback, readiness, coverage, Playwright discovery, and production-bundle
+  smoke have focused tests.
+- The recorded full `release:check` and production-bundle browser smoke preceded the late
+  independent-review corrections; an exact-final-tree full gate is required before integration.
+- Repository-wide release gates, exact-head hosted checks, review/mergeability, automatic post-merge
+  Pages publication, and current-main ancestry are required before integration is called complete.
+- No serial device, controller, pendant, motion, spindle, beam, accessory, air-cut, material cut,
+  reference-CAM comparison, human perceptual review, installed package, real OS picker, stable tag,
+  signing provider, R2 publication, or manual deployment is established by this ADR.
+
+### References
+
+- ADR-158, independent browser smoke; amended to include main pushes and the production-bundle smoke.
+- ADR-182, latched MPG evidence; amended from CNC Start-only fencing to factual app-command ownership.
+- ADR-180, owned Pause/Resume lifecycle; amended so competing MPG ownership freezes refill and
+  continuation traffic without removing Pause or Abort.
+- ADR-228 and ADR-232, Frame-only authorization and factual refusal boundaries.
+- ADR-242 and ADR-245, resumable Image Studio sessions and composite Apply; amended with document and
+  exact-source ownership.
+- ADR-248, packaged Preview and native-evidence boundaries.
 
 ---

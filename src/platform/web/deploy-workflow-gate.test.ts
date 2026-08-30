@@ -66,6 +66,73 @@ describe('Cloudflare production deploy gate', () => {
     expect(workflow).toContain('github.event.workflow_run.head_sha');
   });
 
+  it('serializes candidates, no-ops obsolete reruns, and rechecks freshness after build', () => {
+    const workflow = repoFile('.github/workflows/deploy.yml');
+    const resolver = 'resolve-web-deploy-identity.mjs';
+
+    expect(workflow.match(new RegExp(resolver.replaceAll('.', '\\.'), 'g'))).toHaveLength(3);
+    expect(
+      workflow.match(
+        /git fetch --no-tags origin \+refs\/heads\/main:refs\/remotes\/origin\/main/gu,
+      ),
+    ).toHaveLength(2);
+    expect(workflow).toContain('current-main-sha="$(git rev-parse refs/remotes/origin/main)"');
+    expect(workflow).toContain("if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}");
+    expect(workflow).toContain("if: ${{ steps.pre_publish_identity.outputs.eligible == 'true' }}");
+    expect(workflow).toContain('group: deploy-production-main');
+    expect(workflow).toContain('queue: max');
+    expect(workflow).not.toContain('cancel-in-progress:');
+    expect(workflow.indexOf('Reconfirm current main immediately before publication')).toBeLessThan(
+      workflow.indexOf('uses: cloudflare/wrangler-action@'),
+    );
+  });
+
+  it('uses current-main control code when an obsolete candidate predates the resolver', () => {
+    const workflow = repoFile('.github/workflows/deploy.yml');
+
+    expect(workflow).toContain('WORKFLOW_CONTROL_SHA: ${{ github.workflow_sha }}');
+    expect(workflow).toContain(
+      'git merge-base --is-ancestor "${WORKFLOW_CONTROL_SHA}" refs/remotes/origin/main',
+    );
+    expect(workflow).toContain(
+      'git show "${WORKFLOW_CONTROL_SHA}:scripts/resolve-web-deploy-identity.mjs"',
+    );
+    expect(workflow).toContain('> "${control_resolver}"');
+    expect(workflow).toContain('node "${control_resolver}"');
+    expect(workflow).toContain('node "${RUNNER_TEMP}/resolve-web-deploy-identity.mjs"');
+    expect(workflow).not.toContain('node scripts/resolve-web-deploy-identity.mjs');
+    expect(workflow).toContain('Record obsolete run as an intentional non-deployment');
+    expect(workflow).toContain('Record main advance during build as a non-deployment');
+    expect(workflow).toContain(
+      "steps.deployment_identity.outputs.eligible == 'true' && steps.pre_publish_identity.outputs.eligible == 'false'",
+    );
+    expect(workflow).toContain(
+      "if: ${{ always() && steps.deployment_identity.outputs.eligible == 'true' }}",
+    );
+    expect(workflow).toContain(
+      'No candidate-tree build, report script, or provider command was executed.',
+    );
+  });
+
+  it('keeps checkout, readiness, and artifact naming on one deployment SHA', () => {
+    const workflow = repoFile('.github/workflows/deploy.yml');
+
+    expect(workflow).toContain('--sha=${DEPLOY_SHA}');
+    expect(workflow).toContain('DEPLOY_SHA: ${{ steps.deployment_identity.outputs.sha }}');
+    expect(workflow).toContain(
+      'name: release-readiness-deploy-${{ steps.deployment_identity.outputs.sha }}',
+    );
+    expect(workflow).not.toContain('name: release-readiness-deploy-${{ github.sha }}');
+    expect(workflow).toContain(
+      "github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'refs/heads/main'",
+    );
+    expect(workflow).toContain('CI_STATE: ${{ steps.release_check.outcome }}');
+    expect(workflow).toContain('validated-run=${TRIGGER_RUN_URL}');
+    expect(workflow).not.toContain(
+      "CI_STATE: ${{ github.event_name == 'workflow_run' && 'passed' || steps.release_check.outcome }}",
+    );
+  });
+
   it('runs repo identity proof and CI gates before Wrangler publishes', () => {
     const workflow = repoFile('.github/workflows/deploy.yml');
     const packageJson = JSON.parse(repoFile('package.json')) as {

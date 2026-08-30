@@ -123,6 +123,7 @@ describe('repository policy enforcement contract', () => {
       readonly scripts?: {
         readonly ['release:check']?: string;
         readonly ['test:e2e']?: string;
+        readonly ['test:e2e:production-bundle']?: string;
         readonly ['typecheck:e2e']?: string;
       };
     };
@@ -131,12 +132,33 @@ describe('repository policy enforcement contract', () => {
     const deployWorkflow = repoFile('.github/workflows/deploy.yml');
 
     expect(packageJson.scripts?.['test:e2e']).toBe('playwright test');
+    expect(packageJson.scripts?.['test:e2e:production-bundle']).toContain(
+      '--config=playwright.production.config.ts',
+    );
     expect(packageJson.scripts?.['typecheck:e2e']).toBe('tsc --noEmit -p e2e/tsconfig.json');
     expect(packageJson.scripts?.['release:check']).not.toContain('pnpm test:e2e');
     expect(browserWorkflow).toContain('run: pnpm typecheck:e2e');
     expect(browserWorkflow).toContain('run: pnpm test:e2e');
+    expect(browserWorkflow).toContain('pnpm test:e2e:production-bundle');
+    expect(repoFile('playwright.config.ts')).toContain(
+      "testIgnore: ['**/production-bundle.spec.ts']",
+    );
+    expect(repoFile('playwright.production.config.ts')).toContain('pnpm exec vite preview');
+    expect(repoFile('playwright.production.config.ts')).toContain('production-bundle.spec.ts');
     expect(ciWorkflow).not.toContain('playwright install');
     expect(deployWorkflow).not.toContain('playwright install');
+  });
+
+  it('does not provision Playwright browsers in desktop jobs that never run Playwright', () => {
+    for (const path of [
+      '.github/workflows/release-desktop-stable.yml',
+      '.github/workflows/release-desktop-preview.yml',
+      '.github/workflows/release-desktop-dry-run.yml',
+    ]) {
+      const workflow = repoFile(path);
+      expect(workflow).not.toContain('playwright install');
+      expect(workflow).not.toContain('playwright test');
+    }
   });
 
   it('pre-bundles cold document-worker dependencies before the first import', () => {

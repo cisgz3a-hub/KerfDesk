@@ -4,6 +4,6 @@
     "lib": ["ES2022", "DOM"],
     "types": ["node", "@playwright/test"]
   },
-  "include": ["./**/*.ts", "../playwright.config.ts"],
+  "include": ["./**/*.ts", "../playwright.config.ts", "../playwright.production.config.ts"],
   "exclude": []
 }

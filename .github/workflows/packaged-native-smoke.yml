@@ -57,6 +57,7 @@ jobs:
           --state=packaged-runtime=${{ steps.native_smoke.outcome }}
           --state=perceptual-reference-cam=not-run
           --state=hardware=not-run
+          "--evidence=packaged-runtime=1 isolated packaged launch/import/save scenario; result=${{ steps.native_smoke.outcome }}; run=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       - name: Upload native smoke and readiness evidence
         if: always()

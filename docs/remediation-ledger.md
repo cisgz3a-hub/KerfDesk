@@ -3,10 +3,12 @@
 Historical 37-item implementation worktree:
 `C:\Users\Asus\.codex\worktrees\ab91\LaserForge-2.0` (no longer present).
 
-Current advanced-CNC remediation worktree:
+Current independent Ultra-audit remediation worktree:
 `C:\Users\Asus\.codex\worktrees\ade9\LaserForge-2.0`, branch
-`codex/remediate-advanced-cnc-audit-20260829`, based on
-`55a2438fa2b240d8a739d10c282b68519ce09a30`.
+`codex/remediate-ultra-audit-20260830`, audited from exact `origin/main`
+`c26c9ca96a42ca26a883b968a5f539bc473cee5e` (tree
+`21ed530c3f712abde7ab07acab61fff65fb0e7d4`). The preceding advanced-CNC remediation is in that
+base through merged PR #704.
 
 Current-main integration worktree:
 `C:\Users\Asus\.codex\worktrees\remediation-37-integration\LaserForge-2.0`, branch
@@ -285,3 +287,94 @@ release-integrity tests, production web build, Electron TypeScript build, file-s
 public-export ratchet all passed. Browser interaction, packaged runtime, hosted CI, review, merge,
 deployment, hardware, reference-CAM, and human perceptual evidence remain separate and are not
 claimed here.
+
+## Independent Ultra-audit remediation (2026-08-30)
+
+The post-PR-704 audit re-fingerprinted exact current main and deduplicated the earlier 37-item,
+third-pass, relief, Point Rotation, and advanced-CNC inventories before product changes. The entries
+below are the surviving source-confirmed defects and bounded test/release gaps. They do not change
+compiled laser/CNC geometry or add an ordinary guard. Frame remains the sole ordinary Start guard;
+MPG ownership, live controller state, and fresh status are factual transport preconditions, while
+status traffic and schedule-bounded recovery/fail-off traffic remain available.
+
+| ID | Severity | Current-main reproduction / source evidence | Remediation status | Focused software evidence | Remaining qualification limit |
+|---|---|---|---|---|---|
+| UA-M1 external MPG ownership at command entry | P1 machine motion/beam; P2 settings/air | Latched `MPG:1` already fenced Start and Jog/Frame, but Home, Probe, Autofocus, Origin/manual motion, motion/modal Console/macros, Settings, Work-Z recovery, realtime overrides, Air-on, and Fire-on could still begin app-owned traffic | implemented: every listed entry boundary rejects known MPG ownership. Status remains available. Exact recovery/fail-off traffic may bypass the app-operation fence during a known takeover only after host refill is paused; normal active streaming retains its operation block | table-driven zero-write/recovery matrix plus active-takeover and ordinary-active-job schedules | No controller, pendant, accessory, spindle, laser, motion, or hardware operation |
+| UA-M2 Home controller state | P1 | Home attempted `$H` while cached state was Run and also lacked a known-state precondition; a later numbered `ALARM:N` recorded an alarm code but left the stale Run report authoritative | implemented: Home requires known Idle or explicit Alarm evidence; Run/Hold/Jog/unknown write nothing. `ALARM:N` clears stale status while retaining the alarm code as exact Home recovery evidence; Home-from-Alarm remains available | Home state/recovery and prior-Run-then-numbered-Alarm regressions | No firmware-family or physical homing qualification |
+| UA-M3 Console freshness | P1 | motion/modal Console dispatch trusted cached Idle without a same-session post-query observation | implemented: non-recovery commands that require Idle use the existing fresh-status fence before dispatch and recheck ownership afterward | fresh Idle vs fresh Run and command-matrix regressions | No serial timing, external sender, or controller execution evidence |
+| UA-M4 MPG continuation, latch, and active-stream ownership | P1 | An action could pass its entry check and then continue after an awaited reply delivered `MPG:1`; connection qualification, Probe, multi-line Origin, Settings, and Work-Z each had such continuations. An active stream could also step/refill on later acknowledgements, while Resume, tool-change Continue, and realtime overrides lacked the same competing-owner fence. Alarm, Sleep, and numbered Alarm paths cleared the latch without `MPG:0` or a new session | implemented: ownership is rechecked before and after each app-owned continuation; a handshake parks before `$$`/`$I`/`$G`; Probe retains only its exact `M5`/`M9` fail-off prefix; Origin, Settings, active-WCS readback, and Work-Z stop before later lines and publish no stale evidence. First active-job `MPG:1` pauses host streaming, acknowledgements cannot refill it, and Resume/Continue/refill/overrides require explicit release. Sparse Alarm/Sleep and `ALARM:N` retain the latch; explicit fields remain authoritative | handshake, takeover-at-boundary, no-continuation, active-stream freeze/refill, Resume/Continue, Work-Z query, sparse/explicit Alarm/Sleep, and numbered-Alarm regressions | Software cannot prove controller-side arbitration, pendant release timing, already-buffered motion, or physical recovery behavior |
+| UA-M5 ambiguous accessory activation and fail-off ownership | P1 Fire; P2 Air | Fire cleared its on latch when the `M3` transport promise rejected, and Air set its latch only after `M7`/`M8` resolved; transport rejection therefore hid an outcome that could already be active. A too-broad fail-off exemption could also bypass the normal active-job operation owner without an MPG takeover | implemented: Fire and Air latch potentially-on before activation dispatch and retain that state after an ambiguous rejection. MPG takeover after a pending Air-on write attempts `M9` and clears the latch only when that write is accepted. Exact Console/dedicated fail-off bypass is limited to a known takeover with host refill paused; ordinary active streaming stays blocked | ambiguous activation rejection, takeover cleanup success/failure, exact fail-off, and normal-active-job exclusion regressions | A software latch cannot prove whether the controller accepted the first or compensating write or whether beam/air actually changed |
+| UA-D1 Image Studio document/request ownership | P1 | stashed sessions and asynchronous Apply were keyed only by persisted object ID, so a replacement document with the same ID could resume or receive old pixels; one global Apply flag also let an unresolved request for image A keep image B busy, and old-document stashes retained image buffers | implemented: open/stash/decode/Apply bind document epoch plus exact source-object identity. Apply has an exact request/session owner, so B can proceed after A closes and late A success/failure cannot publish, clear, or toast over B. Open/close purge other-document stash resources while preserving same-document reopen | same-ID and different-ID replacement, same-document resume, unresolved A versus B Apply, stale success/error, and stash-purge regressions | No human image-quality/perceptual, large-image memory profiling, or packaged-runtime qualification |
+| UA-D2 Convert/Crop ownership | P1 | late Convert-to-Bitmap and Crop completions published by ID into the current project; deterministic delayed callbacks replaced same-ID artwork from another document | implemented: both operations capture document epoch and exact source identity; Crop also binds exact mask identity; stale success and failure silently no-op without a misleading toast | cross-document, source-only replacement, mask-only replacement, valid same-document success, and stale-error regressions | No large-image performance or human perceptual qualification |
+| UA-E1 packaged-window visibility | P2 | the production `ready-to-show` listener was attached after awaited renderer load; native smoke observed readiness but not actual visibility | implemented: listener is installed before renderer loading and native smoke requires `windowVisible:true` | ordering-policy test, validator tests, Electron-main build | No installed package, real OS picker, GPU, or visible-window run in this remediation |
+| UA-E2 native-smoke terminal ownership | P2 | the timeout set a finished flag, but a renderer promise already continuing after `ready-to-show` could still attempt a second result write/exit after the timeout finalized the run | implemented: timeout, renderer success, and renderer failure compete for one atomic terminal claim; every late path becomes a no-op | deferred-renderer timeout-versus-late-success terminal-claim regression | A unit race does not establish packaged process timing or real OS launch behavior |
+| UA-R1 current-tip Pages deployment | P1 | successful rerun of historical main CI run 31500435119 (`18fab79a...`) triggered production Pages run 32620299883 after main had advanced | implemented: candidate SHA must equal current main, gate code comes from the workflow revision on protected main rather than the candidate checkout, freshness is rechecked immediately before publish, and all production candidates use a serialized queue so stale reruns cannot cancel an eligible publication; stale runs are intentional provider-free no-ops | resolver unit tests and workflow structural tests, including pre-fix candidate ancestry and stale-rerun concurrency isolation | Automatic post-merge GitHub/Cloudflare execution remains separate; no manual deployment |
+| UA-R2 exact release readiness | P2 | deploy reports defaulted to event `GITHUB_SHA`, and all hosted lane reports omitted their available run evidence | implemented: reports default to checked-out HEAD, deploy checkout/report/artifact share one SHA, and CI/browser/deploy/native lanes record run/result evidence | readiness CLI and workflow regressions | Reports remain informational and do not qualify hardware/perceptual lanes |
+| UA-R3 stable asset closure | P2 | checksums included build-only files while published sets omitted named assets; actual Electron output includes `builder-debug.yml`; immutable staging omitted `latest.yml`; root publication verified the installer but did not read back and hash the root blockmap | implemented: evidence requires an explicit exe/blockmap/latest allowlist, ignores build inputs/diagnostics, fails closed on missing declared assets, stages/downloads `latest.yml`, verifies the full manifest, and reads back/hash-compares both root installer and root blockmap before mutable metadata moves | generator fixtures include `runtime-dependencies.json` and `builder-debug.yml`; stable ordering, closure, and remote-readback structure tests | Stable lane remains inactive; signing, protected environment, R2 credentials, provider execution, installer, and updater are unqualified |
+| UA-R4 browser/release coverage | P2 test gap | browser smoke served only Vite development output; desktop package jobs installed a browser they never used | implemented: the independent Browser workflow adds a real `dist/web` build-and-preview smoke; package jobs remove unused browser provisioning; discovery keeps production smoke out of the default suite | production-bundle Playwright test, discovery/typecheck, workflow policy tests | One narrow production smoke is not perceptual review or full built-bundle E2E coverage |
+| UA-R5 coverage provenance | P3 | coverage Markdown dropped the checked-in baseline's explicit dirty-remediation scope | implemented: report JSON/Markdown preserves `baselineScope` | coverage-report unit regression | The historical mixed-state baseline remains non-reproducible from a commit alone |
+
+Source anchors for the table above:
+
+- **UA-M1 through UA-M5:** `src/ui/state/laser-store-helpers.ts`,
+  `console-command-readiness.ts`, `laser-controller-handshake.ts`, `laser-probe-actions.ts`,
+  `laser-origin-transaction.ts`, `grbl-settings-actions.ts`, `work-z-recovery-actions.ts`,
+  `laser-job-pause-resume.ts`, `laser-pause-resume-refill.ts`, `laser-status-line.ts`, and
+  `laser-stream-ack.ts`, plus the numbered-Alarm handler in `laser-line-handler.ts`,
+  `laser-fire-actions.ts`, and the Air actions in `laser-store.ts`; the table-driven entry matrix is
+  `src/ui/state/laser-store-mpg-command-matrix.test.ts`, with continuation schedules in the
+  adjacent handshake, Probe, Origin, Settings, active-WCS, Work-Z, Fire, and Air tests.
+- **UA-D1 and UA-D2:** `src/ui/image-editor/image-editor-ownership.ts`,
+  `image-editor-lifecycle.ts`, `image-editor-store.ts`,
+  `src/ui/commands/bitmap-conversion.ts`, and `image-command-actions.ts`; the request-liveness,
+  stash-release, same-ID/source, and exact-mask schedules are in the adjacent ownership/lifecycle
+  tests.
+- **UA-E1 and UA-E2:** `electron/main.ts`, `electron/native-smoke.ts`,
+  `electron/native-smoke-terminal-claim.ts`, `electron/window-readiness-policy.test.ts`,
+  `electron/native-smoke-terminal-claim.test.ts`, and
+  `scripts/verify-windows-packaged-native-smoke{,.test}.mjs`.
+- **UA-R1 through UA-R5:** `.github/workflows/{deploy,e2e,ci,packaged-native-smoke,
+  release-desktop-dry-run,release-desktop-preview,release-desktop-stable}.yml`,
+  `scripts/resolve-web-deploy-identity.mjs`, `report-release-readiness.mjs`,
+  `generate-release-evidence.mjs`, `report-coverage-trend.mjs`,
+  `check-playwright-discovery.mjs`, `playwright.production.config.ts`, and
+  `e2e/production-bundle.spec.ts`, with unit/structural contracts beside each script and under
+  `src/platform/{web,electron}/`.
+
+### Audit classifications retained without product changes
+
+- **Already covered / duplicate:** all five ACNC findings remain closed; the cutter bed-bound concern
+  was refuted because bed bounds describe tool-center travel while cutter expansion belongs to
+  warning-only no-go/fixture analysis. No additional compile, preview, placement, or emission defect
+  survived reconciliation.
+- **Policy-only:** browser trigger documentation drift is corrected with ADR-311; no runtime change.
+- **External qualification:** the stable desktop lane remains deliberately inactive and requires a
+  repository `STABLE_APPROVED_RELEASE_SHA` variable plus the protected environment/secrets before
+  any authorized stable tag.
+- **Not claimed:** no serial/device call, hardware motion, spindle/beam/accessory operation, air-cut,
+  material cut, reference-CAM comparison, human perceptual review, installer/OS-picker test, stable
+  release, or manual deployment was performed.
+
+### Integration verification state
+
+Recorded local verification milestones are revision-bounded; the first full gate preceded the late
+independent-review fixes above, so it is not exact-final-tree evidence:
+
+- the terminal post-review machine/Frame matrix: 24 files and 247 tests passed in 45.22 s, with
+  typecheck and diff checks green; Frame/Start contracts were included and remained unchanged;
+- initial focused document/Electron regressions: 6 files and 36 tests passed;
+- the later Image Studio Apply/stash ownership slice: 6 files and 38 tests passed, with scoped
+  ESLint, Prettier, typecheck, and diff checks green;
+- release-integrity contracts: 41 of 41 Node tests passed;
+- an earlier `pnpm release:check`: typecheck, lint, Electron lint, format, ADR numbering, action pinning,
+  license closure (52 production packages across 8 licenses), 1,778 Vitest files and 11,202 tests,
+  two 2,360-module production builds, Electron-main build, file-size/export ratchets, and all remaining
+  release checks passed; 14 perceptual-probe files containing 22 tests remained explicitly skipped;
+- at that same milestone, E2E typecheck passed; Playwright independently discovered 34 development suites and one production
+  suite; the production `dist/web` bundle smoke passed 1 of 1 in Chromium; and
+- `git diff --check` passed.
+
+The documentation reconciliation separately passed scoped Prettier, ADR-number, and diff checks.
+An exact-final-tree `pnpm release:check`, hosted exact-head CI, hosted browser evidence,
+mergeability, review threads, automatic post-merge Pages publication, and final main ancestry remain
+separate states until their own terminal evidence is recorded.

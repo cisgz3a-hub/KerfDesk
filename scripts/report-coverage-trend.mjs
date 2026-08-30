@@ -11,6 +11,7 @@ export function buildCoverageTrend(summary, baseline) {
     schemaVersion: 1,
     currentSha: process.env['GITHUB_SHA'] ?? 'local-working-tree',
     baselineSha: String(baseline?.sha ?? 'unknown'),
+    baselineScope: String(baseline?.scope ?? 'No baseline scope supplied.'),
     blocking: false,
     metrics: METRICS.map((id) => ({
       id,
@@ -28,6 +29,8 @@ export function coverageTrendMarkdown(report) {
     `Current: \`${report.currentSha}\``,
     '',
     `Baseline: \`${report.baselineSha}\``,
+    '',
+    `Baseline scope: ${report.baselineScope}`,
     '',
     '| Metric | Covered / total | Current | Baseline | Delta |',
     '|---|---:|---:|---:|---:|',

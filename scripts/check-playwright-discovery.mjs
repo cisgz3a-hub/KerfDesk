@@ -17,34 +17,47 @@ function browserTestFiles(directory) {
   });
 }
 
-const result = spawnSync(process.execPath, [playwrightCli, 'test', '--list'], {
-  cwd: workspaceRoot,
-  encoding: 'utf8',
+const productionFiles = ['production-bundle.spec.ts'];
+const expectedFiles = browserTestFiles(e2eRoot)
+  .map((path) => relative(e2eRoot, path).replaceAll('\\', '/'))
+  .filter((path) => !productionFiles.includes(path));
+
+verifyDiscovery({ expectedFiles, args: [], label: 'default browser' });
+verifyDiscovery({
+  expectedFiles: productionFiles,
+  args: ['--config=playwright.production.config.ts'],
+  label: 'production bundle',
 });
 
-if (result.error !== undefined) throw result.error;
-if (result.status !== 0) {
-  process.stderr.write(result.stderr);
-  process.stdout.write(result.stdout);
-  process.exit(result.status ?? 1);
-}
-
-const listing = result.stdout.replaceAll('\\', '/');
-const discoveredFiles = new Set(
-  Array.from(listing.matchAll(LISTING_FILE_PATTERN), (match) => match[1]),
+process.stdout.write(
+  `Playwright discovered all ${expectedFiles.length} browser suites and the production-bundle suite.\n`,
 );
-const expectedFiles = browserTestFiles(e2eRoot).map((path) =>
-  relative(e2eRoot, path).replaceAll('\\', '/'),
-);
-const missingFiles = expectedFiles.filter((path) => !discoveredFiles.has(path));
 
-if (missingFiles.length > 0) {
-  process.stderr.write(
-    `Playwright did not discover ${missingFiles.length} browser suite(s):\n${missingFiles
-      .map((path) => `- ${path}`)
-      .join('\n')}\n`,
+function verifyDiscovery({ expectedFiles: expected, args, label }) {
+  const result = spawnSync(process.execPath, [playwrightCli, 'test', ...args, '--list'], {
+    cwd: workspaceRoot,
+    encoding: 'utf8',
+  });
+
+  if (result.error !== undefined) throw result.error;
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr);
+    process.stdout.write(result.stdout);
+    process.exit(result.status ?? 1);
+  }
+
+  const listing = result.stdout.replaceAll('\\', '/');
+  const discoveredFiles = new Set(
+    Array.from(listing.matchAll(LISTING_FILE_PATTERN), (match) => match[1]),
   );
-  process.exit(1);
-}
+  const missingFiles = expected.filter((path) => !discoveredFiles.has(path));
 
-process.stdout.write(`Playwright discovered all ${expectedFiles.length} browser suites.\n`);
+  if (missingFiles.length > 0) {
+    process.stderr.write(
+      `Playwright did not discover ${missingFiles.length} ${label} suite(s):\n${missingFiles
+        .map((path) => `- ${path}`)
+        .join('\n')}\n`,
+    );
+    process.exit(1);
+  }
+}

@@ -15,6 +15,7 @@ test('reports line, branch, function, and statement deltas without a threshold',
   };
   const baseline = {
     sha: '9209fcb',
+    scope: 'Audited base SHA plus an uncommitted remediation worktree',
     totals: {
       lines: metric(90, 70, 77.78),
       branches: metric(45, 27, 60),
@@ -26,6 +27,7 @@ test('reports line, branch, function, and statement deltas without a threshold',
   const report = buildCoverageTrend(summary, baseline);
 
   assert.equal(report.blocking, false);
+  assert.equal(report.baselineScope, baseline.scope);
   assert.deepEqual(
     report.metrics.map((entry) => [entry.id, entry.deltaPct]),
     [
@@ -35,6 +37,7 @@ test('reports line, branch, function, and statement deltas without a threshold',
       ['statements', 2.27],
     ],
   );
+  assert.match(coverageTrendMarkdown(report), /uncommitted remediation worktree/);
   assert.match(coverageTrendMarkdown(report), /No threshold is enforced/);
 });
 

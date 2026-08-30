@@ -11,11 +11,7 @@ function argument(name) {
 
 export function generateReleaseEvidence(options) {
   const releaseDir = path.resolve(options.releaseDir);
-  const files = fs
-    .readdirSync(releaseDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && !isGeneratedEvidence(entry.name))
-    .map((entry) => entry.name)
-    .sort();
+  const files = publishedArtifactNames(releaseDir, options.artifactNames);
   const artifacts = files.map((name) => {
     const bytes = fs.readFileSync(path.join(releaseDir, name));
     return {
@@ -113,10 +109,33 @@ function sanitizeId(value) {
 
 function isGeneratedEvidence(name) {
   return (
+    // This dependency inventory is a build input for the SBOM. It is not a
+    // release asset, so including it would make the published checksum set
+    // impossible to close without leaking builder-only metadata.
+    name === 'runtime-dependencies.json' ||
     name === 'release-sbom.spdx.json' ||
     name === 'release-provenance.json' ||
     name === 'checksums.sha256'
   );
+}
+
+function publishedArtifactNames(releaseDir, artifactNames) {
+  if (!Array.isArray(artifactNames) || artifactNames.length === 0) {
+    throw new Error('At least one explicit published artifact is required.');
+  }
+  const uniqueNames = [...new Set(artifactNames)].sort();
+  if (uniqueNames.length !== artifactNames.length) {
+    throw new Error('Published artifact names must be unique.');
+  }
+  for (const name of uniqueNames) {
+    if (typeof name !== 'string' || name !== path.basename(name) || isGeneratedEvidence(name)) {
+      throw new Error(`Invalid published artifact name: ${name}`);
+    }
+    if (!fs.statSync(path.join(releaseDir, name), { throwIfNoEntry: false })?.isFile()) {
+      throw new Error(`Published artifact does not exist: ${name}`);
+    }
+  }
+  return uniqueNames;
 }
 
 const invoked = process.argv[1] === fileURLToPath(import.meta.url);
@@ -124,6 +143,8 @@ if (invoked) {
   const required = ['release-dir', 'version', 'source-sha', 'dependency-json', 'package-file'];
   const values = Object.fromEntries(required.map((name) => [name, argument(name)]));
   const missing = required.filter((name) => !values[name]);
+  const artifactNames = argumentsFor('artifact');
+  if (artifactNames.length === 0) missing.push('artifact');
   if (missing.length > 0) throw new Error(`Missing required arguments: ${missing.join(', ')}`);
   const result = generateReleaseEvidence({
     releaseDir: values['release-dir'],
@@ -131,7 +152,15 @@ if (invoked) {
     sourceSha: values['source-sha'],
     dependencyJson: values['dependency-json'],
     packageFile: values['package-file'],
+    artifactNames,
     generatedAt: argument('generated-at') ?? new Date().toISOString(),
   });
   console.log(`Release evidence recorded for ${result.artifacts.length} artifacts.`);
+}
+
+function argumentsFor(name) {
+  const prefix = `--${name}=`;
+  return process.argv
+    .filter((value) => value.startsWith(prefix))
+    .map((value) => value.slice(prefix.length));
 }

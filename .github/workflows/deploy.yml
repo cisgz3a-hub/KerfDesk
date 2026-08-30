@@ -16,12 +16,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Cancel a queued deploy if a newer commit lands while one is running.
-# Cloudflare Pages handles a fast cancel gracefully (the in-flight one
-# completes; the new one queues right after).
+# One serialized production publication lane exists. Queueing every candidate
+# prevents an obsolete historical rerun from canceling or replacing an eligible
+# current-main deployment before the freshness resolver can classify it. Stale
+# candidates reach that resolver in turn and become provider-free no-ops.
 concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: false
+  group: deploy-production-main
+  queue: max
 
 # Required for actions/checkout — read access is enough; the deploy
 # itself authenticates via the Pages-only PAGES_CLOUDFLARE_API_TOKEN, not
@@ -46,9 +47,9 @@ jobs:
           # default branch's CURRENT tip, not the commit whose CI succeeded —
           # a push race (or a re-run of an old green CI) would deploy a
           # different commit than the one validated. Pin the checkout to the
-          # triggering run's head SHA; manual dispatches deploy the selected
-          # ref (gated to main above) and re-prove everything below anyway.
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+          # triggering run's head SHA. Manual dispatch has no historical-ref
+          # input: it always checks out current main and re-proves it below.
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'refs/heads/main' }}
           # Fetch full history so the version badge's `git rev-list --count
           # HEAD` (the auto build number, see vite.config.ts appVersion) is the
           # real total, not the shallow-clone 1. `git rev-parse --short HEAD`
@@ -67,18 +68,94 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Resolve current-main deployment identity
+        id: deployment_identity
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW_CONTROL_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          control_resolver="${RUNNER_TEMP}/resolve-web-deploy-identity.mjs"
+          git merge-base --is-ancestor "${WORKFLOW_CONTROL_SHA}" refs/remotes/origin/main
+          git show "${WORKFLOW_CONTROL_SHA}:scripts/resolve-web-deploy-identity.mjs" \
+            > "${control_resolver}"
+          node "${control_resolver}" \
+            --event-name="${EVENT_NAME}" \
+            --checkout-sha="$(git rev-parse HEAD)" \
+            --current-main-sha="$(git rev-parse refs/remotes/origin/main)" \
+            --validated-sha="${VALIDATED_SHA}" \
+            --github-output="${GITHUB_OUTPUT}"
+
+      - name: Record obsolete run as an intentional non-deployment
+        if: ${{ steps.deployment_identity.outputs.eligible == 'false' }}
+        shell: bash
+        env:
+          DEPLOY_SHA: ${{ steps.deployment_identity.outputs.sha }}
+          FRESHNESS_REASON: ${{ steps.deployment_identity.outputs.reason }}
+        run: |
+          {
+            echo '### Production deployment skipped'
+            echo
+            echo "Candidate: \`${DEPLOY_SHA}\`"
+            echo
+            echo "${FRESHNESS_REASON}"
+            echo
+            echo 'No candidate-tree build, report script, or provider command was executed.'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Install dependencies
+        if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}
         run: pnpm install --frozen-lockfile
 
       - name: Verify canonical deployment repository
+        if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}
         run: pnpm guard:repo
 
       - name: Release verification gate
         id: release_check
+        if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}
         run: pnpm release:check
+
+      - name: Reconfirm current main immediately before publication
+        id: pre_publish_identity
+        if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          node "${RUNNER_TEMP}/resolve-web-deploy-identity.mjs" \
+            --event-name="${EVENT_NAME}" \
+            --checkout-sha="${{ steps.deployment_identity.outputs.sha }}" \
+            --current-main-sha="$(git rev-parse refs/remotes/origin/main)" \
+            --validated-sha="${VALIDATED_SHA}" \
+            --github-output="${GITHUB_OUTPUT}"
+
+      - name: Record main advance during build as a non-deployment
+        if: ${{ steps.deployment_identity.outputs.eligible == 'true' && steps.pre_publish_identity.outputs.eligible == 'false' }}
+        shell: bash
+        env:
+          DEPLOY_SHA: ${{ steps.deployment_identity.outputs.sha }}
+          FRESHNESS_REASON: ${{ steps.pre_publish_identity.outputs.reason }}
+        run: |
+          {
+            echo '### Production deployment skipped after verification'
+            echo
+            echo "Candidate: \`${DEPLOY_SHA}\`"
+            echo
+            echo "${FRESHNESS_REASON}"
+            echo
+            echo 'Main advanced during the build, so no provider command was executed.'
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish to Cloudflare Pages
         id: publish
+        if: ${{ steps.pre_publish_identity.outputs.eligible == 'true' }}
         # cloudflare/wrangler-action is the official Cloudflare action.
         # v4 installs Wrangler CLI v4 by default (matches this repo's
         # wrangler ^4.100.0); the apiToken/accountId/command inputs are
@@ -93,23 +170,30 @@ jobs:
           command: pages deploy dist/web --project-name=laserforge --branch=main
 
       - name: Record SHA-correlated readiness lanes
-        if: always()
+        if: ${{ always() && steps.deployment_identity.outputs.eligible == 'true' }}
         env:
-          CI_STATE: ${{ github.event_name == 'workflow_run' && 'passed' || steps.release_check.outcome }}
+          CI_STATE: ${{ steps.release_check.outcome }}
           DEPLOY_STATE: ${{ steps.publish.outcome }}
+          DEPLOY_SHA: ${{ steps.deployment_identity.outputs.sha }}
+          FRESHNESS_REASON: ${{ steps.pre_publish_identity.outputs.reason || steps.deployment_identity.outputs.reason }}
+          TRIGGER_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: >-
           pnpm report:release-readiness
+          --sha=${DEPLOY_SHA}
           --state=ci=${CI_STATE}
           --state=browser=not-run
           --state=deploy=${DEPLOY_STATE}
           --state=packaged-runtime=not-run
           --state=perceptual-reference-cam=not-run
           --state=hardware=not-run
+          "--evidence=ci=validated-run=${TRIGGER_RUN_URL}; release-check=${CI_STATE}; deploy-run=${WORKFLOW_RUN_URL}"
+          "--evidence=deploy=publish=${DEPLOY_STATE}; freshness=${FRESHNESS_REASON}; run=${WORKFLOW_RUN_URL}"
 
       - name: Upload readiness report
-        if: always()
+        if: ${{ always() && steps.deployment_identity.outputs.eligible == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: release-readiness-deploy-${{ github.sha }}
+          name: release-readiness-deploy-${{ steps.deployment_identity.outputs.sha }}
           path: artifacts/release-readiness/
           retention-days: 30
