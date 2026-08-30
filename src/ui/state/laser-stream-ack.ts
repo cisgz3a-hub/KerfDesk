@@ -2,7 +2,12 @@
 // Split from laser-line-handler when the untracked-ack attribution pushed
 // that file past the 400-line cap.
 
-import { onAck, step, type StreamerState } from '../../core/controllers/grbl';
+import {
+  onAck,
+  pause as pauseStreamer,
+  step,
+  type StreamerState,
+} from '../../core/controllers/grbl';
 import { beginPostJobSettle } from './laser-post-job-settle';
 import type { LaserState } from './laser-store';
 import { hasUnsettledStreamAcks, toolChangeHoldEntryPatch } from './laser-store-helpers';
@@ -58,7 +63,7 @@ export function advanceStream(
   const s: StreamerState | null = get().streamer;
   if (s === null) return;
   const acked = onAck(s, ack);
-  const stepped = step(acked.state);
+  const stepped = step(get().mpgActive === true ? pauseStreamer(acked.state) : acked.state);
   const enteredToolChange = s.status !== 'tool-change' && stepped.state.status === 'tool-change';
   const finishedStreaming = s.status !== 'done' && stepped.state.status === 'done';
   set((state) => ({

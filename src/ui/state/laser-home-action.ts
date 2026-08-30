@@ -7,7 +7,12 @@ import {
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import type { LaserState } from './laser-store';
-import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
+import {
+  assertAutofocusIdle,
+  mpgCommandBlockMessage,
+  pushLog,
+  setupCommandBlockMessage,
+} from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -38,19 +43,35 @@ function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): stri
   assertAutofocusIdle(get());
   const homeCommand = driver.commands.home;
   if (homeCommand === null) throw new Error('This controller has no homing command.');
+  const state = get();
+  const mpgBlocked = mpgCommandBlockMessage(state);
+  if (mpgBlocked !== null) blockHome(set, get, mpgBlocked);
   if (hasPendingControllerWrite(get())) {
     const message =
       'Home is blocked until the previous controller write and terminal acknowledgement settle.';
-    set({ lastWriteError: message, log: pushLog(get(), `[lf2] Home command blocked: ${message}`) });
-    throw new Error(message);
+    blockHome(set, get, message);
+  }
+  const controllerState = state.statusReport?.state ?? null;
+  const alarmRecoveryKnown =
+    controllerState === 'Alarm' || (controllerState === null && state.alarmCode !== null);
+  if (controllerState !== 'Idle' && !alarmRecoveryKnown) {
+    blockHome(
+      set,
+      get,
+      `Machine must be known Idle or Alarm before homing (currently ${controllerState ?? 'unknown'}).`,
+    );
   }
   const blockedMessage = setupCommandBlockMessage(get());
   if (blockedMessage === null) return homeCommand;
+  blockHome(set, get, blockedMessage);
+}
+
+function blockHome(set: SetFn, get: GetFn, message: string): never {
   set({
-    lastWriteError: blockedMessage,
-    log: pushLog(get(), `[lf2] Home command blocked: ${blockedMessage}`),
+    lastWriteError: message,
+    log: pushLog(get(), `[lf2] Home command blocked: ${message}`),
   });
-  throw new Error(blockedMessage);
+  throw new Error(message);
 }
 
 export async function runHomeAction(

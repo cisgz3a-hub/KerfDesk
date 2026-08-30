@@ -10,6 +10,7 @@
 import type { ControllerDriver } from '../../core/controllers';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import { mpgCommandBlockMessage } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
 
 type GetFn = () => LaserState;
@@ -29,6 +30,7 @@ export async function requestActiveWcsReadback(
   if (modalQuery === null) return;
   const state = get();
   if (state.controllerSessionEpoch !== expectedSessionEpoch) return;
+  if (mpgCommandBlockMessage(state) !== null) return;
   if (
     state.controllerQualification.kind !== 'qualified' ||
     state.controllerQualification.epoch !== expectedSessionEpoch

@@ -66,9 +66,16 @@ export function readinessMarkdown(report) {
   ].join('\n');
 }
 
+export function resolveReadinessSha({ explicitSha, checkoutSha }) {
+  return explicitSha ?? checkoutSha;
+}
+
 async function runCli() {
   const args = parseArgs(process.argv.slice(2));
-  const sha = args.sha ?? process.env['GITHUB_SHA'] ?? (await currentSha());
+  const sha = resolveReadinessSha({
+    explicitSha: args.sha,
+    checkoutSha: await currentSha(),
+  });
   const report = buildReadinessReport({
     sha,
     generatedAt: new Date().toISOString(),

@@ -154,6 +154,20 @@ describe('momentary low-power Fire action', () => {
     expect(test.get().fireActive).toBe(false);
   });
 
+  it('retains the uncertain Fire-on latch when the activation write rejects', async () => {
+    const write = vi.fn(async (line: string) => {
+      if (line.startsWith('M3')) throw new Error('ambiguous activation write');
+    });
+    const test = harness(write);
+
+    await expect(test.setFireActive(true)).rejects.toThrow('ambiguous activation write');
+
+    expect(test.get().fireActive).toBe(true);
+    await test.setFireActive(false);
+    expect(write).toHaveBeenLastCalledWith('M5\n', 'fire', 'console');
+    expect(test.get().fireActive).toBe(false);
+  });
+
   it('includes M5 in disconnect cleanup and treats a dropped Fire link as unsafe', async () => {
     const test = harness();
     await test.setFireActive(true);

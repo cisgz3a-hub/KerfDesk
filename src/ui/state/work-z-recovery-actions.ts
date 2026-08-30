@@ -3,7 +3,7 @@ import type { ControllerDriver } from '../../core/controllers';
 import { activeCncTool } from '../../core/scene';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
-import { pushLog, setupCommandBlockMessage } from './laser-store-helpers';
+import { mpgCommandBlockMessage, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { useStore } from './store';
 import { captureControllerWorkZEvidence } from './work-z-zero-evidence';
@@ -44,11 +44,11 @@ async function recoverWorkZ(
   const context = recoveryContext(get(), refs, driver(), confirmation);
   set({ controllerOperation: { kind: 'work-z-recovery', phase: 'modal-state' } });
   try {
-    const beforeModal = await query(refs, write, context.modalQuery, 'active WCS');
+    const beforeModal = await query(get, refs, write, context.modalQuery, 'active WCS');
     set({ controllerOperation: { kind: 'work-z-recovery', phase: 'offsets' } });
-    const offsets = await query(refs, write, context.offsetsQuery, 'work offsets');
+    const offsets = await query(get, refs, write, context.offsetsQuery, 'work offsets');
     set({ controllerOperation: { kind: 'work-z-recovery', phase: 'modal-state' } });
-    const afterModal = await query(refs, write, context.modalQuery, 'active WCS recheck');
+    const afterModal = await query(get, refs, write, context.modalQuery, 'active WCS recheck');
     const before = parseOwnedWorkOffsetReadback(beforeModal, offsets);
     const after = parseOwnedWorkOffsetReadback(afterModal, offsets);
     if (!before.ok) throw new Error(before.reason);
@@ -147,6 +147,8 @@ function recoveryMachineStateIssue(state: LaserState): string | null {
     controllerOperationCommandBlockMessage(state.controllerOperation);
   if (busy !== null) return busy;
   if (state.connection.kind !== 'connected') return 'Connect to the CNC controller first.';
+  const mpgBlock = mpgCommandBlockMessage(state);
+  if (mpgBlock !== null) return mpgBlock;
   if (state.statusReport?.state !== 'Idle') return 'CNC must report Idle before Work-Z recovery.';
   if (state.pendingUntrackedAcks > 0 || (state.pendingTransportWrites ?? 0) > 0) {
     return 'Wait for earlier controller writes and acknowledgements before Work-Z recovery.';
@@ -169,17 +171,26 @@ function recoveryCapabilityIssue(driver: ControllerDriver): string | null {
 }
 
 async function query(
+  get: GetFn,
   refs: ControllerLifecycleRefs,
   write: WriteFn,
   command: string,
   label: string,
 ): Promise<ReadonlyArray<string>> {
-  return startControllerCommand(refs, write, {
+  assertRecoveryCommandOwnership(get());
+  const responses = await startControllerCommand(refs, write, {
     kind: 'work-z-recovery',
     label: `Read CNC ${label}`,
     command: `${command}\n`,
     source: 'console',
   });
+  assertRecoveryCommandOwnership(get());
+  return responses;
+}
+
+function assertRecoveryCommandOwnership(state: LaserState): void {
+  const mpgBlock = mpgCommandBlockMessage(state);
+  if (mpgBlock !== null) throw new Error(mpgBlock);
 }
 
 function assertRecoveryReservation(state: LaserState, expected: RecoveryContext): void {

@@ -5534,7 +5534,8 @@ recorded below, and only step 4 remains deliberately open:
    names, both legacy Cloudflare names were deleted, and no `CSC_*` repo
    secrets existed.
 4. [ ] Only when a future signed stable release is deliberately authorized, create
-   the protected `desktop-production` environment and add
+   the protected `desktop-production` environment, add the exact reviewed commit as the repository
+   Actions variable `STABLE_APPROVED_RELEASE_SHA`, and add
    `STABLE_WINDOWS_CSC_LINK`, `STABLE_WINDOWS_CSC_KEY_PASSWORD`,
    `STABLE_R2_API_TOKEN`, and `STABLE_CLOUDFLARE_ACCOUNT_ID` there.
 5. [x] Use the checked-in local tag-policy/workflow tests—not a remote malformed or

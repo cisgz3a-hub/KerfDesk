@@ -91,6 +91,7 @@ import {
   readDesktopUpdateChannelTrust,
   resolveDesktopUpdateModes,
 } from './update-channel-trust.js';
+import { installWindowReadinessPolicy } from './window-readiness-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -392,6 +393,7 @@ function installDevTools(window: BrowserWindow): void {
 
 async function createWindow(): Promise<void> {
   const window = createMainWindow();
+  installWindowReadinessPolicy(window);
   installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
 
@@ -467,8 +469,6 @@ async function createWindow(): Promise<void> {
   // can see errors without having to open DevTools manually. Removed in the
   // packaged build via the app.isPackaged guard.
   installDevTools(window);
-
-  window.once('ready-to-show', () => window.show());
 }
 
 async function startCameraBridgeSafely(): Promise<void> {

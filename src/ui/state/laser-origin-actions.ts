@@ -26,6 +26,7 @@ import {
 import {
   assertAutofocusIdle,
   assertNoActiveJob,
+  mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
 } from './laser-store-helpers';
@@ -63,6 +64,8 @@ function assertOriginActionReadyNow(set: SetFn, get: GetFn, refs: LiveRefs): voi
     motionOperationCommandBlockMessage(state) ??
     controllerOperationCommandBlockMessage(state.controllerOperation);
   if (operationBlock !== null) blockOriginAction(set, get, operationBlock);
+  const mpgBlock = mpgCommandBlockMessage(state);
+  if (mpgBlock !== null) blockOriginAction(set, get, mpgBlock);
   if (state.pendingUntrackedAcks > 0 || refs.controllerCommand !== null) {
     blockOriginAction(
       set,
@@ -132,6 +135,7 @@ async function setOriginHere(
   let sawFreshWcoFrame = true;
   await runOriginTransaction(
     set,
+    get,
     refs,
     safeWrite,
     'Set work origin',
@@ -178,6 +182,7 @@ async function zeroZHere(
   await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
+    get,
     refs,
     safeWrite,
     'Zero work Z',
@@ -201,6 +206,7 @@ async function resetOrigin(
   await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
+    get,
     refs,
     safeWrite,
     'Reset transient origin',
@@ -222,6 +228,7 @@ async function setPersistentOriginHere(
   await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
+    get,
     refs,
     safeWrite,
     'Set persistent origin',
@@ -240,6 +247,7 @@ async function clearPersistentOrigin(
   await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
+    get,
     refs,
     safeWrite,
     'Clear persistent origin',
@@ -258,6 +266,7 @@ async function releaseMotors(
   await assertOriginActionReady(set, get, refs, safeWrite);
   await runOriginTransaction(
     set,
+    get,
     refs,
     safeWrite,
     'Release motors',

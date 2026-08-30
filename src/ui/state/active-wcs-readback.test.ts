@@ -66,6 +66,17 @@ describe('requestActiveWcsReadback', () => {
     expect(write).not.toHaveBeenCalled();
   });
 
+  it('skips the modal query while the MPG owns the controller', async () => {
+    const write = vi.fn(async () => undefined);
+    await requestActiveWcsReadback(
+      stateWith({ mpgActive: true }),
+      grblDriver,
+      write,
+      QUALIFIED_EPOCH,
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it('swallows a write failure — the readback is advisory-only', async () => {
     const write = vi.fn(async () => {
       throw new Error('port gone');

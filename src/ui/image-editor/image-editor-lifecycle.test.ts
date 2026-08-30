@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RgbaBuffer } from '../../core/image-edit';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
-import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
+import {
+  createProject,
+  IDENTITY_TRANSFORM,
+  type Project,
+  type RasterImage,
+} from '../../core/scene';
 import { useStore } from '../state';
+import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { createSession, type EditorSession } from './editor-session';
 import { commitImageSize } from './editor-session-resize';
@@ -33,6 +39,19 @@ function raster(id: string): RasterImage {
   };
 }
 
+function projectWithRaster(image: RasterImage): Project {
+  const project = createProject();
+  return { ...project, scene: { ...project.scene, objects: [image] } };
+}
+
+function setCurrentImages(...images: ReadonlyArray<RasterImage>): void {
+  const project = createProject();
+  useStore.setState({
+    project: { ...project, scene: { ...project.scene, objects: images } },
+    projectDocumentEpoch: 1,
+  });
+}
+
 function session(id: string, revision = 0, dirtySinceApply = false): EditorSession {
   return {
     ...createSession(id, `${id}.png`, createRgbaBuffer(4, 4), BOUNDS),
@@ -60,14 +79,17 @@ async function settle(): Promise<void> {
 }
 
 beforeEach(() => {
+  resetStore();
   vi.mocked(decodeRasterToBuffer).mockReset();
   vi.mocked(bakeBufferToBitmapFields).mockReset();
   useStore.setState({ applyEditedImage: vi.fn() });
   useImageEditorStore.setState({
     session: null,
+    sessionOwner: null,
     stash: {},
     loadState: { kind: 'idle' },
     isApplying: false,
+    applyRequest: null,
     pendingCrop: null,
     transform: null,
   });
@@ -87,9 +109,12 @@ describe('Image Studio session lifecycle', () => {
     vi.mocked(decodeRasterToBuffer).mockImplementation((image) =>
       image.id === 'older' ? older.promise : newer.promise,
     );
+    const olderImage = raster('older');
+    const newerImage = raster('newer');
+    setCurrentImages(olderImage, newerImage);
 
-    useImageEditorStore.getState().openEditor(raster('older'));
-    useImageEditorStore.getState().openEditor(raster('newer'));
+    useImageEditorStore.getState().openEditor(olderImage);
+    useImageEditorStore.getState().openEditor(newerImage);
     older.resolve(createRgbaBuffer(2, 2));
     await settle();
 
@@ -112,9 +137,12 @@ describe('Image Studio session lifecycle', () => {
     vi.mocked(decodeRasterToBuffer).mockImplementation((image) =>
       image.id === 'older' ? older.promise : newer.promise,
     );
+    const olderImage = raster('older');
+    const newerImage = raster('newer');
+    setCurrentImages(olderImage, newerImage);
 
-    useImageEditorStore.getState().openEditor(raster('older'));
-    useImageEditorStore.getState().openEditor(raster('newer'));
+    useImageEditorStore.getState().openEditor(olderImage);
+    useImageEditorStore.getState().openEditor(newerImage);
     newer.resolve(createRgbaBuffer(4, 4));
     await settle();
     older.reject(new Error('stale decode failed'));
@@ -129,6 +157,7 @@ describe('Image Studio session lifecycle', () => {
     const pending = deferred<RgbaBuffer>();
     vi.mocked(decodeRasterToBuffer).mockReturnValue(pending.promise);
     const image = raster('same');
+    setCurrentImages(image);
 
     useImageEditorStore.getState().openEditor(image);
     useImageEditorStore.getState().openEditor(image);
@@ -139,11 +168,113 @@ describe('Image Studio session lifecycle', () => {
     expect(useImageEditorStore.getState().session?.objectId).toBe('same');
   });
 
+  it('does not resume a same-id stashed session after the project document is replaced', async () => {
+    const imageA = raster('persisted-image-id');
+    const imageB = { ...raster('persisted-image-id'), source: 'project-b.png' };
+    const docA = createRgbaBuffer(4, 4);
+    const docB = createRgbaBuffer(4, 4);
+    vi.mocked(decodeRasterToBuffer).mockResolvedValueOnce(docA).mockResolvedValueOnce(docB);
+    useStore.setState({ project: projectWithRaster(imageA), projectDocumentEpoch: 7 });
+
+    useImageEditorStore.getState().openEditor(imageA);
+    await settle();
+    useImageEditorStore.setState((state) => ({
+      session:
+        state.session === null ? null : { ...state.session, revision: 7, dirtySinceApply: true },
+    }));
+    useImageEditorStore.getState().closeEditor();
+
+    useStore.setState({ project: projectWithRaster(imageB), projectDocumentEpoch: 8 });
+    useImageEditorStore.getState().openEditor(imageB);
+    await settle();
+
+    expect(decodeRasterToBuffer).toHaveBeenCalledTimes(2);
+    expect(useImageEditorStore.getState().session?.sourceName).toBe('project-b.png');
+    expect(useImageEditorStore.getState().session?.doc).toBe(docB);
+    expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(false);
+  });
+
+  it('resumes a stashed session only while the same project image still owns the id', async () => {
+    const image = raster('same-document-image');
+    const doc = createRgbaBuffer(4, 4);
+    vi.mocked(decodeRasterToBuffer).mockResolvedValue(doc);
+    useStore.setState({ project: projectWithRaster(image), projectDocumentEpoch: 9 });
+
+    useImageEditorStore.getState().openEditor(image);
+    await settle();
+    useImageEditorStore.setState((state) => ({
+      session:
+        state.session === null ? null : { ...state.session, revision: 3, dirtySinceApply: true },
+    }));
+    useImageEditorStore.getState().closeEditor();
+    useImageEditorStore.getState().openEditor(image);
+
+    expect(decodeRasterToBuffer).toHaveBeenCalledOnce();
+    expect(useImageEditorStore.getState().session?.doc).toBe(doc);
+    expect(useImageEditorStore.getState().session?.revision).toBe(3);
+    expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(true);
+  });
+
+  it('does not publish an Apply completion into a replacement project with the same object id', async () => {
+    const imageA = raster('persisted-image-id');
+    const imageB = { ...raster('persisted-image-id'), source: 'project-b.png' };
+    const bake = deferred<{ readonly dataUrl: string; readonly lumaBase64: string }>();
+    const applyEditedImage = vi.fn();
+    vi.mocked(decodeRasterToBuffer).mockResolvedValue(createRgbaBuffer(4, 4));
+    vi.mocked(bakeBufferToBitmapFields).mockReturnValue(bake.promise);
+    useStore.setState({
+      project: projectWithRaster(imageA),
+      projectDocumentEpoch: 11,
+      applyEditedImage,
+    });
+    useImageEditorStore.getState().openEditor(imageA);
+    await settle();
+    useImageEditorStore.setState((state) => ({
+      session:
+        state.session === null ? null : { ...state.session, revision: 1, dirtySinceApply: true },
+    }));
+
+    useImageEditorStore.getState().apply();
+    // An immutable edit/undo can replace the source object without replacing
+    // the whole project document, so identity must be checked as well as epoch.
+    useStore.setState({ project: projectWithRaster(imageB), projectDocumentEpoch: 11 });
+    bake.resolve({ dataUrl: 'data:image/png;base64,stale', lumaBase64: 'AAA=' });
+    await settle();
+
+    expect(applyEditedImage).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
+  it('does not report a stale Apply failure after its source object is replaced', async () => {
+    const imageA = raster('persisted-image-id');
+    const imageB = { ...raster('persisted-image-id'), source: 'replacement.png' };
+    const bake = deferred<{ readonly dataUrl: string; readonly lumaBase64: string }>();
+    vi.mocked(decodeRasterToBuffer).mockResolvedValue(createRgbaBuffer(4, 4));
+    vi.mocked(bakeBufferToBitmapFields).mockReturnValue(bake.promise);
+    useStore.setState({ project: projectWithRaster(imageA), projectDocumentEpoch: 13 });
+    useImageEditorStore.getState().openEditor(imageA);
+    await settle();
+    useImageEditorStore.setState((state) => ({
+      session:
+        state.session === null ? null : { ...state.session, revision: 1, dirtySinceApply: true },
+    }));
+
+    useImageEditorStore.getState().apply();
+    useStore.setState({ project: projectWithRaster(imageB), projectDocumentEpoch: 13 });
+    bake.reject(new Error('stale bake failure'));
+    await settle();
+
+    expect(useImageEditorStore.getState().isApplying).toBe(false);
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
   it('ignores a decode completion after the editor closes', async () => {
     const pending = deferred<RgbaBuffer>();
     vi.mocked(decodeRasterToBuffer).mockReturnValue(pending.promise);
+    const image = raster('closing');
+    setCurrentImages(image);
 
-    useImageEditorStore.getState().openEditor(raster('closing'));
+    useImageEditorStore.getState().openEditor(image);
     useImageEditorStore.getState().closeEditor();
     pending.resolve(createRgbaBuffer(4, 4));
     await settle();
@@ -166,7 +297,7 @@ describe('Image Studio session lifecycle', () => {
     const state = useImageEditorStore.getState();
     expect(state.session?.objectId).toBe('newer');
     expect(state.session?.dirtySinceApply).toBe(true);
-    expect(state.stash['older']?.dirtySinceApply).toBe(false);
+    expect(state.stash['older']?.session.dirtySinceApply).toBe(false);
 
     state.closeEditor();
     state.openEditor(raster('older'));
@@ -241,8 +372,10 @@ describe('Image Studio session lifecycle', () => {
     vi.mocked(decodeRasterToBuffer).mockResolvedValue(createRgbaBuffer(4, 4));
     useImageEditorStore.setState({ session: session('older') });
     useImageEditorStore.getState().setPendingCrop({ x: 0, y: 0, width: 2, height: 2 });
+    const newerImage = raster('newer');
+    setCurrentImages(newerImage);
 
-    useImageEditorStore.getState().openEditor(raster('newer'));
+    useImageEditorStore.getState().openEditor(newerImage);
     expect(useImageEditorStore.getState().pendingCrop).toBeNull();
     await settle();
     useImageEditorStore.getState().commitPendingCrop();

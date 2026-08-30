@@ -188,6 +188,39 @@ describe('probe controller transaction lifecycle', () => {
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
+  it('allows fail-off lines but emits no probe motion after MPG takeover', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    const probe = useLaserStore.getState().probe(Z_REQUEST);
+    await flush();
+    expect(writes).toEqual(['M5\n']);
+
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:1>');
+    connection.emitLine('ok');
+    await flush();
+    expect(writes).toEqual(['M5\n', 'M9\n']);
+
+    connection.emitLine('ok');
+    await flush();
+    expect(writes.some((line) => line.startsWith('G38.2'))).toBe(false);
+    expect(writes).toContain('\x18');
+
+    connection.emitLine('Grbl 1.1f');
+    await flush();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:0>');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:0>');
+    await expect(probe).resolves.toMatchObject({
+      kind: 'preflight-failed',
+      reason: expect.stringMatching(/MPG|pulse generator/i),
+    });
+    expect(useLaserStore.getState().probeBusy).toBe(false);
+  });
+
   it('captures replies delivered synchronously before write resolves', async () => {
     const writes: string[] = [];
     let autoAck = false;
@@ -263,7 +296,8 @@ describe('probe controller transaction lifecycle', () => {
     await expect(probe).resolves.toEqual({ kind: 'probe-failed', alarmCode: 5 });
     expect(writes.some((line) => line.startsWith('G10 L20'))).toBe(false);
     expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
-    expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
+    expect(useLaserStore.getState().statusReport).toBeNull();
+    expect(useLaserStore.getState().alarmCode).toBe(5);
   });
 
   it('aborts on a status-only Alarm even when no numbered ALARM line arrives', async () => {

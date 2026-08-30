@@ -20,7 +20,7 @@ import {
 } from './laser-controller-qualification';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
-import { pushLog } from './laser-store-helpers';
+import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
@@ -98,6 +98,7 @@ async function readMachineSettingsAction(
     lastSettingsReadAt: null,
   });
   try {
+    assertSettingsCommandOwnership(get);
     await startControllerCommand(refs, write, {
       kind: 'interactive-command',
       label: 'read controller settings',
@@ -105,6 +106,7 @@ async function readMachineSettingsAction(
       action: 'console',
       source: 'console',
     });
+    assertSettingsCommandOwnership(get);
     finishSettingsQualification(set, get, refs, qualificationEpoch);
     if (refs.driver.commands.buildInfoQuery !== null) {
       // The settings line handler releases its narrow $$ operation as soon as
@@ -122,12 +124,16 @@ async function readMachineSettingsAction(
           : {},
       );
     }
+    assertSettingsCommandOwnership(get);
     await refreshControllerBuildInfo(set, get, refs, write, qualificationEpoch);
+    assertSettingsCommandOwnership(get);
     clearInteractiveOperation(set, qualificationEpoch);
     // A reset banner nulls activeWcs and this action is the post-reset
     // re-qualification (refs.runControllerQualification), so a completed read
     // is the earliest safe point to re-seed the C6 advisory's modal state.
+    assertSettingsCommandOwnership(get);
     await requestActiveWcsReadback(get, refs.driver, write, qualificationEpoch);
+    assertSettingsCommandOwnership(get);
   } catch (err) {
     failSettingsOperation(set, refs, qualificationEpoch, 'read', err);
   }
@@ -233,6 +239,7 @@ async function writeAndVerifySetting(
   id: number,
   trimmed: string,
 ): Promise<void> {
+  assertSettingsCommandOwnership(get);
   await startControllerCommand(refs, write, {
     kind: 'interactive-command',
     label: `write $${id}`,
@@ -243,6 +250,7 @@ async function writeAndVerifySetting(
   if (get().controllerSessionEpoch !== qualificationEpoch) {
     throw new Error('Controller session changed while writing the machine setting.');
   }
+  assertSettingsCommandOwnership(get);
   beginSettingsCollection(refs, qualificationEpoch);
   set({
     controllerOperation: {
@@ -257,6 +265,7 @@ async function writeAndVerifySetting(
     grblSettingsRows: [],
     lastSettingsReadAt: null,
   });
+  assertSettingsCommandOwnership(get);
   await startControllerCommand(refs, write, {
     kind: 'interactive-command',
     label: 'verify controller settings',
@@ -267,10 +276,16 @@ async function writeAndVerifySetting(
   if (get().controllerSessionEpoch !== qualificationEpoch) {
     throw new Error('Controller session changed while verifying the machine setting.');
   }
+  assertSettingsCommandOwnership(get);
   finishSettingsQualification(set, get, refs, qualificationEpoch);
   if (!settingWasVerified(get, id, trimmed)) {
     throw new Error(`Controller did not report $${id}=${trimmed} after re-read.`);
   }
+}
+
+function assertSettingsCommandOwnership(get: GetFn): void {
+  const mpgBlock = mpgCommandBlockMessage(get());
+  if (mpgBlock !== null) throw new Error(mpgBlock);
 }
 
 function settingWasVerified(get: GetFn, id: number, trimmed: string): boolean {

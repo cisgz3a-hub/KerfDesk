@@ -30,6 +30,7 @@
     "dist-electron",
     "coverage",
     "e2e",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright-production.config.ts"
   ]
 }

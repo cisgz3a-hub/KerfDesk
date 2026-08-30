@@ -9,6 +9,7 @@ import {
 import type { PostJobSettleRefs } from './laser-post-job-settle';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import { mpgCommandBlockMessage } from './laser-store-helpers';
 import { liveCanvasExecutionAcceptedPatch } from './live-canvas-run';
 
 type SetFn = (
@@ -17,6 +18,7 @@ type SetFn = (
 
 type PauseResumeRefillContext = {
   readonly set: SetFn;
+  readonly get: () => LaserState;
   readonly refs: PostJobSettleRefs;
   readonly safeWrite: (line: string, action?: LaserSafetyAction) => Promise<void>;
 };
@@ -33,6 +35,7 @@ export async function refillResumedStream(
   const { token, liveness } = options;
   while (true) {
     assertPauseResumeTransitionOwner(context.refs, token);
+    assertResumeRefillOwnership(context);
     let foundPausedStream = false;
     let toSend = '';
     let finishedWithoutRefill = false;
@@ -62,10 +65,16 @@ export async function refillResumedStream(
       command: toSend,
       action: 'resume',
     });
+    assertResumeRefillOwnership(context);
     if (liveness === 'cnc-door') {
       refreshPauseResumeTransitionLiveness(context.refs, token);
     }
     // Publish from the current snapshot on the next pass. Early acks may have
     // changed completed/in-flight accounting while this write was pending.
   }
+}
+
+function assertResumeRefillOwnership(context: PauseResumeRefillContext): void {
+  const blocked = mpgCommandBlockMessage(context.get());
+  if (blocked !== null) throw new Error(blocked);
 }

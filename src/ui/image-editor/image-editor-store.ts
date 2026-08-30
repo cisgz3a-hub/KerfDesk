@@ -46,10 +46,17 @@ import {
   closeEditorAction,
   openEditorAction,
 } from './image-editor-lifecycle';
+import type {
+  EditorSessionStash,
+  ImageEditorApplyRequest,
+  ImageEditorSessionOwner,
+} from './image-editor-ownership';
 import type { EditorView } from './image-editor-types';
 
 const DEFAULT_BRUSH: BrushSettings = { diameterPx: 12, hardness: 0.8, opacity: 1 };
 const DEFAULT_WAND_TOLERANCE = 32;
+const EMPTY_OWNED_SESSION = { session: null, sessionOwner: null } as const;
+const EMPTY_APPLY_STATE = { isApplying: false, applyRequest: null } as const;
 
 type LoadState =
   | { readonly kind: 'idle' }
@@ -57,13 +64,15 @@ type LoadState =
       readonly kind: 'loading';
       readonly objectId: string;
       readonly requestToken: symbol;
+      readonly owner: ImageEditorSessionOwner;
     }
   | { readonly kind: 'failed'; readonly message: string };
 
 /** Ephemeral Image Studio state and actions owned outside project undo. */
 export type ImageEditorState = {
   readonly session: EditorSession | null;
-  readonly stash: Readonly<Record<string, EditorSession>>;
+  readonly sessionOwner: ImageEditorSessionOwner | null;
+  readonly stash: EditorSessionStash;
   readonly loadState: LoadState;
   readonly tool: EditorTool;
   readonly brush: BrushSettings;
@@ -77,6 +86,7 @@ export type ImageEditorState = {
   /** Feather (px) applied to every NEW selection (Photoshop options-bar Feather). */
   readonly selectionFeather: number;
   readonly isApplying: boolean;
+  readonly applyRequest: ImageEditorApplyRequest | null;
   /** Viewport transform; null = fit-to-window on next canvas layout. */
   readonly view: EditorView | null;
   readonly viewportSize: { readonly width: number; readonly height: number };
@@ -129,7 +139,7 @@ export type ImageEditorState = {
 };
 
 export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
-  session: null,
+  ...EMPTY_OWNED_SESSION,
   stash: {},
   loadState: { kind: 'idle' },
   tool: { kind: 'brush' },
@@ -140,15 +150,13 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   wandContiguous: true,
   selectionMode: 'replace',
   selectionFeather: 0,
-  isApplying: false,
+  ...EMPTY_APPLY_STATE,
   view: null,
   viewportSize: { width: 0, height: 0 },
   isSpacePanning: false,
   pendingCrop: null,
   transform: null,
-
   openEditor: (image) => openEditorAction(set, get, image),
-
   closeEditor: () => closeEditorAction(set, get),
 
   // Switching tools discards any pending crop box (never the session).

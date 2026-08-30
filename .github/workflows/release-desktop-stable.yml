@@ -88,9 +88,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install chromium
-
       - name: Derive release version
         id: version
         shell: bash
@@ -188,7 +185,10 @@ jobs:
             --version="${VERSION}" \
             --source-sha="${GITHUB_SHA}" \
             --dependency-json="release/${VERSION}/runtime-dependencies.json" \
-            --package-file=package.json
+            --package-file=package.json \
+            --artifact="KerfDesk-${VERSION}-windows-x64-setup.exe" \
+            --artifact="KerfDesk-${VERSION}-windows-x64-setup.exe.blockmap" \
+            --artifact=latest.yml
           (cd "release/${VERSION}" && sha256sum --check checksums.sha256)
 
       - name: Upload installer + update feed as workflow artifact
@@ -236,6 +236,9 @@ jobs:
           pnpm exec wrangler r2 object put "${bucket}/${stage}/${exe}.blockmap" \
             --file "${dir}/${exe}.blockmap" --content-type application/octet-stream \
             --cache-control "${immutable}" --remote
+          pnpm exec wrangler r2 object put "${bucket}/${stage}/latest.yml" \
+            --file "${dir}/latest.yml" --content-type text/yaml \
+            --cache-control "${immutable}" --remote
           pnpm exec wrangler r2 object put "${bucket}/${stage}/checksums.sha256" \
             --file "${dir}/checksums.sha256" --content-type text/plain \
             --cache-control "${immutable}" --remote
@@ -250,6 +253,8 @@ jobs:
             --file "${verify_dir}/${exe}" --remote
           pnpm exec wrangler r2 object get "${bucket}/${stage}/${exe}.blockmap" \
             --file "${verify_dir}/${exe}.blockmap" --remote
+          pnpm exec wrangler r2 object get "${bucket}/${stage}/latest.yml" \
+            --file "${verify_dir}/latest.yml" --remote
           for evidence in checksums.sha256 release-sbom.spdx.json release-provenance.json; do
             pnpm exec wrangler r2 object get "${bucket}/${stage}/${evidence}" \
               --file "${verify_dir}/${evidence}" --remote
@@ -259,8 +264,6 @@ jobs:
             "${verify_dir}/release-provenance.json"
           node -e 'const fs=require("fs"); const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(s.spdxVersion!=="SPDX-2.3"||!Array.isArray(s.packages)) process.exit(1)' \
             "${verify_dir}/release-sbom.spdx.json"
-          grep "  ${exe}$\|  ${exe}.blockmap$" "${dir}/checksums.sha256" \
-            > "${verify_dir}/checksums.sha256"
           (cd "${verify_dir}" && sha256sum --check checksums.sha256)
 
           # Publish immutable root objects needed by electron-updater, then verify
@@ -273,8 +276,12 @@ jobs:
             --cache-control "${immutable}" --remote
           pnpm exec wrangler r2 object get "${bucket}/desktop/${exe}" \
             --file "${verify_dir}/root-${exe}" --remote
+          pnpm exec wrangler r2 object get "${bucket}/desktop/${exe}.blockmap" \
+            --file "${verify_dir}/root-${exe}.blockmap" --remote
           test "$(sha256sum "${verify_dir}/root-${exe}" | cut -d' ' -f1)" = \
             "$(sha256sum "${dir}/${exe}" | cut -d' ' -f1)"
+          test "$(sha256sum "${verify_dir}/root-${exe}.blockmap" | cut -d' ' -f1)" = \
+            "$(sha256sum "${dir}/${exe}.blockmap" | cut -d' ' -f1)"
           VERIFY_EXE_PATH="${verify_dir}/root-${exe}" pwsh -NoProfile -Command \
             '$signature = Get-AuthenticodeSignature -LiteralPath $env:VERIFY_EXE_PATH; if ($signature.Status -ne "Valid") { throw "Remote installer signature invalid: $($signature.StatusMessage)" }'
 

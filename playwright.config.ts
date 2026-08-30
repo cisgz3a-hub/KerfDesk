@@ -9,6 +9,7 @@ const coldDependencyCache = process.env['PLAYWRIGHT_COLD_CACHE'] === '1';
 export default defineConfig({
   testDir: './e2e',
   testMatch: ['**/*.e2e.ts', '**/*.spec.ts'],
+  testIgnore: ['**/production-bundle.spec.ts'],
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,

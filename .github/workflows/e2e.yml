@@ -48,20 +48,24 @@ jobs:
       - name: Verify browser test discovery
         run: pnpm check:e2e-discovery
 
-      - name: Run browser smoke
+      - name: Run development and production-bundle browser smoke
         id: browser_smoke
-        run: pnpm test:e2e:cold && pnpm test:e2e
+        run: pnpm test:e2e:cold && pnpm test:e2e && pnpm test:e2e:production-bundle
 
       - name: Record SHA-correlated readiness lanes
         if: always()
+        env:
+          BROWSER_STATE: ${{ steps.browser_smoke.outcome }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: >-
           pnpm report:release-readiness
           --state=ci=not-run
-          --state=browser=${{ steps.browser_smoke.outcome }}
+          --state=browser=${BROWSER_STATE}
           --state=deploy=not-run
           --state=packaged-runtime=not-run
           --state=perceptual-reference-cam=not-run
           --state=hardware=not-run
+          "--evidence=browser=3 checks: cold dev start, full dev suite, production dist/web bundle; result=${BROWSER_STATE}; run=${WORKFLOW_RUN_URL}"
 
       - name: Upload readiness report
         if: always()

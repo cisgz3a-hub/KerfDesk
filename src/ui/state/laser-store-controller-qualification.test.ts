@@ -135,6 +135,24 @@ describe('epoch-bound controller qualification', () => {
     );
   });
 
+  it('parks connect qualification before settings traffic when fresh Idle reports MPG ownership', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    await useLaserStore.getState().connect(adapter(connection));
+    connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:1>');
+    await flush();
+
+    expect(writes).not.toContain('$$\n');
+    expect(writes).not.toContain('$I\n');
+    expect(writes).not.toContain('$G\n');
+    expect(useLaserStore.getState().controllerQualification).toMatchObject({
+      kind: 'failed',
+      message: expect.stringMatching(/MPG|pulse generator/i),
+    });
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+  });
+
   it('keeps an empty settings read failed until the inline Retry succeeds', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
