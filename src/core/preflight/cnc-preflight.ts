@@ -1,5 +1,6 @@
 // runCncPreflight — pre-write checks for CNC (router) jobs. The CNC analog of
-// runPreflight: an empty issue list means safe-to-write. Pure: no I/O.
+// runPreflight: it reports findings for consumer policy to partition into
+// compile-integrity failures and Job Review advisories. Pure: no I/O.
 //
 // Checks:
 //   1. At least one output layer exists.

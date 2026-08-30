@@ -55,4 +55,19 @@ describe('planStraightInlayPair', () => {
     });
     expect(planStraightInlayPair([square(2)], options)).toMatchObject({ ok: false });
   });
+
+  it('can place the mirrored insert toward negative machine X', () => {
+    const plan = planStraightInlayPair([square(30)], {
+      toolDiameterMm: 3.175,
+      allowanceMm: 0.1,
+      pairSpacingMm: 12,
+      stepoverPercent: 40,
+      pairDirectionX: -1,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const female = xBounds(plan.femaleContours);
+    const male = xBounds(plan.maleContours);
+    expect(female[0] - male[1]).toBeCloseTo(12, 6);
+  });
 });

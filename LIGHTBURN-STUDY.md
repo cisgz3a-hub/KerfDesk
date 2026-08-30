@@ -90,9 +90,10 @@ Power detail below is therefore **[LB-forum]** and must be upgraded.
 | 9 | Sketch | detects hard edges — line drawings, handwriting |
 | 10 | Grayscale | varies power between min and max |
 
-**Ours: 3** — threshold / Floyd–Steinberg / grayscale (`core/raster/dither.ts`, ADR-020). We hold
-**Threshold**, one error-diffusion kernel, and **Grayscale**. Missing: Ordered, Atkinson, Stucki, Jarvis,
-Newsprint, Halftone, Sketch.
+**Ours: 11 algorithms** (`core/raster/dither.ts`): Threshold, Ordered, Floyd–Steinberg (LightBurn's
+"Dither" analogue), Atkinson, Stucki, Jarvis, Burkes, Sierra3, Sierra2, Sierra Lite, and Grayscale.
+That covers seven of LightBurn's ten named modes and adds four error-diffusion alternatives.
+Newsprint, Halftone, and Sketch remain missing image-mode surfaces.
 
 Adjacent settings:
 
@@ -101,7 +102,7 @@ Adjacent settings:
 | **DPI** = `25.4 / Line Interval` | `linesPerMm` (`raster-units.ts`) — same relationship, different unit |
 | **Dot Width Correction** — shortens scan lines to compensate beam width; range 0 → Line Interval | `dotWidthCorrectionMm` (`grbl-strategy.ts:385`) — **PARITY** |
 | **Pass-Through** — use pre-processed image directly, no resampling | per-layer `pass-through` (`PROJECT.md:404`) — verify semantics match |
-| **Negative Image** — inverts; for slate/glass | **No equivalent found in our tree.** §8 G-03 |
+| **Negative Image** — inverts; for slate/glass | `negativeImage` → `maybeInvertLuma` — **PARITY** |
 | **Scan Angle** — 0 default, 90 vertical, 180 reverse | Fill has hatch angle; **raster scan angle unconfirmed.** §8 G-04 |
 
 ## §4 — Power modes (M3 / M4)
@@ -204,21 +205,21 @@ runway-as-rapid rule. Ours is more capable and less discoverable. **Not a defect
 `fillStyle:'island'` (`compile-job.ts:189`) plus `islandFillMotionPolicyForDevice`. No LightBurn
 equivalent found. Never perceptually verified — see weakness register W-03.
 
-### G-01 — Seven missing dither algorithms · **GAP**
+### G-01 — Dither-kernel gap closed; three stylized image modes remain · **PARTIAL GAP**
 
-Ordered, Atkinson, Stucki, Jarvis, Newsprint, Halftone, Sketch. **Jarvis** is LightBurn's own
-recommendation as "generally the best choice for photo images" and we do not have it — the highest-value
-single addition on this list for photo engraving quality.
+Ordered, Atkinson, Stucki, and Jarvis are implemented, along with Burkes and three Sierra variants.
+Newsprint, Halftone, and Sketch remain distinct planned Image Studio modes rather than ordinary
+error-diffusion kernels.
 
 ### G-02 — Sketch mode · **GAP, strategically interesting**
 
 "Detects hard edges for line drawings and handwriting" — an *image mode*, not a trace. Adjacent to our
 ADR-115/ADR-123 edge-detection trace work but a different product surface.
 
-### G-03 — Negative Image · **GAP, cheap**
+### G-03 — Negative Image · **PARITY — CLOSED**
 
-Inverts the image; LightBurn calls out slate and glass, where burned areas go lighter. Trivial against
-our luma pipeline. Likely a real user-visible omission on those materials.
+The persisted `negativeImage` setting is exposed in image cut settings and inverts adjusted luma via
+`maybeInvertLuma` before dithering/emission.
 
 ### G-04 — Raster Scan Angle · **GAP, needs confirmation**
 
@@ -233,6 +234,8 @@ unconfirmed in our tree. Verify before filing.
 | `$30` = 1000 default, "S-Value Max" ↔ `maxPowerS` | §1 |
 | Emit-S-per-move toggle ↔ `emitSOnEveryBurnMove` | §1 |
 | Dot Width Correction ↔ `dotWidthCorrectionMm` | §3 |
+| Threshold, Ordered, Dither/Floyd, Atkinson, Stucki, Jarvis, Grayscale | `core/raster/dither.ts` |
+| Negative Image | `negativeImage` + `maybeInvertLuma` |
 | DPI ↔ lines-per-mm relationship | §3 |
 | Bitmap default 254 DPI (ADR-048) | Asserted by ADR-048; **not re-verified here** |
 
@@ -246,7 +249,8 @@ unconfirmed in our tree. Verify before filing.
    ADR-027 forbids.
 3. **D-01 M3-vs-M4 cannot be settled here** - no machine to test on. Our old rationale and LightBurn's directly contradicted each other; we resolved it toward the references (ADR-257). Treat as closed-by-deference, not proven.
 4. **Research §5 framing** — decides whether frame-first is differentiator or divergence.
-5. **Add Jarvis dithering** (G-01) — highest-value quality gap found so far.
+5. **Build Newsprint, Halftone, and Sketch as Image Studio modes** (G-01/G-02), with perceptual
+   fixtures rather than treating them as interchangeable dither kernels.
 6. Then §6 optimization and §7 trace.
 
 ## Sources

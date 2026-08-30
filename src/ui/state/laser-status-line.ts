@@ -25,7 +25,7 @@ import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './liv
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
 import { frameStatusFailurePatch, jogMpgInterruptionPatch } from './frame-status-failure';
-import { isActiveJob, MPG_ACTIVE_COMMAND_MESSAGE, pushLog } from './laser-store-helpers';
+import { MPG_ACTIVE_COMMAND_MESSAGE, pushLog, streamerCanPauseForMpg } from './laser-store-helpers';
 
 export function handleStatusLine(
   set: SetFn,
@@ -130,12 +130,17 @@ function mpgJobInterruptionPatch(
   state: LaserState,
   report: StatusReport,
 ): Partial<Pick<LaserState, 'streamer' | 'liveCanvasRun' | 'lastWriteError' | 'log'>> {
-  if (report.mpgActive !== true || state.mpgActive === true || !isActiveJob(state.streamer)) {
+  if (
+    report.mpgActive !== true ||
+    state.mpgActive === true ||
+    state.streamer === null ||
+    !streamerCanPauseForMpg(state.streamer)
+  ) {
     return {};
   }
   const message = `Job streaming paused: ${MPG_ACTIVE_COMMAND_MESSAGE}`;
   return {
-    streamer: state.streamer === null ? null : pauseStreamer(state.streamer),
+    streamer: pauseStreamer(state.streamer),
     ...liveCanvasLifecyclePatch(state, 'paused'),
     lastWriteError: message,
     log: pushLog(state, `[lf2] ${message}`),

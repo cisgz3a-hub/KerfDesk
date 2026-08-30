@@ -63,6 +63,14 @@ export function isActiveJob(streamer: StreamerState | null): boolean {
   );
 }
 
+// MPG takeover may freeze only a stream that still has resumable work. A
+// `done` streamer remains active until controller Idle because acknowledged
+// planner motion may still be executing, but converting that terminal state to
+// `paused` loses the only Idle-release path and strands the job lock forever.
+export function streamerCanPauseForMpg(streamer: StreamerState | null): boolean {
+  return streamer !== null && ['streaming', 'paused', 'tool-change'].includes(streamer.status);
+}
+
 export function activeJobCommandBlockMessage(state: LaserState): string | null {
   return isActiveJob(state.streamer) ? ACTIVE_JOB_COMMAND_MESSAGE : null;
 }

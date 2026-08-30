@@ -70,7 +70,13 @@ export function passesForCncLayerWithEvidence(
   sourceContours: ReadonlyArray<CollectedCncContour> = [],
   vcarveLadder?: VCarveLadder,
 ): CncLayerPassesResult {
-  const specialized = resolvedSpecializedPasses(polylines, settings, tool, vcarveLadder);
+  const specialized = resolvedSpecializedPasses(
+    polylines,
+    settings,
+    tool,
+    handedness,
+    vcarveLadder,
+  );
   if (specialized !== null) return completePasses(specialized);
 
   const contours = lineArtContoursForLayer(polylines, settings, tool.diameterMm, sourceContours);
@@ -109,12 +115,13 @@ function resolvedSpecializedPasses(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   tool: CncTool,
+  handedness: FrameHandedness,
   vcarveLadder?: VCarveLadder,
 ): ReadonlyArray<CncPass> | null {
   if (settings.cutType === 'v-carve' && vcarveLadder !== undefined) {
     return vcarveLadder.passes;
   }
-  return specializedPassesForLayer(polylines, settings, tool);
+  return specializedPassesForLayer(polylines, settings, tool, handedness);
 }
 
 function rawToolpathsForLayer(

@@ -67,7 +67,7 @@ function projectWithCncZone(): Project {
 }
 
 describe('runCncPreflight no-go zones (G20)', () => {
-  it('blocks a relative-origin CNC start with an enabled zone instead of scanning a fictional frame', () => {
+  it('reports relative-origin zone uncertainty instead of scanning a fictional frame', () => {
     const result = runCncPreflight(projectWithCncZone(), config, GOOD_GCODE, {
       coordinateMode: 'relative-origin',
     });
@@ -105,7 +105,7 @@ describe('runCncPreflight', () => {
     expect(result.issues.some((issue) => issue.code === 'cnc-inlay-invalid')).toBe(false);
   });
 
-  it('blocks an inlay pair when the selected bit cannot reproduce the design', () => {
+  it('reports an inlay pair when the selected bit cannot reproduce the design', () => {
     const base = projectWithCnc({ cutType: 'inlay-pair' });
     const project: Project = {
       ...base,
@@ -136,7 +136,7 @@ describe('runCncPreflight', () => {
     );
   });
 
-  it('blocks adaptive island pockets instead of crossing uncleared stock', () => {
+  it('reports adaptive island pockets instead of claiming a valid plan', () => {
     const base = projectWithCnc({ cutType: 'pocket', pocketStrategy: 'adaptive' });
     const outer = squareObject('outer', '#ff0000', 30);
     const island = squareObject('island', '#ff0000', 10);
@@ -157,7 +157,7 @@ describe('runCncPreflight', () => {
     );
   });
 
-  it('blocks adaptive clearing when optimal load exceeds half the bit diameter', () => {
+  it('reports adaptive clearing when optimal load exceeds half the bit diameter', () => {
     const base = projectWithCnc({
       cutType: 'pocket',
       pocketStrategy: 'adaptive',
@@ -176,7 +176,7 @@ describe('runCncPreflight', () => {
     );
   });
 
-  it('blocks rest machining when the roughing bit is not larger', () => {
+  it('reports rest machining when the roughing bit is not larger', () => {
     const base = projectWithCnc({
       cutType: 'pocket',
       pocketRoughToolId: 'em-1588',
@@ -208,7 +208,7 @@ describe('runCncPreflight', () => {
     expect(result.issues.some((issue) => issue.code === 'cnc-rest-machining-invalid')).toBe(false);
   });
 
-  it('blocks the temporary rest-machining and helical-entry conflict', () => {
+  it('reports the temporary rest-machining and helical-entry conflict', () => {
     const base = projectWithCnc({
       cutType: 'pocket',
       toolId: 'em-1588',
@@ -228,7 +228,7 @@ describe('runCncPreflight', () => {
     );
   });
 
-  it('blocks a requested helix that cannot fit instead of silently plunging', () => {
+  it('reports a requested helix that cannot fit instead of silently plunging', () => {
     const base = projectWithCnc({
       cutType: 'pocket',
       helixEntry: { minDiameterMm: 50, maxDiameterMm: 60, angleDeg: 3 },
@@ -246,7 +246,7 @@ describe('runCncPreflight', () => {
     );
   });
 
-  it('blocks helical entry with a raster pocket strategy', () => {
+  it('reports helical entry with a raster pocket strategy', () => {
     const base = projectWithCnc({
       cutType: 'pocket',
       pocketStrategy: 'raster-x',

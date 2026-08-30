@@ -18,7 +18,7 @@
 //                        smooth gradients but most diode lasers don't
 //                        respond linearly to S.
 //
-// All three return Uint16Array (length = width*height) of S values
+// All modes return Uint16Array (length = width*height) of S values
 // already scaled to [0, sMax]. Uint16 because typical GRBL `$30` is
 // 1000 (or 255, or higher per controller) and Uint8 wraps modulo 256;
 // Uint16 holds the full 0..65535 range any GRBL fork might use. The

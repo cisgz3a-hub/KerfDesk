@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import type { CncPass } from '../job';
 import { cncGrblStrategy } from '../output';
 import {
@@ -125,6 +126,46 @@ describe('compileCncJob pocket strategies', () => {
     expect(sourceRegionDepthSequence(group.passes)).toEqual(['A:-1', 'A:-2', 'B:-1', 'B:-2']);
   });
 
+  it('applies Climb or Conventional to adaptive entry and finish rotation', () => {
+    const compileDirection = (cutDirection: 'climb' | 'conventional', device = dev) => {
+      const job = compileCncJob(
+        sceneWith(
+          {
+            cutType: 'pocket',
+            pocketStrategy: 'adaptive',
+            adaptiveOptimalLoadMm: 0.4,
+            cutDirection,
+            depthMm: 2,
+            depthPerPassMm: 2,
+          },
+          20,
+        ),
+        device,
+        config,
+      );
+      const group = job.groups[0];
+      if (group?.kind !== 'cnc') throw new Error('expected a CNC group');
+      const helix = group.passes.find((pass) => pass.kind === 'helical-contour');
+      const finish = group.passes.find((pass) => pass.kind === 'contour');
+      if (helix?.kind !== 'helical-contour' || finish?.kind !== 'contour') {
+        throw new Error('expected adaptive helix and finish contour');
+      }
+      return { helix, finish };
+    };
+
+    const climb = compileDirection('climb');
+    const conventional = compileDirection('conventional');
+    expect(climb.helix.clockwise).toBe(false);
+    expect(conventional.helix.clockwise).toBe(true);
+    expect(Math.sign(signedAreaMm2(climb.finish.polyline))).toBe(1);
+    expect(Math.sign(signedAreaMm2(conventional.finish.polyline))).toBe(-1);
+
+    const mirroredClimb = compileDirection('climb', { ...dev, origin: 'front-right' });
+    expect(mirroredClimb.helix.clockwise).toBe(true);
+    // front-right has handedness -1, so this numeric CW ring is physical CCW.
+    expect(Math.sign(signedAreaMm2(mirroredClimb.finish.polyline))).toBe(-1);
+  });
+
   it('runs a larger pocket rougher before a smaller rest-machining bit', () => {
     const job = compileCncJob(
       sceneWith(
@@ -183,6 +224,35 @@ describe('compileCncJob pocket strategies', () => {
     expect([rough.toolId, rest.toolId]).toEqual(['em-6350', 'em-1588']);
     expect(sourceRegionDepthSequence(rough.passes)).toEqual(['A:-1', 'A:-2', 'B:-1', 'B:-2']);
     expect(sourceRegionDepthSequence(rest.passes)).toEqual(['A:-1', 'A:-2', 'B:-1', 'B:-2']);
+  });
+
+  it('applies Climb or Conventional to the separate rest-roughing group', () => {
+    const roughingArea = (cutDirection: 'climb' | 'conventional', device = dev): number => {
+      const job = compileCncJob(
+        sceneWith(
+          {
+            cutType: 'pocket',
+            cutDirection,
+            toolId: 'em-1588',
+            pocketRoughToolId: 'em-6350',
+            depthMm: 2,
+            depthPerPassMm: 2,
+          },
+          30,
+        ),
+        device,
+        config,
+      );
+      const rough = job.groups[0];
+      if (rough?.kind !== 'cnc') throw new Error('expected the roughing CNC group');
+      const contour = rough.passes.find((pass) => pass.kind === 'contour');
+      if (contour?.kind !== 'contour') throw new Error('expected a roughing contour');
+      return signedAreaMm2(contour.polyline);
+    };
+
+    expect(Math.sign(roughingArea('climb'))).toBe(1);
+    expect(Math.sign(roughingArea('conventional'))).toBe(-1);
+    expect(Math.sign(roughingArea('climb', { ...dev, origin: 'front-right' }))).toBe(-1);
   });
 
   it('defensively omits rest machining assigned to a non-flat rougher', () => {

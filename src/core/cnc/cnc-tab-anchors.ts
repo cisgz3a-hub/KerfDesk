@@ -167,9 +167,12 @@ function interpolate(start: Vec2, end: Vec2, t: number): Vec2 {
 function resolvedPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
   const flattened = flattenColoredPathCurves(path, {
     toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-    segmentBudget: 100_000,
+    segmentBudget: Number.MAX_SAFE_INTEGER,
   });
-  return flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+  if (flattened.kind !== 'ok') {
+    throw new Error('Canonical tab geometry exceeded the JavaScript safe-integer budget.');
+  }
+  return flattened.polylines;
 }
 
 function normalizedClosedPoints(polyline: Polyline): ReadonlyArray<Vec2> {

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type CSSProperties } from 'react';
-import { jogAxisSignsForOrigin } from '../../../core/devices';
+import { jogAxisSignsForOrigin, machineBoundsForDevice } from '../../../core/devices';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
@@ -41,6 +41,7 @@ export function BoardFineJogControls(props: BoardFineJogControlsProps): JSX.Elem
       : FINE_JOG_FEED_CAP_MM_PER_MIN;
   const feed = clampJogFeed(safeRequestedFeed, device.maxFeed);
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
+  const bounds = useMemo(() => machineBoundsForDevice(device), [device]);
   const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
 
   const clearError = useCallback((): void => {
@@ -91,7 +92,7 @@ export function BoardFineJogControls(props: BoardFineJogControlsProps): JSX.Elem
         feed={feed}
         signs={signs}
         position={position}
-        bed={{ width: device.bedWidth, height: device.bedHeight }}
+        bounds={bounds}
         continuousJogSupported={false}
         onJog={sendVector}
         onCancel={() => undefined}

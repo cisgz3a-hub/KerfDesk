@@ -10,6 +10,7 @@ export type StraightInlayPairOptions = {
   readonly allowanceMm: number;
   readonly pairSpacingMm: number;
   readonly stepoverPercent: number;
+  readonly pairDirectionX?: 1 | -1;
 };
 
 export type StraightInlayPairPlanningEvidence = {
@@ -38,6 +39,7 @@ export function planStraightInlayPairForSettings(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   tool: CncTool,
+  pairDirectionX: 1 | -1 = 1,
 ): StraightInlayPairPlan {
   if (settings.cutType !== 'inlay-pair') return failure('The layer is not an inlay pair.');
   if (tool.kind !== 'end-mill') return failure('Inlay pairs require an end mill.');
@@ -46,6 +48,7 @@ export function planStraightInlayPairForSettings(
     allowanceMm: settings.inlayAllowanceMm ?? 0.1,
     pairSpacingMm: settings.inlayPairSpacingMm ?? 10,
     stepoverPercent: settings.stepoverPercent,
+    pairDirectionX,
   });
 }
 
@@ -94,7 +97,12 @@ export function planStraightInlayPair(
   if (femaleContours.length === 0 || maleBase.length === 0) {
     return failure('The fit allowance removes geometry from one half of the inlay.');
   }
-  const maleContours = placeMirroredToRight(femaleContours, maleBase, options.pairSpacingMm);
+  const maleContours = placeMirroredToPhysicalRight(
+    femaleContours,
+    maleBase,
+    options.pairSpacingMm,
+    options.pairDirectionX ?? 1,
+  );
   const femalePocket = pocketRingToolpaths(
     femaleContours,
     options.toolDiameterMm,
@@ -140,16 +148,20 @@ function offsetOrIdentity(
   return offsetMm === 0 ? polylines : offsetClosedPolylinesWithRoundJoins(polylines, offsetMm);
 }
 
-function placeMirroredToRight(
+function placeMirroredToPhysicalRight(
   female: ReadonlyArray<Polyline>,
   male: ReadonlyArray<Polyline>,
   spacingMm: number,
+  pairDirectionX: 1 | -1,
 ): ReadonlyArray<Polyline> {
   const femaleBounds = boundsOf(female);
   const maleBounds = boundsOf(male);
   if (femaleBounds === null || maleBounds === null) return [];
   const mirrorAxisX = (maleBounds.minX + maleBounds.maxX) / 2;
-  const shiftX = femaleBounds.maxX + spacingMm - maleBounds.minX;
+  const shiftX =
+    pairDirectionX === 1
+      ? femaleBounds.maxX + spacingMm - maleBounds.minX
+      : femaleBounds.minX - spacingMm - maleBounds.maxX;
   return male.map((polyline) => ({
     ...polyline,
     points: polyline.points.map((point) => ({

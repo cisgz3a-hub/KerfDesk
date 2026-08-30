@@ -12,6 +12,7 @@
 // fallback timer still flushes if no banner ever arrives (dead link), which
 // is exactly as best-effort as the old inline writes were.
 
+import type { ControllerDriver } from '../../core/controllers';
 import type { LaserSafetyAction } from './laser-safety-notice';
 
 export const RESET_CLEANUP_BANNER_TIMEOUT_MS = 500;
@@ -26,6 +27,13 @@ export type ResetCleanupRefs = {
 };
 
 type CleanupWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
+
+/** Cleanup after a controller reset must explicitly include spindle/laser off.
+ * Stock GRBL profiles may expose only M9 as their ordinary stopLaserLines. */
+export function resetCleanupLines(driver: ControllerDriver): ReadonlyArray<string> {
+  const lines = driver.commands.stopLaserLines;
+  return lines.some((line) => line.trim().toUpperCase() === 'M5') ? lines : ['M5', ...lines];
+}
 
 /** Arm the cleanup lines to be flushed on the next welcome banner (or after
  *  the fallback timeout). Re-arming replaces any previously armed lines. */

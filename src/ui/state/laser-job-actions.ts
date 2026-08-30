@@ -31,7 +31,7 @@ import {
 } from './laser-start-program-assertions';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
-import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
+import { armResetCleanup, resetCleanupLines, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { finishedJobStateReset } from './laser-session-reset';
 import { disconnectStopUnconfirmedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -290,11 +290,6 @@ async function runStopJob(context: JobActionContext): Promise<void> {
           : cancelStreamer(state.streamer),
     ...liveCanvasLifecyclePatch(state, 'stopped'),
   }));
-}
-
-function resetCleanupLines(driver: ControllerDriver): ReadonlyArray<string> {
-  const lines = driver.commands.stopLaserLines;
-  return lines.some((line) => line.trim().toUpperCase() === 'M5') ? lines : ['M5', ...lines];
 }
 
 function prepareInitialStream(

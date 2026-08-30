@@ -7,7 +7,7 @@ The one transform every machine move passes through, and the sign trap it create
 | Frame | Convention | Where it lives |
 |---|---|---|
 | **Scene** | `+X` right, `+Y` **down** — SVG / Canvas2D convention | everything above compile |
-| **Machine** | `+X` to the operator's right, `+Y` **away from the operator** — GRBL convention | everything from compile down |
+| **Machine** | Numeric axes start at the configured origin; their physical signs therefore depend on that origin | everything from compile down |
 
 The bridge is a single pure function, `toMachineCoords(p, device)` at
 `src/core/devices/origin-transform.ts:21`, with an exact inverse `toSceneCoords` at line 28.
@@ -51,57 +51,37 @@ Verified call sites (grep, excluding tests):
 `collect-cnc-contours.ts:74` applies `toMachineCoords` exactly as the laser path does. That is
 the correct design, and it creates the trap below.
 
-## The handedness trap — CNC cut direction
+## CNC cut direction across machine-frame handedness
 
-The highest-value finding in this set for anyone comparing us to Easel.
+`compileCncJob` materializes contours in machine coordinates before cut-direction enforcement.
+A shoelace sign in those numbers has the opposite physical meaning when exactly one physical axis
+is mirrored, so `machineFrameHandedness` derives the determinant from the same
+`jogAxisSignsForOrigin` mapping used by the operator's jog controls:
 
-**Setup.** `compileCncJob` materializes contours in *machine* coordinates
-(`compile-cnc-job.ts:68` → `collectLayerContours(sourceObjects, layer, device)`). Cut-direction
-enforcement then runs on those already-transformed polylines, deciding climb vs conventional from
-the **shoelace signed area** (`src/core/cnc/motion-polish.ts:39-60`, via `signedAreaMm2`).
+| Origin | Physical-right → machine X | Physical-away → machine Y | Handedness |
+|---|---:|---:|---:|
+| `front-left` | +1 | +1 | +1 |
+| `front-right` | -1 | +1 | **-1 (mirrored)** |
+| `rear-left` | +1 | -1 | **-1 (mirrored)** |
+| `rear-right` | -1 | -1 | +1 |
+| `center` | +1 | +1 | +1 |
 
-**Reasoning it encodes** (`motion-polish.ts:7-15`): with an M3 top-view-clockwise spindle, climb
-cutting keeps material on the **left** of travel — so outside-profile climb = CCW,
-inside/pocket climb = CW. `wantsCounterClockwise` (`motion-polish.ts:79-83`) implements exactly
-that, and ADR-252 (`DECISIONS.md:7755`) mirrors it for holes because a hole's material lies
-*outside* its boundary.
+With an M3 spindle viewed from above, climb cutting keeps the material on the **right** of travel.
+Therefore an outside-profile climb cut is physically clockwise, while an inside-profile or pocket
+climb cut is physically counter-clockwise. Conventional is the inverse. `enforceCutDirection`
+converts that physical target into the numeric winding required by the configured origin; holes
+retain the opposite winding from their containing outer contour.
 
-**The trap.** Mirroring exactly one axis **flips the sign of the shoelace area**. Counting axis
-flips each origin applies relative to the scene frame:
+**Software status: verified.** `cut-direction-frame-handedness.test.ts` pins the determinant and
+the physical winding for all five origins. Adaptive-pocket finish rings and helix entries, general
+helical entries, and separate rest-roughing groups now use the same direction contract. This is
+source and deterministic test evidence, not a hardware quality claim: chip evacuation, cutter
+loading, edge finish, and dimensional results still require a real coupon/air-cut qualification.
 
-| Origin | X mirrored | Y flipped | Net flips | Shoelace sign vs scene |
-|---|---|---|---|---|
-| `front-left` | no | yes | 1 (odd) | **inverted** |
-| `front-right` | yes | yes | 2 (even) | preserved |
-| `rear-left` | no | no | 0 (even) | preserved |
-| `rear-right` | yes | no | 1 (odd) | **inverted** |
-| `center` | translate | yes | 1 (odd) | **inverted** |
-
-So "CCW in machine coordinates" is **not** the same physical direction as "CCW as the operator
-sees it on canvas", and which way it lands depends on the configured origin. Because
-`enforceCutDirection` reasons in machine space about a physical spindle rotation, the mapping
-from `climb` to an actual chip-load direction is origin-dependent.
-
-**Status: UNRESOLVED AND UNVERIFIED.** This matches the concern held in project memory as *"CNC
-frame left-handed on 2 origins"* and the P1 of the 2026-07-25 CNC full-chain audit (*"possible
-climb inversion, `motion-polish.ts:78-82`, cut a coupon first"*). Nothing in this session
-verified it either way on hardware. The table above is derived from the code and sign algebra,
-**not** from a cut test.
-
-Compounding factors:
-
-- ADR-251 (`DECISIONS.md:11702`) made **climb the default** for profile cuts, so this path is on
-  by default; output is no longer byte-identical to pre-H.9 jobs (`motion-polish.ts:3-5`).
-- ADR-250's lead placement *reads winding opposition* to find holes (`motion-polish.ts:46-49`),
-  so a sign error propagates into lead geometry, aiming leads into the kept part.
-- `dominantWindingSign` (`motion-polish.ts:65-77`) infers the outer boundary from the
-  largest-area contour — winding-based, not containment-based, chosen because winding survives
-  concentric roughing/finishing offsets where containment depth does not.
-
-**The verification that would settle it** (CANNOT be performed - no machine to test on): cut a two-feature coupon — one outer profile, one
-interior hole — on a `front-left` machine and confirm chip ejection and edge finish match climb
-on both. Repeat with origin set to `rear-left`. If the coupon differs between origins, the
-inversion is real.
+ADR-251 makes climb the default, so ordinary profile and pocket output is direction-oriented rather
+than byte-identical to the pre-H.9 compiler. `dominantWindingSign` identifies the outer boundary by
+largest absolute area because winding survives concentric roughing and finishing offsets where a
+simple containment-depth interpretation does not.
 
 ## Z — asymmetric by design
 
@@ -136,8 +116,7 @@ Frame or Start — the physical Frame is the spatial source of truth. See
 1. **Origin enumeration.** LightBurn exposes a device origin corner too. Does it offer `center`?
    Does it define `+Y` identically, and does it warn when origin and homing corner disagree?
 2. **Cut direction UI.** Do Easel/Carbide expose climb vs conventional? If so, do they express it
-   in *scene* terms ("clockwise on screen") or *machine* terms? Scene-relative wording is strong
-   evidence our machine-space reasoning sits at the wrong altitude.
+   as physical clockwise/counter-clockwise or as machine-number direction?
 3. **The coupon question.** Does any competitor doc state which physical direction climb
    corresponds to for an outside profile, in words we can check our sign against?
 4. **Hole detection.** How does Easel decide which contour is a hole — winding, containment, or

@@ -50,12 +50,19 @@ export function compileStraightInlayGroups(
     tool: CncTool,
     passes: ReadonlyArray<CncPass>,
   ) => CncGroup | null,
+  pairDirectionX: 1 | -1 = 1,
 ): {
   readonly female: CncGroup;
   readonly male: CncGroup;
   readonly femalePocketPassLimited: boolean;
 } | null {
-  const compiled = compileStraightInlayGroupsWithEvidence(polylines, settings, config, buildGroup);
+  const compiled = compileStraightInlayGroupsWithEvidence(
+    polylines,
+    settings,
+    config,
+    buildGroup,
+    pairDirectionX,
+  );
   return compiled === null || compiled.groups === null
     ? null
     : {
@@ -73,9 +80,15 @@ export function compileStraightInlayGroupsWithEvidence(
     tool: CncTool,
     passes: ReadonlyArray<CncPass>,
   ) => CncGroup | null,
+  pairDirectionX: 1 | -1 = 1,
 ): StraightInlayGroupsCompilation | null {
   if (settings.cutType !== 'inlay-pair') return null;
-  const compiled = compileStraightInlayOperationWithEvidence(polylines, settings, config);
+  const compiled = compileStraightInlayOperationWithEvidence(
+    polylines,
+    settings,
+    config,
+    pairDirectionX,
+  );
   const operation = compiled.operation;
   if (operation === null) return { groups: null, ...compiled.evidence };
   const female = buildGroup(operation.femaleSettings, operation.tool, operation.femalePasses);
@@ -90,8 +103,10 @@ export function compileStraightInlayOperation(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   config: CncMachineConfig,
+  pairDirectionX: 1 | -1 = 1,
 ): StraightInlayOperation | null {
-  return compileStraightInlayOperationWithEvidence(polylines, settings, config).operation;
+  return compileStraightInlayOperationWithEvidence(polylines, settings, config, pairDirectionX)
+    .operation;
 }
 
 type StraightInlayOperationCompilation = {
@@ -103,12 +118,13 @@ function compileStraightInlayOperationWithEvidence(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   config: CncMachineConfig,
+  pairDirectionX: 1 | -1,
 ): StraightInlayOperationCompilation {
   if (settings.cutType !== 'inlay-pair') {
     return { operation: null, evidence: NO_INLAY_PLANNING_EVIDENCE };
   }
   const tool = layerCncTool(config, settings);
-  const plan = planStraightInlayPairForSettings(polylines, settings, tool);
+  const plan = planStraightInlayPairForSettings(polylines, settings, tool, pairDirectionX);
   const evidence: StraightInlayPairPlanningEvidence = {
     femalePocketOffsetFailed: plan.femalePocketOffsetFailed,
     femalePocketPassLimited: plan.femalePocketPassLimited,

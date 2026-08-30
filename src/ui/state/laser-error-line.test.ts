@@ -8,6 +8,7 @@ import {
   startCollecting,
   step,
 } from '../../core/controllers/grbl';
+import { CMD_SPINDLE_OFF } from '../../core/controllers/grbl/commands';
 import { grblDriver, marlinDriver, type ControllerDriver } from '../../core/controllers';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
@@ -204,7 +205,7 @@ describe('handleLine controller error (P0-1)', () => {
     expect(safeWrite).toHaveBeenNthCalledWith(1, RT_SOFT_RESET, 'stop', 'system');
     // The reset wiped the in-flight accounting (audit F1)...
     expect(get().streamer?.inFlight).toEqual([]);
-    // ...and the M9 beam-off cleanup is deferred until the boot banner
+    // ...and explicit M5 + M9 fail-off cleanup is deferred until the boot banner
     // arrives (audit F2), so it is NOT written yet.
     expect(safeWrite.mock.calls.some(([payload]) => payload === `${CMD_COOLANT_OFF}\n`)).toBe(
       false,
@@ -212,6 +213,7 @@ describe('handleLine controller error (P0-1)', () => {
     handleLine(set, get, refs, safeWrite, 'Grbl 1.1f');
     await Promise.resolve();
     await Promise.resolve();
+    expect(safeWrite.mock.calls.some(([payload]) => payload === `${CMD_SPINDLE_OFF}\n`)).toBe(true);
     expect(safeWrite.mock.calls.some(([payload]) => payload === `${CMD_COOLANT_OFF}\n`)).toBe(true);
     expect(safeWrite.mock.calls.some(([payload]) => payload.startsWith('G1 '))).toBe(false);
     // The code is recorded and the operator is told to check the machine.
@@ -222,6 +224,27 @@ describe('handleLine controller error (P0-1)', () => {
       rejectedLine: 'G1 X1234567890',
       message: expect.stringContaining('error:7'),
     });
+  });
+
+  it('keeps M5 cleanup armed when the realtime reset write rejects', async () => {
+    vi.useFakeTimers();
+    const { refs, set, get } = makeHarness();
+    set({ streamer: step(createStreamer('G1 X10 F600 S100\nM5\n')).state });
+    const safeWrite = vi
+      .fn<(payload: string, action?: unknown, source?: unknown) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('reset transport outcome unknown'))
+      .mockResolvedValue(undefined);
+
+    handleLine(set, get, refs, safeWrite, 'error:7');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(refs.pendingResetCleanup?.lines).toEqual([CMD_SPINDLE_OFF, CMD_COOLANT_OFF]);
+    handleLine(set, get, refs, safeWrite, 'Grbl 1.1f');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(safeWrite).toHaveBeenCalledWith(`${CMD_SPINDLE_OFF}\n`, 'stop', 'system');
+    expect(safeWrite).toHaveBeenCalledWith(`${CMD_COOLANT_OFF}\n`, 'stop', 'system');
   });
 
   it('includes the rejected in-flight G-code line in the controller-error notice', () => {

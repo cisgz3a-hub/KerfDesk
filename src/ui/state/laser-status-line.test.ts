@@ -18,4 +18,20 @@ describe('laser status-line ownership transitions', () => {
     expect(get().streamer).toBeNull();
     expect(get().lastWriteError).toBeNull();
   });
+
+  it('keeps a completed stream terminal when MPG takeover arrives before controller Idle', () => {
+    const { refs, set, get } = makeLineHandlerHarness();
+    const done = onAck(step(createStreamer('M5\n')).state, 'ok').state;
+    const running = parseStatusReport('<Run|MPos:1.000,0.000,0.000|FS:100,0|MPG:1>');
+    const idle = parseStatusReport('<Idle|MPos:1.000,0.000,0.000|FS:0,0|MPG:1>');
+    if (running === null || idle === null) throw new Error('test status report did not parse');
+    set({ streamer: done, mpgActive: null });
+
+    handleStatusLine(set, get, refs, async () => undefined, running);
+    expect(get().streamer?.status).toBe('done');
+    expect(get().lastWriteError).toBeNull();
+
+    handleStatusLine(set, get, refs, async () => undefined, idle);
+    expect(get().streamer).toBeNull();
+  });
 });

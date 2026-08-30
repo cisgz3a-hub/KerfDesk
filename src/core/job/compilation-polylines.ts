@@ -10,9 +10,11 @@ import {
 } from '../scene';
 import { flattenColoredPathCurvesForTransform } from '../scene/curve-path';
 
-// Matches the raw-vector budget the preparation gate uses, so flattening here
-// cannot exceed what preparation already accepted for the same scene.
-const COMPILATION_SEGMENT_BUDGET = 100_000;
+// The 100k preparation threshold is routing-only: it moves expensive output
+// work to the worker and must not change the geometry that worker compiles.
+// Use the largest exactly representable integer so canonical curves never
+// fall back to their compatibility polylines merely because they are large.
+const COMPILATION_SEGMENT_BUDGET = Number.MAX_SAFE_INTEGER;
 
 export function compilationPolylines(
   path: ColoredPath,
@@ -22,7 +24,8 @@ export function compilationPolylines(
     toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
     segmentBudget: COMPILATION_SEGMENT_BUDGET,
   });
-  // Normal output reaches this only after the matching pre-emit budget check.
-  // Direct pure-core callers retain the compatibility view on over-budget data.
-  return flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+  if (flattened.kind !== 'ok') {
+    throw new Error('Canonical curve flattening exceeded the JavaScript safe-integer budget.');
+  }
+  return flattened.polylines;
 }

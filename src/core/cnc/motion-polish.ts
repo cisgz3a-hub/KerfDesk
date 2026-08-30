@@ -73,6 +73,16 @@ export function enforceCutDirection(
   });
 }
 
+/** Numeric arc direction that realizes the requested physical cut direction. */
+export function cutDirectionClockwise(
+  direction: CncCutDirection,
+  cutType: CncCutType,
+  handedness: FrameHandedness,
+): boolean | null {
+  const wantCcw = wantsCounterClockwise(direction, cutType, handedness);
+  return wantCcw === null ? null : !wantCcw;
+}
+
 // The largest-area closed toolpath carries the outer boundary's winding; a
 // contour winding the other way is a hole. Winding survives concentric
 // roughing/finishing offsets of one feature, which containment depth does not.

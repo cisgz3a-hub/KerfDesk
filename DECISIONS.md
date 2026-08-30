@@ -18769,3 +18769,94 @@ guard, a policy refusal, or a physical-output claim.
 - ADR-248, packaged Preview and native-evidence boundaries.
 
 ---
+
+## ADR-312 - Terminal ownership and physical-frame semantics survive specialized paths (2026-08-30)
+
+**Status:** Accepted and implemented in local remediation; focused software verification recorded,
+full repository and hosted verification pending, hardware qualification excluded
+
+### Context
+
+The post-ADR-311 audit found eight places where a valid lower-level contract was lost at a
+specialized boundary. A grblHAL MPG takeover could convert an acknowledged `done` streamer into
+`paused`, removing the terminal Idle-release path. A GRBL stream error armed only the driver's
+ordinary stop lines, and did so after the realtime reset promise resolved; stock GRBL's M9-only
+list omitted explicit M5, while a rejected/ambiguous reset write could leave no deferred cleanup.
+Canonical curve flattening silently replaced more than 100,000 curve segments with compatibility
+polylines even though that threshold only routes output preparation to a Worker. Adaptive pockets,
+general helical entry, and separate rest roughing bypassed part of the physical Climb/Conventional
+mapping. Straight inlay placement treated positive machine X as the operator's right on every
+origin. Continuous jog distance assumed zero-based bounds, so center-origin holds planned travel
+from zero to a full-bed extent instead of to the signed half-bed boundary.
+
+These are ownership, output-integrity, and coordinate-semantics defects. They do not authorize a
+new guard, warning gate, cap, confirmation, or hardware claim.
+
+### Decision
+
+1. **MPG terminal ownership.** MPG takeover may pause only `streaming`, `paused`, or `tool-change`
+   streamers. An acknowledged `done` streamer stays terminal until a later controller Idle releases
+   its exact job ownership; the last acknowledgement during an existing takeover may settle the
+   stream and begin the ordinary post-job settle without reclassifying it as paused.
+2. **Reset fail-off cleanup.** A GRBL-family stream-error reset pre-arms cleanup before dispatching
+   the realtime byte. Cleanup always contains explicit `M5` plus the driver's remaining stop lines,
+   without duplicating M5 when the driver already supplies it. The banner or existing fallback
+   timer flushes that intent even when the reset promise rejects; only a confirmed reset completion
+   wipes dead in-flight accounting.
+3. **Canonical curve authority.** The 100,000-segment threshold remains routing and preview policy,
+   not output geometry. Compilation and CNC contour collection share canonical curve flattening at
+   machine tolerance with a safe-integer segment budget. Compatibility polylines are never a silent
+   large-output fallback; exhausting the JavaScript safe-integer budget is an explicit compile-
+   integrity failure because the canonical program cannot be represented.
+4. **Physical cut direction.** Adaptive finish rings, adaptive helical entry, ordinary tangent
+   helices, and separate rest-roughing toolpaths use the same physical Climb/Conventional mapping as
+   ordinary pocket/profile compilation. Closed finish/roughing rings may be reoriented; the planned
+   open adaptive engagement chain is not reversed. Helix rotation matches the numeric winding that
+   realizes the requested physical direction in the configured machine-frame handedness.
+5. **Physical inlay placement.** The mirrored insert is placed toward the operator's physical right
+   using `jogAxisSignsForOrigin`, so right-origin devices move the pair toward negative machine X.
+6. **Signed jog bounds.** Continuous jog planning consumes `machineBoundsForDevice` min/max bounds.
+   Center-origin travel therefore targets `[-width/2,+width/2] × [-height/2,+height/2]`; corner
+   origins retain their existing zero-based behavior.
+7. **Documentation truth.** Architecture and product documents describe material-right climb
+   semantics, all-origin handedness, advisory preflight findings, current raster algorithms,
+   negative-image support, Image Studio's staged status, and the exact runtime dependency count.
+8. **Guard boundary.** No finding above adds or widens a refusal. Frame remains the sole ordinary
+   Start guard and Job Review remains the single warning surface. The only newly explicit failure is
+   the unreachable safe-integer curve-representation exhaustion, which is compile integrity.
+
+### Consequences
+
+- MPG takeover cannot strand a completed job lock by erasing its terminal state, while resumable
+  streams still pause and stop refilling under the competing transport owner.
+- Stream rejection preserves a best-effort explicit spindle/laser-off and coolant-off cleanup across
+  reset-write ambiguity without sending post-reset queued lines into the reboot window.
+- Worker-routed canonical curves retain their actual geometry instead of emitting a stale coarse
+  compatibility view.
+- Specialized CNC paths obey the same operator-visible direction and placement meaning on all five
+  origins; center-origin continuous jogs target the real signed boundary.
+- More canonical segments can increase Worker time and memory. That cost is disclosed by the
+  existing large-job advisory rather than converted into a refusal or geometry downgrade.
+
+### Verification
+
+- Focused Vitest coverage includes MPG-at-done/Idle release, last-ack-under-MPG settle, reset
+  rejection plus M5/M9 banner cleanup, a 100,001-segment canonical path with a deliberately wrong
+  compatibility view, clockwise tangent helix entry, adaptive entry/finish direction, rest-roughing
+  direction, negative-X inlay placement and right-origin physical placement, and center-origin
+  continuous-jog bounds.
+- The focused run recorded 42 passing tests across nine files. Exact-final typecheck, lint,
+  formatting, full tests, release checks, pull-request checks, and post-merge publication remain
+  required before integration is complete.
+- No controller, pendant, serial transport, spindle, laser, jog motion, air cut, material cut,
+  dimensional result, chip evacuation, edge finish, or packaged runtime is established by these
+  software tests.
+
+### References
+
+- ADR-228 and ADR-232, Frame-only ordinary Start authorization and factual refusal boundaries.
+- ADR-241 and ADR-243, large-work thresholds route/disclose rather than refuse or degrade output.
+- ADR-251 and ADR-252, physical Climb/Conventional semantics and hole winding.
+- ADR-311, exact transport and asynchronous ownership across awaited boundaries.
+
+---

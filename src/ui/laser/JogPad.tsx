@@ -6,7 +6,7 @@
 // object and no longer jog the machine (F104); Z-focus keys stay on the pad.
 
 import { useCallback, useMemo, useState } from 'react';
-import { jogAxisSignsForOrigin } from '../../core/devices';
+import { jogAxisSignsForOrigin, machineBoundsForDevice } from '../../core/devices';
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
@@ -42,6 +42,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const feed = clampJogFeed(selectedFeed, maxFeed);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
+  const bounds = useMemo(() => machineBoundsForDevice(device), [device]);
   const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
   const focusReady = focusJogReady(device, machineKind);
 
@@ -81,7 +82,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
           feed={feed}
           signs={signs}
           position={position}
-          bed={{ width: device.bedWidth, height: device.bedHeight }}
+          bounds={bounds}
           continuousJogSupported={continuousJogSupported}
           onJog={sendVector}
           onCancel={cancelContinuousJog}

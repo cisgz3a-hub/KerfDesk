@@ -1,4 +1,4 @@
-import type { JogAxisSigns } from '../../core/devices';
+import type { JogAxisSigns, MachineBounds } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
 
 export const DEFAULT_JOG_FEED_MM_PER_MIN = 3000;
@@ -44,14 +44,14 @@ export function stepJogVector(
 export function continuousJogVector(
   direction: PhysicalJogDirection,
   position: Vec2 | null,
-  bed: { readonly width: number; readonly height: number },
+  bounds: MachineBounds,
   signs: JogAxisSigns,
   feed: number,
 ): JogVector | null {
   const machineXDirection = direction.x * signs.x;
   const machineYDirection = direction.y * signs.y;
-  const xDistance = distanceToLimit(position?.x, bed.width, machineXDirection);
-  const yDistance = distanceToLimit(position?.y, bed.height, machineYDirection);
+  const xDistance = distanceToLimit(position?.x, bounds.minX, bounds.maxX, machineXDirection);
+  const yDistance = distanceToLimit(position?.y, bounds.minY, bounds.maxY, machineYDirection);
   const vector = vectorForDistances(direction, xDistance, yDistance, signs, feed);
   return vector.dx === undefined && vector.dy === undefined ? null : vector;
 }
@@ -81,13 +81,19 @@ function vectorForDistances(
 
 function distanceToLimit(
   coordinate: number | undefined,
-  extent: number,
+  minimum: number,
+  maximum: number,
   direction: number,
 ): number {
   if (direction === 0) return 0;
-  const safeExtent = Number.isFinite(extent) && extent > 0 ? extent : 1;
-  if (coordinate === undefined || !Number.isFinite(coordinate)) return safeExtent;
-  return direction > 0 ? Math.max(0, safeExtent - coordinate) : Math.max(0, coordinate);
+  const safeMinimum = Number.isFinite(minimum) ? minimum : 0;
+  const safeMaximum = Number.isFinite(maximum) && maximum > safeMinimum ? maximum : safeMinimum + 1;
+  if (coordinate === undefined || !Number.isFinite(coordinate)) {
+    return safeMaximum - safeMinimum;
+  }
+  return direction > 0
+    ? Math.max(0, safeMaximum - coordinate)
+    : Math.max(0, coordinate - safeMinimum);
 }
 
 function signedAxis(axis: 'X' | 'Y', value: number): string {
