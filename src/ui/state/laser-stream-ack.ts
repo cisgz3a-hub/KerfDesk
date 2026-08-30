@@ -10,7 +10,11 @@ import {
 } from '../../core/controllers/grbl';
 import { beginPostJobSettle } from './laser-post-job-settle';
 import type { LaserState } from './laser-store';
-import { hasUnsettledStreamAcks, toolChangeHoldEntryPatch } from './laser-store-helpers';
+import {
+  hasUnsettledStreamAcks,
+  streamerCanPauseForMpg,
+  toolChangeHoldEntryPatch,
+} from './laser-store-helpers';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
@@ -63,7 +67,11 @@ export function advanceStream(
   const s: StreamerState | null = get().streamer;
   if (s === null) return;
   const acked = onAck(s, ack);
-  const stepped = step(get().mpgActive === true ? pauseStreamer(acked.state) : acked.state);
+  const stepped = step(
+    get().mpgActive === true && streamerCanPauseForMpg(acked.state)
+      ? pauseStreamer(acked.state)
+      : acked.state,
+  );
   const enteredToolChange = s.status !== 'tool-change' && stepped.state.status === 'tool-change';
   const finishedStreaming = s.status !== 'done' && stepped.state.status === 'done';
   set((state) => ({

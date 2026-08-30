@@ -18,7 +18,7 @@ describe('jog control policy', () => {
       continuousJogVector(
         { x: 1, y: 0 },
         { x: 125, y: 40 },
-        { width: 400, height: 300 },
+        { width: 400, height: 300, minX: 0, minY: 0, maxX: 400, maxY: 300 },
         { x: 1, y: 1 },
         3000,
       ),
@@ -30,10 +30,27 @@ describe('jog control policy', () => {
       continuousJogVector(
         { x: 1, y: 0 },
         { x: 125, y: 40 },
-        { width: 400, height: 300 },
+        { width: 400, height: 300, minX: 0, minY: 0, maxX: 400, maxY: 300 },
         { x: -1, y: 1 },
         3000,
       ),
     ).toEqual({ dx: -125, feed: 3000 });
+  });
+
+  it('uses signed machine bounds for a center-origin continuous jog', () => {
+    const bounds = {
+      width: 400,
+      height: 300,
+      minX: -200,
+      minY: -150,
+      maxX: 200,
+      maxY: 150,
+    };
+    expect(
+      continuousJogVector({ x: 1, y: 0 }, { x: 0, y: 0 }, bounds, { x: 1, y: 1 }, 3000),
+    ).toEqual({ dx: 200, feed: 3000 });
+    expect(
+      continuousJogVector({ x: -1, y: 0 }, { x: 0, y: 0 }, bounds, { x: 1, y: 1 }, 3000),
+    ).toEqual({ dx: -200, feed: 3000 });
   });
 });

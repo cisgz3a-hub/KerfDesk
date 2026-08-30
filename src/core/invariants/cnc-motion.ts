@@ -6,9 +6,9 @@
 //     before any Z has been established) — an XY rapid with the bit buried;
 //   * any G0 whose Z target is below the safe height — a rapid plunge.
 //
-// Plunges must be G1 at plunge feed; the emitter guarantees it, this check
-// proves it on the final text so a regression anywhere upstream still blocks
-// the file write.
+// Plunges must be G1 at plunge feed; the emitter guarantees it, and this check
+// reports any final-text regression. Consumers surface this finding in Job
+// Review; only the canonical compile-integrity set can refuse output.
 
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import { parseGcodeWord } from './gcode-words';

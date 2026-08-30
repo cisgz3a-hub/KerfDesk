@@ -74,10 +74,9 @@ LongMill), design in Inkscape / Illustrator / Affinity, and expect a LightBurn-s
   dividers, panel cutouts, baked joint clearance and CNC corner-overcut relief. (Kerf itself is
   handled by the normal per-operation cut settings, not by the generator.)
 - **Auto-layout / nesting**, material libraries, and Material/Interval test-grid generators.
-- **Image Studio** — a full in-app raster editor (brush/eraser/line, marquee/lasso/wand
-  selections, levels, curves, blur/median/unsharp, halftone, layers with blend modes, clone
-  stamp, gradient and spot-heal) so you can repair an engrave source and re-trace without
-  leaving the app.
+- **Image Studio** — an in-progress in-app raster-editing workspace. The current Phase L surface
+  is building the line-work, selection, Apply and re-trace loop; adjustments/filters, retouching,
+  and persistent layers/blend modes remain staged work rather than shipped claims.
 - **Camera alignment** — checkerboard intrinsic calibration, lens rectification and marker-based
   bed alignment, with USB and network camera sources.
 
@@ -403,8 +402,9 @@ Boundaries are enforced by `eslint-plugin-boundaries` in CI, not by convention: 
 with exhaustive `assertNever` matching. Files are capped at 400 counted lines by ESLint with a 600
 raw-line CI backstop.
 
-Ten runtime dependencies, total: `clipper2-ts`, `dompurify`, `electron-updater`, `imagetracerjs`,
-`lucide-static`, `opentype.js`, `react`, `react-dom`, `three`, `zustand`.
+Fourteen runtime dependencies, total: `@tabler/icons`, `clipper2-ts`, `delaunator`, `dompurify`,
+`electron-updater`, `imagetracerjs`, `linkedom`, `lucide-static`, `opentype.js`, `react`,
+`react-dom`, `saxes`, `three`, `zustand`.
 
 ---
 

@@ -1,6 +1,7 @@
 // H.9 motion polish: climb/conventional orientation, mid-segment entry
-// rotation, along-path ramp entries, and parking parity. All opt-in — the
-// snapshot corpus separately pins that defaults stay byte-identical.
+// rotation, along-path ramp entries, and parking parity. Ramp/park are opt-in;
+// cut direction defaults to climb and is intentionally not byte-identical to
+// the pre-H.9 compiler.
 
 import { describe, expect, it } from 'vitest';
 import { isCounterClockwise, signedAreaMm2 } from '../geometry/polyline-orientation';

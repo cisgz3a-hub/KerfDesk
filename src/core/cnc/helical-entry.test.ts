@@ -121,6 +121,18 @@ describe('planHelicalPocketPasses', () => {
     expect(result.passes[0]).toMatchObject({ kind: 'helical-contour', revolutions: 23 });
   });
 
+  it('matches the helix rotation to a clockwise finish ring', () => {
+    const clockwise = { ...square, points: [...square.points].reverse() };
+    const result = planHelicalPocketPasses([clockwise], [-2], {
+      maxDiameterMm: 10,
+      minDiameterMm: 4,
+      angleDeg: 5,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.passes[0]).toMatchObject({ kind: 'helical-contour', clockwise: true });
+  });
+
   it('refuses a minimum diameter that cannot fit the pocket', () => {
     expect(
       planHelicalPocketPasses([square], [-2], {

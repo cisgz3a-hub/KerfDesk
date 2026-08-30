@@ -1,5 +1,5 @@
 import type { CncHelicalContourPass, CncPass } from '../job';
-import type { CncLayerSettings, CncTool, Polyline } from '../scene';
+import type { CncCutDirection, CncLayerSettings, CncTool, Polyline } from '../scene';
 import {
   planAdaptivePocket,
   type AdaptivePocketPlan,
@@ -10,6 +10,8 @@ import {
   buildVCarveSourceRegionLayout,
   vcarveSourceRegionRankFromLayout,
 } from './vcarve-region-order';
+import type { FrameHandedness } from './machine-frame-handedness';
+import { cutDirectionClockwise, enforceCutDirection } from './motion-polish';
 
 export type AdaptivePocketOperation =
   | { readonly kind: 'not-requested' }
@@ -55,6 +57,10 @@ export function adaptivePocketPasses(
   operation: Extract<AdaptivePocketOperation, { readonly kind: 'ok' }>,
   depths: ReadonlyArray<number>,
   sourceContours: ReadonlyArray<Polyline> = [],
+  direction?: {
+    readonly cutDirection: CncCutDirection;
+    readonly handedness: FrameHandedness;
+  },
 ): ReadonlyArray<CncPass> {
   const passes: CncPass[] = [];
   const sourceLayout = buildVCarveSourceRegionLayout(sourceContours);
@@ -71,9 +77,18 @@ export function adaptivePocketPasses(
       const zMm = depths[depthIndex];
       if (zMm === undefined) continue;
       const startZMm = depthIndex === 0 ? 0 : (depths[depthIndex - 1] ?? 0);
-      const roughing = roughingPass(sequence, startZMm, zMm);
+      const roughing = roughingPass(sequence, startZMm, zMm, direction);
       if (roughing !== null) passes.push(roughing);
-      for (const ring of sequence.finishRings) {
+      const finishRings =
+        direction === undefined
+          ? sequence.finishRings
+          : enforceCutDirection(
+              sequence.finishRings,
+              direction.cutDirection,
+              'pocket',
+              direction.handedness,
+            );
+      for (const ring of finishRings) {
         passes.push({ kind: 'contour', zMm, polyline: ring.points, closed: true });
       }
     }
@@ -86,16 +101,30 @@ export function adaptivePocketPassesForSettings(
   settings: CncLayerSettings,
   tool: CncTool,
   depths: ReadonlyArray<number>,
+  handedness: FrameHandedness = 1,
 ): ReadonlyArray<CncPass> | null {
   const operation = resolveAdaptivePocketOperation(contours, settings, tool);
   if (operation.kind === 'not-requested') return null;
-  return operation.kind === 'ok' ? adaptivePocketPasses(operation, depths, contours) : [];
+  return operation.kind === 'ok'
+    ? adaptivePocketPasses(
+        operation,
+        depths,
+        contours,
+        settings.cutDirection === undefined
+          ? undefined
+          : { cutDirection: settings.cutDirection, handedness },
+      )
+    : [];
 }
 
 function roughingPass(
   sequence: AdaptivePocketSequence,
   startZMm: number,
   zMm: number,
+  direction?: {
+    readonly cutDirection: CncCutDirection;
+    readonly handedness: FrameHandedness;
+  },
 ): CncHelicalContourPass | null {
   const polyline = sequence.rings.flatMap((ring) => ring.points);
   if (polyline.length < 2) return null;
@@ -108,7 +137,10 @@ function roughingPass(
       y: sequence.entryCenter.y,
     },
     center: sequence.entryCenter,
-    clockwise: false,
+    clockwise:
+      direction === undefined
+        ? false
+        : (cutDirectionClockwise(direction.cutDirection, 'pocket', direction.handedness) ?? false),
     startZMm,
     zMm,
     revolutions: Math.max(1, Math.ceil((startZMm - zMm) / dropPerRevolution)),

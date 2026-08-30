@@ -1,6 +1,7 @@
 // runPreflight — runs WORKFLOW.md F-A10's six pre-write checks against a
-// Project and its emitted G-code. Returns a list of issues; an empty list
-// means safe-to-write. Pure: no I/O.
+// Project and its emitted G-code. Returns findings for consumer policy to
+// partition into compile-integrity failures and Job Review advisories. Pure:
+// no I/O.
 //
 // Checks (per WORKFLOW.md F-A10, in order):
 //   1. At least one output layer exists.
@@ -106,11 +107,11 @@ export type PreflightOptions = {
 const MAX_BOUNDS_ISSUES = 5;
 const MAX_BLANK_FEED_ISSUES = 5;
 
-// Blocking threshold for long laser-off FEED moves (G1 with effective S0), in
+// Reporting threshold for long laser-off FEED moves (G1 with effective S0), in
 // mm. Matches ADR-035's fill gap-rapid split (gaps > 5 mm become G0 rapids), so
 // fresh output never trips this; a hit means a regression or a stale export
-// from before the fix. Do NOT lower in code until the A/B burn threshold
-// experiment is done (roadmap P2-B).
+// from before the fix. This code is advisory, not a refusal. Do NOT lower it
+// until the A/B burn threshold experiment is done (roadmap P2-B).
 const LONG_BLANK_FEED_THRESHOLD_MM = 5;
 
 export function runPreflight(
@@ -430,7 +431,7 @@ function appendLaserOnTravelIssues(
   }
 }
 
-// Block g-code that crawls across a long gap at cutting feed with the laser off
+// Report g-code that crawls across a long gap at cutting feed with the laser off
 // (G1 ... S0). Distinct from laser-on-travel: this is the marking / stale-export
 // invariant (the "moved to the second part and left a stray line" class). Fresh
 // post-ADR-035 output is clean; a hit means a regression or an old export.

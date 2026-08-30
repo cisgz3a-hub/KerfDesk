@@ -102,7 +102,8 @@ re-cuts through chips.
 
 ## Motion polish (Phase H.9)
 
-`src/core/cnc/motion-polish.ts` (232 lines). Three transforms, each opt-in:
+`src/core/cnc/motion-polish.ts`. Cut direction defaults to climb; ramp entry and parking remain
+explicitly configured transforms.
 
 **Cut direction** — `enforceCutDirection` (line 39). Reverses closed toolpaths whose shoelace
 orientation disagrees with the wanted direction; open paths are left alone. Also rotates each closed
@@ -110,9 +111,10 @@ path's start to the **midpoint of its longest segment** (`rotateStartToLongestSe
 entry witness marks land on a flat span instead of a corner — described in code as the v1 lead-in
 strategy.
 
-> **This is the handedness risk.** ADR-251 made climb the **default**, so it runs on ordinary jobs.
-> The sign of the shoelace area depends on the configured origin. Full analysis in
-> [03-coordinates-and-origin.md](03-coordinates-and-origin.md). **UNVERIFIED on hardware.**
+> Cut direction is expressed physically and converted through the configured origin's frame
+> handedness. All five origins are pinned by deterministic tests; cutter loading, chip evacuation,
+> edge finish, and dimensional accuracy remain unverified on hardware. Full analysis in
+> [03-coordinates-and-origin.md](03-coordinates-and-origin.md).
 
 **Hole mirroring** — ADR-252 (`DECISIONS.md:7755`). A hole's material lies *outside* its boundary, so
 its climb direction is the mirror of the outer boundary's. The code comment
@@ -193,7 +195,9 @@ Per `PROJECT.md:138`, every Phase H sub-phase is **"Built = code + tests landed,
 CLAIMED"**. Specifically unverified:
 
 - **All of H.15–H.18** (rest machining, adaptive clearing, inlay pairs, drag tabs) — hardware CLAIMED.
-- **Climb direction correctness** — the P1 above. Unresolvable here - no machine to test on. The origin-by-origin sign algebra in [03](03-coordinates-and-origin.md) is the only evidence available.
+- **Climb-cut physical quality** — direction mapping is software-verified for every origin, but
+  cutter loading, chip evacuation, finish quality, and dimensions have not been qualified on a
+  machine.
 - **ADR-180 amendment 2 spindle park** — not hardware-verified.
 - **Dimensional accuracy of V-carve, relief, and adaptive paths** — the suite asserts determinism and
   pass structure, never that the carved surface matches the model.

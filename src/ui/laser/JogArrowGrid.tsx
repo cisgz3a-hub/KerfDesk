@@ -1,4 +1,4 @@
-import type { JogAxisSigns } from '../../core/devices';
+import type { JogAxisSigns, MachineBounds } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
 import {
   continuousJogVector,
@@ -29,7 +29,7 @@ export function JogArrowGrid(props: {
   readonly feed: number;
   readonly signs: JogAxisSigns;
   readonly position: Vec2 | null;
-  readonly bed: { readonly width: number; readonly height: number };
+  readonly bounds: MachineBounds;
   // Continuous (press-and-hold) jog is only offered when the controller can
   // cancel an in-flight jog; otherwise the boundary-length move cannot be
   // stopped on release (F101).
@@ -68,7 +68,7 @@ function JogArrowButton(
       const vector = continuousJogVector(
         props.direction,
         props.position,
-        props.bed,
+        props.bounds,
         props.signs,
         props.feed,
       );

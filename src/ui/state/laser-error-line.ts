@@ -3,7 +3,7 @@
 // attribution pushed that file past the 400-line cap.
 
 import { wipeInFlight, type StreamerState } from '../../core/controllers/grbl';
-import { armResetCleanup } from './laser-reset-cleanup';
+import { armResetCleanup, resetCleanupLines } from './laser-reset-cleanup';
 import { controllerErrorNotice, type ControllerErrorContext } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
@@ -128,6 +128,15 @@ function requestRealtimeStopAfterStreamError(
   }
   clearCncLiveCaps();
   set((state) => invalidateControllerSessionEvidence(state));
+  // Arm before the realtime write, exactly like operator Abort. Web Serial can
+  // reject its promise after the reset byte reached the controller and a boot
+  // banner can arrive immediately; pre-arming preserves that evidence race and
+  // guarantees the cleanup includes M5 even when stopLaserLines is M9-only.
+  armResetCleanup(
+    refs,
+    (line, action) => safeWrite(line, action, 'system'),
+    resetCleanupLines(driver),
+  );
   void safeWrite(softReset, 'stop', 'system')
     .then(() => {
       // The sent reset wiped the firmware's RX buffer: the errored stream's
@@ -136,9 +145,6 @@ function requestRealtimeStopAfterStreamError(
       // 'errored' — Abort remains mounted. The beam-off cleanup itself is
       // deferred until the boot banner (audit F2), like stopJob's.
       set((s) => ({ streamer: s.streamer === null ? null : wipeInFlight(s.streamer) }));
-      armResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'), [
-        ...driver.commands.stopLaserLines,
-      ]);
     })
     .catch(() => undefined);
 }

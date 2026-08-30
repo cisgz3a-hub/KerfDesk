@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CncContourPass, CncPass } from '../job';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, toSceneCoords } from '../devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -128,6 +128,28 @@ describe('compileCncJob inlay pair', () => {
     expect(male.passes.every((pass) => pass.kind === 'path3d')).toBe(true);
     // The lead is profile-only, so the female pocket keeps plain contours.
     expect(female.passes.every((pass) => pass.kind === 'contour')).toBe(true);
+  });
+
+  it("places the insert on the operator's right for a right-origin machine", () => {
+    const device = { ...DEFAULT_DEVICE_PROFILE, origin: 'front-right' as const };
+    const job = compileCncJob(inlayScene(false), device, DEFAULT_CNC_MACHINE_CONFIG);
+    const female = job.groups[0];
+    const male = job.groups[1];
+    if (female?.kind !== 'cnc' || male?.kind !== 'cnc') throw new Error('expected CNC groups');
+    const physicalXs = (passes: ReadonlyArray<CncPass>): ReadonlyArray<number> =>
+      passes.flatMap((pass) => {
+        const points = (() => {
+          if (pass.kind === 'contour') return pass.polyline;
+          if (pass.kind === 'path3d') return pass.points;
+          if (pass.kind === 'arc') return [pass.start, pass.end];
+          return [pass.start, ...pass.polyline];
+        })();
+        return points.map((point) => toSceneCoords(point, device).x);
+      });
+    const femaleXs = physicalXs(female.passes);
+    const maleXs = physicalXs(male.passes);
+
+    expect(Math.min(...maleXs)).toBeGreaterThan(Math.max(...femaleXs));
   });
 
   it('clears every female pocket depth in one source region before starting the next', () => {

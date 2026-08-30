@@ -1,4 +1,4 @@
-import { machineBoundsForDevice, type DeviceProfile } from '../devices';
+import { jogAxisSignsForOrigin, machineBoundsForDevice, type DeviceProfile } from '../devices';
 import type { CncGroup, CncPass } from '../job';
 import {
   layerCncTool,
@@ -20,7 +20,8 @@ import { cncGroupProvenance } from './cnc-group-provenance';
 import { resolveRestPocketOperation } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
 import { compileStraightInlayGroupsWithEvidence } from './inlay-pair-operation';
-import { applyRampEntry, parkFields } from './motion-polish';
+import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
+import { machineFrameHandedness } from './machine-frame-handedness';
 import { applyProfileLeadPasses } from './profile-lead-passes';
 import { vcarveClearancePocket } from './vcarve-clearance';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
@@ -55,6 +56,7 @@ export function compiledInlayGroups(
         device,
         config,
       ),
+    jogAxisSignsForOrigin(device.origin).x,
   );
 }
 
@@ -115,9 +117,18 @@ function restPocketRoughingGroupForLayer(
     };
   }
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
+  const roughToolpaths =
+    settings.cutDirection === undefined
+      ? operation.roughToolpaths
+      : enforceCutDirection(
+          operation.roughToolpaths,
+          settings.cutDirection,
+          'pocket',
+          machineFrameHandedness(device.origin),
+        );
   let passes: ReadonlyArray<CncPass> = sourceRegionMajorDepthPasses(
     polylines,
-    operation.roughToolpaths,
+    roughToolpaths,
     depths,
   );
   if (settings.rampEntryDeg !== undefined) passes = applyRampEntry(passes, settings.rampEntryDeg);

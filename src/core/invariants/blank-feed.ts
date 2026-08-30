@@ -13,7 +13,8 @@
 //     line" class). ADR-035 split fill gaps > 5 mm into independent sweeps.
 //     Current generic policy may use bounded S0 feed runways at each edge, but
 //     no individual blank feed exceeds this threshold; any longer one is a
-//     regression or a stale export that predates the fix. Either way, block it.
+//     regression or a stale export that predates the fix. Report it for Job
+//     Review; it is not a compile-integrity refusal.
 //
 // Tracks modal X/Y/S exactly as the controller would. Pure-core: no clock, no
 // random, no I/O.

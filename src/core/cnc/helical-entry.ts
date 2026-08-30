@@ -89,6 +89,7 @@ type EntryCircle = {
   readonly start: Vec2;
   readonly center: Vec2;
   readonly radiusMm: number;
+  readonly clockwise: boolean;
   readonly polyline: ReadonlyArray<Vec2>;
 };
 
@@ -135,7 +136,7 @@ function helicalPass(
     kind: 'helical-contour',
     start: entry.start,
     center: entry.center,
-    clockwise: false,
+    clockwise: entry.clockwise,
     startZMm,
     zMm,
     revolutions,
@@ -168,6 +169,7 @@ function tangentEntryOnEdge(
     start,
     center: { x: start.x + inward.x * radiusMm, y: start.y + inward.y * radiusMm },
     radiusMm,
+    clockwise: orientation < 0,
     polyline: reorderClosedRing(ring, edgeIndex, start),
   });
   const fits = (entry: EntryCircle): boolean =>
