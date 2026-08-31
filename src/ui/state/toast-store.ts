@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 
-const AUTO_DISMISS_MS = 3000;
+const AUTO_DISMISS_MS = 8000;
 
 export type ToastVariant = 'info' | 'success' | 'warning' | 'error';
 

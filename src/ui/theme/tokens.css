@@ -323,7 +323,6 @@ body {
 .lf-input:focus,
 .lf-select:focus {
   border-color: var(--lf-accent);
-  outline: none;
 }
 .lf-input:disabled,
 .lf-select:disabled {

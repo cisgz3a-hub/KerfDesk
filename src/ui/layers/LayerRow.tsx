@@ -24,24 +24,23 @@ export function LayerRow(props: {
   const setLayerParam = useStore((state) => state.setLayerParam);
   const active = activeLayerColor === props.layer.color;
   const artworkCount = operationArtworkCount(objects, props.layer);
+  const activate = (): void => setActiveLayerColor(props.layer.color);
   return (
     <section
       aria-label={`Operation ${props.layer.name}`}
       aria-current={active ? 'true' : undefined}
       style={rowStyle(props.layer.output, active)}
-      onClick={() => setActiveLayerColor(props.layer.color)}
+      onClick={(event) => {
+        if (!isNestedControl(event.target, event.currentTarget)) activate();
+      }}
     >
-      <span
-        title={`Automatic operation color ${props.layer.color}`}
-        style={{ ...swatchStyle, background: props.layer.color }}
+      <OperationActivation
+        layer={props.layer}
+        machineKind={machineKind}
+        artworkCount={artworkCount}
+        isActive={active}
+        onActivate={activate}
       />
-      <div style={identityStyle}>
-        <strong style={nameStyle}>{props.layer.name}</strong>
-        <span style={summaryStyle}>
-          {operationSummary(props.layer, machineKind)} · {artworkCount} artwork
-          {artworkCount === 1 ? '' : 's'}
-        </span>
-      </div>
       <LayerOrderControls
         layer={props.layer}
         canMoveUp={props.canMoveUp}
@@ -78,6 +77,47 @@ export function LayerRow(props: {
   );
 }
 
+function OperationActivation(props: {
+  readonly layer: Layer;
+  readonly machineKind: 'laser' | 'cnc';
+  readonly artworkCount: number;
+  readonly isActive: boolean;
+  readonly onActivate: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      aria-label={`Activate operation ${props.layer.name}`}
+      aria-pressed={props.isActive}
+      title={`Make ${props.layer.name} the active drawing operation`}
+      style={activationStyle}
+      onClick={props.onActivate}
+    >
+      <span
+        aria-hidden="true"
+        title={`Automatic operation color ${props.layer.color}`}
+        style={{ ...swatchStyle, background: props.layer.color }}
+      />
+      <span style={identityStyle}>
+        <strong style={nameStyle}>
+          {props.layer.name}
+          {props.isActive ? <span style={activeBadgeStyle}>Active</span> : null}
+        </strong>
+        <span style={summaryStyle}>
+          {operationSummary(props.layer, props.machineKind)} · {props.artworkCount} artwork
+          {props.artworkCount === 1 ? '' : 's'}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function isNestedControl(target: EventTarget, row: HTMLElement): boolean {
+  if (!(target instanceof Element)) return false;
+  const control = target.closest('button,input,select,textarea,a[href],[contenteditable="true"]');
+  return control !== null && row.contains(control);
+}
+
 function operationSummary(layer: Layer, machineKind: 'laser' | 'cnc'): string {
   if (machineKind === 'cnc') {
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
@@ -110,15 +150,40 @@ function rowStyle(output: boolean, active: boolean): React.CSSProperties {
 }
 
 const swatchStyle: React.CSSProperties = { width: 16, height: 16, borderRadius: 4 };
+const activationStyle: React.CSSProperties = {
+  gridColumn: '1 / 3',
+  display: 'grid',
+  gridTemplateColumns: '18px minmax(0, 1fr)',
+  alignItems: 'center',
+  gap: 8,
+  minWidth: 0,
+  padding: 0,
+  border: 0,
+  background: 'transparent',
+  color: 'var(--lf-text)',
+  cursor: 'pointer',
+  textAlign: 'left',
+};
 const identityStyle: React.CSSProperties = {
   minWidth: 0,
   display: 'flex',
   flexDirection: 'column',
 };
 const nameStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
+};
+const activeBadgeStyle: React.CSSProperties = {
+  padding: '1px 5px',
+  border: '1px solid var(--lf-accent)',
+  borderRadius: 999,
+  fontSize: 9,
+  fontWeight: 600,
+  textTransform: 'uppercase',
 };
 const summaryStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',

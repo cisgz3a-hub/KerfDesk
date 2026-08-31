@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RgbaBuffer } from '../../core/image-edit';
+import { usePrefersReducedMotion } from '../common/use-prefers-reduced-motion';
 import { useAdjustPreviewDoc } from './adjust-dialog-store';
 import {
   docToCanvas,
@@ -42,6 +43,7 @@ export function EditorCanvas(props: EditorCanvasProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [antsPhase, setAntsPhase] = useState(0);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const revision = session?.revision ?? -1;
   // The canvas shows the layer composite (identity for single-layer
@@ -54,13 +56,13 @@ export function EditorCanvas(props: EditorCanvasProps): JSX.Element {
   const docCanvas = useMemo(() => (doc === undefined ? null : docToCanvas(doc)), [doc, revision]);
   useCanvasFit(hostRef, canvasRef, doc, view === null);
 
-  // Ants animation ticks only while a selection exists (F-L2).
+  // Ants animation ticks only while a selection exists and motion is welcome (F-L2).
   const hasSelection = (session?.selection ?? null) !== null;
   useEffect(() => {
-    if (!hasSelection) return;
+    if (!hasSelection || prefersReducedMotion) return;
     const timer = window.setInterval(() => setAntsPhase((p) => (p + 1) % 1000), ANTS_TICK_MS);
     return () => window.clearInterval(timer);
-  }, [hasSelection]);
+  }, [hasSelection, prefersReducedMotion]);
 
   const activeView = view ?? { scale: 1, panX: 0, panY: 0 };
   const pointer = useEditorPointer(activeView, setView);
