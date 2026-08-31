@@ -24,7 +24,7 @@ function obj(args: {
     ...(args.locked === undefined ? {} : { locked: args.locked }),
     bounds: { minX: args.minX, minY: args.minY, maxX: args.maxX, maxY: args.maxY },
     transform: { ...IDENTITY_TRANSFORM, x: args.tx ?? 0, y: args.ty ?? 0 },
-    paths: [{ color, polylines: [] }],
+    paths: [{ color, polylines: [rectPolyline(args)] }],
   };
 }
 
@@ -149,6 +149,39 @@ describe('hitTest', () => {
   it('returns null when the point is outside every object', () => {
     const scene = withObjects(obj({ id: 'A', minX: 0, minY: 0, maxX: 10, maxY: 10 }));
     expect(hitTest(scene, { x: 50, y: 50 })).toBeNull();
+  });
+
+  it('does not make an empty vector selectable through its stored bounds', () => {
+    const empty: SceneObject = {
+      kind: 'imported-svg',
+      id: 'empty',
+      source: 'empty.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [{ color: '#ff0000', polylines: [] }],
+    };
+
+    expect(hitTest(withObjects(empty), { x: 5, y: 5 })).toBeNull();
+  });
+
+  it('direct-hits a rotated raster against its transformed rectangle rather than its AABB', () => {
+    const raster: SceneObject = {
+      kind: 'raster-image',
+      id: 'rotated-raster',
+      source: 'rotated.png',
+      dataUrl: 'data:,',
+      pixelWidth: 10,
+      pixelHeight: 10,
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: { ...IDENTITY_TRANSFORM, rotationDeg: 45 },
+      color: '#ff0000',
+      dither: 'grayscale',
+      linesPerMm: 10,
+    };
+    const scene = withObjects(raster);
+
+    expect(hitTest(scene, { x: 0, y: 7 })).toBe('rotated-raster');
+    expect(hitTest(scene, { x: 6, y: 1 })).toBeNull();
   });
 
   it('rejects vector objects outside their expanded bounds before walking path geometry', () => {

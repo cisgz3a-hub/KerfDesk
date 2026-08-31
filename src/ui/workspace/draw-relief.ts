@@ -8,7 +8,7 @@ import { type Heightmap } from '../../core/relief';
 // (scripts/index-export-baseline.json) and may only shrink.
 import type { HeightfieldHeightmapResult } from '../../core/relief/heightfield-to-heightmap';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
-import { transformedBBox } from '../../core/scene';
+import { sceneObjectHasVisibleLayerFromMap, transformedBBox } from '../../core/scene';
 import type { Layer, ReliefObject, SceneObject } from '../../core/scene';
 import type { HeightfieldReliefObject, ReliefHeightfield } from '../../core/scene/relief';
 import {
@@ -117,7 +117,7 @@ export function drawReliefObject(
   layerByColor: ReadonlyMap<string, Layer>,
   view: ViewTransform,
 ): void {
-  if (layerByColor.get(obj.color)?.visible === false) return;
+  if (!sceneObjectHasVisibleLayerFromMap(obj, layerByColor)) return;
   const preview = previewFor(obj);
   if (preview?.kind === 'ready') {
     ctx.imageSmoothingEnabled = true;
@@ -177,7 +177,7 @@ function uniqueMissingHeightfieldPreviews(
   const items: HeightfieldPreviewItem[] = [];
   for (const object of objects) {
     if (!isHeightfieldRelief(object)) continue;
-    if (layerByColor.get(object.color)?.visible === false) continue;
+    if (!sceneObjectHasVisibleLayerFromMap(object, layerByColor)) continue;
     const item = drawReliefHeightfieldPreviewRequest(object, DISPLAY_CELLS_ACROSS);
     const cache = heightfieldPreviewCache.get(item.source);
     if (cache?.has(item.cacheKey) === true) continue;

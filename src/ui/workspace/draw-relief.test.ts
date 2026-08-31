@@ -169,6 +169,24 @@ describe('depth-map canvas preview scheduling', () => {
     await Promise.resolve();
   });
 
+  it('uses explicit operation visibility for both scheduling and drawing', () => {
+    worker.prepare.mockReturnValue(null);
+    const object = { ...relief('bound-hidden', 'AA=='), operationIds: ['hidden-operation'] };
+    const layers = explicitlyHiddenOperationLayers();
+    const ctx = failureContext();
+
+    scheduleReliefPreviews([object], layers);
+    drawReliefObject(ctx as unknown as CanvasRenderingContext2D, object, layers, {
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+    });
+
+    expect(worker.prepare).not.toHaveBeenCalled();
+    expect(ctx.fillRect).not.toHaveBeenCalled();
+    expect(ctx.strokeRect).not.toHaveBeenCalled();
+  });
+
   it('retries infrastructure rejection without poisoning the source cache', async () => {
     vi.useFakeTimers();
     try {
@@ -355,6 +373,18 @@ function visibleLayers() {
 function hiddenLayers() {
   return new Map([
     ['#a0522d', { ...createLayer({ id: 'relief', color: '#a0522d' }), visible: false }],
+  ]);
+}
+
+function explicitlyHiddenOperationLayers() {
+  const colorFallback = createLayer({ id: 'color-fallback', color: '#a0522d' });
+  const hiddenOperation = {
+    ...createLayer({ id: 'hidden-operation', color: '#112233' }),
+    visible: false,
+  };
+  return new Map([
+    ['#a0522d', colorFallback],
+    [hiddenOperation.id, hiddenOperation],
   ]);
 }
 
