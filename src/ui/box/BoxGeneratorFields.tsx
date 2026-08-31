@@ -104,7 +104,7 @@ function FitFields(props: {
         value={draft.partSpacing}
         min={0}
         max={undefined}
-        step={1}
+        step="any"
         onChange={setField('partSpacing')}
       />
       <CalibrationNumberField
