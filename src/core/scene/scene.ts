@@ -6,6 +6,8 @@ import { assertNever, type CncTabAnchor, type ColoredPath, type SceneObject } fr
 
 export type Scene = {
   readonly objects: ReadonlyArray<SceneObject>;
+  /** Transient compile-only references retained by Selected artwork output. */
+  readonly outputDependencies?: ReadonlyArray<SceneObject>;
   readonly layers: ReadonlyArray<Layer>;
   readonly groups?: ReadonlyArray<SceneGroup>;
   // Machine-output priority, intentionally separate from `objects` so changing

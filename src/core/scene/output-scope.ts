@@ -24,10 +24,26 @@ export const DEFAULT_OUTPUT_SCOPE: OutputScope = {
 export function filterSceneForOutputScope(scene: Scene, scope: OutputScope): Scene {
   if (!scope.cutSelectedGraphics) return scene;
   const selected = new Set(scope.selectedObjectIds);
+  const dependencyIds = selectedMaskDependencyIds(scene, selected);
   return {
     ...scene,
     objects: scene.objects.filter((object) => selected.has(object.id)),
+    outputDependencies: scene.objects.filter((object) => dependencyIds.has(object.id)),
   };
+}
+
+function selectedMaskDependencyIds(scene: Scene, selected: ReadonlySet<string>): Set<string> {
+  const dependencies = new Set<string>();
+  for (const object of scene.objects) {
+    if (
+      selected.has(object.id) &&
+      object.kind === 'raster-image' &&
+      object.imageMaskId !== undefined
+    ) {
+      dependencies.add(object.imageMaskId);
+    }
+  }
+  return dependencies;
 }
 
 export function validateOutputScope(scene: Scene, scope: OutputScope): OutputScopeValidation {
