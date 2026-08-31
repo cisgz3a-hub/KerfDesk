@@ -4,12 +4,7 @@ import { confirmDiscardAsync } from '../app/confirm-discard';
 import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
 import { usePlatform } from '../app/platform-context';
 import { editImageAction } from './edit-image-action';
-import {
-  handleImportDxf,
-  handleImportSvg,
-  handleOpenProject,
-  handleSaveProject,
-} from '../app/file-actions';
+import { handleImportDxf, handleImportSvg, handleSaveProject } from '../app/file-actions';
 import {
   inspectCurrentGcodeAction,
   openGcodeInspectorAction,
@@ -26,6 +21,7 @@ import { useUiStore } from '../state/ui-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { handleUnifiedArtworkImport } from '../app/import-dispatch';
+import { openProjectCommand } from './open-project-command';
 import {
   selectedCloseableOpenFillContourCount,
   selectedOpenFillContourCount,
@@ -236,12 +232,12 @@ function fileCommandContext(
   return {
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
-    openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
+    openProject: () => void openProjectCommand(platform, pushToast),
     saveProject: () => saveProject(platform, useStore.getState(), pushToast, false),
     saveProjectAs: () => saveProject(platform, useStore.getState(), pushToast, true),
     importArtwork: () =>
       void handleUnifiedArtworkImport(platform, {
-        project: () => useStore.getState().project,
+        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
         importSvgObject: app.importSvgObject,
         importRasterImage: app.importRasterImage,
         pushToast,
@@ -369,18 +365,6 @@ function windowHelpCommandContext(
     showConnectionHelp: callbacks.showConnectionHelp,
     showSafety: callbacks.showSafety,
   };
-}
-
-function openProject(
-  platform: ReturnType<typeof usePlatform>,
-  setProject: ReturnType<typeof useStore.getState>['setProject'],
-  markLoaded: ReturnType<typeof useStore.getState>['markLoaded'],
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-): void {
-  void confirmDiscardAsync(platform, 'open another project').then((ok) => {
-    if (!ok) return;
-    return handleOpenProject({ platform, setProject, markLoaded, pushToast });
-  });
 }
 
 function saveProject(

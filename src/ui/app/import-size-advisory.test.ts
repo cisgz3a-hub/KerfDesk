@@ -8,6 +8,7 @@
 // entire source on the UI thread.
 
 import { describe, expect, it, vi } from 'vitest';
+import { projectOpenRequestEpochCallbacks } from '../../__fixtures__/file-actions';
 import type { FileHandle, PlatformAdapter } from '../../platform/types';
 import { handleOpenProject } from './file-actions';
 import { handleOpenGcodePreview } from './gcode-open-action';
@@ -130,6 +131,8 @@ const handleProject: Run = async (platform, pushToast) => {
     setProject: vi.fn(() => ({ kind: 'loaded' as const })),
     markLoaded: vi.fn(),
     pushToast,
+    ...projectOpenRequestEpochCallbacks(),
+    getProjectDocumentEpoch: () => 0,
   });
 };
 

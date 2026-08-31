@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { projectOpenRequestEpochCallbacks } from '../../__fixtures__/file-actions';
 import { DEFAULT_CNC_MACHINE_CONFIG, createProject } from '../../core/scene';
 import { serializeProject } from '../../io/project';
 import type { PlatformAdapter } from '../../platform/types';
@@ -35,6 +36,8 @@ describe('project file machine capability disclosure', () => {
       })),
       markLoaded,
       pushToast,
+      ...projectOpenRequestEpochCallbacks(),
+      getProjectDocumentEpoch: () => 0,
     });
 
     expect(markLoaded).toHaveBeenCalledWith('contradictory.lf2');
@@ -68,6 +71,8 @@ describe('project file machine capability disclosure', () => {
       setProject: vi.fn(() => ({ kind: 'loaded' as const, projectBedReconciled: true })),
       markLoaded,
       pushToast: vi.fn(),
+      ...projectOpenRequestEpochCallbacks(),
+      getProjectDocumentEpoch: () => 0,
     });
 
     expect(markLoaded).toHaveBeenCalledWith('mismatched-bed.lf2', { dirty: true });

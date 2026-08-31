@@ -50,7 +50,7 @@ export function useImportDragDrop(
       setDragOverlay(false);
       if (e.dataTransfer === null) return;
       routeDroppedFiles(e.dataTransfer, {
-        project: useStore.getState().project,
+        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
         importSvgObject,
         importRasterImage,
         openGcodeInspector,

@@ -1,4 +1,4 @@
-import type { Project, SceneObject } from '../../core/scene';
+import type { SceneObject } from '../../core/scene';
 import type { FileHandle, PlatformAdapter } from '../../platform/types';
 import type { GcodeInspectionSource } from '../gcode-inspector';
 import { importImageFile } from '../commands/import-image-action';
@@ -12,7 +12,7 @@ import { importSvgFiles } from './svg-import-action';
 export const ARTWORK_IMPORT_EXTENSIONS = ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.stl'] as const;
 
 export type ImportDispatchActions = {
-  readonly project: Project | (() => Project);
+  readonly getProjectDocumentEpoch: () => number;
   readonly importSvgObject: (object: SceneObject, batchIndex?: number) => ImportOutcome;
   readonly importRasterImage: (object: SceneObject, batchIndex?: number) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
@@ -32,7 +32,18 @@ export async function dispatchImportFilesInOrder(
   actions: ImportDispatchActions,
   options: { readonly sourceLabel?: 'Drop' | 'Import' } = {},
 ): Promise<void> {
-  const recognized = recognizedImportFiles(files, actions, options.sourceLabel ?? 'Import');
+  const owner = captureImportDocumentOwner(actions);
+  await dispatchOwnedImportFiles(files, actions, owner, options);
+}
+
+async function dispatchOwnedImportFiles(
+  files: ReadonlyArray<File>,
+  actions: ImportDispatchActions,
+  owner: ImportDocumentOwner,
+  options: { readonly sourceLabel?: 'Drop' | 'Import' },
+): Promise<void> {
+  const ownedActions = bindImportActionsToDocument(actions, owner);
+  const recognized = recognizedImportFiles(files, ownedActions, options.sourceLabel ?? 'Import');
   if (recognized === null) return;
 
   let successfulArtworkCount = 0;
@@ -40,22 +51,23 @@ export async function dispatchImportFilesInOrder(
   const additionalGcodeNames: string[] = [];
   const nextSuccessIndex = (): number => successfulArtworkCount++;
   for (const { file, kind } of recognized) {
+    if (!owner.isCurrent()) return;
     if (kind === 'gcode' && openedGcode) {
       additionalGcodeNames.push(file.name);
       continue;
     }
     try {
-      await dispatchOneFile(file, kind, actions, nextSuccessIndex);
+      await dispatchOneFile(file, kind, ownedActions, nextSuccessIndex);
       if (kind === 'gcode') openedGcode = true;
     } catch (error) {
-      actions.pushToast(
+      ownedActions.pushToast(
         `${file.name}: import failed: ${error instanceof Error ? error.message : String(error)}`,
         'error',
       );
     }
   }
   if (additionalGcodeNames.length > 0) {
-    actions.pushToast(
+    ownedActions.pushToast(
       `Ignored ${additionalGcodeNames.length} additional G-code files: ${additionalGcodeNames.join(', ')}`,
       'warning',
     );
@@ -92,6 +104,8 @@ export async function handleUnifiedArtworkImport(
   platform: PlatformAdapter,
   actions: ImportDispatchActions,
 ): Promise<void> {
+  const owner = captureImportDocumentOwner(actions);
+  const ownedActions = bindImportActionsToDocument(actions, owner);
   let handles: ReadonlyArray<FileHandle>;
   try {
     handles = await platform.pickFilesForOpen({
@@ -99,7 +113,7 @@ export async function handleUnifiedArtworkImport(
       multiple: true,
     });
   } catch (error) {
-    actions.pushToast(
+    ownedActions.pushToast(
       `Could not import artwork: ${error instanceof Error ? error.message : String(error)}`,
       'error',
     );
@@ -107,16 +121,64 @@ export async function handleUnifiedArtworkImport(
   }
   const files: File[] = [];
   for (const handle of handles) {
+    if (!owner.isCurrent()) return;
     try {
       files.push(await fileFromPlatformHandle(handle));
     } catch (error) {
-      actions.pushToast(
+      ownedActions.pushToast(
         `${handle.name}: import failed: ${error instanceof Error ? error.message : String(error)}`,
         'error',
       );
     }
   }
-  await dispatchImportFilesInOrder(files, actions);
+  await dispatchOwnedImportFiles(files, actions, owner, {});
+}
+
+type ImportDocumentOwner = {
+  readonly isCurrent: () => boolean;
+};
+
+function captureImportDocumentOwner(actions: ImportDispatchActions): ImportDocumentOwner {
+  const epoch = actions.getProjectDocumentEpoch();
+  return { isCurrent: () => actions.getProjectDocumentEpoch() === epoch };
+}
+
+function bindImportActionsToDocument(
+  actions: ImportDispatchActions,
+  owner: ImportDocumentOwner,
+): ImportDispatchActions {
+  const assertCurrent = (): void => {
+    if (!owner.isCurrent()) throw new StaleImportCompletion();
+  };
+  return {
+    ...actions,
+    importSvgObject: (object, batchIndex) => {
+      assertCurrent();
+      return actions.importSvgObject(object, batchIndex);
+    },
+    importRasterImage: (object, batchIndex) => {
+      assertCurrent();
+      actions.importRasterImage(object, batchIndex);
+    },
+    pushToast: (message, variant) => {
+      if (owner.isCurrent()) actions.pushToast(message, variant);
+    },
+    ...(actions.openGcodeInspector === undefined
+      ? {}
+      : {
+          openGcodeInspector: (name: string, source: GcodeInspectionSource) => {
+            assertCurrent();
+            actions.openGcodeInspector?.(name, source);
+          },
+        }),
+  };
+}
+
+class StaleImportCompletion extends Error {
+  constructor() {
+    super('stale import completion');
+    this.name = 'StaleImportCompletion';
+  }
 }
 
 async function dispatchOneFile(

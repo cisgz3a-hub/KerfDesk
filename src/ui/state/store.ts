@@ -189,6 +189,9 @@ export type AppState = ObjectPropertiesActions &
     // Session-only identity for the active project document. Incremented only
     // by Open/New replacement, not ordinary immutable project edits.
     readonly projectDocumentEpoch: number;
+    // Session-only owner for overlapping Open requests. Claimed synchronously
+    // before the picker opens; only the latest request may publish completion.
+    readonly projectOpenRequestEpoch: number;
     // Last CNC machine setup, kept when toggling back to laser so the
     // choice of bit/stock survives a round-trip within the session.
     readonly cachedCncMachine: CncMachineConfig | null;
@@ -368,6 +371,7 @@ function initialState(
   AppState,
   | 'project'
   | 'projectDocumentEpoch'
+  | 'projectOpenRequestEpoch'
   | 'probeSetupEpoch'
   | 'cachedCncMachine'
   | 'projectBedReconciliation'

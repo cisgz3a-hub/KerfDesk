@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   mockPlatform,
+  projectOpenRequestEpochCallbacks,
   projectWithLine,
   projectWithTwoLines,
   reject,
@@ -61,6 +62,8 @@ describe('file actions contextual failure handling', () => {
         setProject: vi.fn(() => ({ kind: 'loaded' as const })),
         markLoaded: vi.fn(),
         pushToast: toast.pushToast,
+        ...projectOpenRequestEpochCallbacks(),
+        getProjectDocumentEpoch: () => 0,
       }),
     ).resolves.toBeUndefined();
 
@@ -80,6 +83,8 @@ describe('file actions contextual failure handling', () => {
         setProject: vi.fn(() => ({ kind: 'loaded' as const })),
         markLoaded: vi.fn(),
         pushToast: toast.pushToast,
+        ...projectOpenRequestEpochCallbacks(),
+        getProjectDocumentEpoch: () => 0,
       }),
     ).resolves.toBeUndefined();
 
@@ -260,6 +265,8 @@ describe('file actions contextual failure handling', () => {
       setProject: vi.fn(() => ({ kind: 'loaded' as const })),
       markLoaded: vi.fn(),
       pushToast: toast.pushToast,
+      ...projectOpenRequestEpochCallbacks(),
+      getProjectDocumentEpoch: () => 0,
     });
     await expect(
       handleSaveProject({

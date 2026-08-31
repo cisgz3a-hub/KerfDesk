@@ -9,6 +9,9 @@ afterEach(() => resetStore());
 describe('project lifecycle machine capability', () => {
   it('advances document identity on Open and New without following ordinary edits', () => {
     expect(useStore.getState().projectDocumentEpoch).toBe(0);
+    expect(useStore.getState().projectOpenRequestEpoch).toBe(0);
+    expect(useStore.getState().claimProjectOpenRequest()).toBe(1);
+    expect(useStore.getState().claimProjectOpenRequest()).toBe(2);
     useStore.setState((state) => ({
       project: { ...state.project, notes: 'ordinary edit' },
     }));
@@ -16,8 +19,10 @@ describe('project lifecycle machine capability', () => {
 
     useStore.getState().setProject(createProject());
     expect(useStore.getState().projectDocumentEpoch).toBe(1);
+    expect(useStore.getState().projectOpenRequestEpoch).toBe(2);
     useStore.getState().newProject();
     expect(useStore.getState().projectDocumentEpoch).toBe(2);
+    expect(useStore.getState().projectOpenRequestEpoch).toBe(2);
   });
 
   it('keeps the current Laser mode after New Project despite a CNC-only capability label', () => {

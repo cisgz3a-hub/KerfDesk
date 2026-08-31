@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createProject, type SceneObject } from '../../core/scene';
+import { createProject, type Project, type SceneObject } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { dispatchImportFilesInOrder, handleUnifiedArtworkImport } from './import-dispatch';
 
@@ -32,9 +32,32 @@ function object(id: string): SceneObject {
   return { id } as SceneObject;
 }
 
+function projectWithSharedObject(source: string): Project {
+  const project = createProject();
+  return {
+    ...project,
+    notes: source,
+    scene: { ...project.scene, objects: [object('shared-id')] },
+  };
+}
+
+function deferred<T = void>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+  readonly reject: (error: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
+  return { promise, resolve, reject };
+}
+
 function actions() {
   return {
-    project: createProject(),
+    getProjectDocumentEpoch: () => 0,
     importSvgObject: vi.fn(() => ({ kind: 'added' as const })),
     importRasterImage: vi.fn(),
     pushToast: vi.fn(),
@@ -164,5 +187,119 @@ describe('dispatchImportFilesInOrder', () => {
       expect.objectContaining({ id: 'photo.png' }),
       1,
     );
+  });
+
+  it.each([
+    {
+      name: 'SVG',
+      file: new File([''], 'late.svg'),
+      arrange: (gate: { readonly promise: Promise<void> }) => {
+        calls.importSvgFiles.mockImplementation(
+          async (_files, importObject, pushToast, options) => {
+            await gate.promise;
+            try {
+              importObject(object('shared-id'), options.nextSuccessIndex());
+            } catch {
+              pushToast('late SVG completion', 'error');
+            }
+          },
+        );
+      },
+    },
+    {
+      name: 'DXF',
+      file: new File([''], 'late.dxf'),
+      arrange: (gate: { readonly promise: Promise<void> }) => {
+        calls.importDxfFiles.mockImplementation(async (_files, ctx) => {
+          await gate.promise;
+          try {
+            ctx.importObject(object('shared-id'), ctx.nextSuccessIndex());
+          } catch {
+            ctx.pushToast('late DXF completion', 'error');
+          }
+        });
+      },
+    },
+    {
+      name: 'raster image',
+      file: new File([''], 'late.png', { type: 'image/png' }),
+      arrange: (gate: { readonly promise: Promise<void> }) => {
+        calls.importImageFile.mockImplementation(async (_file, importObject, pushToast) => {
+          await gate.promise;
+          try {
+            importObject(object('shared-id'));
+          } catch {
+            pushToast('late raster completion', 'error');
+          }
+        });
+      },
+    },
+    {
+      name: 'STL',
+      file: new File([''], 'late.stl'),
+      arrange: (gate: { readonly promise: Promise<void> }) => {
+        calls.importStlFiles.mockImplementation(async (_files, ctx) => {
+          await gate.promise;
+          try {
+            ctx.importObject(object('shared-id'), ctx.nextSuccessIndex());
+          } catch {
+            ctx.pushToast('late STL completion', 'error');
+          }
+        });
+      },
+    },
+  ])(
+    'silently discards a late $name completion after a same-id replacement document opens',
+    async ({ file, arrange }) => {
+      const gate = deferred();
+      arrange(gate);
+      let epoch = 40;
+      let currentProject = projectWithSharedObject('initiating document');
+      const replacementProject = projectWithSharedObject('replacement document');
+      const importSvgObject = vi.fn(() => ({ kind: 'added' as const }));
+      const importRasterImage = vi.fn();
+      const pushToast = vi.fn();
+
+      const pending = dispatchImportFilesInOrder([file], {
+        getProjectDocumentEpoch: () => epoch,
+        importSvgObject,
+        importRasterImage,
+        pushToast,
+      });
+      currentProject = replacementProject;
+      epoch += 1;
+      gate.resolve();
+      await pending;
+
+      expect(currentProject).toBe(replacementProject);
+      expect(currentProject.scene.objects[0]?.id).toBe('shared-id');
+      expect(importSvgObject).not.toHaveBeenCalled();
+      expect(importRasterImage).not.toHaveBeenCalled();
+      expect(pushToast).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps a stale unified-picker failure silent after the document is replaced', async () => {
+    const pick = deferred<ReadonlyArray<never>>();
+    let epoch = 70;
+    const pushToast = vi.fn();
+    const platform: PlatformAdapter = {
+      id: 'mock',
+      pickFilesForOpen: () => pick.promise,
+      pickFileForSave: async () => null,
+      serial: { isSupported: () => false, requestPort: async () => null },
+    };
+
+    const pending = handleUnifiedArtworkImport(platform, {
+      getProjectDocumentEpoch: () => epoch,
+      importSvgObject: vi.fn(() => ({ kind: 'added' as const })),
+      importRasterImage: vi.fn(),
+      pushToast,
+    });
+    epoch += 1;
+    pick.reject(new Error('late picker failure'));
+    await pending;
+
+    expect(pushToast).not.toHaveBeenCalled();
   });
 });

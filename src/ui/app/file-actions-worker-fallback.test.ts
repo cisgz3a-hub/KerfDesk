@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { projectOpenRequestEpochCallbacks } from '../../__fixtures__/file-actions';
 import { createProject } from '../../core/scene';
 import { serializeProject } from '../../io/project';
 import type { PlatformAdapter } from '../../platform/types';
@@ -34,6 +35,8 @@ describe('project worker fallback', () => {
       markLoaded: vi.fn(),
       pushToast: (message, variant) =>
         messages.push(variant === undefined ? { message } : { message, variant }),
+      ...projectOpenRequestEpochCallbacks(),
+      getProjectDocumentEpoch: () => 0,
     });
 
     expect(readFile).toHaveBeenCalledOnce();
