@@ -42,7 +42,12 @@ describe('CNC jog-to-point readiness ordering', () => {
       name: 'a controller operation is active',
       arrange: () =>
         useLaserStore.setState({
-          controllerOperation: { kind: 'home', phase: 'awaiting-idle', idleReports: 0 },
+          controllerOperation: {
+            kind: 'home',
+            phase: 'awaiting-idle',
+            idleReports: 0,
+            operationId: 1,
+          },
         }),
       message: /controller operation is active/i,
     },

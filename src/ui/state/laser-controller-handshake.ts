@@ -1,5 +1,5 @@
 import { idleCollector } from '../../core/controllers/grbl';
-import { requestActiveWcsReadback } from './active-wcs-readback';
+import { requestTerminalOwnedActiveWcsReadback } from './terminal-owned-wcs-readback';
 import { beginSettingsCollection } from './detected-settings-action';
 import {
   cancelControllerLifecycleRefs,
@@ -227,13 +227,17 @@ async function qualifyConnectedController(
   // After qualification, ask the controller for its modal state ($G) so a
   // non-G54 frame left active by a $N startup block or an external session
   // becomes visible to the placement-mismatch advisory (C6) with no operator
-  // action. The query is a normal owed-ack read living in the shared
-  // active-wcs-readback helper (also used by the post-reset settings
-  // re-qualification); called inline — not through a wrapper — to keep the
-  // handshake's microtask depth unchanged.
+  // action. Keep its semantic command owner through the terminal response so
+  // background polling cannot interleave an ambiguous query or acknowledgement.
   if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
-  await requestActiveWcsReadback(get, refs.driver, safeWrite, guard.expectedSessionEpoch);
+  await requestTerminalOwnedActiveWcsReadback(
+    get,
+    refs,
+    safeWrite,
+    guard.expectedSessionEpoch,
+    'connection-handshake',
+  );
   parkHandshakeForMpg(set, get, refs, connection, guard);
 }
 

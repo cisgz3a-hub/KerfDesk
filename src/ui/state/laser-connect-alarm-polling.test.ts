@@ -80,4 +80,37 @@ describe('connecting into an Alarm keeps the status feed alive', () => {
     expect(setIntervalSpy).toHaveBeenCalled();
     expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
   });
+
+  it('waits for the final modal acknowledgement before starting status polling', async () => {
+    vi.useFakeTimers();
+    const writes: string[] = [];
+    const connection = makeConnection((data) => {
+      writes.push(data);
+      if (data === '$$\n') {
+        connection.emitLine('$30=1000');
+        connection.emitLine('$32=1');
+        connection.emitLine('ok');
+      }
+      if (data === '$I\n') {
+        connection.emitLine('[VER:1.1h.20190830:test]');
+        connection.emitLine('[OPT:VM,15,128]');
+        connection.emitLine('ok');
+      }
+    });
+
+    await useLaserStore.getState().connect(makeAdapter(connection));
+    connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(writes).toContain('$G\n');
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(writes.filter((line) => line === '?')).toHaveLength(0);
+
+    connection.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+    connection.emitLine('ok');
+    await flush();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(writes).toContain('?');
+  });
 });

@@ -19,6 +19,7 @@ import {
 } from './console-command-readiness';
 import { isOwnedControllerIdentityCommand, writeConsoleCommand } from './console-command-transport';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
+import { interactiveControllerOperation } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import { pushLog } from './laser-store-helpers';
@@ -187,11 +188,10 @@ function beginConsoleSettingsRead(
   if (command.kind !== 'settings-query') return;
   detectedSettings.beginSettingsCollection(refs, get().controllerSessionEpoch);
   set({
-    controllerOperation: {
-      kind: 'interactive-command',
-      phase: 'command',
-      label: detectedSettings.SETTINGS_READ_OPERATION_LABEL,
-    },
+    controllerOperation: interactiveControllerOperation(
+      detectedSettings.SETTINGS_READ_OPERATION_LABEL,
+      'terminal-exchange',
+    ),
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,

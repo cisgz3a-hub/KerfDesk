@@ -151,7 +151,7 @@ describe('SuperConsoleSettingsPane', () => {
     const { host, unmount } = await renderPane();
     expect(readMachineSettings).not.toHaveBeenCalled();
     expect(host.textContent).toContain(
-      'Auto-read waiting: Controller must report Idle before reading machine settings.',
+      'Auto-read waiting: Controller must report Idle or Alarm before reading machine settings.',
     );
     expect(useLaserStore.getState().lastWriteError).toBeNull();
     expect(useLaserStore.getState().log).toEqual([]);

@@ -132,6 +132,27 @@ describe('momentary low-power Fire action', () => {
     expect(test.get().fireActive).toBe(false);
   });
 
+  it('compensates with M5 when MPG takeover wins an in-flight activation', async () => {
+    let resolveStart: (() => void) | undefined;
+    const write = vi.fn((line: string) =>
+      line.startsWith('M3')
+        ? new Promise<void>((resolve) => {
+            resolveStart = resolve;
+          })
+        : Promise.resolve(),
+    );
+    const test = harness(write);
+
+    const starting = test.setFireActive(true);
+    expect(test.get().fireActive).toBe(true);
+    Object.assign(test.get(), { mpgActive: true });
+    resolveStart?.();
+    await starting;
+
+    expect(write.mock.calls.map(([line]) => line)).toEqual(['M3 S20\n', 'M5\n']);
+    expect(test.get().fireActive).toBe(false);
+  });
+
   it('keeps the OFF latch when the M5 write fails and resends M5 on retry', async () => {
     let failNextOff = true;
     const write = vi.fn(async (line: string) => {
