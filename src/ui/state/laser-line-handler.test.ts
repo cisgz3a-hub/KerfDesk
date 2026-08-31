@@ -288,6 +288,30 @@ describe('handleLine axis-specific work-origin evidence', () => {
     expect(get().workOriginActive).toBe(false);
     expect(get().workOriginSource).toBe('none');
   });
+
+  it('does not restore coordinate evidence after a failed Home or explicit invalidation', () => {
+    const { refs, set, get } = makeHarness();
+    set({
+      positionEvidenceSuppressed: true,
+      wcoCache: null,
+      workOriginActive: true,
+      workOriginSource: 'unknown',
+    });
+
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:25.000,40.000,5.000|WCO:25.000,40.000,5.000|FS:0,0>',
+    );
+
+    expect(get().wcoCache).toBeNull();
+    expect(get().statusReport?.mPos).toBeNull();
+    expect(get().statusReport?.wPos).toBeNull();
+    expect(get().statusReport?.wco).toBeNull();
+    expect(get().workOriginSource).toBe('unknown');
+  });
 });
 
 describe('handleLine status-only Alarm recovery state', () => {

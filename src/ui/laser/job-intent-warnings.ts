@@ -16,6 +16,7 @@ import {
   type Project,
   type RasterImage,
 } from '../../core/scene';
+import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { compileDiagnosticWarnings } from './compile-diagnostic-warnings';
 import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 
@@ -37,6 +38,8 @@ export function detectJobIntentWarnings(
     ...compileDiagnosticWarnings(job),
   ];
   append4040FillPolicyWarning(project, job, warnings);
+  appendScanOffsetCoverageWarnings(project, job, warnings);
+  appendGeneratedBoxKerfWarning(project, warnings);
   appendFillHeatWarnings(job, project.device.scanningOffsets, warnings);
 
   const outputLayers = project.scene.layers.filter((layer) => layer.output);
@@ -61,6 +64,71 @@ export function detectJobIntentWarnings(
   }
 
   return warnings;
+}
+
+function appendScanOffsetCoverageWarnings(project: Project, job: Job, warnings: string[]): void {
+  const tableDrivenFeeds = job.groups
+    .map(tableDrivenBidirectionalScanFeed)
+    .filter((feed): feed is number => feed !== null);
+  if (tableDrivenFeeds.length === 0) return;
+  const feeds = [...new Set(tableDrivenFeeds)].sort((a, b) => a - b);
+  const points = project.device.scanningOffsets;
+  if (points.length === 0) {
+    warnings.push(
+      `Bidirectional scan output at ${formatFeedList(feeds)} has no saved scan-offset table. KerfDesk will emit 0 mm scan correction; calibrate these speeds or select one-way scanning if alignment is not verified.`,
+    );
+    return;
+  }
+  const speeds = points.map((point) => point.speedMmPerMin);
+  const min = Math.min(...speeds);
+  const max = Math.max(...speeds);
+  const uncovered = feeds.filter((feed) => feed < min || feed > max);
+  if (uncovered.length === 0) return;
+  warnings.push(
+    `Bidirectional scan output at ${formatFeedList(uncovered)} is outside the saved scan-offset table (${min}–${max} mm/min). KerfDesk clamps to the nearest endpoint offset; add measured rows covering these emitted speeds or select one-way scanning.`,
+  );
+}
+
+function tableDrivenBidirectionalScanFeed(group: Job['groups'][number]): number | null {
+  if (group.kind === 'raster') {
+    return group.bidirectional === true &&
+      group.bidirectionalScanOffsetMm === undefined &&
+      group.pixelWidth > 0 &&
+      group.pixelHeight > 0
+      ? Math.round(group.speed)
+      : null;
+  }
+  if (
+    group.kind === 'fill' &&
+    group.fillStyle !== 'offset' &&
+    group.scanDirection?.bidirectional === true &&
+    group.bidirectionalScanOffsetMm === undefined &&
+    group.segments.length > 0
+  ) {
+    return Math.round(group.speed);
+  }
+  return null;
+}
+
+function formatFeedList(feeds: ReadonlyArray<number>): string {
+  return `${feeds.join(', ')} mm/min`;
+}
+
+function appendGeneratedBoxKerfWarning(project: Project, warnings: string[]): void {
+  const hasUncompensatedBoxPanel = project.scene.objects.some((object) => {
+    if (object.kind !== 'imported-svg' || !object.source.startsWith('Box panel: ')) return false;
+    return project.scene.layers.some(
+      (layer) =>
+        layer.output &&
+        layer.mode === 'line' &&
+        sceneObjectUsesOperation(object, layer) &&
+        effectiveOperationForObject(layer, object).kerfOffsetMm === 0,
+    );
+  });
+  if (!hasUncompensatedBoxPanel) return;
+  warnings.push(
+    'Generated box panels are assigned to a laser Line operation with 0 mm kerf compensation. The emitted paths follow the nominal panel and slot outlines, so physical fit will depend on the real kerf; enter a measured kerf or cut the fit coupon on the intended material first.',
+  );
 }
 
 function append4040FillPolicyWarning(

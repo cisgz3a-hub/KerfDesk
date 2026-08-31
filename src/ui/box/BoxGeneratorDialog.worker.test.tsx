@@ -158,7 +158,7 @@ describe('BoxGeneratorDialog background generation', () => {
       await setInput(rendered.host, 'Width', '');
       expect(worker.isTerminated).toBe(false);
       expect(FakeWorker.instances).toHaveLength(1);
-      expect(rendered.host.textContent).toContain('Width: Enter a value');
+      expect(rendered.host.textContent).toContain('Width (mm): Enter a value');
       expect(generateButton(rendered.host).disabled).toBe(true);
     } finally {
       await unmount(rendered);
@@ -172,7 +172,7 @@ describe('BoxGeneratorDialog background generation', () => {
       await setInput(rendered.host, 'Width', '0');
       expect(worker.isTerminated).toBe(false);
       expect(FakeWorker.instances).toHaveLength(1);
-      expect(rendered.host.textContent).toContain('Width: Must be greater than 0');
+      expect(rendered.host.textContent).toContain('Width (mm): Must be greater than 0');
       expect(generateButton(rendered.host).disabled).toBe(true);
     } finally {
       await unmount(rendered);
@@ -388,7 +388,9 @@ async function respond(worker: FakeWorker, response = responseFor(worker)): Prom
 }
 
 async function setInput(host: HTMLElement, label: string, value: string): Promise<void> {
-  const element = host.querySelector(`input[aria-label="${label}"]`);
+  const element = host.querySelector(
+    `input[aria-label="${label}"], input[aria-label="${label} (mm)"]`,
+  );
   if (!(element instanceof HTMLInputElement)) throw new Error(`${label} input missing`);
   element.value = value;
   await act(async () => Simulate.change(element));

@@ -240,11 +240,12 @@ describe('relief roughing — compile pipeline', () => {
     if (group?.kind !== 'cnc') throw new Error('expected cnc group');
     expect(group.cutType).toBe('relief-rough');
     expect(group.passes.length).toBeGreaterThan(0);
+    const toolRadiusMm = 3.175 / 2;
     expect(computeJobBounds(job, device)).toEqual({
-      minX: 0,
-      minY: device.bedHeight - 20,
-      maxX: 20,
-      maxY: device.bedHeight,
+      minX: -toolRadiusMm,
+      minY: device.bedHeight - 20 - toolRadiusMm,
+      maxX: 20 + toolRadiusMm,
+      maxY: device.bedHeight + toolRadiusMm,
     });
 
     const gcode = cncGrblStrategy.emit(job, device);

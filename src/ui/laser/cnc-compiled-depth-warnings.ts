@@ -57,6 +57,7 @@ export function detectCompiledReliefDepthWarnings(
   return detectDepthWarnings(depths, stockThicknessMm, {
     label: 'relief',
     remediation: 'Reduce the relief depth or use thicker stock if that is not intended.',
+    warnAtStockBottom: true,
   });
 }
 
@@ -89,6 +90,7 @@ function compiledLayerDepths(
 type DepthWarningCopy = {
   readonly label: string;
   readonly remediation: string;
+  readonly warnAtStockBottom?: boolean;
 };
 
 function detectDepthWarnings(
@@ -98,7 +100,19 @@ function detectDepthWarnings(
 ): ReadonlyArray<string> {
   if (!(stockThicknessMm >= 0) || !Number.isFinite(stockThicknessMm)) return [];
   return depths.flatMap(({ layerId, depthMm }) => {
-    if (!(depthMm > stockThicknessMm)) return [];
+    if (
+      !(depthMm > stockThicknessMm) &&
+      !(copy.warnAtStockBottom && depthMm === stockThicknessMm)
+    ) {
+      return [];
+    }
+    if (depthMm === stockThicknessMm) {
+      return [
+        `Layer ${layerId} reaches the configured stock bottom at an actual compiled ${copy.label} ` +
+          `depth of ${format(depthMm)} mm. Relief paths have no holding tabs; if this geometry ` +
+          'separates a part, confirm workholding and spoilboard clearance in Job Review.',
+      ];
+    }
     const pastMm = depthMm - stockThicknessMm;
     return [
       `Layer ${layerId} reaches an actual compiled ${copy.label} depth of ${format(depthMm)} mm ` +

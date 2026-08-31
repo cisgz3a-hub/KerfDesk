@@ -83,7 +83,8 @@ describe('detectCncStockWarnings', () => {
 
     const warnings = detectCncStockWarnings(project, prepared);
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('150.0–170.0');
+    // The warning reports swept volume, including the 3.175 mm tool radius.
+    expect(warnings[0]).toContain('150.0–173.2');
     expect(warnings[0]).toContain('100 × 100 mm stock');
   });
 

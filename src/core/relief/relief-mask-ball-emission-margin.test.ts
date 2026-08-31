@@ -26,7 +26,7 @@ const TRANSFORM: Transform = {
   y: 11.039871519308113,
   rotationDeg: 37,
 };
-const EXPECTED_CUT_LINE = 'G1 X20.217 Y11.541 Z-0.016 F200';
+const EXPECTED_CUT_PREFIX = 'G1X20.217Y11.541Z-0.016';
 
 describe('ball-nose relief mask margin after emitted-coordinate rounding', () => {
   it('keeps a rotated fractional-radius boundary pass outside excluded stock', () => {
@@ -52,8 +52,10 @@ describe('ball-nose relief mask margin after emitted-coordinate rounding', () =>
       ...DEFAULT_DEVICE_PROFILE,
       origin: 'rear-left',
     });
-    const cutLine = gcode.split(/\r?\n/u).find((line) => line === EXPECTED_CUT_LINE);
-    expect(cutLine).toBe(EXPECTED_CUT_LINE);
+    const cutLine = gcode
+      .split(/\r?\n/u)
+      .find((line) => line.replaceAll(' ', '').startsWith(EXPECTED_CUT_PREFIX));
+    expect(cutLine).toBeDefined();
     if (cutLine === undefined) throw new Error('expected emitted boundary cut line');
 
     const emittedAxis = {

@@ -303,9 +303,9 @@ export type AppState = ObjectPropertiesActions &
     // ADR-057: lock/unlock the jig box so it can't drift between the two burns
     // once the operator has positioned it.
     readonly setRegistrationBoxLocked: (locked: boolean) => void;
-    // Clone every currently-selected SceneObject with a fresh id and a
-    // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
-    // new selection. No-op when nothing is selected.
+    // Clone every currently-selected SceneObject in place with fresh object ids
+    // while preserving its operation bindings. Becomes the new selection.
+    // No-op when nothing is selected.
     readonly duplicateSelection: () => void;
     // Zoom to current selection's bounds; falls back to fit-all then
     // bed-fit. Driven by Shift+F and the fit-to-selection zoom button.

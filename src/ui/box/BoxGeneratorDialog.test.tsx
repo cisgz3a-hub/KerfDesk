@@ -112,9 +112,9 @@ describe('BoxGeneratorDialog', () => {
     try {
       expect(controlLabels(host).slice(0, 4)).toEqual([
         'Material thickness (mm)',
-        'Width',
-        'Depth',
-        'Height',
+        'Width (mm)',
+        'Depth (mm)',
+        'Height (mm)',
       ]);
     } finally {
       await act(async () => root.unmount());
@@ -124,12 +124,12 @@ describe('BoxGeneratorDialog', () => {
   it('disables Generate and reports the field for an empty dimension', async () => {
     const { host, root, onGenerate } = await renderDialog();
     try {
-      const width = input(host, 'Width');
+      const width = input(host, 'Width (mm)');
       await act(async () => {
         width.value = '';
         Simulate.change(width);
       });
-      expect(host.textContent).toContain('Width: Enter a value.');
+      expect(host.textContent).toContain('Width (mm): Enter a value.');
       expect(generateButton(host).disabled).toBe(true);
       await act(async () => {
         generateButton(host).dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -145,7 +145,7 @@ describe('BoxGeneratorDialog', () => {
     try {
       const select = host.querySelector('select[aria-label="Dimensions are"]');
       if (!(select instanceof HTMLSelectElement)) throw new Error('mode select missing');
-      const height = input(host, 'Height');
+      const height = input(host, 'Height (mm)');
       await act(async () => {
         select.value = 'outer';
         Simulate.change(select);
@@ -159,24 +159,24 @@ describe('BoxGeneratorDialog', () => {
     }
   });
 
-  it('hides the relief tool field until CNC corner relief is turned on', async () => {
+  it('defaults CNC corner relief on and hides its tool field when turned off', async () => {
     const laser = await renderDialog(LASER);
     try {
-      expect(laser.host.querySelector('input[aria-label="Relief tool diameter"]')).toBeNull();
+      expect(laser.host.querySelector('input[aria-label="Relief tool diameter (mm)"]')).toBeNull();
       expect(laser.host.querySelector('select[aria-label="Corner relief"]')).toBeNull();
     } finally {
       await act(async () => laser.root.unmount());
     }
     const cnc = await renderDialog(CNC);
     try {
-      // Default: corner relief OFF → the select is present but the tool field hides.
-      expect(selectEl(cnc.host, 'Corner relief').value).toBe('off');
-      expect(cnc.host.querySelector('input[aria-label="Relief tool diameter"]')).toBeNull();
+      // A round CNC bit needs dogbones by default so generated finger tabs seat.
+      expect(selectEl(cnc.host, 'Corner relief').value).toBe('on');
+      expect(input(cnc.host, 'Relief tool diameter (mm)').value).toBe('3.175');
       expect(input(cnc.host, 'Material thickness (mm)').value).toBe('6');
-      expect(input(cnc.host, 'Clearance').value).toBe('0.15');
-      // Turn relief on → the tool field appears, prefilled from the active bit.
-      await setSelect(cnc.host, 'Corner relief', 'on');
-      expect(input(cnc.host, 'Relief tool diameter').value).toBe('3.175');
+      expect(input(cnc.host, 'Clearance (mm)').value).toBe('0.15');
+      // An explicit sharp-corner choice hides the no-longer-relevant bit field.
+      await setSelect(cnc.host, 'Corner relief', 'off');
+      expect(cnc.host.querySelector('input[aria-label="Relief tool diameter (mm)"]')).toBeNull();
     } finally {
       await act(async () => cnc.root.unmount());
     }
@@ -204,8 +204,8 @@ describe('BoxGeneratorDialog', () => {
     try {
       await setInput(host, 'Material thickness (mm)', '6');
 
-      expect(input(host, 'Finger width').value).toBe('18');
-      expect(input(host, 'Part spacing').value).toBe('12');
+      expect(input(host, 'Finger width (mm)').value).toBe('18');
+      expect(input(host, 'Part spacing (mm)').value).toBe('12');
       expect(host.textContent).toContain('Outer 72 × 52 × 42 mm');
     } finally {
       await act(async () => root.unmount());
@@ -215,12 +215,12 @@ describe('BoxGeneratorDialog', () => {
   it('keeps manually edited joinery fields when material thickness changes later', async () => {
     const { host, root } = await renderDialog();
     try {
-      await setInput(host, 'Finger width', '11');
-      await setInput(host, 'Part spacing', '10');
+      await setInput(host, 'Finger width (mm)', '11');
+      await setInput(host, 'Part spacing (mm)', '10');
       await setInput(host, 'Material thickness (mm)', '6');
 
-      expect(input(host, 'Finger width').value).toBe('11');
-      expect(input(host, 'Part spacing').value).toBe('10');
+      expect(input(host, 'Finger width (mm)').value).toBe('11');
+      expect(input(host, 'Part spacing (mm)').value).toBe('10');
     } finally {
       await act(async () => root.unmount());
     }
@@ -229,7 +229,7 @@ describe('BoxGeneratorDialog', () => {
   it('persists the draft on Generate and restores it next open', async () => {
     const first = await renderDialog();
     try {
-      const width = input(first.host, 'Width');
+      const width = input(first.host, 'Width (mm)');
       await act(async () => {
         width.value = '80';
         Simulate.change(width);
@@ -242,7 +242,7 @@ describe('BoxGeneratorDialog', () => {
     }
     const second = await renderDialog();
     try {
-      expect(input(second.host, 'Width').value).toBe('80');
+      expect(input(second.host, 'Width (mm)').value).toBe('80');
     } finally {
       await act(async () => second.root.unmount());
     }

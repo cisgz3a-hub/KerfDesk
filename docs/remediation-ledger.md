@@ -399,3 +399,81 @@ evidence note is the only post-gate documentation mutation and is covered by the
 diff checks recorded with the integration commit. Hosted exact-head CI, hosted browser evidence,
 mergeability, review threads, automatic post-merge Pages publication, and final main ancestry remain
 separate states until their own terminal evidence is recorded.
+
+## Chief Code / Grok multi-pack reconciliation (2026-08-31)
+
+This pass re-audited the submitted `.lf2`, transport, tool-change, override, undo, clipboard,
+scan-offset, homing, box, Electron, relief, and shorthand follow-up packs against current main
+`cbaecbbeb5e6f67f17bb757bc2ceb5471934fb0e`, not their older `97f93b9` baseline. Evidence is source
+read plus deterministic software tests. No serial/controller, spindle, laser, camera, installer,
+GPU, reference-CAM, LightBurn physical-equivalence, material, or hardware run is claimed. Frame
+remains the sole ordinary Start guard; new output concerns below are either compile integrity,
+handoff consistency, or Job Review disclosures.
+
+### Source-confirmed defects remediated
+
+| Finding IDs | Disposition and bounded remediation |
+|---|---|
+| Original eight: `KD-CTRL-01`, `KD-MAIN-V5`, `KD-CNC-04`, `KD-GEO-01/02/03/04/07` | already integrated by PR 706 on the audited base, including its CNC/document corrections |
+| `KD-UND-01`, `KD-UND-04` | every Job Review Confirm synchronously re-prepares; changed bytes/evidence require review of the rebuilt model, and Undo during an active transform restores that transform's pending snapshot instead of popping older history |
+| `KD-CLP-01/02/03/05/06/07/08/10` | Duplicate no longer manufactures sibling operations, preserves overrides, deep-clones nested state, and remaps mask/path-text dependencies; same-project Paste reuses existing operations, cross-project Paste keeps one mapped operation set, CNC tab-color anchors follow remapped operations, and unmapped artwork receives an explicit operation |
+| `KD-EL-01/02/04/07` | Electron is single-instance, restores/focuses the primary window, has idempotent `ready-to-show` plus load-finish fallback and failure visibility, and resolves the packaged workflow path from `package.json` version |
+| `KD-SO-01/02/03` | Job Review discloses missing/out-of-table scan calibration coverage and the emitter now resolves scan offsets from the rounded feed actually written for both raster and scanline fill |
+| `KD-HOME-03/04` | failed Home and unlock invalidate coordinate evidence and suppress status-driven position/WCO reconstruction until explicit Home or origin re-establishment succeeds; dedicated and console unlock paths now share that invalidation contract |
+| `KD-BOX-01/02/03/04/06/08/09` | CNC boxes default to profile-outside, laser zero-kerf boxes warn in Job Review, Generate runs the assembly referees, slide-lid notch geometry is bounded by lid length, dimensional fields name millimetres, and CNC dogbones default on |
+| `KD-REL-01/02/03/04/05/06/09/10/12` | Job Review names the unproven continuous finishing interpolant and mixed depth semantics; CNC motion bounds include cutter radius; full-design origin includes relief; stock-bottom relief without tabs warns; 3D lateral descents use Z-capped feed; finish allowance and climb/conventional rough contours are honored; stored stepover wording now matches unclamped compilation |
+| `KD-LF2-05` | an unknown saved `machine.kind` is rejected as an invalid project instead of silently becoming a laser project |
+| `KD-M0-07` | structured tool-plan counting and streamer holds share one stop parser for `M0/M00/M1/M01`, including comment-suffixed lines; the parser now removes semicolon comments before the queued newline |
+| `KD-GIO-01` | imported G-code remains an inspector/simulator input, but an always-visible banner and Start-time Job Review warning explicitly state that Frame/Start run the current design, not the previewed file |
+
+Duplicate remains intentionally in-place, matching the documented command behavior; the change removes
+unintended process duplication but cannot make overlapping artwork non-overlapping. The selected clone
+is ready to move. `KD-CLP-04` therefore remains a feature-parity request for a separate Paste-in-Place
+command rather than an output defect in this remediation.
+
+### Findings closed by current behavior or classified as non-defects
+
+- `KD-LF2-01/02/04`: `.lf2` is a project, not a live controller snapshot. Current Frame and Job Review
+  bind/display the active origin, Work Z, controller, and exact compiled program; choosing the current
+  machine is explicit. `KD-LF2-03/06/07/08` describe intentionally session-only/unapplied editor,
+  camera, and history state. `KD-LF2-09` is stale because current serialization includes `jobSetup`
+  and groups. `KD-LF2-10` is deterministic legacy migration, not current-schema data loss.
+- `KD-RX-01/02` are factual controller transport limits and stay compile/transport preconditions.
+  `KD-RX-03` is valid per-run emission, not one concatenated scanline. `KD-RX-04` is already disclosed
+  by FluidNC Job Review warnings. `KD-RX-05/06` are profile-versus-firmware evidence disagreements,
+  not authority to write beyond the configured channel; no firmware capability was invented.
+- `KD-M0-01/02/03/04/05/06/08` describe the intentional supervised tool-change ownership model:
+  no automatic continuation, fresh Idle, exact tool-bound Work Z when available, and MPG ownership.
+- `KD-OVR-01..14` were checked against the current effective-operation inspector, Job Review effective
+  rows, and compilation contracts. Layer and object-local settings are now separately disclosed;
+  CNC intentionally ignores laser overrides, while image overscan remains a layer setting.
+- `KD-UND-02/03/05..12` are stale against persisted `jobSetup`, atomic machine transitions, and current
+  interaction history, or describe intentional session/UI history. `KD-CLP-09/11..14` are intentional
+  group validity, clipboard-scope, calibration, identity, and in-memory clipboard contracts.
+- `KD-SO-04` is correctly advisory under the Frame-only rule. `KD-SO-05` is an offset-contour fill,
+  not bidirectional scan motion. `KD-SO-06/08` need a reference file or primary LightBurn semantics
+  before an equivalence claim can be made; `KD-SO-07/09` match current profile policy and fail-closed
+  numeric materialization.
+- `KD-HOME-01/02` are factual transport/handoff behavior. `KD-HOME-05` accurately separates dedicated
+  recovery Home from console commands. `KD-HOME-06` remains hardware-unqualified.
+- `KD-BOX-05` is a preview-surface limitation, `KD-BOX-07` is covered by the production referee, and
+  `KD-BOX-10` describes fail-closed validation and variants outside the current generator model.
+- `KD-EL-03/05/06` describe qualification scope or deliberate packaged/smoke routing, not product
+  defects. `KD-REL-07/08/11/13/14` are current fail-closed materialization, mixed-mode routing, preview,
+  or input-unit contracts; no unsafe coercion was added.
+- `KD-RC-01..06` do not justify automatic replay after connection loss. The current checkpoint is
+  evidence for supervised requalification, not proof of physical completion or a resumable live
+  controller queue.
+
+### Shorthand-only follow-ups
+
+The submitted shorthand rows did not include fixtures or line-level reproductions. Current source was
+nevertheless checked for their named contracts: tabs have containment/full-coverage and through-stock
+warnings; default/small/angled cutter feeds and controller RPM limits reach Job Review; rotary and
+print-and-cut carry setup/registration evidence; fill rules are per object and artwork order persists;
+imports retain current supported semantics; and recovery copy explicitly denies true-resume proof.
+Therefore `TAB-01/02`, `FEED-01..03`, `ROT-01..03`, `PNC-01/02/05`, `FILL-01/02`, `$32-01..04`,
+`IMP-01..05`, `TXT-01/02`, `ARR-01/02`, `RC-02..06`, `LASER-01`, and `LB-01/02` do not receive an
+unproven geometry or policy mutation here. `GIO-01` was independently reproducible and is the one
+shorthand finding remediated above. A concrete counterexample can reopen any retained classification;
+hardware and LightBurn equivalence remain explicitly unqualified.

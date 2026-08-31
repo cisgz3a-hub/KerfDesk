@@ -36,6 +36,7 @@ import { useUnsavedChangesGuard } from './use-unsaved-changes-guard';
 import { useWindowTitle } from './use-window-title';
 import { WorkspaceSidePanels } from './WorkspaceSidePanels';
 import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner';
+import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 
 export function App(): JSX.Element {
   // Recovery first — runs once on mount, prompts the user before any
@@ -63,6 +64,7 @@ export function App(): JSX.Element {
     <div style={shellStyle}>
       <CommandShell />
       <ProjectBedReconciliationBanner />
+      <ExternalGcodePreviewBanner />
       <main style={mainStyle}>
         <ToolStrip />
         <CanvasArea />

@@ -42,6 +42,7 @@ import {
 import { detectFluidncDivergenceWarnings } from './fluidnc-divergence-warnings';
 import { useJobReviewStore, type JobReviewPurpose } from './job-review-store';
 import { refreshControllerIdentityWarnings } from '../controller-identity-warnings';
+import { appendExternalGcodePreviewWarning } from '../../state/external-gcode-preview-disclosure';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
  * by another successful prepare, so the bundle that streams is provably the
@@ -71,6 +72,9 @@ export async function runJobReviewGate(args: {
   readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
   readonly purpose?: JobReviewPurpose;
+  readonly onCompletedReplayChanged?: () => Promise<void> | void;
+  /** Exact-handoff owner check for a pre-existing permit. */
+  readonly shouldAbandon?: () => boolean;
 }): Promise<ConfirmedJobReview | null> {
   const purpose = args.purpose ?? 'start';
   let current = args.initial;
@@ -78,12 +82,38 @@ export async function runJobReviewGate(args: {
   if (!useJobReviewStore.getState().open(displayedModel, purpose)) return null;
   for (;;) {
     const signal = await useJobReviewStore.getState().nextSignal();
-    if (signal === 'cancel') {
+    if (reviewShouldClose(signal, args.shouldAbandon)) {
       useJobReviewStore.getState().close();
       return null;
     }
     if (signal === 'confirm') {
-      const confirmed = confirmReviewedStart(current, displayedModel);
+      // A field commit and the review rebuild request are both debounced. A
+      // fast Confirm can therefore arrive before that request. Re-prepare
+      // synchronously at this handoff boundary so approval can never bind to
+      // stale bytes or stale live evidence.
+      useJobReviewStore.getState().beginPrepare();
+      const rebuilt = await rebuildCurrentStart(
+        args.checkpointToReplace,
+        args.completedReceipt,
+        purpose,
+        current.frameWcsNormalizationWarning,
+        args.onCompletedReplayChanged,
+      );
+      if (!rebuilt.ok) {
+        if (presentRebuildFailure(rebuilt)) return null;
+        continue;
+      }
+      const rebuiltModel = modelFor(rebuilt.bundle);
+      if (!sameReviewedArtifact(current, displayedModel, rebuilt.bundle, rebuiltModel)) {
+        // The operator has not yet seen this program/evidence. Display it and
+        // require a new affirmative click; this is handoff consistency, not a
+        // new policy guard.
+        current = rebuilt.bundle;
+        displayedModel = rebuiltModel;
+        useJobReviewStore.getState().completePrepare(displayedModel);
+        continue;
+      }
+      const confirmed = confirmReviewedStart(rebuilt.bundle, rebuiltModel);
       useJobReviewStore.getState().close();
       return confirmed;
     }
@@ -93,15 +123,35 @@ export async function runJobReviewGate(args: {
       args.completedReceipt,
       purpose,
       current.frameWcsNormalizationWarning,
+      args.onCompletedReplayChanged,
     );
     if (!rebuilt.ok) {
-      useJobReviewStore.getState().failPrepare(rebuilt.messages);
+      if (presentRebuildFailure(rebuilt)) return null;
       continue;
     }
     current = rebuilt.bundle;
     displayedModel = modelFor(current);
     useJobReviewStore.getState().completePrepare(displayedModel);
   }
+}
+
+function reviewShouldClose(
+  signal: 'cancel' | 'confirm' | 'rebuild',
+  shouldAbandon: (() => boolean) | undefined,
+): boolean {
+  return signal === 'cancel' || shouldAbandon?.() === true;
+}
+
+function sameReviewedArtifact(
+  current: ReviewedStartBundle,
+  displayedModel: JobReviewModel,
+  rebuilt: ReviewedStartBundle,
+  rebuiltModel: JobReviewModel,
+): boolean {
+  return (
+    current.prepared.gcode === rebuilt.prepared.gcode &&
+    JSON.stringify(displayedModel) === JSON.stringify(rebuiltModel)
+  );
 }
 
 function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
@@ -127,10 +177,12 @@ function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReview
       ? baseModel
       : { ...baseModel, warnings: [...baseModel.warnings, ...fluidnc] };
   const warning = bundle.frameWcsNormalizationWarning;
-  const model =
+  const framedModel =
     warning === undefined || disclosed.warnings.includes(warning)
       ? disclosed
       : { ...disclosed, warnings: [warning, ...disclosed.warnings] };
+  const externalPreview = useStore.getState().externalGcodePreview;
+  const model = appendExternalGcodePreviewWarning(framedModel, externalPreview?.name);
   return refreshControllerIdentityWarnings(
     model,
     configured,
@@ -170,7 +222,20 @@ function confirmReviewedStart(
 
 type RebuiltStart =
   | { readonly ok: true; readonly bundle: ReviewedStartBundle }
-  | { readonly ok: false; readonly messages: ReadonlyArray<string> };
+  | {
+      readonly ok: false;
+      readonly messages: ReadonlyArray<string>;
+      readonly closeReview?: true;
+    };
+
+function presentRebuildFailure(rebuilt: Extract<RebuiltStart, { readonly ok: false }>): boolean {
+  if (rebuilt.closeReview === true) {
+    useJobReviewStore.getState().close();
+    return true;
+  }
+  useJobReviewStore.getState().failPrepare(rebuilt.messages);
+  return false;
+}
 
 // Mirrors the pre-review sequence of runStartJobFlowWithCheckpoint against
 // the LIVE store state, minus its side effects: a refusal here becomes an
@@ -182,12 +247,20 @@ async function rebuildCurrentStart(
   completedReceipt: LastCompletedReceipt | null,
   purpose: JobReviewPurpose,
   frameWcsNormalizationWarning: string | undefined,
+  onCompletedReplayChanged: (() => Promise<void> | void) | undefined,
 ): Promise<RebuiltStart> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
   const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
   const externalEnvironment = captureStartExternalEnvironment(app.project);
+  if (
+    completedReceipt !== null &&
+    currentReplayExecutionSignature(app) !== completedReceipt.artifact.executionSignature
+  ) {
+    await onCompletedReplayChanged?.();
+    return { ok: false, messages: [COMPLETED_REPLAY_CHANGED_MESSAGE], closeReview: true };
+  }
   const prepared = await prepareCurrentStartJob(
     app,
     laser,
@@ -197,12 +270,9 @@ async function rebuildCurrentStart(
     purpose === 'start',
   );
   if (!prepared.ok) return { ok: false, messages: prepared.messages };
-  if (
-    completedReceipt !== null &&
-    (!replayCompilationMatches(prepared, completedReceipt) ||
-      currentReplayExecutionSignature(app) !== completedReceipt.artifact.executionSignature)
-  ) {
-    return { ok: false, messages: [COMPLETED_REPLAY_CHANGED_MESSAGE] };
+  if (completedReceipt !== null && !replayCompilationMatches(prepared, completedReceipt)) {
+    await onCompletedReplayChanged?.();
+    return { ok: false, messages: [COMPLETED_REPLAY_CHANGED_MESSAGE], closeReview: true };
   }
   const programIssue = checkpointProgramIssue(checkpointToReplace, prepared.gcode);
   if (programIssue !== null) return { ok: false, messages: [programIssue] };

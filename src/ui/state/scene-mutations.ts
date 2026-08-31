@@ -125,10 +125,10 @@ export function resolveRasterLayerColor(
   return preferred; // 16M layers in use — pathological; preflight will catch it
 }
 
-// Clone every selected SceneObject with a fresh id and a 10 mm offset.
-// Returns the new selection (first clone as primary, rest as extras)
-// plus the new scene + undo push. Matches the F-A3 multi-import
-// stagger so duplicate-of-multi feels consistent.
+// Clone every selected SceneObject in place with fresh object ids while
+// preserving the selected artwork's operation bindings. Returns the new
+// selection (first clone as primary, rest as extras) plus the new scene and
+// undo push.
 //
 // Empty selection → no-op; the caller's `set((s) => ...)` should fall
 // through without changing state (the undefined return signals that).

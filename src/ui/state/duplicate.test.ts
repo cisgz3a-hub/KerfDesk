@@ -26,8 +26,8 @@ describe('useStore — duplicateSelection (Cmd+D)', () => {
     // New clone becomes the selection.
     expect(useStore.getState().selectedObjectId).toBe(clone.id);
     const layers = useStore.getState().project.scene.layers;
-    expect(operationIdsForObject(before, layers)).not.toEqual(operationIdsForObject(clone, layers));
-    expect(layers).toHaveLength(2);
+    expect(operationIdsForObject(clone, layers)).toEqual(operationIdsForObject(before, layers));
+    expect(layers).toHaveLength(1);
   });
 
   it('on multi-select clones every selected object', () => {
@@ -53,7 +53,7 @@ describe('useStore — duplicateSelection (Cmd+D)', () => {
     expect(useStore.getState().project.scene.objects).toHaveLength(before);
   });
 
-  it('copies every added operation without sharing settings with the source', () => {
+  it('keeps every added operation without manufacturing stacked sibling operations', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().addOperationForSelection();
 
@@ -64,11 +64,11 @@ describe('useStore — duplicateSelection (Cmd+D)', () => {
     const cloneIds = operationIdsForObject(objects[1]!, layers);
     expect(sourceIds).toHaveLength(2);
     expect(cloneIds).toHaveLength(2);
-    expect(cloneIds.some((id) => sourceIds.includes(id))).toBe(false);
-    expect(layers).toHaveLength(4);
+    expect(cloneIds).toEqual(sourceIds);
+    expect(layers).toHaveLength(2);
   });
 
-  it('preserves every sublayer on duplicated operations with independent settings objects', () => {
+  it('keeps duplicated artwork on the source operation and its sublayers', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const sourceId = useStore.getState().project.scene.layers[0]?.id;
     if (sourceId === undefined) throw new Error('source operation missing');
@@ -81,8 +81,36 @@ describe('useStore — duplicateSelection (Cmd+D)', () => {
     const cloneId = operationIdsForObject(objects[1]!, layers)[0];
     const source = layers.find((layer) => layer.id === sourceId);
     const clone = layers.find((layer) => layer.id === cloneId);
-    expect(clone?.subLayers).toEqual(source?.subLayers);
-    expect(clone?.subLayers).not.toBe(source?.subLayers);
-    expect(clone?.subLayers[0]?.settings).not.toBe(source?.subLayers[0]?.settings);
+    expect(cloneId).toBe(sourceId);
+    expect(clone).toBe(source);
+  });
+
+  it('preserves object-local overrides without promoting them to the operation', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: state.project.scene.objects.map((object) =>
+            object.id === 'O1' ? { ...object, operationOverride: { speed: 321 } } : object,
+          ),
+        },
+      },
+    }));
+    useStore.getState().selectObject('O1');
+
+    useStore.getState().duplicateSelection();
+
+    const { objects, layers } = useStore.getState().project.scene;
+    expect(objects[1]?.operationOverride).toEqual({ speed: 321 });
+    expect(layers).toHaveLength(1);
+    expect(layers[0]?.speed).not.toBe(321);
+    const source = objects[0];
+    const clone = objects[1];
+    if (source?.kind !== 'imported-svg' || clone?.kind !== 'imported-svg') {
+      throw new Error('expected imported SVG artwork');
+    }
+    expect(clone.paths).not.toBe(source.paths);
   });
 });

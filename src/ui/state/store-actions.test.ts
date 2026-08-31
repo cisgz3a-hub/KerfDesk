@@ -55,6 +55,21 @@ describe('useStore — undo/redo selection preservation (CNV-13)', () => {
     expect(useStore.getState().selectedPathNodes).toEqual([]);
   });
 
+  it('undo during a live interaction cancels that gesture before older history', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().selectObject('O1');
+    const before = useStore.getState().project.scene.objects[0]?.transform;
+    const priorUndoLength = useStore.getState().undoStack.length;
+    useStore.getState().beginInteraction();
+    useStore.getState().setObjectTransform('O1', MOVED_TRANSFORM);
+
+    useStore.getState().undo();
+
+    expect(useStore.getState().project.scene.objects[0]?.transform).toEqual(before);
+    expect(useStore.getState().pendingUndo).toBeNull();
+    expect(useStore.getState().undoStack).toHaveLength(priorUndoLength);
+  });
+
   it('commits profile, workspace, and CNC config as one undoable machine setup', () => {
     const profile = {
       ...DEFAULT_DEVICE_PROFILE,

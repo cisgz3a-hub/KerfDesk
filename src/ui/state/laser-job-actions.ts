@@ -12,6 +12,7 @@ import {
   step,
   wipeInFlight,
 } from '../../core/controllers/grbl';
+import { isToolChangeLine } from '../../core/controllers/grbl/streamer';
 import type { ControllerDriver } from '../../core/controllers';
 import { extractToolChangeLabels } from '../../core/output';
 import { cncControllerEpochOf, type CncControllerEpoch } from './cnc-setup-attestation';
@@ -318,7 +319,7 @@ function toolChangeManifest(
   // Structured compile metadata carries stable IDs without changing G-code
   // bytes. Direct/imported callers retain the legacy comment-label fallback.
   const plannedChanges = options.cncToolPlan?.slice(1);
-  if (plannedChanges !== undefined && plannedChanges.length !== countM0Boundaries(gcode)) {
+  if (plannedChanges !== undefined && plannedChanges.length !== countToolChangeBoundaries(gcode)) {
     throw new Error(TOOL_CHANGE_PLAN_MISMATCH_MESSAGE);
   }
   const labels =
@@ -330,8 +331,8 @@ function toolChangeManifest(
   };
 }
 
-function countM0Boundaries(gcode: string): number {
-  return gcode.split('\n').filter((line) => line.trim().toUpperCase() === 'M0').length;
+export function countToolChangeBoundaries(gcode: string): number {
+  return gcode.split('\n').filter(isToolChangeLine).length;
 }
 
 function toolChangeEntryPatch(state: LaserState, entersHoldNow: boolean): Partial<LaserState> {

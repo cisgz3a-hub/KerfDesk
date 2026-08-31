@@ -87,7 +87,9 @@ function expectPastedOperationToRetainSettings(pasted: ReliefObject, project: Pr
   if (original === undefined) throw new Error('expected original relief');
   const originalOperation = operationFor(original, project.scene.layers);
   const pastedOperation = operationFor(pasted, project.scene.layers);
-  expect(pastedOperation.id).not.toBe(originalOperation.id);
+  // Same-project Paste keeps artwork in its existing operation. Cloning the
+  // operation here would make one visible relief emit twice.
+  expect(pastedOperation.id).toBe(originalOperation.id);
   expect(pastedOperation.cnc).toEqual(originalOperation.cnc);
   expect(pastedOperation.output).toBe(originalOperation.output);
 }

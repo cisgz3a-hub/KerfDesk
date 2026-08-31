@@ -27,7 +27,30 @@ export function autofocusActions(
       const unlock = refs.driver.commands.unlock;
       if (unlock === null) throw new Error('This controller has no unlock command.');
       await write(`${unlock}\n`, 'unlock');
-      set({ alarmCode: null, homingState: 'unknown' });
+      set((state) => {
+        const persistentOrUnknown =
+          state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown';
+        return {
+          alarmCode: null,
+          homingState: 'unknown',
+          homingProof: null,
+          positionEvidenceSuppressed: true,
+          statusReport: null,
+          statusObservation: null,
+          wcoCache: null,
+          workOriginActive: persistentOrUnknown,
+          workOriginSource: persistentOrUnknown ? 'unknown' : 'none',
+          workZZeroEvidence: null,
+          workZReferenceEpoch: state.workZReferenceEpoch + 1,
+          frameVerification: null,
+          framedRun: null,
+          trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+          log: pushLog(
+            state,
+            '[lf2] Controller unlocked. Cleared stale position, origin, Z, Home, and Frame evidence.',
+          ),
+        };
+      });
     },
   };
 }

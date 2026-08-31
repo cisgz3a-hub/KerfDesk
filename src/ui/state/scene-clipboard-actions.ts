@@ -102,6 +102,9 @@ function clipboardFromSelection(
     if (object.kind === 'raster-image' && object.imageMaskId !== undefined) {
       closureIds.add(object.imageMaskId);
     }
+    if (object.kind === 'text' && object.pathText !== undefined) {
+      closureIds.add(object.pathText.guideObjectId);
+    }
   }
   const objects = state.project.scene.objects
     .filter((object) => closureIds.has(object.id))
@@ -162,9 +165,17 @@ function remapClipboardReferences(
   object: SceneObject,
   idMap: ReadonlyMap<string, string>,
 ): SceneObject {
-  if (object.kind !== 'raster-image' || object.imageMaskId === undefined) return object;
-  const mapped = idMap.get(object.imageMaskId);
-  return mapped === undefined ? object : { ...object, imageMaskId: mapped };
+  if (object.kind === 'raster-image' && object.imageMaskId !== undefined) {
+    const mapped = idMap.get(object.imageMaskId);
+    return mapped === undefined ? object : { ...object, imageMaskId: mapped };
+  }
+  if (object.kind === 'text' && object.pathText !== undefined) {
+    const mapped = idMap.get(object.pathText.guideObjectId);
+    return mapped === undefined
+      ? object
+      : { ...object, pathText: { ...object.pathText, guideObjectId: mapped } };
+  }
+  return object;
 }
 
 function prepareClipboardPaste(
@@ -180,6 +191,14 @@ function prepareClipboardPaste(
   let out = scene;
   const operationIdMap = new Map<string, string>();
   for (const source of copiedLayers) {
+    const existing = scene.layers.find((operation) => operation.id === source.id);
+    if (existing !== undefined) {
+      // Same-project Paste remains in the source process operation. This is
+      // the ordinary editor meaning of copying artwork; cloning the operation
+      // here stacked a second emission over the same visible object.
+      operationIdMap.set(source.id, existing.id);
+      continue;
+    }
     const representative = objects.find((object) => sceneObjectUsesOperation(object, source));
     if (representative === undefined) continue;
     const seed = createArtworkOperation(out, representative, {
@@ -197,9 +216,21 @@ function prepareClipboardPaste(
     out = addLayer(out, operation);
   }
   const cloned = cloneClipboardObjects(objects, copiedLayers, operationIdMap);
+  const materialized: SceneObject[] = [];
+  for (const object of cloned.objects) {
+    if (operationIdsForObject(object, out.layers).length > 0) {
+      materialized.push(remapClipboardTabAnchors(object, copiedLayers, operationIdMap, out.layers));
+      continue;
+    }
+    // Malformed/legacy clipboard artwork with no resolvable binding must not
+    // paste as invisible-to-output geometry. Give it one explicit operation.
+    const created = createArtworkOperation(out, object);
+    out = addLayer(out, created.operation);
+    materialized.push(created.object);
+  }
   return {
     scene: out,
-    objects: cloned.objects,
+    objects: materialized,
     groups: groups.map((group) => ({
       ...structuredClone(group),
       id: crypto.randomUUID(),
@@ -209,6 +240,28 @@ function prepareClipboardPaste(
       }),
     })),
   };
+}
+
+function remapClipboardTabAnchors(
+  object: SceneObject,
+  sourceOperations: ReadonlyArray<Layer>,
+  operationIdMap: ReadonlyMap<string, string>,
+  targetOperations: ReadonlyArray<Layer>,
+): SceneObject {
+  if (object.cncTabAnchors === undefined || object.cncTabAnchors.length === 0) return object;
+  const colorMap = new Map<string, string>();
+  for (const source of sourceOperations) {
+    const targetId = operationIdMap.get(source.id);
+    const target = targetOperations.find((operation) => operation.id === targetId);
+    if (target !== undefined) colorMap.set(source.color.toLowerCase(), target.color);
+  }
+  return {
+    ...object,
+    cncTabAnchors: object.cncTabAnchors.map((anchor) => ({
+      ...anchor,
+      layerColor: colorMap.get(anchor.layerColor.toLowerCase()) ?? anchor.layerColor,
+    })),
+  } as SceneObject;
 }
 
 function cloneSceneObject(object: SceneObject): SceneObject {

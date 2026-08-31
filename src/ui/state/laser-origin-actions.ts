@@ -161,7 +161,7 @@ async function setOriginHere(
         wcoCache,
       );
     },
-    { changesXyOrigin: true },
+    { changesXyOrigin: true, reestablishesPositionEvidence: true },
   );
   // The controller stayed silent past the wait, so the origin is recorded
   // without a fresh work offset — its machine location is unconfirmed and Start
@@ -272,7 +272,14 @@ async function releaseMotors(
     'Release motors',
     releaseMotorsAction,
     () =>
-      get().workOriginSource === 'g54-persistent' ? unknownOriginPatch() : clearedOriginPatch(),
+      get().workOriginSource === 'g54-persistent'
+        ? unknownOriginPatch()
+        : {
+            ...clearedOriginPatch(),
+            positionEvidenceSuppressed: true,
+            statusReport: null,
+            statusObservation: null,
+          },
     { changesXyOrigin: true },
   );
 }
@@ -325,6 +332,7 @@ function transientXyOriginPatch(
   return {
     workOriginActive: true,
     workOriginSource: 'g92',
+    positionEvidenceSuppressed: false,
     wcoCache: axisHonestWco,
     frameVerification: null,
     framedRun: null,
@@ -335,6 +343,7 @@ function persistentOriginAfterTransientClearPatch(): Partial<LaserState> {
   return {
     workOriginActive: true,
     workOriginSource: 'g54-persistent',
+    positionEvidenceSuppressed: false,
     // G92.1 clears every transient axis. The boolean does not encode whether
     // Z came from G92 or persistent G54, so conservatively require a new touch-off.
     // Any Z-reference loss also voids work-Z evidence (fail-closed for CNC start).

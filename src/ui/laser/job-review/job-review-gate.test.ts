@@ -228,7 +228,7 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     capture.stop();
   });
 
-  it('returns the exact identity evidence displayed even if detection changes before Confirm', async () => {
+  it('rebuilds live identity evidence on Confirm and requires review of any changed model', async () => {
     useLaserStore.setState({
       activeControllerKind: 'grbl-v1.1',
       detectedControllerKind: 'grbl-v1.1',
@@ -243,15 +243,18 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     });
     await vi.waitFor(() => expect(capture.models).toHaveLength(1));
 
-    const displayedModel = capture.models[0];
-    expect(displayedModel?.warnings.join('\n')).not.toContain('Controller identity');
+    expect(capture.models[0]?.warnings.join('\n')).not.toContain('Controller identity');
     useLaserStore.setState({ detectedControllerKind: 'marlin' });
+    useJobReviewStore.getState().confirm();
+
+    await vi.waitFor(() => expect(capture.models).toHaveLength(2));
+    expect(capture.models[1]?.warnings.join('\n')).toContain('Controller identity mismatch:');
     useJobReviewStore.getState().confirm();
 
     const confirmed = await review;
     capture.stop();
-    expect(confirmed?.reviewModel).toBe(displayedModel);
-    expect(confirmed?.reviewModel.warnings.join('\n')).not.toContain('Controller identity');
+    expect(confirmed?.reviewModel).toEqual(capture.models[1]);
+    expect(confirmed?.reviewModel.warnings.join('\n')).toContain('Controller identity mismatch:');
   });
 
   it('preserves frame purpose and rebuilds without requiring an earlier Frame', async () => {

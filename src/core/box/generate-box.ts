@@ -13,6 +13,9 @@ import { layoutPanelOffsets, type PanelExtent } from './layout';
 import { dividerLayout, hasDividers } from './divider-layout';
 import { dividerName, dividerPanelRings, wallSlotCutouts } from './divider-panels';
 import { buildSlideLidParts } from './slide-lid-panels';
+import { checkBoxAssembly } from './assembly-referee';
+import { checkDividerAssembly } from './divider-referee';
+import { checkSlideLidAssembly } from './slide-lid-referee';
 
 export type BoxPanel = {
   readonly name: string;
@@ -45,6 +48,27 @@ const PANEL_NAMES: Readonly<Record<PanelId, string>> = {
   right: 'Right',
 };
 
+type FittedBoxPanel = {
+  readonly name: string;
+  readonly panel: PanelId | 'divider' | 'lid';
+  readonly divider?: BoxPanel['divider'];
+} & PanelRings;
+
+type PreparedBoxPanel = {
+  readonly name: string;
+  readonly panel: PanelId | 'divider' | 'lid';
+  readonly divider?: BoxPanel['divider'];
+  readonly rings: PanelRings;
+};
+
+type FittedPanelsResult =
+  | {
+      readonly kind: 'fitted';
+      readonly panels: ReadonlyArray<FittedBoxPanel>;
+      readonly proofPanels: ReadonlyArray<FittedBoxPanel>;
+    }
+  | { readonly kind: 'error'; readonly message: string };
+
 /** Generate the cut-ready panel sheet for a validated spec. */
 export function generateBox(spec: BoxSpec): GenerateBoxResult {
   const validation = validateBoxSpec(spec);
@@ -53,48 +77,92 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
   }
   const dividers = hasDividers(spec) ? dividerLayout(spec) : null;
   const slots = dividers === null ? null : wallSlotCutouts(dividers, spec);
-  const fittedPanels: Array<
-    { name: string; panel: PanelId | 'divider' | 'lid'; divider?: BoxPanel['divider'] } & PanelRings
-  > = [];
-  for (const part of nominalParts(spec, slots)) {
-    const fit = applyPanelFit(part.rings, {
-      clearanceMm: spec.clearanceMm,
-      // The loose lid's thumb notch is a handhold, not a square-tab seat.
-      relief: part.panel === 'lid' ? { kind: 'none' } : spec.relief,
-    });
-    if (fit.kind !== 'fitted') {
-      return { kind: 'error', message: `${part.name} panel: ${fit.detail}.` };
-    }
-    fittedPanels.push({
-      name: part.name,
-      panel: part.panel,
-      outline: fit.outline,
-      cutouts: fit.cutouts,
-    });
+  const fitted = fitGeneratedPanels(spec, slots, dividers);
+  if (fitted.kind === 'error') return fitted;
+  const panels = layoutFittedPanels(fitted.panels, spec.partSpacingMm);
+  // Keep numeric-integrity failures ahead of the geometric referee. At extreme
+  // finite inputs the layout addition can overflow even though each unplaced
+  // panel is finite; feeding those values to the referee produces a misleading
+  // collision report instead of the established numeric-range failure.
+  if (!panels.every(panelGeometryIsFinite)) {
+    return {
+      kind: 'error',
+      message: 'Box dimensions or spacing exceed the supported numeric range.',
+    };
   }
-  if (dividers !== null) {
-    for (const placement of [...dividers.xDividers, ...dividers.yDividers]) {
-      const fit = applyPanelFit(dividerPanelRings(dividers, placement, spec), {
-        clearanceMm: spec.clearanceMm,
-        relief: spec.relief,
-      });
-      if (fit.kind !== 'fitted') {
-        return { kind: 'error', message: `${dividerName(placement)} panel: ${fit.detail}.` };
-      }
-      fittedPanels.push({
-        name: dividerName(placement),
-        panel: 'divider',
-        divider: { axis: placement.axis, index: placement.index },
-        outline: fit.outline,
-        cutouts: fit.cutouts,
-      });
-    }
+  const assemblyIssues = verifyFittedAssembly(fitted.proofPanels, spec, dividers !== null);
+  if (assemblyIssues.length > 0) {
+    return {
+      kind: 'error',
+      message: `Generated box failed its assembly proof: ${assemblyIssues.slice(0, 3).join('; ')}.`,
+    };
   }
+  return { kind: 'generated', panels };
+}
+
+function fitGeneratedPanels(
+  spec: BoxSpec,
+  slots: ReturnType<typeof wallSlotCutouts> | null,
+  dividers: ReturnType<typeof dividerLayout> | null,
+): FittedPanelsResult {
+  const fittedPanels: FittedBoxPanel[] = [];
+  const proofPanels: FittedBoxPanel[] = [];
+  const parts = [
+    ...nominalParts(spec, slots),
+    ...(dividers === null ? [] : dividerParts(spec, dividers)),
+  ];
+  for (const part of parts) {
+    const result = fitPanelWithAssemblyProof(part, spec);
+    if (result.kind === 'error') return result;
+    fittedPanels.push(result.panel);
+    proofPanels.push(result.proofPanel);
+  }
+  return { kind: 'fitted', panels: fittedPanels, proofPanels };
+}
+
+function fitPanelWithAssemblyProof(
+  part: PreparedBoxPanel,
+  spec: BoxSpec,
+):
+  | { readonly kind: 'fitted'; readonly panel: FittedBoxPanel; readonly proofPanel: FittedBoxPanel }
+  | { readonly kind: 'error'; readonly message: string } {
+  // The loose lid's thumb notch is a handhold, not a square-tab seat.
+  const relief = part.panel === 'lid' ? ({ kind: 'none' } as const) : spec.relief;
+  const fit = applyPanelFit(part.rings, { clearanceMm: spec.clearanceMm, relief });
+  if (fit.kind !== 'fitted') {
+    return { kind: 'error', message: `${part.name} panel: ${fit.detail}.` };
+  }
+  const proof =
+    relief.kind === 'none'
+      ? fit
+      : applyPanelFit(part.rings, {
+          clearanceMm: spec.clearanceMm,
+          relief: { kind: 'none' },
+        });
+  if (proof.kind !== 'fitted') {
+    return { kind: 'error', message: `${part.name} assembly proof: ${proof.detail}.` };
+  }
+  const identity = {
+    name: part.name,
+    panel: part.panel,
+    ...(part.divider === undefined ? {} : { divider: part.divider }),
+  };
+  return {
+    kind: 'fitted',
+    panel: { ...identity, outline: fit.outline, cutouts: fit.cutouts },
+    proofPanel: { ...identity, outline: proof.outline, cutouts: proof.cutouts },
+  };
+}
+
+function layoutFittedPanels(
+  fittedPanels: ReadonlyArray<FittedBoxPanel>,
+  partSpacingMm: number,
+): ReadonlyArray<BoxPanel> {
   const offsets = layoutPanelOffsets(
     fittedPanels.map((panel) => ringsExtent(panel)),
-    spec.partSpacingMm,
+    partSpacingMm,
   );
-  const panels = fittedPanels.map((panel, index): BoxPanel => {
+  return fittedPanels.map((panel, index): BoxPanel => {
     const offsetMm = offsets[index] ?? { x: 0, y: 0 };
     return {
       name: panel.name,
@@ -105,27 +173,51 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
       offsetMm,
     };
   });
-  if (!panels.every(panelGeometryIsFinite)) {
-    return {
-      kind: 'error',
-      message: 'Box dimensions or spacing exceed the supported numeric range.',
-    };
-  }
-  return { kind: 'generated', panels };
 }
 
-type NominalPart = {
-  readonly name: string;
-  readonly panel: PanelId | 'divider' | 'lid';
-  readonly rings: PanelRings;
-};
+function verifyFittedAssembly(
+  panels: ReadonlyArray<FittedBoxPanel>,
+  spec: BoxSpec,
+  includesDividers: boolean,
+): ReadonlyArray<string> {
+  // The referee's play model covers nominal and non-negative clearance.
+  // Negative clearance is deliberate interference and has a different fit
+  // contract, so it retains the generator's numeric/topology validation.
+  if (spec.clearanceMm < 0) return [];
+  const options = { playMm: spec.clearanceMm };
+  const walls = panels.flatMap((panel) =>
+    panel.panel === 'divider' || panel.panel === 'lid'
+      ? []
+      : [{ panel: panel.panel, outline: panel.outline, cutouts: panel.cutouts }],
+  );
+  const issues =
+    spec.style === 'slide-lid'
+      ? checkSlideLidAssembly(panels, spec, options)
+      : checkBoxAssembly(walls, spec, options);
+  if (!includesDividers) return issues;
+  return [
+    ...issues,
+    ...checkDividerAssembly(
+      {
+        walls: walls.map((panel) => ({ panel: panel.panel, cutouts: panel.cutouts })),
+        dividers: panels.flatMap((panel) =>
+          panel.panel === 'divider' && panel.divider !== undefined
+            ? [{ ...panel.divider, outline: panel.outline }]
+            : [],
+        ),
+      },
+      spec,
+      options,
+    ),
+  ];
+}
 
 // Walls (with any divider slots) per style: claim-model panels for closed
 // and open-top, the dedicated slide-lid builder otherwise.
 function nominalParts(
   spec: BoxSpec,
   slots: ReadonlyMap<PanelId, ReadonlyArray<Polyline>> | null,
-): ReadonlyArray<NominalPart> {
+): ReadonlyArray<PreparedBoxPanel> {
   if (spec.style === 'slide-lid') {
     return buildSlideLidParts(spec).map((part) => ({
       name: part.name,
@@ -146,6 +238,18 @@ function nominalParts(
       outline: panelOutline(claims),
       cutouts: slots?.get(claims.panel) ?? [],
     },
+  }));
+}
+
+function dividerParts(
+  spec: BoxSpec,
+  dividers: ReturnType<typeof dividerLayout>,
+): ReadonlyArray<PreparedBoxPanel> {
+  return [...dividers.xDividers, ...dividers.yDividers].map((placement) => ({
+    name: dividerName(placement),
+    panel: 'divider',
+    divider: { axis: placement.axis, index: placement.index },
+    rings: dividerPanelRings(dividers, placement, spec),
   }));
 }
 

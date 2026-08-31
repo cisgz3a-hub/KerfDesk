@@ -89,6 +89,7 @@ export async function runHomeAction(
     controllerOperation: { kind: 'home', phase: 'command', idleReports: 0 },
     homingState: 'homing',
     homingProof: null,
+    positionEvidenceSuppressed: true,
     statusReport: null,
     statusObservation: null,
     trustedPositionEpoch: (expectedPositionEpoch = (state.trustedPositionEpoch ?? 0) + 1),
@@ -167,6 +168,7 @@ function confirmHome(set: SetFn, get: GetFn, epochs: HomeEpochs): void {
   set((state) => ({
     controllerOperation: null,
     homingState: 'confirmed',
+    positionEvidenceSuppressed: false,
     homingProof: {
       sessionEpoch: epochs.session,
       positionEpoch: epochs.position,

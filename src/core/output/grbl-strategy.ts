@@ -227,7 +227,7 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
   // Generic Scan Line gives every sweep bounded feed-matched laser-off entry
   // and exit motion. The 4040 plan retains its qualified bounded-entry policy.
   const scanOffsetMm =
-    group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, group.speed);
+    group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, feed);
   const sweepPlans = planFillSweeps(group, scanOffsetMm);
   const context = { s, feed, device, dialect };
   for (let p = 0; p < group.passes; p += 1) {

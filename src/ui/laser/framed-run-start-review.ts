@@ -25,6 +25,21 @@ export async function reviewFramedRunForStart(
   permit: FramedRunPermit,
 ): Promise<FramedRunReviewEvidence | null> {
   const candidate = permit.candidate;
+  const laserAtOpen = useLaserStore.getState();
+  let sourceChangedDuringReview = false;
+  // Project edits are allowed to rebuild in place and surface the expected
+  // re-Frame blocker. Losing the permit while the source project is unchanged
+  // means an external handoff fact died, so there is nothing left to approve.
+  const shouldAbandon = (): boolean => {
+    const liveLaser = useLaserStore.getState();
+    if (
+      useStore.getState().project !== candidate.project ||
+      !onlyFrameOwnershipChanged(laserAtOpen, liveLaser)
+    ) {
+      sourceChangedDuringReview = true;
+    }
+    return liveLaser.framedRun !== permit && !sourceChangedDuringReview;
+  };
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const review = await runJobReviewGate({
@@ -41,8 +56,14 @@ export async function reviewFramedRunForStart(
     },
     checkpointToReplace: null,
     completedReceipt: null,
+    shouldAbandon,
   });
-  if (review === null) return null;
+  if (review === null) {
+    if (shouldAbandon()) {
+      useToastStore.getState().pushToast(FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE, 'warning');
+    }
+    return null;
+  }
   if (review.bundle.prepared.canvasPlan.retentionKey !== candidate.executionSignature) {
     useLaserStore.setState({ framedRun: null, frameVerification: null });
     useToastStore.getState().pushToast(REVIEW_CHANGED_FRAMED_JOB_MESSAGE, 'warning');
@@ -58,4 +79,15 @@ export async function reviewFramedRunForStart(
       ? {}
       : { cncSetupAttestation: review.cncSetupAttestation }),
   };
+}
+
+function onlyFrameOwnershipChanged(
+  before: ReturnType<typeof useLaserStore.getState>,
+  after: ReturnType<typeof useLaserStore.getState>,
+): boolean {
+  for (const key of Object.keys(before) as ReadonlyArray<keyof typeof before>) {
+    if (key === 'framedRun' || key === 'frameVerification') continue;
+    if (before[key] !== after[key]) return false;
+  }
+  return true;
 }

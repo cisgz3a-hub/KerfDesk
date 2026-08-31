@@ -92,6 +92,7 @@ import {
   resolveDesktopUpdateModes,
 } from './update-channel-trust.js';
 import { installWindowReadinessPolicy } from './window-readiness-policy.js';
+import { revealPrimaryWindow } from './single-instance-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -104,6 +105,17 @@ const DESKTOP_DATA_PATH = NATIVE_SMOKE_CONFIG?.userDataPath ?? LEGACY_DESKTOP_DA
 app.setName(DESKTOP_PRODUCT_NAME);
 app.setPath('userData', DESKTOP_DATA_PATH);
 app.setPath('sessionData', DESKTOP_DATA_PATH);
+
+// One process owns the shared Chromium profile and the serial-capable UI.
+// A second launch only raises that primary window.
+const HAS_SINGLE_INSTANCE_LOCK = app.requestSingleInstanceLock();
+if (!HAS_SINGLE_INSTANCE_LOCK) app.quit();
+else {
+  app.on('second-instance', () => {
+    const primary = BrowserWindow.getAllWindows()[0];
+    if (primary !== undefined) revealPrimaryWindow(primary);
+  });
+}
 
 function installApplicationMenu(): void {
   const template = desktopApplicationMenuTemplate(process.platform);
@@ -393,7 +405,9 @@ function installDevTools(window: BrowserWindow): void {
 
 async function createWindow(): Promise<void> {
   const window = createMainWindow();
-  installWindowReadinessPolicy(window);
+  installWindowReadinessPolicy(window, {
+    reportFailure: (message) => dialog.showErrorBox('KerfDesk window error', message),
+  });
   installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
 
@@ -480,29 +494,30 @@ async function startCameraBridgeSafely(): Promise<void> {
   }
 }
 
-void app
-  .whenReady()
-  .then(async () => {
-    // Wire the app:// scheme to the dist/web bundle before opening any
-    // window. createWindow() will call loadURL('app://app/index.html'),
-    // which fails fast if this handler isn't installed yet.
-    const distRoot = path.join(__dirname, '..', 'dist', 'web');
-    protocol.handle('app', makeAppProtocolHandler(distRoot));
-    if (NATIVE_SMOKE_CONFIG === null) await startCameraBridgeSafely();
-    // Background auto-update against our self-hosted feed (ADR-024/135). This is
-    // inert until production artifacts are code-signed; once trusted, updates
-    // install on quit and never mid-burn. Check errors are never fatal to startup.
-    configureAutoUpdater(autoUpdater, {
-      isPackaged: app.isPackaged,
-      isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
-      onError: (error: unknown) => console.warn('Desktop update check failed:', error),
+if (HAS_SINGLE_INSTANCE_LOCK)
+  void app
+    .whenReady()
+    .then(async () => {
+      // Wire the app:// scheme to the dist/web bundle before opening any
+      // window. createWindow() will call loadURL('app://app/index.html'),
+      // which fails fast if this handler isn't installed yet.
+      const distRoot = path.join(__dirname, '..', 'dist', 'web');
+      protocol.handle('app', makeAppProtocolHandler(distRoot));
+      if (NATIVE_SMOKE_CONFIG === null) await startCameraBridgeSafely();
+      // Background auto-update against our self-hosted feed (ADR-024/135). This is
+      // inert until production artifacts are code-signed; once trusted, updates
+      // install on quit and never mid-burn. Check errors are never fatal to startup.
+      configureAutoUpdater(autoUpdater, {
+        isPackaged: app.isPackaged,
+        isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
+        onError: (error: unknown) => console.warn('Desktop update check failed:', error),
+      });
+      return createWindow();
+    })
+    .catch((err: unknown) => {
+      console.error('Failed to create window:', err);
+      app.exit(1);
     });
-    return createWindow();
-  })
-  .catch((err: unknown) => {
-    console.error('Failed to create window:', err);
-    app.exit(1);
-  });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

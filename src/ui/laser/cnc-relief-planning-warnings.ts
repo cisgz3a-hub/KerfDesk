@@ -36,6 +36,7 @@ export function detectCncReliefPlanningWarnings(
     ),
     ...compiledReliefPlanningWarnings(project, compiled?.reliefPlans ?? []),
     ...sourceReliefPlanningWarnings(project, compiled, sourceGeometryChecks),
+    ...(sourceGeometryChecks === 'full' ? mixedReliefLayerWarnings(project) : []),
   ];
   return unique(warnings);
 }
@@ -65,7 +66,30 @@ function compiledReliefPlanningWarnings(
   return plans.flatMap((plan) => [
     ...oversizedReliefGridWarnings(project, plan),
     ...compiledReliefScallopWarnings(project, plan),
+    ...(plan.stage === 'finishing'
+      ? [
+          `Relief "${plan.source}" on layer "${layerNameFor(project, plan.layerId)}" uses ` +
+            'cutter-dilated stationary samples, but the G1 interpolants between samples are not ' +
+            'a continuous swept-volume proof. Finishing rows are open serpentine cuts and ' +
+            'alternate direction rather than applying the layer Climb/Conventional setting. ' +
+            'Check the finishing preview before running.',
+        ]
+      : []),
   ]);
+}
+
+function mixedReliefLayerWarnings(project: Project): ReadonlyArray<string> {
+  return project.scene.layers.flatMap((layer) => {
+    if (!layer.output) return [];
+    const bound = project.scene.objects.filter((object) => sceneObjectUsesOperation(object, layer));
+    if (!bound.some((object) => object.kind === 'relief')) return [];
+    if (!bound.some((object) => object.kind !== 'relief')) return [];
+    return [
+      `Layer "${layer.name}" mixes relief and vector artwork. Relief depth comes from each ` +
+        'height map while vector depth comes from the layer CNC Depth setting; Job Review ' +
+        'shows their compiled motions together.',
+    ];
+  });
 }
 
 function oversizedReliefGridWarnings(project: Project, plan: CncReliefPlan): ReadonlyArray<string> {
@@ -180,16 +204,11 @@ function stepoverWarning(layerName: string, stepoverPercent: number): ReadonlyAr
   ) {
     return [];
   }
-  const effectiveStepover = Math.min(
-    RECOMMENDED_STEPOVER_MAX_PERCENT,
-    Math.max(RECOMMENDED_STEPOVER_MIN_PERCENT, stepoverPercent),
-  );
   return [
-    `Stored Stepover on layer "${layerName}" is ${format(stepoverPercent)}%, outside the established ` +
-      `${RECOMMENDED_STEPOVER_MIN_PERCENT}-${RECOMMENDED_STEPOVER_MAX_PERCENT}% shared-planner range. ` +
-      `Pocket, rest-machining, V-carve clearing, and relief roughing use ${format(
-        effectiveStepover,
-      )}%. The stored value remains in the project. Check the preview before running.`,
+    `Stored Stepover on layer "${layerName}" is ${format(stepoverPercent)}%, outside the ` +
+      `${RECOMMENDED_STEPOVER_MIN_PERCENT}-${RECOMMENDED_STEPOVER_MAX_PERCENT}% recommended range. ` +
+      'The planner uses this positive value as stored; it does not clamp it into that range. ' +
+      'Check the resulting route density in Preview before running.',
   ];
 }
 

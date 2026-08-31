@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateBox, type BoxPanel, type BoxSpec } from '../../core/box';
-import { createProject, operationIdsForObject } from '../../core/scene';
+import { createProject, DEFAULT_CNC_MACHINE_CONFIG, operationIdsForObject } from '../../core/scene';
 import { applyInsertBoxPanels } from './box-insert-mutation';
 
 const SPEC: BoxSpec = {
@@ -98,6 +98,14 @@ describe('applyInsertBoxPanels', () => {
     expect(result.undoStack).toEqual([slice.project]);
     expect(result.redoStack).toEqual([]);
     expect(result.dirty).toBe(true);
+  });
+
+  it('inserts CNC box parts as outside profiles so holes offset inward', () => {
+    const project = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
+    const result = applyInsertBoxPanels({ project, undoStack: [] }, generatedPanels());
+    if (result === null) throw new Error('expected insertion');
+
+    expect(result.project.scene.layers[0]?.cnc?.cutType).toBe('profile-outside');
   });
 
   it('does nothing for an empty panel list', () => {

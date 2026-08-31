@@ -11,6 +11,7 @@ import {
   bindSceneObjectToOperations,
   createArtworkOperation,
   IDENTITY_TRANSFORM,
+  DEFAULT_CNC_LAYER_SETTINGS,
   type Bounds,
   type ImportedSvg,
   type Polyline,
@@ -42,10 +43,23 @@ export function applyInsertBoxPanels(
   const firstSource = sourceObjects[0];
   if (firstSource === undefined) return null;
   const created = createArtworkOperation(s.project.scene, firstSource, { name: 'Box panels' });
+  const operation =
+    s.project.machine?.kind === 'cnc'
+      ? {
+          ...created.operation,
+          cnc: {
+            ...(created.operation.cnc ?? DEFAULT_CNC_LAYER_SETTINGS),
+            // Box outlines and their interior rings are part geometry. The
+            // profile-outside compiler grows outer boundaries and shrinks
+            // holes, preserving nominal panel and slot dimensions.
+            cutType: 'profile-outside' as const,
+          },
+        }
+      : created.operation;
   const objects = sourceObjects.map((object) =>
-    bindSceneObjectToOperations(object, [created.operation.id]),
+    bindSceneObjectToOperations(object, [operation.id]),
   );
-  let scene = addLayer(s.project.scene, created.operation);
+  let scene = addLayer(s.project.scene, operation);
   for (const object of objects) scene = addObject(scene, object);
   const [head, ...rest] = objects;
   if (head === undefined) return null;

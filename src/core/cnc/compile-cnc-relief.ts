@@ -26,6 +26,7 @@ import {
 } from '../relief/relief-materialization-failure';
 import {
   applyTransform,
+  DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
@@ -39,8 +40,9 @@ import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
 import { cncGroupProvenance } from './cnc-group-provenance';
 import { zPassArrayMaterializationError } from './depth-passes';
-import { parkFields } from './motion-polish';
+import { enforceCutDirection, parkFields } from './motion-polish';
 import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
+import { machineFrameHandedness } from './machine-frame-handedness';
 
 const MIN_FEED_MM_PER_MIN = 1;
 const ROUGHING_CELL_TOOL_FRACTION = 8;
@@ -282,6 +284,9 @@ function reliefLadderFor(
     reliefDepthMm: relief.reliefDepthMm,
     depthPerPassMm: settings.depthPerPassMm,
     stepoverPercent: settings.stepoverPercent,
+    ...(settings.finishAllowanceMm === undefined
+      ? {}
+      : { allowanceMm: settings.finishAllowanceMm }),
   });
   return {
     kind: 'compiled',
@@ -354,11 +359,22 @@ function appendReliefPasses(
   if (result.kind === 'relief-materialization-failed') return result;
   for (const pass of result.ladder.passes) {
     if (pass.kind !== 'contour') continue;
-    passes.push({
+    const mapped = {
       ...pass,
       polyline: pass.polyline.map((p) =>
         toMachineCoords(applyTransform(p, residualTransform), device),
       ),
+    };
+    const directed = enforceCutDirection(
+      [{ points: mapped.polyline, closed: mapped.closed }],
+      settings.cutDirection ?? DEFAULT_CNC_LAYER_SETTINGS.cutDirection ?? 'climb',
+      'pocket',
+      machineFrameHandedness(device.origin),
+    )[0];
+    if (directed === undefined) continue;
+    passes.push({
+      ...mapped,
+      polyline: directed.points,
     });
   }
   return {

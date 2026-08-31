@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import { computeJobBounds, frameBoundsSignature } from '../job';
+import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { scallopRowSpacingMm } from '../relief';
 import {
   createLayer,
@@ -152,6 +153,9 @@ describe('relief finishing compile (H.8)', () => {
     expect(finish.layerPrimaryToolId).toBe(DEFAULT_CNC_MACHINE_CONFIG.toolId);
     expect(finish.passes.length).toBeGreaterThan(0);
     expect(finish.passes.every((pass) => pass.kind === 'path3d')).toBe(true);
+    expect(
+      finish.passes.every((pass) => pass.kind === 'path3d' && pass.lateralFeed === 'z-rate-capped'),
+    ).toBe(true);
     for (const pass of finish.passes) {
       if (pass.kind !== 'path3d') continue;
       for (const point of pass.points) expect(point.z).toBeCloseTo(-0.1, 6);
@@ -187,6 +191,27 @@ describe('relief finishing compile (H.8)', () => {
         group.kind === 'cnc' ? group.cutType : '',
       ),
     ).toEqual(['relief-rough']);
+  });
+
+  it('uses the stored finish allowance for relief roughing', () => {
+    const legacy = compile({}).groups[0];
+    const exact = compile({ finishAllowanceMm: 0 }).groups[0];
+    expect(legacy?.kind).toBe('cnc');
+    expect(exact?.kind).toBe('cnc');
+    if (legacy?.kind !== 'cnc' || exact?.kind !== 'cnc') return;
+    expect(exact.passes).not.toEqual(legacy.passes);
+  });
+
+  it('applies climb versus conventional winding to relief waterline roughing', () => {
+    const area = (cutDirection: 'climb' | 'conventional'): number => {
+      const group = compile({ cutDirection }).groups[0];
+      if (group?.kind !== 'cnc') throw new Error('roughing group missing');
+      const contour = group.passes.find((pass) => pass.kind === 'contour');
+      if (contour?.kind !== 'contour') throw new Error('roughing contour missing');
+      return signedAreaMm2(contour.polyline);
+    };
+
+    expect(Math.sign(area('climb'))).toBe(-Math.sign(area('conventional')));
   });
 
   it.each([0.5, 2])(
@@ -260,8 +285,8 @@ describe('relief finishing compile (H.8)', () => {
 
     expect(points.length).toBeGreaterThan(0);
     expect(points.every((point) => Math.abs(point.x - 17) < 1e-9)).toBe(true);
-    expect(bounds?.minX).toBeCloseTo(17, 9);
-    expect(bounds?.maxX).toBeCloseTo(17, 9);
+    expect(bounds?.minX).toBeCloseTo(17 - 3.175 / 2, 9);
+    expect(bounds?.maxX).toBeCloseTo(17 + 3.175 / 2, 9);
     expect(compiledReliefArtifact(collapsed)).toEqual(compiledReliefArtifact(collapsed));
   });
 

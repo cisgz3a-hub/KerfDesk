@@ -20,9 +20,9 @@ export type BoxDraft = {
   readonly clearance: string;
   readonly partSpacing: string;
   readonly toolDiameter: string;
-  // CNC corner relief (dogbones). 'off' (default) = sharp finger corners; 'on'
-  // = bit-radius overcuts so tabs seat fully in a round-bit slot — opt in when
-  // a joint won't close. Ignored in laser mode (a kerf has no corner limit).
+  // CNC corner relief (dogbones). 'on' (the CNC default) adds bit-radius
+  // overcuts so tabs seat fully in a round-bit slot; 'off' explicitly requests
+  // sharp corners for a different downstream process. Ignored in laser mode.
   readonly relief: string;
   readonly dividersX: string;
   readonly dividersY: string;
@@ -74,7 +74,10 @@ export function defaultBoxDraft(machine: BoxMachineContext): BoxDraft {
     clearance: machine.kind === 'cnc' ? String(CNC_DEFAULT_CLEARANCE_MM) : '0',
     partSpacing: autoFit.partSpacing,
     toolDiameter: machine.kind === 'cnc' ? String(machine.toolDiameterMm) : '',
-    relief: 'off',
+    // A round CNC bit cannot cut the square internal seats required by the
+    // generated finger joints. Default to dogbones; the operator can still
+    // turn them off explicitly for a different downstream process.
+    relief: machine.kind === 'cnc' ? 'on' : 'off',
     dividersX: '0',
     dividersY: '0',
   };
@@ -154,14 +157,14 @@ export function parseBoxDraft(draft: BoxDraft, machine: BoxMachineContext): BoxD
 }
 
 export const BOX_FIELD_LABELS: Readonly<Record<BoxSpecField, string>> = {
-  width: 'Width',
-  depth: 'Depth',
-  height: 'Height',
+  width: 'Width (mm)',
+  depth: 'Depth (mm)',
+  height: 'Height (mm)',
   thickness: 'Material thickness (mm)',
-  fingerWidth: 'Finger width',
-  clearance: 'Clearance',
-  reliefTool: 'Relief tool diameter',
-  partSpacing: 'Part spacing',
+  fingerWidth: 'Finger width (mm)',
+  clearance: 'Clearance (mm)',
+  reliefTool: 'Relief tool diameter (mm)',
+  partSpacing: 'Part spacing (mm)',
   dividersX: 'Dividers across width',
   dividersY: 'Dividers across depth',
 };

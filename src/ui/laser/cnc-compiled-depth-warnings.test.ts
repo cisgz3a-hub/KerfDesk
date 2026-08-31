@@ -69,7 +69,7 @@ describe('compiled relief depth warnings', () => {
     ]);
   });
 
-  it('stays silent inside the stock and reaches the shared Save/Start warning surface', () => {
+  it('warns at the exact stock bottom and reaches the shared Save/Start warning surface', () => {
     expect(
       detectCompiledReliefDepthWarnings(
         compiledReliefLayerDepths({
@@ -77,7 +77,7 @@ describe('compiled relief depth warnings', () => {
         }),
         6.35,
       ),
-    ).toEqual([]);
+    ).toEqual([expect.stringContaining('reaches the configured stock bottom')]);
 
     const base = createProject();
     const project = {
