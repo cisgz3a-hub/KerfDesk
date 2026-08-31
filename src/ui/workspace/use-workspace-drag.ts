@@ -98,7 +98,10 @@ export function useDragMove(
       deps.setSelectionMarquee({ start: next.startScenePoint, end: next.startScenePoint });
     } else if (next.kind === 'measure') {
       deps.setMeasureDraft({ start: next.startScenePoint, end: next.startScenePoint });
-    } else if (next.kind !== 'pan') {
+    } else if (next.kind !== 'pan' && next.kind !== 'draw') {
+      // Draw drafts do not mutate the project. Their pointer-up commit owns
+      // one atomic history entry, so opening an interaction snapshot here
+      // leaves stale pendingUndo state after the shape has been inserted.
       deps.beginInteraction();
     }
     setDrag(next);

@@ -106,6 +106,19 @@ describe('useDragMove hook event pipeline', () => {
     );
   });
 
+  it('commits a drawn shape without leaving a live interaction snapshot', async () => {
+    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'rect' });
+    const { canvas } = await renderHarness();
+
+    await dispatchPointer(canvas, 'pointerdown', { clientX: 60, clientY: 60 });
+    await dispatchPointer(canvas, 'pointermove', { clientX: 100, clientY: 100 });
+    await dispatchPointer(canvas, 'pointerup', { clientX: 100, clientY: 100 });
+
+    expect(useStore.getState().project.scene.objects).toHaveLength(1);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+    expect(useStore.getState().pendingUndo).toBeNull();
+  });
+
   it('captures the pointer on drag start (C1)', async () => {
     const project = projectWithRectangle();
     useStore.getState().setProject(project);
