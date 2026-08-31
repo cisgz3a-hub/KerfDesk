@@ -5,32 +5,40 @@
 import type { SceneObject } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { useImageEditorStore } from '../image-editor/image-editor-store';
+import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
-import { importImageFile } from './import-image-action';
-import { pickPlatformImageFile } from './platform-image-files';
+import { runImagePickAction } from './image-pick-action';
 
 export function editImageAction(
   platform: PlatformAdapter,
   selected: SceneObject | null,
+  getProjectDocumentEpoch: () => number,
+  importSvgObject: (object: SceneObject, batchIndex?: number) => ImportOutcome,
   importRasterImage: (object: SceneObject) => void,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): () => void {
+  const documentEpoch = getProjectDocumentEpoch();
+  const documentIsCurrent = (): boolean => getProjectDocumentEpoch() === documentEpoch;
   return () => {
+    if (!documentIsCurrent()) return;
     if (selected?.kind === 'raster-image') {
       useImageEditorStore.getState().openEditor(selected);
       return;
     }
-    void pickPlatformImageFile(platform)
-      .then((file) => {
-        if (file === null) return null;
-        return importImageFile(file, importRasterImage, pushToast);
-      })
+    void runImagePickAction({
+      platform,
+      getProjectDocumentEpoch,
+      importSvgObject,
+      importRasterImage,
+      pushToast,
+    })
       .then((imported) => {
-        if (imported?.kind === 'raster-image') {
+        if (documentIsCurrent() && imported?.kind === 'raster-image') {
           useImageEditorStore.getState().openEditor(imported);
         }
       })
       .catch((err: unknown) => {
+        if (!documentIsCurrent()) return;
         const message = err instanceof Error ? err.message : String(err);
         pushToast(`Could not open an image to edit: ${message}`, 'error');
       });

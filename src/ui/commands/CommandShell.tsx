@@ -29,10 +29,10 @@ import { Toolbar } from '../common/Toolbar';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
 import { convertSelectedVectorsToBitmap } from './bitmap-conversion';
-import { importImageFile } from './import-image-action';
+import { runImagePickAction } from './image-pick-action';
 import { runMultiFileTrace, writeTraceSvgFileWithPlatform } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
-import { pickPlatformImageFile, pickPlatformImageFiles } from './platform-image-files';
+import { pickPlatformImageFiles } from './platform-image-files';
 import { ProjectNotesDialog } from './ProjectNotesDialog';
 import { selectedConvertibleVectors, selectedObjectIds } from './selection-command-state';
 import { UndoHistoryDialog } from './UndoHistoryDialog';
@@ -325,18 +325,17 @@ function useMultiFileTracePickHandler(): () => void {
 
 function useImagePickHandler(): () => void {
   const platform = usePlatform();
+  const importSvgObject = useStore((s) => s.importSvgObject);
   const importRasterImage = useStore((s) => s.importRasterImage);
   const pushToast = useToastStore((s) => s.pushToast);
-  return () => {
-    void pickPlatformImageFile(platform)
-      .then((file) => {
-        if (file === null) return;
-        return importImageFile(file, importRasterImage, pushToast);
-      })
-      .catch((err: unknown) => {
-        pushToast(`Could not choose image: ${errMsg(err)}`, 'error');
-      });
-  };
+  return () =>
+    void runImagePickAction({
+      platform,
+      getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+      importSvgObject,
+      importRasterImage,
+      pushToast,
+    });
 }
 
 async function pickAndRunMultiFileTrace(

@@ -22,7 +22,17 @@ export function SelectedSourceReimportControl(props: {
         className="lf-btn"
         title="Replace only this selected source-aware object; a fresh import always appends a new object."
         onClick={() =>
-          void handleReimportSelectedArtwork({ platform, target, reimportObject, pushToast })
+          void handleReimportSelectedArtwork({
+            platform,
+            target,
+            getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+            getTargetObject: () =>
+              useStore
+                .getState()
+                .project.scene.objects.find((candidate) => candidate.id === target.id),
+            reimportObject,
+            pushToast,
+          })
         }
       >
         Re-import selected source…

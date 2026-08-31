@@ -32,7 +32,7 @@ export async function dispatchImportFilesInOrder(
   actions: ImportDispatchActions,
   options: { readonly sourceLabel?: 'Drop' | 'Import' } = {},
 ): Promise<void> {
-  const owner = captureImportDocumentOwner(actions);
+  const owner = captureImportDocumentOwner(actions.getProjectDocumentEpoch);
   await dispatchOwnedImportFiles(files, actions, owner, options);
 }
 
@@ -104,7 +104,7 @@ export async function handleUnifiedArtworkImport(
   platform: PlatformAdapter,
   actions: ImportDispatchActions,
 ): Promise<void> {
-  const owner = captureImportDocumentOwner(actions);
+  const owner = captureImportDocumentOwner(actions.getProjectDocumentEpoch);
   const ownedActions = bindImportActionsToDocument(actions, owner);
   let handles: ReadonlyArray<FileHandle>;
   try {
@@ -134,16 +134,18 @@ export async function handleUnifiedArtworkImport(
   await dispatchOwnedImportFiles(files, actions, owner, {});
 }
 
-type ImportDocumentOwner = {
+export type ImportDocumentOwner = {
   readonly isCurrent: () => boolean;
 };
 
-function captureImportDocumentOwner(actions: ImportDispatchActions): ImportDocumentOwner {
-  const epoch = actions.getProjectDocumentEpoch();
-  return { isCurrent: () => actions.getProjectDocumentEpoch() === epoch };
+export function captureImportDocumentOwner(
+  getProjectDocumentEpoch: () => number,
+): ImportDocumentOwner {
+  const epoch = getProjectDocumentEpoch();
+  return { isCurrent: () => getProjectDocumentEpoch() === epoch };
 }
 
-function bindImportActionsToDocument(
+export function bindImportActionsToDocument(
   actions: ImportDispatchActions,
   owner: ImportDocumentOwner,
 ): ImportDispatchActions {

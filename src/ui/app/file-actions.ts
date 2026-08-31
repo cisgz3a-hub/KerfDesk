@@ -50,6 +50,11 @@ import {
   type ProjectOpenCompletionContext,
 } from './project-open-completion';
 import { claimProjectOpenRequest } from './project-open-request-owner';
+import {
+  bindImportActionsToDocument,
+  captureImportDocumentOwner,
+  type ImportDispatchActions,
+} from './import-dispatch';
 
 export {
   ordinaryGcodeSaveUsesPrebuiltDialog,
@@ -61,7 +66,11 @@ export async function handleImportDxf(
   platform: PlatformAdapter,
   importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
+  getProjectDocumentEpoch: () => number,
 ): Promise<void> {
+  const actions = vectorImportActions(importSvgObject, pushToast, getProjectDocumentEpoch);
+  const owner = captureImportDocumentOwner(getProjectDocumentEpoch);
+  const ownedActions = bindImportActionsToDocument(actions, owner);
   let files: ReadonlyArray<{
     readonly name: string;
     readonly size?: number;
@@ -71,17 +80,25 @@ export async function handleImportDxf(
   try {
     files = await platform.pickFilesForOpen({ accept: ['.dxf'], multiple: true });
   } catch (err) {
-    pushToast(`Could not import DXF: ${errorMessage(err)}`, 'error');
+    ownedActions.pushToast(`Could not import DXF: ${errorMessage(err)}`, 'error');
     return;
   }
-  await importDxfFiles(files, { importObject: importSvgObject, pushToast });
+  if (!owner.isCurrent()) return;
+  await importDxfFiles(files, {
+    importObject: ownedActions.importSvgObject,
+    pushToast: ownedActions.pushToast,
+  });
 }
 
 export async function handleImportSvg(
   platform: PlatformAdapter,
   importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
+  getProjectDocumentEpoch: () => number,
 ): Promise<void> {
+  const actions = vectorImportActions(importSvgObject, pushToast, getProjectDocumentEpoch);
+  const owner = captureImportDocumentOwner(getProjectDocumentEpoch);
+  const ownedActions = bindImportActionsToDocument(actions, owner);
   let files: ReadonlyArray<{
     readonly name: string;
     readonly size?: number;
@@ -91,10 +108,24 @@ export async function handleImportSvg(
   try {
     files = await platform.pickFilesForOpen({ accept: ['.svg'], multiple: true });
   } catch (err) {
-    pushToast(`Could not import SVG: ${errorMessage(err)}`, 'error');
+    ownedActions.pushToast(`Could not import SVG: ${errorMessage(err)}`, 'error');
     return;
   }
-  await importSvgFiles(files, importSvgObject, pushToast);
+  if (!owner.isCurrent()) return;
+  await importSvgFiles(files, ownedActions.importSvgObject, ownedActions.pushToast);
+}
+
+function vectorImportActions(
+  importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+  getProjectDocumentEpoch: () => number,
+): ImportDispatchActions {
+  return {
+    getProjectDocumentEpoch,
+    importSvgObject,
+    importRasterImage: () => undefined,
+    pushToast,
+  };
 }
 
 export type SaveGcodeCtx = {

@@ -55,6 +55,14 @@ export function shouldPageBackPng(file: File): boolean {
   return isPngCandidate(file) && file.size > PAGED_PNG_MIN_BYTES;
 }
 
+/** True when a portable sub-threshold PNG still needs the qualified worker
+ * because its encoded dimensions exceed the browser canvas decode boundary. */
+export async function shouldDecodeDimensionQualifiedPng(file: File): Promise<boolean> {
+  if (!isPngCandidate(file) || shouldPageBackPng(file)) return false;
+  const dimensions = await readPngHeaderDimensions(file);
+  return dimensions !== null && !embeddedCanvasSupportsImageDimensions(dimensions);
+}
+
 export async function tryDecodeQualifiedPng(
   file: File,
   options: QualifiedPngDecodeOptions = {},
@@ -73,9 +81,7 @@ export async function tryDecodeDimensionQualifiedPng(
   file: File,
   options: QualifiedPngDecodeOptions = {},
 ): Promise<EmbeddedQualifiedPngRaster | null> {
-  if (!isPngCandidate(file) || shouldPageBackPng(file)) return null;
-  const dimensions = await readPngHeaderDimensions(file);
-  if (dimensions === null || embeddedCanvasSupportsImageDimensions(dimensions)) return null;
+  if (!(await shouldDecodeDimensionQualifiedPng(file))) return null;
   const paged = await decodeQualifiedPngToPages(file, options);
   if (paged === null) return null;
   const repository = new IndexedDbPagedAssetRepository();

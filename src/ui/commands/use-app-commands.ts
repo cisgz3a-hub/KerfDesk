@@ -33,6 +33,7 @@ import type { AppCommandContext } from './command-types';
 import { selectedImageMaskPair } from './image-mask-command-state';
 import { traceSourceForTracedImage } from './image-command-actions';
 import { hasPreviewableContent } from './previewable-content';
+import { deleteSelection } from './selection-delete-action';
 import { handleImportHeightMaps } from '../app/height-map-import-action';
 import {
   selectedObject,
@@ -127,7 +128,14 @@ function appCommandContext(
     toggleCameraPanel: dialogs.toggleCameraPanel,
     ...railPanelCommandContext(dialogs, activeStreamer),
     hasRasterSelection: selected?.kind === 'raster-image',
-    editImage: editImageAction(platform, selected, app.importRasterImage, pushToast),
+    editImage: editImageAction(
+      platform,
+      selected,
+      () => useStore.getState().projectDocumentEpoch,
+      app.importSvgObject,
+      app.importRasterImage,
+      pushToast,
+    ),
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
     hasConvertibleSelection: selectedConvertibleVectors(app.project, selectedIds).length > 0,
     canConvertSelectionToPath: selectionHasUnlockedVectorObject(app.project, selectedIds),
@@ -242,13 +250,26 @@ function fileCommandContext(
         importRasterImage: app.importRasterImage,
         pushToast,
       }),
-    importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
-    importDxf: () => void handleImportDxf(platform, app.importSvgObject, pushToast),
+    importSvg: () =>
+      void handleImportSvg(
+        platform,
+        app.importSvgObject,
+        pushToast,
+        () => useStore.getState().projectDocumentEpoch,
+      ),
+    importDxf: () =>
+      void handleImportDxf(
+        platform,
+        app.importSvgObject,
+        pushToast,
+        () => useStore.getState().projectDocumentEpoch,
+      ),
     importImage: callbacks.requestImportImage,
     importHeightMap: () => {
       const current = useStore.getState();
       void handleImportHeightMaps(platform, {
         project: current.project,
+        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
         importObject: current.importSvgObject,
         pushToast,
       });
@@ -385,17 +406,4 @@ function saveProject(
     },
     forceDialog,
   );
-}
-
-function deleteSelection(): void {
-  const state = useStore.getState();
-  if (state.selectedPathNode !== null) {
-    state.deleteSelectedPathNodes();
-    return;
-  }
-  const ids = [
-    ...(state.selectedObjectId !== null ? [state.selectedObjectId] : []),
-    ...state.additionalSelectedIds,
-  ];
-  state.removeSceneObjects(ids);
 }

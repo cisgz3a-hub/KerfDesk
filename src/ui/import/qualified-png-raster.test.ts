@@ -21,6 +21,7 @@ vi.mock('../raster/luma-bitmap', () => ({ lumaToBase64: vi.fn(() => 'luma') }));
 
 import {
   PAGED_PNG_MIN_BYTES,
+  shouldDecodeDimensionQualifiedPng,
   shouldPageBackPng,
   tryDecodeDimensionQualifiedPng,
   tryDecodeQualifiedPng,
@@ -139,8 +140,17 @@ describe('tryDecodeQualifiedPng', () => {
   });
 
   it('leaves an embedded-safe compressed PNG on the ordinary portable route', async () => {
+    await expect(shouldDecodeDimensionQualifiedPng(compressedPngHeader(640, 480))).resolves.toBe(
+      false,
+    );
     await expect(tryDecodeDimensionQualifiedPng(compressedPngHeader(640, 480))).resolves.toBeNull();
     expect(worker.importPngOffThread).not.toHaveBeenCalled();
+  });
+
+  it('classifies a sub-threshold oversize edge as a qualified worker route', async () => {
+    await expect(shouldDecodeDimensionQualifiedPng(compressedPngHeader(20_000, 1))).resolves.toBe(
+      true,
+    );
   });
 
   it('fails closed after worker or staging infrastructure errors', async () => {

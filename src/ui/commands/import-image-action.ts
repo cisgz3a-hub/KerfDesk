@@ -16,6 +16,7 @@ import {
 import type { ImageDensity } from '../common/image-density';
 import { largeImportAdvisory } from '../app/import-size-advisory';
 import {
+  shouldDecodeDimensionQualifiedPng,
   shouldPageBackPng,
   tryDecodeDimensionQualifiedPng,
   tryDecodeQualifiedPng,
@@ -33,13 +34,17 @@ export async function importImageFile(
   // toolbar picker and drag-drop route through here.
   const advisory = largeImportAdvisory(file.name, file.size);
   if (advisory !== null) pushToast(advisory, 'warning');
-  // One routing decision for the whole import: it selects the storage
-  // representation and therefore whether worker-progress toasts apply at all.
-  const pageBacked = shouldPageBackPng(file);
-  const controls = pageBacked ? createPngImportControls(file.name, pushToast) : null;
+  let controls: PngImportControls | null = null;
   let rollback: (() => Promise<string | null>) | null = null;
   try {
-    const loaded = await loadImageSamples(file, pageBacked, controls?.options);
+    // Storage ownership and worker ownership are distinct. A compressed PNG
+    // can remain portable while still requiring the queued worker because its
+    // encoded edge exceeds the browser canvas boundary.
+    const pageBacked = shouldPageBackPng(file);
+    const dimensionQualified = !pageBacked && (await shouldDecodeDimensionQualifiedPng(file));
+    controls =
+      pageBacked || dimensionQualified ? createPngImportControls(file.name, pushToast) : null;
+    const loaded = await loadImageSamples(file, pageBacked, dimensionQualified, controls?.options);
     if (loaded.kind === 'embedded' && loaded.cleanupWarning !== undefined) {
       pushToast(loaded.cleanupWarning, 'warning');
     }
@@ -144,12 +149,13 @@ async function handleFailedImport(
 async function loadImageSamples(
   file: File,
   pageBacked: boolean,
+  dimensionQualified: boolean,
   options: PngImportControls['options'] | undefined,
 ): Promise<LoadedImageSamples> {
   if (pageBacked) {
     const qualified = await tryDecodeQualifiedPng(file, options);
     if (qualified !== null) return { kind: 'paged', ...qualified };
-  } else {
+  } else if (dimensionQualified) {
     const qualified = await tryDecodeDimensionQualifiedPng(file, options);
     if (qualified !== null) {
       return {

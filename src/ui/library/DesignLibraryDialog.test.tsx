@@ -1,10 +1,11 @@
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
+import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { DESIGN_LIBRARY } from './design-library';
 import { DesignLibraryDialog } from './DesignLibraryDialog';
@@ -16,21 +17,35 @@ import { DesignLibraryDialog } from './DesignLibraryDialog';
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-async function renderDialog(platformId?: PlatformAdapter['id']): Promise<HTMLDivElement> {
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((onResolve) => {
+    resolve = onResolve;
+  });
+  return { promise, resolve };
+}
+
+async function renderDialog(
+  platformId?: PlatformAdapter['id'],
+  strictMode = false,
+): Promise<HTMLDivElement> {
   host = document.createElement('div');
   document.body.appendChild(host);
   await act(async () => {
     root = createRoot(host as HTMLDivElement);
     const dialog = <DesignLibraryDialog />;
-    root.render(
+    const content =
       platformId === undefined ? (
         dialog
       ) : (
         <PlatformProvider adapter={{ id: platformId } as PlatformAdapter}>
           {dialog}
         </PlatformProvider>
-      ),
-    );
+      );
+    root.render(strictMode ? <StrictMode>{content}</StrictMode> : content);
   });
   return host;
 }
@@ -68,6 +83,7 @@ async function waitForObservation(
 
 beforeEach(() => {
   resetStore();
+  useToastStore.setState({ toasts: [] });
   useUiStore.setState({ modalDepth: 0, libraryDialogOpen: true });
 });
 
@@ -117,6 +133,93 @@ describe('DesignLibraryDialog', () => {
     expect(useUiStore.getState().modalDepth).toBe(0);
     expect(document.activeElement).toBe(opener);
     opener.remove();
+  });
+
+  it.each(['Close button', 'Escape'] as const)(
+    'silently abandons a deferred insertion after %s closes the dialog',
+    async (closeMethod) => {
+      const entry = DESIGN_LIBRARY.find((candidate) => candidate.id === 'laser-kerf-comb');
+      if (entry?.insert.kind !== 'svg') throw new Error('expected Kerf Comb SVG entry');
+      const loaded = deferred<string>();
+      const loadSpy = vi.spyOn(entry.insert, 'loadSvgText').mockReturnValueOnce(loaded.promise);
+      try {
+        const h = await renderDialog();
+        await setSearch(h, 'kerf');
+        const objectCount = useStore.getState().project.scene.objects.length;
+        await click(h.querySelector('button[aria-label="Add Kerf Comb to canvas"]'));
+
+        if (closeMethod === 'Close button') {
+          await click(h.querySelector('button[aria-label="Close Design Library"]'));
+        } else {
+          await act(async () => {
+            h.querySelector('[role="dialog"]')?.dispatchEvent(
+              new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+            );
+          });
+        }
+        expect(useUiStore.getState().libraryDialogOpen).toBe(false);
+
+        await act(async () => {
+          loaded.resolve(
+            '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L10 10" stroke="#000"/></svg>',
+          );
+          await loaded.promise;
+          await Promise.resolve();
+        });
+
+        expect(useStore.getState().project.scene.objects).toHaveLength(objectCount);
+        expect(useToastStore.getState().toasts).toEqual([]);
+      } finally {
+        loadSpy.mockRestore();
+      }
+    },
+  );
+
+  it('retains exact insertion ownership after a StrictMode close and reopen', async () => {
+    const h = await renderDialog(undefined, true);
+    await click(h.querySelector('button[aria-label="Close Design Library"]'));
+    await act(async () => useUiStore.getState().setLibraryDialogOpen(true));
+    await setSearch(h, 'kerf');
+    const objectCount = useStore.getState().project.scene.objects.length;
+
+    await click(h.querySelector('button[aria-label="Add Kerf Comb to canvas"]'));
+
+    expect(useStore.getState().project.scene.objects.length).toBeGreaterThan(objectCount);
+    expect(useUiStore.getState().libraryDialogOpen).toBe(false);
+  });
+
+  it('does not let an old deferred completion close a same-document reopened dialog', async () => {
+    const entry = DESIGN_LIBRARY.find((candidate) => candidate.id === 'laser-kerf-comb');
+    if (entry?.insert.kind !== 'svg') throw new Error('expected Kerf Comb SVG entry');
+    const loaded = deferred<string>();
+    const loadSpy = vi.spyOn(entry.insert, 'loadSvgText').mockReturnValueOnce(loaded.promise);
+    try {
+      const h = await renderDialog(undefined, true);
+      await setSearch(h, 'kerf');
+      const objectCount = useStore.getState().project.scene.objects.length;
+      await click(h.querySelector('button[aria-label="Add Kerf Comb to canvas"]'));
+      await click(h.querySelector('button[aria-label="Close Design Library"]'));
+      await act(async () => useUiStore.getState().setLibraryDialogOpen(true));
+      await setSearch(h, 'kerf');
+
+      await act(async () => {
+        loaded.resolve(
+          '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L10 10" stroke="#000"/></svg>',
+        );
+        await loaded.promise;
+        await Promise.resolve();
+      });
+
+      expect(useStore.getState().project.scene.objects).toHaveLength(objectCount);
+      expect(useToastStore.getState().toasts).toEqual([]);
+      expect(useUiStore.getState().libraryDialogOpen).toBe(true);
+
+      await click(h.querySelector('button[aria-label="Add Kerf Comb to canvas"]'));
+      expect(useStore.getState().project.scene.objects.length).toBeGreaterThan(objectCount);
+      expect(useUiStore.getState().libraryDialogOpen).toBe(false);
+    } finally {
+      loadSpy.mockRestore();
+    }
   });
 
   it('selects a card without inserting, then adds from exact provenance details', async () => {
