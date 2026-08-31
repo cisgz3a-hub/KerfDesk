@@ -56,10 +56,10 @@ export function findNoGoZoneCollisions(
     readonly defaultCutterRadiusMm?: number | undefined;
   } = {},
 ): ReadonlyArray<NoGoZoneCollision> {
+  const bedRect = boundsRect(bed);
   const activeZones = zones
     .filter((zone) => zone.enabled)
-    .map((zone) => ({ zone, rect: rectForZone(zone) }))
-    .filter(({ rect }) => rectsIntersect(rect, boundsRect(bed)));
+    .map((zone) => ({ zone, rect: rectForZone(zone) }));
   if (activeZones.length === 0) return [];
 
   const offset = options.motionOffset ?? { x: 0, y: 0 };
@@ -86,6 +86,7 @@ export function findNoGoZoneCollisions(
       stripped,
       motion,
       activeZones,
+      bedRect,
       index + 1,
       cutterRadiusMm,
     );
@@ -125,13 +126,18 @@ function appendCollision(
   line: string,
   motion: GcodeMotionMode,
   activeZones: ReadonlyArray<ActiveZone>,
+  bedRect: Rect,
   lineNumber: number,
   cutterRadiusMm: number,
 ): void {
   if (current === null) return;
-  const hit = activeZones.find(({ rect }) =>
-    motionIntersectsRect(current, next, line, motion, expandRect(rect, cutterRadiusMm)),
-  );
+  const hit = activeZones.find(({ rect }) => {
+    const cutterEnvelope = expandRect(rect, cutterRadiusMm);
+    return (
+      rectsIntersect(cutterEnvelope, bedRect) &&
+      motionIntersectsRect(current, next, line, motion, cutterEnvelope)
+    );
+  });
   if (hit !== undefined) {
     collisions.push({
       lineNumber,
