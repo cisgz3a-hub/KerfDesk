@@ -57,6 +57,7 @@ import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { useToastStore } from './toast-store';
 import type { TranscriptSource } from './laser-transcript';
 import { clearCncLiveCaps } from './detected-settings-action';
+import { createLaserStatusPollWriter } from './laser-status-poll-writer';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -410,6 +411,7 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
   const queuedQuery = refs.driver.commands.queuedStatusQuery;
   if (realtimeQuery === null && queuedQuery === null) return;
   let pollTick = 0;
+  const writeStatusPoll = createLaserStatusPollWriter(safeWrite);
   refs.pollHandle = setInterval(() => {
     pollTick++;
     const s = get();
@@ -429,7 +431,7 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     if (s.motionOperation?.cancelRequested === true) return;
     if (realtimeQuery !== null) {
       if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
-      void safeWrite(realtimeQuery).catch(() => undefined);
+      void writeStatusPoll(realtimeQuery);
       return;
     }
     // Queued status query (Marlin M114): it consumes planner space and emits
@@ -439,6 +441,6 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     // flight DOES poll — the post-job settle needs Idle reports to finish.
     if (queuedQuery === null) return;
     if (!canSendQueuedStatusQuery(s, refs, pollTick, IDLE_POLL_DIVISOR)) return;
-    void safeWrite(`${queuedQuery}\n`).catch(() => undefined);
+    void writeStatusPoll(`${queuedQuery}\n`);
   }, STATUS_POLL_MS);
 }
