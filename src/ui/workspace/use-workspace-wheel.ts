@@ -23,6 +23,7 @@ export function useWorkspaceWheelZoom(ref: React.RefObject<HTMLCanvasElement | n
     if (canvas === null) return undefined;
     const onWheel = (e: WheelEvent): void => {
       e.preventDefault();
+      if (e.deltaY === 0) return;
       const ui = useUiStore.getState();
       ui.closeWorkspaceContextBar();
       const cursorPx = clientToCanvasPx(e, canvas);
