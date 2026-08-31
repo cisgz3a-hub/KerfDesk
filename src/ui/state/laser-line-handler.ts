@@ -56,6 +56,7 @@ import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { pushLog } from './laser-store-helpers';
 import { appendSystemNotice } from './laser-system-notice';
 import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
+import { invalidateSettingsForMpgTakeover } from './laser-settings-mpg-takeover';
 
 export type { GetFn, HandlerRefs, SetFn } from './laser-line-shared';
 
@@ -70,6 +71,7 @@ export function handleLine(
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
   captureActiveWcsFromModalReport(set, line);
+  invalidateSettingsForMpgTakeover(set, refs, state, cls);
   publishDetectedSettings(set, get, refs, cls);
   // Marlin answers an operator-owned M115 with the same FIRMWARE_NAME line it
   // may emit as a spontaneous startup banner. Let the command owner consume
