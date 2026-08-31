@@ -3,7 +3,7 @@
 // scanner, so the glossary can never disagree with the parser about what a
 // word IS — only about how to describe it.
 
-import { scanGcodeWords, stripInlineComments } from '../../core/gcode';
+import { scanCompleteGcodeWords, stripInlineComments } from '../../core/gcode';
 
 export type WordExplanation = {
   /** The word as written, e.g. "G1" or "X12.5". */
@@ -78,7 +78,9 @@ const LETTERS: Readonly<Record<string, string>> = {
 export function explainLine(rawLine: string): ReadonlyArray<WordExplanation> {
   const stripped = stripInlineComments(rawLine);
   if (stripped === '' || stripped === '%') return [];
-  return scanGcodeWords(stripped).map((word) => ({
+  const words = scanCompleteGcodeWords(stripped);
+  if (words === null) return [];
+  return words.map((word) => ({
     text: `${word.letter}${word.value}`,
     meaning: explainWord(word.letter, word.value),
   }));

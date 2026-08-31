@@ -10,7 +10,7 @@ import {
   ijArcCenter,
   PROGRAM_PARSE_REASON,
   rArcGeometry,
-  scanGcodeWords,
+  scanCompleteGcodeWords,
   stripInlineComments,
 } from '../gcode';
 import { sampleArcPoints } from '../geometry';
@@ -162,10 +162,8 @@ function processLine(context: BuildContext, raw: string, line: number): number {
   if (stripped === '') return LINE_CATEGORY.comment;
   if (stripped === '%') return LINE_CATEGORY.marker;
   if (context.modal.ended) return LINE_CATEGORY.afterEnd;
-  const words = scanGcodeWords(stripped);
-  const consumed = words.reduce((sum, word) => sum + word.matchedLength, 0);
-  const nonSpace = stripped.replace(/\s+/g, '').length;
-  if (words.length === 0 || consumed < nonSpace * 0.5) return LINE_CATEGORY.junk;
+  const words = scanCompleteGcodeWords(stripped);
+  if (words === null || words.length === 0) return LINE_CATEGORY.junk;
   context.recognizedWords += words.length;
   const outcome = applyLineWords(context.modal, words, line, {
     countUnsupported: (word, atLine) => countUnsupported(context.unsupported, word, atLine),

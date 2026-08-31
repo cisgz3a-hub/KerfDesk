@@ -5,6 +5,7 @@
 export {
   GCODE_WORD_PATTERN,
   INCH_TO_MM,
+  scanCompleteGcodeWords,
   scanGcodeWords,
   stripInlineComments,
   type GcodeWordMatch,

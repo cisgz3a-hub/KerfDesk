@@ -41,4 +41,13 @@ describe('explainLine', () => {
     expect(words.map((word) => word.text)).toEqual(['G0', 'X1']);
     expect(words[0]?.meaning).toContain('Rapid');
   });
+
+  it('does not explain a numeric prefix from a malformed block as executable motion', () => {
+    expect(explainLine('G1 X10junk')).toEqual([]);
+  });
+
+  it('explains externally framed blocks without treating framing as motion words', () => {
+    expect(explainLine('/G1 X10').map((word) => word.text)).toEqual(['G1', 'X10']);
+    expect(explainLine('N2 G1 X20*23').map((word) => word.text)).toEqual(['N2', 'G1', 'X20']);
+  });
 });
