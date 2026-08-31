@@ -3,8 +3,9 @@
 // no canvas is needed), hue slider, hex and laser-centric K% ink fields,
 // current-vs-new preview. Commits on OK; Esc/Cancel closes without change.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PaintColor } from '../../core/image-edit';
+import { useDialogA11y } from '../common/use-dialog-a11y';
 import {
   hexToRgb,
   hsvToRgb,
@@ -25,6 +26,8 @@ export function ColorPickerDialog(props: {
   const [hsv, setHsv] = useState<HsvColor>(() => rgbToHsv(props.initial));
   const [hexDraft, setHexDraft] = useState(() => rgbToHex(props.initial));
   const rgb = hsvToRgb(hsv);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(dialogRef, props.onClose);
 
   // Keep the hex field following pad/slider moves (draft wins while typing).
   useEffect(() => {
@@ -33,13 +36,13 @@ export function ColorPickerDialog(props: {
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={props.title}
       style={backdropStyle}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') props.onClose();
-        if (e.key === 'Enter') props.onCommit(rgb);
+        if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) props.onCommit(rgb);
         e.stopPropagation();
       }}
     >

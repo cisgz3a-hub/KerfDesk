@@ -56,6 +56,17 @@ function isKerfCheckContextCurrent(input: {
 }
 
 describe('kerf-check context ownership', () => {
+  it('retains an unselected image mask dependency for selected-only output parity', () => {
+    const sourceProject = project();
+    const mask = sourceProject.scene.objects.find(
+      (candidate) => candidate.id === 'kerf-context-mask',
+    );
+    const context = kerfCheckContext(session(), sourceProject, selectedScope([OBJECT_ID]));
+
+    expect(mask).toBeDefined();
+    expect(context?.maskObject).toBe(mask);
+  });
+
   it('invalidates a result when its revision, document, or layer settings change', () => {
     const editor = session();
     const sourceProject = project();

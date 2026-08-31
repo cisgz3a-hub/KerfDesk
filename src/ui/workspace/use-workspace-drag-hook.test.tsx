@@ -237,6 +237,23 @@ describe('useDragMove hook event pipeline', () => {
     expect(useUiStore.getState()).toMatchObject({ panX: 8, panY: -5 });
   });
 
+  it('restores the exact starting pan and ends the drag on Escape', async () => {
+    useUiStore.setState({ panX: 8, panY: -5 });
+    const { canvas } = await renderHarness({ previewMode: true });
+
+    await dispatchPointer(canvas, 'pointerdown', { clientX: 60, clientY: 60, button: 1 });
+    await dispatchPointer(canvas, 'pointermove', { clientX: 100, clientY: 120, button: 1 });
+    expect(useUiStore.getState()).not.toMatchObject({ panX: 8, panY: -5 });
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+
+    expect(useUiStore.getState()).toMatchObject({ panX: 8, panY: -5 });
+    await dispatchPointer(canvas, 'pointermove', { clientX: 140, clientY: 160, button: 1 });
+    expect(useUiStore.getState()).toMatchObject({ panX: 8, panY: -5 });
+  });
+
   it('Esc cancels an in-progress move drag and rolls the object back (C4)', async () => {
     const project = projectWithRectangle();
     useStore.getState().setProject(project);

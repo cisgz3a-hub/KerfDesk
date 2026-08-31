@@ -41,6 +41,20 @@ describe('LayerRow activation accessibility', () => {
       await mounted.unmount();
     }
   });
+
+  it('does not activate when Show or Output label text is clicked', async () => {
+    const mounted = await mountRow();
+    try {
+      const labels = mounted.row.querySelectorAll<HTMLLabelElement>('label');
+      expect(labels).toHaveLength(2);
+      for (const label of labels) {
+        await act(async () => label.click());
+        expect(useUiStore.getState().activeLayerColor).toBeNull();
+      }
+    } finally {
+      await mounted.unmount();
+    }
+  });
 });
 
 async function mountRow(): Promise<{

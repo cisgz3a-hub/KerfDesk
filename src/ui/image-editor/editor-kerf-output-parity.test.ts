@@ -10,6 +10,7 @@ import {
   IDENTITY_TRANSFORM,
   type DitherAlgorithm,
   type Layer,
+  type OutputScope,
   type Project,
   type RasterImage,
   type SceneObject,
@@ -89,8 +90,12 @@ function fixture(options: FixtureOptions): {
   };
 }
 
-function outputParity(session: EditorSession, project: Project) {
-  const context = kerfCheckContext(session, project, DEFAULT_OUTPUT_SCOPE, DEFAULT_JOB_PLACEMENT);
+function outputParity(
+  session: EditorSession,
+  project: Project,
+  outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
+) {
+  const context = kerfCheckContext(session, project, outputScope, DEFAULT_JOB_PLACEMENT);
   if (context === null) throw new Error('Expected an Image-mode kerf context.');
   return computeKerfOutputParity({
     composite: compositeSession(session),
@@ -257,6 +262,28 @@ describe('computeKerfOutputParity', () => {
     });
     expect(outputParity(session, project)?.removedPixels).toBe(1);
     expect(outputParity(session, project)?.thickenCandidate).not.toBeNull();
+  });
+
+  it('honors an unselected mask dependency in selected-only output parity', () => {
+    const mask = createRectangle({
+      id: 'M1',
+      color: '#000000',
+      spec: { widthMm: 1, heightMm: 1, cornerRadiusMm: 0 },
+      transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 },
+    });
+    const { project, session } = fixture({
+      luma: [0, 0],
+      dither: 'threshold',
+      object: { imageMaskId: mask.id },
+      extraObjects: [mask],
+    });
+    const selectedOnly: OutputScope = {
+      cutSelectedGraphics: true,
+      useSelectionOrigin: false,
+      selectedObjectIds: ['R1'],
+    };
+
+    expect(outputParity(session, project, selectedOnly)?.removedPixels).toBe(1);
   });
 
   it('honors adjustments, power, pass-through, and row direction', () => {

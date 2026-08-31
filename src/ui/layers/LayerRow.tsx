@@ -30,9 +30,6 @@ export function LayerRow(props: {
       aria-label={`Operation ${props.layer.name}`}
       aria-current={active ? 'true' : undefined}
       style={rowStyle(props.layer.output, active)}
-      onClick={(event) => {
-        if (!isNestedControl(event.target, event.currentTarget)) activate();
-      }}
     >
       <OperationActivation
         layer={props.layer}
@@ -110,12 +107,6 @@ function OperationActivation(props: {
       </span>
     </button>
   );
-}
-
-function isNestedControl(target: EventTarget, row: HTMLElement): boolean {
-  if (!(target instanceof Element)) return false;
-  const control = target.closest('button,input,select,textarea,a[href],[contenteditable="true"]');
-  return control !== null && row.contains(control);
 }
 
 function operationSummary(layer: Layer, machineKind: 'laser' | 'cnc'): string {
