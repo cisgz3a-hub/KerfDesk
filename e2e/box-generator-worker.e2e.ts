@@ -61,6 +61,24 @@ test('Box Generator keeps flat and assembled previews available above 20,000 poi
   await expect(dialog).toHaveCount(0);
 });
 
+test('Box Generator inserts the ready CNC panel sheet from its primary action', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'CNC', exact: true }).click();
+  await runMenuCommand(page, 'Tools', 'Box Generator...');
+
+  const dialog = page.getByRole('dialog', { name: 'Box Generator' });
+  const generate = dialog.getByRole('button', { name: 'Generate', exact: true });
+  await expect(generate).toBeEnabled();
+  await generate.click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText('Objects: 6', { exact: true })).toBeVisible();
+  await expect(page.getByText('Inserted 6 box panels.', { exact: true })).toBeVisible();
+});
+
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {
   await page.getByText(family, { exact: true }).click();
   await page.getByRole('menuitem').filter({ hasText: command }).click();
