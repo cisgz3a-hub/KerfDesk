@@ -9,8 +9,15 @@
 // in. EMITTER_REVISION is a code constant HERE because it describes this
 // emitter's behavior, not the build environment.
 
-import type { DeviceProfile } from '../../core/devices';
+import {
+  resolveGrblDialect,
+  resolveMarlinDialect,
+  type ControllerKind,
+  type DeviceProfile,
+  type GcodeDialectId,
+} from '../../core/devices';
 import { sanitizeGcodeCommentValue } from '../../core/gcode-comments';
+import type { LaserJobPowerModeWords, LaserPowerModeWord } from '../../core/output';
 
 export type GcodeMetadata = {
   readonly appName: string;
@@ -34,9 +41,10 @@ export type GcodeMetadata = {
  * ADR-286's non-zero resolution of a text object's own glyphs, ADR-287's
  * flat-tip V-carve radial envelope, ADR-289's transformed-relief machine-space
  * cutter envelope, finish-only relief output when roughing has no passes, and
- * ADR-294's exact partial terminal-cell relief geometry.
+ * ADR-294's exact partial terminal-cell relief geometry, and ADR-313's laser
+ * dialect/raster representation plus fine-contour output reconciliation.
  */
-export const EMITTER_REVISION = 'adr-294-relief-partial-edge-grid';
+export const EMITTER_REVISION = 'adr-313-audit-output-parity-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
@@ -44,7 +52,13 @@ export const EMITTER_REVISION = 'adr-294-relief-partial-edge-grid';
 // $30 = spindle max RPM so `S<rpm>` maps 1:1 — and $32 must be 1 on a laser
 // but 0 on a router (laser mode alters M3 during rapids).
 export type GcodeHeaderAssumptions =
-  | { readonly kind: 'laser'; readonly maxPowerS: number }
+  | {
+      readonly kind: 'laser';
+      readonly maxPowerS: number;
+      readonly controllerKind: ControllerKind | undefined;
+      readonly dialectId: GcodeDialectId;
+      readonly effectivePowerModes: LaserJobPowerModeWords;
+    }
   | { readonly kind: 'cnc'; readonly spindleMaxRpm: number };
 
 export type GcodeProfileIdentity = Pick<
@@ -110,8 +124,45 @@ function assumptionLines(assumed: GcodeHeaderAssumptions): ReadonlyArray<string>
       '; safety: retract to safe Z before travels; spindle spin-up dwell before first plunge',
     ];
   }
+  const dialectSelection = { gcodeDialect: { dialectId: assumed.dialectId } };
+  if (assumed.controllerKind === 'marlin') {
+    const dialect = resolveMarlinDialect(dialectSelection);
+    return dialect.powerMode === 'fan'
+      ? [
+          `; output-dialect: ${dialect.id}`,
+          '; assumes: Marlin fan-mosfet power via M106/M107',
+          '; safety: laser-off travel is explicit M107; ordinary Scan Line runway <=5mm per side',
+        ]
+      : [
+          `; output-dialect: ${dialect.id}`,
+          `; assumes: Marlin LASER_FEATURE inline power, max S=${assumed.maxPowerS}`,
+          laserPowerSafetyLine(assumed.effectivePowerModes),
+        ];
+  }
+  const dialect = resolveGrblDialect(dialectSelection);
+  if (assumed.controllerKind === 'smoothieware') {
+    return [
+      `; output-dialect: ${dialect.id}`,
+      `; assumes: Smoothieware laser power scale max S=${assumed.maxPowerS}`,
+      laserPowerSafetyLine(assumed.effectivePowerModes),
+    ];
+  }
   return [
+    `; output-dialect: ${dialect.id}`,
     `; assumes: GRBL $30=${assumed.maxPowerS} (max S), $32=1 (laser mode)`,
-    '; safety: laser-off travel is explicit S0; ordinary Scan Line runway <=5mm per side; fill+raster dynamic power (M4)',
+    laserPowerSafetyLine(assumed.effectivePowerModes),
   ];
+}
+
+function laserPowerSafetyLine(effectivePowerModes: LaserJobPowerModeWords): string {
+  return (
+    '; safety: laser-off travel is explicit S0; ordinary Scan Line runway <=5mm per side; ' +
+    `power modes: cut ${powerModeWordsText(effectivePowerModes.cut)}, ` +
+    `fill ${powerModeWordsText(effectivePowerModes.fill)}, ` +
+    `raster ${powerModeWordsText(effectivePowerModes.raster)}`
+  );
+}
+
+function powerModeWordsText(words: ReadonlyArray<LaserPowerModeWord>): string {
+  return words.length === 0 ? 'none' : words.join('+');
 }

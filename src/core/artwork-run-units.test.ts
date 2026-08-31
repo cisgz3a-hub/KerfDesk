@@ -30,6 +30,17 @@ describe('artwork run units', () => {
     expect(moveArtworkRunUnitsToPosition(scene, new Set(['B']), 3)).toEqual(['A', 'C', 'D', 'B']);
     expect(moveArtworkRunUnitsToPosition(scene, new Set(['C']), 2)).toEqual(['B', 'A', 'C', 'D']);
   });
+
+  it('accumulates a large same-operation run without rebuilding prior members', () => {
+    const objects = Array.from({ length: 4_000 }, (_, index) => object(`O${index}`, ['shared']));
+
+    const units = artworkRunUnits(fixtureScene(objects));
+
+    expect(units).toHaveLength(1);
+    expect(units[0]?.objectIds).toHaveLength(objects.length);
+    expect(units[0]?.objectIds[0]).toBe('O0');
+    expect(units[0]?.objectIds.at(-1)).toBe('O3999');
+  });
 });
 
 function fixtureScene(objects: ReadonlyArray<SceneObject>): Scene {

@@ -1,7 +1,6 @@
 import type { Job } from '../job';
 import type { Vec2 } from '../scene';
 import {
-  backtrackContourPolyline,
   clearedContourDistanceMm,
   clearedTangentDistanceMm,
   isClearedDistanceSufficient,
@@ -10,6 +9,7 @@ import {
   requiredContourRunwayMm,
   type CncRunwayParameters,
 } from './cnc-contour-runway-geometry';
+import { buildRepresentedContourRunway } from './cnc-contour-runway-representation';
 import { recoveryEventsEqual, resolveContourSource } from './cnc-contour-runway-source';
 import {
   buildCncRecoveryEventManifest,
@@ -118,10 +118,24 @@ function buildPreview(
       availableClearedMm,
     };
   }
-  const runwayPolyline = backtrackContourPolyline(pass.polyline, segmentIndex, requiredRunwayMm);
-  const start = pass.polyline[segmentIndex];
-  const end = pass.polyline[segmentIndex + 1];
-  if (runwayPolyline === null || start === undefined || end === undefined) {
+  const represented = buildRepresentedContourRunway(
+    pass,
+    segmentIndex,
+    requiredRunwayMm,
+    availableClearedMm,
+  );
+  if (represented.kind === 'error') {
+    return {
+      kind: 'error',
+      reason: 'insufficient-cleared-distance',
+      requiredRunwayMm,
+      availableClearedMm: represented.representedAvailableMm,
+    };
+  }
+  const start = represented.runway.recoveryPolyline[represented.runway.uncertaintyStartPointIndex];
+  const end =
+    represented.runway.recoveryPolyline[represented.runway.uncertaintyStartPointIndex + 1];
+  if (start === undefined || end === undefined) {
     return { kind: 'error', reason: 'invalid-geometry' };
   }
   return {
@@ -130,8 +144,8 @@ function buildPreview(
     eventId: event.id,
     requiredRunwayMm,
     availableClearedMm,
-    runwayPolyline,
-    recoveryPolyline: [...runwayPolyline, ...pass.polyline.slice(segmentIndex + 1)],
+    runwayPolyline: represented.runway.runwayPolyline,
+    recoveryPolyline: represented.runway.recoveryPolyline,
     uncertaintySegment: [start, end],
     feedMmPerMin: group.feedMmPerMin,
     cutZMm: pass.zMm,

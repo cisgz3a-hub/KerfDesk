@@ -21,7 +21,9 @@ vi.mock('../raster/luma-bitmap', () => ({ lumaToBase64: vi.fn(() => 'luma') }));
 
 import {
   PAGED_PNG_MIN_BYTES,
+  shouldDecodeDimensionQualifiedPng,
   shouldPageBackPng,
+  tryDecodeDimensionQualifiedPng,
   tryDecodeQualifiedPng,
 } from './qualified-png-raster';
 
@@ -33,6 +35,46 @@ function pngFileOfSize(bytes: number, name = 'source.png'): File {
 }
 
 const largePng = (name = 'source.png'): File => pngFileOfSize(PAGED_PNG_MIN_BYTES + 1, name);
+
+function compressedPngHeader(width: number, height: number): File {
+  return new File(
+    [
+      Uint8Array.of(
+        0x89,
+        0x50,
+        0x4e,
+        0x47,
+        0x0d,
+        0x0a,
+        0x1a,
+        0x0a,
+        0x00,
+        0x00,
+        0x00,
+        0x0d,
+        0x49,
+        0x48,
+        0x44,
+        0x52,
+        (width >>> 24) & 0xff,
+        (width >>> 16) & 0xff,
+        (width >>> 8) & 0xff,
+        width & 0xff,
+        (height >>> 24) & 0xff,
+        (height >>> 16) & 0xff,
+        (height >>> 8) & 0xff,
+        height & 0xff,
+        0x08,
+        0x02,
+        0x00,
+        0x00,
+        0x00,
+      ),
+    ],
+    'compressed.png',
+    { type: 'image/png' },
+  );
+}
 
 describe('page-backing threshold', () => {
   it('leaves a PNG at or below the threshold on the portable embedded path', async () => {
@@ -60,6 +102,55 @@ describe('page-backing threshold', () => {
 describe('tryDecodeQualifiedPng', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('incrementally samples an oversize-edge compressed PNG but returns portable embedded luma', async () => {
+    const file = compressedPngHeader(20_000, 1);
+    expect(shouldPageBackPng(file)).toBe(false);
+    repository.readAssetChunks.mockReturnValue(
+      (async function* () {
+        yield Uint8Array.of(0, 127, 255);
+      })(),
+    );
+    worker.importPngOffThread.mockResolvedValue({
+      kind: 'ok',
+      width: 20_000,
+      height: 1,
+      sampledWidth: 3,
+      sampledHeight: 1,
+      density: null,
+      sourceManifest: { assetId: 'source-pages', mimeType: 'image/png', byteLength: file.size },
+      lumaManifest: { assetId: 'luma-pages', byteLength: 3 },
+      thumbnail: {
+        mimeType: 'image/bmp',
+        width: 3,
+        height: 1,
+        bytes: Uint8Array.of(0x42, 0x4d),
+      },
+    });
+
+    await expect(tryDecodeDimensionQualifiedPng(file)).resolves.toMatchObject({
+      natural: { width: 20_000, height: 1 },
+      sampled: { width: 3, height: 1 },
+      lumaBase64: 'AH//',
+      cleanupWarning: null,
+    });
+    expect(worker.importPngOffThread).toHaveBeenCalledOnce();
+    expect(repository.abort).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves an embedded-safe compressed PNG on the ordinary portable route', async () => {
+    await expect(shouldDecodeDimensionQualifiedPng(compressedPngHeader(640, 480))).resolves.toBe(
+      false,
+    );
+    await expect(tryDecodeDimensionQualifiedPng(compressedPngHeader(640, 480))).resolves.toBeNull();
+    expect(worker.importPngOffThread).not.toHaveBeenCalled();
+  });
+
+  it('classifies a sub-threshold oversize edge as a qualified worker route', async () => {
+    await expect(shouldDecodeDimensionQualifiedPng(compressedPngHeader(20_000, 1))).resolves.toBe(
+      true,
+    );
   });
 
   it('fails closed after worker or staging infrastructure errors', async () => {

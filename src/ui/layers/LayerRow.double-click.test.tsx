@@ -37,7 +37,7 @@ describe('compact operation row and selected operation settings', () => {
     const mounted = await mountPanel();
     try {
       const row = operationRow(mounted.host);
-      await click(row);
+      await click(operationActivation(row));
 
       expect(useUiStore.getState().activeLayerColor).toBe('#000000');
       expect(row.getAttribute('aria-current')).toBe('true');
@@ -130,6 +130,12 @@ function operationRow(host: HTMLElement): HTMLElement {
   const row = host.querySelector('section[aria-label="Operation O1"]');
   if (!(row instanceof HTMLElement)) throw new Error('operation row missing');
   return row;
+}
+
+function operationActivation(row: HTMLElement): HTMLButtonElement {
+  const button = row.querySelector('button[aria-label^="Activate operation"]');
+  if (!(button instanceof HTMLButtonElement)) throw new Error('operation activation missing');
+  return button;
 }
 
 function advancedButton(host: HTMLElement): HTMLButtonElement {

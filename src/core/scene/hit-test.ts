@@ -13,6 +13,7 @@ import { flattenColoredPathCurves } from './curve-path';
 import { resolveVisibleOperationForPath, sceneObjectHasVisibleLayerFromMap } from './visibility';
 
 const VECTOR_STROKE_HIT_TOLERANCE_MM = 2;
+const BOUNDS_EDGE_EPSILON_MM = 1e-9;
 
 export type HitTestObjectResult =
   | { readonly kind: 'none' }
@@ -52,7 +53,9 @@ export function hitTestObject(
   point: Vec2,
 ): HitTestObjectResult {
   const paths = vectorPathsFor(obj);
-  if (paths === null) return pointInObjectBBox(point, obj) ? { kind: 'primary' } : NO_HIT;
+  if (paths === null) {
+    return pointInTransformedObjectBounds(point, obj) ? { kind: 'primary' } : NO_HIT;
+  }
   if (!pointInExpandedObjectBBox(point, obj, VECTOR_STROKE_HIT_TOLERANCE_MM)) return NO_HIT;
   return hitVectorObject(layerByColor, obj, paths, point);
 }
@@ -81,7 +84,10 @@ function hitVectorObject(
       }
     }
   }
-  if (!hasPolyline && pointInObjectBBox(point, obj)) return { kind: 'primary' };
+  // An empty vector has no rendered geometry. Its persisted bounds are useful
+  // for diagnostics and repair, but must not turn invisible artwork into a
+  // direct-hit slab over real objects underneath.
+  if (!hasPolyline) return NO_HIT;
   return lineInteriorArea === null ? NO_HIT : { kind: 'line-interior', area: lineInteriorArea };
 }
 
@@ -180,8 +186,21 @@ function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
   return inside;
 }
 
-function pointInObjectBBox(point: Vec2, obj: SceneObject): boolean {
-  return pointInExpandedObjectBBox(point, obj, 0);
+function pointInTransformedObjectBounds(point: Vec2, obj: SceneObject): boolean {
+  const polygon = boundsCorners(obj.bounds).map((corner) => applyTransform(corner, obj.transform));
+  if (pointInPolygon(point, polygon)) return true;
+  for (let index = 0; index < polygon.length; index += 1) {
+    const start = polygon[index];
+    const end = polygon[(index + 1) % polygon.length];
+    if (
+      start !== undefined &&
+      end !== undefined &&
+      pointToSegmentDistance(point, start, end) <= BOUNDS_EDGE_EPSILON_MM
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function pointInExpandedObjectBBox(point: Vec2, obj: SceneObject, paddingMm: number): boolean {
@@ -212,13 +231,16 @@ export function transformedBBox(obj: SceneObject): AABB {
  * extents, which understates any rotated placement.
  */
 export function transformedBounds(bounds: Bounds, transform: Transform): AABB {
-  const corners: Vec2[] = [
+  return aabbOfCorners(boundsCorners(bounds), transform);
+}
+
+function boundsCorners(bounds: Bounds): ReadonlyArray<Vec2> {
+  return [
     { x: bounds.minX, y: bounds.minY },
     { x: bounds.maxX, y: bounds.minY },
     { x: bounds.maxX, y: bounds.maxY },
     { x: bounds.minX, y: bounds.maxY },
   ];
-  return aabbOfCorners(corners, transform);
 }
 
 export function combinedBBox(objects: ReadonlyArray<SceneObject>): AABB | null {

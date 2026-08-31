@@ -6,12 +6,7 @@
 // Original. Pure UI pieces live in dialog-parts.tsx.
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  IDENTITY_TRANSFORM,
-  type RasterImage,
-  type SceneObject,
-  type TracedImage,
-} from '../../core/scene';
+import { IDENTITY_TRANSFORM, type RasterImage, type TracedImage } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
   TRACE_PRESETS,
@@ -45,6 +40,13 @@ import { useBoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
 import { fairTracedPathsForCnc } from './cnc-trace-fairing';
 import { resolveTraceCommitResult } from './trace-commit-result';
+import {
+  captureTraceCommitOwner,
+  claimTraceCommitOwner,
+  closeOwnedTraceDialog,
+  sameTraceSourceContent,
+  type TraceCommitClaim,
+} from './trace-commit-ownership';
 import { commitTraceOutput } from './trace-output-commit';
 import { useTracePreview } from './use-trace-preview';
 
@@ -52,9 +54,14 @@ export function ImportImageDialog(): JSX.Element | null {
   const dialog = useUiStore((s) => s.imageDialog);
   if (dialog === null) return null;
   return dialog.replaceTraceId === undefined ? (
-    <DialogBody seed={dialog.source} />
+    <DialogBody key={dialog.requestToken} seed={dialog.source} requestToken={dialog.requestToken} />
   ) : (
-    <DialogBody seed={dialog.source} replaceTraceId={dialog.replaceTraceId} />
+    <DialogBody
+      key={dialog.requestToken}
+      seed={dialog.source}
+      requestToken={dialog.requestToken}
+      replaceTraceId={dialog.replaceTraceId}
+    />
   );
 }
 
@@ -77,11 +84,12 @@ type TraceCommitContext = {
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
   readonly close: () => void;
   readonly setBusy: (v: boolean) => void;
-  readonly getCurrentProject: () => ReturnType<typeof useStore.getState>['project'];
+  readonly claimOwner: () => TraceCommitClaim | null;
 };
 
 function DialogBody(props: {
   readonly seed: RasterImage;
+  readonly requestToken: string;
   readonly replaceTraceId?: string;
 }): JSX.Element {
   const { seed } = props;
@@ -141,8 +149,8 @@ function DialogBody(props: {
       traceExistingImage,
       commitRasterizedTrace,
       pushToast,
-      close,
       setBusy,
+      requestToken: props.requestToken,
     });
   };
 
@@ -216,6 +224,7 @@ function useTraceSourceFile(
   const [file, setFile] = useState<File | null>(null);
   useEffect(() => {
     let cancelled = false;
+    setFile(null);
     readRasterSourceFile(seed, seed.source)
       .then((f) => {
         if (!cancelled) setFile(f);
@@ -296,13 +305,15 @@ function submitTraceDialog(deps: {
   readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
   readonly commitRasterizedTrace: ReturnType<typeof useStore.getState>['commitRasterizedTrace'];
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
-  readonly close: () => void;
   readonly setBusy: (v: boolean) => void;
+  readonly requestToken: string;
 }): void {
   if (deps.file === null) {
     deps.pushToast('Image still loading — try again in a moment.', 'warning');
     return;
   }
+  const owner = captureTraceCommitOwner(deps.seed, deps.requestToken);
+  if (owner === null) return;
   const traceArgs = {
     file: deps.file,
     options: deps.options,
@@ -319,14 +330,15 @@ function submitTraceDialog(deps: {
     traceExistingImage: deps.traceExistingImage,
     commitRasterizedTrace: deps.commitRasterizedTrace,
     pushToast: deps.pushToast,
-    close: deps.close,
+    close: () => closeOwnedTraceDialog(owner.dialogRequestToken),
     setBusy: deps.setBusy,
-    getCurrentProject: () => useStore.getState().project,
+    claimOwner: () => claimTraceCommitOwner(owner),
   });
 }
 
 // Exported for testing the source-revalidation guard (P2-A).
 export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Promise<void> {
+  if (ctx.claimOwner() === null) return;
   ctx.setBusy(true);
   try {
     // Direct tracedata path: ColoredPath[] directly, skipping the
@@ -344,6 +356,8 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       ...args,
       sourceGrid: { width: args.seed.pixelWidth, height: args.seed.pixelHeight },
     });
+    const owner = ctx.claimOwner();
+    if (owner === null) return;
     if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,
@@ -369,13 +383,13 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       paths,
       ...(operationOverride === undefined ? {} : { operationOverride }),
     };
-    const liveProject = ctx.getCurrentProject();
-    const liveSource = liveProject.scene.objects.find((object) => object.id === args.seed.id);
+    const liveProject = owner.project;
+    const liveSource = owner.source;
     // P2-A: refuse to commit if the live source changed (content/grid) or was
     // removed while the modal was open. Vector output may follow a moved source;
     // raster output captures the complete live object and operation references
     // below, then checks them again after its asynchronous bitmap build.
-    if (!sameTraceSource(liveSource, args.seed)) {
+    if (!sameTraceSourceContent(liveSource, args.seed)) {
       ctx.pushToast(
         `The source image for ${args.seed.source} changed or was removed — re-open Trace to continue.`,
         'error',
@@ -397,30 +411,28 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
         : traced;
     if (await commitTraceOutput(args, ctx, commitTraced, liveProject)) ctx.close();
   } catch (err) {
-    ctx.pushToast(
-      `Could not trace ${args.seed.source}: ${err instanceof Error ? err.message : String(err)}`,
-      'error',
-    );
+    reportTraceCommitError(args.seed.source, err, ctx);
   } finally {
-    ctx.setBusy(false);
+    releaseTraceCommitBusy(ctx);
   }
+}
+
+function reportTraceCommitError(source: string, err: unknown, ctx: TraceCommitContext): void {
+  if (ctx.claimOwner() === null) return;
+  ctx.pushToast(
+    `Could not trace ${source}: ${err instanceof Error ? err.message : String(err)}`,
+    'error',
+  );
+}
+
+function releaseTraceCommitBusy(ctx: TraceCommitContext): void {
+  if (ctx.claimOwner() !== null) ctx.setBusy(false);
 }
 
 /** Compare trace-source content and pixel grids while intentionally allowing a
  * transform-only change. A true result narrows `live` to the current
  * `RasterImage`, whose transform can then register the trace at commit. */
-export function sameTraceSource(
-  live: SceneObject | undefined,
-  seed: RasterImage,
-): live is RasterImage {
-  return (
-    live !== undefined &&
-    live.kind === 'raster-image' &&
-    live.dataUrl === seed.dataUrl &&
-    live.pixelWidth === seed.pixelWidth &&
-    live.pixelHeight === seed.pixelHeight
-  );
-}
+export { sameTraceSourceContent as sameTraceSource } from './trace-commit-ownership';
 
 function operationOverrideForTrace(
   traceMode: TracedImage['traceMode'],

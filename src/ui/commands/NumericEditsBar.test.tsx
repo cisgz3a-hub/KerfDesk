@@ -109,6 +109,41 @@ describe('NumericEditsBar', () => {
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
 
+  it('marks a blank draft invalid without coercing it to zero or creating undo history', async () => {
+    installProject(25);
+    const container = await render(<NumericEditsBar />);
+    const x = input(container, 'Selection X position');
+
+    await act(async () => {
+      setInputValue(x, '');
+      x.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    });
+    expect(x.getAttribute('aria-invalid')).toBe('true');
+    await act(async () => {
+      x.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+
+    expect(useStore.getState().project.scene.objects[0]?.transform.x).toBe(25);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(input(container, 'Selection X position').value).toBe('25');
+  });
+
+  it('treats step as an editing increment rather than refusing finite values', async () => {
+    installProject(25);
+    const container = await render(<NumericEditsBar />);
+    const x = input(container, 'Selection X position');
+
+    await act(async () => {
+      setInputValue(x, '25.05');
+      x.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    });
+    expect(x.getAttribute('aria-invalid')).toBe('false');
+    await act(async () => Simulate.blur(x));
+
+    expect(useStore.getState().project.scene.objects[0]?.transform.x).toBe(25.05);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
   // Bug (2026-07-16): the aspect lock defaulted ON, so setting width silently
   // rescaled height (and vice versa) — the operator could never dial in an
   // independent W and H. LightBurn's W/H fields are independent unless the
@@ -165,7 +200,7 @@ function setInputValue(inputElement: HTMLInputElement, value: string): void {
   setter.call(inputElement, value);
 }
 
-function installProject(): void {
+function installProject(x = 0): void {
   useStore.setState({
     project: {
       ...createProject(),
@@ -178,7 +213,7 @@ function installProject(): void {
             spec: { kind: 'rect', widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
             color: '#000000',
             bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
-            transform: IDENTITY_TRANSFORM,
+            transform: { ...IDENTITY_TRANSFORM, x },
             paths: [],
           },
         ],

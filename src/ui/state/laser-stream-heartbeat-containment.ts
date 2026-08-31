@@ -22,6 +22,18 @@ type SafeWriteFn = (
   source?: TranscriptSource,
 ) => Promise<void>;
 
+export type StreamWriteOwner = {
+  readonly controllerSessionEpoch: number;
+  readonly streamerEpoch: number;
+};
+
+export function streamWriteOwner(state: LaserState): StreamWriteOwner {
+  return {
+    controllerSessionEpoch: state.controllerSessionEpoch,
+    streamerEpoch: state.streamerEpoch,
+  };
+}
+
 export function containLostStreamHeartbeat(
   set: SetFn,
   state: LaserState,
@@ -56,9 +68,11 @@ export function containActiveStreamWriteFailure(
   refs: object,
   safeWrite: SafeWriteFn,
   action: LaserSafetyAction,
+  owner: StreamWriteOwner,
 ): void {
   let shouldQuarantine = false;
   set((state) => {
+    if (!streamWriteOwnerMatches(state, owner)) return state;
     if (!isActiveJob(state.streamer) || state.streamer === null) return state;
     shouldQuarantine = true;
     return {
@@ -73,6 +87,13 @@ export function containActiveStreamWriteFailure(
   if (!isLiveRefs(refs) || !isGrblFamilyDriver(refs.driver)) return;
   const connection = refs.connection;
   if (connection !== null) void quarantineStreamFault(set, refs, safeWrite, connection);
+}
+
+function streamWriteOwnerMatches(state: LaserState, owner: StreamWriteOwner): boolean {
+  return (
+    state.controllerSessionEpoch === owner.controllerSessionEpoch &&
+    state.streamerEpoch === owner.streamerEpoch
+  );
 }
 
 async function quarantineStreamFault(

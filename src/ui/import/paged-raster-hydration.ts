@@ -87,7 +87,12 @@ async function hydrateLeasedImage(
       `Page-backed raster luma manifest has ${manifest.byteLength} bytes; expected ${asset.lumaByteLength}.`,
     );
   }
-  const lumaBase64 = await encodeAssetBase64(repository, asset.lumaAssetId, expectedBytes, signal);
+  const lumaBase64 = await encodePagedAssetBase64(
+    repository,
+    asset.lumaAssetId,
+    expectedBytes,
+    signal,
+  );
   const { imageAsset: _imageAsset, ...fields } = image;
   return {
     ...fields,
@@ -96,7 +101,8 @@ async function hydrateLeasedImage(
   };
 }
 
-async function encodeAssetBase64(
+/** Read one complete paged byte asset into the canonical base64 representation. */
+export async function encodePagedAssetBase64(
   repository: PagedRasterAssetReader,
   assetId: string,
   expectedBytes: number,

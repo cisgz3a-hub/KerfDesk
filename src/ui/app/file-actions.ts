@@ -19,18 +19,15 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import type { importLightBurnProject } from '../../io/lightburn';
 import { prepareProjectForPersistence } from '../../io/project';
 import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { requestSaveFilename } from '../state/save-filename-store';
 import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
-import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { handleSalvageExportProject } from './salvage-export';
 import type { ImportOutcome } from '../state/store';
-import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { ToastVariant } from '../state/toast-store';
-import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
 import {
   type JobPlacementSettings,
   type MachinePlacementSnapshot,
@@ -46,7 +43,18 @@ import { parseOpenedProjectFile, type OpenProjectFile } from './project-open-par
 import { importSvgFiles } from './svg-import-action';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { saveGcodePlacement, type PrebuiltGcodeSave } from './transactional-gcode-save';
-import { describeOpenResult, errorMessage, suggestedGcodeName } from './file-action-formatters';
+import { errorMessage, suggestedGcodeName } from './file-action-formatters';
+import {
+  completeLightBurnProjectOpen,
+  completeNativeProjectOpen,
+  type ProjectOpenCompletionContext,
+} from './project-open-completion';
+import { claimProjectOpenRequest } from './project-open-request-owner';
+import {
+  bindImportActionsToDocument,
+  captureImportDocumentOwner,
+  type ImportDispatchActions,
+} from './import-dispatch';
 
 export {
   ordinaryGcodeSaveUsesPrebuiltDialog,
@@ -58,7 +66,11 @@ export async function handleImportDxf(
   platform: PlatformAdapter,
   importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
+  getProjectDocumentEpoch: () => number,
 ): Promise<void> {
+  const actions = vectorImportActions(importSvgObject, pushToast, getProjectDocumentEpoch);
+  const owner = captureImportDocumentOwner(getProjectDocumentEpoch);
+  const ownedActions = bindImportActionsToDocument(actions, owner);
   let files: ReadonlyArray<{
     readonly name: string;
     readonly size?: number;
@@ -68,17 +80,25 @@ export async function handleImportDxf(
   try {
     files = await platform.pickFilesForOpen({ accept: ['.dxf'], multiple: true });
   } catch (err) {
-    pushToast(`Could not import DXF: ${errorMessage(err)}`, 'error');
+    ownedActions.pushToast(`Could not import DXF: ${errorMessage(err)}`, 'error');
     return;
   }
-  await importDxfFiles(files, { importObject: importSvgObject, pushToast });
+  if (!owner.isCurrent()) return;
+  await importDxfFiles(files, {
+    importObject: ownedActions.importSvgObject,
+    pushToast: ownedActions.pushToast,
+  });
 }
 
 export async function handleImportSvg(
   platform: PlatformAdapter,
   importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
+  getProjectDocumentEpoch: () => number,
 ): Promise<void> {
+  const actions = vectorImportActions(importSvgObject, pushToast, getProjectDocumentEpoch);
+  const owner = captureImportDocumentOwner(getProjectDocumentEpoch);
+  const ownedActions = bindImportActionsToDocument(actions, owner);
   let files: ReadonlyArray<{
     readonly name: string;
     readonly size?: number;
@@ -88,10 +108,24 @@ export async function handleImportSvg(
   try {
     files = await platform.pickFilesForOpen({ accept: ['.svg'], multiple: true });
   } catch (err) {
-    pushToast(`Could not import SVG: ${errorMessage(err)}`, 'error');
+    ownedActions.pushToast(`Could not import SVG: ${errorMessage(err)}`, 'error');
     return;
   }
-  await importSvgFiles(files, importSvgObject, pushToast);
+  if (!owner.isCurrent()) return;
+  await importSvgFiles(files, ownedActions.importSvgObject, ownedActions.pushToast);
+}
+
+function vectorImportActions(
+  importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+  getProjectDocumentEpoch: () => number,
+): ImportDispatchActions {
+  return {
+    getProjectDocumentEpoch,
+    importSvgObject,
+    importRasterImage: () => undefined,
+    pushToast,
+  };
 }
 
 export type SaveGcodeCtx = {
@@ -368,14 +402,29 @@ async function offerSalvageExport(ctx: SaveProjectCtx): Promise<void> {
   });
 }
 
-export type OpenProjectCtx = {
+export type OpenProjectCtx = ProjectOpenCompletionContext & {
   readonly platform: PlatformAdapter;
-  readonly setProject: (p: Project) => ProjectMachineCapabilityLoadResult;
-  readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
-  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly claimProjectOpenRequest: () => number;
+  readonly getProjectOpenRequestEpoch: () => number;
+  readonly getProjectDocumentEpoch: () => number;
 };
 
 export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
+  const owner = claimProjectOpenRequest(
+    ctx.pushToast,
+    ctx.claimProjectOpenRequest,
+    ctx.getProjectOpenRequestEpoch,
+    ctx.getProjectDocumentEpoch,
+  );
+  const ownedCtx: OpenProjectCtx = {
+    ...ctx,
+    setProject: (project) => {
+      const result = ctx.setProject(project);
+      owner.adoptCurrentDocument();
+      return result;
+    },
+    pushToast: owner.pushToast,
+  };
   let files: ReadonlyArray<OpenProjectFile>;
   try {
     files = await ctx.platform.pickFilesForOpen({
@@ -383,27 +432,29 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
       multiple: false,
     });
   } catch (err) {
-    ctx.pushToast(`Could not open project: ${errorMessage(err)}`, 'error');
+    ownedCtx.pushToast(`Could not open project: ${errorMessage(err)}`, 'error');
     return;
   }
+  if (!owner.isCurrent()) return;
   const file = files[0];
   if (file === undefined) return;
   const sizeAdvisory = importSourceSizeAdvisory(
     file,
     /\.lbrn2?$/i.test(file.name) ? 'lightburn-project' : 'native-project',
   );
-  if (sizeAdvisory !== null) ctx.pushToast(sizeAdvisory, 'warning');
-  const controls = createImportWorkerControls(file.name, ctx.pushToast);
+  if (sizeAdvisory !== null) ownedCtx.pushToast(sizeAdvisory, 'warning');
+  const controls = createImportWorkerControls(file.name, ownedCtx.pushToast);
   let result: ReturnType<typeof deserializeProject>;
   try {
-    const parsed = await parseOpenedProjectFile(file, controls.options, ctx.pushToast);
+    const parsed = await parseOpenedProjectFile(file, controls.options, ownedCtx.pushToast);
+    if (!owner.isCurrent()) return;
     if (parsed.kind === 'lightburn') {
-      openLightBurnMigration(ctx, file.name, parsed.result);
+      completeLightBurnProjectOpen(ownedCtx, file.name, parsed.result);
       return;
     }
     result = parsed.result;
   } catch (err) {
-    ctx.pushToast(
+    ownedCtx.pushToast(
       isImportCancellation(err)
         ? `${file.name}: open cancelled.`
         : `Could not open ${file.name}: ${errorMessage(err)}`,
@@ -413,63 +464,6 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   } finally {
     controls.dispose();
   }
-  if (result.kind === 'ok') {
-    const loadResult = ctx.setProject(result.project);
-    markCapabilityAwareLoad(ctx, file.name, loadResult);
-    // Opening a real .lf2 makes any autosaved snapshot stale.
-    clearAutosaveAfterFileHandoff(ctx.pushToast);
-    if (result.migratedFrom !== undefined) {
-      ctx.pushToast(`Opened ${file.name} — migrated from schema v${result.migratedFrom}`, 'info');
-    } else {
-      ctx.pushToast(`Opened ${file.name}`, 'success');
-    }
-    reportMachineCapabilityRepair(loadResult, ctx.pushToast);
-    return;
-  }
-  if (result.kind === 'schema-too-new') {
-    jobAwareAlert(
-      `This project was saved with a newer KerfDesk (schemaVersion ${result.sawVersion}). Update the app to open it.`,
-    );
-    return;
-  }
-  ctx.pushToast(`Could not open ${file.name}: ${describeOpenResult(result)}`, 'error');
-}
-
-function openLightBurnMigration(
-  ctx: OpenProjectCtx,
-  fileName: string,
-  result: ReturnType<typeof importLightBurnProject>,
-): void {
-  if (!result.ok) {
-    ctx.pushToast(`Could not import ${fileName}: ${result.reason}`, 'error');
-    return;
-  }
-  const loadResult = ctx.setProject(result.project);
-  ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'), { dirty: true });
-  clearAutosaveAfterFileHandoff(ctx.pushToast);
-  const unsupported = result.report.unsupportedShapeTypes.length;
-  const warnings = result.report.warnings.length;
-  ctx.pushToast(
-    `Imported ${fileName}: ${result.report.importedObjects} objects, ${result.report.importedLayers} layers${unsupported + warnings === 0 ? '' : `, ${unsupported + warnings} warning(s)`}. Save as .lf2 to keep changes.`,
-    unsupported + warnings === 0 ? 'success' : 'warning',
-  );
-  reportMachineCapabilityRepair(loadResult, ctx.pushToast);
-}
-
-function reportMachineCapabilityRepair(
-  result: ProjectMachineCapabilityLoadResult,
-  pushToast: OpenProjectCtx['pushToast'],
-): void {
-  if (result.kind !== 'capability-warning') return;
-  pushToast(loadedMachineCapabilityWarningMessage(result.activeKind), 'warning');
-}
-
-function markCapabilityAwareLoad(
-  ctx: OpenProjectCtx,
-  filename: string,
-  result: ProjectMachineCapabilityLoadResult,
-): void {
-  if (result.projectBedReconciled === true) {
-    ctx.markLoaded(filename, { dirty: true });
-  } else ctx.markLoaded(filename);
+  if (!owner.isCurrent()) return;
+  completeNativeProjectOpen(ownedCtx, file.name, result);
 }

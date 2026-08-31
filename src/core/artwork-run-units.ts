@@ -7,9 +7,15 @@ export type ArtworkRunUnit = {
   readonly operationIds: ReadonlyArray<string>;
 };
 
+type MutableArtworkRunUnit = {
+  readonly key: string;
+  readonly objectIds: string[];
+  readonly operationIds: ReadonlyArray<string>;
+};
+
 /** Groups artwork only when every member has the same complete operation set. */
 export function artworkRunUnits(scene: Scene): ReadonlyArray<ArtworkRunUnit> {
-  const units: ArtworkRunUnit[] = [];
+  const units: MutableArtworkRunUnit[] = [];
   const byOperationSet = new Map<string, number>();
   for (const object of orderedArtworkObjects(scene)) {
     const operationIds = operationIdsForObject(object, scene.layers);
@@ -23,9 +29,9 @@ export function artworkRunUnits(scene: Scene): ReadonlyArray<ArtworkRunUnit> {
     }
     const existing = units[existingIndex];
     if (existing === undefined) continue;
-    units[existingIndex] = { ...existing, objectIds: [...existing.objectIds, object.id] };
+    existing.objectIds.push(object.id);
   }
-  return units;
+  return units.map((unit) => ({ ...unit, objectIds: [...unit.objectIds] }));
 }
 
 export function artworkRunUnitForObject(scene: Scene, objectId: string): ArtworkRunUnit | null {

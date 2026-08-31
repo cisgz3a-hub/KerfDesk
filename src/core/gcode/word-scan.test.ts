@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scanGcodeWords, stripInlineComments } from './word-scan';
+import { scanCompleteGcodeWords, scanGcodeWords, stripInlineComments } from './word-scan';
 
 describe('scanGcodeWords', () => {
   it('scans letters, signed values, and spacing variants', () => {
@@ -19,6 +19,21 @@ describe('scanGcodeWords', () => {
 
   it('returns empty for wordless text', () => {
     expect(scanGcodeWords('%')).toEqual([]);
+  });
+});
+
+describe('scanCompleteGcodeWords', () => {
+  it('accepts compact and spaced complete words', () => {
+    expect(scanCompleteGcodeWords('G1X5 Y -2.5')).toEqual(scanGcodeWords('G1X5 Y -2.5'));
+  });
+
+  it('does not prefix-coerce a malformed numeric word', () => {
+    expect(scanCompleteGcodeWords('G1 X10junk')).toBeNull();
+  });
+
+  it('accepts block-delete and line-number/checksum framing', () => {
+    expect(scanCompleteGcodeWords('/G1 X10')).toEqual(scanGcodeWords('G1 X10'));
+    expect(scanCompleteGcodeWords('N1 G1 X10*23')).toEqual(scanGcodeWords('N1 G1 X10'));
   });
 });
 

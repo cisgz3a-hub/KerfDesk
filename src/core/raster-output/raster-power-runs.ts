@@ -28,7 +28,7 @@ export type RasterSweepRunsForPixelRunInput = {
 };
 
 /** Split an inclusive raster span whenever its exact S value changes. */
-export function rasterPixelRuns(row: Uint16Array, span: RasterPixelSpan): RasterPixelRun[] {
+export function rasterPixelRuns(row: RasterPowerValues, span: RasterPixelSpan): RasterPixelRun[] {
   const runs: RasterPixelRun[] = [];
   let firstX = span.firstX;
   let s = row[firstX] ?? 0;
@@ -92,3 +92,4 @@ function survivingBurnEdges(
   const shouldSurvive = isReverse ? burnStartX > burnEndX : burnStartX < burnEndX;
   return shouldSurvive ? { burnStartX, burnEndX } : null;
 }
+import type { RasterPowerValues } from '../raster/raster-power-values';

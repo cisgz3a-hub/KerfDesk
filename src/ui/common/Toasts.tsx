@@ -8,21 +8,45 @@ export function Toasts(): JSX.Element {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismissToast);
   return (
-    <div style={containerStyle} aria-live="polite" aria-atomic="false">
-      {toasts.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          onClick={() => dismiss(t.id)}
-          style={{ ...toastStyle, ...variantStyle(t.variant) }}
-          aria-label={`Dismiss notification: ${t.message}`}
-          title={`Dismiss notification: ${t.message}`}
-        >
-          {t.message}
-        </button>
-      ))}
+    <div
+      style={containerStyle}
+      role="region"
+      aria-label="Notifications"
+      aria-live="polite"
+      aria-atomic="false"
+      aria-relevant="additions"
+    >
+      {toasts.map((toast) => {
+        const variantLabel = toastVariantLabel(toast.variant);
+        return (
+          <button
+            key={toast.id}
+            type="button"
+            onClick={() => dismiss(toast.id)}
+            style={{ ...toastStyle, ...variantStyle(toast.variant) }}
+            aria-label={`Dismiss ${variantLabel.toLowerCase()} notification: ${toast.message}`}
+            title={`Dismiss ${variantLabel.toLowerCase()} notification: ${toast.message}`}
+          >
+            <strong>{variantLabel}: </strong>
+            {toast.message}
+          </button>
+        );
+      })}
     </div>
   );
+}
+
+function toastVariantLabel(variant: ToastVariant): string {
+  switch (variant) {
+    case 'success':
+      return 'Success';
+    case 'warning':
+      return 'Warning';
+    case 'error':
+      return 'Error';
+    case 'info':
+      return 'Info';
+  }
 }
 
 function variantStyle(variant: ToastVariant): React.CSSProperties {

@@ -3,6 +3,8 @@
 // (Canvas Size). Physical mm size never changes on Image Size — only pixel
 // density — and the note says so.
 
+import { useRef } from 'react';
+import { useDialogA11y } from '../common/use-dialog-a11y';
 import type { CanvasAnchor } from './editor-session-resize';
 import { useImageEditorStore } from './image-editor-store';
 import { useResizeDialogStore, type ResizeDialog } from './resize-dialog-store';
@@ -20,15 +22,17 @@ function ResizeBody(props: { readonly dialog: ResizeDialog }): JSX.Element {
   const { dialog } = props;
   const store = useResizeDialogStore.getState();
   const title = dialog.kind === 'image-size' ? 'Image Size' : 'Canvas Size';
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(dialogRef, store.cancel);
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={title}
       style={backdropStyle}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') store.cancel();
-        if (e.key === 'Enter') store.commit();
+        if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) store.commit();
         e.stopPropagation();
       }}
     >

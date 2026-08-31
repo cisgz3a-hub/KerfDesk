@@ -57,7 +57,10 @@ import {
   liveCanvasStartPatch,
 } from './live-canvas-run';
 import { runConfirmedPauseJob, runConfirmedResumeJob } from './laser-job-pause-resume';
-import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
+import {
+  containActiveStreamWriteFailure,
+  streamWriteOwner,
+} from './laser-stream-heartbeat-containment';
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
 import { originUnknownAfterControllerReset } from './laser-status-line';
 import { refreshLaserLiveStartState } from './laser-live-start-readiness';
@@ -145,6 +148,7 @@ async function runStartJob(
     const isImmediateToolChange = entersHoldNow && stepped.toSend.length === 0;
     set((state) => ({
       streamer: stepped.state,
+      streamerEpoch: state.streamerEpoch + 1,
       activeRunId: options.runId ?? null,
       ...liveCanvasStartPatch(
         options.canvasPlan,
@@ -160,12 +164,13 @@ async function runStartJob(
       pendingToolId: entersHoldNow ? (toolIds[0] ?? null) : null,
       ...toolChangeEntryPatch(state, entersHoldNow),
     }));
+    const writeOwner = streamWriteOwner(get());
     if (stepped.toSend.length === 0) return;
     try {
       await safeWrite(stepped.toSend, 'start');
       set((state) => liveCanvasExecutionAcceptedPatch(state));
     } catch (error) {
-      containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start');
+      containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start', writeOwner);
       // The first transport write did not resolve as accepted, so the staged
       // run must not replace an older recovery capsule. Keep the fail-dark
       // errored streamer and safety notice, but release only this run's
@@ -431,6 +436,7 @@ async function runContinueToolChange(
     };
   });
   if (toSend.length > 0) {
+    const writeOwner = streamWriteOwner(get());
     try {
       await safeWrite(toSend, 'resume');
       const mpgBlock = mpgCommandBlockMessage(get());
@@ -440,7 +446,7 @@ async function runContinueToolChange(
       }
       set((state) => liveCanvasExecutionAcceptedPatch(state));
     } catch (err) {
-      containActiveStreamWriteFailure(set, refs, safeWrite, 'resume');
+      containActiveStreamWriteFailure(set, refs, safeWrite, 'resume', writeOwner);
       throw err;
     }
   }

@@ -126,6 +126,18 @@ describe('parseSvg — happy path', () => {
       expect(points[points.length - 1]?.x).toBeCloseTo(25.4);
     });
 
+    it('converts absolute units on child geometry through the same 96 DPI user space', () => {
+      const result = parseSvg(
+        args(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96">
+          <line x1="0" y1="0" x2="1in" y2="25.4mm" stroke="#000"/>
+        </svg>`),
+      );
+
+      const points = result.object?.paths[0]?.polylines[0]?.points ?? [];
+      expect(points[1]?.x).toBeCloseTo(25.4, 12);
+      expect(points[1]?.y).toBeCloseTo(25.4, 12);
+    });
+
     it('keeps the 1-user-unit = 1 mm assumption for viewBox-only files', () => {
       const result = parseSvg(
         args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">

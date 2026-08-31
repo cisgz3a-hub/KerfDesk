@@ -28,6 +28,7 @@ function makeLaserStateFields() {
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
+    streamerEpoch: 0,
     pauseResumeTransition: null,
     activeRunId: null,
     activeJobMachineKind: null,

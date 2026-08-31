@@ -13,6 +13,7 @@ export function resetStore(): void {
   useStore.setState({
     project: createProject(),
     projectDocumentEpoch: 0,
+    projectOpenRequestEpoch: 0,
     probeSetupEpoch: 0,
     selectedObjectId: null,
     selectedPathNode: null,

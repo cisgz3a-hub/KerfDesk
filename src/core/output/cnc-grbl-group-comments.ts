@@ -1,6 +1,6 @@
 import { sanitizeGcodeCommentValue } from '../gcode-comments';
 import type { CncGroup, CncPath3dPass } from '../job';
-import { cncGroupMaximumDepthMm } from '../job/job';
+import { cncGroupMaximumDepthMm } from '../cnc/cnc-group-maximum-depth';
 import { fmt, fmtFeed } from './cnc-grbl-emit-head';
 
 const LABEL_BYTES = 48;

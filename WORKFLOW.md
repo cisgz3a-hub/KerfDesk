@@ -165,10 +165,10 @@
 
 ---
 
-### F-A4. Import SVG — via File menu
+### F-A4. Import artwork — via File menu
 
-Identical to F-A3 except:
-- Triggered by `File → Import SVG` (`Cmd/Ctrl+I`).
+Identical to the format-specific import flows except:
+- Triggered by `File → Import...` (`Cmd/Ctrl+I`) for ordered SVG, DXF, PNG/JPG, or STL input.
 - OS-native file picker (Electron) or browser file picker (web).
 - Multi-select supported in the picker.
 
@@ -638,7 +638,7 @@ the completed physical Frame is the spatial source of truth.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
 3. Project saved-as does not auto-trigger; user can save to persist migration.
 
-> **Current note:** project schema v3 stores canonical curve subpaths plus explicit artwork-to-operation bindings. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations (ADR-159, ADR-211).
+> **Current note:** project schema v4 stores canonical curve subpaths, explicit artwork-to-operation bindings, and canonical relief heightfields. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes to canonical heightfields where exact conversion is available (ADR-159, ADR-211, ADR-292).
 
 #### Error — schema newer than supported
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
@@ -703,7 +703,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+O` — Open project
 - `Cmd/Ctrl+S` — Save project
 - `Cmd/Ctrl+Shift+S` — Save Project As
-- `Cmd/Ctrl+I` — Import SVG
+- `Cmd/Ctrl+I` — Import SVG, DXF, PNG/JPG, or STL through the unified picker
 - `Cmd/Ctrl+Shift+E` — Save G-code (Export)
 
 #### Edit
@@ -2774,7 +2774,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 ### F-CNC7. Import an STL relief — Phase H.4 (ADR-098/309)
 
 #### Success
-1. In either machine mode, the user drags an `.stl` file onto the workspace. Both
+1. In either machine mode, the user chooses `.stl` through **File → Import...** / `Cmd/Ctrl+I`
+   or drags the file onto the workspace. Both
    binary and ASCII STLs parse (a binary file whose header starts with
    "solid" is detected by its length signature). Reading, parsing, and
    the coarse relief-preparation probe run in the import worker; the

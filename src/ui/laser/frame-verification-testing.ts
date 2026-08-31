@@ -4,7 +4,8 @@
 // can pass the gate without re-deriving compile internals.
 
 import type { JobOriginPlacement } from '../../core/job';
-import { computeJobBounds, computeJobMotionBounds, frameBoundsSignature } from '../../core/job';
+import { frameBoundsSignature } from '../../core/job';
+import { computeFrameJobBounds, computeFrameJobMotionBounds } from '../../core/job/job-bounds';
 import type { OutputScope, Project } from '../../core/scene';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
@@ -31,11 +32,11 @@ export function frameVerificationForProject(
         .join('; ')}`,
     );
   }
-  const burnBounds = computeJobBounds(prepared.job, project.device);
+  const burnBounds = computeFrameJobBounds(prepared.job, project.device);
   const bounds =
     project.machine?.kind === 'cnc'
       ? burnBounds
-      : (computeJobMotionBounds(prepared.job, project.device) ?? burnBounds);
+      : (computeFrameJobMotionBounds(prepared.job, project.device) ?? burnBounds);
   if (bounds === null) {
     throw new Error('frameVerificationForProject: the compiled job has no bounds to frame.');
   }

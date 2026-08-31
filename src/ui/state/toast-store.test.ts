@@ -35,7 +35,9 @@ describe('useToastStore', () => {
   it('auto-dismisses after the configured timeout', () => {
     useToastStore.getState().pushToast('temp');
     expect(useToastStore.getState().toasts.length).toBe(1);
-    vi.advanceTimersByTime(3001);
+    vi.advanceTimersByTime(7999);
+    expect(useToastStore.getState().toasts.length).toBe(1);
+    vi.advanceTimersByTime(1);
     expect(useToastStore.getState().toasts.length).toBe(0);
   });
 
@@ -43,7 +45,7 @@ describe('useToastStore', () => {
     useToastStore.getState().pushToast('first');
     vi.advanceTimersByTime(1000);
     useToastStore.getState().pushToast('second');
-    vi.advanceTimersByTime(2001); // first hits 3001, second hits 2001
+    vi.advanceTimersByTime(7000); // first hits 8000, second hits 7000
     expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual(['second']);
   });
 
@@ -58,7 +60,7 @@ describe('useToastStore', () => {
     useToastStore.getState().dismissToast(t.id);
     expect(vi.getTimerCount()).toBe(0);
     // And advancing past the auto-dismiss window must not throw or change state.
-    vi.advanceTimersByTime(5000);
+    vi.advanceTimersByTime(9000);
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 });

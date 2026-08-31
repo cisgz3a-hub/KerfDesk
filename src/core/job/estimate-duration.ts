@@ -23,9 +23,9 @@
 // Pure-core compliant: no clock reads, no Math.random, no I/O.
 
 import { isEstimateTimeScale, type DeviceProfile } from '../devices';
+import { cncPassRepresentedXyPoints } from '../cnc/cnc-pass-representation';
 import {
   cncPassEntryDepthMm,
-  cncPassXyPoints,
   type CncGroup,
   type CncPath3dPass,
   type CutGroup,
@@ -180,7 +180,7 @@ function cncAsCutGroup(
     passes: 1,
     airAssist: false,
     segments: passes.map((pass, index) => ({
-      polyline: cncPassXyPoints(pass),
+      polyline: cncPassRepresentedXyPoints(pass),
       closed: pass.closed,
       ...(index === 0 && motion !== undefined ? { plannerMotion: motion } : {}),
     })),
@@ -213,6 +213,7 @@ function cncPlungeSeconds(job: Job, device: DeviceProfile): number {
     const plungeFeed = Math.max(1, group.plungeMmPerMin);
     const retractFeed = Math.max(1, device.maxFeed);
     for (const pass of group.passes) {
+      if (pass.kind === 'contour' && cncPassRepresentedXyPoints(pass).length < 2) continue;
       const travelZMm = group.safeZMm + Math.abs(cncPassEntryDepthMm(pass));
       seconds += (travelZMm / plungeFeed) * SECONDS_PER_MINUTE;
       seconds += (travelZMm / retractFeed) * SECONDS_PER_MINUTE;

@@ -84,7 +84,7 @@ describe('drawRasterPreview', () => {
     expect(previewCanvas).toEqual({ width: 2048, height: 2048 });
   });
 
-  it('uses image-layer minPower in grayscale preview while leaving white pixels white', () => {
+  it('renders grayscale minPower on the device power scale while leaving white pixels white', () => {
     let capturedImageData: FakeImageData | undefined;
     vi.stubGlobal('ImageData', FakeImageData);
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
@@ -120,8 +120,11 @@ describe('drawRasterPreview', () => {
 
     drawRasterPreviewSync(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
 
+    const maxPowerS = project.device.maxPowerS;
     expect(Array.from(capturedImageData?.data ?? [])).toEqual([
-      0, 0, 0, 255, 85, 85, 85, 255, 255, 255, 255, 255,
+      ...previewPixel(300, maxPowerS),
+      ...previewPixel(200, maxPowerS),
+      ...previewPixel(0, maxPowerS),
     ]);
   });
 
@@ -157,7 +160,7 @@ describe('drawRasterPreview', () => {
     expect(createdCanvases).toHaveLength(1);
   });
 
-  it('inverts image-mode luma before rendering raster preview when negative image is enabled', () => {
+  it('inverts image-mode luma and renders burn shade on the device power scale', () => {
     let capturedImageData: FakeImageData | undefined;
     vi.stubGlobal('ImageData', FakeImageData);
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
@@ -193,10 +196,13 @@ describe('drawRasterPreview', () => {
 
     drawRasterPreviewSync(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
 
-    expect(Array.from(capturedImageData?.data ?? [])).toEqual([255, 255, 255, 255, 0, 0, 0, 255]);
+    expect(Array.from(capturedImageData?.data ?? [])).toEqual([
+      ...previewPixel(0, project.device.maxPowerS),
+      ...previewPixel(300, project.device.maxPowerS),
+    ]);
   });
 
-  it('uses the source image pixel grid in raster preview when pass-through is enabled', () => {
+  it('uses the source pixel grid and device power scale when pass-through is enabled', () => {
     let capturedCanvas: { width: number; height: number } | undefined;
     let capturedImageData: FakeImageData | undefined;
     vi.stubGlobal('ImageData', FakeImageData);
@@ -236,7 +242,10 @@ describe('drawRasterPreview', () => {
     drawRasterPreviewSync(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
 
     expect(capturedCanvas).toEqual({ width: 2, height: 1 });
-    expect(Array.from(capturedImageData?.data ?? [])).toEqual([0, 0, 0, 255, 255, 255, 255, 255]);
+    expect(Array.from(capturedImageData?.data ?? [])).toEqual([
+      ...previewPixel(300, project.device.maxPowerS),
+      ...previewPixel(0, project.device.maxPowerS),
+    ]);
   });
 
   it('does not reuse stale preview canvases when image mode toggles change', () => {
@@ -297,7 +306,7 @@ describe('drawRasterPreview', () => {
     expect(captures[0]?.data).not.toEqual(captures[1]?.data);
   });
 
-  it('uses raster image brightness in grayscale preview', () => {
+  it('uses raster image brightness on the device-absolute power scale', () => {
     let capturedImageData: FakeImageData | undefined;
     vi.stubGlobal('ImageData', FakeImageData);
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
@@ -333,7 +342,9 @@ describe('drawRasterPreview', () => {
 
     drawRasterPreviewSync(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
 
-    expect(Array.from(capturedImageData?.data ?? [])).toEqual([179, 179, 179, 255]);
+    expect(Array.from(capturedImageData?.data ?? [])).toEqual(
+      previewPixel(89, project.device.maxPowerS),
+    );
   });
 });
 
@@ -374,6 +385,11 @@ function drawRasterPreviewSync(
 function runImmediately(work: () => void): () => void {
   work();
   return () => undefined;
+}
+
+function previewPixel(powerS: number, maxPowerS: number): [number, number, number, number] {
+  const gray = 255 - Math.round((255 * powerS) / maxPowerS);
+  return [gray, gray, gray, 255];
 }
 
 function burnRaster(dataUrl: string): RasterImage {

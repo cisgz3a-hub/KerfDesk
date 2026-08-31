@@ -23,7 +23,27 @@ function platformWith(file: { readonly name: string }): PlatformAdapter {
   } as unknown as PlatformAdapter;
 }
 
+function owner(targetObject: ImportedSvg) {
+  return {
+    getProjectDocumentEpoch: () => 0,
+    getTargetObject: () => targetObject,
+  };
+}
+
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((onResolve) => {
+    resolve = onResolve;
+  });
+  return { promise, resolve };
+}
+
 describe('handleReimportSelectedArtwork', () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it('uses the selected SVG identity rather than filename equality', async () => {
     const replacement = svgObj('incoming', ['#00ff00']);
     const reimportObject = vi.fn(() => ({
@@ -38,9 +58,11 @@ describe('handleReimportSelectedArtwork', () => {
     });
     const platform = platformWith({ name: 'renamed-revision.svg' });
 
+    const selected = target('original.svg');
     await handleReimportSelectedArtwork({
       platform,
-      target: target('original.svg'),
+      target: selected,
+      ...owner(selected),
       reimportObject,
       pushToast: vi.fn(),
     });
@@ -53,15 +75,79 @@ describe('handleReimportSelectedArtwork', () => {
     parserMocks.importDxfFiles.mockResolvedValueOnce(undefined);
     const platform = platformWith({ name: 'revision.dxf' });
 
+    const selected = target('original.dxf');
     await handleReimportSelectedArtwork({
       platform,
-      target: target('original.dxf'),
+      target: selected,
+      ...owner(selected),
       reimportObject: vi.fn(),
       pushToast: vi.fn(),
     });
 
     expect(platform.pickFilesForOpen).toHaveBeenCalledWith({ accept: ['.dxf'], multiple: false });
     expect(parserMocks.importDxfFiles).toHaveBeenCalledOnce();
+  });
+
+  it('silently discards a deferred picker after the document epoch changes', async () => {
+    const picked = deferred<Awaited<ReturnType<PlatformAdapter['pickFilesForOpen']>>>();
+    const platform = {
+      ...platformWith({ name: 'unused.svg' }),
+      pickFilesForOpen: vi.fn(() => picked.promise),
+    };
+    const selected = target('original.svg');
+    const current: SceneObject | undefined = selected;
+    let epoch = 3;
+    const pushToast = vi.fn();
+    const pending = handleReimportSelectedArtwork({
+      platform,
+      target: selected,
+      getProjectDocumentEpoch: () => epoch,
+      getTargetObject: () => current,
+      reimportObject: vi.fn(),
+      pushToast,
+    });
+    await vi.waitFor(() => expect(platform.pickFilesForOpen).toHaveBeenCalledOnce());
+
+    epoch += 1;
+    picked.resolve([{ name: 'revision.svg', text: async () => '<svg />' }]);
+    await pending;
+
+    expect(parserMocks.importSvgFiles).not.toHaveBeenCalled();
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it('silently discards deferred parsing after the exact target identity changes', async () => {
+    const parsed = deferred<undefined>();
+    const replacement = svgObj('incoming', ['#00ff00']);
+    parserMocks.importSvgFiles.mockImplementationOnce(async (_files, importObject, pushToast) => {
+      await parsed.promise;
+      try {
+        importObject(replacement);
+      } catch {
+        pushToast('stale parser completion', 'error');
+      }
+    });
+    const selected = target('original.svg');
+    let current: SceneObject | undefined = selected;
+    const epoch = 8;
+    const reimportObject = vi.fn();
+    const pushToast = vi.fn();
+    const pending = handleReimportSelectedArtwork({
+      platform: platformWith({ name: 'revision.svg' }),
+      target: selected,
+      getProjectDocumentEpoch: () => epoch,
+      getTargetObject: () => current,
+      reimportObject,
+      pushToast,
+    });
+    await vi.waitFor(() => expect(parserMocks.importSvgFiles).toHaveBeenCalledOnce());
+
+    current = target('replacement.svg');
+    parsed.resolve(undefined);
+    await pending;
+
+    expect(reimportObject).not.toHaveBeenCalled();
+    expect(pushToast).not.toHaveBeenCalled();
   });
 });
 

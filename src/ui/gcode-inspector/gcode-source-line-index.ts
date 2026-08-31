@@ -48,7 +48,7 @@ export async function indexUtf8ChunkLines(
   const decoder = new TextDecoder();
   const starts = new SourceOffsetBuilder();
   starts.push(0);
-  let tail = '';
+  let tailParts: string[] = [];
   let shouldSkipLeadingLf = false;
   let previousByteWasCr = false;
   let bytesRead = 0;
@@ -60,22 +60,24 @@ export async function indexUtf8ChunkLines(
       if (text.startsWith('\n')) text = text.slice(1);
       shouldSkipLeadingLf = false;
     }
-    const combined = tail + text;
     let lineStart = 0;
     let index = 0;
-    while (index < combined.length) {
-      const char = combined[index];
+    while (index < text.length) {
+      const char = text[index];
       if (char !== '\n' && char !== '\r') {
         index += 1;
         continue;
       }
-      onLine(combined.slice(lineStart, index));
-      if (char === '\r' && combined[index + 1] === '\n') index += 1;
-      else if (char === '\r' && index + 1 === combined.length) shouldSkipLeadingLf = true;
+      const linePart = text.slice(lineStart, index);
+      onLine(joinLineParts(tailParts, linePart));
+      tailParts = [];
+      if (char === '\r' && text[index + 1] === '\n') index += 1;
+      else if (char === '\r' && index + 1 === text.length) shouldSkipLeadingLf = true;
       index += 1;
       lineStart = index;
     }
-    tail = combined.slice(lineStart);
+    const remainder = text.slice(lineStart);
+    if (remainder.length > 0) tailParts.push(remainder);
   };
 
   for await (const chunk of chunks) {
@@ -95,8 +97,13 @@ export async function indexUtf8ChunkLines(
     onProgress?.({ bytesRead, totalBytes });
   }
   consumeText(decoder.decode());
-  onLine(tail);
+  onLine(joinLineParts(tailParts));
   return { unit: 'utf8-byte', starts: starts.finish(), sourceLength: bytesRead };
+}
+
+function joinLineParts(parts: string[], finalPart = ''): string {
+  parts.push(finalPart);
+  return parts.join('');
 }
 
 export async function readGcodeSourceLines(

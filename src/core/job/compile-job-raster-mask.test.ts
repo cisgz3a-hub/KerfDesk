@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import { createLayer, IDENTITY_TRANSFORM, type RasterImage } from '../scene';
+import {
+  createLayer,
+  filterSceneForOutputScope,
+  IDENTITY_TRANSFORM,
+  type RasterImage,
+} from '../scene';
 import { createRectangle } from '../shapes/primitives';
 import { compileJob } from './compile-job';
 
@@ -47,5 +52,37 @@ describe('compileJob raster image masks', () => {
 
     expect(group?.kind).toBe('raster');
     expect(group?.kind === 'raster' ? Array.from(group.sValues) : []).toEqual([0, 300, 300, 0]);
+  });
+
+  it('retains an unselected mask as a dependency without outputting the mask', () => {
+    const mask = {
+      ...createRectangle({
+        id: 'M1',
+        color: '#000000',
+        spec: { widthMm: 2, heightMm: 1, cornerRadiusMm: 0 },
+      }),
+      transform: { ...IDENTITY_TRANSFORM, x: 1, y: 0 },
+    };
+    const imageLayer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' }),
+      passThrough: true,
+      ditherAlgorithm: 'threshold' as const,
+    };
+    const maskLayer = createLayer({ id: 'mask', color: '#000000', mode: 'line' });
+    const scoped = filterSceneForOutputScope(
+      {
+        objects: [raster({ imageMaskId: 'M1' }), mask],
+        layers: [imageLayer, maskLayer],
+      },
+      { cutSelectedGraphics: true, useSelectionOrigin: false, selectedObjectIds: ['R1'] },
+    );
+
+    const job = compileJob(scoped, DEFAULT_DEVICE_PROFILE);
+
+    expect(job.groups).toHaveLength(1);
+    expect(job.groups[0]?.kind).toBe('raster');
+    expect(job.groups[0]?.kind === 'raster' ? Array.from(job.groups[0].sValues) : []).toEqual([
+      0, 300, 300, 0,
+    ]);
   });
 });

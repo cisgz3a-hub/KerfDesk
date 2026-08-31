@@ -9,6 +9,7 @@ export type LaserControllerOperation =
       readonly kind: 'home';
       readonly phase: 'command' | 'settling' | 'awaiting-idle';
       readonly idleReports: number;
+      readonly operationId: number;
     }
   | {
       readonly kind: 'autofocus';
@@ -31,6 +32,7 @@ export type LaserControllerOperation =
       readonly kind: 'interactive-command';
       readonly phase: 'command';
       readonly label: string;
+      readonly pollingOwnership?: 'terminal-exchange';
     }
   | {
       readonly kind: 'recovery';
@@ -53,6 +55,18 @@ export type LaserControllerOperation =
 
 export const CONTROLLER_OPERATION_ACTIVE_MESSAGE =
   'A controller operation is active. Wait for it to finish before sending another command.';
+
+export function interactiveControllerOperation(
+  label: string,
+  pollingOwnership?: 'terminal-exchange',
+): Extract<LaserControllerOperation, { readonly kind: 'interactive-command' }> {
+  return {
+    kind: 'interactive-command',
+    phase: 'command',
+    label,
+    ...(pollingOwnership === undefined ? {} : { pollingOwnership }),
+  };
+}
 
 export function controllerOperationCommandBlockMessage(
   operation: LaserControllerOperation | null,

@@ -4,12 +4,7 @@ import { confirmDiscardAsync } from '../app/confirm-discard';
 import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
 import { usePlatform } from '../app/platform-context';
 import { editImageAction } from './edit-image-action';
-import {
-  handleImportDxf,
-  handleImportSvg,
-  handleOpenProject,
-  handleSaveProject,
-} from '../app/file-actions';
+import { handleImportDxf, handleImportSvg, handleSaveProject } from '../app/file-actions';
 import {
   inspectCurrentGcodeAction,
   openGcodeInspectorAction,
@@ -26,6 +21,7 @@ import { useUiStore } from '../state/ui-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { handleUnifiedArtworkImport } from '../app/import-dispatch';
+import { openProjectCommand } from './open-project-command';
 import {
   selectedCloseableOpenFillContourCount,
   selectedOpenFillContourCount,
@@ -37,6 +33,7 @@ import type { AppCommandContext } from './command-types';
 import { selectedImageMaskPair } from './image-mask-command-state';
 import { traceSourceForTracedImage } from './image-command-actions';
 import { hasPreviewableContent } from './previewable-content';
+import { deleteSelection } from './selection-delete-action';
 import { handleImportHeightMaps } from '../app/height-map-import-action';
 import {
   selectedObject,
@@ -131,7 +128,14 @@ function appCommandContext(
     toggleCameraPanel: dialogs.toggleCameraPanel,
     ...railPanelCommandContext(dialogs, activeStreamer),
     hasRasterSelection: selected?.kind === 'raster-image',
-    editImage: editImageAction(platform, selected, app.importRasterImage, pushToast),
+    editImage: editImageAction(
+      platform,
+      selected,
+      () => useStore.getState().projectDocumentEpoch,
+      app.importSvgObject,
+      app.importRasterImage,
+      pushToast,
+    ),
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
     hasConvertibleSelection: selectedConvertibleVectors(app.project, selectedIds).length > 0,
     canConvertSelectionToPath: selectionHasUnlockedVectorObject(app.project, selectedIds),
@@ -236,23 +240,36 @@ function fileCommandContext(
   return {
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
-    openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
+    openProject: () => void openProjectCommand(platform, pushToast),
     saveProject: () => saveProject(platform, useStore.getState(), pushToast, false),
     saveProjectAs: () => saveProject(platform, useStore.getState(), pushToast, true),
     importArtwork: () =>
       void handleUnifiedArtworkImport(platform, {
-        project: () => useStore.getState().project,
+        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
         importSvgObject: app.importSvgObject,
         importRasterImage: app.importRasterImage,
         pushToast,
       }),
-    importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
-    importDxf: () => void handleImportDxf(platform, app.importSvgObject, pushToast),
+    importSvg: () =>
+      void handleImportSvg(
+        platform,
+        app.importSvgObject,
+        pushToast,
+        () => useStore.getState().projectDocumentEpoch,
+      ),
+    importDxf: () =>
+      void handleImportDxf(
+        platform,
+        app.importSvgObject,
+        pushToast,
+        () => useStore.getState().projectDocumentEpoch,
+      ),
     importImage: callbacks.requestImportImage,
     importHeightMap: () => {
       const current = useStore.getState();
       void handleImportHeightMaps(platform, {
         project: current.project,
+        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
         importObject: current.importSvgObject,
         pushToast,
       });
@@ -371,18 +388,6 @@ function windowHelpCommandContext(
   };
 }
 
-function openProject(
-  platform: ReturnType<typeof usePlatform>,
-  setProject: ReturnType<typeof useStore.getState>['setProject'],
-  markLoaded: ReturnType<typeof useStore.getState>['markLoaded'],
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-): void {
-  void confirmDiscardAsync(platform, 'open another project').then((ok) => {
-    if (!ok) return;
-    return handleOpenProject({ platform, setProject, markLoaded, pushToast });
-  });
-}
-
 function saveProject(
   platform: ReturnType<typeof usePlatform>,
   app: ReturnType<typeof useStore.getState>,
@@ -401,17 +406,4 @@ function saveProject(
     },
     forceDialog,
   );
-}
-
-function deleteSelection(): void {
-  const state = useStore.getState();
-  if (state.selectedPathNode !== null) {
-    state.deleteSelectedPathNodes();
-    return;
-  }
-  const ids = [
-    ...(state.selectedObjectId !== null ? [state.selectedObjectId] : []),
-    ...state.additionalSelectedIds,
-  ];
-  state.removeSceneObjects(ids);
 }

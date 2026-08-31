@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createProject } from '../../core/scene';
+import { MAX_ZOOM, MIN_ZOOM } from '../state/ui-store';
 import {
   canvasMouseToScene,
   clientToCanvasPx,
@@ -117,6 +118,25 @@ describe('zoomAtCursorPx', () => {
     });
     expect(next.zoomFactor).toBeCloseTo(1.2 * 1.1);
   });
+
+  it.each([
+    ['maximum', MAX_ZOOM, 2],
+    ['minimum', MIN_ZOOM, 0.5],
+  ] as const)(
+    'clamps at the %s zoom before solving cursor-anchored pan',
+    (_label, zoom, factor) => {
+      const view = { zoomFactor: zoom, panX: 17, panY: -9 };
+      const next = zoomAtCursorPx({
+        cursorPx: { x: 713, y: 91 },
+        factor,
+        canvas: CANVAS,
+        bed: BED,
+        view,
+      });
+
+      expect(next).toEqual(view);
+    },
+  );
 
   it('ignores non-finite or non-positive zoom factors', () => {
     const view = { zoomFactor: 1.2, panX: 4, panY: -2 };

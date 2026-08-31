@@ -8,7 +8,9 @@ const imageLoader = vi.hoisted(() => ({
 }));
 const pngImport = vi.hoisted(() => ({
   isPngCandidate: vi.fn(() => true),
+  shouldDecodeDimensionQualifiedPng: vi.fn(),
   shouldPageBackPng: vi.fn(() => true),
+  tryDecodeDimensionQualifiedPng: vi.fn(),
   tryDecodeQualifiedPng: vi.fn(),
 }));
 const imageDensity = vi.hoisted(() => ({
@@ -28,7 +30,9 @@ describe('raster-image import resolution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pngImport.isPngCandidate.mockReturnValue(true);
+    pngImport.shouldDecodeDimensionQualifiedPng.mockResolvedValue(false);
     pngImport.shouldPageBackPng.mockReturnValue(true);
+    pngImport.tryDecodeDimensionQualifiedPng.mockResolvedValue(null);
     pngImport.tryDecodeQualifiedPng.mockResolvedValue(null);
   });
 
@@ -60,6 +64,80 @@ describe('raster-image import resolution', () => {
     expect(imported).not.toHaveProperty('imageAsset');
     // No worker-progress toast belongs on an import that never reaches the worker.
     expect(pushToast).not.toHaveBeenCalledWith(expect.stringContaining('worker'), 'info');
+  });
+
+  it('keeps a compressed oversize-edge PNG embedded after incremental worker sampling', async () => {
+    pngImport.shouldPageBackPng.mockReturnValue(false);
+    pngImport.shouldDecodeDimensionQualifiedPng.mockResolvedValue(true);
+    pngImport.tryDecodeDimensionQualifiedPng.mockImplementation(async (_file, options) => {
+      options.onProgress({ phase: 'decoding', encodedBytes: 64, queuePosition: 0 });
+      return {
+        natural: { width: 20_000, height: 1 },
+        sampled: { width: 8192, height: 1 },
+        density: null,
+        lumaBase64: 'sampled-luma',
+        cleanupWarning: null,
+      };
+    });
+    const importRasterImage = vi.fn();
+    const pushToast = vi.fn();
+
+    await importImageFile(
+      new File(['compressed'], 'panorama.png', { type: 'image/png' }),
+      importRasterImage,
+      pushToast,
+    );
+
+    expect(imageLoader.readImageNaturalSize).not.toHaveBeenCalled();
+    expect(imageLoader.loadImageAsRawData).not.toHaveBeenCalled();
+    expect(importRasterImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dataUrl: 'data:image/png;base64,source',
+        lumaBase64: 'sampled-luma',
+        pixelWidth: 8192,
+        pixelHeight: 1,
+      }),
+    );
+    expect(importRasterImage.mock.calls[0]?.[0]).not.toHaveProperty('imageAsset');
+    expect(pushToast).toHaveBeenCalledWith(
+      'panorama.png: decoding and sampling in worker. Press Esc to cancel.',
+      'info',
+    );
+  });
+
+  it('cancels a dimension-qualified portable PNG on Escape without mutating the scene', async () => {
+    pngImport.shouldPageBackPng.mockReturnValue(false);
+    pngImport.shouldDecodeDimensionQualifiedPng.mockResolvedValue(true);
+    pngImport.tryDecodeDimensionQualifiedPng.mockImplementation(
+      async (_file, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener(
+            'abort',
+            () => {
+              const error = new Error('cancelled');
+              error.name = 'AbortError';
+              reject(error);
+            },
+            { once: true },
+          );
+        }),
+    );
+    const importRasterImage = vi.fn();
+    const pushToast = vi.fn();
+
+    const pending = importImageFile(
+      new File(['compressed'], 'panorama.png', { type: 'image/png' }),
+      importRasterImage,
+      pushToast,
+    );
+    await vi.waitFor(() => expect(pngImport.tryDecodeDimensionQualifiedPng).toHaveBeenCalledOnce());
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    await expect(pending).resolves.toBeNull();
+    expect(imageLoader.readImageNaturalSize).not.toHaveBeenCalled();
+    expect(imageLoader.loadImageAsRawData).not.toHaveBeenCalled();
+    expect(importRasterImage).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith('panorama.png: import cancelled.', 'info');
   });
 
   it('uses the burn decode cap instead of silently sampling through the trace-preview cap', async () => {

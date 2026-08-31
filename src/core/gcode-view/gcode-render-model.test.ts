@@ -117,6 +117,23 @@ describe('buildGcodeRenderModel — events and accountability', () => {
     }
   });
 
+  it('keeps a malformed numeric word diagnostic-only instead of previewing prefix motion', () => {
+    const model = okModel(['G21 G90', 'G0 X5', 'G1 X10junk', 'G1 X20'].join('\n'));
+
+    expect(model.lineCategories[2]).toBe(LINE_CATEGORY.junk);
+    expect([...model.segLine]).toEqual([1, 3]);
+    expect(model.segmentCount).toBe(2);
+    expect(model.positions[9]).toBe(20);
+  });
+
+  it('renders motion wrapped in external block-delete or checksum framing', () => {
+    const model = okModel(['G21 G90', '/G1 X10', 'N2 G1 X20*23'].join('\n'));
+
+    expect(model.segmentCount).toBe(2);
+    expect(model.lineCategories[1]).toBe(LINE_CATEGORY.motion);
+    expect(model.lineCategories[2]).toBe(LINE_CATEGORY.motion);
+  });
+
   it('counts unsupported words with their first line', () => {
     // G43/H remain uninterpreted; G99 and Q became meaningful when canned
     // cycles landed, so they are no longer valid "unsupported" examples.

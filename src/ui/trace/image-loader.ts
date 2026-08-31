@@ -64,7 +64,7 @@ const IMAGE_HEADER_PROBE_BYTES = 64 * 1024;
 const MAX_SAFE_DECODE_EDGE_PX = 16_384;
 const MAX_SAFE_DECODE_PIXELS = 268_435_456;
 
-type ImageDimensions = { readonly width: number; readonly height: number };
+export type ImageDimensions = { readonly width: number; readonly height: number };
 
 export async function loadImageAsRawData(
   file: File,
@@ -181,10 +181,27 @@ function decodeImage(url: string): Promise<HTMLImageElement> {
 }
 
 async function readHeaderImageDimensions(file: File): Promise<ImageDimensions | null> {
-  const header = new Uint8Array(
-    await readBlobAsArrayBuffer(file.slice(0, IMAGE_HEADER_PROBE_BYTES)),
-  );
+  const header = await readImageHeader(file);
   return parsePngDimensions(header) ?? parseJpegDimensions(header);
+}
+
+/** Read only a PNG IHDR size, without invoking a browser image decoder. */
+export async function readPngHeaderDimensions(file: File): Promise<ImageDimensions | null> {
+  return parsePngDimensions(await readImageHeader(file));
+}
+
+/** Whether the embedded route can allocate its full-size Chromium canvas. */
+export function embeddedCanvasSupportsImageDimensions(dimensions: ImageDimensions): boolean {
+  const pixels = dimensions.width * dimensions.height;
+  return (
+    dimensions.width <= MAX_SAFE_DECODE_EDGE_PX &&
+    dimensions.height <= MAX_SAFE_DECODE_EDGE_PX &&
+    pixels <= MAX_SAFE_DECODE_PIXELS
+  );
+}
+
+async function readImageHeader(file: File): Promise<Uint8Array> {
+  return new Uint8Array(await readBlobAsArrayBuffer(file.slice(0, IMAGE_HEADER_PROBE_BYTES)));
 }
 
 function readBlobAsArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
@@ -209,12 +226,7 @@ function readBlobAsArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
 }
 
 function assertSafeDecodeDimensions(dimensions: ImageDimensions): void {
-  const pixels = dimensions.width * dimensions.height;
-  if (
-    dimensions.width > MAX_SAFE_DECODE_EDGE_PX ||
-    dimensions.height > MAX_SAFE_DECODE_EDGE_PX ||
-    pixels > MAX_SAFE_DECODE_PIXELS
-  ) {
+  if (!embeddedCanvasSupportsImageDimensions(dimensions)) {
     throw new Error(
       `Image source dimensions ${dimensions.width}x${dimensions.height} px are too large to decode safely. Resize the image before importing.`,
     );

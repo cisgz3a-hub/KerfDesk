@@ -64,10 +64,7 @@ export function kerfCheckContext(
     }),
   );
   if (layers.length === 0 || !hasPositiveCorrection) return null;
-  const maskObject =
-    object.imageMaskId === undefined
-      ? null
-      : (scoped.scene.objects.find((candidate) => candidate.id === object.imageMaskId) ?? null);
+  const maskObject = findScopedMaskObject(object, scoped.scene);
   return {
     object,
     layers,
@@ -81,6 +78,18 @@ export function kerfCheckContext(
     outputScopeKey: outputScopeIdentity(outputScope),
     outputPlacementKey: outputPlacementIdentity(jobPlacement),
   };
+}
+
+function findScopedMaskObject(
+  object: RasterImage,
+  scene: Pick<Project['scene'], 'objects' | 'outputDependencies'>,
+): SceneObject | null {
+  if (object.imageMaskId === undefined) return null;
+  return (
+    [...scene.objects, ...(scene.outputDependencies ?? [])].find(
+      (candidate) => candidate.id === object.imageMaskId,
+    ) ?? null
+  );
 }
 
 /** Resolve one compiled raster group back to its materialized operation. */

@@ -76,7 +76,7 @@ test('Box Generator inserts the ready CNC panel sheet from its primary action', 
 
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText('Objects: 6', { exact: true })).toBeVisible();
-  await expect(page.getByText('Inserted 6 box panels.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Success: Inserted 6 box panels.', { exact: true })).toBeVisible();
 });
 
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {

@@ -14,6 +14,8 @@ export function WorkspaceCanvasLayers(props: {
     readonly onPointerDown: React.PointerEventHandler<HTMLCanvasElement>;
     readonly onPointerMove: React.PointerEventHandler<HTMLCanvasElement>;
     readonly onPointerUp: React.PointerEventHandler<HTMLCanvasElement>;
+    readonly onPointerCancel: React.PointerEventHandler<HTMLCanvasElement>;
+    readonly onLostPointerCapture: React.PointerEventHandler<HTMLCanvasElement>;
   };
   readonly project: Project;
   readonly viewState: ViewState;
@@ -38,7 +40,8 @@ export function WorkspaceCanvasLayers(props: {
         onPointerDown={props.handlers.onPointerDown}
         onPointerMove={props.handlers.onPointerMove}
         onPointerUp={props.handlers.onPointerUp}
-        onPointerCancel={props.handlers.onPointerUp}
+        onPointerCancel={props.handlers.onPointerCancel}
+        onLostPointerCapture={props.handlers.onLostPointerCapture}
         onDoubleClick={props.onDoubleClick}
         onContextMenu={props.onContextMenu}
         style={canvasStyle}

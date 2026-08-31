@@ -28,7 +28,12 @@ type HomeEpochs = {
   readonly session: number;
   readonly write: number;
   readonly position: number;
+  readonly operationId: number;
 };
+
+type HomeOperation = Extract<NonNullable<LaserState['controllerOperation']>, { kind: 'home' }>;
+
+let nextHomeOperationId = 1;
 
 // GRBL acks $H only after the homing cycle physically completes — commonly
 // 10-60 s on real beds, so the default 8 s ack budget reports a spurious
@@ -84,9 +89,10 @@ export async function runHomeAction(
   const homeCommand = assertHomeReady(set, get, driver);
   const expectedSessionEpoch = get().controllerSessionEpoch;
   const expectedWriteEpoch = refs.writeEpoch ?? 0;
+  const operationId = nextHomeOperationId++;
   let expectedPositionEpoch = 0;
   set((state) => ({
-    controllerOperation: { kind: 'home', phase: 'command', idleReports: 0 },
+    controllerOperation: homeOperation(operationId, 'command'),
     homingState: 'homing',
     homingProof: null,
     positionEvidenceSuppressed: true,
@@ -112,6 +118,7 @@ export async function runHomeAction(
     session: expectedSessionEpoch,
     write: expectedWriteEpoch,
     position: expectedPositionEpoch,
+    operationId,
   };
   try {
     await executeHomeSequence(set, get, refs, safeWrite, driver, homeCommand, epochs);
@@ -141,7 +148,7 @@ async function executeHomeSequence(
     timeoutMode: 'non-idle-status-activity',
   });
   assertHomeCurrent(get(), refs, epochs);
-  set({ controllerOperation: { kind: 'home', phase: 'settling', idleReports: 0 } });
+  set({ controllerOperation: homeOperation(epochs.operationId, 'settling') });
   await startControllerCommand(refs, safeWrite, {
     kind: 'home',
     label: 'home settle marker',
@@ -150,7 +157,7 @@ async function executeHomeSequence(
     source: 'system',
   });
   assertHomeCurrent(get(), refs, epochs);
-  set({ controllerOperation: { kind: 'home', phase: 'awaiting-idle', idleReports: 0 } });
+  set({ controllerOperation: homeOperation(epochs.operationId, 'awaiting-idle') });
   await waitForFreshIdle(refs, { kind: 'home', requiredReports: 1 });
   assertHomeCurrent(get(), refs, epochs);
   confirmHome(set, get, epochs);
@@ -183,8 +190,8 @@ function recordHomeFailure(set: SetFn, message: string, epochs: HomeEpochs): voi
   set((state) => {
     if (
       state.controllerOperation?.kind !== 'home' ||
-      state.controllerSessionEpoch !== epochs.session ||
-      (state.trustedPositionEpoch ?? 0) !== epochs.position
+      state.controllerOperation.operationId !== epochs.operationId ||
+      state.controllerSessionEpoch !== epochs.session
     )
       return {};
     return {
@@ -205,10 +212,15 @@ function assertHomeCurrent(
 ): void {
   if (
     state.controllerOperation?.kind !== 'home' ||
+    state.controllerOperation.operationId !== epochs.operationId ||
     state.controllerSessionEpoch !== epochs.session ||
     (refs.writeEpoch ?? 0) !== epochs.write ||
     (state.trustedPositionEpoch ?? 0) !== epochs.position
   ) {
     throw new Error('Home evidence was invalidated before confirmation.');
   }
+}
+
+function homeOperation(operationId: number, phase: HomeOperation['phase']): HomeOperation {
+  return { kind: 'home', phase, idleReports: 0, operationId };
 }

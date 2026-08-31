@@ -1,9 +1,5 @@
-import {
-  computeJobBounds,
-  computeJobMotionBounds,
-  frameBoundsSignature,
-  machineSpaceJob,
-} from '../../core/job';
+import { frameBoundsSignature, machineSpaceJob } from '../../core/job';
+import { computeFrameJobBounds, computeFrameJobMotionBounds } from '../../core/job/job-bounds';
 import type { PreparedOutput } from '../../io/gcode';
 import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
@@ -31,11 +27,11 @@ export function requiredFrameIssueFromPrepared(args: {
     prepared.project.device,
     prepared.project.machine,
   );
-  const burnBounds = computeJobBounds(framedJob, prepared.project.device);
+  const burnBounds = computeFrameJobBounds(framedJob, prepared.project.device);
   const bounds =
     prepared.project.machine?.kind === 'cnc'
       ? burnBounds
-      : (computeJobMotionBounds(framedJob, prepared.project.device) ?? burnBounds);
+      : (computeFrameJobMotionBounds(framedJob, prepared.project.device) ?? burnBounds);
   if (bounds === null) return null;
   const valid = isVerifiedFrameValid(args.machine.frameVerification ?? null, {
     boundsSignature: frameBoundsSignature(bounds),

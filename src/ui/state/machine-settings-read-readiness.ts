@@ -27,19 +27,32 @@ export function machineSettingsReadBlockReason(
 ): string | null {
   const transportBlock = machineSettingsTransportBlockReason(state);
   if (transportBlock !== null) return transportBlock;
+  const activityBlock = machineSettingsActivityBlockReason(state);
+  if (activityBlock !== null) return activityBlock;
+  const controllerState = state.statusReport?.state ?? null;
+  const exactAlarmEvidence =
+    controllerState === 'Alarm' || (controllerState === null && state.alarmCode !== null);
+  if (controllerState !== 'Idle' && !exactAlarmEvidence) {
+    return 'Controller must report Idle or Alarm before reading machine settings.';
+  }
+  return machineSettingsOperationBlockReason(state, options);
+}
+
+function machineSettingsActivityBlockReason(state: LaserState): string | null {
   if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
   if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
   if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
-  if (hasPendingControllerWrite(state)) {
-    return 'Wait for the previous controller write and acknowledgement before reading machine settings.';
-  }
-  if (state.statusReport?.state !== 'Idle') {
-    return 'Controller must report Idle before reading machine settings.';
-  }
-  const controllerOperationMessage = controllerOperationCommandBlockMessage(
-    state.controllerOperation,
-  );
-  if (controllerOperationMessage !== null) return controllerOperationMessage;
+  return hasPendingControllerWrite(state)
+    ? 'Wait for the previous controller write and acknowledgement before reading machine settings.'
+    : null;
+}
+
+function machineSettingsOperationBlockReason(
+  state: LaserState,
+  options: MachineSettingsReadReadinessOptions,
+): string | null {
+  const operationMessage = controllerOperationCommandBlockMessage(state.controllerOperation);
+  if (operationMessage !== null) return operationMessage;
   if (state.autofocusBusy) {
     return 'Auto-focus is running. Wait for it to finish before reading machine settings.';
   }

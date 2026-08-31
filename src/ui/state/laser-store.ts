@@ -122,6 +122,8 @@ export type LaserState = LaserStoreActions &
     readonly motionOperation: LaserMotionOperation | null;
     readonly controllerOperation: LaserControllerOperation | null;
     readonly streamer: StreamerState | null;
+    /** Monotonic owner for async stream writes within a controller session. */
+    readonly streamerEpoch: number;
     readonly pauseResumeTransition: PauseResumeTransitionState | null;
     /** Immutable recovery/replay ownership for the current streamer. */
     readonly activeRunId: RunId | null;

@@ -9,6 +9,7 @@ import {
   resampleLumaNearest,
 } from '../raster';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
+import type { RasterPowerValues } from '../raster/raster-power-values';
 import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import {
   captureLayerOperationSettings,
@@ -29,6 +30,9 @@ import { resolveImageScanDirection } from './scan-direction-policy';
 import { validatedScanOffsetMm } from './scan-offset';
 
 const WHITE_LUMA_BYTE = 255;
+const FULL_TURN_DEG = 360;
+const QUARTER_TURN_DEG = 90;
+const THREE_QUARTER_TURN_DEG = 270;
 
 type CompileRasterGroupsOptions = {
   readonly sceneObjects?: ReadonlyArray<SceneObject>;
@@ -100,11 +104,12 @@ function compileRasterGroup(
   const sMax = Math.round((powerPercent / 100) * device.maxPowerS);
   const sMin = Math.round((minPowerPercent / 100) * device.maxPowerS);
   const bounds = rasterBoundsInMachineCoords(obj, device);
+  const passThroughDimensions = rasterPassThroughDimensions(obj);
   const pixelWidth = layer.passThrough
-    ? obj.pixelWidth
+    ? passThroughDimensions.width
     : pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
   const pixelHeight = layer.passThrough
-    ? obj.pixelHeight
+    ? passThroughDimensions.height
     : pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
   const lineIntervalMm = (bounds.maxY - bounds.minY) / pixelHeight;
   const maskObject = imageMaskObjectFor(obj, options.objects);
@@ -147,6 +152,17 @@ function compileRasterGroup(
   };
 }
 
+function rasterPassThroughDimensions(obj: RasterImage): {
+  readonly width: number;
+  readonly height: number;
+} {
+  const rotation = ((obj.transform.rotationDeg % FULL_TURN_DEG) + FULL_TURN_DEG) % FULL_TURN_DEG;
+  const swapsAxes = rotation === QUARTER_TURN_DEG || rotation === THREE_QUARTER_TURN_DEG;
+  return swapsAxes
+    ? { width: obj.pixelHeight, height: obj.pixelWidth }
+    : { width: obj.pixelWidth, height: obj.pixelHeight };
+}
+
 function rasterValuesFor(
   input: MaterializedRasterInput,
 ): Pick<RasterGroup, 'sValues' | 'rowProvider'> {
@@ -156,7 +172,7 @@ function rasterValuesFor(
     return { sValues: materializedRasterValues(input) };
   }
   return {
-    sValues: new Uint16Array(0),
+    sValues: new Float64Array(0),
     rowProvider: streamedRasterRowProvider({
       sourceLuma: input.preparedLuma,
       sourceWidth: input.obj.pixelWidth,
@@ -195,7 +211,7 @@ type MaterializedRasterInput = {
   readonly sMin: number;
 };
 
-function materializedRasterValues(input: MaterializedRasterInput): Uint16Array {
+function materializedRasterValues(input: MaterializedRasterInput): RasterPowerValues {
   // Rotated images bypass the axis-aligned resample + flip pipeline: the
   // machine scan grid samples the rotated content directly.
   if (isRotatedRaster(input.obj)) {

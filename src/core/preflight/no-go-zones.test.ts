@@ -264,6 +264,16 @@ describe('findNoGoZoneCollisions motion path coverage', () => {
     expect(twoMillimetre).toEqual([]);
   });
 
+  it('keeps a fixture just outside the bed when its cutter envelope reaches the bed', () => {
+    const outsideClamp = { ...zone, x: 401, y: 10, width: 10, height: 10 };
+    const gcode = ['G0 X395 Y15', 'G1 X399.5 Y15'].join('\n');
+
+    expect(
+      findNoGoZoneCollisions(gcode, [outsideClamp], bed, { defaultCutterRadiusMm: 2 }),
+    ).toEqual([{ lineNumber: 2, zone: outsideClamp, cutterRadiusMm: 2 }]);
+    expect(findNoGoZoneCollisions(gcode, [outsideClamp], bed)).toEqual([]);
+  });
+
   it('switches cutter envelopes between multi-tool sections', () => {
     const clamp = { ...zone, x: 0, y: 10, width: 20, height: 10 };
     const collisions = findNoGoZoneCollisions(

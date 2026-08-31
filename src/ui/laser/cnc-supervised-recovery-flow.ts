@@ -7,7 +7,10 @@ import {
   type CncRunwayProfile,
 } from '../../core/recovery/cnc';
 import { createCncSupervisedRecoveryPackageIdentity } from '../../core/recovery/cnc-recovery-package';
-import { recoveryEventsEqual } from '../../core/recovery/cnc-contour-runway-source';
+import {
+  recoveryEventsEqual,
+  resolveContourSource,
+} from '../../core/recovery/cnc-contour-runway-source';
 import {
   buildCncSupervisedRecoveryJob,
   cncSupervisedRecoveryRunwayProfile,
@@ -62,6 +65,7 @@ type RecoveryContext = {
   readonly completedPrefixProofId: string;
   readonly profile: CncRunwayProfile;
   readonly uncertaintyEventId: string;
+  readonly priorEventId: string;
   readonly operatorReview: CncSupervisedRecoveryReview;
 };
 type PlannedRecovery = RecoveryContext & {
@@ -125,7 +129,12 @@ function prepareRecoveryContext(
   if (source === null) return null;
   const manifest = recoveryManifest(capsule, source);
   if (manifest === null) return null;
-  const priorEventId = priorCutEventId(review.uncertaintyEventId);
+  const selectedEvent = manifest.events.find((event) => event.id === review.uncertaintyEventId);
+  const resolved =
+    selectedEvent === undefined
+      ? { kind: 'error' as const }
+      : resolveContourSource(source.prepared.job, selectedEvent);
+  const priorEventId = resolved.kind === 'ok' ? resolved.previousEventId : null;
   if (priorEventId === null) {
     jobAwareAlert(
       'Cannot start CNC recovery:\n\nThe first contour segment has no proven tangent runway. ' +
@@ -141,6 +150,7 @@ function prepareRecoveryContext(
     clearedPathProofId: `${reviewId}/clear-through/${priorEventId}`,
     completedPrefixProofId: `${reviewId}/complete-before/${review.uncertaintyEventId}`,
     uncertaintyEventId: review.uncertaintyEventId,
+    priorEventId,
     profile: cncSupervisedRecoveryRunwayProfile(
       source.project.device.accelMmPerSec2,
       review.qualificationId,
@@ -193,10 +203,9 @@ function planRecoveryProgram(
 }
 
 function clearedPathEvidence(context: RecoveryContext) {
-  const eventId = priorCutEventId(context.uncertaintyEventId);
   return {
     kind: 'operator-confirmed-through-event' as const,
-    eventId: eventId ?? '',
+    eventId: context.priorEventId,
     proofId: context.clearedPathProofId,
   };
 }
@@ -326,13 +335,6 @@ function validateReview(review: CncSupervisedRecoveryReview): string | null {
   }
   if (review.uncertaintyEventId.trim() === '') return 'Select the first uncertain contour segment.';
   return null;
-}
-
-function priorCutEventId(eventId: string): string | null {
-  const match = /^(.*\/cut-)(\d+)$/.exec(eventId);
-  if (match === null) return null;
-  const segment = Number(match[2]);
-  return Number.isInteger(segment) && segment > 1 ? `${match[1]}${segment - 1}` : null;
 }
 
 function createReviewId(): string {

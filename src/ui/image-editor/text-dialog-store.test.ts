@@ -1,9 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDENTITY_AFFINE } from '../../core/image-edit';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
+import type { RasterImage } from '../../core/scene';
 import { createSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
 import { useTextDialogStore } from './text-dialog-store';
+
+const raster = vi.hoisted(() => ({ rasterizeTextLayer: vi.fn() }));
+vi.mock('./editor-text-raster', () => ({ rasterizeTextLayer: raster.rasterizeTextLayer }));
 
 const BOUNDS = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
 
@@ -14,9 +18,26 @@ function seedSession(): void {
   });
 }
 
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((onResolve) => {
+    resolve = onResolve;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
-  useTextDialogStore.setState({ isOpen: false, text: '', sizePx: 48 });
-  useImageEditorStore.setState({ session: null, transform: null });
+  raster.rasterizeTextLayer.mockReset();
+  useTextDialogStore.setState({
+    isOpen: false,
+    text: '',
+    sizePx: 48,
+    commitRequest: null,
+  });
+  useImageEditorStore.setState({ session: null, sessionOwner: null, transform: null });
 });
 
 describe('useTextDialogStore', () => {
@@ -47,5 +68,58 @@ describe('useTextDialogStore', () => {
     useTextDialogStore.getState().setSizePx(0);
     useTextDialogStore.getState().setSizePx(Number.NaN);
     expect(useTextDialogStore.getState().sizePx).toBe(24.25);
+  });
+
+  it('discards deferred text rasterization after a same-id replacement session opens', async () => {
+    const rendered = deferred<ReturnType<typeof createRgbaBuffer>>();
+    raster.rasterizeTextLayer.mockReturnValue(rendered.promise);
+    const startingSession = createSession('R1', 'source.png', createRgbaBuffer(16, 16), BOUNDS);
+    const replacementSession = createSession(
+      'R1',
+      'replacement.png',
+      createRgbaBuffer(16, 16),
+      BOUNDS,
+    );
+    const sourceImage = { id: 'R1', kind: 'raster-image' } as RasterImage;
+    const replacementImage = { id: 'R1', kind: 'raster-image' } as RasterImage;
+    useImageEditorStore.setState({
+      session: startingSession,
+      sessionOwner: { projectDocumentEpoch: 1, sourceImage },
+    });
+    useTextDialogStore.setState({ isOpen: true, text: 'Old document' });
+    const pending = useTextDialogStore.getState().commit();
+    await vi.waitFor(() => expect(raster.rasterizeTextLayer).toHaveBeenCalledOnce());
+
+    useImageEditorStore.setState({
+      session: replacementSession,
+      sessionOwner: { projectDocumentEpoch: 2, sourceImage: replacementImage },
+    });
+    rendered.resolve(createRgbaBuffer(16, 16));
+    await pending;
+
+    expect(useImageEditorStore.getState().session).toBe(replacementSession);
+    expect(useTextDialogStore.getState().isOpen).toBe(true);
+  });
+
+  it('discards deferred text rasterization after the exact dialog request closes', async () => {
+    const rendered = deferred<ReturnType<typeof createRgbaBuffer>>();
+    raster.rasterizeTextLayer.mockReturnValue(rendered.promise);
+    const session = createSession('R1', 'source.png', createRgbaBuffer(16, 16), BOUNDS);
+    const sourceImage = { id: 'R1', kind: 'raster-image' } as RasterImage;
+    const sessionOwner = { projectDocumentEpoch: 1, sourceImage };
+    useImageEditorStore.setState({ session, sessionOwner });
+    useTextDialogStore.setState({ isOpen: true, text: 'Cancelled text' });
+
+    const pending = useTextDialogStore.getState().commit();
+    await vi.waitFor(() => expect(raster.rasterizeTextLayer).toHaveBeenCalledOnce());
+    useTextDialogStore.getState().close();
+    rendered.resolve(createRgbaBuffer(16, 16));
+    await pending;
+
+    expect(useImageEditorStore.getState()).toMatchObject({ session, sessionOwner });
+    expect(useTextDialogStore.getState()).toMatchObject({
+      isOpen: false,
+      commitRequest: null,
+    });
   });
 });

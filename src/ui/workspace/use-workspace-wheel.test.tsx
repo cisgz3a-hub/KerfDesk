@@ -64,6 +64,26 @@ describe('useWorkspaceWheelZoom', () => {
     });
     expect(useUiStore.getState().zoomFactor).toBeLessThan(1);
   });
+
+  it('does not zoom or pan for horizontal-only wheel input', async () => {
+    useUiStore.setState({ zoomFactor: 2, panX: 7, panY: -3 });
+    const { canvas } = await renderHarness();
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          deltaX: 120,
+          deltaY: 0,
+          clientX: 25,
+          clientY: 175,
+        }),
+      );
+    });
+
+    expect(useUiStore.getState()).toMatchObject({ zoomFactor: 2, panX: 7, panY: -3 });
+  });
 });
 
 function WheelHarness(): JSX.Element {

@@ -42,6 +42,16 @@ describe('GRBL G-code dialect catalog', () => {
     });
   });
 
+  it('keeps every laser operation on M3 for the M4-incompatible profile', () => {
+    const compatible = resolveGrblDialect({ gcodeDialect: { dialectId: 'grbl-compatible' } });
+
+    expect({
+      cut: compatible.cutPowerMode,
+      fill: compatible.fillPowerMode,
+      raster: compatible.rasterPowerMode,
+    }).toEqual({ cut: 'constant', fill: 'constant', raster: 'constant' });
+  });
+
   it('defaults only absent dialect selections and rejects explicit unknown ids', () => {
     expect(resolveGrblDialect({}).id).toBe('grbl-dynamic');
     expect(() => resolveGrblDialect({ gcodeDialect: { dialectId: 'unknown' } })).toThrow(

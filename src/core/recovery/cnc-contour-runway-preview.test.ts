@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { CncGroup, Job } from '../job';
+import type { Vec2 } from '../scene';
 import { previewCncContourRunway } from './cnc-contour-runway-preview';
 import { buildCncRecoveryEventManifest } from './cnc-recovery-manifest';
 
-function contourJob(): Job {
+function contourJob(
+  polyline: ReadonlyArray<Vec2> = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 20, y: 10 },
+  ],
+): Job {
   const group: CncGroup = {
     kind: 'cnc',
     layerId: 'layer-a',
@@ -21,12 +29,7 @@ function contourJob(): Job {
         kind: 'contour',
         zMm: -2,
         closed: false,
-        polyline: [
-          { x: 0, y: 0 },
-          { x: 10, y: 0 },
-          { x: 10, y: 10 },
-          { x: 20, y: 10 },
-        ],
+        polyline,
       },
     ],
   };
@@ -83,6 +86,23 @@ describe('previewCncContourRunway', () => {
         manifest: forged,
         uncertaintyEventId: 'cnc-op-1/pass-1/cut-3',
         parameters,
+      }),
+    ).toEqual({ kind: 'error', reason: 'source-mismatch' });
+  });
+
+  it('rejects a raw uncertainty segment that emitted CNC coordinates collapse away', () => {
+    const job = contourJob([
+      { x: 10_000, y: 20_000 },
+      { x: 10_010, y: 20_000 },
+      { x: 10_010.0004, y: 20_000 },
+    ]);
+
+    expect(
+      previewCncContourRunway({
+        job,
+        manifest: buildCncRecoveryEventManifest(job),
+        uncertaintyEventId: 'cnc-op-1/pass-1/cut-2',
+        parameters: { ...parameters, minRunwayMm: 5 },
       }),
     ).toEqual({ kind: 'error', reason: 'source-mismatch' });
   });

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { projectOpenRequestEpochCallbacks } from '../../__fixtures__/file-actions';
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { handleOpenProject } from './file-actions';
@@ -26,7 +27,14 @@ describe('LightBurn project open migration', () => {
       serial: { isSupported: () => false, requestPort: async () => null },
     };
 
-    await handleOpenProject({ platform, setProject, markLoaded, pushToast });
+    await handleOpenProject({
+      platform,
+      setProject,
+      markLoaded,
+      pushToast,
+      ...projectOpenRequestEpochCallbacks(),
+      getProjectDocumentEpoch: () => 0,
+    });
 
     expect(setProject).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -62,6 +70,8 @@ describe('LightBurn project open migration', () => {
       setProject: state.setProject,
       markLoaded: state.markLoaded,
       pushToast: vi.fn(),
+      ...projectOpenRequestEpochCallbacks(),
+      getProjectDocumentEpoch: () => 0,
     });
 
     expect(useStore.getState()).toMatchObject({
@@ -93,7 +103,14 @@ describe('LightBurn project open migration', () => {
       serial: { isSupported: () => false, requestPort: async () => null },
     };
 
-    await handleOpenProject({ platform, setProject, markLoaded: vi.fn(), pushToast });
+    await handleOpenProject({
+      platform,
+      setProject,
+      markLoaded: vi.fn(),
+      pushToast,
+      ...projectOpenRequestEpochCallbacks(),
+      getProjectDocumentEpoch: () => 0,
+    });
 
     expect(readFile).toHaveBeenCalledOnce();
     expect(setProject).toHaveBeenCalledOnce();

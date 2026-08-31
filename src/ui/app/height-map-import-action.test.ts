@@ -13,6 +13,19 @@ import { makePng, streamingBlob, u16beBytes } from '../import/png-incremental-de
 import { applyFreshImport } from '../state/scene-mutations';
 import { handleImportHeightMaps, importHeightMapFiles } from './height-map-import-action';
 
+const getProjectDocumentEpoch = (): number => 0;
+
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((onResolve) => {
+    resolve = onResolve;
+  });
+  return { promise, resolve };
+}
+
 vi.mock('../import/import-worker-client', () => ({
   prepareReliefHeightfieldPngOffThread: vi.fn(),
 }));
@@ -35,6 +48,28 @@ beforeEach(() => {
 });
 
 describe('importHeightMapFiles', () => {
+  it('silently discards a deferred decode after a replacement document opens', async () => {
+    const prepared = deferred<typeof PREPARED>();
+    vi.mocked(prepareReliefHeightfieldPngOffThread).mockReturnValue(prepared.promise);
+    let epoch = 9;
+    const importObject = vi.fn();
+    const pushToast = vi.fn();
+    const pending = importHeightMapFiles([new File(['png'], 'late-depth.png')], {
+      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+      getProjectDocumentEpoch: () => epoch,
+      importObject,
+      pushToast,
+    });
+    await vi.waitFor(() => expect(prepareReliefHeightfieldPngOffThread).toHaveBeenCalledOnce());
+
+    epoch += 1;
+    prepared.resolve(PREPARED);
+    await pending;
+
+    expect(importObject).not.toHaveBeenCalled();
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
   it('creates an aspect-correct durable relief with explicit safe defaults', async () => {
     vi.mocked(prepareReliefHeightfieldPngOffThread).mockResolvedValue(PREPARED);
     const importObject = vi.fn();
@@ -42,6 +77,7 @@ describe('importHeightMapFiles', () => {
 
     await importHeightMapFiles([new File(['png'], 'depth.png', { type: 'image/png' })], {
       project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+      getProjectDocumentEpoch,
       importObject,
       pushToast,
     });
@@ -104,6 +140,7 @@ describe('importHeightMapFiles', () => {
           const imported: SceneObject[] = [];
           await importHeightMapFiles([new File(['png'], 'depth.png')], {
             project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+            getProjectDocumentEpoch,
             importObject: (object) => imported.push(object),
             pushToast: vi.fn(),
           });
@@ -125,6 +162,7 @@ describe('importHeightMapFiles', () => {
 
     await importHeightMapFiles([new File(['png'], 'depth.png', { type: 'image/png' })], {
       project: createProject(),
+      getProjectDocumentEpoch,
       importObject,
       pushToast,
     });
@@ -156,6 +194,7 @@ describe('importHeightMapFiles', () => {
 
     await importHeightMapFiles([new File(['png'], 'tall-depth.png')], {
       project: state.project,
+      getProjectDocumentEpoch,
       importObject: (object, batchIndex) => {
         const result = applyFreshImport(state, object, batchIndex ?? 0);
         state = { project: result.project, undoStack: result.undoStack };
@@ -187,6 +226,7 @@ describe('importHeightMapFiles', () => {
 
     await importHeightMapFiles([streamingFile(png, 'fallback.png')], {
       project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+      getProjectDocumentEpoch,
       importObject,
       pushToast,
     });
@@ -227,6 +267,7 @@ describe('importHeightMapFiles', () => {
 
     await importHeightMapFiles([streamingFile(png, 'fallback-u16.png')], {
       project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+      getProjectDocumentEpoch,
       importObject,
       pushToast,
     });
@@ -268,6 +309,7 @@ describe('importHeightMapFiles', () => {
 
     await importHeightMapFiles([streamingFile(png, 'fallback-alpha.png')], {
       project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+      getProjectDocumentEpoch,
       importObject,
       pushToast,
     });
@@ -302,6 +344,7 @@ describe('importHeightMapFiles', () => {
 
     await importHeightMapFiles([new File(['png'], 'cancelled.png')], {
       project: createProject(),
+      getProjectDocumentEpoch,
       importObject,
       pushToast,
     });
@@ -319,6 +362,7 @@ describe('importHeightMapFiles', () => {
 
     await importHeightMapFiles([new File(['png'], 'failed.png')], {
       project: createProject(),
+      getProjectDocumentEpoch,
       importObject,
       pushToast,
     });
@@ -353,6 +397,7 @@ describe('handleImportHeightMaps', () => {
     await expect(
       handleImportHeightMaps(platform, {
         project: createProject(),
+        getProjectDocumentEpoch,
         importObject: vi.fn(),
         pushToast,
       }),

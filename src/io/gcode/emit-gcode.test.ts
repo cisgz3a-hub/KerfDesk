@@ -95,6 +95,58 @@ describe('emitGcode', () => {
     expect(withMeta.preflight.ok).toBe(withoutMeta.preflight.ok);
   });
 
+  it('keeps grbl-compatible header power modes consistent with its M3-only body', () => {
+    const base = createProject();
+    const project = {
+      ...base,
+      device: { ...base.device, gcodeDialect: { dialectId: 'grbl-compatible' as const } },
+      scene: addLayer(
+        addObject(base.scene, sampleObject),
+        createLayer({ id: 'L1', color: '#ff0000' }),
+      ),
+    };
+    const body = emitGcode(project).gcode;
+    const withMeta = emitGcode(project, {
+      metadata: {
+        appName: 'KerfDesk',
+        appVersion: '9.9.9',
+        gitSha: 'deadbee',
+        buildTimeUtc: '2026-06-03T00:00:00.000Z',
+        emitterRevision: 'test-rev',
+      },
+    }).gcode;
+
+    expect(withMeta).toContain('; output-dialect: grbl-compatible');
+    expect(withMeta).toContain('power modes: cut M3, fill none, raster none');
+    expect(body).toContain('M3 S0');
+    expect(body).not.toMatch(/^M4(?:\s|$)/m);
+    expect(withMeta.endsWith(body)).toBe(true);
+  });
+
+  it('records a per-layer constant override from the exact compiled job', () => {
+    const base = createProject();
+    const project = {
+      ...base,
+      scene: addLayer(addObject(base.scene, sampleObject), {
+        ...createLayer({ id: 'L1', color: '#ff0000' }),
+        powerMode: 'constant' as const,
+      }),
+    };
+    const withMeta = emitGcode(project, {
+      metadata: {
+        appName: 'KerfDesk',
+        appVersion: '9.9.9',
+        gitSha: 'deadbee',
+        buildTimeUtc: '2026-06-03T00:00:00.000Z',
+        emitterRevision: 'test-rev',
+      },
+    }).gcode;
+
+    expect(withMeta).toContain('; output-dialect: grbl-dynamic');
+    expect(withMeta).toContain('power modes: cut M3, fill none, raster none');
+    expect(withMeta).toMatch(/^M3 S0$/m);
+  });
+
   it(
     'emits an error-diffusion raster above the former working-set budget (ADR-243)',
     { timeout: RASTER_COMPILES_AT_ALL_MS },

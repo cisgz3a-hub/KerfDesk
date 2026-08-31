@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCncCompilationTask } from '../../core/cnc/cnc-compilation-artifact';
-import { cncGroupMaximumDepthMm } from '../../core/job/job';
+import { cncGroupMaximumDepthMm } from '../../core/cnc/cnc-group-maximum-depth';
 import { DEFAULT_CNC_LAYER_SETTINGS, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
 import { emitPreparedGcode } from '../../io/gcode/emit-gcode';
 import { prepareOutputAsync } from '../../io/gcode/prepare-output-async';

@@ -11,6 +11,7 @@
 
 import type { DeviceProfile } from '../devices';
 import { applyImageMaskToLuma } from '../raster';
+import type { RasterPowerValues } from '../raster/raster-power-values';
 import { createImageMaskPixelTest } from '../raster/image-mask';
 import { ditherIndependentRow, isErrorDiffusionMode } from '../raster/dither';
 import { createErrorDiffusionRowDitherer } from '../raster/dither-rows';
@@ -37,14 +38,16 @@ export type StreamedRasterInput = {
 };
 
 /**
- * Row provider for a streamed raster group: `(y) => Uint16Array` of S values
+ * Row provider for a streamed raster group: `(y) => RasterPowerValues` of S values
  * for the machine-oriented target row y. Byte-identical to the materialized
  * pipeline for every dither algorithm — the axis-aligned
  * resample→mask→orient path for unrotated images, the inverse-transform
  * sampler for rotated ones (masked at source resolution, matching
  * rotatedMaskedRasterLuma).
  */
-export function streamedRasterRowProvider(input: StreamedRasterInput): (y: number) => Uint16Array {
+export function streamedRasterRowProvider(
+  input: StreamedRasterInput,
+): (y: number) => RasterPowerValues {
   const lumaRowAt = streamedLumaRowAt(input);
   if (isErrorDiffusionMode(input.algorithm)) {
     return createErrorDiffusionRowDitherer({
@@ -56,7 +59,7 @@ export function streamedRasterRowProvider(input: StreamedRasterInput): (y: numbe
     });
   }
   const algorithm = input.algorithm;
-  return (y: number): Uint16Array =>
+  return (y: number): RasterPowerValues =>
     ditherIndependentRow(lumaRowAt(y), y, {
       algorithm,
       sMax: input.sMax,

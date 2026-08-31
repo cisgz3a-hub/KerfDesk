@@ -1,4 +1,5 @@
 import type { CncContourPass, CncPass, CncGroup, Job } from '../job';
+import { cncContourEmissionVertices } from '../cnc/cnc-contour-emission';
 import { flatPath3dZMm, type CncRecoveryEvent } from './cnc-recovery-manifest';
 
 export type ResolvedContourSource =
@@ -6,9 +7,17 @@ export type ResolvedContourSource =
       readonly kind: 'ok';
       readonly group: CncGroup;
       readonly pass: CncContourPass;
+      /** Segment index in the represented pass used for preview and replay. */
       readonly segmentIndex: number;
+      /** Segment index in the sealed raw pass and manifest identity. */
+      readonly sourceSegmentIndex: number;
+      /** Raw manifest event that produced the preceding represented vertex. */
+      readonly previousEventId: string | null;
     }
-  | { readonly kind: 'error'; readonly reason: 'source-mismatch' | 'unsupported-pass' };
+  | {
+      readonly kind: 'error';
+      readonly reason: 'source-mismatch' | 'unsupported-pass' | 'invalid-geometry';
+    };
 
 export function resolveContourSource(job: Job, event: CncRecoveryEvent): ResolvedContourSource {
   const segmentIndex = event.source.segmentIndex;
@@ -24,7 +33,55 @@ export function resolveContourSource(job: Job, event: CncRecoveryEvent): Resolve
   if (segmentIndex < 0 || segmentIndex >= contour.polyline.length - 1) {
     return { kind: 'error', reason: 'source-mismatch' };
   }
-  return { kind: 'ok', group, pass: contour, segmentIndex };
+  if (!contour.polyline.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))) {
+    return { kind: 'error', reason: 'invalid-geometry' };
+  }
+  return pass.kind === 'contour'
+    ? resolveRepresentedContour(group, pass, event, segmentIndex)
+    : resolvedFlatPath(group, contour, event, segmentIndex);
+}
+
+function resolvedFlatPath(
+  group: CncGroup,
+  pass: CncContourPass,
+  event: CncRecoveryEvent,
+  segmentIndex: number,
+): ResolvedContourSource {
+  return {
+    kind: 'ok',
+    group,
+    pass,
+    segmentIndex,
+    sourceSegmentIndex: segmentIndex,
+    previousEventId: segmentIndex === 0 ? null : `${event.passId}/cut-${segmentIndex}`,
+  };
+}
+
+function resolveRepresentedContour(
+  group: CncGroup,
+  pass: CncContourPass,
+  event: CncRecoveryEvent,
+  sourceSegmentIndex: number,
+): ResolvedContourSource {
+  const vertices = cncContourEmissionVertices(pass);
+  const representedTargetIndex = vertices.findIndex(
+    (vertex) => vertex.sourcePointIndex === sourceSegmentIndex + 1,
+  );
+  if (representedTargetIndex <= 0) return { kind: 'error', reason: 'source-mismatch' };
+  const representedSegmentIndex = representedTargetIndex - 1;
+  const representedStart = vertices[representedSegmentIndex];
+  if (representedStart === undefined) return { kind: 'error', reason: 'source-mismatch' };
+  return {
+    kind: 'ok',
+    group,
+    pass: { ...pass, polyline: vertices.map((vertex) => vertex.point) },
+    segmentIndex: representedSegmentIndex,
+    sourceSegmentIndex,
+    previousEventId:
+      representedSegmentIndex === 0
+        ? null
+        : `${event.passId}/cut-${representedStart.sourcePointIndex}`,
+  };
 }
 
 // A plain contour is used directly; a FLAT led path3d (ADR-250) is presented as

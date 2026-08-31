@@ -3,7 +3,9 @@
 // new transparent layer you then position with Move / Ctrl+T. Modal card;
 // Ctrl+Enter commits (Enter stays a newline in the textarea), Esc cancels.
 
+import { useRef } from 'react';
 import { FONT_REGISTRY } from '../../core/text';
+import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useTextDialogStore, type TextDialogState } from './text-dialog-store';
 
 const OUTLINE_FONTS = FONT_REGISTRY.filter((entry) => entry.geometry === 'outline');
@@ -12,14 +14,21 @@ export function TextDialog(): JSX.Element | null {
   const isOpen = useTextDialogStore((s) => s.isOpen);
   const state = useTextDialogStore();
   if (!isOpen) return null;
+  return <TextDialogBody state={state} />;
+}
+
+function TextDialogBody(props: { readonly state: TextDialogState }): JSX.Element {
+  const { state } = props;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(dialogRef, state.close);
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="Add text"
       style={backdropStyle}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') state.close();
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void state.commit();
         e.stopPropagation();
       }}
@@ -30,7 +39,6 @@ export function TextDialog(): JSX.Element | null {
           value={state.text}
           onChange={(e) => state.setText(e.target.value)}
           rows={3}
-          autoFocus
           placeholder="Type text — Ctrl+Enter to add"
           style={textareaStyle}
           aria-label="Text content"

@@ -340,7 +340,7 @@ type InitialLaserState = Pick<
   | 'probeBusy'
   | 'motionOperation'
   | 'controllerOperation'
-  | 'streamer'
+  | keyof Pick<LaserState, 'streamer' | 'streamerEpoch'>
   | 'pauseResumeTransition'
   | 'activeRunId'
   | 'liveCanvasRun'
@@ -402,7 +402,7 @@ export function initialLaserState(): InitialLaserState {
     probeBusy: false,
     motionOperation: null,
     controllerOperation: null,
-    streamer: null,
+    ...{ streamer: null, streamerEpoch: 0 },
     activeRunId: null,
     liveCanvasRun: null,
     pendingUntrackedAcks: 0,

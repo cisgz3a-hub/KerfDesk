@@ -14,6 +14,14 @@ import type { Bounds } from '../../core/scene';
 
 const MM_PER_INCH = 25.4;
 const CSS_PX_PER_INCH = 96;
+const CSS_LENGTH_UNITS_TO_USER_UNITS: Readonly<Record<string, number>> = {
+  in: CSS_PX_PER_INCH,
+  cm: CSS_PX_PER_INCH / 2.54,
+  mm: CSS_PX_PER_INCH / MM_PER_INCH,
+  q: CSS_PX_PER_INCH / (MM_PER_INCH * 4),
+  pt: CSS_PX_PER_INCH / 72,
+  pc: CSS_PX_PER_INCH / 6,
+};
 const SVG_LENGTH_UNITS_TO_MM: Readonly<Record<string, number>> = {
   mm: 1,
   cm: 10,
@@ -83,6 +91,19 @@ export function parseSvgLengthMmOrNull(input: string | null): number | null {
   if (unit === '' || unit === 'px') return pxToMm(value);
   const mmFactor = SVG_LENGTH_UNITS_TO_MM[unit];
   return mmFactor === undefined ? null : value * mmFactor;
+}
+
+/** Resolves absolute geometry lengths into current SVG user units (CSS px at 96 DPI). */
+export function parseSvgLengthUserUnitsOrNull(input: string | null): number | null {
+  if (input === null || input.trim() === '') return null;
+  const match = /^\s*([+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)\s*([a-zA-Z]*)\s*$/.exec(input);
+  if (match === null) return null;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return null;
+  const unit = (match[2] ?? '').toLowerCase();
+  if (unit === '' || unit === 'px') return value;
+  const userUnitFactor = CSS_LENGTH_UNITS_TO_USER_UNITS[unit];
+  return userUnitFactor === undefined ? null : value * userUnitFactor;
 }
 
 function pxToMm(px: number): number {

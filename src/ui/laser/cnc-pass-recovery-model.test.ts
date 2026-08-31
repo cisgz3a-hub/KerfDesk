@@ -9,6 +9,7 @@ import {
   type ImportedSvg,
   type Project,
 } from '../../core/scene';
+import type { CncContourPass } from '../../core/job';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { createExecutionArtifact, type RecoveryCapsule } from '../state/recovery';
@@ -94,7 +95,46 @@ function exactCapsule(options?: {
   };
 }
 
+function withFirstPreparedPass(capsule: RecoveryCapsule, pass: CncContourPass): RecoveryCapsule {
+  const artifact = capsule.artifact;
+  if (artifact.kind !== 'exact-execution') throw new Error('Expected exact execution artifact.');
+  const [firstGroup, ...laterGroups] = artifact.prepared.job.groups;
+  if (firstGroup?.kind !== 'cnc') throw new Error('Expected first prepared group to be CNC.');
+  return {
+    ...capsule,
+    artifact: {
+      ...artifact,
+      prepared: {
+        ...artifact.prepared,
+        job: {
+          ...artifact.prepared.job,
+          groups: [
+            { ...firstGroup, passes: [pass, ...firstGroup.passes.slice(1)] },
+            ...laterGroups,
+          ],
+        },
+      },
+    },
+  };
+}
+
 describe('buildCncPassRecoveryModel', () => {
+  it('previews the parser-represented contour while retaining the sealed pass identity', () => {
+    const capsule = withFirstPreparedPass(exactCapsule(), {
+      kind: 'contour',
+      zMm: -1,
+      closed: false,
+      polyline: [
+        { x: 247.01767, y: 20 },
+        { x: 247.01768, y: 20 },
+      ],
+    });
+
+    const model = buildCncPassRecoveryModel(capsule, { x: 0, y: 0, z: 0 });
+    if (model.kind !== 'ready') throw new Error(model.kind);
+    expect(model.passes[0]).toMatchObject({ groupIndex: 0, passIndex: 0, xyPoints: [] });
+  });
+
   it('lists every pass with labels and preselects the computed boundary', () => {
     const model = buildCncPassRecoveryModel(exactCapsule(), { x: 0, y: 0, z: 0 });
     expect(model.kind).toBe('ready');

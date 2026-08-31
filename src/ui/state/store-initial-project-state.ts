@@ -8,6 +8,7 @@ export function initialProjectWorkspaceState(project: Project) {
   return {
     project,
     projectDocumentEpoch: 0,
+    projectOpenRequestEpoch: 0,
     cachedCncMachine: null,
     projectBedReconciliation: null,
     cncLiveCaps: null,

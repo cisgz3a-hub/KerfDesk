@@ -236,6 +236,7 @@ function NumberField(props: {
   readonly onCommit: (value: number) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState(formatNumber(props.value));
+  const [draftIsValid, setDraftIsValid] = useState(true);
   // Re-snap on every commit ATTEMPT, not only when the value moved. A commit
   // the store rejects (resizing a rotated selection, a zero dimension) or
   // normalizes to what it already held (370° on a 10° shape) leaves
@@ -243,11 +244,18 @@ function NumberField(props: {
   // showing a number the scene never took — the lie useDebouncedCommit's blur
   // re-snap exists to prevent.
   const [commitSeq, setCommitSeq] = useState(0);
-  useEffect(() => setDraft(formatNumber(props.value)), [props.value, commitSeq]);
-  const commit = (): void => {
-    const next = Number(draft);
+  useEffect(() => {
+    setDraft(formatNumber(props.value));
+    setDraftIsValid(true);
+  }, [props.value, commitSeq]);
+  const updateDraft = (input: HTMLInputElement): void => {
+    setDraft(input.value);
+    setDraftIsValid(numericInputIsValid(input));
+  };
+  const commit = (input: HTMLInputElement): void => {
+    const next = Number(input.value);
     setCommitSeq((seq) => seq + 1);
-    if (!Number.isFinite(next)) return;
+    if (!numericInputIsValid(input)) return;
     props.onCommit(next);
   };
   return (
@@ -261,17 +269,28 @@ function NumberField(props: {
         step={props.step ?? FIELD_STEP_MM}
         value={draft}
         disabled={props.disabled}
-        onInput={(event) => setDraft(event.currentTarget.value)}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
+        aria-invalid={!draftIsValid}
+        onInput={(event) => updateDraft(event.currentTarget)}
+        onChange={(event) => updateDraft(event.currentTarget)}
+        onBlur={(event) => commit(event.currentTarget)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') commit();
+          if (event.key === 'Enter') commit(event.currentTarget);
         }}
         style={inputStyle}
       />
       <span style={unitStyle}>{props.unit}</span>
     </label>
   );
+}
+
+function numericInputIsValid(input: HTMLInputElement): boolean {
+  const value = input.value.trim();
+  // The step attribute is an editing affordance for the spinner, not a value
+  // policy. Valid finite values such as 0.05 mm and 10.5 degrees must not be
+  // refused merely because they do not land on 0.1/1 increments. Browser
+  // number inputs expose unparseable native drafts as blank/badInput; those
+  // and non-finite values are the only input-level failures here.
+  return value !== '' && !input.validity.badInput && Number.isFinite(Number(value));
 }
 
 function selectedObjects(

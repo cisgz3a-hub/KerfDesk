@@ -2,6 +2,7 @@ import type { DeviceProfile } from '../../core/devices';
 import type { RasterGroup } from '../../core/job';
 import { rasterRow } from '../../core/job/raster-rows';
 import { rasterPreviewRgba } from '../../core/raster';
+import type { RasterPowerValues } from '../../core/raster/raster-power-values';
 
 export const MAX_RASTER_PREVIEW_EDGE = 2048;
 
@@ -11,7 +12,7 @@ export type CompiledRasterPreview = {
   readonly sourceWidth: number;
   readonly sourceHeight: number;
   readonly displayDecimated: boolean;
-  readonly sValues: Uint16Array;
+  readonly sValues: RasterPowerValues;
   readonly rgba: Uint8ClampedArray<ArrayBuffer>;
 };
 
@@ -27,7 +28,6 @@ export function compiledRasterPreview(
 ): CompiledRasterPreview {
   const dimensions = displayDimensions(group.pixelWidth, group.pixelHeight, maxEdge);
   const sValues = materializeDisplayGrid(group, dimensions.width, dimensions.height);
-  const sMax = Math.round((group.power / 100) * device.maxPowerS);
   return {
     ...dimensions,
     sourceWidth: group.pixelWidth,
@@ -35,7 +35,11 @@ export function compiledRasterPreview(
     displayDecimated:
       dimensions.width !== group.pixelWidth || dimensions.height !== group.pixelHeight,
     sValues,
-    rgba: rasterPreviewRgba(sValues, sMax, dimensions.width, dimensions.height),
+    // Keep the preview on the controller/profile's absolute S scale. Using
+    // this group's local maximum made every fully dark source pixel render
+    // black even when the compiled operation requested only a fraction of
+    // the machine's available power.
+    rgba: rasterPreviewRgba(sValues, device.maxPowerS, dimensions.width, dimensions.height),
   };
 }
 
@@ -57,8 +61,8 @@ function materializeDisplayGrid(
   group: RasterGroup,
   displayWidth: number,
   displayHeight: number,
-): Uint16Array {
-  const display = new Uint16Array(displayWidth * displayHeight);
+): RasterPowerValues {
+  const display = new Float64Array(displayWidth * displayHeight);
   for (let sourceY = 0; sourceY < group.pixelHeight; sourceY += 1) {
     const row = rasterRow(group, sourceY);
     const displayY = Math.min(

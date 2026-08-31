@@ -71,6 +71,7 @@ function vectorCompilation(parts: ReadonlyArray<VectorCompilation>): VectorCompi
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
   const groups: Group[] = [];
   const diagnostics: JobDiagnostic[] = [];
+  const completeSceneObjects = [...scene.objects, ...(scene.outputDependencies ?? [])];
   const jigRuns = registrationJigCompilationRuns(scene);
   if (jigRuns !== null) {
     for (const run of jigRuns) {
@@ -81,7 +82,7 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
         run.layer,
         device,
         run.priorityObjectId,
-        scene.objects,
+        completeSceneObjects,
       );
     }
     return diagnostics.length === 0 ? { groups } : { groups, diagnostics };
@@ -95,7 +96,7 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
       layer,
       device,
       priorityObjectId,
-      scene.objects,
+      completeSceneObjects,
     );
   }
   return diagnostics.length === 0 ? { groups } : { groups, diagnostics };

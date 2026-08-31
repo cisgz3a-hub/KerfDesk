@@ -277,6 +277,26 @@ describe('latched grblHAL MPG machine-command ownership', () => {
     await expect(homing).rejects.toThrow();
   });
 
+  it('releases the exact Home owner when MPG takeover invalidates pending Home', async () => {
+    useLaserStore.setState({ mpgActive: false });
+    const homing = useLaserStore.getState().home();
+    await flush();
+    expect(writes).toEqual(['$H\n']);
+
+    connection.emitLine('<Home|MPos:0.000,0.000,0.000|FS:0,0|MPG:1>');
+    connection.emitLine('ok');
+    await expect(homing).rejects.toThrow(/invalidated/i);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:0>');
+
+    expect(writes).toEqual(['$H\n']);
+    expect(useLaserStore.getState()).toMatchObject({
+      controllerOperation: null,
+      homingState: 'unknown',
+      homingProof: null,
+      mpgActive: false,
+    });
+  });
+
   it.each(['Alarm', 'Sleep'] as const)(
     'latches a first explicit MPG acquisition from a %s report',
     (state) => {

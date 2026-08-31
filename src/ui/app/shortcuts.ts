@@ -124,6 +124,9 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
         setProject: c.setProject,
         markLoaded: c.markLoaded,
         pushToast: c.pushToast,
+        claimProjectOpenRequest: useStore.getState().claimProjectOpenRequest,
+        getProjectOpenRequestEpoch: () => useStore.getState().projectOpenRequestEpoch,
+        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
       });
     });
   },
@@ -139,7 +142,7 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
     }),
   i: (c) =>
     void handleUnifiedArtworkImport(c.platform, {
-      project: c.project,
+      getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
       importSvgObject: c.importSvgObject,
       importRasterImage: c.importRasterImage,
       pushToast: c.pushToast,

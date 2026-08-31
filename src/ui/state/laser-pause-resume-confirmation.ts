@@ -17,7 +17,10 @@ import {
 import type { PostJobSettleRefs } from './laser-post-job-settle';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
-import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
+import {
+  containActiveStreamWriteFailure,
+  streamWriteOwner,
+} from './laser-stream-heartbeat-containment';
 
 type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
 type SetFn = (
@@ -26,6 +29,7 @@ type SetFn = (
 
 type PauseResumeWriteContext = {
   readonly set: SetFn;
+  readonly get?: () => LaserState;
   readonly refs: PostJobSettleRefs;
   readonly safeWrite: SafeWriteFn;
 };
@@ -60,13 +64,22 @@ export async function writeWhilePauseResumeOwner(
 ): Promise<void> {
   const { token, command, action } = options;
   const writeEpoch = context.refs.writeEpoch ?? 0;
+  const writeOwner = context.get === undefined ? null : streamWriteOwner(context.get());
   reservePauseResumeTransportWrite(context.refs, token);
   try {
     try {
       await context.safeWrite(command, action);
     } catch (error) {
       if ((context.refs.writeEpoch ?? 0) === writeEpoch) {
-        containActiveStreamWriteFailure(context.set, context.refs, context.safeWrite, action);
+        if (writeOwner !== null) {
+          containActiveStreamWriteFailure(
+            context.set,
+            context.refs,
+            context.safeWrite,
+            action,
+            writeOwner,
+          );
+        }
         markPauseResumeTransportWriteRejected(context.refs, token);
       }
       throw error;

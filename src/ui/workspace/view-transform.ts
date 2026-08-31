@@ -8,6 +8,7 @@
 // scene-mm, applied to the camera (positive panX shifts content left).
 
 import type { Project, Vec2 } from '../../core/scene';
+import { MAX_ZOOM, MIN_ZOOM } from '../state/ui-store';
 
 const PADDING_PX = 24;
 const MIN_USABLE_PX = 1;
@@ -101,8 +102,9 @@ export function canvasMouseToScene(
 //
 // Math: solve for (panX', panY') such that the scene-mm point under
 // `cursorCanvasPx` is unchanged after the zoom. Pure — returns the
-// next ViewState; the caller writes it to the store. Doesn't clamp
-// zoomFactor itself; the store clamps in setZoom.
+// next ViewState; the caller writes it to the store. The zoom must be clamped
+// before solving the anchored pan, otherwise setZoom clamps only the scale and
+// leaves pan calculated for a different, out-of-range scale.
 export function zoomAtCursorPx(args: {
   readonly cursorPx: { readonly x: number; readonly y: number };
   readonly factor: number;
@@ -113,11 +115,12 @@ export function zoomAtCursorPx(args: {
   const { cursorPx, factor, canvas, bed, view } = args;
   if (!isPositiveFinite(factor)) return normalizeViewState(view);
   const safeView = normalizeViewState(view);
-  const v0 = computeView(canvas.width, canvas.height, bed.width, bed.height, view);
+  const v0 = computeView(canvas.width, canvas.height, bed.width, bed.height, safeView);
   if (!isPositiveFinite(v0.scale)) return safeView;
   const sceneBeforeX = (cursorPx.x - v0.offsetX) / v0.scale;
   const sceneBeforeY = (cursorPx.y - v0.offsetY) / v0.scale;
-  const nextView: ViewState = { ...safeView, zoomFactor: safeView.zoomFactor * factor };
+  const nextZoomFactor = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, safeView.zoomFactor * factor));
+  const nextView: ViewState = { ...safeView, zoomFactor: nextZoomFactor };
   const v1 = computeView(canvas.width, canvas.height, bed.width, bed.height, nextView);
   if (!isPositiveFinite(v1.scale)) return safeView;
   const sceneAfterX = (cursorPx.x - v1.offsetX) / v1.scale;
@@ -126,8 +129,8 @@ export function zoomAtCursorPx(args: {
   // To pull sceneAfter back to sceneBefore, add (after - before) to pan.
   return {
     zoomFactor: nextView.zoomFactor,
-    panX: view.panX + (sceneAfterX - sceneBeforeX),
-    panY: view.panY + (sceneAfterY - sceneBeforeY),
+    panX: safeView.panX + (sceneAfterX - sceneBeforeX),
+    panY: safeView.panY + (sceneAfterY - sceneBeforeY),
   };
 }
 

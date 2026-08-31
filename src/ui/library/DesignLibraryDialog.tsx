@@ -2,7 +2,7 @@
 // bundled manufacturing templates and vetted artwork. Insertion stays on the
 // normal SVG scene path and never applies operation or machine settings.
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, IconButton } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -14,7 +14,7 @@ import { DESIGN_LIBRARY } from './design-library';
 import { filterDesignLibrary, type LibraryFilters } from './design-library-filter';
 import type { LibraryEntry } from './design-library-types';
 import { EMPTY_LIBRARY_FILTERS } from './design-library-view-model';
-import { librarySvgObjectFor } from './library-entry-insert';
+import { insertLibraryEntryForDocument } from './library-entry-insert';
 import './design-library.css';
 import './design-library-card.css';
 import './design-library-detail.css';
@@ -29,8 +29,27 @@ export function DesignLibraryDialog(): JSX.Element | null {
 
 function OpenDesignLibraryDialog(): JSX.Element {
   const setOpen = useUiStore((state) => state.setLibraryDialogOpen);
-  const close = (): void => setOpen(false);
-  const browser = useDesignLibraryBrowser(close);
+  const owner = useRef({ mounted: true, revision: 0 });
+  useEffect(() => {
+    const currentOwner = owner.current;
+    currentOwner.mounted = true;
+    return () => {
+      currentOwner.mounted = false;
+      currentOwner.revision += 1;
+    };
+  }, []);
+  const close = useCallback((): void => {
+    owner.current.revision += 1;
+    setOpen(false);
+  }, [setOpen]);
+  const captureInsertOwner = useCallback((): (() => boolean) => {
+    const revision = ++owner.current.revision;
+    return () =>
+      owner.current.mounted &&
+      owner.current.revision === revision &&
+      useUiStore.getState().libraryDialogOpen;
+  }, []);
+  const browser = useDesignLibraryBrowser(close, captureInsertOwner);
   return (
     <Dialog title="Design Library" size="xl" panelClassName="lf-library-dialog" onClose={close}>
       <div className="lf-library-dialog__close">
@@ -92,7 +111,7 @@ function LibraryWorkspace(props: { readonly browser: LibraryBrowser }): JSX.Elem
   );
 }
 
-function useDesignLibraryBrowser(onClose: () => void) {
+function useDesignLibraryBrowser(onClose: () => void, captureInsertOwner: () => () => boolean) {
   const importSvgObject = useStore((state) => state.importSvgObject);
   const pushToast = useToastStore((state) => state.pushToast);
   const [filters, setFilters] = useState<LibraryFilters>(EMPTY_LIBRARY_FILTERS);
@@ -118,27 +137,20 @@ function useDesignLibraryBrowser(onClose: () => void) {
     setErrorMessage(undefined);
   };
   const insertEntry = async (entry: LibraryEntry): Promise<void> => {
-    let added = false;
+    const isRequestCurrent = captureInsertOwner();
     setAddingId(entry.id);
     setErrorMessage(undefined);
-    try {
-      const object = await librarySvgObjectFor(entry, crypto.randomUUID());
-      if (object === null) {
-        reportInsertError(entry);
-        return;
-      }
-      const outcome = importSvgObject(object);
-      if (outcome.kind !== 'added') {
-        reportInsertError(entry);
-        return;
-      }
-      added = true;
-    } catch {
-      reportInsertError(entry);
-    } finally {
-      setAddingId(undefined);
-    }
-    if (added) {
+    const result = await insertLibraryEntryForDocument({
+      entry,
+      id: crypto.randomUUID(),
+      getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+      isRequestCurrent,
+      importSvgObject,
+    });
+    if (!isRequestCurrent()) return;
+    setAddingId(undefined);
+    if (result === 'failed') reportInsertError(entry);
+    if (result === 'added') {
       pushToast(`${entry.title} added to the canvas.`, 'success');
       onClose();
     }

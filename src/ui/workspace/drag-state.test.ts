@@ -352,7 +352,7 @@ function objectAt(id: string, x: number, y: number): SceneObject {
     source: `${id}.svg`,
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
     transform: { ...IDENTITY_TRANSFORM, x, y },
-    paths: [],
+    paths: [{ color: '#ff0000', polylines: [rectanglePolyline(0, 0, 10, 10)] }],
   };
 }
 

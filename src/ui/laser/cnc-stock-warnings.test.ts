@@ -88,6 +88,47 @@ describe('detectCncStockWarnings', () => {
     expect(warnings[0]).toContain('100 × 100 mm stock');
   });
 
+  it('does not warn from a parser-collapsed tail outside the final stock footprint', () => {
+    const project = cncProject({
+      widthMm: 10_012,
+      heightMm: 20_002,
+      originOffset: { x: 0, y: 0 },
+    });
+    const prepared = prepareOutput(project);
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    const precisionJob = {
+      groups: [
+        {
+          kind: 'cnc' as const,
+          layerId: 'L1',
+          color: '#ff0000',
+          cutType: 'engrave' as const,
+          toolDiameterMm: 4,
+          feedMmPerMin: 600,
+          plungeMmPerMin: 200,
+          spindleRpm: 12_000,
+          spindleSpinupSec: 1,
+          safeZMm: 5,
+          passes: [
+            {
+              kind: 'contour' as const,
+              zMm: -1,
+              closed: false,
+              polyline: [
+                { x: 10_000, y: 20_000 },
+                { x: 10_010, y: 20_000 },
+                { x: 10_010.0004, y: 20_000 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(detectCncStockWarnings(project, { ...prepared, job: precisionJob })).toEqual([]);
+  });
+
   it('returns nothing for a laser project', () => {
     expect(detectCncStockWarnings(createProject())).toEqual([]);
   });

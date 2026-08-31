@@ -3,6 +3,11 @@ export {
   type OutputEmitOptions,
   type OutputStrategy,
 } from './output-strategy';
+export {
+  grblPowerModeWordsForJob,
+  type LaserJobPowerModeWords,
+  type LaserPowerModeWord,
+} from './grbl-power-modes';
 export { grblStrategy } from './grbl-strategy';
 export { resolveJobParkTarget } from './job-park-target';
 export { cncGrblStrategy, emitCncJobWithPassSpans } from './cnc-grbl-strategy';

@@ -34,7 +34,18 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-export function useDialogA11y(ref: RefObject<HTMLElement>, onClose: () => void): void {
+type DialogInitialFocus = 'first-control' | 'surface';
+
+type DialogA11yOptions = {
+  readonly closeOnEscape?: boolean;
+  readonly initialFocus?: DialogInitialFocus;
+};
+
+export function useDialogA11y(
+  ref: RefObject<HTMLElement>,
+  onClose: () => void,
+  options: DialogA11yOptions = {},
+): void {
   // The element that was focused before the dialog mounted, so we can
   // hand focus back on close. Captured once (the ref guards against
   // re-render clobbering) and read in the cleanup.
@@ -47,6 +58,8 @@ export function useDialogA11y(ref: RefObject<HTMLElement>, onClose: () => void):
   // field and collapsing any open <select> the operator just clicked.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   useEffect(() => {
     previouslyFocused.current =
@@ -57,11 +70,15 @@ export function useDialogA11y(ref: RefObject<HTMLElement>, onClose: () => void):
 
     // Initial focus — the first focusable child, or the dialog itself
     // (which becomes focusable when we set tabindex="-1" on it in JSX).
-    const initial = node.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? node;
+    const initial =
+      optionsRef.current.initialFocus === 'surface'
+        ? node
+        : (node.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? node);
     initial.focus();
 
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
+      if (!isTopmostModal(node)) return;
+      if (e.key === 'Escape' && optionsRef.current.closeOnEscape !== false) {
         e.preventDefault();
         onCloseRef.current();
         return;
@@ -85,6 +102,11 @@ export function useDialogA11y(ref: RefObject<HTMLElement>, onClose: () => void):
     // once for the dialog's lifetime. onClose is read via onCloseRef so its
     // changing identity never re-triggers this (see the ref above).
   }, [ref]);
+}
+
+function isTopmostModal(node: HTMLElement): boolean {
+  const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]');
+  return dialogs[dialogs.length - 1] === node;
 }
 
 function trapTabWithin(node: HTMLElement, event: KeyboardEvent): void {

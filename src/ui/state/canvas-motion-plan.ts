@@ -3,11 +3,11 @@ import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-e
 import { toSceneCoords, type DeviceProfile } from '../../core/devices';
 import {
   buildToolpath,
-  computeJobBounds,
   rotaryAppliesTo,
   type JobOriginPlacement,
   type JobPlacementSettings,
 } from '../../core/job';
+import { computeFrameJobBounds } from '../../core/job/job-bounds';
 import {
   buildMotionManifest,
   type MotionManifest,
@@ -160,7 +160,7 @@ function assembleCanvasPlan(
       device: args.prepared.project.device,
       coordinateFrame,
     });
-  const bounds = computeJobBounds(args.prepared.job, args.prepared.project.device);
+  const bounds = computeFrameJobBounds(args.prepared.job, args.prepared.project.device);
   const frameController =
     bounds === null
       ? []

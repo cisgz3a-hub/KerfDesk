@@ -21,6 +21,7 @@ import { gcodeCoordinateFailure } from '../../core/job/job-coordinate-encodabili
 import {
   emitCncJobWithPassSpans,
   finishOptionsForJobOrigin,
+  grblPowerModeWordsForJob,
   selectOutputStrategy,
   type CncPassSpan,
 } from '../../core/output';
@@ -164,7 +165,7 @@ export function emitPreparedGcodeWithCncPassSpans(
   const gcode = options.metadata
     ? gcodeMetadataHeader(
         options.metadata,
-        headerAssumptionsFor(prepared.project),
+        headerAssumptionsFor(prepared.project, job),
         prepared.project.device,
       ) + body
     : body;
@@ -270,9 +271,15 @@ function applyRotaryStage(project: Project, job: Job, allowRotaryRaster: boolean
 // The provenance header's assumption lines are machine-specific (ADR-103
 // defect fix): laser files record the $30 S-scale; router files record the
 // RPM mapping and $32=0.
-function headerAssumptionsFor(project: Project): GcodeHeaderAssumptions {
+function headerAssumptionsFor(project: Project, job: Job): GcodeHeaderAssumptions {
   const machine = project.machine;
   return machine !== undefined && machine.kind === 'cnc'
     ? { kind: 'cnc', spindleMaxRpm: machine.params.spindleMaxRpm }
-    : { kind: 'laser', maxPowerS: project.device.maxPowerS };
+    : {
+        kind: 'laser',
+        maxPowerS: project.device.maxPowerS,
+        controllerKind: project.device.controllerKind,
+        dialectId: project.device.gcodeDialect.dialectId,
+        effectivePowerModes: grblPowerModeWordsForJob(job, project.device),
+      };
 }

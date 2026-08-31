@@ -25,12 +25,12 @@ function materialized(luma: Uint8Array, width: number, height: number, mode: Err
 }
 
 function collectRows(
-  rowAt: (y: number) => Uint16Array,
+  rowAt: (y: number) => Float64Array,
   width: number,
   height: number,
   order: ReadonlyArray<number>,
-): Uint16Array {
-  const out = new Uint16Array(width * height);
+): Float64Array {
+  const out = new Float64Array(width * height);
   for (const y of order) out.set(rowAt(y), y * width);
   return out;
 }

@@ -90,7 +90,7 @@ test('Image Studio keeps transparent text transforms from covering the bitmap', 
   );
 
   await editor.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(page.getByText('Image edits applied.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Success: Image edits applied.', { exact: true })).toBeVisible();
   await waitForTwoFrames(page);
   const applied = await imageStudioCanvasSample(page);
   expect(await canvasRgbaSamples(canvas, transparentSamples)).toEqual(expectedTransparentRgba);

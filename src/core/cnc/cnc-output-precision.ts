@@ -1,8 +1,10 @@
-// Shared precision contract between CNC planning and emitted coordinates.
-// The GRBL emitter writes XYZ to three decimal places. Mask-aware CAM keeps a
-// full output quantum of clearance in XY and Z so nearest-decimal rounding,
-// residual rotation/translation, and representable-number noise cannot turn a
-// mathematically tangent path into excluded-stock removal.
+// Shared precision contract between CNC planning and ordinary emitted
+// coordinates. The GRBL emitter writes XYZ to three decimal places; only a
+// contour whose real XY motion would otherwise disappear may use the narrowest
+// per-word representation supported by GRBL's eight parsed input digits (see
+// cnc-contour-emission.ts). Mask-aware CAM keeps a full standard-output quantum
+// of clearance in XY and Z, so that narrow exception cannot weaken its
+// conservative clearance.
 
 export const CNC_COORDINATE_DECIMAL_PLACES = 3;
 export const CNC_COORDINATE_QUANTUM_MM = 10 ** -CNC_COORDINATE_DECIMAL_PLACES;

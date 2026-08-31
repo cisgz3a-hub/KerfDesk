@@ -35,6 +35,7 @@ import { normalizeLibraryAssetProvenance } from './project-library-provenance-no
 import { validateProjectShape } from './project-shape-validator';
 import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
 import { normalizeProjectJobSetup } from './project-job-setup-normalizer';
+import { projectDeviceControllerCompatibleFields } from './project-device-controller-compatibility';
 
 export type DeserializeResult =
   | { readonly kind: 'ok'; readonly project: Project; readonly migratedFrom?: number }
@@ -297,7 +298,16 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     ? dev['controllerKind']
     : undefined;
   const scanningOffsets = normalizeScanOffsetTable(dev['scanningOffsets']);
-  return {
+  const compatibleControllerFields = projectDeviceControllerCompatibleFields({
+    ...(controllerKind === undefined ? {} : { controllerKind }),
+    streamingMode: streamingModeForController(
+      controllerKind,
+      normalizeGrblStreamingMode(dev['streamingMode']),
+    ),
+    rxBufferBytes: normalizeGrblRxBufferBytes(dev['rxBufferBytes']),
+    gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
+  });
+  const normalized = {
     ...dev,
     accelMmPerSec2: numberOrDefault(dev['accelMmPerSec2'], DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
     junctionDeviationMm: numberOrDefault(
@@ -311,12 +321,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
       DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     ),
     airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
-    streamingMode: streamingModeForController(
-      controllerKind,
-      normalizeGrblStreamingMode(dev['streamingMode']),
-    ),
-    rxBufferBytes: normalizeGrblRxBufferBytes(dev['rxBufferBytes']),
-    gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
+    ...compatibleControllerFields,
     scanningOffsets,
     ...recoveredCncDevicePatch(dev),
     scanOffsetCalibrationStatus: normalizeScanOffsetCalibrationStatus(
@@ -343,6 +348,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     ...normalizeZTravelPatch(dev),
     ...normalizeControllerPatch(dev),
   };
+  return normalized;
 }
 
 // ADR-094: a corrupt/unknown controllerKind must never reach

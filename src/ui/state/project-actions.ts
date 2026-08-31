@@ -21,6 +21,7 @@ type InitialStateFactory = (project?: Project) => Partial<AppState>;
 export type ProjectActions = {
   readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
   readonly newProject: () => void;
+  readonly claimProjectOpenRequest: () => number;
   readonly acceptOpenedProjectMachine: () => void;
   readonly keepCurrentMachineForOpenedProject: () => void;
 };
@@ -67,6 +68,11 @@ export function projectActions(
           projectBedReconciliation: null,
         };
       }),
+    claimProjectOpenRequest: () => {
+      const nextEpoch = get().projectOpenRequestEpoch + 1;
+      set({ projectOpenRequestEpoch: nextEpoch });
+      return nextEpoch;
+    },
     acceptOpenedProjectMachine: () => set({ projectBedReconciliation: null }),
     keepCurrentMachineForOpenedProject: () =>
       set((state) => keepCurrentMachinePatch(state, state.projectBedReconciliation)),
@@ -95,7 +101,7 @@ function keepCurrentMachinePatch(
 
 function retainedApplicationState(
   state: AppState,
-): Pick<AppState, 'layerDefaults' | 'cncLibrary' | 'cncLiveCaps'> &
+): Pick<AppState, 'layerDefaults' | 'cncLibrary' | 'cncLiveCaps' | 'projectOpenRequestEpoch'> &
   ReturnType<typeof currentMaterialLibraryState> &
   ReturnType<typeof currentSavedLibrariesState> {
   return {
@@ -104,5 +110,6 @@ function retainedApplicationState(
     layerDefaults: state.layerDefaults,
     cncLibrary: state.cncLibrary,
     cncLiveCaps: state.cncLiveCaps,
+    projectOpenRequestEpoch: state.projectOpenRequestEpoch,
   };
 }

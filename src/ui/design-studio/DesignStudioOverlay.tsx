@@ -10,7 +10,8 @@
 // Studio binds its own keymap to this root div rather than to window. Esc is a
 // ladder, not a close.
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
+import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useStore } from '../state';
 import { DesignCanvas } from './DesignCanvas';
@@ -27,10 +28,11 @@ import { fitView } from './design-view';
 export function DesignStudioOverlay(): JSX.Element | null {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const session = useDesignStudioStore((state) => state.session);
+  const closeStudio = useDesignStudioStore((state) => state.closeStudio);
   const setView = useDesignStudioStore((state) => state.setView);
   const workspace = useStore((state) => state.project.workspace);
   useRegisterModal();
-  useInitialFocus(rootRef);
+  useDialogA11y(rootRef, closeStudio, { closeOnEscape: false, initialFocus: 'surface' });
 
   const handleFit = useCallback(() => {
     const host = rootRef.current?.querySelector('canvas')?.parentElement;
@@ -71,15 +73,6 @@ export function DesignStudioOverlay(): JSX.Element | null {
       <DesignStatusBar />
     </div>
   );
-}
-
-// Deferred a frame so it wins the initial-focus race against whatever the app
-// focused last — the kit-dialog convention Image Studio also follows.
-function useInitialFocus(rootRef: React.RefObject<HTMLDivElement | null>): void {
-  useEffect(() => {
-    const handle = requestAnimationFrame(() => rootRef.current?.focus());
-    return () => cancelAnimationFrame(handle);
-  }, [rootRef]);
 }
 
 const overlayStyle: React.CSSProperties = {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LaserState } from './laser-store';
 import { useLaserStore } from './laser-store';
-import { FIRE_ACTIVE_COMMAND_MESSAGE } from './laser-store-helpers';
+import { FIRE_ACTIVE_COMMAND_MESSAGE, MPG_ACTIVE_COMMAND_MESSAGE } from './laser-store-helpers';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
 
 function state(overrides: Partial<LaserState> = {}): LaserState {
@@ -25,18 +25,35 @@ describe('machineSettingsReadBlockReason', () => {
     expect(machineSettingsReadBlockReason(state())).toBeNull();
   });
 
-  it('requires a connection and a reported Idle state', () => {
+  it('requires a connection and exact Idle or Alarm evidence', () => {
     expect(machineSettingsReadBlockReason(state({ connection: { kind: 'disconnected' } }))).toBe(
       'Connect to the laser first.',
     );
     expect(machineSettingsReadBlockReason(state({ statusReport: null }))).toBe(
-      'Controller must report Idle before reading machine settings.',
+      'Controller must report Idle or Alarm before reading machine settings.',
     );
     expect(
       machineSettingsReadBlockReason(
         state({ statusReport: { state: 'Run' } as LaserState['statusReport'] }),
       ),
-    ).toBe('Controller must report Idle before reading machine settings.');
+    ).toBe('Controller must report Idle or Alarm before reading machine settings.');
+    expect(
+      machineSettingsReadBlockReason(
+        state({ statusReport: { state: 'Alarm' } as LaserState['statusReport'] }),
+      ),
+    ).toBeNull();
+    expect(machineSettingsReadBlockReason(state({ statusReport: null, alarmCode: 9 }))).toBeNull();
+  });
+
+  it('keeps explicit MPG ownership authoritative during Alarm', () => {
+    expect(
+      machineSettingsReadBlockReason(
+        state({
+          statusReport: { state: 'Alarm' } as LaserState['statusReport'],
+          mpgActive: true,
+        }),
+      ),
+    ).toBe(MPG_ACTIVE_COMMAND_MESSAGE);
   });
 
   it('waits for fire and queued writes without dispatching anything', () => {

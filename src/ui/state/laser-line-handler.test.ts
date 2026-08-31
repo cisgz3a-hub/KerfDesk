@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createStreamer, idleCollector, onAck, pause, step } from '../../core/controllers/grbl';
+import {
+  createStreamer,
+  idleCollector,
+  onAck,
+  pause,
+  startCollecting,
+  step,
+} from '../../core/controllers/grbl';
 import { handleLine } from './laser-line-handler';
 import { makeLineHandlerHarness as makeHarness } from './laser-line-handler.test-support';
+import { reportedWorkPositionMm } from './canvas-motion-plan';
 import { useStore } from './store';
 
 afterEach(() => {
@@ -10,6 +18,47 @@ afterEach(() => {
 });
 
 describe('handleLine detected controller settings', () => {
+  it('discards a settings read and its qualification when MPG takes ownership', () => {
+    const { refs, set, get } = makeHarness();
+    refs.settingsCollector = startCollecting();
+    refs.settingsCollectorSessionEpoch = get().controllerSessionEpoch;
+    set({
+      controllerSettings: { maxPowerS: 1_000, reportInches: true },
+      controllerSettingsObservation: { sessionEpoch: get().controllerSessionEpoch, observedAt: 1 },
+      controllerQualification: {
+        kind: 'qualified',
+        epoch: get().controllerSessionEpoch,
+        settings: 'verified',
+      },
+    });
+    useStore.getState().setCncLiveCaps({ xMaxFeedMmPerMin: 500 });
+
+    handleLine(set, get, refs, async () => undefined, '<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:1>');
+    for (const line of ['$30=100000', '$32=1', 'ok']) {
+      handleLine(set, get, refs, async () => undefined, line);
+    }
+
+    expect(refs.settingsCollector).toEqual(idleCollector());
+    expect(refs.settingsCollectorSessionEpoch).toBeNull();
+    expect(get()).toMatchObject({
+      mpgActive: true,
+      controllerSettings: { maxPowerS: 1_000, reportInches: true },
+      controllerSettingsObservation: null,
+      detectedSettings: null,
+      grblSettingsRows: [],
+      lastSettingsReadAt: null,
+      controllerQualification: { kind: 'failed', epoch: get().controllerSessionEpoch },
+    });
+    expect(useStore.getState().cncLiveCaps).toBeNull();
+
+    handleLine(set, get, refs, async () => undefined, '<Idle|MPos:1.000,0.000,0.000|FS:0,0|MPG:0>');
+    expect(reportedWorkPositionMm(get(), get().controllerSettings?.reportInches === true)).toEqual({
+      x: 25.4,
+      y: 0,
+      z: 0,
+    });
+  });
+
   it('publishes detected settings both for the banner and for live Start readiness', () => {
     const { refs, set, get } = makeHarness();
 

@@ -7,7 +7,7 @@ import { grblSettingMachineKindIssue } from '../../core/controllers/grbl/grbl-se
 import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf, type MachineKind } from '../../core/scene';
 import { useStore } from './store';
-import { requestActiveWcsReadback } from './active-wcs-readback';
+import { requestTerminalOwnedActiveWcsReadback } from './terminal-owned-wcs-readback';
 import {
   beginSettingsCollection,
   clearCncLiveCaps,
@@ -19,6 +19,7 @@ import {
   qualifyingController,
 } from './laser-controller-qualification';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
+import { interactiveControllerOperation } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
@@ -40,6 +41,10 @@ type SettingsWriteFn = (
 ) => Promise<void>;
 
 const BUILD_INFO_READ_OPERATION_LABEL = 'Reading controller build information';
+
+function settingsControllerOperation(label: string) {
+  return interactiveControllerOperation(label, 'terminal-exchange');
+}
 
 export type GrblSettingsActionRefs = ControllerLifecycleRefs & {
   driver: ControllerDriver;
@@ -84,11 +89,7 @@ async function readMachineSettingsAction(
   }
   beginSettingsCollection(refs, qualificationEpoch);
   set({
-    controllerOperation: {
-      kind: 'interactive-command',
-      phase: 'command',
-      label: SETTINGS_READ_OPERATION_LABEL,
-    },
+    controllerOperation: settingsControllerOperation(SETTINGS_READ_OPERATION_LABEL),
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
@@ -115,11 +116,7 @@ async function readMachineSettingsAction(
       set((state) =>
         state.controllerSessionEpoch === qualificationEpoch
           ? {
-              controllerOperation: {
-                kind: 'interactive-command',
-                phase: 'command',
-                label: BUILD_INFO_READ_OPERATION_LABEL,
-              },
+              controllerOperation: settingsControllerOperation(BUILD_INFO_READ_OPERATION_LABEL),
             }
           : {},
       );
@@ -127,13 +124,26 @@ async function readMachineSettingsAction(
     assertSettingsCommandOwnership(get);
     await refreshControllerBuildInfo(set, get, refs, write, qualificationEpoch);
     assertSettingsCommandOwnership(get);
-    clearInteractiveOperation(set, qualificationEpoch);
     // A reset banner nulls activeWcs and this action is the post-reset
     // re-qualification (refs.runControllerQualification), so a completed read
     // is the earliest safe point to re-seed the C6 advisory's modal state.
+    set((state) =>
+      state.controllerSessionEpoch === qualificationEpoch
+        ? {
+            controllerOperation: settingsControllerOperation('Reading active work coordinates'),
+          }
+        : {},
+    );
     assertSettingsCommandOwnership(get);
-    await requestActiveWcsReadback(get, refs.driver, write, qualificationEpoch);
+    await requestTerminalOwnedActiveWcsReadback(
+      get,
+      refs,
+      write,
+      qualificationEpoch,
+      'interactive-command',
+    );
     assertSettingsCommandOwnership(get);
+    clearInteractiveOperation(set, qualificationEpoch);
   } catch (err) {
     failSettingsOperation(set, refs, qualificationEpoch, 'read', err);
   }
@@ -216,11 +226,7 @@ async function writeGrblSettingAction(
   const qualificationEpoch = get().controllerSessionEpoch;
   const trimmed = value.trim();
   set({
-    controllerOperation: {
-      kind: 'interactive-command',
-      phase: 'command',
-      label: `Writing $${id}`,
-    },
+    controllerOperation: settingsControllerOperation(`Writing $${id}`),
   });
   try {
     await writeAndVerifySetting(set, get, refs, write, qualificationEpoch, id, trimmed);
@@ -253,11 +259,7 @@ async function writeAndVerifySetting(
   assertSettingsCommandOwnership(get);
   beginSettingsCollection(refs, qualificationEpoch);
   set({
-    controllerOperation: {
-      kind: 'interactive-command',
-      phase: 'command',
-      label: `Verifying $${id}`,
-    },
+    controllerOperation: settingsControllerOperation(`Verifying $${id}`),
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,

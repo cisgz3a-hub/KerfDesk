@@ -5,8 +5,10 @@ import {
   burnDecodeMaxEdge,
   compositeRgbOverWhitePreservingAlpha,
   dataUrlToFile,
+  embeddedCanvasSupportsImageDimensions,
   loadImageAsRawData,
   readImageNaturalSize,
+  readPngHeaderDimensions,
   readFileAsDataUrl,
   scaleToCap,
 } from './image-loader';
@@ -148,6 +150,17 @@ describe('image-loader scaleToCap (ADR-037 decode resolution)', () => {
 });
 
 describe('image-loader header guards', () => {
+  it('separates an oversize source edge from the incremental decoder route', async () => {
+    const compressed = pngFileWithSize(20_000, 1);
+
+    await expect(readPngHeaderDimensions(compressed)).resolves.toEqual({
+      width: 20_000,
+      height: 1,
+    });
+    expect(embeddedCanvasSupportsImageDimensions({ width: 20_000, height: 1 })).toBe(false);
+    expect(embeddedCanvasSupportsImageDimensions({ width: 16_384, height: 1 })).toBe(true);
+  });
+
   it('asks ImageBitmap to resize a large source during decode', async () => {
     const file = pngFileWithSize(4096, 2048);
     const bitmap = {

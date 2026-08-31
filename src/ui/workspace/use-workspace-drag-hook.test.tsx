@@ -176,6 +176,84 @@ describe('useDragMove hook event pipeline', () => {
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
 
+  it('ignores move and up events from a pointer that does not own the drag', async () => {
+    const project = projectWithRectangle();
+    useStore.getState().setProject(project);
+    useStore.getState().selectObject('rect');
+    const { canvas } = await renderHarness();
+    const start = clientForScenePoint(project, { x: 50, y: 50 });
+    const end = clientForScenePoint(project, { x: 70, y: 80 });
+
+    await dispatchPointer(canvas, 'pointerdown', start);
+    await dispatchPointer(canvas, 'pointermove', { ...end, pointerId: POINTER_ID + 1 });
+    await dispatchPointer(canvas, 'pointerup', { ...end, pointerId: POINTER_ID + 1 });
+
+    expect(canvas.dataset.dragKind).toBe('move');
+    expect(useStore.getState().project.scene.objects[0]?.transform).toEqual(
+      project.scene.objects[0]?.transform,
+    );
+    expect(useStore.getState().pendingUndo).not.toBeNull();
+
+    await dispatchPointer(canvas, 'pointermove', end);
+    await dispatchPointer(canvas, 'pointerup', end);
+    expect(canvas.dataset.dragKind).toBe('');
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it.each(['pointercancel', 'lostpointercapture'] as const)(
+    '%s from the owner rolls the project back without undo history',
+    async (endEvent) => {
+      const project = projectWithRectangle();
+      useStore.getState().setProject(project);
+      useStore.getState().selectObject('rect');
+      const { canvas } = await renderHarness();
+
+      await dispatchPointer(canvas, 'pointerdown', clientForScenePoint(project, { x: 50, y: 50 }));
+      await dispatchPointer(canvas, 'pointermove', clientForScenePoint(project, { x: 70, y: 80 }));
+      expect(useStore.getState().project.scene.objects[0]?.transform).not.toEqual(
+        project.scene.objects[0]?.transform,
+      );
+
+      await dispatchPointer(canvas, endEvent, { clientX: 0, clientY: 0 });
+
+      expect(canvas.dataset.dragKind).toBe('');
+      expect(useStore.getState().project.scene.objects[0]?.transform).toEqual(
+        project.scene.objects[0]?.transform,
+      );
+      expect(useStore.getState().pendingUndo).toBeNull();
+      expect(useStore.getState().undoStack).toHaveLength(0);
+    },
+  );
+
+  it('restores the exact starting pan when pointer capture is cancelled', async () => {
+    useUiStore.setState({ panX: 8, panY: -5 });
+    const { canvas } = await renderHarness({ previewMode: true });
+
+    await dispatchPointer(canvas, 'pointerdown', { clientX: 60, clientY: 60, button: 1 });
+    await dispatchPointer(canvas, 'pointermove', { clientX: 100, clientY: 120, button: 1 });
+    expect(useUiStore.getState()).not.toMatchObject({ panX: 8, panY: -5 });
+    await dispatchPointer(canvas, 'pointercancel', { clientX: 100, clientY: 120, button: 1 });
+
+    expect(useUiStore.getState()).toMatchObject({ panX: 8, panY: -5 });
+  });
+
+  it('restores the exact starting pan and ends the drag on Escape', async () => {
+    useUiStore.setState({ panX: 8, panY: -5 });
+    const { canvas } = await renderHarness({ previewMode: true });
+
+    await dispatchPointer(canvas, 'pointerdown', { clientX: 60, clientY: 60, button: 1 });
+    await dispatchPointer(canvas, 'pointermove', { clientX: 100, clientY: 120, button: 1 });
+    expect(useUiStore.getState()).not.toMatchObject({ panX: 8, panY: -5 });
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+
+    expect(useUiStore.getState()).toMatchObject({ panX: 8, panY: -5 });
+    await dispatchPointer(canvas, 'pointermove', { clientX: 140, clientY: 160, button: 1 });
+    expect(useUiStore.getState()).toMatchObject({ panX: 8, panY: -5 });
+  });
+
   it('Esc cancels an in-progress move drag and rolls the object back (C4)', async () => {
     const project = projectWithRectangle();
     useStore.getState().setProject(project);
@@ -237,7 +315,8 @@ function DragHarness(props: { readonly previewMode?: boolean }): JSX.Element {
       onPointerDown={handlers.onPointerDown}
       onPointerMove={handlers.onPointerMove}
       onPointerUp={handlers.onPointerUp}
-      onPointerCancel={handlers.onPointerUp}
+      onPointerCancel={handlers.onPointerCancel}
+      onLostPointerCapture={handlers.onLostPointerCapture}
       aria-label="drag hook test canvas"
     />
   );
@@ -262,8 +341,19 @@ async function renderHarness(
 
 async function dispatchPointer(
   target: HTMLCanvasElement,
-  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel' | 'pointerleave',
-  init: { readonly clientX: number; readonly clientY: number; readonly button?: number },
+  type:
+    | 'pointerdown'
+    | 'pointermove'
+    | 'pointerup'
+    | 'pointercancel'
+    | 'pointerleave'
+    | 'lostpointercapture',
+  init: {
+    readonly clientX: number;
+    readonly clientY: number;
+    readonly button?: number;
+    readonly pointerId?: number;
+  },
 ): Promise<void> {
   // jsdom has no PointerEvent constructor, so build a MouseEvent of the
   // pointer type (React maps it to onPointerX) and attach a pointerId.
@@ -273,7 +363,7 @@ async function dispatchPointer(
     clientX: init.clientX,
     clientY: init.clientY,
   });
-  Object.defineProperty(event, 'pointerId', { value: POINTER_ID });
+  Object.defineProperty(event, 'pointerId', { value: init.pointerId ?? POINTER_ID });
   await act(async () => {
     target.dispatchEvent(event);
   });

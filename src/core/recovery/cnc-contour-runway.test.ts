@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { cncContourEmissionPoints } from '../cnc/cnc-contour-emission';
 import type { CncGroup, Job } from '../job';
 import type { Vec2 } from '../scene';
 import { buildCncRecoveryEventManifest } from './cnc-recovery-manifest';
@@ -285,5 +286,77 @@ describe('planCncContourRunway', () => {
         },
       }),
     ).toEqual({ kind: 'error', reason: 'source-mismatch' });
+  });
+
+  it('maps a later raw event to represented motion and proves it from the prior emitted event', () => {
+    const job = contourJob([
+      { x: 10_000, y: 20_000 },
+      { x: 10_010, y: 20_000 },
+      { x: 10_010.0004, y: 20_000 },
+      { x: 10_020, y: 20_000 },
+    ]);
+    const result = planCncContourRunway({
+      job,
+      manifest: buildCncRecoveryEventManifest(job),
+      uncertaintyEventId: 'cnc-op-1/pass-1/cut-3',
+      clearedPathEvidence: {
+        kind: 'committed-through-event',
+        eventId: 'cnc-op-1/pass-1/cut-1',
+        proofId: 'execution-fence-4',
+      },
+      profile: {
+        qualificationId: 'machine-profile-4040-v1',
+        minRunwayMm: 5,
+        accelerationMmPerSec2: 100,
+        safetyMarginMm: 0,
+      },
+    });
+
+    const plan = expectPlan(result);
+    expect(plan.source.segmentIndex).toBe(2);
+    expect(plan.recoveryPolyline).toEqual([
+      { x: 10_005, y: 20_000 },
+      { x: 10_010, y: 20_000 },
+      { x: 10_020, y: 20_000 },
+    ]);
+  });
+
+  it('keeps the represented recovery runway at or beyond its required length', () => {
+    const job = contourJob([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 20, y: 0 },
+    ]);
+    const requiredRunwayMm = 1.2344;
+    const result = planCncContourRunway({
+      job,
+      manifest: buildCncRecoveryEventManifest(job),
+      uncertaintyEventId: 'cnc-op-1/pass-1/cut-2',
+      clearedPathEvidence: {
+        kind: 'committed-through-event',
+        eventId: 'cnc-op-1/pass-1/cut-1',
+        proofId: 'execution-fence-4',
+      },
+      profile: {
+        qualificationId: 'machine-profile-4040-v1',
+        minRunwayMm: requiredRunwayMm,
+        accelerationMmPerSec2: 100,
+        safetyMarginMm: 0,
+      },
+    });
+
+    const plan = expectPlan(result);
+    const represented = cncContourEmissionPoints({
+      kind: 'contour',
+      zMm: plan.motion.cutZMm,
+      closed: false,
+      polyline: plan.recoveryPolyline,
+    });
+    expect(plan.recoveryPolyline).toEqual(represented);
+    const runwayStart = plan.runwayPolyline[0];
+    const runwayEnd = plan.runwayPolyline[plan.runwayPolyline.length - 1];
+    expect(Math.hypot((runwayEnd?.x ?? 0) - (runwayStart?.x ?? 0))).toBeGreaterThanOrEqual(
+      requiredRunwayMm,
+    );
   });
 });

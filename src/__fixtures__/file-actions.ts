@@ -70,6 +70,20 @@ export function projectWithLine(): Project {
   };
 }
 
+export function projectOpenRequestEpochCallbacks(): {
+  readonly claimProjectOpenRequest: () => number;
+  readonly getProjectOpenRequestEpoch: () => number;
+} {
+  let epoch = 0;
+  return {
+    claimProjectOpenRequest: () => {
+      epoch += 1;
+      return epoch;
+    },
+    getProjectOpenRequestEpoch: () => epoch,
+  };
+}
+
 export function projectWithTwoLines(): Project {
   const project = createProject();
   return {

@@ -101,7 +101,23 @@ describe('compileJob raster image groups', () => {
 
     expect(raster).toMatchObject({ pixelWidth: 2100, pixelHeight: 2100 });
     expect(raster?.sValues).toHaveLength(0);
-    expect(raster?.rowProvider?.(0)).toEqual(new Uint16Array(2100).fill(300));
+    expect(raster?.rowProvider?.(0)).toEqual(new Float64Array(2100).fill(300));
+  });
+
+  it('emits raster S values above 65535 without wrapping or capping', () => {
+    const highPowerDevice = { ...dev, maxPowerS: 100_000 };
+    const job = compileJob(
+      {
+        objects: [rasterObject('AAAAAA==')],
+        layers: [imageLayer({ passThrough: true, power: 100 })],
+      },
+      highPowerDevice,
+    );
+
+    expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toEqual([
+      100_000, 100_000, 100_000, 100_000,
+    ]);
+    expect(grblStrategy.emit(job, highPowerDevice)).toContain('S100000');
   });
 
   it('keeps scan-offset compensation profile-scoped instead of baking it into raster groups', () => {

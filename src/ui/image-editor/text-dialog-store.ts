@@ -13,6 +13,7 @@ const MAX_LAYER_NAME = 24;
 
 export type TextDialogState = {
   readonly isOpen: boolean;
+  readonly commitRequest: symbol | null;
   readonly text: string;
   readonly fontKey: TextLayerSpec['fontKey'];
   readonly sizePx: number;
@@ -28,6 +29,7 @@ export type TextDialogState = {
 
 export const useTextDialogStore = create<TextDialogState>((set, get) => ({
   isOpen: false,
+  commitRequest: null,
   text: '',
   fontKey: 'roboto-regular',
   sizePx: 48,
@@ -41,9 +43,9 @@ export const useTextDialogStore = create<TextDialogState>((set, get) => ({
     if (editor.transform !== null) editor.commitTransform();
     const current = useImageEditorStore.getState();
     if (current.session === null || current.transform !== null) return;
-    set({ isOpen: true, text: '' });
+    set({ isOpen: true, text: '', commitRequest: null });
   },
-  close: () => set({ isOpen: false }),
+  close: () => set({ isOpen: false, commitRequest: null }),
   setText: (text) => set({ text }),
   setFontKey: (fontKey) => set({ fontKey }),
   setSizePx: (sizePx) => {
@@ -53,23 +55,35 @@ export const useTextDialogStore = create<TextDialogState>((set, get) => ({
 
   commit: async () => {
     const { text, fontKey, sizePx, ink } = get();
-    const session = useImageEditorStore.getState().session;
+    const editor = useImageEditorStore.getState();
+    const session = editor.session;
+    const sessionOwner = editor.sessionOwner;
     if (session === null) {
-      set({ isOpen: false });
+      set({ isOpen: false, commitRequest: null });
       return;
     }
+    const commitRequest = Symbol(session.objectId);
+    set({ commitRequest });
     const buffer = await rasterizeTextLayer(session.doc.width, session.doc.height, {
       text,
       fontKey,
       sizePx,
       color: ink === 'black' ? BLACK : WHITE,
     });
-    set({ isOpen: false });
-    // Re-read: the async render may have outlived the session (close/switch).
-    const current = useImageEditorStore.getState().session;
-    if (buffer === null || current === null || current.objectId !== session.objectId) return;
+    // Re-read: the async render may have outlived this exact session, owner,
+    // dialog, or a later commit request. Object ids alone are not ownership.
+    const current = useImageEditorStore.getState();
+    if (
+      buffer === null ||
+      get().commitRequest !== commitRequest ||
+      current.session !== session ||
+      current.sessionOwner !== sessionOwner
+    ) {
+      return;
+    }
+    set({ isOpen: false, commitRequest: null });
     useImageEditorStore.setState({
-      session: addTextLayer(current, crypto.randomUUID(), layerName(text), buffer),
+      session: addTextLayer(session, crypto.randomUUID(), layerName(text), buffer),
     });
   },
 }));

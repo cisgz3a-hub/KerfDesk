@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { createStreamer, step } from '../../core/controllers/grbl';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { fingerprintGcode } from '../../core/recovery';
 import { createProject } from '../../core/scene';
@@ -70,6 +71,17 @@ function deferred(): { readonly promise: Promise<void>; readonly resolve: () => 
     resolve = done;
   });
   return { promise, resolve };
+}
+
+function rejectedDeferred(): {
+  readonly promise: Promise<void>;
+  readonly reject: (error: Error) => void;
+} {
+  let reject: (error: Error) => void = () => undefined;
+  const promise = new Promise<void>((_resolve, fail) => {
+    reject = fail;
+  });
+  return { promise, reject };
 }
 
 async function waitForToolChangeStream(): Promise<void> {
@@ -329,6 +341,36 @@ describe('CNC tool-change Continue into the next hold (F22)', () => {
     startWrite.resolve();
     await starting;
     expectCountdownState('tool-change', 'paused');
+  });
+
+  it('leaves a replacement stream untouched when a Continue write rejects late', async () => {
+    const writeControl: ProgramWriteControl = { gate: null };
+    const connection = makeConnection([], writeControl);
+    await connectWith(connection);
+    await startCountdownJob();
+    await settleToolChange(connection, 'em-6350');
+
+    const continueWrite = rejectedDeferred();
+    writeControl.gate = continueWrite.promise;
+    const continuing = useLaserStore.getState().continueToolChange();
+    await flush();
+    const oldEpoch = useLaserStore.getState().streamerEpoch;
+    const replacement = step(createStreamer('G1 X99\n')).state;
+    useLaserStore.setState({
+      streamer: replacement,
+      streamerEpoch: oldEpoch + 1,
+      safetyNotice: null,
+    });
+    continueWrite.reject(new Error('late old Continue rejection'));
+
+    await expect(continuing).rejects.toThrow('late old Continue rejection');
+    await flush();
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: replacement,
+      streamerEpoch: oldEpoch + 1,
+      safetyNotice: { kind: 'write-failed', action: 'resume' },
+      connection: { kind: 'connected' },
+    });
   });
 
   it.each([
