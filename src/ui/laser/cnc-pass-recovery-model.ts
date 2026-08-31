@@ -3,7 +3,8 @@
 // boundary is preselected. Built ONLY from the sealed capsule plus the live
 // work-offset snapshot passed in — never from the open canvas.
 
-import { cncPassEntryDepthMm, cncPassXyPoints, type Group } from '../../core/job';
+import { cncPassRepresentedXyPoints } from '../../core/cnc/cnc-pass-representation';
+import { cncPassEntryDepthMm, type Group } from '../../core/job';
 import { resolveCncResumePoint, type CncResumePoint } from '../../core/recovery/cnc-resume-point';
 import type { Vec2 } from '../../core/scene';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
@@ -131,7 +132,7 @@ function collectPassOptions(
           ` · pass ${passIndex + 1} of ${group.passes.length}` +
           ` · Z ${cncPassEntryDepthMm(pass).toFixed(3)} mm`,
         status: passStatus({ groupIndex, passIndex }, resumePoint, lastPossiblePass),
-        xyPoints: cncPassXyPoints(pass),
+        xyPoints: cncPassRepresentedXyPoints(pass),
       });
     }
   }

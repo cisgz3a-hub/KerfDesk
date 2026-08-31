@@ -24,6 +24,7 @@ export type CncContourEmissionVertex = {
   readonly point: Vec2;
   readonly xText: string;
   readonly yText: string;
+  readonly sourcePointIndex: number;
 };
 
 type ContourSegmentStats = {
@@ -128,7 +129,9 @@ export function cncContourEmissionVertices(
   const precision = cncContourEmissionPrecision(pass);
   if (precision === null) return [];
   const vertices: CncContourEmissionVertex[] = [];
-  for (const point of pass.polyline) {
+  for (let sourcePointIndex = 0; sourcePointIndex < pass.polyline.length; sourcePointIndex += 1) {
+    const point = pass.polyline[sourcePointIndex];
+    if (point === undefined) continue;
     const xText = formatCncContourCoordinate(point.x, precision);
     const yText = formatCncContourCoordinate(point.y, precision);
     const parsed = {
@@ -143,7 +146,7 @@ export function cncContourEmissionVertices(
     ) {
       continue;
     }
-    vertices.push({ point: parsed, xText, yText });
+    vertices.push({ point: parsed, xText, yText, sourcePointIndex });
   }
   return vertices;
 }

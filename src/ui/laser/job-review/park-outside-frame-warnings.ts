@@ -6,7 +6,8 @@
 // informs the operator and never refuses Frame or Start.
 
 import type { DeviceProfile } from '../../../core/devices';
-import { computeJobMotionBounds, type Job, type JobBounds } from '../../../core/job';
+import type { Job, JobBounds } from '../../../core/job';
+import { computeFrameJobMotionBounds } from '../../../core/job/job-bounds';
 import { resolveJobParkTarget, type OutputEmitOptions } from '../../../core/output';
 import type { MachineKind, Vec2 } from '../../../core/scene';
 import { formatMm } from './job-review-format';
@@ -33,7 +34,7 @@ export function detectParkOutsideFrameWarnings(
   machineKind: MachineKind,
   finishPosition: OutputEmitOptions['finishPosition'],
 ): ReadonlyArray<string> {
-  const bounds = computeJobMotionBounds(job, device);
+  const bounds = computeFrameJobMotionBounds(job, device);
   const park = resolveJobParkTarget(job, device, machineKind, finishPosition);
   return detectParkOutsideFrameWarningsFromMetrics(bounds, park);
 }

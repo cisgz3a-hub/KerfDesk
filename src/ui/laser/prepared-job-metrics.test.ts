@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type RotarySetup } from '../../core/devices';
 import type { ExecutablePlanV1 } from '../../core/execution-plan';
-import { estimateJobDuration, machineSpaceJob, type CutGroup, type Job } from '../../core/job';
+import {
+  estimateJobDuration,
+  machineSpaceJob,
+  type CncGroup,
+  type CutGroup,
+  type Job,
+} from '../../core/job';
 import { createProject } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import { buildPreparedJobMetrics } from './prepared-job-metrics';
@@ -57,6 +63,30 @@ function subPrecisionYLineJob(): Job {
       },
     ],
   };
+}
+
+function precisionCncJob(xs: ReadonlyArray<number>): Job {
+  const group: CncGroup = {
+    kind: 'cnc',
+    layerId: 'cnc',
+    color: '#000000',
+    cutType: 'engrave',
+    toolDiameterMm: 4,
+    feedMmPerMin: 600,
+    plungeMmPerMin: 200,
+    spindleRpm: 12_000,
+    spindleSpinupSec: 1,
+    safeZMm: 5,
+    passes: [
+      {
+        kind: 'contour',
+        zMm: -1,
+        closed: false,
+        polyline: xs.map((x) => ({ x, y: 20_000 })),
+      },
+    ],
+  };
+  return { groups: [group] };
 }
 
 function deviceWith(rotary: RotarySetup | undefined) {
@@ -120,5 +150,21 @@ describe('buildPreparedJobMetrics calculated bounds', () => {
     expect(metrics.motionBounds?.maxY).toBe(50);
     expect(metrics.frameJobBounds?.maxY).toBe(50.0004);
     expect(metrics.frameMotionBounds?.maxY).toBe(50.0004);
+  });
+
+  it('uses represented CNC bounds for output disclosure and Frame on a mixed contour', () => {
+    const metrics = buildPreparedJobMetrics(
+      preparedWith(precisionCncJob([10_000, 10_010, 10_010.0004])),
+    );
+
+    expect(metrics.jobBounds?.maxX).toBe(10_012);
+    expect(metrics.frameJobBounds?.maxX).toBe(10_012);
+  });
+
+  it('keeps a Frame outline while disclosing no emitted bounds for an emissionless contour', () => {
+    const metrics = buildPreparedJobMetrics(preparedWith(precisionCncJob([10_000, 10_000.0004])));
+
+    expect(metrics.jobBounds).toBeNull();
+    expect(metrics.frameJobBounds).not.toBeNull();
   });
 });

@@ -542,6 +542,10 @@ authorization.
 | TL-L7 qualified PNG worker ownership | P2 | a dimension-qualified embedded PNG used the incremental worker without exposing progress or Escape cancellation | implemented: every qualified worker route owns progress and cancellation independently of page-backed storage selection |
 | TL-L8 Home takeover cleanup | P1 | `MPG:1` after `$H` dispatch invalidated position proof and prevented the settle `G4`, but the epoch mismatch also prevented failure cleanup and could strand the Home owner after explicit MPG release | implemented: every Home phase carries an exact transaction identity; takeover still invalidates proof and emits no continuation, while failure releases only that exact owner and leaves Home unknown with no proof |
 | TL-L9 Trace commit ownership | P1 | deferred Trace completion compared only source ID, embedded data URL, and pixel dimensions, so a replacement document with an equivalent raster could receive stale geometry/delete-source mutation and an old dialog could close a reopened Trace request; page-backed asset identity was omitted entirely; the first owner repair did not remount local React state, so a new request could inherit the old file or busy flag | implemented: Submit captures the exact document epoch, live source object, and unique Trace-dialog request; every post-worker mutation, feedback, busy release, and close reclaims that owner, while stale completion silently no-ops and cannot close a newer dialog; the request identity keys the rendered dialog lifetime and source changes clear retained files; page-backed source eligibility includes exact asset identity |
+| TL-L10 CNC recovery/duration contour parity | P1 | ADR-313 made contour emission and the main Preview use GRBL-parser-represented coordinates, but pass-recovery Preview and duration estimation still consumed raw contour points; a parser-collapsed contour therefore rendered nonexistent recovery motion and received 8.4168 seconds of nonexistent motion/entry time, while a partially collapsed contour retained extra planner time | implemented: a shared represented-XY helper keeps non-contour behavior unchanged while recovery Preview preserves the sealed pass identity with only represented contour motion; duration planning uses the same representation and omits plunge/retract time when the emitter returns before an unrepresentable contour |
+| TL-L11 supervised runway representation | P1 | advanced CNC recovery treated raw manifest segments as selectable/executable geometry, so a parser-collapsed event could be offered as the uncertainty segment; a later retained segment incorrectly required proof of the immediately preceding raw event, and a mathematically exact runway start could round toward re-entry and emit shorter than the reviewed minimum | implemented: sealed raw event IDs remain stable, but each event resolves through retained source-point provenance to represented motion and its preceding emitted event; collapsed and first-represented events are not offered; Preview, review-plan, package identity, and the generated recovery job share one re-represented polyline, and a bounded safe-candidate search accepts only an emitted tangent runway at least as long as the qualified minimum |
+| TL-L12 final CNC bounds ownership | P1 | the one raw bounds API served both pre-placement transforms and final physical disclosure; replacing it globally would lose detail that placement/tiling can restore, while leaving it raw made final Frame, canvas, stock, and park comparisons include parser-collapsed contour tails | implemented: pre-placement and tiling retain requested geometry; distinct final-output bounds use represented contour motion and cutter radius; Frame uses those exact bounds for mixed jobs plus the established raw fallback only when the whole job has no represented process motion, preserving Frame as the sole ordinary Start permit; stock warnings use final emitted bounds and park disclosure compares against the actual Frame outline |
+| TL-L13 represented actual max depth | P2 | an emissionless deep contour still drove exported `actual-max-depth` metadata, Job Review depth, and stock-depth warnings despite emitting neither a plunge nor cut motion | implemented: actual compiled depth ignores only contour passes with no representable motion, retains every partially represented contour depth, and leaves requested-depth and tab-policy provenance unchanged |
 
 The expanded late-repair matrix passed 44 files and 333 tests. It includes delayed final-`$G`
 acknowledgement, Close/Escape/StrictMode/reopen Library schedules, isolated Text request cancellation,
@@ -660,5 +664,43 @@ questions, not autonomous remediations.
   completion silent no-ops, and a rendered replacement-request schedule proves the new source inherits
   neither the old file nor its in-flight busy state. The focused Trace matrix passed 6 files/64 tests; TypeScript and scoped
   ESLint passed. Hosted checks and the final repository-wide release gate are tracked separately.
+- The post-Trace exact-head safety audit then reproduced one adjacent ADR-313 parity defect before
+  merge: an emissionless contour still exposed both requested points in pass-recovery Preview and
+  received 8.4168 seconds of estimated motion/entry travel; a partially collapsed contour also kept
+  nonexistent planner time. The pre-fix matrix failed all three targeted assertions. Recovery Preview
+  and duration now consume the same parser-represented contour points as emission, while retaining the
+  sealed `(groupIndex, passIndex)` recovery identity; emissionless contours receive no plunge/retract
+  estimate. The focused parity matrix passed 4 files/42 tests. Hosted exact-head and final
+  repository-wide verification are restarted on the resulting commit rather than credited from the
+  canceled pre-fix CI run; the expanded emission/Preview/duration/recovery matrix then passed 17
+  files/117 tests.
+- The ensuing independent raw-contour ownership sweep classified every post-compilation consumer.
+  Origin placement, tiling, coordinate-integrity scans, raw semantic manifest identities, precision
+  warnings, and the deliberately conservative warning-only compiled-work estimate remain requested-
+  geometry owners. Four final-output seams survived: advanced recovery selection/replay, final bounds,
+  park-versus-Frame disclosure, and actual compiled depth. Pre-fix regressions proved a collapsed
+  runway event was selectable, a later emitted event demanded proof of the wrong raw predecessor, a
+  re-rounded runway could emit shorter than its reviewed minimum, final bounds retained a phantom
+  tail, park disclosure lost the all-emissionless Frame fallback, and an emissionless Z -7 contour
+  reported 7 mm actual depth despite emitting no plunge or cut.
+- Raw recovery IDs now map through retained source-point provenance without renumbering archived
+  manifests; the generated recovery contour is canonicalized to exact parser coordinates and a
+  safe-candidate search accepts only a tangent emitted runway meeting the qualified minimum. Final
+  represented bounds are separate from raw pre-transform bounds, and Frame alone keeps the existing
+  all-emissionless outline fallback. Actual-depth disclosure ignores only contours with no represented
+  motion. The exact-current focused matrix passed 29 files/209 tests; TypeScript, all changed-file
+  ESLint, scoped Prettier, and `git diff --check` passed. An independent current-byte side review passed
+  17 files/85 tests and returned CLEAN after verifying recovery, bounds, depth, call-site, and Rule-7
+  behavior. The first post-review `pnpm release:check` passed 1,818 Vitest files and 11,450 tests,
+  41/41 release-integrity tests, both builds, and file-size policy, then correctly failed the final
+  public-export ratchet because four new bounds helpers had grown the legacy Job barrel from 85 to 89
+  exports. Those helpers now remain leaf-module APIs at their seven internal consumers. The repair
+  passed 7 files/43 independent focused tests, TypeScript, scoped ESLint/Prettier, `git diff --check`,
+  and the 85-export ratchet. An exact-byte full `pnpm release:check` rerun then exited 0 across
+  typecheck, source/Electron lint, repository formatting, ADR/action-pin/license checks, the same
+  1,818 passing test files plus 14 skipped (11,450 passing tests plus 22 skipped), 41/41 release-
+  integrity tests, the 2,388-module production build, Electron-main build, file-size policy, soft-size
+  reporting, and the public-export ratchet. Only this evidence text changed after that terminal gate;
+  hosted exact-head remains a separate state.
 - These are software/source results, not controller acceptance, physical execution, material output,
   image quality, reference-CAM equivalence, installed-package behavior, or human-perceptual proof.

@@ -6,7 +6,6 @@ import {
   type CncRecoveryEventManifest,
 } from './cnc-recovery-manifest';
 import {
-  backtrackContourPolyline,
   clearedContourDistanceMm,
   clearedTangentDistanceMm,
   isClearedDistanceSufficient,
@@ -15,6 +14,7 @@ import {
   requiredContourRunwayMm,
   type CncRunwayProfile,
 } from './cnc-contour-runway-geometry';
+import { buildRepresentedContourRunway } from './cnc-contour-runway-representation';
 import { recoveryEventsEqual, resolveContourSource } from './cnc-contour-runway-source';
 
 export type { CncRunwayProfile } from './cnc-contour-runway-geometry';
@@ -105,6 +105,8 @@ export function planCncContourRunway(request: CncContourRunwayRequest): CncConto
     source.group,
     source.pass,
     source.segmentIndex,
+    source.sourceSegmentIndex,
+    source.previousEventId,
   );
 }
 
@@ -115,13 +117,15 @@ function buildPlan(
   group: CncGroup,
   pass: CncContourPass,
   segmentIndex: number,
+  sourceSegmentIndex: number,
+  previousEventId: string | null,
 ): CncContourRunwayResult {
   if (!isFiniteContourPolyline(pass.polyline) || !Number.isFinite(pass.zMm)) {
     return { kind: 'error', reason: 'invalid-geometry' };
   }
   if (!isValidMotion(group)) return { kind: 'error', reason: 'invalid-motion' };
   if (segmentIndex === 0) return { kind: 'error', reason: 'first-segment-unproved' };
-  if (!hasClearedPathProof(clearedPathEvidence, event, segmentIndex)) {
+  if (!hasClearedPathProof(clearedPathEvidence, previousEventId)) {
     return { kind: 'error', reason: 'cleared-path-unproved' };
   }
   const requiredRunwayMm = requiredContourRunwayMm(profile, group.feedMmPerMin);
@@ -137,36 +141,54 @@ function buildPlan(
       availableClearedMm,
     };
   }
-  const runwayPolyline = backtrackContourPolyline(pass.polyline, segmentIndex, requiredRunwayMm);
-  if (runwayPolyline === null) return { kind: 'error', reason: 'invalid-geometry' };
-  return successfulPlan(
-    event,
-    group,
+  const represented = buildRepresentedContourRunway(
     pass,
     segmentIndex,
     requiredRunwayMm,
     availableClearedMm,
-    runwayPolyline,
+  );
+  if (represented.kind === 'error') {
+    return {
+      kind: 'error',
+      reason: 'insufficient-cleared-distance',
+      requiredRunwayMm,
+      availableClearedMm: represented.representedAvailableMm,
+    };
+  }
+  return successfulPlan(
+    event,
+    group,
+    pass,
+    sourceSegmentIndex,
+    requiredRunwayMm,
+    availableClearedMm,
+    represented.runway,
   );
 }
 
 function hasClearedPathProof(
   evidence: CncContourRunwayRequest['clearedPathEvidence'],
-  event: CncRecoveryEvent,
-  segmentIndex: number,
+  previousEventId: string | null,
 ): boolean {
-  const expectedPriorEventId = `${event.passId}/cut-${segmentIndex}`;
-  return evidence.eventId === expectedPriorEventId && evidence.proofId.trim().length > 0;
+  return (
+    previousEventId !== null &&
+    evidence.eventId === previousEventId &&
+    evidence.proofId.trim().length > 0
+  );
 }
 
 function successfulPlan(
   event: CncRecoveryEvent,
   group: CncGroup,
   pass: CncContourPass,
-  segmentIndex: number,
+  sourceSegmentIndex: number,
   requiredRunwayMm: number,
   availableClearedMm: number,
-  runwayPolyline: ReadonlyArray<Vec2>,
+  represented: {
+    readonly runwayPolyline: ReadonlyArray<Vec2>;
+    readonly recoveryPolyline: ReadonlyArray<Vec2>;
+    readonly uncertaintyStartPointIndex: number;
+  },
 ): CncContourRunwayPlan {
   return {
     kind: 'review-plan',
@@ -176,13 +198,13 @@ function successfulPlan(
     passId: event.passId,
     requiredRunwayMm,
     availableClearedMm,
-    runwayPolyline,
-    recoveryPolyline: [...runwayPolyline, ...pass.polyline.slice(segmentIndex + 1)],
-    uncertaintyStartPointIndex: runwayPolyline.length - 1,
+    runwayPolyline: represented.runwayPolyline,
+    recoveryPolyline: represented.recoveryPolyline,
+    uncertaintyStartPointIndex: represented.uncertaintyStartPointIndex,
     source: {
       groupIndex: event.source.groupIndex,
       passIndex: event.source.passIndex,
-      segmentIndex,
+      segmentIndex: sourceSegmentIndex,
     },
     motion: {
       cutZMm: pass.zMm,

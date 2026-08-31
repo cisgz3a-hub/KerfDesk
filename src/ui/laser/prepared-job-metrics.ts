@@ -1,6 +1,4 @@
 import {
-  computeJobBounds,
-  computeJobMotionBounds,
   estimateJobDuration,
   machineSpaceJob,
   rotaryAppliesTo,
@@ -8,6 +6,12 @@ import {
   type JobDurationEstimate,
   type JobOriginPlacement,
 } from '../../core/job';
+import {
+  computeEmittedJobBounds,
+  computeEmittedJobMotionBounds,
+  computeFrameJobBounds,
+  computeFrameJobMotionBounds,
+} from '../../core/job/job-bounds';
 import type { ExecutablePlanV1 } from '../../core/execution-plan';
 import { resolveJobParkTarget } from '../../core/output';
 import { machineKindOf, type Vec2 } from '../../core/scene';
@@ -50,14 +54,14 @@ export function buildPreparedJobMetrics(
     finishPosition === undefined ? {} : { initialPosition: finishPosition, finishPosition },
   );
   const calculatedBounds = selectExecutablePlanCalculatedBounds({
-    legacyJobBounds: computeJobBounds(prepared.job, device),
-    legacyMotionBounds: computeJobMotionBounds(prepared.job, device),
+    legacyJobBounds: computeEmittedJobBounds(prepared.job, device),
+    legacyMotionBounds: computeEmittedJobMotionBounds(prepared.job, device),
     ...(executablePlan === undefined ? {} : { executablePlan }),
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
     rotaryApplies: rotaryAppliesTo(device, prepared.project.machine),
   });
-  const frameJobBounds = computeJobBounds(framedJob, device);
-  const frameMotionBounds = computeJobMotionBounds(framedJob, device);
+  const frameJobBounds = computeFrameJobBounds(framedJob, device);
+  const frameMotionBounds = computeFrameJobMotionBounds(framedJob, device);
   return {
     duration,
     jobBounds: calculatedBounds.jobBounds,

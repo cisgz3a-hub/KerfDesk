@@ -4,7 +4,10 @@ import {
   previewCncContourRunway,
   type CncContourRunwayPreviewResult,
 } from '../../core/recovery/cnc-contour-runway-preview';
-import { recoveryEventsEqual } from '../../core/recovery/cnc-contour-runway-source';
+import {
+  recoveryEventsEqual,
+  resolveContourSource,
+} from '../../core/recovery/cnc-contour-runway-source';
 import {
   buildCncRecoveryEventManifest,
   type CncRecoveryEvent,
@@ -233,7 +236,7 @@ function buildSemanticPreview(
   checks: ReadonlyArray<CncRecoveryEvidenceCheck>,
   requestedEventId: string | undefined,
 ): CncRecoveryPreviewModel {
-  const candidates = manifest.events.filter(isPreviewCandidate);
+  const candidates = manifest.events.filter((event) => isPreviewCandidate(job, event));
   const events = candidates.map((event) => ({ id: event.id, label: eventLabel(event) }));
   const selectedEventId =
     requestedEventId !== undefined && events.some(({ id }) => id === requestedEventId)
@@ -309,13 +312,10 @@ function unavailable(
   };
 }
 
-function isPreviewCandidate(event: CncRecoveryEvent): boolean {
-  return (
-    event.intent === 'cut' &&
-    event.recoverySupport === 'runway-v1' &&
-    event.source.segmentIndex !== null &&
-    event.source.segmentIndex > 0
-  );
+function isPreviewCandidate(job: Job, event: CncRecoveryEvent): boolean {
+  if (event.intent !== 'cut' || event.recoverySupport !== 'runway-v1') return false;
+  const source = resolveContourSource(job, event);
+  return source.kind === 'ok' && source.segmentIndex > 0 && source.previousEventId !== null;
 }
 
 function eventLabel(event: CncRecoveryEvent): string {

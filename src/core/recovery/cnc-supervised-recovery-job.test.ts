@@ -188,6 +188,54 @@ describe('buildCncSupervisedRecoveryJob', () => {
     });
     expect(result).toEqual({ kind: 'error', reason: 'cleared-path-unproved' });
   });
+
+  it('replays represented contour motion without a parser-collapsed source vertex', () => {
+    const precisionGroup: CncGroup = {
+      ...sourceGroup,
+      passes: [
+        {
+          kind: 'contour',
+          zMm: -1,
+          closed: false,
+          polyline: [
+            { x: 10_000, y: 20_000 },
+            { x: 10_010, y: 20_000 },
+            { x: 10_010.0004, y: 20_000 },
+            { x: 10_020, y: 20_000 },
+          ],
+        },
+      ],
+    };
+    const job: Job = { groups: [precisionGroup] };
+    const result = buildCncSupervisedRecoveryJob({
+      job,
+      manifest: buildCncRecoveryEventManifest(job),
+      uncertaintyEventId: 'cnc-op-1/pass-1/cut-3',
+      profile: {
+        qualificationId: 'air-cut-2026-07-15',
+        minRunwayMm: 5,
+        accelerationMmPerSec2: 100,
+        safetyMarginMm: 0,
+      },
+      clearedPathEvidence: {
+        kind: 'operator-confirmed-through-event',
+        eventId: 'cnc-op-1/pass-1/cut-1',
+        proofId: 'review-8',
+      },
+    });
+
+    if (result.kind !== 'recovery-job') throw new Error(`Unexpected ${result.reason}`);
+    const group = result.job.groups[0];
+    if (group?.kind !== 'cnc') throw new Error('Expected CNC recovery group.');
+    const pass = group.passes[0];
+    if (pass?.kind !== 'contour') throw new Error('Expected represented contour recovery pass.');
+    expect(pass.polyline).toEqual([
+      { x: 10_005, y: 20_000 },
+      { x: 10_010, y: 20_000 },
+      { x: 10_020, y: 20_000 },
+    ]);
+    expect(cncGrblStrategy.emit(result.job, DEFAULT_DEVICE_PROFILE)).not.toContain('10010.0004');
+  });
 });
 
 function vcarveEvidence(layerId: string, operationIndex: number) {

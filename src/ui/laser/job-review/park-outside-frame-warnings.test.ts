@@ -126,4 +126,28 @@ describe('detectParkOutsideFrameWarnings (cnc)', () => {
 
     expect(detectParkOutsideFrameWarnings(job, dev, 'cnc', undefined)).toEqual([]);
   });
+
+  it('compares park against the Frame fallback for an emissionless contour', () => {
+    const job: Job = {
+      groups: [
+        cncGroup({
+          parkXMm: 300,
+          parkYMm: 10,
+          passes: [
+            {
+              kind: 'contour',
+              zMm: -1.5,
+              closed: false,
+              polyline: [
+                { x: 247.01767, y: 10 },
+                { x: 247.01768, y: 10 },
+              ],
+            },
+          ],
+        }),
+      ],
+    };
+
+    expect(detectParkOutsideFrameWarnings(job, dev, 'cnc', undefined)).toHaveLength(1);
+  });
 });

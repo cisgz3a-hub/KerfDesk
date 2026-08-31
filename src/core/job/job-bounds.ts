@@ -3,6 +3,7 @@
 
 import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
+import { cncPassRepresentedXyPoints } from '../cnc/cnc-pass-representation';
 import { contourEntryPoint } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
@@ -28,7 +29,7 @@ export type JobBounds = {
 type MutableBounds = { minX: number; minY: number; maxX: number; maxY: number };
 
 export function computeJobBounds(job: Job, device?: DeviceProfile): JobBounds | null {
-  return computeBounds(job, false, device);
+  return computeBounds(job, false, device, false);
 }
 
 // Full physical motion envelope, including laser-off acceleration runways.
@@ -36,13 +37,37 @@ export function computeJobBounds(job: Job, device?: DeviceProfile): JobBounds | 
 // the cached executable artifact will travel; computeJobBounds remains the
 // artwork/burn-area measurement shown separately in review.
 export function computeJobMotionBounds(job: Job, device?: DeviceProfile): JobBounds | null {
-  return computeBounds(job, true, device);
+  return computeBounds(job, true, device, false);
+}
+
+/** Final-output burn bounds. CNC contours use the same parser-represented
+ * vertices as emission and Preview. Keep computeJobBounds for pre-placement
+ * and pre-tiling geometry because those transforms can restore representability. */
+export function computeEmittedJobBounds(job: Job, device?: DeviceProfile): JobBounds | null {
+  return computeBounds(job, false, device, true);
+}
+
+/** Final-output physical motion bounds, with represented CNC contour motion. */
+export function computeEmittedJobMotionBounds(job: Job, device?: DeviceProfile): JobBounds | null {
+  return computeBounds(job, true, device, true);
+}
+
+/** Frame remains the sole ordinary Start permit. When an entire program has
+ * no represented process motion, preserve the established raw outline so the
+ * operator can still complete Frame; mixed jobs use exact emitted bounds. */
+export function computeFrameJobBounds(job: Job, device?: DeviceProfile): JobBounds | null {
+  return computeEmittedJobBounds(job, device) ?? computeJobBounds(job, device);
+}
+
+export function computeFrameJobMotionBounds(job: Job, device?: DeviceProfile): JobBounds | null {
+  return computeEmittedJobMotionBounds(job, device) ?? computeJobMotionBounds(job, device);
 }
 
 function computeBounds(
   job: Job,
   includeOverscanMotion: boolean,
   device: DeviceProfile | undefined,
+  useRepresentedCncMotion: boolean,
 ): JobBounds | null {
   const b: MutableBounds = {
     minX: Number.POSITIVE_INFINITY,
@@ -52,7 +77,8 @@ function computeBounds(
   };
   let any = false;
   for (const group of job.groups) {
-    if (extendBoundsForGroup(b, group, includeOverscanMotion, device)) any = true;
+    if (extendBoundsForGroup(b, group, includeOverscanMotion, device, useRepresentedCncMotion))
+      any = true;
   }
   return any ? { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY } : null;
 }
@@ -63,6 +89,7 @@ function extendBoundsForGroup(
   group: Group,
   includeOverscanMotion: boolean,
   device: DeviceProfile | undefined,
+  useRepresentedCncMotion: boolean,
 ): boolean {
   switch (group.kind) {
     case 'cut': {
@@ -75,13 +102,17 @@ function extendBoundsForGroup(
     case 'raster':
       return extendBoundsForRaster(b, group, includeOverscanMotion, device);
     case 'cnc':
-      return extendBoundsForCnc(b, group);
+      return extendBoundsForCnc(b, group, useRepresentedCncMotion);
     default:
       return assertNever(group, 'Group');
   }
 }
 
-function extendBoundsForCnc(b: MutableBounds, group: CncGroup): boolean {
+function extendBoundsForCnc(
+  b: MutableBounds,
+  group: CncGroup,
+  useRepresentedMotion: boolean,
+): boolean {
   const toolCenter: MutableBounds = {
     minX: Number.POSITIVE_INFINITY,
     minY: Number.POSITIVE_INFINITY,
@@ -90,7 +121,8 @@ function extendBoundsForCnc(b: MutableBounds, group: CncGroup): boolean {
   };
   let any = false;
   for (const pass of group.passes) {
-    for (const p of cncPassXyPoints(pass)) {
+    const points = useRepresentedMotion ? cncPassRepresentedXyPoints(pass) : cncPassXyPoints(pass);
+    for (const p of points) {
       extendBoundsForPoint(toolCenter, p);
       any = true;
     }

@@ -1,5 +1,5 @@
 import type { CncGroup, Group, Job } from '../../../core/job';
-import { cncGroupMaximumDepthMm } from '../../../core/job/job';
+import { cncGroupMaximumDepthMm } from '../../../core/cnc/cnc-group-maximum-depth';
 import { artworkOperationName, type Layer, type SceneObject } from '../../../core/scene';
 import { laserOperationDetail } from './job-review-detail-facts';
 

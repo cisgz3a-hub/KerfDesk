@@ -8,6 +8,7 @@
 
 import { compileCncJob } from '../../core/cnc';
 import { computeJobBounds } from '../../core/job';
+import { computeEmittedJobBounds } from '../../core/job/job-bounds';
 import type { Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 
@@ -20,7 +21,7 @@ export function detectCncStockWarnings(
   const bounds =
     prepared === undefined
       ? computeJobBounds(compileCncJob(project.scene, project.device, machine))
-      : computeJobBounds(prepared.job);
+      : computeEmittedJobBounds(prepared.job);
   if (bounds === null) return [];
 
   const stock = machine.stock;

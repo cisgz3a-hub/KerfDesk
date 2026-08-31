@@ -1,5 +1,5 @@
 import type { CncGroup, Job } from '../../core/job';
-import { cncGroupMaximumDepthMm } from '../../core/job/job';
+import { cncGroupMaximumDepthMm } from '../../core/cnc/cnc-group-maximum-depth';
 import type { Project } from '../../core/scene';
 
 type CompiledLayerDepth = {
