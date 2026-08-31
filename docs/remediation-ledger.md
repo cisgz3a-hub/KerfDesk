@@ -524,6 +524,34 @@ confirmation, cap, clamp, hidden action, or second warning surface.
 | TL-O10 status poll overlap | P2 | background `?` polling has no single-flight owner and can queue overlapping writes under a slow channel | implemented in this branch: one unresolved background status write owns the poll loop and later ticks coalesce until settlement; no action guard was added; warning/poll focused 22/22 and related 115/115 passed |
 | TL-O11 emitter provenance | P1 | output-shaping changes in this remediation retained the ADR-294 `EMITTER_REVISION`, so exported headers mislabeled new laser/raster/CNC bytes | implemented in this branch: export provenance advances to `adr-313-audit-output-parity-v1`; metadata regression updated |
 
+### Late independent side-audit reconciliation
+
+After the first frozen release gate, independent exact-head reviews challenged the integrated branch
+rather than accepting its green suite as closure. The following unique findings survived source
+reconciliation; all are implemented in the same branch without adding a guard or changing Frame/Start
+authorization.
+
+| ID | Severity | Confirmed result | Current disposition |
+|---|---|---|---|
+| TL-L1 adjacent document owners | P1 | direct SVG/DXF/image commands, Edit Image, Height Map, Design Library insertion, and selected-source re-import could finish against a replacement document; Edit Image and Text could also inherit a same-id replacement session; a deferred Library load could mutate or close after Close/Escape or close a same-document reopened dialog | implemented: every route captures the initiating document epoch and, where applicable, exact object/session identity; Library also owns the exact open dialog/request across Close, Escape, unmount, StrictMode replay, and reopen; Text owns the exact render request; stale mutation, dialog publication, close, success, and failure feedback no-op |
+| TL-L2 exact export metadata | P2 | static dialect defaults could report M4 when a layer override emitted M3, while independently normalized controller/dialect fields could label GRBL output as Marlin fan | implemented: deserialization uses the canonical controller-profile compatibility seam, and the metadata header consumes exact compiled-job power-mode facts from the same owner as emission; absent families report `none`, mixed families report every effective word |
+| TL-L3 Alarm settings completion | P2 | the first Alarm regression asserted only `$$` dispatch and an empty response; a fast repeated-Alarm poll could cancel a slow read-only settings/build-info workflow, and both settings re-qualification and initial handshake released their final `$G` owner at transport acceptance rather than terminal `ok` | implemented: exact Alarm evidence permits the upstream-supported read-only query while all factual transport/MPG/activity fences remain; tagged terminal-exchange ownership pauses background polling, and both `$G` callers use the semantic command arbiter through terminal acknowledgement; polling resumes afterward, while ordinary interactive operations such as Set Origin remain pollable; regressions prove completed rows/qualification, preserved Alarm, no pre-`ok` poll, resumed polling, and Set Origin WCO refresh |
+| TL-L4 production nested dialogs | P2 | Resize, Text, and Color dialogs did not own the shared topmost focus trap/restore contract, and ancestor Enter handlers could commit when Cancel was keyboard-activated | implemented: production dialogs use the shared owner, restore the opener, and preserve native button activation so Cancel never commits |
+| TL-L5 explicit operation activation | P2 | clicking Show/Output label text bubbled through the operation section and changed the active drawing operation | implemented: only the accessible activation button changes the operation; labels and all other controls retain their own native behavior |
+| TL-L6 selected-mask advisory parity | P2 | selected-only compilation retained an unselected mask as an output dependency, but Image Studio's kerf advisory searched only emitted objects and could analyze unmasked pixels | implemented: the advisory resolves the same scoped dependency graph as compilation without independently emitting the mask |
+| TL-L7 qualified PNG worker ownership | P2 | a dimension-qualified embedded PNG used the incremental worker without exposing progress or Escape cancellation | implemented: every qualified worker route owns progress and cancellation independently of page-backed storage selection |
+| TL-L8 Home takeover cleanup | P1 | `MPG:1` after `$H` dispatch invalidated position proof and prevented the settle `G4`, but the epoch mismatch also prevented failure cleanup and could strand the Home owner after explicit MPG release | implemented: every Home phase carries an exact transaction identity; takeover still invalidates proof and emits no continuation, while failure releases only that exact owner and leaves Home unknown with no proof |
+
+The expanded late-repair matrix passed 44 files and 333 tests. It includes delayed final-`$G`
+acknowledgement, Close/Escape/StrictMode/reopen Library schedules, isolated Text request cancellation,
+Home takeover cleanup, and pending-Fire takeover compensation with `M5`. Exact-current TypeScript,
+scoped ESLint, scoped Prettier, and `git diff --check` also passed. The product-source snapshot then
+passed the full local `pnpm release:check`: typecheck, full source and Electron lint, repository-wide
+format, ADR/action-pin/license gates, 1,812 test files with 11,424 tests, 41 release-integrity tests,
+production web and Electron builds, file-size policy, and the public-export no-growth ratchet. Only
+these evidence lines changed after that terminal gate; hosted exact-head and post-merge verification
+remain separate.
+
 SVG root `preserveAspectRatio` behavior is **policy-only**, not a defect in this branch: ADR-046
 explicitly requires independent X/Y scaling when both physical dimensions exist. Recovery from
 `ackedLines` remains an explicit physical-uncertainty disclosure rather than proof of execution.
@@ -619,5 +647,11 @@ questions, not autonomous remediations.
   Electron-main build, file-size and soft-size policies, and the public-export ratchet. The first
   exact-final attempt had exposed only stale M3-mode, empty-vector-hit, and device-absolute raster
   Preview expectations; their focused repair matrix passed 6 files/61 tests before this frozen rerun.
+- Independent late review then found the adjacent ownership, metadata, Alarm polling, production-dialog,
+  operation-label, selected-mask advisory, and qualified-PNG gaps recorded above. Exact-owner challenge
+  added the Library lifetime, final-`$G`, and Home-takeover repairs plus isolated Text and Fire takeover
+  coverage. The expanded exact-current matrix passed 44 files/333 tests plus TypeScript, scoped
+  ESLint/Prettier, and `git diff --check`; the post-repair repository-wide release gate is tracked
+  separately rather than retroactively attributed to the earlier frozen snapshot.
 - These are software/source results, not controller acceptance, physical execution, material output,
   image quality, reference-CAM equivalence, installed-package behavior, or human-perceptual proof.

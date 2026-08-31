@@ -18863,8 +18863,9 @@ new guard, warning gate, cap, confirmation, or hardware claim.
 
 ## ADR-313 - Current-main audit reconciliation preserves exact semantic owners (2026-08-31)
 
-**Status:** Accepted and implemented in local remediation; focused software verification recorded,
-full repository and hosted verification pending, hardware and perceptual qualification excluded
+**Status:** Accepted and implemented in local remediation; the first frozen snapshot passed the full
+local gate, late independent repairs passed focused verification, and their exact-final repository and
+hosted verification remains pending; hardware and perceptual qualification excluded
 
 ### Context
 
@@ -18879,6 +18880,12 @@ precision-empty CNC contours, absolute SVG primitive units, absolute-power previ
 direct-hit geometry, and malformed external-Inspector tokens. Cutter-expanded fixtures and slow status
 poll writes also exposed warning and scheduling gaps.
 
+Independent review after the first frozen gate found the same ownership pattern in direct SVG/DXF/image
+commands, Edit Image, Height Map, Design Library, selected-source re-import, and asynchronous Text. It
+also found that static header defaults could contradict per-layer emitted M3/M4 words, a read-only Alarm
+settings workflow could be cancelled by its own fast poll, and synthetic accessibility coverage did not
+match the production nested dialogs and operation-label behavior.
+
 These findings require semantic correction, not new operator authorization. Frame remains the sole
 ordinary Start guard, Job Review remains the single warning surface, and external G-code remains an
 inspector-only input that cannot be streamed.
@@ -18890,7 +18897,12 @@ inspector-only input that cannot be streamed.
    Project Open additionally binds to both the initiating document epoch and one latest-request
    owner, so an older picker/read/parse completion cannot replace or speak over a newer Open or a
    New document. The winning synchronous replacement retains its own success/capability feedback
-   after `setProject` advances the epoch.
+   after `setProject` advances the epoch. Direct import commands, Edit Image, Height Map, Design
+   Library insertion, selected-source re-import, and asynchronous Text additionally bind the exact
+   initiating document/object/session owner. Library insertion also binds one exact open-dialog and
+   request revision across Close, Escape, unmount, StrictMode replay, and same-document reopen; Text
+   binds one exact render request. Stale dialogs, mutation, close, progress, success, and failure
+   feedback silently no-op.
 2. **Compatibility without a new refusal.** Absolute SVG primitive units (`in`, `cm`, `mm`, `q`,
    `pt`, `pc`, and `px`) resolve in the 96-DPI SVG user space before the existing root transform.
    Existing malformed-unit fallback remains unchanged. External G-code preview and glossary consumers
@@ -18902,7 +18914,10 @@ inspector-only input that cannot be streamed.
 3. **Laser dialect and power representation.** The GRBL-compatible profile uses constant-power M3
    semantics for Cut, Fill, and Raster because that profile explicitly covers firmware without M4.
    Compiled and streamed raster S values use `Float64Array`, preserving the configured numeric value
-   above 65,535 instead of wrapping, capping, or clamping it.
+   above 65,535 instead of wrapping, capping, or clamping it. Persisted controller and dialect fields
+   normalize through the canonical compatibility seam. Export metadata consumes exact compiled-job
+   power words from the same semantic owner as emission, so layer overrides and mixed families cannot
+   contradict the body; operation families absent from the exact job report `none`.
 4. **Raster and CNC output identity.** Selected-only output retains referenced mask objects as
    compile-only dependencies without emitting them as independent artwork. Exact 90/270-degree
    pass-through raster rotations swap the pixel grid. A CNC contour with any nonzero consecutive XY
@@ -18922,12 +18937,20 @@ inspector-only input that cannot be streamed.
    collector, observation, detected settings, live CNC capabilities, and controller qualification
    before late rows can publish. The last completed settings snapshot remains only as best-known
    status-report unit interpretation so an inch-mode Frame cannot become 25.4 times misplaced; it is
-   not current qualification. The separately identified tool-change `motionOperation` refusal
-   question is not changed.
+   not current qualification. Settings re-qualification and the initial connection handshake retain
+   a semantic owner through the terminal response to their final `$G` modal read, so polling cannot
+   interleave an ambiguous query or acknowledgement. Home phases carry one exact transaction identity;
+   MPG takeover invalidates proof and releases only that Home owner without dispatching the settle
+   marker. The separately identified tool-change `motionOperation` refusal question is not changed.
 6. **Warning and polling semantics.** No-go analysis tests bed relevance after expanding the fixture
    by the active cutter radius, including a fixture immediately outside the nominal bed. The result is
    still warning-only in Job Review. Periodic status polling owns at most one unresolved transport
    write; later timer ticks coalesce until settlement while inbound status handling remains live.
+   Exact Idle or Alarm evidence permits the upstream-supported read-only settings workflow while MPG,
+   transport, job, motion, autofocus, and competing-operation ownership remain factual preconditions.
+   Explicitly tagged terminal-exchange settings/build-info/modal reads own their poll interval so a
+   repeated Alarm report cannot cancel the workflow; background Alarm polling resumes when that owner
+   releases, while ordinary interactive operations such as Set Origin remain pollable for WCO updates.
 7. **Preview, input, and accessibility ownership.** Compiled raster shading uses the device maximum,
    blank or browser-unparseable numeric drafts create no mutation, and numeric `step` remains a spinner
    increment rather than a refusal of other finite values. One pointer owns each drag. Cancel,
@@ -18935,7 +18958,11 @@ inspector-only input that cannot be streamed.
    and clamps before cursor-anchor math. Relief draw/scheduling uses shared operation visibility.
    Raster/relief direct hits use their transformed bounds quadrilateral and empty vectors have no
    direct-hit geometry. Studio overlays use the shared topmost focus trap/restore contract; operation
-   activation is keyboard operable and non-color-only; toasts expose severity; selection animation
+   activation is keyboard operable, explicit, and non-color-only; Show/Output labels never activate
+   their operation. Production Resize/Text/Color dialogs share topmost focus ownership and native
+   Cancel semantics. Image Studio kerf analysis resolves selected-only mask dependencies through the
+   same scoped graph as compilation, and every qualified PNG worker route exposes progress and Escape
+   cancellation. Toasts expose severity; selection animation
    honors reduced motion; and Image Studio controls remain reachable on constrained viewports.
 8. **Bounded scalability corrections.** Chunked UTF-8 readers accumulate fragments and join once per
    completed line rather than repeatedly concatenating and rescanning an unterminated line. Run Order
@@ -18977,8 +19004,17 @@ inspector-only input that cannot be streamed.
   9 of 9 tests; and the final CNC emission/Preview/Job Review matrix passed 94 of 94 tests across nine
   files. A separate precision/provenance side audit also found and repaired the stale emitter revision.
 - Typecheck, scoped lint/format, file-size policy, and diff checks passed for the completed slices. The
-  exact-final full `release:check`, hosted required checks, review/mergeability, post-merge exact-main
-  CI/Browser, and automatic Pages publication remain required before integration is complete.
+  product-source snapshot then passed the full local `pnpm release:check`: typecheck, full source and
+  Electron lint, repository-wide format, ADR/action-pin/license gates, 1,812 test files with 11,424
+  tests, 41 release-integrity tests, production web and Electron builds, file-size policy, and the
+  public-export no-growth ratchet. Only these evidence lines changed afterward; hosted exact-head
+  required checks, review/mergeability, post-merge exact-main CI/Browser, and automatic Pages
+  publication remain required before integration is complete.
+- After the first frozen full gate, independent side audits also repaired exact Library dialog/request
+  ownership, terminal ownership of both final `$G` call paths, and exact Home-owner cleanup after MPG
+  takeover; they added isolated Text-request and Fire-takeover regressions. The expanded repair matrix
+  passed 44 files and 333 tests. Exact-current TypeScript, scoped ESLint/Prettier, and
+  `git diff --check` passed before that terminal repository-wide gate.
 - No serial device, controller, MPG pendant, motion, spindle, laser, coolant/air, material cut,
   reference-CAM comparison, human perceptual review, installed package, real OS picker, or manual
   deployment is established by this ADR.
