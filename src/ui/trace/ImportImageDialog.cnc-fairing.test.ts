@@ -135,7 +135,7 @@ function ctxWith(machine: MachineConfig, source = seedRaster()): TestCommitConte
     pushToast: vi.fn<CommitContext['pushToast']>(),
     close: vi.fn<CommitContext['close']>(),
     setBusy: vi.fn<CommitContext['setBusy']>(),
-    getCurrentProject: () => project,
+    claimOwner: () => ({ project, source }),
   };
 }
 

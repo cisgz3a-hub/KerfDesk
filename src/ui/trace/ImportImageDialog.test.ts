@@ -55,14 +55,25 @@ function seedRaster(over: Partial<RasterImage> = {}): RasterImage {
   };
 }
 
-function ctxWith(getCurrentObject: (id: string) => SceneObject | undefined) {
+function ctxWith(
+  getCurrentObject: (id: string) => SceneObject | undefined,
+  exactOwner?: RasterImage,
+) {
+  const claimOwner = () => {
+    const source = getCurrentObject('src-1');
+    const project = projectWith(source);
+    if (source?.kind !== 'raster-image' || (exactOwner !== undefined && source !== exactOwner)) {
+      return null;
+    }
+    return { project, source };
+  };
   return {
     traceExistingImage: vi.fn(),
     commitRasterizedTrace: vi.fn(),
     pushToast: vi.fn(),
     close: vi.fn(),
     setBusy: vi.fn(),
-    getCurrentProject: () => projectWith(getCurrentObject('src-1')),
+    claimOwner: vi.fn(claimOwner),
   };
 }
 
@@ -192,7 +203,7 @@ describe('commit source revalidation (P2-A)', () => {
 
   it('commits when the live source is unchanged', async () => {
     const seed = seedRaster();
-    const ctx = ctxWith(() => seedRaster());
+    const ctx = ctxWith(() => seed);
     await commit(args(seed), ctx);
     expect(ctx.traceExistingImage).toHaveBeenCalledTimes(1);
     expect(ctx.traceExistingImage).toHaveBeenCalledWith(
@@ -201,6 +212,35 @@ describe('commit source revalidation (P2-A)', () => {
       { deleteSourceAfterTrace: false },
     );
     expect(ctx.pushToast).toHaveBeenCalledWith(expect.stringContaining('source kept'), 'success');
+  });
+
+  it('does not commit into a replacement document with an equivalent source clone', async () => {
+    const seed = seedRaster();
+    const replacement = seedRaster();
+    const ctx = ctxWith(() => replacement, seed);
+
+    await commit(args(seed), ctx);
+
+    expect(ctx.traceExistingImage).not.toHaveBeenCalled();
+    expect(ctx.commitRasterizedTrace).not.toHaveBeenCalled();
+    expect(ctx.pushToast).not.toHaveBeenCalled();
+    expect(ctx.close).not.toHaveBeenCalled();
+  });
+
+  it('silently drops a deferred completion after its exact owner is lost', async () => {
+    const seed = seedRaster();
+    const project = projectWith(seed);
+    const ctx = ctxWith(() => seed, seed);
+    vi.mocked(ctx.claimOwner).mockReturnValueOnce({ project, source: seed }).mockReturnValue(null);
+
+    await commit(args(seed), ctx);
+
+    expect(ctx.setBusy).toHaveBeenCalledTimes(1);
+    expect(ctx.setBusy).toHaveBeenCalledWith(true);
+    expect(ctx.traceExistingImage).not.toHaveBeenCalled();
+    expect(ctx.commitRasterizedTrace).not.toHaveBeenCalled();
+    expect(ctx.pushToast).not.toHaveBeenCalled();
+    expect(ctx.close).not.toHaveBeenCalled();
   });
 
   it('applies Scanline as an object-level fill override', async () => {

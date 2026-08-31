@@ -32,7 +32,7 @@ import { ImportImageDialog } from './ImportImageDialog';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-function seedRaster(): RasterImage {
+function seedRaster(over: Partial<RasterImage> = {}): RasterImage {
   return {
     kind: 'raster-image',
     id: 'src-1',
@@ -45,6 +45,7 @@ function seedRaster(): RasterImage {
     color: '#808080',
     dither: 'floyd-steinberg',
     linesPerMm: 10,
+    ...over,
   };
 }
 
@@ -348,13 +349,13 @@ async function withTraceDialog(run: (host: HTMLElement) => Promise<void>): Promi
   }
 }
 
-async function renderTraceDialog(): Promise<{
+async function renderTraceDialog(source = seedRaster()): Promise<{
   readonly host: HTMLDivElement;
   readonly root: Root;
 }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
-  useUiStore.setState({ imageDialog: { source: seedRaster() } });
+  useUiStore.getState().openImageDialog(source);
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);

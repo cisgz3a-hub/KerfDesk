@@ -52,6 +52,8 @@ export type TextDialogState =
 
 export type TraceImageDialogState = {
   readonly source: RasterImage;
+  /** Exact owner for one open Trace dialog lifetime. */
+  readonly requestToken: string;
   readonly replaceTraceId?: string;
 };
 
@@ -260,8 +262,8 @@ function uiDialogSlice(
       set({
         imageDialog:
           options?.replaceTraceId === undefined
-            ? { source }
-            : { source, replaceTraceId: options.replaceTraceId },
+            ? { source, requestToken: crypto.randomUUID() }
+            : { source, requestToken: crypto.randomUUID(), replaceTraceId: options.replaceTraceId },
       }),
     closeImageDialog: () => set({ imageDialog: null }),
     convertBitmapDialogOpen: false,

@@ -94,14 +94,21 @@ function projectWith(source: RasterImage, operations: Layer | ReadonlyArray<Laye
   };
 }
 
-function context(getCurrentProject: () => Project) {
+function context(getCurrentProject: () => Project, exactOwner?: RasterImage) {
+  const claimOwner = () => {
+    const project = getCurrentProject();
+    const source = project.scene.objects.find((object) => object.kind === 'raster-image');
+    return source?.kind === 'raster-image' && (exactOwner === undefined || source === exactOwner)
+      ? { project, source }
+      : null;
+  };
   return {
     traceExistingImage: vi.fn(),
     commitRasterizedTrace: vi.fn(),
     pushToast: vi.fn(),
     close: vi.fn(),
     setBusy: vi.fn(),
-    getCurrentProject,
+    claimOwner,
   };
 }
 
@@ -293,6 +300,26 @@ describe('Trace Image raster output', () => {
       expect.stringContaining('changed while the raster scan was being built'),
       'error',
     );
+    expect(ctx.close).not.toHaveBeenCalled();
+  });
+
+  it('silently drops raster completion when its exact owner is lost during materialization', async () => {
+    const source = sourceRaster();
+    const operation = imageOperation();
+    let project = projectWith(source, operation);
+    const ctx = context(() => project, source);
+    vi.mocked(buildBitmapFromVectors).mockImplementationOnce(async () => {
+      project = projectWith(sourceRaster(), operation);
+      return sourceRaster({ id: 'raster-trace-1' });
+    });
+
+    await commit(commitArgs(source, 'Line Art'), ctx);
+
+    expect(ctx.setBusy).toHaveBeenCalledTimes(1);
+    expect(ctx.setBusy).toHaveBeenCalledWith(true);
+    expect(ctx.commitRasterizedTrace).not.toHaveBeenCalled();
+    expect(ctx.traceExistingImage).not.toHaveBeenCalled();
+    expect(ctx.pushToast).not.toHaveBeenCalled();
     expect(ctx.close).not.toHaveBeenCalled();
   });
 

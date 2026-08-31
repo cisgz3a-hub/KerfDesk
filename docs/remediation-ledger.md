@@ -541,6 +541,7 @@ authorization.
 | TL-L6 selected-mask advisory parity | P2 | selected-only compilation retained an unselected mask as an output dependency, but Image Studio's kerf advisory searched only emitted objects and could analyze unmasked pixels | implemented: the advisory resolves the same scoped dependency graph as compilation without independently emitting the mask |
 | TL-L7 qualified PNG worker ownership | P2 | a dimension-qualified embedded PNG used the incremental worker without exposing progress or Escape cancellation | implemented: every qualified worker route owns progress and cancellation independently of page-backed storage selection |
 | TL-L8 Home takeover cleanup | P1 | `MPG:1` after `$H` dispatch invalidated position proof and prevented the settle `G4`, but the epoch mismatch also prevented failure cleanup and could strand the Home owner after explicit MPG release | implemented: every Home phase carries an exact transaction identity; takeover still invalidates proof and emits no continuation, while failure releases only that exact owner and leaves Home unknown with no proof |
+| TL-L9 Trace commit ownership | P1 | deferred Trace completion compared only source ID, embedded data URL, and pixel dimensions, so a replacement document with an equivalent raster could receive stale geometry/delete-source mutation and an old dialog could close a reopened Trace request; page-backed asset identity was omitted entirely; the first owner repair did not remount local React state, so a new request could inherit the old file or busy flag | implemented: Submit captures the exact document epoch, live source object, and unique Trace-dialog request; every post-worker mutation, feedback, busy release, and close reclaims that owner, while stale completion silently no-ops and cannot close a newer dialog; the request identity keys the rendered dialog lifetime and source changes clear retained files; page-backed source eligibility includes exact asset identity |
 
 The expanded late-repair matrix passed 44 files and 333 tests. It includes delayed final-`$G`
 acknowledgement, Close/Escape/StrictMode/reopen Library schedules, isolated Text request cancellation,
@@ -653,5 +654,11 @@ questions, not autonomous remediations.
   coverage. The expanded exact-current matrix passed 44 files/333 tests plus TypeScript, scoped
   ESLint/Prettier, and `git diff --check`; the post-repair repository-wide release gate is tracked
   separately rather than retroactively attributed to the earlier frozen snapshot.
+- A final independent handoff audit reproduced stale Trace completion against an equivalent same-ID
+  replacement raster: the pre-fix focused regression performed one unintended `traceExistingImage`
+  mutation. Exact document/source/dialog ownership now makes that schedule and close/reopen stale
+  completion silent no-ops, and a rendered replacement-request schedule proves the new source inherits
+  neither the old file nor its in-flight busy state. The focused Trace matrix passed 6 files/64 tests; TypeScript and scoped
+  ESLint passed. Hosted checks and the final repository-wide release gate are tracked separately.
 - These are software/source results, not controller acceptance, physical execution, material output,
   image quality, reference-CAM equivalence, installed-package behavior, or human-perceptual proof.
