@@ -1,5 +1,6 @@
 import type { SelectionMask } from '../../core/image-select';
 import type { RasterGroup } from '../../core/job';
+import type { RasterPowerValues } from '../../core/raster/raster-power-values';
 import { rasterRunSurvivesDotWidthCorrection } from '../../core/raster-output';
 
 /** Compact prepared-raster mask for exact-power runs removed from output. */
@@ -21,7 +22,7 @@ type LossAccumulator = {
 
 type RowLossInput = {
   readonly loss: LossAccumulator;
-  readonly row: Uint16Array;
+  readonly row: RasterPowerValues;
   readonly rowIndex: number;
   readonly group: RasterGroup;
   readonly pixelWidthMm: number;
@@ -115,7 +116,7 @@ function appendRemovedRun(input: RowLossInput, firstX: number, endX: number): vo
   }
 }
 
-function rasterSourceRow(group: RasterGroup, sourceY: number): Uint16Array | null {
+function rasterSourceRow(group: RasterGroup, sourceY: number): RasterPowerValues | null {
   const row =
     group.rowProvider === undefined
       ? group.sValues.subarray(sourceY * group.pixelWidth, (sourceY + 1) * group.pixelWidth)

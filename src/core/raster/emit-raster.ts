@@ -36,6 +36,7 @@ import {
   type RasterRowSweepPlan,
 } from './raster-sweep-plan';
 import type { RasterRowProviderOrder } from '../job/job';
+import type { RasterPowerValues } from './raster-power-values';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
@@ -48,8 +49,8 @@ export type EmitRasterInput = {
   // Dithered S-values, one per pixel, row-major. Length must equal
   // width * height. Each value is in [0, sMax] — the caller (the
   // dither module) has already applied the power scale.
-  readonly sValues: Uint16Array;
-  readonly rowProvider?: (y: number) => Uint16Array;
+  readonly sValues: RasterPowerValues;
+  readonly rowProvider?: (y: number) => RasterPowerValues;
   readonly rowProviderOrder?: RasterRowProviderOrder;
   readonly width: number;
   readonly height: number;
@@ -164,7 +165,7 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
 
 function* inputRowsInProviderOrder(
   input: EmitRasterInput,
-): Generator<{ readonly rowIndex: number; readonly row: Uint16Array }> {
+): Generator<{ readonly rowIndex: number; readonly row: RasterPowerValues }> {
   for (let sourceY = 0; sourceY < input.height; sourceY += 1) {
     const row =
       input.rowProvider === undefined

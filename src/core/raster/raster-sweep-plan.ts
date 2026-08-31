@@ -4,6 +4,7 @@
 // by the gap, so neither forward nor reverse motion can double back.
 
 import { rasterPixelRuns, rasterSweepRunsForPixelRun, type RasterSweepRun } from '../raster-output';
+import type { RasterPowerValues } from './raster-power-values';
 
 export { rasterRunSurvivesDotWidthCorrection, type RasterSweepRun } from '../raster-output';
 
@@ -23,7 +24,7 @@ export type RasterRowSweepPlan = {
 };
 
 type RasterActiveSpanInput = {
-  readonly row: Uint16Array;
+  readonly row: RasterPowerValues;
   readonly pixelWidthMm: number;
 };
 
@@ -96,7 +97,7 @@ export function planRasterRowSweeps(input: RasterRowSweepPlanInput): RasterRowSw
 }
 
 function planRasterSweepRuns(
-  row: Uint16Array,
+  row: RasterPowerValues,
   span: RasterActiveSpan,
   pixelWidthMm: number,
   reverse: boolean,

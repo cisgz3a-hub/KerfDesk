@@ -165,7 +165,7 @@ function rasterKerfGroupFacts(group: RasterGroup, device: DeviceProfile): Raster
   return {
     layerId: group.layerId,
     sValues: group.sValues,
-    blackS: Uint16Array.of(Math.round((group.power / 100) * device.maxPowerS))[0] ?? 0,
+    blackS: Math.round((group.power / 100) * device.maxPowerS),
     pixelWidth: group.pixelWidth,
     pixelHeight: group.pixelHeight,
     bounds: group.bounds,

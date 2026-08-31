@@ -88,7 +88,7 @@ function materializedReference(
   mask: SceneObject | null,
   device: DeviceProfile,
   algorithm: DitherAlgorithm,
-): Uint16Array {
+): Float64Array {
   const resampled = resampleLumaNearest(
     { luma: sourceLuma(), width: SOURCE_W, height: SOURCE_H },
     TARGET_W,

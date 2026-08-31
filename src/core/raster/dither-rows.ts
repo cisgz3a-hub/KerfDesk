@@ -37,17 +37,17 @@ export type ErrorDiffusionRowInput = {
 
 /**
  * Stateful sequential row ditherer for the error-diffusion modes. The returned
- * function is a RasterGroup-compatible rowProvider: `(y) => Uint16Array` whose
+ * function is a RasterGroup-compatible rowProvider: `(y) => Float64Array` whose
  * concatenation over y equals `dither()` on the same full-image luma.
  */
 export function createErrorDiffusionRowDitherer(
   input: ErrorDiffusionRowInput,
-): (y: number) => Uint16Array {
+): (y: number) => Float64Array {
   const kernel = errorDiffusionKernel(input.algorithm);
   const state = new DiffusionWindow(input, kernel);
   let lastY = -1;
-  let lastRow: Uint16Array = new Uint16Array(0);
-  return (y: number): Uint16Array => {
+  let lastRow: Float64Array = new Float64Array(0);
+  return (y: number): Float64Array => {
     if (!Number.isInteger(y) || y < 0 || y >= input.height) {
       throw new Error(`dither-rows: row ${y} outside 0..${input.height - 1}`);
     }
@@ -90,10 +90,10 @@ class DiffusionWindow {
     this.loadLuma(this.ahead2, 2);
   }
 
-  advance(): Uint16Array {
+  advance(): Float64Array {
     const { width } = this.input;
     const y = this.nextY;
-    const out = new Uint16Array(width);
+    const out = new Float64Array(width);
     // Serpentine scan identical to ditherErrorDiffusion: even rows sweep
     // left-to-right, odd rows right-to-left with the kernel's dx mirrored.
     const ltr = y % 2 === 0;

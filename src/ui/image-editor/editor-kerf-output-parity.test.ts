@@ -147,7 +147,7 @@ describe('computeKerfOutputParity', () => {
     });
   });
 
-  it('carries the compiler Uint16 black-power value into the repair proof', () => {
+  it('carries compiler black power above Uint16 into the repair proof', () => {
     const { project, session } = fixture({
       luma: [0],
       bounds: { minX: 10, minY: 10, maxX: 11, maxY: 11 },
@@ -157,7 +157,7 @@ describe('computeKerfOutputParity', () => {
       device: { ...project.device, maxPowerS: 65_537 },
     };
 
-    expect(outputParity(session, wrappedPowerProject)?.thickenCandidate?.group.blackS).toBe(1);
+    expect(outputParity(session, wrappedPowerProject)?.thickenCandidate?.group.blackS).toBe(65_537);
   });
 
   it('prepares the dirty editor composite instead of the stale stored luma', () => {

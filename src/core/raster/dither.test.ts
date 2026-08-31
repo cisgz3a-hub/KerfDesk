@@ -30,6 +30,15 @@ const BINARY_ALGORITHMS = DITHER_ALGORITHMS.filter(
 );
 
 describe('dither — threshold', () => {
+  it('preserves controller power ranges above Uint16 without wrapping', () => {
+    const highPower = 100_000;
+
+    const out = dither(uniform(1, 1, 0), { algorithm: 'threshold', sMax: highPower });
+
+    expect(out).toBeInstanceOf(Float64Array);
+    expect(out[0]).toBe(highPower);
+  });
+
   it('all-black input → every pixel at sMax', () => {
     const out = dither(uniform(8, 4, 0), { algorithm: 'threshold', sMax: SMAX });
     expect(Array.from(out).every((v) => v === SMAX)).toBe(true);

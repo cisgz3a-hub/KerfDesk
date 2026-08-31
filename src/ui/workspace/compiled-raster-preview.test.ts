@@ -59,6 +59,19 @@ describe('compiledRasterPreview', () => {
     expect(streamedPreview.sValues).toEqual(materializedPreview.sValues);
     expect(streamedPreview.rgba).toEqual(materializedPreview.rgba);
   });
+
+  it('renders compiled power against the device maximum instead of normalizing the group', () => {
+    const group = compileRaster(asymmetricRaster(), imageLayer({ power: 25 }));
+    const preview = compiledRasterPreview(group, DEFAULT_DEVICE_PROFILE);
+    const fullGroupPower = Math.round(DEFAULT_DEVICE_PROFILE.maxPowerS * 0.25);
+    const poweredPixel = preview.sValues.findIndex((value) => value === fullGroupPower);
+
+    expect(poweredPixel).toBeGreaterThanOrEqual(0);
+    expect(preview.rgba[poweredPixel * 4]).toBe(
+      255 - Math.round((255 * fullGroupPower) / DEFAULT_DEVICE_PROFILE.maxPowerS),
+    );
+    expect(preview.rgba[poweredPixel * 4]).toBeGreaterThan(0);
+  });
 });
 
 function compileRaster(raster: RasterImage, layer: ReturnType<typeof imageLayer>): RasterGroup {

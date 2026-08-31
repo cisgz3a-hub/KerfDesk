@@ -26,7 +26,7 @@ const CHANNELS_PER_PIXEL = 4;
 // which rejects a possibly-shared buffer. `new Uint8ClampedArray(n)` is
 // always backed by a plain ArrayBuffer, so this is accurate, not a cast.
 export function rasterPreviewRgba(
-  sValues: Uint16Array,
+  sValues: RasterPowerValues,
   sMax: number,
   width: number,
   height: number,
@@ -44,3 +44,4 @@ export function rasterPreviewRgba(
   }
   return rgba;
 }
+import type { RasterPowerValues } from './raster-power-values';

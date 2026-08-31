@@ -46,6 +46,24 @@ function imageLayer(overrides: Partial<ReturnType<typeof createLayer>> = {}) {
 }
 
 describe('compileJob rotated raster images', () => {
+  it.each([90, 270])('swaps pass-through grid dimensions at %s degrees', (rotationDeg) => {
+    const asymmetric: SceneObject = {
+      ...rasterObject('AAAAAP//'),
+      pixelWidth: 2,
+      pixelHeight: 3,
+      bounds: { minX: 0, minY: 0, maxX: 2, maxY: 3 },
+      transform: { ...IDENTITY_TRANSFORM, rotationDeg },
+    };
+
+    const job = compileJob(
+      { objects: [asymmetric], layers: [imageLayer({ passThrough: true })] },
+      dev,
+    );
+
+    expect(firstRasterGroup(job)).toMatchObject({ pixelWidth: 3, pixelHeight: 2 });
+    expect(firstRasterGroup(job)?.sValues).toHaveLength(6);
+  });
+
   it('burns a 90-degree rotated raster with the content rotated, not stretched', () => {
     // Top row black, bottom row white. Unrotated this compiles to
     // [0, 0, 300, 300] (top row lands at machine back on front-left devices).

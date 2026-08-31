@@ -1,4 +1,5 @@
 import type { SelectionMask } from '../../core/image-select';
+import type { RasterPowerValues } from '../../core/raster/raster-power-values';
 import { rasterRunSurvivesDotWidthCorrection } from '../../core/raster-output';
 
 type HorizontalMaskRepairInput = {
@@ -7,7 +8,7 @@ type HorizontalMaskRepairInput = {
   readonly minXWorldMm: number;
   readonly pixelWidthMm: number;
   readonly dotWidthCorrectionMm: number;
-  readonly sourceSValues: Uint16Array;
+  readonly sourceSValues: RasterPowerValues;
   readonly filledS: number;
   readonly outputMaskFor: (sourceMask: SelectionMask) => SelectionMask;
 };

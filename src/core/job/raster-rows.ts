@@ -1,11 +1,12 @@
 import type { RasterGroup } from './job';
+import type { RasterPowerValues } from '../raster/raster-power-values';
 
 export type RasterRowEntry = {
   readonly rowIndex: number;
-  readonly row: Uint16Array;
+  readonly row: RasterPowerValues;
 };
 
-export function rasterRow(group: RasterGroup, y: number): Uint16Array {
+export function rasterRow(group: RasterGroup, y: number): RasterPowerValues {
   if (!Number.isInteger(y) || y < 0 || y >= group.pixelHeight) {
     throw new Error(`Raster row ${y} is outside 0..${group.pixelHeight - 1}.`);
   }
@@ -33,7 +34,7 @@ export function* rasterRowsInProviderOrder(group: RasterGroup): Generator<Raster
   }
 }
 
-function providedRasterRow(group: RasterGroup, providerY: number): Uint16Array {
+function providedRasterRow(group: RasterGroup, providerY: number): RasterPowerValues {
   const row = group.rowProvider?.(providerY);
   if (row === undefined || row.length !== group.pixelWidth) {
     throw new Error(

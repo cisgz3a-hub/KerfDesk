@@ -1,5 +1,6 @@
 import { cncPassXyPoints, type Job, type RasterGroup } from '../job';
 import { rasterRowsInProviderOrder } from '../job/raster-rows';
+import type { RasterPowerValues } from '../raster/raster-power-values';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 export const MAX_COMPILED_MOTION_SEGMENTS = 250_000;
@@ -141,7 +142,7 @@ function exceedsLimits(work: CompiledWork, limits: CompiledWorkLimits | undefine
 }
 
 function measureRasterRow(
-  row: Uint16Array,
+  row: RasterPowerValues,
   pixelWidthMm: number,
 ): { readonly runs: number; readonly spans: number } {
   let firstActive = -1;

@@ -10,6 +10,7 @@
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
 import { sampleCircularArcPoints } from '../geometry/circular-arc';
+import type { RasterPowerValues } from '../raster/raster-power-values';
 import {
   assertNever,
   type CncCoolantMode,
@@ -96,8 +97,8 @@ export type RasterGroup = {
   readonly passes: number; // integer â‰¥ 1
   readonly airAssist: boolean;
   // S-values per pixel, already scaled by power %. Row-major.
-  readonly sValues: Uint16Array;
-  readonly rowProvider?: (y: number) => Uint16Array;
+  readonly sValues: RasterPowerValues;
+  readonly rowProvider?: (y: number) => RasterPowerValues;
   // Raster storage and streamed error-diffusion providers are consumed from
   // source row 0 upward. A descending physical order maps those source rows
   // onto the job from maxY to minY without reversing storage or rewinding a

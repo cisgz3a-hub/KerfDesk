@@ -18,12 +18,11 @@
 //                        smooth gradients but most diode lasers don't
 //                        respond linearly to S.
 //
-// All modes return Uint16Array (length = width*height) of S values
-// already scaled to [0, sMax]. Uint16 because typical GRBL `$30` is
-// 1000 (or 255, or higher per controller) and Uint8 wraps modulo 256;
-// Uint16 holds the full 0..65535 range any GRBL fork might use. The
-// raster emit path consumes these directly — power-scale invariant
-// is already applied here.
+// All modes return Float64Array (length = width*height) of integer S values
+// already scaled to [0, sMax]. A numeric rather than fixed-width integer
+// buffer preserves controller ranges above 65535 without wrap or policy caps.
+// The raster emit path consumes these directly — power-scale invariant is
+// already applied here.
 //
 // Pure-core compliant: no clock, no random, no I/O. Algorithms are
 // deterministic — same input, same output, always.
@@ -56,7 +55,7 @@ export type DitherOptions = {
 
 const DEFAULT_THRESHOLD = 128;
 
-export function dither(input: DitherInput, options: DitherOptions): Uint16Array {
+export function dither(input: DitherInput, options: DitherOptions): Float64Array {
   if (isErrorDiffusionMode(options.algorithm)) {
     return ditherErrorDiffusion(input, options, errorDiffusionKernel(options.algorithm));
   }
@@ -74,12 +73,12 @@ export function ditherIndependentRow(
   luma: Uint8Array,
   rowIndex: number,
   options: DitherOptions,
-): Uint16Array {
+): Float64Array {
   const algorithm = options.algorithm;
   if (!isIndependentDitherMode(algorithm)) {
     throw new Error(`Dither algorithm ${algorithm} requires full-image state.`);
   }
-  const out = new Uint16Array(luma.length);
+  const out = new Float64Array(luma.length);
   const cutoff = options.thresholdLuma ?? DEFAULT_THRESHOLD;
   const sMax = normalizeS(options.sMax);
   const sMin = Math.min(sMax, normalizeS(options.sMin ?? 0));
@@ -176,8 +175,8 @@ export function errorDiffusionKernel(mode: ErrorDiffusionMode): DiffusionKernel 
 }
 
 // Single-cutoff: harsh black/white split. ~5 LOC of real work.
-function ditherThreshold(input: DitherInput, options: DitherOptions): Uint16Array {
-  const out = new Uint16Array(input.luma.length);
+function ditherThreshold(input: DitherInput, options: DitherOptions): Float64Array {
+  const out = new Float64Array(input.luma.length);
   const cutoff = options.thresholdLuma ?? DEFAULT_THRESHOLD;
   for (let i = 0; i < input.luma.length; i += 1) {
     const l = input.luma[i] ?? TWO_FIFTY_FIVE;
@@ -190,8 +189,8 @@ function ditherThreshold(input: DitherInput, options: DitherOptions): Uint16Arra
 // sMax, white (255) maps to 0. For lasers that can actually modulate
 // power smoothly via S — diode lasers vary; the operator decides
 // whether to use this or floyd-steinberg.
-function ditherGrayscale(input: DitherInput, options: DitherOptions): Uint16Array {
-  const out = new Uint16Array(input.luma.length);
+function ditherGrayscale(input: DitherInput, options: DitherOptions): Float64Array {
+  const out = new Float64Array(input.luma.length);
   const sMax = normalizeS(options.sMax);
   const sMin = Math.min(sMax, normalizeS(options.sMin ?? 0));
   for (let i = 0; i < input.luma.length; i += 1) {
@@ -207,8 +206,8 @@ function normalizeS(value: number): number {
   return Math.max(0, Math.round(Number.isFinite(value) ? value : 0));
 }
 
-function ditherOrdered(input: DitherInput, options: DitherOptions): Uint16Array {
-  const out = new Uint16Array(input.luma.length);
+function ditherOrdered(input: DitherInput, options: DitherOptions): Float64Array {
+  const out = new Float64Array(input.luma.length);
   for (let y = 0; y < input.height; y += 1) {
     for (let x = 0; x < input.width; x += 1) {
       const i = y * input.width + x;
@@ -224,13 +223,13 @@ function ditherErrorDiffusion(
   input: DitherInput,
   options: DitherOptions,
   kernel: DiffusionKernel,
-): Uint16Array {
+): Float64Array {
   const { width, height } = input;
   const buf = new Float32Array(input.luma.length);
   for (let i = 0; i < input.luma.length; i += 1) {
     buf[i] = input.luma[i] ?? TWO_FIFTY_FIVE;
   }
-  const out = new Uint16Array(input.luma.length);
+  const out = new Float64Array(input.luma.length);
   for (let y = 0; y < height; y += 1) {
     const ltr = y % 2 === 0;
     const xStart = ltr ? 0 : width - 1;
