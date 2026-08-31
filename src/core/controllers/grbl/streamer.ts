@@ -121,10 +121,10 @@ export function createStreamer(gcode: string, opts: CreateStreamerOptions = {}):
 // `M0` between bit sections (the human-readable instructions before it are
 // comments, already filtered out of the queue). Comment-stripped and trimmed
 // so an imported `M0 ; change bit` still matches.
-function isToolChangeLine(line: string): boolean {
-  const code = line
+export function isToolChangeLine(line: string): boolean {
+  const beforeSemicolon = line.split(';', 1)[0] ?? '';
+  const code = beforeSemicolon
     .replace(/\(.*?\)/g, '')
-    .replace(/;.*$/, '')
     .trim()
     .toUpperCase();
   return code === 'M0' || code === 'M00' || code === 'M1' || code === 'M01';

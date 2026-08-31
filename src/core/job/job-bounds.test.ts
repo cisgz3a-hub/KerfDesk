@@ -49,6 +49,38 @@ describe('computeJobBounds', () => {
     });
   });
 
+  it('expands CNC tool-center routes by the cutter radius', () => {
+    expect(
+      computeJobBounds({
+        groups: [
+          {
+            kind: 'cnc',
+            layerId: 'cnc',
+            color: '#000000',
+            cutType: 'engrave',
+            toolDiameterMm: 4,
+            feedMmPerMin: 600,
+            plungeMmPerMin: 200,
+            spindleRpm: 12_000,
+            spindleSpinupSec: 1,
+            safeZMm: 5,
+            passes: [
+              {
+                kind: 'contour',
+                zMm: -1,
+                closed: false,
+                polyline: [
+                  { x: 10, y: 20 },
+                  { x: 30, y: 40 },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual({ minX: 8, minY: 18, maxX: 32, maxY: 42 });
+  });
+
   it('uses fill burn bounds without including overscan runway', () => {
     expect(
       computeJobBounds({

@@ -19,8 +19,8 @@ import { finishedJobStateReset } from './laser-session-reset';
 import { frameCompletionPatch, nextFrameDispatch, observeFrameMotion } from './laser-frame-status';
 import type { LaserState } from './laser-store';
 import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
-import { hasCustomXyOrigin } from './origin-actions';
 import { statusObservationPatch } from './laser-status-observation';
+import { statusPositionPatch } from './laser-status-position';
 import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './live-canvas-run';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
@@ -80,7 +80,7 @@ export function handleStatusLine(
 
   const positionInvalidated = report.mpgActive === true && state.mpgActive !== true;
   const nextSequence = state.statusSequence + 1;
-  const positionPatch = statusPositionPatch(report, state.workOriginSource, state.accessoryCache);
+  const positionPatch = statusPositionPatch(state, report);
   const completionPatch = frameCompletionPatch({
     operation,
     observedOperation,
@@ -286,53 +286,6 @@ function shouldReleaseStreamerAtIdle(
   return streamer.status === 'done' && controllerOperation === null;
 }
 
-function statusPositionPatch(
-  report: StatusReport,
-  originSource: LaserState['workOriginSource'],
-  previousAccessories: LaserState['accessoryCache'],
-): Pick<LaserState, 'statusReport'> &
-  Partial<
-    Pick<
-      LaserState,
-      'wcoCache' | 'ovCache' | 'accessoryCache' | 'workOriginActive' | 'workOriginSource'
-    >
-  > {
-  // Ov: is reported on the same intermittent cadence as WCO — cache the
-  // last-seen values so the overrides readout doesn't flicker (ADR-103 G3).
-  const ovPatch = report.ov === null || report.ov === undefined ? {} : { ovCache: report.ov };
-  // A: is intermittent with Ov:. Preserve the last state on frames carrying
-  // neither field; the parser turns Ov-without-A into a known all-off value.
-  const accessoryPatch =
-    report.accessories === null || report.accessories === undefined
-      ? {}
-      : {
-          accessoryCache: {
-            ...report.accessories,
-            ...(previousAccessories?.secondarySpindlePresent === true
-              ? { secondarySpindlePresent: true }
-              : {}),
-            ...exceptionalAccessoryLatch(previousAccessories, report.accessoryReportPresent),
-          },
-        };
-  if (report.wco === null) return { statusReport: report, ...ovPatch, ...accessoryPatch };
-  // A non-trivial WCO always means a custom origin. A zero WCO is ambiguous: on a
-  // no-homing machine the operator sets the origin right after Release/Wake, when
-  // GRBL sits at machine 0,0, so the resulting G92 offset is exactly zero. That
-  // is a deliberate origin, not the absence of one — a routine zero-WCO frame
-  // must NOT demote it. An actual reset/alarm/clear drops workOriginSource to
-  // 'none' first (originUnknownAfterControllerReset / clearedOriginPatch), so
-  // keying on the source here cannot revive a stale origin.
-  const active = hasCustomXyOrigin(report.wco) || originSource !== 'none';
-  return {
-    statusReport: report,
-    ...ovPatch,
-    ...accessoryPatch,
-    wcoCache: report.wco,
-    workOriginActive: active,
-    workOriginSource: active ? knownOrUnknownOriginSource(originSource) : 'none',
-  };
-}
-
 function mpgOwnershipPatch(
   report: StatusReport,
   state: LaserState,
@@ -363,21 +316,4 @@ function mpgOwnershipPatch(
     frameVerification: null,
     framedRun: null,
   };
-}
-
-function exceptionalAccessoryLatch(
-  previous: LaserState['accessoryCache'],
-  explicitAccessoryReport: boolean | undefined,
-): Partial<NonNullable<LaserState['accessoryCache']>> {
-  if (explicitAccessoryReport === true) return {};
-  return {
-    ...(previous?.spindleEncoderFault === true ? { spindleEncoderFault: true } : {}),
-    ...(previous?.toolChangePending === true ? { toolChangePending: true } : {}),
-  };
-}
-
-function knownOrUnknownOriginSource(
-  source: LaserState['workOriginSource'],
-): LaserState['workOriginSource'] {
-  return source === 'none' ? 'unknown' : source;
 }

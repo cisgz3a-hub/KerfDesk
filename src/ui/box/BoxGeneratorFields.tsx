@@ -52,9 +52,9 @@ function DimensionFields(props: {
   const { draft, setField } = props;
   return (
     <>
-      <MmField label="Width" value={draft.width} min={1} onChange={setField('width')} />
-      <MmField label="Depth" value={draft.depth} min={1} onChange={setField('depth')} />
-      <MmField label="Height" value={draft.height} min={1} onChange={setField('height')} />
+      <MmField label="Width (mm)" value={draft.width} min={1} onChange={setField('width')} />
+      <MmField label="Depth (mm)" value={draft.depth} min={1} onChange={setField('depth')} />
+      <MmField label="Height (mm)" value={draft.height} min={1} onChange={setField('height')} />
       <SelectField
         label="Dimensions are"
         value={draft.mode}
@@ -87,20 +87,20 @@ function FitFields(props: {
   return (
     <>
       <MmField
-        label="Finger width"
+        label="Finger width (mm)"
         value={draft.fingerWidth}
         min={0.1}
         onChange={setField('fingerWidth')}
       />
       <MmField
-        label="Clearance"
+        label="Clearance (mm)"
         value={draft.clearance}
         min={-5}
         max={5}
         onChange={setField('clearance')}
       />
       <CalibrationNumberField
-        label="Part spacing"
+        label="Part spacing (mm)"
         value={draft.partSpacing}
         min={0}
         max={undefined}
@@ -136,7 +136,7 @@ function FitFields(props: {
       ) : null}
       {props.machine.kind === 'cnc' && draft.relief !== 'off' ? (
         <MmField
-          label="Relief tool diameter"
+          label="Relief tool diameter (mm)"
           value={draft.toolDiameter}
           min={0.1}
           onChange={setField('toolDiameter')}

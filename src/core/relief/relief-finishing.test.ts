@@ -293,6 +293,7 @@ describe('reliefFinishingPasses', () => {
           { x: 0.5, y: 0.5, z: -2 },
         ],
         closed: false,
+        lateralFeed: 'z-rate-capped',
       },
     ]);
   });

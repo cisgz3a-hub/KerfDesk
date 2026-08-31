@@ -349,6 +349,7 @@ type InitialLaserState = Pick<
   | 'pendingTransportWrites'
   | 'homingState'
   | 'homingProof'
+  | 'positionEvidenceSuppressed'
   | 'trustedPositionEpoch'
   | 'workZReferenceEpoch'
   | 'log'
@@ -408,6 +409,7 @@ export function initialLaserState(): InitialLaserState {
     pendingTransportWrites: 0,
     homingState: 'unknown',
     homingProof: null,
+    positionEvidenceSuppressed: false,
     trustedPositionEpoch: 0,
     workZReferenceEpoch: 0,
     log: [],
@@ -478,6 +480,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     fireActive: false,
     homingState: 'unknown',
     homingProof: null,
+    positionEvidenceSuppressed: false,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,

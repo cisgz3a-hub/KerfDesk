@@ -145,6 +145,11 @@ export type LaserState = LaserStoreActions &
     readonly pendingTransportWrites?: number;
     readonly homingState: HomingState;
     readonly homingProof: HomingProof | null;
+    /** True after an operation such as failed Home, Unlock, or motor release
+     * makes reported coordinates physically untrustworthy. Status frames remain
+     * visible but cannot repopulate work-position evidence until Home confirms
+     * or an explicit Set Origin transaction succeeds. */
+    readonly positionEvidenceSuppressed?: boolean;
     readonly trustedPositionEpoch?: number;
     readonly workZReferenceEpoch: number;
     readonly log: ReadonlyArray<string>;

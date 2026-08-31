@@ -262,11 +262,13 @@ describe('.lf2 machine / cnc round-trip', () => {
     expect(loaded.machine).toBeUndefined();
   });
 
-  it('drops an unrecognized machine kind', () => {
+  it('rejects an unrecognized machine kind instead of silently loading it as laser', () => {
     const raw = JSON.parse(serializeProject(createProject())) as Record<string, unknown>;
     raw['machine'] = { kind: 'plasma' };
-    const loaded = deserializeOk(`${JSON.stringify(raw)}\n`);
-    expect(loaded.machine).toBeUndefined();
+    expect(deserializeProject(`${JSON.stringify(raw)}\n`)).toEqual({
+      kind: 'invalid',
+      reason: 'missing or invalid `machine.kind`',
+    });
   });
 
   it('rebuilds malformed CNC machine values from defaults', () => {

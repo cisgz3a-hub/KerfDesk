@@ -26,7 +26,10 @@ export async function runOriginTransaction(
   label: string,
   writeCommands: OriginCommandWriter,
   successPatch: () => Partial<LaserState> | Promise<Partial<LaserState>>,
-  options: { readonly changesXyOrigin?: boolean } = {},
+  options: {
+    readonly changesXyOrigin?: boolean;
+    readonly reestablishesPositionEvidence?: boolean;
+  } = {},
 ): Promise<void> {
   const operation: LaserControllerOperation = {
     kind: 'interactive-command',
@@ -34,7 +37,13 @@ export async function runOriginTransaction(
     label,
   };
   let pendingLine = '';
-  set({ controllerOperation: operation, lastWriteError: null });
+  set({
+    controllerOperation: operation,
+    lastWriteError: null,
+    ...(options.reestablishesPositionEvidence === true
+      ? { positionEvidenceSuppressed: false }
+      : {}),
+  });
   try {
     await writeCommands(async (line) => {
       pendingLine = line;
@@ -90,6 +99,9 @@ export function unknownOriginPatch(): Partial<LaserState> {
   return {
     workOriginActive: true,
     workOriginSource: 'unknown',
+    positionEvidenceSuppressed: true,
+    statusReport: null,
+    statusObservation: null,
     workZZeroEvidence: null,
     wcoCache: null,
     frameVerification: null,

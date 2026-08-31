@@ -110,6 +110,19 @@ describe('scene clipboard actions', () => {
     expect(pasted?.subLayers[0]?.label).toBe('Sub-layer 1');
   });
 
+  it('keeps same-project paste on the existing operation instead of double-emitting it', () => {
+    useStore.getState().importSvgObject(svgObj('same-project', ['#ff0000']));
+    useStore.getState().selectObject('same-project');
+    useStore.getState().copySelection();
+    const sourceOperationId = useStore.getState().project.scene.layers[0]?.id;
+
+    useStore.getState().pasteClipboard();
+
+    const { objects, layers } = useStore.getState().project.scene;
+    expect(layers).toHaveLength(1);
+    expect(operationIdsForObject(objects[1]!, layers)).toEqual([sourceOperationId]);
+  });
+
   it('cut copies the selection, removes it as one undoable edit, and can paste it back', () => {
     useStore.setState({ project: projectWithVariants(), dirty: false, undoStack: [] });
     useStore.getState().selectObjects(['svg-1', 'raster-1']);

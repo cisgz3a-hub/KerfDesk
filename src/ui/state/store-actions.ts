@@ -119,6 +119,17 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
   return {
     undo: () =>
       set((s) => {
+        if (s.pendingUndo !== null) {
+          // Ctrl/Cmd+Z during a live drag cancels that uncommitted gesture.
+          // The interaction snapshot is newer than the top of undoStack; if
+          // we skipped it, Undo popped an unrelated older edit and left the
+          // drag mutation in the project.
+          return {
+            ...s.pendingUndo,
+            additionalSelectedIds: new Set(s.pendingUndo.additionalSelectedIds),
+            pendingUndo: null,
+          };
+        }
         const prev = s.undoStack[s.undoStack.length - 1];
         if (prev === undefined) return s;
         const context = setupHistoryContextFor(prev);

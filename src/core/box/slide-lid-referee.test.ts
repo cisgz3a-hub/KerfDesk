@@ -75,6 +75,16 @@ describe('slide-lid builder + referee', () => {
     expect(result.issues[0]?.message).toContain('slide');
   });
 
+  it('bounds the thumb notch by lid length on a shallow box', () => {
+    const shallow = { ...SPEC, depthMm: 10, widthMm: 200 };
+    const lid = buildSlideLidParts(shallow).find((part) => part.panel === 'lid');
+    expect(lid).toBeDefined();
+    if (lid === undefined) return;
+    const ys = lid.rings.outline.points.map((point) => point.y);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(10);
+  });
+
   it('composes with dividers (slots land in the short front too)', () => {
     const result = generateBox({ ...SPEC, dividersXCount: 1, dividersYCount: 1 });
     expect(result.kind).toBe('generated');

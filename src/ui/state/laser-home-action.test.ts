@@ -210,6 +210,7 @@ describe('home command timeout', () => {
     await home;
     const state = useLaserStore.getState();
     expect(state.homingState).toBe('confirmed');
+    expect(state.positionEvidenceSuppressed).toBe(false);
     expect(state.controllerOperation).toBeNull();
     expect(state.homingProof).toEqual({
       sessionEpoch: state.controllerSessionEpoch,
@@ -236,5 +237,6 @@ describe('home command timeout', () => {
     await expect(home).rejects.toThrow(/invalidated|reboot/i);
     expect(useLaserStore.getState().homingState).toBe('unknown');
     expect(useLaserStore.getState().homingProof).toBeNull();
+    expect(useLaserStore.getState().positionEvidenceSuppressed).toBe(true);
   });
 });

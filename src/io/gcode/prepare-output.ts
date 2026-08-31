@@ -10,12 +10,14 @@
 import {
   applyJobOriginOffset,
   compileJob,
+  computeJobBounds,
   computeRegistrationBoxBounds,
   computeSceneOutputBounds,
   jobOriginOffset,
   jobOriginOffsetFromBounds,
   optimizePaths,
   type Job,
+  type JobBounds,
   type JobOriginPlacement,
 } from '../../core/job';
 import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
@@ -206,8 +208,17 @@ function resolveJobOriginOffset(
   if (boxBounds !== null) return jobOriginOffsetFromBounds(boxBounds, jobOrigin);
 
   if (outputScope.cutSelectedGraphics && !outputScope.useSelectionOrigin) {
-    const fullBounds = computeSceneOutputBounds(project.scene, project.device);
+    const fullBounds = fullSceneOutputBounds(project);
     return fullBounds === null ? ZERO_OFFSET : jobOriginOffsetFromBounds(fullBounds, jobOrigin);
   }
   return jobOriginOffset(compiled, jobOrigin, project.device);
+}
+
+function fullSceneOutputBounds(project: Project): JobBounds | null {
+  const machine = project.machine;
+  if (machine === undefined || machine.kind !== 'cnc') {
+    return computeSceneOutputBounds(project.scene, project.device);
+  }
+  const compiled = compileCncJobResult(project.scene, project.device, machine);
+  return compiled.kind === 'compiled' ? computeJobBounds(compiled.job, project.device) : null;
 }

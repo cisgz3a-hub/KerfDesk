@@ -25,7 +25,17 @@ export function installAutoJobReview(
     });
   };
   const unsubscribe = useJobReviewStore.subscribe((store, previous) => {
-    if (store.state.kind === 'open' && previous.state.kind !== 'open') answer();
+    if (store.state.kind !== 'open') return;
+    if (previous.state.kind !== 'open') {
+      answer();
+      return;
+    }
+    // A real operator must confirm again after the gate publishes re-prepared
+    // bytes or evidence. Mirror that second click in flow tests; do not answer
+    // failed rebuilds, whose blocker intentionally keeps Confirm unavailable.
+    if (previous.state.isPreparing && !store.state.isPreparing && store.state.blocker === null) {
+      answer();
+    }
   });
   if (useJobReviewStore.getState().state.kind === 'open') answer();
   return unsubscribe;

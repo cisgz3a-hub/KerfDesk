@@ -50,16 +50,17 @@ function prepared(project: Project, job: Job) {
 }
 
 describe('CNC relief planning warnings', () => {
-  it('discloses stored out-of-range Stepover normalization without a new refusal', () => {
+  it('discloses stored out-of-range Stepover without falsely claiming a clamp', () => {
     const low = detectCncReliefPlanningWarnings(pocketProject(1));
     const high = detectCncReliefPlanningWarnings(pocketProject(200));
 
     expect(low).toHaveLength(1);
     expect(low[0]).toContain('is 1%');
-    expect(low[0]).toContain('use 10%');
+    expect(low[0]).toContain('uses this positive value as stored');
+    expect(low[0]).toContain('does not clamp');
     expect(high).toHaveLength(1);
     expect(high[0]).toContain('is 200%');
-    expect(high[0]).toContain('use 85%');
+    expect(high[0]).toContain('uses this positive value as stored');
     expect(detectCncReliefPlanningWarnings(pocketProject(40))).toEqual([]);
   });
 
@@ -228,7 +229,7 @@ describe('CNC relief planning warnings', () => {
     expect(warnings).toContainEqual(expect.stringContaining('3.175 mm row spacing'));
   });
 
-  it('accepts a ball-nose scallop exactly equal to the cutter radius', () => {
+  it('accepts a ball-nose scallop exactly equal to the cutter radius while disclosing interpolation', () => {
     const project = pocketProject(40);
     const job: Job = {
       groups: [],
@@ -251,7 +252,9 @@ describe('CNC relief planning warnings', () => {
       },
     };
 
-    expect(detectCncReliefPlanningWarnings(project, job, 'compiled-evidence-only')).toEqual([]);
+    expect(detectCncReliefPlanningWarnings(project, job, 'compiled-evidence-only')).toEqual([
+      expect.stringContaining('not a continuous swept-volume proof'),
+    ]);
   });
 
   it('does not derive source-only advisories in compiled-evidence-only mode', () => {

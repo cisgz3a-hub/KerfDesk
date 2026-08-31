@@ -115,8 +115,8 @@ function normalizeProject(raw: Record<string, unknown>): Project {
     },
   };
   // `...raw` copied whatever `machine` value the file carried; replace it
-  // with the sanitized config, or REMOVE it entirely when unrecognized so an
-  // unknown kind can't ride through the spread.
+  // with the sanitized config. Shape validation has already rejected unknown
+  // machine kinds so they cannot silently change a project into a laser job.
   const machine = normalizeMachineValue(raw['machine']);
   if (machine === undefined) {
     delete normalized['machine'];
@@ -126,10 +126,9 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   return normalized as unknown as Project;
 }
 
-// Optional machine config (CNC support). Absent or unrecognized → undefined
-// (the key is dropped and the project loads as a laser project). A CNC config
+// Optional machine config (CNC support). Absent → undefined. A CNC config
 // is rebuilt from defaults field-by-field so malformed values cannot reach
-// the compiler.
+// the compiler; shape validation rejects unrecognized kinds before this runs.
 function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefined {
   if (!isObject(raw)) return undefined;
   if (raw['kind'] === 'laser') return { kind: 'laser' };

@@ -18,6 +18,7 @@ import * as reliefField from './project-relief-heightfield-validator';
 import { validateSingleReliefSource } from './project-relief-source-authority';
 import { validateProjectJobSetup } from './project-job-setup-validator';
 import { validateOperationIds } from './project-operation-id-validator';
+import { validateProjectMachineKind } from './project-machine-kind-validator';
 import {
   firstError,
   isObject,
@@ -59,6 +60,7 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
   return firstError([
     validateDevice(device),
     validateWorkspace(workspace),
+    validateProjectMachineKind(raw['machine']),
     validateOptimization(raw['optimization']),
     validateProjectJobSetup(raw['jobSetup']),
     validateProjectVariables(raw['variables']),

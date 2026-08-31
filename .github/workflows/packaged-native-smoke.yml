@@ -44,7 +44,8 @@ jobs:
         id: native_smoke
         shell: pwsh
         run: |
-          $executable = (Resolve-Path 'release/0.1.0/win-unpacked/KerfDesk.exe').Path
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $executable = (Resolve-Path "release/$packageVersion/win-unpacked/KerfDesk.exe").Path
           pnpm smoke:desktop:native -- $executable
 
       - name: Record SHA-correlated readiness lanes

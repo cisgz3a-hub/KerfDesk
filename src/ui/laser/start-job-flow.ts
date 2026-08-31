@@ -1,5 +1,4 @@
-// runStartJobFlow — the full Start-job sequence (readiness checks →
-// operator confirmation → stream). Extracted from LaserWindow so the
+// runStartJobFlow — readiness → review → stream, extracted from LaserWindow so the
 // toolbar button and the Ctrl+Return shortcut (M22, WORKFLOW F-A15) run the
 // identical flow. Reads both stores imperatively at call time.
 //
@@ -39,11 +38,14 @@ import { streamResumeFromRawLine } from './start-job-resume-stream';
 import { prepareCurrentStartJob, prepareRecoverySource } from './start-job-source';
 import { captureStartExternalEnvironment } from './start-job-external-environment';
 import {
-  COMPLETED_REPLAY_CHANGED_MESSAGE,
   completedReceiptIsCurrent,
   replayCompilationMatches,
   stageFreshExecutionArtifact,
 } from './start-job-execution-tracking';
+import {
+  completedReplayInvalidationHandler,
+  discardChangedCompletedReplay,
+} from './completed-replay-invalidation';
 import {
   currentLaserForAuthorizedStartNow,
   type CurrentStartAuthorizationArgs,
@@ -202,8 +204,7 @@ async function runStartJobFlowWithCheckpoint(
     return;
   }
   if (completedReceipt !== null && !replayCompilationMatches(prepared, completedReceipt)) {
-    await repository.discardCompletedReceipt(completedReceipt.runId);
-    useToastStore.getState().pushToast(COMPLETED_REPLAY_CHANGED_MESSAGE, 'warning');
+    await discardChangedCompletedReplay(completedReceipt, repository);
     return;
   }
   const programIssue = checkpointProgramIssue(checkpointToReplace, prepared.gcode);
@@ -219,6 +220,7 @@ async function runStartJobFlowWithCheckpoint(
     initial: { app, project, laser, prepared, laserModeStartSnapshot, externalEnvironment },
     checkpointToReplace,
     completedReceipt,
+    ...completedReplayInvalidationHandler(completedReceipt, repository),
   });
   if (review === null) return;
   const { bundle, reviewedAtIso, reviewModel, laserModeStartEvidence, cncSetupAttestation } =

@@ -82,12 +82,23 @@ function extendBoundsForGroup(
 }
 
 function extendBoundsForCnc(b: MutableBounds, group: CncGroup): boolean {
+  const toolCenter: MutableBounds = {
+    minX: Number.POSITIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+  };
   let any = false;
   for (const pass of group.passes) {
     for (const p of cncPassXyPoints(pass)) {
-      extendBoundsForPoint(b, p);
+      extendBoundsForPoint(toolCenter, p);
       any = true;
     }
+  }
+  if (any) {
+    const radius = group.toolDiameterMm / 2;
+    extendBoundsForPoint(b, { x: toolCenter.minX - radius, y: toolCenter.minY - radius });
+    extendBoundsForPoint(b, { x: toolCenter.maxX + radius, y: toolCenter.maxY + radius });
   }
   return any;
 }

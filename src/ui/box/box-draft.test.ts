@@ -27,6 +27,7 @@ describe('defaultBoxDraft', () => {
     expect(draft.partSpacing).toBe('12.7');
     expect(draft.toolDiameter).toBe('3.175');
     expect(draft.clearance).toBe('0.15');
+    expect(draft.relief).toBe('on');
   });
 });
 
@@ -92,10 +93,13 @@ describe('parseBoxDraft', () => {
     expect(parsed.kind).toBe('spec');
   });
 
-  it('defaults corner relief OFF for CNC (sharp corners; dogbones are opt-in)', () => {
-    expect(defaultBoxDraft(CNC).relief).toBe('off');
+  it('defaults corner relief ON for CNC so round bits leave square joint seats', () => {
+    expect(defaultBoxDraft(CNC).relief).toBe('on');
     const parsed = parseBoxDraft(defaultBoxDraft(CNC), CNC);
-    expect(parsed.kind === 'spec' ? parsed.spec.relief : null).toEqual({ kind: 'none' });
+    expect(parsed.kind === 'spec' ? parsed.spec.relief : null).toEqual({
+      kind: 'corner-overcut',
+      toolDiameterMm: 3.175,
+    });
   });
 });
 

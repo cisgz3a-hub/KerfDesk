@@ -5,6 +5,7 @@ import {
   IDENTITY_TRANSFORM,
   type Project,
   type RasterImage,
+  type TextObject,
 } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from './store';
@@ -112,6 +113,56 @@ describe('scene dependency closure', () => {
       state.project.scene.objects.some((object) => object.id === clonedImage.imageMaskId),
     ).toBe(true);
     expect(state.project.scene.groups).toHaveLength(2);
+  });
+
+  it('copies and duplicates path-text with a remapped guide dependency', () => {
+    const base = createProject();
+    const guide = {
+      ...createRectangle({
+        id: 'guide',
+        color: '#000000',
+        spec: { widthMm: 20, heightMm: 5, cornerRadiusMm: 0 },
+      }),
+      operationIds: ['guide-op'],
+    };
+    const text: TextObject = {
+      kind: 'text',
+      id: 'path-text',
+      content: 'Curve',
+      fontKey: 'Roboto',
+      sizeMm: 5,
+      alignment: 'left',
+      lineHeight: 1,
+      letterSpacing: 0,
+      color: '#000000',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 5 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [],
+      pathText: { guideObjectId: 'guide', offsetMm: 0, reverse: false },
+      operationIds: ['text-op'],
+    };
+    useStore.setState({
+      project: {
+        ...base,
+        scene: {
+          objects: [guide, text],
+          layers: [
+            createLayer({ id: 'guide-op', color: '#000000' }),
+            createLayer({ id: 'text-op', color: '#123456' }),
+          ],
+        },
+      },
+      selectedObjectId: 'path-text',
+    });
+
+    useStore.getState().duplicateSelection();
+
+    const objects = useStore.getState().project.scene.objects;
+    const clone = objects.find((object) => object.kind === 'text' && object.id !== 'path-text');
+    expect(clone?.kind).toBe('text');
+    if (clone?.kind !== 'text') return;
+    expect(clone.pathText?.guideObjectId).not.toBe('guide');
+    expect(objects.some((object) => object.id === clone.pathText?.guideObjectId)).toBe(true);
   });
 
   it('repairs a dangling image mask on delete and surfaces a nonblocking warning', () => {

@@ -183,12 +183,17 @@ function rowHasSelection(selected: Uint8Array, row: number, widthCells: number):
 
 function appendFinishingRun(passes: CncPass[], points: ReadonlyArray<FinishingPoint>): void {
   if (points.length >= 2) {
-    passes.push({ kind: 'path3d', points, closed: false });
+    passes.push({ kind: 'path3d', points, closed: false, lateralFeed: 'z-rate-capped' });
     return;
   }
   const point = points[0];
   if (point !== undefined && point.z < 0) {
-    passes.push({ kind: 'path3d', points: [{ ...point, z: 0 }, point], closed: false });
+    passes.push({
+      kind: 'path3d',
+      points: [{ ...point, z: 0 }, point],
+      closed: false,
+      lateralFeed: 'z-rate-capped',
+    });
   }
 }
 

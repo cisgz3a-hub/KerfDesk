@@ -140,6 +140,7 @@ function lidPanel(spec: BoxSpec): Polyline {
   const radiusMm = Math.min(
     THUMB_NOTCH_MAX_RADIUS_MM,
     dims.innerWidthMm / THUMB_NOTCH_SPAN_FRACTION,
+    lengthMm / 2,
   );
   const centerX = dims.outerWidthMm / 2;
   const points: Vec2[] = [{ x: 0, y: 0 }];

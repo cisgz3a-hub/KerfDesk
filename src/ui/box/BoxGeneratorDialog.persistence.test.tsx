@@ -80,7 +80,7 @@ async function closeDialog(host: HTMLElement, action: 'Cancel' | 'Escape'): Prom
 }
 
 function widthInput(host: HTMLElement): HTMLInputElement {
-  const input = host.querySelector('input[aria-label="Width"]');
+  const input = host.querySelector('input[aria-label="Width (mm)"]');
   if (!(input instanceof HTMLInputElement)) throw new Error('Width input missing');
   return input;
 }

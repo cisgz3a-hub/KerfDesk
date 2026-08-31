@@ -193,7 +193,35 @@ describe('laser lifecycle against the GRBL simulator', () => {
     expect(sim.outbound()).toContain('M9\n');
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
     expect(useLaserStore.getState().alarmCode).toBe(3);
+    useLaserStore.setState({
+      homingState: 'confirmed',
+      homingProof: { sessionEpoch: 1, positionEpoch: 1, confirmedStatusSequence: 1 },
+      wcoCache: { x: 1, y: 2, z: 3 },
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      frameVerification: {
+        boundsSignature: 'stale',
+        wco: { x: 1, y: 2, z: 3 },
+        workOriginActive: true,
+      },
+    });
+    const positionEpoch = useLaserStore.getState().trustedPositionEpoch;
+    const zEpoch = useLaserStore.getState().workZReferenceEpoch;
     await useLaserStore.getState().unlockAlarm();
+    expect(useLaserStore.getState()).toMatchObject({
+      homingState: 'unknown',
+      homingProof: null,
+      statusReport: null,
+      statusObservation: null,
+      wcoCache: null,
+      workOriginActive: false,
+      workOriginSource: 'none',
+      workZZeroEvidence: null,
+      frameVerification: null,
+      framedRun: null,
+      trustedPositionEpoch: (positionEpoch ?? 0) + 1,
+      workZReferenceEpoch: zEpoch + 1,
+    });
     await pump(50);
     expect(useLaserStore.getState().alarmCode).toBeNull();
     expect(sim.state().locked).toBe(false);
