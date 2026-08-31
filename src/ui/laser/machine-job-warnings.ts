@@ -11,6 +11,7 @@ import type { PreparedOutput } from '../../io/gcode';
 import { detectActiveWcsMismatchWarnings } from './active-wcs-warnings';
 import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings';
 import { detectCompiledReliefDepthWarningsForJob } from './cnc-compiled-depth-warnings';
+import { detectCncContourPrecisionWarnings } from './cnc-contour-precision-warnings';
 import { detectCncDefaultFeedWarnings } from './cnc-default-feed-warnings';
 import { detectCncFullTabCoverageWarnings } from './cnc-full-tab-coverage-warnings';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
@@ -47,6 +48,9 @@ export function detectMachineJobWarnings(
           ...detectCncAngledToolFeedWarnings(project),
           ...detectCncMachineLimitWarnings(project, controllerSettings),
           ...detectCncMissingPrimaryToolWarnings(project),
+          ...(prepared === undefined
+            ? []
+            : detectCncContourPrecisionWarnings(project, prepared.job)),
           ...detectCncRasterWarnings(project),
           ...detectCncReliefPlanningWarnings(project, prepared?.job, sourceGeometryChecks),
           ...detectCncOffsetLadderWarnings(project, prepared?.job, sourceGeometryChecks),

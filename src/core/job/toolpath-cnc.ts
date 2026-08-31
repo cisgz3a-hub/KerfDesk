@@ -6,6 +6,12 @@
 // toolpath-cnc.test.ts locks the two together.
 
 import { circularArcLengthMm, sampleCircularArcPoints } from '../geometry/circular-arc';
+import {
+  cncContourEmissionVertices,
+  parseGrblCncCoordinate,
+  type CncContourEmissionVertex,
+} from '../cnc/cnc-contour-emission';
+import { CNC_COORDINATE_DECIMAL_PLACES } from '../cnc/cnc-output-precision';
 import { assertNever, type Vec2 } from '../scene';
 import {
   cncHelicalContourPoints,
@@ -17,8 +23,9 @@ import {
 import { dist, polylineLength } from './toolpath-math';
 import type { ToolpathStep } from './toolpath-types';
 
-// The emitter compares coordinates at 3-decimal emit precision; the
-// simulator matches its chaining decisions at the same tolerance.
+// The initial canvas head retains the legacy 3-decimal approximation. Once a
+// CNC pass has run, boundary comparisons use the exact numeric coordinates
+// written by the emitter so mixed pass kinds retract/travel/plunge identically.
 const XY_EPS = 5e-4;
 
 // Head Z persists ACROSS CNC groups (the emitter tracks one modal Z for the
@@ -26,11 +33,18 @@ const XY_EPS = 5e-4;
 // is the bit currently in the spindle: a retract belongs to the bit that was
 // just cutting, not to the group whose pass comes next (between those two the
 // emitter parks and pauses for the change).
-export type CncSimState = { zMm: number | null; toolId: string | undefined };
+export type CncSimState = {
+  zMm: number | null;
+  toolId: string | undefined;
+  headXText: string | null;
+  headYText: string | null;
+};
 
 export function createCncSimState(): CncSimState {
-  return { zMm: null, toolId: undefined };
+  return { zMm: null, toolId: undefined, headXText: null, headYText: null };
 }
+
+type CncBoundary = { readonly point: Vec2; readonly xText: string; readonly yText: string };
 
 // exactOptionalPropertyTypes: an absent bit must omit the key, not set it to
 // undefined. Absent means the machine's active bit.
@@ -61,21 +75,23 @@ function appendPassSteps(
   group: CncGroup,
   state: CncSimState,
 ): Vec2 | null {
-  const xy = cncPassXyPoints(pass);
-  const first = xy[0];
+  const contourVertices = pass.kind === 'contour' ? cncContourEmissionVertices(pass) : [];
+  const xy =
+    pass.kind === 'contour' ? contourVertices.map((vertex) => vertex.point) : cncPassXyPoints(pass);
+  const first = cncPassRepresentedEntry(pass, contourVertices);
   if (first === undefined || xy.length < 2) return head;
   const safeZ = Math.max(0, group.safeZMm);
   const entryZ = cncPassEntryDepthMm(pass);
 
-  const alreadyAtStart = head !== null && sameXy(head, first);
+  const alreadyAtStart = head !== null && sameXyForPass(head, first, state);
   if (!alreadyAtStart) {
     appendRetract(steps, head, safeZ, state);
-    if (head !== null && !sameXy(head, first)) {
+    if (head !== null && !sameXyForPass(head, first, state)) {
       steps.push({
         kind: 'travel',
         from: head,
-        to: first,
-        length: dist(head, first),
+        to: first.point,
+        length: dist(head, first.point),
         z: { from: safeZ, to: safeZ },
       });
     }
@@ -84,7 +100,7 @@ function appendPassSteps(
     const fromZ = state.zMm ?? safeZ;
     steps.push({
       kind: 'plunge',
-      at: first,
+      at: first.point,
       fromZ,
       toZ: entryZ,
       length: Math.abs(fromZ - entryZ),
@@ -96,7 +112,10 @@ function appendPassSteps(
   steps.push({ ...cut, ...toolIdField(group.toolId) });
   state.zMm = passExitZMm(pass);
   state.toolId = group.toolId;
-  return xy[xy.length - 1] ?? first;
+  const exit = cncPassRepresentedExit(pass, contourVertices) ?? first;
+  state.headXText = exit.xText;
+  state.headYText = exit.yText;
+  return exit.point;
 }
 
 // The emitter's preamble parks at safe Z from an unknown prior position; the
@@ -222,4 +241,55 @@ function path3dLength(points: ReadonlyArray<{ x: number; y: number; z: number }>
 
 function sameXy(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= XY_EPS && Math.abs(a.y - b.y) <= XY_EPS;
+}
+
+function sameXyForPass(a: Vec2, b: CncBoundary, state: CncSimState): boolean {
+  return state.headXText === null || state.headYText === null
+    ? sameXy(a, b.point)
+    : state.headXText === b.xText && state.headYText === b.yText;
+}
+
+function cncPassRepresentedEntry(
+  pass: CncPass,
+  vertices: ReadonlyArray<CncContourEmissionVertex>,
+): CncBoundary | undefined {
+  if (pass.kind === 'contour') return vertices[0];
+  switch (pass.kind) {
+    case 'path3d':
+      return ordinaryRepresentedPoint(pass.points[0]);
+    case 'arc':
+      return ordinaryRepresentedPoint(pass.start);
+    case 'helical-contour':
+      return ordinaryRepresentedPoint(pass.start);
+    default:
+      return assertNever(pass, 'CncPass');
+  }
+}
+
+function cncPassRepresentedExit(
+  pass: CncPass,
+  vertices: ReadonlyArray<CncContourEmissionVertex>,
+): CncBoundary | undefined {
+  if (pass.kind === 'contour') return vertices[vertices.length - 1];
+  switch (pass.kind) {
+    case 'path3d':
+      return ordinaryRepresentedPoint(pass.points[pass.points.length - 1]);
+    case 'arc':
+      return ordinaryRepresentedPoint(pass.end);
+    case 'helical-contour':
+      return ordinaryRepresentedPoint(pass.polyline[pass.polyline.length - 1] ?? pass.start);
+    default:
+      return assertNever(pass, 'CncPass');
+  }
+}
+
+function ordinaryRepresentedPoint(point: Vec2 | undefined): CncBoundary | undefined {
+  if (point === undefined) return undefined;
+  const xText = point.x.toFixed(CNC_COORDINATE_DECIMAL_PLACES);
+  const yText = point.y.toFixed(CNC_COORDINATE_DECIMAL_PLACES);
+  return {
+    point: { x: parseGrblCncCoordinate(xText), y: parseGrblCncCoordinate(yText) },
+    xText,
+    yText,
+  };
 }

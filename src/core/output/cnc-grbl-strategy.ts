@@ -27,6 +27,11 @@
 // primitives in cnc-grbl-emit-head.ts (ADR-015 size cap); coolant is in
 // cnc-grbl-coolant.ts.
 
+import {
+  cncContourCoordinateEquals,
+  cncContourEmissionPrecision,
+  formatCncContourCoordinate,
+} from '../cnc/cnc-contour-emission';
 import type { DeviceProfile } from '../devices';
 import { sanitizeGcodeCommentValue } from '../gcode-comments';
 import {
@@ -292,8 +297,12 @@ function appendContourPass(
 ): void {
   const first = pass.polyline[0];
   if (first === undefined || pass.polyline.length < 2) return;
-  const startX = fmt(first.x);
-  const startY = fmt(first.y);
+  const xyPrecision = cncContourEmissionPrecision(pass);
+  if (xyPrecision === null) return;
+  const formatXy = (coordinate: number): string =>
+    formatCncContourCoordinate(coordinate, xyPrecision);
+  const startX = formatXy(first.x);
+  const startY = formatXy(first.y);
   const passZ = fmt(pass.zMm);
 
   // ADR-253: lift clear of the cut before this pass replunges, instead of
@@ -311,7 +320,7 @@ function appendContourPass(
     lines.push(`G1 Z${passZ} F${plunge}`);
     head.z = passZ;
   }
-  appendCutMoves(lines, head, pass, feed);
+  appendCutMoves(lines, head, pass, feed, formatXy, cncContourCoordinateEquals);
 }
 
 // arc: same retract/rapid/plunge discipline as a contour pass, then a native
@@ -469,14 +478,22 @@ function appendPath3dCutMoves(
   }
 }
 
-function appendCutMoves(lines: string[], head: Head, pass: CncContourPass, feed: number): void {
+function appendCutMoves(
+  lines: string[],
+  head: Head,
+  pass: CncContourPass,
+  feed: number,
+  formatXy: (coordinate: number) => string = fmt,
+  coordinatesEqual: (current: string | null, target: string) => boolean = (current, target) =>
+    current === target,
+): void {
   let feedEmitted = false;
   for (let i = 1; i < pass.polyline.length; i += 1) {
     const point = pass.polyline[i];
     if (point === undefined) continue;
-    const x = fmt(point.x);
-    const y = fmt(point.y);
-    if (x === head.x && y === head.y) continue; // zero-length at emit precision
+    const x = formatXy(point.x);
+    const y = formatXy(point.y);
+    if (coordinatesEqual(head.x, x) && coordinatesEqual(head.y, y)) continue;
     const feedWord = feedEmitted ? '' : ` F${feed}`;
     feedEmitted = true;
     lines.push(`G1 X${x} Y${y}${feedWord}`);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
+import { cncContourEmissionPoints } from '../cnc/cnc-contour-emission';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { scanGcodeWords } from '../gcode';
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
@@ -79,6 +80,82 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     const retract = toolpath.steps[3];
     if (retract?.kind !== 'plunge') throw new Error('expected retract plunge');
     expect(retract.toZ).toBe(SAFE_Z_MM);
+  });
+
+  it('previews the same four-decimal contour represented by the emitter', () => {
+    const fine: CncPass = {
+      kind: 'contour',
+      zMm: -1,
+      polyline: [
+        { x: 10, y: 20 },
+        { x: 10.0004, y: 20.0004 },
+        { x: 10, y: 20 },
+      ],
+      closed: true,
+    };
+
+    const cut = buildToolpath({ groups: [group([fine])] }).steps.find(
+      (step) => step.kind === 'cut',
+    );
+
+    expect(cut?.kind).toBe('cut');
+    if (cut?.kind !== 'cut') throw new Error('expected fine contour cut');
+    expect(cut.polyline).toEqual(cncContourEmissionPoints(fine));
+  });
+
+  it('previews five-decimal motion retained by the emitted parser representation', () => {
+    const tooFine: CncPass = {
+      kind: 'contour',
+      zMm: -1,
+      polyline: [
+        { x: 10, y: 20 },
+        { x: 10.00004, y: 20.00004 },
+        { x: 10, y: 20 },
+      ],
+      closed: true,
+    };
+
+    const cut = buildToolpath({ groups: [group([tooFine])] }).steps.find(
+      (step) => step.kind === 'cut',
+    );
+    expect(cut?.kind).toBe('cut');
+    if (cut?.kind !== 'cut') throw new Error('expected five-decimal contour cut');
+    expect(cut.polyline).toEqual(cncContourEmissionPoints(tooFine));
+  });
+
+  it('matches emitted repositioning across three- and four-decimal contour text', () => {
+    const passes: CncPass[] = [
+      {
+        kind: 'contour',
+        zMm: -1,
+        polyline: [
+          { x: 0, y: 0 },
+          { x: 10, y: 20 },
+        ],
+        closed: false,
+      },
+      {
+        kind: 'contour',
+        zMm: -2,
+        polyline: [
+          { x: 10, y: 20 },
+          { x: 10.0004, y: 20.0004 },
+          { x: 10, y: 20 },
+        ],
+        closed: true,
+      },
+    ];
+
+    expect(
+      buildToolpath({ groups: [group(passes)] }, { startPoint: { x: 0, y: 0 } }).steps,
+    ).toMatchObject([
+      { kind: 'plunge', toZ: -1 },
+      { kind: 'cut' },
+      { kind: 'plunge', fromZ: -1, toZ: 3.81 },
+      { kind: 'travel' },
+      { kind: 'plunge', fromZ: 3.81, toZ: -2 },
+      { kind: 'cut' },
+    ]);
   });
 
   it('gives path3d cuts a 3D arc length and a z span', () => {
