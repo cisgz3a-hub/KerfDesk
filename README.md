@@ -127,15 +127,15 @@ last, inner contours before outer — a part is machined completely before the c
 | `.clb` | LightBurn cut libraries → material presets. Proven against four real public libraries. Replaces the active library. |
 | `.lbdev` | LightBurn device profiles, with an Applied / Needs Review / Ignored card before anything is applied. GRBL-flavoured devices only. **Experimental — written against an inferred schema and never tested against a real LightBurn export.** |
 | `.png` `.jpg` | Engrave/trace sources. |
-| `.stl` | CNC relief. **Drag-and-drop only, CNC mode only** — there is no menu item. |
+| `.stl` | CNC relief through the unified Import picker or drag-and-drop, in either machine mode. |
 | `.nc` `.gcode` `.tap` | **View only**, in the G-code Inspector. Does not become editable geometry. (An older 2D simulator is reachable from inside the Inspector, in CNC mode only.) |
 | `.ttf` `.otf` | Embedded into the project (≤10 MB each, ≤32 per project). |
 | `.csv` | Variable-text datasets. |
-| `.lf2` | KerfDesk's own project format (JSON, schema v3, auto-migrating from v1/v2). |
+| `.lf2` | KerfDesk's own project format (JSON, schema v4, auto-migrating from v1/v2/v3). |
 
 Also: `.lfml.json` material libraries, `.lfmachine.json` machine profiles, `.lfsettings.json`
-controller snapshots. Drag-and-drop accepts SVG, DXF, PNG/JPG and STL; everything else needs its
-own dialog.
+controller snapshots. **File → Import...**, `Ctrl/Cmd+I`, the toolbar, and drag-and-drop share the
+ordered SVG, DXF, PNG/JPG, and STL import surface; specialized formats retain their own dialogs.
 
 Not supported: `.ai`, PDF, EPS, `.cdr`, Gerber, OBJ/3MF, and LightBurn `.lbzip` bundles.
 

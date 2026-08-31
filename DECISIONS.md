@@ -18860,3 +18860,148 @@ new guard, warning gate, cap, confirmation, or hardware claim.
 - ADR-311, exact transport and asynchronous ownership across awaited boundaries.
 
 ---
+
+## ADR-313 - Current-main audit reconciliation preserves exact semantic owners (2026-08-31)
+
+**Status:** Accepted and implemented in local remediation; focused software verification recorded,
+full repository and hosted verification pending, hardware and perceptual qualification excluded
+
+### Context
+
+An exact-current-main audit after ADR-312 independently rechecked the prior day's merged remediation,
+then ran new ownership, compatibility, output, UI, release, and scalability lanes. The merged behavior
+remained present, but several adjacent paths still lost the same underlying semantic owner: generic
+imports and concurrent Open requests could publish into a replacement document; selected raster output
+lost an unselected mask dependency; late stream-write rejection could terminalize a replacement stream;
+and a settings collector could publish after MPG takeover. Separate compile/preview findings included
+M4 on the M3-compatible dialect, raster S-value wrap above 65,535, rectangular quarter-turn grids,
+precision-empty CNC contours, absolute SVG primitive units, absolute-power preview shading, transformed
+direct-hit geometry, and malformed external-Inspector tokens. Cutter-expanded fixtures and slow status
+poll writes also exposed warning and scheduling gaps.
+
+These findings require semantic correction, not new operator authorization. Frame remains the sole
+ordinary Start guard, Job Review remains the single warning surface, and external G-code remains an
+inspector-only input that cannot be streamed.
+
+### Decision
+
+1. **Document and request ownership.** Generic SVG, DXF, raster, and STL import completion binds to
+   the initiating `projectDocumentEpoch`. Stale mutation, success, and failure feedback silently no-op.
+   Project Open additionally binds to both the initiating document epoch and one latest-request
+   owner, so an older picker/read/parse completion cannot replace or speak over a newer Open or a
+   New document. The winning synchronous replacement retains its own success/capability feedback
+   after `setProject` advances the epoch.
+2. **Compatibility without a new refusal.** Absolute SVG primitive units (`in`, `cm`, `mm`, `q`,
+   `pt`, `pc`, and `px`) resolve in the 96-DPI SVG user space before the existing root transform.
+   Existing malformed-unit fallback remains unchanged. External G-code preview and glossary consumers
+   require complete comment-free word consumption; malformed input becomes a junk diagnostic with no
+   preview segment, while leading optional-block-delete and trailing line/checksum framing remain
+   visible as valid diagnostic motion. Import is not refused and no executable path is added. A
+   compressed PNG whose source edge exceeds the embedded canvas uses the qualified incremental worker,
+   folds bounded luma back into the portable embedded representation, and removes its temporary pages.
+3. **Laser dialect and power representation.** The GRBL-compatible profile uses constant-power M3
+   semantics for Cut, Fill, and Raster because that profile explicitly covers firmware without M4.
+   Compiled and streamed raster S values use `Float64Array`, preserving the configured numeric value
+   above 65,535 instead of wrapping, capping, or clamping it.
+4. **Raster and CNC output identity.** Selected-only output retains referenced mask objects as
+   compile-only dependencies without emitting them as independent artwork. Exact 90/270-degree
+   pass-through raster rotations swap the pixel grid. A CNC contour with any nonzero consecutive XY
+   segment that would disappear after ordinary three-decimal text is parsed uses the narrowest
+   per-word decimal representation that preserves every parser-representable segment; the emitter and
+   Preview share that representation. If no one representation preserves every segment, both retain
+   the candidate preserving the most motion and Job Review names the residual parser-unrepresentable
+   loss without refusing Frame, Start, Save, or export. Upstream GRBL describes E-4 as typical input,
+   not a limit; its separate warning about printing more than four decimals does not cap accepted
+   input. Contours whose every nonzero segment already survives parser interpretation stay
+   byte-identical at three decimals; any change in emitted coordinate text conservatively repositions
+   before plunge, while detail-pass in-cut deduplication follows the parser representation.
+   Compile-integrity policy is unchanged.
+5. **Transport and settings completion ownership.** Every asynchronous Start, tool-change Continue,
+   Resume/refill, and acknowledgement refill write captures the controller-session and streamer epoch.
+   Its rejection may contain only that exact stream. Explicit `MPG:1` invalidates an active settings
+   collector, observation, detected settings, live CNC capabilities, and controller qualification
+   before late rows can publish. The last completed settings snapshot remains only as best-known
+   status-report unit interpretation so an inch-mode Frame cannot become 25.4 times misplaced; it is
+   not current qualification. The separately identified tool-change `motionOperation` refusal
+   question is not changed.
+6. **Warning and polling semantics.** No-go analysis tests bed relevance after expanding the fixture
+   by the active cutter radius, including a fixture immediately outside the nominal bed. The result is
+   still warning-only in Job Review. Periodic status polling owns at most one unresolved transport
+   write; later timer ticks coalesce until settlement while inbound status handling remains live.
+7. **Preview, input, and accessibility ownership.** Compiled raster shading uses the device maximum,
+   blank or browser-unparseable numeric drafts create no mutation, and numeric `step` remains a spinner
+   increment rather than a refusal of other finite values. One pointer owns each drag. Cancel,
+   capture loss, or Escape restores exact starting project/pan state. Wheel zoom uses vertical intent
+   and clamps before cursor-anchor math. Relief draw/scheduling uses shared operation visibility.
+   Raster/relief direct hits use their transformed bounds quadrilateral and empty vectors have no
+   direct-hit geometry. Studio overlays use the shared topmost focus trap/restore contract; operation
+   activation is keyboard operable and non-color-only; toasts expose severity; selection animation
+   honors reduced motion; and Image Studio controls remain reachable on constrained viewports.
+8. **Bounded scalability corrections.** Chunked UTF-8 readers accumulate fragments and join once per
+   completed line rather than repeatedly concatenating and rescanning an unterminated line. Run Order
+   grouping accumulates members internally and copies once at the immutable return boundary. These
+   changes alter neither source bytes nor output order.
+9. **Export provenance.** Because this remediation changes laser mode words, raster numeric storage,
+   and CNC contour coordinate representation, exported headers advance `EMITTER_REVISION` to
+   `adr-313-audit-output-parity-v1` instead of mislabeling new bytes as the ADR-294 emitter.
+10. **Standing policy boundary.** No change in this ADR adds a confirmation, cap, clamp, hidden action,
+   Frame/Start gate, output gate, or broader compile/import refusal. Stricter STL/DXF/LightBurn parser
+   rejection and tool-change competing-motion refusal remain deferred under ADR-228/232 pending an
+   explicit maintainer policy decision. Existing scene/raster/page ceilings remain policy, not findings
+   silently converted into new guards.
+
+### Consequences
+
+- A replacement document, stream, settings owner, or pointer interaction cannot inherit a late earlier
+  completion merely because persisted ids or store fields match.
+- Requested supported laser power and mask/rotation semantics survive compilation without typed-array
+  rollover or selection-scope loss; fine CNC input cannot create a plunge-only program or disappear
+  from output while remaining visible only in Preview.
+- Job Review discloses cutter-expanded fixture contact without refusing Frame or Start, and a slow
+  serial promise cannot accumulate background status writes.
+- Preview and UI affordances describe absolute output and interaction state more faithfully while
+  remaining evidence-bounded: software tests do not establish human perception or physical output.
+- Fragment accumulation trades a bounded list of chunk strings for removal of quadratic long-line
+  copying; widened raster buffers use more memory than `Uint16Array` in exchange for honest S values.
+
+### Verification
+
+- Focused schedules cover document/Open epoch races; dialect, raster power/mask/rotation, CNC precision,
+  stream/settings ownership; warning-only cutter envelopes and slow polling; preview/numeric/pointer/
+  wheel/relief behavior; transformed direct hits; complete G-code preview tokens; compressed oversized-
+  edge PNG routing; SVG units; long-line readers; Run Order grouping; and Studio/accessibility behavior.
+- Final adversarial review found and repaired five integration defects: Open-vs-New epoch ownership,
+  post-MPG inch status interpretation, numeric step-mismatch refusal, valid externally framed G-code
+  diagnostics, and silent CNC contour omission. The first repair matrix passed 94 of 94 tests across
+  11 files, typecheck, and the public-export ratchet; an advancing-epoch Open feedback schedule passed
+  9 of 9 tests; and the final CNC emission/Preview/Job Review matrix passed 94 of 94 tests across nine
+  files. A separate precision/provenance side audit also found and repaired the stale emitter revision.
+- Typecheck, scoped lint/format, file-size policy, and diff checks passed for the completed slices. The
+  exact-final full `release:check`, hosted required checks, review/mergeability, post-merge exact-main
+  CI/Browser, and automatic Pages publication remain required before integration is complete.
+- No serial device, controller, MPG pendant, motion, spindle, laser, coolant/air, material cut,
+  reference-CAM comparison, human perceptual review, installed package, real OS picker, or manual
+  deployment is established by this ADR.
+
+### Primary compatibility sources
+
+- GRBL `read_float`, including the eight captured digits and typical E0-through-E-4 input note:
+  <https://github.com/gnea/grbl/blob/master/grbl/nuts_bolts.c>
+- GRBL coordinate reporting guidance (an output/reporting warning, not an input grammar ceiling):
+  <https://github.com/gnea/grbl/blob/master/grbl/config.h>
+
+### References
+
+- ADR-046, existing root SVG independent-axis scaling policy.
+- ADR-137, asynchronous worker ownership and supersession.
+- ADR-228 and ADR-232, Frame-only authorization and factual refusal boundaries.
+- ADR-241 and ADR-243, large-work routing/disclosure without refusal or silent degradation.
+- ADR-255, shared G-code word scanning and external-inspector semantics.
+- ADR-283, portable embedded versus page-backed raster ownership.
+- ADR-311 and ADR-312, exact asynchronous/transport ownership and physical-frame semantics.
+- LinuxCNC 2.9 G-code Overview, optional block delete and line-number grammar:
+  <https://www.linuxcnc.org/docs/2.9/html/gcode/overview.html>.
+- Marlin Code Structure, line-number/checksum preprocessing:
+  <https://marlinfw.org/docs/development/code_structure.html>.
+
+---
