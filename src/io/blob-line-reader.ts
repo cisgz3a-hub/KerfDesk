@@ -38,7 +38,8 @@ export async function readUtf8ChunkLines(
   onProgress?: ByteProgress,
 ): Promise<BlobLineReadStats> {
   const decoder = new TextDecoder();
-  let tail = '';
+  let tailParts: string[] = [];
+  let tailLength = 0;
   let shouldSkipLeadingLf = false;
   let bytesRead = 0;
   let lineCount = 0;
@@ -52,48 +53,62 @@ export async function readUtf8ChunkLines(
   };
 
   const consumeText = (decoded: string): LineScanCompletion => {
-    if (decoded.length === 0) return 'complete';
     let text = decoded;
     if (shouldSkipLeadingLf) {
       if (text.startsWith('\n')) text = text.slice(1);
       shouldSkipLeadingLf = false;
     }
-    const combined = tail + text;
-    maxBufferedChars = Math.max(maxBufferedChars, combined.length);
+    maxBufferedChars = Math.max(maxBufferedChars, tailLength + text.length);
     let lineStart = 0;
     let index = 0;
-    while (index < combined.length) {
-      const char = combined[index];
+    while (index < text.length) {
+      const char = text[index];
       if (char !== '\n' && char !== '\r') {
         index += 1;
         continue;
       }
-      onLine(combined.slice(lineStart, index), control);
+      const linePart = text.slice(lineStart, index);
+      onLine(joinLineParts(tailParts, linePart), control);
+      tailParts = [];
+      tailLength = 0;
       lineCount += 1;
-      if (char === '\r' && combined[index + 1] === '\n') index += 1;
-      else if (char === '\r' && index + 1 === combined.length) shouldSkipLeadingLf = true;
+      if (char === '\r' && text[index + 1] === '\n') index += 1;
+      else if (char === '\r' && index + 1 === text.length) shouldSkipLeadingLf = true;
       index += 1;
       lineStart = index;
       if (isStopRequested) return 'stopped';
     }
-    tail = combined.slice(lineStart);
+    const remainder = text.slice(lineStart);
+    if (remainder.length > 0) {
+      tailParts.push(remainder);
+      tailLength += remainder.length;
+    }
     return 'complete';
+  };
+  const consumeDecodedText = (decoded: string): LineScanCompletion => {
+    if (decoded.length === 0) return 'complete';
+    return consumeText(decoded);
   };
 
   for await (const chunk of chunks) {
     bytesRead += chunk.byteLength;
-    completion = consumeText(decoder.decode(chunk, { stream: true }));
+    completion = consumeDecodedText(decoder.decode(chunk, { stream: true }));
     if (completion === 'stopped') break;
     onProgress?.(bytesRead);
   }
   // The flush can stop too: the consumer may cut off on the source's last line.
-  if (completion === 'complete') completion = consumeText(decoder.decode());
+  if (completion === 'complete') completion = consumeDecodedText(decoder.decode());
   // The unterminated tail is a line only when the source was read to the end.
   if (completion === 'complete') {
-    onLine(tail, control);
+    onLine(joinLineParts(tailParts), control);
     lineCount += 1;
   }
   return { bytesRead, lineCount, maxBufferedChars, completion };
+}
+
+function joinLineParts(parts: string[], finalPart = ''): string {
+  parts.push(finalPart);
+  return parts.join('');
 }
 
 async function* blobChunks(blob: Blob): AsyncGenerator<Uint8Array> {

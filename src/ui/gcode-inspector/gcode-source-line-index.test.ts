@@ -65,6 +65,24 @@ describe('G-code source line index', () => {
     ]);
   });
 
+  it('assembles one long indexed line from many chunks without changing byte offsets', async () => {
+    const text = '\u03b1'.repeat(512 * 1024);
+    const bytes = new TextEncoder().encode(text);
+    const parsedLines: string[] = [];
+    const chunkList: Uint8Array[] = [];
+    for (let offset = 0; offset < bytes.length; offset += 4096) {
+      chunkList.push(bytes.slice(offset, offset + 4096));
+    }
+
+    const sourceIndex = await indexUtf8ChunkLines(asAsync(chunkList), bytes.byteLength, (line) =>
+      parsedLines.push(line),
+    );
+
+    expect(parsedLines).toEqual([text]);
+    expect(Array.from(sourceIndex.starts)).toEqual([0]);
+    expect(sourceIndex.sourceLength).toBe(bytes.byteLength);
+  });
+
   it('reports a source/index mismatch instead of showing wrong lines', async () => {
     const sourceIndex = indexGcodeTextLines('G0 X1', () => undefined);
     await expect(
