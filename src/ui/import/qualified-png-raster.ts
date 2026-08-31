@@ -1,6 +1,12 @@
 import type { RasterImage } from '../../core/scene';
-import { BURN_MAX_EDGE_PX, BURN_MAX_SOURCE_PIXELS } from '../trace/image-loader';
+import {
+  BURN_MAX_EDGE_PX,
+  BURN_MAX_SOURCE_PIXELS,
+  embeddedCanvasSupportsImageDimensions,
+  readPngHeaderDimensions,
+} from '../trace/image-loader';
 import { IndexedDbPagedAssetRepository } from './paged-asset-indexeddb';
+import { encodePagedAssetBase64 } from './paged-raster-hydration';
 import { importPngOffThread, type PngImportWorkerProgress } from './png-import-worker-client';
 import type { ImageDensity } from '../common/image-density';
 
@@ -10,6 +16,14 @@ export type QualifiedPngRaster = {
   readonly density: ImageDensity | null;
   readonly imageAsset: NonNullable<RasterImage['imageAsset']>;
   readonly rollback: () => Promise<string | null>;
+};
+
+export type EmbeddedQualifiedPngRaster = {
+  readonly natural: { readonly width: number; readonly height: number };
+  readonly sampled: { readonly width: number; readonly height: number };
+  readonly density: ImageDensity | null;
+  readonly lumaBase64: string;
+  readonly cleanupWarning: string | null;
 };
 
 export type QualifiedPngDecodeOptions = {
@@ -46,6 +60,52 @@ export async function tryDecodeQualifiedPng(
   options: QualifiedPngDecodeOptions = {},
 ): Promise<QualifiedPngRaster | null> {
   if (!shouldPageBackPng(file)) return null;
+  return decodeQualifiedPngToPages(file, options);
+}
+
+/**
+ * Preserve the portable embedded representation for a compressed PNG whose
+ * source edge exceeds the embedded canvas route. The existing incremental
+ * worker samples it first; its temporary pages are then folded back into the
+ * ordinary embedded luma field and removed.
+ */
+export async function tryDecodeDimensionQualifiedPng(
+  file: File,
+  options: QualifiedPngDecodeOptions = {},
+): Promise<EmbeddedQualifiedPngRaster | null> {
+  if (!isPngCandidate(file) || shouldPageBackPng(file)) return null;
+  const dimensions = await readPngHeaderDimensions(file);
+  if (dimensions === null || embeddedCanvasSupportsImageDimensions(dimensions)) return null;
+  const paged = await decodeQualifiedPngToPages(file, options);
+  if (paged === null) return null;
+  const repository = new IndexedDbPagedAssetRepository();
+  try {
+    const lumaBase64 = await encodePagedAssetBase64(
+      repository,
+      paged.imageAsset.lumaAssetId,
+      paged.imageAsset.lumaByteLength,
+      options.signal,
+    );
+    const cleanupWarning = await paged.rollback();
+    return {
+      natural: paged.natural,
+      sampled: paged.sampled,
+      density: paged.density,
+      lumaBase64,
+      cleanupWarning,
+    };
+  } catch (error) {
+    const cleanupWarning = await paged.rollback();
+    if (cleanupWarning === null) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new AggregateError([error], `${message}. ${cleanupWarning}`);
+  }
+}
+
+async function decodeQualifiedPngToPages(
+  file: File,
+  options: QualifiedPngDecodeOptions,
+): Promise<QualifiedPngRaster | null> {
   const assetId = crypto.randomUUID();
   const lumaAssetId = crypto.randomUUID();
   const pending = importPngOffThread(file, {

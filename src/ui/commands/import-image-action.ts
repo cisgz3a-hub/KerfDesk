@@ -15,7 +15,11 @@ import {
 } from '../common/image-import';
 import type { ImageDensity } from '../common/image-density';
 import { largeImportAdvisory } from '../app/import-size-advisory';
-import { shouldPageBackPng, tryDecodeQualifiedPng } from '../import/qualified-png-raster';
+import {
+  shouldPageBackPng,
+  tryDecodeDimensionQualifiedPng,
+  tryDecodeQualifiedPng,
+} from '../import/qualified-png-raster';
 import type { PngImportWorkerProgress } from '../import/png-import-worker-client';
 
 /** Imports the file into the scene; resolves with the created object (null
@@ -36,6 +40,9 @@ export async function importImageFile(
   let rollback: (() => Promise<string | null>) | null = null;
   try {
     const loaded = await loadImageSamples(file, pageBacked, controls?.options);
+    if (loaded.kind === 'embedded' && loaded.cleanupWarning !== undefined) {
+      pushToast(loaded.cleanupWarning, 'warning');
+    }
     rollback = loaded.kind === 'paged' ? loaded.rollback : null;
     const imported = await importedRasterObject(file, loaded);
     importRasterImage(imported.object);
@@ -59,6 +66,8 @@ type LoadedImageSamples =
       readonly natural: ImageDimensions;
       readonly sampled: ImageDimensions;
       readonly lumaBase64: string;
+      readonly density?: ImageDensity | null;
+      readonly cleanupWarning?: string;
     }
   | {
       readonly kind: 'paged';
@@ -78,7 +87,14 @@ async function importedRasterObject(
   readonly object: SceneObject;
   readonly geometry: ReturnType<typeof rasterImportGeometry>;
 }> {
-  const density = loaded.kind === 'paged' ? loaded.density : await readImageDensity(file);
+  let density: ImageDensity | null;
+  if (loaded.kind === 'paged') {
+    density = loaded.density;
+  } else if (loaded.density !== undefined) {
+    density = loaded.density;
+  } else {
+    density = await readImageDensity(file);
+  }
   const geometry = rasterImportGeometry({
     naturalWidth: loaded.natural.width,
     naturalHeight: loaded.natural.height,
@@ -130,8 +146,22 @@ async function loadImageSamples(
   pageBacked: boolean,
   options: PngImportControls['options'] | undefined,
 ): Promise<LoadedImageSamples> {
-  const qualified = pageBacked ? await tryDecodeQualifiedPng(file, options) : null;
-  if (qualified !== null) return { kind: 'paged', ...qualified };
+  if (pageBacked) {
+    const qualified = await tryDecodeQualifiedPng(file, options);
+    if (qualified !== null) return { kind: 'paged', ...qualified };
+  } else {
+    const qualified = await tryDecodeDimensionQualifiedPng(file, options);
+    if (qualified !== null) {
+      return {
+        kind: 'embedded',
+        natural: qualified.natural,
+        sampled: qualified.sampled,
+        lumaBase64: qualified.lumaBase64,
+        density: qualified.density,
+        ...(qualified.cleanupWarning === null ? {} : { cleanupWarning: qualified.cleanupWarning }),
+      };
+    }
+  }
   const natural = await readImageNaturalSize(file);
   const sampled = await loadImageAsRawData(file, burnDecodeMaxEdge(natural.width, natural.height));
   return {
