@@ -13,12 +13,7 @@
 // LightBurn divergence (LIGHTBURN-STUDY §8): stock GRBL headers there are
 // units/positioning only, with M3/M4 issued per cut layer — ours pre-arms.
 
-import {
-  resolveGrblDialect,
-  type DeviceProfile,
-  type GrblGcodeDialect,
-  type GrblPowerMode,
-} from '../devices';
+import { resolveGrblDialect, type DeviceProfile, type GrblGcodeDialect } from '../devices';
 import { contourEntryPoint } from '../job/contour-entry';
 import { expandFillHatchWithRunways } from '../job/fill-runway';
 import { planFillSweeps, type FillSweepPlan } from '../job/fill-sweep-plan';
@@ -30,6 +25,7 @@ import { assertNever, type LayerOperationSettings } from '../scene';
 import { formatGcodeCoordinateMm } from '../gcode';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { fillRunwayCommentText } from './fill-runway-comment';
+import { laserModeWord, vectorPowerWord } from './grbl-power-modes';
 import { laserParkTarget } from './job-park-target';
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 
@@ -38,10 +34,6 @@ type CoolantMode = 'off' | 'M7' | 'M8';
 
 function scaleS(powerPercent: number, maxPowerS: number): number {
   return Math.round((powerPercent / 100) * maxPowerS);
-}
-
-function laserModeWord(mode: GrblPowerMode): 'M3' | 'M4' {
-  return mode === 'dynamic' ? 'M4' : 'M3';
 }
 
 function laserOffSeekLine(
@@ -505,15 +497,6 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
 function powerModeForGroup(group: Group, dialect: GrblGcodeDialect): 'M3' | 'M4' | 'group-managed' {
   if (group.kind === 'raster' || group.kind === 'cnc') return 'group-managed';
   return vectorPowerWord(group, dialect);
-}
-
-// The effective M3/M4 word for a vector group: per-layer override first, then
-// the dialect's per-kind default. Used both to arm the group (emitJob) and to
-// re-arm between passes (emitGroup) so the two can never disagree.
-function vectorPowerWord(group: CutGroup | FillGroup, dialect: GrblGcodeDialect): 'M3' | 'M4' {
-  if (group.powerMode !== undefined) return laserModeWord(group.powerMode);
-  if (group.kind === 'fill') return dialect.fillPowerMode === 'dynamic' ? 'M4' : 'M3';
-  return laserModeWord(dialect.cutPowerMode);
 }
 
 export const grblStrategy: OutputStrategy = {

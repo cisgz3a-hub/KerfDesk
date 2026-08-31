@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { EMITTER_REVISION, gcodeMetadataHeader, type GcodeMetadata } from './gcode-metadata';
+import {
+  EMITTER_REVISION,
+  gcodeMetadataHeader,
+  type GcodeHeaderAssumptions,
+  type GcodeMetadata,
+} from './gcode-metadata';
 
 const META: GcodeMetadata = {
   appName: 'KerfDesk',
@@ -9,13 +14,38 @@ const META: GcodeMetadata = {
   emitterRevision: EMITTER_REVISION,
 };
 
+function laserAssumptions(
+  maxPowerS = 1000,
+  dialectId: Extract<
+    GcodeHeaderAssumptions,
+    { readonly kind: 'laser' }
+  >['dialectId'] = 'grbl-dynamic',
+  controllerKind: Extract<
+    GcodeHeaderAssumptions,
+    { readonly kind: 'laser' }
+  >['controllerKind'] = 'grbl-v1.1',
+): GcodeHeaderAssumptions {
+  const defaultMode = dialectId === 'grbl-compatible' ? 'M3' : 'M4';
+  return {
+    kind: 'laser',
+    maxPowerS,
+    controllerKind,
+    dialectId,
+    effectivePowerModes: {
+      cut: [defaultMode],
+      fill: [defaultMode],
+      raster: [defaultMode],
+    },
+  };
+}
+
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
     expect(EMITTER_REVISION).toBe('adr-313-audit-output-parity-v1');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
-    const header = gcodeMetadataHeader(META, { kind: 'laser', maxPowerS: 1000 });
+    const header = gcodeMetadataHeader(META, laserAssumptions());
     expect(header).toContain('; KerfDesk');
     expect(header).toContain('; version: 0.0.0');
     expect(header).toContain('; commit: abc1234');
@@ -33,11 +63,34 @@ describe('gcodeMetadataHeader', () => {
   // controller clamps every S>255 to 100% beam power. The header must record
   // the assumed $30 so the mismatch is auditable from the file alone.
   it('records the assumed $30 power scale and laser mode', () => {
-    const header = gcodeMetadataHeader(META, { kind: 'laser', maxPowerS: 255 });
+    const header = gcodeMetadataHeader(META, laserAssumptions(255));
     expect(header).toContain('; assumes: GRBL $30=255 (max S), $32=1 (laser mode)');
     expect(header).toContain(
       '; safety: laser-off travel is explicit S0; ordinary Scan Line runway <=5mm per side',
     );
+    expect(header).toContain('power modes: cut M4, fill M4, raster M4');
+  });
+
+  it('records constant power for every grbl-compatible operation family', () => {
+    const header = gcodeMetadataHeader(META, laserAssumptions(1000, 'grbl-compatible'));
+    expect(header).toContain('; output-dialect: grbl-compatible');
+    expect(header).toContain('power modes: cut M3, fill M3, raster M3');
+    expect(header).not.toContain('dynamic power (M4)');
+  });
+
+  it('does not persist GRBL settings assumptions for Marlin fan output', () => {
+    const header = gcodeMetadataHeader(META, laserAssumptions(255, 'marlin-fan', 'marlin'));
+    expect(header).toContain('; output-dialect: marlin-fan');
+    expect(header).toContain('; assumes: Marlin fan-mosfet power via M106/M107');
+    expect(header).toContain('; safety: laser-off travel is explicit M107');
+    expect(header).not.toContain('GRBL $30');
+  });
+
+  it('uses the controller strategy when a constructed profile carries an incompatible dialect', () => {
+    const header = gcodeMetadataHeader(META, laserAssumptions(1000, 'marlin-fan', 'grbl-v1.1'));
+    expect(header).toContain('; output-dialect: grbl-dynamic');
+    expect(header).toContain('power modes: cut M4, fill M4, raster M4');
+    expect(header).not.toContain('M106/M107');
   });
 
   // ADR-103 defect fix: router exports carried the laser-worded banner. The
@@ -75,7 +128,7 @@ describe('gcodeMetadataHeader', () => {
         buildTimeUtc: '2026-06-03T12:00:00.000Z\u2028G1 X10',
         emitterRevision: 'rev\u007fM30',
       },
-      { kind: 'laser', maxPowerS: 1000 },
+      laserAssumptions(),
     );
 
     for (const char of header) {

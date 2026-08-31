@@ -44,4 +44,24 @@ describe('.lf2 controllerKind + baudRate round-trip', () => {
       expect(result.project.device.baudRate).toBeUndefined();
     }
   });
+
+  it('normalizes valid persisted controller and output dialects as one compatible profile', () => {
+    const marlin = deserializeProject(
+      withDevicePatch({
+        controllerKind: 'marlin',
+        gcodeDialect: { dialectId: 'grbl-compatible' },
+      }),
+    );
+    if (marlin.kind !== 'ok') throw new Error(`expected ok, got ${marlin.kind}`);
+    expect(marlin.project.device.gcodeDialect).toEqual({ dialectId: 'marlin-inline' });
+
+    const grbl = deserializeProject(
+      withDevicePatch({
+        controllerKind: 'grbl-v1.1',
+        gcodeDialect: { dialectId: 'marlin-fan' },
+      }),
+    );
+    if (grbl.kind !== 'ok') throw new Error(`expected ok, got ${grbl.kind}`);
+    expect(grbl.project.device.gcodeDialect).toEqual({ dialectId: 'grbl-dynamic' });
+  });
 });
