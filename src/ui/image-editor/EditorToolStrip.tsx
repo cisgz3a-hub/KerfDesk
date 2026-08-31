@@ -98,12 +98,14 @@ function ColorChips(): JSX.Element {
         <button
           type="button"
           onClick={() => setPicking('background')}
+          aria-label="Choose background color"
           title="Background color — the eraser paints this. Click to choose."
           style={{ ...chipStyle, background: css(background), top: 10, left: 10 }}
         />
         <button
           type="button"
           onClick={() => setPicking('foreground')}
+          aria-label="Choose foreground color"
           title="Foreground color — brush, pencil, line, and fill paint this. Click to choose."
           style={{ ...chipStyle, background: css(foreground), top: 2, left: 2, zIndex: 1 }}
         />
@@ -145,6 +147,9 @@ function ColorChips(): JSX.Element {
 const railStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
+  minHeight: 0,
+  overflowX: 'hidden',
+  overflowY: 'auto',
   gap: 4,
   padding: 6,
   borderRight: '1px solid var(--lf-border)',

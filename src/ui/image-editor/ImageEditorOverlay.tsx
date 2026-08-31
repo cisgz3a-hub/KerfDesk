@@ -3,18 +3,19 @@
 // closing (Esc / ×) keeps the session and never asks anything. Apply bakes
 // the working pixels into the scene object as one project undo entry.
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { RgbaBuffer } from '../../core/image-edit';
 import { formatDuration } from '../../core/job';
 import type { RasterImage } from '../../core/scene';
+import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { useInkTimeReadout } from './use-ink-time-readout';
 import { AdjustDialogPanel } from './AdjustDialog';
 import type { EditorSession } from './editor-session';
-import { EditorAdjustMenus } from './EditorAdjustMenus';
 import { HistoryPanel } from './HistoryPanel';
+import { ImageEditorTopBar } from './ImageEditorTopBar';
 import { KerfStatus } from './KerfStatus';
 import { LayersPanel } from './LayersPanel';
 import { EditorCanvas } from './EditorCanvas';
@@ -43,12 +44,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
   useRegisterModal();
 
   const rootRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    // rAF focus override (kit-dialog convention): win the initial-focus race
-    // so the editor keymap receives keys immediately.
-    const frame = requestAnimationFrame(() => rootRef.current?.focus());
-    return () => cancelAnimationFrame(frame);
-  }, []);
+  useDialogA11y(rootRef, closeEditor, { closeOnEscape: false, initialFocus: 'surface' });
 
   if (session === null) return null;
   const trimmed = session.history.trimmedCount;
@@ -64,7 +60,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
       onKeyDown={handleEditorKeyDown}
       onKeyUp={handleEditorKeyUp}
     >
-      <TopBar
+      <ImageEditorTopBar
         session={session}
         isApplying={isApplying}
         isHistoryOpen={isHistoryOpen}
@@ -165,121 +161,6 @@ function InkTimeStatus(): JSX.Element | null {
   );
 }
 
-type TopBarActions = {
-  readonly undo: () => void;
-  readonly redo: () => void;
-  readonly revert: () => void;
-  readonly apply: () => void;
-  readonly applyAndTrace: () => void;
-  readonly close: () => void;
-};
-
-function TopBar(props: {
-  readonly session: EditorSession;
-  readonly isApplying: boolean;
-  readonly isHistoryOpen: boolean;
-  readonly onToggleHistory: () => void;
-  readonly actions: TopBarActions;
-}): JSX.Element {
-  const { session, isApplying, actions } = props;
-  const canUndo = session.history.undoStack.length > 0;
-  const canRedo = session.history.redoStack.length > 0;
-  return (
-    <header style={topBarStyle}>
-      <strong style={titleStyle}>
-        Image Studio — {session.sourceName} ({session.doc.width}×{session.doc.height} px)
-      </strong>
-      <EditorAdjustMenus />
-      <span style={topActionsStyle}>
-        <button
-          type="button"
-          className={props.isHistoryOpen ? 'lf-btn' : 'lf-btn lf-btn--ghost'}
-          onClick={props.onToggleHistory}
-          aria-pressed={props.isHistoryOpen}
-          title="Show or hide the Layers and History panels"
-        >
-          Panels
-        </button>
-        <TopBarActionButtons
-          session={session}
-          isApplying={isApplying}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          actions={actions}
-        />
-      </span>
-    </header>
-  );
-}
-
-function TopBarActionButtons(props: {
-  readonly session: EditorSession;
-  readonly isApplying: boolean;
-  readonly canUndo: boolean;
-  readonly canRedo: boolean;
-  readonly actions: TopBarActions;
-}): JSX.Element {
-  const { session, isApplying, canUndo, canRedo, actions } = props;
-  const applyDisabled = !session.dirtySinceApply || isApplying;
-  return (
-    <>
-      <button
-        type="button"
-        className="lf-btn"
-        onClick={actions.undo}
-        disabled={!canUndo}
-        title="Undo the last editor step (Ctrl+Z)"
-      >
-        Undo
-      </button>
-      <button
-        type="button"
-        className="lf-btn"
-        onClick={actions.redo}
-        disabled={!canRedo}
-        title="Redo the last undone editor step (Ctrl+Shift+Z)"
-      >
-        Redo
-      </button>
-      <button
-        type="button"
-        className="lf-btn"
-        onClick={actions.revert}
-        disabled={!canUndo && !session.dirtySinceApply}
-        title="Discard every session edit and return to the as-opened image"
-      >
-        Revert
-      </button>
-      <button
-        type="button"
-        className="lf-btn lf-btn--primary"
-        onClick={actions.apply}
-        disabled={applyDisabled}
-        title="Bake the edits into the project image (one undo step)"
-      >
-        {isApplying ? 'Applying…' : 'Apply'}
-      </button>
-      <button
-        type="button"
-        className="lf-btn"
-        onClick={actions.applyAndTrace}
-        disabled={isApplying}
-        title="Apply pending edits if needed, then open the tracer"
-      >
-        Apply &amp; Trace
-      </button>
-      <button
-        type="button"
-        className="lf-btn lf-btn--ghost"
-        onClick={actions.close}
-        title="Close — the editing session is kept and resumes on reopen"
-      >
-        ✕
-      </button>
-    </>
-  );
-}
-
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
@@ -291,18 +172,6 @@ const overlayStyle: React.CSSProperties = {
   outline: 'none',
 };
 
-const topBarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  padding: '8px 12px',
-  borderBottom: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-1)',
-};
-
-const titleStyle: React.CSSProperties = { fontSize: 14, color: 'var(--lf-text)' };
-const topActionsStyle: React.CSSProperties = { display: 'inline-flex', gap: 8 };
 const bodyStyle: React.CSSProperties = { display: 'flex', flex: 1, minHeight: 0 };
 const mainColumnStyle: React.CSSProperties = {
   display: 'flex',
@@ -314,6 +183,7 @@ const mainColumnStyle: React.CSSProperties = {
 };
 const statusStyle: React.CSSProperties = {
   display: 'flex',
+  flexWrap: 'wrap',
   justifyContent: 'space-between',
   gap: 12,
   padding: '4px 12px',

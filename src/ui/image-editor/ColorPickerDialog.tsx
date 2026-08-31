@@ -3,7 +3,7 @@
 // no canvas is needed), hue slider, hex and laser-centric K% ink fields,
 // current-vs-new preview. Commits on OK; Esc/Cancel closes without change.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PaintColor } from '../../core/image-edit';
 import {
   hexToRgb,
@@ -14,6 +14,7 @@ import {
   rgbToInkPercent,
   type HsvColor,
 } from './editor-color';
+import { ColorPickerPad } from './ColorPickerPad';
 
 export function ColorPickerDialog(props: {
   readonly title: string;
@@ -44,7 +45,7 @@ export function ColorPickerDialog(props: {
     >
       <div style={cardStyle}>
         <strong style={{ fontSize: 13 }}>{props.title}</strong>
-        <PickerPad hsv={hsv} onChange={setHsv} />
+        <ColorPickerPad hsv={hsv} onChange={setHsv} />
         <input
           type="range"
           min={0}
@@ -86,47 +87,6 @@ export function ColorPickerDialog(props: {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function PickerPad(props: {
-  readonly hsv: HsvColor;
-  readonly onChange: (update: (current: HsvColor) => HsvColor) => void;
-}): JSX.Element {
-  const padRef = useRef<HTMLDivElement | null>(null);
-  const setFromPad = (e: React.PointerEvent<HTMLDivElement>): void => {
-    const pad = padRef.current;
-    if (pad === null) return;
-    const rect = pad.getBoundingClientRect();
-    const s = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const v = 1 - Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-    props.onChange((current) => ({ ...current, s, v }));
-  };
-  return (
-    <div
-      ref={padRef}
-      style={{ ...padStyle, backgroundColor: `hsl(${Math.round(props.hsv.h)}, 100%, 50%)` }}
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        setFromPad(e);
-      }}
-      onPointerMove={(e) => {
-        if (e.buttons === 1) setFromPad(e);
-      }}
-      role="slider"
-      aria-label="Saturation and brightness"
-      aria-valuetext={`saturation ${Math.round(props.hsv.s * 100)}%, brightness ${Math.round(props.hsv.v * 100)}%`}
-      tabIndex={0}
-      title="Drag to pick saturation (→) and brightness (↑)"
-    >
-      <span
-        style={{
-          ...padCursorStyle,
-          left: `${props.hsv.s * 100}%`,
-          top: `${(1 - props.hsv.v) * 100}%`,
-        }}
-      />
     </div>
   );
 }
@@ -191,39 +151,15 @@ const cardStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: 10,
   width: 260,
+  maxWidth: 'calc(100vw - 24px)',
+  maxHeight: 'calc(100vh - 24px)',
+  boxSizing: 'border-box',
+  overflowY: 'auto',
   padding: 14,
   borderRadius: 8,
   border: '1px solid var(--lf-border)',
   background: 'var(--lf-bg-1)',
 };
-
-// White→hue horizontally, transparent→black vertically: the classic S×V pad.
-// Picker chrome is inherently literal color math (white/black ramps over the
-// hue), not themable UI — hence the raw values.
-/* eslint-disable no-restricted-syntax */
-const padStyle: React.CSSProperties = {
-  position: 'relative',
-  height: 140,
-  borderRadius: 6,
-  cursor: 'crosshair',
-  backgroundImage:
-    'linear-gradient(to top, #000, rgba(0, 0, 0, 0)), linear-gradient(to right, #fff, rgba(255, 255, 255, 0))',
-  touchAction: 'none',
-};
-
-const padCursorStyle: React.CSSProperties = {
-  position: 'absolute',
-  width: 10,
-  height: 10,
-  marginLeft: -5,
-  marginTop: -5,
-  borderRadius: '50%',
-  border: '2px solid #fff',
-  boxShadow: '0 0 0 1px #000',
-  pointerEvents: 'none',
-};
-
-/* eslint-enable no-restricted-syntax */
 
 const hueSliderStyle: React.CSSProperties = { width: '100%' };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 10, alignItems: 'center' };
