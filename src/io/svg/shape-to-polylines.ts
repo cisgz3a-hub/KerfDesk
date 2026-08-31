@@ -12,6 +12,7 @@ import type { Vec2 } from '../../core/scene';
 import { ellipseSegmentCount } from '../../core/shapes/primitives';
 import { DEFAULT_FLATNESS_MM } from './flatten-curves';
 import { parsePathD, type SubPath } from './parse-path-d';
+import { parseSvgLengthUserUnitsOrNull } from './svg-units';
 
 const RECT_CORNER_SEGMENTS = 8;
 const POINT_NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
@@ -52,14 +53,18 @@ function positiveScale(scale: number): number {
 function numAttr(el: Element, name: string, fallback = 0): number {
   const raw = el.getAttribute(name);
   if (raw === null) return fallback;
-  const parsed = Number.parseFloat(raw);
+  // SVG absolute units resolve to CSS-pixel user units before the accumulated
+  // viewBox/root transform maps them into scene millimetres. Preserve the
+  // historical numeric-prefix fallback for unsupported/malformed units; strict
+  // import refusal is a separate maintainer-owned policy decision.
+  const parsed = parseSvgLengthUserUnitsOrNull(raw) ?? Number.parseFloat(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function optionalNumAttr(el: Element, name: string): number | null {
   const raw = el.getAttribute(name);
   if (raw === null) return null;
-  const parsed = Number.parseFloat(raw);
+  const parsed = parseSvgLengthUserUnitsOrNull(raw) ?? Number.parseFloat(raw);
   return Number.isFinite(parsed) ? parsed : null;
 }
 

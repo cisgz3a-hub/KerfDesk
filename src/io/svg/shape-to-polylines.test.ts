@@ -25,6 +25,13 @@ describe('elementToSubPaths — <line>', () => {
       },
     ]);
   });
+
+  it('resolves absolute CSS units to current SVG user units', () => {
+    const subs = elementToSubPaths(svgEl('<line x1="0" y1="0" x2="1in" y2="101.6q"/>'));
+
+    expect(subs[0]?.points[1]?.x).toBeCloseTo(96, 12);
+    expect(subs[0]?.points[1]?.y).toBeCloseTo(96, 12);
+  });
 });
 
 describe('elementToSubPaths — <polyline> / <polygon>', () => {
