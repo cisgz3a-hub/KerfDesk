@@ -1,4 +1,6 @@
 import {
+  useCallback,
+  useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -35,7 +37,11 @@ import {
   updateMeasureDraft,
 } from './workspace-drag-updates';
 import { handleArtworkNumberingPointerDown } from './artwork-numbering-click';
-import { capturePointer, releasePointer } from './pointer-capture';
+import {
+  clearOwnedPointerDrag,
+  createOwnedPointerHandlers,
+  type OwnedPointerHandlers,
+} from './workspace-pointer-owner';
 
 type CanvasMouseEvent = ReactMouseEvent<HTMLCanvasElement>;
 // The canvas binds POINTER events so an in-progress drag can be captured to the
@@ -51,14 +57,8 @@ type WorkspaceViewState = {
   readonly panY: number;
 };
 
-type DragHandlers = {
-  readonly onPointerDown: (e: CanvasPointerEvent) => void;
-  readonly onPointerMove: (e: CanvasPointerEvent) => void;
-  readonly onPointerUp: (e: CanvasPointerEvent) => void;
-};
-
 type DragMoveResult = {
-  readonly handlers: DragHandlers;
+  readonly handlers: OwnedPointerHandlers;
   readonly dragKind: 'move' | 'scale' | 'rotate' | null;
 };
 
@@ -70,90 +70,69 @@ export function useDragMove(
 ): DragMoveResult {
   const deps = useWorkspaceDragDeps();
   const [drag, setDrag] = useState<DragState | null>(null);
+  const activePointerId = useRef<number | null>(null);
+  const clearDrag = useCallback(
+    () => clearOwnedPointerDrag({ canvas: ref.current, activePointerId, setDrag }),
+    [ref],
+  );
 
-  const handlePointerDown = (e: CanvasPointerEvent): void => {
-    useUiStore.getState().closeWorkspaceContextBar();
-    deps.setSnapGuides([]);
-    if (handleArtworkNumberingPointerDown({ event: e, canvas: ref.current, project, viewState }))
-      return;
-    const next = beginWorkspaceDrag({
-      e,
-      ref,
-      project,
-      viewState,
-      previewMode,
-      toolMode: deps.toolMode,
-      selectedObjectId: deps.selectedObjectId,
-      additionalSelectedIds: deps.additionalSelectedIds,
-      selectObject: deps.selectObject,
-      selectPathNode: deps.selectPathNode,
-      toggleSelectObject: deps.toggleSelectObject,
-      drawShape: deps.drawShape,
-      selectionAnchor: deps.selectionAnchor,
-    });
-    if (next === null) return;
-    // Capture so move/up keep coming while the drag runs off-canvas (audit C1).
-    capturePointer(ref.current, e.pointerId);
-    if (next.kind === 'marquee') {
-      deps.setSelectionMarquee({ start: next.startScenePoint, end: next.startScenePoint });
-    } else if (next.kind === 'measure') {
-      deps.setMeasureDraft({ start: next.startScenePoint, end: next.startScenePoint });
-    } else if (next.kind !== 'pan' && next.kind !== 'draw') {
-      // Draw drafts do not mutate the project. Their pointer-up commit owns
-      // one atomic history entry, so opening an interaction snapshot here
-      // leaves stale pendingUndo state after the shape has been inserted.
-      deps.beginInteraction();
-    }
-    setDrag(next);
-  };
-
-  const handlePointerMove = (e: CanvasPointerEvent): void => {
-    updateSelectionMoveCursor({
-      e,
-      canvas: ref.current,
-      drag,
-      project,
-      previewMode,
-      viewState,
-      toolMode: deps.toolMode,
-      selectedObjectId: deps.selectedObjectId,
-      additionalSelectedIds: deps.additionalSelectedIds,
-    });
-    runWorkspaceDragMove({ e, ref, drag, project, viewState, deps });
-  };
-
-  const handlePointerUp = (e: CanvasPointerEvent): void => {
-    releasePointer(ref.current, e.pointerId);
-    deps.setCursorMm(null);
-    deps.setSnapGuides([]);
-    if (drag === null) return;
-    finishWorkspaceDrag({
-      drag,
-      e,
-      ref,
-      project,
-      viewState,
-      drawShape: deps.drawShape,
-      setDraftShape: deps.setDraftShape,
-      setMeasureDraft: deps.setMeasureDraft,
-      selectObject: deps.selectObject,
-      selectObjects: deps.selectObjects,
-      setSelectionMarquee: deps.setSelectionMarquee,
-      endInteraction: deps.endInteraction,
-    });
-    setDrag(null);
-  };
-  useEscCancelsDrag(drag, deps, setDrag);
-  const handlers = dragHandlers(handlePointerDown, handlePointerMove, handlePointerUp);
+  const handlers = createOwnedPointerHandlers({
+    getCanvas: () => ref.current,
+    activePointerId,
+    drag,
+    deps,
+    setDrag,
+    createDrag: (e) => {
+      if (handleArtworkNumberingPointerDown({ event: e, canvas: ref.current, project, viewState }))
+        return null;
+      return beginWorkspaceDrag({
+        e,
+        ref,
+        project,
+        viewState,
+        previewMode,
+        toolMode: deps.toolMode,
+        selectedObjectId: deps.selectedObjectId,
+        additionalSelectedIds: deps.additionalSelectedIds,
+        selectObject: deps.selectObject,
+        selectPathNode: deps.selectPathNode,
+        toggleSelectObject: deps.toggleSelectObject,
+        drawShape: deps.drawShape,
+        selectionAnchor: deps.selectionAnchor,
+      });
+    },
+    move: (e) => {
+      updateSelectionMoveCursor({
+        e,
+        canvas: ref.current,
+        drag,
+        project,
+        previewMode,
+        viewState,
+        toolMode: deps.toolMode,
+        selectedObjectId: deps.selectedObjectId,
+        additionalSelectedIds: deps.additionalSelectedIds,
+      });
+      runWorkspaceDragMove({ e, ref, drag, project, viewState, deps });
+    },
+    finish: (e, ownedDrag) =>
+      finishWorkspaceDrag({
+        drag: ownedDrag,
+        e,
+        ref,
+        project,
+        viewState,
+        drawShape: deps.drawShape,
+        setDraftShape: deps.setDraftShape,
+        setMeasureDraft: deps.setMeasureDraft,
+        selectObject: deps.selectObject,
+        selectObjects: deps.selectObjects,
+        setSelectionMarquee: deps.setSelectionMarquee,
+        endInteraction: deps.endInteraction,
+      }),
+  });
+  useEscCancelsDrag(drag, deps, clearDrag);
   return { handlers, dragKind: visibleDragKind(drag) };
-}
-
-function dragHandlers(
-  onPointerDown: DragHandlers['onPointerDown'],
-  onPointerMove: DragHandlers['onPointerMove'],
-  onPointerUp: DragHandlers['onPointerUp'],
-): DragHandlers {
-  return { onPointerDown, onPointerMove, onPointerUp };
 }
 
 // Pointer-move fan-out, lifted out of useDragMove so that hook stays under the

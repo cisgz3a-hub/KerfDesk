@@ -8,6 +8,7 @@
 import { useEffect } from 'react';
 import type { DragState } from './drag-state';
 import type { useWorkspaceDragDeps } from './workspace-drag-deps';
+import { cancelWorkspaceDrag } from './workspace-drag-cancel';
 
 // Transforms roll back via cancelInteraction; a marquee just clears its box.
 // Draw/measure/pen/pan keep the existing global Esc (resetToolMode) behavior.
@@ -26,8 +27,9 @@ export function useEscCancelsDrag(
   deps: ReturnType<typeof useWorkspaceDragDeps>,
   setDrag: (next: DragState | null) => void,
 ): void {
-  const { cancelInteraction, setSelectionMarquee, setMeasureDraft, setDraftShape, setSnapGuides } =
+  const { cancelInteraction, setSelectionMarquee, setMeasureDraft, setDraftShape, setCursorMm } =
     deps;
+  const { setSnapGuides } = deps;
   const active = drag !== null && ESC_CANCELABLE_DRAG_KINDS.has(drag.kind);
   useEffect(() => {
     if (!active) return undefined;
@@ -35,21 +37,26 @@ export function useEscCancelsDrag(
       if (e.key !== 'Escape') return;
       e.preventDefault();
       e.stopPropagation();
-      cancelInteraction();
-      setSelectionMarquee(null);
-      setMeasureDraft(null);
-      setDraftShape(null);
-      setSnapGuides([]);
+      cancelWorkspaceDrag(drag, {
+        cancelInteraction,
+        setSelectionMarquee,
+        setMeasureDraft,
+        setDraftShape,
+        setCursorMm,
+        setSnapGuides,
+      });
       setDrag(null);
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [
     active,
+    drag,
     cancelInteraction,
     setSelectionMarquee,
     setMeasureDraft,
     setDraftShape,
+    setCursorMm,
     setSnapGuides,
     setDrag,
   ]);
