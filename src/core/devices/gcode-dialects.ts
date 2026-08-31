@@ -100,8 +100,8 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     // firmware without dynamic power (GRBL 1.1e and older, where M4 does not exist),
     // mirroring LightBurn's separate "GRBL-M3" device profile for the same firmware.
     cutPowerMode: 'constant',
-    fillPowerMode: 'dynamic',
-    rasterPowerMode: 'dynamic',
+    fillPowerMode: 'constant',
+    rasterPowerMode: 'constant',
     requiresS0OnRapid: true,
     parkAtOriginAfterJob: true,
     emitSOnEveryBurnMove: false,

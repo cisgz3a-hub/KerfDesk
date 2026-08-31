@@ -462,17 +462,13 @@ function coolantTransition(from: CoolantMode, to: CoolantMode): string {
   return `${to}${LINE_END}`;
 }
 
-// Laser power mode is modal and spans groups. The preamble arms M3 (constant
-// power). Cut groups keep M3 — a slow corner must still cut fully through. FILL
-// groups want M4 DYNAMIC power: GRBL then scales S by actual/programmed feed, so
-// a short engrave stroke that never reaches feed (the head accelerating from
-// rest inside a few-mm glyph) deposits constant energy/mm instead of over-burning
-// the slow zones — the small-text "uneven density" defect
-// (docs/research/burn-perfection-small-text.md Cause A; supersedes ADR-020 #4,
-// see ADR-036). Raster manages its own M4 internally and ends in M5. A flip is
-// emitted ONLY when the required mode actually changes, so cut-only jobs stay
-// byte-identical. Under M4 the diode is also dark whenever the head is stopped
-// (dynamic power → 0 at 0 feed), so fill is now strictly safer on travel/pause.
+// Laser power mode is modal and spans groups. The preamble arms the dialect's
+// cut mode; each vector group then selects an explicit layer override or its
+// dialect/kind default. Dialects that use M4 for fill get GRBL's dynamic scaling
+// by actual/programmed feed, while the M4-incompatible profile remains on M3.
+// Raster manages its own mode internally and ends in M5. A flip is emitted only
+// when the effective mode changes, and the same effective mode is used when a
+// multi-pass group re-arms between passes.
 function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
   const dialect = resolveGrblDialect(device);
   const parts: string[] = [];
