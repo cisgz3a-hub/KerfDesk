@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { createProject } from '../../core/scene';
 import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
+import { createStreamer, step } from '../../core/controllers/grbl';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
@@ -134,6 +135,53 @@ afterEach(async () => {
 });
 
 describe('active-job transport write containment', () => {
+  it('leaves a replacement job untouched when an initial Start write rejects late', async () => {
+    const writes: string[] = [];
+    let holdInitial = false;
+    let pendingCaptured = false;
+    let rejectPending = (_error: Error): void => undefined;
+    const behavior: ConnectionBehavior = {
+      autoResetBanner: true,
+      reject: () => false,
+      beforeProtocol: (data) =>
+        holdInitial && data.includes('G21')
+          ? new Promise<void>((_resolve, reject) => {
+              pendingCaptured = true;
+              rejectPending = reject;
+            })
+          : Promise.resolve(),
+    };
+    const connection = makeConnection(writes, behavior);
+    liveBehavior = behavior;
+    await connectReady(connection);
+    holdInitial = true;
+
+    const start = startTestLaserJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n', {
+      runId: 'old-run',
+    });
+    await vi.waitFor(() => expect(pendingCaptured).toBe(true));
+    const oldEpoch = useLaserStore.getState().streamerEpoch;
+    const replacement = step(createStreamer('G1 X99\n')).state;
+    useLaserStore.setState({
+      streamer: replacement,
+      streamerEpoch: oldEpoch + 1,
+      activeRunId: 'replacement-run',
+      safetyNotice: null,
+    });
+    rejectPending(new Error('late old Start rejection'));
+
+    await expect(start).rejects.toThrow('late old Start rejection');
+    await flush();
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: replacement,
+      streamerEpoch: oldEpoch + 1,
+      activeRunId: 'replacement-run',
+      safetyNotice: { kind: 'write-failed', action: 'start' },
+      connection: { kind: 'connected' },
+    });
+    expect(connection.resetSnapshots).toEqual([]);
+  });
+
   it('cancels ownership before resetting and quarantining an initial Start write rejection', async () => {
     const writes: string[] = [];
     let rejectInitial = false;

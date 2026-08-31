@@ -17,7 +17,10 @@ import {
 } from './laser-store-helpers';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
-import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
+import {
+  containActiveStreamWriteFailure,
+  streamWriteOwner,
+} from './laser-stream-heartbeat-containment';
 import { consumeUntrackedAck } from './laser-untracked-ack-ledger';
 
 // Every queued non-job write owes exactly one terminal ok/error, in strict
@@ -66,6 +69,7 @@ export function advanceStream(
 ): void {
   const s: StreamerState | null = get().streamer;
   if (s === null) return;
+  const writeOwner = streamWriteOwner(get());
   const acked = onAck(s, ack);
   const stepped = step(
     get().mpgActive === true && streamerCanPauseForMpg(acked.state)
@@ -99,7 +103,7 @@ export function advanceStream(
       // The shared helper freezes from the current store snapshot, then owns
       // reset/quarantine. Acks or onClose can land between dispatch and
       // rejection, so it never rolls back or resurrects terminal ownership.
-      containActiveStreamWriteFailure(set, refs, safeWrite, 'stream');
+      containActiveStreamWriteFailure(set, refs, safeWrite, 'stream', writeOwner);
     });
   }
 }
