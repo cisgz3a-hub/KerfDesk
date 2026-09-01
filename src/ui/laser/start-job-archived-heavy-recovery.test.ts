@@ -293,7 +293,6 @@ function exactVCarveArtifact(variant: 'vcarve' | 'vcarve-clearance' | 'pocket-he
     DEFAULT_OUTPUT_SCOPE,
     undefined,
     false,
-    false,
   );
   if (!prepared.ok)
     throw new Error(`V-carve fixture did not prepare: ${prepared.messages.join('; ')}`);

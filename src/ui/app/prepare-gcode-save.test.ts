@@ -19,7 +19,7 @@ describe('prepareGcodeSave', () => {
     vi.restoreAllMocks();
   });
 
-  it('stops a post-prepare rotary raster refusal through the existing failure surface', async () => {
+  it('prepares non-empty rotary raster bytes without workstation-local permission', async () => {
     const alert = vi.spyOn(window, 'alert').mockReturnValue(undefined);
 
     const result = await prepareGcodeSave(
@@ -32,9 +32,10 @@ describe('prepareGcodeSave', () => {
       { ok: true },
     );
 
-    expect(result).toEqual({ kind: 'failed' });
-    expect(alert).toHaveBeenCalledWith(
-      expect.stringContaining('Rotary image engraving is experimental and disabled'),
-    );
+    expect(result.kind).toBe('ready');
+    if (result.kind !== 'ready') throw new Error('Rotary raster did not prepare.');
+    expect(result.gcode).not.toBe('');
+    expect(result.advisories).toEqual([]);
+    expect(alert).not.toHaveBeenCalled();
   });
 });

@@ -13,7 +13,6 @@ import {
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore } from '../state/laser-store';
 import type { StatusReport } from '../../core/controllers/grbl';
-import { captureStartExternalEnvironment } from './start-job-external-environment';
 import { prepareCurrentStartJob } from './start-job-source';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import { buildJobReviewModel } from './job-review';
@@ -64,15 +63,7 @@ async function buildFramedRunPermitForCurrentState(
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
-  const externalEnvironment = captureStartExternalEnvironment(app.project);
-  const prepared = await prepareCurrentStartJob(
-    app,
-    laser,
-    camera,
-    externalEnvironment.rotaryRasterAllowed,
-    undefined,
-    false,
-  );
+  const prepared = await prepareCurrentStartJob(app, laser, camera, undefined, false);
   if (!prepared.ok) {
     throw new Error(`Cannot build a framed-run fixture: ${prepared.messages.join(' ')}`);
   }
@@ -104,7 +95,6 @@ async function buildFramedRunPermitForCurrentState(
       wco: laser.wcoCache,
       workOriginActive: laser.workOriginActive,
     },
-    externalEnvironment,
     ...(reviewState === 'review-pending'
       ? {}
       : {

@@ -50,7 +50,6 @@ export type EmitGcodeOptions = {
   readonly outputScope?: OutputScope;
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly preflightInitialMachinePosition?: PreflightOptions['initialMachinePosition'];
-  readonly allowRotaryRaster?: boolean;
   /** Exact archived recovery may verify compiled evidence and emitted bytes,
    * but must never rebuild source-geometry planners in the browser realm. */
   readonly sourceGeometryChecks?: 'full' | 'compiled-evidence-only';
@@ -97,16 +96,9 @@ export function emitPreparedGcodeWithCncPassSpans(
 ): EmitPreparedCncGcodeResult {
   if (!prepared.ok) return { gcode: '', preflight: prepared.preflight, spans: null };
   const machine = prepared.project.machine;
-  // Scale Y at the last moment so design previews stay surface-true. Raster
-  // remains fail-closed unless the caller proves the Labs gate.
-  const rotaryStage = applyRotaryStage(
-    prepared.project,
-    prepared.job,
-    options.allowRotaryRaster === true,
-  );
-  if (rotaryStage.kind === 'refused') {
-    return { gcode: '', preflight: rotaryStage.preflight, spans: null };
-  }
+  // Scale Y at the last moment so design previews stay surface-true. The exact
+  // persisted rotary setup owns this transform for vector, fill, and raster.
+  const rotaryStage = applyRotaryStage(prepared.project, prepared.job);
   const job = rotaryStage.job;
   const coordinateFailure = gcodeCoordinateFailure(job);
   if (coordinateFailure !== null) {
@@ -236,30 +228,16 @@ function runEmitPreflight(
   });
 }
 
-type RotaryStage =
-  | { readonly kind: 'refused'; readonly preflight: PreflightResult }
-  | { readonly kind: 'ok'; readonly job: Job; readonly boundsHeightOverrideMm?: number };
+type RotaryStage = {
+  readonly kind: 'ok';
+  readonly job: Job;
+  readonly boundsHeightOverrideMm?: number;
+};
 
 // Delegate Y scale/rebase + wrap limit to the shared machine-space helper.
 // CNC and disabled rotary pass through untouched.
-function applyRotaryStage(project: Project, job: Job, allowRotaryRaster: boolean): RotaryStage {
+function applyRotaryStage(project: Project, job: Job): RotaryStage {
   if (!rotaryAppliesTo(project.device, project.machine)) return { kind: 'ok', job };
-  if (!allowRotaryRaster && job.groups.some((group) => group.kind === 'raster')) {
-    return {
-      kind: 'refused',
-      preflight: {
-        ok: false,
-        issues: [
-          {
-            code: 'rotary-raster-unsupported',
-            message:
-              'Rotary image engraving is experimental and disabled. ' +
-              'Enable it in Tools > Labs, disable the rotary, or remove the image layer.',
-          },
-        ],
-      },
-    };
-  }
   const boundsHeightOverrideMm = rotaryWrapLimitMm(project.device, project.machine);
   return {
     kind: 'ok',

@@ -49,8 +49,6 @@ function baseCtxFlags(): Partial<AppCommandContext> {
     hasLockedObjects: false,
     measureActive: false,
     focusTestAvailable: false,
-    rotaryFeatureEnabled: false,
-    rotaryProfileSupported: false,
     canTransformSelection: false,
     canAlignSelection: false,
     canDistributeSelection: false,

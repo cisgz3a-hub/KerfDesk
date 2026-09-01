@@ -154,7 +154,6 @@ describe('transient reviewed Frame dispatch', () => {
       laser: useLaserStore.getState(),
       prepared: captured.preparedStart,
       laserModeStartSnapshot: captureLaserModeStartSnapshot(useLaserStore.getState()),
-      externalEnvironment: captured.externalEnvironment,
     };
 
     const review: ConfirmedJobReview = {

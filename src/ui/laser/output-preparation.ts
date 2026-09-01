@@ -138,7 +138,6 @@ async function prepareStartOutput(
           request.jobPlacement,
           request.outputScope,
           request.resolvedJobOrigin,
-          request.allowRotaryRaster,
           request.requireFrame,
           prepare,
         )
@@ -148,7 +147,6 @@ async function prepareStartOutput(
           request.machine,
           request.jobPlacement,
           request.outputScope,
-          request.allowRotaryRaster,
           {
             clock: fixedSnapshotClock(request.snapshot.evaluatedAtIso),
             renderVariableText,

@@ -30,7 +30,6 @@ import {
 } from '../../state/recovery/testing';
 import { resetStore } from '../../state/test-helpers';
 import { completeFramedRunCandidateForTest } from '../framed-run-testing';
-import { captureStartExternalEnvironment } from '../start-job-external-environment';
 import { prepareCurrentStartJob } from '../start-job-source';
 import { useStartBlockerStore } from '../start-blocker-store';
 import { runStartJobFlow } from '../start-job-flow';
@@ -134,15 +133,7 @@ async function unframedReviewBundle() {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
-  const externalEnvironment = captureStartExternalEnvironment(app.project);
-  const prepared = await prepareCurrentStartJob(
-    app,
-    laser,
-    camera,
-    externalEnvironment.rotaryRasterAllowed,
-    undefined,
-    false,
-  );
+  const prepared = await prepareCurrentStartJob(app, laser, camera, undefined, false);
   if (!prepared.ok)
     throw new Error(`Frame review preparation failed: ${prepared.messages.join(' / ')}`);
   return {
@@ -151,7 +142,6 @@ async function unframedReviewBundle() {
     laser,
     prepared,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
-    externalEnvironment,
   };
 }
 

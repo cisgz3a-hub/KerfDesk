@@ -25,7 +25,6 @@ import {
 } from './start-job-readiness';
 import { prepareStartJobFromPrepared } from './start-job-readiness-prepared';
 import { recoveryArtifactPreparedOutput } from './recovery-artifact-binding';
-import { resolveRotaryRasterAllowed } from './start-job-external-environment';
 import {
   outputPreparationShouldRunOffThread,
   prepareStartOutputOffThread,
@@ -48,7 +47,6 @@ export async function prepareCurrentStartJob(
   app: ReturnType<typeof useStore.getState>,
   laser: ReturnType<typeof useLaserStore.getState>,
   camera: ReturnType<typeof useCameraStore.getState>,
-  allowRotaryRaster = resolveRotaryRasterAllowed(app.project),
   resolvedJobOrigin?: JobOriginPlacement,
   requireFrame = true,
 ): Promise<StartJobPreparation> {
@@ -65,7 +63,6 @@ export async function prepareCurrentStartJob(
       jobPlacement,
       outputScope,
       ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
-      allowRotaryRaster,
       requireFrame,
       registration,
       useSnapshot,
@@ -77,7 +74,6 @@ export async function prepareCurrentStartJob(
     machine,
     jobPlacement,
     outputScope,
-    allowRotaryRaster,
     {
       clock: () => new Date(),
       renderVariableText,
@@ -95,7 +91,6 @@ async function prepareCurrentStartInBackground(args: {
   readonly jobPlacement: JobPlacementSettings;
   readonly outputScope: OutputScope;
   readonly resolvedJobOrigin?: JobOriginPlacement;
-  readonly allowRotaryRaster: boolean;
   readonly requireFrame: boolean;
   readonly registration: ReturnType<typeof currentPrintCutOutputRegistration>;
   readonly useSnapshot: boolean;
@@ -108,7 +103,6 @@ async function prepareCurrentStartInBackground(args: {
     jobPlacement: args.jobPlacement,
     outputScope: args.outputScope,
     ...(args.resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin: args.resolvedJobOrigin }),
-    allowRotaryRaster: args.allowRotaryRaster,
     requireFrame: args.requireFrame,
     ...(args.useSnapshot
       ? {
@@ -180,7 +174,6 @@ export function prepareArchivedRecoverySource(
     jobPlacementForArchivedArtifact(artifact),
     artifact.outputScope,
     artifact.jobOrigin,
-    resolveRotaryRasterAllowed(project),
   );
   if (!qualified.ok) {
     const lines = qualified.messages.map((message) => `• ${message}`).join('\n');
@@ -238,7 +231,6 @@ function prepareRecoveryProjectSource(
     jobPlacement,
     outputScope,
     resolvedJobOrigin,
-    resolveRotaryRasterAllowed(project),
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');

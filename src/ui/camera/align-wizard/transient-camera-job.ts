@@ -29,7 +29,6 @@ import {
   prepareTransientFrameController,
   type TransientFrameControllerPreparation,
 } from '../../laser/use-frame-action';
-import { captureStartExternalEnvironment } from '../../laser/start-job-external-environment';
 import type { FramedRunPermit } from '../../state/framed-run';
 
 const GRBL_LASER_MODE_SETTING = '$32';
@@ -59,7 +58,6 @@ async function prepareTransientCameraReview(
     transientMachineSnapshot(laser, camera),
     DEFAULT_JOB_PLACEMENT,
     DEFAULT_OUTPUT_SCOPE,
-    false,
     { clock: () => new Date(), renderVariableText, requireFrame: false },
   );
   if (!prepared.ok) {
@@ -102,7 +100,6 @@ async function prepareTransientCameraReview(
     jobAwareConfirm,
   );
   if (machineKind === 'cnc' && cncSetupAttestation === null) return null;
-  const externalEnvironment = captureStartExternalEnvironment(project);
   return {
     bundle: {
       app: useStore.getState(),
@@ -110,7 +107,6 @@ async function prepareTransientCameraReview(
       laser,
       prepared,
       laserModeStartSnapshot,
-      externalEnvironment,
       ...(controller.wcsNormalizationWarning === undefined
         ? {}
         : { frameWcsNormalizationWarning: controller.wcsNormalizationWarning }),

@@ -107,7 +107,7 @@
 | ADR-124 | — | accepted (maintainer directive: "jog the head to each cor... | Capture Board Corners: build the registration box from jogged machine coordinates (2026-07-08) |
 | ADR-125 | — | accepted (maintainer directive: expand Place Board — chos... | Fill the board: auto-fit + array artwork onto the placed board (2026-07-08) |
 | ADR-126 | — | accepted (maintainer directive: capture round boards - "o... | Generalize Place Board to a board-shape union; circle boards (2026-07-08) |
-| ADR-127 | — | Accepted | Rotary axis engine: one machine-space job for chuck/roller Y-scaling (Phase N, 2026-07-09) |
+| ADR-127 | — | Accepted; raster-refusal clause superseded by ADR-315 | Rotary axis engine: one machine-space job for chuck/roller Y-scaling (Phase N, 2026-07-09) |
 | ADR-128 | — | Accepted | Measured-boundary trace pipeline: sub-pixel extraction, supersampling, and fair-then-fit finishing |
 | ADR-129 | — | accepted (audit DEV-04: no-go zones gated Start/Frame/exp... | Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10) |
 | ADR-130 | — | accepted (audit CAM-04: the Registration Jig panel could... | Registration-box provenance: protect a captured board from the jig panel (2026-07-10) |
@@ -135,8 +135,8 @@
 | ADR-157 | 2026-07-13 | Superseded in part (ADR-228: Start qualification deleted) | Detected controller identity gates profile transport and output |
 | ADR-158 | 2026-07-13 | Accepted | Browser smoke is independent from the release and deploy gate |
 | ADR-159 | 2026-07-13 | Accepted | Schema v2 curves are canonical and compatibility polylines are invalidated |
-| ADR-160 | 2026-07-13 | Accepted | Rotary raster is an explicit experimental amendment to ADR-127 |
-| ADR-161 | 2026-07-13 | Accepted | Labs gates experimental laser features locally and fail closed |
+| ADR-160 | 2026-07-13 | Superseded by ADR-315 | Rotary raster is an explicit experimental amendment to ADR-127 |
+| ADR-161 | 2026-07-13 | Accepted for remaining features; rotary clauses superseded by ADR-315 | Labs gates experimental laser features locally and fail closed |
 | ADR-162 | 2026-07-13 | Accepted | Low-power Fire is profile-opted, hard-capped, and momentary |
 | ADR-163 | 2026-07-13 | Accepted | Cut Planner exposes five persisted deterministic policies |
 | ADR-164 | 2026-07-13 | Accepted | Adopt bounded offline editing and interoperability already shipped |
@@ -6717,6 +6717,10 @@ identity for non-rotary jobs; every downstream consumer routes through it.
 - Image/raster engraving is refused while rotary is enabled
   (rotary-raster-unsupported) - v1 is vectors-only.
 
+Amendment. ADR-315 supersedes only the raster-refusal clause above. The canonical
+rotary surface-to-machine mapping remains accepted, while G-code rotary raster
+output no longer depends on a workstation-local Labs or capability permission.
+
 Scope of THIS change. Engine only: the rotary math and its wiring through
 emit/.rd/preflight/estimate/framing plus the .lf2 + machine-profile round-trip.
 The Rotary Setup dialog and command wiring are a deliberate follow-up so this
@@ -7646,7 +7650,7 @@ invalidate curves. Budget exhaustion refuses the operation instead of emitting p
 
 ## ADR-160 - Rotary raster is an explicit experimental amendment to ADR-127
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded by ADR-315 | **Date:** 2026-07-13
 
 ### Decision
 
@@ -7664,7 +7668,7 @@ hardware CLAIMED and must not be presented as verified cylindrical photo engravi
 
 ## ADR-161 - Labs gates experimental laser features locally and fail closed
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Accepted for the remaining Labs features; rotary clauses superseded by ADR-315 | **Date:** 2026-07-13
 
 ### Decision
 
@@ -19162,5 +19166,88 @@ Job Review and comments. Frame remains the sole ordinary Start guard.
 - ADR-242 and ADR-246, Image Studio session and Text behavior.
 - ADR-313, exact asynchronous owners and GRBL fine-contour parser representation.
 - GRBL `read_float`: <https://github.com/gnea/grbl/blob/master/grbl/nuts_bolts.c>.
+
+---
+
+## ADR-315 - Rotary G-code availability is independent of workstation-local policy (2026-09-02)
+
+**Status:** Accepted and implemented in local remediation; focused verification is complete;
+exact-head hosted checks, merge, exact-main verification, and automatic publication remain pending;
+physical rotary output is not qualified
+
+### Context
+
+The rotary transform already handles vector, fill, and raster groups, but a local Labs flag combined
+with a profile capability decided whether rotary raster G-code existed. The same UI-local policy bit
+reached Save, current-canvas inspection, worker preparation, Frame, Start, recovery, and framed-permit
+identity. With the flag absent, pure raster and mixed jobs returned empty bytes and Save treated that
+policy decision as a factual emission failure. Changing the flag could also invalidate a completed
+Frame even though the exact project, machine setup, and output bytes had not changed. Rotary Setup was
+separately hidden or disabled by machine mode, Labs state, and profile capability.
+
+That behavior violates ADR-228: physical qualification belongs in the single Job Review warning
+surface and cannot suppress an otherwise producible action or program. Removing the output gate does
+not establish rotary scale, direction, seam, focus, workholding, backlash, slip, material response,
+or controller behavior.
+
+### Decision
+
+1. **Bytes follow the exact project.** Active rotary laser projects always pass cut, fill, and raster
+   groups through the canonical machine-space rotary transform before G-code emission. No Labs flag,
+   workstation storage value, or profile capability may change, empty, or refuse those G-code bytes.
+   Default state and retired legacy `rotary` / `rotaryRaster` storage values are byte-identical.
+2. **No policy in preparation or handoff identity.** Save, current-canvas inspection, output workers,
+   Frame, Start, recovery, and transient-camera preparation carry no rotary-raster permission bit.
+   Framed permits retain exact project, placement, registration, controller, and output identity, but
+   no external workstation-policy identity. Actual persisted rotary setup changes remain project
+   changes and therefore already invalidate stale prepared work.
+3. **Setup is reachable.** Tools > Rotary Setup is an enabled command in both laser and CNC shells,
+   independent of Labs and profile capability. CNC compilation continues to ignore the laser rotary
+   transform; command reachability is not a claim of an A-axis or CNC rotary output contract.
+4. **One exact-job disclosure.** Job Review appends exactly one warning when the exact prepared laser
+   job has active rotary mapping and contains raster output, including mixed vector/raster jobs. The
+   warning states that Frame verifies only the commanded motion envelope and does not qualify scale,
+   direction, seam, focus, workholding, slip, backlash, or material response. Vector-only, inactive,
+   flat-bed, selected-without-raster, and CNC jobs receive no such warning.
+5. **Labs state is retired compatibly.** Rotary and rotary-raster rows and types leave Labs. The v1
+   storage key remains readable for the other experimental features; retired keys are ignored rather
+   than migrated into a new policy identity.
+6. **Encoder boundary remains truthful.** This ADR makes the existing G-code rotary raster path
+   unconditional. It does not add Ruida raster encoding or claim `.rd` raster support where that
+   separate encoder cannot produce it.
+7. **Standing policy.** The warning changes no `ok` result, preflight issue, Frame permit, Start
+   authorization, output availability, confirmation availability, or generated byte. Frame remains
+   the sole ordinary Start guard.
+
+### Consequences
+
+- Two workstations opening the same project no longer produce different rotary G-code because of a
+  local experimental preference.
+- Rotary physical uncertainty is visible at the one operator confirmation surface without becoming a
+  second guard or a hidden output refusal.
+- Legacy preference files continue loading the remaining Labs choices while rotary behavior comes
+  only from the persisted project/device setup.
+- Hardware evidence is still required before any dimensional, optical, material, seam, controller,
+  or physical-safety claim.
+
+### Verification
+
+- Regression coverage proves nonempty scaled rotary raster output, accepted golden G-code stability,
+  successful Save/worker preparation, and byte identity across default plus legacy-false/legacy-true
+  local storage.
+- Command and Labs tests prove Rotary Setup stays enabled for laser and CNC while retired rows/keys no
+  longer participate in state or cache identity.
+- Exact prepared-job warning tests cover raster-only, mixed, selected-without-raster, vector-only,
+  inactive, flat-bed, and CNC cases. Existing Frame/recovery tests prove removal of the policy bit does
+  not shift positional preparation arguments or widen authorization.
+- No controller, rotary attachment, laser, camera, material, packaged runtime, perceptual comparison,
+  or hardware operation is established by these software checks.
+
+### References
+
+- ADR-127, canonical rotary surface-to-machine mapping.
+- ADR-160 and ADR-161, historical Labs/capability policy now superseded for rotary setup and G-code.
+- ADR-228 and ADR-232, Frame-only authorization and factual refusal boundaries.
+- ADR-243, disclosure without policy-sized output refusal.
 
 ---

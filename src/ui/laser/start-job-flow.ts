@@ -36,7 +36,6 @@ import {
 } from './start-job-checkpoint-policy';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 import { prepareCurrentStartJob, prepareRecoverySource } from './start-job-source';
-import { captureStartExternalEnvironment } from './start-job-external-environment';
 import {
   completedReceiptIsCurrent,
   replayCompilationMatches,
@@ -127,7 +126,6 @@ async function streamFramedRun(
     checkpointToReplace: null,
     completedReceipt: null,
     expectedExecutionSignature: permit.candidate.executionSignature,
-    externalEnvironment: permit.candidate.externalEnvironment,
     repository,
     framedRunClaim: claim,
   } as const;
@@ -145,7 +143,6 @@ async function streamFramedRun(
     cncSetupAttestation: review.cncSetupAttestation,
     checkpointToReplace: null,
     completedReceipt: null,
-    externalEnvironment: permit.candidate.externalEnvironment,
     repository,
     framedRunClaim: claim,
   });
@@ -184,12 +181,10 @@ async function runStartJobFlowWithCheckpoint(
   const { project } = app;
   const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
   const camera = useCameraStore.getState();
-  const externalEnvironment = captureStartExternalEnvironment(project);
   const prepared = await prepareCurrentStartJob(
     app,
     laser,
     camera,
-    externalEnvironment.rotaryRasterAllowed,
     completedReceipt?.artifact.jobOrigin,
   );
   if (!prepared.ok) {
@@ -217,7 +212,7 @@ async function runStartJobFlowWithCheckpoint(
   // — re-prepared if the operator edited settings inside the review — plus
   // the same evidence/attestation objects the confirms used to produce.
   const review = await runJobReviewGate({
-    initial: { app, project, laser, prepared, laserModeStartSnapshot, externalEnvironment },
+    initial: { app, project, laser, prepared, laserModeStartSnapshot },
     checkpointToReplace,
     completedReceipt,
     ...completedReplayInvalidationHandler(completedReceipt, repository),
@@ -231,7 +226,6 @@ async function runStartJobFlowWithCheckpoint(
     checkpointToReplace,
     completedReceipt,
     expectedExecutionSignature: bundle.prepared.canvasPlan.retentionKey,
-    externalEnvironment: bundle.externalEnvironment,
     repository,
   });
   if (currentLaser === null) return;
@@ -247,7 +241,6 @@ async function runStartJobFlowWithCheckpoint(
     cncSetupAttestation,
     checkpointToReplace,
     completedReceipt,
-    externalEnvironment: bundle.externalEnvironment,
     repository,
   });
 }
@@ -324,7 +317,6 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
     checkpointToReplace: args.checkpointToReplace,
     completedReceipt: args.completedReceipt,
     expectedExecutionSignature: args.prepared.canvasPlan.retentionKey,
-    externalEnvironment: args.externalEnvironment,
     repository: args.repository,
     ...(args.framedRunClaim === undefined ? {} : { framedRunClaim: args.framedRunClaim }),
   } as const;

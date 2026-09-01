@@ -38,6 +38,7 @@ import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
+import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
 
 export type PreparedCurrentStart = Extract<
   Awaited<ReturnType<typeof prepareCurrentStartJob>>,
@@ -100,6 +101,10 @@ export function buildJobReviewModel(args: {
       ...detectParkOutsideFrameWarningsFromMetrics(
         args.prepared.metrics.motionBounds,
         args.prepared.metrics.parkTarget,
+      ),
+      ...detectRotaryRasterQualificationWarnings(
+        args.prepared.prepared.project,
+        args.prepared.prepared.job,
       ),
     ]),
     resolvedOriginLabel: describeJobOrigin(args.prepared.jobOrigin),

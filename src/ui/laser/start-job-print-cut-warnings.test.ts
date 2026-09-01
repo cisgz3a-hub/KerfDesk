@@ -57,7 +57,6 @@ describe('Print-and-Cut Frame warnings', () => {
       },
       { startFrom: 'user-origin', anchor: 'front-left' },
       DEFAULT_OUTPUT_SCOPE,
-      false,
       {
         clock: () => new Date('2026-07-19T00:00:00.000Z'),
         renderVariableText: unusedRenderer,
@@ -103,7 +102,6 @@ describe('Print-and-Cut Frame warnings', () => {
           useSelectionOrigin: false,
           selectedObjectIds: [actualSelectedId],
         },
-        false,
         {
           clock: () => new Date('2026-07-19T00:00:00.000Z'),
           renderVariableText: unusedRenderer,

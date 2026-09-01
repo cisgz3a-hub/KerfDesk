@@ -156,7 +156,6 @@ export function prepareStartJob(
   // head XY and its checkpoint fingerprint) while the live machine is still
   // re-validated through the origin's mode (R1).
   resolvedJobOrigin?: JobOriginPlacement,
-  allowRotaryRaster?: boolean,
   requireFrame = true,
 ): StartJobPreparation {
   const input = prepareStartInput(
@@ -181,7 +180,6 @@ export function prepareStartJob(
     machine,
     machineWithReportUnits: input.machineWithReportUnits,
     outputScope,
-    allowRotaryRaster: allowRotaryRaster === true,
     requireFrame,
     placement: input.placement,
     motionOffset: input.motionOffset,
@@ -198,7 +196,6 @@ export async function prepareStartJobSnapshot(
   machine: MachineStartSnapshot,
   jobPlacement: JobPlacementSettings,
   outputScope: OutputScope,
-  allowRotaryRaster: boolean,
   options: {
     readonly clock: () => Date;
     readonly renderVariableText: VariableTextRenderer;
@@ -241,7 +238,6 @@ export async function prepareStartJobSnapshot(
     machine,
     machineWithReportUnits,
     outputScope,
-    allowRotaryRaster,
     requireFrame: options.requireFrame !== false,
     placement,
     motionOffset,
@@ -265,7 +261,6 @@ type FinalizeStartPreparationOptions = {
   readonly machine: MachineStartSnapshot;
   readonly machineWithReportUnits: MachineStartSnapshot;
   readonly outputScope: OutputScope;
-  readonly allowRotaryRaster: boolean;
   readonly requireFrame: boolean;
   readonly placement: Extract<ResolvedJobPlacement, { readonly ok: true }>;
   readonly motionOffset: PreflightOptions['motionOffset'];
@@ -286,7 +281,6 @@ export function finalizeStartPreparation(
     outputScope: options.outputScope,
     ...(options.motionOffset === undefined ? {} : { preflightMotionOffset: options.motionOffset }),
     ...initialMachinePositionOption(options.machineWithReportUnits),
-    allowRotaryRaster: options.allowRotaryRaster,
     sourceGeometryChecks: options.sourceGeometryChecks,
   });
   const emitSplit = partitionEmitPreflight(preflight);

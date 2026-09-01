@@ -8,7 +8,6 @@ import type { CncSetupAttestation } from '../state/cnc-setup-attestation';
 import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence';
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
 import type { prepareCurrentStartJob } from './start-job-source';
-import type { StartExternalEnvironment } from './start-job-external-environment';
 import type { JobReviewModel } from './job-review';
 import { activateAcceptedFreshRun } from './start-job-execution-tracking';
 import {
@@ -36,7 +35,6 @@ export type PreparedStartArgs = {
   readonly cncSetupAttestation: CncSetupAttestation | undefined;
   readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
-  readonly externalEnvironment: StartExternalEnvironment;
   readonly repository: RecoveryRepository;
   readonly framedRunClaim?: FramedRunStartClaim;
 };

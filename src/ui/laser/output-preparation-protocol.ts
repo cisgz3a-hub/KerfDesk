@@ -25,7 +25,6 @@ export type StartOutputPreparationRequest = {
   readonly jobPlacement: JobPlacementSettings;
   readonly outputScope: OutputScope;
   readonly resolvedJobOrigin?: JobOriginPlacement;
-  readonly allowRotaryRaster: boolean;
   readonly requireFrame: boolean;
   readonly snapshot?: OutputSnapshotRequest;
 };

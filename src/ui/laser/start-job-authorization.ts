@@ -2,13 +2,8 @@ import type { JobCheckpoint } from '../../core/recovery';
 import type { FramedRunControllerSnapshot } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import type { LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
-import { useStore } from '../state/store';
 import { checkpointStartIssue } from './start-job-checkpoint-policy';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
-import {
-  startExternalEnvironmentMatches,
-  type StartExternalEnvironment,
-} from './start-job-external-environment';
 import { framedRunStartClaimIsCurrent, type FramedRunStartClaim } from './framed-run-start-claim';
 
 export type StartAuthorizationRefusal =
@@ -25,7 +20,6 @@ export type CurrentStartAuthorizationArgs = {
   readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
   readonly expectedExecutionSignature: string;
-  readonly externalEnvironment: StartExternalEnvironment;
   readonly repository: RecoveryRepository;
   /** Ordinary fresh Start only. Replay/recovery retain their existing
    * authorization paths and therefore omit this exact-permit claim. */
@@ -59,9 +53,6 @@ export function currentLaserForAuthorizedStartNow(
     return { ok: false, refusal: { kind: 'completed-receipt-changed' } };
   }
   if (currentReplayExecutionSignature() !== args.expectedExecutionSignature) {
-    return { ok: false, refusal: { kind: 'execution-inputs-changed' } };
-  }
-  if (!startExternalEnvironmentMatches(args.externalEnvironment, useStore.getState().project)) {
     return { ok: false, refusal: { kind: 'execution-inputs-changed' } };
   }
   const current = useLaserStore.getState();

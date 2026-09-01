@@ -123,7 +123,9 @@ export async function injectRecoveryJobCompileIntegrityFailure(): Promise<Recove
   let recoveryJobEmissionCount = 0;
   vi.mocked(emitPreparedGcode).mockImplementation((prepared, options) => {
     const real = actual.emitPreparedGcode(prepared, options);
-    if (options?.allowRotaryRaster !== undefined) {
+    // Source qualification always declares how archived geometry evidence is
+    // checked. The derived recovery job emits without that source-only marker.
+    if (options?.sourceGeometryChecks !== undefined) {
       sourceEmissionCount += 1;
       return real;
     }

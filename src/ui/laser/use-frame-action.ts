@@ -25,10 +25,6 @@ import { waitForFreshIdleFramePosition } from './frame-position-readiness';
 import { clearStartBlockers, reportStartBlockers } from './start-blocker-invalidation';
 import { controllerStartPreparationStillCurrent } from './start-job-authorization';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
-import {
-  captureStartExternalEnvironment,
-  startExternalEnvironmentMatches,
-} from './start-job-external-environment';
 import { prepareCurrentStartJob } from './start-job-source';
 import { type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
@@ -134,15 +130,7 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
     reportFramePreparationRefusal(placement.messages, wcsNormalization.warning);
     return null;
   }
-  const externalEnvironment = captureStartExternalEnvironment(app.project);
-  const prepared = await prepareCurrentStartJob(
-    app,
-    laser,
-    camera,
-    externalEnvironment.rotaryRasterAllowed,
-    placement.jobOrigin,
-    false,
-  );
+  const prepared = await prepareCurrentStartJob(app, laser, camera, placement.jobOrigin, false);
   if (!prepared.ok) {
     reportFramePreparationRefusal(prepared.messages, wcsNormalization.warning);
     return null;
@@ -153,7 +141,6 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
     laser,
     prepared,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
-    externalEnvironment,
     ...(wcsNormalization.warning === undefined
       ? {}
       : { frameWcsNormalizationWarning: wcsNormalization.warning }),
@@ -216,7 +203,6 @@ async function dispatchPreparedFrame(
     ...candidateOptions,
     executionSignature: bundle.prepared.canvasPlan.retentionKey,
     controllerBeforeFrame: framedRunControllerSnapshot(currentLaser),
-    externalEnvironment: bundle.externalEnvironment,
     frameVerification: {
       boundsSignature: frameBoundsSignature(verificationBounds),
       wco: currentLaser.wcoCache,
@@ -336,10 +322,6 @@ function reviewedFrameIsCurrent(
   return (
     (transientProject ||
       currentReplayExecutionSignature() === bundle.prepared.canvasPlan.retentionKey) &&
-    startExternalEnvironmentMatches(
-      bundle.externalEnvironment,
-      transientProject ? bundle.project : useStore.getState().project,
-    ) &&
     controllerStartPreparationStillCurrent(bundle.laser, currentLaser)
   );
 }

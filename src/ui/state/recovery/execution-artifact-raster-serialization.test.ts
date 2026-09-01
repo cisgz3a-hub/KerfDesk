@@ -77,7 +77,6 @@ describe('streamed raster execution artifact persistence', () => {
     } satisfies Extract<PreparedOutput, { readonly ok: true }>;
     const emitted = emitPreparedGcode(prepared, {
       outputScope: DEFAULT_OUTPUT_SCOPE,
-      allowRotaryRaster: true,
     }).gcode;
     expect(emitted).not.toBe('');
 
@@ -115,7 +114,6 @@ describe('streamed raster execution artifact persistence', () => {
     expect(
       emitPreparedGcode(hydrated ?? cloned.prepared, {
         outputScope: cloned.outputScope,
-        allowRotaryRaster: true,
       }).gcode,
     ).toBe(emitted);
     expect(recoveryArtifactPreparedProgramMatches(cloned)).toBe(true);

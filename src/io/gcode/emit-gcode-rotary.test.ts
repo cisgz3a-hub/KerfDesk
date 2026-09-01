@@ -11,8 +11,9 @@ import {
 } from '../../core/scene';
 import { emitGcode } from './emit-gcode';
 
-// ADR-127 N1: rotary Y scaling applies at emit, wrap-taller jobs and raster
-// jobs are refused, and disabled rotary output is byte-identical.
+// ADR-127 N1: rotary Y scaling applies at emit, and disabled rotary output is
+// byte-identical. Raster qualification is advisory: workstation-local policy
+// must never change or suppress emitted bytes.
 
 function lineProject(rotary: RotarySetup | undefined, yTopMm = 50): Project {
   const obj: SceneObject = {
@@ -51,6 +52,36 @@ const CHUCK: RotarySetup = {
   mmPerRotation: 360,
   objectDiameterMm: 60, // circumference ≈ 188.5 → scale ≈ 1.9099
 };
+
+function rotaryRasterProject(includeVector = false): Project {
+  const color = '#808080';
+  const raster: SceneObject = {
+    kind: 'raster-image',
+    id: 'R1',
+    color,
+    source: 'x.png',
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    pixelWidth: 4,
+    pixelHeight: 4,
+    dither: 'floyd-steinberg',
+    linesPerMm: 4,
+    // 4×4 = 16 zero bytes.
+    lumaBase64: 'AAAAAAAAAAAAAAAAAAAAAA==',
+    bounds: { minX: 10, minY: 10, maxX: 20, maxY: 20 },
+    transform: IDENTITY_TRANSFORM,
+  };
+  const base = createProject({ ...DEFAULT_DEVICE_PROFILE, rotary: CHUCK });
+  let scene = addLayer(
+    addObject(base.scene, raster),
+    createLayer({ id: 'L1', color, mode: 'image' }),
+  );
+  if (includeVector) {
+    const vector = lineProject(CHUCK).scene.objects[0];
+    if (vector === undefined) throw new Error('Expected the vector fixture.');
+    scene = addLayer(addObject(scene, vector), createLayer({ id: 'L2', color: '#ff0000' }));
+  }
+  return { ...base, scene };
+}
 
 describe('emitGcode rotary (ADR-127)', () => {
   it('is byte-identical with rotary absent vs disabled', () => {
@@ -93,65 +124,15 @@ describe('emitGcode rotary (ADR-127)', () => {
     expect(result.preflight.issues.some((i) => i.code === 'out-of-bed')).toBe(true);
   });
 
-  it('refuses raster jobs while the rotary is enabled', () => {
-    const color = '#808080';
-    const raster: SceneObject = {
-      kind: 'raster-image',
-      id: 'R1',
-      color,
-      source: 'x.png',
-      dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
-      pixelWidth: 4,
-      pixelHeight: 4,
-      dither: 'floyd-steinberg',
-      linesPerMm: 4,
-      // 4×4 = 16 zero bytes.
-      lumaBase64: 'AAAAAAAAAAAAAAAAAAAAAA==',
-      bounds: { minX: 10, minY: 10, maxX: 20, maxY: 20 },
-      transform: IDENTITY_TRANSFORM,
-    } as SceneObject;
-    const base = createProject({ ...DEFAULT_DEVICE_PROFILE, rotary: CHUCK });
-    const project: Project = {
-      ...base,
-      scene: addLayer(
-        addObject(base.scene, raster),
-        createLayer({ id: 'L1', color, mode: 'image' }),
-      ),
-    };
-    const result = emitGcode(project);
-    expect(result.preflight.ok).toBe(false);
-    expect(result.preflight.issues[0]?.code).toBe('rotary-raster-unsupported');
-    expect(result.gcode).toBe('');
-  });
+  it('emits non-empty rotary raster output without workstation-local permission', () => {
+    const project = rotaryRasterProject();
+    const defaultResult = emitGcode(project);
+    expect(defaultResult.gcode).not.toBe('');
+    expect(defaultResult.preflight.issues).toEqual([]);
 
-  it('scales rotary raster row spacing only with explicit permission', () => {
-    const color = '#808080';
-    const raster: SceneObject = {
-      kind: 'raster-image',
-      id: 'R2',
-      color,
-      source: 'allowed.png',
-      dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
-      pixelWidth: 4,
-      pixelHeight: 4,
-      dither: 'floyd-steinberg',
-      linesPerMm: 4,
-      lumaBase64: 'AAAAAAAAAAAAAAAAAAAAAA==',
-      bounds: { minX: 10, minY: 10, maxX: 20, maxY: 20 },
-      transform: IDENTITY_TRANSFORM,
-    } as SceneObject;
-    const base = createProject({ ...DEFAULT_DEVICE_PROFILE, rotary: CHUCK });
-    const project: Project = {
-      ...base,
-      scene: addLayer(
-        addObject(base.scene, raster),
-        createLayer({ id: 'L2', color, mode: 'image' }),
-      ),
-    };
-    const result = emitGcode(project, { allowRotaryRaster: true });
+    const result = defaultResult;
     expect(result.preflight.issues).toEqual([]);
     expect(result.preflight.ok).toBe(true);
-    expect(result.gcode).not.toBe('');
     const yValues = [...result.gcode.matchAll(/Y(-?\d+(?:\.\d+)?)/g)].map((match) =>
       Number(match[1]),
     );
@@ -159,5 +140,14 @@ describe('emitGcode rotary (ADR-127)', () => {
     expect(Math.min(...yValues)).toBeCloseTo(0, 3);
     expect(Math.max(...yValues)).toBeGreaterThan(15);
     expect(Math.max(...yValues)).toBeLessThanOrEqual(10 * (360 / (Math.PI * 60)));
+  });
+
+  it('keeps mixed vector and raster rotary output non-empty', () => {
+    const result = emitGcode(rotaryRasterProject(true));
+
+    expect(result.preflight.ok).toBe(true);
+    expect(result.gcode).not.toBe('');
+    expect(result.gcode).toContain('L1');
+    expect(result.gcode).toContain('L2');
   });
 });

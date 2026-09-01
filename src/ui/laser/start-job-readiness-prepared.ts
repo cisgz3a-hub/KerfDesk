@@ -21,7 +21,6 @@ export function prepareStartJobFromPrepared(
   jobPlacement: JobPlacementSettings = DEFAULT_JOB_PLACEMENT,
   outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
   resolvedJobOrigin?: JobOriginPlacement,
-  allowRotaryRaster?: boolean,
   requireFrame = true,
 ): StartJobPreparation {
   const input = prepareStartInput(
@@ -40,7 +39,6 @@ export function prepareStartJobFromPrepared(
     machine,
     machineWithReportUnits: input.machineWithReportUnits,
     outputScope,
-    allowRotaryRaster: allowRotaryRaster === true,
     requireFrame,
     placement: input.placement,
     motionOffset: input.motionOffset,

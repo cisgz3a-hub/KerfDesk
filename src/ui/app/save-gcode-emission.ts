@@ -52,7 +52,6 @@ function saveGcodeOptions(
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
-    ...(ctx.allowRotaryRaster === true ? { allowRotaryRaster: true } : {}),
   };
 }
 

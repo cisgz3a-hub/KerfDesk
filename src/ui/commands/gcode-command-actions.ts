@@ -4,7 +4,6 @@
 // Inspector simply omits the variable-text advance, which belongs to a real
 // export.
 
-import { profileSupportsCapability } from '../../core/devices';
 import { handleSaveGcode } from '../app/file-actions';
 import { handleOpenGcodeInspector } from '../app/gcode-open-action';
 import { handleInspectCurrentGcode } from '../app/inspect-current-gcode-action';
@@ -12,7 +11,6 @@ import type { PlatformAdapter } from '../../platform/types';
 import { currentOutputScope } from '../state';
 import type { useStore } from '../state';
 import type { useLaserStore } from '../state/laser-store';
-import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import type { useToastStore } from '../state/toast-store';
 import type { GcodeInspectionSource } from '../gcode-inspector';
 
@@ -73,9 +71,6 @@ export function saveGcodeContext(
     controllerSettings: laser.controllerSettings,
     settingsCapability: laser.capabilities.settings,
     activeWcs: laser.activeWcs,
-    allowRotaryRaster:
-      useExperimentalLaserFeatures.getState().features.rotaryRaster &&
-      profileSupportsCapability(app.project.device, 'rotary'),
     pushToast: deps.pushToast,
   };
 }

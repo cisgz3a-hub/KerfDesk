@@ -6,7 +6,6 @@ import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { jobTimeNoun } from '../machine/machine-labels';
 import {
   actionGridStyle,
@@ -153,16 +152,13 @@ function shouldShowIdleOverrideReset(
 function useSetupRowModel(props: { readonly disabled: boolean; readonly streaming: boolean }) {
   const onFrame = useFrameAction();
   const onAutofocus = useAutofocusAction();
-  // A permit can become stale from an artwork, scope, placement, controller,
-  // or rotary-policy change. Subscribe to exactly the fields that comparison
+  // A permit can become stale from an artwork, scope, placement, or controller
+  // change. Subscribe to exactly the fields that comparison
   // reads so the status text changes immediately without the whole rail
   // re-rendering per mousemove and per controller ack; Start repeats the same
   // comparison at handoff.
   const app = useExecutionSignatureAppState();
   const laser = useFramedRunLaserState();
-  // The resolved rotary-raster policy is part of the framed environment but
-  // lives outside the app store, so subscribe explicitly for immediate expiry.
-  useExperimentalLaserFeatures((s) => s.features.rotaryRaster);
   const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
   // ADR-101 §5 (provisional): auto-focus is a laser focus routine; it hides
   // on a router. The CNC Z-zeroing flow arrives as its own H.7 surface.

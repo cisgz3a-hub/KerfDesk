@@ -62,38 +62,20 @@ describe('output preparation worker payload', () => {
     expect(() => structuredClone(response)).not.toThrow();
   });
 
-  it('returns a cloneable non-writable Save result when rotary raster permission is absent', async () => {
-    const response = await prepareOutputRequest({
+  it('returns cloneable rotary raster output without a permission field', async () => {
+    const defaultResponse = await prepareOutputRequest({
       kind: 'save',
       project: rotaryRasterSaveProject(),
       options: {},
     });
 
-    expect(response).toMatchObject({
-      kind: 'save',
-      result: {
-        kind: 'emission-refused',
-        gcode: '',
-        preflight: { issues: [{ code: 'rotary-raster-unsupported' }] },
-      },
-    });
-    expect(() => structuredClone(response)).not.toThrow();
-  });
-
-  it('returns emitted rotary raster bytes when worker permission is explicit', async () => {
-    const response = await prepareOutputRequest({
-      kind: 'save',
-      project: rotaryRasterSaveProject(),
-      options: { allowRotaryRaster: true },
-    });
-
-    expect(response).toMatchObject({
+    expect(defaultResponse).toMatchObject({
       kind: 'save',
       result: { kind: 'emitted', preflight: { issues: [] } },
     });
-    if (response.kind !== 'save') throw new Error('Save did not prepare.');
-    expect(response.result.gcode).not.toBe('');
-    expect(() => structuredClone(response)).not.toThrow();
+    if (defaultResponse.kind !== 'save') throw new Error('Save did not prepare.');
+    expect(defaultResponse.result.gcode).not.toBe('');
+    expect(() => structuredClone(defaultResponse)).not.toThrow();
   });
 
   it('returns an exact cloneable large Start result without a function-valued raster', async () => {
@@ -110,7 +92,6 @@ describe('output preparation worker payload', () => {
       },
       jobPlacement: DEFAULT_JOB_PLACEMENT,
       outputScope: DEFAULT_OUTPUT_SCOPE,
-      allowRotaryRaster: false,
       requireFrame: false,
     });
 
@@ -146,7 +127,6 @@ describe('output preparation worker payload', () => {
       },
       jobPlacement: DEFAULT_JOB_PLACEMENT,
       outputScope: DEFAULT_OUTPUT_SCOPE,
-      allowRotaryRaster: false,
       requireFrame: false,
     });
 

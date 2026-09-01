@@ -29,10 +29,6 @@ import {
   currentReplayExecutionSignature,
   replayCompilationMatches,
 } from '../start-job-execution-tracking';
-import {
-  captureStartExternalEnvironment,
-  type StartExternalEnvironment,
-} from '../start-job-external-environment';
 import { prepareCurrentStartJob } from '../start-job-source';
 import {
   buildJobReviewModel,
@@ -53,7 +49,6 @@ export type ReviewedStartBundle = {
   readonly laser: ReturnType<typeof useLaserStore.getState>;
   readonly prepared: PreparedCurrentStart;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
-  readonly externalEnvironment: StartExternalEnvironment;
   /** Durable disclosure for the owned pre-Frame G54 selection. Rebuilds run
    * after that selection, so they must retain the original named WCS fact. */
   readonly frameWcsNormalizationWarning?: string;
@@ -253,7 +248,6 @@ async function rebuildCurrentStart(
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
   const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
-  const externalEnvironment = captureStartExternalEnvironment(app.project);
   if (
     completedReceipt !== null &&
     currentReplayExecutionSignature(app) !== completedReceipt.artifact.executionSignature
@@ -265,7 +259,6 @@ async function rebuildCurrentStart(
     app,
     laser,
     camera,
-    externalEnvironment.rotaryRasterAllowed,
     completedReceipt?.artifact.jobOrigin,
     purpose === 'start',
   );
@@ -284,7 +277,6 @@ async function rebuildCurrentStart(
       laser,
       prepared,
       laserModeStartSnapshot,
-      externalEnvironment,
       ...(frameWcsNormalizationWarning === undefined ? {} : { frameWcsNormalizationWarning }),
     },
   };

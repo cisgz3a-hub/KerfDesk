@@ -29,6 +29,7 @@ const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
   'tools.crop-image',
   'tools.apply-image-mask',
   'tools.remove-image-mask',
+  'tools.rotary-setup',
   'arrange.align-left',
   'arrange.break-apart',
   'laser.connect',

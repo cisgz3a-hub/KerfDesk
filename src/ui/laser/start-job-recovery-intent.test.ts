@@ -193,10 +193,6 @@ describe('interrupted laser job intent separation', () => {
       'current output scope',
       () => useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true }),
     ],
-    [
-      'resolved rotary-raster policy',
-      () => useExperimentalLaserFeatures.getState().setFeature('rotaryRaster', true),
-    ],
   ])('refuses Start when %s changes during artifact staging', async (_label, change) => {
     const repository = recoveryHarness();
     const paused = pauseNextArtifactStage(repository);

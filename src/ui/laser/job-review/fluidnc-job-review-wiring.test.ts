@@ -9,7 +9,6 @@ import { initialLaserState } from '../../state/laser-store-helpers';
 import { useLaserStore } from '../../state/laser-store';
 import { captureLaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
 import { resetStore, svgObj } from '../../state/test-helpers';
-import { captureStartExternalEnvironment } from '../start-job-external-environment';
 import { prepareCurrentStartJob } from '../start-job-source';
 import {
   FLUIDNC_IDENTITY_MISMATCH_WARNING_PREFIX,
@@ -50,12 +49,10 @@ async function openReviewWithLongLine(): Promise<{
 }> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
-  const externalEnvironment = captureStartExternalEnvironment(app.project);
   const prepared = await prepareCurrentStartJob(
     app,
     laser,
     useCameraStore.getState(),
-    externalEnvironment.rotaryRasterAllowed,
     undefined,
     false,
   );
@@ -68,7 +65,6 @@ async function openReviewWithLongLine(): Promise<{
       laser,
       prepared: { ...prepared, gcode: LONG_SENDABLE_LINE },
       laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
-      externalEnvironment,
     },
     checkpointToReplace: null,
     completedReceipt: null,
