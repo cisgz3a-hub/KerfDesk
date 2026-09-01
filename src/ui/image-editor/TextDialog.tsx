@@ -6,7 +6,11 @@
 import { useRef } from 'react';
 import { FONT_REGISTRY } from '../../core/text';
 import { useDialogA11y } from '../common/use-dialog-a11y';
-import { useTextDialogStore, type TextDialogState } from './text-dialog-store';
+import {
+  textSizeDraftIsValid,
+  useTextDialogStore,
+  type TextDialogState,
+} from './text-dialog-store';
 
 const OUTLINE_FONTS = FONT_REGISTRY.filter((entry) => entry.geometry === 'outline');
 
@@ -99,8 +103,10 @@ function TextControls(props: { readonly state: TextDialogState }): JSX.Element {
         <input
           type="number"
           step="any"
-          value={state.sizePx}
-          onChange={(e) => state.setSizePx(Number(e.target.value))}
+          value={state.sizeDraft}
+          aria-invalid={!textSizeDraftIsValid(state.sizeDraft)}
+          onChange={(e) => state.setSizeDraft(e.target.value)}
+          onBlur={state.reconcileSizeDraft}
           style={inputStyle}
           aria-label="Text size in pixels"
           title="Glyph height in document pixels"

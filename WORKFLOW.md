@@ -5128,8 +5128,8 @@ and lifts the command's CNC-only gate.)*
    is silent and cannot mutate or close the replacement.
 2. A current Text font/raster failure remains in the dialog with its draft and
    an inline error so the operator can edit and retry.
-3. Blank, invalid, non-positive size drafts and out-of-range color Ink drafts
-   create no mutation. Blur restores the last valid displayed value; HTML
+3. Blank, invalid, non-positive Text, Image Size, and Canvas Size drafts and
+   out-of-range color Ink drafts create no mutation. Blur restores the last valid displayed value; HTML
    `step` controls spinner increments and does not refuse other finite values.
    OK/Enter closes with the last valid represented value rather than refusing
    the action because transient text is incomplete.

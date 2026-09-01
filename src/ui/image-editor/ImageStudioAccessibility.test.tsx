@@ -22,6 +22,7 @@ afterEach(() => {
     isOpen: false,
     dialogOwner: null,
     text: '',
+    sizeDraft: '48',
     commitRequest: null,
     errorMessage: null,
   });
@@ -196,6 +197,27 @@ describe('Image Studio reachability', () => {
     await pressKey(dialog, 'Escape');
     expect(useTextDialogStore.getState().isOpen).toBe(false);
     expect(document.activeElement).toBe(mounted.opener);
+    await act(async () => mounted.root.unmount());
+  });
+
+  it('keeps a blank Text size draft visible until it is reconciled', async () => {
+    const mounted = mountWithOpener();
+    openTextDialog('Label');
+    await act(async () => mounted.root.render(<TextDialog />));
+    const size = mounted.host.querySelector<HTMLInputElement>('[aria-label="Text size in pixels"]');
+    if (size === null) throw new Error('Text size field missing');
+
+    await act(async () => {
+      setInputValue(size, '');
+      size.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    });
+
+    expect(size.value).toBe('');
+    expect(size.getAttribute('aria-invalid')).toBe('true');
+
+    await act(async () => size.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(size.value).toBe('48');
+    expect(size.getAttribute('aria-invalid')).toBe('false');
     await act(async () => mounted.root.unmount());
   });
 

@@ -19044,8 +19044,9 @@ inspector-only input that cannot be streamed.
 
 ## ADR-314 - Latest Save ownership and controller-represented CNC Z remain exact (2026-09-01)
 
-**Status:** Accepted and implemented in local remediation; focused verification is complete,
-repository-wide and hosted verification remain pending; hardware and perceptual qualification excluded
+**Status:** Accepted and implemented in local remediation; focused and exact-tree local release
+verification are complete; hosted, merge, exact-main, and deployment verification remain pending;
+hardware and perceptual qualification excluded
 
 ### Context
 
@@ -19088,9 +19089,10 @@ Job Review and comments. Frame remains the sole ordinary Start guard.
    owner, not an object id. Replacement, removal, close, retry, or any draft edit retires the prior
    raster request. A current raster/font failure stays in the owned dialog with the draft intact;
    stale success and failure cannot mutate or speak over a later session.
-5. **Transient numeric drafts and exact dialog owner.** Image Size, Canvas Size, and color Ink keep
-   editable strings distinct from the last valid numeric candidate. Blank, non-finite, non-positive
-   dimensions and out-of-range Ink drafts create no mutation; blur restores the last valid value.
+5. **Transient numeric drafts and exact dialog owner.** Text size, Image Size, Canvas Size, and color
+   Ink keep editable strings distinct from the last valid numeric candidate. Blank, non-finite,
+   non-positive dimensions and out-of-range Ink drafts create no mutation; blur restores the last
+   valid value.
    Resize/Canvas Size captures the exact editor session and source owner and retires on either identity
    change, including a same-object-id replacement. OK/Enter uses the last valid represented value when
    the transient text is invalid, so draft integrity does not become a new action refusal. Existing
@@ -19141,17 +19143,17 @@ Job Review and comments. Frame remains the sole ordinary Start guard.
   replay failure disclosure, earlier rejection recovery, document replacement, same-document newer
   edits, stale recovery completion, confirm-before-discard, and all command/shortcut call sites.
 - Image Studio schedules cover exact Text owner replacement/removal, stale success/failure/retry/edit,
-  current font/raster errors, Resize invalid drafts/blur/exact same-id owner replacement, and Ink
-  blank/range drafts.
+  current font/raster errors, Text-size and Resize invalid drafts/blur/last-valid completion, exact
+  same-id Resize owner replacement, and Ink blank/range drafts.
 - CNC schedules cover the GRBL parser model, half-quantum and large non-idempotent boundaries, combined
   fine XY plus represented Z, contour/arc/path3d/helix eligibility, multi-revolution seam text/value
   parity, maximum depth, duration, Preview/removal, Job Review, stock warnings, provenance, surfacing,
   tiling, recovery compatibility, and unchanged exact-output snapshots/performance fixtures.
 - Current verification is recorded by evidence lane in `docs/remediation-ledger.md`. Focused checks
-  are present there; repository-wide release, hosted exact-head, merge, exact-main, and automatic
-  deployment evidence remain explicitly pending until those commands or workflows finish. None of
-  those lanes establishes controller acceptance, physical movement/cutting, reference-CAM
-  equivalence, installed-package behavior, or human perception.
+  and the exact-tree local `pnpm release:check` are present there; hosted exact-head, merge,
+  exact-main, and automatic deployment evidence remain explicitly pending until those workflows
+  finish. None of those lanes establishes controller acceptance, physical movement/cutting,
+  reference-CAM equivalence, installed-package behavior, or human perception.
 
 ### References
 

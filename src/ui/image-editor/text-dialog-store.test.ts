@@ -58,6 +58,7 @@ beforeEach(() => {
     text: '',
     fontKey: 'roboto-regular',
     sizePx: 48,
+    sizeDraft: '48',
     ink: 'black',
     commitRequest: null,
     errorMessage: null,
@@ -87,15 +88,38 @@ describe('useTextDialogStore', () => {
   });
 
   it('accepts positive fractional and document-scale sizes without a fixed cap', () => {
-    useTextDialogStore.getState().setSizePx(1024.5);
+    useTextDialogStore.getState().setSizeDraft('1024.5');
     expect(useTextDialogStore.getState().sizePx).toBe(1024.5);
+    expect(useTextDialogStore.getState().sizeDraft).toBe('1024.5');
   });
 
-  it('keeps the last valid size for non-positive or non-finite input', () => {
-    useTextDialogStore.getState().setSizePx(24.25);
-    useTextDialogStore.getState().setSizePx(0);
-    useTextDialogStore.getState().setSizePx(Number.NaN);
+  it('keeps the last valid size while an invalid draft remains editable until blur', () => {
+    useTextDialogStore.getState().setSizeDraft('24.25');
+    useTextDialogStore.getState().setSizeDraft('');
+    expect(useTextDialogStore.getState()).toMatchObject({ sizePx: 24.25, sizeDraft: '' });
+    useTextDialogStore.getState().setSizeDraft('not-a-number');
     expect(useTextDialogStore.getState().sizePx).toBe(24.25);
+    expect(useTextDialogStore.getState().sizeDraft).toBe('not-a-number');
+
+    useTextDialogStore.getState().reconcileSizeDraft();
+    expect(useTextDialogStore.getState()).toMatchObject({ sizePx: 24.25, sizeDraft: '24.25' });
+  });
+
+  it('commits a blank size draft with the last valid size instead of refusing the action', async () => {
+    raster.rasterizeTextLayer.mockResolvedValue(createRgbaBuffer(16, 16));
+    seedSession();
+    openText('Last valid size');
+    useTextDialogStore.getState().setSizeDraft('24.25');
+    useTextDialogStore.getState().setSizeDraft('');
+
+    await useTextDialogStore.getState().commit();
+
+    expect(raster.rasterizeTextLayer).toHaveBeenCalledWith(
+      16,
+      16,
+      expect.objectContaining({ sizePx: 24.25 }),
+    );
+    expect(useTextDialogStore.getState().isOpen).toBe(false);
   });
 
   it('discards deferred text rasterization after a same-id replacement session opens', async () => {
@@ -113,6 +137,7 @@ describe('useTextDialogStore', () => {
     useImageEditorStore.setState({
       session: startingSession,
       sessionOwner: { projectDocumentEpoch: 1, sourceImage },
+      transform: null,
     });
     openText('Old document');
     const pending = useTextDialogStore.getState().commit();
@@ -121,6 +146,7 @@ describe('useTextDialogStore', () => {
     useImageEditorStore.setState({
       session: replacementSession,
       sessionOwner: { projectDocumentEpoch: 2, sourceImage: replacementImage },
+      transform: null,
     });
     rendered.resolve(createRgbaBuffer(16, 16));
     await pending;
@@ -162,7 +188,7 @@ describe('useTextDialogStore', () => {
     const session = createSession('R1', 'source.png', createRgbaBuffer(16, 16), BOUNDS);
     const sourceImage = { id: 'R1', kind: 'raster-image' } as RasterImage;
     const sessionOwner = { projectDocumentEpoch: 1, sourceImage };
-    useImageEditorStore.setState({ session, sessionOwner });
+    useImageEditorStore.setState({ session, sessionOwner, transform: null });
     openText('Cancelled text');
 
     const pending = useTextDialogStore.getState().commit();
@@ -184,7 +210,7 @@ describe('useTextDialogStore', () => {
     const session = createSession('R1', 'source.png', createRgbaBuffer(16, 16), BOUNDS);
     const sourceImage = { id: 'R1', kind: 'raster-image' } as RasterImage;
     const sessionOwner = { projectDocumentEpoch: 1, sourceImage };
-    useImageEditorStore.setState({ session, sessionOwner });
+    useImageEditorStore.setState({ session, sessionOwner, transform: null });
     openText('Keep this text');
 
     const pending = useTextDialogStore.getState().commit();
@@ -217,6 +243,7 @@ describe('useTextDialogStore', () => {
         projectDocumentEpoch: 1,
         sourceImage: { id: 'R1', kind: 'raster-image' } as RasterImage,
       },
+      transform: null,
     });
     openText('Old text');
     const pending = useTextDialogStore.getState().commit();
@@ -228,6 +255,7 @@ describe('useTextDialogStore', () => {
         projectDocumentEpoch: 2,
         sourceImage: { id: 'R1', kind: 'raster-image' } as RasterImage,
       },
+      transform: null,
     });
     rendered.reject(new Error('old document font failure'));
     await pending;
@@ -286,8 +314,8 @@ describe('useTextDialogStore', () => {
 
   it.each([
     ['font', () => useTextDialogStore.getState().setFontKey('poppins-regular')],
-    ['size', () => useTextDialogStore.getState().setSizePx(72.5)],
-    ['blank size', () => useTextDialogStore.getState().setSizePx(0)],
+    ['size', () => useTextDialogStore.getState().setSizeDraft('72.5')],
+    ['blank size', () => useTextDialogStore.getState().setSizeDraft('')],
     ['ink', () => useTextDialogStore.getState().setInk('white')],
   ])('retires a pending raster failure when the %s draft changes', async (_label, edit) => {
     const rendered = deferred<ReturnType<typeof createRgbaBuffer>>();
