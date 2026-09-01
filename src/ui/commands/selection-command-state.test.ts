@@ -9,6 +9,7 @@ import {
 import {
   selectedConvertibleVectors,
   selectionCanBreakApart,
+  selectionCanCombine,
   selectionCanWeld,
 } from './selection-command-state';
 
@@ -28,7 +29,7 @@ describe('selection command state', () => {
     expect(selectionCanBreakApart(project, ['compound'])).toBe(true);
   });
 
-  it('does not allow Weld for selected vectors with mixed output metadata', () => {
+  it('allows Weld for selected vectors with mixed output metadata', () => {
     const project = {
       ...createProject(),
       scene: {
@@ -41,7 +42,26 @@ describe('selection command state', () => {
       },
     };
 
-    expect(selectionCanWeld(project, ['low-power', 'high-power'])).toBe(false);
+    expect(selectionCanWeld(project, ['low-power', 'high-power'])).toBe(true);
+  });
+
+  it('uses canonical curve closedness for Weld and Boolean availability', () => {
+    const canonicalOpen = importedSvg('canonical-open', canonicalPath(true, false));
+    const canonicalClosed = importedSvg('canonical-closed', canonicalPath(false, true));
+    const ordinaryClosed = importedSvg('ordinary-closed', squarePath('#000000', 20, 0, 10));
+    const project = {
+      ...createProject(),
+      scene: {
+        objects: [canonicalOpen, canonicalClosed, ordinaryClosed],
+        layers: [createLayer({ id: '#000000', color: '#000000' })],
+        groups: [],
+      },
+    };
+
+    expect(selectionCanWeld(project, ['canonical-open'])).toBe(false);
+    expect(selectionCanCombine(project, ['canonical-open', 'ordinary-closed'])).toBe(false);
+    expect(selectionCanWeld(project, ['canonical-closed'])).toBe(true);
+    expect(selectionCanCombine(project, ['canonical-closed', 'ordinary-closed'])).toBe(true);
   });
 
   // ADR-029 amendment ii: Convert to Bitmap merges the whole selection into
@@ -111,6 +131,24 @@ function compoundPath(
   polylines: ReadonlyArray<ColoredPath['polylines'][number]>,
 ): ColoredPath {
   return { color, polylines };
+}
+
+function canonicalPath(compatibilityClosed: boolean, canonicalClosed: boolean): ColoredPath {
+  return {
+    color: '#000000',
+    polylines: [{ ...square(0, 0, 10), closed: compatibilityClosed }],
+    curves: [
+      {
+        start: { x: 0, y: 0 },
+        segments: [
+          { kind: 'line', to: { x: 10, y: 0 } },
+          { kind: 'line', to: { x: 10, y: 10 } },
+          { kind: 'line', to: { x: 0, y: 10 } },
+        ],
+        closed: canonicalClosed,
+      },
+    ],
+  };
 }
 
 function square(x: number, y: number, size: number): ColoredPath['polylines'][number] {

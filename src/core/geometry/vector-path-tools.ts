@@ -1,6 +1,8 @@
-import { FillRule, unionD, type PathD } from 'clipper2-ts';
+import { type PathD } from 'clipper2-ts';
 import { err, ok, type Result } from '../result';
 import {
+  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+  flattenColoredPathCurves,
   IDENTITY_TRANSFORM,
   type Bounds,
   type ColoredPath,
@@ -29,7 +31,6 @@ export type VectorOpError = {
     | 'collapsed'
     | 'no-corners'
     | 'bad-distance'
-    | 'mixed-metadata'
     // The clipper2-ts engine threw on pathological/degenerate geometry. Before
     // ADR-131 the store's try/catch swallowed this; now the op catches the
     // third-party throw at the boundary and surfaces it as a Result so an
@@ -64,7 +65,9 @@ export function materializeVectorObject(object: VectorSceneObject, id = object.i
     color: path.color,
     ...(path.operationIds === undefined ? {} : { operationIds: path.operationIds }),
     ...materializedStrokeWidth(path, object.transform),
-    polylines: path.polylines.map((polyline) => materializePolyline(polyline, object.transform)),
+    polylines: materializationPolylines(path, object.transform).map((polyline) =>
+      materializePolyline(polyline, object.transform),
+    ),
   }));
   return {
     ...objectPowerScale(object),
@@ -78,76 +81,25 @@ export function materializeVectorObject(object: VectorSceneObject, id = object.i
   };
 }
 
-export function weldVectorObjects(
-  objects: ReadonlyArray<VectorSceneObject>,
-  id: string,
-): Result<ImportedSvg, VectorOpError> {
-  if (objects.length === 0) {
-    return err({
-      kind: 'too-few-objects',
-      message: 'Weld requires selected closed vector contours.',
-    });
-  }
-  if (!vectorObjectOutputMetadataCompatible(objects)) {
-    return err({
-      kind: 'mixed-metadata',
-      message: 'Weld requires selected vector contours with matching output metadata.',
-    });
-  }
-  const materialized = objects.map((object) => materializeVectorObject(object));
-  const byColor = new Map<string, PathD[]>();
-  for (const object of materialized) {
-    for (const path of object.paths) {
-      const paths = byColor.get(path.color) ?? [];
-      for (const polyline of path.polylines) {
-        if (!isClosedPolygon(polyline)) {
-          return err({
-            kind: 'open-contours',
-            message: 'Weld requires selected closed vector contours.',
-          });
-        }
-        paths.push(polylineToPathD(polyline));
-      }
-      byColor.set(path.color, paths);
-    }
-  }
-  const paths: ColoredPath[] = [];
-  for (const [color, subject] of byColor) {
-    const welded = tryVectorOp(() => unionD(subject, FillRule.NonZero));
-    if (welded.kind === 'error') return welded;
-    paths.push({
-      color,
-      polylines: welded.value.map(pathDToPolyline).filter(isClosedPolygon),
-    });
-  }
-  const filtered = paths.filter((path) => path.polylines.length > 0);
-  if (filtered.length === 0) {
-    return err({ kind: 'empty-result', message: 'Welding these shapes produced an empty result.' });
-  }
-  return ok({
-    ...commonObjectMetadata(objects),
-    kind: 'imported-svg',
-    id,
-    source: 'Welded paths',
-    bounds: boundsForPaths(filtered) ?? firstBounds(objects),
-    transform: IDENTITY_TRANSFORM,
-    paths: filtered,
+function materializationPolylines(
+  path: ColoredPath,
+  transform: SceneObject['transform'],
+): ReadonlyArray<Polyline> {
+  const largestScale = Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY));
+  const localTolerance =
+    largestScale > 0 && Number.isFinite(largestScale)
+      ? DEFAULT_MACHINE_CURVE_TOLERANCE_MM / largestScale
+      : DEFAULT_MACHINE_CURVE_TOLERANCE_MM;
+  const flattened = flattenColoredPathCurves(path, {
+    toleranceMm: localTolerance,
+    // Match output compilation: routing or compatibility views must never
+    // replace canonical curves merely because the path is large.
+    segmentBudget: Number.MAX_SAFE_INTEGER,
   });
-}
-
-export function vectorObjectOutputMetadataCompatible(
-  objects: ReadonlyArray<VectorSceneObject>,
-): boolean {
-  if (objects.length <= 1) return true;
-  const first = objectPowerScale(objects[0] as VectorSceneObject);
-  return objects.slice(1).every((object) => objectMetadataEqual(first, objectPowerScale(object)));
-}
-
-function commonObjectMetadata(
-  objects: ReadonlyArray<VectorSceneObject>,
-): Pick<ImportedSvg, 'locked' | 'operationOverride' | 'powerScale'> {
-  // Metadata compatibility is checked by weldVectorObjects before this runs.
-  return objectPowerScale(objects[0] as VectorSceneObject);
+  if (flattened.kind === 'segment-budget-exceeded') {
+    throw new Error('Canonical curve flattening exceeded the JavaScript safe-integer budget.');
+  }
+  return flattened.polylines;
 }
 
 function materializePolyline(polyline: Polyline, transform: SceneObject['transform']): Polyline {
@@ -161,7 +113,12 @@ function materializedStrokeWidth(
   path: ColoredPath,
   transform: SceneObject['transform'],
 ): Pick<ColoredPath, 'strokeWidthMm'> {
-  if (path.strokeWidthMm === undefined || transform.scaleX !== transform.scaleY) return {};
+  if (
+    path.strokeWidthMm === undefined ||
+    Math.abs(transform.scaleX) !== Math.abs(transform.scaleY)
+  ) {
+    return {};
+  }
   return { strokeWidthMm: path.strokeWidthMm * Math.abs(transform.scaleX) };
 }
 
@@ -187,32 +144,6 @@ function objectPowerScale(
       : { operationOverride: object.operationOverride }),
     ...(object.powerScale === undefined ? {} : { powerScale: object.powerScale }),
   };
-}
-
-function objectMetadataEqual(
-  left: Pick<ImportedSvg, 'locked' | 'operationOverride' | 'powerScale'>,
-  right: Pick<ImportedSvg, 'locked' | 'operationOverride' | 'powerScale'>,
-): boolean {
-  return (
-    left.locked === right.locked &&
-    Object.is(left.powerScale, right.powerScale) &&
-    operationOverrideEqual(left.operationOverride, right.operationOverride)
-  );
-}
-
-function operationOverrideEqual(
-  left: ImportedSvg['operationOverride'],
-  right: ImportedSvg['operationOverride'],
-): boolean {
-  const leftKeys = Object.keys(left ?? {}).sort();
-  const rightKeys = Object.keys(right ?? {}).sort();
-  return (
-    leftKeys.length === rightKeys.length &&
-    leftKeys.every((key, index) => {
-      if (key !== rightKeys[index]) return false;
-      return Object.is(left?.[key as keyof typeof left], right?.[key as keyof typeof right]);
-    })
-  );
 }
 
 export function isClosedPolygon(polyline: Polyline): boolean {
@@ -266,10 +197,6 @@ export function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds | null
   }
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
   return { minX, minY, maxX, maxY };
-}
-
-function firstBounds(objects: ReadonlyArray<VectorSceneObject>): Bounds {
-  return objects[0]?.bounds ?? { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 }
 
 function pointsEqual(a: Vec2, b: Vec2): boolean {

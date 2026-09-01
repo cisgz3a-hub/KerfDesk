@@ -15,14 +15,17 @@ import { err, ok, type Result } from '../result';
 import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg } from '../scene';
 import {
   boundsForPaths,
-  isClosedPolygon,
-  materializeVectorObject,
   pathDToPolyline,
-  polylineToPathD,
   tryVectorOp,
   type VectorOpError,
   type VectorSceneObject,
 } from './vector-path-tools';
+import { canonicalizeVectorPaths, compareCanonicalVectorPaths } from './vector-path-canonical';
+import {
+  normalizeVectorObjectRegion,
+  unionNormalizedRegions,
+  VECTOR_PATH_PRECISION_DECIMALS,
+} from './vector-path-regions';
 
 export type VectorBooleanOp = 'subtract' | 'intersect' | 'exclude';
 
@@ -53,16 +56,21 @@ export function combineVectorObjects(
       message: 'Boolean operations need two or more closed vector objects.',
     });
   }
-  const subject = closedWorldPaths([subjectObject]);
+  const subject = normalizeVectorObjectRegion(subjectObject);
   if (subject.kind === 'error') return subject;
-  const clip = closedWorldPaths(clipObjects);
-  if (clip.kind === 'error') return clip;
-  const combined = tryVectorOp(() => runBooleanOp(op, subject.value, clip.value));
+  const clipRegions = clipObjects.map(normalizeVectorObjectRegion);
+  const clipError = clipRegions.find((region) => region.kind === 'error');
+  if (clipError?.kind === 'error') return clipError;
+  const combined = runBooleanOp(
+    op,
+    subject.value,
+    clipRegions.flatMap((region) => (region.kind === 'ok' ? [region.value] : [])),
+  );
   if (combined.kind === 'error') return combined;
   const paths: ColoredPath[] = [
     {
       color: objectColor(subjectObject),
-      polylines: combined.value.map(pathDToPolyline).filter(isClosedPolygon),
+      polylines: combined.value.map(pathDToPolyline),
     },
   ];
   if ((paths[0]?.polylines.length ?? 0) === 0) {
@@ -97,16 +105,30 @@ export function offsetVectorObjects(
       message: 'Offset distance must be a non-zero number of millimeters.',
     });
   }
-  const world = closedWorldPaths(objects);
+  const regions = objects.map(normalizeVectorObjectRegion);
+  const regionError = regions.find((region) => region.kind === 'error');
+  if (regionError?.kind === 'error') return regionError;
+  const world = unionNormalizedRegions(
+    regions.flatMap((region) => (region.kind === 'ok' ? [region.value] : [])),
+  );
   if (world.kind === 'error') return world;
   const inflated = tryVectorOp(() =>
-    inflatePathsD(world.value, deltaMm, JoinType.Round, EndType.Polygon),
+    canonicalizeVectorPaths(
+      inflatePathsD(
+        world.value,
+        deltaMm,
+        JoinType.Round,
+        EndType.Polygon,
+        2,
+        VECTOR_PATH_PRECISION_DECIMALS,
+      ),
+    ),
   );
   if (inflated.kind === 'error') return inflated;
   const paths: ColoredPath[] = [
     {
       color: objectColor(first),
-      polylines: inflated.value.map(pathDToPolyline).filter(isClosedPolygon),
+      polylines: inflated.value.map(pathDToPolyline),
     },
   ];
   if ((paths[0]?.polylines.length ?? 0) === 0) {
@@ -120,36 +142,31 @@ export function offsetVectorObjects(
   );
 }
 
-function runBooleanOp(op: VectorBooleanOp, subject: PathsD, clip: PathsD): PathsD {
-  switch (op) {
-    case 'subtract':
-      return differenceD(subject, clip, FillRule.NonZero);
-    case 'intersect':
-      return intersectD(subject, clip, FillRule.NonZero);
-    case 'exclude':
-      return xorD(subject, clip, FillRule.NonZero);
-  }
-}
-
-function closedWorldPaths(
-  objects: ReadonlyArray<VectorSceneObject>,
+function runBooleanOp(
+  op: VectorBooleanOp,
+  subject: PathsD,
+  clips: ReadonlyArray<PathsD>,
 ): Result<PathsD, VectorOpError> {
-  const out: PathsD = [];
-  for (const object of objects) {
-    const materialized = materializeVectorObject(object);
-    for (const path of materialized.paths) {
-      for (const polyline of path.polylines) {
-        if (!isClosedPolygon(polyline)) {
-          return err({
-            kind: 'open-contours',
-            message: 'Boolean and offset operations need closed contours only.',
-          });
-        }
-        out.push(polylineToPathD(polyline));
-      }
-    }
+  if (op === 'subtract') {
+    const clip = unionNormalizedRegions(clips);
+    if (clip.kind === 'error') return clip;
+    return tryVectorOp(() =>
+      canonicalizeVectorPaths(
+        differenceD(subject, clip.value, FillRule.NonZero, VECTOR_PATH_PRECISION_DECIMALS),
+      ),
+    );
   }
-  return ok(out);
+  return tryVectorOp(() => {
+    const ordered = [subject, ...clips].sort(compareCanonicalVectorPaths);
+    let combined: PathsD = ordered[0] ?? [];
+    for (const clip of ordered.slice(1)) {
+      combined =
+        op === 'intersect'
+          ? intersectD(combined, clip, FillRule.NonZero, VECTOR_PATH_PRECISION_DECIMALS)
+          : xorD(combined, clip, FillRule.NonZero, VECTOR_PATH_PRECISION_DECIMALS);
+    }
+    return canonicalizeVectorPaths(combined);
+  });
 }
 
 function objectColor(object: VectorSceneObject): string {
@@ -163,6 +180,10 @@ function resultObject(
   subject: VectorSceneObject,
 ): ImportedSvg {
   return {
+    ...(subject.powerScale === undefined ? {} : { powerScale: subject.powerScale }),
+    ...(subject.operationOverride === undefined
+      ? {}
+      : { operationOverride: subject.operationOverride }),
     kind: 'imported-svg',
     id,
     source,

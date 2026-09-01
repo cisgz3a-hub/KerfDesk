@@ -17,7 +17,10 @@ import { compilationPolylines } from './compilation-polylines';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { fillRunwayPolicyForDevice } from './fill-runway-policy';
-import { normalizeClosedPolylinesNonZeroChecked } from '../geometry/polygon-difference';
+import {
+  normalizeClosedPolylinesEvenOddChecked,
+  normalizeClosedPolylinesNonZeroChecked,
+} from '../geometry/polygon-difference';
 import { groupFillContoursIntoIslands } from './island-fill';
 import { islandFillMotionPolicyForDevice } from './island-fill-motion';
 import type { FillSegment, Group } from './job';
@@ -185,31 +188,44 @@ function appendFillPathContours(
   device: DeviceProfile,
   out: Polyline[],
 ): void {
-  const objectContours: Polyline[] = [];
+  const normalizedBatches: Polyline[] = [];
+  const originalClosedContours: Polyline[] = [];
+  const openContours: Polyline[] = [];
+  let batchNormalizationFailed = false;
   for (const path of object.paths) {
     if (!pathUsesOperation(object, path, layer)) continue;
+    const closed: Polyline[] = [];
     for (const polyline of compilationPolylines(path, object.transform)) {
-      objectContours.push({
+      const transformed = {
         points: polyline.points.map((p) =>
           toMachineCoords(applyTransform(p, object.transform), device),
         ),
         closed: polyline.closed,
-      });
+      };
+      if (transformed.closed) closed.push(transformed);
+      else openContours.push(transformed);
     }
+    originalClosedContours.push(...closed);
+    const resolved =
+      object.kind === 'text'
+        ? normalizeClosedPolylinesNonZeroChecked(closed)
+        : normalizeClosedPolylinesEvenOddChecked(closed);
+    if (resolved.kind === 'error') {
+      batchNormalizationFailed = true;
+      continue;
+    }
+    normalizedBatches.push(...resolved.value);
   }
-  if (object.kind !== 'text') {
-    out.push(...objectContours);
+  if (batchNormalizationFailed) {
+    // Do not reinterpret a mixed raw/normalized object as non-zero. Preserve
+    // the established raw-contour fallback and let the layer-wide even-odd
+    // hatching policy own the degraded case.
+    out.push(...originalClosedContours, ...openContours);
     return;
   }
-  const closed = objectContours.filter((polyline) => polyline.closed);
-  const open = objectContours.filter((polyline) => !polyline.closed);
-  if (closed.length < 2) {
-    out.push(...objectContours);
-    return;
-  }
-  const resolved = normalizeClosedPolylinesNonZeroChecked(closed);
+  const resolvedObject = normalizeClosedPolylinesNonZeroChecked(normalizedBatches);
   out.push(
-    ...(resolved.kind === 'ok' && resolved.value.length > 0 ? resolved.value : closed),
-    ...open,
+    ...(resolvedObject.kind === 'ok' ? resolvedObject.value : normalizedBatches),
+    ...openContours,
   );
 }
