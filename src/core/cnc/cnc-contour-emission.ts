@@ -9,14 +9,16 @@
 
 import type { CncContourPass } from '../job/job';
 import type { Vec2 } from '../scene';
+import { GRBL_MAX_PARSED_DIGITS, parseGrblCncCoordinate } from './cnc-grbl-coordinate-parser';
 import { CNC_COORDINATE_DECIMAL_PLACES } from './cnc-output-precision';
+
+export { parseGrblCncCoordinate } from './cnc-grbl-coordinate-parser';
 
 export const CNC_CONTOUR_DETAIL_DECIMAL_PLACES = 4;
 // JavaScript's exact toFixed limit. Selection normally stops far earlier, as
 // soon as every rounded candidate reaches the exact binary64 parser prefix.
 export const CNC_CONTOUR_MAX_DECIMAL_PLACES = 100;
 export const CNC_CONTOUR_PARSER_PREFIX = 'parser-prefix';
-const GRBL_MAX_PARSED_DIGITS = 8;
 
 export type CncContourEmissionPrecision = number | typeof CNC_CONTOUR_PARSER_PREFIX;
 
@@ -188,33 +190,6 @@ export function cncContourLosesMotionAtSupportedPrecision(pass: CncContourPass):
   return stats.retainedSegments < stats.geometricSegments;
 }
 
-/** Source-faithful model of stock GRBL's `read_float` for the fixed-decimal
- * coordinate words produced above. GRBL captures at most eight digits into an
- * integer, casts that integer to its 32-bit float, then applies the decimal
- * exponent through rounded 0.01/0.1 multiplications. A direct Math.fround of
- * the final JavaScript number is not equivalent near float boundaries. */
-export function parseGrblCncCoordinate(formatted: string): number {
-  const captured = captureGrblFixedDecimal(formatted);
-  if (captured === null) return Number.NaN;
-  let value = Math.fround(captured.integerValue);
-  let exponent = captured.exponent;
-  if (value !== 0) {
-    while (exponent <= -2) {
-      value = multiplyFloat32(value, 0.01);
-      exponent += 2;
-    }
-    if (exponent < 0) {
-      value = multiplyFloat32(value, 0.1);
-    } else {
-      while (exponent > 0) {
-        value = multiplyFloat32(value, 10);
-        exponent -= 1;
-      }
-    }
-  }
-  return captured.negative ? -value : value;
-}
-
 export function cncParsedCoordinateEquals(current: string | null, target: string): boolean {
   return current !== null && parseGrblCncCoordinate(current) === parseGrblCncCoordinate(target);
 }
@@ -351,33 +326,4 @@ function exactBinary64DecimalParts(coordinate: number): {
 
 function digitCount(formatted: string): number {
   return formatted.replace(/[-.]/g, '').length;
-}
-
-function multiplyFloat32(left: number, right: number): number {
-  return Math.fround(Math.fround(left) * Math.fround(right));
-}
-
-function captureGrblFixedDecimal(formatted: string): {
-  readonly integerValue: number;
-  readonly exponent: number;
-  readonly negative: boolean;
-} | null {
-  const match = /^([+-]?)(\d*)(?:\.(\d*))?/.exec(formatted);
-  if (match === null) return null;
-  const integerDigits = match[2] ?? '';
-  const fractionalDigits = match[3] ?? '';
-  const digits = integerDigits + fractionalDigits;
-  if (digits.length === 0) return null;
-  const capturedFractionDigits = Math.max(
-    0,
-    Math.min(fractionalDigits.length, GRBL_MAX_PARSED_DIGITS - integerDigits.length),
-  );
-  return {
-    integerValue: Number(digits.slice(0, GRBL_MAX_PARSED_DIGITS)),
-    exponent:
-      integerDigits.length > GRBL_MAX_PARSED_DIGITS
-        ? integerDigits.length - GRBL_MAX_PARSED_DIGITS
-        : -capturedFractionDigits,
-    negative: match[1] === '-',
-  };
 }

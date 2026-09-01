@@ -1,5 +1,9 @@
 import type { CncGroup, Group, Job } from '../../../core/job';
-import { cncGroupMaximumDepthMm } from '../../../core/cnc/cnc-group-maximum-depth';
+import { cncGroupMaximumDepth } from '../../../core/cnc/output-representation';
+import {
+  type CncCoordinateRepresentation,
+  requestedCncCoordinateText,
+} from '../../../core/cnc/coordinate-representation';
 import { artworkOperationName, type Layer, type SceneObject } from '../../../core/scene';
 import { laserOperationDetail } from './job-review-detail-facts';
 
@@ -18,24 +22,25 @@ export function buildEffectiveOperationReview(
   },
 ): ReadonlyArray<JobReviewEffectiveOperation> {
   const summariesByLayer = new Map<string, string[]>();
-  const vCarveDepthByLayer = new Map<string, number>();
+  const vCarveDepthByLayer = new Map<string, CncCoordinateRepresentation>();
   for (const group of job.groups) {
     const summary = effectiveGroupSummary(group, scene);
     const summaries = summariesByLayer.get(group.layerId) ?? [];
     if (!summaries.includes(summary)) summaries.push(summary);
     summariesByLayer.set(group.layerId, summaries);
     if (group.kind === 'cnc' && group.cutType === 'v-carve') {
-      vCarveDepthByLayer.set(
-        group.layerId,
-        Math.max(vCarveDepthByLayer.get(group.layerId) ?? 0, cncGroupMaximumDepthMm(group)),
-      );
+      const candidate = cncGroupMaximumDepth(group);
+      const current = vCarveDepthByLayer.get(group.layerId);
+      if (current === undefined || candidate.value > current.value) {
+        vCarveDepthByLayer.set(group.layerId, candidate);
+      }
     }
   }
   return [...summariesByLayer].map(([layerId, summaries]) => {
-    const cncActualMaxDepthMm = vCarveDepthByLayer.get(layerId);
-    return cncActualMaxDepthMm === undefined
+    const cncActualMaxDepth = vCarveDepthByLayer.get(layerId);
+    return cncActualMaxDepth === undefined
       ? { layerId, summaries }
-      : { layerId, summaries, cncActualMaxDepthMm };
+      : { layerId, summaries, cncActualMaxDepthMm: cncActualMaxDepth.value };
   });
 }
 
@@ -59,9 +64,13 @@ function cncGroupSummary(group: CncGroup): string {
     group.coolant === undefined || group.coolant === 'off'
       ? 'coolant off'
       : `${group.coolant} coolant`;
+  const actualMaxDepth = cncGroupMaximumDepth(group);
   const actualDepth = reportsGeometryDerivedDepth(group.cutType)
-    ? `Actual max depth ${formatNumber(cncGroupMaximumDepthMm(group))} mm · `
-    : '';
+    ? `Actual max depth ${formatCoordinateText(actualMaxDepth.text)} mm · `
+    : group.requestedDepthMm !== undefined &&
+        requestedCncCoordinateText(group.requestedDepthMm) !== actualMaxDepth.text
+      ? `Emitted max depth ${formatCoordinateText(actualMaxDepth.text)} mm (${formatRequestedNumber(group.requestedDepthMm)} requested) · `
+      : '';
   return (
     actualDepth +
     `${tool} · ${group.passes.length} ${plural(group.passes.length, 'pass', 'passes')}` +
@@ -119,6 +128,15 @@ function contourEntrySummary(group: Exclude<Group, CncGroup>): string {
 
 function formatNumber(value: number): string {
   return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
+}
+
+function formatCoordinateText(text: string): string {
+  return Number(text).toLocaleString('en-US', { maximumFractionDigits: 3 });
+}
+
+function formatRequestedNumber(value: number): string {
+  const text = requestedCncCoordinateText(value);
+  return text === String(value) ? text : formatNumber(Number(text));
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {

@@ -5,6 +5,8 @@ import { cncGrblStrategy } from '../output';
 import type { CncGroup, CncPass, Job } from './job';
 import { buildToolpath } from './toolpath';
 
+const REPRESENTED_SAFE_Z_MM = parseGrblCncCoordinate('3.810');
+
 function group(passes: ReadonlyArray<CncPass>): CncGroup {
   return {
     kind: 'cnc',
@@ -75,9 +77,9 @@ describe('CNC Preview precision boundaries', () => {
     ).toMatchObject([
       { kind: 'plunge', toZ: -1 },
       { kind: 'cut' },
-      { kind: 'plunge', fromZ: -1, toZ: 3.81 },
+      { kind: 'plunge', fromZ: -1, toZ: REPRESENTED_SAFE_Z_MM },
       { kind: 'travel' },
-      { kind: 'plunge', fromZ: 3.81, toZ: -2 },
+      { kind: 'plunge', fromZ: REPRESENTED_SAFE_Z_MM, toZ: -2 },
       { kind: 'cut' },
     ]);
   });
@@ -183,9 +185,9 @@ describe('CNC Preview precision boundaries', () => {
     expect(buildToolpath(job, { startPoint: { x: 10, y: 20 } }).steps).toMatchObject([
       { kind: 'plunge', toZ: -1 },
       { kind: 'cut' },
-      { kind: 'plunge', fromZ: -1, toZ: 3.81 },
+      { kind: 'plunge', fromZ: -1, toZ: REPRESENTED_SAFE_Z_MM },
       { kind: 'travel' },
-      { kind: 'plunge', fromZ: 3.81, toZ: -2 },
+      { kind: 'plunge', fromZ: REPRESENTED_SAFE_Z_MM, toZ: -2 },
       { kind: 'cut' },
     ]);
     expect(cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE)).toContain('G0 X10.000 Y20.000');

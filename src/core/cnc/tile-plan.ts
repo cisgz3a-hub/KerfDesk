@@ -8,7 +8,7 @@
 // positions, so dowel pins re-index the stock physically.
 
 import { cncPassXyPoints, type CncGroup, type CncPass, type Job } from '../job';
-import { cncHelicalContourPoints } from '../job/job';
+import { cncHelicalContourPoints } from '../job/helical-representation';
 import type { CncTiling } from '../scene';
 import type { CncTile, TiledJob } from './cnc-tile';
 import type { TiledJobsResult } from './tile-plan-result';

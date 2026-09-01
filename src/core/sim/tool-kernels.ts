@@ -26,9 +26,9 @@
 // behaviour and correct for a V-bit, so saved projects are unchanged.
 
 import { assertNever, type CncTool } from '../scene';
-// Deep imports: core/cnc's barrel is a ratcheted over-cap legacy barrel
-// (scripts/index-export-baseline.json) and may only shrink.
-import { CNC_MASK_EMISSION_XY_CLEARANCE_MM } from '../cnc/cnc-output-precision';
+import { CNC_MASK_EMISSION_XY_CLEARANCE_MM } from '../cnc/coordinate-representation';
+// Deep imports: these geometry leaves predate the narrow representation barrel;
+// the legacy core/cnc barrel is frozen by the public-export no-growth ratchet.
 import { vcarveIncludedAngleDeg } from '../cnc/vcarve-angle';
 import { conicalRadialEnvelope, radialEnvelopeHeightMm } from '../cnc/radial-envelope';
 

@@ -2,6 +2,7 @@
 // spindle bracketing, and determinism.
 
 import { describe, expect, it } from 'vitest';
+import { formatCncCoordinateMm } from './cnc-output-precision';
 import {
   buildSurfacingProgram,
   surfacingRowYs,
@@ -99,9 +100,20 @@ describe('buildSurfacingProgram', () => {
     expect(plunges).toEqual(['G1 Z-0.500 F600.000', 'G1 Z-1.000 F600.000', 'G1 Z-1.200 F600.000']);
   });
 
-  it.each([0.001, 0.01, 0.049, 0.05, 0.051])(
-    'never cuts deeper than a shallow requested total of %s mm',
-    (totalDepthMm) => {
+  it.each([
+    [0.00049, 0],
+    [0.0005, 0.001],
+    [0.0006, 0.001],
+    [0.001, 0.001],
+    [0.01, 0.01],
+    [0.049, 0.049],
+    [0.05, 0.05],
+    [0.05049, 0.05],
+    [0.0505, 0.051],
+    [0.051, 0.051],
+  ] as const)(
+    'discloses requested shallow total %s mm as emitted maximum %s mm',
+    (totalDepthMm, emittedMaximumDepthMm) => {
       const program = expectSurfacingProgram(
         buildSurfacingProgram({
           ...PARAMS,
@@ -110,13 +122,37 @@ describe('buildSurfacingProgram', () => {
         }),
       );
       const depths = program.lines
-        .filter((line) => line.startsWith('G1 Z-'))
+        .filter((line) => line.startsWith('G1 Z'))
         .map((line) => Math.abs(Number(/Z(-?[\d.]+)/.exec(line)?.[1])));
 
-      expect(depths.at(-1)).toBeCloseTo(totalDepthMm, 3);
-      expect(Math.max(...depths)).toBeLessThanOrEqual(totalDepthMm + 0.0005);
+      expect(program.requestedTotalDepthMm).toBe(totalDepthMm);
+      expect(formatCncCoordinateMm(program.emittedMaximumDepthMm)).toBe(
+        emittedMaximumDepthMm.toFixed(3),
+      );
+      expect(program.emittedMaximumDepthText).toBe(emittedMaximumDepthMm.toFixed(3));
+      expect(Math.max(...depths).toFixed(3)).toBe(emittedMaximumDepthMm.toFixed(3));
+      expect(program.lines).toContain(
+        `; depth requested-total-mm: ${totalDepthMm}; emitted-maximum-mm: ${emittedMaximumDepthMm.toFixed(3)}`,
+      );
     },
   );
+
+  it('retains exact emitted depth text when GRBL float storage is not format-idempotent', () => {
+    const program = expectSurfacingProgram(
+      buildSurfacingProgram({
+        ...PARAMS,
+        depthPerPassMm: 6553.606,
+        totalDepthMm: 6553.606,
+      }),
+    );
+
+    expect(program.emittedMaximumDepthText).toBe('6553.606');
+    expect(formatCncCoordinateMm(program.emittedMaximumDepthMm)).toBe('6553.605');
+    expect(program.lines).toContain(
+      '; depth requested-total-mm: 6553.606; emitted-maximum-mm: 6553.606',
+    );
+    expect(program.lines).toContain('G1 Z-6553.606 F600.000');
+  });
 
   it('serpentines: alternating X targets, monotonic Y steps', () => {
     const program = expectSurfacingProgram(buildSurfacingProgram(PARAMS));

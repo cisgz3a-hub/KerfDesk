@@ -1,6 +1,7 @@
 import { sanitizeGcodeCommentValue } from '../gcode-comments';
 import type { CncGroup, CncPath3dPass } from '../job';
-import { cncGroupMaximumDepthMm } from '../cnc/cnc-group-maximum-depth';
+import { requestedCncCoordinateText } from '../cnc/coordinate-representation';
+import { cncGroupMaximumDepth } from '../cnc/output-representation';
 import { fmt, fmtFeed } from './cnc-grbl-emit-head';
 
 const LABEL_BYTES = 48;
@@ -46,7 +47,7 @@ function appendVCarveComments(lines: string[], group: CncGroup): void {
       `; cnc v-carve-depth: ${group.vCarveFlatDepthEnabled ? 'flat-floor' : 'flowing-width'}`,
     );
   }
-  lines.push(`; cnc v-carve-actual-max-depth-mm: ${fmt(cncGroupMaximumDepthMm(group))}`);
+  lines.push(`; cnc v-carve-actual-max-depth-mm: ${cncGroupMaximumDepth(group).text}`);
 }
 
 function appendEntryComments(lines: string[], group: CncGroup): void {
@@ -94,11 +95,17 @@ function toolGeometryComment(group: CncGroup): string {
 
 function depthComment(group: CncGroup): string | null {
   const values: string[] = [];
+  let requested: string | null = null;
   if (group.requestedDepthMm !== undefined) {
-    values.push(`requested-mm: ${fmt(group.requestedDepthMm)}`);
+    requested = requestedCncCoordinateText(group.requestedDepthMm);
+    values.push(`requested-mm: ${requested}`);
   }
   if (group.depthPerPassMm !== undefined) {
-    values.push(`per-pass-mm: ${fmt(group.depthPerPassMm)}`);
+    values.push(`per-pass-mm: ${requestedCncCoordinateText(group.depthPerPassMm)}`);
+  }
+  const emittedMaximum = cncGroupMaximumDepth(group).text;
+  if (requested !== null && requested !== emittedMaximum) {
+    values.push(`emitted-max-mm: ${emittedMaximum}`);
   }
   return values.length === 0 ? null : `; cnc depth: ${values.join('; ')}`;
 }

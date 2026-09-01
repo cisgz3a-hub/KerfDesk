@@ -65,6 +65,7 @@ function mockPlatform(cancelPicker = false): {
 async function clickSave(
   platform: PlatformAdapter,
   noGoZones: ReadonlyArray<NoGoZone> = [],
+  totalDepthMm?: number,
 ): Promise<void> {
   const project = {
     ...createProject({ ...DEFAULT_DEVICE_PROFILE, maxFeed: 500, noGoZones }),
@@ -83,6 +84,17 @@ async function clickSave(
       </PlatformProvider>,
     );
   });
+  if (totalDepthMm !== undefined) {
+    const input = host.querySelector('input[aria-label="Surfacing total depth"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('Total depth input missing');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    if (setter === undefined) throw new Error('Native input value setter missing');
+    await act(async () => {
+      setter.call(input, String(totalDepthMm));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+  }
   const saveButton = [...host.querySelectorAll('button')].find((button) =>
     button.textContent?.includes('Save surfacing G-code'),
   );
@@ -179,6 +191,25 @@ describe('SurfacingPanel save path', () => {
     expect(data.indexOf('G0 Z3.810')).toBeLessThan(data.indexOf('M3 S12000'));
     expect(data).toContain('F500.000');
     expect(data).not.toContain('F2500.000');
+  });
+
+  it('discloses requested and represented shallow depth in the file and success toast', async () => {
+    const { platform, write } = mockPlatform();
+    await clickSave(platform, [], 0.0006);
+
+    const data = write.mock.calls[0]?.[0];
+    expect(typeof data).toBe('string');
+    if (typeof data !== 'string') throw new Error('expected text output');
+    expect(data).toContain('; depth requested-total-mm: 0.0006; emitted-maximum-mm: 0.001');
+    expect(data).toContain('G1 Z-0.001');
+    expect(useToastStore.getState().toasts).toContainEqual(
+      expect.objectContaining({
+        variant: 'success',
+        message: expect.stringContaining(
+          'Requested total depth 0.0006 mm; emitted maximum depth 0.001 mm',
+        ),
+      }),
+    );
   });
 
   // Rule 7 / ADR-228: `no-go-zone-collision` and `out-of-bed` are the two

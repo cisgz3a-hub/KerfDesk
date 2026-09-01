@@ -183,7 +183,7 @@ async function saveSurfacingProgram({
     if (target === null) return;
     await target.write(emitted.gcode);
     pushToast(
-      `Saved preflighted surfacing program: ${program.passes} pass(es) × ${program.rowsPerPass} rows with the ${tool.name}. Zero X/Y at the area's front-left corner and Z on the surface before running; the file lifts to safe Z before spindle start.`,
+      `Saved preflighted surfacing program: ${program.passes} pass(es) × ${program.rowsPerPass} rows with the ${tool.name}. Requested total depth ${program.requestedTotalDepthMm} mm; emitted maximum depth ${program.emittedMaximumDepthText} mm at 0.001 mm coordinate precision. Zero X/Y at the area's front-left corner and Z on the surface before running; the file lifts to safe Z before spindle start.`,
       'success',
     );
   } catch (err) {

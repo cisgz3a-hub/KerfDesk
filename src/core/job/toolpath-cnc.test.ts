@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { cncContourEmissionPoints } from '../cnc/cnc-contour-emission';
+import { parseGrblCncCoordinate } from '../cnc/cnc-grbl-coordinate-parser';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { scanGcodeWords } from '../gcode';
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
@@ -9,6 +10,7 @@ import type { CncGroup, CncPass, Job } from './job';
 import { buildToolpath } from './toolpath';
 
 const SAFE_Z_MM = 3.81;
+const REPRESENTED_SAFE_Z_MM = parseGrblCncCoordinate('3.810');
 
 function group(passes: ReadonlyArray<CncPass>, overrides: Partial<CncGroup> = {}): CncGroup {
   return {
@@ -52,7 +54,7 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     expect(kinds.slice(0, 3)).toEqual(['travel', 'plunge', 'cut']);
     const travel = toolpath.steps[0];
     if (travel?.kind !== 'travel') throw new Error('expected travel');
-    expect(travel.z).toEqual({ from: SAFE_Z_MM, to: SAFE_Z_MM });
+    expect(travel.z).toEqual({ from: REPRESENTED_SAFE_Z_MM, to: REPRESENTED_SAFE_Z_MM });
   });
 
   it('chains same-XY depth passes without a retract or travel (emitter parity)', () => {
@@ -79,7 +81,7 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     expect(kinds).toEqual(['travel', 'plunge', 'cut', 'plunge', 'travel', 'plunge', 'cut']);
     const retract = toolpath.steps[3];
     if (retract?.kind !== 'plunge') throw new Error('expected retract plunge');
-    expect(retract.toZ).toBe(SAFE_Z_MM);
+    expect(retract.toZ).toBe(REPRESENTED_SAFE_Z_MM);
   });
 
   it('previews the same four-decimal contour represented by the emitter', () => {
@@ -151,9 +153,9 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     ).toMatchObject([
       { kind: 'plunge', toZ: -1 },
       { kind: 'cut' },
-      { kind: 'plunge', fromZ: -1, toZ: 3.81 },
+      { kind: 'plunge', fromZ: -1, toZ: REPRESENTED_SAFE_Z_MM },
       { kind: 'travel' },
-      { kind: 'plunge', fromZ: 3.81, toZ: -2 },
+      { kind: 'plunge', fromZ: REPRESENTED_SAFE_Z_MM, toZ: -2 },
       { kind: 'cut' },
     ]);
   });
@@ -304,7 +306,7 @@ function simulatedMoves(job: Job): ParsedMoves {
   const plungeZ: string[] = [];
   for (const step of toolpath.steps) {
     if (step.kind === 'plunge') {
-      if (step.toZ !== SAFE_Z_MM) plungeZ.push(fmt(step.toZ));
+      if (step.toZ !== REPRESENTED_SAFE_Z_MM) plungeZ.push(fmt(step.toZ));
       continue;
     }
     if (step.kind !== 'cut') continue;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../core/job';
+import { parseGrblCncCoordinate } from '../../../core/cnc/cnc-grbl-coordinate-parser';
 import { captureLayerOperationSettings, createLayer } from '../../../core/scene';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
 
@@ -109,7 +110,113 @@ describe('buildEffectiveOperationReview', () => {
       'Actual max depth 3.798 mm · 90 degree V-bit · 1 pass · 600 mm/min feed · ' +
         '250 mm/min plunge · 12,000 RPM · coolant off',
     );
-    expect(review?.cncActualMaxDepthMm).toBe(3.798);
+    expect(review?.cncActualMaxDepthMm).toBe(parseGrblCncCoordinate('3.798'));
+  });
+
+  it('discloses an ordinary requested depth that differs from represented output', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'cnc',
+          layerId: 'shallow-engrave',
+          color: '#000000',
+          cutType: 'engrave',
+          toolName: 'Engraving bit',
+          toolDiameterMm: 3.175,
+          requestedDepthMm: 0.0506,
+          depthPerPassMm: 0.0506,
+          feedMmPerMin: 600,
+          plungeMmPerMin: 250,
+          spindleRpm: 12_000,
+          spindleSpinupSec: 2,
+          safeZMm: 5,
+          passes: [
+            {
+              kind: 'contour',
+              zMm: -0.0506,
+              polyline: [
+                { x: 0, y: 0 },
+                { x: 1, y: 0 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(buildEffectiveOperationReview(job)[0]?.summaries[0]).toContain(
+      'Emitted max depth 0.051 mm (0.0506 requested)',
+    );
+  });
+
+  it('does not format represented GRBL float storage into a different emitted depth', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'cnc',
+          layerId: 'deep-engrave',
+          color: '#000000',
+          cutType: 'engrave',
+          toolName: 'Engraving bit',
+          toolDiameterMm: 3.175,
+          requestedDepthMm: 6553.605,
+          feedMmPerMin: 600,
+          plungeMmPerMin: 250,
+          spindleRpm: 12_000,
+          spindleSpinupSec: 2,
+          safeZMm: 5,
+          passes: [
+            {
+              kind: 'contour',
+              zMm: -6553.606,
+              polyline: [
+                { x: 0, y: 0 },
+                { x: 1, y: 0 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(buildEffectiveOperationReview(job)[0]?.summaries[0]).toContain(
+      'Emitted max depth 6,553.606 mm (6553.605 requested)',
+    );
+  });
+
+  it('does not report a false requested/emitted mismatch from GRBL float storage', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'cnc',
+          layerId: 'exact-engrave',
+          color: '#000000',
+          cutType: 'engrave',
+          toolDiameterMm: 3.175,
+          requestedDepthMm: 0.1,
+          feedMmPerMin: 600,
+          plungeMmPerMin: 250,
+          spindleRpm: 12_000,
+          spindleSpinupSec: 2,
+          safeZMm: 5,
+          passes: [
+            {
+              kind: 'contour',
+              zMm: -0.1,
+              polyline: [
+                { x: 0, y: 0 },
+                { x: 1, y: 0 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(buildEffectiveOperationReview(job)[0]?.summaries[0]).not.toContain('Emitted max depth');
   });
 
   it('discloses exact relief depth without replacing the layer depth editor', () => {

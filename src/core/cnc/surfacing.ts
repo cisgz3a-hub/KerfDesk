@@ -5,6 +5,8 @@
 // operator zeroed X/Y at the area's front-left corner and Z on the surface
 // to be faced. Pure and deterministic (no clock, no randomness).
 
+import { cncDepthRepresentationMm, formatCncCoordinateMm } from './cnc-output-precision';
+
 export type SurfacingParams = {
   readonly widthMm: number;
   readonly heightMm: number;
@@ -24,6 +26,9 @@ export type SurfacingProgram = {
   readonly lines: ReadonlyArray<string>;
   readonly passes: number;
   readonly rowsPerPass: number;
+  readonly requestedTotalDepthMm: number;
+  readonly emittedMaximumDepthMm: number;
+  readonly emittedMaximumDepthText: string;
 };
 
 export type SurfacingRowsResult =
@@ -46,7 +51,7 @@ const MAX_SURFACING_ITERATIONS = 100_000;
 const POSITIVE_FINITE_REASON = 'must be a positive finite number.';
 
 function fmt(value: number): string {
-  const text = value.toFixed(3);
+  const text = formatCncCoordinateMm(value);
   return text === '-0.000' ? '0.000' : text;
 }
 
@@ -77,6 +82,7 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   const depthResult = depthLadder(params.depthPerPassMm, params.totalDepthMm);
   if (!depthResult.ok) return depthResult;
   const { depths } = depthResult;
+  const emittedMaximumDepth = cncDepthRepresentationMm(Math.max(...depths));
   const lines: string[] = [
     '; KerfDesk spoilboard surfacing',
     `; area ${fmt(params.widthMm)} x ${fmt(params.heightMm)} mm, bit ${fmt(params.bitDiameterMm)} mm, stepover ${params.stepoverPct}%`,
@@ -91,6 +97,7 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
     // console or a $N startup block last set, and surfacing shares its preamble
     // contract with the job emitter.
     'G17',
+    `; depth requested-total-mm: ${params.totalDepthMm}; emitted-maximum-mm: ${emittedMaximumDepth.text}`,
     `G0 Z${fmt(params.safeZMm)}`,
     `M3 S${Math.round(params.spindleRpm)}`,
   ];
@@ -107,7 +114,17 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   }
   lines.push('M5');
   lines.push('G0 X0.000 Y0.000');
-  return { ok: true, program: { lines, passes: depths.length, rowsPerPass: rows.length } };
+  return {
+    ok: true,
+    program: {
+      lines,
+      passes: depths.length,
+      rowsPerPass: rows.length,
+      requestedTotalDepthMm: params.totalDepthMm,
+      emittedMaximumDepthMm: emittedMaximumDepth.value,
+      emittedMaximumDepthText: emittedMaximumDepth.text,
+    },
+  };
 }
 
 type DepthLadderResult =
