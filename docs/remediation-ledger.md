@@ -1,7 +1,6 @@
 # Audit remediation ledger
 
-Current authoritative 2026-09-01 remediation: isolated worktree
-`C:\Users\Asus\.codex\worktrees\ade9\LaserForge-2.0`, branch
+Current authoritative 2026-09-01 remediation: isolated worktree label `ade9`, branch
 `codex/fix-reaudit-findings-20260901`, reconstructed from exact `origin/main`
 `da67029a82ca82c64c46e1cf86ad3945c95eefad` (tree
 `695c486c878187753d18922cd7186cb8ce41c270`). The original dirty checkout was
@@ -744,9 +743,10 @@ requested/effective differences remain disclosures rather than output blocks.
 - Focused Image Studio and CNC evidence is recorded above. The exact combined Save/recovery matrix
   passed 13 files and 123 tests after the nondelaying replay-failure repair and save-tracking test
   extraction.
-- The frozen product-source tree passed `pnpm release:check` with exit 0: TypeScript, full source and
+- The exact review-remediated product-source tree passed `pnpm release:check` with exit 0:
+  TypeScript, full source and
   Electron lint, repository-wide Prettier, ADR numbering, seven action-pin checks, production-license
-  policy (52 packages/eight licenses), 1,825 passed Vitest files plus 14 skipped, 11,548 passed tests
+  policy (52 packages/eight licenses), 1,825 passed Vitest files plus 14 skipped, 11,550 passed tests
   plus 22 skipped, 41/41 release-integrity checks, the 2,399-module web build, Electron-main build,
   raw and report-only soft file-size scans, and the legacy public-export no-growth ratchet. The only
   post-gate edit is this evidence text; Prettier, ADR numbering, and `git diff --check` are rerun below

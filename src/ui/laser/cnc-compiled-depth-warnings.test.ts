@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../core/job';
-import { parseGrblCncCoordinate } from '../../core/cnc/cnc-grbl-coordinate-parser';
+import { parseGrblCncCoordinate } from '../../core/cnc/coordinate-representation';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import {
   compiledReliefLayerDepths,
@@ -89,6 +89,18 @@ describe('compiled V-carve depth warnings', () => {
     ]);
     expect(detectCompiledVCarveDepthWarnings(depths, 6553.605)).toEqual([
       expect.stringContaining('actual compiled V-carve depth of 6553.606 mm'),
+    ]);
+  });
+
+  it('does not turn two coordinate words with one GRBL value into an overrun', () => {
+    const stockThicknessMm = 9999.01;
+    const controllerDepthMm = parseGrblCncCoordinate('9999.011');
+    expect(controllerDepthMm).toBe(parseGrblCncCoordinate('9999.010'));
+    const depths = [{ layerId: 'script', depthMm: controllerDepthMm, depthText: '9999.011' }];
+
+    expect(detectCompiledVCarveDepthWarnings(depths, stockThicknessMm)).toEqual([]);
+    expect(detectCompiledReliefDepthWarnings(depths, stockThicknessMm)).toEqual([
+      expect.stringContaining('reaches the configured stock bottom'),
     ]);
   });
 });

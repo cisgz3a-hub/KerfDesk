@@ -4,6 +4,7 @@ export {
   CNC_MASK_EMISSION_XY_CLEARANCE_MM,
   cncCoordinateRepresentationMm,
   formatCncCoordinateMm,
+  parseGrblCncCoordinate,
   representedCncCoordinateMm,
   requestedCncCoordinateText,
   type CncCoordinateRepresentation,

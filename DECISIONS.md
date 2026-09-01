@@ -19123,8 +19123,9 @@ Job Review and comments. Frame remains the sole ordinary Start guard.
 ### Consequences
 
 - Concurrent or late Saves cannot leave older bytes after a successful same-destination reconciliation
-  or publish state into a replacement document; every selected destination receives its captured
-  payload, and unrelated destinations remain independent.
+  or publish state into a replacement document; every selected destination is attempted with its
+  captured payload, successful reconciliation leaves the newest bytes, and unrelated destinations
+  remain independent.
 - Current Text failures are recoverable in place; stale Text work and invalid transient numeric drafts
   cannot mutate another Image Studio session.
 - CNC Preview, removal, duration, provenance, and warnings describe controller-parsed ordinary Z text

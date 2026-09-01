@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../core/job';
-import { parseGrblCncCoordinate } from '../../../core/cnc/cnc-grbl-coordinate-parser';
+import { parseGrblCncCoordinate } from '../../../core/cnc/coordinate-representation';
 import { captureLayerOperationSettings, createLayer } from '../../../core/scene';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
 

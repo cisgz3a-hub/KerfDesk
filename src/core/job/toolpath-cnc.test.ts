@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { cncContourEmissionPoints } from '../cnc/cnc-contour-emission';
-import { parseGrblCncCoordinate } from '../cnc/cnc-grbl-coordinate-parser';
+import { parseGrblCncCoordinate } from '../cnc/coordinate-representation';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { scanGcodeWords } from '../gcode';
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';

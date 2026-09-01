@@ -8,6 +8,8 @@
 
 import { parseGrblCncCoordinate } from './cnc-grbl-coordinate-parser';
 
+export { parseGrblCncCoordinate } from './cnc-grbl-coordinate-parser';
+
 export const CNC_COORDINATE_DECIMAL_PLACES = 3;
 export const CNC_COORDINATE_QUANTUM_MM = 10 ** -CNC_COORDINATE_DECIMAL_PLACES;
 

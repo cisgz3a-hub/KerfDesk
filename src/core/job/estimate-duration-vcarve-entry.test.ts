@@ -114,6 +114,26 @@ describe('V-carve ramp duration', () => {
     );
   });
 
+  it('prices a GRBL float-boundary segment at the exact emitted feed', () => {
+    const points = [
+      { x: 0, y: 0, z: 0 },
+      { x: 6553.606, y: 0, z: -3000.001 },
+    ];
+    const group = {
+      ...rampGroup('z-rate-capped', points, 5000),
+      plungeMmPerMin: 1103,
+    };
+    const representedPoints = points.map(representedPoint);
+    const estimate = estimateJobDuration({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
+    const emitted = cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
+
+    expect(emitted).toContain('X6553.606Y0.000Z-3000.001F2650');
+    expect(estimate.breakdown.cutSeconds).toBeCloseTo(
+      expectedCutSeconds(representedPoints, [2650], SAFE_Z_MM, 1103),
+      9,
+    );
+  });
+
   it('retains the emitter feed across opposite signed-zero XY words on a rise', () => {
     const points = [
       { x: -0.0004, y: 0, z: -0.0506 },
@@ -186,6 +206,7 @@ function expectedCutSeconds(
   points: ReadonlyArray<PathPoint>,
   feeds: ReadonlyArray<number>,
   safeZMm = SAFE_Z_MM,
+  plungeFeedMmPerMin = PLUNGE_FEED_MM_PER_MIN,
 ): number {
   const blocks = profileBlocks(points, feeds);
   const plan = planVelocities(
@@ -201,7 +222,7 @@ function expectedCutSeconds(
           blockTime(block, velocity.entryV, velocity.exitV, DEFAULT_DEVICE_PROFILE.accelMmPerSec2);
   }, 0);
   const entryTravelMm = safeZMm + Math.abs(points[0]?.z ?? 0);
-  const plungeSeconds = (entryTravelMm / PLUNGE_FEED_MM_PER_MIN) * SECONDS_PER_MINUTE;
+  const plungeSeconds = (entryTravelMm / plungeFeedMmPerMin) * SECONDS_PER_MINUTE;
   const retractSeconds = (entryTravelMm / DEFAULT_DEVICE_PROFILE.maxFeed) * SECONDS_PER_MINUTE;
   return motionSeconds + plungeSeconds + retractSeconds;
 }

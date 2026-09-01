@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseGrblCncCoordinate } from '../cnc/cnc-contour-emission';
+import { parseGrblCncCoordinate } from '../cnc/coordinate-representation';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { cncGrblStrategy } from '../output';
 import type { CncGroup, CncPass, Job } from './job';

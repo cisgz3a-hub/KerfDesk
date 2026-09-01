@@ -1,5 +1,8 @@
 import type { CncGroup, Job } from '../../core/job';
-import { formatCncCoordinateMm } from '../../core/cnc/coordinate-representation';
+import {
+  formatCncCoordinateMm,
+  parseGrblCncCoordinate,
+} from '../../core/cnc/coordinate-representation';
 import { cncGroupMaximumDepth } from '../../core/cnc/output-representation';
 import type { Project } from '../../core/scene';
 
@@ -110,8 +113,8 @@ function detectDepthWarnings(
   return depths.flatMap(({ layerId, depthMm, depthText }) => {
     const emittedDepthText = depthText ?? formatCncCoordinateMm(depthMm);
     const representedStockText = formatCncCoordinateMm(stockThicknessMm);
-    const emittedDepthMm = Number(emittedDepthText);
-    const representedStockMm = Number(representedStockText);
+    const emittedDepthMm = parseGrblCncCoordinate(emittedDepthText);
+    const representedStockMm = parseGrblCncCoordinate(representedStockText);
     if (
       !(emittedDepthMm > representedStockMm) &&
       !(copy.warnAtStockBottom && emittedDepthMm === representedStockMm)
