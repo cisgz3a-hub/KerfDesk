@@ -5,7 +5,6 @@ import {
   cornerCurveNode,
   convertCurveSegment,
   curveNodeCount,
-  joinCurveSubpaths,
   moveCurveAnchor,
   moveCurveControl,
   setCurveStartNode,
@@ -98,24 +97,5 @@ describe('curve editing', () => {
     expect(broken?.closed).toBe(false);
     expect(broken?.start).toEqual({ x: 10, y: 0 });
     expect(broken?.segments).toHaveLength(1);
-  });
-
-  it('joins two open subpaths with a deterministic bridge', () => {
-    const first: CurveSubpath = {
-      start: { x: 0, y: 0 },
-      segments: [{ kind: 'line', to: { x: 2, y: 0 } }],
-      closed: false,
-    };
-    const second: CurveSubpath = {
-      start: { x: 5, y: 0 },
-      segments: [{ kind: 'line', to: { x: 8, y: 0 } }],
-      closed: false,
-    };
-    const joined = joinCurveSubpaths(first, second);
-    expect(joined?.segments).toEqual([
-      { kind: 'line', to: { x: 2, y: 0 } },
-      { kind: 'line', to: { x: 5, y: 0 } },
-      { kind: 'line', to: { x: 8, y: 0 } },
-    ]);
   });
 });

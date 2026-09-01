@@ -218,6 +218,42 @@ Identical to the format-specific import flows except:
 
 ---
 
+### F-A5a. Join curve endpoints
+
+#### Success — join two open subpaths
+1. Arm **Edit nodes**, then select one endpoint on each of two open subpaths in the same colored
+   path. **Join** remains available whenever exactly two curve anchors are selected.
+2. The app honors the selected start/end endpoint on each subpath, reverses exact cubic or arc
+   geometry when needed, and places the joined result at the earlier source-subpath position.
+   Selection click order never changes stored path order or source-order machine output.
+3. A visible gap between the selected endpoints becomes one continuous line segment in the joined
+   path. Coincident endpoints do not gain a zero-length segment.
+4. Join commits one project undo step, clears the node selection, announces success, and returns
+   keyboard focus to **Edit nodes**.
+
+#### Success — close one open subpath
+1. Select the start and end endpoints of the same open subpath and click **Join**.
+2. The path closes in its existing direction and source position. A closing line is added only when
+   the stored endpoints are not already coincident. Editable polyline-shape parameters remain
+   synchronized with their canonical and compatibility geometry.
+
+#### Error — the two anchors cannot form an endpoint Join
+1. Interior anchors, closed paths, different colored paths, stale cross-object selections, and
+   unavailable geometry leave project data, history, dirty state, and selection unchanged.
+2. A nonblocking warning names the exact reason and, for a closed path, directs the operator to
+   **Break** it first. Join is not narrowed into a disabled-state guard for these reachable cases.
+
+#### Empty — fewer or more than two anchors
+1. **Join** is disabled until exactly two curve anchors are selected. No mutation or history entry
+   occurs.
+
+#### Edge — interior branch topology
+1. Join is endpoint-only because one canonical curve subpath represents one continuous traversal.
+   Interior anchors do not create a disconnected third cutting run or silently reinterpret stored
+   endpoints.
+
+---
+
 ### F-A6. Transform — move, scale, rotate, mirror
 
 #### Move — drag

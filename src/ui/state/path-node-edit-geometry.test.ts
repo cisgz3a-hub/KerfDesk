@@ -9,7 +9,7 @@ import {
   type ImportedSvg,
 } from '../../core/scene';
 import { deserializeProject, serializeProject } from '../../io/project';
-import { deletePathsNodes, editPathsNodesByDelta } from './path-node-edit-geometry';
+import { boundsForPaths, deletePathsNodes, editPathsNodesByDelta } from './path-node-edit-geometry';
 
 const SOURCE_PATH: ColoredPath = {
   color: '#123456',
@@ -47,6 +47,56 @@ describe('compatibility-polyline node editing', () => {
     expect(path?.operationIds).toEqual(['cut-operation']);
     expect(path?.strokeWidthMm).toBe(0.8);
     expect(path?.curves).toBeUndefined();
+  });
+
+  it('uses canonical curve extrema for bounds and compatibility points when curves are absent', () => {
+    expect(
+      boundsForPaths([
+        {
+          color: '#123456',
+          polylines: [
+            {
+              points: [
+                { x: 0, y: 0 },
+                { x: 6, y: 0 },
+              ],
+              closed: false,
+            },
+          ],
+          curves: [
+            {
+              start: { x: 0, y: 0 },
+              segments: [
+                {
+                  kind: 'cubic',
+                  control1: { x: 2, y: 1 },
+                  control2: { x: 4, y: 0 },
+                  to: { x: 6, y: 0 },
+                },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ]).maxY,
+    ).toBeCloseTo(4 / 9, 12);
+
+    expect(
+      boundsForPaths([
+        {
+          color: '#123456',
+          polylines: [
+            {
+              points: [
+                { x: -3, y: 2 },
+                { x: 8, y: 11 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ]),
+    ).toEqual({ minX: -3, minY: 2, maxX: 8, maxY: 11 });
   });
 
   it('retains the edited path binding through save and reopen', () => {
