@@ -8,6 +8,7 @@ import {
   type TextObject,
 } from '../core/scene';
 import type { FileHandle, PlatformAdapter, SaveTarget } from '../platform/types';
+import { createProjectSaveWriteCoordinator } from '../ui/state/project-save-write-coordinator';
 
 const LAYER_COLOR = '#000000';
 const MISSING_COLUMN = 'missing-column';
@@ -81,6 +82,24 @@ export function projectOpenRequestEpochCallbacks(): {
       return epoch;
     },
     getProjectOpenRequestEpoch: () => epoch,
+  };
+}
+
+export function projectSaveRequestEpochCallbacks(): {
+  readonly claimProjectSaveRequest: () => number;
+  readonly getProjectSaveRequestEpoch: () => number;
+  readonly projectSaveWriteCoordinator: ReturnType<typeof createProjectSaveWriteCoordinator>;
+  readonly markProjectSaveUncertain: () => Promise<boolean>;
+} {
+  let epoch = 0;
+  return {
+    claimProjectSaveRequest: () => {
+      epoch += 1;
+      return epoch;
+    },
+    getProjectSaveRequestEpoch: () => epoch,
+    projectSaveWriteCoordinator: createProjectSaveWriteCoordinator(),
+    markProjectSaveUncertain: async () => true,
   };
 }
 

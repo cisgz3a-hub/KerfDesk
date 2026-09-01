@@ -9,7 +9,7 @@ import { createProject, DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import type { ImportOutcome } from '../state/store';
-import { projectWithLine } from '../../__fixtures__/file-actions';
+import { projectSaveRequestEpochCallbacks, projectWithLine } from '../../__fixtures__/file-actions';
 import { projectWithObject, shapeObject } from './shortcuts-test-helpers';
 import { useUiStore } from '../state/ui-store';
 
@@ -29,6 +29,8 @@ function fileCtx(
   return {
     platform: mockPlatform,
     project: createProject(),
+    projectDocumentEpoch: 0,
+    ...projectSaveRequestEpochCallbacks(),
     importSvgObject: vi.fn((): ImportOutcome => ({ kind: 'added' })),
     importRasterImage: vi.fn(),
     setProject: vi.fn(() => ({ kind: 'loaded' as const })),

@@ -26,6 +26,7 @@ import {
 import type { Toolpath } from '../../core/job';
 import type { SaveTarget } from '../../platform/types';
 import type { JobPlacementSettings } from '../job-placement';
+import type { ProjectSaveWriteCoordinator } from './project-save-write-coordinator';
 import { imageImportActions } from './import-actions';
 import { machineActions, type MachineActions } from './machine-actions';
 import { projectActions, type ProjectActions } from './project-actions';
@@ -192,6 +193,16 @@ export type AppState = ObjectPropertiesActions &
     // Session-only owner for overlapping Open requests. Claimed synchronously
     // before the picker opens; only the latest request may publish completion.
     readonly projectOpenRequestEpoch: number;
+    // Session-only owner for overlapping Save/Save As requests. The file write
+    // cannot always be cancelled, but only the latest request may publish
+    // completion, target identity, recovery cleanup, or feedback.
+    readonly projectSaveRequestEpoch: number;
+    // Last Save-request epoch that actually published a successful file
+    // handoff for this document. Pending/cancelled claims never advance it.
+    readonly projectSavedRequestEpoch: number | null;
+    // Session-local physical-destination coordinator. Selected writes start
+    // immediately; only proven same-file repair replays are coordinated.
+    readonly projectSaveWriteCoordinator: ProjectSaveWriteCoordinator;
     // Last CNC machine setup, kept when toggling back to laser so the
     // choice of bit/stock survives a round-trip within the session.
     readonly cachedCncMachine: CncMachineConfig | null;
@@ -361,7 +372,17 @@ export type AppState = ObjectPropertiesActions &
     readonly cancelInteraction: () => void;
     readonly applyObjectTransform: (id: string, transform: Transform) => void;
 
-    readonly markSaved: (target: SaveTarget, expectedProject?: Project) => boolean;
+    readonly markSaved: (
+      target: SaveTarget,
+      expectedProject: Project,
+      expectedProjectDocumentEpoch: number,
+      expectedProjectSaveRequestEpoch: number,
+    ) => boolean;
+    readonly markProjectSaveUncertain: (
+      expectedProjectDocumentEpoch: number,
+      expectedProjectSavedRequestEpoch: number,
+      target: SaveTarget,
+    ) => Promise<boolean>;
     readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
   };
 
@@ -372,6 +393,9 @@ function initialState(
   | 'project'
   | 'projectDocumentEpoch'
   | 'projectOpenRequestEpoch'
+  | 'projectSaveRequestEpoch'
+  | 'projectSavedRequestEpoch'
+  | 'projectSaveWriteCoordinator'
   | 'probeSetupEpoch'
   | 'cachedCncMachine'
   | 'projectBedReconciliation'
@@ -458,5 +482,5 @@ export const useStore = create<AppState>((set, get) => ({
   ...historyActions(set),
   ...viewActions(set),
   ...interactionActions(set),
-  ...saveTrackingActions(set),
+  ...saveTrackingActions(set, get),
 }));

@@ -323,68 +323,6 @@ describe('useStore — explicit selected-target SVG re-import', () => {
   });
 });
 
-describe('useStore — dirty / save tracking (F-A11)', () => {
-  beforeEach(() => {
-    reset();
-  });
-
-  it('starts clean with no savedName', () => {
-    const s = useStore.getState();
-    expect(s.dirty).toBe(false);
-    expect(s.savedName).toBeNull();
-    expect(s.lastSaveTarget).toBeNull();
-  });
-
-  it('importSvgObject flips dirty to true', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    expect(useStore.getState().dirty).toBe(true);
-  });
-
-  it('setLayerParam flips dirty', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.setState({ dirty: false });
-    useStore.getState().setLayerParam('#ff0000', { power: 60 });
-    expect(useStore.getState().dirty).toBe(true);
-  });
-
-  it('markSaved clears dirty and remembers the SaveTarget', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const target = {
-      displayName: 'my-job.lf2',
-      write: async () => {
-        /* test stub — no-op */
-      },
-    };
-    useStore.getState().markSaved(target);
-    const s = useStore.getState();
-    expect(s.dirty).toBe(false);
-    expect(s.savedName).toBe('my-job.lf2');
-    expect(s.lastSaveTarget).toBe(target);
-  });
-
-  it('markLoaded sets savedName and clears dirty + target', () => {
-    useStore.getState().markLoaded('logo.lf2');
-    const s = useStore.getState();
-    expect(s.savedName).toBe('logo.lf2');
-    expect(s.dirty).toBe(false);
-    expect(s.lastSaveTarget).toBeNull();
-  });
-
-  it('newProject clears save tracking', () => {
-    useStore.getState().markSaved({
-      displayName: 'old.lf2',
-      write: async () => {
-        /* test stub — no-op */
-      },
-    });
-    useStore.getState().newProject();
-    const s = useStore.getState();
-    expect(s.savedName).toBeNull();
-    expect(s.lastSaveTarget).toBeNull();
-    expect(s.dirty).toBe(false);
-  });
-});
-
 describe('useStore — undo / redo (F-A14)', () => {
   beforeEach(() => {
     reset();

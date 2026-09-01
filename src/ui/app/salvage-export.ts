@@ -14,7 +14,7 @@
 
 import type { Project } from '../../core/scene';
 import { serializeProject } from '../../io/project';
-import type { PlatformAdapter } from '../../platform/types';
+import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { ToastVariant } from '../state/toast-store';
 
 const RECOVERY_SUFFIX = '-recovery.lf2';
@@ -25,37 +25,64 @@ export type SalvageExportCtx = {
   readonly project: Project;
   readonly savedName: string | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly isCurrent?: () => boolean;
+  readonly writeTarget?: (target: SaveTarget, contents: string | Blob) => Promise<void>;
 };
 
-export type SalvageExportOutcome = 'exported' | 'cancelled' | 'error';
+export type SalvageExportOutcome = 'exported' | 'cancelled' | 'stale' | 'error';
+
+type PreparedRecovery =
+  | { readonly kind: 'ready'; readonly raw: string }
+  | { readonly kind: 'finished'; readonly outcome: SalvageExportOutcome };
+
+type PickedRecoveryTarget =
+  | { readonly kind: 'selected'; readonly target: SaveTarget }
+  | { readonly kind: 'finished'; readonly outcome: SalvageExportOutcome };
 
 export async function handleSalvageExportProject(
   ctx: SalvageExportCtx,
 ): Promise<SalvageExportOutcome> {
-  let raw: string;
+  const prepared = prepareRecovery(ctx);
+  if (prepared.kind === 'finished') return prepared.outcome;
+  const picked = await pickRecoveryTarget(ctx);
+  if (picked.kind === 'finished') return picked.outcome;
+  return writeRecoveryTarget(ctx, picked.target, prepared.raw);
+}
+
+function prepareRecovery(ctx: SalvageExportCtx): PreparedRecovery {
   try {
-    raw = serializeProject(ctx.project);
+    return { kind: 'ready', raw: serializeProject(ctx.project) };
   } catch (err) {
     // The project cannot even be serialized — nothing can be recovered to a
     // file. Say so honestly rather than writing empty or partial bytes.
-    ctx.pushToast(`Could not export a recovery copy: ${errMsg(err)}`, 'error');
-    return 'error';
+    return { kind: 'finished', outcome: recoveryError(ctx, err) };
   }
+}
 
-  let target;
+async function pickRecoveryTarget(ctx: SalvageExportCtx): Promise<PickedRecoveryTarget> {
   try {
-    target = await ctx.platform.pickFileForSave({
+    const target = await ctx.platform.pickFileForSave({
       suggestedName: recoveryName(ctx.savedName),
       extensions: ['.lf2'],
     });
+    if (target !== null) return { kind: 'selected', target };
+    return {
+      kind: 'finished',
+      outcome: ctx.isCurrent?.() === false ? 'stale' : 'cancelled',
+    };
   } catch (err) {
-    ctx.pushToast(`Could not export a recovery copy: ${errMsg(err)}`, 'error');
-    return 'error';
+    return { kind: 'finished', outcome: recoveryError(ctx, err) };
   }
-  if (target === null) return 'cancelled';
+}
 
+async function writeRecoveryTarget(
+  ctx: SalvageExportCtx,
+  target: SaveTarget,
+  raw: string,
+): Promise<SalvageExportOutcome> {
   try {
-    await target.write(raw);
+    await (ctx.writeTarget === undefined ? target.write(raw) : ctx.writeTarget(target, raw));
+    if (ctx.isCurrent?.() === false) return 'stale';
     ctx.pushToast(
       `Exported a raw recovery copy to ${target.displayName}. It preserves your work but may ` +
         'need repair before it reopens cleanly.',
@@ -63,9 +90,14 @@ export async function handleSalvageExportProject(
     );
     return 'exported';
   } catch (err) {
-    ctx.pushToast(`Could not export a recovery copy: ${errMsg(err)}`, 'error');
-    return 'error';
+    return recoveryError(ctx, err);
   }
+}
+
+function recoveryError(ctx: SalvageExportCtx, err: unknown): SalvageExportOutcome {
+  if (ctx.isCurrent?.() === false) return 'stale';
+  ctx.pushToast(`Could not export a recovery copy: ${errMsg(err)}`, 'error');
+  return 'error';
 }
 
 function recoveryName(savedName: string | null): string {

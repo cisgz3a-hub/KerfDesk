@@ -20,6 +20,10 @@ export type FileHandle = {
 
 export type SaveTarget = {
   readonly displayName: string;
+  /** Adapter-owned identity used only to recognize one physical destination. */
+  readonly destinationIdentity?: unknown;
+  /** Compare adapter identities without opening, creating, or writing a file. */
+  readonly isSameDestination?: (other: SaveTarget) => Promise<boolean>;
   readonly write: (data: string | Blob) => Promise<void>;
 };
 

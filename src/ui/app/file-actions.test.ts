@@ -3,13 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   mockPlatform,
   projectOpenRequestEpochCallbacks,
+  projectSaveRequestEpochCallbacks,
   projectWithLine,
   projectWithTwoLines,
   reject,
   selectedScope,
   toasts,
 } from '../../__fixtures__/file-actions';
-import { createProject } from '../../core/scene';
+import { createProject, type Project } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import {
   handleImportSvg,
@@ -18,6 +19,15 @@ import {
   handleSaveProject,
 } from './file-actions';
 import { AUTOSAVE_FILE_CLEANUP_WARNING } from './autosave-file-cleanup';
+
+function saveOwner(project: Project) {
+  return {
+    expectedProject: project,
+    projectDocumentEpoch: 0,
+    getProjectDocumentEpoch: () => 0,
+    ...projectSaveRequestEpochCallbacks(),
+  };
+}
 
 describe('file actions contextual failure handling', () => {
   it('keeps a no-dump controller readiness advisory non-blocking', async () => {
@@ -94,11 +104,13 @@ describe('file actions contextual failure handling', () => {
 
   it('handles project save picker failures with save-specific toast copy', async () => {
     const toast = toasts();
+    const project = createProject();
 
     await expect(
       handleSaveProject({
         platform: mockPlatform({ save: () => reject('save picker failed') }),
-        project: createProject(),
+        project,
+        ...saveOwner(project),
         savedName: null,
         lastSaveTarget: null,
         markSaved: vi.fn(),
@@ -272,10 +284,12 @@ describe('file actions contextual failure handling', () => {
       ...projectOpenRequestEpochCallbacks(),
       getProjectDocumentEpoch: () => 0,
     });
+    const project = projectWithLine();
     await expect(
       handleSaveProject({
         platform,
-        project: projectWithLine(),
+        project,
+        ...saveOwner(project),
         savedName: null,
         lastSaveTarget: null,
         markSaved: vi.fn(),
@@ -296,13 +310,15 @@ describe('file actions contextual failure handling', () => {
   // cancelled picker must abort the destructive action, not discard.
   it('reports saved after a successful write', async () => {
     const write = vi.fn(async () => undefined);
-    const markSaved = vi.fn();
+    const markSaved = vi.fn(() => true);
     const toast = toasts();
+    const project = projectWithLine();
 
     await expect(
       handleSaveProject({
         platform: mockPlatform({ save: async () => ({ displayName: 'badge.lf2', write }) }),
-        project: projectWithLine(),
+        project,
+        ...saveOwner(project),
         savedName: null,
         lastSaveTarget: null,
         markSaved,
@@ -316,8 +332,9 @@ describe('file actions contextual failure handling', () => {
 
   it('keeps a completed save successful when recovery cleanup storage is blocked', async () => {
     const write = vi.fn(async () => undefined);
-    const markSaved = vi.fn();
+    const markSaved = vi.fn(() => true);
     const toast = toasts();
+    const project = projectWithLine();
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
@@ -329,7 +346,8 @@ describe('file actions contextual failure handling', () => {
       await expect(
         handleSaveProject({
           platform: mockPlatform({ save: async () => ({ displayName: 'safe.lf2', write }) }),
-          project: projectWithLine(),
+          project,
+          ...saveOwner(project),
           savedName: null,
           lastSaveTarget: null,
           markSaved,
@@ -353,13 +371,15 @@ describe('file actions contextual failure handling', () => {
 
   it('reports error when the write itself fails', async () => {
     const toast = toasts();
+    const project = projectWithLine();
 
     await expect(
       handleSaveProject({
         platform: mockPlatform({
           save: async () => ({ displayName: 'badge.lf2', write: () => reject('disk full') }),
         }),
-        project: projectWithLine(),
+        project,
+        ...saveOwner(project),
         savedName: null,
         lastSaveTarget: null,
         markSaved: vi.fn(),

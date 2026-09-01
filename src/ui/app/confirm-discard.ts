@@ -23,7 +23,7 @@ export async function confirmDiscardAsync(
   if (choice === 'cancel') return false;
   if (choice === 'discard') return true;
   const outcome = await saveNow(platform);
-  return outcome === 'saved' || outcome === 'saved-with-newer-edits';
+  return outcome === 'saved';
 }
 
 function requestChoice(projectName: string, action: string): Promise<ConfirmSaveChoice> {
@@ -41,9 +41,15 @@ async function saveNow(platform: PlatformAdapter): Promise<SaveProjectOutcome> {
     platform,
     project: projectWithCurrentJobSetup(state),
     expectedProject: state.project,
+    projectDocumentEpoch: state.projectDocumentEpoch,
+    getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+    claimProjectSaveRequest: state.claimProjectSaveRequest,
+    getProjectSaveRequestEpoch: () => useStore.getState().projectSaveRequestEpoch,
+    projectSaveWriteCoordinator: state.projectSaveWriteCoordinator,
     savedName: state.savedName,
     lastSaveTarget: state.lastSaveTarget,
     markSaved: state.markSaved,
+    markProjectSaveUncertain: state.markProjectSaveUncertain,
     pushToast: useToastStore.getState().pushToast,
   });
 }

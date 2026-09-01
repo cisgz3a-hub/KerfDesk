@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { projectWithLine } from '../../__fixtures__/file-actions';
+import { projectSaveRequestEpochCallbacks, projectWithLine } from '../../__fixtures__/file-actions';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
@@ -13,6 +13,8 @@ function contextForFileShortcut(platform: PlatformAdapter): FileCtx {
   return {
     platform,
     project: projectWithLine(),
+    projectDocumentEpoch: 0,
+    ...projectSaveRequestEpochCallbacks(),
     importSvgObject: vi.fn((): ImportOutcome => ({ kind: 'added' })),
     importRasterImage: vi.fn(),
     setProject: vi.fn(() => ({ kind: 'loaded' as const })),

@@ -19,7 +19,7 @@ import type {
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { JobPlacementSettings, MachinePlacementSnapshot } from '../job-placement';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
-import type { ImportOutcome } from '../state/store';
+import type { AppState, ImportOutcome } from '../state/store';
 import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { ToastVariant } from '../state/toast-store';
 import { handleOpenProject, handleSaveProject } from './file-actions';
@@ -40,6 +40,10 @@ export type FileCtx = {
   readonly importRasterImage: (obj: SceneObject, batchIdx?: number) => void;
   readonly setProject: (p: Project) => ProjectMachineCapabilityLoadResult;
   readonly newProject: () => void;
+  readonly projectDocumentEpoch: number;
+  readonly claimProjectSaveRequest: AppState['claimProjectSaveRequest'];
+  readonly getProjectSaveRequestEpoch: () => number;
+  readonly projectSaveWriteCoordinator: AppState['projectSaveWriteCoordinator'];
   readonly savedName: string | null;
   readonly jobPlacement: JobPlacementSettings;
   readonly outputScope: OutputScope;
@@ -48,7 +52,8 @@ export type FileCtx = {
   readonly settingsCapability: ReadinessSettingsCapability;
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   readonly lastSaveTarget: SaveTarget | null;
-  readonly markSaved: (target: SaveTarget, expectedProject?: Project) => boolean | undefined;
+  readonly markSaved: AppState['markSaved'];
+  readonly markProjectSaveUncertain: AppState['markProjectSaveUncertain'];
   readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
@@ -135,9 +140,15 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
       platform: c.platform,
       project: projectForPersistence(c),
       expectedProject: c.project,
+      projectDocumentEpoch: c.projectDocumentEpoch,
+      getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+      claimProjectSaveRequest: c.claimProjectSaveRequest,
+      getProjectSaveRequestEpoch: c.getProjectSaveRequestEpoch,
+      projectSaveWriteCoordinator: c.projectSaveWriteCoordinator,
       savedName: c.savedName,
       lastSaveTarget: c.lastSaveTarget,
       markSaved: c.markSaved,
+      markProjectSaveUncertain: c.markProjectSaveUncertain,
       pushToast: c.pushToast,
     }),
   i: (c) =>
@@ -159,9 +170,15 @@ export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
         platform: ctx.platform,
         project: projectForPersistence(ctx),
         expectedProject: ctx.project,
+        projectDocumentEpoch: ctx.projectDocumentEpoch,
+        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+        claimProjectSaveRequest: ctx.claimProjectSaveRequest,
+        getProjectSaveRequestEpoch: ctx.getProjectSaveRequestEpoch,
+        projectSaveWriteCoordinator: ctx.projectSaveWriteCoordinator,
         savedName: ctx.savedName,
         lastSaveTarget: ctx.lastSaveTarget,
         markSaved: ctx.markSaved,
+        markProjectSaveUncertain: ctx.markProjectSaveUncertain,
         pushToast: ctx.pushToast,
       },
       true,
