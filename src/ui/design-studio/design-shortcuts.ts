@@ -8,6 +8,7 @@
 // whatever is in progress and only closes the Studio when there is nothing left
 // to back out of. Closing is never a prompt — the session is stashed.
 
+import { isKeyboardActivationTarget } from '../common/keyboard-targets';
 import { designToolForShortcut } from './design-tool';
 import { useDesignStudioStore } from './design-studio-store';
 
@@ -15,8 +16,8 @@ export function handleDesignStudioKey(
   event: React.KeyboardEvent<HTMLDivElement>,
   onFit: () => void,
 ): void {
-  // Never steal keys from a real text field inside the Studio.
-  if (isTextEntry(event.target)) return;
+  // Native editing and activation controls retain their browser key ownership.
+  if (event.defaultPrevented || isKeyboardActivationTarget(event.target)) return;
   const store = useDesignStudioStore.getState();
   if (store.session === null) return;
 
@@ -145,10 +146,4 @@ function handleEscapeLadder(): void {
     return;
   }
   store.closeStudio();
-}
-
-function isTextEntry(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
 }

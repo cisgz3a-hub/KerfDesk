@@ -331,11 +331,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'window.toggle-machine-panel': {
     family: 'window',
-    tooltip: 'Show or hide the machine controls panel when no job is active.',
+    tooltip: 'Show or hide the machine controls panel, including during a job.',
   },
   'window.toggle-side-panels': {
     family: 'window',
-    tooltip: 'Show or hide both workspace side panels with F12 when no job is active.',
+    tooltip: 'Show or hide both workspace side panels with F12, including during a job.',
   },
   'window.reset-layout': {
     family: 'window',

@@ -4,6 +4,7 @@
 // selection commands, and Esc (cancel → close with the session kept, F-L1).
 
 import { invertMask, selectAllMask } from '../../core/image-select';
+import { isKeyboardActivationTarget } from '../common/keyboard-targets';
 import { useAdjustDialogStore } from './adjust-dialog-store';
 import type { EditorTool } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
@@ -11,6 +12,7 @@ import { useQuickMaskStore } from './quick-mask-store';
 import { useTextDialogStore } from './text-dialog-store';
 
 export function handleEditorKeyDown(e: React.KeyboardEvent): void {
+  if (e.defaultPrevented || isKeyboardActivationTarget(e.target)) return;
   const key = e.key.toLowerCase();
   if (key === ' ') {
     // Held Spacebar = temporary Hand pan (Photoshop convention).
@@ -127,10 +129,11 @@ function handleModalCanvasKey(
 }
 
 export function handleEditorKeyUp(e: React.KeyboardEvent): void {
-  if (e.key === ' ') {
-    useImageEditorStore.getState().setSpacePanning(false);
-    e.preventDefault();
-  }
+  if (e.key !== ' ') return;
+  const store = useImageEditorStore.getState();
+  if (!store.isSpacePanning) return;
+  store.setSpacePanning(false);
+  if (!isKeyboardActivationTarget(e.target)) e.preventDefault();
 }
 
 const ZOOM_KEY_STEP = 1.25;

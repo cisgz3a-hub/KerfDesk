@@ -40,7 +40,7 @@ describe('LaserWindow panel visibility', () => {
     }
   });
 
-  it('forces machine controls visible while a job is active', async () => {
+  it('respects panel visibility and permits toggling while a job is active', async () => {
     useUiStore.getState().setRailPanelVisible('machine', false);
     useLaserStore.setState({
       connection: { kind: 'connected' },
@@ -48,10 +48,18 @@ describe('LaserWindow panel visibility', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderLaserWindow();
     try {
+      expect(
+        view.host.querySelector('aside[aria-label="Laser controls collapsed"]'),
+      ).not.toBeNull();
+      const expand = requiredButton(view.host, 'Expand Laser panel');
+      await act(async () => expand.click());
       expect(view.host.querySelector('aside[aria-label="Laser controls"]')).not.toBeNull();
       const collapse = requiredButton(view.host, 'Collapse Laser panel');
-      expect(collapse.disabled).toBe(true);
-      expect(collapse.title).toContain('ABORT remains reachable');
+      expect(collapse.disabled).toBe(false);
+      await act(async () => collapse.click());
+      expect(
+        view.host.querySelector('aside[aria-label="Laser controls collapsed"]'),
+      ).not.toBeNull();
     } finally {
       await view.unmount();
     }
