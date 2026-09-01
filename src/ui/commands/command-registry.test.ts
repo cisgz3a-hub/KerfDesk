@@ -273,26 +273,18 @@ describe('buildAppCommands', () => {
     expect(optimizationSettings).toHaveBeenCalled();
   });
 
-  it('keeps Rotary Setup disabled until its Labs gate is enabled', () => {
+  it('keeps Rotary Setup enabled without Labs or profile capability policy', () => {
     const rotarySetup = vi.fn();
-    const disabledCommands = buildAppCommands(baseCtx({ rotarySetup }));
-    const disabledCommand = commandById(disabledCommands, 'tools.rotary-setup');
-
-    expect(disabledCommand.enabled).toBe(false);
-    expect(disabledCommand.disabledReason).toContain('Tools > Labs');
-    expect(runCommand(disabledCommand)).toBe(false);
-
-    const unsupported = commandById(
-      buildAppCommands(baseCtx({ rotaryFeatureEnabled: true, rotarySetup })),
-      'tools.rotary-setup',
-    );
-    expect(unsupported.disabledReason).toContain('does not support a rotary axis');
-
-    const enabledCommands = buildAppCommands(
-      baseCtx({ rotaryFeatureEnabled: true, rotaryProfileSupported: true, rotarySetup }),
-    );
-    expect(runCommand(commandById(enabledCommands, 'tools.rotary-setup'))).toBe(true);
-    expect(rotarySetup).toHaveBeenCalledTimes(1);
+    for (const machineKind of ['laser', 'cnc'] as const) {
+      const command = commandById(
+        buildAppCommands(baseCtx({ machineKind, rotarySetup })),
+        'tools.rotary-setup',
+      );
+      expect(command.enabled).toBe(true);
+      expect(command.disabledReason).toBeUndefined();
+      expect(runCommand(command)).toBe(true);
+    }
+    expect(rotarySetup).toHaveBeenCalledTimes(2);
   });
 
   it('runs Project Notes from the Window menu without the destructive dirty-project guard', () => {

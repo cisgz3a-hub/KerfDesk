@@ -39,7 +39,6 @@ describe('canvas motion overlay performance budgets', () => {
         outputScope: DEFAULT_OUTPUT_SCOPE,
         placementSettings,
         placement,
-        rotaryRaster: false,
         registrationKey: '',
         machineRevision: 'performance-fixture',
         interactionActive: false,

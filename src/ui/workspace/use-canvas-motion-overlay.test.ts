@@ -63,7 +63,6 @@ describe('idle canvas motion plan', () => {
         outputScope: DEFAULT_OUTPUT_SCOPE,
         placementSettings,
         placement,
-        rotaryRaster: false,
         registrationKey: '',
         machineRevision: 'test-machine',
         interactionActive: false,

@@ -49,7 +49,6 @@ export async function reviewFramedRunForStart(
       laser,
       prepared: candidate.preparedStart,
       laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
-      externalEnvironment: candidate.externalEnvironment,
       ...(candidate.frameWcsNormalizationWarning === undefined
         ? {}
         : { frameWcsNormalizationWarning: candidate.frameWcsNormalizationWarning }),

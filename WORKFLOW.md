@@ -552,9 +552,8 @@ Identical to the format-specific import flows except:
 Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. For **Save
 G-code**, a factual no-file outcome stops before the picker: placement cannot be
 resolved; selection, variable, registration, or output-snapshot preparation
-produces no program; the post-prepare emitter refuses the requested output (for
-example, rotary raster while its Labs permission is off); or emitted preflight
-contains one of the seven codes in `COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
+produces no program; or emitted preflight contains one of the seven codes in
+`COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
 other preflight finding is an advisory reported after a successful save.
 
 For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232, ADR-237): the same
@@ -968,7 +967,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    session/origin drift. Advisory settings and build-info observations may refresh.
 4. Clean completion issues a one-run, review-pending `FramedRunPermit`. The controls read **Ready to
    start — framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
-   one-use. Any project, output-scope, placement, registration, or rotary-raster edit, Jog, Home,
+   one-use. Any project, output-scope, placement, or registration edit, Jog, Home,
    origin/probe/reset/disconnect, or controller drift expires it. Camera-only UI state does not.
 5. The user clicks **Start framed job**. The app opens the single **Job Review** dialog (ADR-224,
    ADR-237) against the permit's exact prepared program plus current controller state; it neither

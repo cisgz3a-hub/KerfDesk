@@ -4,15 +4,15 @@
 
 1. Open **Machine Setup** and choose the closest supported profile.
 2. Connect, read controller settings, and confirm the work area, origin, maximum feed, and power scale.
-3. Open **Tools > Labs** only for workflows still awaiting hardware acceptance.
-4. Keep Rotary, rotary image engraving, low-power Fire, Print and Cut, and camera alignment v2 disabled unless the connected profile supports them.
+3. Open **Tools > Labs** only for workflows that still use a local experimental switch.
+4. Keep low-power Fire, Print and Cut, and camera alignment v2 disabled unless the connected profile supports them. Rotary setup and G-code output do not use a Labs permission; their physical qualification remains operator-owned and is disclosed in Job Review.
 
 ## Rotary jobs
 
-1. Enable **Rotary setup** in Labs, then open **Tools > Rotary Setup**.
+1. Open **Tools > Rotary Setup**.
 2. Choose Roller or Chuck, enter the object diameter, and set direction. Chuck mode also requires machine motion per revolution.
 3. Generate the calibration pattern and measure it on the actual attachment before running artwork.
-4. Enable rotary image engraving separately only after vector calibration succeeds.
+4. For raster output, review the rotary qualification warning and use a supervised low-risk test to establish scale, direction, seam placement, focus, workholding, and material response. The warning informs and never refuses output.
 
 ## Variable text
 

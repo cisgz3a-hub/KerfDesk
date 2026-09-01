@@ -10,12 +10,6 @@ const FEATURE_ROWS: ReadonlyArray<{
   readonly label: string;
   readonly detail: string;
 }> = [
-  { id: 'rotary', label: 'Rotary setup', detail: 'Vector jobs on roller and chuck rotaries.' },
-  {
-    id: 'rotaryRaster',
-    label: 'Rotary image engraving',
-    detail: 'Raster output on a configured rotary. Requires Rotary setup.',
-  },
   {
     id: 'lowPowerFire',
     label: 'Low-power Fire control',

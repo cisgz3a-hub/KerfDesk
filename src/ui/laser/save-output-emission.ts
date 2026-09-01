@@ -5,9 +5,7 @@ import {
   type CompiledVCarveLayerDepth,
 } from './cnc-compiled-depth-warnings';
 
-const ROTARY_RASTER_REFUSAL_CODE = 'rotary-raster-unsupported';
 const FACTUAL_EMISSION_REFUSAL_CODES = new Set([
-  ROTARY_RASTER_REFUSAL_CODE,
   'coordinate-unencodable',
   'program-materialization-failed',
 ]);

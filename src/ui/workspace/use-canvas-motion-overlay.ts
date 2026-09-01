@@ -41,7 +41,6 @@ export function useCanvasMotionOverlay(
     () => canvasMachineSnapshot(useLaserStore.getState(), machineRevision),
     [machineRevision],
   );
-  const rotaryRaster = useExperimentalLaserFeatures((state) => state.features.rotaryRaster);
   const printAndCut = useExperimentalLaserFeatures((state) => state.features.printAndCut);
   const firstRegistration = usePrintCutSessionStore((state) => state.first);
   const secondRegistration = usePrintCutSessionStore((state) => state.second);
@@ -62,7 +61,6 @@ export function useCanvasMotionOverlay(
     outputScope,
     placementSettings,
     placement,
-    rotaryRaster,
     registrationKey,
     machineRevision,
     interactionActive,
@@ -92,7 +90,6 @@ type IdlePlanInput = {
   readonly outputScope: OutputScope;
   readonly placementSettings: JobPlacementSettings;
   readonly placement: ResolvedJobPlacement;
-  readonly rotaryRaster: boolean;
   readonly registrationKey: string;
   readonly machineRevision: string;
   readonly interactionActive: boolean;
@@ -105,7 +102,6 @@ type IdlePlanState = {
   readonly project: Project;
   readonly outputScope: OutputScope;
   readonly placementSettings: JobPlacementSettings;
-  readonly rotaryRaster: boolean;
   readonly registrationKey: string;
   readonly machineRevision: string;
 };
@@ -176,7 +172,6 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): IdlePlanSelection | null
     input.outputScope,
     input.placementSettings,
     input.placement,
-    input.rotaryRaster,
     input.registrationKey,
     input.machineRevision,
     input.interactionActive,
@@ -246,7 +241,6 @@ function idlePlanState(plan: CanvasMotionPlan, input: IdlePlanInput): IdlePlanSt
     project: input.project,
     outputScope: input.outputScope,
     placementSettings: input.placementSettings,
-    rotaryRaster: input.rotaryRaster,
     registrationKey: input.registrationKey,
     machineRevision: input.machineRevision,
   };
@@ -261,7 +255,6 @@ function idleStateMatches(
     state.project === input.project &&
     state.outputScope === input.outputScope &&
     state.placementSettings === input.placementSettings &&
-    state.rotaryRaster === input.rotaryRaster &&
     state.registrationKey === input.registrationKey &&
     state.machineRevision === input.machineRevision
   );
@@ -273,7 +266,6 @@ function idleStateCanRemainVisible(state: IdlePlanState, input: IdlePlanInput): 
     state.project.machine === input.project.machine &&
     state.outputScope === input.outputScope &&
     state.placementSettings === input.placementSettings &&
-    state.rotaryRaster === input.rotaryRaster &&
     state.registrationKey === input.registrationKey &&
     state.machineRevision === input.machineRevision
   );

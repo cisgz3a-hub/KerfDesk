@@ -119,7 +119,6 @@ function installTransientPermit(review: ConfirmedJobReview): FramedRunPermit {
       workOriginActive: laser.workOriginActive,
     },
     controllerBeforeFrame: framedRunControllerSnapshot(laser),
-    externalEnvironment: review.bundle.externalEnvironment,
     returnToWorkPosition: { x: 0, y: 0 },
     review: {
       reviewedAtIso: review.reviewedAtIso,
@@ -177,7 +176,7 @@ describe('runTransientCameraJob laser-mode evidence', () => {
       unverifiedAcknowledged: false,
     });
     expect(options?.framedRunPermit?.candidate.authorizationContext).toBe('transient-camera');
-    expect(vi.mocked(prepareStartJobSnapshot).mock.calls[0]?.[6]).toMatchObject({
+    expect(vi.mocked(prepareStartJobSnapshot).mock.calls[0]?.[5]).toMatchObject({
       requireFrame: false,
     });
     expect(dispatchTransientReviewedFrame).toHaveBeenCalledOnce();

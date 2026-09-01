@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
-import { profileSupportsCapability } from '../../core/devices';
 import { Button, Dialog, DialogActions } from '../kit';
 import { currentOutputScope, useStore } from '../state';
-import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { usePlatform } from './platform-context';
@@ -90,9 +88,6 @@ function saveContext(
     controllerSettings: laser.controllerSettings,
     settingsCapability: laser.capabilities.settings,
     activeWcs: laser.activeWcs,
-    allowRotaryRaster:
-      useExperimentalLaserFeatures.getState().features.rotaryRaster &&
-      profileSupportsCapability(app.project.device, 'rotary'),
     advanceVariablesAfter: app.advanceVariablesAfter,
     pushToast,
   };

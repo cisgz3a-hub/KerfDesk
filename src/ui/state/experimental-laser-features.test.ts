@@ -21,33 +21,34 @@ describe('experimental laser feature gates', () => {
   it('accepts only explicit true values from persisted state', () => {
     expect(
       readExperimentalLaserFeatures({
-        getItem: () => JSON.stringify({ rotary: true, rotaryRaster: 'true', lowPowerFire: 1 }),
+        getItem: () =>
+          JSON.stringify({
+            rotary: true,
+            rotaryRaster: true,
+            lowPowerFire: true,
+            printAndCut: 'true',
+          }),
       }),
     ).toEqual({
       ...DEFAULT_EXPERIMENTAL_LASER_FEATURES,
-      rotary: true,
+      lowPowerFire: true,
     });
   });
 
   it('persists changes and can reset every gate', () => {
-    useExperimentalLaserFeatures.getState().setFeature('rotary', true);
-    expect(readExperimentalLaserFeatures().rotary).toBe(true);
+    useExperimentalLaserFeatures.getState().setFeature('lowPowerFire', true);
+    expect(readExperimentalLaserFeatures().lowPowerFire).toBe(true);
 
     useExperimentalLaserFeatures.getState().resetFeatures();
     expect(readExperimentalLaserFeatures()).toEqual(DEFAULT_EXPERIMENTAL_LASER_FEATURES);
   });
 
-  it('keeps rotary raster dependent on the base rotary gate', () => {
-    useExperimentalLaserFeatures.getState().setFeature('rotaryRaster', true);
-    expect(useExperimentalLaserFeatures.getState().features).toMatchObject({
-      rotary: true,
-      rotaryRaster: true,
+  it('ignores retired rotary gates from legacy persisted state', () => {
+    const features = readExperimentalLaserFeatures({
+      getItem: () => JSON.stringify({ rotary: true, rotaryRaster: true }),
     });
-
-    useExperimentalLaserFeatures.getState().setFeature('rotary', false);
-    expect(useExperimentalLaserFeatures.getState().features).toMatchObject({
-      rotary: false,
-      rotaryRaster: false,
-    });
+    expect(features).toEqual(DEFAULT_EXPERIMENTAL_LASER_FEATURES);
+    expect(features).not.toHaveProperty('rotary');
+    expect(features).not.toHaveProperty('rotaryRaster');
   });
 });

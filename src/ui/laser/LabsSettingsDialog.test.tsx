@@ -22,23 +22,25 @@ afterEach(() => {
 });
 
 describe('LabsSettingsDialog', () => {
-  it('starts fail-closed and persists an explicit rotary opt-in', async () => {
+  it('shows only the remaining experimental features and persists an explicit opt-in', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const root: Root = createRoot(host);
     await act(async () => root.render(<LabsSettingsDialog onClose={vi.fn()} />));
     try {
-      const rotary = checkboxByLabel(host, 'Rotary setup');
-      expect(rotary.checked).toBe(false);
+      expect(host.textContent).not.toContain('Rotary setup');
+      expect(host.textContent).not.toContain('Rotary image engraving');
+      const lowPowerFire = checkboxByLabel(host, 'Low-power Fire control');
+      expect(lowPowerFire.checked).toBe(false);
 
       await act(async () => {
-        rotary.checked = true;
-        Simulate.change(rotary);
+        lowPowerFire.checked = true;
+        Simulate.change(lowPowerFire);
       });
 
-      expect(useExperimentalLaserFeatures.getState().features.rotary).toBe(true);
+      expect(useExperimentalLaserFeatures.getState().features.lowPowerFire).toBe(true);
       expect(localStorage.getItem('kerfdesk.experimental-laser-features.v1')).toContain(
-        '"rotary":true',
+        '"lowPowerFire":true',
       );
     } finally {
       await act(async () => root.unmount());

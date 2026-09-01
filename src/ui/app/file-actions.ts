@@ -146,7 +146,6 @@ export type SaveGcodeCtx = {
   // Operator-selected active WCS (C6): a non-G54 value warns the saved job's
   // G54 emission will mismatch a placement measured from the active offset.
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
-  readonly allowRotaryRaster?: boolean;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
 };

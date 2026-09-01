@@ -3,7 +3,6 @@ import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { controllerStartPreparationStillCurrent } from './start-job-authorization';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
-import { startExternalEnvironmentMatches } from './start-job-external-environment';
 
 export const FRAME_JOB_FIRST_MESSAGE =
   'Frame this job first. A completed Frame authorizes the exact prepared job that Start will send.';
@@ -21,10 +20,6 @@ export function framedRunReadinessIssue(
     currentReplayExecutionSignature(app) !== permit.candidate.executionSignature
   ) {
     return 'The artwork, output selection, placement, or registration changed after Frame. Frame the updated job again.';
-  }
-  const environmentProject = transientProject ? permit.candidate.project : app.project;
-  if (!startExternalEnvironmentMatches(permit.candidate.externalEnvironment, environmentProject)) {
-    return 'The rotary setup changed after Frame. Frame the current setup again.';
   }
   if (
     !controllerStartPreparationStillCurrent(permit.controller, laser, {

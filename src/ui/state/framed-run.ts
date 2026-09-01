@@ -32,10 +32,6 @@ export type PreparedStartProgram = {
   readonly jobOrigin?: JobOriginPlacement;
 };
 
-export type FramedRunExternalEnvironment = {
-  readonly rotaryRasterAllowed: boolean;
-};
-
 /** Review evidence confirmed in the Job Review dialog. An ordinary Frame
  * issues a review-pending permit and Start opens the single Job Review
  * (ADR-237); a transient camera Frame is reviewed before dispatch and
@@ -59,7 +55,6 @@ export type FramedRunCandidate = {
   /** Controller/setup identity captured immediately before Frame dispatch and
    * interpreted by the later Start-time review for an ordinary permit. */
   readonly controllerBeforeFrame: FramedRunControllerSnapshot;
-  readonly externalEnvironment: FramedRunExternalEnvironment;
   /** Work-coordinate point occupied while this exact program was prepared.
    * Frame appends a tool-off return leg so Start begins from that same point. */
   readonly returnToWorkPosition: { readonly x: number; readonly y: number };

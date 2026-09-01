@@ -115,7 +115,6 @@ describe('laser controller Start guards', () => {
       readyMachine(project),
       DEFAULT_JOB_PLACEMENT,
       DEFAULT_OUTPUT_SCOPE,
-      false,
       {
         clock: () => new Date('2026-07-19T00:00:00.000Z'),
         renderVariableText: async () => {

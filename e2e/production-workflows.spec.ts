@@ -110,7 +110,6 @@ test('configures chuck rotary and generates its calibration pattern', async ({
   page,
   kerfdesk,
 }) => {
-  await enableLab(page, 'Rotary setup');
   await runMenuCommand(page, 'Tools', 'Rotary Setup...');
   await page.getByLabel('Enable rotary for this machine profile').check();
   await page.getByRole('button', { name: 'Chuck' }).click();
@@ -134,11 +133,10 @@ test('configures chuck rotary and generates its calibration pattern', async ({
   });
 });
 
-test('exports rotary raster through the opted-in machine-space transform', async ({
+test('exports rotary raster through the configured machine-space transform', async ({
   page,
   kerfdesk,
 }) => {
-  await enableLab(page, 'Rotary image engraving');
   await runMenuCommand(page, 'Tools', 'Rotary Setup...');
   await page.getByLabel('Enable rotary for this machine profile').check();
   await page.getByRole('button', { name: 'Chuck' }).click();

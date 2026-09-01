@@ -11,7 +11,6 @@ import { completeFramedRunCandidateForTest } from './framed-run-testing';
 import { installAutoJobReview } from './job-review';
 import { JobControls } from './JobControls';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
-import { captureStartExternalEnvironment } from './start-job-external-environment';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -161,7 +160,6 @@ describe('JobControls camera placement', () => {
     });
     const candidate = {
       executionSignature: currentReplayExecutionSignature(),
-      externalEnvironment: captureStartExternalEnvironment(useStore.getState().project),
     } as FramedRunCandidate;
     useLaserStore.setState((laser) => ({
       framedRun: createFramedRunPermit(candidate, laser),

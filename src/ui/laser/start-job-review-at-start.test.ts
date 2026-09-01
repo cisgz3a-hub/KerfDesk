@@ -151,7 +151,6 @@ describe('reviewFramedRunForStart', () => {
     if (args === undefined) throw new Error('Expected the Start review gate to receive arguments.');
     expect(args.initial.prepared).toBe(permit.candidate.preparedStart);
     expect(args.initial.project).toBe(permit.candidate.project);
-    expect(args.initial.externalEnvironment).toBe(permit.candidate.externalEnvironment);
     expect(args.initial.frameWcsNormalizationWarning).toBe(disclosure);
     expect(args.checkpointToReplace).toBeNull();
     expect(args.completedReceipt).toBeNull();

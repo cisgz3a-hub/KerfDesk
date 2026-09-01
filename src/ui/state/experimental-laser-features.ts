@@ -1,17 +1,10 @@
 import { create } from 'zustand';
 
-export type ExperimentalLaserFeature =
-  | 'rotary'
-  | 'rotaryRaster'
-  | 'lowPowerFire'
-  | 'printAndCut'
-  | 'cameraAlignmentV2';
+export type ExperimentalLaserFeature = 'lowPowerFire' | 'printAndCut' | 'cameraAlignmentV2';
 
 export type ExperimentalLaserFeatures = Readonly<Record<ExperimentalLaserFeature, boolean>>;
 
 export const DEFAULT_EXPERIMENTAL_LASER_FEATURES: ExperimentalLaserFeatures = {
-  rotary: false,
-  rotaryRaster: false,
   lowPowerFire: false,
   printAndCut: false,
   cameraAlignmentV2: false,
@@ -48,10 +41,7 @@ export function readExperimentalLaserFeatures(
     if (raw === null) return DEFAULT_EXPERIMENTAL_LASER_FEATURES;
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return DEFAULT_EXPERIMENTAL_LASER_FEATURES;
-    const rotary = parsed['rotary'] === true;
     return {
-      rotary,
-      rotaryRaster: rotary && parsed['rotaryRaster'] === true,
       lowPowerFire: parsed['lowPowerFire'] === true,
       printAndCut: parsed['printAndCut'] === true,
       cameraAlignmentV2: parsed['cameraAlignmentV2'] === true,
@@ -66,12 +56,6 @@ function withFeatureDependency(
   feature: ExperimentalLaserFeature,
   enabled: boolean,
 ): ExperimentalLaserFeatures {
-  if (feature === 'rotary' && !enabled) {
-    return { ...current, rotary: false, rotaryRaster: false };
-  }
-  if (feature === 'rotaryRaster' && enabled) {
-    return { ...current, rotary: true, rotaryRaster: true };
-  }
   return { ...current, [feature]: enabled };
 }
 

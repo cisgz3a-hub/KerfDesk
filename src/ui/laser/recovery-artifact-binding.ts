@@ -19,7 +19,6 @@ export function recoveryArtifactPreparedOutput(
     let gcode = emitPreparedGcode(prepared, {
       outputScope: artifact.outputScope,
       ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
-      allowRotaryRaster: true,
       sourceGeometryChecks: 'compiled-evidence-only',
     }).gcode;
     for (const step of artifact.laserResumeChain ?? []) {

@@ -81,8 +81,6 @@ export type PreflightCode =
   // Advisory-only: secondary CNC cutters share values established for the
   // layer's primary cutter and require explicit operator verification.
   | 'cnc-secondary-tool-feed-retained'
-  // ADR-127: image engraves are refused while the rotary is enabled (v1).
-  | 'rotary-raster-unsupported'
   | 'empty-output';
 
 export type PreflightIssue = {

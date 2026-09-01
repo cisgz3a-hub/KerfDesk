@@ -67,7 +67,6 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const layersPanelOpen = useUiStore((s) => s.railPanelVisibility.layers);
   const machinePanelOpen = useUiStore((s) => s.railPanelVisibility.machine);
   const toggleRailPanel = useUiStore((s) => s.toggleRailPanel);
-  const rotaryFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.rotary);
   const printAndCutFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.printAndCut);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
@@ -85,8 +84,6 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       toggleLayersPanel: () => toggleRailPanel('layers'),
       machinePanelOpen,
       toggleMachinePanel: () => toggleRailPanel('machine'),
-      rotaryFeatureEnabled,
-      rotaryProfileSupported: profileSupportsCapability(app.project.device, 'rotary'),
       printAndCutFeatureEnabled,
       printAndCutProfileSupported: app.project.device.homing.enabled,
       printAndCut: callbacks.requestPrintAndCut,
@@ -165,8 +162,6 @@ function appCommandContext(
     focusTestAvailable:
       profileSupportsCapability(app.project.device, 'z-axis') &&
       app.project.device.zTravelConfirmed === true,
-    rotaryFeatureEnabled: dialogs.rotaryFeatureEnabled,
-    rotaryProfileSupported: dialogs.rotaryProfileSupported,
     printAndCutFeatureEnabled: dialogs.printAndCutFeatureEnabled,
     printAndCutProfileSupported: dialogs.printAndCutProfileSupported,
     previewActive: app.previewMode,

@@ -19,7 +19,6 @@ export async function prepareStartJobAsync(
   jobPlacement: JobPlacementSettings,
   outputScope: OutputScope,
   resolvedJobOrigin: JobOriginPlacement | undefined,
-  allowRotaryRaster: boolean,
   requireFrame: boolean,
   prepare: (project: Project, options: PrepareOutputOptions) => Promise<PreparedOutput>,
 ): Promise<StartJobPreparation> {
@@ -43,7 +42,6 @@ export async function prepareStartJobAsync(
     machine,
     machineWithReportUnits: input.machineWithReportUnits,
     outputScope,
-    allowRotaryRaster,
     requireFrame,
     placement: input.placement,
     motionOffset: input.motionOffset,

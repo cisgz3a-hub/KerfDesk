@@ -21,7 +21,6 @@ export function deriveCncArtifactPassSpans(
     const emitted = emitPreparedGcodeWithCncPassSpans(artifact.prepared, {
       outputScope: artifact.outputScope,
       ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
-      allowRotaryRaster: true,
     });
     if (emitted.spans === null || emitted.gcode !== artifact.gcode) return null;
     if (!fingerprintsEqual(fingerprintGcode(emitted.gcode), artifact.fingerprint)) return null;

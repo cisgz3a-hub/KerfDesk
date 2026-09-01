@@ -364,32 +364,6 @@ describe('runFrameNow framed-run authorization', () => {
     expect(useLaserStore.getState().framedRun).not.toBeNull();
   });
 
-  it('expires permanently when rotary feature identity changes away and back', async () => {
-    const project = useStore.getState().project;
-    useStore.setState({
-      project: {
-        ...project,
-        device: {
-          ...project.device,
-          capabilities: [...(project.device.capabilities ?? []), 'rotary'],
-        },
-      },
-    });
-    const frame = vi.fn(
-      async (_bounds: JobBounds, _feed: number, candidate?: FramedRunCandidate) => {
-        if (candidate === undefined) throw new Error('Frame candidate was not supplied');
-        dispatchedFrame(candidate);
-        completeFrame(candidate);
-      },
-    );
-    useLaserStore.setState({ frame });
-    await expect(runFrameNow()).resolves.toBe(true);
-
-    useExperimentalLaserFeatures.getState().setFeature('rotaryRaster', true);
-    useExperimentalLaserFeatures.getState().setFeature('rotaryRaster', false);
-    expect(useLaserStore.getState().framedRun).toBeNull();
-  });
-
   it('expires permanently when print-and-cut registration changes away and back', async () => {
     const project = useStore.getState().project;
     useStore.setState({

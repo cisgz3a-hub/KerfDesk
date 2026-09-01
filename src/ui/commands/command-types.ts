@@ -201,8 +201,6 @@ export type AppCommandContext = {
   readonly focusTestAvailable: boolean;
   readonly focusTest: () => void;
   readonly optimizationSettings: () => void;
-  readonly rotaryFeatureEnabled: boolean;
-  readonly rotaryProfileSupported: boolean;
   readonly rotarySetup: () => void;
   readonly printAndCutFeatureEnabled: boolean;
   readonly printAndCutProfileSupported: boolean;

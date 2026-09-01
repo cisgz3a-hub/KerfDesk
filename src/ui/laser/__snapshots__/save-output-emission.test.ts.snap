@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`emitSavePreparedOutput > emits rotary raster bytes when the Labs permission is explicit 1`] = `
+exports[`emitSavePreparedOutput > emits rotary raster bytes without workstation-local permission 1`] = `
 "G21
 G90
 G54

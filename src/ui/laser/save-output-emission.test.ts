@@ -31,25 +31,13 @@ describe('emitSavePreparedOutput', () => {
     expect(result.preflight.issues.map((issue) => issue.code)).toContain('empty-output');
   });
 
-  it('retains a post-prepare rotary raster refusal as non-writable', () => {
+  it('emits rotary raster bytes without workstation-local permission', () => {
     const project = rotaryRasterSaveProject();
     const result = emitSavePreparedOutput(prepareOutput(project), {});
 
-    expect(result).toMatchObject({
-      kind: 'emission-refused',
-      gcode: '',
-      preflight: { issues: [{ code: 'rotary-raster-unsupported' }] },
-    });
-  });
-
-  it('emits rotary raster bytes when the Labs permission is explicit', () => {
-    const project = rotaryRasterSaveProject();
-    const result = emitSavePreparedOutput(prepareOutput(project), {
-      allowRotaryRaster: true,
-    });
-
     expect(result.kind).toBe('emitted');
     expect(result.preflight.issues).toEqual([]);
+    expect(result.gcode).not.toBe('');
     expect(result.gcode).toMatchSnapshot();
   });
 });

@@ -182,7 +182,6 @@ describe('over-budget rasters compile and frame (ADR-243)', () => {
         userOriginPlacement,
         undefined,
         undefined,
-        undefined,
         false,
       );
 
