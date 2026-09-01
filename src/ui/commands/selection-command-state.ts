@@ -1,9 +1,5 @@
 import type { Project } from '../../core/scene';
-import {
-  isVectorPathObject,
-  vectorObjectOutputMetadataCompatible,
-  type VectorSceneObject,
-} from '../../core/geometry';
+import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 
 export function selectedObject(project: Project, selectedObjectId: string | null) {
@@ -80,11 +76,7 @@ export function selectionCanWeld(project: Project, selectedIds: ReadonlyArray<st
     (object): object is VectorSceneObject =>
       selected.has(object.id) && object.locked !== true && isVectorPathObject(object),
   );
-  return (
-    objects.length > 0 &&
-    vectorObjectOutputMetadataCompatible(objects) &&
-    objects.every(objectHasOnlyClosedContours)
-  );
+  return objects.length > 0 && objects.every(objectHasOnlyClosedContours);
 }
 
 // ADR-103 G1: booleans need a subject AND at least one clip.
@@ -114,10 +106,17 @@ function objectHasOnlyClosedContours(object: Project['scene']['objects'][number]
   if (!isConvertibleVector(object)) return false;
   return (
     object.paths.length > 0 &&
-    object.paths.every(
-      (path) =>
+    object.paths.every((path) => {
+      if (path.curves !== undefined) {
+        return (
+          path.curves.length > 0 &&
+          path.curves.every((curve) => curve.closed && curve.segments.length > 0)
+        );
+      }
+      return (
         path.polylines.length > 0 &&
-        path.polylines.every((polyline) => polyline.closed && polyline.points.length >= 3),
-    )
+        path.polylines.every((polyline) => polyline.closed && polyline.points.length >= 3)
+      );
+    })
   );
 }

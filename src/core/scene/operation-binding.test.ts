@@ -99,4 +99,14 @@ describe('automatic artwork operations', () => {
     });
     expect(result.object.operationIds).toEqual(['operation-Johann']);
   });
+
+  it('keeps every valid-project operation color collision-free after palette exhaustion', () => {
+    const operations: Array<{ color: string }> = [];
+    for (let index = 0; index < 256; index += 1) {
+      const color = nextOperationColor(operations);
+      expect(operations.map((operation) => operation.color)).not.toContain(color);
+      operations.push({ color });
+    }
+    expect(new Set(operations.map((operation) => operation.color)).size).toBe(256);
+  });
 });

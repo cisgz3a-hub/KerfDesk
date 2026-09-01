@@ -1,5 +1,6 @@
 export {
   effectiveObjectMinPowerPercent,
   effectiveObjectPowerPercent,
+  effectiveOperationForObject,
   objectPowerScalePercent,
-} from '../effective-output';
+} from './effective-output';

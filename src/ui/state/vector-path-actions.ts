@@ -4,15 +4,18 @@ import {
   isVectorPathObject,
   materializeVectorObject,
   offsetVectorObjects,
-  weldVectorObjects,
   type VectorBooleanOp,
   type VectorSceneObject,
 } from '../../core/geometry';
+import { canonicalArtworkOrder } from '../../core/artwork-order';
+import { effectiveOperationForObject } from '../../core/effective-output';
 import {
   addLayer,
   addObject,
   bindSceneObjectToOperations,
+  captureLayerOperationSettings,
   createArtworkOperation,
+  layerFromSubLayer,
   primaryOperationForObject,
   removeObject,
   replaceObject,
@@ -22,11 +25,11 @@ import {
   type Scene,
   type SceneObject,
 } from '../../core/scene';
-import { cloneLayerSubLayers } from '../../core/scene/layer';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
+import { planWeldSelection } from './vector-path-weld-plan';
 
 export type VectorPathActions = {
   readonly convertSelectionToPath: () => void;
@@ -84,7 +87,11 @@ function dogboneSelectionMutation(
     // intended silent behavior — dogbone a selection, relieve what qualifies,
     // leave the rest (WORKFLOW F-CNC26; CNV-04 keeps this one silent).
     const result = dogboneVectorObject(object, bitDiameterMm);
-    if (result.kind === 'error') continue;
+    if (result.kind === 'error') {
+      if (result.error.kind !== 'operation-failed') continue;
+      useToastStore.getState().pushToast(result.error.message, 'warning');
+      return state;
+    }
     const prepared = prepareCollapsedEdit(scene, object, result.value);
     scene = replaceObject(prepared.scene, object.id, prepared.object);
     changed = true;
@@ -133,7 +140,11 @@ function convertSelectionToPathMutation(
 function weldSelectionMutation(state: VectorPathState): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
-  const weldResult = weldVectorObjects(selected, uniqueWeldId(state.project.scene));
+  const weldResult = planWeldSelection(
+    state.project.scene,
+    selected,
+    uniqueWeldId(state.project.scene),
+  );
   if (weldResult.kind === 'error') {
     // The core op returns a user-worded message for reachable failures the menu
     // gating can't pre-detect (empty intersect of disjoint shapes, a collapsing
@@ -141,13 +152,23 @@ function weldSelectionMutation(state: VectorPathState): VectorPathMutation | Vec
     useToastStore.getState().pushToast(weldResult.error.message, 'warning');
     return state;
   }
-  const prepared = prepareIndependentArtwork(state.project.scene, weldResult.value, selected[0]);
-  const welded = prepared.object;
+  const welded = weldResult.value.object;
   const removeIds = new Set(selected.map((object) => object.id));
-  let scene = prepared.scene;
-  for (const id of removeIds) scene = removeObject(scene, id);
+  let scene: Scene = {
+    ...state.project.scene,
+    objects: replaceSelectedAtEarliest(state.project.scene.objects, removeIds, welded),
+    layers: weldResult.value.layers,
+    ...(state.project.scene.artworkOrder === undefined
+      ? {}
+      : {
+          artworkOrder: replaceIdsAtEarliest(
+            canonicalArtworkOrder(state.project.scene),
+            removeIds,
+            welded.id,
+          ),
+        }),
+  };
   scene = removeObjectIdsFromGroups(scene, removeIds);
-  scene = addObject(scene, welded);
   scene = pruneOrphanLayers(scene);
   return {
     project: { ...state.project, scene },
@@ -159,6 +180,34 @@ function weldSelectionMutation(state: VectorPathState): VectorPathMutation | Vec
     redoStack: [],
     dirty: true,
   };
+}
+
+function replaceSelectedAtEarliest(
+  objects: ReadonlyArray<SceneObject>,
+  removeIds: ReadonlySet<string>,
+  replacement: SceneObject,
+): ReadonlyArray<SceneObject> {
+  let inserted = false;
+  return objects.flatMap((object) => {
+    if (!removeIds.has(object.id)) return [object];
+    if (inserted) return [];
+    inserted = true;
+    return [replacement];
+  });
+}
+
+function replaceIdsAtEarliest(
+  ids: ReadonlyArray<string>,
+  removeIds: ReadonlySet<string>,
+  replacementId: string,
+): ReadonlyArray<string> {
+  let inserted = false;
+  return ids.flatMap((id) => {
+    if (!removeIds.has(id)) return [id];
+    if (inserted) return [];
+    inserted = true;
+    return [replacementId];
+  });
 }
 
 // Replace the selection with one combined object (weld's shape, different op).
@@ -236,18 +285,34 @@ function prepareIndependentArtwork(
   const operation: Layer =
     sourceOperation === null
       ? seed.operation
-      : {
-          ...sourceOperation,
-          ...(artwork.operationOverride ?? {}),
-          id: seed.operation.id,
-          name: seed.operation.name,
-          color: seed.operation.color,
-          subLayers: cloneLayerSubLayers(sourceOperation.subLayers),
-        };
+      : independentOperationForArtwork(sourceOperation, seed.operation, artwork);
   return {
     scene: addLayer(scene, operation),
     object: seed.object as ImportedSvg,
   };
+}
+
+function independentOperationForArtwork(source: Layer, seed: Layer, artwork: ImportedSvg): Layer {
+  const effectiveRoot = effectiveOperationForObject(source, artwork);
+  const subLayers = source.subLayers.map((subLayer) => ({
+    ...subLayer,
+    settings: captureLayerOperationSettings(
+      effectiveOperationForObject(layerFromSubLayer(source, subLayer), artwork),
+    ),
+  }));
+  const { bindingOperationId: _bindingOperationId, ...withoutRuntimeBinding } = effectiveRoot;
+  const cloned: Layer = {
+    ...withoutRuntimeBinding,
+    id: seed.id,
+    name: seed.name,
+    color: seed.color,
+    subLayers,
+  };
+  if (artwork.operationOverride === undefined) return cloned;
+  // The override is materialized into the root and every sublayer, so a later
+  // linked-preset refresh must not silently erase the derived artwork's output.
+  const { materialBinding: _materialBinding, ...detached } = cloned;
+  return detached;
 }
 
 function prepareCollapsedEdit(

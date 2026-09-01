@@ -5,10 +5,10 @@
 export {
   isVectorPathObject,
   materializeVectorObject,
-  vectorObjectOutputMetadataCompatible,
-  weldVectorObjects,
+  type VectorOpError,
   type VectorSceneObject,
 } from './vector-path-tools';
+export { weldVectorObjects } from './vector-path-weld';
 export {
   combineVectorObjects,
   offsetVectorObjects,

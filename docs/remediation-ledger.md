@@ -1,13 +1,13 @@
 # Audit remediation ledger
 
 Current authoritative 2026-09-01 remediation: isolated worktree label `ade9`, branch
-`codex/fix-design-state-invariants-20260901`, reconstructed from exact `origin/main`
-`0a29540d9319958e35bfccc5f261edeed66cea82` (tree
-`e1434596fc235f246f1388f5b1106258afcb5b54`). The preceding ADR-314 remediation merged through
-PR #710; its exact-head required checks and post-merge Chrome smoke are green, while the independent
-post-merge full-CI/automatic-Pages evidence remains a separate live lane below. The original dirty checkout was
+`codex/fix-vector-topology-output-20260901`, reconstructed from exact `origin/main`
+`26745bc7a36adc9d6890d54aa3f906330d32df6b` (tree
+`7463233cc5c8396896186486603317cab240b6b0`). The preceding design-state remediation merged through
+PR #711; its exact-head required checks and exact-main Chrome smoke are green, while the independent
+exact-main full-CI/automatic-Pages evidence remains a separate live lane below. The original dirty checkout was
 re-fingerprinted read-only at `9209fcb33f4807ebfc1f7a55780069b6a7b0e23c`, branch
-`claude/vcarve-stamp-subcell`, with 9 modified tracked files, 0 staged files, 6 untracked files,
+`claude/vcarve-stamp-subcell`, with 9 modified tracked files, 0 staged files, 13 untracked files,
 and tracked-diff hash `6a1fc1cb119a370814a5eb65c66f78c4038f41a5`. The detached `6b32` donor retained the same
 HEAD/tracked-diff hash with 9 modified tracked, 0 staged, and 4 untracked files. The historical
 `ab91` donor path is absent. Both extant evidence trees remain read-only; current verification and
@@ -781,7 +781,7 @@ adversarial topology, Join, or Clipboard cases listed here.
 | UA8-DS2 transitive copy dependencies | confirmed defect: Array, Duplicate, and Clipboard each followed only one `pathText.guideObjectId` or `imageMaskId` hop, so text-to-text-to-guide and text-to-raster-to-mask copies retained dangling second-hop references; adversarial review then proved Clipboard conflated user roots with dependencies, Cut removed the whole closure or bypassed deletion repair, Open/New cleared the clipboard, cross-document operation-id collisions inherited target settings, missing ids could collide with target or newly generated operations, source-less legacy color aliases and cross-object aliases could adopt unrelated settings, partial groups were cloned, and Array could move locked/shared/group-owned dependency sources beneath untouched artwork | implemented through one ordered, cycle-safe shared closure/remapper used by all three actions; Clipboard separately owns roots and source document epoch, survives document replacement, selects/cuts only roots, uses canonical dependency repair, clones source operations across documents, tracks mapped operation ownership per copied object, keeps unresolved partial bindings away from target/generated aliases, materializes source-less objects under fresh fallback operations, and preserves only complete groups; Array clones protected first-placement components, includes selected sources with incoming owners, expands groups through an indexed fixed point, bounds protection to the copy closure, and treats normalized full turns/quadrants as exact identity; deleting a path-text guide removes the stale link with a nonblocking warning while retaining materialized text geometry | nine regression-first assertions failed before the first closure repair; six further adversarial Clipboard/Duplicate assertions and nine initial Array ownership/identity assertions then failed before their repairs; selected-owner, partial-group, nonzero-radius, huge-angle, target/generated-operation alias, legacy-color alias, and cross-object alias schedules were also reproduced before repair; post-fix coverage includes both dependency chains, cycles, missing/colliding references, Raster/Relief/mixed-path operation ownership, deep array copies, actual `setProject` lifecycle, selected-root Cut/Paste, canonical mask/path-text deletion repair, exact compiled settings, complete-versus-partial groups, 1,000-member group expansion, huge finite circular angles, save/reopen, and delete-original isolation | Existing already-missing references remain truthful rather than inventing an object; dynamic text after deliberate guide deletion becomes ordinary unbent editable text, and perceptual path-text/mask rendering remains unqualified |
 | UA8-DS3 overlapping group closure | confirmed defect: one forward pass over groups made selection depend on group record order and missed transitive overlap | implemented with a member-indexed fixed-point traversal that preserves scene order and leaves both persisted group records unchanged | reverse-order reproduction failed before the fix; selection plus exact save/reopen group records now pass | Group appearance and complex interactive pointer schedules remain browser/perceptual evidence lanes |
 | UA8-DS4 hidden snap targets | confirmed defect: object snapping excluded locked/self/ignored objects but did not apply the canonical operation-binding visibility resolver | implemented with one per-snap visibility lookup; hidden bindings and duplicate legacy color aliases no longer create snap guides, while any visible or unknown binding retains canonical fail-visible behavior | pre-fix hidden-target integration failed; canonical operation-id, color-alias, duplicate-color, any-visible, unknown, and ignored-target tests now pass | Pointer feel and high-density canvas perception remain unqualified |
-| UA8-GEO1 design topology and output semantics | confirmed defects, intentionally not copied from the donor: n-ary Intersect/XOR semantics, Text non-zero fill, per-`ColoredPath` render-batch normalization, raw stored/source-order determinism, multi-operation Weld settings, and Boolean/Offset subject overrides all have source-backed adversarial reproductions | pending a separate corrected geometry/output slice; Subtract remains subject-minus-union, Intersect/XOR must reduce every object region, each render batch is normalized independently before object union, and no operation metadata may collapse | donor reviewers supplied three-operand permutations, same-wound Text, multi-color/duplicate-color, and exact-output fixtures; normalized signatures alone are rejected because opposite raw path orders can normalize identically, so raw stored paths plus compiled `source-order` bytes, genuine rotation/nonuniform-scale/reflection fixtures, and independent union/difference/intersect/xor/inflate failure mocks with no partial mutation/history are required | External CAM, perceptual topology, physical kerf, and material output remain unqualified |
+| UA8-GEO1 design topology and output semantics | confirmed defects, intentionally not copied from the donor: n-ary Intersect/XOR semantics, Text non-zero fill, per-`ColoredPath` render-batch normalization, canonical-curve ownership, raw stored/source-order determinism, multi-operation Weld settings, and Boolean/Offset subject overrides all have source-backed adversarial reproductions | implemented in the geometry/output branch: Subtract remains subject-minus-union; Intersect/XOR reduce every canonicalized object region in deterministic order; Text uses per-batch NonZero and ordinary artwork per-batch EvenOdd before within-object union, while the documented layer-wide EvenOdd-between-objects contract remains unchanged; canonical curves flatten at machine tolerance before genuine transforms; Weld preserves effective per-path operations, no-output and orphan ownership, shared-run grouping, source/clone lifecycle, and collision-free operation ids/colors; Boolean/Offset retain subject overrides, sublayers, power scale, and truthful linked-material state; every geometry-engine failure is transactional | exact focused matrix passes 18 files/120 tests; typecheck, full source/Electron lint, repository-wide Prettier, `git diff --check`, raw/report-only file-size, and public-export no-growth checks pass; coverage includes all n-ary permutations, transformed/reflected/nonuniform fixtures, raw and compiled source order, Text/Weld/Boolean/Offset/donut controls, same/duplicate-color batches, AB+A bindings, reflected V-carve stroke parity, explicit-empty/full/partial orphan ownership, selected/unselected id and legacy-color collisions, 256 operation colors, later-stage engine failures, undo/delete/save/reopen, and exact compiled settings | External CAM, perceptual topology, physical kerf, material output, and controller behavior remain unqualified |
 | UA8-JOIN1 Join determinism and truthful reachability | confirmed donor defects: click order changed raw/compiled source order, interior anchors appended a disconnected run, and several enabled two-anchor selections silently no-op | pending a separate Join slice; raw stored order and compiled `source-order` output must be asserted across click permutations with unrelated curves and genuine rotation/nonuniform-scale/reflection fixtures; unsupported reachable combinations require truthful nonblocking feedback rather than a new guard | donor endpoint/cubic/arc tests and the 8-file/43-test frozen verifier are useful but insufficient; same-subpath close, different `ColoredPath`/object, closed/open, interior, undo, announcement, and source-order permutations remain required | Product choice for interior-anchor split-and-join versus truthful independent-run disclosure must be resolved from existing contracts without widening refusal surfaces |
 
 ### Reconciled command-shell and diagnostic findings
@@ -895,3 +895,32 @@ and missing-glyph cases below.
   classifications will be appended without rewriting this design-state evidence.
 - No device, camera, controller, provider mutation, manual deployment, material cut, air-cut,
   perceptual comparison, or reference-CAM qualification was performed.
+
+### Geometry/output slice integration verification
+
+- The current branch starts from the exact PR #711 merge `26745bc7a36adc9d6890d54aa3f906330d32df6b`.
+  The corrected implementation was reconstructed against that main revision; no donor commit was
+  cherry-picked and no donor worktree was modified.
+- Regression-first coverage passes 18 focused files and 120 tests. `pnpm typecheck`, full source and
+  Electron lint, repository-wide Prettier, `git diff --check`, raw/report-only file-size checks, and
+  the public-export no-growth ratchet pass. The over-soft Weld planner was split into a 223-line plan
+  and 158-line binding-ownership module before release verification.
+- The exact-final product-source snapshot passed `pnpm release:check`: typecheck, full source and
+  Electron lint, repository-wide Prettier, ADR numbering, seven action-pin checks, production-license
+  closure (52 packages/eight licenses), 1,841 passed Vitest files plus 14 skipped, 11,667 passed tests
+  plus 22 skipped, 41/41 release-integrity tests, the 2,411-module web/PWA build (172 precache entries,
+  11,193.37 KiB), Electron-main build, raw and report-only soft file-size checks, and the public-export
+  no-growth ratchet. The first full-suite attempt had one untouched camera proxy `/health` timeout;
+  that exact file then passed 13/13 in isolation, passed 10/10 consecutive isolated invocations, and
+  passed 13/13 in 363 ms inside the clean full-gate rerun. No speculative camera change was made.
+- Three independent read-only review lanes challenged the slice. Their reproduced transformed-order,
+  canonical-curve, reflected-stroke, sublayer/material, no-output/orphan, shared-run, id/color-alias,
+  and later-engine-failure findings are repaired and pinned. The exact-current final reviewer found no
+  remaining source-confirmed defect. Its cross-object NonZero candidate was refuted against PROJECT
+  F.1, WORKFLOW F.1, ADR-286, and the ADR-270 amendment, which deliberately retain EvenOdd pooling
+  between objects.
+- Exact-main Browser smoke run 33523172646, full CI run 33523172662, and automatic Pages run
+  33527490475 for PR #711 merge `26745bc7a36adc9d6890d54aa3f906330d32df6b` are green. The
+  geometry/output branch hosted exact-head checks, PR review, merge, and post-merge publication remain
+  pending; no manual deployment was performed. Only this evidence text changed after the terminal
+  local release gate.

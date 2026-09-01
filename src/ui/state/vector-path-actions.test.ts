@@ -89,8 +89,7 @@ describe('vector path actions', () => {
     expect(object?.kind === 'imported-svg' ? object.paths[0]?.polylines : []).toHaveLength(1);
     const weldedOperationIds =
       object === undefined ? [] : operationIdsForObject(object, state.project.scene.layers);
-    expect(weldedOperationIds).toHaveLength(1);
-    expect(weldedOperationIds).not.toContain('#222222');
+    expect(weldedOperationIds).toEqual(['#222222']);
     expect(state.project.scene.layers).toHaveLength(1);
     expect(state.project.scene.layers[0]?.power).toBe(61);
     expect(state.selectedObjectId).toBe(object?.id);
@@ -99,7 +98,7 @@ describe('vector path actions', () => {
     expect(state.dirty).toBe(true);
   });
 
-  it('does not weld selected vectors with mixed output metadata', () => {
+  it('welds mixed output metadata into distinct effective operations', () => {
     loadObjects([
       { ...shapeObject('left', '#222222', squarePath('#222222', 0, 0, 10)), powerScale: 50 },
       { ...shapeObject('right', '#222222', squarePath('#222222', 5, 0, 10)), powerScale: 80 },
@@ -109,13 +108,18 @@ describe('vector path actions', () => {
       additionalSelectedIds: new Set(['right']),
       dirty: false,
     });
-    const before = useStore.getState().project;
-
     useStore.getState().weldSelection();
 
-    expect(useStore.getState().project).toBe(before);
-    expect(useStore.getState().dirty).toBe(false);
-    expect(useStore.getState().undoStack).toHaveLength(0);
+    const state = useStore.getState();
+    expect(state.project.scene.objects).toHaveLength(1);
+    expect(state.project.scene.layers.map((layer) => layer.power)).toEqual([15, 24]);
+    expect(
+      state.project.scene.objects[0]?.kind === 'imported-svg'
+        ? state.project.scene.objects[0].paths.map((path) => path.operationIds)
+        : [],
+    ).toHaveLength(2);
+    expect(state.dirty).toBe(true);
+    expect(state.undoStack).toHaveLength(1);
   });
 
   it('does not weld when the selection contains open contours', () => {

@@ -7,7 +7,8 @@ export function fillRuleForLayer(objects: ReadonlyArray<SceneObject>, layer: Lay
   void layer;
   // Text geometry is resolved per object under non-zero semantics before the
   // layer is pooled. The pooled layer must remain even-odd so one text object
-  // cannot alter unrelated SVG/shape donut topology.
+  // cannot alter unrelated SVG/shape donut topology (ADR-286 and the ADR-270
+  // amendment).
   return 'evenodd';
 }
 

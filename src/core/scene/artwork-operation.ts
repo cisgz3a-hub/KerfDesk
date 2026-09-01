@@ -114,8 +114,15 @@ export function nextOperationColor(operations: ReadonlyArray<Pick<Layer, 'color'
   const used = new Set(operations.map((operation) => operation.color.toLowerCase()));
   const paletteColor = OPERATION_PALETTE.find((color) => !used.has(color));
   if (paletteColor !== undefined) return paletteColor;
-  for (let hue = 7; hue < 3600; hue += 37) {
-    const color = hslToHex(hue % 360, 70, 42);
+  for (let index = 0; index < 360; index += 1) {
+    const color = hslToHex((7 + index * 37) % 360, 70, 42);
+    if (!used.has(color)) return color;
+  }
+  // Valid projects contain at most 256 operations. The RGB scan is a
+  // deterministic collision-free fallback even when every palette/hue color
+  // is already present (including imported legacy aliases).
+  for (let rgb = 0; rgb <= 0xffffff; rgb += 1) {
+    const color = `#${rgb.toString(16).padStart(6, '0')}`;
     if (!used.has(color)) return color;
   }
   return '#475569';

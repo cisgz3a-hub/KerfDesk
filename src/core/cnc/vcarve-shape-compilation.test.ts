@@ -9,6 +9,7 @@ import {
   type Scene,
 } from '../scene';
 import { createEllipse } from '../shapes/primitives';
+import { weldVectorObjects } from '../geometry';
 import { collectLayerContours } from './collect-cnc-contours';
 import { compileCncJob } from './compile-cnc-job';
 
@@ -101,4 +102,61 @@ describe('V-carve shape compilation', () => {
     expect(contours.length).toBeGreaterThan(0);
     expect(contours.every((contour) => contour.manualTabPoints === undefined)).toBe(true);
   });
+
+  it('preserves reflected uniform stroke outlines through Weld materialization', () => {
+    const color = '#000000';
+    const source: ImportedSvg = {
+      kind: 'imported-svg',
+      id: 'reflected-stroke',
+      source: 'reflected-stroke.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: { ...IDENTITY_TRANSFORM, scaleX: -2, scaleY: 2 },
+      paths: [
+        {
+          color,
+          strokeWidthMm: 0.5,
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 0, y: 0 },
+                { x: 10, y: 0 },
+                { x: 10, y: 10 },
+                { x: 0, y: 10 },
+                { x: 0, y: 0 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const layer = {
+      ...createLayer({ id: 'vcarve', color }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' as const },
+    };
+    const welded = weldVectorObjects([source], 'welded');
+    if (welded.kind === 'error') throw new Error(welded.error.message);
+
+    const before = contourBounds(collectLayerContours([source], layer, DEFAULT_DEVICE_PROFILE));
+    const after = contourBounds(
+      collectLayerContours([welded.value], layer, DEFAULT_DEVICE_PROFILE),
+    );
+    expect(welded.value.paths[0]?.strokeWidthMm).toBe(1);
+    expect(after).toEqual(before);
+  });
 });
+
+function contourBounds(contours: ReturnType<typeof collectLayerContours>) {
+  return contours
+    .map((contour) => {
+      const xs = contour.polyline.points.map((point) => point.x);
+      const ys = contour.polyline.points.map((point) => point.y);
+      return {
+        minX: Math.min(...xs),
+        minY: Math.min(...ys),
+        maxX: Math.max(...xs),
+        maxY: Math.max(...ys),
+      };
+    })
+    .sort((left, right) => left.minX - right.minX || left.minY - right.minY);
+}

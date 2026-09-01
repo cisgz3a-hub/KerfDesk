@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM, type ImportedSvg, type ShapeObject, type TextObject } from '../scene';
-import { materializeVectorObject, weldVectorObjects } from './vector-path-tools';
+import { materializeVectorObject } from './vector-path-tools';
+import { weldVectorObjects } from './vector-path-weld';
 
 const square = (x: number, y: number, size: number) => ({
   closed: true,
@@ -67,6 +68,24 @@ describe('vector path tools', () => {
     const materialized = materializeVectorObject(artwork);
 
     expect(materialized.paths[0]?.strokeWidthMm).toBe(1);
+  });
+
+  it('preserves trusted round-stroke width through signed uniform reflections', () => {
+    for (const transform of [
+      { ...IDENTITY_TRANSFORM, scaleX: -2, scaleY: 2 },
+      { ...IDENTITY_TRANSFORM, scaleX: 2, scaleY: -2 },
+    ]) {
+      const artwork: ImportedSvg = {
+        kind: 'imported-svg',
+        id: 'reflected-stroke',
+        source: 'reflected.svg',
+        bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+        transform,
+        paths: [{ color: '#111111', strokeWidthMm: 0.5, polylines: [square(0, 0, 1)] }],
+      };
+
+      expect(materializeVectorObject(artwork).paths[0]?.strokeWidthMm).toBe(1);
+    }
   });
 
   it('drops round-stroke provenance that a baked non-uniform transform cannot represent', () => {
@@ -138,7 +157,7 @@ describe('vector path tools', () => {
     expect(welded.powerScale).toBe(65);
   });
 
-  it('rejects weld input with mixed output metadata', () => {
+  it('does not refuse weld input with mixed output metadata', () => {
     const left: ShapeObject = {
       ...shapeObject('left', '#222222', square(0, 0, 10)),
       powerScale: 50,
@@ -149,17 +168,14 @@ describe('vector path tools', () => {
     };
 
     const result = weldVectorObjects([left, right], 'welded');
-    expect(result.kind).toBe('error');
-    if (result.kind === 'error') {
-      expect(result.error.kind).toBe('mixed-metadata');
-      expect(result.error.message).toMatch(/matching output metadata/i);
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.powerScale).toBeUndefined();
+      expect(result.value.paths).toHaveLength(1);
     }
   });
 
-  it('checks output-metadata compatibility before contour closedness (fixed precedence)', () => {
-    // A selection that fails BOTH checks reports mixed-metadata: inputs are
-    // validated before any geometry is materialized. Pins the ARC-02 order so it
-    // is intentional, not an accident of the refactor (self-audit finding).
+  it('reports open contours even when object output metadata differs', () => {
     const openMismatched: ImportedSvg = {
       kind: 'imported-svg',
       id: 'open-a',
@@ -188,7 +204,7 @@ describe('vector path tools', () => {
     };
     const result = weldVectorObjects([openMismatched, closed], 'welded');
     expect(result.kind).toBe('error');
-    if (result.kind === 'error') expect(result.error.kind).toBe('mixed-metadata');
+    if (result.kind === 'error') expect(result.error.kind).toBe('open-contours');
   });
 
   it('rejects weld input containing open polylines', () => {
@@ -218,7 +234,7 @@ describe('vector path tools', () => {
     expect(result.kind).toBe('error');
     if (result.kind === 'error') {
       expect(result.error.kind).toBe('open-contours');
-      expect(result.error.message).toMatch(/closed vector contours/i);
+      expect(result.error.message).toMatch(/closed contours/i);
     }
   });
 });
