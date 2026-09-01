@@ -13,7 +13,7 @@ const OUTLINE_FONTS = FONT_REGISTRY.filter((entry) => entry.geometry === 'outlin
 export function TextDialog(): JSX.Element | null {
   const isOpen = useTextDialogStore((s) => s.isOpen);
   const state = useTextDialogStore();
-  if (!isOpen) return null;
+  if (!isOpen || state.dialogOwner === null) return null;
   return <TextDialogBody state={state} />;
 }
 
@@ -45,6 +45,11 @@ function TextDialogBody(props: { readonly state: TextDialogState }): JSX.Element
           title="The text to rasterize onto a new layer"
         />
         <TextControls state={state} />
+        {state.errorMessage === null ? null : (
+          <p role="alert" style={errorStyle}>
+            {state.errorMessage}
+          </p>
+        )}
         <div style={actionsStyle}>
           <button
             type="button"
@@ -176,4 +181,10 @@ const actionsStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-end',
   gap: 8,
+};
+
+const errorStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-danger)',
+  fontSize: 12,
 };

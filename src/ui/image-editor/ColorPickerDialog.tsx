@@ -25,6 +25,7 @@ export function ColorPickerDialog(props: {
 }): JSX.Element {
   const [hsv, setHsv] = useState<HsvColor>(() => rgbToHsv(props.initial));
   const [hexDraft, setHexDraft] = useState(() => rgbToHex(props.initial));
+  const [inkDraft, setInkDraft] = useState(() => String(rgbToInkPercent(props.initial)));
   const rgb = hsvToRgb(hsv);
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogA11y(dialogRef, props.onClose);
@@ -32,7 +33,14 @@ export function ColorPickerDialog(props: {
   // Keep the hex field following pad/slider moves (draft wins while typing).
   useEffect(() => {
     setHexDraft(rgbToHex(hsvToRgb(hsv)));
+    setInkDraft(String(rgbToInkPercent(hsvToRgb(hsv))));
   }, [hsv]);
+
+  const commit = (): void => {
+    // Invalid transient text never mutates hsv/rgb, so OK uses the last valid
+    // represented color instead of turning the action into a new refusal.
+    props.onCommit(rgb);
+  };
 
   return (
     <div
@@ -42,7 +50,7 @@ export function ColorPickerDialog(props: {
       aria-label={props.title}
       style={backdropStyle}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) props.onCommit(rgb);
+        if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) commit();
         e.stopPropagation();
       }}
     >
@@ -64,32 +72,47 @@ export function ColorPickerDialog(props: {
           rgb={rgb}
           initial={props.initial}
           hexDraft={hexDraft}
+          inkDraft={inkDraft}
           onHexChange={(value) => {
             setHexDraft(value);
             const parsed = hexToRgb(value);
             if (parsed !== null) setHsv(rgbToHsv(parsed));
           }}
-          onInkChange={(percent) => setHsv(rgbToHsv(inkPercentToRgb(percent)))}
+          onInkChange={(draft) => {
+            setInkDraft(draft);
+            const percent = parseInkDraft(draft);
+            if (percent !== null) setHsv(rgbToHsv(inkPercentToRgb(percent)));
+          }}
+          onInkBlur={() => setInkDraft(String(rgbToInkPercent(rgb)))}
         />
-        <div style={actionsStyle}>
-          <button
-            type="button"
-            className="lf-btn"
-            onClick={props.onClose}
-            title="Close without changing the color (Esc)"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="lf-btn lf-btn--primary"
-            onClick={() => props.onCommit(rgb)}
-            title="Use this color (Enter)"
-          >
-            OK
-          </button>
-        </div>
+        <PickerActions onCommit={commit} onClose={props.onClose} />
       </div>
+    </div>
+  );
+}
+
+function PickerActions(props: {
+  readonly onCommit: () => void;
+  readonly onClose: () => void;
+}): JSX.Element {
+  return (
+    <div style={actionsStyle}>
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={props.onClose}
+        title="Close without changing the color (Esc)"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        className="lf-btn lf-btn--primary"
+        onClick={props.onCommit}
+        title="Use this color (Enter)"
+      >
+        OK
+      </button>
     </div>
   );
 }
@@ -98,8 +121,10 @@ function PickerFields(props: {
   readonly rgb: PaintColor;
   readonly initial: PaintColor;
   readonly hexDraft: string;
+  readonly inkDraft: string;
   readonly onHexChange: (value: string) => void;
-  readonly onInkChange: (percent: number) => void;
+  readonly onInkChange: (draft: string) => void;
+  readonly onInkBlur: () => void;
 }): JSX.Element {
   const css = (c: PaintColor): string => `rgb(${c.r}, ${c.g}, ${c.b})`;
   return (
@@ -120,8 +145,10 @@ function PickerFields(props: {
           type="number"
           min={0}
           max={100}
-          value={rgbToInkPercent(props.rgb)}
-          onChange={(e) => props.onInkChange(Number(e.target.value))}
+          value={props.inkDraft}
+          aria-invalid={parseInkDraft(props.inkDraft) === null}
+          onChange={(e) => props.onInkChange(e.target.value)}
+          onBlur={props.onInkBlur}
           style={inputStyle}
           title="Ink percentage: 0 = white (no burn), 100 = black"
           aria-label="Ink percent"
@@ -133,6 +160,12 @@ function PickerFields(props: {
       </span>
     </div>
   );
+}
+
+function parseInkDraft(draft: string): number | null {
+  if (draft.trim().length === 0) return null;
+  const value = Number(draft);
+  return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
 }
 
 const actionsStyle: React.CSSProperties = {
