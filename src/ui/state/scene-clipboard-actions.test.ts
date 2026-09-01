@@ -1,33 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  createLayer,
-  createProject,
-  IDENTITY_TRANSFORM,
-  operationIdsForObject,
-  type ColoredPath,
-  type Project,
-  type RasterImage,
-  type SceneObject,
-  type ShapeObject,
-  type TextObject,
-  type TracedImage,
-} from '../../core/scene';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { compileJob } from '../../core/job';
+import { createProject, operationIdsForObject } from '../../core/scene';
+import { deserializeProject, serializeProject } from '../../io/project';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
-
-const BLACK_PATH: ColoredPath = {
-  color: '#000000',
-  polylines: [
-    {
-      closed: true,
-      points: [
-        { x: 0, y: 0 },
-        { x: 3, y: 0 },
-        { x: 3, y: 3 },
-      ],
-    },
-  ],
-};
+import {
+  allObjectDependenciesResolve,
+  dependencyProject,
+  dependentText,
+  projectWithVariants,
+  rasterDependencyChain,
+  shapeObject,
+  textDependencyChain,
+} from './testing/scene-clipboard-fixtures';
 
 describe('scene clipboard actions', () => {
   beforeEach(() => resetStore());
@@ -161,84 +147,198 @@ describe('scene clipboard actions', () => {
     expect(pastedRasterOperation?.mode).toBe('image');
     expect(pastedRasterOperation?.color).not.toBe('#808080');
   });
+
+  it.each([
+    ['text guide', textDependencyChain()],
+    ['raster mask', rasterDependencyChain()],
+  ])('copies every hop in a %s chain into an empty project', (_name, fixture) => {
+    useStore.setState({ project: fixture.project });
+    useStore.getState().selectObject(fixture.rootId);
+
+    useStore.getState().copySelection();
+
+    expect(useStore.getState().sceneClipboard?.objects.map((object) => object.id)).toEqual(
+      fixture.project.scene.objects.map((object) => object.id),
+    );
+    useStore.setState({
+      project: createProject(),
+      selectedObjectId: null,
+      additionalSelectedIds: new Set(),
+    });
+    useStore.getState().pasteClipboard();
+    const pasted = useStore.getState().project;
+    expect(allObjectDependenciesResolve(pasted.scene.objects)).toBe(true);
+
+    const reopened = deserializeProject(serializeProject(pasted));
+    expect(reopened.kind).toBe('ok');
+    if (reopened.kind !== 'ok') throw new Error(reopened.kind);
+    expect(allObjectDependenciesResolve(reopened.project.scene.objects)).toBe(true);
+    expect(compileJob(reopened.project.scene, DEFAULT_DEVICE_PROFILE)).toEqual(
+      compileJob(pasted.scene, DEFAULT_DEVICE_PROFILE),
+    );
+  });
+
+  it('selects only the user-owned root after pasting a dependency closure', () => {
+    const fixture = textDependencyChain();
+    useStore.setState({ project: fixture.project });
+    useStore.getState().selectObject(fixture.rootId);
+    useStore.getState().copySelection();
+    useStore.setState((state) => ({
+      project: createProject(),
+      projectDocumentEpoch: state.projectDocumentEpoch + 1,
+      selectedObjectId: null,
+      additionalSelectedIds: new Set(),
+    }));
+
+    useStore.getState().pasteClipboard();
+
+    const state = useStore.getState();
+    const pastedRoot = state.project.scene.objects.find(
+      (object) => object.kind === 'text' && object.content === fixture.rootId,
+    );
+    expect(state.selectedObjectId).toBe(pastedRoot?.id);
+    expect(state.additionalSelectedIds).toEqual(new Set());
+  });
+
+  it('cuts only the user selection while carrying its dependency closure on the clipboard', () => {
+    const fixture = textDependencyChain();
+    useStore.setState({ project: fixture.project });
+    useStore.getState().selectObject(fixture.rootId);
+
+    useStore.getState().cutSelection();
+
+    expect(useStore.getState().sceneClipboard?.objects.map((object) => object.id)).toEqual(
+      fixture.project.scene.objects.map((object) => object.id),
+    );
+    expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
+      'guide-c',
+      'text-b',
+    ]);
+    useStore.getState().pasteClipboard();
+    expect(allObjectDependenciesResolve(useStore.getState().project.scene.objects)).toBe(true);
+  });
+
+  it('uses canonical dependency repair when a cut removes a selected mask', () => {
+    const fixture = rasterDependencyChain();
+    useStore.setState({ project: fixture.project });
+    useStore.getState().selectObject('mask-c');
+
+    useStore.getState().cutSelection();
+
+    const raster = useStore
+      .getState()
+      .project.scene.objects.find((object) => object.kind === 'raster-image');
+    expect(raster?.kind === 'raster-image' ? raster.imageMaskId : 'missing').toBeUndefined();
+    expect(allObjectDependenciesResolve(useStore.getState().project.scene.objects)).toBe(true);
+  });
+
+  it('keeps materialized text and removes its path link when a cut removes the guide', () => {
+    const fixture = textDependencyChain();
+    useStore.setState({ project: fixture.project });
+    useStore.getState().selectObject('guide-c');
+
+    useStore.getState().cutSelection();
+
+    const middle = useStore
+      .getState()
+      .project.scene.objects.find((object) => object.id === 'text-b');
+    expect(middle?.kind === 'text' ? middle.pathText : 'missing').toBeUndefined();
+    expect(allObjectDependenciesResolve(useStore.getState().project.scene.objects)).toBe(true);
+  });
+
+  it('does not clone a partial unrelated group reached only through dependencies', () => {
+    const fixture = textDependencyChain();
+    const unrelated = { ...shapeObject(), id: 'unrelated' };
+    useStore.setState({
+      project: {
+        ...fixture.project,
+        scene: {
+          ...fixture.project.scene,
+          objects: [...fixture.project.scene.objects, unrelated],
+          groups: [
+            {
+              id: 'dependency-group',
+              name: 'Partially reached',
+              objectIds: ['guide-c', 'text-b', unrelated.id],
+            },
+          ],
+        },
+      },
+    });
+    useStore.getState().selectObject(fixture.rootId);
+
+    useStore.getState().copySelection();
+
+    expect(useStore.getState().sceneClipboard?.groups).toEqual([]);
+  });
+
+  it('keeps a missing dependency unresolved across a target id collision', () => {
+    const source = dependencyProject([dependentText('source-root', 'missing-guide')]);
+    useStore.setState({ project: source });
+    useStore.getState().selectObject('source-root');
+    useStore.getState().copySelection();
+
+    const target = createProject();
+    const collidingTarget = { ...shapeObject(), id: 'missing-guide' };
+    useStore.getState().setProject({
+      ...target,
+      scene: { ...target.scene, objects: [collidingTarget] },
+    });
+    useStore.getState().pasteClipboard();
+
+    const scene = useStore.getState().project.scene;
+    const pasted = scene.objects.find(
+      (object) => object.kind === 'text' && object.content === 'source-root',
+    );
+    expect(pasted?.kind).toBe('text');
+    if (pasted?.kind !== 'text') throw new Error('pasted text missing');
+    expect(pasted.pathText?.guideObjectId).not.toBe(collidingTarget.id);
+    expect(scene.objects.some((object) => object.id === pasted.pathText?.guideObjectId)).toBe(
+      false,
+    );
+  });
+
+  it('keeps a pasted multi-hop chain isolated after deleting every source object', () => {
+    const fixture = rasterDependencyChain();
+    useStore.setState({ project: fixture.project });
+    useStore.getState().selectObject(fixture.rootId);
+    useStore.getState().copySelection();
+    useStore.getState().pasteClipboard();
+
+    for (const object of fixture.project.scene.objects)
+      useStore.getState().removeSceneObject(object.id);
+
+    const remaining = useStore.getState().project.scene.objects;
+    expect(remaining).toHaveLength(3);
+    expect(allObjectDependenciesResolve(remaining)).toBe(true);
+  });
+
+  it('remaps complete copied group ownership across projects', () => {
+    const fixture = textDependencyChain();
+    const group = {
+      id: 'dependency-group',
+      name: 'Dependency group',
+      objectIds: fixture.project.scene.objects.map((object) => object.id),
+    };
+    useStore.setState({
+      project: {
+        ...fixture.project,
+        scene: { ...fixture.project.scene, groups: [group] },
+      },
+    });
+    useStore.getState().selectObject(fixture.rootId);
+    useStore.getState().copySelection();
+    useStore.setState({
+      project: createProject(),
+      selectedObjectId: null,
+      additionalSelectedIds: new Set(),
+    });
+
+    useStore.getState().pasteClipboard();
+
+    const scene = useStore.getState().project.scene;
+    expect(scene.groups).toHaveLength(1);
+    expect(scene.groups?.[0]?.name).toBe(group.name);
+    expect(scene.groups?.[0]?.objectIds).toEqual(scene.objects.map((object) => object.id));
+  });
 });
-
-function projectWithVariants(): Project {
-  const objects: ReadonlyArray<SceneObject> = [
-    { ...svgObj('svg-1', ['#ff0000']), transform: { ...IDENTITY_TRANSFORM, x: 0, y: 0 } },
-    textObject(),
-    tracedObject(),
-    rasterObject(),
-    shapeObject(),
-  ];
-  const project = createProject();
-  return {
-    ...project,
-    scene: {
-      objects,
-      layers: [
-        createLayer({ id: '#ff0000', color: '#ff0000', mode: 'line' }),
-        createLayer({ id: '#123456', color: '#123456', mode: 'line' }),
-        createLayer({ id: '#000000', color: '#000000', mode: 'fill' }),
-        createLayer({ id: '#808080', color: '#808080', mode: 'image' }),
-      ],
-    },
-  };
-}
-
-function textObject(): TextObject {
-  return {
-    kind: 'text',
-    id: 'text-1',
-    content: 'Text',
-    fontKey: 'Roboto',
-    sizeMm: 10,
-    alignment: 'left',
-    lineHeight: 1,
-    letterSpacing: 0,
-    color: '#123456',
-    bounds: { minX: 0, minY: 0, maxX: 8, maxY: 4 },
-    transform: { ...IDENTITY_TRANSFORM, x: 1, y: 1 },
-    paths: [{ ...BLACK_PATH, color: '#123456' }],
-  };
-}
-
-function tracedObject(): TracedImage {
-  return {
-    kind: 'traced-image',
-    id: 'trace-1',
-    source: 'trace.png',
-    bounds: { minX: 0, minY: 0, maxX: 5, maxY: 5 },
-    transform: { ...IDENTITY_TRANSFORM, x: 2, y: 2 },
-    paths: [BLACK_PATH],
-  };
-}
-
-function rasterObject(): RasterImage {
-  return {
-    kind: 'raster-image',
-    id: 'raster-1',
-    source: 'raster.png',
-    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
-    pixelWidth: 2,
-    pixelHeight: 2,
-    bounds: { minX: 0, minY: 0, maxX: 5, maxY: 5 },
-    transform: { ...IDENTITY_TRANSFORM, x: 3, y: 3 },
-    color: '#808080',
-    dither: 'grayscale',
-    linesPerMm: 10,
-    lumaBase64: 'gA==',
-  };
-}
-
-function shapeObject(): ShapeObject {
-  return {
-    kind: 'shape',
-    id: 'shape-1',
-    spec: { kind: 'rect', widthMm: 5, heightMm: 5, cornerRadiusMm: 0 },
-    color: '#000000',
-    bounds: { minX: 0, minY: 0, maxX: 5, maxY: 5 },
-    transform: { ...IDENTITY_TRANSFORM, x: 4, y: 4 },
-    paths: [BLACK_PATH],
-  };
-}

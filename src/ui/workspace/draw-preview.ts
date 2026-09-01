@@ -6,6 +6,7 @@
 import { canvasTheme } from '../theme/canvas-theme';
 import {
   assertNever,
+  sceneLayerVisibility,
   type Layer,
   type Project,
   type SceneObject,
@@ -13,7 +14,6 @@ import {
   type Vec2,
   validateOutputScope,
 } from '../../core/scene';
-import { resolveVisibleOperationForPath } from '../../core/scene/visibility';
 import {
   buildToolpath,
   EMPTY_JOB,
@@ -54,12 +54,7 @@ export function drawObjectsFaint(
 ): void {
   ctx.save();
   ctx.globalAlpha = 0.3;
-  const layerByColor = new Map(
-    project.scene.layers.flatMap((layer) => [
-      [layer.id, layer] as const,
-      [layer.color, layer] as const,
-    ]),
-  );
+  const layerByColor = sceneLayerVisibility.lookup(project.scene.layers);
   for (const obj of project.scene.objects) {
     if (!hasFaintVectorGeometry(obj)) continue;
     drawObjectPolylinesFaint(ctx, obj, layerByColor, view);
@@ -90,7 +85,7 @@ function drawObjectPolylinesFaint(
 ): void {
   if (!hasFaintVectorGeometry(obj)) return;
   for (const path of obj.paths) {
-    const resolution = resolveVisibleOperationForPath(obj, path, layerByColor);
+    const resolution = sceneLayerVisibility.resolvePath(obj, path, layerByColor);
     if (!resolution.visible) continue;
     ctx.strokeStyle = resolution.operation?.color ?? path.color;
     ctx.lineWidth = resolution.operation?.output === false ? 0.75 : 1.5;

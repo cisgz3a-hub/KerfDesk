@@ -9,7 +9,7 @@ import type { Toolpath } from '../../core/job';
 import {
   isRegistrationBox,
   flattenColoredPathCurves,
-  sceneObjectHasVisibleLayerFromMap,
+  sceneLayerVisibility,
   type ColoredPath,
   type Layer,
   type Polyline,
@@ -17,7 +17,6 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
-import { resolveVisibleOperationForPath } from '../../core/scene/visibility';
 import { drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawMeasurement } from './draw-measurement';
 import { drawNoGoZones } from './draw-no-go-zones';
@@ -252,7 +251,7 @@ function drawObjects(
   displayPolylineCache?: DisplayPolylineCache,
   artworkRunFocus?: ArtworkRunFocus,
 ): boolean {
-  const layerByColor = operationLookup(project.scene.layers);
+  const layerByColor = sceneLayerVisibility.lookup(project.scene.layers);
   scheduleReliefPreviews(project.scene.objects, layerByColor, onRasterBitmapReady);
   let simplified = false;
   for (const obj of project.scene.objects) {
@@ -260,7 +259,7 @@ function drawObjects(
     if (artworkRunFocus !== undefined && !artworkRunFocus.objectIds.includes(obj.id)) {
       ctx.globalAlpha = 0.24;
     }
-    const isVisible = sceneObjectHasVisibleLayerFromMap(obj, layerByColor);
+    const isVisible = sceneLayerVisibility.hasObject(obj, layerByColor);
     // ImportedSvg and TextObject share the same polyline shape after text renders
     // to paths — single drawing path. ADR-057: dash the jig box so it reads as a
     // placement fixture, not artwork; reset after, before the overlays below.
@@ -314,8 +313,7 @@ function selectedObjectsForOverlay(
   if (selectedId === null || additionalSelectedIds.size === 0) return [];
   const selectedIds = new Set([selectedId, ...additionalSelectedIds]);
   return objects.filter(
-    (object) =>
-      selectedIds.has(object.id) && sceneObjectHasVisibleLayerFromMap(object, layerByColor),
+    (object) => selectedIds.has(object.id) && sceneLayerVisibility.hasObject(object, layerByColor),
   );
 }
 
@@ -340,7 +338,7 @@ function drawObjectPolylines(
   }
   let simplified = false;
   for (const path of obj.paths) {
-    const resolution = resolveVisibleOperationForPath(obj, path, layerByColor);
+    const resolution = sceneLayerVisibility.resolvePath(obj, path, layerByColor);
     if (!resolution.visible) continue;
     const layer = resolution.operation;
     if (layer === undefined) {
@@ -370,15 +368,6 @@ function drawObjectPolylines(
     strokePolylinesBatched(ctx, obj, display.polylines, view);
   }
   return simplified;
-}
-
-function operationLookup(layers: ReadonlyArray<Layer>): Map<string, Layer> {
-  const lookup = new Map<string, Layer>();
-  for (const layer of layers) {
-    lookup.set(layer.id, layer);
-    if (!lookup.has(layer.color)) lookup.set(layer.color, layer);
-  }
-  return lookup;
 }
 
 function displayPathFor(

@@ -3,13 +3,12 @@ import {
   curveControlPoint,
   curveNodeCount,
   curveNodePoint,
-  sceneObjectHasVisibleLayerFromMap,
+  sceneLayerVisibility,
   type ColoredPath,
   type Scene,
   type SceneObject,
   type Vec2,
 } from '../../core/scene';
-import { resolveVisibleOperationForPath } from '../../core/scene/visibility';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 
 export const PATH_NODE_HIT_RADIUS_PX = 8;
@@ -25,13 +24,11 @@ export function hitPathNode(
   selectedNodes: ReadonlyArray<PathNodeRef> = [],
 ): PathNodeRef | null {
   const radiusMm = Math.max(0, PATH_NODE_HIT_RADIUS_PX * pxToMm);
-  const layerByColor = new Map(
-    scene.layers.flatMap((layer) => [[layer.id, layer] as const, [layer.color, layer] as const]),
-  );
+  const layerByColor = sceneLayerVisibility.lookup(scene.layers);
   for (let objectIndex = scene.objects.length - 1; objectIndex >= 0; objectIndex -= 1) {
     const object = scene.objects[objectIndex];
     if (object === undefined || !isEditablePathObject(object)) continue;
-    if (!sceneObjectHasVisibleLayerFromMap(object, layerByColor)) continue;
+    if (!sceneLayerVisibility.hasObject(object, layerByColor)) continue;
     const hit = hitObjectPathNode(object, point, radiusMm, layerByColor, selectedNodes);
     if (hit !== null) return hit;
   }
@@ -50,7 +47,7 @@ function hitObjectPathNode(
   for (let pathIndex = 0; pathIndex < object.paths.length; pathIndex += 1) {
     const path = object.paths[pathIndex];
     if (path === undefined) continue;
-    if (!resolveVisibleOperationForPath(object, path, layerByColor).visible) continue;
+    if (!sceneLayerVisibility.resolvePath(object, path, layerByColor).visible) continue;
     const hit = hitPathNodes(object, path, pathIndex, point, maxDistanceSq, selectedNodes);
     if (hit === null) continue;
     if (best !== null && hit.distanceSq >= best.distanceSq) continue;

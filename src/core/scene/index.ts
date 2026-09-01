@@ -172,7 +172,7 @@ export {
   type GridArraySpec,
 } from './array-layout';
 export type { PrintAndCutDesignTargets } from './print-and-cut';
-export { sceneObjectHasVisibleLayer, sceneObjectHasVisibleLayerFromMap } from './visibility';
+export { sceneLayerVisibility, sceneObjectHasVisibleLayer } from './visibility';
 
 export type { Scene, SceneGroup } from './scene';
 export type { LayerMoveDirection } from './scene';

@@ -2,13 +2,17 @@ import {
   arrayPlacements,
   combinedBBox,
   sceneObjectHasVisibleLayer,
-  type ArrayPlacement,
   type ArraySpec,
   type SceneGroup,
   type SceneObject,
 } from '../../core/scene';
+import { copyObjectsAtArrayPlacement } from './array-selection-copies';
+import { planArrayFirstPlacement } from './array-first-placement';
+import { sceneObjectCopyClosure } from './scene-object-copy-dependencies';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
+
+export { placedObject } from './array-selection-copies';
 
 export type ArrayActions = { readonly arraySelection: (spec: ArraySpec) => void };
 
@@ -40,27 +44,42 @@ export function applyArraySelection(
   const first = placements[0];
   if (first === undefined) return state;
 
-  const moved = new Map(selected.map((object) => [object.id, placedObject(object, first)]));
-  const copies: SceneObject[] = [];
-  const copiedGroups: SceneGroup[] = [];
+  const copySources = sceneObjectCopyClosure(state.project.scene.objects, selectedIds);
+  const copySourceIds = new Set(copySources.map((object) => object.id));
+  const firstPlan = planArrayFirstPlacement(
+    state.project.scene.objects,
+    state.project.scene.groups ?? [],
+    selected,
+    copySources,
+    first,
+    idFactory,
+  );
+  const copies: SceneObject[] = [...firstPlan.copiedObjects];
+  const copiedSelectedIds: string[] = [];
+  const copiedGroups: SceneGroup[] = cloneSelectedGroups(
+    state.project.scene.groups ?? [],
+    firstPlan.protectedSourceIds,
+    firstPlan.copiedIds,
+    idFactory,
+  );
   for (const placement of placements.slice(1)) {
-    const ids = new Map<string, string>();
-    for (const object of selected) {
-      const id = idFactory();
-      ids.set(object.id, id);
-      copies.push({ ...placedObject(object, placement), id } as SceneObject);
-    }
+    const copied = copyObjectsAtArrayPlacement(copySources, placement, idFactory);
+    const ids = copied.ids;
+    copies.push(...copied.objects);
+    copiedSelectedIds.push(
+      ...selected.flatMap((object) => {
+        const id = ids.get(object.id);
+        return id === undefined ? [] : [id];
+      }),
+    );
     copiedGroups.push(
-      ...cloneSelectedGroups(state.project.scene.groups ?? [], selectedIds, ids, idFactory),
+      ...cloneSelectedGroups(state.project.scene.groups ?? [], copySourceIds, ids, idFactory),
     );
   }
   const objects = state.project.scene.objects
-    .map((object) => moved.get(object.id) ?? object)
+    .map((object) => firstPlan.movedById.get(object.id) ?? object)
     .concat(copies);
-  const selectedResultIds = [
-    ...selected.map((object) => object.id),
-    ...copies.map((copy) => copy.id),
-  ];
+  const selectedResultIds = [...firstPlan.selectedObjectIds, ...copiedSelectedIds];
   return {
     project: {
       ...state.project,
@@ -85,44 +104,6 @@ function selectionIds(state: AppState): ReadonlySet<string> {
   ]);
 }
 
-/** Pure placement of one array copy. Exported for direct pivot coverage. */
-export function placedObject(object: SceneObject, placement: ArrayPlacement): SceneObject {
-  const moved = {
-    ...object.transform,
-    x: object.transform.x + placement.dx,
-    y: object.transform.y + placement.dy,
-  };
-  // applyTransform rotates about the object's local origin. Moving that origin
-  // around the placement pivot makes Circular and Point Rotation both rotate
-  // the complete selection rigidly around their requested scene-space point.
-  if (placement.rotationDeg === 0 || placement.pivot === undefined) {
-    return { ...object, transform: moved } as SceneObject;
-  }
-  const origin = rotateAboutPivot(moved, placement.pivot, placement.rotationDeg);
-  return {
-    ...object,
-    transform: {
-      ...moved,
-      x: origin.x,
-      y: origin.y,
-      rotationDeg: normalizeDegrees(object.transform.rotationDeg + placement.rotationDeg),
-    },
-  } as SceneObject;
-}
-
-function rotateAboutPivot(
-  origin: { readonly x: number; readonly y: number },
-  pivot: { readonly x: number; readonly y: number },
-  deltaDeg: number,
-): { readonly x: number; readonly y: number } {
-  const rad = (deltaDeg * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const dx = origin.x - pivot.x;
-  const dy = origin.y - pivot.y;
-  return { x: pivot.x + dx * cos - dy * sin, y: pivot.y + dx * sin + dy * cos };
-}
-
 function cloneSelectedGroups(
   groups: ReadonlyArray<SceneGroup>,
   selectedIds: ReadonlySet<string>,
@@ -137,9 +118,4 @@ function cloneSelectedGroups(
     });
     return objectIds.length < 2 ? [] : [{ ...group, id: idFactory(), objectIds }];
   });
-}
-
-function normalizeDegrees(value: number): number {
-  const normalized = value % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
 }

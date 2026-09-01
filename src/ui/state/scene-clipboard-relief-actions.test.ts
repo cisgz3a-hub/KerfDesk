@@ -80,6 +80,46 @@ describe('machine-agnostic relief paste', () => {
     useStore.getState().redo();
     expect(currentReliefs().map((relief) => relief.id)).toContain(pasted.id);
   });
+
+  it('materializes a relief fallback instead of adopting a colliding missing operation', () => {
+    const sourceRelief = {
+      ...meshRelief(),
+      operationIds: ['missing-operation'],
+      operationOverride: { speed: 321, power: 22 },
+    };
+    const source = cncProjectWithRelief(sourceRelief);
+    useStore.setState({
+      project: { ...source, scene: { ...source.scene, objects: [sourceRelief], layers: [] } },
+    });
+    useStore.getState().selectObject(sourceRelief.id);
+    useStore.getState().copySelection();
+
+    const targetOperation = {
+      ...createLayer({ id: 'missing-operation', color: DEFAULT_RELIEF_LAYER_COLOR }),
+      speed: 999,
+      power: 88,
+    };
+    const target = createProject();
+    useStore.getState().setProject({
+      ...target,
+      scene: { ...target.scene, layers: [targetOperation] },
+    });
+    useStore.getState().pasteClipboard();
+
+    const scene = useStore.getState().project.scene;
+    const [pasted] = scene.objects.filter(
+      (object): object is ReliefObject => object.kind === 'relief',
+    );
+    expect(pasted).toBeDefined();
+    if (pasted === undefined) throw new Error('pasted relief missing');
+    const [pastedOperationId] = operationIdsForObject(pasted, scene.layers);
+    expect(pastedOperationId).toBeDefined();
+    expect(pastedOperationId).not.toBe(targetOperation.id);
+    expect(scene.layers.find((operation) => operation.id === pastedOperationId)).toMatchObject({
+      speed: 321,
+      power: 22,
+    });
+  });
 });
 
 function expectPastedOperationToRetainSettings(pasted: ReliefObject, project: Project): void {

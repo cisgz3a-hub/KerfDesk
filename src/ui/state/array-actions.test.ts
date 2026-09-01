@@ -5,6 +5,7 @@ import {
   createProject,
   IDENTITY_TRANSFORM,
   type SceneObject,
+  type TextObject,
 } from '../../core/scene';
 import { applyArraySelection } from './array-actions';
 import type { AppState } from './store';
@@ -127,4 +128,228 @@ describe('arraySelection', () => {
     expect(result.project.scene.objects[0]?.transform.rotationDeg).toBe(30);
     expect(result.project.scene.objects[2]?.transform.rotationDeg).toBe(120);
   });
+
+  it('copies and remaps every hop in a selected dependency chain', () => {
+    let nextId = 0;
+    const before = state();
+    const chained = {
+      ...before,
+      selectedObjectId: 'text-a',
+      additionalSelectedIds: new Set<string>(),
+      project: {
+        ...before.project,
+        scene: {
+          ...before.project.scene,
+          objects: [
+            object('guide-c', 0),
+            dependentText('text-b', 'guide-c'),
+            dependentText('text-a', 'text-b'),
+          ],
+        },
+      },
+    };
+
+    const result = applyArraySelection(
+      chained,
+      { kind: 'grid', rows: 1, columns: 2, spacingX: 5, spacingY: 0 },
+      () => `copy-${nextId++}`,
+    ) as AppState;
+    const copiedRootId = [...result.additionalSelectedIds][0];
+    const copiedRoot = result.project.scene.objects.find((item) => item.id === copiedRootId);
+    if (copiedRoot?.kind !== 'text') throw new Error('copied root text missing');
+    const copiedMiddle = result.project.scene.objects.find(
+      (item) => item.id === copiedRoot.pathText?.guideObjectId,
+    );
+    if (copiedMiddle?.kind !== 'text') throw new Error('copied middle text missing');
+
+    expect(copiedMiddle.pathText?.guideObjectId).toBe('copy-0');
+    expect(result.project.scene.objects.some((item) => item.id === 'copy-0')).toBe(true);
+    expect([...result.additionalSelectedIds]).toEqual([copiedRoot.id]);
+  });
+
+  it('preserves a shared dependency cycle by selecting a placed clone', () => {
+    let nextId = 0;
+    const before = state();
+    const root = dependentText('root', 'middle');
+    const middle = dependentText('middle', root.id);
+    const outside = {
+      ...dependentText('outside', middle.id),
+      transform: { ...IDENTITY_TRANSFORM, x: 30 },
+    };
+    const cyclic = {
+      ...before,
+      selectedObjectId: root.id,
+      additionalSelectedIds: new Set<string>(),
+      project: {
+        ...before.project,
+        scene: { ...before.project.scene, objects: [root, middle, outside] },
+      },
+    };
+
+    const result = applyArraySelection(
+      cyclic,
+      {
+        kind: 'circular',
+        count: 1,
+        centerX: 100,
+        centerY: 100,
+        radius: 0,
+        startAngleDeg: 0,
+        rotateCopies: false,
+      },
+      () => `copy-${nextId++}`,
+    ) as AppState;
+
+    const originalRoot = result.project.scene.objects.find((item) => item.id === root.id);
+    const originalMiddle = result.project.scene.objects.find((item) => item.id === middle.id);
+    const selectedClone = result.project.scene.objects.find(
+      (item) => item.id === result.selectedObjectId,
+    );
+    expect(originalRoot?.transform).toEqual(root.transform);
+    expect(originalMiddle?.transform).toEqual(middle.transform);
+    expect(selectedClone?.kind).toBe('text');
+    expect(selectedClone?.transform).toMatchObject({ x: 95, y: 97.5 });
+    expect(selectedClone?.id).not.toBe(root.id);
+  });
+
+  it('clones a selected guide instead of moving it beneath unselected path text', () => {
+    let nextId = 0;
+    const before = state();
+    const root = object('root', 0);
+    const outside = {
+      ...dependentText('outside', root.id),
+      transform: { ...IDENTITY_TRANSFORM, x: 30 },
+    };
+    const owned = {
+      ...before,
+      selectedObjectId: root.id,
+      additionalSelectedIds: new Set<string>(),
+      project: {
+        ...before.project,
+        scene: { ...before.project.scene, objects: [root, outside], groups: [] },
+      },
+    };
+
+    const result = applyArraySelection(
+      owned,
+      {
+        kind: 'circular',
+        count: 1,
+        centerX: 100,
+        centerY: 100,
+        radius: 0,
+        startAngleDeg: 0,
+        rotateCopies: false,
+      },
+      () => `copy-${nextId++}`,
+    ) as AppState;
+
+    expect(result.project.scene.objects.find((item) => item.id === root.id)).toEqual(root);
+    expect(result.project.scene.objects.find((item) => item.id === outside.id)).toEqual(outside);
+    expect(result.selectedObjectId).toBe('copy-0');
+    expect(
+      result.project.scene.objects.find((item) => item.id === 'copy-0')?.transform,
+    ).toMatchObject({ x: 95, y: 97.5 });
+  });
+
+  it.each([270, -90])(
+    'keeps a shared component byte-equivalent for circular start angle %d',
+    (startAngleDeg) => {
+      let idCalls = 0;
+      const before = state();
+      const guide = object('guide', 0);
+      const root = dependentText('root', guide.id);
+      const outside = {
+        ...dependentText('outside', guide.id),
+        transform: { ...IDENTITY_TRANSFORM, x: 30 },
+      };
+      const shared = {
+        ...before,
+        selectedObjectId: root.id,
+        additionalSelectedIds: new Set<string>(),
+        project: {
+          ...before.project,
+          scene: { ...before.project.scene, objects: [guide, root, outside], groups: [] },
+        },
+      };
+
+      const result = applyArraySelection(
+        shared,
+        {
+          kind: 'circular',
+          count: 1,
+          centerX: 5,
+          centerY: 12.5,
+          radius: 10,
+          startAngleDeg,
+          rotateCopies: true,
+        },
+        () => `copy-${idCalls++}`,
+      ) as AppState;
+
+      expect(result.project.scene.objects).toEqual(shared.project.scene.objects);
+      expect(idCalls).toBe(0);
+    },
+  );
+
+  it('does not clone a partial group through an unrelated referenced member', () => {
+    let nextId = 0;
+    const before = state();
+    const root = dependentText('root', 'a');
+    const a = dependentText('a', 'b');
+    const b = object('b', 0);
+    const unrelated = object('unrelated', 30);
+    const outside = {
+      ...dependentText('outside', unrelated.id),
+      transform: { ...IDENTITY_TRANSFORM, x: 60 },
+    };
+    const group = { id: 'mixed-group', name: 'Mixed', objectIds: [a.id, b.id, unrelated.id] };
+    const grouped = {
+      ...before,
+      selectedObjectId: root.id,
+      additionalSelectedIds: new Set<string>(),
+      project: {
+        ...before.project,
+        scene: {
+          ...before.project.scene,
+          objects: [root, a, b, unrelated, outside],
+          groups: [group],
+        },
+      },
+    };
+
+    const result = applyArraySelection(
+      grouped,
+      {
+        kind: 'circular',
+        count: 1,
+        centerX: 100,
+        centerY: 100,
+        radius: 0,
+        startAngleDeg: 0,
+        rotateCopies: false,
+      },
+      () => `copy-${nextId++}`,
+    ) as AppState;
+
+    expect(result.project.scene.groups).toEqual([group]);
+  });
 });
+
+function dependentText(id: string, guideObjectId: string): TextObject {
+  return {
+    kind: 'text',
+    id,
+    content: id,
+    fontKey: 'Roboto',
+    sizeMm: 5,
+    alignment: 'left',
+    lineHeight: 1,
+    letterSpacing: 0,
+    color: '#000000',
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 5 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [],
+    pathText: { guideObjectId, offsetMm: 0, reverse: false },
+  };
+}

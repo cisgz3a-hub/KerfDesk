@@ -10,7 +10,11 @@ import type { Scene } from './scene';
 import type { Bounds, ColoredPath, Polyline, SceneObject, Transform, Vec2 } from './scene-object';
 import { applyTransform } from './transform';
 import { flattenColoredPathCurves } from './curve-path';
-import { resolveVisibleOperationForPath, sceneObjectHasVisibleLayerFromMap } from './visibility';
+import {
+  resolveVisibleOperationForPath,
+  sceneLayerVisibilityLookup,
+  sceneObjectHasVisibleLayerFromMap,
+} from './visibility';
 
 const VECTOR_STROKE_HIT_TOLERANCE_MM = 2;
 const BOUNDS_EDGE_EPSILON_MM = 1e-9;
@@ -23,9 +27,7 @@ export type HitTestObjectResult =
 const NO_HIT: HitTestObjectResult = { kind: 'none' };
 
 export function hitTest(scene: Scene, point: Vec2): string | null {
-  const layerByColor = new Map(
-    scene.layers.flatMap((layer) => [[layer.id, layer] as const, [layer.color, layer] as const]),
-  );
+  const layerByColor = sceneLayerVisibilityLookup(scene.layers);
   let bestLineInterior: { readonly id: string; readonly area: number } | null = null;
 
   // Topmost first: later-added objects render on top so direct hits win first.

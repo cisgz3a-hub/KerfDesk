@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createLayer,
   createProject,
   IDENTITY_TRANSFORM,
   type Project,
@@ -81,6 +82,45 @@ describe('snapMoveTransform', () => {
 
     const result = snapMoveTransform({
       project: projectWithObjects([moving, lockedTarget]),
+      movingObjectId: 'moving',
+      proposedTransform: transformAt(19.2, 0),
+      settings: BASE_SETTINGS,
+    });
+
+    expect(result.transform.x).toBeCloseTo(19.2);
+    expect(result.guides).toEqual([]);
+  });
+
+  it('skips object ids owned by the current multi-object move', () => {
+    const moving = objectAt('moving', 0, 0);
+    const selectionPeer = objectAt('selection-peer', 30, 0);
+
+    const result = snapMoveTransform({
+      project: projectWithObjects([moving, selectionPeer]),
+      movingObjectId: moving.id,
+      ignoredObjectIds: new Set([selectionPeer.id]),
+      proposedTransform: transformAt(19.2, 0),
+      settings: BASE_SETTINGS,
+    });
+
+    expect(result.transform.x).toBeCloseTo(19.2);
+    expect(result.guides).toEqual([]);
+  });
+
+  it('skips targets whose canonical operation bindings are all hidden', () => {
+    const moving = objectAt('moving', 0, 0);
+    const target = { ...objectAt('target', 30, 0), operationIds: ['hidden'] };
+    const base = projectWithObjects([moving, target]);
+    const project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        layers: [{ ...createLayer({ id: 'hidden', color: '#111111' }), visible: false }],
+      },
+    };
+
+    const result = snapMoveTransform({
+      project,
       movingObjectId: 'moving',
       proposedTransform: transformAt(19.2, 0),
       settings: BASE_SETTINGS,

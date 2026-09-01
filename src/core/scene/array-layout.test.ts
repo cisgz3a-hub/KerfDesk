@@ -36,6 +36,52 @@ describe('arrayPlacements', () => {
     expect(placements[1]?.dy).toBeCloseTo(95);
   });
 
+  it.each([270, -90])(
+    'keeps exact quadrant placement at the source for start angle %d',
+    (startAngleDeg) => {
+      expect(
+        arrayPlacements(bounds, {
+          kind: 'circular',
+          count: 1,
+          centerX: 20,
+          centerY: 35,
+          radius: 10,
+          startAngleDeg,
+          rotateCopies: true,
+        })[0],
+      ).toMatchObject({ dx: 0, dy: 0 });
+    },
+  );
+
+  it.each([1e308, -1e308, Number.MAX_VALUE])(
+    'reduces huge finite start angle %d before trigonometry',
+    (startAngleDeg) => {
+      const spec = {
+        kind: 'circular' as const,
+        count: 4,
+        centerX: 20,
+        centerY: 25,
+        radius: 10,
+        rotateCopies: true,
+      };
+      const placements = arrayPlacements(bounds, { ...spec, startAngleDeg });
+      const equivalent = arrayPlacements(bounds, {
+        ...spec,
+        startAngleDeg: startAngleDeg % 360,
+      });
+
+      expect(
+        placements.every((placement) =>
+          [placement.dx, placement.dy, placement.rotationDeg].every(Number.isFinite),
+        ),
+      ).toBe(true);
+      expect(placements).toEqual(equivalent);
+      expect(new Set(placements.map((placement) => `${placement.dx},${placement.dy}`)).size).toBe(
+        4,
+      );
+    },
+  );
+
   it('rotates copies in place over a full turn without duplicating the endpoint', () => {
     expect(
       arrayPlacements(bounds, { kind: 'point-rotation', count: 4, totalAngleDeg: 360 }),
