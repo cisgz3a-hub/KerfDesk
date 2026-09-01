@@ -179,19 +179,6 @@ export function breakCurveAtNode(path: CurveSubpath, nodeIndex: number): CurveSu
   return { ...rotated, segments: rotated.segments.slice(0, -1), closed: false };
 }
 
-export function joinCurveSubpaths(first: CurveSubpath, second: CurveSubpath): CurveSubpath | null {
-  if (first.closed || second.closed) return null;
-  const firstEnd = first.segments.at(-1)?.to ?? first.start;
-  const bridge = samePoint(firstEnd, second.start)
-    ? []
-    : [{ kind: 'line' as const, to: second.start }];
-  return {
-    start: first.start,
-    segments: [...first.segments, ...bridge, ...second.segments],
-    closed: false,
-  };
-}
-
 function incomingSegmentIndex(path: CurveSubpath, nodeIndex: number): number | null {
   if (nodeIndex > 0) return nodeIndex - 1;
   return path.closed && path.segments.length > 0 ? path.segments.length - 1 : null;

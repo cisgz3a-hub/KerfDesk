@@ -1,6 +1,7 @@
 import {
   curveControlPoint,
   curveNodePoint,
+  curveSubpathBounds,
   flattenCurveSubpath,
   moveCurveAnchor,
   moveCurveControl,
@@ -158,16 +159,39 @@ export function materializedPolylineToSpecPoints(
 }
 
 export function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds {
-  const points = paths.flatMap((path) =>
-    path.polylines.flatMap((polyline: Polyline) => polyline.points),
+  const bounds = paths.flatMap((path) =>
+    path.curves === undefined
+      ? path.polylines.flatMap((polyline) => {
+          const bounds = boundsForPolyline(polyline);
+          return bounds === null ? [] : [bounds];
+        })
+      : path.curves.map((curve) => curveSubpathBounds(curve)),
   );
-  if (points.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  return {
-    minX: Math.min(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    maxY: Math.max(...points.map((point) => point.y)),
-  };
+  const first = bounds[0];
+  if (first === undefined) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  return bounds.slice(1).reduce(
+    (combined, next) => ({
+      minX: Math.min(combined.minX, next.minX),
+      minY: Math.min(combined.minY, next.minY),
+      maxX: Math.max(combined.maxX, next.maxX),
+      maxY: Math.max(combined.maxY, next.maxY),
+    }),
+    first,
+  );
+}
+
+function boundsForPolyline(polyline: Polyline): Bounds | null {
+  const first = polyline.points[0];
+  if (first === undefined) return null;
+  return polyline.points.slice(1).reduce(
+    (bounds, point) => ({
+      minX: Math.min(bounds.minX, point.x),
+      minY: Math.min(bounds.minY, point.y),
+      maxX: Math.max(bounds.maxX, point.x),
+      maxY: Math.max(bounds.maxY, point.y),
+    }),
+    { minX: first.x, minY: first.y, maxX: first.x, maxY: first.y },
+  );
 }
 
 function deletePolylineNodes(

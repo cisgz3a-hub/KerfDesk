@@ -94,12 +94,12 @@ export {
   curveControlPoint,
   curveNodeCount,
   curveNodePoint,
-  joinCurveSubpaths,
   moveCurveAnchor,
   moveCurveControl,
   setCurveStartNode,
   smoothCurveNode,
 } from './curve-edit';
+export { curveEndpointJoin } from './curve-join';
 export {
   DITHER_ALGORITHMS,
   DEFAULT_RASTER_LAYER_COLOR,

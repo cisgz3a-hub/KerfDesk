@@ -56,9 +56,13 @@
 ## Curve-native design
 
 1. SVG, DXF, trace, text, and supported LightBurn project geometry retain canonical curves.
-2. Use node editing for anchors, cubic controls, corner/smooth conversion, join/break, and start-point selection.
-3. Imported fonts are embedded with stored outlines. Missing fonts remain renderable but must be relinked before text edits.
-4. Text can bend or follow a selected vector guide; output flattening happens only at preview and machine boundaries.
+2. Use node editing for anchors, cubic controls, corner/smooth conversion, Join/Break, and start-point selection.
+3. Join connects two selected endpoints from open subpaths in the same colored path. Selecting the
+   two endpoints of one open subpath closes it; click order never changes source-order output.
+4. Interior anchors, closed paths, and anchors with incompatible ownership remain selected and get
+   a nonblocking explanation instead of a disconnected cut or silent success.
+5. Imported fonts are embedded with stored outlines. Missing fonts remain renderable but must be relinked before text edits.
+6. Text can bend or follow a selected vector guide; output flattening happens only at preview and machine boundaries.
 
 ## Output check
 

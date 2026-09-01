@@ -20,6 +20,7 @@ export function IconButton(props: {
   readonly label: string;
   readonly title?: string;
   readonly helpId?: string;
+  readonly buttonRef?: React.Ref<HTMLButtonElement>;
   readonly onClick: () => void;
   readonly disabled?: boolean;
   readonly size?: IconButtonSize;
@@ -29,6 +30,7 @@ export function IconButton(props: {
   const title = props.title ?? props.label;
   return (
     <button
+      ref={props.buttonRef}
       type="button"
       className={SIZE_CLASS[size]}
       onClick={props.onClick}

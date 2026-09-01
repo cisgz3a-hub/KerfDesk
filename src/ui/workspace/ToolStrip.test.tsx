@@ -159,6 +159,73 @@ describe('ToolStrip', () => {
     expect(updated.paths[0]?.curves?.[0]?.segments[0]?.kind).toBe('cubic');
   });
 
+  it('keeps Join available for two anchors and returns focus to Edit nodes after success', async () => {
+    const object = curveObject([
+      {
+        start: { x: 0, y: 0 },
+        segments: [{ kind: 'line', to: { x: 10, y: 0 } }],
+        closed: false,
+      },
+    ]);
+    loadNodeProject(object, [
+      { objectId: 'curve', pathIndex: 0, polylineIndex: 0, pointIndex: 0, geometry: 'curve' },
+      { objectId: 'curve', pathIndex: 0, polylineIndex: 0, pointIndex: 1, geometry: 'curve' },
+    ]);
+    const h = await render(<ToolStrip />);
+    const node = h.querySelector<HTMLButtonElement>('button[aria-label="Edit nodes"]');
+    const join = h.querySelector<HTMLButtonElement>('button[aria-label="Join"]');
+
+    expect(join?.disabled).toBe(false);
+    expect(join?.title).toBe('Join two selected open curve endpoints');
+    join?.focus();
+    await act(async () => join?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+    expect(h.querySelector('button[aria-label="Join"]')).toBeNull();
+    expect(document.activeElement).toBe(node);
+  });
+
+  it('does not turn unsupported interior anchors into a narrower disabled-state guard', async () => {
+    const object = curveObject([
+      {
+        start: { x: 0, y: 0 },
+        segments: [
+          { kind: 'line', to: { x: 5, y: 0 } },
+          { kind: 'line', to: { x: 10, y: 0 } },
+        ],
+        closed: false,
+      },
+      {
+        start: { x: 20, y: 0 },
+        segments: [{ kind: 'line', to: { x: 30, y: 0 } }],
+        closed: false,
+      },
+    ]);
+    const refs = [
+      {
+        objectId: 'curve',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 1,
+        geometry: 'curve' as const,
+      },
+      {
+        objectId: 'curve',
+        pathIndex: 0,
+        polylineIndex: 1,
+        pointIndex: 0,
+        geometry: 'curve' as const,
+      },
+    ];
+    loadNodeProject(object, refs);
+    const h = await render(<ToolStrip />);
+    const join = h.querySelector<HTMLButtonElement>('button[aria-label="Join"]');
+
+    expect(join?.disabled).toBe(false);
+    await act(async () => join?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(useStore.getState().selectedPathNodes).toEqual(refs);
+    expect(h.querySelector<HTMLButtonElement>('button[aria-label="Join"]')?.disabled).toBe(false);
+  });
+
   it('arms the Star tool from the tool strip', async () => {
     const h = await render(<ToolStrip />);
     const star = h.querySelector('button[aria-label="Draw star"]');
@@ -182,3 +249,49 @@ describe('ToolStrip', () => {
     expect(useUiStore.getState().libraryDialogOpen).toBe(true);
   });
 });
+
+function curveObject(curves: NonNullable<ImportedSvg['paths'][number]['curves']>): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id: 'curve',
+    source: 'curve.svg',
+    bounds: { minX: 0, minY: 0, maxX: 30, maxY: 0 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#000000',
+        curves,
+        polylines: curves.map((curve) => ({
+          points: [curve.start, ...curve.segments.map((segment) => segment.to)],
+          closed: curve.closed,
+        })),
+      },
+    ],
+  };
+}
+
+function loadNodeProject(
+  object: ImportedSvg,
+  refs: ReadonlyArray<{
+    readonly objectId: string;
+    readonly pathIndex: number;
+    readonly polylineIndex: number;
+    readonly pointIndex: number;
+    readonly geometry: 'curve';
+  }>,
+): void {
+  useStore.setState({
+    project: {
+      ...createProject(),
+      scene: {
+        objects: [object],
+        layers: [createLayer({ id: '#000000', color: '#000000' })],
+        groups: [],
+      },
+    },
+    selectedObjectId: 'curve',
+    selectedPathNode: refs.at(-1) ?? null,
+    selectedPathNodes: refs,
+  });
+  useUiStore.getState().setToolMode({ kind: 'node' });
+}

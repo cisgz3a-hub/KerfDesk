@@ -3,7 +3,6 @@ import {
   convertCurveSegment,
   cornerCurveNode,
   flattenCurveSubpath,
-  joinCurveSubpaths,
   setCurveStartNode,
   smoothCurveNode,
   type ColoredPath,
@@ -15,6 +14,14 @@ import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { boundsForPaths } from './path-node-edit-geometry';
 import type { PathNodeRef } from './path-node-edit-actions';
+import { planCurveNodeJoin } from './path-node-curve-join-plan';
+import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
+import { useToastStore } from './toast-store';
+
+type CurveJoinCommandOutcome =
+  | { readonly kind: 'joined' }
+  | { readonly kind: 'closed' }
+  | { readonly kind: 'unchanged' };
 
 export type PathNodeCurveCommandActions = {
   readonly smoothSelectedCurveNode: () => void;
@@ -22,7 +29,7 @@ export type PathNodeCurveCommandActions = {
   readonly convertSelectedCurveSegment: (kind: 'line' | 'cubic') => void;
   readonly setSelectedCurveStart: () => void;
   readonly breakSelectedCurve: () => void;
-  readonly joinSelectedCurveNodes: () => void;
+  readonly joinSelectedCurveNodes: () => CurveJoinCommandOutcome;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -37,7 +44,39 @@ export function pathNodeCurveCommandActions(set: Setter): PathNodeCurveCommandAc
       ),
     setSelectedCurveStart: () => set((state) => mutateSelected(state, setCurveStartNode)),
     breakSelectedCurve: () => set((state) => mutateSelected(state, breakCurveAtNode)),
-    joinSelectedCurveNodes: () => set((state) => joinSelected(state)),
+    joinSelectedCurveNodes: () => {
+      let outcome: CurveJoinCommandOutcome = { kind: 'unchanged' };
+      const notification = { present: false, text: '', success: false };
+      set((state) => {
+        const plan = planCurveNodeJoin(state.project, state.selectedPathNodes.filter(isAnchorRef));
+        if (plan.kind === 'unchanged') {
+          notification.present = true;
+          notification.text = plan.message;
+          return state;
+        }
+        outcome = { kind: plan.outcome };
+        notification.present = true;
+        notification.text = plan.message;
+        notification.success = true;
+        const objects = state.project.scene.objects.map((object) =>
+          object.id === plan.object.id ? plan.object : object,
+        );
+        return {
+          project: { ...state.project, scene: { ...state.project.scene, objects } },
+          undoStack: pushUndo(state.project, state.undoStack),
+          redoStack: [],
+          dirty: true,
+          selectedPathNode: null,
+          selectedPathNodes: [],
+        };
+      });
+      if (notification.present) {
+        useToastStore
+          .getState()
+          .pushToast(notification.text, notification.success ? 'success' : 'warning');
+      }
+      return outcome;
+    },
   };
 }
 
@@ -58,31 +97,6 @@ function mutateSelected(
   });
 }
 
-function joinSelected(state: AppState): AppState | Partial<AppState> {
-  const refs = state.selectedPathNodes.filter(isAnchorRef);
-  if (refs.length !== 2) return state;
-  const [firstRef, secondRef] = refs;
-  if (
-    firstRef === undefined ||
-    secondRef === undefined ||
-    firstRef.objectId !== secondRef.objectId ||
-    firstRef.pathIndex !== secondRef.pathIndex ||
-    firstRef.polylineIndex === secondRef.polylineIndex
-  ) {
-    return state;
-  }
-  return mutateObjectCurve(state, firstRef, (curves) => {
-    const first = curves[firstRef.polylineIndex];
-    const second = curves[secondRef.polylineIndex];
-    if (first === undefined || second === undefined) return null;
-    const joined = joinCurveSubpaths(first, second);
-    if (joined === null) return null;
-    return curves
-      .map((curve, index) => (index === firstRef.polylineIndex ? joined : curve))
-      .filter((_curve, index) => index !== secondRef.polylineIndex);
-  });
-}
-
 function mutateObjectCurve(
   state: AppState,
   ref: PathNodeRef,
@@ -100,8 +114,14 @@ function mutateObjectCurve(
     const paths = object.paths.map((candidate, index) =>
       index === ref.pathIndex ? nextPath : candidate,
     );
+    const bounds = boundsForPaths(paths);
+    const updated =
+      object.kind === 'shape'
+        ? synchronizePolylineShapeGeometry(object, paths, bounds)
+        : { ...object, paths, bounds };
+    if (updated === null) return object;
     changed = true;
-    return { ...object, paths, bounds: boundsForPaths(paths) };
+    return updated;
   });
   if (!changed) return state;
   const project: Project = { ...state.project, scene: { ...state.project.scene, objects } };
@@ -135,5 +155,9 @@ function isAnchorRef(ref: PathNodeRef | null): ref is PathNodeRef & { geometry: 
 function isCurveCommandObject(
   object: SceneObject,
 ): object is Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }> {
-  return object.kind === 'imported-svg' || object.kind === 'traced-image';
+  return (
+    object.kind === 'imported-svg' ||
+    object.kind === 'traced-image' ||
+    (object.kind === 'shape' && object.spec.kind === 'polyline')
+  );
 }

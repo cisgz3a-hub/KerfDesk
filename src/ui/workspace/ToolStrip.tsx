@@ -4,6 +4,8 @@
 // mirroring the right-side panels. Toggle state shows via aria-pressed (the
 // lf-btn pressed fill); the active name lives on each IconButton.
 
+import { useRef } from 'react';
+
 import { IconButton, type IconName } from '../kit';
 import { useDesignStudioStore } from '../design-studio';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
@@ -29,6 +31,7 @@ const TOOLS: ReadonlyArray<Tool> = [
 ];
 
 export function ToolStrip(): JSX.Element {
+  const nodeToolButtonRef = useRef<HTMLButtonElement>(null);
   const toolMode = useUiStore((s) => s.toolMode);
   const setToolMode = useUiStore((s) => s.setToolMode);
   const resetToolMode = useUiStore((s) => s.resetToolMode);
@@ -42,6 +45,7 @@ export function ToolStrip(): JSX.Element {
           label={TOOL_HELP[tool.helpKey].label}
           title={TOOL_HELP[tool.helpKey].tooltip}
           helpId={toolHelpId(tool.helpKey)}
+          {...(tool.helpKey === 'node' ? { buttonRef: nodeToolButtonRef } : {})}
           onClick={() => {
             if (tool.mode.kind === 'draw' && isActive(toolMode, tool.mode)) resetToolMode();
             else setToolMode(tool.mode);
@@ -49,7 +53,7 @@ export function ToolStrip(): JSX.Element {
           pressed={isActive(toolMode, tool.mode)}
         />
       ))}
-      {toolMode.kind === 'node' ? <NodeCommandBar /> : null}
+      {toolMode.kind === 'node' ? <NodeCommandBar nodeToolButtonRef={nodeToolButtonRef} /> : null}
       <button
         type="button"
         aria-label="Open design library"
@@ -72,7 +76,9 @@ export function ToolStrip(): JSX.Element {
   );
 }
 
-function NodeCommandBar(): JSX.Element | null {
+function NodeCommandBar(props: {
+  readonly nodeToolButtonRef: React.RefObject<HTMLButtonElement | null>;
+}): JSX.Element | null {
   const project = useStore((state) => state.project);
   const selected = useStore((state) => state.selectedPathNode);
   const selectedNodes = useStore((state) => state.selectedPathNodes);
@@ -128,7 +134,10 @@ function NodeCommandBar(): JSX.Element | null {
         label="Join"
         title="Join two selected open curve endpoints"
         disabled={!canJoin}
-        onClick={join}
+        onClick={() => {
+          const outcome = join();
+          if (outcome.kind !== 'unchanged') props.nodeToolButtonRef.current?.focus();
+        }}
       />
     </div>
   );
