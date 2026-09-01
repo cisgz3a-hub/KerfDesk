@@ -1,6 +1,7 @@
 import { IDBFactory as FakeIDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import {
   createProject,
   DEFAULT_RELIEF_LAYER_COLOR,
@@ -23,39 +24,43 @@ beforeEach(() => {
 });
 
 describe('large canonical heightfield autosave', () => {
-  it('round-trips the full 2048x2048 U16 field through atomic IndexedDB', async () => {
-    const project = largeHeightfieldProject();
-    const source = reliefSource(project);
-    const service = new AutosaveDurableService({
-      repository: new IndexedDbAutosaveRepository({
-        factory: new FakeIDBFactory(),
-        databaseName: `curvedesk-autosave-large-${crypto.randomUUID()}`,
-      }),
-      locks: new AutosaveSessionLocks(null),
-      initialSessionId: 'large-heightfield',
-      rotateSessionId: () => 'large-heightfield-degraded',
-    });
+  it(
+    'round-trips the full 2048x2048 U16 field through atomic IndexedDB',
+    { timeout: ciBudgetMs(15_000, 30_000) },
+    async () => {
+      const project = largeHeightfieldProject();
+      const source = reliefSource(project);
+      const service = new AutosaveDurableService({
+        repository: new IndexedDbAutosaveRepository({
+          factory: new FakeIDBFactory(),
+          databaseName: `curvedesk-autosave-large-${crypto.randomUUID()}`,
+        }),
+        locks: new AutosaveSessionLocks(null),
+        initialSessionId: 'large-heightfield',
+        rotateSessionId: () => 'large-heightfield-degraded',
+      });
 
-    expect(source.samplesBase64).toHaveLength(Math.ceil(SAMPLE_BYTE_COUNT / 3) * 4);
-    expect(source.samplesBase64.length).toBeGreaterThan(11_000_000);
-    expect(source.digest).toBe(
-      'sha256:44cabfc80c072c1e4d7c454829f88a29264ee8d17fcdba7bf23fc0a48419dcd2',
-    );
-    await expect(service.write(project, 100)).resolves.toMatchObject({
-      kind: 'ok',
-      backend: 'indexeddb',
-    });
-    expect(localStorage.length).toBe(0);
+      expect(source.samplesBase64).toHaveLength(Math.ceil(SAMPLE_BYTE_COUNT / 3) * 4);
+      expect(source.samplesBase64.length).toBeGreaterThan(11_000_000);
+      expect(source.digest).toBe(
+        'sha256:44cabfc80c072c1e4d7c454829f88a29264ee8d17fcdba7bf23fc0a48419dcd2',
+      );
+      await expect(service.write(project, 100)).resolves.toMatchObject({
+        kind: 'ok',
+        backend: 'indexeddb',
+      });
+      expect(localStorage.length).toBe(0);
 
-    const read = await service.readLatest();
-    expect(read.warnings).toEqual([]);
-    expect(read.snapshot).toMatchObject({ backend: 'indexeddb', savedAt: 100 });
-    const recovered = read.snapshot?.project;
-    const recoveredSource = recovered === undefined ? null : reliefSource(recovered);
-    expect(recovered?.notes).toBe('large canonical recovery');
-    expect(recoveredSource).toEqual(source);
-    await service.stop();
-  });
+      const read = await service.readLatest();
+      expect(read.warnings).toEqual([]);
+      expect(read.snapshot).toMatchObject({ backend: 'indexeddb', savedAt: 100 });
+      const recovered = read.snapshot?.project;
+      const recoveredSource = recovered === undefined ? null : reliefSource(recovered);
+      expect(recovered?.notes).toBe('large canonical recovery');
+      expect(recoveredSource).toEqual(source);
+      await service.stop();
+    },
+  );
 });
 
 function largeHeightfieldProject(): Project {

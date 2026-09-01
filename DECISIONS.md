@@ -119,7 +119,7 @@
 | ADR-136 | 2026-07-12 | Superseded | CNC interruption recovery rewinds to a retract-first safe boundary (see ADR-143) |
 | ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
 | ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
-| ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
+| ADR-139 | 2026-07-13 | Superseded in part by ADR-207 | Right workspace rails collapse independently with fail-visible machine controls |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
 | ADR-141 | 2026-07-12 | Accepted; macOS Preview RTSP qualification amended by ADR-248 | Network-camera bridge is desktop and local-development only |
 | ADR-142 | 2026-07-12 | Accepted; manual-dispatch topology amended by ADR-248 | Production desktop tags require a valid Windows signature |
@@ -7129,7 +7129,13 @@ the command group, but every command also remains available from the menus.
 
 ## ADR-139 - Right workspace rails are independently collapsible, with machine controls fail-visible
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded in part by ADR-207 | **Date:** 2026-07-13
+
+> **Supersession note (2026-09-02).** ADR-207 moved Pause, Resume, Continue,
+> and software Abort into the independent Live Motion bar and explicitly permits
+> the Machine rail to collapse during a run. The active-job force-visible rule,
+> disabled collapse button, and disabled Window/F12 commands below no longer
+> govern; the independent rail states remain operator-controlled at all times.
 
 ### Context
 

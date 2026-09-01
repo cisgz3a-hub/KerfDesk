@@ -94,14 +94,15 @@ describe('WorkspaceSidePanels', () => {
     }
   });
 
-  it('keeps the machine shell expanded while an active job overrides its collapsed preference', async () => {
+  it('keeps the stored machine-panel preference while a job is active', async () => {
     useUiStore.getState().setRailPanelVisible('machine', false);
     useLaserStore.setState({ streamer: step(createStreamer('G1 X1 S100')).state });
     const { host, root } = await renderPanels();
     try {
       const machine = requiredPanel(host, 'Machine controls resizable panel');
-      expect(machine.style.width).toBe('300px');
-      expect(machine.style.resize).toBe('horizontal');
+      expect(machine.style.width).toBe(COLLAPSED_PANEL_WIDTH_CSS);
+      expect(machine.style.minWidth).toBe(COLLAPSED_PANEL_WIDTH_CSS);
+      expect(machine.style.resize).toBe('none');
     } finally {
       await act(async () => root.unmount());
     }

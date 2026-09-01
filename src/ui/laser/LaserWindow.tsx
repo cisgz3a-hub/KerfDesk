@@ -56,11 +56,7 @@ export function LaserWindow(): JSX.Element {
   return (
     <aside aria-label={machineControlsLabel(machineKind)} className="lf-rail" style={panelStyle}>
       <DetectedSettingsToast />
-      <MachineRailHeading
-        machineKind={machineKind}
-        jobActive={machinePanel.isJobActive}
-        onCollapse={machinePanel.toggle}
-      />
+      <MachineRailHeading machineKind={machineKind} onCollapse={machinePanel.toggle} />
       <ControllerConnectionControls
         machineKind={machineKind}
         autofocusBusy={autofocusBusy}
@@ -166,16 +162,10 @@ function CollapsedMachineRail(props: {
 
 function MachineRailHeading(props: {
   readonly machineKind: MachineKind;
-  readonly jobActive: boolean;
   readonly onCollapse: () => void;
 }): JSX.Element {
   return (
-    <RailPanelHeading
-      title={machineDisplayName(props.machineKind)}
-      onCollapse={props.onCollapse}
-      collapseDisabled={props.jobActive}
-      collapseDisabledReason="Machine controls stay visible while a job is active so ABORT remains reachable."
-    />
+    <RailPanelHeading title={machineDisplayName(props.machineKind)} onCollapse={props.onCollapse} />
   );
 }
 

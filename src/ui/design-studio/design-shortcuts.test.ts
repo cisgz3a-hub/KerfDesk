@@ -12,6 +12,7 @@ type KeyInit = {
   readonly shiftKey?: boolean;
   readonly altKey?: boolean;
   readonly target?: EventTarget;
+  readonly defaultPrevented?: boolean;
 };
 
 function press(init: KeyInit): { readonly prevented: boolean } {
@@ -23,6 +24,7 @@ function press(init: KeyInit): { readonly prevented: boolean } {
     shiftKey: init.shiftKey ?? false,
     altKey: init.altKey ?? false,
     target: init.target ?? document.createElement('div'),
+    defaultPrevented: init.defaultPrevented ?? false,
     preventDefault,
   } as unknown as React.KeyboardEvent<HTMLDivElement>;
   handleDesignStudioKey(event, onFit);
@@ -91,10 +93,33 @@ describe('tool shortcuts', () => {
     expect(session().tool).toBe('select');
   });
 
-  it('ignores keys while focus is in a text field', () => {
-    const input = document.createElement('input');
-    press({ key: 'r', target: input });
-    expect(session().tool).toBe('select');
+  it('leaves native editing and activation controls in charge of their keys', () => {
+    const roleButton = document.createElement('div');
+    roleButton.setAttribute('role', 'button');
+    const targets = [
+      document.createElement('input'),
+      document.createElement('textarea'),
+      document.createElement('select'),
+      document.createElement('button'),
+      roleButton,
+    ];
+
+    for (const target of targets) {
+      store().setTool('select');
+      expect(press({ key: 'r', target }).prevented).toBe(false);
+      expect(session().tool).toBe('select');
+    }
+  });
+
+  it('leaves an already-handled custom-control key with its owning control', () => {
+    seedSelectedRect();
+    const before = structuredClone(session().history.present.entities);
+    const historyDepth = session().history.past.length;
+
+    expect(press({ key: 'ArrowRight', defaultPrevented: true }).prevented).toBe(false);
+
+    expect(session().history.present.entities).toEqual(before);
+    expect(session().history.past).toHaveLength(historyDepth);
   });
 });
 
@@ -238,3 +263,16 @@ describe('closed Studio', () => {
     expect(store().session).toBeNull();
   });
 });
+
+function seedSelectedRect(): void {
+  store().setTool('rect');
+  store().setDraft({
+    tool: 'rect',
+    anchorMm: { x: 0, y: 0 },
+    pointerMm: { x: 20, y: 20 },
+    modifiers: NO_MODIFIERS,
+  });
+  store().commitDraft('selected-rect');
+  store().setTool('select');
+  store().setSelection(['selected-rect']);
+}

@@ -12,7 +12,14 @@ export function isKeyboardActivationTarget(target: EventTarget | null): boolean 
   if (!(target instanceof HTMLElement)) return false;
   if (target.tagName === 'BUTTON' || target.tagName === 'SELECT') return true;
   const role = target.getAttribute('role');
-  return role === 'button' || role === 'checkbox' || role === 'radio' || role === 'switch';
+  return (
+    role === 'button' ||
+    role === 'checkbox' ||
+    role === 'radio' ||
+    role === 'separator' ||
+    role === 'slider' ||
+    role === 'switch'
+  );
 }
 
 function isFormEditingTag(tagName: string): boolean {

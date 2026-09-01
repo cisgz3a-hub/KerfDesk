@@ -131,15 +131,7 @@ function useTransformViewShortcuts(): void {
   const fitToSelection = useStore((s) => s.fitToSelection);
   const resetView = useUiStore((s) => s.resetView);
   const zoomBy = useUiStore((s) => s.zoomBy);
-  const toggleSidePanels = (): void => {
-    const streamer = useLaserStore.getState().streamer;
-    if (
-      streamer !== null &&
-      ['streaming', 'paused', 'done', 'errored', 'tool-change'].includes(streamer.status)
-    )
-      return;
-    toggleWorkspaceSidePanels(useUiStore.getState());
-  };
+  const toggleSidePanels = (): void => toggleWorkspaceSidePanels(useUiStore.getState());
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (isModalOpen(useUiStore.getState())) return;

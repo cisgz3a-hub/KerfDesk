@@ -18,17 +18,17 @@ describe('workspace panel commands', () => {
     expect(resetWorkspaceLayout).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks the toggle-all command during an active job', () => {
+  it('keeps the toggle-all command available during an active job', () => {
     const toggleSidePanels = vi.fn();
     const command = commandById(
       buildAppCommands(baseCtx({ jobActive: true, toggleSidePanels })),
       'window.toggle-side-panels',
     );
 
-    expect(command.enabled).toBe(false);
-    expect(command.disabledReason).toContain('ABORT remains reachable');
-    expect(runCommand(command)).toBe(false);
-    expect(toggleSidePanels).not.toHaveBeenCalled();
+    expect(command.enabled).toBe(true);
+    expect(command.disabledReason).toBeUndefined();
+    expect(runCommand(command)).toBe(true);
+    expect(toggleSidePanels).toHaveBeenCalledTimes(1);
   });
 
   it('dispatches F12 outside editable controls', () => {

@@ -124,7 +124,7 @@ describe('file shortcuts while a job is streaming', () => {
 });
 
 describe('F12 workspace panels while a job is streaming', () => {
-  it('does not hide machine controls while Stop must remain reachable', async () => {
+  it('toggles both panels while Live Motion independently owns Abort', async () => {
     useLaserStore.setState({
       streamer: step(createStreamer('G1 X1 S100')).state,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
@@ -132,7 +132,7 @@ describe('F12 workspace panels while a job is streaming', () => {
 
     await pressKey({ key: 'F12' });
 
-    expect(useUiStore.getState().railPanelVisibility).toEqual({ layers: true, machine: true });
+    expect(useUiStore.getState().railPanelVisibility).toEqual({ layers: false, machine: false });
     await unmount();
   });
 

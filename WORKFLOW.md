@@ -77,6 +77,7 @@
 - **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering either responsive range again reapplies only its collapsed default.
 - **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button and a "Design" button that opens the Design Studio (ADR-272, flows F-DS1..F-DS4). Preview lives in the top toolbar and the Window menu, not here.
 - **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores both panels. Panel visibility does not affect the Live Motion bar.
+- **Studio keyboard ownership**: native form and activation controls retain their browser keys. Focusable resize separators and sliders retain their arrow keys, and a Studio root never reuses a key already handled by a nested control.
 
 #### Disabled controls
 - `File → Save Project`
@@ -5174,6 +5175,11 @@ and lifts the command's CNC-only gate.)*
    software Abort control inside the editor chrome (non-negotiable #9); the
    editor never blocks it.
 
+#### Edge — focus is in a native control
+1. Inputs, textareas, selects, buttons, and button-like controls retain Space,
+   arrow, Enter, and Ctrl/Cmd+A ownership. The Image Studio keymap does not pan,
+   nudge, commit, select, or add history while a native control owns the key.
+
 ### F-L2. Select and change an area
 
 #### Success
@@ -5989,8 +5995,9 @@ The chosen tool is pressed in its rail and its hint is on the status bar.
 
 #### Edge — typing in a field inside the Studio
 
-1. Tool letters are ignored while focus is in an input, textarea, or
-   contenteditable, so typing a dimension never switches tools.
+1. Tool letters are ignored while focus is in an input, textarea, select,
+   contenteditable, button, or button-like control, so editing and native
+   activation never switch tools or add history.
 
 ### F-DS4. Undo, redo, and close
 

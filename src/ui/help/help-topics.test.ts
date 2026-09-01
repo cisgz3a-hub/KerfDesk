@@ -37,6 +37,13 @@ describe('help topics', () => {
     );
   });
 
+  it('describes workspace panels as available while a job is active', () => {
+    expect(COMMAND_HELP['window.toggle-machine-panel'].tooltip).not.toMatch(/no job is active/i);
+    expect(COMMAND_HELP['window.toggle-side-panels'].tooltip).not.toMatch(/no job is active/i);
+    expect(COMMAND_HELP['window.toggle-machine-panel'].tooltip).toMatch(/during a job/i);
+    expect(COMMAND_HELP['window.toggle-side-panels'].tooltip).toMatch(/during a job/i);
+  });
+
   it('keeps command help families aligned with the command menu families', () => {
     const families = new Set(Object.values(COMMAND_HELP).map((topic) => topic.family));
 
