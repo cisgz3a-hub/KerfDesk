@@ -1,9 +1,11 @@
 # Audit remediation ledger
 
 Current authoritative 2026-09-01 remediation: isolated worktree label `ade9`, branch
-`codex/fix-reaudit-findings-20260901`, reconstructed from exact `origin/main`
-`da67029a82ca82c64c46e1cf86ad3945c95eefad` (tree
-`695c486c878187753d18922cd7186cb8ce41c270`). The original dirty checkout was
+`codex/fix-design-state-invariants-20260901`, reconstructed from exact `origin/main`
+`0a29540d9319958e35bfccc5f261edeed66cea82` (tree
+`e1434596fc235f246f1388f5b1106258afcb5b54`). The preceding ADR-314 remediation merged through
+PR #710; its exact-head required checks and post-merge Chrome smoke are green, while the independent
+post-merge full-CI/automatic-Pages evidence remains a separate live lane below. The original dirty checkout was
 re-fingerprinted read-only at `9209fcb33f4807ebfc1f7a55780069b6a7b0e23c`, branch
 `claude/vcarve-stamp-subcell`, with 9 modified tracked files, 0 staged files, 6 untracked files,
 and tracked-diff hash `6a1fc1cb119a370814a5eb65c66f78c4038f41a5`. The detached `6b32` donor retained the same
@@ -752,8 +754,144 @@ requested/effective differences remain disclosures rather than output blocks.
   post-gate edits are the exact evidence/status wording in this ledger and ADR-314; Prettier, ADR
   numbering, and `git diff --check` are rerun below rather than misrepresenting documentation-only
   evidence as part of the earlier byte set.
-- Hosted exact-head checks, review resolution, mergeability, exact-main CI/browser checks, and
-  automatic Pages publication remain separate pending evidence lanes. They are not credited in
-  advance.
+- PR #710 satisfied its exact-head required checks and review/thread policy, merged as exact main
+  `0a29540d9319958e35bfccc5f261edeed66cea82`, and retained zero open PRs. Exact-main Chrome UX smoke
+  run 33504650137 and full CI run 33504650074 succeeded. Automatic Pages run 33507899422 then passed
+  its independent release gate and current-main freshness check before publishing deployment
+  `https://f79a9f41.laserforge-2fj.pages.dev`; that URL, `https://kerfdesk.com/`, and the default Pages
+  alias returned HTTP 200 with the same `assets/index-DfGlib0o.js` asset. These hosted states remain
+  separate from the local release evidence above.
 - No device was contacted and no hardware, air-cut, material-cut, perceptual, reference-CAM,
   installed-package, or manual-deployment qualification was performed.
+
+## 2026-09-01 eight-lane follow-up and design-state remediation
+
+This section reconciles the eight frozen Ultra-audit lanes and the frozen design-authoring donor
+against exact main `0a29540d9319958e35bfccc5f261edeed66cea82`. Donor changes are evidence only:
+the design donor remains unmodified at `da67029a82ca82c64c46e1cf86ad3945c95eefad`, with 17 modified
+tracked files, 12 untracked files, tracked-diff SHA-256
+`a35c5b2faad1f737d367269b27ac8bd6c9ca7eb47c0e93e3860654b8a8053a61`, and untracked-manifest
+SHA-256 `3ccf59a2d52e1eaa4a1feb44db4ffc95e7bee843300fb436fc948cdc963a4eb8`.
+Its 1,825-file/11,479-test green suite is useful regression evidence but does not clear the missing
+adversarial topology, Join, or Clipboard cases listed here.
+
+| ID | Current-main classification and reproduction | Current disposition | Current evidence | Remaining boundary |
+|---|---|---|---|---|
+| UA8-DS1 compatibility-node metadata | confirmed defect: compatibility-polyline move/delete rebuilt a path from only `color` and `polylines`, dropping `operationIds`, `strokeWidthMm`, and any other output metadata | implemented in this branch by removing only stale `curves` and preserving the rest of the exact path; save/reopen retains the operation binding | both regressions failed before the fix; move/delete plus save/reopen tests now pass | Node-edit geometry is software-verified; emitted motion and physical output are not hardware-qualified |
+| UA8-DS2 transitive copy dependencies | confirmed defect: Array, Duplicate, and Clipboard each followed only one `pathText.guideObjectId` or `imageMaskId` hop, so text-to-text-to-guide and text-to-raster-to-mask copies retained dangling second-hop references; adversarial review then proved Clipboard conflated user roots with dependencies, Cut removed the whole closure or bypassed deletion repair, Open/New cleared the clipboard, cross-document operation-id collisions inherited target settings, missing ids could collide with target or newly generated operations, source-less legacy color aliases and cross-object aliases could adopt unrelated settings, partial groups were cloned, and Array could move locked/shared/group-owned dependency sources beneath untouched artwork | implemented through one ordered, cycle-safe shared closure/remapper used by all three actions; Clipboard separately owns roots and source document epoch, survives document replacement, selects/cuts only roots, uses canonical dependency repair, clones source operations across documents, tracks mapped operation ownership per copied object, keeps unresolved partial bindings away from target/generated aliases, materializes source-less objects under fresh fallback operations, and preserves only complete groups; Array clones protected first-placement components, includes selected sources with incoming owners, expands groups through an indexed fixed point, bounds protection to the copy closure, and treats normalized full turns/quadrants as exact identity; deleting a path-text guide removes the stale link with a nonblocking warning while retaining materialized text geometry | nine regression-first assertions failed before the first closure repair; six further adversarial Clipboard/Duplicate assertions and nine initial Array ownership/identity assertions then failed before their repairs; selected-owner, partial-group, nonzero-radius, huge-angle, target/generated-operation alias, legacy-color alias, and cross-object alias schedules were also reproduced before repair; post-fix coverage includes both dependency chains, cycles, missing/colliding references, Raster/Relief/mixed-path operation ownership, deep array copies, actual `setProject` lifecycle, selected-root Cut/Paste, canonical mask/path-text deletion repair, exact compiled settings, complete-versus-partial groups, 1,000-member group expansion, huge finite circular angles, save/reopen, and delete-original isolation | Existing already-missing references remain truthful rather than inventing an object; dynamic text after deliberate guide deletion becomes ordinary unbent editable text, and perceptual path-text/mask rendering remains unqualified |
+| UA8-DS3 overlapping group closure | confirmed defect: one forward pass over groups made selection depend on group record order and missed transitive overlap | implemented with a member-indexed fixed-point traversal that preserves scene order and leaves both persisted group records unchanged | reverse-order reproduction failed before the fix; selection plus exact save/reopen group records now pass | Group appearance and complex interactive pointer schedules remain browser/perceptual evidence lanes |
+| UA8-DS4 hidden snap targets | confirmed defect: object snapping excluded locked/self/ignored objects but did not apply the canonical operation-binding visibility resolver | implemented with one per-snap visibility lookup; hidden bindings and duplicate legacy color aliases no longer create snap guides, while any visible or unknown binding retains canonical fail-visible behavior | pre-fix hidden-target integration failed; canonical operation-id, color-alias, duplicate-color, any-visible, unknown, and ignored-target tests now pass | Pointer feel and high-density canvas perception remain unqualified |
+| UA8-GEO1 design topology and output semantics | confirmed defects, intentionally not copied from the donor: n-ary Intersect/XOR semantics, Text non-zero fill, per-`ColoredPath` render-batch normalization, raw stored/source-order determinism, multi-operation Weld settings, and Boolean/Offset subject overrides all have source-backed adversarial reproductions | pending a separate corrected geometry/output slice; Subtract remains subject-minus-union, Intersect/XOR must reduce every object region, each render batch is normalized independently before object union, and no operation metadata may collapse | donor reviewers supplied three-operand permutations, same-wound Text, multi-color/duplicate-color, and exact-output fixtures; normalized signatures alone are rejected because opposite raw path orders can normalize identically, so raw stored paths plus compiled `source-order` bytes, genuine rotation/nonuniform-scale/reflection fixtures, and independent union/difference/intersect/xor/inflate failure mocks with no partial mutation/history are required | External CAM, perceptual topology, physical kerf, and material output remain unqualified |
+| UA8-JOIN1 Join determinism and truthful reachability | confirmed donor defects: click order changed raw/compiled source order, interior anchors appended a disconnected run, and several enabled two-anchor selections silently no-op | pending a separate Join slice; raw stored order and compiled `source-order` output must be asserted across click permutations with unrelated curves and genuine rotation/nonuniform-scale/reflection fixtures; unsupported reachable combinations require truthful nonblocking feedback rather than a new guard | donor endpoint/cubic/arc tests and the 8-file/43-test frozen verifier are useful but insufficient; same-subpath close, different `ColoredPath`/object, closed/open, interior, undo, announcement, and source-order permutations remain required | Product choice for interior-anchor split-and-join versus truthful independent-run disclosure must be resolved from existing contracts without widening refusal surfaces |
+
+### Reconciled command-shell and diagnostic findings
+
+The read-only shell/diagnostics lane remained byte-identical to exact main and passed 24 focused
+files/167 tests. Those green legacy tests do not cover the adversarial schedules below.
+
+| ID | Classification and exact current-main result | Disposition |
+|---|---|---|
+| UA8-DIR01 | P1 confirmed: status-only Alarm cancels a stream without Alarm-owned interruption evidence; checkpointing can consume a stale global notice or label the stop as an app cancellation | pending run/session/causal-sequence ownership; cover streaming, paused, and tool-change Alarm paths without adding a Start guard |
+| UA8-DIR04 | P1 confirmed: physical disconnect, EOF, read exception, intentional close, and permission loss collapse through a cause-free `SerialConnection.onClose` | pending typed observed-cause propagation into transcript/recovery; do not claim a controller cause the platform did not observe |
+| UA8-GUARD01 | P1 confirmed policy violations: empty-output Preview is disabled despite the `P` route; dirty unload silently refuses close; PWA Update is hidden during activity; and Machine Panel, Toggle Side Panels, and F12 are blocked during active/terminal streamer states even though Live Motion independently owns Abort | pending removal/narrowing: Preview remains reachable with explanation, close relies on autosave/fail-off with no Leave/Stay prompt, Update remains reachable with truthful consequences plus in-flight coalescing, and panel visibility remains operable; Frame stays the sole ordinary Start guard |
+| UA8-CS01 | P1 confirmed: Image Studio root shortcuts steal Space, arrows, Enter, and Ctrl+A from native inputs/buttons, while Design Studio omits `SELECT` from its native-control arbitration | pending exact native-control ownership plus input/button/select regressions; no geometry/history mutation may occur from native editing or activation |
+| UA8-CS03/04 | P2 confirmed: context click collapses member multiselection and lacks complete menu keyboard/focus ownership; a 320 px menubar cannot reach all families | pending roving menu focus/restore, selection-preserving context ownership, and 320 px pointer/keyboard coverage |
+| UA8-PWA01/02/03 | P2 confirmed: service-worker failure is console-only while Offline can claim readiness; compact side panels can consume the canvas; Update shares a hidden-scroll telemetry row | pending nonblocking readiness/error state, compact-layout ownership, and fixed action reachability |
+| UA8-EL02/03/04 | P2 confirmed: fixed support links are denied by Electron child-window policy; macOS window recreation accumulates serial-selection listeners; Electron serial help says to install the app | pending exact-URL external allowlist, session-global/disposed listener ownership, and runtime-aware copy; packaged macOS remains external qualification |
+| UA8-DIR02/03 | P2 confirmed: reconnect clears the prior transcript before a new port succeeds, and failed writes are absent rather than recorded as attempted/receipt-unknown | pending session archive/attachment ownership and truthful ambiguous-write entries |
+| UA8-DIR05/06/10 | P2 confirmed: documented diagnostic export is absent; crash/global/Electron evidence is inconsistent; exact execution archives are private/unredacted without disclosure | pending a versioned allowlisted share-safe diagnostic and explicit exact-archive disclosure; exact private archives remain byte-faithful and are never redacted in place |
+| UA8-DIR07/08/09 | P2 confirmed: repeated PWA Update owns independent reload latches; autosave reporting permanently suppresses later incidents; G-code Save allows duplicate picker/write invocations | pending coalesced retryable owners with tests; existing identity-bound variable advancement is already correct and is not reopened |
+| UA8-SHELL-P3 | P3 confirmed: shortcut help omissions/stale Ctrl copy, splash precache gap, docked-console clipboard rejection loss, and stale `.lf` bug-template copy | pending documentation/cache/error-copy cleanup in the matching shell slice |
+| UA8-SHELL-N | narrowed/refuted: Super Console already handles clipboard rejection; duplicate variable advancement is refuted; docked Clear/history mismatch was not reproduced; macOS accelerator arbitration is external | no duplicate source change; retain exact evidence boundaries |
+
+### Reconciled camera and rotary findings
+
+The read-only camera/rotary lane remained byte-identical to exact main, passed 22 camera files/144
+tests and 14 rotary files/45 tests, and ran source-level adversarial probes without contacting any
+camera, controller, or machine.
+
+| ID | Classification and exact current-main result | Disposition |
+|---|---|---|
+| UA8-CAM-PRIV01/ID01 | P1 confirmed: raw RTSP credentials can reach renderer queries/status via bridge and FFmpeg errors; removing the whole query also collapses distinct query-selected feeds to one calibration identity | pending opaque renderer session routes, allowlisted structured errors, and a non-secret full-endpoint fingerprint; exact private process evidence remains internal |
+| UA8-CAM-ASYNC01/02 | P1/P2 confirmed: capture, auto-align, Detect, Trace, enumeration, and discovery can publish after source/document/wizard/request supersession | pending reusable source/document/session/request epochs; late work retires silently without mutation or false success |
+| UA8-CAM-BED01/COMPAT01 | P1 confirmed: bed/profile edits retain old alignment, and overlay rectification checks alignment but not calibration binding | pending persisted bed/profile signature plus dual current-capture compatibility; mismatch is a Camera/Job Review warning and never a Frame/Start refusal |
+| UA8-CAM-MIRROR01/HOMO01 | P1 confirmed: a mirrored marker fixture persisted as aligned with a 15.791 px verification residual while independent physical corner error was about 402.3 mm; a singular homography passes validation | pending handedness/permutation evaluation, invertibility/conditioning/finite-mapping validation, and truthful nonblocking failure recovery |
+| UA8-CAM-TRACE01 | P1 confirmed: Camera Trace creates a transient raster that ordinary scene-owned Submit cannot claim, so Submit silently returns no mutation | pending explicit transient-camera owner and one atomic source/output/delete/operation/undo/document mutation |
+| UA8-CAM-MEM01/JR01/CLAMP01 | P2 confirmed: closing the lens wizard retains pixel buffers; calculated camera geometry warning is dead data; material/alignment height silently caps at 500 mm | pending session cleanup, warning-only Job Review routing with `ok === true`, and preservation of positive finite representable height without arbitrary cap |
+| UA8-ROT-RAS01 | P1 confirmed Frame-only violation: Labs policy returns empty raster/mixed rotary output and Save treats it as factual refusal | pending removal from Save/Preview/Frame/Start/Inspector with qualification disclosed only as a nonblocking Job Review warning |
+| UA8-ROT-FEED01 | P1 confirmed: chuck scaling transforms Y geometry but retains the requested `F` and contour-entry/fill-runway distance scalars, so equal requested horizontal, vertical, and diagonal moves have different surface traversal speeds | pending direction-aware feed/runway mapping shared by Preview, estimate, G-code, `.rd`, mixed, and multipass output; add scale 0.5/1/2 fixtures without a cap or qualification refusal |
+| UA8-ROT-REC01 | P1 confirmed: project-open machine reconciliation ignores all output-affecting rotary changes | pending identity/reconciliation coverage for enable, kind, diameter, motion per turn, and reverse fields |
+| UA8-ROT-Q01 | narrowed but confirmed: the alleged `1e308` NaN-emission path is refuted; overflow instead yields zero scale, Y collapse, and NaN wrap | pending overflow-resistant scale/wrap algebra and extreme finite-ratio fixtures; do not create a numeric cap or refusal |
+| UA8-ROT-UI01/JR01/CLAMP01 | P2 confirmed: quick Setup can be disabled while persisted rotary output remains active (full Machine Setup still exists); review says only Enabled and omits surface versus commanded-machine extent/seam/wrap/reverse facts; edit UI silently caps at 100000 | pending truthful reachable setup, exact requested/effective mapping facts, every rotary-field reconciliation notice, and positive-finite editing without arbitrary maximum |
+| UA8-ROT-HOME01 | P2 confirmed source/disclosure gap: generic Home exposes no rotary/Y-substitution context while the physical effect is hardware-only | pending truthful nonblocking Home/Y-substitution disclosure without implying A-axis support; physical homing behavior remains external |
+| UA8-ROT-RD01 | P2 confirmed: `.rd` applies rotary conversion but emits an over-wrap program without the final advisory available to reviewed output | pending byte-preserving exact/under-wrap behavior plus a nonblocking over-wrap advisory for reverse/custom profiles |
+| UA8-ROT-OPT01 | P3 confirmed: path optimization ranks pre-scale surface-space Euclidean distance, which can choose a farther machine-space path after rotary scaling | pending rotary-metric-aware source-order fixtures at scales 0.5/1/2 while preserving scale-1 byte identity |
+| UA8-ROT-QUANT01 | P3 narrowed: extreme accepted calibration can quantize visibly requested surface Y to stationary emitted motion without disclosure | pending Preview/Job Review representation disclosure only; do not add a cap, rewrite, or refusal |
+| UA8-ROT-SEAM01 | covered/policy: flat-bed Y rebasing to the rotary seam is the explicit ADR-127 contract; a distinct persisted periodic phase/unwrap intent does not exist and requires a new product contract rather than being inferred as a bug | preserve current rebase; add raw stored/emitted source-order disclosure tests, but do not silently reinterpret linear 99-to-1 input as a two-unit wrap |
+| UA8-CAMROT-EXT | external qualification: optics, handed physical mounts, controller calibration, scale/direction, slip/backlash, seam quality, and material output | no software or safety claim; no hardware operation in this remediation |
+
+### Reconciled jig, variable-data, text, and estimation findings
+
+This read-only lane used exact-main blobs while the parent branch changed unrelated files. Its 24-file
+legacy matrix passed 131 tests; separate no-file probes reproduced the duration, sequence, ligature,
+and missing-glyph cases below.
+
+| ID | Classification and exact current-main result | Disposition |
+|---|---|---|
+| UA8-JIG01 | P1 confirmed: replacing, shrinking, or removing a jig set leaves generated copies that compile as ordinary artwork because cleanup recognizes only current active prefixes | pending atomic generated-copy/group/order reconciliation with undo, persistence, and compile tests |
+| UA8-JIG02 | P1 confirmed: Jig and Quick Nest do not move transitive mask/path-text dependencies; Array and Clipboard shared the same one-hop defect | Array/Clipboard/Duplicate are implemented in UA8-DS2; Jig must copy and Nest must move the same closure in their own slice; cycles/missing/group/operation cases remain required |
+| UA8-JIG03 | P1 confirmed: selected-only output drops registration boxes needed for set anchor and piece-run context | pending non-emitting context dependencies while only selected artwork emits |
+| UA8-VAR04/05 | P1 confirmed: tiled G-code and `.rd` bypass caller-captured variable snapshots and never run successful-export advancement | pending direct/worker snapshot parity and exactly-once advancement only after all writes succeed; cancel/partial/failure/stale-document paths never advance |
+| UA8-VAR06 | P1 confirmed: variable cut-setting fields render raw layer values rather than effective object/path bindings, `powerScale`, and overrides | pending canonical effective-operation resolution with core/store/compile parity |
+| UA8-FONT07 | P1 confirmed: embedded font cache is keyed only by user-controlled font key, so a second project can reuse the first project's different bytes | pending content/project identity cache plus two-project replacement geometry/output fixtures |
+| UA8-JIG08 | P2 confirmed: repeated Auto-fit appends deterministic reused IDs to `artworkOrder` | pending uniqueness and source-order compile assertions across repeat/save/reopen |
+| UA8-JIG09 | P1 confirmed: Auto-fit computes one first-outline fit and reuses it for rotated/mixed outlines via transformed AABB, which can place emitted artwork outside later physical outlines | pending per-outline local-geometry fit with 45-degree and mixed-size fixtures |
+| UA8-JIG10 | P2 confirmed Frame-only conflict: Quick Nest silently falls back at 32 items/250k work and can falsely report no fit | pending removal of the cap/refusal; asynchronous progress/cancel is allowed, but no performance policy may suppress valid output |
+| UA8-JIG11 | P2 confirmed: review attribution selects the first object in a layer rather than the object owning an override bucket | pending compiled-bucket source identity and distinct-override review fixtures |
+| UA8-VAR12/13 | P2 confirmed: ordinary variable advancement observer is armed after Start and can miss a short stream; CNC supervised recovery never arms advancement | pending pre-first-write/artifact ownership with receipt reconciliation and exactly-once recovery completion |
+| UA8-VAR14 | P1 confirmed: deferred CSV reads lack request/document/unmount ownership and can overwrite a newer file or project | pending latest request plus exact document/session lifetime |
+| UA8-VAR15 | P2 confirmed: full safe-integer sequence range overflows `end-start+1`; probe `[0, MAX_SAFE_INTEGER]`, current 0, next 1 returned 0 | pending overflow-safe modular arithmetic across signs, strides, and endpoints |
+| UA8-TXT16 | P1 confirmed: NFC/NFD-equivalent CSV headers are compared and selected by exact code units, so a selected canonically equivalent duplicate can resolve the wrong column; resolved literals/CSV values also generate different geometry | pending normalized comparison with explicit duplicate-column identity plus normalization of resolved output; do not collapse distinct token identity silently |
+| UA8-TXT17 | P2 confirmed: editing or materializing moved path text resets its transform to guide origin | pending persisted guide-relative user offset with edit/evaluate/save/reopen/compile parity |
+| UA8-FONT18 | P2 confirmed: replacing an imported font leaves old random-key bytes until the unrelated 32-font persistence refusal | pending transactional pruning of only unreferenced old fonts; shared references and undo retained; the numeric cap is not the remedy |
+| UA8-TXT19 | P2 confirmed: tracking/alignment counts UTF-16 units while OpenType places shaped glyphs; `fi` shaped to one glyph but received an extra 2 mm tracking shift | pending measurement from the exact shaped glyph sequence with ligature, combining, and supplementary fixtures |
+| UA8-TXT20 | P2 confirmed: unsupported characters silently compile as `.notdef` glyph 0 | pending truthful nonblocking Preview/Job Review warning; never a Frame/Start refusal |
+| UA8-TXT21 | P1 confirmed for reproduced scope: Hebrew/mixed-bidi and bundled-Poppins Devanagari strings are sent through logical-order `opentype.getPath` without bidi or complex-script shaping, producing wrong source geometry | pending a source-backed shaping pipeline with Hebrew/bidi and Devanagari regressions; Arabic was not generalized, and visual/font fidelity remains perceptual qualification |
+| UA8-TXT22 | P2 confirmed: canvas selection/faint Preview artwork/out-of-bounds overlays can use template geometry while preparation uses the resolved current record, and Job Review omits the resolved record identity | pending one captured variable snapshot/identity across prepared visual and review consumers without consuming records |
+| UA8-TXT23 | P2 confirmed disclosure gap: generic Date/Time fields emit UTC, so local operators can see a prior date/time with no UTC label | pending truthful UTC labeling or an explicit repository-backed timezone contract; timezone choice itself remains product policy |
+| UA8-TIME21/22 | P2 confirmed: duration formatting produces `1m 60s`/`59m 60s`, and active line progress can round to 100% before terminal settlement | pending total-first duration rounding and active-progress maximum 99 until completion |
+| UA8-TIME23 | P2 confirmed: Pause freezes streamer/live countdown before realtime pause/parking settles | pending truthful pausing/parking timing state and coherent timeout/failure restoration |
+| UA8-TIME24 | P2 confirmed: Job Review's semantic estimator omits deterministic emitted spindle `G4` dwell | pending exact emitted-program timing when evidence exists, otherwise explicit unavailable disclosure; manual pauses remain indefinite |
+| UA8-TIME25 | P2 confirmed: calibration scales the pre-run estimate but Start seeds the exact live plan at uncalibrated pace 1, producing a model jump | pending calibrated motion seed or explicit model-transition disclosure; dwells remain unscaled |
+| UA8-TIME26 | P1 confirmed software defect: pre-run and initial live timing omit the deterministic serial last-byte floor; a 350077-byte/20008-line fixture estimated 0.600 s versus a 30.388628 s 115200-baud 8N1 floor before ACK/controller delay | pending byte/RX-aware floor shared by Review and initial live timing; controller processing and physical execution remain separate external evidence |
+| UA8-TIME27 | P1 confirmed: general pre-run CNC timing still diverges from emitted peck, helix, path3d, entry/retract, and pass-transition programs; PR #710 fixed represented-coordinate/emissionless subcases only | pending emitted-program-derived deterministic timing with parsed-output parity within the repository tolerance; do not mark broader CNC estimation already fixed |
+| UA8-TIME28 | P1 confirmed: emitted deterministic `G4` and indefinite manual `M0` are both absent from Job Review timing | pending every emitted dwell in the deterministic total and explicit excluded/unknown manual-pause duration |
+| UA8-TIME29 | P2 confirmed: requested fractional feed is timed before emitter whole-number rounding, so values such as 1.49 can estimate against F1 bytes incorrectly | pending one formatted emitted-feed authority across estimate, Preview, and output |
+| UA8-TIME30 | P2 confirmed: `continueToolChange()` advances the persisted controller-ACK counter for a host-swallowed `M0` that was never written or acknowledged | pending separate host-barrier and controller-receipt counters; preserve the intentional supervised Continue flow |
+| UA8-TIME31 | P2 confirmed: Image Studio ink/time uses an independent proxy; Preview allocates category time by length rather than each operation's emitted feed; active overrun can remain `~0s`; G-code Inspector uses an undisclosed fixed planner profile | pending canonical prepared timing or explicit assumptions per surface, with sparse-raster, mixed-feed, overrun, and configured-profile fixtures |
+| UA8-BATCH-N1 | narrowed/test gap: absolute translation can change an optimizer's internal nearest-neighbor order, but the current contract guarantees piece-complete jig grid order rather than identical internal traversal | add raw stored/compiled source-order fixtures before changing behavior |
+| UA8-BATCH-N2 | duplicate/already fixed only in narrow scope: multi-object topology is UA8-GEO1; PR #710 owns represented coordinates/feed, emissionless passes, and its exact path3d/helix subcases, but not UA8-TIME27 general emitted-program timing | no duplicate implementation; retain the broader estimator regressions |
+| UA8-BATCH-N3 | contract/policy: Preview and Frame intentionally capture separate current-time snapshots; Frame-to-Review-to-Start retains exact-artifact parity, so no same-clock defect is filed | preserve; UTC disclosure is UA8-TXT23, shaping is UA8-TXT21, and deterministic serial throughput is UA8-TIME26 rather than externalized |
+
+### Follow-up verification state
+
+- Regression-first evidence: the initial six-file run passed 18 legacy tests and failed all nine new
+  defect assertions. After the adversarial Clipboard and Array ownership repairs, the exact-current
+  cross-consumer matrix passes 28 files and 157 tests. TypeScript, changed-file ESLint, scoped Prettier,
+  `git diff --check`, raw/report-only file-size checks, and the public-export no-growth ratchet pass.
+  Three independent read-only reviewers returned clean after freezing the repaired tree. The exact-final
+  product-source snapshot then passed `pnpm release:check`: typecheck, full source and Electron lint,
+  repository-wide Prettier, ADR numbering, seven action-pin checks, production-license closure (52
+  packages/eight licenses), 1,835 passed Vitest files plus 14 skipped, 11,614 passed tests plus 22
+  skipped, 41/41 release-integrity tests, the 2,404-module web/PWA build (172 precache entries),
+  Electron-main build, raw and report-only soft file-size checks, and the 207-export scene-barrel
+  no-growth ratchet. Only these evidence lines changed after that terminal gate.
+- PR #710 merged at `0a29540d9319958e35bfccc5f261edeed66cea82`. Exact-main Chrome UX smoke
+  run 33504650137, exact-main full CI run 33504650074, and automatic Pages run 33507899422 are green.
+  The publish step recorded exact deploy SHA `0a29540d`; the unique deployment, production alias, and
+  default Pages alias each returned HTTP 200 with the same `assets/index-DfGlib0o.js` asset.
+- The command/app-shell/diagnostics and camera/rotary side audits have independently reproduced
+  current-main candidates, but their implementation belongs to later coherent slices. Their final
+  classifications will be appended without rewriting this design-state evidence.
+- No device, camera, controller, provider mutation, manual deployment, material cut, air-cut,
+  perceptual comparison, or reference-CAM qualification was performed.

@@ -21,10 +21,10 @@ export function objectDeleteActions(set: Setter): ObjectDeleteActions {
 function removeSceneObjectFromState(state: AppState, id: string): AppState | Partial<AppState> {
   const nextExtras = new Set(state.additionalSelectedIds);
   nextExtras.delete(id);
-  const repaired = repairDanglingImageMasks(
+  const repaired = repairDanglingObjectDependencies(
     removeObjectIdsFromGroups(removeObject(state.project.scene, id), new Set([id])),
   );
-  if (repaired.repairedCount > 0) reportMaskRepair(repaired.repairedCount);
+  reportDependencyRepairs(repaired);
   const scene = pruneOrphanLayers(repaired.scene);
   return {
     project: { ...state.project, scene },
@@ -36,7 +36,7 @@ function removeSceneObjectFromState(state: AppState, id: string): AppState | Par
   };
 }
 
-function removeSceneObjectsFromState(
+export function removeSceneObjectsFromState(
   state: AppState,
   ids: ReadonlyArray<string>,
 ): AppState | Partial<AppState> {
@@ -46,10 +46,10 @@ function removeSceneObjectsFromState(
   if (objects.length === state.project.scene.objects.length) return state;
   const nextExtras = new Set(state.additionalSelectedIds);
   for (const id of uniqueIds) nextExtras.delete(id);
-  const repaired = repairDanglingImageMasks(
+  const repaired = repairDanglingObjectDependencies(
     removeObjectIdsFromGroups({ ...state.project.scene, objects }, uniqueIds),
   );
-  if (repaired.repairedCount > 0) reportMaskRepair(repaired.repairedCount);
+  reportDependencyRepairs(repaired);
   return {
     project: {
       ...state.project,
@@ -66,34 +66,56 @@ function removeSceneObjectsFromState(
   };
 }
 
-export function repairDanglingImageMasks(scene: Scene): {
+export function repairDanglingObjectDependencies(scene: Scene): {
   readonly scene: Scene;
-  readonly repairedCount: number;
+  readonly repairedImageMasks: number;
+  readonly repairedPathTextGuides: number;
 } {
   const liveIds = new Set(scene.objects.map((object) => object.id));
-  let repairedCount = 0;
+  let repairedImageMasks = 0;
+  let repairedPathTextGuides = 0;
   const objects = scene.objects.map((object) => {
     if (
-      object.kind !== 'raster-image' ||
-      object.imageMaskId === undefined ||
-      liveIds.has(object.imageMaskId)
+      object.kind === 'raster-image' &&
+      object.imageMaskId !== undefined &&
+      !liveIds.has(object.imageMaskId)
     ) {
-      return object;
+      repairedImageMasks += 1;
+      const { imageMaskId: _removed, ...unmasked } = object;
+      return unmasked;
     }
-    repairedCount += 1;
-    const { imageMaskId: _removed, ...unmasked } = object;
-    return unmasked;
+    if (
+      object.kind === 'text' &&
+      object.pathText !== undefined &&
+      !liveIds.has(object.pathText.guideObjectId)
+    ) {
+      repairedPathTextGuides += 1;
+      const { pathText: _removed, ...materialized } = object;
+      return materialized;
+    }
+    return object;
   });
-  return repairedCount === 0
-    ? { scene, repairedCount }
-    : { scene: { ...scene, objects }, repairedCount };
+  return repairedImageMasks === 0 && repairedPathTextGuides === 0
+    ? { scene, repairedImageMasks, repairedPathTextGuides }
+    : { scene: { ...scene, objects }, repairedImageMasks, repairedPathTextGuides };
 }
 
-function reportMaskRepair(count: number): void {
-  useToastStore
-    .getState()
-    .pushToast(
-      `${count} image mask reference${count === 1 ? '' : 's'} was removed because its mask artwork was deleted. The image remains editable and unmasked.`,
-      'warning',
+function reportDependencyRepairs(
+  repair: Pick<
+    ReturnType<typeof repairDanglingObjectDependencies>,
+    'repairedImageMasks' | 'repairedPathTextGuides'
+  >,
+): void {
+  const messages: string[] = [];
+  if (repair.repairedImageMasks > 0) {
+    messages.push(
+      `${repair.repairedImageMasks} image mask reference${repair.repairedImageMasks === 1 ? '' : 's'} was removed because its mask artwork was deleted. The image remains editable and unmasked.`,
     );
+  }
+  if (repair.repairedPathTextGuides > 0) {
+    messages.push(
+      `${repair.repairedPathTextGuides} path-text guide reference${repair.repairedPathTextGuides === 1 ? '' : 's'} was removed because its guide artwork was deleted. The stored text geometry remains in place and editable.`,
+    );
+  }
+  if (messages.length > 0) useToastStore.getState().pushToast(messages.join(' '), 'warning');
 }

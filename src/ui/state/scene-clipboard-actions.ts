@@ -11,8 +11,13 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { cloneLayerSubLayers } from '../../core/scene/layer';
-import { pruneOrphanLayers, pushUndo } from './scene-mutations';
-import { removeObjectIdsFromGroups } from './scene-group-actions';
+import { removeSceneObjectsFromState } from './object-delete-actions';
+import {
+  remapSceneObjectCopyDependencies,
+  sceneObjectCopyDependencyId,
+  sceneObjectCopyClosure,
+} from './scene-object-copy-dependencies';
+import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 
 const PASTE_OFFSET_MM = 10;
@@ -20,6 +25,8 @@ const PASTE_OFFSET_MM = 10;
 export type SceneClipboard = {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly layers: ReadonlyArray<Layer>;
+  readonly selectedObjectIds: ReadonlyArray<string>;
+  readonly sourceDocumentEpoch: number;
   readonly groups?: ReadonlyArray<SceneGroup>;
 };
 
@@ -42,20 +49,8 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
       set((state) => {
         const clipboard = clipboardFromSelection(state);
         if (clipboard === null) return state;
-        const cutIds = new Set(clipboard.objects.map((object) => object.id));
-        const objects = state.project.scene.objects.filter((object) => !cutIds.has(object.id));
-        const scene = pruneOrphanLayers(
-          removeObjectIdsFromGroups({ ...state.project.scene, objects }, cutIds),
-        );
-        return {
-          sceneClipboard: clipboard,
-          project: { ...state.project, scene },
-          selectedObjectId: null,
-          additionalSelectedIds: new Set<string>(),
-          undoStack: pushUndo(state.project, state.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
+        const removed = removeSceneObjectsFromState(state, clipboard.selectedObjectIds);
+        return removed === state ? state : { ...removed, sceneClipboard: clipboard };
       }),
     pasteClipboard: () =>
       set((state) => {
@@ -65,7 +60,9 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
           state.project.scene,
           clipboard.layers,
           clipboard.objects,
+          clipboard.selectedObjectIds,
           clipboard.groups ?? [],
+          clipboard.sourceDocumentEpoch === state.projectDocumentEpoch,
         );
         const pasted = prepared.objects;
         let scene = prepared.scene;
@@ -73,7 +70,7 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
         if (prepared.groups.length > 0) {
           scene = { ...scene, groups: [...(scene.groups ?? []), ...prepared.groups] };
         }
-        const [primary, ...rest] = pasted.map((object) => object.id);
+        const [primary, ...rest] = prepared.selectedObjectIds;
         return {
           project: { ...state.project, scene },
           selectedObjectId: primary ?? null,
@@ -87,38 +84,33 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
 }
 
 function clipboardFromSelection(
-  state: Pick<AppState, 'project' | 'selectedObjectId' | 'additionalSelectedIds'>,
+  state: Pick<
+    AppState,
+    'project' | 'projectDocumentEpoch' | 'selectedObjectId' | 'additionalSelectedIds'
+  >,
 ): SceneClipboard | null {
   const ids = [
     ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
     ...state.additionalSelectedIds,
   ];
   if (ids.length === 0) return null;
-  const selected = ids
-    .map((id) => state.project.scene.objects.find((object) => object.id === id))
-    .filter((object): object is SceneObject => object !== undefined);
-  const closureIds = new Set(selected.map((object) => object.id));
-  for (const object of selected) {
-    if (object.kind === 'raster-image' && object.imageMaskId !== undefined) {
-      closureIds.add(object.imageMaskId);
-    }
-    if (object.kind === 'text' && object.pathText !== undefined) {
-      closureIds.add(object.pathText.guideObjectId);
-    }
-  }
-  const objects = state.project.scene.objects
-    .filter((object) => closureIds.has(object.id))
-    .map(cloneSceneObject);
+  const objects = sceneObjectCopyClosure(state.project.scene.objects, new Set(ids)).map(
+    cloneSceneObject,
+  );
   if (objects.length === 0) return null;
   const copiedIds = new Set(objects.map((object) => object.id));
   const groups = (state.project.scene.groups ?? [])
-    .map((group) => ({
-      ...group,
-      objectIds: group.objectIds.filter((id) => copiedIds.has(id)),
-    }))
-    .filter((group) => group.objectIds.length >= 2)
+    .filter(
+      (group) => group.objectIds.length >= 2 && group.objectIds.every((id) => copiedIds.has(id)),
+    )
     .map((group) => structuredClone(group) as SceneGroup);
-  return { objects, layers: copiedLayersForObjects(state.project.scene, objects), groups };
+  return {
+    objects,
+    layers: copiedLayersForObjects(state.project.scene, objects),
+    selectedObjectIds: ids.filter((id) => copiedIds.has(id)),
+    sourceDocumentEpoch: state.projectDocumentEpoch,
+    groups,
+  };
 }
 
 function copiedLayersForObjects(
@@ -132,6 +124,7 @@ function copiedLayersForObjects(
 }
 
 function cloneClipboardObjects(
+  scene: Scene,
   objects: ReadonlyArray<SceneObject>,
   sourceOperations: ReadonlyArray<Layer>,
   operationIdMap: ReadonlyMap<string, string>,
@@ -140,6 +133,13 @@ function cloneClipboardObjects(
   readonly idMap: ReadonlyMap<string, string>;
 } {
   const idMap = new Map(objects.map((object) => [object.id, crypto.randomUUID()] as const));
+  const targetIds = new Set(scene.objects.map((object) => object.id));
+  for (const object of objects) {
+    const dependencyId = sceneObjectCopyDependencyId(object);
+    if (dependencyId !== undefined && !idMap.has(dependencyId) && targetIds.has(dependencyId)) {
+      idMap.set(dependencyId, crypto.randomUUID());
+    }
+  }
   return {
     idMap,
     objects: objects.map((object) => {
@@ -153,7 +153,7 @@ function cloneClipboardObjects(
         },
       } as SceneObject;
       return remapSceneObjectOperationBindings(
-        remapClipboardReferences(clone, idMap),
+        remapSceneObjectCopyDependencies(clone, idMap),
         sourceOperations,
         operationIdMap,
       );
@@ -161,42 +161,31 @@ function cloneClipboardObjects(
   };
 }
 
-function remapClipboardReferences(
-  object: SceneObject,
-  idMap: ReadonlyMap<string, string>,
-): SceneObject {
-  if (object.kind === 'raster-image' && object.imageMaskId !== undefined) {
-    const mapped = idMap.get(object.imageMaskId);
-    return mapped === undefined ? object : { ...object, imageMaskId: mapped };
-  }
-  if (object.kind === 'text' && object.pathText !== undefined) {
-    const mapped = idMap.get(object.pathText.guideObjectId);
-    return mapped === undefined
-      ? object
-      : { ...object, pathText: { ...object.pathText, guideObjectId: mapped } };
-  }
-  return object;
-}
-
 function prepareClipboardPaste(
   scene: Scene,
   copiedLayers: ReadonlyArray<Layer>,
   objects: ReadonlyArray<SceneObject>,
+  selectedObjectIds: ReadonlyArray<string>,
   groups: ReadonlyArray<SceneGroup> = [],
+  reuseExistingOperations = false,
 ): {
   readonly scene: Scene;
   readonly objects: ReadonlyArray<SceneObject>;
+  readonly selectedObjectIds: ReadonlyArray<string>;
   readonly groups: ReadonlyArray<SceneGroup>;
 } {
   let out = scene;
   const operationIdMap = new Map<string, string>();
   for (const source of copiedLayers) {
     const existing = scene.layers.find((operation) => operation.id === source.id);
-    if (existing !== undefined) {
+    if (existing !== undefined && reuseExistingOperations) {
       // Same-project Paste remains in the source process operation. This is
       // the ordinary editor meaning of copying artwork; cloning the operation
       // here stacked a second emission over the same visible object.
       operationIdMap.set(source.id, existing.id);
+      if (source.bindingOperationId !== undefined) {
+        operationIdMap.set(source.bindingOperationId, existing.id);
+      }
       continue;
     }
     const representative = objects.find((object) => sceneObjectUsesOperation(object, source));
@@ -213,24 +202,30 @@ function prepareClipboardPaste(
       subLayers: cloneLayerSubLayers(source.subLayers),
     };
     operationIdMap.set(source.id, operation.id);
+    if (source.bindingOperationId !== undefined) {
+      operationIdMap.set(source.bindingOperationId, operation.id);
+    }
     out = addLayer(out, operation);
   }
-  const cloned = cloneClipboardObjects(objects, copiedLayers, operationIdMap);
-  const materialized: SceneObject[] = [];
-  for (const object of cloned.objects) {
-    if (operationIdsForObject(object, out.layers).length > 0) {
-      materialized.push(remapClipboardTabAnchors(object, copiedLayers, operationIdMap, out.layers));
-      continue;
-    }
-    // Malformed/legacy clipboard artwork with no resolvable binding must not
-    // paste as invisible-to-output geometry. Give it one explicit operation.
-    const created = createArtworkOperation(out, object);
-    out = addLayer(out, created.operation);
-    materialized.push(created.object);
-  }
+  const reservedOperationIds = operationIdentityIds(out.layers);
+  protectCollidingMissingOperationIds(out, objects, operationIdMap, reservedOperationIds);
+  const cloned = cloneClipboardObjects(scene, objects, copiedLayers, operationIdMap);
+  const materialized = materializeClipboardObjects(
+    out,
+    cloned.objects,
+    objects,
+    copiedLayers,
+    operationIdMap,
+    reservedOperationIds,
+  );
+  out = materialized.scene;
   return {
     scene: out,
-    objects: materialized,
+    objects: materialized.objects,
+    selectedObjectIds: selectedObjectIds.flatMap((id) => {
+      const mapped = cloned.idMap.get(id);
+      return mapped === undefined ? [] : [mapped];
+    }),
     groups: groups.map((group) => ({
       ...structuredClone(group),
       id: crypto.randomUUID(),
@@ -240,6 +235,106 @@ function prepareClipboardPaste(
       }),
     })),
   };
+}
+
+function materializeClipboardObjects(
+  scene: Scene,
+  objects: ReadonlyArray<SceneObject>,
+  sourceObjects: ReadonlyArray<SceneObject>,
+  copiedLayers: ReadonlyArray<Layer>,
+  operationIdMap: ReadonlyMap<string, string>,
+  reservedOperationIds: Set<string>,
+): { readonly scene: Scene; readonly objects: ReadonlyArray<SceneObject> } {
+  let out = scene;
+  const materialized: SceneObject[] = [];
+  for (const [index, clone] of objects.entries()) {
+    const object = protectUnownedLegacyPathBindings(clone, reservedOperationIds);
+    const sourceObject = sourceObjects[index];
+    const ownedTargetOperationIds = new Set(
+      sourceObject === undefined
+        ? []
+        : operationIdsForObject(sourceObject, copiedLayers).flatMap((sourceId) => {
+            const targetId = operationIdMap.get(sourceId);
+            return targetId === undefined ? [] : [targetId];
+          }),
+    );
+    const sourceOwnedOperationIds = operationIdsForObject(object, out.layers).filter((id) =>
+      ownedTargetOperationIds.has(id),
+    );
+    if (sourceOwnedOperationIds.length > 0) {
+      materialized.push(remapClipboardTabAnchors(object, copiedLayers, operationIdMap, out.layers));
+      continue;
+    }
+    // Malformed/legacy clipboard artwork with no resolvable binding must not
+    // paste as invisible-to-output geometry. Give it one explicit operation.
+    const created = createArtworkOperation(
+      out,
+      object,
+      object.kind === 'raster-image' ? { mode: 'image' } : {},
+    );
+    out = addLayer(out, created.operation);
+    materialized.push(created.object);
+  }
+  return { scene: out, objects: materialized };
+}
+
+function protectCollidingMissingOperationIds(
+  targetScene: Scene,
+  objects: ReadonlyArray<SceneObject>,
+  operationIdMap: Map<string, string>,
+  reservedIds: Set<string>,
+): void {
+  const targetBindingIds = new Set(
+    targetScene.layers.map((operation) => operation.bindingOperationId ?? operation.id),
+  );
+  for (const operationId of operationIdMap.values()) reservedIds.add(operationId);
+  for (const object of objects) {
+    for (const sourceId of explicitOperationIdsForObject(object)) {
+      if (operationIdMap.has(sourceId) || !targetBindingIds.has(sourceId)) continue;
+      const unresolvedId = freshUnresolvedOperationId(reservedIds);
+      operationIdMap.set(sourceId, unresolvedId);
+    }
+  }
+}
+
+function explicitOperationIdsForObject(object: SceneObject): ReadonlySet<string> {
+  const operationIds = new Set(object.operationIds ?? []);
+  if ('paths' in object) {
+    for (const path of object.paths) {
+      for (const operationId of path.operationIds ?? []) operationIds.add(operationId);
+    }
+  }
+  return operationIds;
+}
+
+function protectUnownedLegacyPathBindings(
+  object: SceneObject,
+  reservedIds: Set<string>,
+): SceneObject {
+  if (!('paths' in object) || object.operationIds !== undefined) return object;
+  let unresolvedId: string | undefined;
+  const paths = object.paths.map((path) => {
+    if (path.operationIds !== undefined) return path;
+    unresolvedId ??= freshUnresolvedOperationId(reservedIds);
+    return { ...path, operationIds: [unresolvedId] };
+  });
+  return { ...object, paths } as SceneObject;
+}
+
+function operationIdentityIds(operations: ReadonlyArray<Layer>): Set<string> {
+  const ids = new Set<string>();
+  for (const operation of operations) {
+    ids.add(operation.id);
+    if (operation.bindingOperationId !== undefined) ids.add(operation.bindingOperationId);
+  }
+  return ids;
+}
+
+function freshUnresolvedOperationId(reservedIds: Set<string>): string {
+  let id = crypto.randomUUID();
+  while (reservedIds.has(id)) id = crypto.randomUUID();
+  reservedIds.add(id);
+  return id;
 }
 
 function remapClipboardTabAnchors(

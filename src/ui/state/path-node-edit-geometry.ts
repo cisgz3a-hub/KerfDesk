@@ -11,6 +11,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import type { PathNodeRef } from './path-node-edit-actions';
+import { replaceCompatibilityPolylines } from './path-node-edit-path';
 
 export function editPathsNodesByDelta(
   paths: ReadonlyArray<ColoredPath>,
@@ -50,7 +51,7 @@ export function editPathsNodesByDelta(
     // The legacy node editor addresses compatibility-polyline indices. Until
     // handle-aware curve editing lands, discard stale canonical geometry so
     // preview and machine output use the points the user actually changed.
-    return pathChanged ? { color: path.color, polylines } : path;
+    return pathChanged ? replaceCompatibilityPolylines(path, polylines) : path;
   });
   return changed ? { paths: nextPaths } : null;
 }
@@ -82,7 +83,7 @@ export function deletePathsNodes(
       pathChanged = true;
       return edited;
     });
-    return pathChanged ? { color: path.color, polylines } : path;
+    return pathChanged ? replaceCompatibilityPolylines(path, polylines) : path;
   });
   if (invalid || !changed) return null;
   return { paths: nextPaths };

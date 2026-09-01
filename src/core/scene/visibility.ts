@@ -9,12 +9,23 @@ export type VisibleOperationResolution<T extends LayerVisibility> = {
 };
 
 export function sceneObjectHasVisibleLayer(scene: Scene, object: SceneObject): boolean {
-  const lookup = new Map<string, LayerVisibility>();
-  for (const operation of scene.layers) {
-    lookup.set(operation.id, operation);
-    if (!lookup.has(operation.color)) lookup.set(operation.color, operation);
+  return sceneObjectHasVisibleLayerFromMap(object, sceneLayerVisibilityLookup(scene.layers));
+}
+
+/**
+ * Build the canonical operation lookup used by canvas visibility consumers.
+ * Persisted operation ids take precedence; the first matching color remains a
+ * compatibility alias for projects saved before per-path operation bindings.
+ */
+export function sceneLayerVisibilityLookup<
+  T extends LayerVisibility & { readonly id: string; readonly color: string },
+>(layers: ReadonlyArray<T>): Map<string, T> {
+  const lookup = new Map<string, T>();
+  for (const layer of layers) {
+    lookup.set(layer.id, layer);
+    if (!lookup.has(layer.color)) lookup.set(layer.color, layer);
   }
-  return sceneObjectHasVisibleLayerFromMap(object, lookup);
+  return lookup;
 }
 
 export function sceneObjectHasVisibleLayerFromMap(
@@ -72,6 +83,13 @@ export function resolveVisibleOperationForPath<T extends LayerVisibility>(
   }
   return { visible: hasUnknownBinding, operation: undefined };
 }
+
+/** Canonical cached visibility API for canvas consumers outside the Scene module. */
+export const sceneLayerVisibility = {
+  lookup: sceneLayerVisibilityLookup,
+  hasObject: sceneObjectHasVisibleLayerFromMap,
+  resolvePath: resolveVisibleOperationForPath,
+} as const;
 
 function hasVisibleOperation(
   operationIds: ReadonlyArray<string>,

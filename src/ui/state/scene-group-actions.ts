@@ -116,9 +116,25 @@ function expandedObjectIdsForGroups(
   ids: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
   const selected = new Set(ids);
+  const groupsByMember = new Map<string, SceneGroup[]>();
   for (const group of scene.groups ?? []) {
-    if (group.objectIds.some((id) => selected.has(id))) {
-      for (const id of group.objectIds) selected.add(id);
+    for (const id of group.objectIds) {
+      const memberships = groupsByMember.get(id) ?? [];
+      memberships.push(group);
+      groupsByMember.set(id, memberships);
+    }
+  }
+  const pending = [...selected];
+  const expandedGroups = new Set<SceneGroup>();
+  for (const id of pending) {
+    for (const group of groupsByMember.get(id) ?? []) {
+      if (expandedGroups.has(group)) continue;
+      expandedGroups.add(group);
+      for (const memberId of group.objectIds) {
+        if (selected.has(memberId)) continue;
+        selected.add(memberId);
+        pending.push(memberId);
+      }
     }
   }
   return orderedLiveIds(scene, selected);

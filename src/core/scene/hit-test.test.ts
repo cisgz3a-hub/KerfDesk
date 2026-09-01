@@ -272,6 +272,24 @@ describe('hitTest', () => {
       ),
     ).toBe('A');
   });
+
+  it('keeps the first layer for duplicate legacy color aliases', () => {
+    const target = obj({ id: 'target', minX: 0, minY: 0, maxX: 10, maxY: 10 });
+    const scene = withObjects(target);
+
+    expect(
+      hitTest(
+        {
+          ...scene,
+          layers: [
+            { ...createLayer({ id: 'first', color: '#ff0000' }), visible: false },
+            createLayer({ id: 'second', color: '#ff0000' }),
+          ],
+        },
+        { x: 5, y: 5 },
+      ),
+    ).toBeNull();
+  });
 });
 
 describe('hitTestCandidates', () => {

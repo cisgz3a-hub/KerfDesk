@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { createProject } from '../../core/scene';
+import { deserializeProject, serializeProject } from '../../io/project';
 import { useStore } from './store';
 import { resetStore as reset, svgObj } from './test-helpers';
 
@@ -69,6 +71,51 @@ describe('scene group actions', () => {
     expect(useStore.getState().project.scene.groups).toEqual([
       expect.objectContaining({ objectIds: ['O1', 'O2'] }),
     ]);
+  });
+
+  it('selects the transitive closure of overlapping groups without rewriting either group', () => {
+    const base = createProject();
+    const groups = [
+      { id: 'G1', name: 'First', objectIds: ['O1', 'O2'] },
+      { id: 'G2', name: 'Second', objectIds: ['O2', 'O3'] },
+    ];
+    useStore.setState({
+      project: {
+        ...base,
+        scene: {
+          ...base.scene,
+          objects: [
+            svgObj('O1', ['#ff0000']),
+            svgObj('O2', ['#00ff00']),
+            svgObj('O3', ['#0000ff']),
+          ],
+          groups,
+        },
+      },
+    });
+
+    useStore.getState().selectObject('O3');
+
+    expect(useStore.getState().selectedObjectId).toBe('O1');
+    expect([...useStore.getState().additionalSelectedIds]).toEqual(['O2', 'O3']);
+    expect(useStore.getState().project.scene.groups).toEqual(groups);
+    const reopened = deserializeProject(serializeProject(useStore.getState().project));
+    expect(reopened.kind).toBe('ok');
+    if (reopened.kind === 'ok') expect(reopened.project.scene.groups).toEqual(groups);
+  });
+
+  it('expands one large group without rescanning it for every member', () => {
+    const base = createProject();
+    const objects = Array.from({ length: 1_000 }, (_, index) => svgObj(`O${index}`, ['#ff0000']));
+    const group = { id: 'G-large', name: 'Large', objectIds: objects.map((object) => object.id) };
+    useStore.setState({
+      project: { ...base, scene: { ...base.scene, objects, groups: [group] } },
+    });
+
+    useStore.getState().selectObject('O999');
+
+    expect(useStore.getState().selectedObjectId).toBe('O0');
+    expect(useStore.getState().additionalSelectedIds.size).toBe(999);
   });
 });
 

@@ -1,4 +1,5 @@
 import { transformedBBox, type Project, type SceneObject, type Transform } from '../../core/scene';
+import { visibleSnapTargetPredicate } from './snap-target-visibility';
 
 export type SnapAxis = 'x' | 'y';
 
@@ -118,8 +119,10 @@ function objectSnapCandidates(args: {
   readonly movedBox: Aabb;
 }): ReadonlyArray<SnapCandidate> {
   const candidates: SnapCandidate[] = [];
+  const isVisibleTarget = visibleSnapTargetPredicate(args.project.scene.layers);
   for (const object of args.project.scene.objects) {
     if (!canUseObjectTarget(object, args.movingObjectId, args.ignoredObjectIds)) continue;
+    if (!isVisibleTarget(object)) continue;
     const targetBox = transformedBBox(object);
     addObjectCandidates(candidates, args.axis, args.movedBox, targetBox);
   }

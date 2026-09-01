@@ -115,6 +115,7 @@ function retainedApplicationState(
   | 'projectOpenRequestEpoch'
   | 'projectSaveRequestEpoch'
   | 'projectSaveWriteCoordinator'
+  | 'sceneClipboard'
 > &
   ReturnType<typeof currentMaterialLibraryState> &
   ReturnType<typeof currentSavedLibrariesState> {
@@ -127,5 +128,6 @@ function retainedApplicationState(
     projectOpenRequestEpoch: state.projectOpenRequestEpoch,
     projectSaveRequestEpoch: state.projectSaveRequestEpoch,
     projectSaveWriteCoordinator: state.projectSaveWriteCoordinator,
+    sceneClipboard: state.sceneClipboard,
   };
 }
