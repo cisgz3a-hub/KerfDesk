@@ -1,4 +1,5 @@
 import type { Project } from '../../core/scene';
+import { createProjectSaveWriteCoordinator } from './project-save-write-coordinator';
 
 export function initialProjectWorkspaceState(project: Project) {
   const persistedIds = project.jobSetup.outputScope.selectedObjectIds.filter((id) =>
@@ -9,6 +10,9 @@ export function initialProjectWorkspaceState(project: Project) {
     project,
     projectDocumentEpoch: 0,
     projectOpenRequestEpoch: 0,
+    projectSaveRequestEpoch: 0,
+    projectSavedRequestEpoch: null,
+    projectSaveWriteCoordinator: createProjectSaveWriteCoordinator(),
     cachedCncMachine: null,
     projectBedReconciliation: null,
     cncLiveCaps: null,

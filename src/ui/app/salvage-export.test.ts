@@ -91,4 +91,57 @@ describe('handleSalvageExportProject', () => {
     ).resolves.toBe('error');
     expect(pushToast).toHaveBeenCalledWith('Could not export a recovery copy: disk full', 'error');
   });
+
+  it('writes captured recovery bytes when the selected target arrives after ownership is stale', async () => {
+    let isCurrent = true;
+    const picked = deferred<SaveTarget | null>();
+    const write = vi.fn(async () => undefined);
+    const pushToast = vi.fn();
+    const exporting = handleSalvageExportProject({
+      platform: platformWith(async () => picked.promise),
+      project: invalidLiveProject(),
+      savedName: 'logo.lf2',
+      pushToast,
+      isCurrent: () => isCurrent,
+    });
+
+    isCurrent = false;
+    picked.resolve(saveTarget(write));
+
+    await expect(exporting).resolves.toBe('stale');
+    expect(write).toHaveBeenCalledOnce();
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it('finishes a selected recovery write but suppresses feedback after ownership turns stale', async () => {
+    let isCurrent = true;
+    const written = deferred<undefined>();
+    const write = vi.fn(async () => written.promise);
+    const pushToast = vi.fn();
+    const exporting = handleSalvageExportProject({
+      platform: platformWith(async () => saveTarget(write)),
+      project: invalidLiveProject(),
+      savedName: 'logo.lf2',
+      pushToast,
+      isCurrent: () => isCurrent,
+    });
+    await vi.waitFor(() => expect(write).toHaveBeenCalledOnce());
+
+    isCurrent = false;
+    written.resolve(undefined);
+
+    await expect(exporting).resolves.toBe('stale');
+    expect(pushToast).not.toHaveBeenCalled();
+  });
 });
+
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+} {
+  let resolve = (_value: T): void => undefined;
+  const promise = new Promise<T>((onResolve) => {
+    resolve = onResolve;
+  });
+  return { promise, resolve };
+}

@@ -6,14 +6,18 @@
 import { useRef } from 'react';
 import { FONT_REGISTRY } from '../../core/text';
 import { useDialogA11y } from '../common/use-dialog-a11y';
-import { useTextDialogStore, type TextDialogState } from './text-dialog-store';
+import {
+  textSizeDraftIsValid,
+  useTextDialogStore,
+  type TextDialogState,
+} from './text-dialog-store';
 
 const OUTLINE_FONTS = FONT_REGISTRY.filter((entry) => entry.geometry === 'outline');
 
 export function TextDialog(): JSX.Element | null {
   const isOpen = useTextDialogStore((s) => s.isOpen);
   const state = useTextDialogStore();
-  if (!isOpen) return null;
+  if (!isOpen || state.dialogOwner === null) return null;
   return <TextDialogBody state={state} />;
 }
 
@@ -45,6 +49,11 @@ function TextDialogBody(props: { readonly state: TextDialogState }): JSX.Element
           title="The text to rasterize onto a new layer"
         />
         <TextControls state={state} />
+        {state.errorMessage === null ? null : (
+          <p role="alert" style={errorStyle}>
+            {state.errorMessage}
+          </p>
+        )}
         <div style={actionsStyle}>
           <button
             type="button"
@@ -94,8 +103,10 @@ function TextControls(props: { readonly state: TextDialogState }): JSX.Element {
         <input
           type="number"
           step="any"
-          value={state.sizePx}
-          onChange={(e) => state.setSizePx(Number(e.target.value))}
+          value={state.sizeDraft}
+          aria-invalid={!textSizeDraftIsValid(state.sizeDraft)}
+          onChange={(e) => state.setSizeDraft(e.target.value)}
+          onBlur={state.reconcileSizeDraft}
           style={inputStyle}
           aria-label="Text size in pixels"
           title="Glyph height in document pixels"
@@ -176,4 +187,10 @@ const actionsStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-end',
   gap: 8,
+};
+
+const errorStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-danger)',
+  fontSize: 12,
 };

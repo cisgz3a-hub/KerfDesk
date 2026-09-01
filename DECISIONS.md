@@ -19041,3 +19041,126 @@ inspector-only input that cannot be streamed.
   <https://marlinfw.org/docs/development/code_structure.html>.
 
 ---
+
+## ADR-314 - Latest Save ownership and controller-represented CNC Z remain exact (2026-09-01)
+
+**Status:** Accepted and implemented in local remediation; focused and exact-tree local release
+verification are complete; hosted, merge, exact-main, and deployment verification remain pending;
+hardware and perceptual qualification excluded
+
+### Context
+
+An exact-current-main re-audit after ADR-313 found three related ownership gaps and one output-model
+gap. Concurrent Save requests could finish out of order, allowing older bytes, targets, errors, or
+success feedback to overtake the latest request or a replacement document. Add Text could lose a font
+or rasterization rejection and its transient draft was not bound to the exact Image Studio session.
+Resize and color Ink fields converted blank browser drafts into numeric mutations. Finally, ordinary
+CNC Z words were formatted to three decimals, but Preview, removal, maximum-depth disclosure, stock
+warnings, and surfacing feedback sometimes retained the requested binary64 value. Modeling GRBL's
+32-bit parser exposed a second error: passing an already represented coordinate through the formatter
+again changes some large but accepted values.
+
+These are consistency defects, not reasons for another authorization surface. A selected Save target
+must still receive the bytes the operator chose to write. CNC depth differences remain disclosures in
+Job Review and comments. Frame remains the sole ordinary Start guard.
+
+### Decision
+
+1. **Save document and request ownership.** Every Save captures the exact project object, document
+   epoch, serialized bytes, and a monotonically increasing Save-request epoch. Only that exact owner
+   may publish the saved target/name, clear dirty/autosave state, or show terminal success/failure.
+   A replacement document or newer Save request makes an older completion silent, while same-document
+   edits made after capture stay dirty and receive the existing captured-version warning.
+2. **Destination-specific Save ordering without suppressing a chosen write.** Pickers and proven-
+   distinct destinations remain independent: an unresolved earlier picker or write never delays a
+   later selected destination. The platform target carries an adapter-owned identity comparison;
+   Chromium uses `FileSystemHandle.isSameEntry`, while exact target-object identity covers retained
+   subsequent Save. Once a target is selected, its captured bytes begin writing immediately even if
+   request or document ownership later becomes stale; neither identity comparison nor another write
+   delays that selected write. When targets are proven to share one physical destination, background
+   repair waits for their already-started writes and replays the newest captured bytes so the final
+   successful state remains latest. Rejection cannot poison later writes. Staleness suppresses only ordinary
+   application-state, autosave, and feedback publication; failure to restore the newest bytes is a
+   current handoff-integrity error, not a silent stale completion.
+3. **Recovery-copy ownership.** A separately selected raw recovery file uses the same destination-
+   specific coordinator. A stale recovery request still writes the target the operator selected,
+   while ordinary late success or failure is silent and never marks the canonical project saved.
+4. **Text draft/request ownership.** Add Text binds the exact Image Studio session and its source
+   owner, not an object id. Replacement, removal, close, retry, or any draft edit retires the prior
+   raster request. A current raster/font failure stays in the owned dialog with the draft intact;
+   stale success and failure cannot mutate or speak over a later session.
+5. **Transient numeric drafts and exact dialog owner.** Text size, Image Size, Canvas Size, and color
+   Ink keep editable strings distinct from the last valid numeric candidate. Blank, non-finite,
+   non-positive dimensions and out-of-range Ink drafts create no mutation; blur restores the last
+   valid value.
+   Resize/Canvas Size captures the exact editor session and source owner and retires on either identity
+   change, including a same-object-id replacement. OK/Enter uses the last valid represented value when
+   the transient text is invalid, so draft integrity does not become a new action refusal. Existing
+   dimension bounds and valid-value behavior are unchanged.
+6. **Single-pass CNC coordinate representation.** Ordinary CNC coordinates retain both the exact
+   emitted three-decimal text and the numeric value produced by the source-faithful GRBL eight-digit,
+   float32 parser model. Preview plunges/cuts, material removal, helix seams, pass exit state, duration,
+   and compiled maximum depth consume that numeric value without formatting it a second time. Maximum-
+   depth and standalone-surfacing records also retain the winning emitted text so provenance, Job
+   Review, warnings, and feedback cannot turn `6553.606` into `6553.605`. Helix emission consumes the
+   retained text from the same seam representation.
+7. **Emission eligibility and compatibility.** Maximum depth and duration ignore every pass kind that
+   emits no pass motion under the existing emitter preconditions. Raw recovery-manifest events are
+   deliberately not renumbered or filtered: archived manifest identity remains compatible pending a
+   separately designed schema migration for phantom recovery-option presentation.
+8. **Requested/effective disclosure.** G-code provenance and Job Review preserve extra requested depth
+   precision only when ordinary emitted text changes it. Warning-only stock comparisons classify
+   emitted depth and configured stock from their one formatted coordinate texts, avoiding binary-float
+   false positives, twice-rounded text, and missed stock-bottom warnings. Standalone surfacing records
+   and reports raw requested total depth beside the exact emitted maximum. Duration derives path3d feed
+   selection from the emitter's formatted XYZ text, plans controller-represented XYZ motion, and prices
+   represented safe-Z/entry travel.
+9. **Provenance, module surface, and standing policy.** Export metadata advances `EMITTER_REVISION`
+   to `adr-314-cnc-represented-z-v1`. The frozen legacy CNC/Job barrels do not grow: small
+   `coordinate-representation`, `output-representation`, `helical-representation`, and geometry
+   `arc-representation` entry points carry the shared cross-module contracts under the repository's
+   index-only import rule. No change adds a confirmation, cap, clamp, refusal, Frame/Start gate, or
+   output gate. Job Review remains advisory and Frame remains the sole ordinary Start permit.
+
+### Consequences
+
+- Concurrent or late Saves cannot leave older bytes after a successful same-destination reconciliation
+  or publish state into a replacement document; every selected destination is attempted with its
+  captured payload, successful reconciliation leaves the newest bytes, and unrelated destinations
+  remain independent.
+- Current Text failures are recoverable in place; stale Text work and invalid transient numeric drafts
+  cannot mutate another Image Studio session.
+- CNC Preview, removal, duration, provenance, and warnings describe controller-parsed ordinary Z text
+  rather than an unattainable requested or twice-rounded value.
+- Archived raw recovery identities remain stable. Hiding emissionless recovery options is deferred
+  until a versioned compatibility design can preserve sealed artifact reconstruction.
+
+### Verification
+
+- Save-focused schedules cover independent destinations with an unresolved earlier picker/write or
+  stalled identity comparison, immediate overlapping same-destination writes, out-of-order pickers,
+  adapter equality across distinct wrappers, newest-byte replay,
+  replay failure disclosure, earlier rejection recovery, document replacement, same-document newer
+  edits, stale recovery completion, confirm-before-discard, and all command/shortcut call sites.
+- Image Studio schedules cover exact Text owner replacement/removal, stale success/failure/retry/edit,
+  current font/raster errors, Text-size and Resize invalid drafts/blur/last-valid completion, exact
+  same-id Resize owner replacement, and Ink blank/range drafts.
+- CNC schedules cover the GRBL parser model, half-quantum and large non-idempotent boundaries, combined
+  fine XY plus represented Z, contour/arc/path3d/helix eligibility, multi-revolution seam text/value
+  parity, maximum depth, duration, Preview/removal, Job Review, stock warnings, provenance, surfacing,
+  tiling, recovery compatibility, and unchanged exact-output snapshots/performance fixtures.
+- Current verification is recorded by evidence lane in `docs/remediation-ledger.md`. Focused checks
+  and the exact-tree local `pnpm release:check` are present there; hosted exact-head, merge,
+  exact-main, and automatic deployment evidence remain explicitly pending until those workflows
+  finish. None of those lanes establishes controller acceptance, physical movement/cutting,
+  reference-CAM equivalence, installed-package behavior, or human perception.
+
+### References
+
+- ADR-204, canonical project round-trip integrity and separate raw recovery copies.
+- ADR-228 and ADR-232, Frame-only authorization and factual refusal boundaries.
+- ADR-242 and ADR-246, Image Studio session and Text behavior.
+- ADR-313, exact asynchronous owners and GRBL fine-contour parser representation.
+- GRBL `read_float`: <https://github.com/gnea/grbl/blob/master/grbl/nuts_bolts.c>.
+
+---

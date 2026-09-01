@@ -125,6 +125,28 @@ describe('computeRemovalGrid — properties', () => {
       { numRuns: 100 },
     );
   });
+
+  it('stamps the represented emitted Z instead of the raw planner depth', () => {
+    const toolpath = buildToolpath(
+      jobOf([
+        {
+          kind: 'contour',
+          zMm: -0.0506,
+          polyline: [
+            { x: 5, y: 5 },
+            { x: 25, y: 5 },
+          ],
+          closed: false,
+        },
+      ]),
+      { startPoint: { x: 0, y: 0 } },
+    );
+    const grid = expectGrid(
+      computeRemovalGrid(toolpath, GRID_SPEC, kernelForTool(FLAT_TOOL, GRID_SPEC.mmPerCell)),
+    );
+
+    expect(Math.min(...grid.depth)).toBeCloseTo(-0.051, 6);
+  });
 });
 
 describe('computeRemovalGrid - partial terminal cells', () => {

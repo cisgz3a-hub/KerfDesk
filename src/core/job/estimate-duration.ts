@@ -25,6 +25,11 @@
 import { isEstimateTimeScale, type DeviceProfile } from '../devices';
 import { cncPassRepresentedXyPoints } from '../cnc/cnc-pass-representation';
 import {
+  formatCncCoordinateMm,
+  representedCncCoordinateMm,
+} from '../cnc/coordinate-representation';
+import { cncPassCanEmit } from '../cnc/output-representation';
+import {
   cncPassEntryDepthMm,
   type CncGroup,
   type CncPath3dPass,
@@ -132,12 +137,14 @@ function zRateCappedPathAsCutGroups(group: CncGroup, pass: CncPath3dPass): Reado
     const from = pass.points[index - 1];
     const to = pass.points[index];
     if (from === undefined || to === undefined) continue;
+    const representedFrom = representedPath3dPoint(from);
+    const representedTo = representedPath3dPoint(to);
     groups.push(
       cncAsCutGroup(
         group,
         [{ ...pass, points: [from, to], closed: false }],
         zRateCappedSegmentFeed(group, from, to),
-        plannerMotion(from, to),
+        plannerMotion(representedFrom, representedTo),
       ),
     );
   }
@@ -149,20 +156,60 @@ function zRateCappedSegmentFeed(
   from: CncPath3dPass['points'][number],
   to: CncPath3dPass['points'][number],
 ): number {
+  const emittedFrom = emittedPath3dPoint(from);
+  const emittedTo = emittedPath3dPoint(to);
+  const feed = emittedCncFeedMmPerMin(group.feedMmPerMin);
+  const plunge = emittedCncFeedMmPerMin(group.plungeMmPerMin);
   // Match the emitter's same-XY rule: a pure vertical in-cut move uses plunge
   // feed in either direction, while a lateral rise keeps cutting feed.
-  if (to.x === from.x && to.y === from.y && to.z !== from.z) {
-    return group.plungeMmPerMin;
+  if (
+    emittedTo.x.text === emittedFrom.x.text &&
+    emittedTo.y.text === emittedFrom.y.text &&
+    emittedTo.z.text !== emittedFrom.z.text
+  ) {
+    return plunge;
   }
-  const descentMm = from.z - to.z;
-  if (!(descentMm > 0) || !Number.isFinite(descentMm)) return group.feedMmPerMin;
-  const length3d = Math.hypot(to.x - from.x, to.y - from.y, descentMm);
-  if (!(length3d > 0) || !Number.isFinite(length3d)) return group.feedMmPerMin;
-  const plungeLimitedFeed = Math.max(
-    1,
-    Math.floor((Math.max(1, group.plungeMmPerMin) * length3d) / descentMm),
+  const descentMm = emittedFrom.z.value - emittedTo.z.value;
+  if (!(descentMm > 0) || !Number.isFinite(descentMm)) return feed;
+  const length3d = Math.hypot(
+    emittedTo.x.value - emittedFrom.x.value,
+    emittedTo.y.value - emittedFrom.y.value,
+    descentMm,
   );
-  return Math.min(group.feedMmPerMin, plungeLimitedFeed);
+  if (!(length3d > 0) || !Number.isFinite(length3d)) return feed;
+  const plungeLimitedFeed = Math.max(1, Math.floor((plunge * length3d) / descentMm));
+  return Math.min(feed, plungeLimitedFeed);
+}
+
+function emittedCncFeedMmPerMin(value: number): number {
+  return Math.max(1, Math.round(value));
+}
+
+function emittedPath3dPoint(point: CncPath3dPass['points'][number]): {
+  readonly x: { readonly text: string; readonly value: number };
+  readonly y: { readonly text: string; readonly value: number };
+  readonly z: { readonly text: string; readonly value: number };
+} {
+  return {
+    x: emittedCoordinate(point.x),
+    y: emittedCoordinate(point.y),
+    z: emittedCoordinate(point.z),
+  };
+}
+
+function emittedCoordinate(value: number): { readonly text: string; readonly value: number } {
+  const text = formatCncCoordinateMm(value);
+  return { text, value: Number(text) };
+}
+
+function representedPath3dPoint(
+  point: CncPath3dPass['points'][number],
+): CncPath3dPass['points'][number] {
+  return {
+    x: representedCncCoordinateMm(point.x),
+    y: representedCncCoordinateMm(point.y),
+    z: representedCncCoordinateMm(point.z),
+  };
 }
 
 function cncAsCutGroup(
@@ -210,11 +257,12 @@ function cncPlungeSeconds(job: Job, device: DeviceProfile): number {
   let seconds = 0;
   for (const group of job.groups) {
     if (group.kind !== 'cnc') continue;
-    const plungeFeed = Math.max(1, group.plungeMmPerMin);
+    const plungeFeed = emittedCncFeedMmPerMin(group.plungeMmPerMin);
     const retractFeed = Math.max(1, device.maxFeed);
+    const safeZMm = representedCncCoordinateMm(Math.max(0, group.safeZMm));
     for (const pass of group.passes) {
-      if (pass.kind === 'contour' && cncPassRepresentedXyPoints(pass).length < 2) continue;
-      const travelZMm = group.safeZMm + Math.abs(cncPassEntryDepthMm(pass));
+      if (!cncPassCanEmit(pass)) continue;
+      const travelZMm = safeZMm + Math.abs(cncPassEntryDepthMm(pass));
       seconds += (travelZMm / plungeFeed) * SECONDS_PER_MINUTE;
       seconds += (travelZMm / retractFeed) * SECONDS_PER_MINUTE;
     }

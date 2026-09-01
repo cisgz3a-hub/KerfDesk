@@ -19,13 +19,9 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { prepareProjectForPersistence } from '../../io/project';
 import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { requestSaveFilename } from '../state/save-filename-store';
-import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { handleSalvageExportProject } from './salvage-export';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import {
@@ -61,6 +57,11 @@ export {
   prebuildGcodeSave,
   type PrebuiltGcodeSave,
 } from './transactional-gcode-save';
+export { handleSaveProject, type SaveProjectCtx } from './project-save-action';
+export {
+  SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE,
+  type SaveProjectOutcome,
+} from './project-save-completion';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -314,92 +315,6 @@ function outputScopedWarningProject(ctx: SaveGcodeCtx): Project {
   const scoped = validateOutputScope(ctx.project.scene, ctx.outputScope ?? DEFAULT_OUTPUT_SCOPE);
   if (!scoped.ok || scoped.scene === ctx.project.scene) return ctx.project;
   return { ...ctx.project, scene: scoped.scene };
-}
-
-export type SaveProjectCtx = {
-  readonly platform: PlatformAdapter;
-  readonly project: Project;
-  readonly expectedProject?: Project;
-  readonly savedName: string | null;
-  readonly lastSaveTarget: SaveTarget | null;
-  readonly markSaved: (target: SaveTarget, expectedProject: Project) => boolean | undefined;
-  readonly pushToast: (message: string, variant?: ToastVariant) => void;
-};
-
-// LU18: the Save-before-discard flow needs to know whether the save
-// actually landed — a cancelled picker must abort the destructive action
-// that triggered it, not fall through to "discard anyway".
-export type SaveProjectOutcome = 'saved' | 'saved-with-newer-edits' | 'cancelled' | 'error';
-
-export const SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE =
-  'Saved the captured version; newer edits remain unsaved and recovery is preserved.';
-
-// F-A11 Save vs Save As. Without `forceDialog`, Ctrl+S reuses the in-memory
-// SaveTarget from the last save (no dialog, toast just says "Saved").
-// `forceDialog` = true is Save As — always prompts. New/Open clear
-// lastSaveTarget so the next save will prompt regardless.
-export async function handleSaveProject(
-  ctx: SaveProjectCtx,
-  forceDialog = false,
-): Promise<SaveProjectOutcome> {
-  const prepared = prepareProjectForPersistence(ctx.project);
-  if (prepared.kind !== 'ok') {
-    ctx.pushToast(`Could not save project: ${prepared.reason}`, 'error');
-    // The canonical save is refused (ADR-204), but the session must not be a
-    // dead end — offer a raw recovery copy to a SEPARATE file (A7). The
-    // outcome stays 'error': the real project was not saved, so callers like
-    // the discard-before-close flow must not treat this as a clean save.
-    await offerSalvageExport(ctx);
-    return 'error';
-  }
-  const reuseTarget = !forceDialog && ctx.lastSaveTarget !== null;
-  let target: SaveTarget | null;
-  try {
-    target = reuseTarget
-      ? ctx.lastSaveTarget
-      : await ctx.platform.pickFileForSave({
-          suggestedName: ctx.savedName ?? 'untitled.lf2',
-          extensions: ['.lf2'],
-        });
-  } catch (err) {
-    ctx.pushToast(`Could not save project: ${errorMessage(err)}`, 'error');
-    return 'error';
-  }
-  if (target === null) return 'cancelled';
-  try {
-    await target.write(prepared.json);
-    const savedCurrentProject = ctx.markSaved(target, ctx.expectedProject ?? ctx.project) !== false;
-    if (savedCurrentProject) {
-      // This exact project reached disk, so its recovery slot is redundant.
-      clearAutosaveAfterFileHandoff(ctx.pushToast);
-      ctx.pushToast(reuseTarget ? 'Saved' : `Saved project to ${target.displayName}`, 'success');
-    } else {
-      ctx.pushToast(SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE, 'warning');
-      return 'saved-with-newer-edits';
-    }
-    return 'saved';
-  } catch (err) {
-    ctx.pushToast(`Could not save project: ${errorMessage(err)}`, 'error');
-    return 'error';
-  }
-}
-
-// jobAwareConfirm fails closed during an active job (returns false), so a
-// mid-job discard-save that is refused will not prompt — correct, since the
-// recovery copy needs an idle picker anyway.
-async function offerSalvageExport(ctx: SaveProjectCtx): Promise<void> {
-  const wantsSalvage = jobAwareConfirm(
-    'This project cannot be saved as-is without changing its machine or output settings. ' +
-      'Export a raw recovery copy to a new file instead? It preserves your work but may need ' +
-      'repair before it reopens cleanly.',
-  );
-  if (!wantsSalvage) return;
-  await handleSalvageExportProject({
-    platform: ctx.platform,
-    project: ctx.project,
-    savedName: ctx.savedName,
-    pushToast: ctx.pushToast,
-  });
 }
 
 export type OpenProjectCtx = ProjectOpenCompletionContext & {

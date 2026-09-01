@@ -60,12 +60,68 @@ describe('CNC G-code provenance comments', () => {
     expect(enrichedGcode).toContain('; cnc tool: v-bit; diameter-mm: 3.175; angle-deg: 90.000');
     expect(enrichedGcode).toContain('; cnc tool-flutes: 2');
     expect(enrichedGcode).toContain('; cnc layer-primary-tool-id: primary-v-bit');
-    expect(enrichedGcode).toContain('; cnc depth: requested-mm: 1.191; per-pass-mm: 0.500');
+    expect(enrichedGcode).toContain(
+      '; cnc depth: requested-mm: 1.191; per-pass-mm: 0.500; emitted-max-mm: 3.000',
+    );
     expect(enrichedGcode).toContain('; cnc v-resolution-mm: auto');
     expect(enrichedGcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 3.000');
     expect(enrichedGcode).toContain('; cnc feed-source: machine-starter');
     expect(enrichedGcode).toContain('; cnc starter-id: neotronics-4040-safe; revision: 2');
     expect(sendableLines(enrichedGcode)).toEqual(sendableLines(plainGcode));
+  });
+
+  it('discloses a shallow requested depth beside its represented emitted maximum', () => {
+    const gcode = cncGrblStrategy.emit(
+      {
+        groups: [
+          group({
+            requestedDepthMm: 0.0506,
+            depthPerPassMm: 0.0506,
+            passes: [
+              {
+                kind: 'contour',
+                zMm: -0.0506,
+                polyline: squareLoop(10, 20),
+                closed: true,
+              },
+            ],
+          }),
+        ],
+      },
+      DEFAULT_DEVICE_PROFILE,
+    );
+
+    expect(gcode).toContain(
+      '; cnc depth: requested-mm: 0.0506; per-pass-mm: 0.0506; emitted-max-mm: 0.051',
+    );
+    expect(gcode).toContain('G1 Z-0.051');
+  });
+
+  it('retains the exact emitted maximum text at a non-idempotent GRBL float boundary', () => {
+    const gcode = cncGrblStrategy.emit(
+      {
+        groups: [
+          group({
+            requestedDepthMm: 6553.605,
+            depthPerPassMm: 6553.605,
+            passes: [
+              {
+                kind: 'contour',
+                zMm: -6553.606,
+                polyline: squareLoop(10, 20),
+                closed: true,
+              },
+            ],
+          }),
+        ],
+      },
+      DEFAULT_DEVICE_PROFILE,
+    );
+
+    expect(gcode).toContain(
+      '; cnc depth: requested-mm: 6553.605; per-pass-mm: 6553.605; emitted-max-mm: 6553.606',
+    );
+    expect(gcode).toContain('G1 Z-6553.606');
   });
 
   it('keeps untrusted layer and tool labels inside comments', () => {

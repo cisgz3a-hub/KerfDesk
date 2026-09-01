@@ -65,13 +65,7 @@ async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null>
     if (err instanceof Error && err.name === 'AbortError') return null;
     throw err;
   }
-  return {
-    displayName: handle.name,
-    write: async (data) => {
-      const writable = await handle.createWritable();
-      await writeAndClose(writable, data);
-    },
-  };
+  return fileHandleTarget(handle);
 }
 
 async function reserveFileForSave(req: FileSaveRequest): Promise<SaveTarget | null> {
@@ -100,14 +94,64 @@ function directoryFileTarget(
   directory: FileSystemDirectoryHandle,
   displayName: string,
 ): SaveTarget {
+  const identity: WebSaveDestination = { kind: 'directory-file', directory, displayName };
   return {
     displayName,
+    destinationIdentity: identity,
+    isSameDestination: (other) => sameWebSaveDestination(identity, other.destinationIdentity),
     write: async (data) => {
       const handle = await directory.getFileHandle(displayName, { create: true });
       const writable = await handle.createWritable();
       await writeAndClose(writable, data);
     },
   };
+}
+
+type WebSaveDestination =
+  | { readonly kind: 'file'; readonly handle: FileSystemFileHandle }
+  | {
+      readonly kind: 'directory-file';
+      readonly directory: FileSystemDirectoryHandle;
+      readonly displayName: string;
+    };
+
+function fileHandleTarget(handle: FileSystemFileHandle): SaveTarget {
+  const identity: WebSaveDestination = { kind: 'file', handle };
+  return {
+    displayName: handle.name,
+    destinationIdentity: identity,
+    isSameDestination: (other) => sameWebSaveDestination(identity, other.destinationIdentity),
+    write: async (data) => {
+      const writable = await handle.createWritable();
+      await writeAndClose(writable, data);
+    },
+  };
+}
+
+async function sameWebSaveDestination(left: WebSaveDestination, right: unknown): Promise<boolean> {
+  if (!isWebSaveDestination(right) || left.kind !== right.kind) return false;
+  if (left.kind === 'file' && right.kind === 'file') {
+    return sameFileSystemEntry(left.handle, right.handle);
+  }
+  if (left.kind === 'directory-file' && right.kind === 'directory-file') {
+    return (
+      left.displayName === right.displayName &&
+      (await sameFileSystemEntry(left.directory, right.directory))
+    );
+  }
+  return false;
+}
+
+function isWebSaveDestination(value: unknown): value is WebSaveDestination {
+  if (typeof value !== 'object' || value === null || !('kind' in value)) return false;
+  if (value.kind === 'file') return 'handle' in value;
+  return value.kind === 'directory-file' && 'directory' in value && 'displayName' in value;
+}
+
+function sameFileSystemEntry(left: FileSystemHandle, right: FileSystemHandle): Promise<boolean> {
+  if (left === right) return Promise.resolve(true);
+  if (typeof left.isSameEntry !== 'function') return Promise.resolve(false);
+  return left.isSameEntry(right);
 }
 
 async function writeAndClose(

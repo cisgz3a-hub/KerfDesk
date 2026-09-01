@@ -18,8 +18,15 @@ import { useTextDialogStore } from './text-dialog-store';
 
 afterEach(() => {
   useResizeDialogStore.setState({ dialog: null });
-  useTextDialogStore.setState({ isOpen: false, text: '' });
-  useImageEditorStore.setState({ session: null, transform: null });
+  useTextDialogStore.setState({
+    isOpen: false,
+    dialogOwner: null,
+    text: '',
+    sizeDraft: '48',
+    commitRequest: null,
+    errorMessage: null,
+  });
+  useImageEditorStore.setState({ session: null, sessionOwner: null, transform: null });
   document.body.replaceChildren();
 });
 
@@ -109,7 +116,7 @@ describe('Image Studio reachability', () => {
     const focusables = exposeFocusableChildren(dialog);
     const last = focusables.at(-1);
     if (last === undefined) throw new Error('Resize dialog focus controls missing');
-    last.focus();
+    await act(async () => last.focus());
     await pressKey(dialog, 'Tab');
     expect(document.activeElement).toBe(width);
 
@@ -131,7 +138,7 @@ describe('Image Studio reachability', () => {
       transform: null,
     });
     useResizeDialogStore.getState().open('image-size');
-    useResizeDialogStore.getState().setWidth(4);
+    useResizeDialogStore.getState().setWidthDraft('4');
     await act(async () => mounted.root.render(<ResizeDialogPanel />));
     const cancel = mounted.host.querySelector<HTMLButtonElement>('button[title^="Close without"]');
     if (cancel === null) throw new Error('Resize Cancel button missing');
@@ -144,9 +151,36 @@ describe('Image Studio reachability', () => {
     await act(async () => mounted.root.unmount());
   });
 
+  it('closes a blank Resize draft on Enter using the last valid size', async () => {
+    const mounted = mountWithOpener();
+    const session = createSession('resize-draft', 'source.png', createEditorTestBuffer(2, 2), {
+      minX: 0,
+      minY: 0,
+      maxX: 2,
+      maxY: 2,
+    });
+    useImageEditorStore.setState({ session, transform: null });
+    useResizeDialogStore.getState().open('image-size');
+    await act(async () => mounted.root.render(<ResizeDialogPanel />));
+    const width = mounted.host.querySelector<HTMLInputElement>('[aria-label="Width (px)"]');
+    if (width === null) throw new Error('Resize width field missing');
+
+    await act(async () => {
+      setInputValue(width, '');
+      width.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    });
+    expect(width.value).toBe('');
+    expect(width.getAttribute('aria-invalid')).toBe('true');
+
+    await pressKey(width, 'Enter');
+    expect(useImageEditorStore.getState().session).toBe(session);
+    expect(useResizeDialogStore.getState().dialog).toBeNull();
+    await act(async () => mounted.root.unmount());
+  });
+
   it('traps and restores focus in the production Text dialog', async () => {
     const mounted = mountWithOpener();
-    useTextDialogStore.setState({ isOpen: true, text: 'Label' });
+    openTextDialog('Label');
     await act(async () => mounted.root.render(<TextDialog />));
 
     const dialog = mounted.host.querySelector<HTMLElement>('[aria-label="Add text"]');
@@ -163,6 +197,43 @@ describe('Image Studio reachability', () => {
     await pressKey(dialog, 'Escape');
     expect(useTextDialogStore.getState().isOpen).toBe(false);
     expect(document.activeElement).toBe(mounted.opener);
+    await act(async () => mounted.root.unmount());
+  });
+
+  it('keeps a blank Text size draft visible until it is reconciled', async () => {
+    const mounted = mountWithOpener();
+    openTextDialog('Label');
+    await act(async () => mounted.root.render(<TextDialog />));
+    const size = mounted.host.querySelector<HTMLInputElement>('[aria-label="Text size in pixels"]');
+    if (size === null) throw new Error('Text size field missing');
+
+    await act(async () => {
+      setInputValue(size, '');
+      size.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    });
+
+    expect(size.value).toBe('');
+    expect(size.getAttribute('aria-invalid')).toBe('true');
+
+    await act(async () => size.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(size.value).toBe('48');
+    expect(size.getAttribute('aria-invalid')).toBe('false');
+    await act(async () => mounted.root.unmount());
+  });
+
+  it('announces exact Text raster failures inside the open dialog', async () => {
+    const mounted = mountWithOpener();
+    openTextDialog('Keep me');
+    useTextDialogStore.setState({
+      errorMessage: 'Could not add text: font bytes unavailable',
+    });
+    await act(async () => mounted.root.render(<TextDialog />));
+
+    const alert = mounted.host.querySelector<HTMLElement>('[role="alert"]');
+    expect(alert?.textContent).toBe('Could not add text: font bytes unavailable');
+    expect(
+      mounted.host.querySelector<HTMLTextAreaElement>('[aria-label="Text content"]')?.value,
+    ).toBe('Keep me');
     await act(async () => mounted.root.unmount());
   });
 
@@ -254,4 +325,25 @@ async function pressKey(target: HTMLElement, key: string, shiftKey = false): Pro
   await act(async () =>
     target.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true })),
   );
+}
+
+function setInputValue(input: HTMLInputElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  if (setter === undefined) throw new Error('native input value setter missing');
+  setter.call(input, value);
+}
+
+function openTextDialog(text: string): void {
+  useImageEditorStore.setState({
+    session: createSession('text-dialog', 'source.png', createEditorTestBuffer(2, 2), {
+      minX: 0,
+      minY: 0,
+      maxX: 2,
+      maxY: 2,
+    }),
+    sessionOwner: null,
+    transform: null,
+  });
+  useTextDialogStore.getState().open();
+  useTextDialogStore.getState().setText(text);
 }

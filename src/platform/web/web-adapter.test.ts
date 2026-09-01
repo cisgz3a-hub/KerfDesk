@@ -49,6 +49,32 @@ describe('webAdapter save target', () => {
     expect(writable.abort).toHaveBeenCalledTimes(1);
   });
 
+  it('compares separately picked handles with the browser entry identity contract', async () => {
+    const secondHandle = { kind: 'file', name: 'out.gcode' } as FileSystemFileHandle;
+    const isSameEntry = vi.fn(async (other: FileSystemHandle) => other === secondHandle);
+    const firstHandle = {
+      kind: 'file',
+      name: 'out.gcode',
+      isSameEntry,
+    } as unknown as FileSystemFileHandle;
+    const handles = [firstHandle, secondHandle];
+    Object.defineProperty(window, 'showSaveFilePicker', {
+      configurable: true,
+      value: vi.fn(async () => {
+        const handle = handles.shift();
+        if (handle === undefined) throw new Error('No picker handle remains.');
+        return handle;
+      }),
+    });
+
+    const first = await webAdapter.pickFileForSave(saveRequest);
+    const second = await webAdapter.pickFileForSave(saveRequest);
+    if (first === null || second === null) throw new Error('expected save targets');
+
+    await expect(first.isSameDestination?.(second)).resolves.toBe(true);
+    expect(isSameEntry).toHaveBeenCalledWith(secondHandle);
+  });
+
   it('reports unsupported browsers with a clear File System Access error', async () => {
     Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined });
 

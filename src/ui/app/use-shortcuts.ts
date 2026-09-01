@@ -65,9 +65,13 @@ function useFileEditShortcuts(): void {
   const setToolMode = useUiStore((s) => s.setToolMode);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
+  const projectDocumentEpoch = useStore((s) => s.projectDocumentEpoch);
+  const claimProjectSaveRequest = useStore((s) => s.claimProjectSaveRequest);
+  const projectSaveWriteCoordinator = useStore((s) => s.projectSaveWriteCoordinator);
   const savedName = useStore((s) => s.savedName);
   const lastSaveTarget = useStore((s) => s.lastSaveTarget);
   const markSaved = useStore((s) => s.markSaved);
+  const markProjectSaveUncertain = useStore((s) => s.markProjectSaveUncertain);
   const markLoaded = useStore((s) => s.markLoaded);
   const advanceVariablesAfter = useStore((s) => s.advanceVariablesAfter);
   const statusReport = useLaserStore((s) => s.statusReport);
@@ -81,7 +85,7 @@ function useFileEditShortcuts(): void {
   const confirmDiscard = (action: string): Promise<boolean> =>
     confirmDiscardAsync(platform, action);
   // prettier-ignore
-  const fileCtx: FileCtx = { platform, project, jobPlacement, outputScope, machine, controllerSettings, settingsCapability, activeWcs, importSvgObject, importRasterImage, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, advanceVariablesAfter, pushToast, confirmDiscard };
+  const fileCtx: FileCtx = { platform, project, projectDocumentEpoch, claimProjectSaveRequest, getProjectSaveRequestEpoch: () => useStore.getState().projectSaveRequestEpoch, projectSaveWriteCoordinator, jobPlacement, outputScope, machine, controllerSettings, settingsCapability, activeWcs, importSvgObject, importRasterImage, setProject, newProject, savedName, lastSaveTarget, markSaved, markProjectSaveUncertain, markLoaded, advanceVariablesAfter, pushToast, confirmDiscard };
   // prettier-ignore
   const editCtx: EditCtx = { undo, redo, selectedObjectId, selectedPathNode, additionalSelectedIds, removeSceneObjects, deleteSelectedPathNodes, selectObject, selectAllObjects, copySelection, cutSelection, pasteClipboard, groupSelection, ungroupSelection, duplicateSelection, resetToolMode };
   useFileEditShortcutEffect(fileCtx, editCtx, { setToolMode, openConvertToBitmap });

@@ -4,35 +4,58 @@
 
 import { create } from 'zustand';
 import { rasterizeTextLayer, type TextLayerSpec } from './editor-text-raster';
+import type { EditorSession } from './editor-session';
 import { addTextLayer } from './editor-session-layers';
-import { useImageEditorStore } from './image-editor-store';
+import { useImageEditorStore, type ImageEditorState } from './image-editor-store';
+import type { ImageEditorSessionOwner } from './image-editor-ownership';
 
 const BLACK = { r: 0, g: 0, b: 0 };
 const WHITE = { r: 255, g: 255, b: 255 };
 const MAX_LAYER_NAME = 24;
+const RETIRED_REQUEST = { commitRequest: null, errorMessage: null } as const;
+const CLOSED_DIALOG = {
+  isOpen: false,
+  dialogOwner: null,
+  text: '',
+  sizeDraft: '',
+  ...RETIRED_REQUEST,
+} as const;
+
+export type TextDialogOwner = {
+  readonly session: EditorSession;
+  readonly sessionOwner: ImageEditorSessionOwner | null;
+};
 
 export type TextDialogState = {
   readonly isOpen: boolean;
+  readonly dialogOwner: TextDialogOwner | null;
   readonly commitRequest: symbol | null;
+  readonly errorMessage: string | null;
   readonly text: string;
   readonly fontKey: TextLayerSpec['fontKey'];
   readonly sizePx: number;
+  /** Exact editable text; invalid drafts keep the last valid sizePx. */
+  readonly sizeDraft: string;
   readonly ink: 'black' | 'white';
   readonly open: () => void;
   readonly close: () => void;
   readonly setText: (text: string) => void;
   readonly setFontKey: (fontKey: TextLayerSpec['fontKey']) => void;
-  readonly setSizePx: (sizePx: number) => void;
+  readonly setSizeDraft: (sizeDraft: string) => void;
+  readonly reconcileSizeDraft: () => void;
   readonly setInk: (ink: 'black' | 'white') => void;
   readonly commit: () => Promise<void>;
 };
 
 export const useTextDialogStore = create<TextDialogState>((set, get) => ({
   isOpen: false,
+  dialogOwner: null,
   commitRequest: null,
+  errorMessage: null,
   text: '',
   fontKey: 'roboto-regular',
   sizePx: 48,
+  sizeDraft: '48',
   ink: 'black',
 
   open: () => {
@@ -43,50 +66,121 @@ export const useTextDialogStore = create<TextDialogState>((set, get) => ({
     if (editor.transform !== null) editor.commitTransform();
     const current = useImageEditorStore.getState();
     if (current.session === null || current.transform !== null) return;
-    set({ isOpen: true, text: '', commitRequest: null });
+    set({
+      isOpen: true,
+      dialogOwner: { session: current.session, sessionOwner: current.sessionOwner },
+      text: '',
+      sizeDraft: String(get().sizePx),
+      ...RETIRED_REQUEST,
+    });
   },
-  close: () => set({ isOpen: false, commitRequest: null }),
-  setText: (text) => set({ text }),
-  setFontKey: (fontKey) => set({ fontKey }),
-  setSizePx: (sizePx) => {
-    if (Number.isFinite(sizePx) && sizePx > 0) set({ sizePx });
+  close: () => set(CLOSED_DIALOG),
+  setText: (text) => set({ text, ...RETIRED_REQUEST }),
+  setFontKey: (fontKey) => set({ fontKey, ...RETIRED_REQUEST }),
+  setSizeDraft: (sizeDraft) => {
+    const sizePx = textSizeDraftIsValid(sizeDraft) ? Number(sizeDraft) : null;
+    set(
+      sizePx === null
+        ? { sizeDraft, ...RETIRED_REQUEST }
+        : { sizeDraft, sizePx, ...RETIRED_REQUEST },
+    );
   },
-  setInk: (ink) => set({ ink }),
+  reconcileSizeDraft: () =>
+    set((state) => ({ sizeDraft: String(state.sizePx), ...RETIRED_REQUEST })),
+  setInk: (ink) => set({ ink, ...RETIRED_REQUEST }),
+  commit: commitTextDialog,
+}));
 
-  commit: async () => {
-    const { text, fontKey, sizePx, ink } = get();
-    const editor = useImageEditorStore.getState();
-    const session = editor.session;
-    const sessionOwner = editor.sessionOwner;
-    if (session === null) {
-      set({ isOpen: false, commitRequest: null });
-      return;
-    }
-    const commitRequest = Symbol(session.objectId);
-    set({ commitRequest });
-    const buffer = await rasterizeTextLayer(session.doc.width, session.doc.height, {
+async function commitTextDialog(): Promise<void> {
+  const { isOpen, dialogOwner, text, fontKey, sizePx, ink } = useTextDialogStore.getState();
+  if (!isOpen || dialogOwner === null) return;
+  const editor = useImageEditorStore.getState();
+  if (!dialogOwnerMatchesEditor(dialogOwner, editor)) {
+    retireDialogOwner(dialogOwner);
+    return;
+  }
+  const { session } = dialogOwner;
+  const commitRequest = Symbol(session.objectId);
+  useTextDialogStore.setState({ commitRequest, errorMessage: null });
+  let buffer: Awaited<ReturnType<typeof rasterizeTextLayer>>;
+  try {
+    buffer = await rasterizeTextLayer(session.doc.width, session.doc.height, {
       text,
       fontKey,
       sizePx,
       color: ink === 'black' ? BLACK : WHITE,
     });
-    // Re-read: the async render may have outlived this exact session, owner,
-    // dialog, or a later commit request. Object ids alone are not ownership.
+  } catch (error) {
+    // A close, retry, or replacement session retires this request. Its
+    // rejection must not publish feedback into the newer dialog/session.
     const current = useImageEditorStore.getState();
-    if (
-      buffer === null ||
-      get().commitRequest !== commitRequest ||
-      current.session !== session ||
-      current.sessionOwner !== sessionOwner
-    ) {
+    if (!requestIsCurrent(useTextDialogStore.getState(), dialogOwner, commitRequest)) return;
+    if (!dialogOwnerMatchesEditor(dialogOwner, current)) {
+      retireDialogOwner(dialogOwner);
       return;
     }
-    set({ isOpen: false, commitRequest: null });
-    useImageEditorStore.setState({
-      session: addTextLayer(session, crypto.randomUUID(), layerName(text), buffer),
+    useTextDialogStore.setState({ commitRequest: null, errorMessage: textRasterError(error) });
+    return;
+  }
+  // Re-read: the async render may have outlived this exact session, owner,
+  // dialog, or a later commit request. Object ids alone are not ownership.
+  const current = useImageEditorStore.getState();
+  if (!requestIsCurrent(useTextDialogStore.getState(), dialogOwner, commitRequest)) return;
+  if (!dialogOwnerMatchesEditor(dialogOwner, current)) {
+    retireDialogOwner(dialogOwner);
+    return;
+  }
+  if (buffer === null) {
+    useTextDialogStore.setState({
+      commitRequest: null,
+      errorMessage: 'Could not add text: no rendered pixels were produced.',
     });
-  },
-}));
+    return;
+  }
+  useTextDialogStore.setState(CLOSED_DIALOG);
+  useImageEditorStore.setState({
+    session: addTextLayer(session, crypto.randomUUID(), layerName(text), buffer),
+  });
+}
+
+export function textSizeDraftIsValid(sizeDraft: string): boolean {
+  if (sizeDraft.trim().length === 0) return false;
+  const sizePx = Number(sizeDraft);
+  return Number.isFinite(sizePx) && sizePx > 0;
+}
+
+function dialogOwnerMatchesEditor(
+  owner: TextDialogOwner,
+  editor: Pick<ImageEditorState, 'session' | 'sessionOwner'>,
+): boolean {
+  return editor.session === owner.session && editor.sessionOwner === owner.sessionOwner;
+}
+
+function requestIsCurrent(
+  state: TextDialogState,
+  owner: TextDialogOwner,
+  request: symbol,
+): boolean {
+  return state.isOpen && state.dialogOwner === owner && state.commitRequest === request;
+}
+
+function retireDialogOwner(owner: TextDialogOwner): void {
+  useTextDialogStore.setState((state) => (state.dialogOwner === owner ? CLOSED_DIALOG : {}));
+}
+
+// A Text draft belongs to the exact session and source owner that opened it.
+// Closing, replacing, or removing either identity retires the draft and any
+// raster request before that old work can publish into a later editor.
+useImageEditorStore.subscribe((state, previous) => {
+  if (state.session === previous.session && state.sessionOwner === previous.sessionOwner) return;
+  const owner = useTextDialogStore.getState().dialogOwner;
+  if (owner !== null && !dialogOwnerMatchesEditor(owner, state)) retireDialogOwner(owner);
+});
+
+function textRasterError(error: unknown): string {
+  const detail = error instanceof Error ? error.message.trim() : String(error).trim();
+  return detail.length === 0 ? 'Could not add text.' : `Could not add text: ${detail}`;
+}
 
 function layerName(text: string): string {
   const firstLine = text.split('\n')[0]?.trim() ?? '';

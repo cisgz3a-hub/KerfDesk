@@ -1,10 +1,16 @@
 import type { CncGroup, Job } from '../../core/job';
-import { cncGroupMaximumDepthMm } from '../../core/cnc/cnc-group-maximum-depth';
+import {
+  formatCncCoordinateMm,
+  parseGrblCncCoordinate,
+} from '../../core/cnc/coordinate-representation';
+import { cncGroupMaximumDepth } from '../../core/cnc/output-representation';
 import type { Project } from '../../core/scene';
 
 type CompiledLayerDepth = {
   readonly layerId: string;
   readonly depthMm: number;
+  /** Exact positive depth text from the deepest emitted negative-Z word. */
+  readonly depthText?: string;
 };
 
 /** Greatest actual compiled V-carve depth for one operation layer. */
@@ -76,15 +82,20 @@ function compiledLayerDepths(
   job: Job,
   matchesCutType: (cutType: CncGroup['cutType']) => boolean,
 ): ReadonlyArray<CompiledLayerDepth> {
-  const byLayer = new Map<string, number>();
+  const byLayer = new Map<string, CompiledLayerDepth>();
   for (const group of job.groups) {
     if (group.kind !== 'cnc' || !matchesCutType(group.cutType)) continue;
-    byLayer.set(
-      group.layerId,
-      Math.max(byLayer.get(group.layerId) ?? 0, cncGroupMaximumDepthMm(group)),
-    );
+    const depth = cncGroupMaximumDepth(group);
+    const current = byLayer.get(group.layerId);
+    if (current === undefined || depth.value > current.depthMm) {
+      byLayer.set(group.layerId, {
+        layerId: group.layerId,
+        depthMm: depth.value,
+        depthText: depth.text,
+      });
+    }
   }
-  return [...byLayer].map(([layerId, depthMm]) => ({ layerId, depthMm }));
+  return [...byLayer.values()];
 }
 
 type DepthWarningCopy = {
@@ -99,29 +110,33 @@ function detectDepthWarnings(
   copy: DepthWarningCopy,
 ): ReadonlyArray<string> {
   if (!(stockThicknessMm >= 0) || !Number.isFinite(stockThicknessMm)) return [];
-  return depths.flatMap(({ layerId, depthMm }) => {
+  return depths.flatMap(({ layerId, depthMm, depthText }) => {
+    const emittedDepthText = depthText ?? formatCncCoordinateMm(depthMm);
+    const representedStockText = formatCncCoordinateMm(stockThicknessMm);
+    const emittedDepthMm = parseGrblCncCoordinate(emittedDepthText);
+    const representedStockMm = parseGrblCncCoordinate(representedStockText);
     if (
-      !(depthMm > stockThicknessMm) &&
-      !(copy.warnAtStockBottom && depthMm === stockThicknessMm)
+      !(emittedDepthMm > representedStockMm) &&
+      !(copy.warnAtStockBottom && emittedDepthMm === representedStockMm)
     ) {
       return [];
     }
-    if (depthMm === stockThicknessMm) {
+    if (emittedDepthMm === representedStockMm) {
       return [
         `Layer ${layerId} reaches the configured stock bottom at an actual compiled ${copy.label} ` +
-          `depth of ${format(depthMm)} mm. Relief paths have no holding tabs; if this geometry ` +
+          `depth of ${formatText(emittedDepthText)} mm. Relief paths have no holding tabs; if this geometry ` +
           'separates a part, confirm workholding and spoilboard clearance in Job Review.',
       ];
     }
-    const pastMm = depthMm - stockThicknessMm;
+    const pastMm = emittedDepthMm - representedStockMm;
     return [
-      `Layer ${layerId} reaches an actual compiled ${copy.label} depth of ${format(depthMm)} mm ` +
-        `in ${format(stockThicknessMm)} mm stock — ${pastMm.toFixed(2)} mm past the bottom, ` +
+      `Layer ${layerId} reaches an actual compiled ${copy.label} depth of ${formatText(emittedDepthText)} mm ` +
+        `in ${formatText(representedStockText)} mm stock — ${pastMm.toFixed(2)} mm past the bottom, ` +
         `into the spoilboard. ${copy.remediation}`,
     ];
   });
 }
 
-function format(value: number): string {
-  return Number(value.toFixed(3)).toString();
+function formatText(text: string): string {
+  return text.includes('.') ? text.replace(/\.?0+$/, '') : text;
 }

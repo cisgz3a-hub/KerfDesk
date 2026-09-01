@@ -611,7 +611,10 @@ the completed physical Frame is the spatial source of truth.
 2. Always shows dialog. Default name: current project name.
 
 #### Error — save failure
-- Modal: `Could not save project: <reason>`. Project remains dirty, user can retry.
+- Error toast: `Could not save project: <reason>`. Project remains dirty, user can retry.
+- If a late older request wrote the same physical file and restoring the newest captured bytes fails,
+  the exact newest Save owner is marked unsaved and the error toast says to save again. A replacement
+  document or still-newer Save cannot be dirtied by that callback.
 
 #### Edge — save in web context
 - Requires the File System Access API (Chromium-only, per PROJECT.md "Delivery targets"). There is **no browser-download fallback and no IndexedDB fallback** — an unsupported browser fails clearly rather than creating a second persistence path outside the project/file contract (`web-adapter.ts`).
@@ -621,6 +624,17 @@ the completed physical Frame is the spatial source of truth.
 - The captured project version still reaches the chosen file. The newer in-memory edits remain dirty
   and recoverable, and a pending New/Open action stays stopped instead of treating the older captured
   version as authorization to discard them.
+
+#### Edge — concurrent Save / Save As requests
+- File pickers and writes to destinations proven distinct remain independent; an unresolved earlier
+  picker or file write does not delay a later selected destination.
+- Every selected target starts writing its captured bytes immediately, including selections later
+  proven to address the same physical file. Once identity is established, the coordinator waits only
+  in its background repair path and replays the newest captured bytes after overlapping or late older
+  writes. Chromium compares picker handles with `FileSystemHandle.isSameEntry`; retained subsequent
+  Save also carries exact target identity. Slow identity checks never delay another selected write.
+- Only the latest request for the current document may publish the remembered target/name, clear
+  dirty/autosave state, or show ordinary success/failure feedback. A stale selected write still runs.
 
 ---
 
@@ -2688,6 +2702,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    labels are flattened into one inert comment line. Export
    metadata also records the selected machine-profile identity for ordinary,
    tiled, and standalone CNC files.
+5. Ordinary XYZ words have one shared representation: the exact three-decimal
+   text written to the file and the value GRBL's parser receives. Requested
+   depth remains visible when it differs; maximum-depth comments retain the
+   exact emitted text instead of formatting the parsed value a second time.
 
 #### Error — preflight violation
 1. The modal lists each issue with its code and message; no file is written
@@ -2716,6 +2734,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    Total distances and the time estimate.
 4. The simulation is provably faithful: a property test locks the
    simulator's step sequence to the emitted G-code's motion (H.2.3).
+5. Contour, arc, 3-D path, and helical Z motion use the same represented
+   coordinates as output. A multi-revolution helix shows every descending
+   revolution before its final contour, and the duration estimate prices only
+   pass motion the emitter can produce using represented XYZ/feed values.
 
 #### Error — job invalid
 1. Preflight-failing jobs show the same preview-blocked state as laser
@@ -5098,6 +5120,19 @@ and lifts the command's CNC-only gate.)*
 1. Editing a kept trace source (ADR-026 tinted backing) changes future
    re-traces only after Apply; the existing committed vectors are untouched
    until the operator re-traces (F-L3).
+
+#### Edge — dialog and asynchronous ownership
+1. Text, Image Size, and Canvas Size belong to the exact open editor session
+   and document source, not only the persisted object id. Replacing or
+   reopening a same-id source retires the old dialog/request; stale completion
+   is silent and cannot mutate or close the replacement.
+2. A current Text font/raster failure remains in the dialog with its draft and
+   an inline error so the operator can edit and retry.
+3. Blank, invalid, non-positive Text, Image Size, and Canvas Size drafts and
+   out-of-range color Ink drafts create no mutation. Blur restores the last valid displayed value; HTML
+   `step` controls spinner increments and does not refuse other finite values.
+   OK/Enter closes with the last valid represented value rather than refusing
+   the action because transient text is incomplete.
 
 #### Edge — job streaming
 1. While a job is active the overlay shows the streaming state with the

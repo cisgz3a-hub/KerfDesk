@@ -7,7 +7,11 @@ import { useRef } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import type { CanvasAnchor } from './editor-session-resize';
 import { useImageEditorStore } from './image-editor-store';
-import { useResizeDialogStore, type ResizeDialog } from './resize-dialog-store';
+import {
+  resizeEdgeDraftIsValid,
+  useResizeDialogStore,
+  type ResizeDialog,
+} from './resize-dialog-store';
 
 const ANCHOR_VALUES = [0, 0.5, 1] as const;
 
@@ -38,8 +42,18 @@ function ResizeBody(props: { readonly dialog: ResizeDialog }): JSX.Element {
     >
       <div style={cardStyle}>
         <strong style={{ fontSize: 13 }}>{title}</strong>
-        <DimensionField label="Width (px)" value={dialog.width} onChange={store.setWidth} />
-        <DimensionField label="Height (px)" value={dialog.height} onChange={store.setHeight} />
+        <DimensionField
+          label="Width (px)"
+          draft={dialog.widthDraft}
+          onChange={store.setWidthDraft}
+          onBlur={store.reconcileWidthDraft}
+        />
+        <DimensionField
+          label="Height (px)"
+          draft={dialog.heightDraft}
+          onChange={store.setHeightDraft}
+          onBlur={store.reconcileHeightDraft}
+        />
         {dialog.kind === 'image-size' ? (
           <label style={rowStyle} title="Keep the width/height ratio while editing">
             <input
@@ -84,9 +98,11 @@ function ResizeBody(props: { readonly dialog: ResizeDialog }): JSX.Element {
 
 function DimensionField(props: {
   readonly label: string;
-  readonly value: number;
-  readonly onChange: (value: number) => void;
+  readonly draft: string;
+  readonly onChange: (draft: string) => void;
+  readonly onBlur: () => void;
 }): JSX.Element {
+  const isValid = resizeEdgeDraftIsValid(props.draft);
   return (
     <label style={rowStyle}>
       <span style={labelStyle}>{props.label}</span>
@@ -94,11 +110,10 @@ function DimensionField(props: {
         type="number"
         min={1}
         max={8192}
-        value={props.value}
-        onChange={(e) => {
-          const next = Number(e.target.value);
-          if (Number.isFinite(next)) props.onChange(next);
-        }}
+        value={props.draft}
+        aria-invalid={!isValid}
+        onChange={(e) => props.onChange(e.target.value)}
+        onBlur={props.onBlur}
         style={numberStyle}
         aria-label={props.label}
         title={props.label}

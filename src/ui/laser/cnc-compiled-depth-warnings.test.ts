@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../core/job';
+import { parseGrblCncCoordinate } from '../../core/cnc/coordinate-representation';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import {
   compiledReliefLayerDepths,
@@ -44,7 +45,9 @@ describe('compiled V-carve depth warnings', () => {
     const depths = compiledVCarveLayerDepths(jobAtDepth(22.787));
     const warnings = detectCompiledVCarveDepthWarnings(depths, 6.35);
 
-    expect(depths).toEqual([{ layerId: 'script', depthMm: 22.787 }]);
+    expect(depths).toEqual([
+      { layerId: 'script', depthMm: parseGrblCncCoordinate('22.787'), depthText: '22.787' },
+    ]);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('actual compiled V-carve depth of 22.787 mm');
     expect(warnings[0]).toContain('16.44 mm past the bottom');
@@ -55,6 +58,51 @@ describe('compiled V-carve depth warnings', () => {
       detectCompiledVCarveDepthWarnings(compiledVCarveLayerDepths(jobAtDepth(0.759)), 6.35),
     ).toEqual([]);
   });
+
+  it('reports the represented emitted maximum rather than a deeper raw-precision fiction', () => {
+    expect(compiledVCarveLayerDepths(jobAtDepth(0.0506))).toEqual([
+      { layerId: 'script', depthMm: parseGrblCncCoordinate('0.051'), depthText: '0.051' },
+    ]);
+  });
+
+  it('classifies stock thresholds by emitted coordinate text, not binary float drift', () => {
+    const exact = compiledVCarveLayerDepths(jobAtDepth(3.798));
+
+    expect(detectCompiledVCarveDepthWarnings(exact, 3.798)).toEqual([]);
+    expect(
+      detectCompiledReliefDepthWarnings(
+        exact.map((entry) => ({ ...entry })),
+        3.798,
+      ),
+    ).toEqual([expect.stringContaining('reaches the configured stock bottom')]);
+  });
+
+  it('retains an overrun whose emitted text would change after a second float format', () => {
+    const depths = compiledVCarveLayerDepths(jobAtDepth(6553.606));
+
+    expect(depths).toEqual([
+      {
+        layerId: 'script',
+        depthMm: parseGrblCncCoordinate('6553.606'),
+        depthText: '6553.606',
+      },
+    ]);
+    expect(detectCompiledVCarveDepthWarnings(depths, 6553.605)).toEqual([
+      expect.stringContaining('actual compiled V-carve depth of 6553.606 mm'),
+    ]);
+  });
+
+  it('does not turn two coordinate words with one GRBL value into an overrun', () => {
+    const stockThicknessMm = 9999.01;
+    const controllerDepthMm = parseGrblCncCoordinate('9999.011');
+    expect(controllerDepthMm).toBe(parseGrblCncCoordinate('9999.010'));
+    const depths = [{ layerId: 'script', depthMm: controllerDepthMm, depthText: '9999.011' }];
+
+    expect(detectCompiledVCarveDepthWarnings(depths, stockThicknessMm)).toEqual([]);
+    expect(detectCompiledReliefDepthWarnings(depths, stockThicknessMm)).toEqual([
+      expect.stringContaining('reaches the configured stock bottom'),
+    ]);
+  });
 });
 
 describe('compiled relief depth warnings', () => {
@@ -63,7 +111,9 @@ describe('compiled relief depth warnings', () => {
       groups: [reliefGroup('relief-rough', 4), reliefGroup('relief-finish', 7.5)],
     };
 
-    expect(compiledReliefLayerDepths(job)).toEqual([{ layerId: 'relief', depthMm: 7.5 }]);
+    expect(compiledReliefLayerDepths(job)).toEqual([
+      { layerId: 'relief', depthMm: 7.5, depthText: '7.500' },
+    ]);
     expect(detectCompiledReliefDepthWarnings(compiledReliefLayerDepths(job), 6.35)).toEqual([
       expect.stringContaining('actual compiled relief depth of 7.5 mm'),
     ]);

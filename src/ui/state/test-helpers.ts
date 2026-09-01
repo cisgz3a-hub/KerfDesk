@@ -8,12 +8,16 @@ import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import { DEFAULT_LAYER_DEFAULTS_STATE } from './layer-default-actions';
 import { EMPTY_MATERIAL_LIBRARY_COLLECTION } from './material-library-collection';
 import { DEFAULT_OUTPUT_SCOPE_SETTINGS, useStore } from './store';
+import { createProjectSaveWriteCoordinator } from './project-save-write-coordinator';
 
 export function resetStore(): void {
   useStore.setState({
     project: createProject(),
     projectDocumentEpoch: 0,
     projectOpenRequestEpoch: 0,
+    projectSaveRequestEpoch: 0,
+    projectSavedRequestEpoch: null,
+    projectSaveWriteCoordinator: createProjectSaveWriteCoordinator(),
     probeSetupEpoch: 0,
     selectedObjectId: null,
     selectedPathNode: null,
