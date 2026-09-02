@@ -399,17 +399,20 @@ describe('buildAppCommands', () => {
   });
 });
 
-// M27 (AUDIT-2026-06-10): preview had exactly one entry point (the P key);
-// the command now carries content gating + an active flag the toolbar
-// renders as aria-pressed.
+// M27 (AUDIT-2026-06-10): Preview is shared by the toolbar, Window menu,
+// and P shortcut. Empty output changes the in-Preview disclosure, not whether
+// an entry point may open the mode.
 describe('window.toggle-preview command (M27)', () => {
-  it('is disabled with a reason when nothing is previewable', () => {
+  it('opens from the command surface when nothing is previewable', () => {
+    const togglePreview = vi.fn();
     const command = commandById(
-      buildAppCommands(baseCtx({ hasPreviewableContent: false })),
+      buildAppCommands(baseCtx({ hasPreviewableContent: false, togglePreview })),
       'window.toggle-preview',
     );
-    expect(command.enabled).toBe(false);
-    expect(command.disabledReason).toContain('Enable Output');
+    expect(command.enabled).toBe(true);
+    expect(command.disabledReason).toBeUndefined();
+    expect(runCommand(command)).toBe(true);
+    expect(togglePreview).toHaveBeenCalledTimes(1);
   });
 
   it('is enabled and inactive with previewable content', () => {

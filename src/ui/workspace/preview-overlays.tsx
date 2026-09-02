@@ -1,5 +1,5 @@
 // Preview-mode status overlays (M27, AUDIT-2026-06-10 / WORKFLOW F-A8):
-// the empty-preview hint ("No layers have Output enabled") and the
+// the empty-preview hint ("Nothing to preview") and the
 // out-of-bounds banner. Preview is the operator's primary pre-burn
 // verification surface — a silently-empty preview or an unexplained red
 // outline is a trust leak.

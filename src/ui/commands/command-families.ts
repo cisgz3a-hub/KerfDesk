@@ -346,29 +346,24 @@ function guardedCalibrationAction(
 }
 
 export function windowCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
-  // Preview is gated on previewable content (M27/F-A8) — but ALWAYS
-  // exit-able, so emptying the scene mid-preview can't trap the mode on.
-  const previewCommand =
-    ctx.hasPreviewableContent || ctx.previewActive
-      ? {
-          ...enabled(
-            'window.toggle-preview',
-            'window',
-            'Preview',
-            ctx.previewActive ? 'Exit preview (P)' : 'Preview the exact toolpath the machine runs',
-            ctx.togglePreview,
-            'P',
-          ),
-          active: ctx.previewActive,
-        }
-      : disabled(
-          'window.toggle-preview',
-          'window',
-          'Preview',
-          'Enable Output on at least one layer with objects to preview',
-          ctx.togglePreview,
-          'P',
-        );
+  // Empty output is a truthful Preview state with its own explanation, not a
+  // reason to refuse the toolbar or Window-menu entry points. Keep every
+  // surface aligned with the always-reachable P shortcut (M27/F-A8).
+  const previewCommand = {
+    ...enabled(
+      'window.toggle-preview',
+      'window',
+      'Preview',
+      ctx.previewActive
+        ? 'Exit preview (P)'
+        : ctx.hasPreviewableContent
+          ? 'Preview the exact toolpath the machine runs'
+          : 'Open Preview and show the empty-output explanation',
+      ctx.togglePreview,
+      'P',
+    ),
+    active: ctx.previewActive,
+  };
   return [
     previewCommand,
     ...windowPanelCommands(ctx),
