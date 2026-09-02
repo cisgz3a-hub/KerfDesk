@@ -323,7 +323,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'window.toggle-preview': {
     family: 'window',
-    tooltip: 'Preview the exact toolpath that will be sent to the machine.',
+    tooltip:
+      'Open or close Preview. When no output exists, Preview explains how to make it visible.',
   },
   'window.toggle-layers-panel': {
     family: 'window',

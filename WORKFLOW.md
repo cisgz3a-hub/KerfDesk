@@ -83,7 +83,6 @@
 - `File → Save Project`
 - `File → Save Project As`
 - `File → Save G-code`
-- Preview toggle
 - All transform controls
 - Cuts/Layers row controls
 
@@ -91,6 +90,7 @@
 - `File → New` (no-op when already empty)
 - `File → Open Project`
 - `File → Import SVG`
+- Preview toggle (opens the empty-output explanation when nothing is previewable)
 - Pan, Zoom, Zoom-fit
 - Help, About
 
@@ -503,7 +503,7 @@ Identical to the format-specific import flows except:
 
 #### Empty — preview with no output layers
 - Preview shows empty workspace (no paths visible).
-- Hint text: `No layers have Output enabled. Toggle a layer to see preview.`
+- Hint text: `Nothing to preview — enable Output on at least one layer with objects.`
 
 #### Edge — preview of out-of-bounds geometry
 - Out-of-bounds path segments rendered in red.
