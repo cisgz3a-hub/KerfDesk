@@ -86,6 +86,80 @@ describe('prepareOutputSnapshot', () => {
     expect(renderer).toHaveBeenCalledTimes(1);
   });
 
+  it('normalizes composed variable content before rendering and compiled preparation', async () => {
+    const base = variableProject();
+    const variableText = base.scene.objects[0];
+    if (variableText?.kind !== 'text') throw new Error('variable text fixture is missing');
+    const rendered: string[] = [];
+    const capturingRenderer: VariableTextRenderer = async ({ text, content }) => {
+      rendered.push(content);
+      return {
+        bounds: { minX: 0, minY: 0, maxX: content.length, maxY: 1 },
+        paths: [
+          {
+            color: text.color,
+            polylines: [
+              {
+                closed: false,
+                points: [
+                  { x: 0, y: 0 },
+                  { x: content.length, y: 0 },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+    };
+    const splitProject: Project = {
+      ...base,
+      variables: {
+        ...(base.variables ?? DEFAULT_PROJECT_VARIABLE_DATA),
+        csv: { sourceName: 'marks.csv', headers: ['mark'], records: [['\u0301']] },
+      },
+      scene: {
+        ...base.scene,
+        objects: [
+          {
+            ...variableText,
+            variableTemplate: {
+              tokens: [
+                { kind: 'literal', value: 'Cafe' },
+                { kind: 'csv', column: 'mark' },
+              ],
+            },
+          },
+        ],
+      },
+    };
+    const composedProject: Project = {
+      ...splitProject,
+      scene: {
+        ...splitProject.scene,
+        objects: [
+          {
+            ...variableText,
+            variableTemplate: { tokens: [{ kind: 'literal', value: 'Caf\u00e9' }] },
+          },
+        ],
+      },
+    };
+
+    const split = await prepareOutputSnapshot(splitProject, {
+      clock: () => NOW,
+      renderVariableText: capturingRenderer,
+    });
+    const composed = await prepareOutputSnapshot(composedProject, {
+      clock: () => NOW,
+      renderVariableText: capturingRenderer,
+    });
+
+    expect(rendered).toEqual(['Caf\u00e9', 'Caf\u00e9']);
+    expect(split.ok).toBe(true);
+    expect(composed.ok).toBe(true);
+    if (split.ok && composed.ok) expect(split.job).toEqual(composed.job);
+  });
+
   it('materializes many variable objects in source order with bounded concurrency', async () => {
     const first = variableProject();
     const template = first.scene.objects[0];

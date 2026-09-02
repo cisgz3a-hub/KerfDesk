@@ -24,6 +24,22 @@ describe('parseVariableCsv', () => {
     expect(result.ok && result.dataset.records).toEqual([['1', '', '']]);
   });
 
+  it('preserves canonically equivalent headers and records as distinct raw identities', () => {
+    const result = parseVariableCsv(
+      'canonical.csv',
+      'Caf\u00e9,Cafe\u0301\nCaf\u00e9,Cafe\u0301\n',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      dataset: {
+        sourceName: 'canonical.csv',
+        headers: ['Caf\u00e9', 'Cafe\u0301'],
+        records: [['Caf\u00e9', 'Cafe\u0301']],
+      },
+    });
+  });
+
   it('rejects unterminated quotes, duplicate headers, and uneven rows', () => {
     expect(parseVariableCsv('bad.csv', 'a\n"open')).toMatchObject({ ok: false, row: 2 });
     expect(parseVariableCsv('bad.csv', 'a,a\n1,2')).toMatchObject({

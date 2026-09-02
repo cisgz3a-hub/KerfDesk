@@ -57,6 +57,37 @@ describe('project variable persistence', () => {
     expect(result).toEqual({ kind: 'ok', project });
   });
 
+  it('round-trips canonical-equivalent CSV and token identities without collapsing them', () => {
+    const project = projectWithVariables();
+    const variableText = project.scene.objects[0];
+    if (variableText?.kind !== 'text') throw new Error('variable text fixture is missing');
+    const withCanonicalTwins: Project = {
+      ...project,
+      variables: {
+        ...(project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA),
+        csv: {
+          sourceName: 'canonical.csv',
+          headers: ['Caf\u00e9', 'Cafe\u0301'],
+          records: [['Caf\u00e9', 'Cafe\u0301']],
+        },
+      },
+      scene: {
+        ...project.scene,
+        objects: [
+          {
+            ...variableText,
+            variableTemplate: { tokens: [{ kind: 'csv', column: 'Cafe\u0301' }] },
+          },
+        ],
+      },
+    };
+
+    expect(deserializeProject(serializeProject(withCanonicalTwins))).toEqual({
+      kind: 'ok',
+      project: withCanonicalTwins,
+    });
+  });
+
   it('rejects invalid token fields and uneven embedded records', () => {
     const badToken = JSON.parse(serializeProject(projectWithVariables())) as Record<
       string,

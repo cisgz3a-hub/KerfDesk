@@ -32,4 +32,14 @@ describe('variable template source', () => {
 
     expect(result).toEqual({ ok: true, template });
   });
+
+  it('encodes generated non-NFC columns while preserving legacy raw tokens verbatim', () => {
+    const column = 'Cafe\u0301';
+    const template = { tokens: [{ kind: 'csv' as const, column }] };
+    const source = variableTemplateToSource(template);
+
+    expect(source).toMatch(/^\{\{csv-json:/);
+    expect(parseVariableTemplateSource(source)).toEqual({ ok: true, template });
+    expect(parseVariableTemplateSource(`{{csv:${column}}}`)).toEqual({ ok: true, template });
+  });
 });
