@@ -269,7 +269,10 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
   await page.getByRole('button', { name: 'Text...' }).click();
   await page.getByRole('textbox', { name: 'Text content' }).fill('Part-');
   await page.getByRole('checkbox', { name: 'Variable text' }).check();
-  await page.getByLabel('Import variable CSV').setInputFiles({
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Import CSV...' }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
     name: 'parts.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from('name,material\nBracket,Birch\nPanel,Acrylic\n'),
