@@ -50,7 +50,6 @@ export function DesktopPreviewUpdateButton(): JSX.Element {
 }
 
 const buttonStyle: React.CSSProperties = {
-  marginLeft: 'auto',
   fontSize: 12,
   padding: '1px 10px',
   whiteSpace: 'nowrap',

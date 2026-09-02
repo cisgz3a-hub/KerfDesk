@@ -24,15 +24,20 @@ afterEach(() => {
 });
 
 describe('StatusBar', () => {
-  it('contains status segments without a layout-consuming scrollbar', async () => {
+  it('scrolls telemetry without moving the fixed action rail', async () => {
     const { host, root } = await renderStatusBar();
     try {
       const status = host.querySelector('footer[aria-label="Status bar"]');
+      const telemetry = status?.querySelector<HTMLElement>('.lf-status-bar__telemetry');
+      const actions = status?.querySelector<HTMLElement>('.lf-status-bar__actions');
       expect(status).toBeInstanceOf(HTMLElement);
       expect(status?.classList.contains('lf-status-bar')).toBe(true);
-      expect((status as HTMLElement).style.overflowX).toBe('auto');
+      expect((status as HTMLElement).style.overflowX).toBe('hidden');
       expect((status as HTMLElement).style.minWidth).toBe('0');
       expect((status as HTMLElement).style.maxWidth).toBe('100%');
+      expect(telemetry?.style.overflowX).toBe('auto');
+      expect(telemetry?.style.minWidth).toBe('0');
+      expect(actions?.style.flexShrink).toBe('0');
     } finally {
       await act(async () => root.unmount());
     }
@@ -107,7 +112,7 @@ describe('StatusBar', () => {
     }
   });
 
-  it('hosts the right-aligned Update button when an update is ready (ADR-227)', async () => {
+  it('hosts the Update button in the fixed action rail when an update is ready', async () => {
     usePwaUpdateStore.setState({
       availability: { kind: 'ready', applyUpdate: () => Promise.resolve() },
     });
@@ -115,7 +120,7 @@ describe('StatusBar', () => {
     try {
       const button = host.querySelector<HTMLButtonElement>('button[aria-label="Apply app update"]');
       expect(button).not.toBeNull();
-      expect(button?.style.marginLeft).toBe('auto');
+      expect(button?.closest('.lf-status-bar__actions')).not.toBeNull();
     } finally {
       await act(async () => root.unmount());
     }

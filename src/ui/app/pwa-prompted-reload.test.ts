@@ -118,4 +118,26 @@ describe('applyPromptedReload', () => {
     vi.advanceTimersByTime(5000);
     expect(reload).toHaveBeenCalledTimes(1);
   });
+
+  it('removes the failed attempt listener and timer so a retry owns the reload', async () => {
+    vi.useFakeTimers();
+    const failedWorker = new FakeServiceWorker();
+    const failed = makeHooks({
+      getRegistration: () => Promise.resolve(registrationWith(failedWorker)),
+      requestSkipWaiting: () => Promise.reject(new Error('post failed')),
+    });
+
+    await expect(applyPromptedReload(failed.hooks)).rejects.toThrow('post failed');
+    failedWorker.transition('activated');
+    vi.advanceTimersByTime(5000);
+    expect(failed.reload).not.toHaveBeenCalled();
+
+    const retryWorker = new FakeServiceWorker();
+    const retry = makeHooks({
+      getRegistration: () => Promise.resolve(registrationWith(retryWorker)),
+    });
+    await applyPromptedReload(retry.hooks);
+    retryWorker.transition('activated');
+    expect(retry.reload).toHaveBeenCalledTimes(1);
+  });
 });

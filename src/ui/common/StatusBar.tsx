@@ -28,32 +28,35 @@ export function StatusBar(): JSX.Element {
   const selectedFillWarning = fillWarning(project, selectedObjectId, additionalSelectedIds);
   return (
     <footer aria-label="Status bar" className="lf-status-bar" style={barStyle}>
-      <Segment>
-        {cursorMm === null
-          ? 'Cursor: —'
-          : `Cursor: X ${cursorMm.x.toFixed(1)}, Y ${cursorMm.y.toFixed(1)} mm`}
-      </Segment>
-      <Segment>{describeSelection(project, selectedObjectId, additionalSelectedIds)}</Segment>
-      {selectedFillWarning !== null && <Segment>{selectedFillWarning}</Segment>}
-      <Segment>Objects: {objectCount}</Segment>
-      {groupCount > 0 && <Segment>Groups: {groupCount}</Segment>}
-      {lockedCount > 0 && <Segment>Locked: {lockedCount}</Segment>}
-      <Segment>
-        Layers: {layerCount} ({outputLayerCount} output)
-      </Segment>
-      <Segment>Device: {project.device.name}</Segment>
-      <Segment>
-        Bed: {project.device.bedWidth} × {project.device.bedHeight} mm
-      </Segment>
-      <Segment>Zoom: {Math.round(zoomFactor * 100)}%</Segment>
-      {/* Mount point for the canvas motion overlay's machine-status line, which
-          the workspace portals in rather than floating over the drawing area.
-          display:contents keeps the empty slot from becoming a flex item (and
-          adding a phantom gap), and lets the portalled text sit in the bar's
-          own flex flow. */}
-      <span id={CANVAS_MOTION_SLOT_ID} style={slotStyle} />
-      <DesktopPreviewUpdateButton />
-      <PwaUpdateButton />
+      <div className="lf-status-bar__telemetry" style={telemetryStyle}>
+        <Segment>
+          {cursorMm === null
+            ? 'Cursor: —'
+            : `Cursor: X ${cursorMm.x.toFixed(1)}, Y ${cursorMm.y.toFixed(1)} mm`}
+        </Segment>
+        <Segment>{describeSelection(project, selectedObjectId, additionalSelectedIds)}</Segment>
+        {selectedFillWarning !== null && <Segment>{selectedFillWarning}</Segment>}
+        <Segment>Objects: {objectCount}</Segment>
+        {groupCount > 0 && <Segment>Groups: {groupCount}</Segment>}
+        {lockedCount > 0 && <Segment>Locked: {lockedCount}</Segment>}
+        <Segment>
+          Layers: {layerCount} ({outputLayerCount} output)
+        </Segment>
+        <Segment>Device: {project.device.name}</Segment>
+        <Segment>
+          Bed: {project.device.bedWidth} × {project.device.bedHeight} mm
+        </Segment>
+        <Segment>Zoom: {Math.round(zoomFactor * 100)}%</Segment>
+        {/* Mount point for the canvas motion overlay's machine-status line, which
+            the workspace portals in rather than floating over the drawing area.
+            display:contents keeps the empty slot from becoming a flex item (and
+            adding a phantom gap), and lets the portalled text sit in telemetry. */}
+        <span id={CANVAS_MOTION_SLOT_ID} style={slotStyle} />
+      </div>
+      <div className="lf-status-bar__actions" style={actionsStyle}>
+        <DesktopPreviewUpdateButton />
+        <PwaUpdateButton />
+      </div>
     </footer>
   );
 }
@@ -94,9 +97,9 @@ const barStyle: React.CSSProperties = {
   minWidth: 0,
   maxWidth: '100%',
   boxSizing: 'border-box',
-  overflowX: 'auto',
+  overflowX: 'hidden',
   overflowY: 'hidden',
-  gap: 16,
+  gap: 8,
   alignItems: 'center',
   padding: '4px 12px',
   background: 'var(--lf-bg-0)',
@@ -104,6 +107,22 @@ const barStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
   fontSize: 12,
   borderTop: '1px solid var(--lf-border)',
+};
+const telemetryStyle: React.CSSProperties = {
+  display: 'flex',
+  flex: '1 1 auto',
+  minWidth: 0,
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  gap: 16,
+  alignItems: 'center',
+};
+const actionsStyle: React.CSSProperties = {
+  display: 'flex',
+  flex: '0 0 auto',
+  flexShrink: 0,
+  gap: 8,
+  alignItems: 'center',
 };
 const segStyle: React.CSSProperties = { whiteSpace: 'nowrap' };
 const slotStyle: React.CSSProperties = { display: 'contents' };

@@ -57,6 +57,14 @@
 1. In Phase A, no error. Phase A doesn't use WebSerial.
 2. In Phase B+, attempting to connect shows: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
 
+#### Edge — close an idle window with unsaved changes
+1. The existing renderer dirty predicate requests the ordinary Leave/Stay decision only while no job
+   is active. It does not widen to clean documents or active jobs.
+2. Browsers use their native leave-site prompt. Electron shows **Leave** and **Stay** for that exact
+   renderer request; **Leave** permits the close and **Stay** keeps the window and project unchanged.
+3. Active-job unload retains its independent stop-and-recovery behavior and does not show this dirty
+   prompt. This flow does not create, change, or consume a Frame permit.
+
 ---
 
 ### F-A2. Empty workspace state
@@ -68,6 +76,11 @@
 - **Origin marker**: small cross at the device-profile origin.
 - **Drop hint**: centered ghost text "Drag an SVG here, or use File → Import" — visible only when scene is empty, fades out on hover.
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
+  Telemetry scrolls in its own hidden-scrollbar lane. Ready web or desktop update actions sit in a
+  fixed trailing rail that remains inside 640, 390, and 320 px viewports; machine/job state never
+  hides or disables a ready update action, and applying an update still requires an explicit click.
+  Rapid repeated clicks share one update/reload attempt. If that attempt fails, a nonblocking error
+  toast is shown and the still-visible action owns the next retry.
 - **Top command toolbar**: one non-wrapping row. Familiar file, import, export, Preview, and Shortcuts actions use icon-only buttons with accessible names and hover help. Specialist tools keep icon-plus-label at wide widths and become icon-only at 1280 px and below. Below 700 px the redundant brand wordmark hides; if the window is still narrower than the command set, the command group scrolls horizontally instead of creating a second row.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order widens the same docked rail while the canvas remains on the left; it is not a modal or a third sidebar. Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Machine controls panel**: docked at the far right with the same collapse/expand pattern. It may be collapsed during a job because active run controls live independently in the Live Motion bar.

@@ -50,6 +50,7 @@ beforeEach(() => {
   h.swState.needRefresh = false;
   usePwaUpdateStore.setState({ availability: { kind: 'none' } });
   vi.clearAllMocks();
+  promptedReload.applyPromptedReload.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -94,6 +95,45 @@ describe('PwaUpdateWatcher', () => {
     // updateServiceWorker so the SKIP_WAITING message path is unchanged.
     await hooks.requestSkipWaiting();
     expect(h.updateServiceWorker).toHaveBeenCalledWith(true);
+  });
+
+  it('coalesces rapid Update clicks into one prompted reload owner', async () => {
+    h.swState.needRefresh = true;
+    let resolveReload!: () => void;
+    promptedReload.applyPromptedReload.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveReload = resolve;
+        }),
+    );
+    await render();
+    const availability = usePwaUpdateStore.getState().availability;
+    if (availability.kind !== 'ready') throw new Error('expected ready availability');
+
+    const first = availability.applyUpdate();
+    const second = availability.applyUpdate();
+    expect(second).toBe(first);
+    await vi.waitFor(() => expect(promptedReload.applyPromptedReload).toHaveBeenCalledTimes(1));
+    resolveReload();
+    await first;
+  });
+
+  it('reports a failed update once and allows the visible action to retry', async () => {
+    h.swState.needRefresh = true;
+    promptedReload.applyPromptedReload
+      .mockRejectedValueOnce(new Error('update failed'))
+      .mockResolvedValueOnce(undefined);
+    await render();
+    const availability = usePwaUpdateStore.getState().availability;
+    if (availability.kind !== 'ready') throw new Error('expected ready availability');
+
+    await availability.applyUpdate();
+    expect(h.pushToast).toHaveBeenCalledWith(
+      'Could not apply the app update. Try Update again.',
+      'error',
+    );
+    await availability.applyUpdate();
+    expect(promptedReload.applyPromptedReload).toHaveBeenCalledTimes(2);
   });
 
   it('fires a one-time offline-ready toast', async () => {
