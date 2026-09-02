@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { DEFAULT_PROJECT_VARIABLE_DATA } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -9,7 +8,6 @@ export function VariableTextFields(props: {
   readonly onEnabledChange: (enabled: boolean) => void;
   readonly onInsert: (source: string) => void;
 }): JSX.Element {
-  const inputRef = useRef<HTMLInputElement>(null);
   const variables = useStore((state) => state.project.variables) ?? DEFAULT_PROJECT_VARIABLE_DATA;
   const setCsv = useStore((state) => state.setVariableCsv);
   const setSettings = useStore((state) => state.setVariableSettings);
@@ -32,7 +30,6 @@ export function VariableTextFields(props: {
       {props.enabled ? (
         <VariableTextControls
           variables={variables}
-          inputRef={inputRef}
           firstColumn={firstColumn}
           onInsert={props.onInsert}
           setCsv={setCsv}

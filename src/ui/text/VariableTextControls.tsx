@@ -1,18 +1,17 @@
-import { useEffect, useRef } from 'react';
 import type {
   ProjectVariableData,
   VariableAdvancementPolicy,
   VariableCsvDataset,
 } from '../../core/scene';
-import { parseVariableCsv, variableTemplateToSource } from '../../core/variables';
+import { variableTemplateToSource } from '../../core/variables';
 import { Button, NumberInput } from '../kit';
-import { useStore } from '../state';
+import type { useStore } from '../state';
 import type { useToastStore } from '../state/toast-store';
+import { VariableCsvImport } from './VariableCsvImport';
 import { VariableSequenceControls } from './VariableSequenceControls';
 
 type ControlsProps = {
   readonly variables: ProjectVariableData;
-  readonly inputRef: React.RefObject<HTMLInputElement>;
   readonly firstColumn: string | undefined;
   readonly onInsert: (source: string) => void;
   readonly setCsv: (csv: VariableCsvDataset | undefined) => void;
@@ -41,7 +40,7 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
         )}
       </div>
       <div style={settingsStyle}>
-        <CsvInput {...props} />
+        <VariableCsvImport setCsv={props.setCsv} pushToast={props.pushToast} />
         <Counter
           label="Record"
           value={props.variables.recordIndex + 1}
@@ -65,91 +64,6 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
       </div>
     </>
   );
-}
-
-function CsvInput(props: ControlsProps): JSX.Element {
-  const owner = useRef<CsvImportOwner>({ mounted: true, revision: 0, pending: undefined });
-  useEffect(() => {
-    const currentOwner = owner.current;
-    currentOwner.mounted = true;
-    return () => {
-      currentOwner.mounted = false;
-      currentOwner.revision += 1;
-      currentOwner.pending = undefined;
-    };
-  }, []);
-  return (
-    <>
-      <Button
-        onClick={() => {
-          const currentOwner = owner.current;
-          currentOwner.pending = {
-            revision: ++currentOwner.revision,
-            projectDocumentEpoch: useStore.getState().projectDocumentEpoch,
-          };
-          props.inputRef.current?.click();
-        }}
-      >
-        Import CSV...
-      </Button>
-      <input
-        ref={props.inputRef}
-        type="file"
-        accept=".csv,text/csv"
-        hidden
-        title="Choose a CSV file to embed in this project."
-        aria-label="Import variable CSV"
-        onChange={(event) => void importCsvFile(event.currentTarget, props, owner.current)}
-      />
-    </>
-  );
-}
-
-type CsvImportClaim = { readonly revision: number; readonly projectDocumentEpoch: number };
-type CsvImportOwner = {
-  mounted: boolean;
-  revision: number;
-  pending: CsvImportClaim | undefined;
-};
-
-async function importCsvFile(
-  input: HTMLInputElement,
-  props: ControlsProps,
-  owner: CsvImportOwner,
-): Promise<void> {
-  const claim = owner.pending;
-  owner.pending = undefined;
-  const file = input.files?.[0];
-  input.value = '';
-  if (file === undefined || claim === undefined) return;
-  let text: string;
-  try {
-    text = await file.text();
-  } catch (error) {
-    if (!ownsCsvImport(owner, claim)) return;
-    props.pushToast(`Could not read ${file.name}: ${errorMessage(error)}`, 'error');
-    return;
-  }
-  if (!ownsCsvImport(owner, claim)) return;
-  const result = parseVariableCsv(file.name, text);
-  if (!result.ok) {
-    props.pushToast(`${result.message} Row ${result.row}, column ${result.column}.`, 'error');
-    return;
-  }
-  props.setCsv(result.dataset);
-  props.pushToast(`Embedded ${result.dataset.records.length} CSV record(s).`, 'success');
-}
-
-function ownsCsvImport(owner: CsvImportOwner, claim: CsvImportClaim): boolean {
-  return (
-    owner.mounted &&
-    owner.revision === claim.revision &&
-    useStore.getState().projectDocumentEpoch === claim.projectDocumentEpoch
-  );
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function Advancement(props: {
