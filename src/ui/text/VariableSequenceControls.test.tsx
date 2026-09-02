@@ -2,7 +2,12 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectVariableData, VariableSequenceSettings } from '../../core/scene';
+import {
+  createProject,
+  type ProjectVariableData,
+  type VariableSequenceSettings,
+} from '../../core/scene';
+import { prepareProjectForAutosave, prepareProjectForPersistence } from '../../io/project';
 import { VariableSequenceControls } from './VariableSequenceControls';
 
 (
@@ -51,45 +56,126 @@ describe('VariableSequenceControls', () => {
     expect(reset).toHaveBeenCalledOnce();
     expect(next).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    { label: 'ordinary values', serialStartValue: 10, advanceBy: 2, expectedEnd: 12 },
+    {
+      label: 'the exact safe-integer ceiling',
+      serialStartValue: Number.MAX_SAFE_INTEGER - 1,
+      advanceBy: 1,
+      expectedEnd: Number.MAX_SAFE_INTEGER,
+    },
+    {
+      label: 'one step beyond the ceiling',
+      serialStartValue: Number.MAX_SAFE_INTEGER,
+      advanceBy: 1,
+      expectedEnd: Number.MAX_SAFE_INTEGER,
+    },
+    {
+      label: 'a maximum stride beyond the ceiling',
+      serialStartValue: Number.MAX_SAFE_INTEGER - 1,
+      advanceBy: Number.MAX_SAFE_INTEGER,
+      expectedEnd: Number.MAX_SAFE_INTEGER - 1,
+    },
+  ])('stores a persistable serial wrap endpoint for $label', async (testCase) => {
+    let submitted: ProjectVariableData | undefined;
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    await act(async () =>
+      root?.render(
+        <Harness
+          initialVariables={variablesWithoutSerialEnd(
+            testCase.serialStartValue,
+            testCase.advanceBy,
+          )}
+          onVariables={(variables) => {
+            submitted = variables;
+          }}
+          previous={vi.fn()}
+          next={vi.fn()}
+          reset={vi.fn()}
+        />,
+      ),
+    );
+
+    const wrap = requireInput('Wrap serial');
+    wrap.checked = true;
+    await act(async () => Simulate.change(wrap));
+
+    const serialEndValue = submitted?.sequence?.serialEndValue;
+    expect(serialEndValue).toBe(testCase.expectedEnd);
+    expect(Number.isSafeInteger(serialEndValue)).toBe(true);
+    expect(submitted).toBeDefined();
+    if (submitted === undefined) return;
+    const project = { ...createProject(), variables: submitted };
+    expect(prepareProjectForPersistence(project)).toMatchObject({ kind: 'ok' });
+    expect(prepareProjectForAutosave(project)).toMatchObject({ kind: 'ok' });
+  });
 });
 
 function Harness(props: {
   readonly previous: () => void;
   readonly next: () => void;
   readonly reset: () => void;
+  readonly initialVariables?: ProjectVariableData;
+  readonly onVariables?: (variables: ProjectVariableData) => void;
 }): JSX.Element {
-  const [variables, setVariables] = useState<ProjectVariableData>({
-    recordIndex: 0,
-    serialValue: 10,
-    advancement: 'manual',
-    csv: {
-      sourceName: 'parts.csv',
-      headers: ['name'],
-      records: [['A'], ['B'], ['C']],
+  const [variables, setVariables] = useState<ProjectVariableData>(
+    props.initialVariables ?? {
+      recordIndex: 0,
+      serialValue: 10,
+      advancement: 'manual',
+      csv: {
+        sourceName: 'parts.csv',
+        headers: ['name'],
+        records: [['A'], ['B'], ['C']],
+      },
+      sequence: {
+        recordStartIndex: 0,
+        recordEndIndex: 2,
+        serialStartValue: 10,
+        serialEndValue: 20,
+        advanceBy: 1,
+      },
     },
-    sequence: {
-      recordStartIndex: 0,
-      recordEndIndex: 2,
-      serialStartValue: 10,
-      serialEndValue: 20,
-      advanceBy: 1,
-    },
-  });
+  );
   return (
     <VariableSequenceControls
       variables={variables}
       setSettings={(settings) =>
-        setVariables((current) => ({
-          ...current,
-          ...settings,
-          ...(settings.sequence === undefined ? {} : { sequence: settings.sequence }),
-        }))
+        setVariables((current) => {
+          const nextVariables = {
+            ...current,
+            ...settings,
+            ...(settings.sequence === undefined ? {} : { sequence: settings.sequence }),
+          };
+          props.onVariables?.(nextVariables);
+          return nextVariables;
+        })
       }
       previous={props.previous}
       next={props.next}
       reset={props.reset}
     />
   );
+}
+
+function variablesWithoutSerialEnd(
+  serialStartValue: number,
+  advanceBy: number,
+): ProjectVariableData {
+  return {
+    recordIndex: 0,
+    serialValue: serialStartValue,
+    advancement: 'manual',
+    sequence: {
+      recordStartIndex: 0,
+      recordEndIndex: 0,
+      serialStartValue,
+      advanceBy,
+    },
+  };
 }
 
 async function changeNumber(label: string, value: number): Promise<void> {

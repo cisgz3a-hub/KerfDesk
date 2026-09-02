@@ -94,4 +94,38 @@ describe('project variable persistence', () => {
       reason: expect.stringContaining('recordEndIndex'),
     });
   });
+
+  it('round-trips full safe-integer serial settings and rejects unsafe values', () => {
+    const project = projectWithVariables();
+    const maximum = Number.MAX_SAFE_INTEGER;
+    const withMaximums: Project = {
+      ...project,
+      variables: {
+        ...DEFAULT_PROJECT_VARIABLE_DATA,
+        ...project.variables,
+        serialValue: maximum,
+        sequence: {
+          recordStartIndex: 0,
+          recordEndIndex: 0,
+          serialStartValue: maximum - 2,
+          serialEndValue: maximum,
+          advanceBy: maximum,
+        },
+      },
+    };
+
+    expect(deserializeProject(serializeProject(withMaximums))).toEqual({
+      kind: 'ok',
+      project: withMaximums,
+    });
+
+    const unsafe = JSON.parse(serializeProject(withMaximums)) as {
+      variables: { sequence: { advanceBy: number } };
+    };
+    unsafe.variables.sequence.advanceBy = maximum + 1;
+    expect(deserializeProject(JSON.stringify(unsafe))).toMatchObject({
+      kind: 'invalid',
+      reason: expect.stringContaining('advanceBy'),
+    });
+  });
 });
