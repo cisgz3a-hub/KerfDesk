@@ -33,7 +33,7 @@ export function evaluateVariableTemplate(
     if (!evaluated.ok) return evaluated;
     values.push(evaluated.value);
   }
-  return { ok: true, value: values.join('') };
+  return { ok: true, value: values.join('').normalize('NFC') };
 }
 
 function evaluateToken(
@@ -80,13 +80,35 @@ function evaluateCsv(
   const variables = project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
   const dataset = variables.csv;
   if (dataset === undefined) return { ok: false, message: 'This template needs an embedded CSV.' };
-  const columnIndex = dataset.headers.indexOf(column);
+  const exactIndex = dataset.headers.indexOf(column);
+  const columnIndex =
+    exactIndex >= 0 ? exactIndex : uniqueCanonicalHeaderIndex(dataset.headers, column);
+  if (columnIndex === 'ambiguous') {
+    return {
+      ok: false,
+      message: `CSV column "${column}" is ambiguous because multiple canonically equivalent headers exist.`,
+    };
+  }
   if (columnIndex < 0) return { ok: false, message: `CSV column "${column}" was not found.` };
   const recordIndex = context.recordIndex ?? variables.recordIndex;
   const record = dataset.records[recordIndex];
   if (record === undefined)
     return { ok: false, message: `CSV record ${recordIndex + 1} is missing.` };
   return { ok: true, value: record[columnIndex] ?? '' };
+}
+
+function uniqueCanonicalHeaderIndex(
+  headers: readonly string[],
+  column: string,
+): number | 'ambiguous' {
+  const canonicalColumn = column.normalize('NFC');
+  let match = -1;
+  for (let index = 0; index < headers.length; index += 1) {
+    if (headers[index]?.normalize('NFC') !== canonicalColumn) continue;
+    if (match >= 0) return 'ambiguous';
+    match = index;
+  }
+  return match;
 }
 
 function evaluateCutSetting(

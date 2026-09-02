@@ -90,4 +90,121 @@ describe('evaluateVariableTemplate', () => {
       ),
     ).toEqual({ ok: false, message: 'This template needs an embedded CSV.' });
   });
+
+  it('resolves CSV headers by exact identity before a unique canonical fallback', () => {
+    const context = { now: new globalThis.Date(0) };
+
+    for (const [headers, records] of [
+      [
+        ['Caf\u00e9', 'Cafe\u0301', 'city'],
+        ['NFC', 'NFD', 'Paris'],
+      ],
+      [
+        ['Cafe\u0301', 'city', 'Caf\u00e9'],
+        ['NFD', 'Paris', 'NFC'],
+      ],
+    ] as const) {
+      const project: Project = {
+        ...variableProject(),
+        variables: {
+          ...DEFAULT_PROJECT_VARIABLE_DATA,
+          csv: { sourceName: 'canonical.csv', headers, records: [records] },
+        },
+      };
+      expect(
+        evaluateVariableTemplate(
+          { tokens: [{ kind: 'csv', column: 'Cafe\u0301' }] },
+          text,
+          project,
+          context,
+        ),
+      ).toEqual({ ok: true, value: 'NFD' });
+    }
+
+    expect(
+      evaluateVariableTemplate(
+        { tokens: [{ kind: 'csv', column: 'Caf\u0065\u0301' }] },
+        text,
+        {
+          ...variableProject(),
+          variables: {
+            ...DEFAULT_PROJECT_VARIABLE_DATA,
+            csv: {
+              sourceName: 'canonical.csv',
+              headers: ['Caf\u00e9', 'city'],
+              records: [['UNIQUE', 'Paris']],
+            },
+          },
+        },
+        context,
+      ),
+    ).toEqual({ ok: true, value: 'UNIQUE' });
+  });
+
+  it('reports canonical header ambiguity independent of header order', () => {
+    const query = 'A\u030a\u0301';
+    const equivalentHeaders = ['\u01fa', '\u00c5\u0301'];
+    const context = { now: new globalThis.Date(0) };
+
+    for (const headers of [equivalentHeaders, [...equivalentHeaders].reverse()]) {
+      const project: Project = {
+        ...variableProject(),
+        variables: {
+          ...DEFAULT_PROJECT_VARIABLE_DATA,
+          csv: { sourceName: 'ambiguous.csv', headers, records: [['FIRST', 'SECOND']] },
+        },
+      };
+      expect(
+        evaluateVariableTemplate(
+          { tokens: [{ kind: 'csv', column: query }] },
+          text,
+          project,
+          context,
+        ),
+      ).toEqual({
+        ok: false,
+        message: `CSV column "${query}" is ambiguous because multiple canonically equivalent headers exist.`,
+      });
+    }
+  });
+
+  it('does not treat compatibility-only forms as the same CSV header', () => {
+    const project: Project = {
+      ...variableProject(),
+      variables: {
+        ...DEFAULT_PROJECT_VARIABLE_DATA,
+        csv: { sourceName: 'compatibility.csv', headers: ['\ufb01'], records: [['ligature']] },
+      },
+    };
+
+    expect(
+      evaluateVariableTemplate({ tokens: [{ kind: 'csv', column: 'fi' }] }, text, project, {
+        now: new globalThis.Date(0),
+      }),
+    ).toEqual({ ok: false, message: 'CSV column "fi" was not found.' });
+  });
+
+  it('normalizes the final joined value after token boundaries are composed', () => {
+    const project: Project = {
+      ...variableProject(),
+      variables: {
+        ...DEFAULT_PROJECT_VARIABLE_DATA,
+        csv: { sourceName: 'marks.csv', headers: ['mark'], records: [['\u0301']] },
+      },
+    };
+
+    expect(
+      evaluateVariableTemplate(
+        {
+          tokens: [
+            { kind: 'literal', value: 'Cafe' },
+            { kind: 'csv', column: 'mark' },
+          ],
+        },
+        text,
+        project,
+        { now: new globalThis.Date(0) },
+      ),
+    ).toEqual({ ok: true, value: 'Caf\u00e9' });
+  });
 });

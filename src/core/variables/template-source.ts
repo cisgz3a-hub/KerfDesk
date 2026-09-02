@@ -124,7 +124,9 @@ function tokenToSource(token: VariableTemplateToken): string {
       : encodedTag('serial-json', token);
   }
   if (token.kind === 'csv') {
-    return token.column.trim() === token.column && !/[{}]/.test(token.column)
+    return token.column.trim() === token.column &&
+      !/[{}]/.test(token.column) &&
+      token.column.normalize('NFC') === token.column
       ? `{{csv:${token.column}}}`
       : encodedTag('csv-json', token.column);
   }
