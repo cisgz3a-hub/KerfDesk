@@ -3,15 +3,15 @@ import type {
   VariableAdvancementPolicy,
   VariableCsvDataset,
 } from '../../core/scene';
-import { parseVariableCsv, variableTemplateToSource } from '../../core/variables';
+import { variableTemplateToSource } from '../../core/variables';
 import { Button, NumberInput } from '../kit';
 import type { useStore } from '../state';
 import type { useToastStore } from '../state/toast-store';
+import { VariableCsvImport } from './VariableCsvImport';
 import { VariableSequenceControls } from './VariableSequenceControls';
 
 type ControlsProps = {
   readonly variables: ProjectVariableData;
-  readonly inputRef: React.RefObject<HTMLInputElement>;
   readonly firstColumn: string | undefined;
   readonly onInsert: (source: string) => void;
   readonly setCsv: (csv: VariableCsvDataset | undefined) => void;
@@ -40,7 +40,7 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
         )}
       </div>
       <div style={settingsStyle}>
-        <CsvInput {...props} />
+        <VariableCsvImport setCsv={props.setCsv} pushToast={props.pushToast} />
         <Counter
           label="Record"
           value={props.variables.recordIndex + 1}
@@ -64,36 +64,6 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
       </div>
     </>
   );
-}
-
-function CsvInput(props: ControlsProps): JSX.Element {
-  return (
-    <>
-      <Button onClick={() => props.inputRef.current?.click()}>Import CSV...</Button>
-      <input
-        ref={props.inputRef}
-        type="file"
-        accept=".csv,text/csv"
-        hidden
-        title="Choose a CSV file to embed in this project."
-        aria-label="Import variable CSV"
-        onChange={(event) => void importCsvFile(event.currentTarget, props)}
-      />
-    </>
-  );
-}
-
-async function importCsvFile(input: HTMLInputElement, props: ControlsProps): Promise<void> {
-  const file = input.files?.[0];
-  input.value = '';
-  if (file === undefined) return;
-  const result = parseVariableCsv(file.name, await file.text());
-  if (!result.ok) {
-    props.pushToast(`${result.message} Row ${result.row}, column ${result.column}.`, 'error');
-    return;
-  }
-  props.setCsv(result.dataset);
-  props.pushToast(`Embedded ${result.dataset.records.length} CSV record(s).`, 'success');
 }
 
 function Advancement(props: {
