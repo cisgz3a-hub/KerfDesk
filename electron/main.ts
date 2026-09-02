@@ -75,6 +75,7 @@ import {
   type RtspCameraBridgeHandle,
 } from './rtsp-camera-bridge.js';
 import { configureAutoUpdater } from './auto-update.js';
+import { installApplicationFinalCleanup } from './application-final-cleanup.js';
 import { DESKTOP_PRODUCT_NAME, legacyDesktopDataPath } from './desktop-identity.js';
 import { installPackagedNativeSmoke, readNativeSmokeConfig } from './native-smoke.js';
 import {
@@ -92,6 +93,7 @@ import {
   resolveDesktopUpdateModes,
 } from './update-channel-trust.js';
 import { installWindowReadinessPolicy } from './window-readiness-policy.js';
+import { installWindowUnloadDecision } from './window-unload-decision.js';
 import { revealPrimaryWindow } from './single-instance-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -410,6 +412,19 @@ async function createWindow(): Promise<void> {
   });
   installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
+  installWindowUnloadDecision(window, () => {
+    const response = dialog.showMessageBoxSync(window, {
+      type: 'question',
+      buttons: ['Leave', 'Stay'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      title: 'Unsaved changes',
+      message: 'Leave without saving?',
+      detail: 'Changes you made may not be saved.',
+    });
+    return response === 0 ? 'leave' : 'stay';
+  });
 
   // F-9 audit fix: set Content-Security-Policy via webRequest headers
   // rather than a <meta> tag. Per Electron docs, meta CSP is unreliable
@@ -523,8 +538,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => {
-  void cameraBridge?.close();
+installApplicationFinalCleanup(app, () => cameraBridge?.close(), {
+  reportFailure: (error: unknown) => console.warn('RTSP camera bridge cleanup failed:', error),
 });
 
 app.on('activate', () => {

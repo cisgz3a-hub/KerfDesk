@@ -48,17 +48,35 @@ export async function applyPromptedReload(hooks: PromptedReloadHooks): Promise<v
     return;
   }
   let hasReloaded = false;
-  const reloadOnce = (): void => {
-    if (hasReloaded) return;
-    hasReloaded = true;
-    hooks.reload();
-  };
-  waiting.addEventListener('statechange', () => {
+  let fallbackTimer: number | null = null;
+  const handleStateChange = (): void => {
     // `activated`: the swap completed — the reload is now served by the new
     // worker. `redundant`: an even newer worker replaced this one mid-click;
     // reload and let the fresh page surface whatever is current.
     if (waiting.state === 'activated' || waiting.state === 'redundant') reloadOnce();
-  });
-  window.setTimeout(reloadOnce, ACTIVATION_FALLBACK_MS);
-  await hooks.requestSkipWaiting();
+  };
+  const releaseListeners = (): void => {
+    waiting.removeEventListener('statechange', handleStateChange);
+    if (fallbackTimer !== null) {
+      window.clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+    }
+  };
+  const reloadOnce = (): void => {
+    if (hasReloaded) return;
+    hasReloaded = true;
+    releaseListeners();
+    hooks.reload();
+  };
+  waiting.addEventListener('statechange', handleStateChange);
+  fallbackTimer = window.setTimeout(reloadOnce, ACTIVATION_FALLBACK_MS);
+  try {
+    await hooks.requestSkipWaiting();
+  } catch (error: unknown) {
+    releaseListeners();
+    // If the fallback already initiated a reload, the user's request has been
+    // fulfilled and the late transport failure is no longer actionable.
+    if (hasReloaded) return;
+    throw error;
+  }
 }

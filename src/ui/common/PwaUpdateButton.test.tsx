@@ -2,9 +2,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Controllable laser-store double: the button reads only the recovery-pending
-// predicate fields. isActiveJob (laser-store-helpers) stays real — it is a pure
-// function over the streamer value this mock supplies.
+// Negative-control laser-store double: ready Update must stay reachable for
+// every old suppression state. If production code ever reintroduces that store
+// dependency, the active-state matrix below catches the guard regression.
 const h = vi.hoisted(() => ({
   streamer: { status: null as string | null },
   machine: {
@@ -33,6 +33,7 @@ import { PwaUpdateButton } from './PwaUpdateButton';
 
 const BUTTON = 'button[aria-label="Apply app update"]';
 const LIVE_REGION = '[role="status"]';
+const mountedRoots = new Set<Root>();
 
 async function render(): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
@@ -43,6 +44,7 @@ async function render(): Promise<{ readonly host: HTMLDivElement; readonly root:
     root.render(<PwaUpdateButton />);
   });
   if (root === null) throw new Error('root missing');
+  mountedRoots.add(root);
   return { host, root };
 }
 
@@ -61,7 +63,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await act(async () => {
+    for (const root of mountedRoots) root.unmount();
+  });
+  mountedRoots.clear();
   document.body.innerHTML = '';
 });
 
@@ -96,22 +102,24 @@ describe('PwaUpdateButton', () => {
     ['paused', 'paused'],
     ['done (awaiting Idle cleanup)', 'done'],
     ['errored (needs operator handling)', 'errored'],
-  ])('hides the button while a job is %s', async (_label, status) => {
+  ])('keeps the button reachable while a job is %s', async (_label, status) => {
     markUpdateReady();
     h.streamer.status = status;
     const { host } = await render();
-    expect(host.querySelector(BUTTON)).toBeNull();
+    expect(host.querySelector(BUTTON)).not.toBeNull();
+    expect(host.querySelector(LIVE_REGION)?.textContent).toContain('Update');
   });
 
   it.each([
     ['a terminal safety notice', 'safetyNotice'],
     ['a motion operation', 'motionOperation'],
     ['a controller operation', 'controllerOperation'],
-  ] as const)('hides the button during %s', async (_label, field) => {
+  ] as const)('keeps the button reachable during %s', async (_label, field) => {
     markUpdateReady();
     h.machine[field] = {};
     const { host } = await render();
-    expect(host.querySelector(BUTTON)).toBeNull();
+    expect(host.querySelector(BUTTON)).not.toBeNull();
+    expect(host.querySelector(LIVE_REGION)?.textContent).toContain('Update');
   });
 
   // ADR-227 amendment (audit #22 P3-3): the old banner had role="alert", so
@@ -126,17 +134,17 @@ describe('PwaUpdateButton', () => {
     expect(region?.textContent).toBe('');
   });
 
-  it('announces readiness through the live region when the machine is idle', async () => {
+  it('announces readiness through the live region', async () => {
     markUpdateReady();
     const { host } = await render();
     expect(host.querySelector(LIVE_REGION)?.textContent).toContain('KerfDesk');
     expect(host.querySelector(LIVE_REGION)?.textContent).toContain('Update');
   });
 
-  it('keeps the live region silent while a job is active', async () => {
+  it('keeps the live region truthful while a job is active', async () => {
     markUpdateReady();
     h.streamer.status = 'streaming';
     const { host } = await render();
-    expect(host.querySelector(LIVE_REGION)?.textContent).toBe('');
+    expect(host.querySelector(LIVE_REGION)?.textContent).toContain('Update');
   });
 });

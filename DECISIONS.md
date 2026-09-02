@@ -10186,14 +10186,16 @@ operator clicks whenever they choose.
    (`{ kind: 'none' } | { kind: 'ready'; applyUpdate }`).
 2. **The status bar hosts the update control.** `PwaUpdateButton` renders a right-aligned
    primary **Update** button whenever availability is `ready`. Clicking it runs the staged
-   callback - the unchanged `applyPromptedReload` path (skip-wait, then a guaranteed reload in
-   every service-worker state). The update still applies only on a user click; ADR-060's
-   "never auto-reload" rule stands.
-3. **The old banner's machine suppression carries over verbatim as presentation.** The button is
-   hidden - not disabled - while a job is active or a safety notice / motion operation /
-   controller operation is pending; readiness persists in the store, so the button reappears
-   once the machine clears. This preserves ADR-060's "a reload can abort motion" intent with no
-   new guard surface (ADR-206: same predicate, same effect, nothing newly blocked).
+   callback - the `applyPromptedReload` path (skip-wait, then a guaranteed reload in every
+   service-worker state). One ready-update epoch owns one retryable callback: rapid clicks share
+   the same attempt, successful ownership remains latched until reload, and a failed attempt
+   releases ownership after a nonblocking error toast so the visible action can be clicked again.
+   The update still applies only on a user click; ADR-060's "never auto-reload" rule stands.
+3. **Machine suppression was superseded by ADR-228.** The original implementation carried the old
+   banner's active-job hiding into this passive button. ADR-228 subsequently made Frame the only
+   ordinary guard, so a ready Update action remains reachable in every machine/job state. Applying
+   it still requires an explicit operator click; discovery never reloads automatically. The action
+   rail is fixed while telemetry scrolls independently, so readiness cannot be stranded offscreen.
 4. **The "Later" dismissal machinery is deleted** (`pwa-update-dismissal.ts` and the
    `updatefound` re-arm). It existed only to stop the popup from re-nagging; a passive button
    does not nag, so workbox re-firing `waiting` on every load is now harmless. The orphaned
@@ -10205,8 +10207,8 @@ operator clicks whenever they choose.
   project deploys on nearly every merge; the nag was structural, not a timing bug.
 - An always-visible "Check for updates" control - permanent chrome for a state that is almost
   always empty; update discovery still happens on page load exactly as before.
-- Disabling instead of hiding during jobs - a visible disabled control invites mid-burn clicks
-  and enlarges the existing suppression surface; hiding preserves it exactly.
+- Disabling instead of hiding during jobs - superseded by ADR-228; either behavior is a forbidden
+  non-Frame guard, so the passive action remains reachable.
 - A toolbar placement - the status bar is the app's persistent low-attention strip (VS
   Code-style update affordance) and the maintainer asked for a "task bar" location.
 
@@ -10217,8 +10219,8 @@ operator clicks whenever they choose.
   divergence from LightBurn behavior. (Amended 2026-07-17, rolling audit #22 P3-3,
   maintainer-approved: `PwaUpdateButton` also mounts a visually-hidden `role="status"` live
   region that politely announces readiness to screen-reader users — the deleted banner was
-  `role="alert"`, so the passive button was silent for them. Audio-only, no visual popup;
-  the suppression predicate is unchanged.)
+  `role="alert"`, so the passive button was silent for them. Audio-only, no visual popup. The
+  announcement follows readiness itself and is not suppressed by machine state.)
 - On Electron nothing changes: the watcher never mounts, the store stays `none`, the status bar
   never shows the button, and desktop updates remain electron-updater's (ADR-024/ADR-135).
 - Files: `src/ui/app/PwaUpdateWatcher(.test).tsx`, `src/ui/app/PwaUpdateWatcherGate(.test).tsx`,

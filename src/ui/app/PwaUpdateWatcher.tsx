@@ -12,11 +12,12 @@
 // reloads), routed through applyPromptedReload so the click ends in a real
 // reload in every service-worker state.
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { usePwaUpdateStore } from '../state/pwa-update-store';
 import { useToastStore } from '../state/toast-store';
 import { applyPromptedReload } from './pwa-prompted-reload';
+import { createRetryableUpdateApplyOwner } from './pwa-update-apply-owner';
 
 export function PwaUpdateWatcher(): JSX.Element | null {
   const pushToast = useToastStore((s) => s.pushToast);
@@ -33,6 +34,9 @@ export function PwaUpdateWatcher(): JSX.Element | null {
       console.error('Service worker registration failed; offline mode unavailable.', error);
     },
   });
+  const updateServiceWorkerRef = useRef(updateServiceWorker);
+  updateServiceWorkerRef.current = updateServiceWorker;
+  const applyOwnerRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (!offlineReady) return;
@@ -42,26 +46,31 @@ export function PwaUpdateWatcher(): JSX.Element | null {
 
   useEffect(() => {
     if (!needRefresh) {
+      applyOwnerRef.current = null;
       setAvailability({ kind: 'none' });
       return;
     }
+    applyOwnerRef.current ??= createRetryableUpdateApplyOwner(
+      () =>
+        applyPromptedReload({
+          getRegistration: () =>
+            'serviceWorker' in navigator
+              ? navigator.serviceWorker.getRegistration()
+              : Promise.resolve(undefined),
+          requestSkipWaiting: () => updateServiceWorkerRef.current(true),
+          reload: () => window.location.reload(),
+        }),
+      () => pushToast('Could not apply the app update. Try Update again.', 'error'),
+    );
     setAvailability({
       kind: 'ready',
       // Not updateServiceWorker alone: its reload path needs a `controlling`
       // event an uncontrolled page never gets, and its SKIP_WAITING no-ops
       // once the waiting slot is empty — the click must always reload (see
       // pwa-prompted-reload).
-      applyUpdate: () =>
-        applyPromptedReload({
-          getRegistration: () =>
-            'serviceWorker' in navigator
-              ? navigator.serviceWorker.getRegistration()
-              : Promise.resolve(undefined),
-          requestSkipWaiting: () => updateServiceWorker(true),
-          reload: () => window.location.reload(),
-        }),
+      applyUpdate: applyOwnerRef.current,
     });
-  }, [needRefresh, setAvailability, updateServiceWorker]);
+  }, [needRefresh, pushToast, setAvailability]);
 
   return null;
 }
