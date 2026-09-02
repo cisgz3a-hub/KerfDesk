@@ -98,10 +98,7 @@ function SerialEndControl(props: {
             props.setSequence(
               event.currentTarget.checked
                 ? {
-                    serialEndValue: Math.max(
-                      props.sequence.serialStartValue,
-                      props.sequence.serialStartValue + props.sequence.advanceBy,
-                    ),
+                    serialEndValue: initialSerialEndValue(props.sequence),
                   }
                 : { serialEndValue: undefined },
             )
@@ -119,6 +116,11 @@ function SerialEndControl(props: {
       ) : null}
     </div>
   );
+}
+
+function initialSerialEndValue(sequence: VariableSequenceSettings): number {
+  const proposedEnd = sequence.serialStartValue + sequence.advanceBy;
+  return Number.isSafeInteger(proposedEnd) ? proposedEnd : sequence.serialStartValue;
 }
 
 function SequenceNumber(props: {

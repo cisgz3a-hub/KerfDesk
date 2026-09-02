@@ -61,18 +61,14 @@ function advanceSerial(current: number, delta: number, sequence: VariableSequenc
 }
 
 function wrap(current: number, delta: number, start: number, end: number): number {
-  const span = end - start + 1;
-  const normalized =
-    Number.isSafeInteger(current) && current >= start && current <= end
-      ? current
-      : delta >= 0
-        ? start - delta
-        : end - delta;
-  return start + modulo(normalized - start + delta, span);
-}
-
-function modulo(value: number, divisor: number): number {
-  return ((value % divisor) + divisor) % divisor;
+  if (!Number.isSafeInteger(current) || current < start || current > end) {
+    return delta >= 0 ? start : end;
+  }
+  const exactStart = BigInt(start);
+  const span = BigInt(end) - exactStart + 1n;
+  const offset = BigInt(current) - exactStart + BigInt(delta);
+  const wrappedOffset = ((offset % span) + span) % span;
+  return Number(exactStart + wrappedOffset);
 }
 
 function clampInteger(value: number, min: number, max: number): number {

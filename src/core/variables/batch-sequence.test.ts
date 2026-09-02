@@ -71,6 +71,36 @@ describe('planVariableBatchSequence', () => {
     });
   });
 
+  it('uses exact bounded arithmetic for maximum safe strides', () => {
+    const variables: ProjectVariableData = {
+      ...DEFAULT_PROJECT_VARIABLE_DATA,
+      csv: {
+        sourceName: 'jobs.csv',
+        headers: ['name'],
+        records: [['One'], ['Two'], ['Three']],
+      },
+      recordIndex: 2,
+      serialValue: 2,
+      sequence: {
+        recordStartIndex: 0,
+        recordEndIndex: 2,
+        serialStartValue: 0,
+        serialEndValue: 2,
+        advanceBy: Number.MAX_SAFE_INTEGER,
+      },
+    };
+
+    const plan = planVariableBatchSequence(variables, [undefined, undefined, undefined, undefined]);
+
+    expect(plan.slots).toEqual([
+      { slotIndex: 0, recordIndex: 2, serialValue: 2 },
+      { slotIndex: 1, recordIndex: 0, serialValue: 0 },
+      { slotIndex: 2, recordIndex: 1, serialValue: 1 },
+      { slotIndex: 3, recordIndex: 2, serialValue: 2 },
+    ]);
+    expect(plan.nextVariables).toMatchObject({ recordIndex: 0, serialValue: 0 });
+  });
+
   it('returns an unchanged cursor for an empty supplied slot list', () => {
     const variables = productionData();
 
