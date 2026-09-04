@@ -207,4 +207,93 @@ describe('evaluateVariableTemplate', () => {
       ),
     ).toEqual({ ok: true, value: 'Caf\u00e9' });
   });
+
+  it.each<{
+    name: string;
+    settings: Pick<TextObject, 'powerScale' | 'operationOverride'>;
+    expected: string;
+  }>([
+    { name: 'base operation', settings: {}, expected: '10/1000/1/off' },
+    { name: 'scale only', settings: { powerScale: 25 }, expected: '2.5/1000/1/off' },
+    {
+      name: 'override only',
+      settings: { operationOverride: { power: 80, speed: 500, passes: 3, airAssist: true } },
+      expected: '80/500/3/on',
+    },
+    {
+      name: 'override with scale',
+      settings: {
+        powerScale: 25,
+        operationOverride: { power: 80, speed: 500, passes: 3, airAssist: true },
+      },
+      expected: '20/500/3/on',
+    },
+    {
+      name: 'zero scale',
+      settings: { powerScale: 0, operationOverride: { power: 80 } },
+      expected: '0/1000/1/off',
+    },
+    {
+      name: 'zero-power override',
+      settings: { powerScale: 25, operationOverride: { power: 0 } },
+      expected: '0/1000/1/off',
+    },
+    {
+      name: 'fractional scale and partial override',
+      settings: { powerScale: 12.5, operationOverride: { power: 80, speed: 321.5 } },
+      expected: '10/321.5/1/off',
+    },
+  ])('evaluates $name from the explicitly bound operation', ({ settings, expected }) => {
+    const fallback = {
+      ...createLayer({ id: 'fallback', color: '#ff0000' }),
+      power: 91,
+      speed: 910,
+      passes: 9,
+      airAssist: false,
+    };
+    const bound = {
+      ...createLayer({ id: 'bound', color: '#0000ff' }),
+      power: 10,
+      speed: 1000,
+      passes: 1,
+      airAssist: false,
+    };
+    const effectiveText: TextObject = {
+      ...text,
+      paths: [{ color: text.color, operationIds: ['bound'], polylines: [] }],
+      ...settings,
+    };
+    const project: Project = {
+      ...variableProject(),
+      scene: { objects: [effectiveText], layers: [fallback, bound] },
+    };
+    const template: VariableTemplate = {
+      tokens: [
+        { kind: 'cut-setting', field: 'power-percent' },
+        { kind: 'literal', value: '/' },
+        { kind: 'cut-setting', field: 'speed-mm-min' },
+        { kind: 'literal', value: '/' },
+        { kind: 'cut-setting', field: 'passes' },
+        { kind: 'literal', value: '/' },
+        { kind: 'cut-setting', field: 'air-assist' },
+      ],
+    };
+
+    expect(
+      evaluateVariableTemplate(template, effectiveText, project, {
+        now: new globalThis.Date(0),
+      }),
+    ).toEqual({ ok: true, value: expected });
+  });
+
+  it('does not replace a missing explicit operation with same-color settings', () => {
+    expect(
+      evaluateVariableTemplate(
+        { tokens: [{ kind: 'cut-setting', field: 'power-percent' }] },
+        { ...text, operationIds: ['missing'], operationOverride: { power: 80 } },
+        variableProject(),
+        { now: new globalThis.Date(0) },
+      ),
+    ).toEqual({ ok: false, message: 'No operation is assigned to this text.' });
+  });
 });

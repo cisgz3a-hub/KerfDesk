@@ -160,6 +160,73 @@ describe('prepareOutputSnapshot', () => {
     if (split.ok && composed.ok) expect(split.job).toEqual(composed.job);
   });
 
+  it.each(['object', 'path'] as const)(
+    'keeps rendered cut-setting text equal to compiled output with %s bindings',
+    async (binding) => {
+      const base = variableProject();
+      const variableText = base.scene.objects[0];
+      const operation = base.scene.layers[0];
+      if (variableText?.kind !== 'text' || operation === undefined) {
+        throw new Error('variable text fixture is missing');
+      }
+      const effectiveText: TextObject = {
+        ...variableText,
+        ...(binding === 'object'
+          ? { operationIds: [operation.id] }
+          : {
+              paths: [{ color: variableText.color, operationIds: [operation.id], polylines: [] }],
+            }),
+        powerScale: 25,
+        operationOverride: {
+          power: 80,
+          speed: 500,
+          passes: 3,
+          airAssist: true,
+        },
+        variableTemplate: {
+          tokens: [
+            { kind: 'cut-setting', field: 'power-percent' },
+            { kind: 'literal', value: '/' },
+            { kind: 'cut-setting', field: 'speed-mm-min' },
+            { kind: 'literal', value: '/' },
+            { kind: 'cut-setting', field: 'passes' },
+            { kind: 'literal', value: '/' },
+            { kind: 'cut-setting', field: 'air-assist' },
+          ],
+        },
+      };
+      const project: Project = {
+        ...base,
+        scene: {
+          ...base.scene,
+          layers: [
+            { ...operation, color: '#0000ff', power: 10, speed: 1000, passes: 1, airAssist: false },
+          ],
+          objects: [effectiveText],
+        },
+      };
+      const rendered: string[] = [];
+      const result = await prepareOutputSnapshot(project, {
+        clock: () => NOW,
+        renderVariableText: async (input) => {
+          rendered.push(input.content);
+          return renderer(input);
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(rendered).toEqual(['20/500/3/on']);
+      expect(result.project.scene.objects[0]).toMatchObject({ content: '20/500/3/on' });
+      expect(result.job.groups[0]).toMatchObject({
+        power: 20,
+        speed: 500,
+        passes: 3,
+        airAssist: true,
+      });
+    },
+  );
+
   it('materializes many variable objects in source order with bounded concurrency', async () => {
     const first = variableProject();
     const template = first.scene.objects[0];
