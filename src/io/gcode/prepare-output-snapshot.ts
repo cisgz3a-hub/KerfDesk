@@ -154,7 +154,16 @@ async function materializeObject(
     const { variableTemplate: _template, ...plainText } = object;
     return {
       ok: true,
-      object: { ...plainText, content: evaluated.value, ...rendered },
+      object: {
+        ...plainText,
+        content: evaluated.value,
+        ...rendered,
+        paths: rendered.paths.map((path, index) => {
+          // Legacy text and copied text can own operations on their render batch.
+          const operationIds = object.paths[index]?.operationIds;
+          return operationIds === undefined ? path : { ...path, operationIds };
+        }),
+      },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

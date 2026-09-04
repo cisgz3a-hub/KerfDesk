@@ -1,6 +1,15 @@
 # Audit remediation ledger
 
-Current authoritative 2026-09-01 remediation: isolated worktree label `ade9`, branch
+Current checkpoint, 2026-09-04: `ade9` remains the sole implementation worktree. The active
+`codex/fix-variable-effective-settings-20260902` slice starts from live main
+`59bc989e829aff5a9edce957857135b09bbefaa8`. Its UA8-VAR06 and regenerated-path binding fixes
+passed the full local release gate below; hosted integration for this slice is not yet complete.
+Main CI `33598168071`, Browser smoke `33598168131`, and automatic Pages `33600665445` passed
+for that base. Scheduled packaged-native run `33615466935` failed; the independently reproduced
+launcher defect is recorded separately below. This does not undo the web publication evidence.
+The remaining pending rows are still open work, not cleared by those successful gates.
+
+Historical 2026-09-01 remediation: isolated worktree label `ade9`, branch
 `codex/fix-vector-topology-output-20260901`, reconstructed from exact `origin/main`
 `26745bc7a36adc9d6890d54aa3f906330d32df6b` (tree
 `7463233cc5c8396896186486603317cab240b6b0`). The preceding design-state remediation merged through
@@ -847,7 +856,8 @@ and missing-glyph cases below.
 | UA8-JIG02 | P1 confirmed: Jig and Quick Nest do not move transitive mask/path-text dependencies; Array and Clipboard shared the same one-hop defect | Array/Clipboard/Duplicate are implemented in UA8-DS2; Jig must copy and Nest must move the same closure in their own slice; cycles/missing/group/operation cases remain required |
 | UA8-JIG03 | P1 confirmed: selected-only output drops registration boxes needed for set anchor and piece-run context | pending non-emitting context dependencies while only selected artwork emits |
 | UA8-VAR04/05 | P1 confirmed: tiled G-code and `.rd` bypass caller-captured variable snapshots and never run successful-export advancement | pending direct/worker snapshot parity and exactly-once advancement only after all writes succeed; cancel/partial/failure/stale-document paths never advance |
-| UA8-VAR06 | P1 confirmed: variable cut-setting fields render raw layer values rather than effective object/path bindings, `powerScale`, and overrides | pending canonical effective-operation resolution with core/store/compile parity |
+| UA8-VAR06 | P1 confirmed: variable cut-setting fields render raw layer values rather than effective object/path bindings, `powerScale`, and overrides | implemented locally: resolve the existing primary operation, then reuse the canonical object override and power-scale helpers; seven setting combinations cover base, scale, override, combined, zero, and fractional values; missing explicit ownership retains its existing error; focused matrix 7 files / 36 tests and full local release gate pass; hosted integration pending. These are effective object settings, not a new claim about final device-capped, rounded, rotary, or CNC feeds |
+| UA8-VAR06B | P1 confirmed during UA8-VAR06 review: variable geometry regeneration discards path-specific operation IDs created by ordinary v2 migration and preserved by Duplicate/Clipboard, so a label can resolve `20/500/3/on` while output falls back to `2.5/1000/1/off` or disappears | implemented locally: preserve each regenerated text batch's existing path binding, matching ordinary text-edit ownership; no pooling or remapping of unrelated operations. Regression-first object/path fixture failed only the path case before repair; real bundled-stroke geometry tests cover migration, canonical save/reopen, and Duplicate, assert compiled settings and emitted feed/power, and prove source-project immutability. Included in the 7-file / 36-test matrix and passing full local release gate; hosted integration pending |
 | UA8-FONT07 | P1 confirmed: embedded font cache is keyed only by user-controlled font key, so a second project can reuse the first project's different bytes | pending content/project identity cache plus two-project replacement geometry/output fixtures |
 | UA8-JIG08 | P2 confirmed: repeated Auto-fit appends deterministic reused IDs to `artworkOrder` | pending uniqueness and source-order compile assertions across repeat/save/reopen |
 | UA8-JIG09 | P1 confirmed: Auto-fit computes one first-outline fit and reuses it for rotated/mixed outlines via transformed AABB, which can place emitted artwork outside later physical outlines | pending per-outline local-geometry fit with 45-degree and mixed-size fixtures |
@@ -930,3 +940,52 @@ and missing-glyph cases below.
   geometry/output branch hosted exact-head checks, PR review, merge, and post-merge publication remain
   pending; no manual deployment was performed. Only this evidence text changed after the terminal
   local release gate.
+
+### 2026-09-04 effective variable settings and release-health checkpoint
+
+- The preserved in-progress slice was resumed without discarding its three-file diff. The original
+  dirty checkout remains on `claude/vcarve-stamp-subcell` at
+  `9209fcb33f4807ebfc1f7a55780069b6a7b0e23c`: 9 modified tracked, 0 staged, 13 untracked files;
+  tracked-diff hash `6a1fc1cb119a370814a5eb65c66f78c4038f41a5`, staged empty-blob hash
+  `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391`. No original checkout or donor worktree was changed.
+- Initial effective-setting regressions failed at the raw `10/1000/1/off` label; the resumed
+  three-file focused run passed 17 tests. An independent source review then reproduced the distinct
+  path-binding loss using actual v2 deserialization and bundled Relief SingleLine geometry. The new
+  object/path regression failed only the path case before the binding repair.
+- Exact focused command:
+  `pnpm exec vitest run src/core/variables/evaluate-template.test.ts src/io/gcode/prepare-output-snapshot.test.ts src/io/gcode/prepare-output-snapshot-operation-bindings.test.ts src/core/job/compile-job-object-overrides.test.ts src/core/scene/effective-operation.test.ts src/core/scene/operation-binding.test.ts src/ui/text/render-variable-text.test.ts`
+  passed 7 files / 36 tests. This combines structural unit tests with real bundled stroke-font
+  generation, project migration/reopen, Duplicate, compiled settings, and emitted feed/power checks.
+  It is not screen appearance, reference-CAM, material, controller, or hardware qualification.
+- Full `pnpm release:check` passed on the final product/test tree: 1,853 Vitest files / 11,759 tests
+  passed, 14 files / 22 tests skipped; 41/41 release-integrity tests; typecheck, full source and
+  Electron lint, repository format, ADR/action-pin/license checks, web and Electron builds,
+  file-size and public-export gates. The web build processed 2,417 modules and generated 172
+  precache entries. Existing soft-size/chunk reports remain nonblocking, not qualification evidence.
+  Only this evidence text changed after that gate. Disposable Chrome variable-sequence acceptance
+  passed 1/1; the independent final source review was clear, not maintainer approval.
+- Both production aliases, `https://kerfdesk.com` and `https://laserforge-2fj.pages.dev`, returned
+  HTTP 200 and the same `index-PsgJALHa.js` entry asset containing base SHA `59bc989e` (SHA-256
+  `5EB28FE140C394D35BFE35CC2A6EE2C66A36E08B938B48DDA5EDF1A0FFA953F1`). This confirms the base
+  publication only; the current unmerged slice is not deployed. No manual publication was performed.
+- Scope remains narrow: the token describes the selected primary operation's effective object
+  settings. Final device feed limits/rounding and CNC/rotary motion mapping remain separate output
+  stages; this slice neither changes nor claims to model them in the variable token. Multi-operation
+  text still uses the existing primary-operation selection contract.
+- Live GitHub confirms PR #717 **Preserve safe-integer variable sequence state** merged at
+  `d79c3b23772cf445eec582a1d75d75a9855db525`, PR #718 **Preserve Unicode variable-text identity**
+  at `d6e937a584bebed2c61d70d5b7b916992ae021ba`, and PR #720 **Keep update and unload decisions
+  reachable** at current main `59bc989e829aff5a9edce957857135b09bbefaa8`. Earlier row text that says
+  those branches await integration is historical. The complete open-PR inventory was empty at
+  this checkpoint; this unfinished slice has no PR yet.
+- **NATIVE-SMOKE-01, confirmed harness defect, pending separate slice:** scheduled Windows run
+  `33615466935` built and packaged successfully but its smoke failed only `ok`/window visibility.
+  The launcher requests `windowsHide: true`. An isolated Electron 42.5.1 fixture using the exact
+  production readiness policy reproduced invisible windows in 3/3 hidden launches and visible
+  windows in 3/3 ordinary launches, all with isolated userData/sessionData and renderer readiness.
+  Do not weaken visibility validation or alter production readiness to compensate. This fixture is
+  not a repaired packaged-product pass, and no workflow rerun or manual deployment has occurred.
+- **NATIVE-SMOKE-02, confirmed diagnostic-loss defect, pending same harness slice:** validation
+  precedes result/stdout/stderr preservation, and the `finally` removes the temporary evidence.
+  Failed run artifact `9840872041` consequently contains only the readiness report. Preserve failure
+  evidence before cleanup in the narrowly scoped repair; no private execution archive is involved.

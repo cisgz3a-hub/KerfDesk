@@ -7,6 +7,7 @@ import {
   type VariableTemplate,
   type VariableTemplateToken,
 } from '../scene';
+import { effectiveObjectPowerPercent, effectiveOperationForObject } from '../effective-output';
 
 export type VariableEvaluationContext = {
   readonly now: Date;
@@ -118,16 +119,20 @@ function evaluateCutSetting(
 ): VariableEvaluationResult {
   const layer = primaryOperationForObject(text, project.scene.layers);
   if (layer === null) return { ok: false, message: 'No operation is assigned to this text.' };
-  return { ok: true, value: cutSettingValue(field, layer) };
+  return {
+    ok: true,
+    value: cutSettingValue(field, effectiveOperationForObject(layer, text), text),
+  };
 }
 
 function cutSettingValue(
   field: Extract<VariableTemplateToken, { readonly kind: 'cut-setting' }>['field'],
   layer: Layer,
+  text: TextObject,
 ): string {
   switch (field) {
     case 'power-percent':
-      return String(layer.power);
+      return String(effectiveObjectPowerPercent(layer, text));
     case 'speed-mm-min':
       return String(layer.speed);
     case 'passes':
