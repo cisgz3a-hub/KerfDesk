@@ -19,6 +19,7 @@ import {
 import {
   EMPTY_MATERIAL_LIBRARY_COLLECTION,
   libraryDocument,
+  reconcileActiveDocument,
   removeLibrary,
   setActiveLibrary,
   setLibraryPayload,
@@ -27,6 +28,7 @@ import {
   type MaterialLibraryCollection,
   type SavedLibrarySummary,
 } from './material-library-collection';
+import { resolveImportedLibrary } from './material-library-import';
 
 export const SAVED_LIBRARIES_STATE_DEFAULTS = {
   savedLibraries: EMPTY_MATERIAL_LIBRARY_COLLECTION,
@@ -41,6 +43,7 @@ export function currentSavedLibrariesState(state: SavedLibrariesState): SavedLib
 }
 
 export type SavedLibrariesActions = {
+  readonly importMaterialLibrary: (library: MaterialLibraryDocument) => void;
   readonly createLibrary: (name: string) => string | null;
   readonly openSavedLibrary: (id: string) => boolean;
   readonly renameLibrary: (id: string, name: string) => boolean;
@@ -72,6 +75,7 @@ export function savedLibrariesActions(
   get: SavedLibrariesGet,
 ): SavedLibrariesActions {
   return {
+    importMaterialLibrary: (library) => importMaterialLibrary(set, library),
     createLibrary: (name) => createLibrary(set, get, name),
     openSavedLibrary: (id) => openSavedLibrary(set, get, id),
     renameLibrary: (id, name) => renameLibrary(set, get, id, name),
@@ -79,6 +83,19 @@ export function savedLibrariesActions(
     deleteLibrary: (id) => deleteLibrary(set, get, id),
     listSavedLibraries: () => summarizeLibraries(get().savedLibraries, get().materialLibrary),
   };
+}
+
+function importMaterialLibrary(set: SavedLibrariesSet, incoming: MaterialLibraryDocument): void {
+  set((state) => {
+    const now = Date.now();
+    const collection = reconcileActiveDocument(state.savedLibraries, state.materialLibrary, now);
+    const library = resolveImportedLibrary(collection, incoming);
+    return {
+      materialLibrary: library,
+      materialLibraryDirty: false,
+      savedLibraries: reconcileActiveDocument(collection, library, now),
+    };
+  });
 }
 
 function createLibrary(
@@ -157,7 +174,7 @@ function duplicateLibrary(
 
 function deleteLibrary(set: SavedLibrariesSet, get: SavedLibrariesGet, id: string): boolean {
   const state = get();
-  if (state.savedLibraries.libraries[id] === undefined) return false;
+  if (!Object.hasOwn(state.savedLibraries.libraries, id)) return false;
   const wasActive = state.savedLibraries.activeLibraryId === id;
   set((s) => ({
     savedLibraries: removeLibrary(s.savedLibraries, id),

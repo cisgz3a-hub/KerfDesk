@@ -28,7 +28,11 @@ export async function bakeBufferToBitmapFields(doc: RgbaBuffer): Promise<BitmapF
   canvas.height = doc.height;
   const ctx = canvas.getContext('2d');
   if (ctx === null) throw new Error('Could not create a 2D canvas to encode the edited image.');
-  ctx.putImageData(new ImageData(new Uint8ClampedArray(doc.data), doc.width, doc.height), 0, 0);
+  // Session pixels remain editable while encoding waits. Both representations
+  // must describe this same revision, using the captured dimensions and pixels.
+  const pixels = new ImageData(new Uint8ClampedArray(doc.data), doc.width, doc.height);
+  ctx.putImageData(pixels, 0, 0);
+  const lumaBase64 = extractLumaBase64(pixels);
   const blob = await new Promise<Blob>((resolve, reject) => {
     // Async encode (never the sync toDataURL string path — RESEARCH_LOG
     // 2026-06-04 memory-pressure finding).
@@ -38,6 +42,5 @@ export async function bakeBufferToBitmapFields(doc: RgbaBuffer): Promise<BitmapF
     }, 'image/png');
   });
   const dataUrl = await readFileAsDataUrl(new File([blob], 'edited.png', { type: 'image/png' }));
-  const lumaBase64 = extractLumaBase64({ width: doc.width, height: doc.height, data: doc.data });
   return { dataUrl, lumaBase64 };
 }

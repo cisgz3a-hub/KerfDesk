@@ -278,7 +278,7 @@ function committed(
   };
 }
 
-/** Brush / pencil / eraser stroke (eraser paints white). */
+/** Brush / pencil / eraser stroke using the caller-selected paint color. */
 export function commitStroke(
   session: EditorSession,
   tool: EditorTool,
@@ -290,7 +290,7 @@ export function commitStroke(
   const stroke = {
     points,
     brush: brushFor(tool, settings),
-    color: tool.kind === 'eraser' ? WHITE : color,
+    color,
   };
   const rect = strokeDirtyRect(stroke, session.doc);
   if (rect.width === 0 || rect.height === 0) return session;
@@ -374,6 +374,7 @@ export function undoSession(session: EditorSession): EditorSession {
     ...session,
     history: result.history,
     revision: session.revision + 1,
+    dirtySinceApply: true,
     lastDirtyRect: null,
   };
 }
@@ -385,6 +386,7 @@ export function redoSession(session: EditorSession): EditorSession {
     ...session,
     history: result.history,
     revision: session.revision + 1,
+    dirtySinceApply: true,
     lastDirtyRect: null,
   };
 }

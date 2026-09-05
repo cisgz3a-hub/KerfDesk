@@ -6,10 +6,9 @@
 // is scaled UP to fill it. "Fit artwork to the placed board" wants grow=true;
 // the bed-import path wants grow=false.
 //
-// Fit uses the object's ROTATED footprint (the AABB of its transform at unit
-// scale), NOT its intrinsic W×H — otherwise a rotated design overflows the
-// region and burns off the physical board. Because a uniform scale s is applied
-// before rotation, the footprint scales linearly with s, so
+// Fit uses the object's current scaled, rotated footprint, retaining its axis
+// proportions and mirrors. Multiplying both current scales by a uniform factor
+// s scales that footprint linearly, so
 // s = margin·min(regionW/footprintW, regionH/footprintH) fits it exactly.
 // Centering is rotation-safe too: the local center is mapped through the scaled
 // transform and the offset placed so that point lands on the region center.
@@ -34,11 +33,9 @@ export function fitObjectToRegion(
   const regionH = region.maxY - region.minY;
   if (regionW <= 0 || regionH <= 0) return object;
 
-  // The design's footprint at unit scale, keeping its rotation/mirror.
+  // Translation does not affect the current design's footprint dimensions.
   const footprint = transformedBounds(object.bounds, {
     ...object.transform,
-    scaleX: 1,
-    scaleY: 1,
     x: 0,
     y: 0,
   });
@@ -55,7 +52,13 @@ export function fitObjectToRegion(
     x: (object.bounds.minX + object.bounds.maxX) / 2,
     y: (object.bounds.minY + object.bounds.maxY) / 2,
   };
-  const scaledTransform = { ...object.transform, scaleX: scale, scaleY: scale, x: 0, y: 0 };
+  const scaledTransform = {
+    ...object.transform,
+    scaleX: object.transform.scaleX * scale,
+    scaleY: object.transform.scaleY * scale,
+    x: 0,
+    y: 0,
+  };
   const mapped = applyTransform(localCenter, scaledTransform);
 
   return {

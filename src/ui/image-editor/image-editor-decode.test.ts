@@ -1,10 +1,43 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
+import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import * as imageLoader from '../trace/image-loader';
-import { decodeRasterToBuffer } from './image-editor-decode';
+import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('bakeBufferToBitmapFields', () => {
+  it('encodes PNG and luma from the same frozen revision while later edits mutate the document', async () => {
+    const doc = createRgbaBuffer(2, 1);
+    doc.data.set([0, 0, 0, 255], 4);
+    let pngPixels: ImageData | undefined;
+    let finish: BlobCallback | undefined;
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      () =>
+        ({
+          putImageData: (pixels: ImageData) => {
+            pngPixels = pixels;
+          },
+        }) as unknown as CanvasRenderingContext2D,
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+      finish = callback;
+    });
+    const pending = bakeBufferToBitmapFields(doc);
+    expect(pngPixels?.width).toBe(2);
+    expect(pngPixels?.height).toBe(1);
+    if (pngPixels === undefined) throw new Error('PNG pixels were not captured');
+    expect([...pngPixels.data]).toEqual([255, 255, 255, 255, 0, 0, 0, 255]);
+    doc.data.fill(0);
+    if (finish === undefined) throw new Error('PNG encoding did not start');
+    finish(new Blob(['encoded-snapshot'], { type: 'image/png' }));
+    const fields = await pending;
+    expect(fields.lumaBase64).toBe(btoa(String.fromCharCode(255, 0)));
+    expect(fields.lumaBase64).toBe(imageLoader.extractLumaBase64(pngPixels));
+    expect(fields.dataUrl).toBe('data:image/png;base64,ZW5jb2RlZC1zbmFwc2hvdA==');
+  });
 });
 
 const IMAGE: RasterImage = {

@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { VectorRaster } from '../../core/raster';
 import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { lumaToBase64, type BitmapFields } from './luma-bitmap';
 import { cropMaskedRasterImage } from './crop-image';
+import * as imageLoader from '../trace/image-loader';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function raster(overrides: Partial<RasterImage> = {}): RasterImage {
   return {
@@ -45,6 +50,44 @@ function decode(base64: string): ReadonlyArray<number> {
 }
 
 describe('cropMaskedRasterImage', () => {
+  it.each([undefined, 'bad base64', 'AA=='])(
+    'recovers embedded pixels when luma is missing or corrupt (%s)',
+    async (lumaBase64) => {
+      const { lumaBase64: _storedLuma, ...embedded } = raster();
+      const input = lumaBase64 === undefined ? embedded : { ...embedded, lumaBase64 };
+      const rgba = new Uint8ClampedArray(4 * 2 * 4);
+      for (let i = 0; i < 8; i += 1)
+        rgba.set([(i + 1) * 10, (i + 1) * 10, (i + 1) * 10, 255], i * 4);
+      const loader = vi
+        .spyOn(imageLoader, 'loadImageAsRawData')
+        .mockResolvedValue({ width: 4, height: 2, data: rgba });
+      const cropped = await cropMaskedRasterImage(input, maskAt(1, 2), encode);
+      expect(decode(cropped.lumaBase64 ?? '')).toEqual([20, 30, 60, 70]);
+      expect(loader).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('rejects missing source pixels instead of publishing a white crop', async () => {
+    const { lumaBase64: _luma, dataUrl: _url, ...input } = raster();
+    const encoder = vi.fn(encode);
+    await expect(cropMaskedRasterImage(input, maskAt(1, 2), encoder)).rejects.toThrow(
+      'neither embedded pixels nor a page-backed source',
+    );
+    expect(encoder).not.toHaveBeenCalled();
+  });
+
+  it('rejects an embedded source with inconsistent dimensions instead of misregistering the crop', async () => {
+    const { lumaBase64: _luma, ...input } = raster();
+    vi.spyOn(imageLoader, 'loadImageAsRawData').mockResolvedValue({
+      width: 2,
+      height: 1,
+      data: new Uint8ClampedArray(8),
+    });
+    await expect(cropMaskedRasterImage(input, maskAt(1, 2), encode)).rejects.toThrow(
+      'dimensions do not match',
+    );
+  });
+
   it('bakes the image mask into source pixels and shrinks bounds to the covered pixels', async () => {
     const encoder = vi.fn(encode);
 

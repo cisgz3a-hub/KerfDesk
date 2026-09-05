@@ -36,8 +36,12 @@ export type SavedLibrarySummary = {
 
 export const EMPTY_MATERIAL_LIBRARY_COLLECTION: MaterialLibraryCollection = {
   activeLibraryId: null,
-  libraries: {},
+  libraries: emptyEntries(),
 };
+
+function emptyEntries(): Record<string, StoredLibraryEntry> {
+  return Object.create(null) as Record<string, StoredLibraryEntry>;
+}
 
 export function isEmptyCollection(collection: MaterialLibraryCollection): boolean {
   return Object.keys(collection.libraries).length === 0;
@@ -50,10 +54,9 @@ export function setLibraryPayload(
 ): MaterialLibraryCollection {
   return {
     activeLibraryId: collection.activeLibraryId,
-    libraries: {
-      ...collection.libraries,
+    libraries: Object.assign(emptyEntries(), collection.libraries, {
       [doc.libraryId]: { payload: serializeMaterialLibrary(doc), updatedAt: now },
-    },
+    }),
   };
 }
 
@@ -61,7 +64,7 @@ export function setActiveLibrary(
   collection: MaterialLibraryCollection,
   id: string | null,
 ): MaterialLibraryCollection {
-  if (id !== null && collection.libraries[id] === undefined) return collection;
+  if (id !== null && !Object.hasOwn(collection.libraries, id)) return collection;
   return { activeLibraryId: id, libraries: collection.libraries };
 }
 
@@ -69,8 +72,8 @@ export function removeLibrary(
   collection: MaterialLibraryCollection,
   id: string,
 ): MaterialLibraryCollection {
-  if (collection.libraries[id] === undefined) return collection;
-  const libraries: Record<string, StoredLibraryEntry> = {};
+  if (!Object.hasOwn(collection.libraries, id)) return collection;
+  const libraries = emptyEntries();
   for (const [key, entry] of Object.entries(collection.libraries)) {
     if (key !== id) libraries[key] = entry;
   }
@@ -84,7 +87,7 @@ export function libraryDocument(
   collection: MaterialLibraryCollection,
   id: string,
 ): MaterialLibraryDocument | null {
-  const entry = collection.libraries[id];
+  const entry = Object.hasOwn(collection.libraries, id) ? collection.libraries[id] : undefined;
   if (entry === undefined) return null;
   const result = deserializeMaterialLibrary(entry.payload);
   return result.kind === 'ok' ? result.library : null;
@@ -94,9 +97,9 @@ export function libraryDocument(
 // existing entry (e.g. `birch`, then `birch-2`, `birch-3`...).
 export function uniqueLibraryId(base: string, collection: MaterialLibraryCollection): string {
   const root = base.length === 0 ? 'library' : base;
-  if (collection.libraries[root] === undefined) return root;
+  if (!Object.hasOwn(collection.libraries, root)) return root;
   let suffix = 2;
-  while (collection.libraries[`${root}-${suffix}`] !== undefined) suffix += 1;
+  while (Object.hasOwn(collection.libraries, `${root}-${suffix}`)) suffix += 1;
   return `${root}-${suffix}`;
 }
 
@@ -178,13 +181,13 @@ export function parseCollection(raw: string): MaterialLibraryCollection | null {
   if (activeLibraryId !== null && typeof activeLibraryId !== 'string') return null;
   if (!isRecord(libraries)) return null;
 
-  const entries: Record<string, StoredLibraryEntry> = {};
+  const entries = emptyEntries();
   for (const [key, value] of Object.entries(libraries)) {
     if (!isStoredEntry(value)) return null;
     entries[key] = { payload: value.payload, updatedAt: value.updatedAt };
   }
   const active =
-    activeLibraryId !== null && entries[activeLibraryId] === undefined ? null : activeLibraryId;
+    activeLibraryId !== null && !Object.hasOwn(entries, activeLibraryId) ? null : activeLibraryId;
   return { activeLibraryId: active, libraries: entries };
 }
 

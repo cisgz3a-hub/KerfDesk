@@ -1,10 +1,15 @@
 import {
   applyImageMaskToLuma,
   hasClosedImageMaskGeometry,
-  whiteLuma,
   type VectorRaster,
 } from '../../core/raster';
 import type { Bounds, RasterImage, SceneObject } from '../../core/scene';
+import {
+  hydratePagedRasterImage,
+  type PagedRasterAssetReader,
+} from '../import/paged-raster-hydration';
+import { readRasterSourceFile } from '../import/paged-raster-source';
+import { extractLumaBase64, loadImageAsRawData } from '../trace/image-loader';
 import { lumaToBitmap, type BitmapFields } from './luma-bitmap';
 
 type PixelCrop = {
@@ -23,6 +28,7 @@ export async function cropMaskedRasterImage(
   image: RasterImage,
   maskObject: SceneObject | null | undefined,
   encode: BitmapEncoder = lumaToBitmap,
+  repository?: PagedRasterAssetReader,
 ): Promise<RasterImage> {
   const width = Math.max(1, Math.floor(image.pixelWidth));
   const height = Math.max(1, Math.floor(image.pixelHeight));
@@ -38,7 +44,8 @@ export async function cropMaskedRasterImage(
   if (crop === null) {
     throw new Error('Image mask does not overlap the selected image.');
   }
-  const sourceLuma = decodeLuma(image.lumaBase64, width * height);
+  const source = await hydratePagedRasterImage(image, repository);
+  const sourceLuma = await readCropLuma(source, width, height);
   const maskedLuma = applyImageMaskToLuma({ image, maskObject, luma: sourceLuma, width, height });
   const croppedLuma = cropLuma(maskedLuma, width, crop);
   const croppedRaster = {
@@ -47,7 +54,7 @@ export async function cropMaskedRasterImage(
     luma: croppedLuma,
   };
   const fields = await encode(croppedRaster);
-  const { imageMaskId: _imageMaskId, ...unmasked } = image;
+  const { imageMaskId: _imageMaskId, ...unmasked } = source;
   return {
     ...unmasked,
     dataUrl: fields.dataUrl,
@@ -118,15 +125,32 @@ function cropLocalBounds(
   };
 }
 
-function decodeLuma(base64: string | undefined, expectedLength: number): Uint8Array {
-  const out = whiteLuma(expectedLength);
-  if (base64 === undefined) return out;
+async function readCropLuma(
+  image: RasterImage,
+  width: number,
+  height: number,
+): Promise<Uint8Array> {
+  const stored = decodeLuma(image.lumaBase64, width * height);
+  if (stored !== null) return stored;
+  // Older embedded images may lack luminance. Recover their actual pixels;
+  // missing or corrupt source data must never become a successful white crop.
+  const file = await readRasterSourceFile(image, 'crop-image-source');
+  const pixels = await loadImageAsRawData(file, Math.max(width, height));
+  if (pixels.width !== width || pixels.height !== height) {
+    throw new Error('Image source dimensions do not match the selected image.');
+  }
+  const luma = decodeLuma(extractLumaBase64(pixels), width * height);
+  if (luma === null) throw new Error('Could not read the image pixels to crop.');
+  return luma;
+}
+
+function decodeLuma(base64: string | undefined, expectedLength: number): Uint8Array | null {
+  if (base64 === undefined) return null;
   try {
     const binary = atob(base64);
-    const n = Math.min(binary.length, expectedLength);
-    for (let i = 0; i < n; i += 1) out[i] = binary.charCodeAt(i);
+    if (binary.length !== expectedLength) return null;
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
   } catch {
-    return out;
+    return null;
   }
-  return out;
 }

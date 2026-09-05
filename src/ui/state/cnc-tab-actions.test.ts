@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { cncTabAnchorPosition } from '../../core/cnc';
 import {
+  applyTransform,
   createProject,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
@@ -34,9 +36,9 @@ const OBJECT: ImportedSvg = {
 
 afterEach(resetStore);
 
-function install(): void {
+function install(object = OBJECT): void {
   const base = createProject();
-  const project: Project = { ...base, scene: { objects: [OBJECT], layers: [] } };
+  const project: Project = { ...base, scene: { objects: [object], layers: [] } };
   useStore.setState({ project, selectedObjectId: OBJECT.id, additionalSelectedIds: new Set() });
 }
 
@@ -63,5 +65,37 @@ describe('CNC tab actions', () => {
     useStore.getState().seedSelectedCncTabAnchors('#ff0000', 4);
     useStore.getState().resetSelectedCncTabAnchors('#ff0000');
     expect(useStore.getState().project.scene.objects[0]?.cncTabAnchors).toBeUndefined();
+  });
+
+  it('keeps a transformed drag attached to the selected point and undoes it once', () => {
+    const transform = {
+      ...IDENTITY_TRANSFORM,
+      x: 100,
+      y: 80,
+      scaleX: 2,
+      mirrorX: true,
+      rotationDeg: 37,
+    };
+    install({ ...OBJECT, transform });
+    useStore.getState().seedSelectedCncTabAnchors('#ff0000', 4);
+    useStore.getState().beginInteraction();
+    useStore
+      .getState()
+      .setSelectedCncTabAnchorDuringInteraction(
+        0,
+        '#ff0000',
+        applyTransform({ x: 12, y: 5 }, transform),
+      );
+    useStore.getState().endInteraction();
+    const moved = useStore.getState().project.scene.objects[0]!;
+    const anchor = moved.cncTabAnchors![0]!;
+    expect(anchor.pathT).toBeCloseTo(0.375, 9);
+    const position = cncTabAnchorPosition(moved, anchor);
+    const expected = applyTransform({ x: 10, y: 5 }, transform);
+    expect(position?.x).toBeCloseTo(expected.x, 9);
+    expect(position?.y).toBeCloseTo(expected.y, 9);
+
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene.objects[0]?.cncTabAnchors?.[0]?.pathT).toBe(0.125);
   });
 });

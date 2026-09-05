@@ -92,6 +92,27 @@ describe('wandAt', () => {
   });
 });
 
+it('routes the background color picker through an eraser stroke, undo, and redo', () => {
+  seedSession();
+  useImageEditorStore.getState().setBackground({ r: 17, g: 34, b: 51 });
+  useImageEditorStore.setState({
+    tool: { kind: 'eraser' },
+    foreground: { r: 0, g: 0, b: 0 },
+    brush: { diameterPx: 3, hardness: 1, opacity: 1 },
+  });
+  const offset = (3 * 10 + 3) * RGBA_CHANNELS;
+  const pixel = () => [
+    ...(useImageEditorStore.getState().session?.doc.data.slice(offset, offset + RGBA_CHANNELS) ??
+      []),
+  ];
+  useImageEditorStore.getState().stroke([{ x: 3, y: 3 }]);
+  expect(pixel()).toEqual([17, 34, 51, 255]);
+  useImageEditorStore.getState().undo();
+  expect(pixel()).toEqual([80, 80, 80, 255]);
+  useImageEditorStore.getState().redo();
+  expect(pixel()).toEqual([17, 34, 51, 255]);
+});
+
 describe('free transform', () => {
   it('preserves upper-layer alpha through the store start and commit seam', () => {
     seedSession();
