@@ -16,6 +16,12 @@
 // leftover material meets a later pass that believed it was cleared.
 
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
+import {
+  differenceClosedPolylinesChecked,
+  normalizeClosedPolylineTreeEvenOddChecked,
+  type NormalizedPolylineTreeNode,
+} from '../geometry/polygon-difference';
+import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import { fillHatchingExactWithBudget } from '../job/fill-hatching';
 import type { Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
@@ -76,13 +82,38 @@ export function pocketRingToolpaths(
   const ladder = buildOffsetLadder(contours, MAX_POCKET_RINGS, (step) => radius + step * stepMm);
   const core = coreRing(contours, ladder.rings, radius, stepMm);
   const rings = core.ring === null ? ladder.rings : [...ladder.rings, core.ring];
+  const toolpaths = innermostFirst(rings);
+  const remaining =
+    stepMm > radius && !ladder.capped && !ladder.offsetFailed && !core.offsetFailed
+      ? remainingPocketCores(ladder.rings[0] ?? [], toolpaths, toolDiameterMm)
+      : { toolpaths: [], offsetFailed: false };
   return {
     // Innermost ring first, boundary (ring 0) last as the finishing pass.
-    toolpaths: innermostFirst(rings),
-    offsetFailed: ladder.offsetFailed || core.offsetFailed,
+    toolpaths: [...remaining.toolpaths, ...toolpaths],
+    offsetFailed: ladder.offsetFailed || core.offsetFailed || remaining.offsetFailed,
     passLimited: ladder.capped,
     stepoverUsed: true,
   };
+}
+
+// A component may disappear before the GLOBAL deepest ring, including a lobe
+// that splits and collapses between two regular insets. Find its actual uncut
+// material from the cutter sweep, retaining the ordinary stepover rings.
+// Clip to the first ring's tool-center region: every added centerline stays
+// inside the pocket and outside its islands, without trying to clear corners
+// the configured cutter cannot reach.
+function remainingPocketCores(
+  centerRegion: ReadonlyArray<Polyline>,
+  toolpaths: ReadonlyArray<Polyline>,
+  toolDiameterMm: number,
+): Pick<PocketToolpaths, 'toolpaths' | 'offsetFailed'> {
+  if (toolpaths.length === 0) return { toolpaths: [], offsetFailed: false };
+  const cleared = roundStrokeOutline(toolpaths, toolDiameterMm);
+  if (cleared === null) return { toolpaths: [], offsetFailed: true };
+  const remaining = differenceClosedPolylinesChecked(centerRegion, cleared);
+  return remaining.kind === 'error'
+    ? { toolpaths: [], offsetFailed: true }
+    : { toolpaths: remaining.value, offsetFailed: false };
 }
 
 // A stepover wider than the tool RADIUS can leave the last ring further from
@@ -103,7 +134,35 @@ function coreRing(
     return NO_DEEPEST_RING;
   }
   const lastInset = radius + lastRing * stepMm;
-  return deepestRing(contours, lastInset, lastInset + stepMm);
+  const topology = normalizeClosedPolylineTreeEvenOddChecked(contours);
+  if (topology.kind === 'error') return { ring: null, offsetFailed: true };
+  const regions = solidRegions(topology.value);
+  if (regions.length <= 1) return deepestRing(contours, lastInset, lastInset + stepMm);
+  // Keep the existing central cleanup for EACH independent region, even when
+  // the operator chooses spacing wider than a diameter. Local sweep-boundary
+  // cleanup alone need not reach the center of such a wide leftover core.
+  const cores: Polyline[] = [];
+  let offsetFailed = false;
+  for (const region of regions) {
+    const first = insetContoursChecked(region, radius);
+    if (first.offsetFailed) offsetFailed = true;
+    if (first.contours.length === 0) continue;
+    const core = deepestRing(region, radius, lastInset + stepMm);
+    if (core.ring !== null) cores.push(...core.ring);
+    offsetFailed ||= core.offsetFailed;
+  }
+  return { ring: cores.length === 0 ? null : cores, offsetFailed };
+}
+
+function solidRegions(
+  nodes: ReadonlyArray<NormalizedPolylineTreeNode>,
+): ReadonlyArray<ReadonlyArray<Polyline>> {
+  const regions = new Map<number, Polyline[]>();
+  nodes.forEach((node, index) => {
+    if (!node.isHole) regions.set(index, [node.contour]);
+    else if (node.parentIndex !== null) regions.get(node.parentIndex)?.push(node.contour);
+  });
+  return [...regions.values()];
 }
 
 type DeepestRing = {

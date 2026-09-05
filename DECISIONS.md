@@ -4533,6 +4533,32 @@ active machine bit, but Start and Save G-code now carry a nonblocking warning na
 the actual fallback bit, and the cutter-dependent values to verify. This removes a silent tool
 substitution without adding a refusal, rewriting the project, or changing emitted bytes.
 
+### Amendment - pocket core coverage across offset components (2026-09-05)
+
+The PR #419 history audit found that the ring planner's last core pass belonged
+only to the globally deepest pocket. A smaller disconnected pocket, or a lobe
+that split and disappeared between regular insets, could retain a full-depth
+center at an ordinary 85% stepover.
+
+Regular stepover rings and their order remain unchanged. Each independent filled
+region retains its central cleanup, with direct holes kept under their topology
+owner. The planner then subtracts the actual planned cutter sweep from the first
+ring's tool-center region and traces the remaining local core boundaries. This
+also finds short-lived split lobes and annular stock without entering islands or
+trying to machine corners outside the tool-center region. It does not replace
+the regular ladder, rasterize the residual, or rewrite the requested stepover.
+The existing >100% spacing can still leave inter-ring gaps; this
+repair preserves each independent region's central cleanup at those values.
+
+Existing offset/budget failure evidence remains authoritative. A failed sweep or
+subtraction retains the established paths and propagates the existing geometry
+warning. No Frame/Start policy, refusal, or settings value changes.
+
+Regression evidence covers disconnected pockets, dumbbell necks that split
+before and between regular insets, island clearance, original ring order,
+operator spacing above a diameter, and compiled/emitted cutter-sweep coverage.
+Hardware and material verification remain unavailable.
+
 ## ADR-101 — CNC/laser UI separation policy: gate-and-hide
 
 **Status:** Accepted; amended by ADR-255 (Open G-code / Inspect G-code becomes mode-independent)
