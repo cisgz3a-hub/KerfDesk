@@ -1,6 +1,6 @@
 import {
   combineVectorObjects,
-  dogboneVectorObject,
+  dogboneOperationRegions,
   isVectorPathObject,
   materializeVectorObject,
   offsetVectorObjects,
@@ -12,10 +12,10 @@ import { effectiveOperationForObject } from '../../core/effective-output';
 import {
   addLayer,
   addObject,
-  bindSceneObjectToOperations,
   captureLayerOperationSettings,
   createArtworkOperation,
   layerFromSubLayer,
+  operationIdsForObject,
   primaryOperationForObject,
   removeObject,
   replaceObject,
@@ -86,13 +86,13 @@ function dogboneSelectionMutation(
     // Per-object skip on error (no qualifying corners / open contour) is the
     // intended silent behavior — dogbone a selection, relieve what qualifies,
     // leave the rest (WORKFLOW F-CNC26; CNV-04 keeps this one silent).
-    const result = dogboneVectorObject(object, bitDiameterMm);
+    const result = dogboneOperationRegions(object, bitDiameterMm, scene.layers);
     if (result.kind === 'error') {
       if (result.error.kind !== 'operation-failed') continue;
       useToastStore.getState().pushToast(result.error.message, 'warning');
       return state;
     }
-    const prepared = prepareCollapsedEdit(scene, object, result.value);
+    const prepared = prepareDogboneEdit(scene, object, result.value);
     scene = replaceObject(prepared.scene, object.id, prepared.object);
     changed = true;
   }
@@ -315,12 +315,11 @@ function independentOperationForArtwork(source: Layer, seed: Layer, artwork: Imp
   return detached;
 }
 
-function prepareCollapsedEdit(
+function prepareDogboneEdit(
   scene: Scene,
   source: VectorSceneObject,
   artwork: ImportedSvg,
 ): { readonly scene: Scene; readonly object: ImportedSvg } {
-  const sourceOperation = primaryOperationForObject(source, scene.layers);
   const withMetadata: ImportedSvg = {
     ...artwork,
     ...(source.locked === undefined ? {} : { locked: source.locked }),
@@ -329,10 +328,10 @@ function prepareCollapsedEdit(
       ? {}
       : { operationOverride: source.operationOverride }),
   };
-  if (sourceOperation !== null) {
+  if (operationIdsForObject(source, scene.layers).length > 0) {
     return {
       scene,
-      object: bindSceneObjectToOperations(withMetadata, [sourceOperation.id]) as ImportedSvg,
+      object: withMetadata,
     };
   }
   const created = createArtworkOperation(scene, withMetadata);

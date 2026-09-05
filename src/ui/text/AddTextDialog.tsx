@@ -12,7 +12,7 @@
 // scripts opentype's getPath handles word-spacing and Unicode glyph
 // lookup; we just split on '\n' for line breaks.
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { bendTextRender, placeTextOnPath } from '../../core/text';
 import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
 import { parseVariableTemplateSource } from '../../core/variables';
@@ -59,13 +59,33 @@ function DialogForm(props: {
   const pushToast = useToastStore((s) => s.pushToast);
   const fields = useTextDialogFields(state, project, selectedObjectId);
   const [submitting, setSubmitting] = useState(false);
+  const request = useRef(0);
+  useEffect(() => {
+    const unsubscribe = useStore.subscribe((next, previous) => {
+      if (
+        next.projectDocumentEpoch !== previous.projectDocumentEpoch &&
+        useUiStore.getState().textDialog === state
+      )
+        close();
+    });
+    return () => {
+      request.current += 1;
+      unsubscribe();
+    };
+  }, [close, state]);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
+    const token = ++request.current;
+    const epoch = useStore.getState().projectDocumentEpoch;
     void commitText(state, fields.values, {
       upsert,
       close,
       pushToast,
       setSubmitting,
+      isCurrent: () =>
+        request.current === token &&
+        useUiStore.getState().textDialog === state &&
+        useStore.getState().projectDocumentEpoch === epoch,
     });
   };
   // kit Dialog owns the a11y wiring (Escape closes, Tab cycles, focus
@@ -97,6 +117,7 @@ async function commitText(
     readonly close: () => void;
     readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
     readonly setSubmitting: (v: boolean) => void;
+    readonly isCurrent: () => boolean;
   },
 ): Promise<void> {
   const normalizedContent = normalizeTextContent(v.content);
@@ -122,6 +143,7 @@ async function commitText(
       letterSpacing: safeValues.letterSpacing,
       color: v.color,
     });
+    if (!ctx.isCurrent()) return;
     const placed = placeRenderedText(rawRendered, safeValues, v);
     const obj: TextObject = {
       kind: 'text',
@@ -143,12 +165,13 @@ async function commitText(
     ctx.upsert(obj, v.importedFont);
     ctx.close();
   } catch (err) {
+    if (!ctx.isCurrent()) return;
     ctx.pushToast(
       `Could not render text: ${err instanceof Error ? err.message : String(err)}`,
       'error',
     );
   } finally {
-    ctx.setSubmitting(false);
+    if (ctx.isCurrent()) ctx.setSubmitting(false);
   }
 }
 

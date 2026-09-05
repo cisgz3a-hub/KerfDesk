@@ -32,6 +32,7 @@ export function useDesignSessionPersistence(): void {
         activeLayerId: session.activeLayerId,
         surface3d: session.surface3d,
         applied: session.applied,
+        dirtySinceApply: session.dirtySinceApply,
       });
     };
 

@@ -86,6 +86,7 @@ describe('restoring a session from the saved drawing', () => {
       activeLayerId: DEFAULT_DESIGN_LAYER.id,
       surface3d: true,
       applied,
+      dirtySinceApply: false,
     });
     expect(sessionSketch(restored).entities).toHaveLength(1);
     // History does not outlive the tab: undoing into a project state that no

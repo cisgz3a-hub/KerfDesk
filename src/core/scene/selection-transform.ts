@@ -378,6 +378,8 @@ function flipTransformAboutPoint(
       : { x: before.x, y: anchor.y * 2 - before.y };
   const flipped: Transform = {
     ...object.transform,
+    // Reflection is in the selection's world axes: M R(theta) = R(-theta) M.
+    rotationDeg: normalizeDeg(-object.transform.rotationDeg),
     mirrorX: axis === 'horizontal' ? !object.transform.mirrorX : object.transform.mirrorX,
     mirrorY: axis === 'vertical' ? !object.transform.mirrorY : object.transform.mirrorY,
   };

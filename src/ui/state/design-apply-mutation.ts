@@ -30,6 +30,8 @@ import {
   type DesignApplyRecord,
 } from './design-apply-record';
 import { pushUndo, type MutationResult, type StateSlice } from './scene-mutations';
+import { removeObjectIdsFromGroups } from './scene-group-actions';
+import { repairDanglingObjectDependencies } from './object-delete-actions';
 
 // The design layer whose settings produced a scene operation, so the action
 // can stamp the carve settings onto the fresh operation after defaults run.
@@ -38,7 +40,12 @@ export type DesignCarveOperation = {
   readonly layer: DesignLayer;
 };
 
-export type DesignApplyResult = MutationResult & {
+export type DesignApplyResult = Omit<MutationResult, 'selectedObjectId'> & {
+  readonly selectedObjectId: string | null;
+  readonly dependencyRepairs: Pick<
+    ReturnType<typeof repairDanglingObjectDependencies>,
+    'repairedImageMasks' | 'repairedPathTextGuides'
+  >;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly carveOperations: ReadonlyArray<DesignCarveOperation>;
   // What this apply put in the scene, so the NEXT one updates it instead of
@@ -55,9 +62,8 @@ export type DesignApplyResult = MutationResult & {
  * back to fix a mistake edits the part instead of duplicating it. The whole
  * replacement is one state transition, so one undo entry reverses it.
  *
- * Returns null when the sketch contributes nothing — empty, or entirely
- * construction geometry. Null means "nothing applied", never an error, and the
- * caller leaves the project untouched (rule 7: inform, never refuse).
+ * An empty sketch clears surviving output from the previous Apply. Without
+ * owned output to replace, it is a no-op and returns null.
  */
 export function applyDesignSketch(
   s: StateSlice,
@@ -66,13 +72,13 @@ export function applyDesignSketch(
   previous: DesignApplyRecord | null = null,
 ): DesignApplyResult | null {
   const groups = buildLayerGroups(sketch, ids);
-  const first = groups[0]?.objects[0];
-  if (first === undefined) return null;
+  const previousIds = survivingObjectIds(s.project.scene, previous);
+  if (groups.length === 0 && previousIds.size === 0) return null;
 
   let scene = s.project.scene;
   // Drop the previous apply's objects BEFORE inserting, so a re-apply that
   // reuses an operation never leaves the old geometry bound to it.
-  for (const objectId of survivingObjectIds(scene, previous)) {
+  for (const objectId of previousIds) {
     scene = removeObject(scene, objectId);
   }
   const carveOperations: DesignCarveOperation[] = [];
@@ -86,11 +92,18 @@ export function applyDesignSketch(
     });
   }
   scene = dropEmptyReusedOperations(scene, previous, operationIdByLayerId);
+  const removedIds = new Set(previousIds);
+  for (const object of scene.objects) removedIds.delete(object.id);
+  const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(scene, removedIds));
+  scene = repaired.scene;
   const [head, ...rest] = inserted;
-  if (head === undefined) return null;
   return {
     project: { ...s.project, scene },
-    selectedObjectId: head.id,
+    dependencyRepairs: {
+      repairedImageMasks: repaired.repairedImageMasks,
+      repairedPathTextGuides: repaired.repairedPathTextGuides,
+    },
+    selectedObjectId: head?.id ?? null,
     additionalSelectedIds: new Set(rest.map((object) => object.id)),
     carveOperations,
     applyRecord: {
