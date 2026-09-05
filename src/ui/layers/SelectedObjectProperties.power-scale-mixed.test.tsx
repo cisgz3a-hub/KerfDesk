@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
+import { effectiveOperationForObject } from '../../core/effective-output';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
@@ -99,8 +100,19 @@ describe('SelectedObjectProperties mixed power scale', () => {
       await act(async () => Simulate.blur(spacing));
 
       const state = useStore.getState();
-      expect(state.project.scene.objects[0]?.operationOverride?.hatchSpacingMm).toBe(0.5);
-      expect(state.project.scene.layers[0]).toMatchObject({ mode: 'line', hatchSpacingMm: 0.1 });
+      const object = state.project.scene.objects[0];
+      const operation = state.project.scene.layers[0];
+      if (object === undefined || operation === undefined)
+        throw new Error('artwork operation missing');
+      expect(spacing.value).toBe('0.5');
+      expect(effectiveOperationForObject(operation, object)).toMatchObject({
+        mode: 'fill',
+        hatchSpacingMm: 0.5,
+        fillStyle: 'offset',
+        fillBidirectional: false,
+      });
+      expect(object.operationOverride?.hatchSpacingMm).toBe(0.35);
+      expect(operation).toMatchObject({ mode: 'line', hatchSpacingMm: 0.1 });
     } finally {
       await act(async () => root.unmount());
       host.remove();
