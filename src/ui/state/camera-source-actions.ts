@@ -103,15 +103,19 @@ export function createCameraSourceActions(
 // browser-side <img> probe is CSP-blocked in the desktop app and on the
 // deployed site, so the bridge is the one discovery path.
 function makeDetectMachineCamera(set: CameraSourceSet): CameraSourceActions['detectMachineCamera'] {
+  let latestRequest = 0;
   return async (bridge) => {
+    const request = ++latestRequest;
     if (bridge === undefined) {
       set({ machineCamera: { kind: 'unavailable', reason: BRIDGE_MISSING } });
       return;
     }
     set({ machineCamera: { kind: 'detecting' } });
     const result = await bridge.discoverMachineCamera();
+    if (request !== latestRequest) return;
     if (result.kind === 'found') {
       const queryFingerprint = await cameraQueryFingerprint(result.cameraUrl);
+      if (request !== latestRequest) return;
       set({
         machineCamera: {
           kind: 'found',
