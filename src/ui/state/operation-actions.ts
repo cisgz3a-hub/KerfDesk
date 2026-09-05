@@ -182,11 +182,12 @@ function cloneOperationForObjects(
   };
   const objects = state.project.scene.objects.map((object) => {
     if (!objectIds.has(object.id)) return object;
-    const clean = clearOperationOverride(object);
+    // Cloning changes operation identity, not effective artwork settings. Each
+    // selected object may carry a different override, including trace inversion.
     return additive
-      ? appendSceneObjectOperationBinding(clean, operation.id, state.project.scene.layers)
+      ? appendSceneObjectOperationBinding(object, operation.id, state.project.scene.layers)
       : replaceSceneObjectOperationBinding(
-          clean,
+          object,
           operationId,
           operation.id,
           state.project.scene.layers,

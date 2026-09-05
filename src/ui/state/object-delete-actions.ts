@@ -100,7 +100,7 @@ export function repairDanglingObjectDependencies(scene: Scene): {
     : { scene: { ...scene, objects }, repairedImageMasks, repairedPathTextGuides };
 }
 
-function reportDependencyRepairs(
+export function reportDependencyRepairs(
   repair: Pick<
     ReturnType<typeof repairDanglingObjectDependencies>,
     'repairedImageMasks' | 'repairedPathTextGuides'

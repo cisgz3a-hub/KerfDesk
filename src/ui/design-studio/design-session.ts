@@ -149,6 +149,10 @@ export function restoreDesignSession(saved: PersistedDesignSession): DesignSessi
     activeLayerId: saved.activeLayerId,
     surface3d: saved.surface3d,
     applied: saved.applied,
+    // Old payloads cannot establish that their sketch still matches the last
+    // Apply. Offer a replacement Apply rather than strand recovered work.
+    dirtySinceApply:
+      saved.dirtySinceApply ?? (saved.sketch.entities.length > 0 || saved.applied !== null),
   });
 }
 
