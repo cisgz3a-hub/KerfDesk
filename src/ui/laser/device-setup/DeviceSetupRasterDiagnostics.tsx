@@ -20,7 +20,12 @@ export function DeviceSetupRasterDiagnostics(props: {
         if (event.currentTarget.open) setIsActivated(true);
       }}
     >
-      <summary style={{ cursor: 'pointer' }}>Raster Diagnostics and assisted conversion</summary>
+      <summary
+        style={{ cursor: 'pointer' }}
+        title="Show or hide raster diagnostics and assisted scan-offset conversion for this setup draft."
+      >
+        Raster Diagnostics and assisted conversion
+      </summary>
       {isActivated ? (
         <>
           <p role="note">
