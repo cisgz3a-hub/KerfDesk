@@ -8,6 +8,7 @@ import {
   IDENTITY_TRANSFORM,
   type Project,
   type TextObject,
+  type VariableTemplate,
 } from '../../core/scene';
 import { prepareOutput } from './prepare-output';
 import { prepareOutputSnapshot, type VariableTextRenderer } from './prepare-output-snapshot';
@@ -68,6 +69,34 @@ const renderer: VariableTextRenderer = vi.fn(async ({ text, content }) => ({
 }));
 
 describe('prepareOutputSnapshot', () => {
+  it.each([Object, Object.prototype, null, { kind: 'unknown' }])(
+    'returns a typed output failure for malformed variable token %#',
+    async (token) => {
+      const base = variableProject();
+      const text = base.scene.objects[0];
+      if (text?.kind !== 'text') throw new Error('variable text fixture is missing');
+      const project: Project = {
+        ...base,
+        scene: {
+          ...base.scene,
+          objects: [
+            { ...text, variableTemplate: { tokens: [token] } as unknown as VariableTemplate },
+          ],
+        },
+      };
+      const render = vi.fn(renderer);
+      const result = await prepareOutputSnapshot(project, {
+        clock: () => NOW,
+        renderVariableText: render,
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        preflight: { issues: [{ code: 'variable-evaluation-failed' }] },
+      });
+      expect(render).not.toHaveBeenCalled();
+    },
+  );
+
   it('evaluates and renders variable text once for a stable project/context', async () => {
     const project = variableProject();
     const options = { clock: () => NOW, renderVariableText: renderer };

@@ -58,7 +58,9 @@ export function validateVariableTemplate(value: unknown, path: string): string |
 
 function validateToken(value: unknown, path: string): string | null {
   if (!isObject(value) || typeof value['kind'] !== 'string') return invalid(path);
-  const validator = TOKEN_VALIDATORS[value['kind']];
+  const validator = Object.hasOwn(TOKEN_VALIDATORS, value['kind'])
+    ? TOKEN_VALIDATORS[value['kind']]
+    : undefined;
   return validator === undefined ? invalid(`${path}.kind`) : validator(value, path);
 }
 
@@ -66,7 +68,8 @@ type TokenValidator = (value: Record<string, unknown>, path: string) => string |
 const TOKEN_VALIDATORS: Readonly<Record<string, TokenValidator>> = {
   literal: (value, path) => (typeof value['value'] === 'string' ? null : invalid(`${path}.value`)),
   'date-time': (value, path) =>
-    ['date-iso', 'time-24h', 'datetime-iso'].includes(String(value['format']))
+    typeof value['format'] === 'string' &&
+    ['date-iso', 'time-24h', 'datetime-iso'].includes(value['format'])
       ? null
       : invalid(`${path}.format`),
   serial: validateSerialToken,
@@ -75,7 +78,8 @@ const TOKEN_VALIDATORS: Readonly<Record<string, TokenValidator>> = {
       ? null
       : invalid(`${path}.column`),
   'cut-setting': (value, path) =>
-    ['power-percent', 'speed-mm-min', 'passes', 'air-assist'].includes(String(value['field']))
+    typeof value['field'] === 'string' &&
+    ['power-percent', 'speed-mm-min', 'passes', 'air-assist'].includes(value['field'])
       ? null
       : invalid(`${path}.field`),
 };

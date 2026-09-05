@@ -172,4 +172,39 @@ describe('material library collection', () => {
     const parsed = parseCollection(JSON.stringify({ activeLibraryId: 'ghost', libraries: {} }));
     expect(parsed).toEqual(EMPTY_MATERIAL_LIBRARY_COLLECTION);
   });
+
+  it.each(['__proto__', 'constructor', 'toString'])(
+    'preserves the library ID %s across restore, switch, and unrelated deletion',
+    (libraryId) => {
+      const special = doc({ libraryId, entries: [preset()] });
+      const saved = reconcileActiveDocument(EMPTY_MATERIAL_LIBRARY_COLLECTION, special, 1);
+      const restored = parseCollection(serializeCollection(saved));
+      expect(restored).not.toBeNull();
+      if (restored === null) return;
+      expect(summarizeLibraries(restored, null).map((summary) => summary.id)).toEqual([libraryId]);
+      const switched = reconcileActiveDocument(restored, doc(), 2);
+      const remaining = removeLibrary(switched, 'birch');
+      const reloaded = parseCollection(serializeCollection(remaining));
+      expect(reloaded).not.toBeNull();
+      if (reloaded !== null) {
+        expect(serializeMaterialLibrary(libraryDocument(reloaded, libraryId)!)).toBe(
+          serializeMaterialLibrary(special),
+        );
+      }
+    },
+  );
+
+  it.each(['__proto__', 'constructor', 'toString'])(
+    'does not confuse an inherited %s property with a stored library',
+    (id) => {
+      expect(uniqueLibraryId(id, EMPTY_MATERIAL_LIBRARY_COLLECTION)).toBe(id);
+      expect(setActiveLibrary(EMPTY_MATERIAL_LIBRARY_COLLECTION, id)).toBe(
+        EMPTY_MATERIAL_LIBRARY_COLLECTION,
+      );
+      expect(removeLibrary(EMPTY_MATERIAL_LIBRARY_COLLECTION, id)).toBe(
+        EMPTY_MATERIAL_LIBRARY_COLLECTION,
+      );
+      expect(libraryDocument(EMPTY_MATERIAL_LIBRARY_COLLECTION, id)).toBeNull();
+    },
+  );
 });

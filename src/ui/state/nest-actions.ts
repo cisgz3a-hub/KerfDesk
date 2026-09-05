@@ -1,4 +1,3 @@
-import { isVectorPathObject, materializeVectorObject } from '../../core/geometry';
 import {
   outlineNest,
   quickNest,
@@ -16,6 +15,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { pushUndo } from './scene-mutations';
+import { outlineForNestUnit } from './nest-outline';
 import type { AppState } from './store';
 
 export type QuickNestOptions = {
@@ -168,7 +168,7 @@ function nestUnits(state: AppState, movableIds: ReadonlySet<string>): NestUnit[]
       id: `group:${group.id}`,
       objects,
       bounds,
-      ...outlineForUnit(objects, bounds),
+      ...outlineForNestUnit(objects, bounds),
     });
     group.objectIds.forEach((id) => consumed.add(id));
   }
@@ -179,39 +179,11 @@ function nestUnits(state: AppState, movableIds: ReadonlySet<string>): NestUnit[]
       id: `object:${object.id}`,
       objects: [object],
       bounds,
-      ...outlineForUnit([object], bounds),
+      ...outlineForNestUnit([object], bounds),
     });
   }
   return units;
 }
-
-function outlineForUnit(
-  objects: ReadonlyArray<SceneObject>,
-  bounds: NestRect,
-): { readonly outline?: NestOutline } {
-  const outline: Array<Array<{ readonly x: number; readonly y: number }>> = [];
-  let pointCount = 0;
-  for (const object of objects) {
-    if (!isVectorPathObject(object)) return {};
-    const materialized = materializeVectorObject(object);
-    for (const path of materialized.paths) {
-      for (const polyline of path.polylines) {
-        if (!polyline.closed || polyline.points.length < 3) return {};
-        pointCount += polyline.points.length;
-        if (pointCount > MAX_OUTLINE_POINTS_PER_UNIT) return {};
-        outline.push(
-          polyline.points.map((point) => ({
-            x: point.x - bounds.minX,
-            y: point.y - bounds.minY,
-          })),
-        );
-      }
-    }
-  }
-  return outline.length === 0 ? {} : { outline };
-}
-
-const MAX_OUTLINE_POINTS_PER_UNIT = 20_000;
 
 function placeUnit(unit: NestUnit, placement: NestPlacement): SceneObject[] {
   const rotated = placement.rotated90 ? rotateUnit90(unit) : [...unit.objects];

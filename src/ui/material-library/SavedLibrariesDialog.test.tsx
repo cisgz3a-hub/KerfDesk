@@ -13,8 +13,11 @@ import {
 } from '../../io/material-library';
 import type { FileHandle, PlatformAdapter, SaveTarget } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
+import { useMaterialLibraryPersistence } from '../app/use-material-library-persistence';
+import { libraryDocument } from '../state/material-library-collection';
+import { restoreCollection } from '../state/material-library-persistence';
 import { useStore } from '../state';
-import { resetStore } from '../state/test-helpers';
+import { resetStore, svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { SavedLibrariesDialog } from './SavedLibrariesDialog';
 
@@ -93,6 +96,11 @@ function libraryDoc(
 
 let mounted: { readonly root: Root; readonly host: HTMLDivElement } | null = null;
 
+function Persistence(): null {
+  useMaterialLibraryPersistence();
+  return null;
+}
+
 afterEach(async () => {
   if (mounted !== null) {
     const current = mounted;
@@ -116,6 +124,7 @@ async function renderDialog(
     root = createRoot(host);
     root.render(
       <PlatformProvider adapter={platform}>
+        <Persistence />
         <SavedLibrariesDialog onClose={onClose} />
       </PlatformProvider>,
     );
@@ -146,6 +155,7 @@ async function click(host: HTMLElement, label: string): Promise<void> {
 
 describe('SavedLibrariesDialog', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     resetStore();
     useStore.getState().createLibrary('Alpha');
     useStore.getState().createLibrary('Beta'); // Beta is now the active library.
@@ -228,6 +238,58 @@ describe('SavedLibrariesDialog', () => {
     });
 
     expect(useStore.getState().materialLibrary).toEqual(doc);
+  });
+
+  it('imports a conflicting ID as a persistent copy without changing existing layer bindings', async () => {
+    const original = useStore.getState().materialLibrary!;
+    const incoming = {
+      ...original,
+      entries: [{ ...presetFixture(), recipe: { ...recipe, power: 85 } }],
+    };
+    const { host } = await renderDialog(
+      vi.fn(),
+      mockPlatform({
+        open: async () => [file('shared.lfml.json', serializeMaterialLibrary(incoming))],
+      }),
+    );
+    await act(async () => {
+      useStore.getState().upsertMaterialPreset(presetFixture());
+      useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+      const layer = useStore.getState().project.scene.layers[0]!;
+      useStore.getState().linkMaterialPresetToLayer(layer.id, presetFixture().id);
+    });
+    const savedOriginal = useStore.getState().materialLibrary;
+    const projectBefore = useStore.getState().project;
+
+    await click(host, 'Import library');
+    const importedId = useStore.getState().materialLibrary!.libraryId;
+    expect(importedId).not.toBe(original.libraryId);
+    expect(useStore.getState().project).toBe(projectBefore);
+    expect(libraryDocument(useStore.getState().savedLibraries, original.libraryId)).toEqual(
+      savedOriginal,
+    );
+    const count = libraryNames().length;
+    await click(host, 'Import library');
+    expect(useStore.getState().materialLibrary!.libraryId).toBe(importedId);
+    expect(libraryNames()).toHaveLength(count);
+
+    const restored = restoreCollection(window.localStorage)!;
+    expect(libraryDocument(restored, original.libraryId)).toEqual(savedOriginal);
+    expect(libraryDocument(restored, importedId)).toEqual({ ...incoming, libraryId: importedId });
+  });
+
+  it('re-imports an identical library without creating another entry', async () => {
+    const original = useStore.getState().materialLibrary!;
+    const { host } = await renderDialog(
+      vi.fn(),
+      mockPlatform({
+        open: async () => [file('same.lfml.json', serializeMaterialLibrary(original))],
+      }),
+    );
+    await click(host, 'Import library');
+    await click(host, 'Import library');
+    expect(libraryNames()).toHaveLength(2);
+    expect(useStore.getState().materialLibrary).toEqual(original);
   });
 
   it('exports the active library to a file', async () => {
