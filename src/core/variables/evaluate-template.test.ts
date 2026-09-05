@@ -50,6 +50,38 @@ function variableProject(): Project {
 }
 
 describe('evaluateVariableTemplate', () => {
+  it.each([
+    null,
+    undefined,
+    Object,
+    Object.prototype,
+    { kind: 'unknown' },
+    { kind: 'literal' },
+    { kind: 'date-time', format: 'unrecognized' },
+    { kind: 'date-time', format: Object.create(null) },
+    { kind: 'csv', column: 3 },
+    { kind: 'serial', width: 4 },
+    { kind: 'serial', prefix: '', width: 4, offset: 0.5 },
+    { kind: 'cut-setting', field: 'unrecognized' },
+    { kind: 'cut-setting', field: Object.create(null) },
+  ])('returns a structured error for malformed token %#', (token) => {
+    const malformed = { tokens: [token] } as unknown as VariableTemplate;
+    expect(
+      evaluateVariableTemplate(malformed, text, variableProject(), { now: new globalThis.Date(0) }),
+    ).toMatchObject({ ok: false, message: expect.any(String) });
+  });
+
+  it.each([null, undefined, {}, { tokens: null }])(
+    'returns a structured error for a malformed template %#',
+    (template) => {
+      expect(
+        evaluateVariableTemplate(template as VariableTemplate, text, variableProject(), {
+          now: new globalThis.Date(0),
+        }),
+      ).toMatchObject({ ok: false, message: expect.any(String) });
+    },
+  );
+
   it('evaluates every typed token from one injected context', () => {
     const template: VariableTemplate = {
       tokens: [

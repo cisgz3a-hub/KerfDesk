@@ -42,4 +42,54 @@ describe('variable template source', () => {
     expect(parseVariableTemplateSource(source)).toEqual({ ok: true, template });
     expect(parseVariableTemplateSource(`{{csv:${column}}}`)).toEqual({ ok: true, template });
   });
+
+  it.each(['Literal {{speed}}: ', '{{unknown}}', '{{serial:4}}', '{{', '}}', '{{literal-json:x}}'])(
+    'round-trips literal delimiters without treating %s as a variable field',
+    (value) => {
+      const template = {
+        tokens: [
+          { kind: 'literal' as const, value },
+          { kind: 'serial' as const, prefix: '', width: 4 },
+        ],
+      };
+      expect(parseVariableTemplateSource(variableTemplateToSource(template))).toEqual({
+        ok: true,
+        template,
+      });
+    },
+  );
+
+  it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])(
+    'rejects inherited tag %s as an unknown field',
+    (tag) => {
+      expect(parseVariableTemplateSource(`{{${tag}}}`)).toEqual({
+        ok: false,
+        message: `Unknown variable field "${tag}".`,
+      });
+    },
+  );
+
+  it.each(['%', 'null', '42', '%7B%7D'])(
+    'rejects malformed encoded literal %s through a structured error',
+    (value) => {
+      expect(parseVariableTemplateSource(`{{literal-json:${value}}}{{serial:4}}`)).toEqual({
+        ok: false,
+        message: 'Choose valid literal text.',
+      });
+    },
+  );
+
+  it('preserves literal braces split across adjacent tokens', () => {
+    const template = {
+      tokens: [
+        { kind: 'literal' as const, value: '{' },
+        { kind: 'literal' as const, value: '{speed}}' },
+        { kind: 'serial' as const, prefix: '', width: 4 },
+      ],
+    };
+    expect(parseVariableTemplateSource(variableTemplateToSource(template))).toEqual({
+      ok: true,
+      template,
+    });
+  });
 });
