@@ -4,29 +4,16 @@
 // stock footprint and active bit.
 
 import { useState } from 'react';
-import {
-  buildSurfacingProgram,
-  SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
-  SURFACING_DEFAULT_STEPOVER_PCT,
-  SURFACING_DEFAULT_TOTAL_DEPTH_MM,
-} from '../../core/cnc';
-import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
-import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
-import { emitStandaloneCncGcode } from '../../io/gcode/standalone-cnc-gcode';
-import { buildGcodeMetadata } from '../app/build-info';
-import { controllerReadinessAdvisories } from '../app/controller-readiness-advisories';
+import { SURFACING_DEFAULT_STEPOVER_PCT, SURFACING_DEFAULT_TOTAL_DEPTH_MM } from '../../core/cnc';
+import type { CncMachineConfig } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
-import { partitionSavePreflight } from '../app/save-preflight-policy';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useSourceTrackedState } from '../common/use-source-tracked-state';
 import { RailSection } from '../kit';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
-import { useToastStore, type ToastVariant } from '../state/toast-store';
-
-const GCODE_EXTENSIONS = ['.gcode', '.nc'];
-const DEFAULT_FEED_MM_PER_MIN = 2500;
-const DEFAULT_PLUNGE_MM_PER_MIN = 600;
+import { useToastStore } from '../state/toast-store';
+import { useSurfacingSave } from './use-surfacing-save';
 
 export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): JSX.Element {
   const platform = usePlatform();
@@ -45,27 +32,18 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
   const [stepoverPct, setStepoverPct] = useState(SURFACING_DEFAULT_STEPOVER_PCT);
   const [totalDepthMm, setTotalDepthMm] = useState(SURFACING_DEFAULT_TOTAL_DEPTH_MM);
 
-  const save = (): void => {
-    void saveSurfacingProgram({
+  const { save, cancel, phase } = useSurfacingSave(
+    {
       platform,
       pushToast,
       project,
       machine,
       controllerSettings,
       settingsCapability,
-      inputs: {
-        widthMm,
-        heightMm,
-        stepoverPct,
-        totalDepthMm,
-      },
-    }).catch((err: unknown) => {
-      pushToast(
-        `Could not save the surfacing program: ${err instanceof Error ? err.message : String(err)}`,
-        'error',
-      );
-    });
-  };
+      inputs: { widthMm, heightMm, stepoverPct, totalDepthMm },
+    },
+    projectDocumentEpoch,
+  );
 
   return (
     <RailSection
@@ -102,97 +80,26 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
       >
         Save surfacing G-code…
       </button>
+      {phase !== null && (
+        <div role="status">
+          {phase === 'preparing'
+            ? 'Checking surfacing program… '
+            : phase === 'writing'
+              ? 'Writing surfacing program… '
+              : 'Finishing surfacing save… '}
+          {phase !== 'finalizing' && (
+            <button type="button" onClick={cancel} title={cancelSaveTitle}>
+              Cancel surfacing save
+            </button>
+          )}
+        </div>
+      )}
     </RailSection>
   );
 }
 
-type SurfacingInputs = {
-  readonly widthMm: number;
-  readonly heightMm: number;
-  readonly stepoverPct: number;
-  readonly totalDepthMm: number;
-};
-
-type SaveSurfacingProgramOptions = {
-  readonly platform: ReturnType<typeof usePlatform>;
-  readonly pushToast: (message: string, variant?: ToastVariant) => void;
-  readonly project: Project;
-  readonly machine: CncMachineConfig;
-  readonly controllerSettings: ControllerSettingsSnapshot | null;
-  readonly settingsCapability: ReadinessSettingsCapability;
-  readonly inputs: SurfacingInputs;
-};
-
-async function saveSurfacingProgram({
-  platform,
-  pushToast,
-  project,
-  machine,
-  controllerSettings,
-  settingsCapability,
-  inputs,
-}: SaveSurfacingProgramOptions): Promise<void> {
-  const tool = activeCncTool(machine);
-  const result = buildSurfacingProgram({
-    ...inputs,
-    bitDiameterMm: tool.diameterMm,
-    depthPerPassMm: SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
-    feedMmPerMin: Math.min(DEFAULT_FEED_MM_PER_MIN, project.device.maxFeed),
-    plungeMmPerMin: Math.min(DEFAULT_PLUNGE_MM_PER_MIN, project.device.maxFeed),
-    spindleRpm: machine.params.spindleMaxRpm,
-    spindleSpinupSec: machine.params.spindleSpinupSec,
-    safeZMm: machine.params.safeZMm,
-  });
-  if (!result.ok) {
-    pushToast(`Could not save the surfacing program: ${result.reason}`, 'error');
-    return;
-  }
-  const { program } = result;
-  const emitted = emitStandaloneCncGcode(project, program.lines.join('\n'), buildGcodeMetadata());
-  // Rule 7 / ADR-228: this read `preflight.ok`, which is false for ANY issue,
-  // so runStandaloneCncPreflight's heuristic findings — out-of-bed and
-  // no-go-zone-collision, the two rule 7 names by name as warn-only, plus
-  // plunged-travel and cnc-settings-invalid — refused the export. Enabling any
-  // no-go zone made the wizard permanently unable to save, because the zone
-  // uncertainty is raised unconditionally. Split against the same canonical
-  // compile-integrity set the Start, Save and tiled paths key off.
-  const { blocking, advisories } = partitionSavePreflight(emitted.preflight.issues);
-  // Surfacing never opens Job Review, so this toast list IS the operator's
-  // warnings surface — every demoted finding has to arrive here or the signal
-  // is lost outright. Emitted BEFORE the blocking check and before the picker:
-  // the refusal this replaced joined every message into one toast on every
-  // attempt, so reporting only after a successful write would say less.
-  for (const advisory of advisories) pushToast(advisory.message, 'warning');
-  for (const advisory of controllerReadinessAdvisories(
-    project,
-    controllerSettings,
-    settingsCapability,
-  )) {
-    pushToast(advisory, 'warning');
-  }
-  if (blocking.length > 0) {
-    const reasons = blocking.map((issue) => issue.message).join(' ');
-    pushToast(`Could not save the surfacing program: ${reasons}`, 'error');
-    return;
-  }
-  try {
-    const target = await platform.pickFileForSave({
-      suggestedName: 'surfacing.nc',
-      extensions: GCODE_EXTENSIONS,
-    });
-    if (target === null) return;
-    await target.write(emitted.gcode);
-    pushToast(
-      `Saved preflighted surfacing program: ${program.passes} pass(es) × ${program.rowsPerPass} rows with the ${tool.name}. Requested total depth ${program.requestedTotalDepthMm} mm; emitted maximum depth ${program.emittedMaximumDepthText} mm at 0.001 mm coordinate precision. Zero X/Y at the area's front-left corner and Z on the surface before running; the file lifts to safe Z before spindle start.`,
-      'success',
-    );
-  } catch (err) {
-    pushToast(
-      `Could not save the surfacing program: ${err instanceof Error ? err.message : String(err)}`,
-      'error',
-    );
-  }
-}
+const cancelSaveTitle =
+  'Stop preparing the surfacing program or discard its uncommitted file bytes.';
 
 function Num(props: {
   readonly label: string;

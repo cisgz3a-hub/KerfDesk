@@ -198,14 +198,14 @@ describe('buildSurfacingProgram', () => {
     const result = buildSurfacingProgram({ ...PARAMS, spindleSpinupSec: 0 });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.program.lines.some((line) => line.startsWith('G4 P'))).toBe(false);
+    expect([...result.program.lines].some((line) => line.startsWith('G4 P'))).toBe(false);
   });
 
   it('preserves a positive spin-up delay below the former floor', () => {
     const result = buildSurfacingProgram({ ...PARAMS, spindleSpinupSec: 0.499 });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.program.lines).toContain('G4 P0.499');
+    expect([...result.program.lines]).toContain('G4 P0.499');
   });
 });
 
@@ -215,8 +215,10 @@ function expectSurfacingRows(result: SurfacingRowsResult): ReadonlyArray<number>
   return result.rows;
 }
 
-function expectSurfacingProgram(result: SurfacingProgramResult): SurfacingProgram {
+function expectSurfacingProgram(
+  result: SurfacingProgramResult,
+): Omit<SurfacingProgram, 'lines'> & { readonly lines: ReadonlyArray<string> } {
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error(result.reason);
-  return result.program;
+  return { ...result.program, lines: [...result.program.lines] };
 }

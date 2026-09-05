@@ -10,7 +10,13 @@
 // tolerated. This means they can validate G-code from external tools too, not
 // just GrblStrategy's output.
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
-import { asGcodeLines, isGcodeCommand, parseGcodeWord, stripGcodeComment } from './gcode-words';
+import {
+  asGcodeLines,
+  isGcodeCommand,
+  iterateGcodeLines,
+  parseGcodeWord,
+  stripGcodeComment,
+} from './gcode-words';
 import { arcAabb } from './arc-bounds';
 
 export type Issue = {
@@ -26,6 +32,7 @@ export type MotionBoundsOffset = {
 
 export type OutOfBoundsCoordOptions = {
   readonly motionOffset?: MotionBoundsOffset | undefined;
+  readonly maxIssues?: number;
 };
 
 type BoundsRect = {
@@ -82,11 +89,10 @@ export function findLaserOnTravelIssues(gcode: string | ReadonlyArray<string>): 
 // Every X / Y emitted by a motion command (G0/G1/G2/G3) must fall inside the
 // rectangle [0, width] × [0, height], in machine coordinates.
 export function findOutOfBoundsCoords(
-  gcode: string | ReadonlyArray<string>,
+  gcode: string | Iterable<string>,
   bed: BoundsRect,
   options: OutOfBoundsCoordOptions = {},
 ): readonly Issue[] {
-  const lines = asGcodeLines(gcode);
   const issues: Issue[] = [];
   const offset = options.motionOffset ?? { x: 0, y: 0 };
   const limits = {
@@ -100,14 +106,15 @@ export function findOutOfBoundsCoords(
   // emitted-text scan we track from 0,0 like the rest of the bounds contract.
   let pos = { x: 0, y: 0 };
   let motion: GcodeMotionMode | null = 0;
-  for (let i = 0; i < lines.length; i += 1) {
-    const raw = lines[i];
-    if (raw === undefined) continue;
+  let lineNumber = 0;
+  for (const raw of iterateGcodeLines(gcode)) {
+    lineNumber += 1;
     const stripped = stripGcodeComment(raw);
     const scanned = scanModalMotionLine(stripped, motion);
     motion = scanned.motion;
     if (!scanned.isMotion || motion === null) continue;
-    pos = scanMotionLineBounds(issues, stripped, motion, pos, offset, limits, i + 1, raw);
+    pos = scanMotionLineBounds(issues, stripped, motion, pos, offset, limits, lineNumber, raw);
+    if (issues.length >= (options.maxIssues ?? Infinity)) return issues.slice(0, options.maxIssues);
   }
   return issues;
 }

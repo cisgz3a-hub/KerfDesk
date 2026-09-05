@@ -25,6 +25,14 @@ export type SaveTarget = {
   /** Compare adapter identities without opening, creating, or writing a file. */
   readonly isSameDestination?: (other: SaveTarget) => Promise<boolean>;
   readonly write: (data: string | Blob) => Promise<void>;
+  /** Backpressured output; cancellation discards staged bytes until finalization
+   * begins. onFinalizing marks the irrevocable close, before which callers must
+   * stop offering cancellation. The promise settles when that close completes. */
+  readonly writeChunks?: (
+    chunks: AsyncIterable<string>,
+    signal?: AbortSignal,
+    onFinalizing?: () => void,
+  ) => Promise<void>;
 };
 
 /** A picked directory that can mint named targets later. Merely reserving the

@@ -16,6 +16,7 @@ import type {
 import { webCamera } from './web-camera';
 import { webSerial } from './web-serial';
 import { createHttpCameraBridge } from './camera-bridge';
+import { writeSaveChunks } from './write-save-chunks';
 
 type FilePickerAcceptType = {
   description: string;
@@ -104,6 +105,11 @@ function directoryFileTarget(
       const writable = await handle.createWritable();
       await writeAndClose(writable, data);
     },
+    writeChunks: async (chunks, signal, onFinalizing) => {
+      signal?.throwIfAborted();
+      const handle = await directory.getFileHandle(displayName, { create: true });
+      await writeSaveChunks(await handle.createWritable(), chunks, signal, onFinalizing);
+    },
   };
 }
 
@@ -124,6 +130,10 @@ function fileHandleTarget(handle: FileSystemFileHandle): SaveTarget {
     write: async (data) => {
       const writable = await handle.createWritable();
       await writeAndClose(writable, data);
+    },
+    writeChunks: async (chunks, signal, onFinalizing) => {
+      signal?.throwIfAborted();
+      await writeSaveChunks(await handle.createWritable(), chunks, signal, onFinalizing);
     },
   };
 }
