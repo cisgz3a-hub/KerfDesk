@@ -19,28 +19,77 @@ const CALIBRATION: CameraCalibration = {
 };
 
 describe('compensateAlignmentForSurfaceHeight', () => {
-  it('maps pixels on an elevated parallel surface back to their true machine XY', () => {
-    const alignmentHeight = 3;
-    const targetHeight = 18;
-    const alignment = alignmentAtHeight(alignmentHeight);
+  it.each([
+    { alignmentHeight: 3, targetHeight: 18 },
+    { alignmentHeight: 20, targetHeight: 3 },
+    { alignmentHeight: 0, targetHeight: 20 },
+  ])(
+    'maps physical height $alignmentHeight → $targetHeight back to scene XY',
+    ({ alignmentHeight, targetHeight }) => {
+      const alignment = alignmentAtHeight(alignmentHeight);
+      const result = compensateAlignmentForSurfaceHeight({
+        alignment,
+        calibration: CALIBRATION,
+        surfaceHeightMm: targetHeight,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      for (const point of [
+        { x: 20, y: 30 },
+        { x: 200, y: 160 },
+        { x: 380, y: 350 },
+      ]) {
+        const pixel = projectWorldPoint(point.x, point.y, targetHeight);
+        const recovered = applyHomography(result.homography, pixel);
+        expect(recovered.x).toBeCloseTo(point.x, 7);
+        expect(recovered.y).toBeCloseTo(point.y, 7);
+      }
+    },
+  );
+
+  it('reduces pinhole camera distance when the material rises toward the lens', () => {
+    const alignment: CameraAlignment = {
+      homography: [1, 0, -640, 0, 1, -360, 0, 0, 1],
+      frameWidth: 1280,
+      frameHeight: 720,
+      basis: 'rectified',
+      planeHeightMm: 0,
+      alignedAt: 1,
+    };
     const result = compensateAlignmentForSurfaceHeight({
       alignment,
-      calibration: CALIBRATION,
-      surfaceHeightMm: targetHeight,
+      calibration: { ...CALIBRATION, intrinsics: { fx: 1000, fy: 1000, cx: 640, cy: 360 } },
+      surfaceHeightMm: 20,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    // Scene X-right/Y-down; height above the bed shortens a 1000 mm camera distance.
+    const pixel = { x: 640 + (1000 * 200) / 980, y: 360 + (1000 * 100) / 980 };
+    expect(applyHomography(result.homography, pixel)).toEqual({
+      x: expect.closeTo(200, 8),
+      y: expect.closeTo(100, 8),
+    });
+  });
 
-    for (const point of [
-      { x: 20, y: 30 },
-      { x: 200, y: 160 },
-      { x: 380, y: 350 },
-    ]) {
-      const pixel = projectWorldPoint(point.x, point.y, targetHeight);
-      const recovered = applyHomography(result.homography, pixel);
-      expect(recovered.x).toBeCloseTo(point.x, 7);
-      expect(recovered.y).toBeCloseTo(point.y, 7);
-    }
+  it('uses scaled lens intrinsics for a resized alignment capture', () => {
+    const alignment = alignmentAtHeight(3);
+    const result = compensateAlignmentForSurfaceHeight({
+      alignment: {
+        ...alignment,
+        frameWidth: 640,
+        frameHeight: 360,
+        homography: multiplyMat3(alignment.homography, [2, 0, 0, 0, 2, 0, 0, 0, 1]),
+      },
+      calibration: CALIBRATION,
+      surfaceHeightMm: 18,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const pixel = projectWorldPoint(200, 160, 18);
+    const recovered = applyHomography(result.homography, { x: pixel.x / 2, y: pixel.y / 2 });
+    expect(recovered.x).toBeCloseTo(200, 7);
+    expect(recovered.y).toBeCloseTo(160, 7);
   });
 
   it('leaves the homography unchanged on the alignment plane', () => {
@@ -96,10 +145,12 @@ function alignmentAtHeight(height: number): CameraAlignment {
 }
 
 function projectionForHeight(height: number): Mat3 {
+  // Scene X-right/Y-down has its cross-product normal pointing away from an
+  // overhead camera. Physical height above the bed points in the opposite direction.
   const third = [
-    TRANSLATION[0] + ROTATION[2] * height,
-    TRANSLATION[1] + ROTATION[5] * height,
-    TRANSLATION[2] + ROTATION[8] * height,
+    TRANSLATION[0] - ROTATION[2] * height,
+    TRANSLATION[1] - ROTATION[5] * height,
+    TRANSLATION[2] - ROTATION[8] * height,
   ] as const;
   return multiplyMat3(K, [
     ROTATION[0],
@@ -115,8 +166,8 @@ function projectionForHeight(height: number): Mat3 {
 }
 
 function projectWorldPoint(x: number, y: number, z: number): { x: number; y: number } {
-  const cameraX = ROTATION[0] * x + ROTATION[1] * y + ROTATION[2] * z + TRANSLATION[0];
-  const cameraY = ROTATION[3] * x + ROTATION[4] * y + ROTATION[5] * z + TRANSLATION[1];
-  const cameraZ = ROTATION[6] * x + ROTATION[7] * y + ROTATION[8] * z + TRANSLATION[2];
+  const cameraX = ROTATION[0] * x + ROTATION[1] * y - ROTATION[2] * z + TRANSLATION[0];
+  const cameraY = ROTATION[3] * x + ROTATION[4] * y - ROTATION[5] * z + TRANSLATION[1];
+  const cameraZ = ROTATION[6] * x + ROTATION[7] * y - ROTATION[8] * z + TRANSLATION[2];
   return { x: (800 * cameraX) / cameraZ + 640, y: (820 * cameraY) / cameraZ + 360 };
 }

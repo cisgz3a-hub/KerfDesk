@@ -21,7 +21,12 @@ export type ActiveCameraSource =
   // A machine snapshot camera (Falcon-style) — one JPEG per GET, via the
   // bridge proxy. `cameraUrl` is the camera's own URL (persisted/diagnostics);
   // `frameUrl` is the pixel-readable bridge proxy the UI actually fetches.
-  | { readonly kind: 'machine-jpeg'; readonly frameUrl: string; readonly cameraUrl: string }
+  | {
+      readonly kind: 'machine-jpeg';
+      readonly frameUrl: string;
+      readonly cameraUrl: string;
+      readonly queryFingerprint?: string;
+    }
   // A machine RTSP camera — `previewUrl` is the bridge's continuous MJPEG for
   // display; `frameUrl` is the bridge's ffmpeg single-frame decode for stills.
   | {
@@ -32,6 +37,7 @@ export type ActiveCameraSource =
         | { readonly kind: 'monitored'; readonly streamSessionId: string }
         | { readonly kind: 'unmonitored'; readonly advisory: string };
       readonly sourceId: string;
+      readonly queryFingerprint?: string;
     };
 
 export function cameraCaptureBindingForFrame(
@@ -50,9 +56,21 @@ export function cameraCaptureBindingForFrame(
         resizeMode: source.stream.resizeMode,
       };
     case 'machine-jpeg':
-      return networkCaptureBinding('machine-jpeg', source.cameraUrl, width, height);
+      return networkCaptureBinding(
+        'machine-jpeg',
+        source.cameraUrl,
+        width,
+        height,
+        source.queryFingerprint,
+      );
     case 'machine-rtsp':
-      return networkCaptureBinding('machine-rtsp', source.sourceId, width, height);
+      return networkCaptureBinding(
+        'machine-rtsp',
+        source.sourceId,
+        width,
+        height,
+        source.queryFingerprint,
+      );
     default:
       return assertNever(source, 'camera source');
   }
@@ -67,11 +85,13 @@ function networkCaptureBinding(
   rawId: string,
   width: number,
   height: number,
+  queryFingerprint: string | undefined,
 ): CameraCaptureBinding {
   return {
     version: 1,
     sourceKind,
     sourceId: publicCameraSourceId(rawId),
+    ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
     width,
     height,
     resizeMode: 'unknown',

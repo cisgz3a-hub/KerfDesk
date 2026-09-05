@@ -70,7 +70,11 @@ function translateAlignmentPlane(
   const normalized = removeIntrinsics(planeToCamera, intrinsics);
   const pose = recoverPose(normalized);
   if (pose === null) return null;
-  const translatedOrigin = add(pose.translation, scale(pose.zAxis, deltaHeightMm));
+  // The alignment maps into scene X-right/Y-down coordinates (the same basis
+  // the overlay and camera trace render). Their right-handed cross product
+  // points away from an overhead camera; physical height above the bed points
+  // toward it. Positive material height therefore subtracts this normal.
+  const translatedOrigin = add(pose.translation, scale(pose.zAxis, -deltaHeightMm));
   return invertMat3(applyIntrinsics(pose.xAxis, pose.yAxis, translatedOrigin, intrinsics));
 }
 

@@ -16,6 +16,8 @@ const INITIAL_CALIBRATION_EPOCH = 1;
 const REPLACEMENT_CALIBRATION_EPOCH = 2;
 const MAX_GENERATED_CAPTURE_DIMENSION_PX = 4096;
 const MAX_GENERATED_SOURCE_ID_LENGTH = 40;
+const CAMERA_QUERY_FINGERPRINT = `hmac-sha256:${'a'.repeat(64)}`;
+const REPLACEMENT_QUERY_FINGERPRINT = `hmac-sha256:${'b'.repeat(64)}`;
 
 const CAMERA_CALIBRATION: CameraCalibration = calibrationAt(INITIAL_CALIBRATION_EPOCH);
 
@@ -43,6 +45,7 @@ type CaptureBindingField = Exclude<keyof CameraCaptureBinding, 'version'>;
 const captureBindingFieldArbitrary = fc.constantFrom<CaptureBindingField>(
   'sourceKind',
   'sourceId',
+  'queryFingerprint',
   'width',
   'height',
   'resizeMode',
@@ -84,6 +87,14 @@ function captureWithChangedField(
       return { ...capture, sourceKind: capture.sourceKind === 'usb' ? 'machine-jpeg' : 'usb' };
     case 'sourceId':
       return { ...capture, sourceId: `${capture.sourceId}-replacement` };
+    case 'queryFingerprint':
+      return {
+        ...capture,
+        queryFingerprint:
+          capture.queryFingerprint === CAMERA_QUERY_FINGERPRINT
+            ? REPLACEMENT_QUERY_FINGERPRINT
+            : CAMERA_QUERY_FINGERPRINT,
+      };
     case 'width':
       return { ...capture, width: capture.width + 1 };
     case 'height':
@@ -307,4 +318,36 @@ describe('deviceProfileWithInteractivePatch', () => {
       { numRuns: 200 },
     );
   });
+
+  it.each([CAMERA_QUERY_FINGERPRINT, REPLACEMENT_QUERY_FINGERPRINT, undefined])(
+    'retains rectified alignment only for an unchanged query fingerprint: %s',
+    (queryFingerprint) => {
+      const capture: CameraCaptureBinding = {
+        version: 1,
+        sourceKind: 'machine-rtsp',
+        sourceId: 'rtsp://camera.local/live',
+        width: CAMERA_FRAME_WIDTH_PX,
+        height: CAMERA_FRAME_HEIGHT_PX,
+        resizeMode: 'unknown',
+      };
+      const profile = {
+        ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+        cameraCalibration: calibrationAt(INITIAL_CALIBRATION_EPOCH, {
+          ...capture,
+          queryFingerprint: CAMERA_QUERY_FINGERPRINT,
+        }),
+        cameraAlignment: RECTIFIED_ALIGNMENT,
+      };
+      const patched = deviceProfileWithInteractivePatch(profile, {
+        cameraCalibration: calibrationAt(INITIAL_CALIBRATION_EPOCH, {
+          ...capture,
+          ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
+        }),
+      });
+
+      expect(patched.cameraAlignment).toBe(
+        queryFingerprint === CAMERA_QUERY_FINGERPRINT ? RECTIFIED_ALIGNMENT : undefined,
+      );
+    },
+  );
 });

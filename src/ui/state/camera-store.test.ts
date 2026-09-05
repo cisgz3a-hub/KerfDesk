@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { webcrypto } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CameraAdapter, CameraBridgeAdapter } from '../../platform/types';
 import { useCameraStore } from './camera-store';
 
@@ -26,6 +27,7 @@ function mockBridge(overrides?: Partial<CameraBridgeAdapter>): CameraBridgeAdapt
 }
 
 beforeEach(() => {
+  vi.stubGlobal('crypto', webcrypto);
   // selectCamera persists the preferred device; isolate tests from each other.
   localStorage.clear();
   useCameraStore.setState({
@@ -48,6 +50,8 @@ beforeEach(() => {
     confirmedPositionEpoch: null,
   });
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('camera-store', () => {
   it('overlay prefs default sensibly and the opacity clamps to 0..100', () => {
@@ -237,6 +241,7 @@ describe('camera-store', () => {
       kind: 'found',
       cameraUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
       proxyFrameUrl: 'http://127.0.0.1:51731/frame.jpg?url=x',
+      queryFingerprint: expect.stringMatching(/^hmac-sha256:[0-9a-f]{64}$/),
     });
   });
 
@@ -312,6 +317,7 @@ describe('camera-store', () => {
       kind: 'live',
       source: {
         kind: 'machine-rtsp',
+        queryFingerprint: expect.stringMatching(/^hmac-sha256:[0-9a-f]{64}$/),
         previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
         frameUrl: `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(
           'rtsp://192.168.10.1:8554/',
