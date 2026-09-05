@@ -1,12 +1,12 @@
 import {
   combineVectorObjects,
-  dogboneOperationRegions,
   isVectorPathObject,
   materializeVectorObject,
   offsetVectorObjects,
   type VectorBooleanOp,
   type VectorSceneObject,
 } from '../../core/geometry';
+import { dogboneOperationRegions } from '../../core/geometry/dogbone-operations';
 import { canonicalArtworkOrder } from '../../core/artwork-order';
 import { effectiveOperationForObject } from '../../core/effective-output';
 import {

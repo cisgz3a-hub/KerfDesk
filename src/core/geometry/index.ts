@@ -1,7 +1,7 @@
 // Public API for the geometry module (ADR-015 boundary): cross-module consumers
-// (ui + io) import Weld / boolean / offset / dogbone / arc-sampling from here, not
-// from the leaf files. Intra-geometry code still imports the leaf modules directly
-// (same-module deep imports are fine).
+// (ui + io) import Weld / boolean / offset / dogbone / arc-sampling from here.
+// Specialized operation-region helpers use direct module imports to keep this
+// barrel within its export cap. Intra-geometry code also uses direct imports.
 export {
   isVectorPathObject,
   materializeVectorObject,
@@ -15,7 +15,6 @@ export {
   type VectorBooleanOp,
 } from './vector-path-booleans';
 export { DOGBONE_MAX_CORNER_DEG, dogboneVectorObject } from './dogbone';
-export { dogboneOperationRegions } from './dogbone-operations';
 export { pointInPolygon } from './point-in-polygon';
 export { arcStepRad, sampleArcPoints } from './arc-sampling';
 export { parametricEllipseCurve } from './ellipse-curve';
