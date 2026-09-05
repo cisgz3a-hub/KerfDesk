@@ -62,7 +62,7 @@ describe('importLightBurnProject', () => {
     const xml = `<LightBurnProject FormatVersion="1">
       <CutSetting type="Scan">
         <index Value="1"/><maxPower Value="50"/><speed Value="15"/><numPasses Value="3"/>
-        <interval Value="0.08"/><overscan Value="2"/><angle Value="90"/>
+        <interval Value="0.08"/><overscan Value="1"/><overscanPercent Value="2"/><angle Value="90"/>
         <crossHatch Value="1"/><bidirectional Value="0"/><minPower Value="12"/>
       </CutSetting>
       <Shape Type="Rect" CutIndex="1" W="10" H="6"><XForm>1 0 0 1 5 5</XForm></Shape>
@@ -112,7 +112,7 @@ describe('importLightBurnProject', () => {
   });
 
   it('keeps the default runway and warns when percentage overscan lacks a speed', () => {
-    const xml = `<LightBurnProject><CutSetting index="1" type="Scan" overscan="5"/><Shape Type="Rect" CutIndex="1" W="10" H="6"/></LightBurnProject>`;
+    const xml = `<LightBurnProject><CutSetting index="1" type="Scan" overscan="1" overscanPercent="5"/><Shape Type="Rect" CutIndex="1" W="10" H="6"/></LightBurnProject>`;
     const result = importLightBurnProject(xml, 'missing-speed.lbrn2');
     expect(result).toMatchObject({
       ok: true,

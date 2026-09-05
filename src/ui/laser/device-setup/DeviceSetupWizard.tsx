@@ -55,6 +55,13 @@ type DeviceSetupWizardProps = {
 };
 
 export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
+  const documentEpoch = useStore((s) => s.projectDocumentEpoch);
+  // A replacement document owns a new setup draft, even when its device values
+  // equal the previous document. Never save old measurements into the new owner.
+  return <DeviceSetupWizardDraft key={documentEpoch} {...props} />;
+}
+
+function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
   const project = useStore((s) => s.project);
   const cachedCncMachine = useStore((s) => s.cachedCncMachine);
   const libraryCustomTools = useStore((s) => s.cncLibrary.customTools);

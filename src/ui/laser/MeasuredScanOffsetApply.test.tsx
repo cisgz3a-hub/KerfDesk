@@ -35,6 +35,46 @@ afterEach(() => {
 });
 
 describe('MeasuredScanOffsetApply', () => {
+  it.each(['head', 'controller', 'bed', 'new', 'open'])(
+    'discards uncommitted measurements when the %s identity changes',
+    async (change) => {
+      const { host, unmount } = await renderMeasuredApply();
+      try {
+        await changeInput(host, 'Measured offset 1', '0.2');
+        await act(async () => {
+          const store = useStore.getState();
+          if (change === 'head')
+            store.updateDeviceProfile({
+              laserSubProfile: {
+                model: 'Replacement head',
+                focusMode: 'manual',
+                airAssist: 'none',
+              },
+            });
+          if (change === 'controller') store.updateDeviceProfile({ controllerKind: 'grblhal' });
+          if (change === 'bed') store.updateDeviceProfile({ bedWidth: 300 });
+          if (change === 'new') store.newProject();
+          if (change === 'open') store.setProject(store.project);
+        });
+        expect(input(host, 'Measured offset 1').value).toBe('');
+        expect(useStore.getState().project.device.scanningOffsets).toEqual([]);
+      } finally {
+        await unmount();
+      }
+    },
+  );
+
+  it('preserves a measurement when only the profile display name changes', async () => {
+    const { host, unmount } = await renderMeasuredApply();
+    try {
+      await changeInput(host, 'Measured offset 1', '0.123456789');
+      await act(async () => useStore.getState().updateDeviceProfile({ name: 'Renamed machine' }));
+      expect(input(host, 'Measured offset 1').value).toBe('0.123456789');
+    } finally {
+      await unmount();
+    }
+  });
+
   it('saves measured scan offsets to the active device profile', async () => {
     const { host, unmount } = await renderMeasuredApply();
     try {

@@ -1,6 +1,7 @@
 import { createLayer, type Layer, type Project } from '../../core/scene';
 import { createProject } from '../../core/scene/project';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
+import { resolveLightBurnOverscan } from './lbrn-overscan';
 
 // MAX_XML_DEPTH is an integrity bound, not a policy cap: unbounded nesting
 // overflows the recursive walker. It stays. The former 20 MB byte ceiling and
@@ -119,16 +120,25 @@ function importedLayer(
   if (setting === undefined) return base;
   const mode = textField(setting, ['type', 'mode']).toLowerCase();
   const isScan = mode.includes('scan') || mode.includes('fill');
-  if (isScan) {
-    const overscan = numericField(setting, ['overscan']);
-    const speedMmSec = numericField(setting, ['speed', 'speedmmsec']);
-    warnings.push(...unsupportedScanSettingWarnings(setting, name, overscan, speedMmSec));
-  }
   return {
     ...base,
     mode: isScan ? 'fill' : 'line',
     ...importedCommonLayerFields(setting),
-    ...(isScan ? importedScanLayerFields(setting) : {}),
+    ...(isScan ? importedScanSettings(setting, name, warnings) : {}),
+  };
+}
+
+function importedScanSettings(setting: Element, name: string, warnings: string[]): Partial<Layer> {
+  const overscan = resolveLightBurnOverscan(
+    booleanField(setting, ['overscan']),
+    numericField(setting, ['overscanpercent']),
+    numericField(setting, ['speed', 'speedmmsec']),
+    name,
+  );
+  warnings.push(...unsupportedScanSettingWarnings(setting, name), ...overscan.warnings);
+  return {
+    ...importedScanLayerFields(setting),
+    ...(overscan.distanceMm === null ? {} : { fillOverscanMm: overscan.distanceMm }),
   };
 }
 
@@ -148,43 +158,19 @@ function importedScanLayerFields(setting: Element): Partial<Layer> {
   const angleDeg = numericField(setting, ['scanangle', 'angle']);
   const crossHatch = booleanField(setting, ['crosshatch']);
   const bidirectional = booleanField(setting, ['bidirectional', 'bidir']);
-  const overscan = numericField(setting, ['overscan']);
-  const speedMmSec = numericField(setting, ['speed', 'speedmmsec']);
-  const fixedOverscanMm = lightBurnOverscanMm(overscan, speedMmSec);
   return {
     ...(intervalMm !== null && intervalMm > 0 ? { hatchSpacingMm: intervalMm } : {}),
     ...(angleDeg === null ? {} : { hatchAngleDeg: angleDeg }),
     ...(crossHatch === null ? {} : { fillCrossHatch: crossHatch }),
     ...(bidirectional === null ? {} : { fillBidirectional: bidirectional }),
-    ...(fixedOverscanMm === null ? {} : { fillOverscanMm: fixedOverscanMm }),
   };
-}
-
-function lightBurnOverscanMm(
-  overscanPercent: number | null,
-  speedMmSec: number | null,
-): number | null {
-  if (overscanPercent === null) return null;
-  if (overscanPercent === 0) return 0;
-  if (speedMmSec === null || speedMmSec <= 0) return null;
-  return Math.max(0, (speedMmSec * overscanPercent) / 100);
 }
 
 function unsupportedScanSettingWarnings(
   setting: Element,
   layerName: string,
-  overscan: number | null,
-  speedMmSec: number | null,
 ): ReadonlyArray<string> {
   const warnings: string[] = [];
-  if (overscan !== null && overscan !== 0) {
-    const fixedMm = lightBurnOverscanMm(overscan, speedMmSec);
-    warnings.push(
-      fixedMm === null
-        ? `${layerName}: LightBurn Scan overscan ${overscan}% could not be converted without a positive imported speed; review the default 5 mm runway.`
-        : `${layerName}: LightBurn Scan overscan ${overscan}% was converted to ${fixedMm} mm at ${speedMmSec} mm/s; review it after changing speed because LaserForge stores a fixed physical runway.`,
-    );
-  }
   const supported = new Set([
     'index',
     'name',
@@ -207,6 +193,7 @@ function unsupportedScanSettingWarnings(
     'bidirectional',
     'bidir',
     'overscan',
+    'overscanpercent',
   ]);
   for (const field of directFields(setting)) {
     if (supported.has(field.name) || !meaningfulLightBurnValue(field.value)) continue;

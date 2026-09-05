@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { effectiveScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import { LAYER_DEFAULTS, type Layer, type Project } from '../../core/scene';
@@ -13,7 +14,10 @@ import {
   sectionStyle,
   stackStyle,
 } from './MachineSetupStyles';
-import { MeasuredScanOffsetApply } from './MeasuredScanOffsetApply';
+import {
+  MeasuredScanOffsetApply,
+  type ScanOffsetCalibrationDraft,
+} from './MeasuredScanOffsetApply';
 import {
   machineSetupFillHeatRisk,
   machineSetupFillHeatRiskWarning,
@@ -22,11 +26,17 @@ import {
 import { buildMachineSetupScanFacts } from './machine-setup-scan-facts';
 import { diagnosticChecks, type DiagnosticCheck } from './machine-setup-raster-diagnostic-checks';
 
-export function RasterDiagnosticsPanel(): JSX.Element {
-  const project = useStore((s) => s.project);
+export function RasterDiagnosticsPanel(props: {
+  readonly draft?: ScanOffsetCalibrationDraft;
+}): JSX.Element {
+  const liveProject = useStore((s) => s.project);
+  const project = props.draft?.project ?? liveProject;
   const rows = useLaserStore((s) => s.grblSettingsRows);
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
-  const diagnostics = buildRasterDiagnostics(project, rows, lastSettingsReadAt);
+  const diagnostics = useMemo(
+    () => buildRasterDiagnostics(project, rows, lastSettingsReadAt),
+    [project, rows, lastSettingsReadAt],
+  );
 
   return (
     <div style={stackStyle}>
@@ -84,7 +94,7 @@ export function RasterDiagnosticsPanel(): JSX.Element {
 
       <section style={sectionStyle}>
         <h3 style={sectionHeadingStyle}>Measured Offsets</h3>
-        <MeasuredScanOffsetApply />
+        <MeasuredScanOffsetApply draft={props.draft} />
       </section>
     </div>
   );

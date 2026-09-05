@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { type DeviceProfile, type ScanOffsetPoint } from '../../core/devices';
 import { scanOffsetMeasurementFromLaserForge } from '../../core/devices/scan-offset-measurement-format';
 import {
@@ -6,6 +5,7 @@ import {
   scanOffsetMagnitudeLimitMm,
 } from '../../core/devices/scan-offset-profile';
 import { useStore } from '../state';
+import type { Project } from '../../core/scene';
 import {
   buttonRowStyle,
   inlineLabelStyle,
@@ -14,46 +14,36 @@ import {
 } from './MachineSetupStyles';
 import { ScanOffsetMeasurementFormatControls } from './ScanOffsetMeasurementFormatControls';
 import { ScanOffsetOverrideNotice } from './ScanOffsetOverrideNotice';
+import { useMeasuredScanOffsetDraft } from './use-measured-scan-offset-draft';
 import {
-  convertDraftScanOffsetFormat,
-  NATIVE_SCAN_OFFSET_MEASUREMENT_FORMAT,
   nextDraftScanOffsetRow,
   rowsFromScanOffsetProfile,
-  validateMeasuredScanOffsets,
   type DraftScanOffsetMeasurement,
   type ScanOffsetMeasurementFormat,
   type ScanOffsetMeasurementValidation,
 } from './scan-offset-measurement-draft';
 
-export function MeasuredScanOffsetApply(): JSX.Element {
-  const device = useStore((s) => s.project.device);
-  const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
-  const [format, setFormat] = useState<ScanOffsetMeasurementFormat>(
-    NATIVE_SCAN_OFFSET_MEASUREMENT_FORMAT,
+export type ScanOffsetCalibrationDraft = {
+  readonly project: Project;
+  readonly onChange: (patch: Partial<DeviceProfile>) => void;
+};
+
+export function MeasuredScanOffsetApply(props: {
+  readonly draft?: ScanOffsetCalibrationDraft | undefined;
+}): JSX.Element {
+  const liveProject = useStore((s) => s.project);
+  const liveUpdate = useStore((s) => s.updateDeviceProfile);
+  const documentEpoch = useStore((s) => s.projectDocumentEpoch);
+  const project = props.draft?.project ?? liveProject;
+  const device = project.device;
+  const updateDeviceProfile = props.draft?.onChange ?? liveUpdate;
+  const { format, rows, setRows, validation, handleFormatChange } = useMeasuredScanOffsetDraft(
+    device,
+    documentEpoch,
   );
-  const [rows, setRows] = useState<ReadonlyArray<DraftScanOffsetMeasurement>>(() =>
-    rowsFromScanOffsetProfile(device, NATIVE_SCAN_OFFSET_MEASUREMENT_FORMAT),
-  );
-  const profileFingerprint = scanOffsetProfileFingerprint(device);
-  const priorProfileFingerprint = useRef(profileFingerprint);
   const calibrationStatus = effectiveScanOffsetCalibrationStatus(device);
   const offsetLimitMm = scanOffsetMagnitudeLimitMm(device);
   const inputOffsetLimitMm = scanOffsetMeasurementFromLaserForge(offsetLimitMm, format.convention);
-  const validation = useMemo(
-    () => validateMeasuredScanOffsets(rows, device, format),
-    [rows, device, format],
-  );
-
-  useEffect(() => {
-    if (priorProfileFingerprint.current === profileFingerprint) return;
-    priorProfileFingerprint.current = profileFingerprint;
-    setRows(rowsFromScanOffsetProfile(device, format));
-  }, [device, format, profileFingerprint]);
-
-  const handleFormatChange = (next: ScanOffsetMeasurementFormat): void => {
-    setRows((current) => convertDraftScanOffsetFormat(current, format, next));
-    setFormat(next);
-  };
 
   return (
     <div style={panelStyle}>
@@ -62,7 +52,7 @@ export function MeasuredScanOffsetApply(): JSX.Element {
         Sign is preserved from the selected source convention. Positive moves reverse rows along
         their travel direction; negative moves them opposite. Blank offset rows are ignored.
       </p>
-      <ScanOffsetOverrideNotice />
+      <ScanOffsetOverrideNotice project={project} />
       <div style={measurementListStyle}>
         {rows.map((row, index) => (
           <MeasuredRow
@@ -106,10 +96,6 @@ export function MeasuredScanOffsetApply(): JSX.Element {
       </p>
     </div>
   );
-}
-
-function scanOffsetProfileFingerprint(device: DeviceProfile): string {
-  return JSON.stringify([device.profileId, device.maxFeed, device.scanningOffsets]);
 }
 
 function MeasurementActions(props: {

@@ -2653,6 +2653,13 @@ last updated.
 4. After the physical burn, measure the full signed forward-versus-reverse separation (do not
    halve it), apply measured points, and mark the profile pending or verified truthfully. Legacy
    statusless tables remain active with provenance warnings until the operator records a state.
+   The assisted editor is under **Machine Setup → Options & calibration → Raster scan-offset
+   calibration → Raster Diagnostics and assisted conversion**. Select native full-gap/mm/min or
+   LightBurn Line Shift/mm/s explicitly; conversion previews canonical values and preserves sign.
+   Apply and provenance actions edit the setup draft only. **Save machine setup** commits one
+   undoable change; Cancel discards it. Save before generating a verification coupon. Collapsing
+   diagnostics preserves typed values; replacing the project, head, controller, bed constraints,
+   or profile table resets the corresponding measurement draft. Renaming a profile does not.
 5. Source tests do not qualify belts, focus, optics, firmware timing, or the physical coupon. Frame
    remains the only ordinary Start guard and Job Review remains the warning surface.
 
