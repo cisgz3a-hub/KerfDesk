@@ -15,6 +15,7 @@ import {
 } from '../gcode';
 import { sampleArcPoints } from '../geometry';
 import { expandCannedCycle } from './canned-cycle';
+import { resolveCycleParameters } from './cycle-parameters';
 import { createLineCategoryBuilder } from './line-category-builder';
 import { applyLineWords, type RenderModal } from './render-model-words';
 import { computeProgramStats } from './program-stats';
@@ -152,6 +153,7 @@ function freshModal(initialPosition?: {
     cycleR: null,
     cycleZ: null,
     cycleQ: null,
+    cycleP: null,
     cycleInitialZ: 0,
   };
 }
@@ -248,15 +250,9 @@ function emitCannedCycle(
   const { modal } = context;
   const cycle = modal.cycle;
   if (cycle === null) return;
-  const scaled = (letter: string): number | null => {
-    const raw = axisWords.get(letter);
-    return raw === undefined ? null : raw * modal.unitScale;
-  };
-  modal.cycleR = scaled('R') ?? modal.cycleR;
-  modal.cycleZ = scaled('Z') ?? modal.cycleZ;
-  modal.cycleQ = peckDepth === null ? modal.cycleQ : peckDepth * modal.unitScale;
+  const parameters = resolveCycleParameters(modal, axisWords, peckDepth);
   const target = resolveTarget(modal, axisWords);
-  if (modal.cycleR === null || modal.cycleZ === null) {
+  if (parameters === null) {
     context.skipped.push({ line, reason: 'canned cycle needs both R and Z' });
     return;
   }
@@ -264,8 +260,8 @@ function emitCannedCycle(
   const moves = expandCannedCycle({
     cycle,
     retract: modal.retractMode,
-    target: { x: target.x, y: target.y, z: modal.cycleZ },
-    rPlane: modal.cycleR,
+    target: { x: target.x, y: target.y, z: parameters.depth },
+    rPlane: parameters.rPlane,
     peck: modal.cycleQ,
     from,
     initialZ: modal.cycleInitialZ,
@@ -278,6 +274,9 @@ function emitCannedCycle(
     modal.x = move.to.x;
     modal.y = move.to.y;
     modal.z = move.to.z;
+  }
+  if (parameters.dwellSeconds !== null) {
+    context.events.push({ kind: 'dwell', line, seconds: Math.max(0, parameters.dwellSeconds) });
   }
 }
 
