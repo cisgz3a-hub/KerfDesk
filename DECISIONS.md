@@ -589,6 +589,14 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 - Easier: justifiable adoption decisions; clean license audit; CVE tracking; bounded bundle size.
 - Harder: no quick "throw a library at it" shortcuts. Every new dep is a small ADR-shaped artifact in `RESEARCH_LOG.md`.
 
+**2026-09-05 compatibility correction:** transitive security overrides must retain the
+API expected by their callers. The blanket `brace-expansion` 5 override broke brace
+patterns in ESLint's older `minimatch`. Use the compatible fixed lines 1.1.18, 2.1.4,
+3.0.6, and 5.0.9 identified by the upstream
+[bypass advisory](https://github.com/advisories/GHSA-rgw5-rvv9-x895), with the existing
+coverage-specific `glob`/`minimatch` edge retained. Actual ESLint and coverage-glob
+regressions verify the installed dependency closure rather than only matching YAML.
+
 ### Verification
 - Phase A CI includes the `pnpm license-check` step.
 - `RESEARCH_LOG.md` has an entry for DOMPurify before the first PR that imports it lands.
