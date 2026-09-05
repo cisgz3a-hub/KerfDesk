@@ -88,7 +88,11 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
               ? 'Writing surfacing program… '
               : 'Finishing surfacing save… '}
           {phase !== 'finalizing' && (
-            <button type="button" onClick={cancel}>
+            <button
+              type="button"
+              onClick={cancel}
+              title="Stop preparing the surfacing program or discard its uncommitted file bytes."
+            >
               Cancel surfacing save
             </button>
           )}
