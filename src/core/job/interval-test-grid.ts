@@ -62,7 +62,9 @@ export type IntervalTestGrid = {
 
 export function generateIntervalTestGrid(options: IntervalTestGridOptions): IntervalTestGrid {
   const steps = clampInteger(options.steps, MIN_STEPS, MAX_STEPS);
-  const requestedSpeed = clampFinite(options.speed, MIN_SPEED_MM_MIN);
+  // Like counts/power/intervals, numeric callers normalize to the supported
+  // domain. Draft UIs validate before calling; zero is never an executable feed.
+  const requestedSpeed = Math.max(MIN_SPEED_MM_MIN, clampFinite(options.speed, MIN_SPEED_MM_MIN));
   const effectiveSpeed = effectiveCalibrationSpeed(requestedSpeed, options.maxFeedMmPerMin);
   const power = clampPower(options.power);
   const [intervalLow, intervalHigh] = orderedPair(

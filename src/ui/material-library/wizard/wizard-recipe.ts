@@ -31,9 +31,31 @@ export function recipeToLayer(recipe: MaterialRecipe): Layer {
 // Reads the current step's form into the recipe, falling back to the existing
 // recipe for fields not on that step (identity/settings/details are separate
 // renders, so each form only carries its own controls).
-export function readRecipeFromForm(form: HTMLFormElement, recipe: MaterialRecipe): MaterialRecipe {
+export function readRecipeFromForm(
+  form: HTMLFormElement,
+  recipe: MaterialRecipe,
+  step: 'settings' | 'details',
+): MaterialRecipe {
   const layer = recipeToLayer(recipe);
-  return captureMaterialRecipe({ ...layer, ...readCutSettingsPatch(new FormData(form), layer) });
+  const data = new FormData(form);
+  const patch = readCutSettingsPatch(data, layer);
+  if (step === 'settings') {
+    return captureMaterialRecipe({
+      ...layer,
+      mode: patch.mode ?? layer.mode,
+      power: patch.power ?? layer.power,
+      minPower: Math.min(layer.minPower, patch.power ?? layer.power),
+      speed: patch.speed ?? layer.speed,
+      passes: patch.passes ?? layer.passes,
+      airAssist: data.has('airAssist'),
+    });
+  }
+  // An unchecked checkbox is absent from FormData but still belongs to this
+  // form. Only rendered controls may replace existing recipe settings.
+  const ownedPatch = Object.fromEntries(
+    Object.entries(patch).filter(([key]) => form.elements.namedItem(key) !== null),
+  );
+  return captureMaterialRecipe({ ...layer, ...ownedPatch });
 }
 
 export function identityFromPreset(preset: MaterialPreset): IdentityDraft {

@@ -19,7 +19,11 @@ type ToolEntry = {
 const TOOLS: readonly ToolEntry[] = [
   { tool: { kind: 'brush' }, label: 'Brush', shortcut: 'B' },
   { tool: { kind: 'pencil' }, label: 'Pencil (hard edge)', shortcut: 'P' },
-  { tool: { kind: 'eraser' }, label: 'Eraser (paints the background color)', shortcut: 'E' },
+  {
+    tool: { kind: 'eraser' },
+    label: 'Eraser (clears upper layers; paints the Background color)',
+    shortcut: 'E',
+  },
   { tool: { kind: 'line' }, label: 'Line (Shift = 45°)', shortcut: 'L' },
   {
     tool: { kind: 'marquee', shape: 'rect' },
@@ -99,7 +103,7 @@ function ColorChips(): JSX.Element {
           type="button"
           onClick={() => setPicking('background')}
           aria-label="Choose background color"
-          title="Background color — the eraser paints this. Click to choose."
+          title="Background color — the eraser paints this on the Background layer. Click to choose."
           style={{ ...chipStyle, background: css(background), top: 10, left: 10 }}
         />
         <button

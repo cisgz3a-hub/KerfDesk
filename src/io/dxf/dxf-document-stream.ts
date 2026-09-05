@@ -183,8 +183,9 @@ export function createDxfEntityCollector(
 
   function readEntity(entity: RawEntity): void {
     const expanded = expandEntities([entity], metadata, null, 0);
-    polylines.push(...expanded.polylines);
-    notes.push(...expanded.notes);
+    // One compact INSERT can produce an input-sized collection on its own.
+    for (const polyline of expanded.polylines) polylines.push(polyline);
+    for (const note of expanded.notes) notes.push(note);
     for (const [type, count] of expanded.skipped) {
       skipped.set(type, (skipped.get(type) ?? 0) + count);
     }

@@ -53,13 +53,14 @@ const MIN_PECK_MM = 0.01;
 export function expandCannedCycle(request: CycleRequest): ReadonlyArray<CycleMove> {
   const { target, rPlane, from, initialZ } = request;
   const moves: CycleMove[] = [];
-  const clearance = Math.max(rPlane, initialZ);
-  // Lift clear before traversing, exactly as a controller would.
+  const clearance = Math.max(rPlane, from.z);
+  // Only rise to R if necessary. Subsequent G99 holes traverse at R;
+  // the initial plane controls the final G98 retract, not every traverse.
   if (from.z < clearance) moves.push({ to: { x: from.x, y: from.y, z: clearance }, rapid: true });
   moves.push({ to: { x: target.x, y: target.y, z: clearance }, rapid: true });
   moves.push({ to: { x: target.x, y: target.y, z: rPlane }, rapid: true });
   for (const move of drillMoves(request)) moves.push(move);
-  const retractZ = request.retract === 98 ? initialZ : rPlane;
+  const retractZ = request.retract === 98 ? Math.max(initialZ, rPlane) : rPlane;
   moves.push({ to: { x: target.x, y: target.y, z: retractZ }, rapid: true });
   return moves;
 }

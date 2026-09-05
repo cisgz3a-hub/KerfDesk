@@ -154,6 +154,15 @@ function readFillLineIntervalMm(data: FormData, layer: Layer): number {
 }
 
 function readImageLinesPerMm(data: FormData, layer: Layer): number {
+  if (data.has('linesPerMm')) {
+    return numberField(
+      data,
+      'linesPerMm',
+      layer.linesPerMm,
+      MIN_RASTER_LINES_PER_MM,
+      MAX_RASTER_LINES_PER_MM,
+    );
+  }
   if (data.has('imageDpi')) {
     return dpiToLinesPerMm(
       numberField(

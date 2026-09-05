@@ -100,9 +100,10 @@ export function expandEntities(
   for (const entity of entities) {
     if (entity.type === 'INSERT') {
       const child = expandInsert(entity, ctx, inheritedColor, depth);
-      polylines.push(...child.polylines);
+      // Nested grids can compose far beyond the engine's function-argument limit.
+      for (const polyline of child.polylines) polylines.push(polyline);
       mergeSkipped(skipped, child.skipped);
-      notes.push(...child.notes);
+      for (const note of child.notes) notes.push(note);
       continue;
     }
     // Reject value-level corruption (a non-numeric or astronomically-large

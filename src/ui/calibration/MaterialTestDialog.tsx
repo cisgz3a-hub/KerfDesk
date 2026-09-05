@@ -4,6 +4,7 @@ import { CalibrationNumberField } from './CalibrationNumberField';
 import { Button, Dialog, DialogActions } from '../kit';
 import { persistCalibrationDraft, restoreCalibrationDraft } from './calibration-draft-storage';
 import { calibrationGridStyle } from './calibration-dialog-styles';
+import { calibrationDraftIssues } from './calibration-draft-validation';
 
 type MaterialTestDraft = {
   readonly rows: string;
@@ -62,6 +63,7 @@ export function MaterialTestDialog(props: {
   const [draft, setDraft] = useState(() =>
     restoreCalibrationDraft(MATERIAL_TEST_DRAFT_KEY, DEFAULT_DRAFT, MATERIAL_TEST_DRAFT_FIELDS),
   );
+  const issues = calibrationDraftIssues(draft, FIELD_SPECS);
   const setField =
     (field: keyof MaterialTestDraft) =>
     (event: ChangeEvent<HTMLInputElement>): void => {
@@ -77,12 +79,14 @@ export function MaterialTestDialog(props: {
       as="form"
       onSubmit={(event) => {
         event.preventDefault();
+        if (issues.length > 0) return;
         persistCalibrationDraft(MATERIAL_TEST_DRAFT_KEY, draft);
         props.onGenerate(parseDraft(draft));
       }}
       size="sm"
     >
       <MaterialTestFields draft={draft} setField={setField} />
+      {issues.length > 0 ? <p role="alert">{issues.join(' ')}</p> : null}
       <CalibrationFeedDisclosure
         speedMin={numberValue(draft.speedMin)}
         speedMax={numberValue(draft.speedMax)}
@@ -90,7 +94,7 @@ export function MaterialTestDialog(props: {
       />
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" disabled={issues.length > 0}>
           Generate
         </Button>
       </DialogActions>
@@ -154,8 +158,7 @@ function parseDraft(draft: MaterialTestDraft): MaterialTestGridOptions {
 }
 
 function numberValue(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return value.trim() === '' ? Number.NaN : Number(value);
 }
 
 function formatFeed(value: number): string {

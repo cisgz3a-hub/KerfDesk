@@ -4,6 +4,7 @@
 // stroke never feeds back into its own source.
 
 import { RGBA_CHANNELS, type PaintPoint, type PixelRect, type RgbaBuffer } from '../image-edit';
+import { sourceOverPixelInPlace } from '../image-composite';
 import type { SelectionMask } from '../image-select';
 
 const MAX_BYTE = 255;
@@ -140,12 +141,10 @@ function copyClonePixel(
   if (sx < 0 || sy < 0 || sx >= source.width || sy >= source.height) return;
   const dst = (y * doc.width + x) * RGBA_CHANNELS;
   const src = (sy * source.width + sx) * RGBA_CHANNELS;
-  for (let c = 0; c < 3; c += 1) {
-    const d = doc.data[dst + c] ?? 0;
-    const s = source.data[src + c] ?? 0;
-    doc.data[dst + c] = Math.round(d + (s - d) * strength);
-  }
-  const dstAlpha = doc.data[dst + 3] ?? 0;
-  const srcAlpha = source.data[src + 3] ?? 0;
-  doc.data[dst + 3] = Math.max(dstAlpha, Math.round(srcAlpha * strength));
+  sourceOverPixelInPlace(doc.data, dst, {
+    r: source.data[src] ?? 0,
+    g: source.data[src + 1] ?? 0,
+    b: source.data[src + 2] ?? 0,
+    alpha: ((source.data[src + 3] ?? 0) / MAX_BYTE) * strength,
+  });
 }

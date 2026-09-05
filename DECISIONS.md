@@ -589,6 +589,14 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 - Easier: justifiable adoption decisions; clean license audit; CVE tracking; bounded bundle size.
 - Harder: no quick "throw a library at it" shortcuts. Every new dep is a small ADR-shaped artifact in `RESEARCH_LOG.md`.
 
+**2026-09-05 compatibility correction:** transitive security overrides must retain the
+API expected by their callers. The blanket `brace-expansion` 5 override broke brace
+patterns in ESLint's older `minimatch`. Use the compatible fixed lines 1.1.18, 2.1.4,
+3.0.6, and 5.0.9 identified by the upstream
+[bypass advisory](https://github.com/advisories/GHSA-rgw5-rvv9-x895), with the existing
+coverage-specific `glob`/`minimatch` edge retained. Actual ESLint and coverage-glob
+regressions verify the installed dependency closure rather than only matching YAML.
+
 ### Verification
 - Phase A CI includes the `pnpm license-check` step.
 - `RESEARCH_LOG.md` has an entry for DOMPurify before the first PR that imports it lands.
@@ -4524,6 +4532,32 @@ the machine library. The established compiler compatibility rule still resolves 
 active machine bit, but Start and Save G-code now carry a nonblocking warning naming the missing id,
 the actual fallback bit, and the cutter-dependent values to verify. This removes a silent tool
 substitution without adding a refusal, rewriting the project, or changing emitted bytes.
+
+### Amendment - pocket core coverage across offset components (2026-09-05)
+
+The PR #419 history audit found that the ring planner's last core pass belonged
+only to the globally deepest pocket. A smaller disconnected pocket, or a lobe
+that split and disappeared between regular insets, could retain a full-depth
+center at an ordinary 85% stepover.
+
+Regular stepover rings and their order remain unchanged. Each independent filled
+region retains its central cleanup, with direct holes kept under their topology
+owner. The planner then subtracts the actual planned cutter sweep from the first
+ring's tool-center region and traces the remaining local core boundaries. This
+also finds short-lived split lobes and annular stock without entering islands or
+trying to machine corners outside the tool-center region. It does not replace
+the regular ladder, rasterize the residual, or rewrite the requested stepover.
+The existing >100% spacing can still leave inter-ring gaps; this
+repair preserves each independent region's central cleanup at those values.
+
+Existing offset/budget failure evidence remains authoritative. A failed sweep or
+subtraction retains the established paths and propagates the existing geometry
+warning. No Frame/Start policy, refusal, or settings value changes.
+
+Regression evidence covers disconnected pockets, dumbbell necks that split
+before and between regular insets, island clearance, original ring order,
+operator spacing above a diameter, and compiled/emitted cutter-sweep coverage.
+Hardware and material verification remain unavailable.
 
 ## ADR-101 — CNC/laser UI separation policy: gate-and-hide
 
@@ -11983,12 +12017,16 @@ follows.
   the job's outermost loop keeps the layer side and the opposite winding (a hole) flips to
   the inverse. Containment depth was rejected because it mistakes a finishing loop for a
   nested hole.
-- Three guards each drop the lead back to the legacy straight plunge, so a lead never cuts
-  kept material: a bed guard (any lead point off the bed), a self-collision guard (a lead
-  point on the part side of its own contour — catches a concave lead curling in or a lead
-  larger than the feature), and a sibling guard (a lead point inside a disjoint neighbouring
-  part — the arrayed/nested-parts case). Because a corner-entry inside-lead pokes just past
-  the wall, most holes fall back to a plunge (safe) rather than gaining a lead.
+- Three geometry checks each drop the lead back to the legacy straight plunge: a bed
+  check (any lead point off the bed), a self-collision check (a lead enters the part side
+  of its own contour), and a sibling check (a lead enters a disjoint neighbouring part).
+  **Corrected 2026-09-05:** self and sibling checks cover every emitted line/arc chord,
+  splitting at polygon intersections and inspecting each intervening segment interior.
+  Checking sampled vertices alone missed a lead passing completely through a thin part.
+  Sibling contours already include the cutter offset, so this also checks the cutter
+  footprint without applying its radius twice. Because a corner-entry inside-lead pokes
+  just past the wall, most holes fall back to a plunge rather than gaining a lead.
+  Frame and Start behavior are unchanged; this corrects the existing lead geometry.
 - Recovery parity: a led profile pass is a FLAT `path3d` (every point at the cut depth), so
   `cnc-recovery-manifest` grants it runway-v1 (via `flatPath3dZMm`) and the runway planner
   presents its XY points as a contour view — lead-enabled profile cuts keep automatic
@@ -12691,6 +12729,21 @@ across each window. New pure module `src/core/cnc/cnc-tab-ramp.ts`.
   each tab instead of retracting and replunging. Better in principle and unproven in material.
   It cannot be proven here: No hardware verification is available on this project (maintainer, 2026-07-25): there is no machine to test on. This is a TERMINAL limitation, not a pending task.
 - **Nearest available check:** run an exported .nc through an INDEPENDENT viewer (NC Viewer, CAMotics). Our own 3D preview and core/sim share the emitter's codebase, so a geometry fault can look correct in both; an outside parser cannot. Note the Z-rise model itself is Fusion 360's documented behavior, but the `depth > tabHeight` guard and the small-contour ride-at-tab-top fallback are this project's own inventions and match no reference.
+
+### Amendment 2026-09-05 — Whole-perimeter windows and rectangular seam walls
+
+The PR #414 history audit reproduced two gaps in the existing tab contract:
+normalizing a whole-perimeter window erased its coverage, and closing a loop at
+the first span's Z created a diagonal through a tab boundary at the seam.
+Tab windows now retain full coverage when their width plus tool diameter reaches
+the perimeter. An empty manual-center list still creates no tab. The final span
+closes at its own height; the seam transition remains a vertical same-XY move.
+
+Regression checks cover automatic and manual full-width windows, exact and
+oversized coverage, and windows beginning, ending, and wrapping at the seam.
+They inspect compiled paths and independently read emitted absolute G0/G1
+coordinates. This corrects geometry without changing settings, Frame/Start
+policy, or warning behavior. Hardware and material verification remain unavailable.
 
 ## ADR-260 — CNC traces commit machine-faired polylines (2026-07-25)
 
@@ -13657,6 +13710,14 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
    readers, but their required results still scale with the parsed output. DXF uses two passes and
    retains blocks/output; STL retains the mesh and derived relief data; persistence materializes
    JSON. None has a proven constant peak-memory ceiling.
+   **Nested DXF amendment (2026-09-05).** A small source can describe a large composed MINSERT
+   result. Recursive expansion and the streaming entity collector append geometry and notes by
+   iteration, never by converting an input-sized collection into function arguments. The existing
+   per-grid/depth diagnostics and transform order remain unchanged; no new count limit or geometry
+   truncation is introduced. Every reachable DXF Blob already uses the cancellable worker path
+   regardless of file size. Software regressions retain all 150,000 nested instances, their native
+   curves, endpoints and color, and prove that Escape cancels the small-file worker request without
+   a main-thread text fallback. This does not establish an unlimited-memory or hardware claim.
 7. **Document routes move off the UI thread.** Native `.lf2`, LightBurn `.lbrn`/`.lbrn2`, native
    `.lfml.json`, and LightBurn `.clb` run in a dedicated worker with queue/progress/cancel semantics
    but still perform whole-Blob text decoding plus JSON or XML/DOM construction there. File-backed

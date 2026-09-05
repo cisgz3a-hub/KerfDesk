@@ -384,6 +384,7 @@ describe('Image Studio session lifecycle', () => {
       lumaBase64: 'AAA=',
       pixelWidth: 8,
       pixelHeight: 6,
+      bounds: BOUNDS,
     });
   });
 

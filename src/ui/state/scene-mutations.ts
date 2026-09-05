@@ -438,6 +438,12 @@ export function applyUpsertText(s: StateSlice, text: TextObject): MutationResult
   if (existing !== undefined) {
     const preserved: TextObject = {
       ...text,
+      ...(existing.powerScale === undefined ? {} : { powerScale: existing.powerScale }),
+      ...(existing.operationOverride === undefined
+        ? {}
+        : { operationOverride: existing.operationOverride }),
+      ...(existing.locked === undefined ? {} : { locked: existing.locked }),
+      ...(existing.cncTabAnchors === undefined ? {} : { cncTabAnchors: existing.cncTabAnchors }),
       transform: text.pathText === undefined ? existing.transform : text.transform,
       ...(existing.operationIds === undefined ? {} : { operationIds: existing.operationIds }),
       paths: text.paths.map((path, index) => {

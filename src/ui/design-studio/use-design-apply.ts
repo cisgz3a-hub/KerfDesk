@@ -11,6 +11,7 @@
 import { useCallback } from 'react';
 import { outputSketchBounds, type Sketch } from '../../core/design';
 import { useStore } from '../state';
+import { survivingObjectIds } from '../state/design-apply-record';
 import { sessionSketch } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
 
@@ -26,12 +27,17 @@ export function useDesignApply(): DesignApplyHandlers {
   const markApplied = useDesignStudioStore((state) => state.markApplied);
   const closeStudio = useDesignStudioStore((state) => state.closeStudio);
   const applyDesignSketch = useStore((state) => state.applyDesignSketch);
+  const scene = useStore((state) => state.project.scene);
 
   const apply = useCallback((): boolean => {
     const current = useDesignStudioStore.getState().session;
     if (current === null) return false;
     const sketch = sessionSketch(current);
-    if (!hasOutputGeometry(sketch)) return false;
+    if (
+      !hasOutputGeometry(sketch) &&
+      survivingObjectIds(useStore.getState().project.scene, current.applied).size === 0
+    )
+      return false;
     // Handing back what the last Apply created is what makes a second Apply an
     // EDIT of that artwork rather than a duplicate of it.
     const record = applyDesignSketch(
@@ -50,7 +56,10 @@ export function useDesignApply(): DesignApplyHandlers {
 
   return {
     canApply:
-      session !== null && session.dirtySinceApply && hasOutputGeometry(sessionSketch(session)),
+      session !== null &&
+      session.dirtySinceApply &&
+      (hasOutputGeometry(sessionSketch(session)) ||
+        survivingObjectIds(scene, session.applied).size > 0),
     apply: () => {
       apply();
     },

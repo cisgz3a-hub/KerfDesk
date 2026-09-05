@@ -77,8 +77,8 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
   const rows = clampInteger(options.rows, MIN_COUNT, MAX_COUNT);
   const columns = clampInteger(options.columns, MIN_COUNT, MAX_COUNT);
   const [speedLow, speedHigh] = orderedPair(
-    clampFinite(options.speedMin, MIN_SPEED_MM_MIN),
-    clampFinite(options.speedMax, MIN_SPEED_MM_MIN),
+    Math.max(MIN_SPEED_MM_MIN, clampFinite(options.speedMin, MIN_SPEED_MM_MIN)),
+    Math.max(MIN_SPEED_MM_MIN, clampFinite(options.speedMax, MIN_SPEED_MM_MIN)),
   );
   const [powerLow, powerHigh] = orderedPair(
     clampPower(options.powerMin),

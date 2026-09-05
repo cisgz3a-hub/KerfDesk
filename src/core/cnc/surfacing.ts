@@ -23,7 +23,8 @@ export type SurfacingParams = {
 };
 
 export type SurfacingProgram = {
-  readonly lines: ReadonlyArray<string>;
+  /** Replayable output; consumers must stream it rather than collect the row/pass product. */
+  readonly lines: Iterable<string>;
   readonly passes: number;
   readonly rowsPerPass: number;
   readonly requestedTotalDepthMm: number;
@@ -82,8 +83,30 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   const depthResult = depthLadder(params.depthPerPassMm, params.totalDepthMm);
   if (!depthResult.ok) return depthResult;
   const { depths } = depthResult;
-  const emittedMaximumDepth = cncDepthRepresentationMm(Math.max(...depths));
-  const lines: string[] = [
+  const emittedMaximumDepth = cncDepthRepresentationMm(params.totalDepthMm);
+  const captured = { ...params };
+  return {
+    ok: true,
+    program: {
+      lines: {
+        [Symbol.iterator]: () => surfacingLines(captured, rows, depths, emittedMaximumDepth.text),
+      },
+      passes: depths.length,
+      rowsPerPass: rows.length,
+      requestedTotalDepthMm: params.totalDepthMm,
+      emittedMaximumDepthMm: emittedMaximumDepth.value,
+      emittedMaximumDepthText: emittedMaximumDepth.text,
+    },
+  };
+}
+
+function* surfacingLines(
+  params: SurfacingParams,
+  rows: ReadonlyArray<number>,
+  depths: ReadonlyArray<number>,
+  emittedMaximumDepthText: string,
+): Generator<string> {
+  yield* [
     '; KerfDesk spoilboard surfacing',
     `; area ${fmt(params.widthMm)} x ${fmt(params.heightMm)} mm, bit ${fmt(params.bitDiameterMm)} mm, stepover ${params.stepoverPct}%`,
     '; zero X/Y at the front-left corner of the area, Z0 on the surface to face',
@@ -97,34 +120,23 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
     // console or a $N startup block last set, and surfacing shares its preamble
     // contract with the job emitter.
     'G17',
-    `; depth requested-total-mm: ${params.totalDepthMm}; emitted-maximum-mm: ${emittedMaximumDepth.text}`,
+    `; depth requested-total-mm: ${params.totalDepthMm}; emitted-maximum-mm: ${emittedMaximumDepthText}`,
     `G0 Z${fmt(params.safeZMm)}`,
     `M3 S${Math.round(params.spindleRpm)}`,
   ];
-  if (params.spindleSpinupSec > 0) lines.push(`G4 P${params.spindleSpinupSec.toFixed(3)}`);
+  if (params.spindleSpinupSec > 0) yield `G4 P${params.spindleSpinupSec.toFixed(3)}`;
   for (const depth of depths) {
-    lines.push('G0 X0.000 Y0.000');
-    lines.push(`G1 Z${fmt(-depth)} F${fmt(params.plungeMmPerMin)}`);
-    rows.forEach((y, index) => {
-      if (index > 0) lines.push(`G1 Y${fmt(y)} F${fmt(params.feedMmPerMin)}`);
+    yield 'G0 X0.000 Y0.000';
+    yield `G1 Z${fmt(-depth)} F${fmt(params.plungeMmPerMin)}`;
+    for (const [index, y] of rows.entries()) {
+      if (index > 0) yield `G1 Y${fmt(y)} F${fmt(params.feedMmPerMin)}`;
       // Serpentine: even rows cut toward +X, odd rows back toward 0.
-      lines.push(`G1 X${fmt(index % 2 === 0 ? params.widthMm : 0)} F${fmt(params.feedMmPerMin)}`);
-    });
-    lines.push(`G0 Z${fmt(params.safeZMm)}`);
+      yield `G1 X${fmt(index % 2 === 0 ? params.widthMm : 0)} F${fmt(params.feedMmPerMin)}`;
+    }
+    yield `G0 Z${fmt(params.safeZMm)}`;
   }
-  lines.push('M5');
-  lines.push('G0 X0.000 Y0.000');
-  return {
-    ok: true,
-    program: {
-      lines,
-      passes: depths.length,
-      rowsPerPass: rows.length,
-      requestedTotalDepthMm: params.totalDepthMm,
-      emittedMaximumDepthMm: emittedMaximumDepth.value,
-      emittedMaximumDepthText: emittedMaximumDepth.text,
-    },
-  };
+  yield 'M5';
+  yield 'G0 X0.000 Y0.000';
 }
 
 type DepthLadderResult =

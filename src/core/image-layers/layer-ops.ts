@@ -4,7 +4,7 @@
 // operation's meaning requires a copy (duplicate, merge).
 
 import { cloneRgbaBuffer } from '../image-edit';
-import { compositeLayersInPlace } from './composite';
+import { mergeLayerPixels } from './merge-layers';
 import { createLayer, type EditorLayer } from './layer';
 
 function indexOfLayer(layers: readonly EditorLayer[], id: string): number {
@@ -92,16 +92,23 @@ export function moveLayer(
 
 /**
  * Merge a layer into the one below it (composited with its blend and
- * opacity); the merged layer keeps the LOWER layer's identity and settings.
+ * opacity); the merged layer keeps the LOWER identity. Opacity/blend are
+ * baked into pixels, so their resulting settings are normal at full opacity.
  */
 export function mergeDown(layers: readonly EditorLayer[], id: string): readonly EditorLayer[] {
   const at = indexOfLayer(layers, id);
   const upper = layers[at];
   const lower = layers[at - 1];
   if (upper === undefined || lower === undefined) return layers;
-  const merged = cloneRgbaBuffer(lower.buffer);
-  compositeLayersInPlace(merged, [upper]);
-  return [...layers.slice(0, at - 1), { ...lower, buffer: merged }, ...layers.slice(at + 1)];
+  const merged = mergeLayerPixels(lower, upper, layers.slice(0, at - 1));
+  const replacement: EditorLayer = {
+    ...lower,
+    buffer: merged,
+    opacity: 1,
+    blend: 'normal',
+    isVisible: lower.isVisible || upper.isVisible,
+  };
+  return [...layers.slice(0, at - 1), replacement, ...layers.slice(at + 1)];
 }
 
 export function setLayerProps(

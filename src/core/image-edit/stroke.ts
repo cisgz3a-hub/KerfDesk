@@ -3,9 +3,9 @@
 // The pointer path is resampled into brush stamps at a fixed fraction of the
 // brush diameter (the classic stamping pipeline), accumulated in a
 // stroke-local coverage window (MAX blend — see brush-stamp.ts), then
-// composited once into the working buffer at the stroke's opacity. Painting
-// white IS the eraser: white neither burns nor traces, so no separate erase
-// op exists. The line tool is a two-point stroke; Shift's 45° constraint is
+// composited once into the working buffer at the stroke's opacity. Upper-layer
+// erasing removes alpha; Background erasing paints its chosen empty color.
+// The line tool is a two-point stroke; Shift's 45° constraint is
 // the pure `snapLineEnd45` here so UI and tests share one definition.
 
 import {
@@ -16,6 +16,7 @@ import {
 } from './brush-stamp';
 import { RGBA_CHANNELS, type RgbaBuffer } from './rgba-buffer';
 import type { PixelRect } from './tiles';
+import { sourceOverPixelInPlace } from '../image-composite';
 
 // Quarter-diameter spacing keeps rounded stamp chains visually continuous
 // without quadratic stamp counts on long strokes.
@@ -36,6 +37,8 @@ export type PaintStroke = {
   readonly points: readonly PaintPoint[];
   readonly brush: BrushParams;
   readonly color: PaintColor;
+  /** Remove coverage from the destination alpha instead of painting color. */
+  readonly erase?: boolean;
 };
 
 /**
@@ -110,8 +113,8 @@ export type PaintClip = {
 
 /**
  * Rasterize the stroke into the buffer (mutates pixels in place) and return
- * the dirty rect it wrote inside. Alpha stays opaque — the document has no
- * transparency; "erasing" paints white. With a clip, every pixel's paint
+ * the dirty rect it wrote inside. Paint preserves straight RGBA; erase removes
+ * alpha. With a clip, every pixel's paint
  * alpha is weighted by the selection alpha (Photoshop: strokes clamp to the
  * active selection).
  */
@@ -134,18 +137,14 @@ export function paintStrokeInPlace(
       const alpha = (window.alpha[row * rect.width + col] ?? 0) * opacity * clipAlpha;
       if (alpha <= 0) continue;
       const base = docIndex * RGBA_CHANNELS;
-      blendChannel(buffer, base, stroke.color.r, alpha);
-      blendChannel(buffer, base + 1, stroke.color.g, alpha);
-      blendChannel(buffer, base + 2, stroke.color.b, alpha);
-      buffer.data[base + 3] = 255;
+      if (stroke.erase === true) {
+        buffer.data[base + 3] = Math.round((buffer.data[base + 3] ?? 0) * (1 - alpha));
+      } else {
+        sourceOverPixelInPlace(buffer.data, base, { ...stroke.color, alpha });
+      }
     }
   }
   return rect;
-}
-
-function blendChannel(buffer: RgbaBuffer, index: number, target: number, alpha: number): void {
-  const current = buffer.data[index] ?? 0;
-  buffer.data[index] = Math.round(target * alpha + current * (1 - alpha));
 }
 
 /**

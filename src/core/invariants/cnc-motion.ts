@@ -11,7 +11,7 @@
 // Review; only the canonical compile-integrity set can refuse output.
 
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
-import { parseGcodeWord } from './gcode-words';
+import { iterateGcodeLines, parseGcodeWord } from './gcode-words';
 
 export type CncMotionIssue = {
   readonly lineNumber: number; // 1-based
@@ -21,16 +21,17 @@ export type CncMotionIssue = {
 const Z_EPS = 1e-6;
 
 export function findPlungedTravelIssues(
-  gcode: string,
-  options: { readonly safeZMm: number },
+  gcode: string | Iterable<string>,
+  options: { readonly safeZMm: number; readonly maxIssues?: number },
 ): ReadonlyArray<CncMotionIssue> {
   const safeZ = Math.max(0, options.safeZMm);
   const issues: CncMotionIssue[] = [];
   let modalZ: number | null = null;
   let motion: GcodeMotionMode | null = 0;
-  const lines = gcode.split('\n');
-  for (let i = 0; i < lines.length; i += 1) {
-    const stripped = stripComment(lines[i] ?? '');
+  let lineNumber = 0;
+  for (const line of iterateGcodeLines(gcode)) {
+    lineNumber += 1;
+    const stripped = stripComment(line);
     if (stripped.length === 0) continue;
     const scanned = scanModalMotionLine(stripped, motion);
     motion = scanned.motion;
@@ -38,7 +39,9 @@ export function findPlungedTravelIssues(
     const z = parseGcodeWord(stripped, 'Z');
     const hasXy = parseGcodeWord(stripped, 'X') !== null || parseGcodeWord(stripped, 'Y') !== null;
     if (motion === 0) {
-      appendRapidIssues(issues, i + 1, hasXy, z, modalZ, safeZ);
+      appendRapidIssues(issues, lineNumber, hasXy, z, modalZ, safeZ);
+      if (issues.length >= (options.maxIssues ?? Infinity))
+        return issues.slice(0, options.maxIssues);
     }
     if (z !== null) modalZ = z;
   }
@@ -50,16 +53,17 @@ export function findPlungedTravelIssues(
 // the operator's Z0 touch-off position, even if their later cutting travels are
 // otherwise valid.
 export function findSpindleStartClearanceIssues(
-  gcode: string,
-  options: { readonly safeZMm: number },
+  gcode: string | Iterable<string>,
+  options: { readonly safeZMm: number; readonly maxIssues?: number },
 ): ReadonlyArray<CncMotionIssue> {
   const safeZ = Math.max(0, options.safeZMm);
   const issues: CncMotionIssue[] = [];
   let modalZ: number | null = null;
   let motion: GcodeMotionMode | null = 0;
-  const lines = gcode.split('\n');
-  for (let i = 0; i < lines.length; i += 1) {
-    const stripped = stripComment(lines[i] ?? '');
+  let lineNumber = 0;
+  for (const line of iterateGcodeLines(gcode)) {
+    lineNumber += 1;
+    const stripped = stripComment(line);
     const scanned = scanModalMotionLine(stripped, motion);
     motion = scanned.motion;
     if (scanned.isMotion) {
@@ -70,15 +74,16 @@ export function findSpindleStartClearanceIssues(
     if (!/^M3\b/i.test(stripped)) continue;
     if (modalZ === null) {
       issues.push({
-        lineNumber: i + 1,
+        lineNumber,
         reason: 'M3 spindle start occurs before any Z clearance was established.',
       });
     } else if (modalZ < safeZ - Z_EPS) {
       issues.push({
-        lineNumber: i + 1,
+        lineNumber,
         reason: `M3 spindle start occurs at Z${modalZ.toFixed(3)}, below safe height ${safeZ.toFixed(3)} mm.`,
       });
     }
+    if (issues.length >= (options.maxIssues ?? Infinity)) return issues.slice(0, options.maxIssues);
   }
   return issues;
 }

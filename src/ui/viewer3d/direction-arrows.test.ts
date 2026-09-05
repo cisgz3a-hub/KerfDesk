@@ -51,6 +51,45 @@ describe('directionArrows', () => {
     expect(arrows).toEqual([]);
   });
 
+  it('does not mark rapid downward Z motion as cutting', () => {
+    expect(directionArrows(model('G0 Z-2'))).toEqual([]);
+  });
+
+  it('ignores geometry that overflows render storage without losing valid arrows', () => {
+    const extreme = '1000000000000000000000000000000000000000';
+    const built = model(`G1 X${extreme} F800\nG1 X0\nG1 X100`);
+    expect(built.positions.some((value) => !Number.isFinite(value))).toBe(true);
+    expect(directionArrows(built)).toEqual(directionArrows(model('G1 X100 F800')));
+    expect(directionArrows(model(`G1 X${extreme} F800`))).toEqual([]);
+  });
+
+  it('places the same arrows on a long cut regardless of its segment sampling', () => {
+    const single = model('G1 X100 F800');
+    const sampled = model(
+      Array.from({ length: 1000 }, (_, index) => `G1 X${(index + 1) / 10} F800`).join('\n'),
+    );
+    const positions = (built: GcodeRenderModel) =>
+      directionArrows(built).map((arrow) => Number(arrow.position.x.toFixed(4)));
+    expect(positions(sampled)).toHaveLength(60);
+    expect(positions(sampled)).toEqual(positions(single));
+  });
+
+  it('keeps direction visible on a finely sampled circle', () => {
+    const lines = ['G0 X10 Y0'];
+    for (let index = 1; index <= 200; index += 1) {
+      const angle = (index / 200) * Math.PI * 2;
+      lines.push(
+        `G1 X${(10 * Math.cos(angle)).toFixed(6)} Y${(10 * Math.sin(angle)).toFixed(6)} F800`,
+      );
+    }
+    const arrows = directionArrows(model(lines.join('\n')));
+    expect(arrows).toHaveLength(60);
+    for (const arrow of arrows) {
+      const cross = arrow.position.x * arrow.direction.y - arrow.position.y * arrow.direction.x;
+      expect(cross).toBeGreaterThan(9.9);
+    }
+  });
+
   it('spreads by distance, so a dense curve does not hog every arrow', () => {
     const dense = ['G21 G90', 'M3 S1', 'G1 Z-1 F200'];
     for (let step = 1; step <= 100; step += 1) dense.push(`G1 X${step} F800`);

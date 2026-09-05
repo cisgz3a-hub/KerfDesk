@@ -3049,6 +3049,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 3. INSERT recursion caps at depth 8; deeper nesting (or a block cycle)
    skips that reference with a note.
 4. Z coordinates are ignored (2.5D import): 3D polylines project onto XY.
+5. Nested MINSERT grids can produce many paths from a small file. Their
+   composed instances retain the same transform order and diagnostics without
+   truncation at a JavaScript argument-count limit. File-backed DXF imports use
+   the import worker regardless of byte size; Escape cancels the active parse.
 
 ### F-CNC10. Open a G-code program in the simulator — Phase H.6
 
@@ -3694,10 +3698,18 @@ and lifts the command's CNC-only gate.)*
    after M5. Fixed feeds are capped to the device-profile maximum.
 2. The toast repeats the operator contract: zero X/Y at the area's
    front-left corner and Z on the surface to be faced before running.
-3. Before the picker opens, emitted-text preflight checks the work-origin
-   bed envelope, enabled no-go-zone uncertainty, feed/RPM ceilings,
-   finite coordinates, safe travel/depth, and spindle-start clearance.
-   Connected-controller $30/$32 mismatches use the normal export confirm.
+3. Choose the destination when Save is clicked. Background emitted-text
+   preflight checks the work-origin bed envelope, enabled no-go-zone
+   uncertainty, feed/RPM ceilings, finite coordinates, safe travel/depth,
+   and spindle-start clearance before a writable transaction opens. Setup
+   and controller findings remain advisory toasts, including on picker cancel.
+4. Generation, preflight, and file writes use bounded buffers. **Cancel surfacing
+   save** stops preparation or discards uncommitted file bytes. **Finishing
+   surfacing save…** means the complete file is already being committed and
+   can no longer be cancelled. A replacement save waits for that commit to
+   settle before opening another writable; changing projects retires old UI
+   notifications. Existing file contents survive preflight, generation, or
+   write failures before the final commit.
 
 #### Error — save fails
 1. A preflight failure or failed dialog/write toasts the reason; nothing

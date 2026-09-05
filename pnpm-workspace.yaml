@@ -74,15 +74,18 @@ overrides:
   # this override is required before a desktop release.
   js-yaml@<4.3.1: 4.3.1
   tar@<7.5.21: 7.5.21
-  # GHSA-mh99-v99m-4gvg (2026-07-25) covers every brace-expansion at or below
-  # 5.0.7, so the previous per-major pins (1.1.16, 2.1.2, 5.0.7) all sit inside
-  # the vulnerable range. One catch-all forces every path — including the 1.x
-  # and 2.x consumers under minimatch/glob — onto the patched line.
-  brace-expansion@<5.0.8: 5.0.8
+  # Patched backports cover GHSA-mh99-v99m-4gvg and its later bypass:
+  # https://github.com/advisories/GHSA-rgw5-rvv9-x895 (updated 2026-08-03).
+  # Preserve the callable CommonJS API needed by minimatch 3/5/9; forcing
+  # every consumer onto brace-expansion 5 broke ESLint brace-pattern discovery.
+  brace-expansion@<1.1.18: 1.1.18
+  brace-expansion@>=2.0.0 <2.1.4: 2.1.4
+  brace-expansion@>=3.0.0 <3.0.6: 3.0.6
+  brace-expansion@>=4.0.0 <5.0.9: 5.0.9
   # glob 10.5 resolves minimatch 9, whose CommonJS build expects the removed
   # brace-expansion default export. Keep this one parent edge on minimatch 10,
-  # which natively consumes the patched brace-expansion 5 API; otherwise the
-  # Vitest V8 provider crashes while enumerating untested files.
+  # which natively consumes the patched brace-expansion 5 API. Retain the
+  # established coverage closure while restoring compatibility for older callers.
   'glob@10.5.0>minimatch': 10.2.5
   fast-uri@<3.1.4: 3.1.4
   sharp@<0.35.0: 0.35.0
