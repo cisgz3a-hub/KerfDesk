@@ -4,8 +4,8 @@ export type CameraCaptureBinding = {
   // Stable, non-secret source identity. URLs must be stripped of userinfo,
   // query, and fragment before they reach this persisted core type.
   readonly sourceId: string;
-  // Exact query identity (channel, substream, etc.) without raw query text.
-  // Absent for query-less sources and legacy bindings that did not record it.
+  // App-keyed network resource identity, including an explicitly empty query.
+  // Absent for USB, ambiguous legacy bindings, or unavailable secure identity.
   readonly queryFingerprint?: string;
   readonly width: number;
   readonly height: number;
@@ -54,13 +54,16 @@ export function cameraBindingCompatibility(
   current: CameraCaptureBinding,
 ): CameraBindingCompatibility {
   if (saved === undefined) return 'unbound';
-  if (
-    saved.sourceKind !== current.sourceKind ||
-    saved.sourceId !== current.sourceId ||
-    saved.queryFingerprint !== current.queryFingerprint
-  ) {
+  if (saved.sourceKind !== current.sourceKind || saved.sourceId !== current.sourceId) {
     return 'source-mismatch';
   }
+  if (
+    current.sourceKind !== 'usb' &&
+    (saved.queryFingerprint === undefined || current.queryFingerprint === undefined)
+  ) {
+    return 'unbound';
+  }
+  if (saved.queryFingerprint !== current.queryFingerprint) return 'source-mismatch';
   if (!captureGeometryMatches(saved, current)) return 'geometry-mismatch';
   return 'match';
 }
@@ -107,7 +110,7 @@ function nonEmptyString(value: unknown): string | undefined {
 }
 
 function normalizeQueryFingerprint(value: unknown): string | undefined {
-  return typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test(value) ? value : undefined;
+  return typeof value === 'string' && /^hmac-sha256:[0-9a-f]{64}$/.test(value) ? value : undefined;
 }
 
 function finitePositive(value: unknown): number | undefined {

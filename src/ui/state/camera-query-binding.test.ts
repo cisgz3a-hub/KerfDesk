@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createHash, webcrypto } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   cameraBindingCompatibility,
   type CameraCaptureBinding,
@@ -7,7 +8,7 @@ import { createProject } from '../../core/scene';
 import { deserializeProject } from '../../io/project/deserialize-project';
 import { serializeProject } from '../../io/project/serialize-project';
 import type { CameraBridgeAdapter } from '../../platform/types';
-import { cameraCaptureBindingForFrame } from '../camera/frame-source';
+import { cameraCaptureBindingForFrame, captureSourceFrame } from '../camera/frame-source';
 import { useCameraStore } from './camera-store';
 import { loadRtspCameraUrl, saveRtspCameraUrl } from './camera-preference-storage';
 
@@ -27,10 +28,15 @@ const BRIDGE: CameraBridgeAdapter = {
 };
 
 beforeEach(() => {
+  vi.stubGlobal('crypto', webcrypto);
   useCameraStore.getState().stopSource();
   localStorage.clear();
 });
-afterEach(() => useCameraStore.getState().stopSource());
+afterEach(() => {
+  useCameraStore.getState().stopSource();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 async function capture(url: string): Promise<CameraCaptureBinding> {
   await useCameraStore.getState().startRtspSource(BRIDGE, url);
@@ -41,6 +47,28 @@ async function capture(url: string): Promise<CameraCaptureBinding> {
 }
 
 describe('RTSP resource capture binding', () => {
+  it('does not reuse ambiguous legacy calibration for the remembered default feed', async () => {
+    saveRtspCameraUrl(`${BASE}?channel=2`);
+    const remembered = loadRtspCameraUrl();
+    expect(remembered).toBe(BASE);
+    const current = await capture(remembered ?? '');
+    const { queryFingerprint: _identity, ...legacy } = current;
+    expect(cameraBindingCompatibility(legacy, current)).toBe('unbound');
+    expect(cameraBindingCompatibility(legacy, legacy)).toBe('unbound');
+  });
+
+  it('does not export a public verifier for a low-entropy query password', async () => {
+    const binding = await capture(`${BASE}?channel=1&password=0042`);
+    const digest = binding.queryFingerprint?.split(':').at(-1);
+    expect(digest).toBeDefined();
+    const guesses = Array.from({ length: 10000 }, (_, value) =>
+      createHash('sha256')
+        .update(`?channel=1&password=${String(value).padStart(4, '0')}`)
+        .digest('hex'),
+    );
+    expect(guesses).not.toContain(digest);
+  });
+
   it.each(['channel=2&subtype=0', 'channel=1&subtype=1', ''])(
     'distinguishes resource query %s after source activation',
     async (query) => {
@@ -62,7 +90,7 @@ describe('RTSP resource capture binding', () => {
       'rtsp://operator:password@192.168.1.10/cam/realmonitor?channel=1&token=private-query#secret-fragment';
     const binding = await capture(url);
     expect(binding).toMatchObject({
-      queryFingerprint: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      queryFingerprint: expect.stringMatching(/^hmac-sha256:[0-9a-f]{64}$/),
     });
     const project = createProject();
     const encoded = serializeProject({
@@ -96,11 +124,80 @@ describe('RTSP resource capture binding', () => {
     if (loaded.kind !== 'ok') return;
     expect(loaded.project.device.cameraAlignment?.capture).toEqual(binding);
     expect(loaded.project.device.cameraCalibration?.capture).toEqual(binding);
+    const localSecret = localStorage.getItem('laserforge.camera.resourceIdentityKey.v1');
+    expect(localSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(encoded).not.toContain(localSecret);
+    expect(encoded).not.toContain('resourceIdentityKey');
+    const sameAppReload = await capture(url);
+    expect(
+      cameraBindingCompatibility(loaded.project.device.cameraAlignment?.capture, sameAppReload),
+    ).toBe('match');
     const different = await capture(`${BASE}?channel=2&token=private-query`);
     expect(
       cameraBindingCompatibility(loaded.project.device.cameraAlignment?.capture, different),
     ).toBe('source-mismatch');
     saveRtspCameraUrl(url);
     expect(loadRtspCameraUrl()).toBe(BASE);
+  });
+
+  it('requires a new matching binding after the app-local key is lost', async () => {
+    const saved = await capture(`${BASE}?channel=1`);
+    localStorage.clear();
+    const current = await capture(`${BASE}?channel=1`);
+    expect(cameraBindingCompatibility(saved, current)).toBe('source-mismatch');
+  });
+
+  it('keeps raw capture usable when secure identity is unavailable', async () => {
+    const saved = await capture(BASE);
+    vi.stubGlobal('crypto', undefined);
+    const current = await capture(BASE);
+    expect(current.queryFingerprint).toBeUndefined();
+    expect(cameraBindingCompatibility(saved, current)).toBe('unbound');
+    const state = useCameraStore.getState().sourceState;
+    if (state.kind !== 'live') throw new Error('Capture should remain live');
+    const frame = { width: 1, height: 1, data: new Uint8ClampedArray([0, 0, 0, 255]) };
+    expect(
+      await captureSourceFrame(state.source, {
+        fetchBlob: async () => new Blob(['frame']),
+        decodeToRgba: async () => frame,
+      }),
+    ).toBe(frame);
+  });
+
+  it('does not publish a source stopped while Web Crypto is computing its identity', async () => {
+    let finishSignature: (value: ArrayBuffer) => void = () => undefined;
+    const signature = new Promise<ArrayBuffer>((resolve) => {
+      finishSignature = resolve;
+    });
+    const sign = vi.spyOn(webcrypto.subtle, 'sign').mockReturnValueOnce(signature);
+    const starting = useCameraStore.getState().startRtspSource(BRIDGE, BASE);
+    await vi.waitFor(() => expect(sign).toHaveBeenCalled());
+    useCameraStore.getState().stopSource();
+    finishSignature(new Uint8Array(32).buffer);
+    await starting;
+    expect(useCameraStore.getState().sourceState.kind).toBe('idle');
+  });
+
+  it('carries discovered JPEG query identity into activation and frame capture', async () => {
+    const bridge: CameraBridgeAdapter = {
+      ...BRIDGE,
+      discoverMachineCamera: async () => ({
+        kind: 'found',
+        cameraUrl: 'http://camera.local/frame.jpg?channel=1',
+        proxyFrameUrl: 'http://localhost/frame.jpg',
+      }),
+    };
+    await useCameraStore.getState().detectMachineCamera(bridge);
+    const discovered = useCameraStore.getState().machineCamera;
+    expect(discovered.kind).toBe('found');
+    if (discovered.kind !== 'found') return;
+    expect(discovered.queryFingerprint).toMatch(/^hmac-sha256:/);
+    useCameraStore.getState().activateMachineCamera();
+    const active = useCameraStore.getState().sourceState;
+    expect(active.kind).toBe('live');
+    if (active.kind !== 'live') return;
+    const binding = cameraCaptureBindingForFrame(active.source, 1280, 720);
+    expect(binding.queryFingerprint).toBe(discovered.queryFingerprint);
+    expect(binding.sourceId).toBe('http://camera.local/frame.jpg');
   });
 });

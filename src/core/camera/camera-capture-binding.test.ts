@@ -44,12 +44,12 @@ describe('camera capture binding', () => {
   });
 
   it('preserves valid opaque query identity and rejects malformed persisted fingerprints', () => {
-    const queryFingerprint = `sha256:${'a'.repeat(64)}`;
+    const queryFingerprint = `hmac-sha256:${'a'.repeat(64)}`;
     expect(normalizeCameraCaptureBinding({ ...USB, queryFingerprint })).toEqual({
       ...USB,
       queryFingerprint,
     });
-    for (const value of ['token=secret', `sha256:${'a'.repeat(63)}`, null, {}, 42]) {
+    for (const value of ['token=secret', `sha256:${'a'.repeat(64)}`, null, {}, 42]) {
       expect(normalizeCameraCaptureBinding({ ...USB, queryFingerprint: value })).toBeUndefined();
     }
     expect(cameraBindingCompatibility(USB, { ...USB, queryFingerprint })).toBe('source-mismatch');

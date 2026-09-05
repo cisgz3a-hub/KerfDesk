@@ -5348,13 +5348,18 @@ and lifts the command's CNC-only gate.)*
   both the overlay and camera trace. Positive height moves the projected surface toward an
   overhead camera; the workspace remains X-right/Y-down. The exact alignment height leaves the
   stored homography unchanged.
-- **Network camera resource changed.** Calibration and alignment distinguish the exact URL query
-  as well as its redacted host/path, so a channel or substream change cannot reuse another feed's
-  geometry. Only an opaque query fingerprint is recorded; userinfo, query text, and fragments
-  remain absent from persisted camera bindings and remembered URLs. Any query change, including
-  a query credential change, changes this identity. Older query-based bindings did not record the
-  original query and need a fresh lens calibration and alignment for that resource; query-less
-  bindings retain their existing behavior.
+- **Network camera resource changed.** Calibration and alignment distinguish the exact URL query,
+  including an empty query, as well as its redacted host/path. A channel or substream change
+  therefore cannot reuse another feed's geometry. The recorded identity uses a private app-local
+  key; raw query text, userinfo, fragments, and the key are absent from exported camera bindings.
+  Remembered URLs remain redacted. Any query change, including a query credential change, changes
+  identity. Older network bindings did not record enough resource information and require fresh
+  lens calibration and alignment, even for a remembered query-less URL. USB bindings are unchanged.
+- **Camera setup on another app or after clearing local data.** The private camera identity key
+  survives ordinary reloads in the same app. A different app/browser or loss of that key requires
+  fresh network-camera setup. When local storage is unavailable, a temporary key keeps setup
+  usable for the current session. If secure identity cannot be established, raw camera capture
+  remains available, but saved network geometry cannot be verified for precision placement.
 - **Error / basis mismatch prevented.** The persisted alignment records the
   pixel basis it was clicked in (raw vs de-fisheyed); frames of the other basis
   are never warped with it, so a later lens calibration cannot silently

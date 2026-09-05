@@ -81,17 +81,25 @@ describe('camera capture identity', () => {
 
   it('retains JPEG query resource identity alongside its redacted source URL', () => {
     const first = cameraCaptureBindingForFrame(
-      { ...JPEG_SOURCE, cameraUrl: `${JPEG_SOURCE.cameraUrl}?channel=1` },
+      {
+        ...JPEG_SOURCE,
+        cameraUrl: `${JPEG_SOURCE.cameraUrl}?channel=1`,
+        queryFingerprint: `hmac-sha256:${'a'.repeat(64)}`,
+      },
       1280,
       720,
     );
     const second = cameraCaptureBindingForFrame(
-      { ...JPEG_SOURCE, cameraUrl: `${JPEG_SOURCE.cameraUrl}?channel=2` },
+      {
+        ...JPEG_SOURCE,
+        cameraUrl: `${JPEG_SOURCE.cameraUrl}?channel=2`,
+        queryFingerprint: `hmac-sha256:${'b'.repeat(64)}`,
+      },
       1280,
       720,
     );
     expect(first.sourceId).toBe(JPEG_SOURCE.cameraUrl);
-    expect(first.queryFingerprint).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(first.queryFingerprint).toMatch(/^hmac-sha256:[0-9a-f]{64}$/);
     expect(first.queryFingerprint).not.toBe(second.queryFingerprint);
     expect(JSON.stringify(first)).not.toContain('channel=1');
   });

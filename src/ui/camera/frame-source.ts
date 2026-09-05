@@ -11,7 +11,6 @@ import {
   type CameraCaptureBinding,
 } from '../../core/camera/camera-capture-binding';
 import { assertNever } from '../../core/scene';
-import { cameraQueryFingerprint } from '../../core/camera/camera-query-fingerprint';
 import type { CameraStream } from '../../platform/types';
 import { defaultFrameCaptureIo, type FrameCaptureIo } from './decode-jpeg';
 import { captureStreamFrame } from './frame-capture';
@@ -22,7 +21,12 @@ export type ActiveCameraSource =
   // A machine snapshot camera (Falcon-style) — one JPEG per GET, via the
   // bridge proxy. `cameraUrl` is the camera's own URL (persisted/diagnostics);
   // `frameUrl` is the pixel-readable bridge proxy the UI actually fetches.
-  | { readonly kind: 'machine-jpeg'; readonly frameUrl: string; readonly cameraUrl: string }
+  | {
+      readonly kind: 'machine-jpeg';
+      readonly frameUrl: string;
+      readonly cameraUrl: string;
+      readonly queryFingerprint?: string;
+    }
   // A machine RTSP camera — `previewUrl` is the bridge's continuous MJPEG for
   // display; `frameUrl` is the bridge's ffmpeg single-frame decode for stills.
   | {
@@ -52,7 +56,13 @@ export function cameraCaptureBindingForFrame(
         resizeMode: source.stream.resizeMode,
       };
     case 'machine-jpeg':
-      return networkCaptureBinding('machine-jpeg', source.cameraUrl, width, height);
+      return networkCaptureBinding(
+        'machine-jpeg',
+        source.cameraUrl,
+        width,
+        height,
+        source.queryFingerprint,
+      );
     case 'machine-rtsp':
       return networkCaptureBinding(
         'machine-rtsp',
@@ -75,7 +85,7 @@ function networkCaptureBinding(
   rawId: string,
   width: number,
   height: number,
-  queryFingerprint = cameraQueryFingerprint(rawId),
+  queryFingerprint: string | undefined,
 ): CameraCaptureBinding {
   return {
     version: 1,

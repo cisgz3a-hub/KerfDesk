@@ -41,7 +41,11 @@ export function MachineCameraSection(props: {
         ) : null}
       </div>
       {state.kind === 'found' ? (
-        <NetworkCameraView frameUrl={state.proxyFrameUrl} cameraUrl={state.cameraUrl} />
+        <NetworkCameraView
+          frameUrl={state.proxyFrameUrl}
+          cameraUrl={state.cameraUrl}
+          queryFingerprint={state.queryFingerprint}
+        />
       ) : null}
       {state.kind === 'not-found' ? (
         <p style={noteStyle}>

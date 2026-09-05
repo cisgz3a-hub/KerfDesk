@@ -4,7 +4,7 @@
 // bridge-proxied machine camera).
 
 import type { CameraAdapter, CameraBridgeAdapter } from '../../platform/types';
-import { cameraQueryFingerprint } from '../../core/camera/camera-query-fingerprint';
+import { cameraQueryFingerprint } from './camera-resource-identity';
 import { publicCameraSourceId, type ActiveCameraSource } from '../camera/frame-source';
 import {
   handleUsbStatus,
@@ -33,7 +33,12 @@ export type CameraSourceState =
 export type MachineCameraState =
   | { readonly kind: 'idle' }
   | { readonly kind: 'detecting' }
-  | { readonly kind: 'found'; readonly cameraUrl: string; readonly proxyFrameUrl: string }
+  | {
+      readonly kind: 'found';
+      readonly cameraUrl: string;
+      readonly proxyFrameUrl: string;
+      readonly queryFingerprint?: string;
+    }
   | { readonly kind: 'not-found' }
   // The bridge is missing/unreachable; `reason` says how to start it.
   | { readonly kind: 'unavailable'; readonly reason: string };
@@ -106,11 +111,13 @@ function makeDetectMachineCamera(set: CameraSourceSet): CameraSourceActions['det
     set({ machineCamera: { kind: 'detecting' } });
     const result = await bridge.discoverMachineCamera();
     if (result.kind === 'found') {
+      const queryFingerprint = await cameraQueryFingerprint(result.cameraUrl);
       set({
         machineCamera: {
           kind: 'found',
           cameraUrl: result.cameraUrl,
           proxyFrameUrl: result.proxyFrameUrl,
+          ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
         },
       });
       return;
@@ -143,6 +150,9 @@ function makeActivateMachineCamera(
           kind: 'machine-jpeg',
           frameUrl: machine.proxyFrameUrl,
           cameraUrl: machine.cameraUrl,
+          ...(machine.queryFingerprint === undefined
+            ? {}
+            : { queryFingerprint: machine.queryFingerprint }),
         },
       },
     });
@@ -229,7 +239,8 @@ function makeStartRtspSource(
       });
       return;
     }
-    const queryFingerprint = cameraQueryFingerprint(url);
+    const queryFingerprint = await cameraQueryFingerprint(url);
+    if (get().sourceEpoch !== epoch) return;
     const source: Extract<ActiveCameraSource, { readonly kind: 'machine-rtsp' }> = {
       kind: 'machine-rtsp',
       previewUrl: probe.previewUrl,
