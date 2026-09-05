@@ -5,7 +5,12 @@
 
 import { pushHistoryEntry, type PaintColor, type PaintPoint } from '../../core/image-edit';
 import { fillGradientInPlace, type GradientSpec } from '../../core/image-retouch';
-import { fillMaskedInPlace, maskBounds, wandSelection } from '../../core/image-select';
+import {
+  combineMasks,
+  fillMaskedInPlace,
+  maskBounds,
+  wandSelection,
+} from '../../core/image-select';
 import { captureScoped, type EditorSession } from './editor-session';
 import { compositeSession } from './editor-session-layers';
 import { useImageEditorStore } from './image-editor-store';
@@ -23,7 +28,11 @@ export function commitBucketFill(
   color: PaintColor,
   options: BucketOptions,
 ): EditorSession {
-  const region = wandSelection(compositeSession(session), x, y, options);
+  const region = combineMasks(
+    session.selection,
+    wandSelection(compositeSession(session), x, y, options),
+    'intersect',
+  );
   const bounds = maskBounds(region);
   if (bounds === null) return session;
   const entry = captureScoped(session, bounds, 'Paint bucket');

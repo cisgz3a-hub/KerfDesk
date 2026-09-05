@@ -15,6 +15,7 @@ export function rectSelection(width: number, height: number, rect: PixelRect): S
   const top = Math.max(0, Math.ceil(rect.y - 0.5));
   const right = Math.min(mask.width, Math.ceil(rect.x + rect.width - 0.5));
   const bottom = Math.min(mask.height, Math.ceil(rect.y + rect.height - 0.5));
+  if (right <= left || bottom <= top) return mask;
   for (let y = top; y < bottom; y += 1) {
     mask.alpha.fill(MASK_SOLID, y * mask.width + left, y * mask.width + right);
   }

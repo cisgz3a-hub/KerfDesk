@@ -112,6 +112,8 @@ export type EditorSession = {
   readonly base: RgbaBuffer;
   /** Where the doc sits inside the as-opened image (crop accumulates). */
   readonly cropOffset: { readonly x: number; readonly y: number };
+  /** Continuous physical scale, independent of rounded Revert pixel dimensions. */
+  readonly pixelSizeMm: { readonly x: number; readonly y: number };
   /** The object's mm bounds at open — Apply maps crops through these. */
   readonly sourceBounds: Bounds;
   readonly history: EditHistory;
@@ -146,6 +148,10 @@ export function createSession(
     activeLayerId: BACKGROUND_LAYER_ID,
     base: cloneRgbaBuffer(doc),
     cropOffset: { x: 0, y: 0 },
+    pixelSizeMm: {
+      x: (sourceBounds.maxX - sourceBounds.minX) / doc.width,
+      y: (sourceBounds.maxY - sourceBounds.minY) / doc.height,
+    },
     sourceBounds,
     history: createEditHistory(),
     selection: null,
@@ -164,6 +170,10 @@ export function revertSession(session: EditorSession): EditorSession {
     layers: [layerFromBuffer(BACKGROUND_LAYER_ID, 'Background', doc)],
     activeLayerId: BACKGROUND_LAYER_ID,
     cropOffset: { x: 0, y: 0 },
+    pixelSizeMm: {
+      x: (session.sourceBounds.maxX - session.sourceBounds.minX) / doc.width,
+      y: (session.sourceBounds.maxY - session.sourceBounds.minY) / doc.height,
+    },
     history: createEditHistory(),
     selection: null,
     revision: session.revision + 1,
@@ -179,16 +189,15 @@ export function revertSession(session: EditorSession): EditorSession {
  */
 export function appliedBounds(session: EditorSession): Bounds | null {
   const { sourceBounds } = session;
+  const widthMm = sourceBounds.maxX - sourceBounds.minX;
+  const heightMm = sourceBounds.maxY - sourceBounds.minY;
+  const { x: sx, y: sy } = session.pixelSizeMm;
   const uncropped =
     session.cropOffset.x === 0 &&
     session.cropOffset.y === 0 &&
-    session.doc.width === session.base.width &&
-    session.doc.height === session.base.height;
+    Math.abs(session.doc.width * sx - widthMm) <= Number.EPSILON * Math.max(1, widthMm) * 4 &&
+    Math.abs(session.doc.height * sy - heightMm) <= Number.EPSILON * Math.max(1, heightMm) * 4;
   if (uncropped) return null;
-  const widthMm = sourceBounds.maxX - sourceBounds.minX;
-  const heightMm = sourceBounds.maxY - sourceBounds.minY;
-  const sx = widthMm / session.base.width;
-  const sy = heightMm / session.base.height;
   return {
     minX: sourceBounds.minX + session.cropOffset.x * sx,
     minY: sourceBounds.minY + session.cropOffset.y * sy,
@@ -206,9 +215,9 @@ export function appliedBounds(session: EditorSession): Bounds | null {
 export function commitCrop(session: EditorSession, rect: PixelRect): EditorSession {
   const x = Math.max(0, Math.floor(rect.x));
   const y = Math.max(0, Math.floor(rect.y));
-  const width = Math.max(1, Math.min(session.doc.width - x, Math.round(rect.width)));
-  const height = Math.max(1, Math.min(session.doc.height - y, Math.round(rect.height)));
-  if (width <= 0 || height <= 0) return session;
+  const width = Math.min(session.doc.width, Math.ceil(rect.x + rect.width)) - x;
+  const height = Math.min(session.doc.height, Math.ceil(rect.y + rect.height)) - y;
+  if (!(width > 0 && height > 0)) return session;
   // Every layer crops identically so dimensions stay uniform (ADR-245); the
   // active layer's cropped buffer becomes the new doc pointer.
   const layers = session.layers.map((layer) => ({
@@ -291,6 +300,7 @@ export function commitStroke(
     points,
     brush: brushFor(tool, settings),
     color,
+    erase: tool.kind === 'eraser' && session.activeLayerId !== BACKGROUND_LAYER_ID,
   };
   const rect = strokeDirtyRect(stroke, session.doc);
   if (rect.width === 0 || rect.height === 0) return session;

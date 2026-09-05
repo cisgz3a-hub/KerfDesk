@@ -86,12 +86,11 @@ function estimateSeconds(session: EditorSession, project: Project, scan: InkScan
   if (effective.mode !== 'image' || effective.speed <= 0 || effective.linesPerMm <= 0) {
     return { kind: 'no-image-layer' };
   }
-  const widthMm = session.sourceBounds.maxX - session.sourceBounds.minX;
-  const heightMm = session.sourceBounds.maxY - session.sourceBounds.minY;
-  const mmPerPxX = widthMm / session.base.width;
-  const mmPerPxY = heightMm / session.base.height;
-  const inkWidthMm = Math.max(1, scan.maxX - scan.minX + 1) * mmPerPxX;
-  const machineRows = scan.inkRows * mmPerPxY * effective.linesPerMm;
+  const { x: mmPerPxX, y: mmPerPxY } = session.pixelSizeMm;
+  const inkWidthMm =
+    Math.max(1, scan.maxX - scan.minX + 1) * mmPerPxX * Math.abs(object.transform.scaleX);
+  const machineRows =
+    scan.inkRows * mmPerPxY * Math.abs(object.transform.scaleY) * effective.linesPerMm;
   const rowSeconds = inkWidthMm / (effective.speed / SECONDS_PER_MINUTE);
   return {
     kind: 'estimated',
