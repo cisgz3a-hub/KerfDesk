@@ -58,7 +58,9 @@ export function validateVariableTemplate(value: unknown, path: string): string |
 
 function validateToken(value: unknown, path: string): string | null {
   if (!isObject(value) || typeof value['kind'] !== 'string') return invalid(path);
-  const validator = TOKEN_VALIDATORS[value['kind']];
+  const validator = Object.hasOwn(TOKEN_VALIDATORS, value['kind'])
+    ? TOKEN_VALIDATORS[value['kind']]
+    : undefined;
   return validator === undefined ? invalid(`${path}.kind`) : validator(value, path);
 }
 

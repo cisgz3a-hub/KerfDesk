@@ -16,7 +16,7 @@ export function parseVariableTemplateSource(source: string): VariableTemplateSou
     const parsed = parseTag(match[1] ?? '');
     if (!parsed.ok) return parsed;
     tokens.push(parsed.token);
-    variableFields += 1;
+    if (parsed.token.kind !== 'literal') variableFields += 1;
     cursor = index + match[0].length;
   }
   if (cursor < source.length) tokens.push({ kind: 'literal', value: source.slice(cursor) });
@@ -33,8 +33,9 @@ function parseTag(
 ):
   | { readonly ok: true; readonly token: VariableTemplateToken }
   | { readonly ok: false; readonly message: string } {
-  const simple = SIMPLE_TAGS[tag];
+  const simple = Object.hasOwn(SIMPLE_TAGS, tag) ? SIMPLE_TAGS[tag] : undefined;
   if (simple !== undefined) return { ok: true, token: simple };
+  if (tag.startsWith('literal-json:')) return parseEncodedLiteral(tag.slice(13));
   if (tag.startsWith('csv-json:')) return parseEncodedCsv(tag.slice(9));
   if (tag.startsWith('serial-json:')) return parseEncodedSerial(tag.slice(12));
   if (tag.startsWith('csv:')) {
@@ -50,6 +51,17 @@ function parseTag(
       : { ok: false, message: 'Serial width must be an integer from 1 to 20.' };
   }
   return { ok: false, message: `Unknown variable field "${tag}".` };
+}
+
+function parseEncodedLiteral(
+  source: string,
+):
+  | { readonly ok: true; readonly token: VariableTemplateToken }
+  | { readonly ok: false; readonly message: string } {
+  const value = decodeJson(source);
+  return typeof value === 'string'
+    ? { ok: true, token: { kind: 'literal', value } }
+    : { ok: false, message: 'Choose valid literal text.' };
 }
 
 function parseEncodedCsv(
@@ -112,7 +124,7 @@ const SIMPLE_TAGS: Readonly<Record<string, VariableTemplateToken>> = {
 };
 
 function tokenToSource(token: VariableTemplateToken): string {
-  if (token.kind === 'literal') return token.value;
+  if (token.kind === 'literal') return literalToSource(token.value);
   if (token.kind === 'date-time') {
     const tag =
       token.format === 'date-iso' ? 'date' : token.format === 'time-24h' ? 'time' : 'datetime';
@@ -139,6 +151,12 @@ function tokenToSource(token: VariableTemplateToken): string {
   return `{{${tags[token.field]}}}`;
 }
 
-function encodedTag(kind: 'csv-json' | 'serial-json', value: unknown): string {
+function literalToSource(value: string): string {
+  // Raw braces can become a field when an existing template is edited. Encode
+  // brace-bearing literals like CSV names/prefixes, preserving legacy source.
+  return /[{}]/.test(value) ? encodedTag('literal-json', value) : value;
+}
+
+function encodedTag(kind: 'csv-json' | 'serial-json' | 'literal-json', value: unknown): string {
   return `{{${kind}:${encodeURIComponent(JSON.stringify(value))}}}`;
 }

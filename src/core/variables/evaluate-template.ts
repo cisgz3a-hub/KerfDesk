@@ -28,6 +28,9 @@ export function evaluateVariableTemplate(
   if (!Number.isFinite(context.now.getTime())) {
     return { ok: false, message: 'Variable evaluation needs a valid clock value.' };
   }
+  if (typeof template !== 'object' || template === null || !Array.isArray(template.tokens)) {
+    return { ok: false, message: 'Variable text template must contain a token list.' };
+  }
   const values: string[] = [];
   for (const token of template.tokens) {
     const evaluated = evaluateToken(token, text, project, context);
@@ -43,6 +46,9 @@ function evaluateToken(
   project: Project,
   context: VariableEvaluationContext,
 ): VariableEvaluationResult {
+  if (!isTemplateToken(token)) {
+    return { ok: false, message: 'Variable text contains a malformed token.' };
+  }
   switch (token.kind) {
     case 'literal':
       return { ok: true, value: token.value };
@@ -55,6 +61,44 @@ function evaluateToken(
     case 'cut-setting':
       return evaluateCutSetting(token.field, text, project);
   }
+}
+
+// Templates can survive in a running session after a parser error in an older
+// build. Report malformed data through the ordinary evaluation result instead
+// of throwing or silently dropping text while preparing output.
+function isTemplateToken(value: unknown): value is VariableTemplateToken {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const token = value as Record<string, unknown>;
+  switch (token['kind']) {
+    case 'literal':
+      return typeof token['value'] === 'string';
+    case 'date-time':
+      return (
+        typeof token['format'] === 'string' &&
+        ['date-iso', 'time-24h', 'datetime-iso'].includes(token['format'])
+      );
+    case 'serial':
+      return isSerialToken(token);
+    case 'csv':
+      return typeof token['column'] === 'string' && token['column'] !== '';
+    case 'cut-setting':
+      return (
+        typeof token['field'] === 'string' &&
+        ['power-percent', 'speed-mm-min', 'passes', 'air-assist'].includes(token['field'])
+      );
+    default:
+      return false;
+  }
+}
+
+function isSerialToken(token: Record<string, unknown>): boolean {
+  return (
+    typeof token['prefix'] === 'string' &&
+    Number.isInteger(token['width']) &&
+    Number(token['width']) >= 1 &&
+    Number(token['width']) <= 20 &&
+    (token['offset'] === undefined || Number.isSafeInteger(token['offset']))
+  );
 }
 
 function evaluateSerial(

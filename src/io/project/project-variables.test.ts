@@ -50,6 +50,22 @@ function projectWithVariables(): Project {
 }
 
 describe('project variable persistence', () => {
+  it.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty'])(
+    'returns a structured import error for inherited token kind %s',
+    (kind) => {
+      const raw = JSON.parse(serializeProject(projectWithVariables())) as {
+        scene: { objects: Array<{ variableTemplate: { tokens: unknown[] } }> };
+      };
+      const object = raw.scene.objects[0];
+      if (object === undefined) throw new Error('variable text fixture is missing');
+      object.variableTemplate.tokens = [{ kind }];
+      expect(deserializeProject(JSON.stringify(raw))).toMatchObject({
+        kind: 'invalid',
+        reason: expect.stringContaining('tokens[0].kind'),
+      });
+    },
+  );
+
   it('round-trips structured templates and embedded CSV records', () => {
     const project = projectWithVariables();
     const result = deserializeProject(serializeProject(project));
