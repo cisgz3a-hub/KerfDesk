@@ -4,6 +4,7 @@ import { CalibrationNumberField } from './CalibrationNumberField';
 import { Button, Dialog, DialogActions } from '../kit';
 import { persistCalibrationDraft, restoreCalibrationDraft } from './calibration-draft-storage';
 import { calibrationGridStyle } from './calibration-dialog-styles';
+import { calibrationDraftIssues } from './calibration-draft-validation';
 
 type IntervalTestDraft = {
   readonly steps: string;
@@ -56,6 +57,7 @@ export function IntervalTestDialog(props: {
   const [draft, setDraft] = useState(() =>
     restoreCalibrationDraft(INTERVAL_TEST_DRAFT_KEY, DEFAULT_DRAFT, INTERVAL_TEST_DRAFT_FIELDS),
   );
+  const issues = calibrationDraftIssues(draft, FIELD_SPECS);
   const setField =
     (field: keyof IntervalTestDraft) =>
     (event: ChangeEvent<HTMLInputElement>): void => {
@@ -71,19 +73,21 @@ export function IntervalTestDialog(props: {
       as="form"
       onSubmit={(event) => {
         event.preventDefault();
+        if (issues.length > 0) return;
         persistCalibrationDraft(INTERVAL_TEST_DRAFT_KEY, draft);
         props.onGenerate(parseDraft(draft));
       }}
       size="sm"
     >
       <IntervalTestFields draft={draft} setField={setField} />
+      {issues.length > 0 ? <p role="alert">{issues.join(' ')}</p> : null}
       <CalibrationFeedDisclosure
         requestedSpeed={numberValue(draft.speed)}
         maxFeedMmPerMin={props.maxFeedMmPerMin}
       />
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" disabled={issues.length > 0}>
           Generate
         </Button>
       </DialogActions>
@@ -141,8 +145,7 @@ function parseDraft(draft: IntervalTestDraft): IntervalTestGridOptions {
 }
 
 function numberValue(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return value.trim() === '' ? Number.NaN : Number(value);
 }
 
 function formatFeed(value: number): string {

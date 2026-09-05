@@ -55,7 +55,7 @@ export function MaterialPresetWizard(props: {
     if (state.step === 'settings' || state.step === 'details') {
       dispatch({
         kind: 'set-recipe',
-        recipe: readRecipeFromForm(event.currentTarget, state.recipe),
+        recipe: readRecipeFromForm(event.currentTarget, state.recipe, state.step),
       });
       dispatch({ kind: 'next' });
       return;

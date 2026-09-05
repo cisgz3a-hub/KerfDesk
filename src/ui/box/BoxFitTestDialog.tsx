@@ -67,14 +67,14 @@ export function BoxFitTestDialog(props: {
     };
   const relief: BoxRelief =
     props.machine.kind === 'cnc'
-      ? { kind: 'corner-overcut', toolDiameterMm: Number(draft.toolDiameter) }
+      ? { kind: 'corner-overcut', toolDiameterMm: draftNumber(draft.toolDiameter) }
       : { kind: 'none' };
   const spec: FitCouponSpec = {
-    thicknessMm: Number(draft.thickness),
-    fingerWidthMm: Number(draft.fingerWidth),
-    startClearanceMm: Number(draft.start),
-    stepClearanceMm: Number(draft.step),
-    rungCount: Number(draft.rungs),
+    thicknessMm: draftNumber(draft.thickness),
+    fingerWidthMm: draftNumber(draft.fingerWidth),
+    startClearanceMm: draftNumber(draft.start),
+    stepClearanceMm: draftNumber(draft.step),
+    rungCount: draftNumber(draft.rungs),
     relief,
   };
   const result = generateFitCoupon(spec);
@@ -118,6 +118,10 @@ export function BoxFitTestDialog(props: {
       </DialogActions>
     </Dialog>
   );
+}
+
+function draftNumber(value: string): number {
+  return value.trim() === '' ? Number.NaN : Number(value);
 }
 
 function FitTestFields(props: {
