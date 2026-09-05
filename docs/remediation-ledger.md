@@ -1,7 +1,13 @@
 # Audit remediation ledger
 
-Current integration owner, 2026-09-05: `codex/feature-quality-controller-20260905`.
-The active scope is the 31 confirmed September 5 feature-code findings, with three bounded
+Current CNC/laser change-audit integration owner, 2026-09-05:
+`codex/cnc-laser-audit-fixes-20260905`, based on main `c7681e3af152ed4c1162ef20ae45793552fd1503`.
+The authorized scope is the four findings in the CNC/laser corrective audit; evidence and limits:
+[`audits/2026-09-05-cnc-laser-corrections.md`](audits/2026-09-05-cnc-laser-corrections.md).
+PR/check/merge records are authoritative for publication; this source note does not assert a deployment.
+
+Earlier feature integration owner, 2026-09-05: `codex/feature-quality-controller-20260905`.
+That scope was the 31 confirmed September 5 feature-code findings, with three bounded
 implementation branches plus the controller/integration branch and overlapping surfacing PR #728. Earlier checkpoints below are
 historical; their unrelated pending work and PRs are not part of this remediation.
 

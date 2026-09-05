@@ -8,9 +8,11 @@ type LocalScanOffset = {
   readonly offsetMm: number;
 };
 
-export function ScanOffsetOverrideNotice(): JSX.Element | null {
-  const project = useStore((state) => state.project);
-  const overrides = localScanOffsets(project);
+export function ScanOffsetOverrideNotice(props: {
+  readonly project?: Project;
+}): JSX.Element | null {
+  const liveProject = useStore((state) => state.project);
+  const overrides = localScanOffsets(props.project ?? liveProject);
   if (overrides.length === 0) return null;
   return (
     <div role="note" style={noticeStyle}>

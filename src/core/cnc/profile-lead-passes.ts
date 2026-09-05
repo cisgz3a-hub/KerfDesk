@@ -62,11 +62,12 @@ export function applyProfileLeadPasses(
     const polygon = profileLeadPolygon(pass);
     if (polygon === null) return pass;
     if (pass.kind !== 'contour' && pass.kind !== 'path3d') return pass;
+    const side = windingSide(polygon, outerSign, baseSide);
     const context: LeadContext = {
-      side: windingSide(polygon, outerSign, baseSide),
+      side,
       options,
       bed,
-      siblings: disjointSiblings(polygon, shapes),
+      siblings: leadObstacles(polygon, shapes, side),
     };
     return leadForPass(pass, polygon, context);
   });
@@ -130,13 +131,14 @@ function windingSide(
   return sign === outerSign ? baseSide : oppositeSide(baseSide);
 }
 
-// Sibling parts (neither contains the other): a lead reaching into one of these
-// would gouge a different part, so the lead is dropped. The containment chain
-// (this contour's own holes/parents) is excluded — those are handled by the
-// per-contour side, not treated as collisions.
-function disjointSiblings(
+// Disjoint parts and retained islands inside an inward-led boundary are
+// obstacles. Opposite winding distinguishes those islands from concentric
+// roughing/finishing copies of the same boundary. Enclosing parents remain
+// excluded: their interior includes this contour's legitimate waste region.
+function leadObstacles(
   polygon: ReadonlyArray<Vec2>,
   shapes: ReadonlyArray<ReadonlyArray<Vec2>>,
+  side: ProfileSide,
 ): ReadonlyArray<ReadonlyArray<Vec2>> {
   const probe = polygon[0];
   if (probe === undefined) return [];
@@ -151,7 +153,12 @@ function disjointSiblings(
     if (profileContourSignature(shape) === selfSignature) return false;
     const other = shape[0];
     if (other === undefined) return false;
-    return !pointInPolygon(probe, shape) && !pointInPolygon(other, polygon);
+    if (pointInPolygon(other, polygon)) {
+      return (
+        side === 'inside' && Math.sign(signedAreaMm2(shape)) !== Math.sign(signedAreaMm2(polygon))
+      );
+    }
+    return !pointInPolygon(probe, shape);
   });
 }
 

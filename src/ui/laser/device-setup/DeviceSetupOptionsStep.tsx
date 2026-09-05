@@ -22,6 +22,7 @@ import {
   zAxisStatus,
 } from './device-setup-option-status';
 import { DeviceSetupRotaryFields } from './DeviceSetupRotaryFields';
+import { DeviceSetupRasterDiagnostics } from './DeviceSetupRasterDiagnostics';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupOptionsStep({
@@ -98,6 +99,7 @@ function LaserCalibrationSections(props: {
           withRow={false}
           onChange={(bidirectionalScanPolicy) => update({ bidirectionalScanPolicy })}
         />
+        <DeviceSetupRasterDiagnostics device={draft} onChange={update} />
         <ControlledLaserOffTravelRow
           value={draft.controlledLaserOffTravelFeedMmPerMin}
           maxFeed={draft.maxFeed}

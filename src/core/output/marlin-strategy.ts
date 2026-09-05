@@ -10,6 +10,7 @@ import { resolveMarlinDialect } from '../devices';
 import type { Job } from '../job';
 import { grblStrategy } from './grbl-strategy';
 import { toMarlinFanGcode } from './marlin-fan-transform';
+import { MARLIN_FAN_MAX_POWER, marlinFanRasterJob } from './marlin-fan-raster';
 import type { OutputEmitOptions } from './output-strategy';
 
 export const marlinStrategy = {
@@ -19,9 +20,11 @@ export const marlinStrategy = {
     const intermediateDevice: DeviceProfile = {
       ...device,
       gcodeDialect: { dialectId: 'grbl-dynamic' },
-      ...(dialect.powerMode === 'fan' ? { maxPowerS: 255 } : {}),
+      ...(dialect.powerMode === 'fan' ? { maxPowerS: MARLIN_FAN_MAX_POWER } : {}),
     };
-    const body = grblStrategy.emit(job, intermediateDevice, options);
-    return dialect.powerMode === 'fan' ? toMarlinFanGcode(body, 255) : body;
+    const intermediateJob =
+      dialect.powerMode === 'fan' ? marlinFanRasterJob(job, device.maxPowerS) : job;
+    const body = grblStrategy.emit(intermediateJob, intermediateDevice, options);
+    return dialect.powerMode === 'fan' ? toMarlinFanGcode(body, MARLIN_FAN_MAX_POWER) : body;
   },
 };
