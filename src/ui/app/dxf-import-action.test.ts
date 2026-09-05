@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SceneObject } from '../../core/scene';
+import { nestedMinsertDxf } from '../../__fixtures__/nested-minsert';
+import { resetImportWorkerForTests } from '../import/import-worker-client';
+import type { ImportWorkerRequest } from '../import/import-worker-protocol';
 import { importDxfFiles, isDxfFile } from './dxf-import-action';
 
 function dxfLine(): string {
@@ -57,7 +60,44 @@ describe('isDxfFile', () => {
 });
 
 describe('importDxfFiles', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    resetImportWorkerForTests();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps a tiny nested MINSERT on the cancellable worker path without reading text on the UI thread', async () => {
+    const posted: ImportWorkerRequest[] = [];
+    const terminate = vi.fn();
+    vi.stubGlobal(
+      'Worker',
+      class {
+        postMessage(request: ImportWorkerRequest): void {
+          posted.push(request);
+        }
+        terminate = terminate;
+      },
+    );
+    const content = nestedMinsertDxf();
+    const blob = new Blob([content]);
+    const text = vi.fn(async () => content);
+    const importObject = vi.fn(() => ({ kind: 'added' as const }));
+    const pushToast = vi.fn();
+    const pending = importDxfFiles(
+      [{ name: 'nested.dxf', size: blob.size, blob: async () => blob, text }],
+      { importObject, pushToast },
+    );
+    for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    expect(blob.size).toBeLessThan(500);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toMatchObject({ kind: 'dxf', blob, source: 'nested.dxf' });
+    expect(text).not.toHaveBeenCalled();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await pending;
+    expect(terminate).toHaveBeenCalledOnce();
+    expect(importObject).not.toHaveBeenCalled();
+    expect(text).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith('nested.dxf: import cancelled.', 'warning');
+  });
 
   it('imports through the disclosed main-thread fallback when worker construction fails', async () => {
     vi.stubGlobal('Worker', function WorkerUnavailable(): never {

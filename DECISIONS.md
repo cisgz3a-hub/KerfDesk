@@ -13657,6 +13657,14 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
    readers, but their required results still scale with the parsed output. DXF uses two passes and
    retains blocks/output; STL retains the mesh and derived relief data; persistence materializes
    JSON. None has a proven constant peak-memory ceiling.
+   **Nested DXF amendment (2026-09-05).** A small source can describe a large composed MINSERT
+   result. Recursive expansion and the streaming entity collector append geometry and notes by
+   iteration, never by converting an input-sized collection into function arguments. The existing
+   per-grid/depth diagnostics and transform order remain unchanged; no new count limit or geometry
+   truncation is introduced. Every reachable DXF Blob already uses the cancellable worker path
+   regardless of file size. Software regressions retain all 150,000 nested instances, their native
+   curves, endpoints and color, and prove that Escape cancels the small-file worker request without
+   a main-thread text fallback. This does not establish an unlimited-memory or hardware claim.
 7. **Document routes move off the UI thread.** Native `.lf2`, LightBurn `.lbrn`/`.lbrn2`, native
    `.lfml.json`, and LightBurn `.clb` run in a dedicated worker with queue/progress/cancel semantics
    but still perform whole-Blob text decoding plus JSON or XML/DOM construction there. File-backed
