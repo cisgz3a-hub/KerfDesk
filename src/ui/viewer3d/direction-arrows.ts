@@ -37,7 +37,7 @@ export function directionArrows(model: GcodeRenderModel): ReadonlyArray<ArrowPla
   for (let index = 0; index < model.segmentCount; index += 1) {
     if (!isCutting(model, index)) continue;
     const span = segmentSpan(model, index);
-    if (span.length <= 0) continue;
+    if (!span) continue;
     const endMm = travelledMm + span.length;
     while (nextArrowMm <= endMm) {
       const offsetMm = nextArrowMm - travelledMm;
@@ -65,7 +65,7 @@ function isCutting(model: GcodeRenderModel, index: number): boolean {
 function cutPathLength(model: GcodeRenderModel): number {
   let total = 0;
   for (let index = 0; index < model.segmentCount; index += 1) {
-    if (isCutting(model, index)) total += segmentSpan(model, index).length;
+    if (isCutting(model, index)) total += segmentSpan(model, index)?.length ?? 0;
   }
   return total;
 }
@@ -77,7 +77,7 @@ function segmentSpan(
   readonly length: number;
   readonly start: { readonly x: number; readonly y: number; readonly z: number };
   readonly direction: { readonly x: number; readonly y: number; readonly z: number };
-} {
+} | null {
   const base = index * 6;
   const x0 = model.positions[base] ?? 0;
   const y0 = model.positions[base + 1] ?? 0;
@@ -89,7 +89,9 @@ function segmentSpan(
   const dy = y1 - y0;
   const dz = z1 - z0;
   const length = Math.hypot(dx, dy, dz);
-  const scale = length > 0 ? 1 / length : 0;
+  // Finite input coordinates can overflow the render model's Float32 storage.
+  if (!Number.isFinite(length) || length <= 0) return null;
+  const scale = 1 / length;
   return {
     length,
     start: { x: x0, y: y0, z: z0 },

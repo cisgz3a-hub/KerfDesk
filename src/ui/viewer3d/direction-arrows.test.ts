@@ -55,6 +55,14 @@ describe('directionArrows', () => {
     expect(directionArrows(model('G0 Z-2'))).toEqual([]);
   });
 
+  it('ignores geometry that overflows render storage without losing valid arrows', () => {
+    const extreme = '1000000000000000000000000000000000000000';
+    const built = model(`G1 X${extreme} F800\nG1 X0\nG1 X100`);
+    expect(built.positions.some((value) => !Number.isFinite(value))).toBe(true);
+    expect(directionArrows(built)).toEqual(directionArrows(model('G1 X100 F800')));
+    expect(directionArrows(model(`G1 X${extreme} F800`))).toEqual([]);
+  });
+
   it('places the same arrows on a long cut regardless of its segment sampling', () => {
     const single = model('G1 X100 F800');
     const sampled = model(
