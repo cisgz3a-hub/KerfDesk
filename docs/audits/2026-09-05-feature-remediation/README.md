@@ -9,7 +9,9 @@ The integration owner is `codex/feature-quality-controller-20260905`. Geometry/t
 and settings/calibration use separate branches based on the audited commit. Surfacing overlaps
 the independently owned PR #728 and is being verified against the same acceptance requirements. The original
 `claude/vcarve-stamp-subcell` checkout and its inherited edits remain preserved.
-The authoritative integration status is the September 5 section of `docs/remediation-ledger.md`.
+The integration checkpoint is the September 5 section of `docs/remediation-ledger.md`.
+The [final merge and main-verification record](https://github.com/cisgz3a-hub/KerfDesk/pull/732)
+is updated after the product tree is verified.
 
 | Finding | Corrected behavior | Evidence lane |
 |---|---|---|
