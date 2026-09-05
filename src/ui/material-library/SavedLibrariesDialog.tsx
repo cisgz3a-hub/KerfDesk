@@ -33,7 +33,7 @@ export function SavedLibrariesDialog(props: { readonly onClose: () => void }): J
   const renameLibrary = useStore((state) => state.renameLibrary);
   const duplicateLibrary = useStore((state) => state.duplicateLibrary);
   const deleteLibrary = useStore((state) => state.deleteLibrary);
-  const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
+  const setMaterialLibrary = useStore((state) => state.importMaterialLibrary);
   const markMaterialLibrarySaved = useStore((state) => state.markMaterialLibrarySaved);
   const listSavedLibraries = useStore((state) => state.listSavedLibraries);
   const pushToast = useToastStore((state) => state.pushToast);
