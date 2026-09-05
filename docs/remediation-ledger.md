@@ -1,6 +1,11 @@
 # Audit remediation ledger
 
-Current checkpoint, 2026-09-04: `ade9` remains the sole implementation worktree. The active
+Current integration owner, 2026-09-05: `codex/feature-quality-controller-20260905`.
+The active scope is the 31 confirmed September 5 feature-code findings, with three bounded
+implementation branches plus the controller/integration branch and overlapping surfacing PR #728. Earlier checkpoints below are
+historical; their unrelated pending work and PRs are not part of this remediation.
+
+Historical checkpoint, 2026-09-04: `ade9` remains the sole implementation worktree. The active
 `codex/fix-variable-effective-settings-20260902` slice starts from live main
 `59bc989e829aff5a9edce957857135b09bbefaa8`. Its UA8-VAR06 and regenerated-path binding fixes
 passed the full local release gate below; hosted integration for this slice is not yet complete.
@@ -986,6 +991,11 @@ and missing-glyph cases below.
   Do not weaken visibility validation or alter production readiness to compensate. This fixture is
   not a repaired packaged-product pass, and no workflow rerun or manual deployment has occurred.
 
+- **NATIVE-SMOKE-02, confirmed diagnostic-loss defect, pending same harness slice:** validation
+  precedes result/stdout/stderr preservation, and the `finally` removes the temporary evidence.
+  Failed run artifact `9840872041` consequently contains only the readiness report. Preserve failure
+  evidence before cleanup in the narrowly scoped repair; no private execution archive is involved.
+
 ### 2026-09-05 first 100 pull requests: remediation
 
 - Reviewed PRs #1 through #100 against main `ccaa3064d9efe904821307f0603ce842d903b586`:
@@ -1016,7 +1026,36 @@ and missing-glyph cases below.
 - Implementation uses isolated worktrees. The original `LaserForge-2.0` checkout and its unrelated
   tracked/untracked work remain outside these changes. No manual deployment or hardware operation
   belongs to this remediation.
-- **NATIVE-SMOKE-02, confirmed diagnostic-loss defect, pending same harness slice:** validation
-  precedes result/stdout/stderr preservation, and the `finally` removes the temporary evidence.
-  Failed run artifact `9840872041` consequently contains only the readiness report. Preserve failure
-  evidence before cleanup in the narrowly scoped repair; no private execution archive is involved.
+
+## 2026-09-05 feature audit remediation
+
+Authorized scope: implement the 31 confirmed findings, create scoped PRs, and merge to main after
+verification. Baseline `ccaa3064d9efe904821307f0603ce842d903b586`, website v0.1.1962.
+Inventory: `docs/audits/2026-09-05-feature-remediation/README.md`.
+
+The original LaserForge-2.0 checkout remains on `claude/vcarve-stamp-subcell` at
+`9209fcb33f4807ebfc1f7a55780069b6a7b0e23c`. Its inherited source edits and untracked evidence are
+preserved. Implementation occurs only in isolated feature-quality worktrees. No hardware operation
+or manual publication is part of this slice.
+
+| Lane | Findings | Branch | PR / current evidence |
+|---|---|---|---|
+| Images | 7 | `codex/feature-quality-images-20260905` | PR #729 merged as `7709bc995`; full CI `33935138293` and Chrome `33935138336` passed; 324 focused tests also passed |
+| Settings/calibration/camera | 7 | `codex/feature-quality-settings-20260905` | PR #730 at `a02eae465`; hidden density-field help metadata corrected after the first full gate; 36 focused follow-up tests and format/lint/size/export checks passed; new hosted gates pending |
+| Geometry/text/design | 9 | `codex/feature-quality-geometry-20260905` | PR #731 at `ab0db4fd9`; first full suite/build passed, then its export-cap failure was corrected with a direct helper import; 34 follow-up tests/type/lint/format/size/export checks passed; new hosted gates pending |
+| Controller/workspace/jigs | 7 | `codex/feature-quality-controller-20260905` | PR #732; focused regressions/type/lint/format passed, plus Chrome `33936607963` on `0ec227d40`; frozen-source full local gate and combined-head hosted verification pending |
+| Surfacing | 1 | `codex/first100-surfacing` (existing owner) | PR #728 at `47dc5261b` independently rechecked against F22-1; Chrome `33935740265` passed, full gate/merge pending; duplicate implementation paused and preserved |
+
+This is the integration checkpoint before final hosted checks and merges. The combined revision
+contains all five reviewed source slices; the scoped PRs are merged only after their required gates.
+The final merge SHAs and main verification are recorded in [PR #732](https://github.com/cisgz3a-hub/KerfDesk/pull/732)
+so completion evidence can be updated without changing the verified product tree. Existing unrelated
+PRs remain outside this inventory. Per-lane notes distinguish source, DOM/simulated transport,
+browser and physical evidence. Frame-only Start and warning policy are unchanged.
+
+Preservation was rechecked on 2026-09-05: all 25 inherited working files and all 4,602 archived
+source files matched their recorded hashes. The original branch and HEAD above were unchanged.
+
+Final inventory reconciliation matched all 31 unique finding IDs to their targeted fixes and
+acceptance regressions. The legacy full-page CNC pane remains unmounted; its evidence is source/DOM.
+Rendered jig and Inspector checks are in `docs/audits/2026-09-05-feature-remediation/browser.md`.

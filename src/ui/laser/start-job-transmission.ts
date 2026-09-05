@@ -52,6 +52,10 @@ export async function transmitPreparedStart(input: {
   const assertion = finalStartAssertion(input.authorizationArgs, (refusal) => {
     boundaryRefusal = refusal;
   });
+  // Observe before the first possible stream transition. A short program may
+  // settle while startJob or recovery persistence is still awaiting a write.
+  const advancement = armVariableStreamAdvancement(input.args.project, input.runId);
+  let startAccepted = false;
   try {
     // startJob repeats this synchronous gate after its final await and
     // immediately before streamer creation.
@@ -59,12 +63,14 @@ export async function transmitPreparedStart(input: {
       input.args.prepared.gcode,
       preparedStartOptions(input.args, input.runId, assertion),
     );
+    startAccepted = true;
+    advancement.accept();
     const acceptedHandoff = handoffArmed;
     handoffArmed = false;
     staged = false;
     await activateAcceptedFreshRun(input.runId, acceptedHandoff, input.args.repository);
-    armVariableStreamAdvancement(input.args.project);
   } catch (error) {
+    if (!startAccepted) advancement.cancel();
     if (handoffArmed) await input.args.repository.cancelPendingStart(input.runId);
     if (staged) await input.args.repository.discardStagedRun(input.runId);
     if (boundaryRefusal !== null) {

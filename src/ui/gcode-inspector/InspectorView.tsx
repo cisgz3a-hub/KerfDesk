@@ -71,6 +71,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
     colorOf,
     live: live.point,
     arrows,
+    travelVisible,
   });
 
   // source -> 3D: select the line, and move the playhead to its first move.
@@ -121,10 +122,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           arrowsVisible={arrowsVisible}
           onArrowsVisibleChange={setArrowsVisible}
           travelVisible={travelVisible}
-          onTravelVisibleChange={(visible) => {
-            setTravelVisible(visible);
-            handleRef.current?.setTravelVisible(visible);
-          }}
+          onTravelVisibleChange={setTravelVisible}
           onLocateLine={locateLine}
         />
       ) : null}

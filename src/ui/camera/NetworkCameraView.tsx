@@ -61,6 +61,7 @@ export function clickToIntrinsicPixel(
 export function NetworkCameraView(props: {
   readonly frameUrl: string;
   readonly cameraUrl: string;
+  readonly queryFingerprint: string | undefined;
 }): JSX.Element {
   const device = useStore((s) => s.project.device);
   const alignment = useCameraStore((s) => s.alignment);
@@ -104,6 +105,7 @@ export function NetworkCameraView(props: {
             homography={alignment.homography}
             natural={natural}
             cameraUrl={props.cameraUrl}
+            queryFingerprint={props.queryFingerprint}
           />
           <button
             type="button"
@@ -155,6 +157,7 @@ function SaveAlignmentButton(props: {
   readonly homography: Mat3;
   readonly natural: IntrinsicSize;
   readonly cameraUrl: string;
+  readonly queryFingerprint: string | undefined;
 }): JSX.Element {
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
   const saved = useStore((s) => s.project.device.cameraAlignment);
@@ -176,7 +179,7 @@ function SaveAlignmentButton(props: {
             // the calibrated marker wizard for non-zero surface compensation.
             planeHeightMm: 0,
             capture: cameraCaptureBindingForFrame(
-              machineJpegSource(props.cameraUrl),
+              machineJpegSource(props.cameraUrl, props.queryFingerprint),
               props.natural.width,
               props.natural.height,
             ),
@@ -190,8 +193,16 @@ function SaveAlignmentButton(props: {
   );
 }
 
-function machineJpegSource(cameraUrl: string): ActiveCameraSource {
-  return { kind: 'machine-jpeg', cameraUrl, frameUrl: cameraUrl };
+function machineJpegSource(
+  cameraUrl: string,
+  queryFingerprint: string | undefined,
+): ActiveCameraSource {
+  return {
+    kind: 'machine-jpeg',
+    cameraUrl,
+    frameUrl: cameraUrl,
+    ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
+  };
 }
 
 function usePollTick(): number {

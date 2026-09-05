@@ -133,6 +133,8 @@ async function setOriginHere(
 ): Promise<void> {
   await assertOriginActionReady(set, get, refs, safeWrite);
   let sawFreshWcoFrame = true;
+  const sessionEpoch = get().controllerSessionEpoch;
+  const writeEpoch = refs.writeEpoch;
   await runOriginTransaction(
     set,
     get,
@@ -144,14 +146,13 @@ async function setOriginHere(
     // offset on its next status frame, which populates wcoCache. Right after
     // Release motors ($SLP) + Wake — the no-homing hand-set workflow — the prior
     // offset is unknown, so transientXyOriginPatch honestly declines to fabricate
-    // it and leaves wcoCache null; Start then refuses the location-unknown origin
-    // until a jog forces a frame (the reported bug). Wait for that frame so the
+    // it and leaves wcoCache null. Wait for that frame so the
     // origin is usable the instant Set origin reports success. A G92 does not move
     // the head, and no homing is needed. g92-only (Smoothie) / WCS-less (Marlin)
     // controllers never report WCO, so skip the wait there.
-    async () => {
+    async (assertCurrent) => {
       if (usesPrimaryWcs(get())) {
-        sawFreshWcoFrame = await waitForOriginWcoFrame(get);
+        sawFreshWcoFrame = await waitForOriginWcoFrame(get, assertCurrent);
       }
       const { statusReport, wcoCache } = get();
       return transientXyOriginPatch(
@@ -168,7 +169,11 @@ async function setOriginHere(
   // will refuse it until a jog forces a WCO frame. Say so now, at Set origin
   // time, instead of only surfacing it later at Start (audit B21). Non-blocking:
   // the origin is still set; this is a heads-up, not a gate.
-  if (!sawFreshWcoFrame) {
+  if (
+    !sawFreshWcoFrame &&
+    get().controllerSessionEpoch === sessionEpoch &&
+    refs.writeEpoch === writeEpoch
+  ) {
     set((state) => ({ log: pushLog(state, ORIGIN_WCO_UNCONFIRMED_NOTICE) }));
   }
 }
@@ -303,10 +308,12 @@ export const ORIGIN_WCO_UNCONFIRMED_NOTICE =
 // Resolves true once a fresh work offset lands (wcoCache populated), or false if
 // the controller stays silent past the deadline. The caller uses the outcome to
 // warn that the recorded origin's location is unconfirmed.
-async function waitForOriginWcoFrame(get: GetFn): Promise<boolean> {
+async function waitForOriginWcoFrame(get: GetFn, assertCurrent: () => void): Promise<boolean> {
   const deadline = Date.now() + ORIGIN_WCO_WAIT_TIMEOUT_MS;
+  assertCurrent();
   while (get().wcoCache === null && Date.now() <= deadline) {
     await sleep(ORIGIN_WCO_POLL_MS);
+    assertCurrent();
   }
   return get().wcoCache !== null;
 }

@@ -19321,7 +19321,56 @@ or controller behavior.
 
 ---
 
-## ADR-316 — Operation-owned artwork overrides preserve copied output and later edits
+## ADR-316 - Feature edits retain source, operation and asynchronous ownership (2026-09-05)
+
+**Status:** Accepted | **Date:** 2026-09-05
+
+### Context
+
+The September 5 website/code audit traced 27 feature groups at `ccaa3064` and established 31
+specific defects. Button responses alone did not prove that edited geometry retained output
+settings, image exports used edited pixels, or late asynchronous results still belonged to the
+current document/controller. Inventory: `docs/audits/2026-09-05-feature-remediation/README.md`.
+
+### Decision
+
+1. Geometry edits preserve effective per-object output settings and operation membership. Groups,
+   run order, text/mask references and Design Studio ownership are repaired in the same undoable
+   transaction. World-axis transforms remain correct for rotated and nonuniform objects.
+2. Baked image pixels become the canonical embedded source. Old paged references remain in prior
+   undo snapshots, and asynchronous PNG/luminance encoding captures one immutable revision.
+   Image history, eraser color and adjustment compositing agree with the displayed edit.
+3. Forms preserve canonical values and distinguish absent controls from unchecked controls.
+   Incomplete fit/calibration/jig drafts cannot replace artwork. The synchronous jig editor states
+   the existing project persistence limits (10,000 objects and 256 operations), reserves capacity
+   for retained artwork, and validates the row/column product and finite positions before allocation.
+4. Camera solves return data; the initiating wizard commits only while request, document, device,
+   source and plane remain current. Origin operations retain controller session, write epoch and
+   operation ownership across ACK and post-ACK waits. Retired work publishes neither success nor
+   failure into a replacement owner.
+5. Canvas machine points use the existing machine-position move pipeline. Variable advancement is
+   observed before streamer creation, bound to its run/session, and committed only after accepted
+   transmission and successful terminal settlement. Modal views own application shortcuts/focus;
+   asynchronous viewer controls are replayed at readiness; clipboard failure is actionable.
+6. Surfacing keeps requested spacing/depth and deterministic line order while large preparation
+   uses cancellable batches, incremental preflight and streaming file output. The original click
+   opens the picker; successful preflight precedes opening the writable target. The UI export
+   path does not require a complete line array/string. Actual representation failures are reported without
+   silently changing geometry or inventing a machine policy gate.
+7. Frame remains the sole ordinary Start gate under ADR-228/230/232/237. Policy findings remain
+   warnings. Software tests, browser checks, and controller/material/hardware qualification are
+   distinct evidence categories.
+
+### Verification
+
+Each scoped branch adds desired-behavior regressions and runs neighboring suites, typecheck,
+ESLint, formatting and whitespace checks. PR full CI and Chrome smoke precede merge; the final
+integrated main revision receives its own verification. Exact commits, PRs and check results belong
+in `docs/remediation-ledger.md`, rather than being assumed from this decision.
+
+---
+
+## ADR-317 — Operation-owned artwork overrides preserve copied output and later edits
 
 **Status:** Accepted
 

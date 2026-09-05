@@ -42,4 +42,17 @@ describe('camera capture binding', () => {
   it('marks legacy records without a binding as unbound', () => {
     expect(cameraBindingCompatibility(undefined, USB)).toBe('unbound');
   });
+
+  it('preserves valid opaque query identity and rejects malformed persisted fingerprints', () => {
+    const queryFingerprint = `hmac-sha256:${'a'.repeat(64)}`;
+    expect(normalizeCameraCaptureBinding({ ...USB, queryFingerprint })).toEqual({
+      ...USB,
+      queryFingerprint,
+    });
+    for (const value of ['token=secret', `sha256:${'a'.repeat(64)}`, null, {}, 42]) {
+      expect(normalizeCameraCaptureBinding({ ...USB, queryFingerprint: value })).toBeUndefined();
+    }
+    expect(cameraBindingCompatibility(USB, { ...USB, queryFingerprint })).toBe('source-mismatch');
+    expect(cameraBindingCompatibility({ ...USB, queryFingerprint }, USB)).toBe('source-mismatch');
+  });
 });

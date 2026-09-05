@@ -4,6 +4,7 @@
 // bridge-proxied machine camera).
 
 import type { CameraAdapter, CameraBridgeAdapter } from '../../platform/types';
+import { cameraQueryFingerprint } from './camera-resource-identity';
 import { publicCameraSourceId, type ActiveCameraSource } from '../camera/frame-source';
 import {
   handleUsbStatus,
@@ -32,7 +33,12 @@ export type CameraSourceState =
 export type MachineCameraState =
   | { readonly kind: 'idle' }
   | { readonly kind: 'detecting' }
-  | { readonly kind: 'found'; readonly cameraUrl: string; readonly proxyFrameUrl: string }
+  | {
+      readonly kind: 'found';
+      readonly cameraUrl: string;
+      readonly proxyFrameUrl: string;
+      readonly queryFingerprint?: string;
+    }
   | { readonly kind: 'not-found' }
   // The bridge is missing/unreachable; `reason` says how to start it.
   | { readonly kind: 'unavailable'; readonly reason: string };
@@ -97,19 +103,25 @@ export function createCameraSourceActions(
 // browser-side <img> probe is CSP-blocked in the desktop app and on the
 // deployed site, so the bridge is the one discovery path.
 function makeDetectMachineCamera(set: CameraSourceSet): CameraSourceActions['detectMachineCamera'] {
+  let latestRequest = 0;
   return async (bridge) => {
+    const request = ++latestRequest;
     if (bridge === undefined) {
       set({ machineCamera: { kind: 'unavailable', reason: BRIDGE_MISSING } });
       return;
     }
     set({ machineCamera: { kind: 'detecting' } });
     const result = await bridge.discoverMachineCamera();
+    if (request !== latestRequest) return;
     if (result.kind === 'found') {
+      const queryFingerprint = await cameraQueryFingerprint(result.cameraUrl);
+      if (request !== latestRequest) return;
       set({
         machineCamera: {
           kind: 'found',
           cameraUrl: result.cameraUrl,
           proxyFrameUrl: result.proxyFrameUrl,
+          ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
         },
       });
       return;
@@ -142,6 +154,9 @@ function makeActivateMachineCamera(
           kind: 'machine-jpeg',
           frameUrl: machine.proxyFrameUrl,
           cameraUrl: machine.cameraUrl,
+          ...(machine.queryFingerprint === undefined
+            ? {}
+            : { queryFingerprint: machine.queryFingerprint }),
         },
       },
     });
@@ -228,6 +243,8 @@ function makeStartRtspSource(
       });
       return;
     }
+    const queryFingerprint = await cameraQueryFingerprint(url);
+    if (get().sourceEpoch !== epoch) return;
     const source: Extract<ActiveCameraSource, { readonly kind: 'machine-rtsp' }> = {
       kind: 'machine-rtsp',
       previewUrl: probe.previewUrl,
@@ -237,6 +254,7 @@ function makeStartRtspSource(
           ? { kind: 'unmonitored', advisory: UNMONITORED_RTSP_ADVISORY }
           : { kind: 'monitored', streamSessionId: probe.streamSessionId },
       sourceId: publicCameraSourceId(url),
+      ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
     };
     set({
       sourceState: {

@@ -29,6 +29,7 @@ async function renderPanel(): Promise<{
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     statusReport: null,
@@ -42,6 +43,81 @@ afterEach(() => {
 });
 
 describe('ConsolePanel', () => {
+  it.each(['unavailable', 'rejected', 'throws'] as const)(
+    'offers a manual transcript when clipboard is %s',
+    async (failure) => {
+      const clipboard =
+        failure === 'unavailable'
+          ? undefined
+          : {
+              writeText: vi.fn(() => {
+                if (failure === 'throws') throw new Error('denied');
+                return Promise.reject(new Error('denied'));
+              }),
+            };
+      vi.stubGlobal('navigator', { clipboard });
+      useLaserStore.setState({
+        transcript: [
+          { id: 1, at: 1, direction: 'in', raw: 'error:8', kind: 'error', source: 'controller' },
+        ],
+      });
+      const { host, unmount } = await renderPanel();
+      try {
+        const copy = [...host.querySelectorAll('button')].find(
+          (button) => button.textContent === 'Copy visible',
+        );
+        if (copy === undefined) throw new Error('Copy button missing');
+        await act(async () => copy.click());
+        const manual = host.querySelector<HTMLTextAreaElement>(
+          '[aria-label="Console transcript to copy manually"]',
+        );
+        expect(manual?.value).toBe('in error error:8');
+        expect(manual?.readOnly).toBe(true);
+        expect(host.textContent).toContain('Clipboard access failed');
+      } finally {
+        await unmount();
+      }
+    },
+  );
+
+  it.each(['manual', 'pending'] as const)(
+    'clearing the console retires a %s clipboard copy',
+    async (phase) => {
+      let rejectCopy: (reason: Error) => void = () => undefined;
+      const pending = new Promise<void>((_resolve, reject) => {
+        rejectCopy = reject;
+      });
+      vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn(() => pending) } });
+      useLaserStore.setState({
+        transcript: [
+          { id: 1, at: 1, direction: 'in', raw: 'error:8', kind: 'error', source: 'controller' },
+        ],
+      });
+      const { host, unmount } = await renderPanel();
+      try {
+        const copy = [...host.querySelectorAll('button')].find(
+          (button) => button.textContent === 'Copy visible',
+        );
+        const clear = [...host.querySelectorAll('button')].find(
+          (button) => button.textContent === 'Clear',
+        );
+        if (copy === undefined || clear === undefined) throw new Error('Console buttons missing');
+        await act(async () => copy.click());
+        if (phase === 'manual') {
+          await act(async () => rejectCopy(new Error('denied')));
+          expect(host.querySelector('textarea')).not.toBeNull();
+        }
+        await act(async () => clear.click());
+        if (phase === 'pending') await act(async () => rejectCopy(new Error('denied')));
+        expect(host.querySelector('textarea')).toBeNull();
+        expect(host.textContent).not.toContain('Clipboard access failed');
+        expect(host.textContent).not.toContain('error:8');
+      } finally {
+        await unmount();
+      }
+    },
+  );
+
   it('hides status polls and job stream lines by default', async () => {
     useLaserStore.setState({
       transcript: [
