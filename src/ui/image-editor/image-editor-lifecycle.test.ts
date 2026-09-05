@@ -103,6 +103,52 @@ afterEach(() => {
 });
 
 describe('Image Studio session lifecycle', () => {
+  it('can Apply, Undo, Apply, Redo, and Apply without losing editor changes', async () => {
+    const image = raster('editable');
+    const snapshots: number[] = [];
+    vi.mocked(decodeRasterToBuffer).mockResolvedValue(createRgbaBuffer(4, 4));
+    vi.mocked(bakeBufferToBitmapFields).mockImplementation(async (doc) => {
+      const value = doc.data[0] ?? 0;
+      snapshots.push(value);
+      return {
+        dataUrl: `data:image/png;base64,${btoa(String(value))}`,
+        lumaBase64: btoa(String.fromCharCode(value).repeat(16)),
+      };
+    });
+    useStore.setState({
+      project: projectWithRaster(image),
+      projectDocumentEpoch: 5,
+      applyEditedImage: ORIGINAL_APPLY_EDITED_IMAGE,
+    });
+    useImageEditorStore.getState().openEditor(image);
+    await settle();
+    useImageEditorStore.setState({
+      tool: { kind: 'pencil' },
+      brush: { diameterPx: 3, hardness: 1, opacity: 1 },
+      foreground: { r: 0, g: 0, b: 0 },
+    });
+    useImageEditorStore.getState().stroke([{ x: 0, y: 0 }]);
+    useImageEditorStore.getState().apply();
+    await settle();
+    expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(false);
+
+    useImageEditorStore.getState().undo();
+    expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(true);
+    useImageEditorStore.getState().apply();
+    await settle();
+    expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(false);
+
+    useImageEditorStore.getState().redo();
+    expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(true);
+    useImageEditorStore.getState().apply();
+    await settle();
+    expect(snapshots).toEqual([0, 255, 0]);
+    expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(false);
+    const edited = useStore.getState().project.scene.objects[0];
+    expect(edited).toMatchObject({ lumaBase64: btoa(String.fromCharCode(0).repeat(16)) });
+    expect(useStore.getState().undoStack).toHaveLength(3);
+  });
+
   it('ignores stale decode success after a newer image open starts', async () => {
     const older = deferred<RgbaBuffer>();
     const newer = deferred<RgbaBuffer>();

@@ -3,6 +3,7 @@ import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import { rectSelection } from '../../core/image-select/marquee';
 import { commitAdjustment, computeAdjustPreview } from './editor-adjust-session';
 import { createSession, undoSession, withSelection } from './editor-session';
+import { compositeSession, setActiveLayerProps } from './editor-session-layers';
 
 const BOUNDS = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
 
@@ -32,6 +33,19 @@ describe('commitAdjustment', () => {
 });
 
 describe('computeAdjustPreview', () => {
+  it.each([
+    { name: 'half opacity', props: { opacity: 0.5 }, expected: 128 },
+    { name: 'hidden', props: { isVisible: false }, expected: 255 },
+    { name: 'multiply', props: { blend: 'multiply' as const, opacity: 0.5 }, expected: 128 },
+  ])('previews the committed composite for a single $name layer', ({ props, expected }) => {
+    const session = setActiveLayerProps(newSession(), props);
+    const preview = computeAdjustPreview(session, 'invert', {});
+    expect(preview.data[0]).toBe(expected);
+    expect(session.doc.data[0]).toBe(255);
+    const committed = commitAdjustment(session, 'invert', {});
+    expect(preview).toEqual(compositeSession(committed));
+  });
+
   it('never mutates the session document', () => {
     const session = newSession();
     const preview = computeAdjustPreview(session, 'invert', {});

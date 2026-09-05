@@ -47,7 +47,13 @@ function PanelBody(props: {
       style={panelStyle}
       onKeyDown={(e) => {
         if (e.key === 'Escape') store.cancel();
-        if (e.key === 'Enter') store.commit();
+        // A focused button owns Enter: Cancel/Reset must retain their native
+        // action, and OK must not commit once here and again on native click.
+        const onButton = e.target instanceof Element && e.target.closest('button') !== null;
+        if (e.key === 'Enter' && !e.defaultPrevented && !onButton) {
+          e.preventDefault();
+          store.commit();
+        }
         e.stopPropagation();
       }}
     >

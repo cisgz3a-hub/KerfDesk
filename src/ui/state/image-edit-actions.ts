@@ -2,8 +2,8 @@
 //
 // The editor bakes its RGBA working document to fresh dataUrl + luma fields
 // and hands them here; the swap is exactly one project undo entry. Pixel
-// dimensions and mm bounds are untouched — Studio painting never changes
-// physical scale (crop/resize are separate ops with their own contracts).
+// dimensions and mm bounds follow the editor's crop/resize contract. Baking
+// replaces any paged source; the prior project snapshot retains it for undo.
 
 import { replaceObject, type Bounds, type SceneObject } from '../../core/scene';
 import { pushUndo } from './scene-mutations';
@@ -38,8 +38,9 @@ function applyEdit(
 ): AppState | Partial<AppState> {
   const image = sceneObjectById(state.project.scene.objects, imageId);
   if (image?.kind !== 'raster-image') return state;
+  const { imageAsset: _imageAsset, ...embedded } = image;
   const edited = {
-    ...image,
+    ...embedded,
     dataUrl: fields.dataUrl,
     lumaBase64: fields.lumaBase64,
     ...(fields.pixelWidth === undefined ? {} : { pixelWidth: fields.pixelWidth }),

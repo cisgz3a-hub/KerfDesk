@@ -52,7 +52,7 @@ export function commitAdjustment(
 }
 
 /**
- * The dialog's live preview: the document is never touched. Multi-layer
+ * The dialog's live preview: the document is never touched. All
  * sessions preview the full composite with the adjusted active layer
  * substituted in, so what the dialog shows is what OK produces (ADR-245).
  */
@@ -64,7 +64,6 @@ export function computeAdjustPreview(
 ): RgbaBuffer {
   const clone = cloneRgbaBuffer(session.doc);
   runOp(id, params, curvePoints, clone, selectionRect(session), session.selection);
-  if (session.layers.length === 1) return clone;
   const layers = session.layers.map((layer) =>
     layer.buffer === session.doc ? { ...layer, buffer: clone } : layer,
   );
