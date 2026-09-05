@@ -4,6 +4,7 @@ import {
   type CncHelicalContourPass,
 } from '../job/helical-representation';
 import { fmt } from './cnc-grbl-emit-head';
+import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 
 export type PreparedHelicalMotion = {
   readonly first: { readonly x: number; readonly y: number };
@@ -31,7 +32,9 @@ export function prepareHelicalMotion(
   const arcLines: string[] = [];
   for (let revolution = 1; revolution <= revolutions; revolution += 1) {
     const z = seams[revolution]?.text ?? fmt(0);
-    arcLines.push(`${direction} X${startX} Y${startY} Z${z} I${i} J${j} F${plunge}`);
+    arcLines.push(
+      `${direction} X${startX} Y${startY} Z${z} I${i} J${j} F${formatGcodeFeedMmPerMin(plunge)}`,
+    );
   }
   return {
     first,

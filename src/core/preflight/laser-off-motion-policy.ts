@@ -1,4 +1,5 @@
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
+import { effectiveGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { parseGcodeWord } from '../invariants';
 import { DEFAULT_OVERSCAN_MM } from '../job';
 import {
@@ -62,7 +63,7 @@ export function isConfiguredIntentionalLaserOffMotion(
   if (
     controlledFeed !== undefined &&
     explicitFeed !== null &&
-    explicitFeed === Math.max(1, Math.round(controlledFeed))
+    explicitFeed === effectiveGcodeFeedMmPerMin(controlledFeed)
   ) {
     return true;
   }

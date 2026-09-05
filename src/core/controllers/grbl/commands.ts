@@ -10,6 +10,8 @@
 
 // --- Real-time commands (single byte) ---
 
+import { formatGcodeFeedMmPerMin } from '../../gcode/feed-word';
+
 /** Status report request. GRBL replies with <state|...>. Poll at ~5 Hz. */
 export const RT_STATUS = '?';
 
@@ -128,7 +130,7 @@ export function buildJogCommand(params: JogParams): string {
   if (includeAxis(params.dx)) parts.push(`X${formatMm(params.dx)}`);
   if (includeAxis(params.dy)) parts.push(`Y${formatMm(params.dy)}`);
   if (includeAxis(params.dz)) parts.push(`Z${formatMm(params.dz)}`);
-  parts.push(`F${Math.max(1, Math.round(params.feed))}`);
+  parts.push(`F${formatGcodeFeedMmPerMin(params.feed)}`);
   return `$J=${parts.join(' ')}`;
 }
 

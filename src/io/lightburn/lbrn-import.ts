@@ -55,10 +55,11 @@ export function importLightBurnProjectDocument(
   if (geometry.objects.length === 0) {
     return { ok: false, reason: 'LightBurn project contains no supported vector geometry.' };
   }
-  const layers = importedLayers(
+  const layerImport = importedLayers(
     root,
     geometry.objects.flatMap((object) => object.paths.map((path) => path.color)),
   );
+  const layers = layerImport.layers;
   const operationIdByColor = new Map(layers.map((operation) => [operation.color, operation.id]));
   const objects = geometry.objects.map((object) => ({
     ...object,
@@ -82,12 +83,15 @@ export function importLightBurnProjectDocument(
       importedObjects: geometry.objects.length,
       importedLayers: layers.length,
       unsupportedShapeTypes: geometry.unsupportedShapeTypes,
-      warnings: geometry.warnings,
+      warnings: [...geometry.warnings, ...layerImport.warnings],
     },
   };
 }
 
-function importedLayers(root: Element, usedColors: ReadonlyArray<string>): Layer[] {
+function importedLayers(
+  root: Element,
+  usedColors: ReadonlyArray<string>,
+): { readonly layers: Layer[]; readonly warnings: ReadonlyArray<string> } {
   const settings = new Map<number, Element>();
   for (const element of [...root.children]) {
     if (normalized(element.tagName) !== 'cutsetting') continue;
@@ -95,27 +99,158 @@ function importedLayers(root: Element, usedColors: ReadonlyArray<string>): Layer
     if (index !== null) settings.set(Math.trunc(index), element);
   }
   const colors = [...new Set(usedColors)];
-  return colors.map((color) => {
-    const index = findColorIndex(color);
-    const setting = settings.get(index);
-    const importedName = setting === undefined ? '' : textField(setting, ['name', 'label']).trim();
-    const name =
-      importedName ||
-      (index >= 0 ? `LightBurn C${index.toString().padStart(2, '0')}` : `Imported ${color}`);
-    const base = createLayer({ id: color, name, color });
-    if (setting === undefined) return base;
+  const warnings: string[] = [];
+  const layers = colors.map((color) => importedLayer(color, settings, warnings));
+  return { layers, warnings: [...new Set(warnings)].sort() };
+}
+
+function importedLayer(
+  color: string,
+  settings: ReadonlyMap<number, Element>,
+  warnings: string[],
+): Layer {
+  const index = findColorIndex(color);
+  const setting = settings.get(index);
+  const importedName = setting === undefined ? '' : textField(setting, ['name', 'label']).trim();
+  const name =
+    importedName ||
+    (index >= 0 ? `LightBurn C${index.toString().padStart(2, '0')}` : `Imported ${color}`);
+  const base = createLayer({ id: color, name, color });
+  if (setting === undefined) return base;
+  const mode = textField(setting, ['type', 'mode']).toLowerCase();
+  const isScan = mode.includes('scan') || mode.includes('fill');
+  if (isScan) {
+    const overscan = numericField(setting, ['overscan']);
     const speedMmSec = numericField(setting, ['speed', 'speedmmsec']);
-    const power = numericField(setting, ['maxpower', 'power']);
-    const passes = numericField(setting, ['numpasses', 'passes']);
-    const mode = textField(setting, ['type', 'mode']).toLowerCase();
-    return {
-      ...base,
-      mode: mode.includes('scan') || mode.includes('fill') ? 'fill' : 'line',
-      ...(speedMmSec === null ? {} : { speed: Math.max(1, speedMmSec * 60) }),
-      ...(power === null ? {} : { power: Math.max(0, Math.min(100, power)) }),
-      ...(passes === null ? {} : { passes: Math.max(1, Math.round(passes)) }),
-    };
-  });
+    warnings.push(...unsupportedScanSettingWarnings(setting, name, overscan, speedMmSec));
+  }
+  return {
+    ...base,
+    mode: isScan ? 'fill' : 'line',
+    ...importedCommonLayerFields(setting),
+    ...(isScan ? importedScanLayerFields(setting) : {}),
+  };
+}
+
+function importedCommonLayerFields(setting: Element): Partial<Layer> {
+  const speedMmSec = numericField(setting, ['speed', 'speedmmsec']);
+  const power = numericField(setting, ['maxpower', 'power']);
+  const passes = numericField(setting, ['numpasses', 'passes']);
+  return {
+    ...(speedMmSec === null ? {} : { speed: Math.max(1, speedMmSec * 60) }),
+    ...(power === null ? {} : { power: Math.max(0, Math.min(100, power)) }),
+    ...(passes === null ? {} : { passes: Math.max(1, Math.round(passes)) }),
+  };
+}
+
+function importedScanLayerFields(setting: Element): Partial<Layer> {
+  const intervalMm = numericField(setting, ['interval', 'lineinterval']);
+  const angleDeg = numericField(setting, ['scanangle', 'angle']);
+  const crossHatch = booleanField(setting, ['crosshatch']);
+  const bidirectional = booleanField(setting, ['bidirectional', 'bidir']);
+  const overscan = numericField(setting, ['overscan']);
+  const speedMmSec = numericField(setting, ['speed', 'speedmmsec']);
+  const fixedOverscanMm = lightBurnOverscanMm(overscan, speedMmSec);
+  return {
+    ...(intervalMm !== null && intervalMm > 0 ? { hatchSpacingMm: intervalMm } : {}),
+    ...(angleDeg === null ? {} : { hatchAngleDeg: angleDeg }),
+    ...(crossHatch === null ? {} : { fillCrossHatch: crossHatch }),
+    ...(bidirectional === null ? {} : { fillBidirectional: bidirectional }),
+    ...(fixedOverscanMm === null ? {} : { fillOverscanMm: fixedOverscanMm }),
+  };
+}
+
+function lightBurnOverscanMm(
+  overscanPercent: number | null,
+  speedMmSec: number | null,
+): number | null {
+  if (overscanPercent === null) return null;
+  if (overscanPercent === 0) return 0;
+  if (speedMmSec === null || speedMmSec <= 0) return null;
+  return Math.max(0, (speedMmSec * overscanPercent) / 100);
+}
+
+function unsupportedScanSettingWarnings(
+  setting: Element,
+  layerName: string,
+  overscan: number | null,
+  speedMmSec: number | null,
+): ReadonlyArray<string> {
+  const warnings: string[] = [];
+  if (overscan !== null && overscan !== 0) {
+    const fixedMm = lightBurnOverscanMm(overscan, speedMmSec);
+    warnings.push(
+      fixedMm === null
+        ? `${layerName}: LightBurn Scan overscan ${overscan}% could not be converted without a positive imported speed; review the default 5 mm runway.`
+        : `${layerName}: LightBurn Scan overscan ${overscan}% was converted to ${fixedMm} mm at ${speedMmSec} mm/s; review it after changing speed because LaserForge stores a fixed physical runway.`,
+    );
+  }
+  const supported = new Set([
+    'index',
+    'name',
+    'label',
+    'type',
+    'mode',
+    'speed',
+    'speedmmsec',
+    'maxpower',
+    'minpower',
+    'minpower2',
+    'power',
+    'numpasses',
+    'passes',
+    'interval',
+    'lineinterval',
+    'scanangle',
+    'angle',
+    'crosshatch',
+    'bidirectional',
+    'bidir',
+    'overscan',
+  ]);
+  for (const field of directFields(setting)) {
+    if (supported.has(field.name) || !meaningfulLightBurnValue(field.value)) continue;
+    warnings.push(
+      `${layerName}: unsupported LightBurn Scan field “${field.name}” was not imported.`,
+    );
+  }
+  const minPower = numericField(setting, ['minpower', 'minpower2']);
+  if (minPower !== null && minPower !== 0) {
+    warnings.push(
+      `${layerName}: LightBurn Scan minimum power is not equivalent to LaserForge image grayscale minimum power and was not imported.`,
+    );
+  }
+  return warnings;
+}
+
+function directFields(
+  element: Element,
+): ReadonlyArray<{ readonly name: string; readonly value: string }> {
+  return [
+    ...[...element.attributes].map((attribute) => ({
+      name: normalized(attribute.name),
+      value: attribute.value,
+    })),
+    ...[...element.children].map((child) => ({
+      name: normalized(child.tagName),
+      value: child.getAttribute('Value') ?? child.textContent ?? '',
+    })),
+  ];
+}
+
+function meaningfulLightBurnValue(value: string): boolean {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === '' || trimmed === 'false' || trimmed === 'off' || trimmed === 'none')
+    return false;
+  const numeric = Number(trimmed);
+  return !Number.isFinite(numeric) || numeric !== 0;
+}
+
+function booleanField(element: Element, names: ReadonlyArray<string>): boolean | null {
+  const value = textField(element, names).trim().toLowerCase();
+  if (value === '1' || value === 'true' || value === 'yes') return true;
+  if (value === '0' || value === 'false' || value === 'no') return false;
+  return null;
 }
 
 function numericField(element: Element, names: ReadonlyArray<string>): number | null {

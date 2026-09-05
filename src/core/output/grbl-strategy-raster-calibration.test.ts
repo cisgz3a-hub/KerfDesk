@@ -35,4 +35,39 @@ describe('grblStrategy raster scan calibration', () => {
     expect(out).toContain('G0 X10.000 Y0.500 S0');
     expect(out).toContain('G0 X11.750 Y1.500 S0');
   });
+
+  it('selects scan compensation using the emitted fractional feed', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'raster',
+          layerId: 'slow-image',
+          color: '#808080',
+          power: 30,
+          speed: 0.75,
+          passes: 1,
+          airAssist: false,
+          sValues: new Uint16Array([100, 100, 100, 100]),
+          pixelWidth: 2,
+          pixelHeight: 2,
+          bounds: { minX: 10, minY: 0, maxX: 12, maxY: 2 },
+          overscanMm: 0,
+          dotWidthCorrectionMm: 0,
+        },
+      ],
+    };
+    const device = {
+      ...DEFAULT_DEVICE_PROFILE,
+      scanningOffsets: [
+        { speedMmPerMin: 0.75, offsetMm: 0.75 },
+        { speedMmPerMin: 1, offsetMm: 0.1 },
+      ],
+    };
+
+    const output = grblStrategy.emit(job, device);
+
+    expect(output).toContain('feed 0.75 mm/min');
+    expect(output).toContain('G0 X11.250 Y1.500 S0');
+    expect(output).not.toContain('G0 X11.900 Y1.500 S0');
+  });
 });

@@ -11,6 +11,7 @@ import { SafetyZonesPanel } from '../MachineSetupSafetyZones';
 import { PlannerFields } from '../PlannerAdvanced';
 import { ScanOffsetEditor } from '../ScanOffsetEditor';
 import { ControlledLaserOffTravelRow } from '../ControlledLaserOffTravelRow';
+import { ScanDirectionPolicyEditor } from '../ScanDirectionPolicyEditor';
 import {
   autofocusStatus,
   cameraStatus,
@@ -91,6 +92,11 @@ function LaserCalibrationSections(props: {
               scanOffsetCalibrationStatus: scanningOffsets.length > 0 ? 'pending' : undefined,
             })
           }
+        />
+        <ScanDirectionPolicyEditor
+          profile={draft}
+          withRow={false}
+          onChange={(bidirectionalScanPolicy) => update({ bidirectionalScanPolicy })}
         />
         <ControlledLaserOffTravelRow
           value={draft.controlledLaserOffTravelFeedMmPerMin}

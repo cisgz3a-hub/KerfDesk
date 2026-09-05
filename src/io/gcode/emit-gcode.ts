@@ -26,6 +26,7 @@ import {
   type CncPassSpan,
 } from '../../core/output';
 import type { OutputScope, Project } from '../../core/scene';
+import { findFluidncNonExecutableLines } from '../../core/controllers/fluidnc/fluidnc-line-limit';
 import {
   gcodeMetadataHeader,
   type GcodeHeaderAssumptions,
@@ -150,9 +151,13 @@ export function emitPreparedGcodeWithCncPassSpans(
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
-  const preflight = appendSecondaryToolFeedIssues(
-    runEmitPreflight(prepared.project, body, options, rotaryStage),
-    job,
+  const preflight = appendFluidncLineIssues(
+    appendSecondaryToolFeedIssues(
+      runEmitPreflight(prepared.project, body, options, rotaryStage),
+      job,
+    ),
+    prepared.project,
+    body,
   );
   const gcode = options.metadata
     ? gcodeMetadataHeader(
@@ -163,6 +168,26 @@ export function emitPreparedGcodeWithCncPassSpans(
     : body;
   const spans = cncEmission !== null && options.metadata === undefined ? cncEmission.spans : null;
   return { gcode, preflight, spans };
+}
+
+function appendFluidncLineIssues(
+  preflight: PreflightResult,
+  project: Project,
+  gcode: string,
+): PreflightResult {
+  if (project.device.controllerKind !== 'fluidnc') return preflight;
+  const rejected = findFluidncNonExecutableLines(gcode);
+  if (rejected.length === 0) return preflight;
+  return {
+    ok: false,
+    issues: [
+      ...preflight.issues,
+      ...rejected.map((line) => ({
+        code: 'fluidnc-line-unexecutable' as const,
+        message: `Line ${line.lineNumber} has a ${line.length}-byte executable payload; FluidNC accepts at most 127 bytes before error:14.`,
+      })),
+    ],
+  };
 }
 
 function appendSecondaryToolFeedIssues(preflight: PreflightResult, job: Job): PreflightResult {

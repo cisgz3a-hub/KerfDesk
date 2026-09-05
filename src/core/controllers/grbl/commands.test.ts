@@ -73,9 +73,10 @@ describe('buildJogCommand', () => {
     expect(buildJogCommand({ dx: 0, dy: 5, feed: 1500 })).toBe('$J=G91 G21 Y5.000 F1500');
   });
 
-  it('clamps and rounds the feed to an integer ≥ 1', () => {
+  it('falls back for zero, floors feeds above 1, and preserves positive fractions', () => {
     expect(buildJogCommand({ dx: 1, feed: 0 })).toContain('F1');
-    expect(buildJogCommand({ dx: 1, feed: 1234.7 })).toContain('F1235');
+    expect(buildJogCommand({ dx: 1, feed: 1234.7 })).toContain('F1234');
+    expect(buildJogCommand({ dx: 1, feed: 0.75 })).toContain('F0.75');
   });
 
   it('formats axes to 3 decimal places', () => {

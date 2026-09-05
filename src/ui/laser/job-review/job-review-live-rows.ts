@@ -261,6 +261,8 @@ function scanDirectionFactTone(reason: ScanDirectionReason): JobReviewFact['tone
   const warningReasons: ReadonlyArray<ScanDirectionReason> = [
     'expert-override',
     'calibration-baseline',
+    'pending-calibration-profile-fallback',
+    'uncalibrated-profile-fallback',
     'pending-calibration-4040-fallback',
     'uncalibrated-4040-fallback',
     'sensitive-island-one-way',
@@ -296,6 +298,10 @@ function scanDirectionReasonLabel(reason: ScanDirectionReason): string {
       return 'expert override without calibration';
     case 'sensitive-island-one-way':
       return 'sensitive Island Fill policy';
+    case 'pending-calibration-profile-fallback':
+      return 'profile fallback; saved calibration is awaiting verification';
+    case 'uncalibrated-profile-fallback':
+      return 'profile fallback; no scan-offset calibration';
     case 'pending-calibration-4040-fallback':
       return '4040 fallback; saved calibration is awaiting verification';
     case 'uncalibrated-4040-fallback':

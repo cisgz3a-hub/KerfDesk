@@ -6,9 +6,10 @@
 
 import type { FrameBounds } from './controller-driver';
 import { assertJogHasAxis, type JogParams } from './grbl/commands';
+import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 
 const fmt = (n: number): string => n.toFixed(3);
-const fmtFeed = (feed: number): number => Math.max(1, Math.round(feed));
+const fmtFeed = formatGcodeFeedMmPerMin;
 
 /** Relative jog without a native jog protocol: assert mm units, switch to
  *  relative mode, move, switch back. Multi-line payload — each line is acked

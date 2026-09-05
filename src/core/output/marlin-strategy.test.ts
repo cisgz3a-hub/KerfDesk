@@ -59,6 +59,24 @@ describe('marlinStrategy', () => {
     expect(out).not.toMatch(/^M[345]\b/m);
   });
 
+  it.each([1, 255, 1000])(
+    'fan dialect uses the protocol 0..255 scale even when the profile S max is %s',
+    (maxPowerS) => {
+      const out = marlinStrategy.emit(JOB, { ...MARLIN_FAN_DEVICE, maxPowerS });
+      expect(out).toContain('M106 S128');
+      expect(out).not.toMatch(/^G[01][^\n]*\bS\d/m);
+    },
+  );
+
+  it('does not leak a bypassed Neotronics dialect into Marlin emission', () => {
+    const out = marlinStrategy.emit(JOB, {
+      ...MARLIN_INLINE_DEVICE,
+      gcodeDialect: { dialectId: 'neotronics-4040-safe' },
+    });
+    expect(out).toContain('M4 S0');
+    expect(out).toContain('G0 X0.000 Y0.000 S0');
+  });
+
   it('fan dialect output satisfies the laser-off-on-travel invariant (#3)', () => {
     const out = marlinStrategy.emit(JOB, MARLIN_FAN_DEVICE);
     expect(findLaserOnTravelIssues(out)).toEqual([]);

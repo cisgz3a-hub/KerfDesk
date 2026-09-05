@@ -7,7 +7,7 @@ import {
 import type { Vec2 } from '../scene';
 import type { RasterGroup } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
-import { offsetForSpeed, type ScanOffsetPoint } from './scan-offset';
+import { offsetForEmittedFeed, type ScanOffsetPoint } from './scan-offset';
 
 export type RasterDurationMotion = {
   readonly kind: 'cut' | 'feed-travel' | 'seek';
@@ -23,7 +23,7 @@ export function* rasterDurationMotion(
   const geometry = rasterGeometry(group);
   if (geometry === null) return;
   const scanOffsetMm =
-    group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed);
+    group.bidirectionalScanOffsetMm ?? offsetForEmittedFeed(scanningOffsets, group.speed);
   const passes = Math.max(1, Math.floor(group.passes));
   let cursor = initialCursor;
   for (let pass = 0; pass < passes; pass += 1) {

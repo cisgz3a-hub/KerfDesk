@@ -21,6 +21,7 @@
 // table still returns 0 so uncalibrated machines keep byte-identical output.
 
 import type { DeviceProfile, ScanOffsetPoint } from '../devices';
+import { effectiveGcodeFeedMmPerMin } from '../gcode/feed-word';
 import type { Vec2 } from '../scene';
 export type { ScanOffsetPoint } from '../devices';
 
@@ -90,6 +91,14 @@ export function offsetForSpeed(
     lo = hi;
   }
   return lo.offsetMm;
+}
+
+/** Select compensation at the numeric feed the G-code emitter represents. */
+export function offsetForEmittedFeed(
+  table: ReadonlyArray<ScanOffsetPoint>,
+  requestedSpeedMmPerMin: number,
+): number {
+  return offsetForSpeed(table, effectiveGcodeFeedMmPerMin(requestedSpeedMmPerMin));
 }
 
 /**

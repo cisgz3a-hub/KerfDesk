@@ -30,6 +30,7 @@
 //   - Per-pixel feed modulation for grayscale-on-non-M4 controllers.
 
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
+import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import {
   planRasterRowSweeps,
   rasterControllerCoordinateMm,
@@ -100,7 +101,7 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
   // Then M4 S0 to arm dynamic-power mode at zero output.
   yield `M5${LINE_END}`;
   yield `${input.laserModeCommand ?? 'M4'} S0${LINE_END}`;
-  const feed = Math.round(input.feedMmPerMin);
+  const feed = effectiveGcodeFeedMmPerMin(input.feedMmPerMin);
   const pixelWidthMm = (input.bounds.maxX - input.bounds.minX) / input.width;
   const pixelHeightMm = (input.bounds.maxY - input.bounds.minY) / input.height;
   const dotWidthCorrectionMm = Math.max(0, input.dotWidthCorrectionMm ?? 0);
@@ -254,13 +255,13 @@ function emitSpanSweep(
 
 function formatLaserOffTravel(x: number, y: number, controlledFeed: number | undefined): string {
   if (controlledFeed !== undefined) {
-    return `G1 X${fmt(x)} Y${fmt(y)} F${Math.max(1, Math.round(controlledFeed))} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
+    return `G1 X${fmt(x)} Y${fmt(y)} F${formatGcodeFeedMmPerMin(controlledFeed)} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
   }
   return `G0 X${fmt(x)} Y${fmt(y)} S0`;
 }
 
 function formatLaserOffG1(x: number, feed: number, modalFeedrate: boolean): string {
-  const feedWord = modalFeedrate ? '' : ` F${feed}`;
+  const feedWord = modalFeedrate ? '' : ` F${formatGcodeFeedMmPerMin(feed)}`;
   return `G1 X${fmt(x)}${feedWord} S0`;
 }
 
@@ -277,7 +278,7 @@ function formatRunG1(
   emitSOnEveryBurnMove: boolean,
 ): string {
   const parts: string[] = [`G1 X${fmt(x)}`];
-  if (isVeryFirstG1 || !modalFeedrate) parts.push(`F${feed}`);
+  if (isVeryFirstG1 || !modalFeedrate) parts.push(`F${formatGcodeFeedMmPerMin(feed)}`);
   if (s !== prevS || emitSOnEveryBurnMove) parts.push(`S${s}`);
   return parts.join(' ');
 }
@@ -289,7 +290,7 @@ function headerComment(input: EmitRasterInput): string {
   return [
     `; image layer ${layer} color ${color} power ${power}%`,
     `; ${input.width} × ${input.height} px, ${fmt(input.bounds.maxX - input.bounds.minX)} × ${fmt(input.bounds.maxY - input.bounds.minY)} mm`,
-    `; feed ${Math.round(input.feedMmPerMin)} mm/min, overscan ${fmt(input.overscanMm)} mm, dot width correction ${fmt(input.dotWidthCorrectionMm ?? 0)} mm`,
+    `; feed ${formatGcodeFeedMmPerMin(input.feedMmPerMin)} mm/min, overscan ${fmt(input.overscanMm)} mm, dot width correction ${fmt(input.dotWidthCorrectionMm ?? 0)} mm`,
     ...(input.effectiveOperationComment === undefined
       ? []
       : [`; ${input.effectiveOperationComment}`]),

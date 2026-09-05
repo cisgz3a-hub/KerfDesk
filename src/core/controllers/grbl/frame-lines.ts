@@ -3,9 +3,10 @@
 // byte-identical: five absolute $J= jogs tracing the job perimeter.
 
 import type { FrameBounds } from '../controller-driver';
+import { formatGcodeFeedMmPerMin } from '../../gcode/feed-word';
 
 export function buildGrblFrameJogLines(bounds: FrameBounds, feed: number): ReadonlyArray<string> {
-  const f = Math.max(1, Math.round(feed));
+  const f = formatGcodeFeedMmPerMin(feed);
   const fmt = (n: number): string => n.toFixed(3);
   return [
     { x: bounds.minX, y: bounds.minY },
@@ -20,5 +21,5 @@ export function buildGrblFrameJogLines(bounds: FrameBounds, feed: number): Reado
 // before the XY perimeter. Absolute G90 jog, trailing newline — verbatim from
 // the pre-ADR-094 ui/state literal so the frame bytes stay byte-identical.
 export function buildGrblFrameRetract(zMm: number, feed: number): string {
-  return `$J=G90 G21 Z${zMm.toFixed(3)} F${Math.max(1, Math.round(feed))}\n`;
+  return `$J=G90 G21 Z${zMm.toFixed(3)} F${formatGcodeFeedMmPerMin(feed)}\n`;
 }

@@ -18,6 +18,8 @@ import {
 } from '../scene';
 import type { CncGroup, CncPass } from '../job';
 import { compileCncJob } from './compile-cnc-job';
+import { emitCncJobWithPassSpans } from '../output';
+import { findPlungedTravelIssues } from '../invariants';
 
 const dev = DEFAULT_DEVICE_PROFILE;
 const config = DEFAULT_CNC_MACHINE_CONFIG; // 1/8 in bit (3.175 mm)
@@ -76,6 +78,21 @@ function squareObject(id: string, color: string, size: number, at = 50): Importe
   };
 }
 
+function translatedCircleObject(id: string, color: string, reverse: boolean): ImportedSvg {
+  const ring = Array.from({ length: 128 }, (_, index) => {
+    const angle = (index / 128) * Math.PI * 2;
+    return { x: 90 + 30 * Math.cos(angle), y: 90 + 30 * Math.sin(angle) };
+  });
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 60, minY: 60, maxX: 120, maxY: 120 },
+    transform: { ...IDENTITY_TRANSFORM, x: 12, y: 7 },
+    paths: [{ color, polylines: [{ closed: true, points: reverse ? [...ring].reverse() : ring }] }],
+  };
+}
+
 function cncLayer(id: string, color: string, cnc: Partial<CncLayerSettings>): Layer {
   return { ...createLayer({ id, color }), cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...cnc } };
 }
@@ -93,6 +110,88 @@ function onlyGroup(scene: Scene): CncGroup {
 }
 
 describe('compileCncJob holding tabs (ADR-258)', () => {
+  it('keeps waste-side leads and tab-wall Z moves on every deep pass through emitted G-code', () => {
+    const group = onlyGroup(
+      sceneWith(
+        [
+          cncLayer('L1', '#ff0000', {
+            cutType: 'profile-outside',
+            depthMm: 8,
+            depthPerPassMm: 2,
+            tabsEnabled: true,
+            tabHeightMm: 4,
+            tabWidthMm: 6,
+            tabsPerShape: 4,
+            profileLead: { shape: 'line', radiusMm: 8 },
+            retractBetweenPasses: true,
+          }),
+        ],
+        [squareObject('O1', '#ff0000', 40)],
+      ),
+    );
+    expect(group.passes).toHaveLength(4);
+    const starts = group.passes.map((pass) => passXyPoints(pass)[0]);
+    expect(new Set(starts.map((point) => `${point?.x},${point?.y}`))).toHaveLength(1);
+    for (const pass of group.passes.slice(2)) {
+      expect(tabRisesIn(pass)).toHaveLength(4);
+      if (pass.kind !== 'path3d') throw new Error('deep tab pass must stay path3d');
+      for (let index = 1; index < pass.points.length; index += 1) {
+        const before = pass.points[index - 1]!;
+        const after = pass.points[index]!;
+        if (before.z === after.z) continue;
+        expect(after.x).toBe(before.x);
+        expect(after.y).toBe(before.y);
+      }
+      const end = pass.points.at(-1);
+      expect(end?.x).toBe(starts[0]?.x);
+      expect(end?.y).toBe(starts[0]?.y);
+    }
+
+    const emitted = emitCncJobWithPassSpans({ groups: [group] }, dev);
+    expect(emitted.spans).toHaveLength(4);
+    const retracts = emitted.gcode.match(/^G0 Z3\.810$/gm) ?? [];
+    expect(retracts).toHaveLength(group.passes.length + 1);
+    expect(findPlungedTravelIssues(emitted.gcode, { safeZMm: group.safeZMm })).toEqual([]);
+  });
+
+  it.each([false, true])(
+    'keeps translated default arc leads on every deep tab pass (reversed=%s)',
+    (reverse) => {
+      const layerSettings: Partial<CncLayerSettings> = {
+        cutType: 'profile-outside',
+        depthMm: 8,
+        depthPerPassMm: 2,
+        tabsEnabled: true,
+        tabHeightMm: 4,
+        tabWidthMm: 6,
+        tabsPerShape: 4,
+      };
+      const object = translatedCircleObject('translated-circle', '#ff0000', reverse);
+      const led = onlyGroup(sceneWith([cncLayer('L1', '#ff0000', layerSettings)], [object]));
+      const unled = onlyGroup(
+        sceneWith(
+          [
+            cncLayer('L1', '#ff0000', {
+              ...layerSettings,
+              profileLead: { shape: 'none' },
+            }),
+          ],
+          [object],
+        ),
+      );
+
+      expect(led.passes).toHaveLength(4);
+      const ledStarts = led.passes.map((pass) => passXyPoints(pass)[0]);
+      expect(new Set(ledStarts.map((point) => `${point?.x},${point?.y}`))).toHaveLength(1);
+      for (let index = 0; index < led.passes.length; index += 1) {
+        const unledPass = unled.passes[index];
+        if (unledPass === undefined) throw new Error('missing unled comparison pass');
+        expect(led.passes[index]?.kind).toBe('path3d');
+        expect(ledStarts[index]).not.toEqual(passXyPoints(unledPass)[0]);
+      }
+    },
+  );
+
   it('rides deep profile passes over the tabs in one continuous path', () => {
     const group = onlyGroup(
       sceneWith(

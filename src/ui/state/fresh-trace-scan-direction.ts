@@ -1,4 +1,7 @@
-import type { DeviceProfile } from '../../core/devices';
+import {
+  effectiveBidirectionalScanPolicy,
+  type DeviceProfile,
+} from '../../core/devices/device-profile';
 import { effectiveScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import type { Layer, SceneObject, TracedImage } from '../../core/scene';
 
@@ -23,7 +26,7 @@ function shouldDefaultTraceToOneWay(object: SceneObject, device: DeviceProfile):
   if (object.kind !== 'traced-image') return false;
   if (object.traceMode === 'centerline' || object.traceMode === 'edge') return false;
   if (hasExplicitTraceScanPolicy(object)) return false;
-  if (device.gcodeDialect.dialectId === 'neotronics-4040-safe') return false;
+  if (effectiveBidirectionalScanPolicy(device) === 'require-verified-offsets') return false;
   const calibrationStatus = effectiveScanOffsetCalibrationStatus(device);
   return calibrationStatus !== 'verified' && calibrationStatus !== 'legacy-verified';
 }

@@ -25,6 +25,7 @@ import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { clearCncLiveCaps } from './detected-settings-action';
 import {
+  assertActiveDriverAcceptsMachineKind,
   assertCncSetupAttested,
   assertGcodeFitsController,
   assertProgramHasSendableLine,
@@ -50,6 +51,7 @@ import {
 } from './laser-store-helpers';
 import type { LaserState, StartJobOptions } from './laser-store';
 import { normalizeStartJobOptions } from './laser-job-options';
+import { effectiveStartStreamOptions } from './laser-job-effective-stream-options';
 import { validatedStartJobTimingPlan } from './laser-job-timing-handoff';
 import {
   liveCanvasExecutionAcceptedPatch,
@@ -136,14 +138,14 @@ async function runStartJob(
     ...(options.framedRunPermit === undefined ? { frameVerification: null, framedRun: null } : {}),
   });
   try {
-    await prepareStartBoundary(context, gcode, options, setupEpoch);
+    const effectiveOptions = await prepareStartBoundary(context, gcode, options, setupEpoch);
     // prepareStartBoundary intentionally awaits queue/controller evidence. App
     // and camera state are outside the controller reservation and can change
     // during those awaits, so the owner gets one last synchronous refusal
     // point before streamer/activeRun state or the first program write exists.
     options.assertFinalStartAuthorized?.();
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
-    const { stepped, labels, toolIds } = prepareInitialStream(gcode, options);
+    const { stepped, labels, toolIds } = prepareInitialStream(gcode, effectiveOptions);
     const entersHoldNow = stepped.state.status === 'tool-change';
     const isImmediateToolChange = entersHoldNow && stepped.toSend.length === 0;
     set((state) => ({
@@ -193,7 +195,7 @@ async function prepareStartBoundary(
   gcode: string,
   options: StartJobOptions,
   setupEpoch: StartSetupEpoch,
-): Promise<void> {
+): Promise<StartJobOptions> {
   const { set, get, refs, safeWrite, driver } = context;
   if (hasPendingControllerWrite(get())) {
     await waitForUntrackedAckDrain(get);
@@ -201,6 +203,7 @@ async function prepareStartBoundary(
   }
   assertCncSetupAttested(gcode, options, setupEpoch);
   const machineKind = options.machineKind ?? 'laser';
+  assertActiveDriverAcceptsMachineKind(machineKind, driver());
   assertCncMpgInactive(set, get, machineKind);
   if (machineKind === 'cnc') {
     await startControllerCommand(refs, safeWrite, {
@@ -229,8 +232,10 @@ async function prepareStartBoundary(
   if (hasPendingControllerWrite(pendingState)) {
     throw new Error(startPendingControllerMessage(pendingState));
   }
+  const effectiveOptions = effectiveStartStreamOptions(options, pendingState, driver().kind);
   assertStartControllerEvidence(machineKind, options, gcode);
-  assertGcodeFitsController(gcode, options);
+  assertGcodeFitsController(gcode, effectiveOptions, driver().kind);
+  return effectiveOptions;
 }
 
 async function runStopJob(context: JobActionContext): Promise<void> {

@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { DeviceProfile } from '../../core/devices';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { type DeviceProfile, type ScanOffsetPoint } from '../../core/devices';
+import { scanOffsetMeasurementFromLaserForge } from '../../core/devices/scan-offset-measurement-format';
 import {
   effectiveScanOffsetCalibrationStatus,
-  mergeScanOffsetTableBySpeed,
   scanOffsetMagnitudeLimitMm,
-  type ScanOffsetPoint,
 } from '../../core/devices/scan-offset-profile';
 import { useStore } from '../state';
 import {
@@ -13,55 +12,73 @@ import {
   mutedStyle,
   numberInputStyle,
 } from './MachineSetupStyles';
-
-type DraftMeasurement = {
-  readonly speed: string;
-  readonly offset: string;
-};
-
-type MeasurementValidation = {
-  readonly points: ReadonlyArray<ScanOffsetPoint>;
-  readonly errors: ReadonlyArray<string>;
-};
-
-const DEFAULT_MEASUREMENT_SPEEDS = [1000, 2000, 3000, 4000, 5000] as const;
+import { ScanOffsetMeasurementFormatControls } from './ScanOffsetMeasurementFormatControls';
+import { ScanOffsetOverrideNotice } from './ScanOffsetOverrideNotice';
+import {
+  convertDraftScanOffsetFormat,
+  NATIVE_SCAN_OFFSET_MEASUREMENT_FORMAT,
+  nextDraftScanOffsetRow,
+  rowsFromScanOffsetProfile,
+  validateMeasuredScanOffsets,
+  type DraftScanOffsetMeasurement,
+  type ScanOffsetMeasurementFormat,
+  type ScanOffsetMeasurementValidation,
+} from './scan-offset-measurement-draft';
 
 export function MeasuredScanOffsetApply(): JSX.Element {
   const device = useStore((s) => s.project.device);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
-  const profileRows = useMemo(() => rowsFromProfile(device), [device]);
-  const [rows, setRows] = useState<ReadonlyArray<DraftMeasurement>>(profileRows);
+  const [format, setFormat] = useState<ScanOffsetMeasurementFormat>(
+    NATIVE_SCAN_OFFSET_MEASUREMENT_FORMAT,
+  );
+  const [rows, setRows] = useState<ReadonlyArray<DraftScanOffsetMeasurement>>(() =>
+    rowsFromScanOffsetProfile(device, NATIVE_SCAN_OFFSET_MEASUREMENT_FORMAT),
+  );
+  const profileFingerprint = scanOffsetProfileFingerprint(device);
+  const priorProfileFingerprint = useRef(profileFingerprint);
   const calibrationStatus = effectiveScanOffsetCalibrationStatus(device);
   const offsetLimitMm = scanOffsetMagnitudeLimitMm(device);
-  const validation = useMemo(() => validateMeasuredScanOffsets(rows, device), [rows, device]);
+  const inputOffsetLimitMm = scanOffsetMeasurementFromLaserForge(offsetLimitMm, format.convention);
+  const validation = useMemo(
+    () => validateMeasuredScanOffsets(rows, device, format),
+    [rows, device, format],
+  );
 
   useEffect(() => {
-    setRows(profileRows);
-  }, [profileRows]);
+    if (priorProfileFingerprint.current === profileFingerprint) return;
+    priorProfileFingerprint.current = profileFingerprint;
+    setRows(rowsFromScanOffsetProfile(device, format));
+  }, [device, format, profileFingerprint]);
+
+  const handleFormatChange = (next: ScanOffsetMeasurementFormat): void => {
+    setRows((current) => convertDraftScanOffsetFormat(current, format, next));
+    setFormat(next);
+  };
 
   return (
     <div style={panelStyle}>
+      <ScanOffsetMeasurementFormatControls format={format} onChange={handleFormatChange} />
       <p style={mutedStyle}>
-        From the uncorrected baseline coupon, enter the full signed forward-versus-reverse edge
-        separation. Do not divide the measurement in half: KerfDesk keeps forward rows on the design
-        coordinates and shifts reverse rows only. Positive moves reverse rows along their travel
-        direction; negative moves them opposite. Blank offset rows are ignored.
+        Sign is preserved from the selected source convention. Positive moves reverse rows along
+        their travel direction; negative moves them opposite. Blank offset rows are ignored.
       </p>
+      <ScanOffsetOverrideNotice />
       <div style={measurementListStyle}>
         {rows.map((row, index) => (
           <MeasuredRow
             key={index}
             index={index}
             row={row}
-            offsetLimitMm={offsetLimitMm}
+            format={format}
+            offsetLimitMm={inputOffsetLimitMm}
             onChange={(patch) => setRows((current) => updateRow(current, index, patch))}
           />
         ))}
       </div>
       <MeasurementActions
         applyDisabled={validation.points.length === 0 || validation.errors.length > 0}
-        onAdd={() => setRows((current) => [...current, nextRow(current)])}
-        onReset={() => setRows(profileRows)}
+        onAdd={() => setRows((current) => [...current, nextDraftScanOffsetRow(current, format)])}
+        onReset={() => setRows(rowsFromScanOffsetProfile(device, format))}
         onApply={() =>
           updateDeviceProfile({
             scanningOffsets: validation.points,
@@ -84,11 +101,15 @@ export function MeasuredScanOffsetApply(): JSX.Element {
         onMarkVerified={() => updateDeviceProfile({ scanOffsetCalibrationStatus: 'verified' })}
       />
       <p style={mutedStyle}>
-        Safety limit: |offset| must be at most {offsetLimitMm} mm (1% of the shorter bed axis,
-        capped at 5 mm).
+        Saved LaserForge safety limit: |offset| must be at most {offsetLimitMm} mm (1% of the
+        shorter bed axis, capped at 5 mm).
       </p>
     </div>
   );
+}
+
+function scanOffsetProfileFingerprint(device: DeviceProfile): string {
+  return JSON.stringify([device.profileId, device.maxFeed, device.scanningOffsets]);
 }
 
 function MeasurementActions(props: {
@@ -201,9 +222,10 @@ function CandidateTable(props: { readonly points: ReadonlyArray<ScanOffsetPoint>
 
 function MeasuredRow(props: {
   readonly index: number;
-  readonly row: DraftMeasurement;
+  readonly row: DraftScanOffsetMeasurement;
+  readonly format: ScanOffsetMeasurementFormat;
   readonly offsetLimitMm: number;
-  readonly onChange: (patch: Partial<DraftMeasurement>) => void;
+  readonly onChange: (patch: Partial<DraftScanOffsetMeasurement>) => void;
 }): JSX.Element {
   const rowNumber = props.index + 1;
   return (
@@ -235,90 +257,28 @@ function MeasuredRow(props: {
           title="Measured correction in millimeters for this speed."
         />
       </label>
-      <span style={unitStyle}>mm/min, mm</span>
+      <span style={unitStyle}>
+        {props.format.speedUnit === 'mm-per-second' ? 'mm/s' : 'mm/min'}, mm
+      </span>
     </div>
   );
 }
 
-function rowsFromProfile(device: DeviceProfile): ReadonlyArray<DraftMeasurement> {
-  const existing = mergeScanOffsetTableBySpeed(device.scanningOffsets);
-  if (existing.length > 0) {
-    return existing.map((point) => ({
-      speed: String(point.speedMmPerMin),
-      offset: String(point.offsetMm),
-    }));
-  }
-  return defaultSpeeds(device.maxFeed).map((speed) => ({ speed: String(speed), offset: '' }));
-}
-
-function defaultSpeeds(maxFeed: number): ReadonlyArray<number> {
-  const cappedMax = Number.isFinite(maxFeed) && maxFeed > 0 ? maxFeed : 5000;
-  const speeds = DEFAULT_MEASUREMENT_SPEEDS.filter((speed) => speed <= cappedMax);
-  if (speeds.length > 0) return speeds;
-  return [Math.max(1, Math.round(cappedMax))];
-}
-
-export function validateMeasuredScanOffsets(
-  rows: ReadonlyArray<DraftMeasurement>,
-  device: Pick<DeviceProfile, 'bedWidth' | 'bedHeight' | 'maxFeed'>,
-): MeasurementValidation {
-  const points: ScanOffsetPoint[] = [];
-  const errors: string[] = [];
-  const seenSpeeds = new Set<number>();
-  const offsetLimitMm = scanOffsetMagnitudeLimitMm(device);
-  rows.forEach((row, index) => {
-    if (row.offset.trim() === '') return;
-    const speed = numberFromInput(row.speed);
-    const offset = numberFromInput(row.offset);
-    const rowNumber = index + 1;
-    if (!Number.isFinite(speed) || speed <= 0) {
-      errors.push(`Measurement ${rowNumber}: speed must be a positive number.`);
-      return;
-    }
-    if (speed > device.maxFeed) {
-      errors.push(
-        `Measurement ${rowNumber}: ${speed} mm/min exceeds the profile limit of ${device.maxFeed} mm/min.`,
-      );
-      return;
-    }
-    if (!Number.isFinite(offset)) {
-      errors.push(`Measurement ${rowNumber}: offset must be a finite signed number.`);
-      return;
-    }
-    if (Math.abs(offset) > offsetLimitMm) {
-      errors.push(
-        `Measurement ${rowNumber}: offset must be between -${offsetLimitMm} and ${offsetLimitMm} mm for this bed.`,
-      );
-      return;
-    }
-    if (seenSpeeds.has(speed)) {
-      errors.push(`Measurement ${rowNumber}: speed ${speed} mm/min is duplicated.`);
-      return;
-    }
-    seenSpeeds.add(speed);
-    points.push({ speedMmPerMin: speed, offsetMm: offset });
-  });
-  return {
-    points: [...points].sort((left, right) => left.speedMmPerMin - right.speedMmPerMin),
-    errors,
-  };
-}
-
 function updateRow(
-  rows: ReadonlyArray<DraftMeasurement>,
+  rows: ReadonlyArray<DraftScanOffsetMeasurement>,
   index: number,
-  patch: Partial<DraftMeasurement>,
-): ReadonlyArray<DraftMeasurement> {
-  return rows.map((row, current) => (current === index ? { ...row, ...patch } : row));
+  patch: Partial<DraftScanOffsetMeasurement>,
+): ReadonlyArray<DraftScanOffsetMeasurement> {
+  return rows.map((row, current) => {
+    if (current !== index) return row;
+    const next = { ...row, ...patch };
+    if (patch.speed !== undefined) delete next.canonicalSpeedMmPerMin;
+    if (patch.offset !== undefined) delete next.canonicalOffsetMm;
+    return next;
+  });
 }
 
-function nextRow(rows: ReadonlyArray<DraftMeasurement>): DraftMeasurement {
-  const speeds = rows.map((row) => numberFromInput(row.speed)).filter(isFinitePositive);
-  const nextSpeed = speeds.length === 0 ? 1000 : Math.max(...speeds) + 1000;
-  return { speed: String(nextSpeed), offset: '' };
-}
-
-function summaryText(validation: MeasurementValidation): string {
+function summaryText(validation: ScanOffsetMeasurementValidation): string {
   if (validation.errors.length > 0) return 'Correct the measurement errors before applying.';
   if (validation.points.length === 0)
     return 'Enter at least one measured offset to apply calibration.';
@@ -328,15 +288,6 @@ function summaryText(validation: MeasurementValidation): string {
 function formatSignedOffset(value: number): string {
   if (value > 0) return `+${value}`;
   return String(value);
-}
-
-function numberFromInput(value: string): number {
-  if (value.trim() === '') return Number.NaN;
-  return Number(value);
-}
-
-function isFinitePositive(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 const panelStyle: React.CSSProperties = {

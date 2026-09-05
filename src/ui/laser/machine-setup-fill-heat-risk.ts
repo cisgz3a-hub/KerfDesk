@@ -1,4 +1,9 @@
-import { analyzeFillHeatRisk, compileJob, type FillHeatRiskSummary } from '../../core/job';
+import {
+  analyzeFillHeatRisk,
+  compileJob,
+  type FillHeatRiskSummary,
+  type Job,
+} from '../../core/job';
 import type { Layer, Project } from '../../core/scene';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 
@@ -7,11 +12,14 @@ export type MachineSetupFillHeatRisk = FillHeatRiskSummary | 'no-island' | 'back
 export function machineSetupFillHeatRisk(
   project: Project,
   fillLayers: readonly Layer[],
+  compiledJob?: Job | null,
 ): MachineSetupFillHeatRisk {
   if (!fillLayers.some((layer) => layer.fillStyle === 'island')) return 'no-island';
-  if (costlyCanvasPreparation(project)) return 'background';
+  if (compiledJob === null || (compiledJob === undefined && costlyCanvasPreparation(project))) {
+    return 'background';
+  }
   return analyzeFillHeatRisk(
-    compileJob(project.scene, project.device),
+    compiledJob ?? compileJob(project.scene, project.device),
     project.device.scanningOffsets,
   );
 }

@@ -15,9 +15,11 @@
 // that winding is invariant to concentric roughing/finishing offsets — so a
 // loop whose winding matches the job's outermost loop keeps the layer side, and
 // the opposite winding (a hole) flips to the inverse side.
-// Leads default-on for closed profile-outside/inside cuts; ramp entry, tabs, an
+// Leads default-on for closed profile-outside/inside cuts; ramp entry, an
 // off-bed lead, a lead that curls into this contour, or into a disjoint sibling
-// part all fall back to the legacy straight plunge.
+// part all fall back to the legacy straight plunge. A tabbed pass is represented
+// as one XY-closed path3d ring, so it keeps the same lead without flattening its
+// per-point tab Z moves.
 
 import type { MachineBounds } from '../devices';
 import { pointInPolygon } from '../geometry';
@@ -35,6 +37,11 @@ type LeadContext = {
   readonly siblings: ReadonlyArray<ReadonlyArray<Vec2>>;
 };
 
+// Tab interpolation can place an analytically shared contour endpoint at
+// 1 - ~1e-16 on the lead chord. Treat only parameter-scale roundoff as the
+// endpoint; real boundary crossings farther into the segment remain cuts.
+const BOUNDARY_PARAMETER_EPSILON = 1e-12;
+
 export function applyProfileLeadPasses(
   passes: ReadonlyArray<CncPass>,
   settings: CncLayerSettings,
@@ -42,28 +49,26 @@ export function applyProfileLeadPasses(
   bed: MachineBounds,
 ): ReadonlyArray<CncPass> {
   if (settings.rampEntryDeg !== undefined) return passes; // ramp owns the entry
-  // ADR-258 removed the `tabsEnabled` early return that used to live here. Under
-  // the split tab model a tabbed loop became open pieces that each replunged on
-  // the wall, so leading only the surviving full loops was inconsistent and leads
-  // were disabled outright. Tabs are now a Z-rise inside ONE continuous path
-  // (cnc-tab-ramp.ts), so a tabbed profile keeps exactly one entry and leads apply
-  // to it normally. Deep tabbed passes arrive here as path3d and are skipped by the
-  // `pass.kind !== 'contour'` test below; the shallower full-loop contour passes
-  // (including the pass at the tab top) still get their lead.
+  // ADR-258 removed the `tabsEnabled` early return that used to live here. Tabs
+  // are now a Z-rise inside ONE continuous path (cnc-tab-ramp.ts). Treat that
+  // XY-closed path3d ring as the same contour for lead placement, while keeping
+  // its original Z values intact.
   const baseSide = leadSide(settings.cutType);
   const options = resolveProfileLeadOptions(settings.profileLead, toolDiameterMm);
   if (baseSide === null || options === null) return passes;
   const outerSign = dominantWindingSign(passes);
   const shapes = distinctClosedContours(passes);
   return passes.map((pass) => {
-    if (pass.kind !== 'contour' || !pass.closed) return pass;
+    const polygon = profileLeadPolygon(pass);
+    if (polygon === null) return pass;
+    if (pass.kind !== 'contour' && pass.kind !== 'path3d') return pass;
     const context: LeadContext = {
-      side: windingSide(pass.polyline, outerSign, baseSide),
+      side: windingSide(polygon, outerSign, baseSide),
       options,
       bed,
-      siblings: disjointSiblings(pass.polyline, shapes),
+      siblings: disjointSiblings(polygon, shapes),
     };
-    return leadForPass(pass, context);
+    return leadForPass(pass, polygon, context);
   });
 }
 
@@ -104,8 +109,9 @@ function dominantWindingSign(passes: ReadonlyArray<CncPass>): number {
   let maxAbsArea = 0;
   let sign = 0;
   for (const pass of passes) {
-    if (pass.kind !== 'contour' || !pass.closed) continue;
-    const area = signedAreaMm2(pass.polyline);
+    const polygon = profileLeadPolygon(pass);
+    if (polygon === null) continue;
+    const area = signedAreaMm2(polygon);
     if (Math.abs(area) > maxAbsArea) {
       maxAbsArea = Math.abs(area);
       sign = Math.sign(area);
@@ -140,9 +146,9 @@ function disjointSiblings(
   // after the first mistakes its own shape for a disjoint sibling — dropping
   // the inside-side lead it should keep (an ADR-250 regression). Two genuinely
   // different parts never share a signature (position or area differs).
-  const selfSignature = contourSignature(polygon);
+  const selfSignature = profileContourSignature(polygon);
   return shapes.filter((shape) => {
-    if (contourSignature(shape) === selfSignature) return false;
+    if (profileContourSignature(shape) === selfSignature) return false;
     const other = shape[0];
     if (other === undefined) return false;
     return !pointInPolygon(probe, shape) && !pointInPolygon(other, polygon);
@@ -156,28 +162,156 @@ function distinctClosedContours(
 ): ReadonlyArray<ReadonlyArray<Vec2>> {
   const seen = new Map<string, ReadonlyArray<Vec2>>();
   for (const pass of passes) {
-    if (pass.kind !== 'contour' || !pass.closed) continue;
-    const key = contourSignature(pass.polyline);
-    if (!seen.has(key)) seen.set(key, pass.polyline);
+    const polygon = profileLeadPolygon(pass);
+    if (polygon === null) continue;
+    const key = profileContourSignature(polygon);
+    if (!seen.has(key)) seen.set(key, polygon);
   }
   return [...seen.values()];
 }
 
-function contourSignature(polygon: ReadonlyArray<Vec2>): string {
-  const first = polygon[0];
-  const area = Math.round(signedAreaMm2(polygon) * 1000);
-  const x = first === undefined ? 0 : Math.round(first.x * 1000);
-  const y = first === undefined ? 0 : Math.round(first.y * 1000);
-  return `${polygon.length}:${area}:${x},${y}`;
+export function profileContourSignature(polygon: ReadonlyArray<Vec2>): string {
+  const vertices = canonicalSignatureVertices(polygon);
+  if (vertices.length === 0) return '';
+  const tokens = vertices.map(signaturePoint);
+  const start = minimumCyclicRotation(tokens);
+  const ordered = new Array<string>(tokens.length);
+  for (let index = 0; index < tokens.length; index += 1) {
+    ordered[index] = tokens[(start + index) % tokens.length] as string;
+  }
+  return ordered.join(';');
 }
 
-function leadForPass(pass: CncContourPass, ctx: LeadContext): CncPass {
-  const toolpath: Polyline = { points: pass.polyline, closed: pass.closed };
+function canonicalSignatureVertices(polygon: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+  const quantized = quantizedSignatureVertices(polygon);
+  return quantized.length <= 2 ? quantized : signatureVerticesWithoutCollinearPoints(quantized);
+}
+
+function quantizedSignatureVertices(polygon: ReadonlyArray<Vec2>): Vec2[] {
+  const quantized: Vec2[] = [];
+  for (const point of polygon) {
+    const next = { x: Math.round(point.x * 1e6), y: Math.round(point.y * 1e6) };
+    const prior = quantized.at(-1);
+    if (prior?.x !== next.x || prior.y !== next.y) quantized.push(next);
+  }
+  if (
+    quantized.length > 1 &&
+    quantized[0]?.x === quantized.at(-1)?.x &&
+    quantized[0]?.y === quantized.at(-1)?.y
+  ) {
+    quantized.pop();
+  }
+  return quantized;
+}
+
+function signatureVerticesWithoutCollinearPoints(quantized: ReadonlyArray<Vec2>): Vec2[] {
+  const previous = quantized.map((_, index) => (index - 1 + quantized.length) % quantized.length);
+  const next = quantized.map((_, index) => (index + 1) % quantized.length);
+  const removed = quantized.map(() => false);
+  const queue = quantized.map((_, index) => index);
+  let remaining = quantized.length;
+  for (let cursor = 0; cursor < queue.length && remaining > 2; cursor += 1) {
+    const index = queue[cursor] as number;
+    if (removed[index]) continue;
+    const priorIndex = previous[index] as number;
+    const nextIndex = next[index] as number;
+    if (
+      !collinear(
+        quantized[priorIndex] as Vec2,
+        quantized[index] as Vec2,
+        quantized[nextIndex] as Vec2,
+      )
+    ) {
+      continue;
+    }
+    removed[index] = true;
+    remaining -= 1;
+    next[priorIndex] = nextIndex;
+    previous[nextIndex] = priorIndex;
+    queue.push(priorIndex, nextIndex);
+  }
+  const first = removed.findIndex((value) => !value);
+  if (first < 0) return [];
+  return linkedSignatureVertices(quantized, next, first);
+}
+
+function linkedSignatureVertices(
+  quantized: ReadonlyArray<Vec2>,
+  next: ReadonlyArray<number>,
+  first: number,
+): Vec2[] {
+  const result: Vec2[] = [];
+  let index = first;
+  do {
+    result.push(quantized[index] as Vec2);
+    index = next[index] as number;
+  } while (index !== first);
+  return result;
+}
+
+function signaturePoint(point: Vec2): string {
+  return `${point.x},${point.y}`;
+}
+
+function collinear(a: Vec2, b: Vec2, c: Vec2): boolean {
+  const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const baseLength = Math.hypot(c.x - a.x, c.y - a.y);
+  // Coordinates are quantized to 1e-6 mm above. A source point that lies
+  // exactly on an edge can land within one integer unit of it after rounding
+  // (for example 1/3); treat only that representational noise as collinear.
+  if (Math.abs(cross) > Math.max(1, baseLength)) return false;
+  const between = (b.x - a.x) * (b.x - c.x) + (b.y - a.y) * (b.y - c.y);
+  return between <= 0;
+}
+
+// Booth's minimum-rotation algorithm: O(n) token comparisons and no quadratic
+// rotated-array/string construction for dense imported contours.
+function minimumCyclicRotation(tokens: ReadonlyArray<string>): number {
+  const length = tokens.length;
+  if (length < 2) return 0;
+  let left = 0;
+  let right = 1;
+  let offset = 0;
+  while (left < length && right < length && offset < length) {
+    const a = tokens[(left + offset) % length] as string;
+    const b = tokens[(right + offset) % length] as string;
+    if (a === b) {
+      offset += 1;
+      continue;
+    }
+    if (a > b) {
+      left += offset + 1;
+      if (left <= right) left = right + 1;
+    } else {
+      right += offset + 1;
+      if (right <= left) right = left + 1;
+    }
+    offset = 0;
+  }
+  return Math.min(left, right) % length;
+}
+
+function profileLeadPolygon(pass: CncPass): ReadonlyArray<Vec2> | null {
+  if (pass.kind === 'contour') return pass.closed ? pass.polyline : null;
+  if (pass.kind !== 'path3d' || pass.entryRamp === true || pass.points.length < 3) return null;
+  const first = pass.points[0];
+  const last = pass.points.at(-1);
+  if (first === undefined || last === undefined) return null;
+  if (Math.abs(first.x - last.x) > 1e-9 || Math.abs(first.y - last.y) > 1e-9) return null;
+  return pass.points;
+}
+
+function leadForPass(
+  pass: CncContourPass | CncPath3dPass,
+  polygon: ReadonlyArray<Vec2>,
+  ctx: LeadContext,
+): CncPass {
+  const toolpath: Polyline = { points: polygon, closed: true };
   const result = computeProfileLead(toolpath, ctx.side, ctx.options);
   if (!result.ok) return pass;
   const { leadIn, leadOut } = result.lead;
   if (!fitsBed(leadIn, ctx.bed) || !fitsBed(leadOut, ctx.bed)) return pass;
-  if (!leadClearsPart(leadIn, leadOut, ctx.side, pass.polyline)) return pass;
+  if (!leadClearsPart(leadIn, leadOut, ctx.side, polygon)) return pass;
   if (!leadClearsSiblings(leadIn, leadOut, ctx.siblings)) return pass;
   return ledPath3d(pass, leadIn, leadOut);
 }
@@ -260,31 +394,48 @@ function segmentBoundaryCuts(a: Vec2, b: Vec2, polygon: ReadonlyArray<Vec2>): nu
     if (cross === 0) continue;
     const t = ((c.x - a.x) * sy - (c.y - a.y) * sx) / cross;
     const u = ((c.x - a.x) * ry - (c.y - a.y) * rx) / cross;
-    if (t > 0 && t < 1 && u >= 0 && u <= 1) cuts.push(t);
+    if (t > BOUNDARY_PARAMETER_EPSILON && t < 1 - BOUNDARY_PARAMETER_EPSILON && u >= 0 && u <= 1) {
+      cuts.push(t);
+    }
   }
-  return cuts.sort((left, right) => left - right);
+  cuts.sort((left, right) => left - right);
+  return cuts.filter(
+    (cut, index) => index === 0 || cut - (cuts[index - 1] as number) > BOUNDARY_PARAMETER_EPSILON,
+  );
 }
 
 // leadIn ends on, and leadOut begins on, the contour start vertex, so both
 // splice on without a gap; the shared vertex is dropped to avoid a zero-length
 // move. Every point rides the pass's cutting depth.
 function ledPath3d(
-  pass: CncContourPass,
+  pass: CncContourPass | CncPath3dPass,
   leadIn: ReadonlyArray<Vec2>,
   leadOut: ReadonlyArray<Vec2>,
 ): CncPath3dPass {
-  const z = pass.zMm;
+  const sourcePoints: ReadonlyArray<Vec3> =
+    pass.kind === 'contour'
+      ? pass.polyline.map((point) => ({ ...point, z: pass.zMm }))
+      : pass.points;
+  const entryZ = sourcePoints[0]?.z;
+  const exitZ = sourcePoints.at(-1)?.z;
+  if (entryZ === undefined || exitZ === undefined) return pass as CncPath3dPass;
   const points: Vec3[] = [];
-  for (const point of leadIn) points.push({ x: point.x, y: point.y, z });
-  for (let i = 1; i < pass.polyline.length; i += 1) {
-    const point = pass.polyline[i] as Vec2;
-    points.push({ x: point.x, y: point.y, z });
+  for (const point of leadIn) points.push({ x: point.x, y: point.y, z: entryZ });
+  for (let i = 1; i < sourcePoints.length; i += 1) {
+    points.push(sourcePoints[i] as Vec3);
   }
   for (let i = 1; i < leadOut.length; i += 1) {
     const point = leadOut[i] as Vec2;
-    points.push({ x: point.x, y: point.y, z });
+    points.push({ x: point.x, y: point.y, z: exitZ });
   }
-  return { kind: 'path3d', points, closed: false };
+  return {
+    kind: 'path3d',
+    points,
+    closed: false,
+    ...(pass.kind === 'path3d' && pass.lateralFeed !== undefined
+      ? { lateralFeed: pass.lateralFeed }
+      : {}),
+  };
 }
 
 // Compile-time bed guard in the machine frame. Dropping a lead is always safe

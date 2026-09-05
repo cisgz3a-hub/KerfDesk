@@ -15,8 +15,13 @@ import type { OutputEmitOptions } from './output-strategy';
 export const marlinStrategy = {
   id: 'marlin' as const,
   emit: (job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string => {
-    const body = grblStrategy.emit(job, device, options);
     const dialect = resolveMarlinDialect(device);
-    return dialect.powerMode === 'fan' ? toMarlinFanGcode(body, device.maxPowerS) : body;
+    const intermediateDevice: DeviceProfile = {
+      ...device,
+      gcodeDialect: { dialectId: 'grbl-dynamic' },
+      ...(dialect.powerMode === 'fan' ? { maxPowerS: 255 } : {}),
+    };
+    const body = grblStrategy.emit(job, intermediateDevice, options);
+    return dialect.powerMode === 'fan' ? toMarlinFanGcode(body, 255) : body;
   },
 };

@@ -16,6 +16,12 @@ export function ScanOffsetEditor(props: ScanOffsetEditorProps): JSX.Element {
         style={editorStyle}
         title="Calibrated bidirectional scan compensation. Positive values shift reverse raster/fill sweeps along their travel direction. This only changes generated G-code; it does not write firmware."
       >
+        <p style={conventionNoteStyle}>
+          Stored values are LaserForge mm/min plus the full signed separation; reverse rows move and
+          forward rows stay on design coordinates. A LightBurn Line Shift is half the pair gap, so
+          double its signed magnitude here. LightBurn Initial Offset and .lbso import are not
+          represented; Raster Diagnostics provides assisted conversion.
+        </p>
         {points.length === 0 ? (
           <span style={emptyStyle}>No calibrated offsets</span>
         ) : (
@@ -150,4 +156,10 @@ const speedInputStyle: React.CSSProperties = { width: 74 };
 const emptyStyle: React.CSSProperties = {
   color: 'var(--lf-text-faint)',
   fontSize: 11,
+};
+const conventionNoteStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-text-muted)',
+  fontSize: 11,
+  lineHeight: 1.4,
 };

@@ -59,6 +59,14 @@ export function completeLightBurnProjectOpen(
     `Imported ${fileName}: ${result.report.importedObjects} objects, ${result.report.importedLayers} layers${unsupported + warnings === 0 ? '' : `, ${unsupported + warnings} warning(s)`}. Save as .lf2 to keep changes.`,
     unsupported + warnings === 0 ? 'success' : 'warning',
   );
+  if (result.report.warnings.length > 0) {
+    const visible = result.report.warnings.slice(0, 3);
+    const remainder = result.report.warnings.length - visible.length;
+    ctx.pushToast(
+      `LightBurn settings review: ${visible.join(' ')}${remainder > 0 ? ` ${remainder} more warning(s) are in the import report.` : ''}`,
+      'warning',
+    );
+  }
   reportMachineCapabilityRepair(loadResult, ctx.pushToast);
 }
 

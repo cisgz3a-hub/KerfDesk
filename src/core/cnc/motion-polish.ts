@@ -123,6 +123,8 @@ function wantsCounterClockwiseInPhysicalFrame(
 }
 
 // Entry marks land mid-span of the longest edge (v1 lead-in).
+const SEGMENT_LENGTH_TIE_EPSILON_MM = 1e-9;
+
 export function rotateStartToLongestSegment(toolpath: Polyline): Polyline {
   const points = toolpath.points;
   if (!toolpath.closed || points.length < MIN_CLOSED_POINTS) return toolpath;
@@ -132,7 +134,7 @@ export function rotateStartToLongestSegment(toolpath: Polyline): Polyline {
     const a = points[i] as Vec2;
     const b = points[(i + 1) % points.length] as Vec2;
     const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (length > longestLength) {
+    if (length > longestLength + SEGMENT_LENGTH_TIE_EPSILON_MM) {
       longestLength = length;
       longestIndex = i;
     }

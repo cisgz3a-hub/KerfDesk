@@ -1,7 +1,6 @@
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { effectiveScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import { LAYER_DEFAULTS, type Layer, type Project } from '../../core/scene';
-import { layerFromSubLayer } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import {
@@ -20,6 +19,8 @@ import {
   machineSetupFillHeatRiskWarning,
   type MachineSetupFillHeatRisk,
 } from './machine-setup-fill-heat-risk';
+import { buildMachineSetupScanFacts } from './machine-setup-scan-facts';
+import { diagnosticChecks, type DiagnosticCheck } from './machine-setup-raster-diagnostic-checks';
 
 export function RasterDiagnosticsPanel(): JSX.Element {
   const project = useStore((s) => s.project);
@@ -40,6 +41,8 @@ export function RasterDiagnosticsPanel(): JSX.Element {
           <dd>{diagnostics.imageSummary}</dd>
           <dt>Fill layers</dt>
           <dd>{diagnostics.fillSummary}</dd>
+          <dt>Scan direction</dt>
+          <dd>{diagnostics.directionSummary}</dd>
           <dt>Overscan</dt>
           <dd>{diagnostics.overscanSummary}</dd>
           <dt>Recipe calibration</dt>
@@ -91,6 +94,7 @@ type RasterDiagnostics = {
   readonly scanOffsetSummary: string;
   readonly imageSummary: string;
   readonly fillSummary: string;
+  readonly directionSummary: string;
   readonly overscanSummary: string;
   readonly recipeSummary: string;
   readonly intervalSummary: string;
@@ -100,39 +104,27 @@ type RasterDiagnostics = {
   readonly checks: ReadonlyArray<DiagnosticCheck>;
 };
 
-type DiagnosticCheck = {
-  readonly label: string;
-  readonly status: 'check' | 'ok' | 'warn';
-  readonly detail: string;
-};
-
-function buildRasterDiagnostics(
+export function buildRasterDiagnostics(
   project: Project,
   rows: ReadonlyArray<GrblSettingRow>,
   lastSettingsReadAt: number | null,
 ): RasterDiagnostics {
-  const activeLayers = flattenOperationLayers(project).filter(
-    (layer) => layer.visible && layer.output,
-  );
+  const scanFacts = buildMachineSetupScanFacts(project);
+  const activeLayers = scanFacts.operationLayers;
   const imageLayers = activeLayers.filter((layer) => layer.mode === 'image');
   const fillLayers = activeLayers.filter((layer) => layer.mode === 'fill');
-  const bidirectionalImageLayers = imageLayers.filter((layer) => layer.imageBidirectional);
-  const bidirectionalFillLayers = fillLayers.filter(
-    (layer) =>
-      (layer.fillStyle === 'scanline' || layer.fillStyle === 'island') && layer.fillBidirectional,
-  );
-  const bidirectionalLayers = [...bidirectionalImageLayers, ...bidirectionalFillLayers];
-  const lowOverscanLayers = bidirectionalLayers.filter((layer) => layer.fillOverscanMm < 2);
   const defaultRecipeLayers = activeLayers.filter(usesStarterRecipe);
   const defaultLineIntervalLayers = [...imageLayers, ...fillLayers].filter(usesStarterLineInterval);
   const sMax = settingSummary(rows, 30, lastSettingsReadAt);
   const laserMode = settingSummary(rows, 32, lastSettingsReadAt);
   const scanOffsetStatus = effectiveScanOffsetCalibrationStatus(project.device);
-  const fillHeatRisk = machineSetupFillHeatRisk(project, fillLayers);
+  const fillHeatRisk = machineSetupFillHeatRisk(project, fillLayers, scanFacts.compiledJob);
   const warnings = rasterWarnings({
     project,
-    bidirectionalLayers,
-    lowOverscanLayers,
+    requestedBidirectionalOperations: scanFacts.requestedBidirectionalOperations,
+    effectiveBidirectionalGroups: scanFacts.effectiveBidirectionalGroups,
+    profileFallbackGroups: scanFacts.profileFallbackGroups,
+    lowOverscanGroups: scanFacts.lowOverscanGroups,
     defaultRecipeLayers,
     defaultLineIntervalLayers,
     fillHeatRisk,
@@ -142,9 +134,16 @@ function buildRasterDiagnostics(
 
   return {
     scanOffsetSummary: scanOffsetSummary(project, scanOffsetStatus),
-    imageSummary: `${imageLayers.length} active, Bidirectional image layers: ${bidirectionalImageLayers.length}`,
-    fillSummary: `${fillLayers.length} active, Bidirectional fill layers: ${bidirectionalFillLayers.length}`,
-    overscanSummary: `Low overscan layers: ${lowOverscanLayers.length}`,
+    imageSummary: `${imageLayers.length} requested output operation(s)`,
+    fillSummary: `${fillLayers.length} requested output operation(s)`,
+    directionSummary:
+      scanFacts.effectiveBidirectionalGroups === null
+        ? `${scanFacts.requestedBidirectionalOperations} requested bidirectional operation(s); effective groups are prepared in Job Review`
+        : `${scanFacts.requestedBidirectionalOperations} requested bidirectional operation(s), ${scanFacts.effectiveBidirectionalGroups} executable bidirectional group(s), ${scanFacts.profileFallbackGroups ?? 0} profile fallback group(s)`,
+    overscanSummary:
+      scanFacts.lowOverscanGroups === null
+        ? 'Effective overscan is prepared in Job Review for this large canvas'
+        : `${scanFacts.lowOverscanGroups} executable bidirectional group(s) below 5%-of-speed calibration guidance`,
     recipeSummary: `Default recipe layers: ${defaultRecipeLayers.length}`,
     intervalSummary: `Default line intervals: ${defaultLineIntervalLayers.length}`,
     sMaxSummary: sMax.display,
@@ -152,8 +151,10 @@ function buildRasterDiagnostics(
     warnings,
     checks: diagnosticChecks({
       project,
-      bidirectionalLayers,
-      lowOverscanLayers,
+      requestedBidirectionalOperations: scanFacts.requestedBidirectionalOperations,
+      effectiveBidirectionalGroups: scanFacts.effectiveBidirectionalGroups,
+      profileFallbackGroups: scanFacts.profileFallbackGroups,
+      lowOverscanGroups: scanFacts.lowOverscanGroups,
       defaultRecipeLayers,
       defaultLineIntervalLayers,
       fillHeatRisk,
@@ -182,7 +183,9 @@ function scanOffsetSummary(
 
 function scanOffsetWarnings(
   project: Project,
-  bidirectionalLayerCount: number,
+  effectiveBidirectionalGroupCount: number | null,
+  profileFallbackGroupCount: number | null,
+  requestedBidirectionalOperationCount: number,
 ): ReadonlyArray<string> {
   const status = effectiveScanOffsetCalibrationStatus(project.device);
   if (status === 'legacy-verified') {
@@ -195,7 +198,17 @@ function scanOffsetWarnings(
       'The saved scan-offset table has no recorded verification burn. It remains available; inspect a verification coupon and mark its truthful state.',
     ];
   }
-  if (bidirectionalLayerCount === 0) return [];
+  if (effectiveBidirectionalGroupCount === null) {
+    return requestedBidirectionalOperationCount > 0
+      ? ['Effective scan direction for this large canvas is prepared in Job Review.']
+      : [];
+  }
+  if ((profileFallbackGroupCount ?? 0) > 0) {
+    return [
+      `${profileFallbackGroupCount} executable scan group(s) requested bidirectional output but the active profile forced one-way until scan-offset verification.`,
+    ];
+  }
+  if (effectiveBidirectionalGroupCount === 0) return [];
   if (status === 'uncalibrated') {
     return [
       'Bidirectional raster or fill is active without scan-offset calibration. This can show up as double or fat small text on one machine while another machine burns cleanly.',
@@ -206,17 +219,28 @@ function scanOffsetWarnings(
 
 function rasterWarnings(args: {
   readonly project: Project;
-  readonly bidirectionalLayers: ReadonlyArray<Layer>;
-  readonly lowOverscanLayers: ReadonlyArray<Layer>;
+  readonly requestedBidirectionalOperations: number;
+  readonly effectiveBidirectionalGroups: number | null;
+  readonly profileFallbackGroups: number | null;
+  readonly lowOverscanGroups: number | null;
   readonly defaultRecipeLayers: ReadonlyArray<Layer>;
   readonly defaultLineIntervalLayers: ReadonlyArray<Layer>;
   readonly fillHeatRisk: MachineSetupFillHeatRisk;
   readonly laserMode: SettingDiagnostic;
   readonly sMax: SettingDiagnostic;
 }): ReadonlyArray<string> {
-  const warnings = [...scanOffsetWarnings(args.project, args.bidirectionalLayers.length)];
-  if (args.lowOverscanLayers.length > 0) {
-    warnings.push('Low overscan layers may leave the head accelerating during burn moves.');
+  const warnings = [
+    ...scanOffsetWarnings(
+      args.project,
+      args.effectiveBidirectionalGroups,
+      args.profileFallbackGroups,
+      args.requestedBidirectionalOperations,
+    ),
+  ];
+  if ((args.lowOverscanGroups ?? 0) > 0) {
+    warnings.push(
+      'Runway below the 5%-of-speed calibration reference may leave the head accelerating during burn moves; actual axis acceleration can require more.',
+    );
   }
   const fillHeatWarning = machineSetupFillHeatRiskWarning(args.fillHeatRisk);
   if (fillHeatWarning !== null) warnings.push(fillHeatWarning);
@@ -240,129 +264,6 @@ function rasterWarnings(args: {
     warnings.push('Read controller settings to compare $30 and $32 against the active profile.');
   }
   return warnings;
-}
-
-function diagnosticChecks(args: {
-  readonly project: Project;
-  readonly bidirectionalLayers: ReadonlyArray<Layer>;
-  readonly lowOverscanLayers: ReadonlyArray<Layer>;
-  readonly defaultRecipeLayers: ReadonlyArray<Layer>;
-  readonly defaultLineIntervalLayers: ReadonlyArray<Layer>;
-  readonly fillHeatRisk: MachineSetupFillHeatRisk;
-  readonly laserMode: SettingDiagnostic;
-  readonly sMax: SettingDiagnostic;
-}): ReadonlyArray<DiagnosticCheck> {
-  return [
-    bidirectionalCheck(args),
-    controllerLaserModeCheck(args.laserMode),
-    islandFillHeatCheck(args.fillHeatRisk),
-    accelerationMarginCheck(args.lowOverscanLayers),
-    materialRecipeCheck(args.defaultRecipeLayers),
-    lineIntervalCheck(args.defaultLineIntervalLayers),
-    mechanicalFocusCheck(),
-  ];
-}
-
-function bidirectionalCheck(args: {
-  readonly project: Project;
-  readonly bidirectionalLayers: ReadonlyArray<Layer>;
-}): DiagnosticCheck {
-  const calibrationStatus = effectiveScanOffsetCalibrationStatus(args.project.device);
-  const offsetsNotReady =
-    args.bidirectionalLayers.length > 0 &&
-    (calibrationStatus === 'uncalibrated' || calibrationStatus === 'pending');
-  return {
-    label: 'Bidirectional compensation',
-    status: offsetsNotReady ? 'warn' : 'ok',
-    detail:
-      calibrationStatus === 'pending'
-        ? 'Burn and inspect “Verify saved table,” then mark the table verified. Normal 4040 jobs stay one-way while pending.'
-        : args.bidirectionalLayers.length > 0
-          ? 'Disable bidirectional output for a test burn, then add calibrated scan offsets if the doubled letters disappear.'
-          : 'No active bidirectional raster or fill layers were found.',
-  };
-}
-
-function controllerLaserModeCheck(laserMode: SettingDiagnostic): DiagnosticCheck {
-  return {
-    label: 'Controller laser mode',
-    status: laserMode.value === 0 || laserMode.kind === 'missing' ? 'warn' : 'ok',
-    detail:
-      laserMode.kind === 'missing'
-        ? 'Read controller settings before trusting raster diagnostics.'
-        : `Current controller readback is ${laserMode.display}.`,
-  };
-}
-
-function islandFillHeatCheck(fillHeatRisk: MachineSetupFillHeatRisk): DiagnosticCheck {
-  if (fillHeatRisk === 'background') {
-    return {
-      label: 'Island Fill heat margin',
-      status: 'check',
-      detail:
-        'Detailed sweep analysis is deferred to the background preparation shown in Job Review.',
-    };
-  }
-  if (fillHeatRisk === 'no-island') {
-    return {
-      label: 'Island Fill heat margin',
-      status: 'ok',
-      detail: 'No active Island Fill layers were found.',
-    };
-  }
-  const riskyCount =
-    fillHeatRisk.islandNoRunwayShortSweepCount + fillHeatRisk.islandPartialRunwaySweepCount;
-  return {
-    label: 'Island Fill heat margin',
-    status:
-      fillHeatRisk.islandNoRunwayShortSweepCount > 0 ? 'warn' : riskyCount > 0 ? 'check' : 'ok',
-    detail:
-      riskyCount > 0
-        ? 'Tiny island sweeps are sensitive to acceleration. Use partial overscan, test on scrap, or use Scanline Fill if spots look too dark.'
-        : 'No short Island Fill sweeps were found in the active output.',
-  };
-}
-
-function accelerationMarginCheck(lowOverscanLayers: ReadonlyArray<Layer>): DiagnosticCheck {
-  return {
-    label: 'Head acceleration margin',
-    status: lowOverscanLayers.length > 0 ? 'check' : 'ok',
-    detail:
-      lowOverscanLayers.length > 0
-        ? 'Increase overscan on bidirectional raster or fill layers if edges look darker, stretched, or uneven.'
-        : 'Active bidirectional layers have at least 2 mm overscan.',
-  };
-}
-
-function materialRecipeCheck(defaultRecipeLayers: ReadonlyArray<Layer>): DiagnosticCheck {
-  return {
-    label: 'Material recipe',
-    status: defaultRecipeLayers.length > 0 ? 'check' : 'ok',
-    detail:
-      defaultRecipeLayers.length > 0
-        ? 'Burn a Material Test on scrap and copy the winning speed, power, and passes into the output layer.'
-        : 'Active output layers have moved away from first-run starter settings.',
-  };
-}
-
-function lineIntervalCheck(defaultLineIntervalLayers: ReadonlyArray<Layer>): DiagnosticCheck {
-  return {
-    label: 'Line interval',
-    status: defaultLineIntervalLayers.length > 0 ? 'check' : 'ok',
-    detail:
-      defaultLineIntervalLayers.length > 0
-        ? 'Use Interval Test to tune hatch spacing or image lines/mm for this material and focus height.'
-        : 'Active raster/fill layers are not using the default line interval.',
-  };
-}
-
-function mechanicalFocusCheck(): DiagnosticCheck {
-  return {
-    label: 'Mechanical focus and motion',
-    status: 'check',
-    detail:
-      'If unidirectional output still doubles, inspect belt tension, pulley set screws, frame squareness, focus height, lens cleanliness, and workpiece hold-down.',
-  };
 }
 
 function usesStarterRecipe(layer: Layer): boolean {
@@ -399,13 +300,6 @@ function settingSummary(
     display: `${row.code} ${row.name}: ${row.rawValue}`,
     value: row.numericValue,
   };
-}
-
-function flattenOperationLayers(project: Project): ReadonlyArray<Layer> {
-  return project.scene.layers.flatMap((layer) => [
-    layer,
-    ...layer.subLayers.map((subLayer) => layerFromSubLayer(layer, subLayer)),
-  ]);
 }
 
 const checkGridStyle: React.CSSProperties = {

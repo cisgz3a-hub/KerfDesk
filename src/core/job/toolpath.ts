@@ -17,7 +17,7 @@ import type { FillGroup, Group, Job } from './job';
 import { contourEntryPoint } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
-import { offsetForSpeed } from './scan-offset';
+import { offsetForEmittedFeed } from './scan-offset';
 import { appendCncGroupSteps, createCncSimState, type CncSimState } from './toolpath-cnc';
 import { appendTravelStep, dist, polylineLength } from './toolpath-math';
 import { appendRasterGroupSteps } from './toolpath-raster-steps';
@@ -98,7 +98,8 @@ function appendFillGroupSteps(
     );
   }
   const scanOffsetMm =
-    group.bidirectionalScanOffsetMm ?? offsetForSpeed(options.scanningOffsets ?? [], group.speed);
+    group.bidirectionalScanOffsetMm ??
+    offsetForEmittedFeed(options.scanningOffsets ?? [], group.speed);
   let prevEnd = initialPrevEnd;
   const plans = planFillSweeps(group, scanOffsetMm);
   for (let pass = 0; pass < group.passes; pass += 1) {

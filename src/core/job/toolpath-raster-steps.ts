@@ -8,7 +8,7 @@ import type { Vec2 } from '../scene';
 import { planRasterRowSweeps, type RasterRowSweepPlan } from '../raster/raster-sweep-plan';
 import type { RasterGroup } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
-import { offsetForSpeed, type ScanOffsetPoint } from './scan-offset';
+import { offsetForEmittedFeed, type ScanOffsetPoint } from './scan-offset';
 import { appendTravelStep, dist } from './toolpath-math';
 import type { ToolpathStep } from './toolpath-types';
 
@@ -22,7 +22,7 @@ export function appendRasterGroupSteps(
   const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
   const pixelHeightMm = (group.bounds.maxY - group.bounds.minY) / group.pixelHeight;
   const scanOffsetMm =
-    group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed);
+    group.bidirectionalScanOffsetMm ?? offsetForEmittedFeed(scanningOffsets, group.speed);
   const passes = Math.max(1, Math.floor(group.passes));
   let prevEnd = initialPrevEnd;
   for (let pass = 0; pass < passes; pass += 1) {

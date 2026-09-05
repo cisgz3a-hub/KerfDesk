@@ -138,6 +138,22 @@ export type CncSubProfile = {
 };
 
 export type DeviceMachineKind = 'laser' | 'cnc';
+export type BidirectionalScanPolicy = 'allow-requested' | 'require-verified-offsets';
+
+export function isBidirectionalScanPolicy(value: unknown): value is BidirectionalScanPolicy {
+  return value === 'allow-requested' || value === 'require-verified-offsets';
+}
+
+export function effectiveBidirectionalScanPolicy(
+  profile: Pick<DeviceProfile, 'bidirectionalScanPolicy' | 'gcodeDialect'>,
+): BidirectionalScanPolicy {
+  if (profile.bidirectionalScanPolicy !== undefined) return profile.bidirectionalScanPolicy;
+  // Saved profiles predate the explicit capability. Preserve the established
+  // 4040 safety behavior without making new policy depend on a dialect name.
+  return profile.gcodeDialect.dialectId === 'neotronics-4040-safe'
+    ? 'require-verified-offsets'
+    : 'allow-requested';
+}
 
 export type DeviceProfile = {
   readonly name: string;
@@ -184,9 +200,13 @@ export type DeviceProfile = {
   // Bidirectional fill/raster compensation. Empty keeps emitted output
   // unchanged until the operator calibrates a machine-specific table.
   readonly scanningOffsets: ReadonlyArray<ScanOffsetPoint>;
-  // Newly measured tables remain one-way on the 4040 until the operator burns
-  // and explicitly accepts a corrected verification coupon. Absent on a
-  // nonempty legacy table preserves the historical calibrated behavior.
+  // Profiles with physical bidirectional lag can require a verified table
+  // before honoring requested bidirectional output. Absent retains the legacy
+  // 4040-safe fallback and otherwise allows the requested direction.
+  readonly bidirectionalScanPolicy?: BidirectionalScanPolicy;
+  // Newly measured tables remain pending until the operator burns and
+  // explicitly accepts a corrected verification coupon. Absent on a nonempty
+  // legacy table preserves the historical calibrated behavior.
   readonly scanOffsetCalibrationStatus?: ScanOffsetCalibrationStatus | undefined;
   // Optional controlled laser-off seek feed. Absent keeps normal G0 rapid
   // positioning; a positive value emits explicit G1 F... S0 seeks.
@@ -317,6 +337,7 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   rxBufferBytes: DEFAULT_GRBL_RX_BUFFER_BYTES,
   gcodeDialect: { dialectId: 'grbl-dynamic' },
   scanningOffsets: [],
+  bidirectionalScanPolicy: 'allow-requested',
   noGoZones: [],
   origin: 'front-left',
   homing: { enabled: false, direction: 'front-left' },
@@ -345,6 +366,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   laserModeEnabled: true,
   airAssistCommand: 'none',
   gcodeDialect: { dialectId: 'neotronics-4040-safe' },
+  bidirectionalScanPolicy: 'require-verified-offsets',
   controlledLaserOffTravelFeedMmPerMin: 800,
   framingFeedMmPerMin: 2000,
   noGoZones: [],

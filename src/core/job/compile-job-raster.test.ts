@@ -191,7 +191,7 @@ describe('compileJob raster image groups', () => {
     );
     expect(fallback).toMatchObject({
       bidirectional: false,
-      scanDirection: { bidirectional: false, reason: 'uncalibrated-4040-fallback' },
+      scanDirection: { bidirectional: false, reason: 'uncalibrated-profile-fallback' },
     });
     expect(expert).toMatchObject({
       bidirectional: true,

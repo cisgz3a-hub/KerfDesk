@@ -98,7 +98,7 @@ describe('controlled laser-off motion preflight', () => {
     );
   });
 
-  it('recognizes the emitter-clamped F1 form of a positive sub-1 controlled feed', () => {
+  it('recognizes the emitted fractional form of a positive sub-1 controlled feed', () => {
     const project: Project = {
       ...projectWith(createLayer({ id: 'L1', color: '#ff0000' })),
       device: {
@@ -108,7 +108,7 @@ describe('controlled laser-off motion preflight', () => {
     };
     const generated = emit(project);
 
-    expect(generated).toContain('F1 S0 ; kerfdesk:laser-off-motion');
+    expect(generated).toContain('F0.4 S0 ; kerfdesk:laser-off-motion');
     expect(
       runPreflight(project, generated).issues.filter((issue) => issue.code === 'long-blank-feed'),
     ).toEqual([]);

@@ -40,8 +40,8 @@ const DEFAULT_DRAFT: ScanOffsetCalibrationDraft = {
 
 const FIELD_SPECS: ReadonlyArray<ScanOffsetCalibrationField> = [
   { key: 'steps', label: 'Steps', min: 1, max: 10, step: undefined },
-  { key: 'speedMin', label: 'Min speed', min: 1, max: undefined, step: undefined },
-  { key: 'speedMax', label: 'Max speed', min: 1, max: undefined, step: undefined },
+  { key: 'speedMin', label: 'Min speed (mm/min)', min: 1, max: undefined, step: undefined },
+  { key: 'speedMax', label: 'Max speed (mm/min)', min: 1, max: undefined, step: undefined },
   { key: 'power', label: 'Power', min: 0, max: 100, step: undefined },
   { key: 'swatchWidthMm', label: 'Swatch width', min: 1, max: undefined, step: 0.1 },
   { key: 'swatchHeightMm', label: 'Swatch height', min: 1, max: undefined, step: 0.1 },
@@ -118,7 +118,7 @@ function CalibrationPurpose(props: {
       </label>
       <p style={guidanceStyle}>
         {props.mode === 'baseline'
-          ? 'Baseline forces 0 mm scan correction and deliberately permits bidirectional rows, even on an uncalibrated 4040. Use low power on scrap after checking belts, focus, and optics.'
+          ? 'Baseline forces 0 mm scan correction and deliberately permits bidirectional rows, even when the profile normally requires verified offsets. Use low power on scrap after checking belts, focus, and optics.'
           : 'Verification keeps the active profile scan-offset table. If no measured values are saved, the coupon remains a valid uncorrected comparison; inspect alternating edges physically.'}
       </p>
     </>

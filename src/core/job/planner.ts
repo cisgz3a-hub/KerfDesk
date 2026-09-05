@@ -47,7 +47,8 @@ import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import type { CutGroup, CutSegment, FillGroup, Job, RasterGroup } from './job';
 import { rasterDurationMotion } from './raster-duration-motion';
-import { offsetForSpeed } from './scan-offset';
+import { effectiveGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { offsetForEmittedFeed } from './scan-offset';
 
 const SECONDS_PER_MINUTE = 60;
 const ORIGIN: Vec2 = { x: 0, y: 0 };
@@ -77,7 +78,8 @@ export function estimateWithPlanner(
   const accel = Math.max(1, device.accelMmPerSec2);
   const jd = Math.max(0, device.junctionDeviationMm);
   const travelV =
-    Math.max(1, device.controlledLaserOffTravelFeedMmPerMin ?? device.maxFeed) / SECONDS_PER_MINUTE;
+    effectiveGcodeFeedMmPerMin(device.controlledLaserOffTravelFeedMmPerMin ?? device.maxFeed) /
+    SECONDS_PER_MINUTE;
   const finishPosition =
     options.finishPosition === undefined
       ? resolveGrblDialect(device).parkAtOriginAfterJob
@@ -159,7 +161,7 @@ function groupCutVelocity(
   group: CutGroup | FillGroup | RasterGroup,
   device: DeviceProfile,
 ): number {
-  return Math.max(1, Math.min(group.speed, device.maxFeed)) / SECONDS_PER_MINUTE;
+  return effectiveGcodeFeedMmPerMin(Math.min(group.speed, device.maxFeed)) / SECONDS_PER_MINUTE;
 }
 
 function appendRasterGroupBlocks(
@@ -195,7 +197,7 @@ function appendFillGroupBlocks(
 ): Vec2 {
   let cursor = initialCursor;
   const scanOffsetMm =
-    group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, group.speed);
+    group.bidirectionalScanOffsetMm ?? offsetForEmittedFeed(device.scanningOffsets, group.speed);
   const plans = planFillSweeps(group, scanOffsetMm);
   for (let pass = 0; pass < group.passes; pass += 1) {
     for (const plan of plans) {

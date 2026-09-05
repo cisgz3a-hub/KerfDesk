@@ -4,7 +4,7 @@ exports[`keeps real connected-script multi-operation plans and emitted bytes exa
 {
   "fingerprint": {
     "chars": 367243,
-    "fnv1a": 866451639,
+    "fnv1a": 2638378267,
     "lines": 14969,
   },
   "head": [

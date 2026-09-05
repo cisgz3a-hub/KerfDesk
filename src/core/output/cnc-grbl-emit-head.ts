@@ -4,8 +4,7 @@
 // zero-length moves and redundant retracts by construction.
 
 import { formatCncCoordinateMm } from '../cnc/coordinate-representation';
-
-const MIN_FEED_MM_PER_MIN = 1;
+import { effectiveGcodeFeedMmPerMin } from '../gcode/feed-word';
 
 /** Last commanded position, formatted — compared at emit precision. */
 export type Head = {
@@ -19,9 +18,9 @@ export function fmt(n: number): string {
   return formatCncCoordinateMm(n);
 }
 
-/** Round a feed to a whole positive mm/min the controller accepts. */
+/** Apply the portable emitted-feed contract. */
 export function fmtFeed(feedMmPerMin: number): number {
-  return Math.max(MIN_FEED_MM_PER_MIN, Math.round(feedMmPerMin));
+  return effectiveGcodeFeedMmPerMin(feedMmPerMin);
 }
 
 /** Retract to the safe height unless the head is already there. */

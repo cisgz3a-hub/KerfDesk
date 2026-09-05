@@ -23,6 +23,7 @@
 // Pure-core compliant: no clock reads, no Math.random, no I/O.
 
 import { isEstimateTimeScale, type DeviceProfile } from '../devices';
+import { effectiveGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { cncPassRepresentedXyPoints } from '../cnc/cnc-pass-representation';
 import {
   formatCncCoordinateMm,
@@ -177,12 +178,12 @@ function zRateCappedSegmentFeed(
     descentMm,
   );
   if (!(length3d > 0) || !Number.isFinite(length3d)) return feed;
-  const plungeLimitedFeed = Math.max(1, Math.floor((plunge * length3d) / descentMm));
+  const plungeLimitedFeed = effectiveGcodeFeedMmPerMin((plunge * length3d) / descentMm);
   return Math.min(feed, plungeLimitedFeed);
 }
 
 function emittedCncFeedMmPerMin(value: number): number {
-  return Math.max(1, Math.round(value));
+  return effectiveGcodeFeedMmPerMin(value);
 }
 
 function emittedPath3dPoint(point: CncPath3dPass['points'][number]): {

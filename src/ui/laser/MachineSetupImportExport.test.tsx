@@ -171,6 +171,7 @@ describe('Machine Setup import/export panel', () => {
         ...DEFAULT_DEVICE_PROFILE,
         name: 'Imported wrong-controller profile',
         controllerKind: 'marlin',
+        gcodeDialect: { dialectId: 'marlin-inline' },
         bedWidth: 500,
         maxFeed: 3000,
         framingFeedMmPerMin: 3000,
@@ -189,6 +190,7 @@ describe('Machine Setup import/export panel', () => {
       expect(useStore.getState().project.device).toMatchObject({
         name: 'Imported wrong-controller profile',
         controllerKind: 'marlin',
+        gcodeDialect: { dialectId: 'marlin-inline' },
         bedWidth: 500,
         maxFeed: 3000,
         framingFeedMmPerMin: 3000,

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { MachineBounds } from '../devices';
 import type { CncContourPass, CncPass } from '../job';
 import { DEFAULT_CNC_LAYER_SETTINGS, type CncLayerSettings, type Vec2 } from '../scene';
-import { applyProfileLeadPasses, resolveProfileLeadOptions } from './profile-lead-passes';
+import {
+  applyProfileLeadPasses,
+  profileContourSignature,
+  resolveProfileLeadOptions,
+} from './profile-lead-passes';
 
 const BED: MachineBounds = { width: 300, height: 300, minX: 0, minY: 0, maxX: 300, maxY: 300 };
 const TOOL_MM = 3.175;
@@ -88,6 +92,61 @@ describe('applyProfileLeadPasses — arc lead applied', () => {
     ).length;
     expect(entryCount).toBeGreaterThanOrEqual(2);
   });
+
+  it('keeps a waste-side lead on an XY-closed tabbed path3d pass without flattening its Z rises', () => {
+    const tabbed: CncPass = {
+      kind: 'path3d',
+      closed: false,
+      points: [
+        { x: 50, y: 50, z: -3 },
+        { x: 55, y: 50, z: -2 },
+        { x: 60, y: 50, z: -3 },
+        { x: 60, y: 60, z: -3 },
+        { x: 50, y: 60, z: -3 },
+        { x: 50, y: 50, z: -3 },
+      ],
+    };
+
+    const result = apply([tabbed], {
+      cutType: 'profile-outside',
+      profileLead: { shape: 'arc' },
+    });
+    const pass = result[0];
+    if (pass?.kind !== 'path3d') throw new Error('expected a path3d pass');
+
+    expect(pass.points[0]?.x).toBeLessThan(50);
+    expect(pass.points[0]?.y).toBeLessThan(50);
+    expect(pass.points.some((point) => point.z === -2)).toBe(true);
+    expect(pass.points.filter((point) => point.z === -2)).toHaveLength(1);
+  });
+
+  it('recognizes differently segmented full and tabbed depth passes as the same profile', () => {
+    const tabbed: CncPass = {
+      kind: 'path3d',
+      closed: false,
+      points: [
+        { x: 50, y: 50, z: -3 },
+        { x: 55, y: 50, z: -2 },
+        { x: 60, y: 50, z: -3 },
+        { x: 60, y: 60, z: -3 },
+        { x: 50, y: 60, z: -3 },
+        { x: 50, y: 50, z: -3 },
+      ],
+    };
+
+    const result = apply([squarePass(), tabbed], {
+      cutType: 'profile-outside',
+      profileLead: { shape: 'arc' },
+    });
+    expect(result).toHaveLength(2);
+    for (const pass of result) {
+      expect(pass.kind).toBe('path3d');
+      if (pass.kind === 'path3d') {
+        expect(pass.points[0]?.x).toBeLessThan(50);
+        expect(pass.points[0]?.y).toBeLessThan(50);
+      }
+    }
+  });
 });
 
 describe('applyProfileLeadPasses — per-contour side & sibling parts', () => {
@@ -128,6 +187,27 @@ describe('applyProfileLeadPasses — per-contour side & sibling parts', () => {
     const result = apply([a, b], { cutType: 'profile-outside' });
     expect(result[0]?.kind).toBe('contour'); // a's plunge lands inside sibling b -> fallback
     expect(result[1]?.kind).toBe('path3d'); // b's lead is clear of a
+  });
+
+  it('still rejects a lead segment that crosses a genuinely thin sibling feature', () => {
+    const part = cpass([
+      { x: 50, y: 50 },
+      { x: 60, y: 50 },
+      { x: 60, y: 60 },
+      { x: 50, y: 60 },
+    ]);
+    const thinSibling = cpass([
+      { x: 49.9, y: 45.99 },
+      { x: 50.1, y: 45.99 },
+      { x: 50.1, y: 46.01 },
+      { x: 49.9, y: 46.01 },
+    ]);
+    const result = apply([part, thinSibling], {
+      cutType: 'profile-outside',
+      profileLead: { shape: 'line', radiusMm: 8 },
+    });
+
+    expect(result[0]?.kind).toBe('contour');
   });
 
   it('keeps an inside-side lead on every depth pass, not only the first', () => {
@@ -223,5 +303,72 @@ describe('resolveProfileLeadOptions', () => {
       radiusMm: 8,
       sweepDeg: 45,
     });
+  });
+});
+
+describe('profileContourSignature', () => {
+  it('ignores start rotation and collinear tab stops without conflating equal-area equal-bounds shapes', () => {
+    const triangleA = [
+      { x: 50, y: 50 },
+      { x: 70, y: 50 },
+      { x: 50, y: 70 },
+    ];
+    const triangleAWithStops = [
+      { x: 60, y: 50 },
+      { x: 70, y: 50 },
+      { x: 50, y: 70 },
+      { x: 50, y: 60 },
+      { x: 50, y: 50 },
+      { x: 60, y: 50 },
+    ];
+    const triangleB = [
+      { x: 70, y: 70 },
+      { x: 50, y: 70 },
+      { x: 70, y: 50 },
+    ];
+
+    expect(profileContourSignature(triangleAWithStops)).toBe(profileContourSignature(triangleA));
+    expect(profileContourSignature(triangleB)).not.toBe(profileContourSignature(triangleA));
+  });
+
+  it('removes a fractional on-edge sample even when micron quantization nudges its cross product', () => {
+    const outline = [
+      { x: 0, y: 0 },
+      { x: 3, y: 1 },
+      { x: 0, y: 2 },
+      { x: 0, y: 0 },
+    ];
+    const sampled = [
+      { x: 0, y: 0 },
+      { x: 1, y: 1 / 3 },
+      { x: 3, y: 1 },
+      { x: 0, y: 2 },
+      { x: 0, y: 0 },
+    ];
+    expect(profileContourSignature(sampled)).toBe(profileContourSignature(outline));
+  });
+
+  it('keeps the production lead path bounded for dense contours repeated across many passes', () => {
+    const denseRing = Array.from({ length: 2048 }, (_, index) => {
+      const angle = (index / 2048) * Math.PI * 2;
+      return { x: 150 + Math.cos(angle) * 50, y: 150 + Math.sin(angle) * 50 };
+    });
+    const passes: CncPass[] = Array.from({ length: 24 }, (_, index) => ({
+      kind: 'contour' as const,
+      zMm: -(index + 1) * 0.25,
+      closed: true,
+      polyline: [...denseRing, denseRing[0]!],
+    }));
+
+    const result = apply(passes, { cutType: 'profile-outside' });
+    expect(result).toHaveLength(passes.length);
+    expect(result.every((pass) => pass.kind === 'path3d')).toBe(true);
+    expect(
+      new Set(
+        result.map((pass) =>
+          pass.kind === 'path3d' ? `${pass.points[0]?.x},${pass.points[0]?.y}` : '',
+        ),
+      ),
+    ).toHaveLength(1);
   });
 });

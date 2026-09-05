@@ -15,6 +15,7 @@ import {
   normalizeScanOffsetTable,
   streamingModeForController,
 } from '../../core/devices';
+import { isBidirectionalScanPolicy } from '../../core/devices/device-profile';
 import { normalizeScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
@@ -323,6 +324,9 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
     ...compatibleControllerFields,
     scanningOffsets,
+    bidirectionalScanPolicy: isBidirectionalScanPolicy(dev['bidirectionalScanPolicy'])
+      ? dev['bidirectionalScanPolicy']
+      : undefined,
     ...recoveredCncDevicePatch(dev),
     scanOffsetCalibrationStatus: normalizeScanOffsetCalibrationStatus(
       dev['scanOffsetCalibrationStatus'],

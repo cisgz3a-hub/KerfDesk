@@ -75,7 +75,7 @@ export function CutSettingsImageFields(props: {
         label="Expert override"
         name="allowUncalibratedBidirectionalScan"
         checked={props.layer.allowUncalibratedBidirectionalScan === true}
-        title="Allow bidirectional scanning without a scan-offset calibration. This can double or blur edges on the 4040."
+        title="Allow bidirectional scanning without a verified scan-offset calibration. This can double or blur edges on profiles that require calibration."
       />
       <ImageCheckboxField
         label="Pass-through"

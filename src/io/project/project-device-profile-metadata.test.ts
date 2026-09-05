@@ -46,6 +46,19 @@ describe('project device profile metadata persistence', () => {
     expect(result.project.device.rxBufferBytes).toBe(96);
   });
 
+  it('roundtrips an explicit scan-direction policy independently of profile family', () => {
+    const project = createProject({
+      ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      bidirectionalScanPolicy: 'allow-requested',
+    });
+
+    const result = deserializeProject(serializeProject(project));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.bidirectionalScanPolicy).toBe('allow-requested');
+  });
+
   it('roundtrips independent preview timing calibration factors', () => {
     const project = createProject({
       ...DEFAULT_DEVICE_PROFILE,

@@ -15,6 +15,7 @@ import {
   type ProfileCapability,
   type ProfileEvidenceStatus,
 } from '../../core/devices';
+import { isBidirectionalScanPolicy } from '../../core/devices/device-profile';
 import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
 import { isScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import {
@@ -76,6 +77,12 @@ function validateCncSubProfile(value: unknown): string | null {
 }
 
 function validateScanOffsetCalibrationLifecycle(value: Record<string, unknown>): string | null {
+  if (
+    value['bidirectionalScanPolicy'] !== undefined &&
+    !isBidirectionalScanPolicy(value['bidirectionalScanPolicy'])
+  ) {
+    return 'profile.bidirectionalScanPolicy is invalid';
+  }
   const status = value['scanOffsetCalibrationStatus'];
   if (status !== undefined && !isScanOffsetCalibrationStatus(status)) {
     return 'profile.scanOffsetCalibrationStatus is invalid';
