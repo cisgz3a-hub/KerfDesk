@@ -108,6 +108,22 @@ describe('createNearestEntryQuery', () => {
     expect(pick?.segmentIndex).toBe(1);
   });
 
+  it.each([false, true])(
+    'checks equal-distance entries across cell boundaries (direction tie: %s)',
+    (directionTie) => {
+      const entries: SegmentEntry[] = [
+        { point: { x: 2, y: 1 }, segmentIndex: 0, reverse: false },
+        { point: { x: 0, y: 1 }, segmentIndex: directionTie ? 0 : 1, reverse: directionTie },
+        { point: { x: 0, y: 0 }, segmentIndex: 2, reverse: false },
+        { point: { x: 4, y: 4 }, segmentIndex: 3, reverse: false },
+      ];
+      const cursor = { x: 1, y: 1 };
+      const pick = createNearestEntryQuery(entries)(cursor, () => true);
+      expect(pick).toEqual(referenceNearest(entries, cursor, () => true));
+      expect(pick).toEqual(entries[0]);
+    },
+  );
+
   it('returns null when nothing is available and when there are no entries', () => {
     const entries: SegmentEntry[] = [{ point: { x: 1, y: 1 }, segmentIndex: 0, reverse: false }];
     expect(createNearestEntryQuery(entries)({ x: 0, y: 0 }, () => false)).toBeNull();
