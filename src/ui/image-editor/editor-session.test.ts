@@ -63,18 +63,40 @@ describe('editor session ops', () => {
     expect(channelAt(session, 5, 5)).toBe(0);
   });
 
-  it('eraser strokes always paint white regardless of the active colour', () => {
+  it('eraser strokes paint the selected background color and remain undoable', () => {
     let session = newSession();
     session = commitStroke(session, { kind: 'pencil' }, PENCIL, BLACK, [{ x: 8, y: 8 }], 'Pencil');
     session = commitStroke(
       session,
       { kind: 'eraser' },
       { ...PENCIL, diameterPx: 6 },
-      BLACK,
+      { r: 17, g: 34, b: 51 },
       [{ x: 8, y: 8 }],
       'Eraser',
     );
-    expect(channelAt(session, 8, 8)).toBe(255);
+    const offset = (8 * session.doc.width + 8) * RGBA_CHANNELS;
+    expect([...session.doc.data.slice(offset, offset + RGBA_CHANNELS)]).toEqual([17, 34, 51, 255]);
+    expect(channelAt(undoSession(session), 8, 8)).toBe(0);
+  });
+
+  it('only successful undo and redo mark an applied session dirty', () => {
+    const empty = newSession();
+    expect(undoSession(empty)).toBe(empty);
+    expect(redoSession(empty)).toBe(empty);
+    const painted = commitStroke(
+      empty,
+      { kind: 'pencil' },
+      PENCIL,
+      BLACK,
+      [{ x: 5, y: 5 }],
+      'Pencil',
+    );
+    const undone = undoSession({ ...painted, dirtySinceApply: false });
+    expect(undone.dirtySinceApply).toBe(true);
+    expect(channelAt(undone, 5, 5)).toBe(255);
+    const redone = redoSession({ ...undone, dirtySinceApply: false });
+    expect(redone.dirtySinceApply).toBe(true);
+    expect(channelAt(redone, 5, 5)).toBe(0);
   });
 
   it('line commits with 45° constraint applied', () => {
