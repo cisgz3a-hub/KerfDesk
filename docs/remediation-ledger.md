@@ -985,6 +985,37 @@ and missing-glyph cases below.
   windows in 3/3 ordinary launches, all with isolated userData/sessionData and renderer readiness.
   Do not weaken visibility validation or alter production readiness to compensate. This fixture is
   not a repaired packaged-product pass, and no workflow rerun or manual deployment has occurred.
+
+### 2026-09-05 first 100 pull requests: remediation
+
+- Reviewed PRs #1 through #100 against main `ccaa3064d9efe904821307f0603ce842d903b586`:
+  82 merged and 18 closed without merging. Nine confirmed current defects were grouped into seven
+  focused changes. Historical defects already repaired on main were not reintroduced as findings.
+- F01/F08: [PR #722](https://github.com/cisgz3a-hub/KerfDesk/pull/722) preserves saved libraries,
+  current unsaved edits, exact import identifiers, and special object keys during import/reload.
+- F04: [PR #723](https://github.com/cisgz3a-hub/KerfDesk/pull/723) fits the transformed artwork
+  footprint without changing its aspect ratio, rotation, or reflection.
+- F02: [PR #724](https://github.com/cisgz3a-hub/KerfDesk/pull/724) unions occupied nesting regions
+  using the existing per-path fill rules; overlapping filled objects no longer become false holes.
+- F05: [PR #725](https://github.com/cisgz3a-hub/KerfDesk/pull/725) rasterizes canonical curves at
+  the requested output resolution in both inline and worker conversion paths.
+- F06/F07: [PR #726](https://github.com/cisgz3a-hub/KerfDesk/pull/726) round-trips literal braces
+  and rejects malformed persisted variable fields without coercion or inherited-key dispatch.
+- F03: [PR #727](https://github.com/cisgz3a-hub/KerfDesk/pull/727) projects tab drags in scene
+  space and stores their matching local contour positions. Previously misplaced saved tabs require
+  re-dragging because the original cursor location was never stored.
+- F09, this change: surfacing emits a replayable line stream, performs exact emitted-text preflight
+  in an owned worker, and writes bounded chunks with backpressure. Cancellation terminates preparation
+  and discards staged writes. Once final file commit begins, the UI reports finalizing and replacement
+  writers wait for it to settle. The existing Frame policy and advisory-save policy remain unchanged.
+- F09 local evidence: 20 focused files / 133 tests passed, including large accepted row/pass products
+  without allocating their output, replay/provenance, modal preflight, worker cancellation, real
+  WritableStream behavior, commit serialization, and panel lifecycle. Typecheck, touched-source lint
+  and formatting, file-size policy, export ratchet, and diff whitespace checks passed. Hosted checks
+  and merge state are recorded on the linked PRs; this entry does not assert hardware qualification.
+- Implementation uses isolated worktrees. The original `LaserForge-2.0` checkout and its unrelated
+  tracked/untracked work remain outside these changes. No manual deployment or hardware operation
+  belongs to this remediation.
 - **NATIVE-SMOKE-02, confirmed diagnostic-loss defect, pending same harness slice:** validation
   precedes result/stdout/stderr preservation, and the `finally` removes the temporary evidence.
   Failed run artifact `9840872041` consequently contains only the readiness report. Preserve failure

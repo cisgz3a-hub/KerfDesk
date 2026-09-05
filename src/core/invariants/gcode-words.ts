@@ -40,6 +40,21 @@ export function asGcodeLines(gcode: string | ReadonlyArray<string>): ReadonlyArr
   return typeof gcode === 'string' ? gcode.split('\n') : gcode;
 }
 
+/** Scan replayable generated output without materializing a full line array. */
+export function* iterateGcodeLines(gcode: string | Iterable<string>): Generator<string> {
+  if (typeof gcode !== 'string') {
+    for (const line of gcode) yield line ?? '';
+    return;
+  }
+  let start = 0;
+  let end: number;
+  while ((end = gcode.indexOf('\n', start)) !== -1) {
+    yield gcode.slice(start, end);
+    start = end + 1;
+  }
+  yield gcode.slice(start);
+}
+
 export function stripGcodeComment(line: string): string {
   const semi = line.indexOf(';');
   const head = semi >= 0 ? line.slice(0, semi) : line;
