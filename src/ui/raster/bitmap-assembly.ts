@@ -23,6 +23,7 @@ import {
   type TextObject,
   type TracedImage,
 } from '../../core/scene';
+import { flattenColoredPathCurvesForTransform } from '../../core/scene/curve-path';
 import {
   assertBitmapConversionFits,
   estimateBitmapConversion,
@@ -33,6 +34,7 @@ import type { BitmapFields } from './luma-bitmap';
 
 const DEFAULT_DITHER: DitherAlgorithm = 'floyd-steinberg';
 const BITMAP_SOURCE_SUFFIX = ' (bitmap)';
+const CURVE_TOLERANCE_PIXELS = 0.25;
 
 export type ConvertibleVector = ImportedSvg | TextObject | TracedImage | ShapeObject;
 export type ConvertToBitmapRenderType = 'fill-all' | 'outlines' | 'use-cut-settings';
@@ -110,11 +112,19 @@ function rasterizeConvertibles(
   // it matches both LightBurn's "areas between outlines" Fill All and our
   // own Fill mode, which hatches a layer's contours together — a shape
   // nested inside another object's shape reads as a hole.
-  const baked = objects.map(bakeConvertibleTransform);
   const bounds = combinedConvertibleBounds(objects);
-  const paths = baked.flatMap((b) => b.paths);
   const plan = estimateBitmapConversion({ bounds, transform: IDENTITY_TRANSFORM }, options.dpi);
   assertBitmapConversionFits(plan);
+  // Resolve canonical geometry at the actual rounded pixel pitch, in scene mm.
+  // The flattener accounts for each object's largest axis scale before baking.
+  const toleranceMm =
+    CURVE_TOLERANCE_PIXELS *
+    Math.min(
+      (bounds.maxX - bounds.minX) / plan.pixelWidth,
+      (bounds.maxY - bounds.minY) / plan.pixelHeight,
+    );
+  const baked = objects.map((object) => bakeConvertibleTransform(object, toleranceMm));
+  const paths = baked.flatMap((b) => b.paths);
   const { fillPolylines, outlinePolylines } = conversionPolylineGroups(paths, options);
   const raster = rasterizeVectorToLuma({
     polylines: paths.flatMap((p) => p.polylines),
@@ -213,7 +223,10 @@ function cutSettingModes(
   return modes.length === 0 ? ['line'] : modes;
 }
 
-function bakeConvertibleTransform(o: ConvertibleVector): {
+function bakeConvertibleTransform(
+  o: ConvertibleVector,
+  toleranceMm: number,
+): {
   readonly bounds: Bounds;
   readonly paths: ReadonlyArray<ColoredPath>;
 } {
@@ -221,10 +234,19 @@ function bakeConvertibleTransform(o: ConvertibleVector): {
     bounds: transformedBBox(o),
     paths: o.paths.map((path) => {
       const operationIds = path.operationIds ?? o.operationIds;
+      const flattened = flattenColoredPathCurvesForTransform(path, o.transform, {
+        toleranceMm,
+        // Match compilation: canonical geometry never falls back to a stale
+        // compatibility cache merely because the path is large.
+        segmentBudget: Number.MAX_SAFE_INTEGER,
+      });
+      if (flattened.kind !== 'ok') {
+        throw new Error('Canonical curve flattening exceeded the JavaScript safe-integer budget.');
+      }
       return {
         color: path.color,
         ...(operationIds === undefined ? {} : { operationIds }),
-        polylines: path.polylines.map((polyline) => ({
+        polylines: flattened.polylines.map((polyline) => ({
           closed: polyline.closed,
           points: polyline.points.map((point) => applyTransform(point, o.transform)),
         })),
