@@ -9,7 +9,7 @@
 // flags it at the text boundary, catching every producer (kerf, tabs, trace,
 // text, offset-fill) regardless of which one emitted the non-finite value.
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
-import { asGcodeLines, stripGcodeComment } from './gcode-words';
+import { iterateGcodeLines, stripGcodeComment } from './gcode-words';
 import type { Issue } from './predicates';
 
 // X/Y/Z motion coordinates and I/J arc-centre offsets. Feed (F) and power (S)
@@ -21,13 +21,15 @@ import type { Issue } from './predicates';
 const NON_FINITE_COORD =
   /(?:^|[^A-Za-z])([XYZIJ])\s*([+-]?(?:NaN|Infinity|Inf))(?=$|\s|[A-Za-z;])/gi;
 
-export function findNonFiniteCoords(gcode: string | ReadonlyArray<string>): readonly Issue[] {
-  const lines = asGcodeLines(gcode);
+export function findNonFiniteCoords(
+  gcode: string | Iterable<string>,
+  maxIssues = Infinity,
+): readonly Issue[] {
   const issues: Issue[] = [];
   let motion: GcodeMotionMode | null = 0;
-  for (let i = 0; i < lines.length; i += 1) {
-    const raw = lines[i];
-    if (raw === undefined) continue;
+  let lineNumber = 0;
+  for (const raw of iterateGcodeLines(gcode)) {
+    lineNumber += 1;
     const stripped = stripGcodeComment(raw);
     const scanned = scanModalMotionLine(stripped, motion);
     motion = scanned.motion;
@@ -35,10 +37,11 @@ export function findNonFiniteCoords(gcode: string | ReadonlyArray<string>): read
     const matches = [...stripped.matchAll(NON_FINITE_COORD)];
     for (const match of matches) {
       issues.push({
-        lineNumber: i + 1,
+        lineNumber,
         line: raw,
         reason: `${match[1]} coordinate is non-finite: ${match[2]}`,
       });
+      if (issues.length >= maxIssues) return issues;
     }
   }
   return issues;

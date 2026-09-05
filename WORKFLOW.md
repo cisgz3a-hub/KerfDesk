@@ -3689,10 +3689,18 @@ and lifts the command's CNC-only gate.)*
    after M5. Fixed feeds are capped to the device-profile maximum.
 2. The toast repeats the operator contract: zero X/Y at the area's
    front-left corner and Z on the surface to be faced before running.
-3. Before the picker opens, emitted-text preflight checks the work-origin
-   bed envelope, enabled no-go-zone uncertainty, feed/RPM ceilings,
-   finite coordinates, safe travel/depth, and spindle-start clearance.
-   Connected-controller $30/$32 mismatches use the normal export confirm.
+3. Choose the destination when Save is clicked. Background emitted-text
+   preflight checks the work-origin bed envelope, enabled no-go-zone
+   uncertainty, feed/RPM ceilings, finite coordinates, safe travel/depth,
+   and spindle-start clearance before a writable transaction opens. Setup
+   and controller findings remain advisory toasts, including on picker cancel.
+4. Generation, preflight, and file writes use bounded buffers. **Cancel surfacing
+   save** stops preparation or discards uncommitted file bytes. **Finishing
+   surfacing save…** means the complete file is already being committed and
+   can no longer be cancelled. A replacement save waits for that commit to
+   settle before opening another writable; changing projects retires old UI
+   notifications. Existing file contents survive preflight, generation, or
+   write failures before the final commit.
 
 #### Error — save fails
 1. A preflight failure or failed dialog/write toasts the reason; nothing

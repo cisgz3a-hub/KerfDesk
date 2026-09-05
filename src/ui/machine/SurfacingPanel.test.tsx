@@ -13,6 +13,30 @@ import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { SurfacingPanel } from './SurfacingPanel';
+import type { SurfacingWorkerInput } from './surfacing-worker-protocol';
+
+// Exercise real generation/preflight/chunk output here; client protocol and
+// cancellation have separate Worker-harness tests.
+vi.mock('./surfacing-worker-client', async () => {
+  const { prepareSurfacingStream } = await import('./surfacing-worker-runtime');
+  return {
+    startSurfacingStream: (input: SurfacingWorkerInput, signal: AbortSignal) => {
+      const session = prepareSurfacingStream(input);
+      return {
+        ready: Promise.resolve(session.prepared),
+        chunks: {
+          async *[Symbol.asyncIterator]() {
+            for (let next = session.chunks.next(); !next.done; next = session.chunks.next()) {
+              signal.throwIfAborted();
+              yield next.value;
+            }
+          },
+        },
+        dispose: vi.fn(),
+      };
+    },
+  };
+});
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -47,8 +71,19 @@ function mockPlatform(cancelPicker = false): {
   readonly pickFileForSave: ReturnType<typeof vi.fn>;
 } {
   const write = vi.fn(async (_data: string | Blob) => undefined);
+  const writeChunks = async (
+    chunks: AsyncIterable<string>,
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    let text = '';
+    for await (const chunk of chunks) {
+      signal?.throwIfAborted();
+      text += chunk;
+    }
+    await write(text);
+  };
   const pickFileForSave = vi.fn(async () =>
-    cancelPicker ? null : { displayName: 'surfacing.nc', write },
+    cancelPicker ? null : { displayName: 'surfacing.nc', write, writeChunks },
   );
   return {
     write,
