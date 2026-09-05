@@ -124,6 +124,62 @@ describe('createNearestEntryQuery', () => {
     },
   );
 
+  it.each(['horizontal', 'vertical'] as const)(
+    'keeps candidate work local for exact and tied %s queries',
+    (axis) => {
+      const entries: SegmentEntry[] = Array.from({ length: 4096 }, (_, segmentIndex) => ({
+        point: axis === 'horizontal' ? { x: segmentIndex, y: 17 } : { x: 17, y: segmentIndex },
+        segmentIndex,
+        reverse: false,
+      }));
+      const query = createNearestEntryQuery(entries);
+      for (const position of [0, 2048, 2048.5, 4095]) {
+        const cursor = axis === 'horizontal' ? { x: position, y: 17 } : { x: 17, y: position };
+        let checked = 0;
+        const actual = query(cursor, () => {
+          checked += 1;
+          return true;
+        });
+        expect(actual).toEqual(referenceNearest(entries, cursor, () => true));
+        // Count candidate visits, not timing: an exact/local pick must not
+        // regress to inspecting the entire 4,096-entry population.
+        expect(checked).toBeLessThan(entries.length / 8);
+      }
+    },
+  );
+
+  it.each(['horizontal', 'vertical', 'coincident'] as const)(
+    'matches an exhaustive scan for %s ties and shrinking availability',
+    (axis) => {
+      const point = (along: number) =>
+        axis === 'horizontal' ? { x: along, y: 7 } : { x: 7, y: along };
+      const entries: SegmentEntry[] = Array.from({ length: 32 }, (_, segmentIndex) => [
+        {
+          point: point(axis === 'coincident' ? 7 : segmentIndex % 8),
+          segmentIndex,
+          reverse: false,
+        },
+        {
+          point: point(axis === 'coincident' ? 7 : 8 - (segmentIndex % 8)),
+          segmentIndex,
+          reverse: true,
+        },
+      ]).flat();
+      const query = createNearestEntryQuery(entries);
+      for (let availableFrom = 0; availableFrom <= 32; availableFrom += 1) {
+        const available = (index: number) => index >= availableFrom;
+        for (let along = -2; along <= 10; along += 0.5) {
+          for (const across of [0, 1, 100]) {
+            const cursor = point(along);
+            if (axis === 'horizontal') cursor.y += across;
+            else cursor.x += across;
+            expect(query(cursor, available)).toEqual(referenceNearest(entries, cursor, available));
+          }
+        }
+      }
+    },
+  );
+
   it('returns null when nothing is available and when there are no entries', () => {
     const entries: SegmentEntry[] = [{ point: { x: 1, y: 1 }, segmentIndex: 0, reverse: false }];
     expect(createNearestEntryQuery(entries)({ x: 0, y: 0 }, () => false)).toBeNull();

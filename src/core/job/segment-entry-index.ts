@@ -74,19 +74,22 @@ function buildGrid(entries: ReadonlyArray<SegmentEntry>): Grid | null {
     MAX_GRID_SIDE,
     Math.max(1, Math.ceil(Math.sqrt(entries.length / TARGET_ENTRIES_PER_CELL))),
   );
-  // A degenerate extent (all points on a line, or one point) still needs a
-  // positive cell size, or every index would be NaN.
-  const cellWidth = Math.max((maxX - minX) / side, Number.MIN_VALUE);
-  const cellHeight = Math.max((maxY - minY) / side, Number.MIN_VALUE);
-  const cells: number[][] = Array.from({ length: side * side }, () => []);
+  // A collapsed axis has one occupied cell, not a row of empty cells whose
+  // subnormal boundaries would keep the search radius at zero. Retain a
+  // positive divisor for indexing, including underflowing nonzero extents.
+  const cols = maxX === minX ? 1 : side;
+  const rows = maxY === minY ? 1 : side;
+  const cellWidth = Math.max((maxX - minX) / cols, Number.MIN_VALUE);
+  const cellHeight = Math.max((maxY - minY) / rows, Number.MIN_VALUE);
+  const cells: number[][] = Array.from({ length: cols * rows }, () => []);
   for (let i = 0; i < entries.length; i += 1) {
     const entry = entries[i];
     if (entry === undefined) continue;
-    const cx = clampIndex(Math.floor((entry.point.x - minX) / cellWidth), side);
-    const cy = clampIndex(Math.floor((entry.point.y - minY) / cellHeight), side);
-    cells[cy * side + cx]?.push(i);
+    const cx = clampIndex(Math.floor((entry.point.x - minX) / cellWidth), cols);
+    const cy = clampIndex(Math.floor((entry.point.y - minY) / cellHeight), rows);
+    cells[cy * cols + cx]?.push(i);
   }
-  return { entries, cells, minX, minY, cellWidth, cellHeight, cols: side, rows: side };
+  return { entries, cells, minX, minY, cellWidth, cellHeight, cols, rows };
 }
 
 function clampIndex(value: number, side: number): number {
@@ -142,7 +145,7 @@ function gridNearest(
   const cy = clampIndex(Math.floor((cursor.y - grid.minY) / grid.cellHeight), grid.rows);
   let best: SegmentEntry | null = null;
   let bestDistSq = Number.POSITIVE_INFINITY;
-  const maxRing = Math.max(grid.cols, grid.rows);
+  const maxRing = Math.max(cx, grid.cols - 1 - cx, cy, grid.rows - 1 - cy);
   for (let ring = 0; ring <= maxRing; ring += 1) {
     for (const cellIndex of ringCells(grid, cx, cy, ring)) {
       for (const entryIndex of grid.cells[cellIndex] ?? []) {
@@ -164,16 +167,24 @@ function gridNearest(
   return best;
 }
 
-// Distance from the cursor to the nearest point NOT covered by rings 0..ring.
-// Zero when the cursor sits outside that box, which simply means "keep going".
+// Lower bound on distance to any unsearched cell. A side already at the grid
+// edge cannot hide another entry, so it contributes Infinity, not a zero bound.
+// Once every cell is covered the bound is Infinity. Negative distances mean
+// the cursor is outside an unsearched side; zero conservatively keeps searching.
 function safeRadiusSquared(grid: Grid, cursor: Vec2, cx: number, cy: number, ring: number): number {
   const x0 = grid.minX + (cx - ring) * grid.cellWidth;
   const x1 = grid.minX + (cx + ring + 1) * grid.cellWidth;
   const y0 = grid.minY + (cy - ring) * grid.cellHeight;
   const y1 = grid.minY + (cy + ring + 1) * grid.cellHeight;
-  const inside = cursor.x >= x0 && cursor.x <= x1 && cursor.y >= y0 && cursor.y <= y1;
-  if (!inside) return 0;
-  const radius = Math.min(cursor.x - x0, x1 - cursor.x, cursor.y - y0, y1 - cursor.y);
+  const radius = Math.max(
+    0,
+    Math.min(
+      cx - ring > 0 ? cursor.x - x0 : Infinity,
+      cx + ring < grid.cols - 1 ? x1 - cursor.x : Infinity,
+      cy - ring > 0 ? cursor.y - y0 : Infinity,
+      cy + ring < grid.rows - 1 ? y1 - cursor.y : Infinity,
+    ),
+  );
   return radius * radius;
 }
 
