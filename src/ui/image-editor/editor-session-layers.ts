@@ -16,6 +16,7 @@ import {
 } from '../../core/image-layers';
 import { createEditHistory, type EditHistory, type RgbaBuffer } from '../../core/image-edit';
 import { redoSession, undoSession, type EditorSession } from './editor-session';
+import { compositeIdentity } from './editor-composite-identity';
 
 type LayerProps = Partial<Pick<EditorLayer, 'name' | 'isVisible' | 'opacity' | 'blend'>>;
 
@@ -186,16 +187,8 @@ export function setActiveLayerProps(session: EditorSession, props: LayerProps): 
  * bakes. Fast path: a single fully-visible normal layer IS the document.
  */
 export function compositeSession(session: EditorSession): RgbaBuffer {
-  const only = session.layers.length === 1 ? session.layers[0] : undefined;
-  if (
-    only !== undefined &&
-    only.isVisible &&
-    only.opacity === 1 &&
-    only.blend === 'normal' &&
-    only.buffer === session.doc
-  ) {
-    return session.doc;
-  }
+  const identity = compositeIdentity(session);
+  if (identity !== null) return identity;
   const data = new Uint8ClampedArray(session.doc.width * session.doc.height * 4);
   data.fill(255);
   const target: RgbaBuffer = { width: session.doc.width, height: session.doc.height, data };

@@ -39,18 +39,10 @@ export function fillMaskedInPlace(
       const alpha = (mask.alpha[y * mask.width + x] ?? 0) / MASK_SOLID;
       if (alpha === 0) continue;
       const base = (y * buffer.width + x) * RGBA_CHANNELS;
-      blend(buffer, base, color.r, alpha);
-      blend(buffer, base + 1, color.g, alpha);
-      blend(buffer, base + 2, color.b, alpha);
-      buffer.data[base + 3] = 255;
+      sourceOverPixelInPlace(buffer.data, base, { ...color, alpha });
     }
   }
   return bounds;
-}
-
-function blend(buffer: RgbaBuffer, index: number, target: number, alpha: number): void {
-  const current = buffer.data[index] ?? 0;
-  buffer.data[index] = Math.round(target * alpha + current * (1 - alpha));
 }
 
 /** Copy the selected pixels (and their mask crop) out of the document. */

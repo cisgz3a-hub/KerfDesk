@@ -1,9 +1,10 @@
 // Gradient fill (ADR-246, V2 plan B1): foreground→background ramp along a
 // dragged axis (linear) or out from the drag origin (radial), written
-// opaque, selection-clamped with the established feathered alpha-lerp.
+// selection-clamped with straight-alpha source-over compositing.
 
 import { RGBA_CHANNELS, type PaintColor, type RgbaBuffer } from '../image-edit';
 import type { SelectionMask } from '../image-select';
+import { sourceOverPixelInPlace } from '../image-composite';
 
 const MAX_BYTE = 255;
 
@@ -64,14 +65,10 @@ function writeBlended(
   t: number,
   alpha: number,
 ): void {
-  const channels = [fg.r + (bg.r - fg.r) * t, fg.g + (bg.g - fg.g) * t, fg.b + (bg.b - fg.b) * t];
-  for (let c = 0; c < channels.length; c += 1) {
-    const mapped = Math.round(channels[c] ?? 0);
-    const source = doc.data[base + c] ?? 0;
-    doc.data[base + c] =
-      alpha === MAX_BYTE ? mapped : source + Math.round(((mapped - source) * alpha) / MAX_BYTE);
-  }
-  // Gradients paint opaque ink; a feathered mask still softens via the lerp.
-  const srcAlpha = doc.data[base + 3] ?? 0;
-  doc.data[base + 3] = Math.max(srcAlpha, alpha);
+  sourceOverPixelInPlace(doc.data, base, {
+    r: Math.round(fg.r + (bg.r - fg.r) * t),
+    g: Math.round(fg.g + (bg.g - fg.g) * t),
+    b: Math.round(fg.b + (bg.b - fg.b) * t),
+    alpha: alpha / MAX_BYTE,
+  });
 }

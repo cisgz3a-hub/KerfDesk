@@ -58,9 +58,8 @@ function readoutText(session: EditorSession, x: number, y: number): string {
   const b = session.doc.data[base + 2] ?? 0;
   // Ink %: 0 = white (no burn), 100 = black — the laser-relevant reading.
   const ink = Math.round(100 - ((r + g + b) / 3 / 255) * 100);
-  const { minX, minY, maxX, maxY } = session.sourceBounds;
-  const mmPerPxX = (maxX - minX) / session.base.width;
-  const mmPerPxY = (maxY - minY) / session.base.height;
+  const { minX, minY } = session.sourceBounds;
+  const { x: mmPerPxX, y: mmPerPxY } = session.pixelSizeMm;
   const mmX = minX + (session.cropOffset.x + x + 0.5) * mmPerPxX;
   const mmY = minY + (session.cropOffset.y + y + 0.5) * mmPerPxY;
   return `${x}, ${y} px · ${mmX.toFixed(1)}, ${mmY.toFixed(1)} mm · RGB ${r},${g},${b} · K ${ink}%`;

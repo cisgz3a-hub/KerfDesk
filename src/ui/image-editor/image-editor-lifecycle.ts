@@ -183,12 +183,14 @@ function runApply(set: Setter, get: () => ImageEditorState): Promise<string | nu
         releaseApplyRequest(set, request);
         return null;
       }
-      const bounds = appliedBounds(session);
+      // A prior Apply may already have cropped the scene object. Revert must
+      // explicitly restore the as-opened extent instead of omitting bounds.
+      const bounds = appliedBounds(session) ?? session.sourceBounds;
       useStore.getState().applyEditedImage(objectId, {
         ...fields,
         pixelWidth: session.doc.width,
         pixelHeight: session.doc.height,
-        ...(bounds === null ? {} : { bounds }),
+        bounds,
       });
       const replacementOwner =
         sessionOwner === null ? null : ownerAfterApply(sessionOwner, objectId);

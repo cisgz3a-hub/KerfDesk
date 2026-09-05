@@ -15,7 +15,7 @@ export type EditedImageFields = {
   /** Apply always records the baked bitmap dimensions. */
   readonly pixelWidth?: number;
   readonly pixelHeight?: number;
-  /** Present only when canvas/crop edits changed the physical image extent. */
+  /** Physical extent of this revision; Revert can restore the as-opened extent. */
   readonly bounds?: Bounds;
 };
 

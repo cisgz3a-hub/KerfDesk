@@ -7,6 +7,7 @@ import type { RgbaBuffer } from '../../core/image-edit';
 import { compositeLayersInPlace } from '../../core/image-layers';
 import type { EditorSession } from './editor-session';
 import { compositeSession } from './editor-session-layers';
+import { compositeIdentity } from './editor-composite-identity';
 
 export type CompositeCache = {
   readonly objectId: string;
@@ -28,7 +29,7 @@ type CacheResult = {
  * itself (identity fast path) and carry no cache.
  */
 export function nextComposite(cache: CompositeCache | null, session: EditorSession): CacheResult {
-  const identity = compositeFastPath(session);
+  const identity = compositeIdentity(session);
   if (identity !== null) return { doc: identity, cache: null };
 
   const reusable =
@@ -68,20 +69,6 @@ export function nextComposite(cache: CompositeCache | null, session: EditorSessi
       buffer,
     },
   };
-}
-
-function compositeFastPath(session: EditorSession): RgbaBuffer | null {
-  const only = session.layers.length === 1 ? session.layers[0] : undefined;
-  if (
-    only !== undefined &&
-    only.isVisible &&
-    only.opacity === 1 &&
-    only.blend === 'normal' &&
-    only.buffer === session.doc
-  ) {
-    return session.doc;
-  }
-  return null;
 }
 
 // The composite target is defined as "layers over opaque white" — the

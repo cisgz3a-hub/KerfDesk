@@ -3,7 +3,7 @@
 // keeps the ALIGNED offset on the tool object across strokes; heal is a
 // click-dab tool sized by the brush. One scoped history entry per action.
 
-import { pushHistoryEntry, type PaintPoint } from '../../core/image-edit';
+import { cloneRgbaBuffer, pushHistoryEntry, type PaintPoint } from '../../core/image-edit';
 import {
   cloneStrokeDirtyRect,
   cloneStrokeInPlace,
@@ -23,13 +23,12 @@ export function commitCloneStroke(
   const rect = cloneStrokeDirtyRect(stroke, session.doc);
   if (rect.width === 0 || rect.height === 0) return session;
   const entry = captureScoped(session, rect, 'Clone stamp');
-  cloneStrokeInPlace(
-    session.doc,
-    compositeSession(session),
-    offset,
-    stroke,
-    session.selection ?? undefined,
-  );
+  const composite = compositeSession(session);
+  // The single opaque-layer fast path aliases doc; all dabs must read the
+  // pre-stroke pixels. Multilayer composites already own a separate buffer.
+  const source =
+    composite.data.buffer === session.doc.data.buffer ? cloneRgbaBuffer(composite) : composite;
+  cloneStrokeInPlace(session.doc, source, offset, stroke, session.selection ?? undefined);
   return {
     ...session,
     history: pushHistoryEntry(session.history, entry),

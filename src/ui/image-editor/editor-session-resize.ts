@@ -43,9 +43,10 @@ export function commitImageSize(
     activeLayerId: active.id,
     base: resampleBuffer(session.base, session.base.width * scaleX, session.base.height * scaleY),
     cropOffset: {
-      x: Math.round(session.cropOffset.x * scaleX),
-      y: Math.round(session.cropOffset.y * scaleY),
+      x: session.cropOffset.x * scaleX,
+      y: session.cropOffset.y * scaleY,
     },
+    pixelSizeMm: { x: session.pixelSizeMm.x / scaleX, y: session.pixelSizeMm.y / scaleY },
     history: createEditHistory(),
     selection: null,
     revision: session.revision + 1,

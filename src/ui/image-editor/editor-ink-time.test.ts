@@ -8,7 +8,8 @@ import {
   type RasterImage,
 } from '../../core/scene';
 import { computeInkTimeReadout } from './editor-ink-time';
-import { createSession } from './editor-session';
+import { commitCrop, createSession } from './editor-session';
+import { commitImageSize } from './editor-session-resize';
 
 // 100×100 px mapped onto 100×100 mm (1 px = 1 mm).
 const BOUNDS = { minX: 0, minY: 0, maxX: 100, maxY: 100 };
@@ -58,6 +59,36 @@ function inkSession() {
 }
 
 describe('computeInkTimeReadout', () => {
+  it.each([
+    [1, 1, 100],
+    [2, 3, 600],
+    [-2, 3, 600],
+  ] as const)(
+    'uses physical object scale %s x %s in the rough estimate',
+    (scaleX, scaleY, expectedSeconds) => {
+      const bounds = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
+      const doc = createRgbaBuffer(10, 10);
+      for (let pixel = 0; pixel < 100; pixel += 1) doc.data.set([0, 0, 0, 255], pixel * 4);
+      const session = createSession('R1', 'source.png', doc, bounds);
+      const project = projectWith('image', 60);
+      const scaled = {
+        ...project,
+        scene: {
+          ...project.scene,
+          objects: [{ ...raster(), bounds, transform: { ...IDENTITY_TRANSFORM, scaleX, scaleY } }],
+          layers: project.scene.layers.map((layer) => ({ ...layer, linesPerMm: 1 })),
+        },
+      };
+      expect(computeInkTimeReadout(session, scaled).estimate).toMatchObject({
+        seconds: expectedSeconds,
+      });
+      const crop = commitCrop(session, { x: 2, y: 2, width: 3, height: 3 });
+      const resized = commitImageSize(crop, 2, 2);
+      expect(computeInkTimeReadout(resized, scaled).estimate).toMatchObject({
+        seconds: expectedSeconds * 0.09,
+      });
+    },
+  );
   it('reports coverage and the scanline estimate for an Image-mode layer', () => {
     const readout = computeInkTimeReadout(inkSession(), projectWith('image'));
     expect(readout.inkPercent).toBe(4);
