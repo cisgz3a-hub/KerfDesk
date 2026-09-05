@@ -33,6 +33,7 @@ export const COMPILE_INTEGRITY_PREFLIGHT_CODES: ReadonlySet<PreflightCode> = new
   [
     'non-finite-coordinate',
     'coordinate-unencodable',
+    'fluidnc-line-unexecutable',
     'cnc-tool-geometry-invalid',
     'empty-output',
     'relief-needs-cnc',

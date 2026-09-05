@@ -69,4 +69,36 @@ describe('emitRasterGroup row streaming', () => {
 
     expect(emitRasterGroup(materialized)).toBe(emitRasterGroup(streamed));
   });
+
+  it('keeps blank-row parity, pass resets, and scan offsets identical when streamed', () => {
+    const rows = [
+      new Uint16Array([100, 100, 0, 0]),
+      new Uint16Array([0, 0, 0, 0]),
+      new Uint16Array([0, 0, 700, 700]),
+    ];
+    const materialized: EmitRasterInput = {
+      sValues: Uint16Array.from(rows.flatMap((row) => [...row])),
+      width: 4,
+      height: 3,
+      bounds: { minX: 0, minY: 0, maxX: 4, maxY: 3 },
+      feedMmPerMin: 6000,
+      overscanMm: 0,
+      scanOffsetMm: 0.25,
+      passes: 2,
+    };
+    const streamed: EmitRasterInput = {
+      ...materialized,
+      sValues: new Uint16Array(0),
+      rowProvider: (row) => rows[row] ?? new Uint16Array(0),
+    };
+
+    const gcode = emitRasterGroup(materialized);
+    expect(emitRasterGroup(streamed)).toBe(gcode);
+    expect([...gcode.matchAll(/G0 X([^ ]+) Y([^ ]+) S0/g)].map((match) => match.slice(1))).toEqual([
+      ['0.000', '0.500'],
+      ['3.750', '2.500'],
+      ['0.000', '0.500'],
+      ['3.750', '2.500'],
+    ]);
+  });
 });

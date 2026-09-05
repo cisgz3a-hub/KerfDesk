@@ -13,6 +13,7 @@ export function deviceProfileWithInteractivePatch(
   // A rectified homography is solved in pixels produced by one lens model.
   // Replacing that model makes an inherited mapping stale.
   const cameraSafe = profileWithoutStaleRectifiedAlignment(current, patch, next);
+  const scanIdentityChanged = scanCalibrationIdentity(current) !== scanCalibrationIdentity(next);
   // A bed edit changes the profile-relative scan-offset ceiling. Never retain
   // a partly valid calibration: clear the whole table and lifecycle status so
   // the operator must recalibrate against the new machine geometry.
@@ -20,7 +21,7 @@ export function deviceProfileWithInteractivePatch(
   const hasOrphanCalibrationStatus =
     cameraSafe.scanningOffsets.length === 0 && cameraSafe.scanOffsetCalibrationStatus !== undefined;
   const scanSafe =
-    scanTableIsValid && !hasOrphanCalibrationStatus
+    !scanIdentityChanged && scanTableIsValid && !hasOrphanCalibrationStatus
       ? cameraSafe
       : { ...cameraSafe, scanningOffsets: [], scanOffsetCalibrationStatus: undefined };
   const controlledFeed = scanSafe.controlledLaserOffTravelFeedMmPerMin;
@@ -30,6 +31,19 @@ export function deviceProfileWithInteractivePatch(
   }
   if (controlledFeed <= scanSafe.maxFeed) return scanSafe;
   return { ...scanSafe, controlledLaserOffTravelFeedMmPerMin: scanSafe.maxFeed };
+}
+
+function scanCalibrationIdentity(profile: DeviceProfile): string {
+  const head = profile.laserSubProfile;
+  return JSON.stringify([
+    profile.controllerKind ?? 'grbl-v1.1',
+    profile.gcodeDialect.dialectId,
+    head?.model,
+    head?.technology,
+    head?.opticalPowerW,
+    head?.wavelengthNm,
+    head?.spotSizeMm,
+  ]);
 }
 
 function positiveFinite(value: number): boolean {

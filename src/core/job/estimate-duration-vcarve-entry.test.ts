@@ -107,9 +107,9 @@ describe('V-carve ramp duration', () => {
     const estimate = estimateJobDuration({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
     const emitted = cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
 
-    expect(emitted).toContain('X0.100Y0.000Z-0.051F660');
+    expect(emitted).toContain('X0.100Y0.000Z-0.051F658');
     expect(estimate.breakdown.cutSeconds).toBeCloseTo(
-      expectedCutSeconds(representedPoints, [660]),
+      expectedCutSeconds(representedPoints, [658], SAFE_Z_MM, 299),
       9,
     );
   });

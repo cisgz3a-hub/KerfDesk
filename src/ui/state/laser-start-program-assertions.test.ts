@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_PROGRAM_MESSAGE,
+  assertActiveDriverAcceptsMachineKind,
   assertCncSetupAttested,
   assertGcodeFitsController,
   assertProgramHasSendableLine,
   assertStartControllerEvidence,
 } from './laser-start-program-assertions';
+import {
+  fluidncDriver,
+  grblDriver,
+  marlinDriver,
+  smoothiewareDriver,
+} from '../../core/controllers';
+import { ruidaDriver } from '../../core/controllers/ruida/driver';
 
 // These four leaf checks were previously private to laser-job-actions.ts and
 // only reachable through a full startJob run. Extracting them made them
@@ -35,6 +43,35 @@ describe('laser start program assertions', () => {
     it('rejects a line longer than the controller RX buffer and names the line number', () => {
       const oversized = `G1 ${'X1.000 '.repeat(60)}`;
       expect(() => assertGcodeFitsController(`G21\n${oversized}`, {})).toThrow(/G-code line 2/);
+    });
+
+    it('applies FluidNC executable payload limits independently of a larger RX window', () => {
+      const accepted = `G1 X${'1'.repeat(123)}`;
+      const rejected = `G1 X${'1'.repeat(124)}`;
+      expect(accepted).toHaveLength(127);
+      expect(rejected).toHaveLength(128);
+      expect(() =>
+        assertGcodeFitsController(accepted, { rxBufferBytes: 256 }, 'fluidnc'),
+      ).not.toThrow();
+      expect(() => assertGcodeFitsController(rejected, { rxBufferBytes: 256 }, 'fluidnc')).toThrow(
+        /FluidNC accepts at most 127 bytes.*error:14/i,
+      );
+    });
+  });
+
+  describe('assertActiveDriverAcceptsMachineKind', () => {
+    it('accepts CNC only on drivers that declare the GRBL-shaped CNC contract', () => {
+      expect(() => assertActiveDriverAcceptsMachineKind('cnc', grblDriver)).not.toThrow();
+      expect(() => assertActiveDriverAcceptsMachineKind('cnc', fluidncDriver)).not.toThrow();
+      for (const driver of [marlinDriver, smoothiewareDriver, ruidaDriver]) {
+        expect(() => assertActiveDriverAcceptsMachineKind('cnc', driver)).toThrow(
+          /cannot accept LaserForge CNC jobs/i,
+        );
+      }
+    });
+
+    it('does not restrict laser jobs through the CNC capability check', () => {
+      expect(() => assertActiveDriverAcceptsMachineKind('laser', marlinDriver)).not.toThrow();
     });
   });
 

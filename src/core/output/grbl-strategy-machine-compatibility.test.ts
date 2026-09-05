@@ -211,7 +211,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     expect(out).not.toMatch(/^G0 X0\.000 Y0\.000/m);
   });
 
-  it('clamps a positive sub-1 controlled feed to executable F1 motion', () => {
+  it('preserves a positive sub-1 controlled feed without exceeding its ceiling', () => {
     const device = {
       ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
       controlledLaserOffTravelFeedMmPerMin: 0.4,
@@ -219,8 +219,8 @@ describe('grblStrategy machine compatibility dialects', () => {
     const vector = grblStrategy.emit(singleCutJob, device);
     const raster = grblStrategy.emit(singleRasterJob, device);
 
-    expect(vector).toContain('G1 X10.000 Y20.000 F1 S0');
-    expect(raster).toContain('G1 X0.000 Y0.500 F1 S0');
+    expect(vector).toContain('G1 X10.000 Y20.000 F0.4 S0');
+    expect(raster).toContain('G1 X0.000 Y0.500 F0.4 S0');
   });
 
   it('omits Neotronics vector cuts that collapse at controller precision', () => {

@@ -131,6 +131,10 @@ describe('LaserForge machine profile documents', () => {
       { speedMmPerMin: 3000, offsetMm: 0.09 },
       { speedMmPerMin: 6000, offsetMm: 0.18 },
     ]);
+    expect(result.document.profile.scanOffsetCalibrationStatus).toBe('pending');
+    expect(result.document.reviewNotes).toContainEqual(
+      expect.stringContaining('verification pending'),
+    );
     expect(result.document.profile.gcodeDialect.dialectId).toBe('neotronics-4040-safe');
     expect(result.document.profile.streamingMode).toBe('char-counted');
     expect(result.document.profile.rxBufferBytes).toBe(120);
@@ -148,7 +152,14 @@ describe('LaserForge machine profile documents', () => {
     expect(result.document.profile.noGoZones).toHaveLength(1);
   });
 
-  it('roundtrips pending calibration status and preserves legacy absent status', () => {
+  it('rejects an invalid bidirectional scan policy', () => {
+    expect(deserializeProfilePatch({ bidirectionalScanPolicy: 'guess' })).toEqual({
+      kind: 'invalid',
+      reason: 'profile.bidirectionalScanPolicy is invalid',
+    });
+  });
+
+  it('roundtrips pending status and marks statusless imported calibration pending', () => {
     const pending = deserializeProfilePatch({ scanOffsetCalibrationStatus: 'pending' });
     const legacy = deserializeProfilePatch({ scanOffsetCalibrationStatus: undefined });
 
@@ -161,7 +172,10 @@ describe('LaserForge machine profile documents', () => {
     }
     expect(legacy.kind).toBe('ok');
     if (legacy.kind === 'ok') {
-      expect(legacy.document.profile.scanOffsetCalibrationStatus).toBeUndefined();
+      expect(legacy.document.profile.scanOffsetCalibrationStatus).toBe('pending');
+      expect(legacy.document.reviewNotes).toContainEqual(
+        expect.stringContaining('verification pending'),
+      );
     }
   });
 

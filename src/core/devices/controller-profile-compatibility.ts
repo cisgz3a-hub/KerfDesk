@@ -27,73 +27,109 @@ export function controllerCompatibleProfile(
   const resolvedControllerKind = controllerKind ?? profile.controllerKind ?? 'grbl-v1.1';
   const persistControllerKind =
     controllerKind !== undefined || profile.controllerKind !== undefined;
-  const corrections: ControllerProfileCorrection[] = [];
-  let streamingMode = profile.streamingMode;
-  let dialectId = profile.gcodeDialect.dialectId;
-  const rxBufferBytes = normalizeGrblRxBufferBytes(profile.rxBufferBytes);
-
-  if (persistControllerKind && profile.controllerKind !== resolvedControllerKind) {
-    corrections.push(
-      correction(
-        'controllerKind',
-        profile.controllerKind ?? 'grbl-v1.1',
-        resolvedControllerKind,
-        'Use the firmware family reported by the connected controller.',
-      ),
-    );
-  }
-
-  const requiredStreamingMode = requiredStreamingModeFor(
+  const streamingMode = requiredStreamingModeFor(
     resolvedControllerKind,
     profile.controllerKind,
-    streamingMode,
+    profile.streamingMode,
   );
-  if (requiredStreamingMode !== streamingMode) {
-    corrections.push(
-      correction(
-        'streamingMode',
-        streamingMode,
-        requiredStreamingMode,
-        streamingCorrectionReason(resolvedControllerKind, requiredStreamingMode),
-      ),
-    );
-    streamingMode = requiredStreamingMode;
-  }
+  const dialectId = compatibleDialectFor(resolvedControllerKind, profile.gcodeDialect.dialectId);
+  const rxBufferBytes = normalizeGrblRxBufferBytes(profile.rxBufferBytes);
+  const corrections = controllerProfileCorrections({
+    profile,
+    resolvedControllerKind,
+    persistControllerKind,
+    streamingMode,
+    dialectId,
+    rxBufferBytes,
+  });
 
-  const compatibleDialectId = compatibleDialectFor(resolvedControllerKind, dialectId);
-  if (compatibleDialectId !== dialectId) {
-    corrections.push(
-      correction(
-        'gcodeDialect',
-        dialectId,
-        compatibleDialectId,
-        `The ${dialectId} output dialect is not compatible with ${resolvedControllerKind}.`,
-      ),
-    );
-    dialectId = compatibleDialectId;
-  }
-
-  if (rxBufferBytes !== profile.rxBufferBytes) {
-    corrections.push(
-      correction(
-        'rxBufferBytes',
-        String(profile.rxBufferBytes),
-        String(rxBufferBytes),
-        'Use a bounded positive receive window.',
-      ),
-    );
-  }
-
+  const identityChanged =
+    profile.controllerKind !==
+      (persistControllerKind ? resolvedControllerKind : profile.controllerKind) ||
+    profile.gcodeDialect.dialectId !== dialectId;
+  const compatibleProfile: DeviceProfile = {
+    ...profile,
+    ...(persistControllerKind ? { controllerKind: resolvedControllerKind } : {}),
+    streamingMode,
+    rxBufferBytes,
+    gcodeDialect: { dialectId },
+    ...(identityChanged && profile.scanningOffsets.length > 0
+      ? { scanningOffsets: [], scanOffsetCalibrationStatus: undefined }
+      : {}),
+  };
   return {
-    profile: {
-      ...profile,
-      ...(persistControllerKind ? { controllerKind: resolvedControllerKind } : {}),
-      streamingMode,
-      rxBufferBytes,
-      gcodeDialect: { dialectId },
-    },
+    profile: compatibleProfile,
     corrections,
   };
+}
+
+function controllerProfileCorrections(args: {
+  readonly profile: DeviceProfile;
+  readonly resolvedControllerKind: ControllerKind;
+  readonly persistControllerKind: boolean;
+  readonly streamingMode: GrblStreamingMode;
+  readonly dialectId: GcodeDialectId;
+  readonly rxBufferBytes: number;
+}): ReadonlyArray<ControllerProfileCorrection> {
+  return [
+    ...changedControllerKindCorrection(args),
+    ...changedFieldCorrection(
+      'streamingMode',
+      args.profile.streamingMode,
+      args.streamingMode,
+      streamingCorrectionReason(args.resolvedControllerKind, args.streamingMode),
+    ),
+    ...changedFieldCorrection(
+      'gcodeDialect',
+      args.profile.gcodeDialect.dialectId,
+      args.dialectId,
+      `The ${args.profile.gcodeDialect.dialectId} output dialect is not compatible with ${args.resolvedControllerKind}.`,
+    ),
+    ...changedFieldCorrection(
+      'rxBufferBytes',
+      String(args.profile.rxBufferBytes),
+      String(args.rxBufferBytes),
+      'Use a bounded positive receive window.',
+    ),
+  ];
+}
+
+function changedControllerKindCorrection(args: {
+  readonly profile: DeviceProfile;
+  readonly resolvedControllerKind: ControllerKind;
+  readonly persistControllerKind: boolean;
+}): ReadonlyArray<ControllerProfileCorrection> {
+  if (!args.persistControllerKind || args.profile.controllerKind === args.resolvedControllerKind) {
+    return [];
+  }
+  return [
+    correction(
+      'controllerKind',
+      args.profile.controllerKind ?? 'grbl-v1.1',
+      args.resolvedControllerKind,
+      'Use the firmware family reported by the connected controller.',
+    ),
+  ];
+}
+
+function changedFieldCorrection(
+  field: ControllerProfileCorrectionField,
+  from: string,
+  to: string,
+  reason: string,
+): ReadonlyArray<ControllerProfileCorrection> {
+  return from === to ? [] : [correction(field, from, to, reason)];
+}
+
+export function controllerSupportsGcodeDialect(
+  controllerKind: ControllerKind | undefined,
+  dialectId: GcodeDialectId,
+): boolean {
+  const resolved = controllerKind ?? 'grbl-v1.1';
+  if (resolved === 'marlin') return isMarlinGcodeDialectId(dialectId);
+  if (isMarlinGcodeDialectId(dialectId)) return false;
+  if (dialectId === 'neotronics-4040-safe') return isGrblFamily(resolved);
+  return true;
 }
 
 export function controllerProfilesAreCompatible(
@@ -120,10 +156,8 @@ function compatibleDialectFor(
   controllerKind: ControllerKind,
   current: GcodeDialectId,
 ): GcodeDialectId {
-  if (controllerKind === 'marlin') {
-    return isMarlinGcodeDialectId(current) ? current : 'marlin-inline';
-  }
-  return isMarlinGcodeDialectId(current) ? 'grbl-dynamic' : current;
+  if (controllerSupportsGcodeDialect(controllerKind, current)) return current;
+  return controllerKind === 'marlin' ? 'marlin-inline' : 'grbl-dynamic';
 }
 
 function streamingCorrectionReason(

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { compileJob } from '../../core/job';
+import { grblStrategy } from '../../core/output';
 import { importLightBurnProject } from './lbrn-import';
 
 const PROJECT = `<?xml version="1.0"?>
@@ -53,6 +55,69 @@ describe('importLightBurnProject', () => {
       speed: 900,
       power: 50,
       passes: 3,
+    });
+  });
+
+  it('preserves Scan fields and converts percentage overscan at the imported speed', () => {
+    const xml = `<LightBurnProject FormatVersion="1">
+      <CutSetting type="Scan">
+        <index Value="1"/><maxPower Value="50"/><speed Value="15"/><numPasses Value="3"/>
+        <interval Value="0.08"/><overscan Value="2"/><angle Value="90"/>
+        <crossHatch Value="1"/><bidirectional Value="0"/><minPower Value="12"/>
+      </CutSetting>
+      <Shape Type="Rect" CutIndex="1" W="10" H="6"><XForm>1 0 0 1 5 5</XForm></Shape>
+    </LightBurnProject>`;
+    const result = importLightBurnProject(xml, 'scan-fields.lbrn2');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.project.scene.layers[0]).toMatchObject({
+      mode: 'fill',
+      speed: 900,
+      power: 50,
+      passes: 3,
+      hatchSpacingMm: 0.08,
+      hatchAngleDeg: 90,
+      fillCrossHatch: true,
+      fillBidirectional: false,
+      fillOverscanMm: 0.3,
+    });
+    expect(result.report.warnings).toEqual([
+      expect.stringContaining('minimum power'),
+      expect.stringContaining('converted to 0.3 mm at 15 mm/s'),
+    ]);
+
+    const job = compileJob(result.project.scene, result.project.device);
+    const fill = job.groups.find((group) => group.kind === 'fill');
+    expect(fill).toMatchObject({ speed: 900, overscanMm: 0.3 });
+    if (fill?.kind !== 'fill') throw new Error('expected imported fill group');
+    expect(fill.segments.every((segment) => segment.reverse === false)).toBe(true);
+    expect(
+      fill.segments.some((segment) => {
+        const start = segment.polyline[0];
+        const end = segment.polyline[1];
+        return start !== undefined && end !== undefined && Math.abs(start.x - end.x) < 1e-6;
+      }),
+    ).toBe(true);
+    expect(grblStrategy.emit(job, result.project.device)).toContain('F900');
+  });
+
+  it('maps a zero Scan overscan losslessly without a warning', () => {
+    const xml = `<LightBurnProject><CutSetting index="1" type="Scan" overscan="0"/><Shape Type="Rect" CutIndex="1" W="10" H="6"/></LightBurnProject>`;
+    const result = importLightBurnProject(xml, 'zero-overscan.lbrn2');
+    expect(result).toMatchObject({
+      ok: true,
+      project: { scene: { layers: [{ fillOverscanMm: 0 }] } },
+      report: { warnings: [] },
+    });
+  });
+
+  it('keeps the default runway and warns when percentage overscan lacks a speed', () => {
+    const xml = `<LightBurnProject><CutSetting index="1" type="Scan" overscan="5"/><Shape Type="Rect" CutIndex="1" W="10" H="6"/></LightBurnProject>`;
+    const result = importLightBurnProject(xml, 'missing-speed.lbrn2');
+    expect(result).toMatchObject({
+      ok: true,
+      project: { scene: { layers: [{ fillOverscanMm: 5 }] } },
+      report: { warnings: [expect.stringContaining('could not be converted')] },
     });
   });
 

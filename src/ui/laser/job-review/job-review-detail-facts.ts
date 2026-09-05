@@ -48,6 +48,7 @@ function fillDetail(settings: LayerOperationSettings): string {
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
     `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
+    ...localScanOffsetPart(settings),
     ...powerModePart(settings),
   ].join(SEPARATOR);
 }
@@ -65,7 +66,15 @@ function imageDetail(settings: LayerOperationSettings): string {
     ...(settings.dotWidthCorrectionMm !== 0
       ? [`dot width ${formatMm(settings.dotWidthCorrectionMm)} mm`]
       : []),
+    ...localScanOffsetPart(settings),
   ].join(SEPARATOR);
+}
+
+function localScanOffsetPart(settings: LayerOperationSettings): ReadonlyArray<string> {
+  const offsetMm = settings.bidirectionalScanOffsetMm;
+  if (offsetMm === undefined) return [];
+  const signed = offsetMm > 0 ? `+${formatIntervalMm(offsetMm)}` : formatIntervalMm(offsetMm);
+  return [`local scan offset ${signed} mm — replaces device table only for bidirectional output`];
 }
 
 /** The read-only strategy a CNC operation cuts with, joined for one line. */

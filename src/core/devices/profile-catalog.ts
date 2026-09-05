@@ -1,20 +1,17 @@
 import {
   DEFAULT_DEVICE_PROFILE,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
-  isKnownControllerKind,
   type DeviceProfile,
   type LaserSubProfile,
   type NoGoZone,
   type ProfileCapability,
   type ProfileEvidence,
 } from './device-profile';
-import { isGrblRxBufferBytes, isGrblStreamingMode } from '../grbl-streaming';
 import { validateCameraProfileShape } from '../camera';
-import { isGcodeDialectSelection } from './gcode-dialects';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
-import { isStreamingModeCompatible } from './controller-streaming-mode';
 import { validateScanOffsetProfile } from './scan-offset-profile';
 import { cncSubProfileIssues } from './cnc-sub-profile-validation';
+import { machineProfileControllerIssues } from './machine-profile-controller-validation';
 
 export const PROFILE_CATALOG_VERSION = '2026-06-17';
 
@@ -286,22 +283,7 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   const errors: string[] = [];
   requireNonEmpty(profile.name, 'name', errors);
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
-  if (profile.controllerKind !== undefined && !isKnownControllerKind(profile.controllerKind)) {
-    errors.push(
-      'controllerKind must be one of: grbl-v1.1, grblhal, fluidnc, marlin, smoothieware, ruida',
-    );
-  }
-  if (!isGcodeDialectSelection(profile.gcodeDialect)) {
-    errors.push('gcodeDialect must reference a known GRBL dialect');
-  }
-  if (!isGrblStreamingMode(profile.streamingMode)) {
-    errors.push('streamingMode must be char-counted or ping-pong');
-  } else if (!isStreamingModeCompatible(profile.controllerKind, profile.streamingMode)) {
-    errors.push(`${profile.controllerKind} requires ping-pong streaming`);
-  }
-  if (!isGrblRxBufferBytes(profile.rxBufferBytes)) {
-    errors.push('rxBufferBytes must be a positive integer not greater than 4096');
-  }
+  errors.push(...machineProfileControllerIssues(profile));
   requirePositive(profile.bedWidth, 'bedWidth', errors);
   requirePositive(profile.bedHeight, 'bedHeight', errors);
   requirePositive(profile.maxFeed, 'maxFeed', errors);

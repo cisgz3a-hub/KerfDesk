@@ -17,7 +17,7 @@ import {
   type RasterGroup,
 } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
-import { offsetForSpeed } from './scan-offset';
+import { offsetForEmittedFeed } from './scan-offset';
 
 export type JobBounds = {
   readonly minX: number;
@@ -256,5 +256,5 @@ function hasActiveReverseRasterRow(group: RasterGroup): boolean {
 }
 
 function scanOffsetForGroup(device: DeviceProfile | undefined, speed: number): number {
-  return device === undefined ? 0 : offsetForSpeed(device.scanningOffsets, speed);
+  return device === undefined ? 0 : offsetForEmittedFeed(device.scanningOffsets, speed);
 }

@@ -48,7 +48,7 @@ import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import type { CutGroup, FillGroup, Group, Job } from './job';
-import { offsetForSpeed } from './scan-offset';
+import { offsetForEmittedFeed } from './scan-offset';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
 import { configuredSegmentOrder, startCursorForSegments } from './segment-order';
 
@@ -234,7 +234,7 @@ function islandGroupEndpoints(
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): RouteEndpoints | null {
   const scanOffsetMm =
-    group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed);
+    group.bidirectionalScanOffsetMm ?? offsetForEmittedFeed(scanningOffsets, group.speed);
   const plans = planFillSweeps(group, scanOffsetMm);
   let entry: Vec2 | null = null;
   let exit: Vec2 | null = null;

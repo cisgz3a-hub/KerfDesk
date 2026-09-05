@@ -262,7 +262,7 @@ describe('compileJob fill hatching', () => {
 
     expect(fallback).toMatchObject({
       fillRunwayPolicy: 'feed-matched-entry',
-      scanDirection: { bidirectional: false, reason: 'uncalibrated-4040-fallback' },
+      scanDirection: { bidirectional: false, reason: 'uncalibrated-profile-fallback' },
     });
     expect(fallback?.segments.every((segment) => !segment.reverse)).toBe(true);
     expect(calibrated?.scanDirection).toEqual({

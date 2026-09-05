@@ -48,6 +48,7 @@ import type {
   CncPath3dPass,
   Job,
 } from '../job';
+import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { assertNever } from '../scene';
 import { appendCoolantStart } from './cnc-grbl-coolant';
 import { appendRetract, fmt, fmtFeed, type Head } from './cnc-grbl-emit-head';
@@ -64,9 +65,6 @@ import type { CncPassSpan, CncPassSpanEmission, CncPassSpanRecorder } from './cn
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 
 const LINE_END = '\n';
-// A capped segment feed still has to be a feed the controller accepts; the
-// same floor fmtFeed applies to every other emitted rate.
-const MIN_SEGMENT_FEED_MM_PER_MIN = 1;
 
 function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
   return emitCncProgram(job, device, undefined, options);
@@ -266,7 +264,7 @@ function positionForHelix(
     head.y = prepared.startY;
   }
   if (head.z !== prepared.startZ) {
-    lines.push(`G1 Z${prepared.startZ} F${plunge}`);
+    lines.push(`G1 Z${prepared.startZ} F${formatGcodeFeedMmPerMin(plunge)}`);
     head.z = prepared.startZ;
   }
 }
@@ -280,7 +278,7 @@ function linkHelixToContour(
   const contourStartX = fmt(prepared.first.x);
   const contourStartY = fmt(prepared.first.y);
   if (head.x !== contourStartX || head.y !== contourStartY) {
-    lines.push(`G1 X${contourStartX} Y${contourStartY} F${feed}`);
+    lines.push(`G1 X${contourStartX} Y${contourStartY} F${formatGcodeFeedMmPerMin(feed)}`);
     head.x = contourStartX;
     head.y = contourStartY;
   }
@@ -317,7 +315,7 @@ function appendContourPass(
     head.y = startY;
   }
   if (head.z !== passZ) {
-    lines.push(`G1 Z${passZ} F${plunge}`);
+    lines.push(`G1 Z${passZ} F${formatGcodeFeedMmPerMin(plunge)}`);
     head.z = passZ;
   }
   appendCutMoves(lines, head, pass, feed, formatXy, cncContourCoordinateEquals);
@@ -350,7 +348,7 @@ function appendArcPass(
     head.y = startY;
   }
   if (head.z !== passZ) {
-    lines.push(`G1 Z${passZ} F${plunge}`);
+    lines.push(`G1 Z${passZ} F${formatGcodeFeedMmPerMin(plunge)}`);
     head.z = passZ;
   }
 
@@ -362,7 +360,7 @@ function appendArcPass(
     const direction = pass.clockwise ? 'G2' : 'G3';
     const i = fmt(pass.center.x - pass.start.x);
     const j = fmt(pass.center.y - pass.start.y);
-    lines.push(`${direction} X${endX} Y${endY} I${i} J${j} F${feed}`);
+    lines.push(`${direction} X${endX} Y${endY} I${i} J${j} F${formatGcodeFeedMmPerMin(feed)}`);
     head.x = endX;
     head.y = endY;
     return;
@@ -406,7 +404,7 @@ function appendPath3dPass(
     head.y = startY;
   }
   if (head.z !== startZ) {
-    lines.push(`G1 Z${startZ} F${plunge}`);
+    lines.push(`G1 Z${startZ} F${formatGcodeFeedMmPerMin(plunge)}`);
     head.z = startZ;
   }
   appendPath3dCutMoves(lines, head, pass, feed, plunge);
@@ -438,12 +436,9 @@ function path3dSegmentFeed(
   if (!(length3d > 0) || !Number.isFinite(length3d)) {
     return feed;
   }
-  // Floor, never round: rounding up could emit a rate fractionally above the
-  // configured plunge rate, which is the defect this cap prevents.
-  return Math.min(
-    feed,
-    Math.max(MIN_SEGMENT_FEED_MM_PER_MIN, Math.floor((plunge * length3d) / descentMm)),
-  );
+  // Represent the component-limited rate without raising a positive
+  // fractional result above the configured plunge ceiling.
+  return Math.min(feed, effectiveGcodeFeedMmPerMin((plunge * length3d) / descentMm));
 }
 
 function appendPath3dCutMoves(
@@ -465,7 +460,8 @@ function appendPath3dCutMoves(
     if (x === head.x && y === head.y && z === head.z) continue; // zero-length at emit precision
     // The selected lateral feed is re-issued on the next lateral move.
     const wantFeed = path3dSegmentFeed(head, { x, y, z }, pass.lateralFeed, feed, plunge);
-    const feedWord = modalFeed === wantFeed ? '' : `${isCompact ? '' : ' '}F${wantFeed}`;
+    const feedWord =
+      modalFeed === wantFeed ? '' : `${isCompact ? '' : ' '}F${formatGcodeFeedMmPerMin(wantFeed)}`;
     modalFeed = wantFeed;
     // GRBL keeps G1 modal and its scanner does not require whitespace. The
     // compact continuation blocks leave dense V-carve curves more serial headroom.
@@ -494,7 +490,7 @@ function appendCutMoves(
     const x = formatXy(point.x);
     const y = formatXy(point.y);
     if (coordinatesEqual(head.x, x) && coordinatesEqual(head.y, y)) continue;
-    const feedWord = feedEmitted ? '' : ` F${feed}`;
+    const feedWord = feedEmitted ? '' : ` F${formatGcodeFeedMmPerMin(feed)}`;
     feedEmitted = true;
     lines.push(`G1 X${x} Y${y}${feedWord}`);
     head.x = x;

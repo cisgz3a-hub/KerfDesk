@@ -186,7 +186,7 @@ function parseProfile(value: unknown):
   const optionalFieldError = firstError([optionalRotarySetup(recoveredValue, 'rotary')]);
   if (optionalFieldError !== null) return { kind: 'invalid', reason: optionalFieldError };
 
-  const profile = canonicalProfile({
+  const canonical = canonicalProfile({
     ...validatedDeviceProfile(recoveredValue),
     gcodeDialect: normalizeGcodeDialectSelection(recoveredValue['gcodeDialect']),
     streamingMode: normalizeGrblStreamingMode(recoveredValue['streamingMode']),
@@ -194,6 +194,7 @@ function parseProfile(value: unknown):
     scanningOffsets: normalizeScanOffsetTable(recoveredValue['scanningOffsets']),
     noGoZones: noGoZones.noGoZones,
   });
+  const profile = profileWithImportedCalibrationPending(canonical);
   const validationErrors = validateMachineProfile(profile);
   if (validationErrors.length > 0) {
     return { kind: 'invalid', reason: `profile is invalid: ${validationErrors.join('; ')}` };
@@ -207,10 +208,28 @@ function parseProfile(value: unknown):
   return {
     kind: 'ok',
     profile,
-    recoveryNotes: cncRecovery.issues.map(
-      (issue) => `CNC settings recovery: ${issue}; a default was applied. Review in Device Setup.`,
-    ),
+    recoveryNotes: [
+      ...cncRecovery.issues.map(
+        (issue) =>
+          `CNC settings recovery: ${issue}; a default was applied. Review in Device Setup.`,
+      ),
+      ...importedCalibrationRecoveryNotes(canonical),
+    ],
   };
+}
+
+function profileWithImportedCalibrationPending(profile: DeviceProfile): DeviceProfile {
+  return profile.scanningOffsets.length > 0
+    ? { ...profile, scanOffsetCalibrationStatus: 'pending' }
+    : profile;
+}
+
+function importedCalibrationRecoveryNotes(profile: DeviceProfile): ReadonlyArray<string> {
+  return profile.scanningOffsets.length > 0
+    ? [
+        'Imported scan-offset values were kept but marked verification pending because the file does not bind them to this physical machine and laser head.',
+      ]
+    : [];
 }
 
 function validatedDeviceProfile(value: Record<string, unknown>): DeviceProfile {
@@ -294,6 +313,9 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     laserModeEnabled: profile.laserModeEnabled,
     airAssistCommand: profile.airAssistCommand,
     scanningOffsets,
+    ...(profile.bidirectionalScanPolicy === undefined
+      ? {}
+      : { bidirectionalScanPolicy: profile.bidirectionalScanPolicy }),
     ...(scanningOffsets.length > 0 && profile.scanOffsetCalibrationStatus !== undefined
       ? { scanOffsetCalibrationStatus: profile.scanOffsetCalibrationStatus }
       : {}),

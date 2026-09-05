@@ -14,10 +14,10 @@ describe('resolveEffectiveScanDirection', () => {
     });
   });
 
-  it('falls back only for an uncalibrated 4040 unless explicitly overridden', () => {
+  it('falls back for a profile that requires verified offsets unless explicitly overridden', () => {
     expect(resolveEffectiveScanDirection(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, true)).toEqual({
       bidirectional: false,
-      reason: 'uncalibrated-4040-fallback',
+      reason: 'uncalibrated-profile-fallback',
     });
     expect(
       resolveEffectiveScanDirection(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, true, true),
@@ -42,11 +42,11 @@ describe('resolveEffectiveScanDirection', () => {
 
     expect(resolveEffectiveScanDirection(pending, true)).toEqual({
       bidirectional: false,
-      reason: 'pending-calibration-4040-fallback',
+      reason: 'pending-calibration-profile-fallback',
     });
     expect(resolveEffectiveScanDirection(pending, true, true)).toEqual({
       bidirectional: false,
-      reason: 'pending-calibration-4040-fallback',
+      reason: 'pending-calibration-profile-fallback',
     });
   });
 
@@ -80,6 +80,33 @@ describe('resolveEffectiveScanDirection', () => {
     expect(resolveEffectiveScanDirection(pending, true, false, 'verification')).toEqual({
       bidirectional: true,
       reason: 'calibration-verification',
+    });
+  });
+
+  it('decouples verified-offset policy from the output dialect while preserving legacy 4040 behavior', () => {
+    expect(
+      resolveEffectiveScanDirection(
+        {
+          ...DEFAULT_DEVICE_PROFILE,
+          bidirectionalScanPolicy: 'require-verified-offsets',
+        },
+        true,
+      ),
+    ).toEqual({ bidirectional: false, reason: 'uncalibrated-profile-fallback' });
+    expect(
+      resolveEffectiveScanDirection(
+        {
+          ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+          bidirectionalScanPolicy: 'allow-requested',
+        },
+        true,
+      ),
+    ).toEqual({ bidirectional: true, reason: 'requested-bidirectional' });
+    const legacy4040 = { ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE };
+    delete legacy4040.bidirectionalScanPolicy;
+    expect(resolveEffectiveScanDirection(legacy4040, true)).toEqual({
+      bidirectional: false,
+      reason: 'uncalibrated-profile-fallback',
     });
   });
 });

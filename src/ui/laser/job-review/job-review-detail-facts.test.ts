@@ -43,6 +43,15 @@ describe('laserOperationDetail', () => {
     );
   });
 
+  it('shows an explicit local fill or image offset including zero', () => {
+    expect(
+      laserOperationDetail({ ...baseLayer, mode: 'fill', bidirectionalScanOffsetMm: -0.08 }),
+    ).toContain('local scan offset -0.08 mm — replaces device table only for bidirectional output');
+    expect(
+      laserOperationDetail({ ...baseLayer, mode: 'image', bidirectionalScanOffsetMm: 0 }),
+    ).toContain('local scan offset 0 mm — replaces device table only for bidirectional output');
+  });
+
   it('keeps a stored zero distinct from the prepared job effective runway target', () => {
     const layer: Layer = { ...baseLayer, mode: 'fill', fillOverscanMm: 0 };
 

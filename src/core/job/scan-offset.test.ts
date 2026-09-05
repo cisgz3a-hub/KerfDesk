@@ -7,6 +7,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import {
+  offsetForEmittedFeed,
   offsetForSpeed,
   shiftAlongTravel,
   validatedScanOffsetMm,
@@ -104,6 +105,19 @@ describe('offsetForSpeed', () => {
       ),
       { numRuns: FUZZ_RUNS },
     );
+  });
+});
+
+describe('offsetForEmittedFeed', () => {
+  it('selects compensation at the same floored or fractional feed represented in G-code', () => {
+    const table: ReadonlyArray<ScanOffsetPoint> = [
+      { speedMmPerMin: 0.75, offsetMm: 0.075 },
+      { speedMmPerMin: 1000, offsetMm: 0.1 },
+      { speedMmPerMin: 1001, offsetMm: 0.9 },
+    ];
+
+    expect(offsetForEmittedFeed(table, 0.75)).toBeCloseTo(0.075, 12);
+    expect(offsetForEmittedFeed(table, 1000.6)).toBeCloseTo(0.1, 12);
   });
 });
 

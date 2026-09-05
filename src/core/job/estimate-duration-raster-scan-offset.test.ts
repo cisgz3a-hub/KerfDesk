@@ -30,6 +30,26 @@ describe('raster duration scan-offset precedence', () => {
       baseline.breakdown.travelSeconds,
     );
   });
+
+  it('uses represented feed for both planner velocity and profile scan compensation', () => {
+    const tableDevice = {
+      ...device,
+      scanningOffsets: [
+        { speedMmPerMin: 1000, offsetMm: 0.1 },
+        { speedMmPerMin: 1001, offsetMm: 10 },
+      ],
+    };
+    const represented = estimateJobDuration(
+      { groups: [{ ...rasterGroup(), speed: 1000 }] },
+      tableDevice,
+    );
+    const decimalRequest = estimateJobDuration(
+      { groups: [{ ...rasterGroup(), speed: 1000.6 }] },
+      tableDevice,
+    );
+
+    expect(decimalRequest).toEqual(represented);
+  });
 });
 
 function rasterGroup(bidirectionalScanOffsetMm?: number): RasterGroup {

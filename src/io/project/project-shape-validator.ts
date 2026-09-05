@@ -1,7 +1,7 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
 import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
-import { validateCurveSubpaths } from './project-curve-shape-validator';
+import { validateColoredPaths, validatePoints } from './project-colored-path-validator';
 import { validateObjectOperationOverride } from './project-operation-override-validator';
 import { validateOptimization } from './project-optimization-validator';
 import { validateProjectVariables, validateVariableTemplate } from './project-variable-validator';
@@ -85,6 +85,10 @@ function validateDevice(device: Record<string, unknown>): string | null {
     optionalLiteral(device, 'device.streamingMode', ['char-counted', 'ping-pong']),
     profileField.optionalGrblRxBufferBytes(device, 'device.rxBufferBytes'),
     profileField.optionalGcodeDialect(device, 'device.gcodeDialect'),
+    optionalLiteral(device, 'device.bidirectionalScanPolicy', [
+      'allow-requested',
+      'require-verified-offsets',
+    ]),
     optionalNonNegativeNumber(device, 'device.minPowerS'),
     optionalBoolean(device, 'device.laserModeEnabled'),
     profileField.optionalProfileCapabilities(device, 'device.capabilities'),
@@ -400,44 +404,4 @@ function validateTransform(value: unknown, path: string): string | null {
     requireBoolean(value, `${path}.mirrorX`),
     requireBoolean(value, `${path}.mirrorY`),
   ]);
-}
-
-function validateColoredPaths(value: unknown, path: string): string | null {
-  return Array.isArray(value)
-    ? validateArray(value, path, validateColoredPath)
-    : `missing or invalid \`${path}\``;
-}
-
-function validateColoredPath(value: unknown, path: string): string | null {
-  if (!isObject(value)) return `missing or invalid \`${path}\``;
-  return firstError([
-    requireString(value, `${path}.color`),
-    validateOperationIds(value['operationIds'], `${path}.operationIds`),
-    optionalPositiveNumber(value, `${path}.strokeWidthMm`),
-    validatePolylines(value['polylines'], `${path}.polylines`),
-    validateCurveSubpaths(value['curves'], `${path}.curves`),
-  ]);
-}
-
-function validatePolylines(value: unknown, path: string): string | null {
-  if (!Array.isArray(value)) return `missing or invalid \`${path}\``;
-  return validateArray(value, path, validatePolyline);
-}
-
-function validatePolyline(value: unknown, path: string): string | null {
-  if (!isObject(value)) return `missing or invalid \`${path}\``;
-  return firstError([
-    requireBoolean(value, `${path}.closed`),
-    validatePoints(value['points'], `${path}.points`),
-  ]);
-}
-
-function validatePoints(value: unknown, path: string): string | null {
-  if (!Array.isArray(value)) return `missing or invalid \`${path}\``;
-  return validateArray(value, path, validatePoint);
-}
-
-function validatePoint(value: unknown, path: string): string | null {
-  if (!isObject(value)) return `missing or invalid \`${path}\``;
-  return firstError([requireCoordinate(value, `${path}.x`), requireCoordinate(value, `${path}.y`)]);
 }

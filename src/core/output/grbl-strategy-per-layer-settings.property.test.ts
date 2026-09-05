@@ -151,7 +151,7 @@ describe('grblStrategy per-layer settings (non-negotiable #7, per layer)', () =>
           const body = sections[i]?.body;
           if (body === undefined) return false;
           const fValues = collectG1FValues(body);
-          return fValues.length > 0 && fValues.every((f) => f === Math.round(group.speed));
+          return fValues.length > 0 && fValues.every((f) => f === Math.floor(group.speed));
         });
       }),
       { numRuns: FUZZ_RUNS },

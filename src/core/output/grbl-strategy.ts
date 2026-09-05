@@ -23,6 +23,7 @@ import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '.
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever, type LayerOperationSettings } from '../scene';
 import { formatGcodeCoordinateMm } from '../gcode';
+import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { fillRunwayCommentText } from './fill-runway-comment';
 import { laserModeWord, vectorPowerWord } from './grbl-power-modes';
@@ -47,21 +48,21 @@ function laserOffSeekLine(
       device.controlledLaserOffTravelFeedMmPerMin,
       'Controlled laser-off travel',
     );
-    return `G1 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)} F${feed} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
+    return `G1 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)} F${formatGcodeFeedMmPerMin(feed)} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
   }
   const base = `G0 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)}`;
   return dialect.requiresS0OnRapid ? `${base} S0` : base;
 }
 
 function laserOffRunwayLine(x: number, y: number, feed: number): string {
-  return `G1 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)} F${feed} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
+  return `G1 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)} F${formatGcodeFeedMmPerMin(feed)} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
 }
 
 function roundedPositiveFeed(speed: number, context: string): number {
   if (!Number.isFinite(speed) || speed <= 0) {
     throw new Error(`${context}: speed must be finite and > 0`);
   }
-  return Math.max(1, Math.round(speed));
+  return effectiveGcodeFeedMmPerMin(speed);
 }
 
 function preamble(dialect: GrblGcodeDialect): string {
@@ -135,7 +136,8 @@ function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string {
     // memory can collapse to one machine coordinate at 3 dp. Never emit a
     // stationary positive-power G1, and keep F/S for the first real move.
     if (targetX === headX && targetY === headY) continue;
-    const feedWord = !burnEmitted || !dialect.modalFeedrate ? ` F${feed}` : '';
+    const feedWord =
+      !burnEmitted || !dialect.modalFeedrate ? ` F${formatGcodeFeedMmPerMin(feed)}` : '';
     const sWord = !burnEmitted || dialect.emitSOnEveryBurnMove ? ` S${s}` : '';
     burnLines.push(`G1 X${targetX} Y${targetY}${feedWord}${sWord}`);
     burnEmitted = true;
@@ -368,7 +370,8 @@ function sweepSpanLines(
     const fx = formatGcodeCoordinateMm(x);
     const fy = formatGcodeCoordinateMm(y);
     if (fx === headX && fy === headY) return; // zero-length at emit precision — skip
-    const feedWord = feedEmitted && dialect.modalFeedrate ? '' : ` F${feed}`;
+    const feedWord =
+      feedEmitted && dialect.modalFeedrate ? '' : ` F${formatGcodeFeedMmPerMin(feed)}`;
     feedEmitted = true;
     lines.push(`G1 X${fx} Y${fy}${feedWord} ${sWord}`);
     headX = fx;

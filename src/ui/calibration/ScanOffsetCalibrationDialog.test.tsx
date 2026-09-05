@@ -39,7 +39,7 @@ describe('ScanOffsetCalibrationDialog', () => {
     try {
       expect(host.textContent).toContain('Scan Offset Test');
       const steps = input(host, 'Steps');
-      const speedMax = input(host, 'Max speed');
+      const speedMax = input(host, 'Max speed (mm/min)');
       const swatchWidth = input(host, 'Swatch width');
       await act(async () => {
         steps.value = '4';
@@ -124,7 +124,7 @@ describe('ScanOffsetCalibrationDialog', () => {
       maxFeedMmPerMin: 3000,
     });
     try {
-      const speedMax = input(host, 'Max speed');
+      const speedMax = input(host, 'Max speed (mm/min)');
       await act(async () => {
         speedMax.value = '5000';
         Simulate.change(speedMax);

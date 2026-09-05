@@ -3,6 +3,7 @@ import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from './device-profile';
 import {
   controllerCompatibleProfile,
   controllerProfilesAreCompatible,
+  controllerSupportsGcodeDialect,
 } from './controller-profile-compatibility';
 
 describe('controllerCompatibleProfile', () => {
@@ -85,6 +86,41 @@ describe('controllerCompatibleProfile', () => {
     expect(result.corrections).toContainEqual(
       expect.objectContaining({ field: 'rxBufferBytes', from: '0', to: '120' }),
     );
+  });
+
+  it('removes 4040-only output semantics from non-GRBL controller families', () => {
+    const result = controllerCompatibleProfile(
+      {
+        ...DEFAULT_DEVICE_PROFILE,
+        controllerKind: 'smoothieware',
+        streamingMode: 'ping-pong',
+        gcodeDialect: { dialectId: 'neotronics-4040-safe' },
+      },
+      'smoothieware',
+    );
+    expect(result.profile.gcodeDialect.dialectId).toBe('grbl-dynamic');
+  });
+
+  it('clears machine-specific scan calibration when controller or dialect identity changes', () => {
+    const calibrated: DeviceProfile = {
+      ...DEFAULT_DEVICE_PROFILE,
+      scanningOffsets: [{ speedMmPerMin: 1500, offsetMm: 0.1 }],
+      scanOffsetCalibrationStatus: 'verified',
+    };
+    const result = controllerCompatibleProfile(calibrated, 'marlin');
+    expect(result.profile.scanningOffsets).toEqual([]);
+    expect(result.profile.scanOffsetCalibrationStatus).toBeUndefined();
+  });
+});
+
+describe('controllerSupportsGcodeDialect', () => {
+  it('accepts only controller-family-compatible output contracts', () => {
+    expect(controllerSupportsGcodeDialect('marlin', 'marlin-fan')).toBe(true);
+    expect(controllerSupportsGcodeDialect('marlin', 'grbl-dynamic')).toBe(false);
+    expect(controllerSupportsGcodeDialect('grbl-v1.1', 'marlin-inline')).toBe(false);
+    expect(controllerSupportsGcodeDialect('grblhal', 'neotronics-4040-safe')).toBe(true);
+    expect(controllerSupportsGcodeDialect('smoothieware', 'neotronics-4040-safe')).toBe(false);
+    expect(controllerSupportsGcodeDialect('smoothieware', 'grbl-compatible')).toBe(true);
   });
 });
 

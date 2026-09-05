@@ -11,6 +11,9 @@
 // streamed, or the reviewed evidence does not bind to these bytes.
 
 import { findOversizedLine, isSendableGcodeLine } from '../../core/controllers/grbl';
+import { findFluidncNonExecutableLines } from '../../core/controllers/fluidnc/fluidnc-line-limit';
+import type { ControllerDriver } from '../../core/controllers';
+import type { ControllerKind } from '../../core/devices';
 import {
   CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
   cncSetupAttestationMatches,
@@ -47,13 +50,34 @@ export function assertStartControllerEvidence(
 }
 
 /** Throws when a single line exceeds the controller's RX buffer, so it could never be streamed. */
-export function assertGcodeFitsController(gcode: string, options: StartJobOptions): void {
+export function assertGcodeFitsController(
+  gcode: string,
+  options: StartJobOptions,
+  activeControllerKind?: ControllerKind,
+): void {
   const streamOptions = normalizeStartJobOptions(options);
   const oversized = findOversizedLine(gcode, streamOptions.rxBufferBytes);
-  if (oversized === null) return;
+  if (oversized !== null) {
+    throw new Error(
+      `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
+        `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
+    );
+  }
+  if (activeControllerKind !== 'fluidnc') return;
+  const rejected = findFluidncNonExecutableLines(gcode)[0];
+  if (rejected === undefined) return;
   throw new Error(
-    `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
-      `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
+    `G-code line ${rejected.lineNumber} has a ${rejected.length}-byte executable payload — FluidNC accepts at most 127 bytes before error:14. Job not started.`,
+  );
+}
+
+export function assertActiveDriverAcceptsMachineKind(
+  machineKind: 'laser' | 'cnc',
+  driver: Pick<ControllerDriver, 'label' | 'capabilities'>,
+): void {
+  if (machineKind !== 'cnc' || driver.capabilities.cncJobs) return;
+  throw new Error(
+    `${driver.label} cannot accept LaserForge CNC jobs. No controller or program bytes were sent.`,
   );
 }
 

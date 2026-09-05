@@ -121,7 +121,7 @@ describe('deviceProfileWithInteractivePatch', () => {
     expect(resized.scanOffsetCalibrationStatus).toBeUndefined();
     expect(resolveEffectiveScanDirection(resized, true)).toEqual({
       bidirectional: false,
-      reason: 'uncalibrated-4040-fallback',
+      reason: 'uncalibrated-profile-fallback',
     });
   });
 
@@ -150,6 +150,37 @@ describe('deviceProfileWithInteractivePatch', () => {
 
     expect(cleared.scanningOffsets).toEqual([]);
     expect(cleared.scanOffsetCalibrationStatus).toBeUndefined();
+  });
+
+  it('clears scan calibration when controller, dialect, or laser-head identity changes', () => {
+    const calibrated = {
+      ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      scanningOffsets: [{ speedMmPerMin: 1500, offsetMm: 0.1 }],
+      scanOffsetCalibrationStatus: 'verified' as const,
+    };
+    for (const patch of [
+      { controllerKind: 'grblhal' as const },
+      { gcodeDialect: { dialectId: 'grbl-dynamic' as const } },
+      {
+        laserSubProfile: calibrated.laserSubProfile
+          ? {
+              ...calibrated.laserSubProfile,
+              model: `${calibrated.laserSubProfile.model} replacement`,
+            }
+          : {
+              model: 'replacement',
+              focusMode: 'manual' as const,
+              airAssist: 'none' as const,
+            },
+      },
+    ]) {
+      const changed = deviceProfileWithInteractivePatch(calibrated, patch);
+      expect(changed.scanningOffsets).toEqual([]);
+      expect(changed.scanOffsetCalibrationStatus).toBeUndefined();
+    }
+    expect(
+      deviceProfileWithInteractivePatch(calibrated, { name: 'Renamed' }).scanningOffsets,
+    ).toEqual(calibrated.scanningOffsets);
   });
 
   it('clears a rectified camera alignment when lens calibration changes', () => {

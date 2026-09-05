@@ -1,4 +1,4 @@
-import type { DeviceProfile } from '../devices/device-profile';
+import { effectiveBidirectionalScanPolicy, type DeviceProfile } from '../devices/device-profile';
 import { effectiveScanOffsetCalibrationStatus } from '../devices/scan-offset-profile';
 import type { Layer } from '../scene';
 
@@ -10,6 +10,9 @@ export type ScanDirectionReason =
   | 'calibration-verification'
   | 'expert-override'
   | 'sensitive-island-one-way'
+  | 'pending-calibration-profile-fallback'
+  | 'uncalibrated-profile-fallback'
+  // Archived prepared jobs may carry the former 4040-specific reason values.
   | 'pending-calibration-4040-fallback'
   | 'uncalibrated-4040-fallback';
 
@@ -27,7 +30,7 @@ export function resolveEffectiveScanDirection(
   if (!requestedBidirectional) {
     return { bidirectional: false, reason: 'requested-one-way' };
   }
-  if (device.gcodeDialect.dialectId !== 'neotronics-4040-safe') {
+  if (effectiveBidirectionalScanPolicy(device) !== 'require-verified-offsets') {
     return { bidirectional: true, reason: 'requested-bidirectional' };
   }
   if (calibrationMode === 'baseline') {
@@ -38,7 +41,7 @@ export function resolveEffectiveScanDirection(
   }
   const calibrationStatus = effectiveScanOffsetCalibrationStatus(device);
   if (calibrationStatus === 'pending') {
-    return { bidirectional: false, reason: 'pending-calibration-4040-fallback' };
+    return { bidirectional: false, reason: 'pending-calibration-profile-fallback' };
   }
   if (calibrationStatus === 'verified' || calibrationStatus === 'legacy-verified') {
     return { bidirectional: true, reason: 'calibrated-bidirectional' };
@@ -46,7 +49,7 @@ export function resolveEffectiveScanDirection(
   if (allowUncalibratedBidirectionalScan) {
     return { bidirectional: true, reason: 'expert-override' };
   }
-  return { bidirectional: false, reason: 'uncalibrated-4040-fallback' };
+  return { bidirectional: false, reason: 'uncalibrated-profile-fallback' };
 }
 
 export function resolveFillScanDirection(

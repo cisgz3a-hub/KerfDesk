@@ -65,6 +65,7 @@ describe('partitionSavePreflight', () => {
       'cnc-tool-geometry-invalid',
       'coordinate-unencodable',
       'empty-output',
+      'fluidnc-line-unexecutable',
       'no-output-layer',
       'non-finite-coordinate',
       'program-materialization-failed',

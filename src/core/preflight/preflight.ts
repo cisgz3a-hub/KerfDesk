@@ -78,6 +78,7 @@ export type PreflightCode =
   | 'relief-needs-cnc'
   | 'non-finite-coordinate'
   | 'coordinate-unencodable'
+  | 'fluidnc-line-unexecutable'
   | 'cnc-tool-geometry-invalid'
   // Advisory-only: secondary CNC cutters share values established for the
   // layer's primary cutter and require explicit operator verification.

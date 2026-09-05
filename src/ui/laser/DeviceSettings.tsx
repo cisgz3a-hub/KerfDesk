@@ -25,6 +25,7 @@ import { PlannerAdvanced } from './PlannerAdvanced';
 import { ScanOffsetEditor } from './ScanOffsetEditor';
 import { ControlledLaserOffTravelRow } from './ControlledLaserOffTravelRow';
 import { scanOffsetMagnitudeLimitMm } from '../../core/devices/scan-offset-profile';
+import { ScanDirectionPolicyEditor } from './ScanDirectionPolicyEditor';
 
 export function DeviceSettings(): JSX.Element {
   const device = useStore((s) => s.project.device);
@@ -64,6 +65,10 @@ export function DeviceSettings(): JSX.Element {
                   scanOffsetCalibrationStatus: scanningOffsets.length > 0 ? 'pending' : undefined,
                 })
               }
+            />
+            <ScanDirectionPolicyEditor
+              profile={device}
+              onChange={(bidirectionalScanPolicy) => update({ bidirectionalScanPolicy })}
             />
             <ControlledLaserOffTravelRow
               value={device.controlledLaserOffTravelFeedMmPerMin}

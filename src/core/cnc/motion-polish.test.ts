@@ -146,7 +146,51 @@ describe('rotateStartToLongestSegment', () => {
     expect(rotated.points[0]).toEqual({ x: 20, y: 0 });
     expect(rotated.points).toHaveLength(5);
   });
+
+  it('keeps an equal-facet circle seam phase stable under translation in either winding', () => {
+    for (const clockwise of [false, true]) {
+      const base = regularPolygon(0, 0, 25, 256, clockwise);
+      const expected = relativeStart(rotateStartToLongestSegment(base), 0, 0);
+      for (const [x, y] of [
+        [2, 2],
+        [2, 196],
+        [250, 20],
+        [320, 196],
+      ] as const) {
+        expect(
+          relativeStart(
+            rotateStartToLongestSegment(regularPolygon(x, y, 25, 256, clockwise)),
+            x,
+            y,
+          ),
+        ).toEqual(expected);
+      }
+    }
+  });
 });
+
+function regularPolygon(
+  centerX: number,
+  centerY: number,
+  radius: number,
+  count: number,
+  clockwise: boolean,
+): Polyline {
+  const order = Array.from({ length: count }, (_, index) => (clockwise ? -index : index));
+  return {
+    closed: true,
+    points: order.map((index) => {
+      const angle = (index / count) * Math.PI * 2;
+      return { x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius };
+    }),
+  };
+}
+
+function relativeStart(toolpath: Polyline, centerX: number, centerY: number): string {
+  const first = toolpath.points[0];
+  if (first === undefined) throw new Error('rotated circle has no entry');
+  return `${(first.x - centerX).toFixed(9)},${(first.y - centerY).toFixed(9)}`;
+}
 
 describe('applyRampEntry', () => {
   it('descends along the path at the configured angle, then re-cuts the ramp span', () => {

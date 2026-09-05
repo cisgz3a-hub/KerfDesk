@@ -1,7 +1,7 @@
 import { genericFeedMatchedFillRunwayMm, planFillSweeps } from './fill-sweep-plan';
 import { isSensitiveIslandFillPolicy } from './island-fill-motion';
 import type { FillGroup, Job } from './job';
-import { offsetForSpeed, type ScanOffsetPoint } from './scan-offset';
+import { offsetForEmittedFeed, type ScanOffsetPoint } from './scan-offset';
 
 export type FillHeatRiskSummary = {
   readonly fillSweepCount: number;
@@ -64,7 +64,7 @@ function accumulateFillGroupRisk(
   }
   const emittedPasses = Math.max(1, Math.floor(group.passes));
   const scanOffsetMm =
-    group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed);
+    group.bidirectionalScanOffsetMm ?? offsetForEmittedFeed(scanningOffsets, group.speed);
   for (const plan of planFillSweeps(group, scanOffsetMm)) {
     const sweep = plan.sweep;
     const first = sweep.spans[0];
