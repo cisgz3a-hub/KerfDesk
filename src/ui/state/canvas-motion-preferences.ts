@@ -24,5 +24,10 @@ export function writeCanvasStartMarkersVisible(
 }
 
 function browserStorage(): PreferenceStorage | null {
-  return typeof localStorage === 'undefined' ? null : localStorage;
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    // Some browser contexts deny the property getter before any storage method runs.
+    return null;
+  }
 }
