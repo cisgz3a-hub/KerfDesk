@@ -19,6 +19,28 @@ const ART_SIDE_MM = 10; // svgObj bounds are 0..10 in both axes
 describe('fitSelectionToBoard', () => {
   beforeEach(() => resetStore());
 
+  it('fits resized artwork proportionally and restores its complete transform on undo', () => {
+    useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
+    useStore.getState().addCapturedBoardBox(100, 100);
+    const source = useStore.getState().project.scene.objects.find((object) => object.id === 'A');
+    if (source === undefined) throw new Error('expected artwork');
+    useStore.getState().setObjectTransform('A', { ...source.transform, scaleX: 2, scaleY: 1 });
+    useStore.setState({ selectedObjectId: 'A', additionalSelectedIds: new Set(), undoStack: [] });
+    const before = useStore.getState().project;
+
+    useStore.getState().fitSelectionToBoard();
+
+    const after = useStore.getState();
+    const artwork = after.project.scene.objects.find((object) => object.id === 'A');
+    if (artwork === undefined) throw new Error('expected fitted artwork');
+    const footprint = transformedBBox(artwork);
+    expect(footprint.maxX - footprint.minX).toBeCloseTo(90);
+    expect(footprint.maxY - footprint.minY).toBeCloseTo(45);
+    expect(after.undoStack).toHaveLength(1);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toEqual(before);
+  });
+
   it('scales the single selected design to fill the board, centered, as one undoable edit', () => {
     useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
     useStore.getState().addCapturedBoardBox(100, 60);
