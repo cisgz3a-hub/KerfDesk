@@ -5,6 +5,7 @@ export function CutSettingsCommonFields(props: {
   readonly mode: LayerMode;
   readonly maxFeed?: number;
   readonly onModeChange: (mode: LayerMode) => void;
+  readonly onPowerChange?: (power: number) => void;
 }): JSX.Element {
   const speedValue =
     props.maxFeed === undefined ? props.layer.speed : Math.min(props.layer.speed, props.maxFeed);
@@ -27,7 +28,7 @@ export function CutSettingsCommonFields(props: {
         </select>
       </Field>
       <Field label="Power">
-        <NumberInput name="power" value={props.layer.power} min={0} max={100} label="power" />
+        <PowerInput value={props.layer.power} onChange={props.onPowerChange} />
         <span className="lf-field-unit">%</span>
       </Field>
       {props.mode !== 'image' ? (
@@ -72,6 +73,25 @@ export function CutSettingsCommonFields(props: {
       </Field>
       {props.mode === 'line' ? <LineModeFields layer={props.layer} /> : null}
     </>
+  );
+}
+
+function PowerInput(props: {
+  readonly value: number;
+  readonly onChange: ((power: number) => void) | undefined;
+}): JSX.Element {
+  return (
+    <NumberInput
+      name="power"
+      value={props.value}
+      min={0}
+      max={100}
+      label="power"
+      onChange={(event) => {
+        if (Number.isFinite(event.target.valueAsNumber))
+          props.onChange?.(event.target.valueAsNumber);
+      }}
+    />
   );
 }
 
@@ -164,6 +184,7 @@ function NumberInput(props: {
   readonly step?: number;
   readonly label?: string;
   readonly title?: string;
+  readonly onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }): JSX.Element {
   return (
     <input
@@ -174,6 +195,7 @@ function NumberInput(props: {
       {...(props.max !== undefined ? { max: props.max } : {})}
       step={props.step ?? 1}
       defaultValue={props.value}
+      onChange={props.onChange}
       style={numberStyle}
       aria-label={`Cut settings ${props.label ?? props.name}`}
       title={props.title ?? `Set cut settings ${props.label ?? props.name}.`}

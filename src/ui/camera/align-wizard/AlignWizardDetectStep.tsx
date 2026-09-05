@@ -3,50 +3,14 @@
 // de-fisheye → marker detect → homography solve → persist), and report the
 // outcome with the basis the alignment landed in.
 
-import { useCallback } from 'react';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
-import { runAutoAlign } from '../auto-align';
 import { CameraSourceView } from '../CameraSourceView';
 import { useCameraAlignWizardStore, type DetectStatus } from './camera-align-wizard-store';
+import { detectCameraAlignment } from './detect-camera-alignment';
 
 export function DetectStep(props: { readonly status: DetectStatus }): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
-  const calibration = useStore((s) => s.project.device.cameraCalibration);
-  const bedWidth = useStore((s) => s.project.device.bedWidth);
-  const bedHeight = useStore((s) => s.project.device.bedHeight);
-  const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
-  const setSurfaceHeightMm = useCameraStore((s) => s.setSurfaceHeightMm);
-  const setStep = useCameraAlignWizardStore((s) => s.setStep);
-  const planeHeightMm = useCameraAlignWizardStore((s) => s.planeHeightMm);
-
-  const detect = useCallback(async (): Promise<void> => {
-    if (sourceState.kind !== 'live') return;
-    setStep({ kind: 'detect', status: { kind: 'running' } });
-    const outcome = await runAutoAlign({
-      source: sourceState.source,
-      calibration,
-      bedWidth,
-      bedHeight,
-      planeHeightMm,
-      updateDeviceProfile,
-    });
-    if (outcome.kind === 'ok') {
-      setSurfaceHeightMm(planeHeightMm);
-      setStep({ kind: 'done', basis: outcome.basis });
-      return;
-    }
-    setStep({ kind: 'detect', status: { kind: 'failed', message: outcome.message } });
-  }, [
-    sourceState,
-    calibration,
-    bedWidth,
-    bedHeight,
-    planeHeightMm,
-    setSurfaceHeightMm,
-    updateDeviceProfile,
-    setStep,
-  ]);
 
   return (
     <div style={columnStyle}>
@@ -62,7 +26,7 @@ export function DetectStep(props: { readonly status: DetectStatus }): JSX.Elemen
           type="button"
           className="lf-btn lf-btn--primary"
           disabled={sourceState.kind !== 'live' || props.status.kind === 'running'}
-          onClick={() => void detect()}
+          onClick={() => void detectCameraAlignment()}
           title="Capture a frame, find the five burned markers, and solve the camera-to-bed alignment."
         >
           {props.status.kind === 'running' ? 'Detecting…' : 'Detect markers'}

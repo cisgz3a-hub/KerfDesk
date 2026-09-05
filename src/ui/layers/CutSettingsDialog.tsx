@@ -63,6 +63,7 @@ function CutSettingsBody(props: { readonly layer: Layer; readonly maxFeed?: numb
   const [dither, setDither] = useState<Layer['ditherAlgorithm']>(props.layer.ditherAlgorithm);
   const [fillLineIntervalMm, setFillLineIntervalMm] = useState(props.layer.hatchSpacingMm);
   const [imageLinesPerMm, setImageLinesPerMm] = useState(props.layer.linesPerMm);
+  const [power, setPower] = useState(props.layer.power);
   const maxFeedProps = props.maxFeed === undefined ? {} : { maxFeed: props.maxFeed };
   return (
     <>
@@ -70,6 +71,7 @@ function CutSettingsBody(props: { readonly layer: Layer; readonly maxFeed?: numb
         layer={props.layer}
         mode={mode}
         onModeChange={setMode}
+        onPowerChange={setPower}
         {...maxFeedProps}
       />
       {mode === 'fill' ? (
@@ -83,6 +85,7 @@ function CutSettingsBody(props: { readonly layer: Layer; readonly maxFeed?: numb
         <CutSettingsImageFields
           layer={props.layer}
           dither={dither}
+          maxPower={power}
           imageLinesPerMm={imageLinesPerMm}
           onDitherChange={setDither}
           onImageLinesPerMmChange={setImageLinesPerMm}

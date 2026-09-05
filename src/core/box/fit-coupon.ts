@@ -76,6 +76,12 @@ function validate(spec: FitCouponSpec): BoxSpecIssue[] {
 
 function collectFieldIssues(spec: FitCouponSpec): BoxSpecIssue[] {
   const issues: BoxSpecIssue[] = [];
+  if (
+    spec.relief.kind === 'corner-overcut' &&
+    (!Number.isFinite(spec.relief.toolDiameterMm) || spec.relief.toolDiameterMm <= 0)
+  ) {
+    issues.push({ field: 'reliefTool', message: 'Relief tool diameter must be greater than 0.' });
+  }
   for (const [field, value] of [
     ['thickness', spec.thicknessMm],
     ['fingerWidth', spec.fingerWidthMm],

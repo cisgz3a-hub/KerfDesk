@@ -1,6 +1,8 @@
 // runAutoAlign — capture a frame from the active source, de-fisheye it when a
 // lens calibration exists, detect the five burned markers, solve the
-// camera→bed homography, and persist the alignment (ADR-109). Extracted from
+// camera→bed homography, and return the proposed alignment (ADR-109). The
+// initiating wizard owns whether this asynchronous result may be persisted.
+// Extracted from
 // AutoAlignControls so the alignment wizard's Detect step and any button run
 // the identical path.
 
@@ -25,7 +27,11 @@ import {
 } from './frame-source';
 
 export type AutoAlignOutcome =
-  | { readonly kind: 'ok'; readonly basis: 'raw' | 'rectified' }
+  | {
+      readonly kind: 'ok';
+      readonly basis: 'raw' | 'rectified';
+      readonly alignment: CameraAlignment;
+    }
   | { readonly kind: 'failed'; readonly message: string };
 
 export async function runAutoAlign(deps: {
@@ -34,7 +40,6 @@ export async function runAutoAlign(deps: {
   readonly bedWidth: number;
   readonly bedHeight: number;
   readonly planeHeightMm: number;
-  readonly updateDeviceProfile: (patch: { cameraAlignment: CameraAlignment }) => void;
   readonly io?: FrameCaptureIo;
 }): Promise<AutoAlignOutcome> {
   const raw = await captureSourceFrame(deps.source, deps.io);
@@ -51,8 +56,10 @@ export async function runAutoAlign(deps: {
   if (solved.kind !== 'ok') {
     return { kind: 'failed', message: 'The detected markers were degenerate — re-burn and retry.' };
   }
-  deps.updateDeviceProfile({
-    cameraAlignment: {
+  return {
+    kind: 'ok',
+    basis,
+    alignment: {
       homography: solved.homography,
       frameWidth: frame.width,
       frameHeight: frame.height,
@@ -62,8 +69,7 @@ export async function runAutoAlign(deps: {
       verificationErrorMm: solved.verificationErrorMm,
       capture,
     },
-  });
-  return { kind: 'ok', basis };
+  };
 }
 
 function calibrationBindingIssue(
