@@ -10,7 +10,6 @@ import {
   type SceneGroup,
   type SceneObject,
 } from '../../core/scene';
-import { cloneLayerSubLayers } from '../../core/scene/layer';
 import { removeSceneObjectsFromState } from './object-delete-actions';
 import {
   remapSceneObjectCopyDependencies,
@@ -193,13 +192,14 @@ function prepareClipboardPaste(
     const seed = createArtworkOperation(out, representative, {
       mode: source.mode,
       name: source.name,
+      subLayers: source.subLayers,
     }).operation;
     const operation: Layer = {
       ...cloneLayer(source),
       id: seed.id,
       name: seed.name,
       color: seed.color,
-      subLayers: cloneLayerSubLayers(source.subLayers),
+      subLayers: seed.subLayers,
     };
     operationIdMap.set(source.id, operation.id);
     if (source.bindingOperationId !== undefined) {

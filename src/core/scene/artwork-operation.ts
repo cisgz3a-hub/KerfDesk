@@ -1,7 +1,15 @@
-import { createLayer, type Layer, type LayerMode } from './layer';
+import {
+  cloneLayerSubLayers,
+  createLayer,
+  layerSubLayerOperationId,
+  type Layer,
+  type LayerMode,
+  type LayerSubLayer,
+} from './layer';
 import { bindSceneObjectToOperations } from './operation-binding';
 import type { Scene } from './scene';
 import type { SceneObject } from './scene-object';
+import { effectiveOperationForObject } from '../effective-output';
 
 // New artwork starts in black; later operations receive distinct colors in
 // this stable order so the canvas stays readable as the design grows.
@@ -34,20 +42,27 @@ export type ArtworkOperationsResult = {
 export function createArtworkOperation(
   scene: Scene,
   object: SceneObject,
-  options: { readonly mode?: LayerMode; readonly name?: string } = {},
+  options: {
+    readonly mode?: LayerMode;
+    readonly name?: string;
+    readonly subLayers?: ReadonlyArray<LayerSubLayer>;
+  } = {},
 ): ArtworkOperationResult {
-  const id = nextOperationId(scene.layers, object.id);
+  const id = nextOperationId(scene.layers, object.id, options.subLayers ?? []);
   const name = uniqueOperationName(
     scene.layers,
     options.name?.trim() || artworkOperationName(object),
   );
-  const base = createLayer({
-    id,
-    name,
-    color: nextOperationColor(scene.layers),
-    ...(options.mode === undefined ? {} : { mode: options.mode }),
-  });
-  const operation = { ...base, ...(object.operationOverride ?? {}) };
+  const base = {
+    ...createLayer({
+      id,
+      name,
+      color: nextOperationColor(scene.layers),
+      ...(options.mode === undefined ? {} : { mode: options.mode }),
+    }),
+    subLayers: cloneLayerSubLayers(options.subLayers ?? []),
+  };
+  const operation = effectiveOperationForObject(base, object);
   const bound = bindSceneObjectToOperations(object, [id]);
   if (bound.operationOverride === undefined) return { object: bound, operation };
   const { operationOverride: _operationOverride, ...withoutOverride } = bound;
@@ -128,12 +143,23 @@ export function nextOperationColor(operations: ReadonlyArray<Pick<Layer, 'color'
   return '#475569';
 }
 
-function nextOperationId(operations: ReadonlyArray<Pick<Layer, 'id'>>, objectId: string): string {
+function nextOperationId(
+  operations: ReadonlyArray<Layer>,
+  objectId: string,
+  subLayers: ReadonlyArray<LayerSubLayer>,
+): string {
   const base = `operation-${objectId}`;
-  const used = new Set(operations.map((operation) => operation.id));
-  if (!used.has(base)) return base;
+  const used = new Set(
+    operations.flatMap((operation) => [
+      operation.id,
+      ...operation.subLayers.map((sub) => layerSubLayerOperationId(operation.id, sub.id)),
+    ]),
+  );
+  const available = (id: string): boolean =>
+    !used.has(id) && subLayers.every((sub) => !used.has(layerSubLayerOperationId(id, sub.id)));
+  if (available(base)) return base;
   let suffix = 2;
-  while (used.has(`${base}-${suffix}`)) suffix += 1;
+  while (!available(`${base}-${suffix}`)) suffix += 1;
   return `${base}-${suffix}`;
 }
 

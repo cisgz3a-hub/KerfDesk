@@ -30,6 +30,7 @@ import { duplicateSceneSelection } from './duplicate-scene-selection';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
+import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
 
 export { positionTraceOverRasterSource } from './trace-placement';
 
@@ -174,7 +175,11 @@ export function pruneOrphanLayers(scene: Scene): Scene {
     scene.objects.some((object) => sceneObjectUsesOperation(object, operation)),
   );
   if (kept.length === scene.layers.length) return scene;
-  return { ...scene, layers: kept };
+  return {
+    ...scene,
+    layers: kept,
+    objects: pruneSceneObjectOperationOverrides(scene.objects, kept),
+  };
 }
 
 export function applyFreshImport(

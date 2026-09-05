@@ -5,6 +5,7 @@ import {
   polylineToPolylines,
 } from '../../core/shapes';
 import {
+  captureLayerOperationSettings,
   createLayer,
   createProject,
   polylineToCurveSubpath,
@@ -13,10 +14,89 @@ import {
   type ShapeObject,
   type Vec2,
 } from '../../core/scene';
+import { compileJob } from '../../core/job';
+import { deserializeProject, serializeProject } from '../../io/project';
 import { fitLegacyCentripetalCubics } from '../../core/trace/centerline/curve-cubics';
 import { upgradeProjectPolylineFairing } from './polyline-fairing-upgrade';
 
 describe('upgradeProjectPolylineFairing', () => {
+  it.each([false, true])(
+    'preserves migrated operation output while fairing a v2 drawing (sub-operation: %s)',
+    (withSubOperation) => {
+      const legacy = legacyPolyline(alternatingBends(), false);
+      const base = createLayer({ id: 'cut', color: '#000000' });
+      const subLayers = withSubOperation
+        ? [
+            {
+              id: 'finish',
+              label: 'Finish',
+              enabled: true,
+              settings: { ...captureLayerOperationSettings(base), speed: 400 },
+            },
+          ]
+        : [];
+      const loaded = deserializeProject(
+        JSON.stringify({
+          ...projectWith(legacy),
+          schemaVersion: 2,
+          scene: {
+            objects: [
+              {
+                ...legacy,
+                powerScale: 100,
+                operationOverride: { power: 17, speed: 600, passes: 3 },
+                paths: legacy.paths.map((path) => ({ ...path, strokeWidthMm: 0.4 })),
+              },
+            ],
+            layers: [{ ...base, subLayers }],
+          },
+        }),
+      );
+      if (loaded.kind !== 'ok') throw new Error(JSON.stringify(loaded));
+      const before = loaded.project;
+      const facts = (project: Project) =>
+        compileJob(project.scene, project.device)
+          .groups.filter((group) => group.kind !== 'cnc')
+          .map((group) => ({
+            id: group.layerId,
+            power: group.power,
+            speed: group.speed,
+            passes: group.passes,
+          }));
+      expect(facts(before)).toHaveLength(withSubOperation ? 2 : 1);
+      expect(
+        facts(before).every(
+          (group) => group.power === 17 && group.speed === 600 && group.passes === 3,
+        ),
+      ).toBe(true);
+
+      const result = upgradeProjectPolylineFairing(before);
+
+      expect(result.upgradedCount).toBe(1);
+      const upgraded = result.project.scene.objects[0];
+      if (upgraded?.kind !== 'shape') throw new Error('Expected upgraded shape');
+      expect(upgraded.paths[0]?.operationIds).toEqual(
+        (before.scene.objects[0] as ShapeObject).paths[0]?.operationIds,
+      );
+      expect(upgraded.paths[0]?.strokeWidthMm).toBe(0.4);
+      expect(facts(result.project)).toEqual(facts(before));
+      expect(upgradeProjectPolylineFairing(result.project).project).toBe(result.project);
+      const reopened = deserializeProject(serializeProject(result.project));
+      if (reopened.kind !== 'ok') throw new Error(JSON.stringify(reopened));
+      expect(facts(reopened.project)).toEqual(facts(before));
+    },
+  );
+
+  it('leaves extra authored path geometry intact when the pen spec cannot rematerialize it', () => {
+    const legacy = legacyPolyline(alternatingBends(), false);
+    const object = {
+      ...legacy,
+      paths: [...legacy.paths, { ...legacy.paths[0]!, operationIds: ['other'] }],
+    };
+    const project = projectWith(object);
+    expect(upgradeProjectPolylineFairing(project).project).toBe(project);
+  });
+
   it('upgrades an existing line-only pen drawing without dropping object metadata', () => {
     const points = arcPoints();
     const legacy = legacyPolyline(points, false);

@@ -1,4 +1,12 @@
-import type { ObjectOperationOverride, Project, SceneObject, ShapeObject } from '../../core/scene';
+import {
+  layerFromSubLayer,
+  sceneObjectUsesOperation,
+  type ObjectOperationOverride,
+  type Project,
+  type SceneObject,
+  type ShapeObject,
+} from '../../core/scene';
+import { operationOverrideForObject } from '../../core/effective-output';
 import { rematerializeParametricShape, type ParametricShapeSpec } from '../../core/shapes';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
@@ -27,6 +35,11 @@ export type ObjectPropertiesActions = {
   readonly setSelectedShapeSpec: (spec: ParametricShapeSpec) => void;
   readonly setShapeSpec: (objectId: string, spec: ParametricShapeSpec) => void;
   readonly setSelectedObjectsOperationOverride: (patch: ObjectOperationOverride) => void;
+  readonly setObjectsOperationOverrideForOperation: (
+    objectIds: ReadonlyArray<string>,
+    operationId: string,
+    patch: ObjectOperationOverride,
+  ) => void;
   readonly clearSelectedObjectsOperationOverride: () => void;
 };
 
@@ -44,7 +57,9 @@ export function objectPropertiesActions(set: ObjectPropertiesSet): ObjectPropert
       ),
     setShapeSpec: (objectId, spec) => set((state) => setShapeSpec(state, objectId, spec)),
     setSelectedObjectsOperationOverride: (patch) =>
-      setSelectedObjectsOperationOverrideMatching(set, patch),
+      set((state) => setObjectsOperationOverride(state, selectedObjectIds(state), patch)),
+    setObjectsOperationOverrideForOperation: (objectIds, operationId, patch) =>
+      set((state) => setObjectsOperationOverride(state, new Set(objectIds), patch, operationId)),
     clearSelectedObjectsOperationOverride: () =>
       set((state) => {
         const ids = selectedObjectIds(state);
@@ -121,31 +136,54 @@ function shapeSpecEqual(left: ShapeObject, right: ShapeObject): boolean {
   return JSON.stringify(left.spec) === JSON.stringify(right.spec);
 }
 
-function setSelectedObjectsOperationOverrideMatching(
-  set: ObjectPropertiesSet,
+function setObjectsOperationOverride(
+  state: ObjectPropertiesState,
+  ids: ReadonlySet<string>,
   patch: ObjectOperationOverride,
-): void {
-  set((state) => {
-    const ids = selectedObjectIds(state);
-    if (ids.size === 0) return {};
-    const sanitized = sanitizeOperationOverridePatch(patch);
-    if (Object.keys(sanitized).length === 0) return {};
-    let changed = false;
-    const objects = state.project.scene.objects.map((object) => {
-      if (!ids.has(object.id)) return object;
-      const operationOverride = { ...(object.operationOverride ?? {}), ...sanitized };
-      if (operationOverrideEqual(object.operationOverride, operationOverride)) return object;
-      changed = true;
-      return { ...object, operationOverride };
-    });
-    if (!changed) return {};
-    return {
-      project: { ...state.project, scene: { ...state.project.scene, objects } },
-      undoStack: pushUndo(state.project, state.undoStack),
-      redoStack: [],
-      dirty: true,
-    };
+  operationId?: string,
+): ObjectPropertiesMutation {
+  if (ids.size === 0) return {};
+  const sanitized = sanitizeOperationOverridePatch(patch);
+  if (Object.keys(sanitized).length === 0) return {};
+  const operations =
+    operationId === undefined
+      ? []
+      : state.project.scene.layers
+          .flatMap((layer) => [
+            layer,
+            ...layer.subLayers.map((sub) => layerFromSubLayer(layer, sub)),
+          ])
+          .filter((layer) => layer.id === operationId);
+  if (operationId !== undefined && operations.length !== 1) return {};
+  const operation = operations[0];
+  let changed = false;
+  const objects = state.project.scene.objects.map((object) => {
+    if (
+      !ids.has(object.id) ||
+      (operation !== undefined && !sceneObjectUsesOperation(object, operation))
+    )
+      return object;
+    const operationOverride =
+      operation === undefined
+        ? { ...(object.operationOverride ?? {}), ...sanitized }
+        : {
+            ...object.operationOverride,
+            byOperation: {
+              ...object.operationOverride?.byOperation,
+              [operation.id]: { ...operationOverrideForObject(operation, object), ...sanitized },
+            },
+          };
+    if (operationOverrideEqual(object.operationOverride, operationOverride)) return object;
+    changed = true;
+    return { ...object, operationOverride };
   });
+  if (!changed) return {};
+  return {
+    project: { ...state.project, scene: { ...state.project.scene, objects } },
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
 }
 
 function selectedObjectIds(state: ObjectPropertiesState): Set<string> {
@@ -184,6 +222,8 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   )
     out.fillStyle = patch.fillStyle;
   setBoolean(out, 'fillBidirectional', patch.fillBidirectional);
+  setBoolean(out, 'allowUncalibratedBidirectionalScan', patch.allowUncalibratedBidirectionalScan);
+  setFiniteNumber(out, 'bidirectionalScanOffsetMm', patch.bidirectionalScanOffsetMm);
   setBoolean(out, 'fillCrossHatch', patch.fillCrossHatch);
   if (patch.ditherAlgorithm !== undefined) out.ditherAlgorithm = patch.ditherAlgorithm;
   setPositiveNumber(out, 'linesPerMm', patch.linesPerMm);

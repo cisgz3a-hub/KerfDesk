@@ -6,6 +6,7 @@
 // shapes do not behave like invisible filled slabs over smaller nested shapes.
 
 import type { Layer, LayerMode } from './layer';
+import { effectiveOperationForObject } from './effective-operation';
 import type { Scene } from './scene';
 import type { Bounds, ColoredPath, Polyline, SceneObject, Transform, Vec2 } from './scene-object';
 import { applyTransform } from './transform';
@@ -132,7 +133,9 @@ function vectorPathsFor(obj: SceneObject): ReadonlyArray<ColoredPath> | null {
 }
 
 function effectiveLayerMode(obj: SceneObject, layer: Layer | undefined): LayerMode {
-  return obj.operationOverride?.mode ?? layer?.mode ?? 'line';
+  return layer === undefined
+    ? (obj.operationOverride?.mode ?? 'line')
+    : effectiveOperationForObject(layer, obj).mode;
 }
 
 function transformedPolyline(polyline: Polyline, transform: Transform): Polyline {

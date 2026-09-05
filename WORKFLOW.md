@@ -366,6 +366,9 @@ Identical to the format-specific import flows except:
   returns to Settings with that run selected.
 - When one selected artwork uses an operation shared by others, the inspector says `Affects N
   artworks` and offers **Make unique**. This clones the operation and rebinds only the selection.
+  Each selected artwork keeps its effective settings in an override owned by the copied operation.
+  Existing operations keep their identities, effective settings, and path assignments; selected
+  artworks with different settings retain those differences until an explicit shared edit changes them.
 - When selected artworks use different operations, the inspector says `Multiple operations` and
   offers **Use one operation**. Choosing an operation rebinds the whole selection without grouping
   or changing geometry.
@@ -378,6 +381,8 @@ Identical to the format-specific import flows except:
   partially applied control; **Use one operation** remains an explicit alternative.
 - **Add operation** binds a second ordinary operation to the selected artwork. It appears in the
   same ordered list and can be renamed, reordered, shown/hidden, or output-enabled like any other.
+  Editing the new operation does not change the artwork's existing operations. The retained artwork
+  inspector also displays and edits that artwork's effective overrides when canvas selection is empty.
 - Artwork intentionally sharing one operation compiles as one machining unit so fill holes,
   overlaps, Island Fill clustering, pockets, and inlays retain compound-geometry semantics. Use
   **Make unique** before ordering one member independently.
@@ -701,7 +706,7 @@ the completed physical Frame is the spatial source of truth.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
 3. Project saved-as does not auto-trigger; user can save to persist migration.
 
-> **Current note:** project schema v4 stores canonical curve subpaths, explicit artwork-to-operation bindings, and canonical relief heightfields. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes to canonical heightfields where exact conversion is available (ADR-159, ADR-211, ADR-292).
+> **Current note:** project schema v5 stores canonical curve subpaths, explicit artwork-to-operation bindings, canonical relief heightfields, and operation-owned artwork overrides. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes to canonical heightfields where exact conversion is available; v4→v5 preserves existing settings and bindings unchanged (ADR-159, ADR-211, ADR-292, ADR-316). Readers supporting only v4 report a newer schema instead of silently ignoring operation ownership.
 
 #### Error — schema newer than supported
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.

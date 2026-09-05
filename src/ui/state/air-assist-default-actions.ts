@@ -1,5 +1,6 @@
 import {
   machineKindOf,
+  outputOperationLayers,
   sceneObjectUsesOperation,
   type Layer,
   type Project,
@@ -7,6 +8,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { pushUndo, type StateSlice } from './scene-mutations';
+import { operationOverrideForObject } from '../../core/effective-output';
 
 export type AirAssistDefaultSyncSummary = {
   readonly airOutputUnset: boolean;
@@ -99,15 +101,34 @@ function objectWithAirAssistOverrideEnabled(
   outputLayers: ReadonlyArray<Layer>,
 ): SceneObject {
   if (!hasDisabledAirOverrideOnOutputLayer(object, outputLayers)) return object;
-  return { ...object, operationOverride: { ...object.operationOverride, airAssist: true } };
+  const byOperation = { ...object.operationOverride?.byOperation };
+  for (const layer of outputLayers.flatMap(outputOperationLayers)) {
+    if (!sceneObjectUsesOperation(object, layer)) continue;
+    const override = operationOverrideForObject(layer, object);
+    if (override?.airAssist === false && Object.hasOwn(byOperation, layer.id))
+      byOperation[layer.id] = { ...override, airAssist: true };
+  }
+  return {
+    ...object,
+    operationOverride: {
+      ...object.operationOverride,
+      airAssist: true,
+      ...(object.operationOverride?.byOperation === undefined ? {} : { byOperation }),
+    },
+  };
 }
 
 function hasDisabledAirOverrideOnOutputLayer(
   object: SceneObject,
   outputLayers: ReadonlyArray<Layer>,
 ): boolean {
-  if (object.operationOverride?.airAssist !== false) return false;
-  return outputLayers.some((operation) => sceneObjectUsesOperation(object, operation));
+  return outputLayers
+    .flatMap(outputOperationLayers)
+    .some(
+      (operation) =>
+        sceneObjectUsesOperation(object, operation) &&
+        operationOverrideForObject(operation, object)?.airAssist === false,
+    );
 }
 
 function mapChanged<T>(items: ReadonlyArray<T>, mapItem: (item: T) => T): ReadonlyArray<T> {

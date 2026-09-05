@@ -1,4 +1,5 @@
 import type { SelectionMask } from '../../core/image-select';
+import { effectiveOperationForObject } from '../../core/effective-output';
 import type { DeviceProfile } from '../../core/devices';
 import type { Layer, RasterImage } from '../../core/scene';
 import { editorHorizontalMaskRepair } from './editor-horizontal-mask-repair';
@@ -118,7 +119,7 @@ function isCompiledGridDirect(
 }
 
 function isOperationLocallyMappable(layer: Layer, object: RasterImage): boolean {
-  const effective = { ...layer, ...object.operationOverride };
+  const effective = effectiveOperationForObject(layer, object);
   return !effective.negativeImage && isDeterministicBlackDither(effective.ditherAlgorithm);
 }
 

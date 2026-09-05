@@ -18,6 +18,7 @@ import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import { cncSettingsForArtworkPaste } from './cnc-settings-clipboard';
+import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
@@ -248,7 +249,7 @@ function deleteLayerContent(
   if (layers.length !== scene.layers.length) changed = true;
   if (!changed) return null;
   return {
-    scene: { ...scene, objects, layers },
+    scene: { ...scene, objects: pruneSceneObjectOperationOverrides(objects, layers), layers },
     removedObjectIds,
   };
 }

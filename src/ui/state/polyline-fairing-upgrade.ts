@@ -63,10 +63,21 @@ function upgradePolylineObject(object: SceneObject): SceneObject {
   });
   if (!hasAuthoredCurve(rematerialized)) return object;
   if (hasSameCurves(object, rematerialized)) return object;
+  // Extra authored paths cannot be reconstructed from the pen's point-list spec.
+  if (object.paths.length !== rematerialized.paths.length) return object;
   return {
     ...object,
     bounds: rematerialized.bounds,
-    paths: rematerialized.paths,
+    paths: object.paths.map((path, index) => {
+      const replacement = rematerialized.paths[index];
+      return replacement === undefined
+        ? path
+        : {
+            ...path,
+            polylines: replacement.polylines,
+            ...(replacement.curves === undefined ? {} : { curves: replacement.curves }),
+          };
+    }),
     fairingVersion: CURRENT_POLYLINE_FAIRING_VERSION,
   };
 }

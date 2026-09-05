@@ -19259,3 +19259,67 @@ or controller behavior.
 - ADR-243, disclosure without policy-sized output refusal.
 
 ---
+
+## ADR-316 — Operation-owned artwork overrides preserve copied output and later edits
+
+**Status:** Accepted
+
+**Date:** 2026-09-05
+
+### Context
+
+An artwork-wide operation override can apply different effective settings to artwork sharing
+one operation. Make unique and Add operation previously copied the operation base and discarded
+that override. Keeping the global override fixes the immediate output, but editing the added
+operation then changes the original operation's effective output as well. Promoting every
+existing override into new operation identities is also incorrect: it can separate a CNC pocket
+from its hole and change existing toolpaths merely while adding a new operation.
+
+### Decision
+
+1. Project schema v5 adds optional `operationOverride.byOperation`, a dictionary from operation
+   ID to a settings override or `null`. An exact materialized sub-operation key takes precedence,
+   followed by its parent binding key, followed by the legacy artwork-wide override. A scoped
+   settings entry replaces the global override, with omitted fields inherited from the operation
+   base. `null` explicitly bypasses the global override and inherits the base.
+2. Make unique and Add operation clone only the requested operation. Each affected artwork
+   snapshots its resolved source override into the new operation's scope, including explicit
+   child scopes. Unrelated operations, artwork, geometry, and path-specific bindings retain
+   their identities and settings. Add appends its new binding to each path without widening an
+   existing path's operation assignment. Make unique replaces only the requested binding.
+3. The artwork inspector displays effective settings for its explicit artwork target even when
+   canvas selection is empty. An override edit targets that operation and those artwork IDs;
+   stale callbacks for artwork that no longer uses the operation do nothing. Independent scoped
+   edits do not change existing operations or uninspected artwork. CNC settings continue to be
+   owned by their existing operation records, retaining compound pocket and inlay grouping.
+4. All effective laser settings consumers use the existing effective-operation helper. Copying
+   bindings remaps parent and materialized child scopes, while deleting operations/sub-operations
+   prunes their settings owners. New operation IDs reserve existing and copied child identities;
+   scoped edits require one unambiguous current owner. Legacy aliases remain readable.
+   Geometry metadata copies carry scoped overrides with the artwork.
+   Fairing replaces only geometry and retains authored path metadata and operation bindings.
+5. Scoped settings are validated as known settings fields and references to real operations or
+   unambiguous sub-operations. Legacy orphan path bindings keep their existing compatibility behavior.
+   The registered v4→v5 migration preserves the scene unchanged; the v1–v4 migration chain retains
+   its existing output semantics. The version bump makes older readers reject a newer schema
+   rather than silently ignore scope ownership and change emitted settings.
+6. Effective overrides and v1/v2 override materialization project only recognized artwork settings.
+   Tolerated unknown legacy fields remain readable, but cannot overwrite operation identity,
+   bindings, visibility/output membership, sub-operations, or CNC settings. This also repairs the
+   PR-193 migration path that could turn an unknown `cnc` override into a different toolpath.
+
+### Consequences and verification
+
+- The change is undoable and persists in self-contained project files. Legacy global overrides
+  remain supported; this is not a geometry, CNC settings, or relief-format migration.
+- Regression tests deserialize valid projects, mutate through real store actions, and compile
+  output. They cover heterogeneous owners, parent/child/global/null precedence, subsequent
+  inspector edits, path-specific operations, duplicate/transform/clipboard copying, deletion,
+  save/reopen, undo/redo, and laser/CNC mode changes.
+- A nested CNC pocket counterexample verifies that Add preserves the complete original group
+  while creating only the requested additional operation. DOM tests verify displayed and edited
+  laser power against the same artwork's compiled output.
+- These are source, DOM, and compiler checks. No controller, air-cut, material, or hardware
+  qualification is claimed. The exact-job Frame policy and Job Review advisory policy are unchanged.
+
+---

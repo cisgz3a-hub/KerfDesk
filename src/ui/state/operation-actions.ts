@@ -1,18 +1,12 @@
 import {
-  addLayer,
-  appendSceneObjectOperationBinding,
-  artworkOperationName,
   bindSceneObjectToOperations,
-  createArtworkOperation,
   DEFAULT_CNC_LAYER_SETTINGS,
-  nextOperationColor,
   primaryOperationForObject,
-  replaceSceneObjectOperationBinding,
   type Layer,
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { cloneLayerSubLayers } from '../../core/scene/layer';
+import { cloneArtworkOperations } from './clone-artwork-operations';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 
 type OperationActionState = StateSlice & {
@@ -142,7 +136,14 @@ function rebindObjects(
   const objects = state.project.scene.objects.map((object) => {
     if (!objectIds.has(object.id)) return object;
     const next = bindSceneObjectToOperations(clearOperationOverride(object), [operationId]);
-    if (sameOperationIds(object.operationIds, next.operationIds)) return object;
+    const hasPathBindings =
+      'paths' in object && object.paths.some((path) => path.operationIds !== undefined);
+    if (
+      !hasPathBindings &&
+      object.operationOverride === undefined &&
+      sameOperationIds(object.operationIds, next.operationIds)
+    )
+      return object;
     changed = true;
     return next;
   });
@@ -168,32 +169,9 @@ function cloneOperationForObjects(
   additive: boolean,
 ): OperationMutation | Record<string, never> {
   const source = state.project.scene.layers.find((layer) => layer.id === operationId);
-  const first = objectsWithIds(state, objectIds)[0];
-  if (source === undefined || first === undefined) return {};
-  const seed = createArtworkOperation(state.project.scene, first, {
-    name: additive ? `${source.name} 2` : artworkOperationName(first),
-  });
-  const operation: Layer = {
-    ...source,
-    id: seed.operation.id,
-    name: seed.operation.name,
-    color: nextOperationColor(state.project.scene.layers),
-    subLayers: cloneLayerSubLayers(source.subLayers),
-  };
-  const objects = state.project.scene.objects.map((object) => {
-    if (!objectIds.has(object.id)) return object;
-    const clean = clearOperationOverride(object);
-    return additive
-      ? appendSceneObjectOperationBinding(clean, operation.id, state.project.scene.layers)
-      : replaceSceneObjectOperationBinding(
-          clean,
-          operationId,
-          operation.id,
-          state.project.scene.layers,
-        );
-  });
-  const scene = addLayer({ ...state.project.scene, objects }, operation);
-  return mutation(state, { ...state.project, scene });
+  if (source === undefined) return {};
+  const scene = cloneArtworkOperations(state.project.scene, objectIds, source, additive);
+  return scene === state.project.scene ? {} : mutation(state, { ...state.project, scene });
 }
 
 function objectsWithIds(

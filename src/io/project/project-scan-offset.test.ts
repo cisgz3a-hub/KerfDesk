@@ -1,18 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createLayer,
-  createProject,
-  IDENTITY_TRANSFORM,
-  PROJECT_SCHEMA_VERSION,
-  type SceneObject,
-} from '../../core/scene';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
 
 describe('project scan-offset IO', () => {
   it('back-fills missing scan-offset table on old .lf2 files', () => {
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION - 1,
+      schemaVersion: 3, // This legacy shape predates the required v4 jobSetup.
       device: {
         name: 'Old Profile',
         bedWidth: 300,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, PROJECT_SCHEMA_VERSION, type Project } from '../../core/scene';
+import { createProject, type Project } from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
 
@@ -17,7 +17,7 @@ describe('project notes .lf2 IO', () => {
 
   it('back-fills missing project notes on older .lf2 files', () => {
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION - 1,
+      schemaVersion: 3, // This legacy shape predates the required v4 jobSetup.
       device: {
         name: 'Default',
         bedWidth: 300,

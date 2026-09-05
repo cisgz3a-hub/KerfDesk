@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   createProject,
   IDENTITY_TRANSFORM,
-  PROJECT_SCHEMA_VERSION,
   type Project,
   type SceneObject,
 } from '../../core/scene';
@@ -44,7 +43,7 @@ describe('project scene groups IO', () => {
 
   it('backfills old projects without scene.groups to an empty array', () => {
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION - 1,
+      schemaVersion: 3, // This legacy shape predates the required v4 jobSetup.
       device: createProject().device,
       workspace: createProject().workspace,
       scene: { objects: [], layers: [] },

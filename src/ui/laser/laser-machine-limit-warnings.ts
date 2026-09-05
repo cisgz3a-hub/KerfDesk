@@ -13,6 +13,7 @@
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { DeviceProfile } from '../../core/devices';
 import { sceneObjectUsesOperation, type Layer, type Project } from '../../core/scene';
+import { operationOverrideForObject } from '../../core/effective-output';
 import { reportedAxisFeedLimit } from './reported-axis-feed-limit';
 
 // A profile within float-noise / rounding of the reported travel must not nag.
@@ -90,10 +91,10 @@ function objectOverrideSpeedsOnOutputLayers(
 ): number[] {
   const speeds: number[] = [];
   for (const object of project.scene.objects) {
-    const override = object.operationOverride?.speed;
-    if (override === undefined) continue;
-    if (outputLayers.some((layer) => sceneObjectUsesOperation(object, layer))) {
-      speeds.push(override);
+    for (const layer of outputLayers) {
+      if (!sceneObjectUsesOperation(object, layer)) continue;
+      const speed = operationOverrideForObject(layer, object)?.speed;
+      if (speed !== undefined) speeds.push(speed);
     }
   }
   return speeds;

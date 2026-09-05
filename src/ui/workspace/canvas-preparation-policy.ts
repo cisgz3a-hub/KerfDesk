@@ -2,11 +2,13 @@ import { outputVectorPreparationTooComplex } from '../../core/job/preparation-co
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import {
   outputOperationLayers,
+  sceneObjectUsesOperation,
   validateOutputScope,
   type OutputScope,
   type Project,
 } from '../../core/scene';
 import { DEFAULT_CNC_LAYER_SETTINGS } from '../../core/scene';
+import { effectiveOperationForObject } from '../../core/effective-output';
 import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 
 export type CanvasPreparationClass = 'direct' | 'background-worker';
@@ -46,10 +48,13 @@ function operationAmplifiesPreparation(project: Project): boolean {
   if (operations.some((layer) => layer.mode === 'fill' && layer.fillStyle !== 'scanline')) {
     return true;
   }
-  return project.scene.objects.some((object) => {
-    const override = object.operationOverride;
-    return override?.mode === 'fill' && override.fillStyle !== 'scanline';
-  });
+  return project.scene.objects.some((object) =>
+    operations.some((operation) => {
+      if (!sceneObjectUsesOperation(object, operation)) return false;
+      const effective = effectiveOperationForObject(operation, object);
+      return effective.mode === 'fill' && effective.fillStyle !== 'scanline';
+    }),
+  );
 }
 
 function cncReliefPreparationIsCostly(project: Project): boolean {

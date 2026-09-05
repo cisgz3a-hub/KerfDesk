@@ -2,6 +2,7 @@
 // operation returns a fresh Scene (CLAUDE.md "Mutable state — none").
 
 import { normalizeLayerColor, type Layer } from './layer';
+import { pruneSceneObjectOperationOverrides } from './operation-binding';
 import { assertNever, type CncTabAnchor, type ColoredPath, type SceneObject } from './scene-object';
 
 export type Scene = {
@@ -78,9 +79,13 @@ export function updateLayer(
   layerId: string,
   patch: Partial<Omit<Layer, 'id' | 'color'>>,
 ): Scene {
+  const layers = scene.layers.map((l) => (l.id === layerId ? { ...l, ...patch } : l));
   return {
     ...scene,
-    layers: scene.layers.map((l) => (l.id === layerId ? { ...l, ...patch } : l)),
+    layers,
+    ...(patch.subLayers === undefined
+      ? {}
+      : { objects: pruneSceneObjectOperationOverrides(scene.objects, layers) }),
   };
 }
 
@@ -114,7 +119,8 @@ function hasExplicitOperationBinding(object: SceneObject): boolean {
 }
 
 export function removeLayer(scene: Scene, layerId: string): Scene {
-  return { ...scene, layers: scene.layers.filter((l) => l.id !== layerId) };
+  const layers = scene.layers.filter((l) => l.id !== layerId);
+  return { ...scene, layers, objects: pruneSceneObjectOperationOverrides(scene.objects, layers) };
 }
 
 export function moveLayer(scene: Scene, layerId: string, direction: LayerMoveDirection): Scene {

@@ -6,6 +6,7 @@
 // is coming.
 
 import { pixelExtentForMm } from '../raster';
+import { effectiveOperationForObject } from '../effective-output';
 import { MAX_RASTER_WORK_UNITS } from '../raster/raster-budget';
 import {
   outputOperationLayers,
@@ -28,7 +29,7 @@ export function rasterPreparationWorkUnits(project: Project): number {
   for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
     for (const layer of matchingImageLayers(project, obj)) {
-      const effectiveLayer = { ...layer, ...(obj.operationOverride ?? {}) };
+      const effectiveLayer = effectiveOperationForObject(layer, obj);
       workUnits += rasterLayerWorkUnits(obj, effectiveLayer, project);
     }
   }
@@ -55,6 +56,6 @@ function matchingImageLayers(project: Project, obj: RasterImage): Layer[] {
     .filter(
       (layer) =>
         sceneObjectUsesOperation(obj, layer) &&
-        (obj.operationOverride?.mode ?? layer.mode) === 'image',
+        effectiveOperationForObject(layer, obj).mode === 'image',
     );
 }
