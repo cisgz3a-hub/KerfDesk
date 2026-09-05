@@ -8,17 +8,17 @@
 // Arrows go on CUTTING moves only. Rapids already read as direction-agnostic
 // traversal, and arrowing them would triple the clutter for no information.
 
-import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
+import { SEG_KIND, SEG_MOTION, type GcodeRenderModel } from '../../core/gcode-view';
 
 export type ArrowPlacement = {
-  /** Midpoint of the segment the arrow marks. */
+  /** Position sampled by distance along the cutting route. */
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   /** Unit direction of travel. */
   readonly direction: { readonly x: number; readonly y: number; readonly z: number };
 };
 
-/** Below this a segment is too short to carry a readable arrowhead. */
-const MIN_SEGMENT_MM = 0.5;
+/** Keep arrowheads readable without discarding finely sampled cutting motion. */
+const MIN_ARROW_SPACING_MM = 0.5;
 /** Roughly one arrow per this much cut path, so density suits the job size. */
 const TARGET_ARROWS = 60;
 
@@ -30,22 +30,34 @@ const TARGET_ARROWS = 60;
 export function directionArrows(model: GcodeRenderModel): ReadonlyArray<ArrowPlacement> {
   const cutLength = cutPathLength(model);
   if (cutLength <= 0) return [];
-  const spacing = cutLength / TARGET_ARROWS;
+  const spacing = Math.max(MIN_ARROW_SPACING_MM, cutLength / TARGET_ARROWS);
   const arrows: ArrowPlacement[] = [];
-  let sinceLast = spacing; // place one at the first eligible move
+  let travelledMm = 0;
+  let nextArrowMm = spacing / 2;
   for (let index = 0; index < model.segmentCount; index += 1) {
     if (!isCutting(model, index)) continue;
     const span = segmentSpan(model, index);
-    if (span.length < MIN_SEGMENT_MM) continue;
-    sinceLast += span.length;
-    if (sinceLast < spacing) continue;
-    sinceLast = 0;
-    arrows.push({ position: span.midpoint, direction: span.direction });
+    if (span.length <= 0) continue;
+    const endMm = travelledMm + span.length;
+    while (nextArrowMm <= endMm) {
+      const offsetMm = nextArrowMm - travelledMm;
+      arrows.push({
+        position: {
+          x: span.start.x + span.direction.x * offsetMm,
+          y: span.start.y + span.direction.y * offsetMm,
+          z: span.start.z + span.direction.z * offsetMm,
+        },
+        direction: span.direction,
+      });
+      nextArrowMm = (arrows.length + 0.5) * spacing;
+    }
+    travelledMm = endMm;
   }
   return arrows;
 }
 
 function isCutting(model: GcodeRenderModel, index: number): boolean {
+  if (model.segMotion[index] === SEG_MOTION.rapid) return false;
   const kind = model.segKind[index];
   return kind === SEG_KIND.cut || kind === SEG_KIND.plunge;
 }
@@ -63,7 +75,7 @@ function segmentSpan(
   index: number,
 ): {
   readonly length: number;
-  readonly midpoint: { readonly x: number; readonly y: number; readonly z: number };
+  readonly start: { readonly x: number; readonly y: number; readonly z: number };
   readonly direction: { readonly x: number; readonly y: number; readonly z: number };
 } {
   const base = index * 6;
@@ -80,7 +92,7 @@ function segmentSpan(
   const scale = length > 0 ? 1 / length : 0;
   return {
     length,
-    midpoint: { x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2 },
+    start: { x: x0, y: y0, z: z0 },
     direction: { x: dx * scale, y: dy * scale, z: dz * scale },
   };
 }

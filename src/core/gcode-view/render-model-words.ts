@@ -22,7 +22,7 @@ export type RenderModal = {
   coolantFlood: boolean;
   plane: 17 | 18 | 19;
   ended: boolean;
-  /** Active canned drilling cycle (G73/G81/G82/G83); null after G80. */
+  /** Active canned drilling cycle; G80 and ordinary motion cancel it. */
   cycle: CannedCycle | null;
   /** G98 (retract to initial Z) or G99 (retract to R plane). */
   retractMode: RetractMode;
@@ -30,6 +30,8 @@ export type RenderModal = {
   cycleR: number | null;
   cycleZ: number | null;
   cycleQ: number | null;
+  /** Sticky G82 bottom dwell, in seconds. */
+  cycleP: number | null;
   /** Z the tool sat at when the cycle began: the G98 retract height. */
   cycleInitialZ: number;
 };
@@ -114,6 +116,9 @@ export function applyLineWords(
   const context: WordApplicationContext = { modal, linePower, line, accounting, tally };
   for (const word of words) applyOneWord(word, context);
   resolveDwell(tally, line, accounting);
+  if (modal.cycle === 82 && !tally.sawDwell && tally.dwellSeconds !== null) {
+    modal.cycleP = tally.dwellSeconds;
+  }
   const homeAxes = resolveHome(tally, line, accounting);
   const lineMotion: LineMotionPresence =
     tally.axisWords.size > 0 ? 'with-motion-words' : 'without-motion-words';
@@ -216,6 +221,8 @@ function applyGWord(
   accounting: WordAccounting,
 ): WordOutcome {
   if (applySharedGCode(modal, code)) {
+    // G0/G1/G2/G3 replace the active group-1 cycle before axes are emitted.
+    if (code === 0 || code === 1 || code === 2 || code === 3) modal.cycle = null;
     pushUnitsEvent(code, line, accounting);
     return 'modal';
   }
