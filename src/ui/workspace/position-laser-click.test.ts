@@ -1,5 +1,5 @@
 import fc from 'fast-check';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile, type Origin } from '../../core/devices';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -74,20 +74,22 @@ describe('clampToBed / positionLaserFeed', () => {
 });
 
 describe('dispatchPositionLaser', () => {
+  const initial = useLaserStore.getState();
+  afterEach(() => useLaserStore.setState(initial, true));
   beforeEach(() => {
     useToastStore.setState({ toasts: [] });
   });
 
   it('refuses with a toast when the machine is not connected', () => {
-    const jog = vi.fn();
-    useLaserStore.setState({ connection: { kind: 'disconnected' }, jog });
+    const jogToMachinePosition = vi.fn();
+    useLaserStore.setState({ connection: { kind: 'disconnected' }, jogToMachinePosition });
     dispatchPositionLaser({ x: 10, y: 10 }, DEFAULT_DEVICE_PROFILE);
-    expect(jog).not.toHaveBeenCalled();
+    expect(jogToMachinePosition).not.toHaveBeenCalled();
     expect(useToastStore.getState().toasts[0]?.message).toContain('Connect the machine');
   });
 
   it('sends one absolute jog to the mapped machine point when ready', () => {
-    const jog = vi.fn(async () => undefined);
+    const jogToMachinePosition = vi.fn(async () => undefined);
     useLaserStore.setState({
       connection: { kind: 'connected' },
       streamer: null,
@@ -101,16 +103,11 @@ describe('dispatchPositionLaser', () => {
         spindle: null,
         wco: null,
       },
-      jog,
+      jogToMachinePosition,
     });
     const device = deviceWith('rear-left'); // identity origin transform
     dispatchPositionLaser({ x: 12.5, y: 40 }, device);
-    expect(jog).toHaveBeenCalledTimes(1);
-    expect(jog).toHaveBeenCalledWith({
-      dx: 12.5,
-      dy: 40,
-      feed: positionLaserFeed(device.maxFeed),
-      relative: false,
-    });
+    expect(jogToMachinePosition).toHaveBeenCalledTimes(1);
+    expect(jogToMachinePosition).toHaveBeenCalledWith(12.5, 40, positionLaserFeed(device.maxFeed));
   });
 });

@@ -3,36 +3,57 @@ import { helpProps } from '../help/help-topics';
 import { useLaserStore } from '../state/laser-store';
 import type { SerialTranscriptEntry } from '../state/laser-transcript';
 import { ConsoleCommandDeck } from './console/ConsoleCommandDeck';
+import { useTranscriptCopy } from './console/use-transcript-copy';
 
 export function ConsolePanel(): JSX.Element {
   const transcript = useLaserStore((state) => state.transcript);
   const clearTranscript = useLaserStore((state) => state.clearTranscript);
   const [showStatus, setShowStatus] = useState(false);
   const [showStream, setShowStream] = useState(false);
+  const { copyState, manualText, copy, reset } = useTranscriptCopy();
   const visible = useMemo(
     () => visibleEntries(transcript, { showStatus, showStream }),
     [transcript, showStatus, showStream],
   );
-
-  const handleCopy = (): void => {
-    void navigator.clipboard?.writeText(visible.map(formatTranscriptLine).join('\n'));
-  };
 
   return (
     <section style={panelStyle} aria-label="GRBL console" {...helpProps('control:laser.console')}>
       <ConsoleHeader
         visibleCount={visible.length}
         transcriptCount={transcript.length}
-        onCopy={handleCopy}
-        onClear={clearTranscript}
+        onCopy={() => void copy(visible.map(formatTranscriptLine).join('\n'))}
+        copyState={copyState}
+        onClear={() => {
+          reset();
+          clearTranscript();
+        }}
       />
       <ConsoleFilters
         showStatus={showStatus}
         showStream={showStream}
-        onShowStatus={setShowStatus}
-        onShowStream={setShowStream}
+        onShowStatus={(value) => {
+          reset();
+          setShowStatus(value);
+        }}
+        onShowStream={(value) => {
+          reset();
+          setShowStream(value);
+        }}
       />
       <ConsoleTranscript visible={visible} />
+      {copyState === 'manual' ? (
+        <label>
+          Clipboard access failed. Select and copy this transcript manually.
+          <textarea
+            readOnly
+            aria-label="Console transcript to copy manually"
+            title="Select this transcript and copy it manually."
+            value={manualText}
+            onFocus={(event) => event.currentTarget.select()}
+            style={{ width: '100%', minHeight: 90, boxSizing: 'border-box' }}
+          />
+        </label>
+      ) : null}
       <div style={commandDeckWrapStyle}>
         <ConsoleCommandDeck enableHistory={false} ariaLabel="Docked console commands" />
       </div>
@@ -44,6 +65,7 @@ function ConsoleHeader(props: {
   readonly visibleCount: number;
   readonly transcriptCount: number;
   readonly onCopy: () => void;
+  readonly copyState: 'idle' | 'copying' | 'copied' | 'manual';
   readonly onClear: () => void;
 }): JSX.Element {
   const copyHelp = helpProps('control:laser.console.copy');
@@ -55,11 +77,15 @@ function ConsoleHeader(props: {
         <button
           type="button"
           onClick={props.onCopy}
-          disabled={props.visibleCount === 0}
+          disabled={props.visibleCount === 0 || props.copyState === 'copying'}
           title={copyHelp.title}
           data-help-id={copyHelp['data-help-id']}
         >
-          Copy visible
+          {props.copyState === 'copied'
+            ? 'Copied'
+            : props.copyState === 'copying'
+              ? 'Copying…'
+              : 'Copy visible'}
         </button>
         <button
           type="button"

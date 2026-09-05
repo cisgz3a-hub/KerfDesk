@@ -17,8 +17,14 @@ export function useSceneSync(args: {
   readonly live: { readonly x: number; readonly y: number; readonly z: number } | null;
   /** Direction arrowheads, or null when the overlay is off. */
   readonly arrows: ReadonlyArray<ArrowPlacement> | null;
+  readonly travelVisible: boolean;
 }): void {
-  const { handleRef, state, playhead, colorOf, live, arrows } = args;
+  const { handleRef, state, playhead, colorOf, live, arrows, travelVisible } = args;
+
+  useEffect(() => {
+    if (state !== 'ready') return;
+    handleRef.current?.setTravelVisible(travelVisible);
+  }, [handleRef, state, travelVisible]);
 
   // Initial geometry owns the preparing phase. Sync once after ready so these
   // effects do not redraw the same scene both before and after publication.

@@ -1,6 +1,11 @@
 # Audit remediation ledger
 
-Current checkpoint, 2026-09-04: `ade9` remains the sole implementation worktree. The active
+Current integration owner, 2026-09-05: `codex/feature-quality-controller-20260905`.
+The active scope is the 31 confirmed September 5 feature-code findings, with three bounded
+implementation branches plus the controller/integration branch and overlapping surfacing PR #728. Earlier checkpoints below are
+historical; their unrelated pending work and PRs are not part of this remediation.
+
+Historical checkpoint, 2026-09-04: `ade9` remains the sole implementation worktree. The active
 `codex/fix-variable-effective-settings-20260902` slice starts from live main
 `59bc989e829aff5a9edce957857135b09bbefaa8`. Its UA8-VAR06 and regenerated-path binding fixes
 passed the full local release gate below; hosted integration for this slice is not yet complete.
@@ -989,3 +994,29 @@ and missing-glyph cases below.
   precedes result/stdout/stderr preservation, and the `finally` removes the temporary evidence.
   Failed run artifact `9840872041` consequently contains only the readiness report. Preserve failure
   evidence before cleanup in the narrowly scoped repair; no private execution archive is involved.
+
+## 2026-09-05 feature audit remediation
+
+Authorized scope: implement the 31 confirmed findings, create scoped PRs, and merge to main after
+verification. Baseline `ccaa3064d9efe904821307f0603ce842d903b586`, website v0.1.1962.
+Inventory: `docs/audits/2026-09-05-feature-remediation/README.md`.
+
+The original LaserForge-2.0 checkout remains on `claude/vcarve-stamp-subcell` at
+`9209fcb33f4807ebfc1f7a55780069b6a7b0e23c`. Its inherited source edits and untracked evidence are
+preserved. Implementation occurs only in isolated feature-quality worktrees. No hardware operation
+or manual publication is part of this slice.
+
+| Lane | Findings | Branch | PR / current evidence |
+|---|---|---|---|
+| Images | 7 | `codex/feature-quality-images-20260905` | PR #729; 48 files / 324 focused tests plus type/lint/format passed; hosted checks pending |
+| Settings/calibration/camera | 7 | `codex/feature-quality-settings-20260905` | PR #730; 18 files / 98 distinct focused tests plus type/lint/format passed; hosted checks pending |
+| Geometry/text/design | 9 | `codex/feature-quality-geometry-20260905` | PR #731; focused regression/output suites, type/lint/format passed; hosted checks pending |
+| Controller/workspace/jigs | 7 | `codex/feature-quality-controller-20260905` | Regression fixtures, neighboring suites and final type/lint/format passed; full local gate in progress |
+| Surfacing | 1 | `codex/first100-surfacing` (existing owner) | PR #728 independently rechecked against F22-1; duplicate implementation paused and preserved |
+
+Completion requires reconciliation of these four branches plus PR #728 and exact-main checks. Existing unrelated
+open PRs remain outside this inventory. Per-lane notes distinguish source, DOM/simulated transport,
+browser and physical evidence. Frame-only Start and warning policy are unchanged.
+
+Preservation was rechecked on 2026-09-05: all 25 inherited working files and all 4,602 archived
+source files matched their recorded hashes. The original branch and HEAD above were unchanged.

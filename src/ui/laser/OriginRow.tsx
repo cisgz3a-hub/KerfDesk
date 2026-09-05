@@ -11,6 +11,7 @@ import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
 import { reportedWorkOffsetMm } from '../state/infer-machine-position';
+import { OriginTransactionCancelledError } from '../state/laser-origin-transaction';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset that clears G92), so confirm and spell out the correct order:
@@ -173,17 +174,21 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
 } {
   return {
     onSet: () => {
-      void deps.setOrigin().then(() => {
-        deps.setJobPlacement({ startFrom: 'user-origin' });
-        deps.pushToast('Origin set to current head position (G92).', 'success');
-      });
+      void deps
+        .setOrigin()
+        .then(() => {
+          deps.setJobPlacement({ startFrom: 'user-origin' });
+          deps.pushToast('Origin set to current head position (G92).', 'success');
+        })
+        .catch(reportOriginActionFailure);
     },
     onReset: () => {
       void deps
         .resetOrigin()
         .then(() =>
           deps.pushToast('Work origin cleared — back to machine zero (G92.1).', 'success'),
-        );
+        )
+        .catch(reportOriginActionFailure);
     },
     onRelease: () => {
       if (!jobAwareConfirm(RELEASE_MOTORS_CONFIRM)) return;
@@ -194,9 +199,17 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
             'Motors released ($SLP). Move the head by hand, then Wake and Set origin again.',
             'success',
           ),
-        );
+        )
+        .catch(reportOriginActionFailure);
     },
   };
+}
+
+function reportOriginActionFailure(error: unknown): void {
+  // Session retirement is intentional and cannot produce a current success.
+  if (error instanceof OriginTransactionCancelledError) return;
+  const message = error instanceof Error ? error.message : String(error);
+  useToastStore.getState().pushToast(`Origin action failed: ${message}`, 'error');
 }
 
 function GoToWorkZeroButton(props: {
@@ -251,14 +264,18 @@ function AdvancedOriginControls(props: {
   const pushToast = useToastStore((s) => s.pushToast);
   const onSetPersistent = (): void => {
     if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
-    void setPersistentOrigin().then(() => {
-      setJobPlacement({ startFrom: 'user-origin' });
-      pushToast('Persistent G54 origin set to current head position.', 'success');
-    });
+    void setPersistentOrigin()
+      .then(() => {
+        setJobPlacement({ startFrom: 'user-origin' });
+        pushToast('Persistent G54 origin set to current head position.', 'success');
+      })
+      .catch(reportOriginActionFailure);
   };
   const onClearPersistent = (): void => {
     if (!jobAwareConfirm(CLEAR_PERSISTENT_ORIGIN_CONFIRM)) return;
-    void clearPersistentOrigin().then(() => pushToast('Persistent G54 origin cleared.', 'success'));
+    void clearPersistentOrigin()
+      .then(() => pushToast('Persistent G54 origin cleared.', 'success'))
+      .catch(reportOriginActionFailure);
   };
   const persistentDisabled = props.busy || !props.persistentOriginReady;
   const setTitle = props.persistentOriginReady

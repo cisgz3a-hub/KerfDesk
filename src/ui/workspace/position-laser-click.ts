@@ -1,8 +1,9 @@
 // position-laser-click — the "Move laser here" tool's click handler (ADR-116
 // follow-up). A canvas click becomes an absolute, beam-off jog to that bed
 // point: scene mm → clamp inside the bed → the SAME origin transform G-code
-// emission uses (origin honesty, non-negotiable #2) → $J=G90 through the
-// laser store's fully-gated jog path. With the camera overlay visible this is
+// emission uses (origin honesty, non-negotiable #2) → the laser store's
+// machine-position jog path, including work-offset conversion and CNC safe Z.
+// With the camera overlay visible this is
 // "click the object in the camera image, the head moves to it".
 
 import { toMachineCoords } from '../../core/devices';
@@ -51,12 +52,7 @@ export function dispatchPositionLaser(scenePoint: Vec2, device: DeviceProfile): 
   }
   const target = positionLaserTarget(scenePoint, device);
   void laser
-    .jog({
-      dx: target.x,
-      dy: target.y,
-      feed: positionLaserFeed(device.maxFeed),
-      relative: false,
-    })
+    .jogToMachinePosition(target.x, target.y, positionLaserFeed(device.maxFeed))
     .catch(() => {
       // The jog path surfaces write failures through the transcript/safety
       // notice; the click itself must never throw into React.
