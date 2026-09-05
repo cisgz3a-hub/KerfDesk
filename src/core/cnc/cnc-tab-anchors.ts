@@ -12,6 +12,11 @@ import {
 const EPS = 1e-9;
 
 type Projection = { readonly point: Vec2; readonly pathT: number; readonly distanceSq: number };
+type EdgeProjection = {
+  readonly point: Vec2;
+  readonly edgeT: number;
+  readonly distanceSq: number;
+};
 type MeasuredEdge = {
   readonly start: Vec2;
   readonly end: Vec2;
@@ -81,11 +86,11 @@ export function projectCncTabAnchor(
     for (let polylineIndex = 0; polylineIndex < polylines.length; polylineIndex += 1) {
       const polyline = polylines[polylineIndex];
       if (polyline === undefined || !polyline.closed) continue;
-      const transformed: Polyline = {
-        closed: true,
-        points: polyline.points.map((point) => applyTransform(point, object.transform)),
-      };
-      const candidate = projectPointToPolyline(transformed, scenePoint);
+      const candidate = projectPointToMeasuredPolyline(
+        measurePolyline(polyline),
+        scenePoint,
+        object.transform,
+      );
       if (candidate !== null && (best === null || candidate.distanceSq < best.distanceSq)) {
         best = { ...candidate, pathIndex, polylineIndex };
       }
@@ -101,12 +106,28 @@ export function projectCncTabAnchor(
 }
 
 export function projectPointToPolyline(polyline: Polyline, point: Vec2): Projection | null {
-  const measure = measurePolyline(polyline);
+  return projectPointToMeasuredPolyline(measurePolyline(polyline), point);
+}
+
+function projectPointToMeasuredPolyline(
+  measure: PolylineMeasure | null,
+  point: Vec2,
+  transform?: SceneObject['transform'],
+): Projection | null {
   if (measure === null) return null;
   let best: Projection | null = null;
   for (const edge of measure.edges) {
-    const candidate = projectPointToEdge(point, edge, measure.total);
-    if (best === null || candidate.distanceSq < best.distanceSq) best = candidate;
+    const start = transform === undefined ? edge.start : applyTransform(edge.start, transform);
+    const end = transform === undefined ? edge.end : applyTransform(edge.end, transform);
+    const candidate = projectPointToEdge(point, start, end);
+    if (candidate === null || (best !== null && candidate.distanceSq >= best.distanceSq)) continue;
+    // Choose the nearest edge in the cursor's scene frame, but persist its
+    // fraction of the original local perimeter, as cncTabAnchorPosition reads it.
+    best = {
+      point: candidate.point,
+      pathT: (edge.startDistance + edge.length * candidate.edgeT) / measure.total,
+      distanceSq: candidate.distanceSq,
+    };
   }
   return best;
 }
@@ -142,20 +163,19 @@ function measurePolyline(polyline: Polyline): PolylineMeasure | null {
   return total <= EPS ? null : { edges, total, first };
 }
 
-function projectPointToEdge(point: Vec2, edge: MeasuredEdge, total: number): Projection {
-  const dx = edge.end.x - edge.start.x;
-  const dy = edge.end.y - edge.start.y;
+function projectPointToEdge(point: Vec2, start: Vec2, end: Vec2): EdgeProjection | null {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq <= EPS * EPS) return null;
   const edgeT = Math.max(
     0,
-    Math.min(
-      1,
-      ((point.x - edge.start.x) * dx + (point.y - edge.start.y) * dy) / (edge.length * edge.length),
-    ),
+    Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq),
   );
-  const projected = interpolate(edge.start, edge.end, edgeT);
+  const projected = interpolate(start, end, edgeT);
   return {
     point: projected,
-    pathT: (edge.startDistance + edge.length * edgeT) / total,
+    edgeT,
     distanceSq: (point.x - projected.x) ** 2 + (point.y - projected.y) ** 2,
   };
 }
