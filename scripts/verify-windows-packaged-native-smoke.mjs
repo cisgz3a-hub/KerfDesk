@@ -40,13 +40,14 @@ async function runCli() {
   await mkdir(userData, { recursive: true });
   try {
     const processResult = await launch(executable, userData, resultPath, args.timeoutMs);
-    const parsed = JSON.parse(await readFile(resultPath, 'utf8'));
-    validateNativeSmokeResult(parsed, userData);
-    if (processResult.code !== 0) throw new Error(`packaged app exited ${processResult.code}`);
     await mkdir(output, { recursive: true });
-    await copyFile(resultPath, resolve(output, 'native-smoke-result.json'));
     await writeFile(resolve(output, 'native-smoke-stdout.txt'), processResult.stdout, 'utf8');
     await writeFile(resolve(output, 'native-smoke-stderr.txt'), processResult.stderr, 'utf8');
+    const rawResult = await readFile(resultPath, 'utf8');
+    await copyFile(resultPath, resolve(output, 'native-smoke-result.json'));
+    const parsed = JSON.parse(rawResult);
+    validateNativeSmokeResult(parsed, userData);
+    if (processResult.code !== 0) throw new Error(`packaged app exited ${processResult.code}`);
     process.stdout.write('NATIVE_SMOKE_EXIT=0\nNATIVE_SMOKE_OK=true\n');
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -60,7 +61,7 @@ async function launch(executable, userData, resultPath, timeoutMs) {
       `--kerfdesk-native-smoke-user-data=${userData}`,
       `--kerfdesk-native-smoke-result=${resultPath}`,
     ],
-    { cwd: dirname(executable), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
+    nativeSmokeLaunchOptions(executable),
   );
   let stdout = '';
   let stderr = '';
@@ -83,6 +84,12 @@ async function launch(executable, userData, resultPath, timeoutMs) {
     });
   });
   return { code, stdout, stderr };
+}
+
+export function nativeSmokeLaunchOptions(executable) {
+  // This smoke proves the packaged BrowserWindow becomes visible. STARTF_USESHOWWINDOW/SW_HIDE
+  // can override Electron's window.show() on Windows and would invalidate that observation.
+  return { cwd: dirname(executable), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: false };
 }
 
 function parseArgs(args) {

@@ -147,10 +147,18 @@ const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
     await delay(50);
   }
   if (!saved.includes('native-smoke.svg')) throw new Error('imported SVG was absent from saved project');
+  let savedSchemaVersion = null;
+  try {
+    const savedProject = JSON.parse(saved);
+    savedSchemaVersion = savedProject?.schemaVersion ?? null;
+  } catch {
+    // The result below reports an invalid save without hiding the other smoke evidence.
+  }
   return {
     readyToShow: true,
     imported: true,
-    saved: saved.includes('"schemaVersion": 4'),
+    saved: Number.isSafeInteger(savedSchemaVersion) && savedSchemaVersion > 0,
+    savedSchemaVersion,
     savedBytes: saved.length,
     title: document.title,
     url: location.href,
