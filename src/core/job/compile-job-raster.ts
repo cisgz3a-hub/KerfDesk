@@ -18,7 +18,10 @@ import {
   type RasterImage,
   type SceneObject,
 } from '../scene';
-import { effectiveOperationForObject } from '../scene/effective-operation';
+import {
+  effectiveOperationForObject,
+  operationOverrideForObject,
+} from '../scene/effective-operation';
 import type { JobDiagnostic, RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
@@ -135,7 +138,7 @@ function compileRasterGroup(
     power: powerPercent,
     speed: Math.min(layer.speed, device.maxFeed),
     ...(layer.speed <= device.maxFeed ? {} : { requestedSpeed: layer.speed }),
-    ...(obj.operationOverride === undefined
+    ...(operationOverrideForObject(layer, obj) === undefined
       ? {}
       : { operationSettings: captureLayerOperationSettings(layer) }),
     passes: Math.max(1, Math.floor(layer.passes)),

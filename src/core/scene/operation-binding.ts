@@ -1,4 +1,4 @@
-import type { Layer } from './layer';
+import { layerSubLayerOperationId, type Layer } from './layer';
 import type { ColoredPath, SceneObject } from './scene-object';
 
 type OperationIdentity = Pick<Layer, 'id' | 'color' | 'bindingOperationId'>;
@@ -81,7 +81,12 @@ export function replaceSceneObjectOperationBinding(
   replacementOperationId: string,
   operations: ReadonlyArray<Layer>,
 ): SceneObject {
-  return transformOperationBindings(object, operations, (ids) =>
+  const scoped = remapObjectOperationOverride(
+    object,
+    expandedOperationIdMap(operations, new Map([[sourceOperationId, replacementOperationId]])),
+    true,
+  );
+  return transformOperationBindings(scoped, operations, (ids) =>
     ids.map((id) => (id === sourceOperationId ? replacementOperationId : id)),
   );
 }
@@ -91,7 +96,12 @@ export function removeSceneObjectOperationBinding(
   operationId: string,
   operations: ReadonlyArray<Layer>,
 ): SceneObject | null {
-  const next = transformOperationBindings(object, operations, (ids) =>
+  const scoped = remapObjectOperationOverride(
+    object,
+    expandedOperationIdMap(operations, new Map([[operationId, null]])),
+    true,
+  );
+  const next = transformOperationBindings(scoped, operations, (ids) =>
     ids.filter((id) => id !== operationId),
   );
   return hasExplicitOperationBinding(next) ? next : null;
@@ -112,20 +122,74 @@ export function remapSceneObjectOperationBindings(
   sourceOperations: ReadonlyArray<Layer>,
   operationIdMap: ReadonlyMap<string, string>,
 ): SceneObject {
+  const scoped = remapObjectOperationOverride(
+    object,
+    expandedOperationIdMap(sourceOperations, operationIdMap),
+    false,
+  );
   const objectOperationIds = object.operationIds?.flatMap((id) => mappedId(id, operationIdMap));
   if (!('paths' in object)) {
     const sourceIds =
       objectOperationIds ?? mappedObjectOperationIds(object, sourceOperations, operationIdMap);
-    return sourceIds.length === 0 ? object : { ...object, operationIds: sourceIds };
+    return sourceIds.length === 0 ? scoped : { ...scoped, operationIds: sourceIds };
   }
   const paths = object.paths.map((path) =>
     remapPathOperationBindings(object, path, sourceOperations, operationIdMap),
   );
   return {
-    ...object,
+    ...scoped,
     ...(objectOperationIds === undefined ? {} : { operationIds: objectOperationIds }),
     paths,
   } as SceneObject;
+}
+
+export function pruneSceneObjectOperationOverrides(
+  objects: ReadonlyArray<SceneObject>,
+  operations: ReadonlyArray<Layer>,
+): ReadonlyArray<SceneObject> {
+  const ids = expandedOperationIdMap(operations, new Map(operations.map(({ id }) => [id, id])));
+  let changed = false;
+  const next = objects.map((object) => {
+    if (Object.keys(object.operationOverride?.byOperation ?? {}).every((id) => ids.has(id)))
+      return object;
+    changed = true;
+    return remapObjectOperationOverride(object, ids, false);
+  });
+  return changed ? next : objects;
+}
+
+function expandedOperationIdMap(
+  operations: ReadonlyArray<Layer>,
+  operationIdMap: ReadonlyMap<string, string | null>,
+): ReadonlyMap<string, string | null> {
+  const expanded = new Map(operationIdMap);
+  for (const operation of operations) {
+    if (!operationIdMap.has(operation.id)) continue;
+    const target = operationIdMap.get(operation.id);
+    for (const subLayer of operation.subLayers) {
+      expanded.set(
+        layerSubLayerOperationId(operation.id, subLayer.id),
+        target == null ? null : layerSubLayerOperationId(target, subLayer.id),
+      );
+    }
+  }
+  return expanded;
+}
+
+function remapObjectOperationOverride(
+  object: SceneObject,
+  operationIdMap: ReadonlyMap<string, string | null>,
+  keepUnmapped: boolean,
+): SceneObject {
+  const override = object.operationOverride;
+  if (override?.byOperation === undefined) return object;
+  const byOperation = Object.fromEntries(
+    Object.entries(override.byOperation).flatMap(([id, settings]) => {
+      const target = operationIdMap.has(id) ? operationIdMap.get(id) : keepUnmapped ? id : null;
+      return target == null ? [] : [[target, settings]];
+    }),
+  );
+  return { ...object, operationOverride: { ...override, byOperation } };
 }
 
 function withoutPathOperationIds(path: ColoredPath): ColoredPath {

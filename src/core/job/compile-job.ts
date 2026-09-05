@@ -28,7 +28,10 @@ import {
   type Vec2,
   withClosingPoint,
 } from '../scene';
-import { effectiveOperationForObject } from '../scene/effective-operation';
+import {
+  effectiveOperationForObject,
+  operationOverrideForObject,
+} from '../scene/effective-operation';
 import { compileRasterGroupsForLayer } from './compile-job-raster';
 import { sharedObjectPowerScalePercent } from './compile-job-object-policy';
 import { compilationPolylines } from './compilation-polylines';
@@ -137,7 +140,7 @@ function compileVectorGroupsForLayer(
   priorityObjectId: string,
 ): VectorCompilation {
   const matchingObjects = objects.filter((obj) => vectorObjectMatchesLayer(obj, layer));
-  if (matchingObjects.every((obj) => obj.operationOverride === undefined)) {
+  if (matchingObjects.every((obj) => operationOverrideForObject(layer, obj) === undefined)) {
     return vectorGroupsForObjects(objects, matchingObjects, layer, device, priorityObjectId);
   }
 
@@ -167,7 +170,9 @@ function vectorGroupsForObjects(
   }
   const sharedScale = sharedObjectPowerScalePercent(matchingObjects);
   if (sharedScale !== undefined) {
-    const overrideSource = matchingObjects.find((object) => object.operationOverride !== undefined);
+    const overrideSource = matchingObjects.find(
+      (object) => operationOverrideForObject(layer, object) !== undefined,
+    );
     return vectorGroupsForLayer(
       sourceObjects,
       layer,

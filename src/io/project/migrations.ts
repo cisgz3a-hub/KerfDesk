@@ -27,6 +27,7 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   1: migrateV1ToV2,
   2: migrateV2OperationBindings,
   3: migrateV3ToV4,
+  4: (raw) => ({ ...raw, schemaVersion: 5 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

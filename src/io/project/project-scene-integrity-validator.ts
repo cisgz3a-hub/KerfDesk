@@ -1,4 +1,5 @@
 import { isObject } from './project-shape-primitives';
+import { validateOperationOverrideReferences } from './project-operation-override-validator';
 
 export const PROJECT_SCENE_LIMITS = {
   layers: 256,
@@ -57,7 +58,8 @@ function validateSceneIdentities(arrays: SceneArrays): string | null {
     validateUniqueIds(arrays.layers, 'scene.layers') ??
     validateUniqueLayerColors(arrays.layers) ??
     validateUniqueIds(arrays.groups, 'scene.groups') ??
-    validateGroupMembers(arrays.groups, objectIds)
+    validateGroupMembers(arrays.groups, objectIds) ??
+    validateOperationOverrideReferences(arrays.layers, arrays.objects)
   );
 }
 

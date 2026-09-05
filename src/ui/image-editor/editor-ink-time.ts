@@ -4,6 +4,7 @@
 // numbers only — the Job Review / live estimate stays the authority.
 
 import type { Project } from '../../core/scene';
+import { effectiveOperationForObject } from '../../core/effective-output';
 import { compositeSession } from './editor-session-layers';
 import type { EditorSession } from './editor-session';
 
@@ -82,7 +83,7 @@ function estimateSeconds(session: EditorSession, project: Project, scan: InkScan
       : project.scene.layers.find((candidate) => candidate.color === object.color);
   if (object === undefined || layer === undefined) return { kind: 'no-image-layer' };
   // Same per-object override rule as compile-job-object-policy.
-  const effective = { ...layer, ...object.operationOverride };
+  const effective = effectiveOperationForObject(layer, object);
   if (effective.mode !== 'image' || effective.speed <= 0 || effective.linesPerMm <= 0) {
     return { kind: 'no-image-layer' };
   }

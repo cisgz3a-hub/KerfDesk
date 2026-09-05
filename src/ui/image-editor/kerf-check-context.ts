@@ -12,6 +12,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import type { EditorSession } from './editor-session';
+import { effectiveOperationForObject } from '../../core/effective-output';
 
 /** Exact editor, output-scope, and scene ownership captured by one result. */
 export type KerfCheckContext = {
@@ -59,7 +60,7 @@ export function kerfCheckContext(
   const hasPositiveCorrection = layers.some((layer) =>
     outputOperationLayers(layer).some((operation) => {
       if (!operationUsesEditedRaster(operation, object)) return false;
-      const effective = effectiveOperation(operation, object);
+      const effective = effectiveOperationForObject(operation, object);
       return Number.isFinite(effective.dotWidthCorrectionMm) && effective.dotWidthCorrectionMm > 0;
     }),
   );
@@ -135,16 +136,10 @@ function outputPlacementIdentity(jobPlacement: JobPlacementSettings): string {
 
 function operationUsesEditedRaster(operation: Layer, object: RasterImage): boolean {
   if (!sceneObjectUsesOperation(object, operation)) return false;
-  const effective = effectiveOperation(operation, object);
+  const effective = effectiveOperationForObject(operation, object);
   return (
     effective.mode === 'image' && Number.isFinite(effective.linesPerMm) && effective.linesPerMm > 0
   );
-}
-
-function effectiveOperation(operation: Layer, object: RasterImage): Layer {
-  return object.operationOverride === undefined
-    ? operation
-    : { ...operation, ...object.operationOverride };
 }
 
 function sameLayerIdentities(left: ReadonlyArray<Layer>, right: ReadonlyArray<Layer>): boolean {

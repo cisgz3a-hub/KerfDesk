@@ -10,6 +10,7 @@ import {
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
+import { effectiveOperationForObject } from '../../core/effective-output';
 
 export function IslandFillRecoveryAction({
   streaming,
@@ -91,8 +92,7 @@ function hasPotentialSensitiveIslandFillRisk(project: Project): boolean {
   return project.scene.objects.some((object) =>
     operations.some((layer) => {
       if (!sceneObjectUsesOperation(object, layer)) return false;
-      const settings =
-        object.operationOverride === undefined ? layer : { ...layer, ...object.operationOverride };
+      const settings = effectiveOperationForObject(layer, object);
       return settings.mode === 'fill' && settings.fillStyle === 'island';
     }),
   );

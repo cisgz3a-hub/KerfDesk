@@ -279,9 +279,11 @@ function prepareIndependentArtwork(
   artwork: ImportedSvg,
   source: SceneObject | undefined,
 ): { readonly scene: Scene; readonly object: ImportedSvg } {
-  const seed = createArtworkOperation(scene, artwork);
   const sourceOperation =
     source === undefined ? null : primaryOperationForObject(source, scene.layers);
+  const seed = createArtworkOperation(scene, artwork, {
+    subLayers: sourceOperation?.subLayers ?? [],
+  });
   const operation: Layer =
     sourceOperation === null
       ? seed.operation

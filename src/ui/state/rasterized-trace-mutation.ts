@@ -20,6 +20,10 @@ import {
   type TraceExistingImageOptions,
 } from './scene-mutations';
 import { releaseTraceSourcePalette } from './trace-source-palette';
+import {
+  effectiveOperationForObject,
+  operationOverrideForObject,
+} from '../../core/effective-output';
 
 /**
  * Atomically replace a trace result with an Image-pipeline raster.
@@ -111,7 +115,8 @@ function allocateFreshRasterOperation(
   const committed: RasterImage = {
     ...(created.object as RasterImage),
     operationOverride: {
-      ...(prepared.operationOverride ?? { negativeImage: false }),
+      ...operationOverrideForObject(ctx.fallbackLayer ?? created.operation, prepared),
+      negativeImage: false,
       // The fresh operation and this object override must both be Image mode or
       // a source `mode: line` override would silently suppress the raster output.
       mode: 'image',
@@ -139,6 +144,16 @@ function prepareRasterizedTrace(
   const settingsSource = source ?? raster;
   const operationOverride = {
     ...(settingsSource.operationOverride ?? {}),
+    ...(settingsSource.operationOverride?.byOperation === undefined
+      ? {}
+      : {
+          byOperation: Object.fromEntries(
+            Object.entries(settingsSource.operationOverride.byOperation).map(([id, settings]) => [
+              id,
+              { ...settings, negativeImage: false },
+            ]),
+          ),
+        }),
     // Trace preview is black ink on white. A negative source layer is valid
     // for a photo but would invert this binary result into a burned backdrop.
     negativeImage: false,
@@ -161,7 +176,7 @@ function reusableImageOperationIds(scene: Scene, source: RasterImage): ReadonlyA
       activeOperationVariants(layer).some(
         (operation) =>
           sceneObjectUsesOperation(source, operation) &&
-          (source.operationOverride?.mode ?? operation.mode) === 'image',
+          effectiveOperationForObject(operation, source).mode === 'image',
       ),
     )
     .map((layer) => layer.id);
@@ -212,5 +227,5 @@ function inheritedOperationSettings(
   layer: Layer | undefined,
 ): LayerOperationSettings | null {
   if (source === undefined || layer === undefined) return null;
-  return captureLayerOperationSettings({ ...layer, ...(source.operationOverride ?? {}) });
+  return captureLayerOperationSettings(effectiveOperationForObject(layer, source));
 }

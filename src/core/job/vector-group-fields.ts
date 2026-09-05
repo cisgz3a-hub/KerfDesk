@@ -1,4 +1,5 @@
 import type { DeviceProfile } from '../devices';
+import { operationOverrideForObject } from '../effective-output';
 import { captureLayerOperationSettings, type Layer, type SceneObject } from '../scene';
 import type { CutGroup } from './job';
 import { effectiveObjectPowerPercent } from './object-power-scale';
@@ -21,7 +22,8 @@ export function commonVectorGroupFields(
     ...(layer.powerMode !== undefined ? { powerMode: layer.powerMode } : {}),
     speed,
     ...(speed === layer.speed ? {} : { requestedSpeed: layer.speed }),
-    ...('operationOverride' in powerSource && powerSource.operationOverride !== undefined
+    ...('operationOverride' in powerSource &&
+    operationOverrideForObject(layer, powerSource) !== undefined
       ? { operationSettings: captureLayerOperationSettings(layer) }
       : {}),
     passes: Math.max(1, Math.floor(layer.passes)),

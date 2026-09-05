@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, PROJECT_SCHEMA_VERSION } from '../../core/scene';
+import { createProject } from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
 
 describe('project machine profile IO', () => {
   it('back-fills missing no-go zones on old .lf2 files', () => {
     const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION - 1,
+      schemaVersion: 3, // This legacy shape predates the required v4 jobSetup.
       device: {
         name: 'Old Profile',
         bedWidth: 300,

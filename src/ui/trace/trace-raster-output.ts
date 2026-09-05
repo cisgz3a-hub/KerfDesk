@@ -1,4 +1,5 @@
 import { MAX_RASTER_LINES_PER_MM, MM_PER_INCH, linesPerMmToDpi } from '../../core/raster';
+import { effectiveOperationForObject } from '../../core/effective-output';
 import {
   layerFromSubLayer,
   sceneObjectUsesOperation,
@@ -58,13 +59,13 @@ function imageOperationInputs(
 ): ReadonlyArray<RasterTraceOperationInput> {
   if (!sourceLayer.output || !sceneObjectUsesOperation(source, sourceLayer)) return [];
   const operations: RasterTraceOperationInput[] = [];
-  if ((source.operationOverride?.mode ?? sourceLayer.mode) === 'image') {
+  if (effectiveOperationForObject(sourceLayer, source).mode === 'image') {
     operations.push({ operation: sourceLayer, sourceLayer });
   }
   for (const sourceSubLayer of sourceLayer.subLayers) {
     if (!sourceSubLayer.enabled) continue;
     const operation = layerFromSubLayer(sourceLayer, sourceSubLayer);
-    if ((source.operationOverride?.mode ?? operation.mode) === 'image') {
+    if (effectiveOperationForObject(operation, source).mode === 'image') {
       operations.push({ operation, sourceLayer, sourceSubLayer });
     }
   }
@@ -103,7 +104,7 @@ export function rasterTraceLinesPerMm(
 ): number {
   if (operations.length === 0) throw new Error('Raster trace has no active Image operation.');
   const densities = operations.map((operation) =>
-    normalizedLinesPerMm(source.operationOverride?.linesPerMm ?? operation.linesPerMm),
+    normalizedLinesPerMm(effectiveOperationForObject(operation, source).linesPerMm),
   );
   if (!operations.some((operation) => effectivePassThrough(source, operation))) {
     return Math.max(...densities);
@@ -118,7 +119,7 @@ export function rasterTraceLinesPerMm(
 }
 
 function effectivePassThrough(source: RasterImage, operation: Layer): boolean {
-  return source.operationOverride?.passThrough ?? operation.passThrough;
+  return effectiveOperationForObject(operation, source).passThrough;
 }
 
 function nativeTraceLinesPerMm(source: RasterImage, traced: TracedImage): number {

@@ -1,1 +1,1 @@
-export { effectiveOperationForObject } from '../effective-output';
+export { effectiveOperationForObject, operationOverrideForObject } from '../effective-output';

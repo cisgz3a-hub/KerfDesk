@@ -19,6 +19,7 @@ import {
   type Vec2,
 } from '../scene';
 import { flattenColoredPathCurvesForTransform } from '../scene/curve-path';
+import { effectiveOperationForObject } from '../effective-output';
 import { sceneHasVCarveOutputLayer } from './vcarve-preparation-complexity';
 
 export const PREPARATION_RAW_VECTOR_SEGMENT_BUDGET = 100_000;
@@ -158,7 +159,7 @@ function cncDepthPassCount(layer: Layer): number {
 }
 
 function effectiveLayer(layer: Layer, object: SceneObject): Layer {
-  return object.operationOverride === undefined ? layer : { ...layer, ...object.operationOverride };
+  return effectiveOperationForObject(layer, object);
 }
 
 function countPathEstimatedHatches(path: ColoredPath, transform: Transform, layer: Layer): number {

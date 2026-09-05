@@ -7,7 +7,10 @@ import {
   type LayerMode,
   type SceneObject,
 } from '../../core/scene';
-import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import {
+  effectiveOperationForObject,
+  operationOverrideForObject,
+} from '../../core/scene/effective-operation';
 import { useStore } from '../state';
 import { CncLayerFields } from './CncLayerFields';
 import { CncSelectionDepthField } from './CncSelectionDepthField';
@@ -86,19 +89,14 @@ function SelectedOperationEditor(props: {
   const allObjects = useStore((state) => state.project.scene.objects);
   const layers = useStore((state) => state.project.scene.layers);
   const affected = operationArtworkCount(allObjects, props.active);
-  const selectedUsingActive = props.objects.filter((object) =>
-    operationIdsForObject(object, layers).includes(props.active.id),
-  ).length;
   const objectIds = props.objects.map((object) => object.id);
   const activeObjects = props.objects.filter((object) =>
     operationIdsForObject(object, layers).includes(props.active.id),
   );
-  const overrideEditing =
-    props.selectionActive && activeObjects.some((object) => object.operationOverride !== undefined);
-  const effectiveOperation =
-    overrideEditing && activeObjects[0] !== undefined
-      ? effectiveOperationForObject(props.active, activeObjects[0])
-      : props.active;
+  const overrideEditing = activeObjects.some(
+    (object) => operationOverrideForObject(props.active, object) !== undefined,
+  );
+  const effectiveOperation = effectiveOperationForObject(props.active, activeObjects[0] ?? {});
   return (
     <section
       aria-label={props.selectionActive ? 'Selected artwork operation' : 'Artwork operation'}
@@ -121,7 +119,7 @@ function SelectedOperationEditor(props: {
       ) : null}
       <OperationContextActions
         affected={affected}
-        selectedUsingActive={selectedUsingActive}
+        selectedUsingActive={activeObjects.length}
         onMakeUnique={() => makeUnique(objectIds, props.active.id)}
         onAdd={() => addOperation(objectIds)}
       />
@@ -133,6 +131,7 @@ function SelectedOperationEditor(props: {
           operation={effectiveOperation}
           baseOperation={props.active}
           editObjectOverride={overrideEditing}
+          objectIds={activeObjects.map((object) => object.id)}
           ariaContext={props.selectionActive ? 'selected objects' : 'inspected artwork'}
         />
       )}
@@ -186,10 +185,13 @@ function LaserOperationFields(props: {
   readonly operation: Layer;
   readonly baseOperation: Layer;
   readonly editObjectOverride: boolean;
+  readonly objectIds: ReadonlyArray<string>;
   readonly ariaContext: string;
 }): JSX.Element {
   const setLayerParam = useStore((state) => state.setLayerParam);
-  const setOverride = useStore((state) => state.setSelectedObjectsOperationOverride);
+  const setObjectsOverride = useStore((state) => state.setObjectsOperationOverrideForOperation);
+  const setOverride = (patch: Partial<ReturnType<typeof captureLayerOperationSettings>>): void =>
+    setObjectsOverride(props.objectIds, props.baseOperation.id, patch);
   const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
     useCutSettingsLauncher();
   const commit = (patch: Partial<ReturnType<typeof captureLayerOperationSettings>>): void => {

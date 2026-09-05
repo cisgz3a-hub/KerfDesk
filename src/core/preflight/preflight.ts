@@ -39,6 +39,7 @@ import {
 import { findNoGoZoneCollisions } from './no-go-zones';
 import { findRelativeMotionEnvelopeIssues } from './relative-motion-envelope';
 import { operationScanOffsetIssues } from './scan-offset-policy';
+import { effectiveOperationForObject, operationOverrideForObject } from '../effective-output';
 
 export type PreflightCode =
   | 'no-output-layer'
@@ -312,9 +313,9 @@ function openContourOverrideFillLabel(
   layer: Layer,
 ): string | null {
   for (const obj of objects) {
-    const override = obj.operationOverride;
+    const override = operationOverrideForObject(layer, obj);
     if (override === undefined) continue;
-    const effectiveLayer: Layer = { ...layer, ...override };
+    const effectiveLayer = effectiveOperationForObject(layer, obj);
     if (effectiveLayer.mode !== 'fill') continue;
     if (!objectHasOpenContourOnLayer(obj, effectiveLayer)) continue;
     if (effectiveLayer.fillStyle === 'offset') return 'Follow Shape';

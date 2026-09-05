@@ -3,4 +3,5 @@ export {
   effectiveObjectPowerPercent,
   effectiveOperationForObject,
   objectPowerScalePercent,
+  operationOverrideForObject,
 } from './effective-output';

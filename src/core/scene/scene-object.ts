@@ -87,7 +87,7 @@ export type Bounds = {
   readonly maxY: number;
 };
 
-export type ObjectOperationOverride = {
+export type ObjectOperationSettingsOverride = {
   readonly mode?: 'line' | 'fill' | 'image';
   readonly minPower?: number;
   readonly power?: number;
@@ -113,6 +113,12 @@ export type ObjectOperationOverride = {
   readonly negativeImage?: boolean;
   readonly passThrough?: boolean;
   readonly dotWidthCorrectionMm?: number;
+};
+
+export type ObjectOperationOverride = ObjectOperationSettingsOverride & {
+  // Schema v5: an operation-owned entry replaces the legacy artwork-wide
+  // override for this binding. Null explicitly inherits the operation base.
+  readonly byOperation?: Readonly<Record<string, ObjectOperationSettingsOverride | null>>;
 };
 
 export type ObjectPowerScale = {

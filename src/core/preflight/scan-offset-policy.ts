@@ -4,6 +4,7 @@ import {
 } from '../devices/scan-offset-profile';
 import { outputOperationLayers, sceneObjectUsesOperation, type Project } from '../scene';
 import type { PreflightIssue } from './preflight';
+import { operationOverrideForObject } from '../effective-output';
 
 type ScanOffsetIssueOptions = {
   /** Pre-compile callers use this to reject only values no emitter can encode. */
@@ -26,14 +27,15 @@ export function operationScanOffsetIssues(
     if (issue !== null) issues.push(issue);
   }
   for (const object of project.scene.objects) {
-    if (!outputLayers.some((layer) => sceneObjectUsesOperation(object, layer))) continue;
-    const issue = scanOffsetIssue(
-      `Object ${object.id}`,
-      object.operationOverride?.bidirectionalScanOffsetMm,
-      project,
-      options,
+    const offsets = new Set(
+      outputLayers
+        .filter((layer) => sceneObjectUsesOperation(object, layer))
+        .map((layer) => operationOverrideForObject(layer, object)?.bidirectionalScanOffsetMm),
     );
-    if (issue !== null) issues.push(issue);
+    for (const offset of offsets) {
+      const issue = scanOffsetIssue(`Object ${object.id}`, offset, project, options);
+      if (issue !== null) issues.push(issue);
+    }
   }
   return issues;
 }
