@@ -5343,6 +5343,18 @@ and lifts the command's CNC-only gate.)*
   under the artwork, tracking zoom and pan. The Camera panel's overlay row
   offers show/hide, a Fade slider, "Update still" (freeze the current frame —
   LightBurn's Update Overlay model), and "Live" (continuous video, USB only).
+- **Material surface height.** Enter the material's top height above the bed. A lens-corrected
+  alignment with a recorded marker-plane height compensates for thicker or thinner material in
+  both the overlay and camera trace. Positive height moves the projected surface toward an
+  overhead camera; the workspace remains X-right/Y-down. The exact alignment height leaves the
+  stored homography unchanged.
+- **Network camera resource changed.** Calibration and alignment distinguish the exact URL query
+  as well as its redacted host/path, so a channel or substream change cannot reuse another feed's
+  geometry. Only an opaque query fingerprint is recorded; userinfo, query text, and fragments
+  remain absent from persisted camera bindings and remembered URLs. Any query change, including
+  a query credential change, changes this identity. Older query-based bindings did not record the
+  original query and need a fresh lens calibration and alignment for that resource; query-less
+  bindings retain their existing behavior.
 - **Error / basis mismatch prevented.** The persisted alignment records the
   pixel basis it was clicked in (raw vs de-fisheyed); frames of the other basis
   are never warped with it, so a later lens calibration cannot silently

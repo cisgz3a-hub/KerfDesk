@@ -4,6 +4,9 @@ export type CameraCaptureBinding = {
   // Stable, non-secret source identity. URLs must be stripped of userinfo,
   // query, and fragment before they reach this persisted core type.
   readonly sourceId: string;
+  // Exact query identity (channel, substream, etc.) without raw query text.
+  // Absent for query-less sources and legacy bindings that did not record it.
+  readonly queryFingerprint?: string;
   readonly width: number;
   readonly height: number;
   readonly resizeMode: 'none' | 'crop-and-scale' | 'unknown';
@@ -20,6 +23,7 @@ export function normalizeCameraCaptureBinding(value: unknown): CameraCaptureBind
   const raw = value as Record<string, unknown>;
   const sourceKind = normalizeSourceKind(raw.sourceKind);
   const sourceId = nonEmptyString(raw.sourceId);
+  const queryFingerprint = normalizeQueryFingerprint(raw.queryFingerprint);
   const width = finitePositive(raw.width);
   const height = finitePositive(raw.height);
   const resizeMode = normalizeResizeMode(raw.resizeMode);
@@ -27,13 +31,22 @@ export function normalizeCameraCaptureBinding(value: unknown): CameraCaptureBind
     raw.version !== 1 ||
     sourceKind === undefined ||
     sourceId === undefined ||
+    (raw.queryFingerprint !== undefined && queryFingerprint === undefined) ||
     width === undefined ||
     height === undefined ||
     resizeMode === undefined
   ) {
     return undefined;
   }
-  return { version: 1, sourceKind, sourceId, width, height, resizeMode };
+  return {
+    version: 1,
+    sourceKind,
+    sourceId,
+    width,
+    height,
+    resizeMode,
+    ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
+  };
 }
 
 export function cameraBindingCompatibility(
@@ -41,7 +54,11 @@ export function cameraBindingCompatibility(
   current: CameraCaptureBinding,
 ): CameraBindingCompatibility {
   if (saved === undefined) return 'unbound';
-  if (saved.sourceKind !== current.sourceKind || saved.sourceId !== current.sourceId) {
+  if (
+    saved.sourceKind !== current.sourceKind ||
+    saved.sourceId !== current.sourceId ||
+    saved.queryFingerprint !== current.queryFingerprint
+  ) {
     return 'source-mismatch';
   }
   if (!captureGeometryMatches(saved, current)) return 'geometry-mismatch';
@@ -87,6 +104,10 @@ function normalizeResizeMode(value: unknown): CameraCaptureBinding['resizeMode']
 
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
+
+function normalizeQueryFingerprint(value: unknown): string | undefined {
+  return typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test(value) ? value : undefined;
 }
 
 function finitePositive(value: unknown): number | undefined {

@@ -4,6 +4,7 @@
 // bridge-proxied machine camera).
 
 import type { CameraAdapter, CameraBridgeAdapter } from '../../platform/types';
+import { cameraQueryFingerprint } from '../../core/camera/camera-query-fingerprint';
 import { publicCameraSourceId, type ActiveCameraSource } from '../camera/frame-source';
 import {
   handleUsbStatus,
@@ -228,6 +229,7 @@ function makeStartRtspSource(
       });
       return;
     }
+    const queryFingerprint = cameraQueryFingerprint(url);
     const source: Extract<ActiveCameraSource, { readonly kind: 'machine-rtsp' }> = {
       kind: 'machine-rtsp',
       previewUrl: probe.previewUrl,
@@ -237,6 +239,7 @@ function makeStartRtspSource(
           ? { kind: 'unmonitored', advisory: UNMONITORED_RTSP_ADVISORY }
           : { kind: 'monitored', streamSessionId: probe.streamSessionId },
       sourceId: publicCameraSourceId(url),
+      ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
     };
     set({
       sourceState: {

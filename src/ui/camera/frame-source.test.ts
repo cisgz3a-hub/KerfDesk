@@ -78,6 +78,23 @@ describe('camera capture identity', () => {
       'rtsp://192.168.1.5/live',
     );
   });
+
+  it('retains JPEG query resource identity alongside its redacted source URL', () => {
+    const first = cameraCaptureBindingForFrame(
+      { ...JPEG_SOURCE, cameraUrl: `${JPEG_SOURCE.cameraUrl}?channel=1` },
+      1280,
+      720,
+    );
+    const second = cameraCaptureBindingForFrame(
+      { ...JPEG_SOURCE, cameraUrl: `${JPEG_SOURCE.cameraUrl}?channel=2` },
+      1280,
+      720,
+    );
+    expect(first.sourceId).toBe(JPEG_SOURCE.cameraUrl);
+    expect(first.queryFingerprint).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(first.queryFingerprint).not.toBe(second.queryFingerprint);
+    expect(JSON.stringify(first)).not.toContain('channel=1');
+  });
 });
 
 describe('sourcePollIntervalMs', () => {

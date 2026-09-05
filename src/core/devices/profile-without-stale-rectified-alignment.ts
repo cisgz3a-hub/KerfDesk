@@ -65,6 +65,7 @@ function captureBindingsEqual(
     left.version === right.version &&
     left.sourceKind === right.sourceKind &&
     left.sourceId === right.sourceId &&
+    left.queryFingerprint === right.queryFingerprint &&
     left.width === right.width &&
     left.height === right.height &&
     left.resizeMode === right.resizeMode

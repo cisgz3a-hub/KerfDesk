@@ -11,6 +11,7 @@ import {
   type CameraCaptureBinding,
 } from '../../core/camera/camera-capture-binding';
 import { assertNever } from '../../core/scene';
+import { cameraQueryFingerprint } from '../../core/camera/camera-query-fingerprint';
 import type { CameraStream } from '../../platform/types';
 import { defaultFrameCaptureIo, type FrameCaptureIo } from './decode-jpeg';
 import { captureStreamFrame } from './frame-capture';
@@ -32,6 +33,7 @@ export type ActiveCameraSource =
         | { readonly kind: 'monitored'; readonly streamSessionId: string }
         | { readonly kind: 'unmonitored'; readonly advisory: string };
       readonly sourceId: string;
+      readonly queryFingerprint?: string;
     };
 
 export function cameraCaptureBindingForFrame(
@@ -52,7 +54,13 @@ export function cameraCaptureBindingForFrame(
     case 'machine-jpeg':
       return networkCaptureBinding('machine-jpeg', source.cameraUrl, width, height);
     case 'machine-rtsp':
-      return networkCaptureBinding('machine-rtsp', source.sourceId, width, height);
+      return networkCaptureBinding(
+        'machine-rtsp',
+        source.sourceId,
+        width,
+        height,
+        source.queryFingerprint,
+      );
     default:
       return assertNever(source, 'camera source');
   }
@@ -67,11 +75,13 @@ function networkCaptureBinding(
   rawId: string,
   width: number,
   height: number,
+  queryFingerprint = cameraQueryFingerprint(rawId),
 ): CameraCaptureBinding {
   return {
     version: 1,
     sourceKind,
     sourceId: publicCameraSourceId(rawId),
+    ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
     width,
     height,
     resizeMode: 'unknown',
