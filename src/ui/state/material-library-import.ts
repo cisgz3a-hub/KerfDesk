@@ -12,7 +12,12 @@ export function resolveImportedLibrary(
   collection: MaterialLibraryCollection,
   incoming: MaterialLibraryDocument,
 ): MaterialLibraryDocument {
+  // Bindings name an exact ID. A suffix is only a collision fallback, even if
+  // its contents match and it appears before the original in storage order.
+  if (!Object.hasOwn(collection.libraries, incoming.libraryId)) return incoming;
   const payload = serializeMaterialLibrary(incoming);
+  const exact = libraryDocument(collection, incoming.libraryId);
+  if (exact !== null && serializeMaterialLibrary(exact) === payload) return exact;
   for (const id of Object.keys(collection.libraries)) {
     if (!isImportCandidate(id, incoming.libraryId)) continue;
     const existing = libraryDocument(collection, id);
@@ -28,7 +33,6 @@ export function resolveImportedLibrary(
 }
 
 function isImportCandidate(id: string, originalId: string): boolean {
-  if (id === originalId) return true;
   const prefix = `${originalId}-`;
   if (!id.startsWith(prefix)) return false;
   const suffix = id.slice(prefix.length);

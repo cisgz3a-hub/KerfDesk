@@ -21,6 +21,25 @@ const original: MaterialLibraryDocument = {
 };
 
 describe('material library import identity', () => {
+  it('preserves the incoming ID when only an identical suffixed document exists', () => {
+    const collection = reconcileActiveDocument(
+      EMPTY_MATERIAL_LIBRARY_COLLECTION,
+      { ...original, libraryId: 'birch-2' },
+      1,
+    );
+    expect(resolveImportedLibrary(collection, original)).toEqual(original);
+  });
+
+  it('prefers the identical exact ID even when a suffix was saved first', () => {
+    let collection = reconcileActiveDocument(
+      EMPTY_MATERIAL_LIBRARY_COLLECTION,
+      { ...original, libraryId: 'birch-2' },
+      1,
+    );
+    collection = reconcileActiveDocument(collection, original, 2);
+    expect(resolveImportedLibrary(collection, original)).toEqual(original);
+  });
+
   it('preserves the existing document and reuses an identical collision copy on repeat import', () => {
     const collection = reconcileActiveDocument(EMPTY_MATERIAL_LIBRARY_COLLECTION, original, 1);
     const incoming = { ...original, name: 'Shared library' };
