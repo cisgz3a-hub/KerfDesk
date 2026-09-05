@@ -1,7 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolve } from 'node:path';
-import { validateNativeSmokeResult } from './verify-windows-packaged-native-smoke.mjs';
+import {
+  nativeSmokeLaunchOptions,
+  validateNativeSmokeResult,
+} from './verify-windows-packaged-native-smoke.mjs';
+
+test('launches the packaged app without a Windows hide override', () => {
+  const executable = resolve('release', 'win-unpacked', 'KerfDesk.exe');
+  assert.deepEqual(nativeSmokeLaunchOptions(executable), {
+    cwd: resolve('release', 'win-unpacked'),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: false,
+  });
+});
 
 test('accepts only packaged, isolated, ready/imported/saved results', () => {
   const userData = resolve('tmp', 'native-smoke');
