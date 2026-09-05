@@ -11983,12 +11983,16 @@ follows.
   the job's outermost loop keeps the layer side and the opposite winding (a hole) flips to
   the inverse. Containment depth was rejected because it mistakes a finishing loop for a
   nested hole.
-- Three guards each drop the lead back to the legacy straight plunge, so a lead never cuts
-  kept material: a bed guard (any lead point off the bed), a self-collision guard (a lead
-  point on the part side of its own contour — catches a concave lead curling in or a lead
-  larger than the feature), and a sibling guard (a lead point inside a disjoint neighbouring
-  part — the arrayed/nested-parts case). Because a corner-entry inside-lead pokes just past
-  the wall, most holes fall back to a plunge (safe) rather than gaining a lead.
+- Three geometry checks each drop the lead back to the legacy straight plunge: a bed
+  check (any lead point off the bed), a self-collision check (a lead enters the part side
+  of its own contour), and a sibling check (a lead enters a disjoint neighbouring part).
+  **Corrected 2026-09-05:** self and sibling checks cover every emitted line/arc chord,
+  splitting at polygon intersections and inspecting each intervening segment interior.
+  Checking sampled vertices alone missed a lead passing completely through a thin part.
+  Sibling contours already include the cutter offset, so this also checks the cutter
+  footprint without applying its radius twice. Because a corner-entry inside-lead pokes
+  just past the wall, most holes fall back to a plunge rather than gaining a lead.
+  Frame and Start behavior are unchanged; this corrects the existing lead geometry.
 - Recovery parity: a led profile pass is a FLAT `path3d` (every point at the cut depth), so
   `cnc-recovery-manifest` grants it runway-v1 (via `flatPath3dZMm`) and the runway planner
   presents its XY points as a contour view — lead-enabled profile cuts keep automatic

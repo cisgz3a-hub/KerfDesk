@@ -182,10 +182,8 @@ function leadForPass(pass: CncContourPass, ctx: LeadContext): CncPass {
   return ledPath3d(pass, leadIn, leadOut);
 }
 
-// Self-collision guard: every lead point (except the shared entry vertex, which
-// sits on the boundary) must be on the WASTE side of this contour — outside the
-// loop for an outside cut, inside it for an inside cut. A concave lead that
-// curls back into the kept material fails here and falls back to the plunge.
+// Both sampled vertices and the emitted segments between them must stay on
+// the waste side. The shared contour endpoint is allowed on the boundary.
 function leadClearsPart(
   leadIn: ReadonlyArray<Vec2>,
   leadOut: ReadonlyArray<Vec2>,
@@ -194,10 +192,17 @@ function leadClearsPart(
 ): boolean {
   const onWasteSide = (point: Vec2): boolean =>
     side === 'outside' ? !pointInPolygon(point, polygon) : pointInPolygon(point, polygon);
-  return leadIn.slice(0, -1).every(onWasteSide) && leadOut.slice(1).every(onWasteSide);
+  return (
+    leadIn.slice(0, -1).every(onWasteSide) &&
+    leadOut.slice(1).every(onWasteSide) &&
+    segmentsStayOnSide(leadIn, polygon, side === 'inside') &&
+    segmentsStayOnSide(leadOut, polygon, side === 'inside')
+  );
 }
 
-// Cross-part guard: no lead point may fall inside a disjoint sibling part.
+// These are the already cutter-offset contours, so checking the complete lead
+// centreline against them also accounts for the cutter footprint. Do not add
+// the tool radius again. An unsafe lead retains the existing plunge fallback.
 function leadClearsSiblings(
   leadIn: ReadonlyArray<Vec2>,
   leadOut: ReadonlyArray<Vec2>,
@@ -205,7 +210,59 @@ function leadClearsSiblings(
 ): boolean {
   if (siblings.length === 0) return true;
   const clear = (point: Vec2): boolean => siblings.every((s) => !pointInPolygon(point, s));
-  return leadIn.slice(0, -1).every(clear) && leadOut.slice(1).every(clear);
+  return (
+    leadIn.slice(0, -1).every(clear) &&
+    leadOut.slice(1).every(clear) &&
+    siblings.every(
+      (polygon) =>
+        segmentsStayOnSide(leadIn, polygon, false) && segmentsStayOnSide(leadOut, polygon, false),
+    )
+  );
+}
+
+// Polygon membership can change only at a boundary intersection. Split each
+// emitted line/chord there and inspect every intervening open interval, rather
+// than adding a sampling spacing that could still miss a thin kept feature.
+function segmentsStayOnSide(
+  points: ReadonlyArray<Vec2>,
+  polygon: ReadonlyArray<Vec2>,
+  inside: boolean,
+): boolean {
+  for (let i = 1; i < points.length; i += 1) {
+    const start = points[i - 1] as Vec2;
+    const end = points[i] as Vec2;
+    const cuts = segmentBoundaryCuts(start, end, polygon);
+    for (let j = 1; j < cuts.length; j += 1) {
+      const from = cuts[j - 1] as number;
+      const to = cuts[j] as number;
+      if (from === to) continue;
+      const t = (from + to) / 2;
+      const midpoint = {
+        x: start.x + (end.x - start.x) * t,
+        y: start.y + (end.y - start.y) * t,
+      };
+      if (pointInPolygon(midpoint, polygon) !== inside) return false;
+    }
+  }
+  return true;
+}
+
+function segmentBoundaryCuts(a: Vec2, b: Vec2, polygon: ReadonlyArray<Vec2>): number[] {
+  const cuts = [0, 1];
+  const rx = b.x - a.x;
+  const ry = b.y - a.y;
+  for (let i = 0; i < polygon.length; i += 1) {
+    const c = polygon[i] as Vec2;
+    const d = polygon[(i + 1) % polygon.length] as Vec2;
+    const sx = d.x - c.x;
+    const sy = d.y - c.y;
+    const cross = rx * sy - ry * sx;
+    if (cross === 0) continue;
+    const t = ((c.x - a.x) * sy - (c.y - a.y) * sx) / cross;
+    const u = ((c.x - a.x) * ry - (c.y - a.y) * rx) / cross;
+    if (t > 0 && t < 1 && u >= 0 && u <= 1) cuts.push(t);
+  }
+  return cuts.sort((left, right) => left - right);
 }
 
 // leadIn ends on, and leadOut begins on, the contour start vertex, so both
