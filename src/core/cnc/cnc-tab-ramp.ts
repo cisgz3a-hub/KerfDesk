@@ -184,6 +184,10 @@ function tabWindows(
 ): ReadonlyArray<TabWindow> {
   const half = windowMm / 2;
   const centers = tabCenters(perimeter, tabsPerShape, manualCenters);
+  // Modulo endpoints cannot distinguish a full turn from an empty interval.
+  if (centers.length > 0 && windowMm >= perimeter - EPS) {
+    return [{ start: 0, end: perimeter }];
+  }
   return centers.map((center) => ({
     start: modulo(center - half, perimeter),
     end: modulo(center + half, perimeter),
@@ -268,9 +272,10 @@ function walkWithTabRises(
     out.push({ x: xy.x, y: xy.y, z: spanZ });
     previousZ = spanZ;
   }
-  // Close the loop back to the seam at the Z the first span runs at.
+  // The closing travel belongs to the last span. Any seam Z transition was
+  // already emitted as the same-XY pair at the beginning of the loop.
   const seam = pointAtDistance(points, cumulative, perimeter, stops[0] as number);
-  out.push({ x: seam.x, y: seam.y, z: zForSpan(0) });
+  out.push({ x: seam.x, y: seam.y, z: previousZ });
   return out;
 }
 

@@ -12692,6 +12692,21 @@ across each window. New pure module `src/core/cnc/cnc-tab-ramp.ts`.
   It cannot be proven here: No hardware verification is available on this project (maintainer, 2026-07-25): there is no machine to test on. This is a TERMINAL limitation, not a pending task.
 - **Nearest available check:** run an exported .nc through an INDEPENDENT viewer (NC Viewer, CAMotics). Our own 3D preview and core/sim share the emitter's codebase, so a geometry fault can look correct in both; an outside parser cannot. Note the Z-rise model itself is Fusion 360's documented behavior, but the `depth > tabHeight` guard and the small-contour ride-at-tab-top fallback are this project's own inventions and match no reference.
 
+### Amendment 2026-09-05 — Whole-perimeter windows and rectangular seam walls
+
+The PR #414 history audit reproduced two gaps in the existing tab contract:
+normalizing a whole-perimeter window erased its coverage, and closing a loop at
+the first span's Z created a diagonal through a tab boundary at the seam.
+Tab windows now retain full coverage when their width plus tool diameter reaches
+the perimeter. An empty manual-center list still creates no tab. The final span
+closes at its own height; the seam transition remains a vertical same-XY move.
+
+Regression checks cover automatic and manual full-width windows, exact and
+oversized coverage, and windows beginning, ending, and wrapping at the seam.
+They inspect compiled paths and independently read emitted absolute G0/G1
+coordinates. This corrects geometry without changing settings, Frame/Start
+policy, or warning behavior. Hardware and material verification remain unavailable.
+
 ## ADR-260 — CNC traces commit machine-faired polylines (2026-07-25)
 
 > Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
