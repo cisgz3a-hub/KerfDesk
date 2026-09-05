@@ -8,7 +8,8 @@ Baseline: `ccaa3064d9efe904821307f0603ce842d903b586`.
   counts, invalid dimensions/gaps, and non-finite footprints/positions leave project/undo state
   untouched. A replacement at the object limit round-trips through project serialization.
 - F22-2: full-page CNC preview registers modal ownership and uses shared initial focus, Tab trap,
-  Escape and focus restoration. Its toolbar and renderer lifetime are retained.
+  Escape and focus restoration. Its toolbar and renderer lifetime are retained. This legacy pane
+  remains intentionally unmounted in production; its acceptance is source/DOM evidence.
 - F23-1: the Inspector syncs the latest travel visibility after scene readiness, as it does its
   other derived view controls.
 - F24-1: a canvas machine point goes through `jogToMachinePosition`, retaining work-offset/unit
@@ -29,3 +30,5 @@ Regression evidence exercises the actual controller store with simulated transpo
 shortcut handler and dialogs with simulated WebGL, delayed scene readiness, early stream completion,
 replacement ownership, incomplete jig fields and clipboard failures. No machine, camera or material
 was operated. Full verification and PR/main identifiers are recorded in the remediation ledger.
+
+Browser acceptance on controller commit `0ec227d40` is recorded in [browser.md](browser.md).

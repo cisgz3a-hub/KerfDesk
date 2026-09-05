@@ -38,14 +38,15 @@ The authoritative integration status is the September 5 section of `docs/remedia
 | F17-01 | Jig construction validates the combined allocation and incomplete drafts | controller.md |
 | F18-01 | Camera alignment commits only to its initiating request/document/source | settings.md |
 | F22-1 | Surfacing uses cancellable batched preparation and streaming output | surfacing.md |
-| F22-2 | Full-page CNC preview owns modal focus and suppresses background shortcuts | controller.md |
+| F22-2 | Legacy full-page CNC preview owns modal focus and suppresses background shortcuts (still unmounted in production) | controller.md |
 | F23-1 | Travel visibility is applied when the Inspector scene becomes ready | controller.md |
 | F24-1 | Canvas points use the machine-position jog path and its CNC retract | controller.md |
 | F24-2 | Retired origin transactions cannot publish into another controller session | controller.md |
 | F25-1 | Variable advancement observes its exact stream before transmission starts | controller.md |
 | F26-1 | Clipboard rejection/unavailability offers a manual transcript | controller.md |
 
-Each lane records its regression checks and limitations. Full CI and Chrome smoke must pass on the
+Each lane records its regression checks and limitations. [Browser acceptance](browser.md) records
+rendered jig/Inspector checks separately from simulated transport and the legacy pane fixture. Full CI and Chrome smoke must pass on the
 PR revisions; the final integrated main revision is checked separately. Existing unrelated open PRs
 are outside this scope. Frame remains the sole ordinary Start gate, and Job Review policy findings
 remain warnings.

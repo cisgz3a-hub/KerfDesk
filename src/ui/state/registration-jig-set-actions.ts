@@ -140,7 +140,7 @@ export function registrationJigSetIssue(
   }
   const count = spec.rows * spec.columns;
   if (!Number.isSafeInteger(count) || count > MAX_REGISTRATION_JIG_OUTLINES) {
-    return `This jig editor can construct at most ${MAX_REGISTRATION_JIG_OUTLINES} outlines at once. Rows × columns requests ${count}. Reduce the grid or create separate sets.`;
+    return `This jig editor can construct at most ${MAX_REGISTRATION_JIG_OUTLINES} outlines at once. Rows × columns requests ${count}. Reduce the rows or columns.`;
   }
   const capacityIssue = jigSceneCapacityIssue(scene, count);
   if (capacityIssue !== null) return capacityIssue;
