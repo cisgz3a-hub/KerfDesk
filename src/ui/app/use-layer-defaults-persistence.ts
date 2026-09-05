@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { persistLayerDefaults, restoreLayerDefaults } from '../layers/layer-default-settings';
 import { useStore } from '../state';
+import { browserLocalStorage } from '../state/browser-local-storage';
 import { useToastStore } from '../state/toast-store';
 
 export const LAYER_DEFAULTS_PERSIST_FAILURE_MESSAGE =
@@ -9,8 +10,11 @@ export const LAYER_DEFAULTS_PERSIST_FAILURE_MESSAGE =
 export function useLayerDefaultsPersistence(): void {
   const pushToast = useToastStore((state) => state.pushToast);
   useEffect(() => {
-    const storage = window.localStorage;
-    const restored = restoreLayerDefaults(storage, useStore.getState().project.device.name);
+    const storage = browserLocalStorage();
+    const restored =
+      storage === null
+        ? null
+        : restoreLayerDefaults(storage, useStore.getState().project.device.name);
     if (restored !== null) useStore.getState().setLayerDefaults(restored);
 
     let hasWarned = false;
@@ -21,11 +25,9 @@ export function useLayerDefaultsPersistence(): void {
       ) {
         return;
       }
-      const persisted = persistLayerDefaults(
-        storage,
-        state.project.device.name,
-        state.layerDefaults,
-      );
+      const persisted =
+        storage !== null &&
+        persistLayerDefaults(storage, state.project.device.name, state.layerDefaults);
       if (!persisted && !hasWarned) {
         hasWarned = true;
         pushToast(LAYER_DEFAULTS_PERSIST_FAILURE_MESSAGE, 'warning');

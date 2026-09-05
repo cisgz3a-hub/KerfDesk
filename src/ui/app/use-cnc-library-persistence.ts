@@ -6,6 +6,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
+import { browserLocalStorage } from '../state/browser-local-storage';
 import {
   EMPTY_CNC_LIBRARY,
   persistCncLibrary,
@@ -19,13 +20,13 @@ export const CNC_LIBRARY_PERSIST_FAILURE_MESSAGE =
 export function useCncLibraryPersistence(): void {
   const pushToast = useToastStore((state) => state.pushToast);
   useEffect(() => {
-    const storage = window.localStorage;
-    restoreOnMount(storage);
+    const storage = browserLocalStorage();
+    if (storage !== null) restoreOnMount(storage);
 
     let hasWarned = false;
     const unsubscribe = useStore.subscribe((state, prev) => {
       if (state.cncLibrary === prev.cncLibrary) return;
-      if (!persistCncLibrary(storage, state.cncLibrary) && !hasWarned) {
+      if ((storage === null || !persistCncLibrary(storage, state.cncLibrary)) && !hasWarned) {
         hasWarned = true;
         pushToast(CNC_LIBRARY_PERSIST_FAILURE_MESSAGE, 'warning');
       }
