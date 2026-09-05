@@ -7,6 +7,8 @@ import { useLaserStore } from '../state/laser-store';
 import { OriginRow } from './OriginRow';
 import { DEFAULT_JOG_STEP_MM, useJogControlPreferences } from './jog-control-preferences';
 import { DEFAULT_JOG_FEED_MM_PER_MIN } from './jog-control-policy';
+import { OriginTransactionCancelledError } from '../state/laser-origin-transaction';
+import { useToastStore } from '../state/toast-store';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -68,6 +70,28 @@ afterEach(() => {
 });
 
 describe('OriginRow persistent origin controls', () => {
+  it('handles retired origin requests without success, placement changes or an unhandled rejection', async () => {
+    const pushToast = vi.spyOn(useToastStore.getState(), 'pushToast');
+    useLaserStore.setState({
+      setOriginHere: async () => {
+        throw new OriginTransactionCancelledError();
+      },
+    });
+    const placement = useStore.getState().jobPlacement;
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      await act(async () => buttonByText(host, 'Set origin here').click());
+      expect(pushToast).not.toHaveBeenCalled();
+      expect(useStore.getState().jobPlacement).toBe(placement);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('shows advanced persistent controls and disables transient reset for known G54 origin', async () => {
     useLaserStore.setState({
       statusReport: statusReport('Idle'),

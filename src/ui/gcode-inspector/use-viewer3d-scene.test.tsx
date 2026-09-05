@@ -83,6 +83,7 @@ async function withMountedScene(
       colorOf: COLOR_OF,
       live: null,
       arrows: null,
+      travelVisible: true,
     });
     binding = nextBinding;
     return null;

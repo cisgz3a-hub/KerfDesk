@@ -9,8 +9,10 @@
 // Portalled to document.body so no pane's overflow or stacking context can clip
 // it. Escape closes; the pane behind is left mounted and untouched.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useDialogA11y } from '../common/use-dialog-a11y';
+import { useRegisterModal } from '../common/use-register-modal';
 import type { LiveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
 import { Viewer3DReadout } from '../cnc-viewer3d/Viewer3DReadout';
 import { Viewer3DToolbar } from '../cnc-viewer3d/Viewer3DToolbar';
@@ -28,8 +30,6 @@ import {
 } from './use-cnc-3d-scene';
 import { previewResolutionMessage } from './preview-resolution';
 
-const CLOSE_KEY = 'Escape';
-
 export function Cnc3DFullPage(props: {
   readonly source: DesignSceneSource;
   readonly stockThicknessMm: number;
@@ -46,7 +46,9 @@ export function Cnc3DFullPage(props: {
     '3D result',
     cnc3dPaneDisplayResolution(source.grid),
   );
-  useCloseOnEscape(onClose);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useRegisterModal();
+  useDialogA11y(dialogRef, onClose);
 
   // Pushed on every change AND on every state change: the controls no-op until
   // the WebGL context exists, so a mode picked while it was still loading has
@@ -56,16 +58,7 @@ export function Cnc3DFullPage(props: {
     controls.setSectionFraction(sectionFraction);
   }, [controls, mode, sectionFraction, state]);
 
-  const handleSavePng = useCallback(() => {
-    const dataUrl = controls.capturePng(DEFAULT_SCREENSHOT_SCALE);
-    if (dataUrl === null) return;
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    // The Project model carries no name, so the filename falls back to the
-    // module's own prefix rather than inventing a field to read.
-    link.download = screenshotFileName('', new Date().toISOString());
-    link.click();
-  }, [controls]);
+  const handleSavePng = useCallback(() => saveViewerScreenshot(controls), [controls]);
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -76,7 +69,14 @@ export function Cnc3DFullPage(props: {
   );
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label="3D result, full page" style={overlayStyle}>
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="3D result, full page"
+      style={overlayStyle}
+    >
       <div style={barStyle}>
         <span style={titleStyle}>3D result</span>
         <span style={hintStyle}>
@@ -117,16 +117,13 @@ export function Cnc3DFullPage(props: {
   );
 }
 
-// Escape is the expected way out of a full-window view; without it the only
-// exit is a button the operator may have moved the pointer away from.
-function useCloseOnEscape(onClose: () => void): void {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === CLOSE_KEY) onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+function saveViewerScreenshot(controls: ReturnType<typeof useCnc3dScene>['controls']): void {
+  const dataUrl = controls.capturePng(DEFAULT_SCREENSHOT_SCALE);
+  if (dataUrl === null) return;
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = screenshotFileName('', new Date().toISOString());
+  link.click();
 }
 
 const overlayStyle: React.CSSProperties = {

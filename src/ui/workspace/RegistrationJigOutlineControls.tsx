@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { findRegistrationBoxes, transformedBBox, type ShapeObject } from '../../core/scene';
-import type { RegistrationJigSetSpec } from '../state/registration-jig-set-actions';
+import {
+  registrationJigSetIssue,
+  type RegistrationJigSetSpec,
+} from '../state/registration-jig-set-actions';
 import { Button } from '../kit';
 import { useStore } from '../state';
 import {
@@ -52,7 +55,9 @@ export function RegistrationJigOutlineControls(): JSX.Element {
   const [columns, setColumns] = useState(initialGrid.columns);
   const [spacingX, setSpacingX] = useState(initialGrid.spacingX);
   const [spacingY, setSpacingY] = useState(initialGrid.spacingY);
-  const requestedCount = positiveInteger(rows) * positiveInteger(columns);
+  const spec = jigSetSpec(shape, widthMm, heightMm, diameterMm, rows, columns, spacingX, spacingY);
+  const issue = registrationJigSetIssue(spec, scene);
+  const requestedCount = spec.rows * spec.columns;
 
   return (
     <>
@@ -77,24 +82,22 @@ export function RegistrationJigOutlineControls(): JSX.Element {
         onSpacingYChange={setSpacingY}
       />
       <p style={setSummaryStyle}>
-        {boxes.length === 0
-          ? `${requestedCount} ${jigWord(requestedCount)} requested`
-          : `${boxes.length} ${jigWord(boxes.length)} on canvas`}
+        {issue !== null
+          ? issue
+          : boxes.length === 0
+            ? `${requestedCount} ${jigWord(requestedCount)} requested`
+            : `${boxes.length} ${jigWord(boxes.length)} on canvas`}
       </p>
       <div style={actionRowStyle}>
         <Button
           variant="primary"
-          disabled={isCapturedBoard}
+          disabled={isCapturedBoard || issue !== null}
           title={
             isCapturedBoard
               ? 'This outline is a captured board — Remove it or re-capture with Place Board.'
-              : 'Create one registered outline for every row and column in the jig set'
+              : (issue ?? 'Create one registered outline for every row and column in the jig set')
           }
-          onClick={() =>
-            replaceSet(
-              jigSetSpec(shape, widthMm, heightMm, diameterMm, rows, columns, spacingX, spacingY),
-            )
-          }
+          onClick={() => replaceSet(spec)}
         >
           {createButtonLabel(initial.hasOutline, requestedCount)}
         </Button>
@@ -220,24 +223,20 @@ function jigSetSpec(
       shape === 'circle'
         ? { kind: 'circle', diameterMm: finiteNumber(diameterMm) }
         : { kind: 'rectangle', widthMm: finiteNumber(widthMm), heightMm: finiteNumber(heightMm) },
-    rows: positiveInteger(rows),
-    columns: positiveInteger(columns),
+    rows: finiteNumber(rows),
+    columns: finiteNumber(columns),
     spacingX: finiteNumber(spacingX),
     spacingY: finiteNumber(spacingY),
   };
 }
 
 function finiteNumber(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function positiveInteger(value: string): number {
-  const parsed = Math.floor(finiteNumber(value));
-  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : 1;
+  return value.trim() === '' ? Number.NaN : Number(value);
 }
 
 function createButtonLabel(hasOutline: boolean, count: number): string {
+  if (!Number.isSafeInteger(count) || count < 1)
+    return hasOutline ? 'Replace outlines' : 'Create outlines';
   if (count === 1) return hasOutline ? 'Replace outline' : 'Create outline';
   return hasOutline ? `Replace with ${count} jigs` : `Create ${count} jigs`;
 }
