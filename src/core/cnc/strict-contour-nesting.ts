@@ -1,5 +1,10 @@
 import { pointInPolygon } from '../geometry';
 import type { Polyline, Vec2 } from '../scene';
+import {
+  buildVCarveBoundarySegmentIndex,
+  someVCarveBoundarySegmentInBox,
+} from './vcarve-boundary-segment-index';
+import type { BoundarySegment } from './vcarve-detail-geometry';
 
 export function isClosedFiniteContour(contour: Polyline): boolean {
   return (
@@ -62,19 +67,56 @@ function polylineBounds(polyline: Polyline): Bounds {
 }
 
 function boundariesIntersect(a: Polyline, b: Polyline): boolean {
-  const aCount = distinctClosedPointCount(a);
+  // Reuse the exact-query boundary index: only disjoint segment boxes are
+  // excluded, so touching and crossing still use the original predicate.
+  // A dense trace must not compare every edge to every other edge.
+  const index = buildVCarveBoundarySegmentIndex(contourSegments(a));
+  const precision = Number.EPSILON * 32 * Math.max(coordinateScale(a), coordinateScale(b));
   const bCount = distinctClosedPointCount(b);
-  for (let ai = 0; ai < aCount; ai += 1) {
-    const a0 = a.points[ai];
-    const a1 = a.points[(ai + 1) % aCount];
-    if (a0 === undefined || a1 === undefined) continue;
-    for (let bi = 0; bi < bCount; bi += 1) {
-      const b0 = b.points[bi];
-      const b1 = b.points[(bi + 1) % bCount];
-      if (b0 !== undefined && b1 !== undefined && segmentsIntersect(a0, a1, b0, b1)) return true;
-    }
+  for (let bi = 0; bi < bCount; bi += 1) {
+    const b0 = b.points[bi];
+    const b1 = b.points[(bi + 1) % bCount];
+    if (b0 === undefined || b1 === undefined) continue;
+    const box = {
+      minX: Math.min(b0.x, b1.x) - precision,
+      minY: Math.min(b0.y, b1.y) - precision,
+      maxX: Math.max(b0.x, b1.x) + precision,
+      maxY: Math.max(b0.y, b1.y) + precision,
+    };
+    if (
+      someVCarveBoundarySegmentInBox(index, box, (segment) =>
+        segmentsIntersect(
+          { x: segment.ax, y: segment.ay },
+          { x: segment.bx, y: segment.by },
+          b0,
+          b1,
+          precision,
+        ),
+      )
+    )
+      return true;
   }
   return false;
+}
+
+function coordinateScale(polyline: Polyline): number {
+  let scale = 1;
+  for (const point of polyline.points)
+    scale = Math.max(scale, Math.abs(point.x), Math.abs(point.y));
+  return scale;
+}
+
+function contourSegments(polyline: Polyline): BoundarySegment[] {
+  const count = distinctClosedPointCount(polyline);
+  const segments: BoundarySegment[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const start = polyline.points[i];
+    const end = polyline.points[(i + 1) % count];
+    if (start !== undefined && end !== undefined) {
+      segments.push({ ax: start.x, ay: start.y, bx: end.x, by: end.y });
+    }
+  }
+  return segments;
 }
 
 function distinctClosedPointCount(polyline: Polyline): number {
@@ -85,15 +127,19 @@ function distinctClosedPointCount(polyline: Polyline): number {
     : polyline.points.length;
 }
 
-function segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
+function segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2, precision: number): boolean {
   const abC = cross(a, b, c);
   const abD = cross(a, b, d);
   const cdA = cross(c, d, a);
   const cdB = cross(c, d, b);
-  if (abC === 0 && onSegment(a, b, c)) return true;
-  if (abD === 0 && onSegment(a, b, d)) return true;
-  if (cdA === 0 && onSegment(c, d, a)) return true;
-  if (cdB === 0 && onSegment(c, d, b)) return true;
+  // Transforms can move a touching vertex a few ULPs off its edge. Preserve
+  // contact at coordinate precision, using the same padding as the index.
+  const abPrecision = (Math.abs(b.x - a.x) + Math.abs(b.y - a.y)) * precision;
+  const cdPrecision = (Math.abs(d.x - c.x) + Math.abs(d.y - c.y)) * precision;
+  if (Math.abs(abC) <= abPrecision && onSegment(a, b, c, precision)) return true;
+  if (Math.abs(abD) <= abPrecision && onSegment(a, b, d, precision)) return true;
+  if (Math.abs(cdA) <= cdPrecision && onSegment(c, d, a, precision)) return true;
+  if (Math.abs(cdB) <= cdPrecision && onSegment(c, d, b, precision)) return true;
   return abC > 0 !== abD > 0 && cdA > 0 !== cdB > 0;
 }
 
@@ -101,11 +147,11 @@ function cross(a: Vec2, b: Vec2, point: Vec2): number {
   return (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
 }
 
-function onSegment(a: Vec2, b: Vec2, point: Vec2): boolean {
+function onSegment(a: Vec2, b: Vec2, point: Vec2, precision: number): boolean {
   return (
-    point.x >= Math.min(a.x, b.x) &&
-    point.x <= Math.max(a.x, b.x) &&
-    point.y >= Math.min(a.y, b.y) &&
-    point.y <= Math.max(a.y, b.y)
+    point.x >= Math.min(a.x, b.x) - precision &&
+    point.x <= Math.max(a.x, b.x) + precision &&
+    point.y >= Math.min(a.y, b.y) - precision &&
+    point.y <= Math.max(a.y, b.y) + precision
   );
 }

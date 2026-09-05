@@ -21,9 +21,9 @@
 // with no counter), but it is real type design — text and drawn-shape
 // contours never pair.
 
-import { pointInPolygon } from '../geometry';
 import type { CncCutType, CncLayerSettings, Polyline } from '../scene';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
+import { strictlyContainsContour } from './strict-contour-nesting';
 
 export type LineArtContourSide = NonNullable<CncLayerSettings['lineArtContours']>;
 
@@ -100,22 +100,20 @@ function isClosedRing(polyline: Polyline): boolean {
   return polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS;
 }
 
-// The smallest ring that contains this ring's probe point — bbox area breaks
-// ties toward the immediate enclosure, which is the ring's pair candidate.
+// The smallest ring enclosing the whole boundary is the pair candidate.
+// A contained first vertex (even every vertex) cannot rule out edges crossing
+// a concave notch. Touching and coincident boundaries are not nested pairs.
 function directParent(
   ring: Polyline,
   rings: ReadonlyArray<Polyline>,
   bounds: ReadonlyMap<Polyline, Bounds>,
 ): Polyline | null {
-  const probe = ring.points[0];
-  if (probe === undefined) return null;
   let parent: Polyline | null = null;
   let parentArea = Number.POSITIVE_INFINITY;
   for (const candidate of rings) {
     if (candidate === ring) continue;
-    if (!pointInPolygon(probe, candidate.points)) continue;
     const area = boundsArea(bounds.get(candidate) as Bounds);
-    if (area < parentArea) {
+    if (area < parentArea && strictlyContainsContour(candidate, ring)) {
       parent = candidate;
       parentArea = area;
     }

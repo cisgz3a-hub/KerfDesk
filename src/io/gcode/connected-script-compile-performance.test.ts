@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { connectedScriptCompilationProject } from '../../__fixtures__/connected-script-compilation-project';
+import type { strictContourContainmentDepth } from '../../core/cnc/strict-contour-nesting';
 import type {
   asVCarveBoundarySegmentIndex,
   buildVCarveBoundarySegmentIndex,
@@ -24,6 +25,9 @@ type EveryBoundarySegment = typeof everyVCarveBoundarySegmentInBox;
 type MinimumChordDistance = typeof minimumVCarveBoundaryChordDistance;
 type MinimumPointDistance = typeof minimumVCarveBoundaryPointDistance;
 type SomeBoundarySegment = typeof someVCarveBoundarySegmentInBox;
+type ContourNestingModule = Readonly<Record<string, unknown>> & {
+  readonly strictContourContainmentDepth: typeof strictContourContainmentDepth;
+};
 type BoundaryIndexModule = Readonly<Record<string, unknown>> & {
   readonly asVCarveBoundarySegmentIndex: AsBoundaryIndex;
   readonly buildVCarveBoundarySegmentIndex: BuildBoundaryIndex;
@@ -37,7 +41,24 @@ const boundaryIndexProbe = vi.hoisted(() => ({
   arrayConversions: 0,
   arrayQuerySources: 0,
   explicitBuilds: 0,
+  containmentBuilds: 0,
+  containmentDepth: 0,
 }));
+
+vi.mock('../../core/cnc/strict-contour-nesting', async (importOriginal) => {
+  const actual = (await importOriginal()) as ContourNestingModule;
+  const strictContourContainmentDepth: ContourNestingModule['strictContourContainmentDepth'] = (
+    ...args
+  ) => {
+    boundaryIndexProbe.containmentDepth += 1;
+    try {
+      return actual.strictContourContainmentDepth(...args);
+    } finally {
+      boundaryIndexProbe.containmentDepth -= 1;
+    }
+  };
+  return { ...actual, strictContourContainmentDepth };
+});
 
 vi.mock('../../core/cnc/vcarve-boundary-segment-index', async (importOriginal) => {
   // Vitest cannot infer an asynchronously imported mock's exports; bind the
@@ -59,7 +80,8 @@ function boundaryIndexConstructionWrappers(actual: BoundaryIndexModule) {
     return actual.asVCarveBoundarySegmentIndex(source);
   };
   const buildBoundaryIndex: BuildBoundaryIndex = (segments) => {
-    boundaryIndexProbe.explicitBuilds += 1;
+    if (boundaryIndexProbe.containmentDepth > 0) boundaryIndexProbe.containmentBuilds += 1;
+    else boundaryIndexProbe.explicitBuilds += 1;
     return actual.buildVCarveBoundarySegmentIndex(segments);
   };
   return {
@@ -129,6 +151,9 @@ function assertCompilationProfile(
   expect(compilation.regionTimings).toHaveLength(EXPECTED_REGION_COUNT);
   // Guard the repaired work shape without a machine-speed-sensitive exact time:
   // every region builds once, then every certification query reuses the index.
+  // Whole-contour nesting also indexes its original source boundaries; those
+  // are distinct from the normalized region indexes used for certification.
+  expect(boundaryIndexProbe.containmentBuilds).toBeGreaterThan(0);
   expect(boundaryIndexProbe.explicitBuilds).toBe(EXPECTED_REGION_COUNT);
   expect(boundaryIndexProbe.arrayConversions).toBe(0);
   expect(boundaryIndexProbe.arrayQuerySources).toBe(0);
@@ -142,6 +167,8 @@ function resetBoundaryIndexProbe(): void {
   boundaryIndexProbe.arrayConversions = 0;
   boundaryIndexProbe.arrayQuerySources = 0;
   boundaryIndexProbe.explicitBuilds = 0;
+  boundaryIndexProbe.containmentBuilds = 0;
+  boundaryIndexProbe.containmentDepth = 0;
 }
 
 async function connectedScriptProject() {
