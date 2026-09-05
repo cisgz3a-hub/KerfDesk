@@ -11,6 +11,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
+import { browserLocalStorage } from '../state/browser-local-storage';
 import {
   collectionChanged,
   isEmptyCollection,
@@ -30,8 +31,8 @@ export const MATERIAL_LIBRARY_PERSIST_FAILURE_MESSAGE =
 export function useMaterialLibraryPersistence(): void {
   const pushToast = useToastStore((state) => state.pushToast);
   useEffect(() => {
-    const storage = window.localStorage;
-    restoreOnMount(storage);
+    const storage = browserLocalStorage();
+    if (storage !== null) restoreOnMount(storage);
 
     let hasWarned = false;
     const unsubscribe = useStore.subscribe((state, prev) => {
@@ -52,7 +53,7 @@ export function useMaterialLibraryPersistence(): void {
         useStore.setState({ savedLibraries: reconciled });
         return;
       }
-      if (!persistCollection(storage, state.savedLibraries) && !hasWarned) {
+      if ((storage === null || !persistCollection(storage, state.savedLibraries)) && !hasWarned) {
         hasWarned = true;
         pushToast(MATERIAL_LIBRARY_PERSIST_FAILURE_MESSAGE, 'warning');
       }

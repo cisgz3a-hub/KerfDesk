@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   readCanvasStartMarkersVisible,
   writeCanvasStartMarkersVisible,
@@ -18,6 +18,29 @@ function memoryStorage(initial?: string): Pick<Storage, 'getItem' | 'setItem'> &
 }
 
 describe('canvas motion preferences', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('uses the default when the browser denies access to the storage property', () => {
+    vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('Storage disabled for this origin', 'SecurityError');
+    });
+    expect(readCanvasStartMarkersVisible()).toBe(true);
+    expect(() => writeCanvasStartMarkersVisible(false)).not.toThrow();
+  });
+
+  it('keeps storage method failures optional', () => {
+    const storage = {
+      getItem: () => {
+        throw new Error('Storage read unavailable');
+      },
+      setItem: () => {
+        throw new Error('Storage quota unavailable');
+      },
+    };
+    expect(readCanvasStartMarkersVisible(storage)).toBe(true);
+    expect(() => writeCanvasStartMarkersVisible(false, storage)).not.toThrow();
+  });
+
   it('defaults start markers to visible and restores an explicit hidden preference', () => {
     expect(readCanvasStartMarkersVisible(memoryStorage())).toBe(true);
     expect(readCanvasStartMarkersVisible(memoryStorage('0'))).toBe(false);

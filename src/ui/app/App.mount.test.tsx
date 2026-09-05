@@ -62,32 +62,41 @@ describe('App mount', () => {
     vi.unstubAllGlobals();
   });
 
-  it('does not crash the real shell with hook-order warnings on startup', async () => {
-    const consoleErrors: string[] = [];
-    vi.spyOn(console, 'error').mockImplementation((...args) => {
-      consoleErrors.push(args.map(String).join(' '));
-    });
+  it.each([false, true])(
+    'mounts the real shell when storage access is denied: %s',
+    async (denied) => {
+      if (denied) {
+        vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+          throw new DOMException('Storage disabled for this origin', 'SecurityError');
+        });
+      }
+      const consoleErrors: string[] = [];
+      vi.spyOn(console, 'error').mockImplementation((...args) => {
+        consoleErrors.push(args.map(String).join(' '));
+      });
 
-    await act(async () => {
-      root = createRoot(host);
-      root.render(
-        <StrictMode>
-          <ErrorBoundary>
-            <PlatformProvider adapter={mockPlatform}>
-              <App />
-            </PlatformProvider>
-          </ErrorBoundary>
-        </StrictMode>,
-      );
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <StrictMode>
+            <ErrorBoundary>
+              <PlatformProvider adapter={mockPlatform}>
+                <App />
+              </PlatformProvider>
+            </ErrorBoundary>
+          </StrictMode>,
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
-    const alertText = host.querySelector('[role="alert"]')?.textContent ?? '';
-    expect(host.textContent).not.toContain('Something broke');
-    expect(alertText).not.toContain('Rendered more hooks');
-    expect(consoleErrors.filter(isHookOrderOrBoundaryError)).toEqual([]);
-  });
+      const alertText = host.querySelector('[role="alert"]')?.textContent ?? '';
+      expect(host.textContent).not.toContain('Something broke');
+      expect(host.querySelector('main')).not.toBeNull();
+      expect(alertText).not.toContain('Rendered more hooks');
+      expect(consoleErrors.filter(isHookOrderOrBoundaryError)).toEqual([]);
+    },
+  );
 
   it('anchors the live motion bar below the workspace so jog controls do not move', async () => {
     useLaserStore.setState({ motionOperation: startMotionOperation('jog') });
