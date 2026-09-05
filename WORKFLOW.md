@@ -3044,6 +3044,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 3. INSERT recursion caps at depth 8; deeper nesting (or a block cycle)
    skips that reference with a note.
 4. Z coordinates are ignored (2.5D import): 3D polylines project onto XY.
+5. Nested MINSERT grids can produce many paths from a small file. Their
+   composed instances retain the same transform order and diagnostics without
+   truncation at a JavaScript argument-count limit. File-backed DXF imports use
+   the import worker regardless of byte size; Escape cancels the active parse.
 
 ### F-CNC10. Open a G-code program in the simulator — Phase H.6
 

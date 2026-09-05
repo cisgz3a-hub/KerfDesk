@@ -1,9 +1,29 @@
 import { Blob as NodeBlob } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import { parseDxf } from '../../io/dxf';
+import { nestedMinsertDxf, nestedMinsertStartX } from '../../__fixtures__/nested-minsert';
 import { parseDxfBlob } from './parse-dxf-blob';
 
 describe('parseDxfBlob', () => {
+  it("retains a small file's large nested expansion through the worker Blob parser", async () => {
+    const text = nestedMinsertDxf();
+    const result = await parseDxfBlob(new NodeBlob([text]) as unknown as Blob, {
+      id: 'nested',
+      source: 'nested.dxf',
+    });
+    if (result.kind !== 'ok' || result.object === null)
+      throw new Error('Expected imported geometry');
+    expect(result.pathCount).toBe(150_000);
+    expect(result.notes).toEqual([]);
+    const path = result.object.paths[0];
+    expect(path?.polylines).toHaveLength(150_000);
+    expect(path?.curves).toHaveLength(150_000);
+    for (const index of [0, 499, 500, 149_999]) {
+      expect(path?.polylines[index]?.points[0]?.x).toBeCloseTo(nestedMinsertStartX(index), 8);
+      expect(path?.curves?.[index]?.start.x).toBeCloseTo(nestedMinsertStartX(index), 8);
+    }
+  });
+
   it('streams both semantic passes and matches the compatibility parser', async () => {
     const text = [
       '0',
