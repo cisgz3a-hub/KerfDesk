@@ -98,7 +98,8 @@ function rectAsPath(entity: Extract<SketchEntity, { readonly kind: 'rect' }>): S
     id: entity.id,
     points,
     closed: true,
-    ...(entity.construction === true ? { construction: true } : {}),
+    ...(entity.construction === undefined ? {} : { construction: entity.construction }),
+    ...(entity.layerId === undefined ? {} : { layerId: entity.layerId }),
   };
 }
 

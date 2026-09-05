@@ -31,6 +31,7 @@ export type PersistedDesignSession = {
   readonly activeLayerId: string;
   readonly surface3d: boolean;
   readonly applied: DesignApplyRecord | null;
+  readonly dirtySinceApply?: boolean;
 };
 
 type StoredShape = {
@@ -38,6 +39,7 @@ type StoredShape = {
   readonly sketch: Sketch;
   readonly activeLayerId: string;
   readonly surface3d: boolean;
+  readonly dirtySinceApply?: boolean;
   // Sets and Maps do not survive JSON, so they travel as arrays.
   readonly appliedObjectIds?: ReadonlyArray<string>;
   readonly appliedOperationsByLayer?: ReadonlyArray<readonly [string, string]>;
@@ -51,6 +53,9 @@ export function writePersistedSession(session: PersistedDesignSession): void {
       sketch: session.sketch,
       activeLayerId: session.activeLayerId,
       surface3d: session.surface3d,
+      ...(session.dirtySinceApply === undefined
+        ? {}
+        : { dirtySinceApply: session.dirtySinceApply }),
       ...(session.applied === null
         ? {}
         : {
@@ -101,6 +106,9 @@ function fromStored(value: unknown): PersistedDesignSession | null {
     activeLayerId: stored.activeLayerId,
     surface3d: stored.surface3d !== false,
     applied: appliedFromStored(stored),
+    ...(typeof stored.dirtySinceApply === 'boolean'
+      ? { dirtySinceApply: stored.dirtySinceApply }
+      : {}),
   };
 }
 

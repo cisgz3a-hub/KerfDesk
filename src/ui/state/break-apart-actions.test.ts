@@ -5,9 +5,12 @@ import {
   IDENTITY_TRANSFORM,
   type ColoredPath,
   type ImportedSvg,
+  type CurveSubpath,
+  type TextObject,
 } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { useToastStore } from './toast-store';
 
 describe('break apart selection action', () => {
   beforeEach(() => {
@@ -72,6 +75,85 @@ describe('break apart selection action', () => {
     expect(useStore.getState().project).toBe(before);
     expect(useStore.getState().selectedObjectId).toBe('one');
     expect(useStore.getState().dirty).toBe(false);
+  });
+
+  it('preserves canonical curves and remaps holding tabs to each split part', () => {
+    const curve: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      closed: false,
+      segments: [
+        {
+          kind: 'cubic',
+          control1: { x: 0, y: 10 },
+          control2: { x: 10, y: 10 },
+          to: { x: 10, y: 0 },
+        },
+      ],
+    };
+    const object: ImportedSvg = {
+      ...importedSvg('curves', [
+        {
+          color: '#000000',
+          operationIds: ['cut'],
+          curves: [curve, curve],
+          polylines: [square(0, 0, 10), square(0, 0, 10)],
+          strokeWidthMm: 0.4,
+        },
+      ]),
+      powerScale: 60,
+      cncTabAnchors: [{ layerColor: '#000000', pathIndex: 0, polylineIndex: 1, pathT: 0.3 }],
+    };
+    loadImportedSvg(object);
+    useStore.setState({ selectedObjectId: object.id });
+    useStore.getState().breakApartSelection();
+    const [first, second] = useStore.getState().project.scene.objects as ImportedSvg[];
+    expect(first?.paths[0]?.curves).toEqual([curve]);
+    expect(first?.paths[0]?.operationIds).toEqual(['cut']);
+    expect(first?.paths[0]?.strokeWidthMm).toBe(0.4);
+    expect(first?.bounds.maxY).toBeCloseTo(7.5);
+    expect(first?.cncTabAnchors).toEqual([]);
+    expect(second?.cncTabAnchors).toEqual([
+      { layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.3 },
+    ]);
+    expect(second?.powerScale).toBe(60);
+  });
+
+  it('detaches a removed path-text guide without changing its rendered text geometry, and undo restores the link', () => {
+    const object = importedSvg('guide', [
+      compoundPath('#000000', [square(0, 0, 10), square(20, 0, 10)]),
+    ]);
+    const text: TextObject = {
+      kind: 'text',
+      id: 'label',
+      fontKey: 'roboto-regular',
+      content: 'On path',
+      sizeMm: 10,
+      alignment: 'left',
+      lineHeight: 1.2,
+      letterSpacing: 0,
+      color: '#000000',
+      transform: IDENTITY_TRANSFORM,
+      bounds: object.bounds,
+      paths: [squarePath('#000000', 2, 2, 4)],
+      pathText: { guideObjectId: object.id, offsetMm: 0, reverse: false },
+    };
+    loadImportedSvg(object);
+    useStore.setState((state) => ({
+      project: { ...state.project, scene: { ...state.project.scene, objects: [object, text] } },
+      selectedObjectId: object.id,
+    }));
+    const before = useStore.getState().project;
+    const oldToastCount = useToastStore.getState().toasts.length;
+    useStore.getState().breakApartSelection();
+    const label = useStore
+      .getState()
+      .project.scene.objects.find((item) => item.id === text.id) as TextObject;
+    expect(label.pathText).toBeUndefined();
+    expect(label.paths).toBe(text.paths);
+    expect(label.transform).toBe(text.transform);
+    expect(useToastStore.getState().toasts.length).toBeGreaterThan(oldToastCount);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
   });
 });
 

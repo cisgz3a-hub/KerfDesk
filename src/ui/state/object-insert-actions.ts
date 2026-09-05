@@ -16,6 +16,7 @@ import {
 import type { Sketch } from '../../core/design';
 import { applyInsertBoxPanels, type InsertablePart } from './box-insert-mutation';
 import { applyCarveSettingsToOperations, applyDesignSketch } from './design-apply-mutation';
+import { reportDependencyRepairs } from './object-delete-actions';
 import type { DesignApplyRecord } from './design-apply-record';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
@@ -204,12 +205,14 @@ function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
       // A sketch that contributes nothing leaves the project exactly as it was.
       if (next === null) return state;
       record = next.applyRecord;
+      const { dependencyRepairs, ...nextState } = next;
+      reportDependencyRepairs(dependencyRepairs);
       // Defaults first, then the design layers' carve settings — the reverse
       // order would let the defaults pass clobber the depth/bit the operator
       // just saw in the Studio's 3D preview (ADR-272 Amendment 1 clause 2).
       const withDefaults = applyLayerDefaultsToFreshLayers(
         state.project.scene.layers,
-        next,
+        nextState,
         state.layerDefaults,
         state.cncLiveCaps,
       );

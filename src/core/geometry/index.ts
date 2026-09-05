@@ -1,7 +1,7 @@
 // Public API for the geometry module (ADR-015 boundary): cross-module consumers
-// (ui + io) import Weld / boolean / offset / dogbone / arc-sampling from here, not
-// from the leaf files. Intra-geometry code still imports the leaf modules directly
-// (same-module deep imports are fine).
+// (ui + io) import Weld / boolean / offset / dogbone / arc-sampling from here.
+// Specialized operation-region helpers use direct module imports to keep this
+// barrel within its export cap. Intra-geometry code also uses direct imports.
 export {
   isVectorPathObject,
   materializeVectorObject,
