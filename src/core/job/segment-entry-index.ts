@@ -157,9 +157,9 @@ function gridNearest(
     }
     // Everything not yet scanned lies outside the box of scanned cells, so it
     // is at least `safeRadius` away. Once the best hit is nearer than that, no
-    // later ring can beat it - and because ties never improve on an equal
-    // distance, stopping cannot change the pick.
-    if (best !== null && bestDistSq <= safeRadiusSquared(grid, cursor, cx, cy, ring)) return best;
+    // later ring can beat it. Equality must keep searching: a boundary entry
+    // can still win the segment-index or forward-direction tie-break.
+    if (best !== null && bestDistSq < safeRadiusSquared(grid, cursor, cx, cy, ring)) return best;
   }
   return best;
 }
