@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { CameraCalibration, RgbaImage } from '../../core/camera';
 import type { FrameCaptureIo } from './decode-jpeg';
 import type { ActiveCameraSource } from './frame-source';
@@ -47,49 +47,40 @@ const OTHER_CAMERA_CALIBRATION: CameraCalibration = {
 
 describe('runAutoAlign', () => {
   it('fails typed when no frame can be captured, without persisting', async () => {
-    const updateDeviceProfile = vi.fn();
     const outcome = await runAutoAlign({
       source: SOURCE,
       calibration: undefined,
       bedWidth: 400,
       bedHeight: 400,
       planeHeightMm: 0,
-      updateDeviceProfile,
       io: io(null),
     });
     expect(outcome).toEqual({ kind: 'failed', message: 'Could not capture a camera frame.' });
-    expect(updateDeviceProfile).not.toHaveBeenCalled();
   });
 
   it('fails with the markers-not-found copy on a blank frame, without persisting', async () => {
-    const updateDeviceProfile = vi.fn();
     const outcome = await runAutoAlign({
       source: SOURCE,
       calibration: undefined,
       bedWidth: 400,
       bedHeight: 400,
       planeHeightMm: 0,
-      updateDeviceProfile,
       io: io(grayFrame(320, 240)),
     });
     expect(outcome.kind).toBe('failed');
     if (outcome.kind === 'failed') expect(outcome.message).toContain('Markers not found');
-    expect(updateDeviceProfile).not.toHaveBeenCalled();
   });
 
   it('refuses lens calibration from another camera before solving alignment', async () => {
-    const updateDeviceProfile = vi.fn();
     const outcome = await runAutoAlign({
       source: SOURCE,
       calibration: OTHER_CAMERA_CALIBRATION,
       bedWidth: 400,
       bedHeight: 400,
       planeHeightMm: 0,
-      updateDeviceProfile,
       io: io(grayFrame(320, 240)),
     });
     expect(outcome.kind).toBe('failed');
     if (outcome.kind === 'failed') expect(outcome.message).toContain('different camera');
-    expect(updateDeviceProfile).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   dpiToLinesPerMm,
   lineIntervalMmToLinesPerMm,
@@ -13,9 +14,11 @@ export function CutSettingsImageFields(props: {
   readonly layer: Layer;
   readonly dither: Layer['ditherAlgorithm'];
   readonly imageLinesPerMm: number;
+  readonly maxPower?: number;
   readonly onDitherChange: (dither: Layer['ditherAlgorithm']) => void;
   readonly onImageLinesPerMmChange: (linesPerMm: number) => void;
 }): JSX.Element {
+  const maxPower = props.maxPower ?? props.layer.power;
   return (
     <fieldset className="lf-fieldset">
       <legend className="lf-legend">Image</legend>
@@ -37,12 +40,7 @@ export function CutSettingsImageFields(props: {
       </Field>
       {props.dither === 'grayscale' ? (
         <Field label="Min Power">
-          <NumberInput
-            name="minPower"
-            value={props.layer.minPower}
-            min={0}
-            max={props.layer.power}
-          />
+          <MinPowerInput initialValue={props.layer.minPower} maxPower={maxPower} />
           <span className="lf-field-unit">%</span>
         </Field>
       ) : null}
@@ -89,19 +87,43 @@ export function CutSettingsImageFields(props: {
   );
 }
 
+function MinPowerInput(props: {
+  readonly initialValue: number;
+  readonly maxPower: number;
+}): JSX.Element {
+  const [value, setValue] = useState(props.initialValue);
+  useEffect(() => setValue((current) => Math.min(current, props.maxPower)), [props.maxPower]);
+  return (
+    <input
+      name="minPower"
+      type="number"
+      className="lf-input"
+      aria-label="Cut settings minPower"
+      title="Set the minimum grayscale power."
+      value={Math.min(value, props.maxPower)}
+      min={0}
+      max={props.maxPower}
+      step="any"
+      onChange={(event) => setValue(numericValue(event.target.value, 0))}
+      style={numberStyle}
+    />
+  );
+}
+
 function ImageDensityFields(props: {
   readonly linesPerMm: number;
   readonly onChange: (linesPerMm: number) => void;
 }): JSX.Element {
   return (
     <>
+      <input type="hidden" name="linesPerMm" value={props.linesPerMm} readOnly />
       <Field label="Line Interval">
         <input
           name="lineIntervalMm"
           type="number"
           min={linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM)}
           max={linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM)}
-          step={0.001}
+          step="any"
           className="lf-input"
           value={displayNumber(linesPerMmToLineIntervalMm(props.linesPerMm), 4)}
           onChange={(event) =>
@@ -123,7 +145,7 @@ function ImageDensityFields(props: {
           type="number"
           min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
           max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
-          step={0.01}
+          step="any"
           className="lf-input"
           value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}
           onChange={(event) =>

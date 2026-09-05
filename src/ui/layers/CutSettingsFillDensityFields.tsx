@@ -7,7 +7,7 @@ export function CutSettingsFillDensityFields(props: {
       <input
         type="hidden"
         name="hatchSpacingMm"
-        value={displayNumber(props.lineIntervalMm, 4)}
+        value={props.lineIntervalMm}
         readOnly
         title="Hidden synchronized fill line interval value used when saving cut settings."
       />
@@ -16,7 +16,7 @@ export function CutSettingsFillDensityFields(props: {
           type="number"
           min={0.05}
           max={10}
-          step={0.001}
+          step="any"
           className="lf-input"
           value={displayNumber(props.lineIntervalMm, 4)}
           onChange={(event) =>
@@ -35,7 +35,7 @@ export function CutSettingsFillDensityFields(props: {
           type="number"
           min={lineIntervalMmToLinesPerInch(10)}
           max={lineIntervalMmToLinesPerInch(0.05)}
-          step={0.01}
+          step="any"
           className="lf-input"
           value={displayNumber(lineIntervalMmToLinesPerInch(props.lineIntervalMm), 2)}
           onChange={(event) =>
