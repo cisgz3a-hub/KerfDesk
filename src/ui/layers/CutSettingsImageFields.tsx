@@ -116,7 +116,13 @@ function ImageDensityFields(props: {
 }): JSX.Element {
   return (
     <>
-      <input type="hidden" name="linesPerMm" value={props.linesPerMm} readOnly />
+      <input
+        type="hidden"
+        name="linesPerMm"
+        value={props.linesPerMm}
+        readOnly
+        title="Hidden synchronized image scan density used when saving cut settings."
+      />
       <Field label="Line Interval">
         <input
           name="lineIntervalMm"
