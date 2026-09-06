@@ -280,6 +280,7 @@ describe('CncLayerFields always-visible Advanced section', () => {
       expect(useUiStore.getState().toolMode).toEqual({
         kind: 'cnc-tabs',
         layerColor: layer.color,
+        operationId: layer.id,
       });
 
       const reset = [...host.querySelectorAll('button')].find(

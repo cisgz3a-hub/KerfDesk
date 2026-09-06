@@ -19433,3 +19433,14 @@ from its hole and change existing toolpaths merely while adding a new operation.
   qualification is claimed. The exact-job Frame policy and Job Review advisory policy are unchanged.
 
 ---
+---
+
+## Pending proposal - CNC tab count and editor synchronisation (2026-09-06)
+
+The [dated proposal](docs/proposals/2026-09-06-cnc-tab-count-sync.md) preserves the
+historical disable-editor and count/anchor synchronisation intentions under
+ADR-156 and ADR-211. It is a draft for review, not an accepted architectural
+decision; no ADR number is allocated or reserved. The bounded port uses one
+undoable settings transaction for exclusive unlocked paths. Shared-path anchor
+ownership and the existing compiler/editor color mapping remain explicit open
+follow-ups. Frame/Start policy and hardware qualification are unchanged.

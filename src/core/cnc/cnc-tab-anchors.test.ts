@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { applyTransform, IDENTITY_TRANSFORM, type ImportedSvg } from '../scene';
-import { cncTabAnchorPosition, projectCncTabAnchor, seedCncTabAnchors } from './cnc-tab-anchors';
+import {
+  cncTabAnchorPosition,
+  projectCncTabAnchor,
+  redistributeCncTabAnchors,
+  seedCncTabAnchors,
+} from './cnc-tab-anchors';
 
 const OBJECT: ImportedSvg = {
   kind: 'imported-svg',
@@ -27,6 +32,50 @@ const OBJECT: ImportedSvg = {
 };
 
 describe('CNC tab anchors', () => {
+  it('keeps dragged anchors when the editor is reopened with a different count', () => {
+    const object = {
+      ...OBJECT,
+      cncTabAnchors: [{ layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.3 }],
+    };
+    expect(seedCncTabAnchors(object, '#ff0000', 6)).toBe(object.cncTabAnchors);
+  });
+
+  it('redistributes only saved eligible contours and preserves same-color sibling paths', () => {
+    const path = OBJECT.paths[0]!;
+    const protectedAnchor = { layerColor: path.color, pathIndex: 1, polylineIndex: 0, pathT: 0.3 };
+    const object = {
+      ...OBJECT,
+      paths: [{ ...path, polylines: [...path.polylines, ...path.polylines] }, path],
+      cncTabAnchors: [
+        { layerColor: path.color, pathIndex: 0, polylineIndex: 0, pathT: 0.05 },
+        protectedAnchor,
+      ],
+    };
+    const anchors = redistributeCncTabAnchors(object, new Set([0]), 3);
+    expect(
+      anchors.filter((anchor) => anchor.pathIndex === 0).map((anchor) => anchor.pathT),
+    ).toEqual([1 / 6, 0.5, 5 / 6]);
+    expect(anchors.filter((anchor) => anchor.pathIndex === 1)).toEqual([protectedAnchor]);
+    expect(anchors.some((anchor) => anchor.polylineIndex === 1)).toBe(false);
+    expect(object.cncTabAnchors).toHaveLength(2);
+  });
+
+  it('preserves automatic, open and stale contour anchors without inventing replacements', () => {
+    expect(redistributeCncTabAnchors(OBJECT, new Set([0]), 6)).toEqual([]);
+    const path = OBJECT.paths[0]!;
+    const object = {
+      ...OBJECT,
+      paths: [
+        { ...path, polylines: path.polylines.map((polyline) => ({ ...polyline, closed: false })) },
+      ],
+      cncTabAnchors: [
+        { layerColor: path.color, pathIndex: 0, polylineIndex: 0, pathT: 0.3 },
+        { layerColor: path.color, pathIndex: 0, polylineIndex: 99, pathT: 0.5 },
+      ],
+    };
+    expect(redistributeCncTabAnchors(object, new Set([0]), 6)).toBe(object.cncTabAnchors);
+  });
+
   it('seeds normalized positions and keeps them attached through transforms', () => {
     const anchors = seedCncTabAnchors(OBJECT, '#ff0000', 4);
     expect(anchors.map((anchor) => anchor.pathT)).toEqual([0.125, 0.375, 0.625, 0.875]);
