@@ -1,0 +1,610 @@
+{
+  "preparedAt": "2026-09-06T04:25:12.382Z",
+  "originalAuditHead": "9209fcb33f4807ebfc1f7a55780069b6a7b0e23c",
+  "originalReportSHA256": "8069af68c30b89d33fab65ee87dc2ab288034466ac20b73896c765320992e469",
+  "portableReportSHA256": "3837d1d8296073be8aad74611446b8d01fd8d5af90b527ea7ebf6389d083132d",
+  "acceptedParentFindings": ["TR-013", "TR-014", "TR-012", "TR-017", "TR-018", "TR-019", "TR-016"],
+  "separatelyAcceptedMechanism": "TR-020/QUEUE",
+  "parentTR020Complete": false,
+  "productCommits": [
+    {
+      "finding": "TR-013",
+      "sha": "84d6cf2cdf7561400d7d30f43db65104857ac404",
+      "paths": [
+        "src/ui/trace/ImportImageDialog.cnc-fairing.test.ts",
+        "src/ui/trace/ImportImageDialog.lifetime.test.tsx",
+        "src/ui/trace/ImportImageDialog.raster-output.test.ts",
+        "src/ui/trace/ImportImageDialog.test.ts",
+        "src/ui/trace/ImportImageDialog.tsx",
+        "src/ui/trace/trace-output-commit.ts",
+        "src/ui/trace/use-trace-commit-lifetime.ts"
+      ]
+    },
+    {
+      "finding": "TR-014",
+      "sha": "b6d8e863cd652f5e9cab804a2752f386505a3fae",
+      "paths": [
+        "src/ui/state/image-edit-actions.paged.test.ts",
+        "src/ui/state/image-edit-actions.ts"
+      ]
+    },
+    {
+      "finding": "TR-012",
+      "sha": "07606c00f75e5caff0f97d55b4de4b595df9fd60",
+      "paths": [
+        "src/ui/camera/TraceFromCameraButton.tsx",
+        "src/ui/camera/use-camera-trace-lifetime.ts",
+        "src/ui/state/camera-trace-import.ts",
+        "src/ui/state/import-actions.ts",
+        "src/ui/state/scene-mutations.ts",
+        "src/ui/state/ui-store.ts",
+        "src/ui/trace/ImportImageDialog.camera.test.tsx",
+        "src/ui/trace/ImportImageDialog.tsx",
+        "src/ui/trace/camera-trace-capture.test.tsx",
+        "src/ui/trace/camera-trace.test-support.tsx",
+        "src/ui/trace/trace-output-commit.ts",
+        "src/ui/trace/use-trace-commit-lifetime.ts"
+      ]
+    },
+    {
+      "finding": "TR-017",
+      "sha": "da23ceef6e0072298b3bf856686eaba4914a856f",
+      "paths": [
+        "src/core/job/compile-job-offset-fill-diagnostic.test.ts",
+        "src/core/job/offset-fill-region-engine.test.ts",
+        "src/core/job/offset-fill-region.test.ts",
+        "src/core/job/offset-fill-region.ts",
+        "src/core/job/offset-fill.test.ts",
+        "src/core/job/offset-fill.ts",
+        "src/ui/laser/job-intent-warnings-offset-fill.test.ts"
+      ]
+    },
+    {
+      "finding": "TR-018",
+      "sha": "335d5fb5086d7c228232ade2d66ba6908556929d",
+      "paths": [
+        "src/core/job/fill-contour-groups.ts",
+        "src/core/job/fill-hatching-cache.ts",
+        "src/core/job/fill-hatching-composition.test.ts",
+        "src/core/job/fill-hatching.ts",
+        "src/core/job/fill-rule.ts",
+        "src/core/job/fill-scanline-composition.ts",
+        "src/core/job/layer-fill-composition.test.ts",
+        "src/core/job/layer-fill.ts",
+        "src/core/job/offset-fill-composition.test.ts",
+        "src/core/job/offset-fill-region.ts",
+        "src/core/job/offset-fill.ts"
+      ]
+    },
+    {
+      "finding": "TR-019",
+      "sha": "013e1bad8bf88df062c008e924f995ce8fdb11fc",
+      "paths": [
+        "src/ui/workspace/draw-raster-preview-overrides-async.test.ts",
+        "src/ui/workspace/draw-raster-preview-overrides.test.ts",
+        "src/ui/workspace/draw-raster-preview-processing-overrides.test.ts",
+        "src/ui/workspace/draw-raster-preview.ts",
+        "src/ui/workspace/raster-preview.test-support.ts"
+      ]
+    },
+    {
+      "finding": "TR-016",
+      "sha": "ac880230df16d09938df42abd88bbfaecef5e0f4",
+      "paths": [
+        "src/ui/trace/ImportImageDialog.preview-settlement.test.tsx",
+        "src/ui/trace/ImportImageDialog.raster-output.test.ts",
+        "src/ui/trace/ImportImageDialog.tsx",
+        "src/ui/trace/trace-settlement.test-support.tsx",
+        "src/ui/trace/use-trace-preview-settlement.test.tsx",
+        "src/ui/trace/use-trace-preview-settlement.ts",
+        "src/ui/trace/use-trace-preview.ts"
+      ]
+    },
+    {
+      "finding": "TR-020",
+      "mechanism": "TR-020/QUEUE",
+      "sha": "8b297e83e1630c11671d04e39c1848999564dafe",
+      "paths": [
+        "src/ui/trace/use-trace-worker-client-timeout.test.ts",
+        "src/ui/trace/use-trace-worker-client.ts",
+        "src/ui/trace/use-trace-worker-ownership.test.ts"
+      ]
+    }
+  ],
+  "localEvidenceReferences": [
+    {
+      "label": "Accepted synthesis",
+      "target": "evidence/stage-7/stage-7-report.md",
+      "image": false
+    },
+    {
+      "label": "Accepted findings and closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Lifecycle evidence",
+      "target": "evidence/stage-4/stage-4-report.md",
+      "image": false
+    },
+    {
+      "label": "output evidence",
+      "target": "evidence/stage-5/stage-5-report.md",
+      "image": false
+    },
+    {
+      "label": "performance evidence",
+      "target": "evidence/stage-6/stage-6-report.md",
+      "image": false
+    },
+    {
+      "label": "Inventory",
+      "target": "evidence/stage-1/stage-1-report.md",
+      "image": false
+    },
+    {
+      "label": "coverage reconciliation",
+      "target": "evidence/stage-7/coverage-reconciliation.md",
+      "image": false
+    },
+    {
+      "label": "Independent integrity record",
+      "target": "evidence/manager/stage-7-independent-integrity.json",
+      "image": false
+    },
+    {
+      "label": "Engine and option inventory",
+      "target": "evidence/stage-1/stage-1-report.md",
+      "image": false
+    },
+    {
+      "label": "version and research reconciliation",
+      "target": "evidence/stage-7/research-reconciliation.md",
+      "image": false
+    },
+    {
+      "label": "Stage 2 preprocessing",
+      "target": "evidence/stage-2/stage-2-report.md",
+      "image": false
+    },
+    {
+      "label": "Stage 3 geometry",
+      "target": "evidence/stage-3/stage-3-report.md",
+      "image": false
+    },
+    {
+      "label": "Exact ranges and displayed defaults",
+      "target": "evidence/stage-1/stage-1-report.md",
+      "image": false
+    },
+    {
+      "label": "Scale evidence",
+      "target": "evidence/stage-6/benchmark-summary.json",
+      "image": false
+    },
+    {
+      "label": "region evidence",
+      "target": "evidence/stage-4/stage-4-report.md",
+      "image": false
+    },
+    {
+      "label": "Entry and consumer map",
+      "target": "evidence/stage-1/stage-1-report.md",
+      "image": false
+    },
+    {
+      "label": "Complete claim-to-source reconciliation",
+      "target": "evidence/stage-7/research-reconciliation.md",
+      "image": false
+    },
+    {
+      "label": "Distance oracle",
+      "target": "evidence/manager/distance-oracle-result.json",
+      "image": false
+    },
+    {
+      "label": "topology oracle",
+      "target": "evidence/manager/topology-oracle-result.json",
+      "image": false
+    },
+    {
+      "label": "Manager continuous checks",
+      "target": "evidence/manager/stage-5-continuous-fairing-observations.json",
+      "image": false
+    },
+    {
+      "label": "delegate enclosures",
+      "target": "evidence/stage-5/cnc-conditioning-results.json",
+      "image": false
+    },
+    {
+      "label": "Positive controls and limits",
+      "target": "evidence/stage-7/strengths-tradeoffs-gaps.md",
+      "image": false
+    },
+    {
+      "label": "Independent test accounting",
+      "target": "evidence/manager/cross-stage-test-accounting.json",
+      "image": false
+    },
+    {
+      "label": "Stage 4 browser scope",
+      "target": "evidence/stage-4/stage-4-report.md",
+      "image": false
+    },
+    {
+      "label": "Stage 5 output scope",
+      "target": "evidence/stage-5/stage-5-report.md",
+      "image": false
+    },
+    {
+      "label": "Retained gaps",
+      "target": "evidence/stage-7/strengths-tradeoffs-gaps.md",
+      "image": false
+    },
+    {
+      "label": "Benchmark summary",
+      "target": "evidence/stage-6/benchmark-summary.json",
+      "image": false
+    },
+    {
+      "label": "independent count verification",
+      "target": "evidence/manager/stage-6-independent-integrity.json",
+      "image": false
+    },
+    {
+      "label": "Profiles and scale plans",
+      "target": "evidence/stage-6/benchmark-summary.json",
+      "image": false
+    },
+    {
+      "label": "Queue timeline",
+      "target": "evidence/manager/stage-6-queue-timeline.json",
+      "image": false
+    },
+    {
+      "label": "Failure-boundary evidence",
+      "target": "evidence/stage-6/browser-boundaries.json",
+      "image": false
+    },
+    {
+      "label": "measurement limits",
+      "target": "evidence/stage-7/evaluation-plan.md",
+      "image": false
+    },
+    {
+      "label": "Accepted priority and dependency plan",
+      "target": "evidence/stage-7/remediation-batches.md",
+      "image": false
+    },
+    {
+      "label": "Consolidated ledger",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Evaluation plan",
+      "target": "evidence/stage-7/evaluation-plan.md",
+      "image": false
+    },
+    {
+      "label": "Mechanism criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Accepted criteria and counterfactual limits",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Optional work and limits",
+      "target": "evidence/stage-7/strengths-tradeoffs-gaps.md",
+      "image": false
+    },
+    {
+      "label": "TR-001 evidence",
+      "target": "evidence/stage-2/stage-2-report.md",
+      "image": false
+    },
+    {
+      "label": "accepted closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Transition evidence",
+      "target": "evidence/stage-2/stage-2-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-002 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Original and region evidence",
+      "target": "evidence/stage-4/stage-4-report.md",
+      "image": false
+    },
+    {
+      "label": "corrected adversarial evidence",
+      "target": "evidence/stage-6/adversarial-results.json",
+      "image": false
+    },
+    {
+      "label": "closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Mask and contour evidence",
+      "target": "evidence/stage-2/stage-2-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-004 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Scale-unit reproduction",
+      "target": "evidence/stage-2/stage-2-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-005 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Current route and fixture",
+      "target": "evidence/stage-2/stage-2-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-006 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Geometry causality",
+      "target": "evidence/stage-3/stage-3-report.md",
+      "image": false
+    },
+    {
+      "label": "downstream consequences",
+      "target": "evidence/stage-5/stage-5-report.md",
+      "image": false
+    },
+    {
+      "label": "closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Centerline and alternate-fixture evidence",
+      "target": "evidence/stage-3/stage-3-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-008 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Scale and join causality",
+      "target": "evidence/stage-3/stage-3-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-009 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Graph and cap evidence",
+      "target": "evidence/stage-3/stage-3-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-010 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Tiny-loop evidence",
+      "target": "evidence/stage-3/stage-3-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-011 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Rendered button-to-commit evidence",
+      "target": "evidence/stage-4/stage-4-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-012 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Actual asynchronous schedule",
+      "target": "evidence/stage-4/stage-4-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-013 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Paged-source reproduction",
+      "target": "evidence/stage-4/stage-4-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-014 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Rendered focus evidence",
+      "target": "evidence/stage-4/stage-4-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-015 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Preview-state reproduction",
+      "target": "evidence/stage-4/stage-4-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-016 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Offset and counterfactual evidence",
+      "target": "evidence/stage-5/stage-5-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-017 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Actual-font and region evidence",
+      "target": "evidence/stage-5/stage-5-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-018 closure criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Pixel and emitted-output evidence",
+      "target": "evidence/stage-5/stage-5-report.md",
+      "image": false
+    },
+    {
+      "label": "TR-019 criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "Measured queue",
+      "target": "evidence/manager/stage-6-queue-timeline.json",
+      "image": false
+    },
+    {
+      "label": "Fallback evidence",
+      "target": "evidence/stage-6/browser-boundaries.json",
+      "image": false
+    },
+    {
+      "label": "Complete TR-020 criteria",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "accepted coverage register",
+      "target": "evidence/stage-7/coverage-reconciliation.md",
+      "image": false
+    },
+    {
+      "label": "accepted coverage register",
+      "target": "evidence/stage-7/coverage-reconciliation.md",
+      "image": false
+    },
+    {
+      "label": "accepted coverage register",
+      "target": "evidence/stage-7/coverage-reconciliation.md",
+      "image": false
+    },
+    {
+      "label": "accepted coverage register",
+      "target": "evidence/stage-7/coverage-reconciliation.md",
+      "image": false
+    },
+    {
+      "label": "accepted coverage register",
+      "target": "evidence/stage-7/coverage-reconciliation.md",
+      "image": false
+    },
+    {
+      "label": "accepted coverage register",
+      "target": "evidence/stage-7/coverage-reconciliation.md",
+      "image": false
+    },
+    {
+      "label": "Findings",
+      "target": "evidence/stage-7/consolidated-findings.md",
+      "image": false
+    },
+    {
+      "label": "source anchors",
+      "target": "evidence/stage-7/source-anchors.json",
+      "image": false
+    },
+    {
+      "label": "manager acceptance",
+      "target": "evidence/manager/stage-7-acceptance.json",
+      "image": false
+    }
+  ],
+  "excludedGeneratedMaterial": [
+    "Browser profiles and caches",
+    "Vite caches",
+    "Bulk generated logs",
+    "Build outputs",
+    "Unfinished experiments"
+  ],
+  "freshPublicationVerification": {
+    "tests": {
+      "productHead": "8b297e83e1630c11671d04e39c1848999564dafe",
+      "startedAt": "2026-09-06T04:21:18.931Z",
+      "completedAt": "2026-09-06T04:24:03.633Z",
+      "exitCode": 0,
+      "sourceFiles": 47,
+      "testResults": {
+        "total": 601,
+        "passed": 601,
+        "failed": 0,
+        "files": 82
+      },
+      "maxWorkers": 1
+    },
+    "typecheck": {
+      "productHead": "8b297e83e1630c11671d04e39c1848999564dafe",
+      "startedAt": "2026-09-06T04:25:50.071Z",
+      "completedAt": "2026-09-06T04:26:21.156Z",
+      "exitCode": 0,
+      "sourceFiles": 47
+    },
+    "lint": {
+      "productHead": "8b297e83e1630c11671d04e39c1848999564dafe",
+      "startedAt": "2026-09-06T04:25:50.101Z",
+      "completedAt": "2026-09-06T04:26:06.612Z",
+      "exitCode": 0,
+      "sourceFiles": 47
+    },
+    "format": {
+      "productHead": "8b297e83e1630c11671d04e39c1848999564dafe",
+      "startedAt": "2026-09-06T04:26:47.577Z",
+      "completedAt": "2026-09-06T04:26:49.029Z",
+      "exitCode": 0,
+      "sourceFiles": 47
+    }
+  }
+}
