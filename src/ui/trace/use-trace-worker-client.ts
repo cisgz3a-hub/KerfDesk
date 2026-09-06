@@ -11,24 +11,16 @@
 // Small test-sized images can fall back inline; large images report a
 // recoverable error instead of pinning the main thread.
 //
-// One worker is reused while it is healthy. A new trace supersedes an
-// unfinished trace by rejecting its pending promise but KEEPS the worker
-// alive: synchronous tracing code cannot process a cooperative cancellation
-// message, so the stale job runs to completion inside the worker and its late
-// response is dropped by request id (handleWorkerMessage ignores unknown ids).
-// Tradeoff: the stale synchronous trace briefly occupies the worker and the
-// new request queues behind it — still far cheaper than terminating and
-// paying a cold worker spawn (plus the full unbundled ~85-module graph reload
-// in Vite dev) for every 50-500ms preview trace during slider/preset tuning.
-// Terminate is reserved for the fatal paths: worker runtime error, postMessage
-// failure, and the 30s hung-worker timeout.
+// Reuse a healthy worker after its request completes. Superseding unfinished
+// work retires that worker: synchronous tracing cannot process a cancellation
+// message, and keeping it alive queues the newest request behind obsolete CPU
+// work (TR-020). Supersession rejects only the obsolete promise, without inline
+// fallback or relaxed retry. The replacement pays worker startup, not backlog.
 //
-// Because that backlog is real, the worker acks kind:'started' when a request
-// reaches the head of its message queue and the client restarts the 30s budget
-// on that ack. The budget therefore bounds the worker's COMPUTE time for the
-// request instead of compute-plus-backlog — a 4MP preview raster queued behind
-// a superseded trace used to blow the budget and terminate a healthy worker.
-// A worker that never acks is still bounded by the timer armed at post time.
+// Each message, fatal callback and watchdog belongs to its specific worker.
+// Retired callbacks cannot act on a replacement. The unchanged 30s watchdog
+// bounds startup/no acknowledgement, then restarts on the 'started' ack to
+// give the current computation its own budget.
 
 import type { Bounds, ColoredPath } from '../../core/scene';
 import {
@@ -64,6 +56,7 @@ export function isTraceRequestSuperseded(error: unknown): boolean {
 }
 
 type Pending = {
+  readonly worker: Worker;
   readonly resolve: (result: TraceResult) => void;
   readonly reject: (err: Error) => void;
   // Restart this request's hung-worker budget. Called on the worker's
@@ -106,31 +99,32 @@ function ensureWorker(): Worker | null {
     return null;
   }
   try {
-    workerInstance = new Worker(new URL('./trace-worker.ts', import.meta.url), {
+    const worker = new Worker(new URL('./trace-worker.ts', import.meta.url), {
       type: 'module',
     });
-    workerInstance.onmessage = handleWorkerMessage;
-    workerInstance.onerror = (): void => {
+    workerInstance = worker;
+    worker.onmessage = (event): void => handleWorkerMessage(worker, event);
+    worker.onerror = (): void => {
       // Worker crashed (e.g. module-resolution failure, syntax error
       // in worker bundle). Same shape as a kind:'error' response —
       // reject every in-flight promise so callers can fall back.
       rejectAllPendingAndRetireWorker(
+        worker,
         new Error('Trace worker errored — falling back to inline tracing'),
       );
     };
-    return workerInstance;
+    return worker;
   } catch {
     return null;
   }
 }
 
-function handleWorkerMessage(e: MessageEvent<TraceWorkerResponse>): void {
+function handleWorkerMessage(worker: Worker, e: MessageEvent<TraceWorkerResponse>): void {
+  if (workerInstance !== worker) return;
   const pending = pendingByRequestId.get(e.data.id);
-  if (pending === undefined) return;
+  if (pending === undefined || pending.worker !== worker) return;
   if (e.data.kind === 'started') {
-    // The worker has dequeued this request and is about to trace it. Restart
-    // the budget so the time it spent waiting behind a superseded trace (which
-    // the worker has no way to cancel) is not charged to this request.
+    // Startup completed and this owner is about to trace the current request.
     pending.restartWatchdog();
     return;
   }
@@ -153,11 +147,11 @@ function handleWorkerMessage(e: MessageEvent<TraceWorkerResponse>): void {
 // Tear down the live worker after a fatal runtime error. All callers
 // that race the failure get their pending promises rejected. The next
 // traceImage call will try to construct a fresh worker.
-function retireWorker(): void {
-  if (workerInstance !== null) {
-    workerInstance.terminate();
-    workerInstance = null;
-  }
+function retireWorker(worker: Worker): void {
+  workerInstance = null;
+  worker.onmessage = null;
+  worker.onerror = null;
+  worker.terminate();
 }
 
 // Reject every in-flight caller without touching the worker. Each pending's
@@ -171,8 +165,9 @@ function rejectAllPending(error: Error): void {
   }
 }
 
-function rejectAllPendingAndRetireWorker(error: Error): void {
-  retireWorker();
+function rejectAllPendingAndRetireWorker(worker: Worker, error: Error): void {
+  if (workerInstance !== worker) return;
+  retireWorker(worker);
   rejectAllPending(error);
 }
 
@@ -185,12 +180,8 @@ function rejectAllPendingAndRetireWorker(error: Error): void {
 // is small enough. Without it, every commit through the dialog would
 // error-toast after a bounded inline path could have succeeded.
 export async function traceImage(image: RawImageData, options: TraceOptions): Promise<TraceResult> {
-  if (pendingByRequestId.size > 0) {
-    // Supersede WITHOUT terminating: the stale job keeps the worker busy for
-    // a moment and this request queues behind it, which is still far cheaper
-    // than a cold worker restart per trace (see module header for the full
-    // tradeoff). Its late response is dropped by id in handleWorkerMessage.
-    rejectAllPending(new TraceRequestSupersededError());
+  if (workerInstance !== null && pendingByRequestId.size > 0) {
+    rejectAllPendingAndRetireWorker(workerInstance, new TraceRequestSupersededError());
   }
   const worker = ensureWorker();
   if (worker === null) {
@@ -234,18 +225,12 @@ async function traceInline(image: RawImageData, options: TraceOptions): Promise<
 }
 
 // Bound one request. The budget is armed at post time so a worker that never
-// speaks again (an old chunk with no 'started' ack, or one that dies before
-// dequeuing) is still caught, and RESTARTED — not extended — when the worker
-// acks that this request reached the head of its queue. Restarting is what
-// makes the 30s measure compute rather than compute-plus-backlog: since
-// supersede no longer terminates, an uncancellable stale trace can hold the
-// worker for tens of seconds before the newest request is even looked at.
-function armWatchdog(id: number): Watchdog {
+// speaks again is still caught, and restarted when that owner acknowledges
+// the request. Both the request and worker identity must still be current.
+function armWatchdog(worker: Worker, id: number): Watchdog {
   const fire = (): void => {
-    // On timeout: terminate the shared worker and reject every pending caller.
-    // A timed-out worker cannot answer sibling requests already queued to it.
-    if (!pendingByRequestId.has(id)) return;
-    rejectAllPendingAndRetireWorker(new Error('Trace worker timed out'));
+    if (pendingByRequestId.get(id)?.worker !== worker) return;
+    rejectAllPendingAndRetireWorker(worker, new Error('Trace worker timed out'));
   };
   let timer = setTimeout(fire, TRACE_WORKER_TIMEOUT_MS);
   return {
@@ -267,8 +252,9 @@ function traceInWorker(
   return new Promise<TraceResult>((resolve, reject) => {
     nextRequestId += 1;
     const id = nextRequestId;
-    const watchdog = armWatchdog(id);
+    const watchdog = armWatchdog(worker, id);
     pendingByRequestId.set(id, {
+      worker,
       resolve: (result) => {
         watchdog.clear();
         resolve(result);
@@ -291,7 +277,7 @@ function traceInWorker(
     try {
       worker.postMessage(request, [transferredData.buffer]);
     } catch (err) {
-      rejectAllPendingAndRetireWorker(new Error(traceWorkerSendErrorMessage(err)));
+      rejectAllPendingAndRetireWorker(worker, new Error(traceWorkerSendErrorMessage(err)));
     }
   });
 }
