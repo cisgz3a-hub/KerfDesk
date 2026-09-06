@@ -1,8 +1,6 @@
 import {
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
-  machineKindOf,
-  type Project,
   type ReliefObject,
   type SceneObject,
 } from '../../core/scene';
@@ -18,7 +16,6 @@ import { createImportWorkerControls, isImportCancellation } from './import-worke
 import { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
 
 type HeightMapImportContext = {
-  readonly project: Project;
   readonly getProjectDocumentEpoch: () => number;
   readonly importObject: (object: SceneObject, batchIndex?: number) => unknown;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
@@ -92,7 +89,7 @@ async function importHeightMapFile(
       return false;
     }
     context.importObject(reliefFromHeightfield(file.name, prepared.heightfield), batchIndex);
-    reportImportSuccess(file.name, prepared.heightfield, context, pushToast);
+    reportImportSuccess(file.name, prepared.heightfield, pushToast);
     return true;
   } catch (error) {
     if (owner.isCurrent()) reportImportFailure(file.name, error, pushToast);
@@ -105,16 +102,12 @@ async function importHeightMapFile(
 function reportImportSuccess(
   fileName: string,
   heightfield: ReliefHeightfield,
-  context: HeightMapImportContext,
   pushToast: HeightMapImportContext['pushToast'],
 ): void {
-  const laserNote =
-    machineKindOf(context.project.machine) === 'laser'
-      ? ' It is stored now and becomes output geometry in CNC mode.'
-      : '';
   pushToast(
     `Imported height map "${fileName}" (${heightfield.width}x${heightfield.height}, light is high) at ` +
-      `${DEFAULT_RELIEF_WIDTH_MM} mm wide x ${DEFAULT_RELIEF_DEPTH_MM} mm deep.${laserNote}`,
+      `${DEFAULT_RELIEF_WIDTH_MM} mm wide x ${DEFAULT_RELIEF_DEPTH_MM} mm deep. ` +
+      'It is stored in either machine mode; output geometry is generated only in CNC mode.',
     'success',
   );
 }
