@@ -5,6 +5,8 @@
 // from here. Distances are exact integers (squared), so the thinning bucket
 // queue can key on them directly.
 
+import { runTraceSteps, type TraceSteps } from '../trace-steps';
+
 const INF = Number.MAX_SAFE_INTEGER;
 
 export type InkMask = {
@@ -21,22 +23,23 @@ export type InkMask = {
  *  near-infinite distances and every radius-scaled stage downstream (spur
  *  budgets, tip-extension walk length, artifact-loop rejection) blows up. */
 export function squaredDistanceField(mask: InkMask): Float64Array {
-  const { width, height, ink } = mask;
+  return runTraceSteps(squaredDistanceFieldSteps(mask));
+}
+
+export function* squaredDistanceFieldSteps(mask: InkMask): TraceSteps<Float64Array> {
+  const cooperate = yield;
+  const { width, height } = mask;
   const distSq = new Float64Array(width * height);
   const column = new Float64Array(height);
   // Pass 1: per-column 1D transform of the 0/INF indicator.
   for (let x = 0; x < width; x += 1) {
-    for (let y = 0; y < height; y += 1) {
-      column[y] = (ink[y * width + x] ?? 0) === 1 ? INF : 0;
-    }
-    const transformed = distanceTransform1d(column, height);
-    for (let y = 0; y < height; y += 1) {
-      distSq[y * width + x] = transformed[y] ?? 0;
-    }
+    if (cooperate) yield;
+    transformColumn(mask, x, column, distSq);
   }
   // Pass 2: per-row 1D transform of the column result.
   const row = new Float64Array(width);
   for (let y = 0; y < height; y += 1) {
+    if (cooperate) yield;
     for (let x = 0; x < width; x += 1) {
       row[x] = distSq[y * width + x] ?? 0;
     }
@@ -47,6 +50,21 @@ export function squaredDistanceField(mask: InkMask): Float64Array {
   }
   clampToVirtualBorder(distSq, width, height);
   return distSq;
+}
+
+function transformColumn(
+  { width, height, ink }: InkMask,
+  x: number,
+  column: Float64Array,
+  distSq: Float64Array,
+): void {
+  for (let y = 0; y < height; y += 1) {
+    column[y] = (ink[y * width + x] ?? 0) === 1 ? INF : 0;
+  }
+  const transformed = distanceTransform1d(column, height);
+  for (let y = 0; y < height; y += 1) {
+    distSq[y * width + x] = transformed[y] ?? 0;
+  }
 }
 
 // The 1D passes only see in-image background. Treat the first ring of

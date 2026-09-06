@@ -13,13 +13,14 @@ import {
   closeRingEndpoints,
   inkMaskFromPrepared,
   refineChainForOutput,
-  sharpenChainBends,
   simplifyChain,
   smoothChainCurvature,
   smoothRawChain,
-  squaredDistanceField,
   type InkMask,
 } from './centerline';
+import { sharpenChainBendsSteps } from './centerline/sharpen-bends';
+import { squaredDistanceFieldSteps } from './centerline/distance-field';
+import { runTraceSteps, type TraceSteps } from './trace-steps';
 import {
   midCrackChainWithStats,
   traceBoundaryLoops,
@@ -119,7 +120,16 @@ export function traceImageToContourColoredPaths(
   image: RawImageData,
   options: TraceOptions,
 ): ColoredPath[] {
+  return runTraceSteps(traceImageToContourColoredPathsSteps(image, options));
+}
+
+export function* traceImageToContourColoredPathsSteps(
+  image: RawImageData,
+  options: TraceOptions,
+): TraceSteps<ColoredPath[]> {
+  const cooperate = yield;
   const { prepared, crackField } = prepareTraceForContour(image, options);
+  if (cooperate) yield;
   const mask = inkMaskFromPrepared(prepared);
   // Sub-pixel crack interpolation: vertex POSITIONS come from the
   // pre-threshold scalar field while loop TOPOLOGY stays on the cleaned
@@ -129,7 +139,7 @@ export function traceImageToContourColoredPaths(
   // trace: areas scale by scale², lengths (simplify ε) by scale.
   const scale = effectivePixelScale(options);
   const toleranceScale = optimizationToleranceScaleFromOptimize(options.optimize);
-  const polylines = contourPolylinesFromMask(mask, {
+  const polylines = yield* contourPolylinesFromMaskSteps(mask, {
     minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0) * scale * scale,
     epsilonPx:
       SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale * toleranceScale,
@@ -163,12 +173,20 @@ export type ContourFinishOptions = {
  *  geometry stage behind the filled-contours lane and (via its own mask
  *  builder) the Edge Detection lane. */
 export function contourPolylinesFromMask(mask: InkMask, options: ContourFinishOptions): Polyline[] {
+  return runTraceSteps(contourPolylinesFromMaskSteps(mask, options));
+}
+
+export function* contourPolylinesFromMaskSteps(
+  mask: InkMask,
+  options: ContourFinishOptions,
+): TraceSteps<Polyline[]> {
+  const cooperate = yield;
   const pixelScale =
     options.pixelScale !== undefined && Number.isFinite(options.pixelScale)
       ? Math.max(1, options.pixelScale)
       : 1;
   const finish: LoopFinish = {
-    distSq: squaredDistanceField(mask),
+    distSq: yield* squaredDistanceFieldSteps(mask),
     width: mask.width,
     epsilonPx: options.epsilonPx,
     flattenStrength: options.flattenStrength,
@@ -178,10 +196,11 @@ export function contourPolylinesFromMask(mask: InkMask, options: ContourFinishOp
   };
   const polylines: Polyline[] = [];
   for (const loop of traceBoundaryLoops(mask)) {
+    if (cooperate) yield;
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.
     if (Math.abs(loop.area) < options.minAreaPx) continue;
-    const finished = finishLoop(loop.points, finish);
+    const finished = yield* finishLoopSteps(loop.points, finish);
     if (finished !== null) polylines.push(finished);
   }
   return polylines;
@@ -197,10 +216,10 @@ type LoopFinish = {
   readonly crackField: CrackSubPixelField | undefined;
 };
 
-function finishLoop(
+function* finishLoopSteps(
   staircase: ReadonlyArray<Polyline['points'][number]>,
   finish: LoopFinish,
-): Polyline | null {
+): TraceSteps<Polyline | null> {
   const { distSq, width } = finish;
   if (staircase.length < MIN_LOOP_POINTS) return null;
   // Mid-crack first (lattice steps become ≤45° bends; sub-pixel interpolated
@@ -229,7 +248,7 @@ function finishLoop(
   const flattenStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
   const arcStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
   const sharpened = inSharpenRange
-    ? sharpenChainBends(dense, true, distSq, width)
+    ? yield* sharpenChainBendsSteps(dense, true, distSq, width)
     : { points: dense, corners: NO_CORNERS };
   const evened = smoothChainCurvature(sharpened.points, true, sharpened.corners);
   // Mid-wavelength curvature noise (the "small wobble in the O") is evened

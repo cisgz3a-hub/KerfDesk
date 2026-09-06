@@ -8,13 +8,14 @@
 import type { ColoredPath } from '../../scene';
 import { withCanonicalTraceCurves } from '../trace-curves';
 import { preprocessForTrace, type RawImageData, type TraceOptions } from '../trace-image';
-import { squaredDistanceField, type InkMask } from './distance-field';
-import { thinToMedialAxis } from './medial-thinning';
+import { squaredDistanceFieldSteps, type InkMask } from './distance-field';
+import { thinToMedialAxisSteps } from './medial-thinning';
 import { buildStrokeGraph } from './stroke-graph';
 import { condenseJunctions } from './junction-condense';
-import { DEFAULT_SPUR_OPTIONS, pruneSpurs } from './spur-pruning';
-import { assembleStrokePaths } from './stroke-chains';
+import { DEFAULT_SPUR_OPTIONS, pruneSpursSteps } from './spur-pruning';
+import { assembleStrokePathsSteps } from './stroke-chains';
 import { closeRingEndpoints } from './loop-closure';
+import { runTraceSteps, type TraceSteps } from '../trace-steps';
 
 const CENTERLINE_COLOR = '#000000';
 const INK_LUMA_MAX = 128;
@@ -24,15 +25,26 @@ export function traceCenterlineStrokePaths(
   image: RawImageData,
   options: TraceOptions,
 ): ColoredPath[] {
+  return runTraceSteps(traceCenterlineStrokePathsSteps(image, options));
+}
+
+export function* traceCenterlineStrokePathsSteps(
+  image: RawImageData,
+  options: TraceOptions,
+): TraceSteps<ColoredPath[]> {
+  const cooperate = yield;
   const prepared = preprocessForTrace(image, options);
+  if (cooperate) yield;
   const mask = inkMaskFromPrepared(prepared);
   if (!hasInk(mask)) return [];
-  const distSq = squaredDistanceField(mask);
-  const skeleton = thinToMedialAxis(mask, distSq);
+  const distSq = yield* squaredDistanceFieldSteps(mask);
+  const skeleton = yield* thinToMedialAxisSteps(mask, distSq);
   const graph = buildStrokeGraph(skeleton, mask.width, mask.height);
+  if (cooperate) yield;
   const condensed = condenseJunctions(graph, distSq, mask.width);
-  const pruned = pruneSpurs(condensed, distSq, mask.width, DEFAULT_SPUR_OPTIONS);
-  const polylines = assembleStrokePaths(pruned, distSq, mask, {
+  if (cooperate) yield;
+  const pruned = yield* pruneSpursSteps(condensed, distSq, mask.width, DEFAULT_SPUR_OPTIONS);
+  const polylines = yield* assembleStrokePathsSteps(pruned, distSq, mask, {
     joinGapPx: options.centerlineJoinGapPx ?? DEFAULT_JOIN_GAP_PX,
     // lineTolerance keeps its documented contract (higher = fewer vertices);
     // the preset default of 1 leaves the tuned epsilon unchanged.

@@ -14,13 +14,14 @@ import { fairChainAlongArc } from './arc-fairing';
 import { smoothChainCurvature } from './chain-smoothing';
 import { refineChainForOutput } from './curve-refine';
 import type { InkMask } from './distance-field';
-import { bridgeNearbyEnds, pairThroughJunctions, type Chain } from './junction-pairing';
+import { bridgeNearbyEndsSteps, pairThroughJunctionsSteps, type Chain } from './junction-pairing';
 import { decideLoopClosure, LOOP_TOUCH_GAP_PX, type LoopClosureOptions } from './loop-closure';
 import { pointAtArcDistance, radiusAtPosition } from './polyline-window';
-import { repairJunctionSeams, weldBranchEnds } from './seam-repair';
-import { sharpenChainBends } from './sharpen-bends';
+import { repairJunctionSeams, weldBranchEndsSteps } from './seam-repair';
+import { sharpenChainBendsSteps } from './sharpen-bends';
 import { arcLength } from './spur-pruning';
 import type { StrokeGraph } from './stroke-graph';
+import { runTraceSteps, type TraceSteps } from '../trace-steps';
 
 export type ChainAssemblyOptions = {
   /** Bridge separate open ends closer than this many pixels. */
@@ -54,30 +55,42 @@ export function assembleStrokePaths(
   mask: InkMask,
   options: ChainAssemblyOptions,
 ): Polyline[] {
+  return runTraceSteps(assembleStrokePathsSteps(graph, distSq, mask, options));
+}
+
+export function* assembleStrokePathsSteps(
+  graph: StrokeGraph,
+  distSq: Float64Array,
+  mask: InkMask,
+  options: ChainAssemblyOptions,
+): TraceSteps<Polyline[]> {
+  const cooperate = yield;
   const chains = prepareChains(graph, options.snapPoint);
-  pairThroughJunctions(chains, graph);
+  yield* pairThroughJunctionsSteps(chains, graph);
   const alignedFactor = Math.max(1, options.alignedJoinFactor ?? 1);
-  bridgeNearbyEnds(chains, options.joinGapPx, alignedFactor);
+  yield* bridgeNearbyEndsSteps(chains, options.joinGapPx, alignedFactor);
   const closure = closureOptionsFor(options.joinGapPx, alignedFactor);
   const junctions = graph.nodes.filter((n) => n.kind === 'junction').map((n) => n.pos);
   for (const chain of chains) {
+    if (cooperate) yield;
     closeOrExtend(chain, junctions, distSq, mask, closure);
   }
   // Junction centroids dent every through-path (the medial axis genuinely
   // bends toward a T branch): rebuild those seams on ALL chains, then snap
   // branch endpoints back onto the straightened lines they branch from.
   for (const chain of chains) {
+    if (cooperate) yield;
     if (!chain.alive) continue;
     chain.points = repairJunctionSeams(chain.points, chain.closed, junctions, distSq, mask.width);
   }
-  weldBranchEnds(chains, junctions, Math.max(0, options.weldOpenEndsPx ?? 0));
+  yield* weldBranchEndsSteps(chains, junctions, Math.max(0, options.weldOpenEndsPx ?? 0));
   // Welds move endpoints; a ring whose ends both landed on the same target
   // may only NOW be closable.
   for (const chain of chains) {
     if (chain.alive && !chain.closed) applyLoopClosure(chain, closure);
   }
   const simplifyEpsilonPx = SIMPLIFY_EPSILON_PX * Math.max(0.1, options.simplifyTolerance ?? 1);
-  return finalizeChains(chains, distSq, mask, simplifyEpsilonPx);
+  return yield* finalizeChainsSteps(chains, distSq, mask, simplifyEpsilonPx);
 }
 
 // Raw graph chains → snapped (edge mode) and staircase-smoothed chains.
@@ -139,20 +152,22 @@ function closeOrExtend(
   }
 }
 
-function finalizeChains(
+function* finalizeChainsSteps(
   chains: ReadonlyArray<Chain>,
   distSq: Float64Array,
   mask: InkMask,
   simplifyEpsilonPx: number,
-): Polyline[] {
+): TraceSteps<Polyline[]> {
+  const cooperate = yield;
   const result: Polyline[] = [];
   for (const chain of chains) {
+    if (cooperate) yield;
     if (!chain.alive) continue;
     if (chain.closed && isJunctionArtifactLoop(chain, distSq, mask.width)) continue;
     // Thinning chamfers drawn corners and round nibs round them; rebuild the
     // vertices before simplification eats the dense points the tangent
     // estimates need.
-    const sharpened = sharpenChainBends(chain.points, chain.closed, distSq, mask.width);
+    const sharpened = yield* sharpenChainBendsSteps(chain.points, chain.closed, distSq, mask.width);
     // Even out the residual pixel-scale curvature noise on the DENSE chain
     // (corners pinned) before Douglas-Peucker samples it — otherwise every
     // sampled vertex inherits a slightly-wrong tangent and the curve facets

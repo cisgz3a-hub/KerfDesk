@@ -13,6 +13,7 @@
 // bend-geometry.ts.
 
 import type { Vec2 } from '../../scene';
+import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import {
   MAX_VERTEX_OFFSET_FACTOR,
   apexReachScale,
@@ -64,8 +65,19 @@ export function sharpenChainBends(
   distSq: Float64Array,
   width: number,
 ): SharpenedChain {
+  return runTraceSteps(sharpenChainBendsSteps(points, closed, distSq, width));
+}
+
+export function* sharpenChainBendsSteps(
+  points: ReadonlyArray<Vec2>,
+  closed: boolean,
+  distSq: Float64Array,
+  width: number,
+): TraceSteps<SharpenedChain> {
+  const cooperate = yield;
   let pts = [...points];
   const corners = new Set<Vec2>();
+  let closedMaxArm: number | undefined;
   let i = 1;
   // Every closed-chain replacement restarts the scan (the returned array is
   // rotated), so the iteration budget must grow with each replacement — a
@@ -75,6 +87,7 @@ export function sharpenChainBends(
   let guard = pts.length * 2 + GUARD_BASE_BUDGET;
   let replacementsLeft = Math.max(MIN_REPLACEMENT_BUDGET, Math.ceil(pts.length / 2));
   while (guard > 0) {
+    if (cooperate) yield;
     guard -= 1;
     if (i >= (closed ? pts.length : pts.length - 1)) break;
     if (quickTurnAt(pts, i, closed) < QUICK_TURN_GATE_RAD) {
@@ -82,13 +95,22 @@ export function sharpenChainBends(
       continue;
     }
     const bent = closed
-      ? trySharpenClosed(pts, i, distSq, width)
+      ? trySharpenClosed(
+          pts,
+          i,
+          distSq,
+          width,
+          (closedMaxArm ??= arcLengthOf(pts) / CLOSED_ARM_LENGTH_DIVISOR),
+        )
       : trySharpenOpen(pts, i, distSq, width);
     if (bent === null || tooCloseToExistingCorner(bent.corner, corners)) {
       i += 1;
       continue;
     }
     pts = bent.points;
+    // Candidates only read this chain. Reuse its exact, ordered length sum
+    // until a successful replacement adopts a different (rotated) chain.
+    closedMaxArm = undefined;
     corners.add(bent.corner);
     replacementsLeft -= 1;
     if (replacementsLeft <= 0) break;
@@ -244,10 +266,10 @@ function trySharpenClosed(
   i: number,
   distSq: Float64Array,
   width: number,
+  maxArm: number,
 ): BendResult | null {
   const mid = Math.floor(pts.length / 2);
   const shift = (i - mid + pts.length) % pts.length;
   const rotated = [...pts.slice(shift), ...pts.slice(0, shift)];
-  const maxArm = arcLengthOf(pts) / CLOSED_ARM_LENGTH_DIVISOR;
   return trySharpenOpen(rotated, mid, distSq, width, maxArm);
 }

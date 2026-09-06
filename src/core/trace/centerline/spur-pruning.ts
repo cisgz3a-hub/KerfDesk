@@ -10,6 +10,7 @@
 
 import type { Vec2 } from '../../scene';
 import type { StrokeGraph, StrokeNode } from './stroke-graph';
+import { runTraceSteps, type TraceSteps } from '../trace-steps';
 
 export type SpurPruneOptions = {
   /** Multiplier on the junction's local stroke radius. */
@@ -56,6 +57,16 @@ export function pruneSpurs(
   width: number,
   options: SpurPruneOptions = DEFAULT_SPUR_OPTIONS,
 ): StrokeGraph {
+  return runTraceSteps(pruneSpursSteps(graph, distSq, width, options));
+}
+
+export function* pruneSpursSteps(
+  graph: StrokeGraph,
+  distSq: Float64Array,
+  width: number,
+  options: SpurPruneOptions = DEFAULT_SPUR_OPTIONS,
+): TraceSteps<StrokeGraph> {
+  const cooperate = yield;
   const chains: MutableChain[] = graph.chains.map((c) => ({
     a: c.a,
     b: c.b,
@@ -68,8 +79,9 @@ export function pruneSpurs(
 
   let changed = true;
   while (changed) {
-    changed = pruneOneSpur(chains, nodeKind, distSq, width, options);
-    if (!changed && dissolvePassthroughJunctions(chains, nodeKind)) changed = true;
+    if (cooperate) yield;
+    changed = yield* pruneOneSpurSteps(chains, nodeKind, distSq, width, options);
+    if (!changed && (yield* dissolvePassthroughJunctionsSteps(chains, nodeKind))) changed = true;
   }
 
   return {
@@ -84,19 +96,21 @@ export function pruneSpurs(
 // chain dies, and pruning further against the snapshot lets every leaf of a
 // small mark die in a single pass — a 3-px "+" or a dot vanishes entirely,
 // the exact last-chain violation the component guard exists to prevent.
-function pruneOneSpur(
+function* pruneOneSpurSteps(
   chains: MutableChain[],
   nodeKind: Map<number, StrokeNode['kind']>,
   distSq: Float64Array,
   width: number,
   options: SpurPruneOptions,
-): boolean {
+): TraceSteps<boolean> {
+  const cooperate = yield;
   const degree = liveDegrees(chains);
-  const componentSize = liveComponentChainCounts(chains);
+  const componentSize = yield* liveComponentChainCountsSteps(chains);
   for (const chain of chains) {
+    if (cooperate) yield;
     if (!chain.alive || chain.closed) continue;
     if (!isPrunableLeaf(chain, degree, nodeKind)) continue;
-    if ((componentSize.get(componentKey(chain, chains)) ?? 1) <= 1) continue; // last chain guard
+    if ((componentSize.get(yield* componentKeySteps(chain, chains)) ?? 1) <= 1) continue; // last chain guard
     if (!isArtifactSpur(chain, degree, distSq, width, options)) continue;
     chain.alive = false;
     return true;
@@ -116,7 +130,10 @@ function liveDegrees(chains: ReadonlyArray<MutableChain>): Map<number, number> {
 
 // Union-find over node ids; every open chain links its two ends. Closed
 // chains are their own components and never pruned.
-function liveComponentChainCounts(chains: ReadonlyArray<MutableChain>): Map<string, number> {
+function* liveComponentChainCountsSteps(
+  chains: ReadonlyArray<MutableChain>,
+): TraceSteps<Map<string, number>> {
+  const cooperate = yield;
   const parent = new Map<number, number>();
   const find = (n: number): number => {
     let root = n;
@@ -124,7 +141,9 @@ function liveComponentChainCounts(chains: ReadonlyArray<MutableChain>): Map<stri
     parent.set(n, root);
     return root;
   };
+  let work = 0;
   for (const chain of chains) {
+    if ((work++ & 63) === 0 && cooperate) yield;
     if (!chain.alive || chain.closed) continue;
     const ra = find(chain.a);
     const rb = find(chain.b);
@@ -132,14 +151,23 @@ function liveComponentChainCounts(chains: ReadonlyArray<MutableChain>): Map<stri
   }
   const counts = new Map<string, number>();
   for (const chain of chains) {
+    if ((work++ & 63) === 0 && cooperate) yield;
     if (!chain.alive || chain.closed) continue;
     const key = `n${find(chain.a)}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    incrementComponentCount(counts, key);
   }
   return counts;
 }
 
-function componentKey(chain: MutableChain, chains: ReadonlyArray<MutableChain>): string {
+function incrementComponentCount(counts: Map<string, number>, key: string): void {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+function* componentKeySteps(
+  chain: MutableChain,
+  chains: ReadonlyArray<MutableChain>,
+): TraceSteps<string> {
+  const cooperate = yield;
   // Recompute the representative the same way liveComponentChainCounts does.
   const parent = new Map<number, number>();
   const find = (n: number): number => {
@@ -147,7 +175,9 @@ function componentKey(chain: MutableChain, chains: ReadonlyArray<MutableChain>):
     while ((parent.get(root) ?? root) !== root) root = parent.get(root) ?? root;
     return root;
   };
+  let work = 0;
   for (const c of chains) {
+    if ((work++ & 63) === 0 && cooperate) yield;
     if (!c.alive || c.closed) continue;
     const ra = find(c.a);
     const rb = find(c.b);
@@ -227,12 +257,14 @@ export function arcLength(points: ReadonlyArray<Vec2>): number {
 }
 
 // Merge the two surviving chains of any degree-2 node into one through-chain.
-function dissolvePassthroughJunctions(
+function* dissolvePassthroughJunctionsSteps(
   chains: MutableChain[],
   nodeKind: Map<number, StrokeNode['kind']>,
-): boolean {
+): TraceSteps<boolean> {
+  const cooperate = yield;
   const degree = liveDegrees(chains);
   for (const [nodeId, d] of degree) {
+    if (cooperate) yield;
     if (d !== 2 || nodeKind.get(nodeId) !== 'junction') continue;
     const incident = chains.filter(
       (c) => c.alive && !c.closed && (c.a === nodeId || c.b === nodeId),

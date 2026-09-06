@@ -10,6 +10,7 @@
 // the repaired line so branches still touch what they branch from.
 
 import type { Vec2 } from '../../scene';
+import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import { projectOntoSegment, radiusAtPosition, trimArc } from './polyline-window';
 import { SegmentGrid } from './spatial-grid';
 
@@ -73,6 +74,15 @@ export function weldBranchEnds(
   junctions: ReadonlyArray<Vec2>,
   openEndWeldReachPx = 0,
 ): void {
+  runTraceSteps(weldBranchEndsSteps(polylines, junctions, openEndWeldReachPx));
+}
+
+export function* weldBranchEndsSteps(
+  polylines: ReadonlyArray<WeldChain>,
+  junctions: ReadonlyArray<Vec2>,
+  openEndWeldReachPx = 0,
+): TraceSteps<void> {
+  const cooperate = yield;
   // A shared segment grid replaces the per-end full scan of every chain's
   // every segment. Weld reach is tiny (≤ maxReach), so cells that size span
   // the query. Welds move endpoints, mutating adjacent segments, so the grid
@@ -81,6 +91,7 @@ export function weldBranchEnds(
   const maxReach = Math.max(WELD_REACH_PX, openEndWeldReachPx);
   const foots = new WeldFootFinder(polylines, maxReach);
   for (const chain of polylines) {
+    if (cooperate) yield;
     if (!chain.alive || chain.closed || chain.points.length < 2) continue;
     weldChainEnd(chain, 'start', foots, junctions, openEndWeldReachPx);
     weldChainEnd(chain, 'end', foots, junctions, openEndWeldReachPx);
