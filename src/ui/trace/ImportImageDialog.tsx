@@ -5,7 +5,7 @@
 // CNC stays vector-only. Both outputs retain source provenance for Re-trace
 // Original. Pure UI pieces live in dialog-parts.tsx.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import {
   IDENTITY_TRANSFORM,
   type RasterImage,
@@ -48,6 +48,12 @@ import { resolveTraceCommitResult } from './trace-commit-result';
 import { commitTraceOutput } from './trace-output-commit';
 import { useTracePreview } from './use-trace-preview';
 import { useTraceCommitLifetime } from './use-trace-commit-lifetime';
+import {
+  preparedTraceEntry,
+  type TracePreviewCommitControl,
+  type TracePreviewSettlement,
+} from './use-trace-preview-settlement';
+import { isTraceRequestSuperseded } from './use-trace-worker-client';
 
 export function ImportImageDialog(): JSX.Element | null {
   const dialog = useUiStore((s) => s.imageDialog);
@@ -71,6 +77,7 @@ type TraceCommitArgs = {
 };
 
 type TraceCommitContext = {
+  readonly settlePreview?: (outcome: TracePreviewSettlement) => void;
   readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
   readonly commitRasterizedTrace: ReturnType<typeof useStore.getState>['commitRasterizedTrace'];
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
@@ -120,7 +127,8 @@ function DialogBody(props: { readonly dialog: TraceImageDialogState }): JSX.Elem
   );
   const supportsTraceFillStyle = isFilledContourTraceOptions(options);
   const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : traceOutput;
-  const preview = useSelectedTracePreview(file, options, boundarySelection, seed);
+  const previewCommit = useRef<TracePreviewCommitControl>(null);
+  const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewCommit);
 
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -136,6 +144,7 @@ function DialogBody(props: { readonly dialog: TraceImageDialogState }): JSX.Elem
       boundary: boundarySelection.boundary,
       boundaryMode: boundarySelection.boundaryMode,
       preview,
+      settlePreview: previewCommit.current?.capture(),
       replaceTraceId,
       traceExistingImage,
       commitRasterizedTrace,
@@ -177,24 +186,24 @@ function DialogBody(props: { readonly dialog: TraceImageDialogState }): JSX.Elem
   );
 }
 
-function preparedTraceEntry(preview: ReturnType<typeof useTracePreview>): {
-  readonly preparedTrace?: PreparedTrace;
-} {
-  return preview.kind === 'ready' && preview.preparedTrace !== undefined
-    ? { preparedTrace: preview.preparedTrace }
-    : {};
-}
-
 function useSelectedTracePreview(
   file: File | null,
   options: TraceOptions,
   selection: ReturnType<typeof useBoundarySelection>,
   seed: RasterImage,
+  commitControl: Ref<TracePreviewCommitControl>,
 ): ReturnType<typeof useTracePreview> {
-  return useTracePreview(file, options, selection.boundary, selection.boundaryMode, {
-    width: seed.pixelWidth,
-    height: seed.pixelHeight,
-  });
+  return useTracePreview(
+    file,
+    options,
+    selection.boundary,
+    selection.boundaryMode,
+    {
+      width: seed.pixelWidth,
+      height: seed.pixelHeight,
+    },
+    commitControl,
+  );
 }
 
 function isFilledContourTraceOptions(options: TraceOptions): boolean {
@@ -293,6 +302,7 @@ function submitTraceDialog(deps: {
   readonly boundary: TraceBoundary | null;
   readonly boundaryMode: BoundaryMode;
   readonly preview: ReturnType<typeof useTracePreview>;
+  readonly settlePreview: ((outcome: TracePreviewSettlement) => void) | undefined;
   readonly replaceTraceId: string | undefined;
   readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
   readonly commitRasterizedTrace: ReturnType<typeof useStore.getState>['commitRasterizedTrace'];
@@ -326,7 +336,12 @@ function submitTraceDialog(deps: {
     setBusy: deps.setBusy,
     getCurrentProject: () => useStore.getState().project,
     isCurrent: deps.isCurrent,
+    ...(deps.settlePreview === undefined ? {} : { settlePreview: deps.settlePreview }),
   });
+}
+
+function settleTracePreview(ctx: TraceCommitContext, outcome: TracePreviewSettlement): void {
+  ctx.settlePreview?.(outcome);
 }
 
 // Exported for testing the source-revalidation guard (P2-A).
@@ -345,11 +360,13 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     // re-traces the region supersampled and patches it into the full trace
     // (ADR-113). Either way geometry returns in source-image coordinates so
     // preview, commit, and overlay registration stay on the same pixels.
-    const { paths, bounds, width, height } = await resolveTraceCommitResult({
+    const result = await resolveTraceCommitResult({
       ...args,
       sourceGrid: { width: args.seed.pixelWidth, height: args.seed.pixelHeight },
     });
     if (!ctx.isCurrent()) return;
+    settleTracePreview(ctx, { kind: 'ready', result });
+    const { paths, bounds, width, height } = result;
     if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,
@@ -422,6 +439,8 @@ function resolveCommitSource(
 
 function reportCurrentTraceError(source: string, ctx: TraceCommitContext, err: unknown): void {
   if (!ctx.isCurrent()) return;
+  if (isTraceRequestSuperseded(err)) return;
+  ctx.settlePreview?.({ kind: 'error', error: err });
   ctx.pushToast(
     `Could not trace ${source}: ${err instanceof Error ? err.message : String(err)}`,
     'error',

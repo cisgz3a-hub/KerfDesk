@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type * as TraceWorkerClient from './use-trace-worker-client';
 
 vi.mock('./image-loader', () => ({
   PREVIEW_MAX_EDGE_PX: 2048,
@@ -8,7 +9,8 @@ vi.mock('./image-loader', () => ({
     data: new Uint8ClampedArray(16),
   })),
 }));
-vi.mock('./use-trace-worker-client', () => ({
+vi.mock('./use-trace-worker-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof TraceWorkerClient>()),
   traceImageWithFallback: vi.fn(async () => ({
     paths: [{ color: '#000000', polylines: [] }],
     bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
