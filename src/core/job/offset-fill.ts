@@ -1,4 +1,5 @@
 import { isClosedEnough, type Polyline } from '../scene';
+import type { NonzeroContourGroups } from './fill-contour-groups';
 import { offsetPreparedFillRegionChecked, prepareOffsetFillRegion } from './offset-fill-region';
 import type { OffsetFillTermination } from './offset-fill-termination';
 
@@ -10,6 +11,7 @@ const MAX_OFFSET_FILL_PASSES = 2000;
 export type OffsetFillInput = {
   readonly polylines: ReadonlyArray<Polyline>;
   readonly spacingMm: number;
+  readonly nonzeroGroups?: NonzeroContourGroups;
 };
 
 /** Generated contours plus the factual reason contour production stopped. */
@@ -28,7 +30,10 @@ export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
   const spacing = Math.max(MIN_OFFSET_FILL_SPACING_MM, input.spacingMm);
   // A crossing contour can have zero signed area and still enclose valid
   // even-odd ink. Test area only after resolving the complete filled region.
-  const prepared = prepareOffsetFillRegion(input.polylines.filter(isClosedEnough));
+  const prepared = prepareOffsetFillRegion(
+    input.polylines.filter(isClosedEnough),
+    input.nonzeroGroups,
+  );
   if (prepared.kind === 'error') return { contours: [], termination: { kind: 'offset-failed' } };
   const source = prepared.value.filter(isUsableClosedContour);
   if (source.length === 0) return { contours: [], termination: { kind: 'complete' } };

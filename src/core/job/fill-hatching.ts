@@ -31,6 +31,8 @@
 // — the caller decides whether to surface a warning toast.
 
 import { isClosedEnough, type Polyline, type Vec2 } from '../scene';
+import { nonzeroContourGroupIds, type NonzeroContourGroups } from './fill-contour-groups';
+import { composedFillSpans } from './fill-scanline-composition';
 
 // Small absolute tolerance in mm. Used to (a) collapse near-zero edge
 // lengths, (b) snap "scanline exactly on vertex" cases off the boundary
@@ -49,6 +51,7 @@ export type HatchInput = {
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillRule?: HatchFillRule;
+  readonly nonzeroGroups?: NonzeroContourGroups;
   // Snake fill (alternate each row's direction) when true/undefined; emit every
   // row in the SAME direction when false (unidirectional). Unidirectional trades
   // a return-rapid per row for removing the bidirectional firing-lag zipper that
@@ -91,7 +94,11 @@ export function fillHatchingWithMetadata(input: HatchInput): ReadonlyArray<Hatch
   // their low Y let a single advancing cursor admit them; the half-open
   // `y < yHi` test retires them. Each edge is touched only on the scanlines
   // it actually spans, so the cost tracks the geometry, not bed height.
-  const edges = buildSortedEdges(rotated);
+  const groupIds = nonzeroContourGroupIds(input.nonzeroGroups ?? []);
+  const edges = buildSortedEdges(
+    rotated,
+    closed.map((pl) => groupIds.get(pl) ?? 0),
+  );
   const bidirectional = input.bidirectional ?? true;
   const fillRule = input.fillRule ?? 'evenodd';
   const hatchesRotated: HatchPolyline[] = [];
@@ -120,26 +127,54 @@ export function fillHatchingWithMetadata(input: HatchInput): ReadonlyArray<Hatch
     // interval [yLo, yHi), so y >= yHi means it no longer crosses. Since y
     // only increases, a retired edge never returns.
     active = active.filter((e) => y < e.yHi);
-    if (fillRule === 'nonzero') {
-      pushNonZeroScanlineHatches(
-        active.map((e) => ({ x: intersectX(e, y), windingDelta: e.windingDelta })),
-        y,
-        scanIndex,
-        bidirectional,
-        hatchesRotated,
-      );
-    } else {
-      pushEvenOddScanlineHatches(
-        active.map((e) => intersectX(e, y)),
-        y,
-        scanIndex,
-        bidirectional,
-        hatchesRotated,
-      );
-    }
+    pushScanlineHatches(
+      active,
+      y,
+      scanIndex,
+      { bidirectional, fillRule, grouped: groupIds.size > 0 },
+      hatchesRotated,
+    );
   }
 
   return hatchesRotated.map((pl) => rotateHatchPolyline(pl, angle));
+}
+
+function pushScanlineHatches(
+  active: ReadonlyArray<ScanEdge>,
+  y: number,
+  scanIndex: number,
+  settings: {
+    readonly bidirectional: boolean;
+    readonly fillRule: HatchFillRule;
+    readonly grouped: boolean;
+  },
+  out: HatchPolyline[],
+): void {
+  const { bidirectional, fillRule, grouped } = settings;
+  if (grouped) {
+    const spans = composedFillSpans(
+      active.map((e) => ({ x: intersectX(e, y), windingDelta: e.windingDelta, group: e.group })),
+      fillRule,
+    );
+    const forward = !bidirectional || scanIndex % 2 === 0;
+    for (const [a, b] of spans) pushHatch(out, forward ? a : b, forward ? b : a, y, !forward);
+  } else if (fillRule === 'nonzero') {
+    pushNonZeroScanlineHatches(
+      active.map((e) => ({ x: intersectX(e, y), windingDelta: e.windingDelta })),
+      y,
+      scanIndex,
+      bidirectional,
+      out,
+    );
+  } else {
+    pushEvenOddScanlineHatches(
+      active.map((e) => intersectX(e, y)),
+      y,
+      scanIndex,
+      bidirectional,
+      out,
+    );
+  }
 }
 
 function stripHatchMetadata(pl: HatchPolyline): Polyline {
@@ -212,15 +247,19 @@ type ScanEdge = {
   readonly yLo: number;
   readonly yHi: number;
   readonly windingDelta: 1 | -1;
+  readonly group: number;
 };
 
 // Flatten every closed polyline into a flat edge list, dropping horizontal
 // edges (they never cross a scanline — the half-open rule gives them zero
 // intersections), and sort by yLo so the sweep can admit edges with a single
 // advancing cursor instead of re-scanning the whole list each scanline.
-function buildSortedEdges(polylines: ReadonlyArray<Polyline>): ScanEdge[] {
+function buildSortedEdges(
+  polylines: ReadonlyArray<Polyline>,
+  groups: ReadonlyArray<number>,
+): ScanEdge[] {
   const edges: ScanEdge[] = [];
-  for (const pl of polylines) {
+  for (const [index, pl] of polylines.entries()) {
     const n = pl.points.length;
     if (n < 2) continue;
     // Every edge of the closed polygon, including the implicit closing
@@ -238,6 +277,7 @@ function buildSortedEdges(polylines: ReadonlyArray<Polyline>): ScanEdge[] {
         yLo: Math.min(a.y, b.y),
         yHi: Math.max(a.y, b.y),
         windingDelta: b.y > a.y ? 1 : -1,
+        group: groups[index] ?? 0,
       });
     }
   }

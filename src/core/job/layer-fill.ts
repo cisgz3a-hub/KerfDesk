@@ -14,8 +14,9 @@ import {
   type SceneObject,
 } from '../scene';
 import { compilationPolylines } from './compilation-polylines';
+import type { NonzeroContourGroups } from './fill-contour-groups';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
-import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
+import { layerFillCacheKey } from './fill-rule';
 import { fillRunwayPolicyForDevice } from './fill-runway-policy';
 import { groupFillContoursIntoIslands } from './island-fill';
 import { islandFillMotionPolicyForDevice } from './island-fill-motion';
@@ -46,8 +47,11 @@ export function islandFillGroupsForLayer(
   sourceObjectId?: string,
 ): Group[] {
   const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
-  const fillRule = fillRuleForLayer(objects, layer);
-  const contours = collectFillContoursForLayer(objects, layer, device);
+  const { polylines: contours, nonzeroGroups } = collectFillContoursForLayer(
+    objects,
+    layer,
+    device,
+  );
   const islandMotionPolicy = islandFillMotionPolicyForDevice(device);
   const sensitiveIslandFill = islandMotionPolicy === 'sensitive';
   const scanDirection = resolveIslandFillScanDirection(device, layer, sensitiveIslandFill);
@@ -57,13 +61,16 @@ export function islandFillGroupsForLayer(
   return groupFillContoursIntoIslands(contours, {
     clusterMicroIslands: sensitiveIslandFill,
   }).flatMap((island): Group[] => {
-    const segments = memoizedFillHatchingWithMetadata(island, hatchingLayer, fillRule).map(
-      (polyline) => ({
-        polyline: polyline.points,
-        closed: polyline.closed,
-        reverse: polyline.reverse,
-      }),
-    );
+    const segments = memoizedFillHatchingWithMetadata(
+      island,
+      hatchingLayer,
+      'evenodd',
+      nonzeroGroups,
+    ).map((polyline) => ({
+      polyline: polyline.points,
+      closed: polyline.closed,
+      reverse: polyline.reverse,
+    }));
     if (segments.length === 0) return [];
     return [
       {
@@ -96,7 +103,7 @@ export function collectFillSegmentsForLayer(
   const offsetFill =
     layer.fillStyle === 'offset'
       ? offsetFillContours({
-          polylines: collectFillContoursForLayer(objects, layer, device),
+          ...collectFillContoursForLayer(objects, layer, device),
           spacingMm: layer.hatchSpacingMm,
         })
       : null;
@@ -119,8 +126,7 @@ function memoizedLayerFillHatching(
   layer: Layer,
   device: DeviceProfile,
 ): ReadonlyArray<FillSegmentAsPolyline> {
-  const fillRule = fillRuleForLayer(objects, layer);
-  const cacheKey = layerFillCacheKey(layer, device, fillRule);
+  const cacheKey = layerFillCacheKey(layer, device);
   let bySettings = layerFillCache.get(objects);
   if (bySettings === undefined) {
     bySettings = new Map<string, ReadonlyArray<FillSegmentAsPolyline>>();
@@ -129,8 +135,12 @@ function memoizedLayerFillHatching(
   const cached = bySettings.get(cacheKey);
   if (cached !== undefined) return cached;
 
-  const contours = collectFillContoursForLayer(objects, layer, device);
-  const hatches = memoizedFillHatchingWithMetadata(contours, layer, fillRule);
+  const { polylines: contours, nonzeroGroups } = collectFillContoursForLayer(
+    objects,
+    layer,
+    device,
+  );
+  const hatches = memoizedFillHatchingWithMetadata(contours, layer, 'evenodd', nonzeroGroups);
   if (bySettings.size >= MAX_LAYER_FILL_CACHE_ENTRIES) {
     const oldestKey = bySettings.keys().next().value;
     if (oldestKey !== undefined) bySettings.delete(oldestKey);
@@ -143,12 +153,17 @@ function collectFillContoursForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
-): Polyline[] {
+): { readonly polylines: Polyline[]; readonly nonzeroGroups: NonzeroContourGroups } {
   const out: Polyline[] = [];
+  const nonzeroGroups: Polyline[][] = [];
   for (const obj of objects) {
+    const start = out.length;
     appendFillContoursFromObject(obj, layer, device, out);
+    // Winding belongs to this text object, after path binding and canonical
+    // flattening, rather than to the operation that happens to contain it.
+    if (obj.kind === 'text' && out.length > start) nonzeroGroups.push(out.slice(start));
   }
-  return out;
+  return { polylines: out, nonzeroGroups };
 }
 
 function appendFillContoursFromObject(

@@ -9,6 +9,7 @@ import {
 } from '../geometry/vector-path-tools';
 import { ok, type Result } from '../result';
 import type { Polyline } from '../scene';
+import { nonzeroContourGroupIds, type NonzeroContourGroups } from './fill-contour-groups';
 
 const OFFSET_PRECISION_DECIMALS = 3;
 const MIN_CLOSED_POINTS = 3;
@@ -16,15 +17,30 @@ const MIN_CLOSED_POINTS = 3;
 /** Resolve the complete cross-object even-odd region before its first inset. */
 export function prepareOffsetFillRegion(
   contours: ReadonlyArray<Polyline>,
+  nonzeroGroups: NonzeroContourGroups = [],
 ): Result<ReadonlyArray<Polyline>, VectorOpError> {
-  const paths = contours.map(polylineToPathD).filter((path) => path.length >= MIN_CLOSED_POINTS);
-  if (paths.length === 0) return ok([]);
+  if (contours.length === 0) return ok([]);
   // Follow Shape uses the cross-object even-odd contract (ADR-029). Union
   // resolves overlaps/crossings into consistently wound outers and counters;
   // it does not fill the even-odd overlap as a nonzero union would.
-  const prepared = tryVectorOp(() =>
-    unionD(paths, [], FillRule.EvenOdd, OFFSET_PRECISION_DECIMALS),
-  );
+  const prepared = tryVectorOp(() => {
+    const ids = nonzeroContourGroupIds(nonzeroGroups);
+    const constituents = new Map<number, Polyline[]>();
+    for (const contour of contours) {
+      const id = ids.get(contour) ?? 0;
+      const group = constituents.get(id) ?? [];
+      group.push(contour);
+      constituents.set(id, group);
+    }
+    const paths = [...constituents].flatMap(([id, group]) => {
+      const raw = group.map(polylineToPathD).filter((path) => path.length >= MIN_CLOSED_POINTS);
+      if (raw.length === 0) return [];
+      // Resolve text ink once per object before the cross-object even-odd
+      // region. Keep the existing checked engine boundary and inset cleanup.
+      return id === 0 ? raw : unionD(raw, [], FillRule.NonZero, OFFSET_PRECISION_DECIMALS);
+    });
+    return paths.length === 0 ? [] : unionD(paths, [], FillRule.EvenOdd, OFFSET_PRECISION_DECIMALS);
+  });
   if (prepared.kind === 'error') return prepared;
   return ok(prepared.value.map((path) => cleanContour(pathDToPolyline(path))));
 }
