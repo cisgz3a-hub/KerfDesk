@@ -55,8 +55,8 @@ jobs:
 
       - name: Run dependency audits
         id: audit
-        # Deliberately never fails the step: the report is the product, not
-        # the exit code. Capturing the status lets the next step decide.
+        # Advisory exit 1 is expected. The classifier checks both payloads and
+        # exits so a registry/scanner failure cannot become a clean report.
         run: |
           set +e
           mkdir -p artifacts/dependency-audit
@@ -73,11 +73,13 @@ jobs:
           pnpm report:dependency-audit
           --full=artifacts/dependency-audit/full.json
           --runtime=artifacts/dependency-audit/runtime.json
+          --full-exit=${{ steps.audit.outputs.full_exit }}
+          --runtime-exit=${{ steps.audit.outputs.runtime_exit }}
           --output=artifacts/dependency-audit
           --github-output=${GITHUB_OUTPUT}
 
       - name: Refresh dependency tracking issue
-        if: steps.classify.outputs.total_count != '0'
+        if: steps.classify.outputs.evidence_valid == 'true' && steps.classify.outputs.total_count != '0'
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_TITLE: 'Dependency audit: advisories found'
@@ -97,7 +99,7 @@ jobs:
           fi
 
       - name: Close clean dependency tracking issue
-        if: steps.classify.outputs.total_count == '0'
+        if: steps.classify.outputs.evidence_valid == 'true' && steps.classify.outputs.total_count == '0'
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_TITLE: 'Dependency audit: advisories found'

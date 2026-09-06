@@ -75,6 +75,7 @@ export function okPreparation(
       activeControllerKind: machine.activeControllerKind,
       detectedControllerKind: machine.detectedControllerKind,
     },
+    canvasPlan.machineKind,
   );
   const executablePlan = executablePlanForCalculatedBounds({
     canvasPlan,

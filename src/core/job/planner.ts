@@ -48,10 +48,18 @@ import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import type { CutGroup, CutSegment, FillGroup, Job, RasterGroup } from './job';
 import { rasterDurationMotion } from './raster-duration-motion';
 import { effectiveGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { formatGcodeCoordinateMm } from '../gcode';
 import { offsetForEmittedFeed } from './scan-offset';
+import {
+  appendPlannerStop,
+  beginLaserPlannerGroup,
+  initialLaserPlannerState,
+} from './planner-laser-transitions';
 
 const SECONDS_PER_MINUTE = 60;
 const ORIGIN: Vec2 = { x: 0, y: 0 };
+
+type SeekMotion = { readonly velocity: number; readonly motion: 'rapid' | 'feed' };
 
 export type PlannedDuration = {
   readonly totalSeconds: number;
@@ -77,22 +85,14 @@ export function estimateWithPlanner(
 ): PlannedDuration {
   const accel = Math.max(1, device.accelMmPerSec2);
   const jd = Math.max(0, device.junctionDeviationMm);
-  const travelV =
-    effectiveGcodeFeedMmPerMin(device.controlledLaserOffTravelFeedMmPerMin ?? device.maxFeed) /
-    SECONDS_PER_MINUTE;
+  const seek = seekMotion(device);
   const finishPosition =
     options.finishPosition === undefined
       ? resolveGrblDialect(device).parkAtOriginAfterJob
         ? ORIGIN
         : null
       : options.finishPosition;
-  const blocks = buildBlocks(
-    job,
-    device,
-    travelV,
-    options.initialPosition ?? ORIGIN,
-    finishPosition,
-  );
+  const blocks = buildBlocks(job, device, seek, options.initialPosition ?? ORIGIN, finishPosition);
   if (blocks.length === 0) {
     return {
       totalSeconds: 0,
@@ -124,6 +124,15 @@ export function estimateWithPlanner(
   };
 }
 
+function seekMotion(device: DeviceProfile): SeekMotion {
+  return {
+    velocity:
+      effectiveGcodeFeedMmPerMin(device.controlledLaserOffTravelFeedMmPerMin ?? device.maxFeed) /
+      SECONDS_PER_MINUTE,
+    motion: device.controlledLaserOffTravelFeedMmPerMin === undefined ? 'rapid' : 'feed',
+  };
+}
+
 // Block decomposition. Walks every cut segment and produces one block
 // per polyline edge (cut, full feed), preceded by a one-block travel
 // from the previous cursor position. The final travel mirrors the selected
@@ -132,28 +141,35 @@ export function estimateWithPlanner(
 function buildBlocks(
   job: Job,
   device: DeviceProfile,
-  travelV: number,
+  seek: SeekMotion,
   initialPosition: Vec2,
   finishPosition: Vec2 | null,
 ): Block[] {
   const out: Block[] = [];
+  const laserState = initialLaserPlannerState(device);
   let cursor: Vec2 = initialPosition;
   for (const group of job.groups) {
     // CNC groups are pre-transformed into XY cut groups by estimate-duration.
     // Raster groups retain their emitted per-power runs so S0 and powered G1
     // legs share one continuous feed-motion chain in the planner.
     if (group.kind === 'cnc') continue;
+    if (group.kind === 'cut' && group.plannerStopBefore === true) appendPlannerStop(out);
+    beginLaserPlannerGroup(out, group, device, laserState);
     const cutV = groupCutVelocity(group, device);
     if (group.kind === 'raster') {
-      cursor = appendRasterGroupBlocks(out, cursor, group, cutV, travelV, device);
+      cursor = appendRasterGroupBlocks(out, cursor, group, cutV, seek, device);
+      appendPlannerStop(out);
       continue;
     }
     cursor =
       group.kind === 'fill' && (group.fillStyle ?? 'scanline') !== 'offset'
-        ? appendFillGroupBlocks(out, cursor, group, cutV, travelV, device)
-        : appendCutGroupBlocks(out, cursor, group, cutV, travelV, device);
+        ? appendFillGroupBlocks(out, cursor, group, cutV, seek, device)
+        : appendCutGroupBlocks(out, cursor, group, cutV, seek, device);
   }
-  if (finishPosition !== null) appendTravel(out, cursor, finishPosition, travelV);
+  // M5 (and any coolant stop) drains motion before the postamble seek, even
+  // when that seek uses the same G1 feed and direction as the final burn.
+  appendPlannerStop(out);
+  if (finishPosition !== null) appendSeek(out, cursor, finishPosition, seek);
   return out;
 }
 
@@ -169,7 +185,7 @@ function appendRasterGroupBlocks(
   initialCursor: Vec2,
   group: RasterGroup,
   cutV: number,
-  travelV: number,
+  seek: SeekMotion,
   device: DeviceProfile,
 ): Vec2 {
   let cursor = initialCursor;
@@ -177,10 +193,8 @@ function appendRasterGroupBlocks(
     if (motion.kind === 'cut') appendCut(out, motion.from, motion.to, cutV);
     else if (motion.kind === 'feed-travel') {
       appendFeedTravel(out, motion.from, motion.to, cutV);
-    } else if (device.controlledLaserOffTravelFeedMmPerMin !== undefined) {
-      appendFeedTravel(out, motion.from, motion.to, travelV);
     } else {
-      appendTravel(out, motion.from, motion.to, travelV);
+      appendSeek(out, motion.from, motion.to, seek);
     }
     cursor = motion.to;
   }
@@ -192,7 +206,7 @@ function appendFillGroupBlocks(
   initialCursor: Vec2,
   group: FillGroup,
   cutV: number,
-  travelV: number,
+  seek: SeekMotion,
   device: DeviceProfile,
 ): Vec2 {
   let cursor = initialCursor;
@@ -201,7 +215,7 @@ function appendFillGroupBlocks(
   const plans = planFillSweeps(group, scanOffsetMm);
   for (let pass = 0; pass < group.passes; pass += 1) {
     for (const plan of plans) {
-      cursor = appendFillSweepBlocks(out, cursor, plan, cutV, travelV);
+      cursor = appendFillSweepBlocks(out, cursor, plan, cutV, seek, hasLaserPower(group, device));
     }
   }
   return cursor;
@@ -212,7 +226,8 @@ function appendFillSweepBlocks(
   cursor: Vec2,
   plan: FillSweepPlan,
   cutV: number,
-  travelV: number,
+  seek: SeekMotion,
+  powered: boolean,
 ): Vec2 {
   const sweep = plan.sweep;
   const first = sweep.spans[0];
@@ -223,19 +238,19 @@ function appendFillSweepBlocks(
   // G1 leg stays in feed motion, so changing S never invents a planner stop.
   const run = expandFillHatchWithRunways([first.start, last.end], plan);
   if (run === null) return cursor;
-  appendTravel(out, cursor, run.leadStart, travelV);
+  appendSeek(out, cursor, run.leadStart, seek);
   if (plan.leadInMm > 0) {
-    appendRunwayBlock(out, run.leadStart, run.burnStart, plan, cutV, travelV);
+    appendRunwayBlock(out, run.leadStart, run.burnStart, plan, cutV, seek);
   }
   for (let spanIndex = 0; spanIndex < sweep.spans.length; spanIndex += 1) {
     const span = sweep.spans[spanIndex];
     if (span === undefined) continue;
-    appendCut(out, span.start, span.end, cutV);
+    appendCut(out, span.start, span.end, cutV, powered);
     const next = sweep.spans[spanIndex + 1];
     if (next !== undefined) appendFeedTravel(out, span.end, next.start, cutV);
   }
   if (plan.leadOutMm > 0) {
-    appendRunwayBlock(out, run.burnEnd, run.leadEnd, plan, cutV, travelV);
+    appendRunwayBlock(out, run.burnEnd, run.leadEnd, plan, cutV, seek);
   }
   return run.leadEnd;
 }
@@ -246,10 +261,10 @@ function appendRunwayBlock(
   to: Vec2,
   plan: FillSweepPlan,
   cutV: number,
-  travelV: number,
+  seek: SeekMotion,
 ): void {
   if (plan.runwayMotion === 'feed-matched') appendFeedTravel(out, from, to, cutV);
-  else appendTravel(out, from, to, travelV);
+  else appendSeek(out, from, to, seek);
 }
 
 function appendCutGroupBlocks(
@@ -257,26 +272,31 @@ function appendCutGroupBlocks(
   initialCursor: Vec2,
   group: CutGroup | FillGroup,
   cutV: number,
-  travelV: number,
+  seek: SeekMotion,
   device: DeviceProfile,
 ): Vec2 {
   let cursor = initialCursor;
   const entryRunwayMm = group.entryRunwayMm ?? 0;
   const bed = { widthMm: device.bedWidth, heightMm: device.bedHeight };
   for (let pass = 0; pass < group.passes; pass += 1) {
+    // Ordinary vector passes re-arm with standalone M3/M4 S0. Clearing a
+    // powered final move is a real planner drain, unlike S0 carried on G1.
+    if (rearmsPoweredVectorPass(group, pass, out)) {
+      appendPlannerStop(out);
+    }
     for (const seg of group.segments) {
       const first = seg.polyline[0];
-      if (first === undefined) continue;
+      if (first === undefined || !hasEmittedSegmentMotion(seg)) continue;
       // ADR-239: the tangential entry is laser-off feed motion, timed like
       // the emitted `G1 F<feed> S0` ramp rather than a rapid.
       const entry = entryRunwayMm > 0 ? contourEntryPoint(seg.polyline, entryRunwayMm, bed) : null;
       if (entry === null) {
-        appendTravel(out, cursor, first, travelV);
+        appendSeek(out, cursor, first, seek);
       } else {
-        appendTravel(out, cursor, entry, travelV);
+        appendSeek(out, cursor, entry, seek);
         appendFeedTravel(out, entry, first, cutV);
       }
-      appendCutSegmentBlocks(out, seg, cutV);
+      appendCutSegmentBlocks(out, seg, cutV, hasLaserPower(group, device));
       const last = seg.polyline[seg.polyline.length - 1];
       if (last !== undefined) cursor = last;
     }
@@ -284,15 +304,24 @@ function appendCutGroupBlocks(
   return cursor;
 }
 
-function appendCutSegmentBlocks(out: Block[], segment: CutSegment, cutV: number): void {
+function rearmsPoweredVectorPass(group: CutGroup | FillGroup, pass: number, out: Block[]): boolean {
+  return group.kind === 'cut' && pass > 0 && out.at(-1)?.kind === 'cut';
+}
+
+function appendCutSegmentBlocks(
+  out: Block[],
+  segment: CutSegment,
+  cutV: number,
+  powered: boolean,
+): void {
   if (segment.plannerMotion !== undefined && segment.polyline.length === 2) {
-    appendPlannedCut(out, segment.plannerMotion, cutV);
+    appendPlannedCut(out, segment.plannerMotion, cutV, powered);
     return;
   }
   for (let i = 1; i < segment.polyline.length; i += 1) {
     const a = segment.polyline[i - 1];
     const b = segment.polyline[i];
-    if (a !== undefined && b !== undefined) appendCut(out, a, b, cutV);
+    if (a !== undefined && b !== undefined) appendCut(out, a, b, cutV, powered);
   }
 }
 
@@ -300,10 +329,11 @@ function appendPlannedCut(
   out: Block[],
   motion: NonNullable<CutSegment['plannerMotion']>,
   v: number,
+  powered: boolean,
 ): void {
   if (!(motion.distanceMm > 0)) return;
   out.push({
-    kind: 'cut',
+    kind: powered ? 'cut' : 'travel',
     motion: 'feed',
     distance: motion.distanceMm,
     targetVelocity: v,
@@ -323,6 +353,11 @@ function appendTravel(out: Block[], from: Vec2, to: Vec2, v: number): void {
   });
 }
 
+function appendSeek(out: Block[], from: Vec2, to: Vec2, seek: SeekMotion): void {
+  if (seek.motion === 'feed') appendFeedTravel(out, from, to, seek.velocity);
+  else appendTravel(out, from, to, seek.velocity);
+}
+
 function appendFeedTravel(out: Block[], from: Vec2, to: Vec2, v: number): void {
   const d = distance(from, to);
   if (d <= 0) return;
@@ -335,16 +370,33 @@ function appendFeedTravel(out: Block[], from: Vec2, to: Vec2, v: number): void {
   });
 }
 
-function appendCut(out: Block[], from: Vec2, to: Vec2, v: number): void {
+function appendCut(out: Block[], from: Vec2, to: Vec2, v: number, powered = true): void {
   const d = distance(from, to);
   if (d <= 0) return;
   out.push({
-    kind: 'cut',
+    kind: powered ? 'cut' : 'travel',
     motion: 'feed',
     distance: d,
     targetVelocity: v,
     direction: unitVector(from, to, d),
   });
+}
+
+function hasLaserPower(group: CutGroup | FillGroup, device: DeviceProfile): boolean {
+  return Math.round((group.power / 100) * device.maxPowerS) > 0;
+}
+
+function hasEmittedSegmentMotion(segment: CutSegment): boolean {
+  if (segment.plannerCoordinatesRepresented === true) return segment.polyline.length >= 2;
+  if ((segment.plannerMotion?.distanceMm ?? 0) > 0) return true;
+  const first = segment.polyline[0];
+  if (first === undefined) return false;
+  const firstX = formatGcodeCoordinateMm(first.x);
+  const firstY = formatGcodeCoordinateMm(first.y);
+  return segment.polyline.some(
+    (point) =>
+      formatGcodeCoordinateMm(point.x) !== firstX || formatGcodeCoordinateMm(point.y) !== firstY,
+  );
 }
 
 function distance(a: Vec2, b: Vec2): number {

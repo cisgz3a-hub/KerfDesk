@@ -3,9 +3,13 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-export function classifyDependencyAudit(fullAudit, runtimeAudit) {
-  const runtimeIds = new Set(Object.keys(runtimeAudit.advisories ?? {}));
-  const advisories = Object.entries(fullAudit.advisories ?? {})
+export function classifyDependencyAudit(fullAudit, runtimeAudit, exits = {}) {
+  const full = validatedAdvisories(fullAudit, 'full audit', exits.fullExit);
+  const runtime = validatedAdvisories(runtimeAudit, 'runtime audit', exits.runtimeExit);
+  const runtimeIds = new Set(Object.keys(runtime));
+  // The registry can change between these two requests. A runtime finding
+  // remains evidence even when it was absent from the earlier full snapshot.
+  const advisories = Object.entries({ ...full, ...runtime })
     .map(([id, advisory]) => {
       const moduleName = advisory.module_name ?? 'unknown';
       const paths = (advisory.findings ?? []).flatMap((finding) => finding.paths ?? []);
@@ -37,6 +41,7 @@ export function classifyDependencyAudit(fullAudit, runtimeAudit) {
     );
   return {
     generatedAt: new Date().toISOString(),
+    evidenceStatus: 'valid',
     runtimeCount: advisories.filter((entry) => entry.reachability === 'runtime-reachable').length,
     releaseBuildOnlyCount: advisories.filter((entry) => entry.reachability === 'release-build-only')
       .length,
@@ -46,7 +51,57 @@ export function classifyDependencyAudit(fullAudit, runtimeAudit) {
   };
 }
 
+function validatedAdvisories(audit, label, exitValue) {
+  if (!isRecord(audit) || audit.error !== undefined || !isRecord(audit.advisories)) {
+    const detail = isRecord(audit?.error) ? audit.error.message : undefined;
+    throw new Error(
+      `${label} did not provide valid advisory evidence${detail ? `: ${detail}` : '.'}`,
+    );
+  }
+  if (exitValue !== undefined) {
+    const exitCode = Number(exitValue);
+    if (
+      ![0, 1, '0', '1'].includes(exitValue) ||
+      (exitCode === 1 && Object.keys(audit.advisories).length === 0)
+    ) {
+      throw new Error(`${label} scanner exit ${exitValue} does not establish an audit result.`);
+    }
+  }
+  for (const [id, advisory] of Object.entries(audit.advisories)) {
+    if (
+      !isRecord(advisory) ||
+      typeof advisory.module_name !== 'string' ||
+      !Array.isArray(advisory.findings) ||
+      advisory.findings.some(
+        (finding) =>
+          !isRecord(finding) ||
+          !Array.isArray(finding.paths) ||
+          finding.paths.some((entry) => typeof entry !== 'string'),
+      )
+    ) {
+      throw new Error(`${label} contains malformed advisory ${id}.`);
+    }
+  }
+  return audit.advisories;
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 export function dependencyAuditMarkdown(report) {
+  if (report.evidenceStatus === 'invalid') {
+    return [
+      '# Dependency audit evidence unavailable',
+      '',
+      'Dependency advisory status could not be established. This is not a clean audit.',
+      '',
+      report.error,
+      '',
+      'Retain the existing advisory issue and retry the scanner.',
+      '',
+    ].join('\n');
+  }
   const lines = [
     '# Dependency audit report',
     '',
@@ -88,9 +143,26 @@ if (invoked) {
   const fullFile = argument('full') ?? 'artifacts/dependency-audit/full.json';
   const runtimeFile = argument('runtime') ?? 'artifacts/dependency-audit/runtime.json';
   const outputDir = argument('output') ?? 'artifacts/dependency-audit';
-  const fullAudit = JSON.parse(fs.readFileSync(fullFile, 'utf8'));
-  const runtimeAudit = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
-  const report = classifyDependencyAudit(fullAudit, runtimeAudit);
+  let report;
+  try {
+    const fullAudit = JSON.parse(fs.readFileSync(fullFile, 'utf8'));
+    const runtimeAudit = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
+    report = classifyDependencyAudit(fullAudit, runtimeAudit, {
+      fullExit: argument('full-exit'),
+      runtimeExit: argument('runtime-exit'),
+    });
+  } catch (error) {
+    report = {
+      generatedAt: new Date().toISOString(),
+      evidenceStatus: 'invalid',
+      runtimeCount: null,
+      releaseBuildOnlyCount: null,
+      buildTestOnlyCount: null,
+      advisories: [],
+      error: error.message,
+    };
+    process.exitCode = 1;
+  }
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   fs.writeFileSync(path.join(outputDir, 'report.md'), dependencyAuditMarkdown(report));
@@ -98,10 +170,14 @@ if (invoked) {
   if (githubOutput !== undefined) {
     fs.appendFileSync(
       githubOutput,
-      `runtime_count=${report.runtimeCount}\ntotal_count=${report.advisories.length}\n`,
+      report.evidenceStatus === 'valid'
+        ? `evidence_valid=true\nruntime_count=${report.runtimeCount}\ntotal_count=${report.advisories.length}\n`
+        : 'evidence_valid=false\nruntime_count=unknown\ntotal_count=unknown\n',
     );
   }
   console.log(
-    `Dependency audit classified: ${report.runtimeCount} runtime, ${report.releaseBuildOnlyCount} release-build-only, ${report.buildTestOnlyCount} build/test-only.`,
+    report.evidenceStatus === 'valid'
+      ? `Dependency audit classified: ${report.runtimeCount} runtime, ${report.releaseBuildOnlyCount} release-build-only, ${report.buildTestOnlyCount} build/test-only.`
+      : `Dependency audit evidence failed: ${report.error}`,
   );
 }

@@ -1,12 +1,11 @@
-// PlannerAdvanced — hidden-by-default editor for the planner's GRBL
-// settings ($120 acceleration + $11 junction deviation). Extracted
+// PlannerAdvanced — hidden-by-default editor for local estimates using the
+// recorded GRBL acceleration and junction deviation. Extracted
 // from DeviceSettings.tsx so the parent stays under the 400-line
 // hard cap (F-1 audit finding).
 //
-// Most users never touch these. They only matter when the job-time
-// estimate is systematically off and the user wants to dial it in
-// to their specific machine. <details> gives us native expand /
-// collapse with no React state.
+// Match the controller references before calibrating systematic ETA error.
+// Acceleration also informs separately reviewed CNC recovery runways.
+// <details> gives us native expand / collapse with no React state.
 
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { MAX_ESTIMATE_TIME_SCALE, MIN_ESTIMATE_TIME_SCALE } from '../../core/devices';
@@ -56,7 +55,7 @@ export function PlannerFields(props: PlannerFieldsProps): JSX.Element {
             onCommit={props.onAccelChange}
             style={numInputStyle}
             ariaLabel="Acceleration (mm/s²)"
-            title="GRBL $120/$121. Higher = faster cornering and shorter estimates. Typical 100-2500 mm/s²."
+            title="Acceleration reference for time estimates and reviewed CNC recovery runways. Use the lower of the controller's $120/$121 values; editing this field does not write firmware settings or change controller acceleration."
           />
           <span style={unitStyle}>mm/s²</span>
         </Row>
@@ -69,7 +68,7 @@ export function PlannerFields(props: PlannerFieldsProps): JSX.Element {
             onCommit={props.onJdChange}
             style={numInputStyle}
             ariaLabel="Junction deviation (mm)"
-            title="GRBL $11. Higher = faster corners but more shake. Grbl default is 0.010 mm."
+            title="Junction deviation used by KerfDesk's time estimates. Match the controller's $11 value; this field does not write firmware settings or change machine cornering."
           />
           <span style={unitStyle}>mm</span>
         </Row>
@@ -102,7 +101,9 @@ export function PlannerFields(props: PlannerFieldsProps): JSX.Element {
         <p style={advancedHintStyle}>
           Match acceleration and junction deviation to the machine&apos;s{' '}
           <code style={inlineCodeStyle}>$$</code> output first. Then calibrate each time scale from
-          a measured job. A value of 1.00 leaves the planner estimate unchanged.
+          a measured job. These are local profile references; editing them does not write firmware
+          settings. Time scales apply to both the pre-run estimate and live countdown, while
+          programmed dwell times remain unchanged. A value of 1.00 leaves motion time unchanged.
         </p>
       </div>
     </>

@@ -140,6 +140,7 @@ async function stageLaserRecoveryAttempt(
       activeControllerKind: laser.activeControllerKind,
       detectedControllerKind: laser.detectedControllerKind,
     },
+    canvasPlan.machineKind,
   );
   const recoveryRunId = createRunId();
   let staged: Awaited<ReturnType<RecoveryRepository['stageArtifact']>> | null = null;

@@ -5,6 +5,8 @@ import {
 } from './program-timeline';
 import { blockElapsedTimeAtDistance } from '../motion-planner';
 import type { MotionLimits } from './motion-limits';
+import type { ProgramTimeCalibration } from './program-time';
+import type { MachineKind } from '../scene/machine';
 
 export type GcodeTimingPlan = ProgramTimeline;
 
@@ -22,6 +24,8 @@ type InitialPosition = { readonly x: number; readonly y: number; readonly z: num
 
 export type GcodeTimingPlanOptions = {
   readonly maxSegments?: number;
+  readonly timeCalibration?: ProgramTimeCalibration;
+  readonly machineKind?: MachineKind;
 };
 
 const EMPTY_PROGRESS: PlannedProgramProgress = {
@@ -69,8 +73,9 @@ export function plannedProgressAtRoute(
     acceleration: plan.accelMmPerSec2,
     distance: segmentDistance * fraction,
   });
+  const calibratedElapsed = elapsedInSegment * (plan.segmentTimeScale[index] ?? 1);
   const motionSeconds =
-    motionStart + Math.min(Math.max(0, motionEnd - motionStart), elapsedInSegment);
+    motionStart + Math.min(Math.max(0, motionEnd - motionStart), calibratedElapsed);
   return { motionSeconds, dwellSeconds, totalSeconds: motionSeconds + dwellSeconds };
 }
 

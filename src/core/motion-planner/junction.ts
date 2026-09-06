@@ -7,6 +7,7 @@ import { blockMotion, type Block } from './block';
 // previous block's direction and the next block's direction.
 // sin(θ/2) is computed from the dot product without an explicit acos.
 export function junctionVelocity(prev: Block, next: Block, accel: number, jd: number): number {
+  if (prev.stopAfter === true) return 0;
   // Rapid and feed motion retain the estimator's conservative stop boundary.
   // Laser state is not a motion boundary: G1/S0 feed travel blends through a
   // powered G1 span exactly as the emitted continuous sweep does.

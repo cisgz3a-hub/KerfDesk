@@ -19,8 +19,11 @@ export function normalizeReadinessState(value) {
   const normalized = String(value ?? 'not-run').toLowerCase();
   if (normalized === 'success') return 'passed';
   if (normalized === 'failure') return 'failed';
-  if (normalized === 'cancelled' || normalized === 'skipped') return 'not-run';
-  if (['passed', 'failed', 'pending', 'not-run', 'unknown'].includes(normalized)) {
+  if (
+    ['passed', 'failed', 'pending', 'not-run', 'unknown', 'cancelled', 'skipped'].includes(
+      normalized,
+    )
+  ) {
     return normalized;
   }
   throw new Error(`unsupported readiness state: ${value}`);
@@ -35,7 +38,8 @@ export function buildReadinessReport({ sha, generatedAt, states = {}, evidence =
     policy: {
       blocking: false,
       browserGatesDeploy: false,
-      note: 'Each lane is independent evidence; an unrun lane remains not-run.',
+      scope: 'reported-lanes-only',
+      note: 'This report records only supplied workflow evidence. not-run means not observed by this report; other workflows may have run.',
     },
     lanes: READINESS_LANES.map((id) => ({
       id,
@@ -50,11 +54,14 @@ export function readinessMarkdown(report) {
     (lane) => `| ${lane.id} | ${lane.state} | ${String(lane.evidence).replaceAll('|', '\\|')} |`,
   );
   return [
-    '# Release readiness (informational)',
+    '# Workflow release evidence (informational)',
     '',
     `Commit: \`${report.sha}\``,
     '',
     `Generated: ${report.generatedAt}`,
+    '',
+    'Scope: the evidence supplied by this workflow only, not an aggregate verdict for the commit.',
+    '`not-run` means this report has no observation for that lane; consult its separate workflow.',
     '',
     '| Lane | State | Evidence |',
     '|---|---|---|',

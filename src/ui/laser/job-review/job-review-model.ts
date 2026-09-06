@@ -137,7 +137,7 @@ function buildStatTiles(
 ): ReadonlyArray<JobReviewStatTile> {
   const job = prepared.prepared.job;
   return [
-    timeTile(prepared.metrics.duration),
+    timeTile(prepared.metrics.duration, machineKind),
     sizeTile(prepared.metrics.jobBounds, prepared.metrics.motionBounds),
     operationsTile(job, machineKind, prepared.cncToolPlan),
     ...fillRunwayTiles(job, scanningOffsets),
@@ -197,11 +197,18 @@ function originTile(origin: PreparedCurrentStart['jobOrigin']): JobReviewStatTil
   };
 }
 
-function timeTile(estimate: PreparedCurrentStart['metrics']['duration']): JobReviewStatTile {
+function timeTile(
+  estimate: PreparedCurrentStart['metrics']['duration'],
+  machineKind: MachineKind,
+): JobReviewStatTile {
+  const cutLabel = machineKind === 'cnc' ? 'Cut + plunge' : 'Cut';
+  const dwell = estimate.breakdown.dwellSeconds ?? 0;
   return {
     label: 'Estimated time',
     value: formatDuration(estimate.totalSeconds),
-    detail: `Cut ${formatDuration(estimate.breakdown.cutSeconds)} · travel ${formatDuration(estimate.breakdown.travelSeconds)}`,
+    detail:
+      `${cutLabel} ${formatDuration(estimate.breakdown.cutSeconds)} · travel ${formatDuration(estimate.breakdown.travelSeconds)}` +
+      (dwell > 0 ? ` · spindle dwell ${formatDuration(dwell)}` : ''),
   };
 }
 

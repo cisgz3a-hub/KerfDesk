@@ -110,11 +110,17 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts/dependency-audit
-          pnpm audit --json > artifacts/dependency-audit/full.json || true
-          pnpm audit --prod --json > artifacts/dependency-audit/runtime.json || true
+          set +e
+          pnpm audit --json > artifacts/dependency-audit/full.json
+          full_exit=$?
+          pnpm audit --prod --json > artifacts/dependency-audit/runtime.json
+          runtime_exit=$?
+          set -e
           pnpm report:dependency-audit \
             --full=artifacts/dependency-audit/full.json \
             --runtime=artifacts/dependency-audit/runtime.json \
+            --full-exit="${full_exit}" \
+            --runtime-exit="${runtime_exit}" \
             --output=artifacts/dependency-audit
           runtime_count=$(node -p "require('./artifacts/dependency-audit/report.json').runtimeCount")
           test "${runtime_count}" = '0'

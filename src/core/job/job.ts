@@ -29,6 +29,9 @@ import type { FillRunwayPolicy } from './fill-runway-policy';
 import type { EffectiveScanDirection } from './scan-direction-policy';
 
 export type CutSegment = {
+  /** Timing-only CNC projection already uses the CNC emitter's coordinate
+   * representation; laser decimal-collapse filtering must not reinterpret it. */
+  readonly plannerCoordinatesRepresented?: true;
   // Polyline in mm, in machine coordinates (post-origin-transform). For a
   // closed segment, the last point equals the first by construction.
   readonly polyline: ReadonlyArray<Vec2>;
@@ -46,6 +49,9 @@ export type FillSegment = CutSegment & {
 
 export type CutGroup = {
   readonly kind: 'cut';
+  /** Timing-only CNC projection: an emitted spindle/tool transition drains
+   * preceding motion before this group's first move. */
+  readonly plannerStopBefore?: true;
   readonly layerId: string;
   readonly sourceObjectId?: string;
   readonly color: string;

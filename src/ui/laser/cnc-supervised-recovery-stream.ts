@@ -75,6 +75,7 @@ export async function streamCncRecoveryProgram(
       activeControllerKind: laser.activeControllerKind,
       detectedControllerKind: laser.detectedControllerKind,
     },
+    canvasPlan.machineKind,
   );
   const staged = await stageRecoveryAttempt(
     planned,

@@ -51,5 +51,5 @@ function isCutting(model: GcodeRenderModel, index: number): boolean {
 // for timing, fall back to the machine max rather than dividing by zero.
 function feedMmPerSec(feedMmPerMin: number, maxFeedMmPerMin: number): number {
   const requested = feedMmPerMin > 0 ? feedMmPerMin : maxFeedMmPerMin;
-  return Math.max(1, Math.min(requested, maxFeedMmPerMin)) / SECONDS_PER_MINUTE;
+  return Math.min(requested, maxFeedMmPerMin) / SECONDS_PER_MINUTE;
 }
