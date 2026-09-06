@@ -1,7 +1,8 @@
 // LaserWindow — Phase B controller panel. Connection, status, jog, job
 // controls. Renders alongside the Cuts/Layers panel on the right rail.
 
-import { describeAlarm } from '../../core/controllers/grbl';
+import { presentAlarm } from '../../core/controllers/grbl/response-presentation';
+import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
 import { CollapsedRail, RailPanelHeading } from '../common';
 import { useStore } from '../state';
@@ -33,6 +34,7 @@ export function LaserWindow(): JSX.Element {
   const machinePanel = useMachineRailVisibility();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
+  const controllerKind = useLaserStore((s) => s.activeControllerKind);
   const control = useControllerActions();
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
@@ -67,6 +69,7 @@ export function LaserWindow(): JSX.Element {
       {controllerDisplay.showAlarmBanner && (
         <AlarmBanner
           code={alarmCode}
+          controllerKind={controllerKind}
           homingEnabled={homingEnabled}
           canUnlock={control.canUnlock}
           onHome={() => void control.home().catch(() => undefined)}
@@ -238,6 +241,7 @@ function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
 
 function AlarmBanner({
   code,
+  controllerKind,
   homingEnabled,
   canUnlock,
   onHome,
@@ -245,13 +249,15 @@ function AlarmBanner({
   onUnlock,
 }: {
   readonly code: number | null;
+  readonly controllerKind: ControllerKind;
   readonly homingEnabled: boolean;
   readonly canUnlock: boolean;
   readonly onHome: () => void;
   readonly onConfigureHoming: () => void;
   readonly onUnlock: () => void;
 }): JSX.Element {
-  const alarm = code === null ? null : describeAlarm(code);
+  const alarm = code === null ? null : presentAlarm(controllerKind, code);
+  const alarmAction = alarmRecoveryAction(controllerKind, code, alarm?.action);
   return (
     <div style={alarmStyle} role="alert">
       <strong>
@@ -262,7 +268,7 @@ function AlarmBanner({
           ? 'GRBL has locked jog, frame, and start until the machine is homed or unlocked.'
           : (alarm?.detail ?? '')}
       </p>
-      <p style={alarmDetailStyle}>{alarm?.action ?? STATUS_ALARM_START_MESSAGE}</p>
+      {alarmAction !== undefined && <p style={alarmDetailStyle}>{alarmAction}</p>}
       <AlarmRecoveryActions
         homingEnabled={homingEnabled}
         canUnlock={canUnlock}
@@ -272,6 +278,15 @@ function AlarmBanner({
       />
     </div>
   );
+}
+
+function alarmRecoveryAction(
+  controllerKind: ControllerKind,
+  code: number | null,
+  action: string | undefined,
+): string | undefined {
+  if (code !== null && controllerKind === 'fluidnc') return action;
+  return action ?? STATUS_ALARM_START_MESSAGE;
 }
 
 function AlarmRecoveryActions(props: {

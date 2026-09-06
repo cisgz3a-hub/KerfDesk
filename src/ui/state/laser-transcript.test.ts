@@ -8,6 +8,26 @@ import {
 } from './laser-transcript';
 
 describe('laser transcript', () => {
+  it.each([
+    ['error:10', 'error', 'Soft limit error'],
+    ['error:161', 'error', 'File Download Failed'],
+    ['error:172', 'error', 'Error 172'],
+    ['error:999', 'error', 'Error 999'],
+    ['error:7002009', 'error', 'Unrecognized controller error: error:7002009'],
+    ['ALARM:12', 'alarm', 'Ambiguous Switch'],
+    ['ALARM:99', 'alarm', 'Alarm 99'],
+  ])('preserves raw FluidNC response %s with its family meaning', (raw, kind, decoded) => {
+    expect(inboundTranscriptEntry(7, 100, raw, undefined, 'fluidnc')).toEqual({
+      id: 7,
+      at: 100,
+      direction: 'in',
+      raw,
+      kind,
+      source: 'controller',
+      decoded,
+    });
+  });
+
   it('classifies inbound GRBL lines without dropping the raw text', () => {
     expect(inboundTranscriptEntry(1, 100, '<Idle|MPos:0.000,0.000,0.000|FS:0,0>')).toMatchObject({
       id: 1,
