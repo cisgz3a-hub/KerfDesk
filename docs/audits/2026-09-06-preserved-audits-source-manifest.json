@@ -163,5 +163,12 @@
     "sha256": "3FF4114477DF562F0DAB10095E83F2FE47B43EEDA7557F20A7BEC26CAE4F0F36",
     "sourceWorktree": "C:/Users/Asus/.codex/worktrees/next200-origin-pr732-review",
     "sourceHead": "c7c9c216092440580c5186d36f3fa55df4acc8db"
+  },
+  {
+    "originalPath": "docs/audits/2026-07-12-competitive-audit/data/calibration.json",
+    "publishedPath": "docs/audits/2026-09-06-preserved-evidence/competitive-audit-calibration.json",
+    "sha256": "CF0E82F580B9658E43AED87B7ADFFF01B65D58E7C17670D0C3AABEA6C714F17C",
+    "sourceWorktree": "C:/Users/Asus/LaserForge-2.0/.claude/worktrees/xenodochial-stonebraker-4af61c",
+    "sourceHead": "f29214ba2c366b35ce65bb21ea0ed8caed991c49"
   }
 ]
