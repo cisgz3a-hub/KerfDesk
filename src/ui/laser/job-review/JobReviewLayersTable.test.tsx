@@ -14,7 +14,10 @@ import {
 import { createRectangle } from '../../../core/shapes/primitives';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
-import type { JobReviewEffectiveOperation } from './job-review-effective-operations';
+import {
+  buildEffectiveOperationReview,
+  type JobReviewEffectiveOperation,
+} from './job-review-effective-operations';
 import { JobReviewLayersTable } from './JobReviewLayersTable';
 
 (
@@ -160,6 +163,9 @@ describe('JobReviewLayersTable', () => {
       `output[aria-label="Actual compiled max depth mm for ${layer.name}"]`,
     );
     expect(actual?.textContent).toBe('3.175 mm actual');
+    expect(host.textContent).toContain(
+      'Partial compiled summary (groups with matching shown values are combined): Actual max depth 3.175 mm',
+    );
     expect(
       host.querySelector(`output[aria-label="Depth per pass mm for ${layer.name}"]`)?.textContent,
     ).toBe('1.5');
@@ -207,21 +213,30 @@ describe('JobReviewLayersTable', () => {
     expect(numberInput('Power % for Registration jig').value).toBe(String(registration.power));
   });
 
-  it('keeps editable base values while disclosing every exact compiled variant', async () => {
+  it('keeps editable base values while labeling combined compiled summaries as partial', async () => {
     const layer = { ...createLayer({ id: 'red', color: '#ff0000' }), power: 30 };
     seedLayers([layer], 'laser');
-    await render('laser', [
-      {
-        layerId: 'red',
-        summaries: [
-          'Line · 15% power · 1,000 mm/min · 1 pass · air off · constant power',
-          'Line · 30% power · 1,000 mm/min · 1 pass · air off · constant power',
-        ],
-      },
-    ]);
+    const base = {
+      kind: 'cut' as const,
+      layerId: 'red',
+      color: '#ff0000',
+      power: 15,
+      speed: 1000,
+      passes: 1,
+      airAssist: false,
+      powerMode: 'constant' as const,
+      segments: [],
+    };
+    const summaries = buildEffectiveOperationReview({
+      groups: [base, base, { ...base, power: 30 }],
+    });
+    await render('laser', summaries);
 
     expect(numberInput(`Power % for ${layer.name}`).value).toBe('30');
-    expect(host.textContent).toContain('Exact compiled output: Line · 15% power');
+    expect(host.textContent).toContain(
+      'Partial compiled summary (groups with matching shown values are combined): Line · 15% power',
+    );
+    expect(host.textContent?.match(/Line · 15% power/g)).toHaveLength(1);
     expect(host.textContent).toContain('Line · 30% power');
   });
 
@@ -237,7 +252,9 @@ describe('JobReviewLayersTable', () => {
     ]);
 
     expect(host.textContent).toContain('Second pass');
-    expect(host.textContent).toContain('Exact compiled output: Line · 21% power');
+    expect(host.textContent).toContain(
+      'Partial compiled summary (groups with matching shown values are combined): Line · 21% power',
+    );
   });
 
   it('shows the strategy detail line under a CNC operation', async () => {

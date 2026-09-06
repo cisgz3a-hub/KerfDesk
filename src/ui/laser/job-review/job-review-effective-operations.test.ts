@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Job } from '../../../core/job';
+import type { CncGroup, Job } from '../../../core/job';
 import { parseGrblCncCoordinate } from '../../../core/cnc/coordinate-representation';
 import { captureLayerOperationSettings, createLayer } from '../../../core/scene';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
 
 describe('buildEffectiveOperationReview', () => {
-  it('deduplicates identical compiled laser groups while preserving distinct variants', () => {
+  it('deduplicates identical compiled laser groups while preserving distinct shown summaries', () => {
     const base = {
       kind: 'cut' as const,
       layerId: 'red',
@@ -74,6 +74,49 @@ describe('buildEffectiveOperationReview', () => {
         ],
       },
     ]);
+  });
+
+  it('combines matching CNC summaries even when safe Z differs, preserving distinct shown feeds', () => {
+    const base: CncGroup = {
+      kind: 'cnc',
+      layerId: 'blue',
+      color: '#0000ff',
+      cutType: 'profile-on-path',
+      toolName: '3.175 mm end mill',
+      toolDiameterMm: 3.175,
+      feedMmPerMin: 800,
+      plungeMmPerMin: 300,
+      spindleRpm: 12_000,
+      spindleSpinupSec: 2,
+      coolant: 'flood',
+      safeZMm: 5,
+      passes: [
+        {
+          kind: 'contour',
+          zMm: -1,
+          polyline: [
+            { x: 0, y: 0 },
+            { x: 10, y: 0 },
+          ],
+          closed: false,
+        },
+      ],
+    };
+    const job: Job = {
+      groups: [base, { ...base, safeZMm: 10 }, { ...base, feedMmPerMin: 900 }],
+    };
+    const before = structuredClone(job);
+
+    expect(buildEffectiveOperationReview(job)).toEqual([
+      {
+        layerId: 'blue',
+        summaries: [
+          '3.175 mm end mill · 1 pass · 800 mm/min feed · 300 mm/min plunge · 12,000 RPM · flood coolant',
+          '3.175 mm end mill · 1 pass · 900 mm/min feed · 300 mm/min plunge · 12,000 RPM · flood coolant',
+        ],
+      },
+    ]);
+    expect(job).toEqual(before);
   });
 
   it('reports the actual compiled maximum depth for a flowing V-carve', () => {

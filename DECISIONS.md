@@ -10066,13 +10066,15 @@ into a dropdown. Changes, none touching the gate contract:
 - **Guard surface unchanged:** still one affirmative click, warnings still never block, and
   in-dialog blockers still only re-surface refusals the readiness pipeline already issues.
 
-### Amendment - exact compiled operation disclosure (2026-08-02)
+### Amendment - partial compiled operation summary (2026-08-02; clarified 2026-09-06)
 
-The editable Artwork settings rows continue to show the shared layer values, while a read-only
-detail row now reports every distinct effective operation from the exact prepared `Job`. This makes
-object overrides, per-object power scaling, split tools, and other compile-time resolution visible
-before Start instead of implying that the base layer row is the emitted truth. The disclosure is
-advisory only: it adds no guard, refusal, clamp, confirmation, or change to Frame or streamed bytes.
+The read-only detail row reports selected values from the exact prepared `Job`. It is labeled
+**Partial compiled summary**: groups within one operation with matching shown summaries are
+combined, even when an unshown setting such as CNC safe Z differs. Existing displayed depth,
+contour-entry, effective artwork override, power scaling, tool, and feed details remain available.
+The row makes these resolved values visible before Start without claiming complete operation
+identity or describing every emitted command. It is advisory only: this clarification changes no
+grouping, guard, refusal, clamp, confirmation, Frame behavior, or streamed bytes.
 
 ### Amendment - explicit settings approval (2026-08-09)
 
