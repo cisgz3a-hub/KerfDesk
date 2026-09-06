@@ -1,6 +1,13 @@
 # Audit remediation ledger
 
-Current CNC/laser change-audit integration owner, 2026-09-05:
+Current CNC spindle-review correction owner, 2026-09-06:
+`codex/cnc-review-spindle-facts-20260906`, based on main `5918ef53fd91f6b33a4cd0766f2a3b7ba6991acc`.
+Scope: active CNC/laser controller S-scale facts, offline configured-spindle advisory, and honest
+RPM wording. No motion, controller writes, or Start-policy changes. Evidence and limits:
+[`audits/2026-09-06-cnc-spindle-review-corrections.md`](audits/2026-09-06-cnc-spindle-review-corrections.md).
+PR/check/merge records, not this source note, establish publication.
+
+Earlier CNC/laser change-audit integration owner, 2026-09-05:
 `codex/cnc-laser-audit-fixes-20260905`, based on main `c7681e3af152ed4c1162ef20ae45793552fd1503`.
 The authorized scope is the four findings in the CNC/laser corrective audit; evidence and limits:
 [`audits/2026-09-05-cnc-laser-corrections.md`](audits/2026-09-05-cnc-laser-corrections.md).

@@ -79,7 +79,7 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
     expect(rest).toEqual([]);
     expect(warning).toContain('24000');
     expect(warning).toContain('12000');
-    expect(warning).toContain('will run at');
+    expect(warning).toContain('compiled spindle setting is limited to 12000 RPM');
   });
 
   it('stays silent when the layer sits on the configured ceiling', () => {
