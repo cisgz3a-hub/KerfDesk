@@ -64,9 +64,10 @@ export function drawRasterPreview(
   view: ViewTransform,
   options: DrawRasterPreviewOptions = {},
 ): void {
-  const liveRasterIds = livePreviewRasterIds(project);
+  const activeBuilds = activePreviewBuilds(project);
+  const liveRasterIds = new Set(activeBuilds.keys());
   retainPreviewCanvases(liveRasterIds);
-  pruneRasterPreviewBuilds(liveRasterIds);
+  pruneRasterPreviewBuilds(activeBuilds);
   for (const layer of project.scene.layers) {
     for (const operationLayer of outputOperationLayers(layer)) {
       for (const obj of project.scene.objects) {
@@ -88,12 +89,18 @@ export function drawRasterPreview(
   }
 }
 
-/** Aborts scheduled builds for rasters that are no longer previewed. */
-function pruneRasterPreviewBuilds(liveRasterIds: ReadonlySet<string>): void {
+/** Retain every active operation, cancelling only obsolete settings/content. */
+function pruneRasterPreviewBuilds(
+  active: ReadonlyMap<string, ReadonlyMap<string, RasterImage>>,
+): void {
   for (const [id, builds] of pendingPreviewBuilds) {
-    if (liveRasterIds.has(id)) continue;
-    for (const pending of builds.values()) pending.cancel();
-    pendingPreviewBuilds.delete(id);
+    for (const [key, pending] of builds) {
+      const source = active.get(id)?.get(key);
+      if (source !== undefined && sameRasterContent(pending.content, source)) continue;
+      pending.cancel();
+      builds.delete(key);
+    }
+    if (builds.size === 0) pendingPreviewBuilds.delete(id);
   }
 }
 
@@ -141,7 +148,7 @@ function previewSettingsKey(
   maskObject: SceneObject | null,
 ): string {
   const dimensions = compiledGridDimensions(obj, layer, device);
-  return `${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${dimensions.width}x${dimensions.height}|${transformCacheKey(obj, device)}|${maskCacheKey(maskObject)}`;
+  return `${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${obj.powerScale ?? 100}-${device.maxPowerS}|${layer.linesPerMm}|${dimensions.width}x${dimensions.height}|${transformCacheKey(obj, device)}|${maskCacheKey(maskObject)}`;
 }
 
 function schedulePreviewCanvasBuild(
@@ -155,16 +162,22 @@ function schedulePreviewCanvasBuild(
   if (isBuildInFlight(obj, key)) return;
   const scheduleBuild = options.scheduleBuild ?? scheduleRasterPreviewBuild;
   if (obj.imageAsset === undefined) {
+    let cancelled = false;
     let ownBuild: PendingPreviewBuild | undefined;
     let completedSynchronously = false;
     const cancel = scheduleBuild(() => {
+      if (cancelled) return;
       clearPendingBuild(obj, key, ownBuild);
       const canvas = buildPreviewCanvas(obj, layer, device, sceneObjects);
       storePreviewCanvas(obj, key, canvas);
       if (canvas !== null) options.onRasterPreviewReady?.();
       completedSynchronously = true;
     });
-    if (!completedSynchronously) ownBuild = setPendingBuild(obj, key, cancel);
+    if (!completedSynchronously)
+      ownBuild = setPendingBuild(obj, key, () => {
+        cancelled = true;
+        cancel();
+      });
     return;
   }
   let cancelled = false;
@@ -373,22 +386,25 @@ export function rasterPreviewDisplayAdvisory(
   };
 }
 
-function livePreviewRasterIds(project: Project): Set<string> {
-  const live = new Set<string>();
+function activePreviewBuilds(project: Project): Map<string, Map<string, RasterImage>> {
+  const active = new Map<string, Map<string, RasterImage>>();
   for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image') continue;
     if (obj.role === 'trace-source') continue;
-    if (
-      project.scene.layers
-        .flatMap((layer) => outputOperationLayers(layer))
-        .some(
-          (operation) =>
-            sceneObjectUsesOperation(obj, operation) &&
-            effectiveOperationForObject(operation, obj).mode === 'image',
-        )
-    ) {
-      live.add(obj.id);
+    const builds = new Map<string, RasterImage>();
+    for (const operation of project.scene.layers.flatMap(outputOperationLayers)) {
+      if (!sceneObjectUsesOperation(obj, operation)) continue;
+      const effective = effectiveOperationForObject(operation, obj);
+      if (effective.mode !== 'image') continue;
+      const key = previewSettingsKey(
+        obj,
+        effective,
+        project.device,
+        imageMaskObjectFor(project.scene.objects, obj),
+      );
+      builds.set(key, obj);
     }
+    if (builds.size > 0) active.set(obj.id, builds);
   }
-  return live;
+  return active;
 }

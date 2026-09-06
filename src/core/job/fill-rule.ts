@@ -18,6 +18,8 @@ export function layerFillCacheKey(
   fillRule: HatchFillRule,
 ): string {
   return [
+    layer.id,
+    layer.bindingOperationId,
     layer.color,
     layer.hatchAngleDeg,
     layer.hatchSpacingMm,
