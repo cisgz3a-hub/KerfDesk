@@ -202,6 +202,7 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   const out: Record<string, unknown> = {};
   if (patch.mode === 'line' || patch.mode === 'fill' || patch.mode === 'image')
     out.mode = patch.mode;
+  setPowerMode(out, patch);
   setPercent(out, 'minPower', patch.minPower);
   setPercent(out, 'power', patch.power);
   setPositiveNumber(out, 'speed', patch.speed);
@@ -232,6 +233,19 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setBoolean(out, 'passThrough', patch.passThrough);
   setNonNegativeNumber(out, 'dotWidthCorrectionMm', patch.dotWidthCorrectionMm);
   return out as ObjectOperationOverride;
+}
+
+function setPowerMode(out: Record<string, unknown>, patch: ObjectOperationOverride): void {
+  // Cut Settings represents Auto as an explicit undefined patch. Persist that
+  // choice separately from an omitted field, which leaves inheritance intact.
+  if (
+    Object.hasOwn(patch, 'powerMode') &&
+    (patch.powerMode === undefined ||
+      patch.powerMode === 'auto' ||
+      patch.powerMode === 'constant' ||
+      patch.powerMode === 'dynamic')
+  )
+    out.powerMode = patch.powerMode ?? 'auto';
 }
 
 function setPercent(out: Record<string, unknown>, key: string, value: number | undefined): void {

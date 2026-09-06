@@ -2,6 +2,9 @@ import type { GrblState } from '../../core/controllers/grbl';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 
+export const JOG_MPG_INTERRUPTION_MESSAGE =
+  "The pendant/MPG interrupted KerfDesk's Jog. Return control to KerfDesk and wait for fresh Idle confirmation before sending more motion. The interrupted move will not resume.";
+
 export function frameStatusFailureMessage(
   operation: LaserState['motionOperation'],
   state: GrblState,
@@ -38,11 +41,24 @@ export function jogMpgInterruptionPatch(
   Pick<LaserState, 'motionOperation' | 'frameVerification' | 'framedRun' | 'lastWriteError' | 'log'>
 > {
   const operation = state.motionOperation;
-  if (!mpgOwnsControl || operation?.kind !== 'jog') return {};
-  const message =
-    'Motion stopped because the pendant/MPG took control. The pending Jog was cancelled; return control to KerfDesk and confirm the machine position before moving again.';
+  if (!mpgOwnsControl || operation?.kind !== 'jog' || operation.interruptedByMpg === true) {
+    return {};
+  }
+  const {
+    cancelStatusQueryAfterSequence: staleFence,
+    cancelAttemptId: interruptedCancel,
+    ...interrupted
+  } = operation;
+  void staleFence;
+  void interruptedCancel;
+  const message = JOG_MPG_INTERRUPTION_MESSAGE;
   return {
-    motionOperation: { ...operation, cancelRequested: true },
+    motionOperation: {
+      ...interrupted,
+      cancelRequested: true,
+      interruptedByMpg: true,
+      mpgInterruptionId: Symbol('mpg-interruption'),
+    },
     frameVerification: null,
     framedRun: null,
     lastWriteError: message,

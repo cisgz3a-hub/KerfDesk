@@ -7,8 +7,8 @@
 export type TraceOptions = {
   // Filled contours preserve source silhouettes for fill engraving.
   // Centerline traces skeletonize dark strokes into open line paths
-  // for single-pass vector engraving. Edge detection (Canny) traces the
-  // edges of full-colour art as single-stroke line drawings.
+  // for single-pass vector engraving. Edge detection uses local contrast
+  // to find full-colour artwork and traces closed outlines around its ink.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
   // Number of color quantization buckets. 2 = black-and-white,
   // suitable for most laser engraving. Higher values produce more

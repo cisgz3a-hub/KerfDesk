@@ -44,7 +44,7 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
           }
         />
       </Row>
-      <Row label={grblLabels ? '$31 (min S)' : 'Minimum S'}>
+      <Row label={grblLabels ? '$31 (min S ref)' : 'Controller min S'}>
         <ClearableNumberField
           min={0}
           max={MAX_POWER_S}
@@ -52,14 +52,14 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
           value={device.minPowerS}
           onCommit={(v) => update({ minPowerS: Math.floor(v) })}
           style={numInputStyle}
-          ariaLabel={grblLabels ? 'GRBL $31 min power S' : 'Minimum laser power S'}
-          title="Minimum nonzero laser S value. Diode lasers usually use 0."
+          ariaLabel={grblLabels ? 'GRBL $31 controller minimum S' : 'Controller minimum S'}
+          title="Saved reference for the minimum S value used by the controller's PWM mapping. Generated job S values scale from zero to Maximum S; this field does not set a minimum emitted S."
         />
       </Row>
       <Row label={grblLabels ? '$32 laser mode' : 'Laser mode'}>
         <label
           style={inlineLabelStyle}
-          title="Keep laser mode enabled when the firmware supports dynamic-power engraving."
+          title="Record the laser-mode setting expected on the controller. Profile edits do not write firmware settings."
         >
           <input
             type="checkbox"
@@ -68,8 +68,8 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
             aria-label={grblLabels ? 'GRBL $32 laser mode enabled' : 'Laser mode enabled'}
             title={
               grblLabels
-                ? 'Enable GRBL laser mode ($32=1) for laser jobs.'
-                : 'Record that the controller is configured for laser output.'
+                ? 'Record that GRBL laser mode ($32=1) is expected. This checkbox does not change controller firmware settings.'
+                : 'Record that the controller is configured for laser output. This checkbox does not change controller firmware settings.'
             }
           />
           <span>Enabled</span>

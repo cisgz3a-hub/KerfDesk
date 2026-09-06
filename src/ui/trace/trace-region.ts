@@ -21,6 +21,7 @@ export async function traceImageRegion(
   const cropped = cropRawImageData(image, normalized);
   const traced = await traceImageWithFallback(cropped, options);
   return {
+    ...traced,
     paths: offsetColoredPaths(traced.paths, normalized.x, normalized.y),
     bounds: offsetBounds(traced.bounds, normalized.x, normalized.y),
     // The offset paths are back in the full working image's coordinates, not

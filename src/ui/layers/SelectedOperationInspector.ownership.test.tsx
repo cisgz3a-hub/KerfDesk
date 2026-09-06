@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { compileJob } from '../../core/job';
-import { createLayer, createProject } from '../../core/scene';
+import { createLayer, createProject, type Layer } from '../../core/scene';
 import { deserializeProject, serializeProject } from '../../io/project';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
@@ -84,10 +84,45 @@ describe('operation inspector artwork ownership', () => {
       await mounted.unmount();
     }
   });
+
+  it('applies and restores power-mode choices in the existing artwork override dialog', async () => {
+    loadFixture(true, 'constant');
+    const mounted = await mountInspector();
+    try {
+      let previousChoice = 'constant';
+      for (const choice of ['dynamic', 'constant', 'auto']) {
+        const open = [...mounted.host.querySelectorAll('button')].find(
+          (button) => button.textContent === 'Advanced cut settings',
+        );
+        if (open === undefined) throw new Error('Advanced settings missing');
+        await act(async () => open.click());
+        const field = document.querySelector<HTMLSelectElement>('select[name="powerMode"]');
+        if (field === null || field.form === null) throw new Error('Power mode form missing');
+        expect(field.value).toBe(previousChoice);
+        const form = field.form;
+        field.value = choice;
+        expect(form.checkValidity()).toBe(true);
+        await act(async () => form.requestSubmit());
+
+        const group = output('chosen')[0];
+        if (group?.kind !== 'cut') throw new Error('Expected selected vector output');
+        expect(group.powerMode).toBe(choice === 'auto' ? undefined : choice);
+        const peer = output('peer')[0];
+        if (peer?.kind !== 'cut') throw new Error('Expected peer vector output');
+        expect(peer.powerMode).toBe('constant');
+        const saved = deserializeProject(serializeProject(useStore.getState().project));
+        if (saved.kind !== 'ok') throw new Error(JSON.stringify(saved));
+        await act(async () => useStore.setState({ project: saved.project }));
+        previousChoice = choice;
+      }
+    } finally {
+      await mounted.unmount();
+    }
+  });
 });
 
-function loadFixture(selected: boolean): void {
-  const source = createLayer({ id: 'shared', color: '#000000' });
+function loadFixture(selected: boolean, powerMode?: Layer['powerMode']): void {
+  const source = { ...createLayer({ id: 'shared', color: '#000000' }), powerMode };
   const objects = ['chosen', 'peer'].map((id) => ({
     ...svgObj(id, ['#000000']),
     operationIds: [source.id],

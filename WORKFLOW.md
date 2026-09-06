@@ -405,6 +405,12 @@ Identical to the format-specific import flows except:
 5. Image mode does not show this control because raster emission owns its power mode and laser-off
    travel transitions independently.
 
+Artwork overrides preserve Constant, Dynamic, and an explicit Auto choice through Save/Open.
+An absent artwork power-mode override inherits the assigned operation; explicit Auto follows the
+device default even when that operation selects Constant or Dynamic. Job Review's settings approval
+tracks artwork overrides, power scale, operation bindings, and operation settings, so the badge
+marks later edits as unapproved without changing the existing Frame/Start policy.
+
 #### Success — edit power value
 1. Click input, type new value (or use stepper).
 2. Input is debounced — change is committed after 300 ms of inactivity, **not** on every keystroke (the LF1 audit found this missing; do not repeat).
@@ -1702,6 +1708,10 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
 4. **Confirm settings** — name, usable bed, max/frame feed, origin, homing policy, and the laser
    output contract (S range/air/Fire) on one flat page. CNC machine-output and current-job settings
    live together on the next page instead of being split across this page and Material & Bit.
+   Laser `$31` records the minimum S input used by the controller's PWM mapping; it is not a minimum
+   S emitted by jobs.
+   The laser-mode checkbox records the expected firmware state. Saving these profile fields does
+   not write controller settings.
 5. **Startup Setup** (`cnc-setup`, CNC active only) — three plainly labeled sections on one page:
    **Machine limits** owns safe Z, spindle maximum, spin-up delay, coolant, and park;
    **Current job** owns project material, default/active bit, stock dimensions/origin, and tiling;
@@ -1851,10 +1861,16 @@ ADR-279.*
 **Success**:
 1. Choose a raster image and open the trace dialog. The image is decoded at the
    preview budget and the selected preset starts tracing in a worker.
-2. Adjust a preset, threshold, or boundary control. Changes are debounced; the
+2. Choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
+   or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
+   alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
+   controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
+   use source-image pixels and preserve their separate preset values. Changes are debounced; the
    newest request supersedes and cancels any older trace still running.
 3. The preview displays only the newest completed result. A late response from
    a retired worker is ignored and cannot replace the current preview.
+   A zero-paths retry with relaxed settings is disclosed in the preview and retained in successful
+   commit/export feedback. Edge Detection creates closed outlines; Centerline follows stroke centres.
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.
@@ -1988,6 +2004,11 @@ correct M4-mode raster G-code from Compile.
    modulating per dither output). Active rows alternate left-to-right / right-to-left when effective
    bidirectional output is enabled. An uncalibrated built-in 4040 request falls back to one-way rows
    until a verified scan-offset table or explicit expert override permits bidirectional output.
+   A saved table marked **pending** keeps profiles requiring verified offsets on one-way output,
+   including with Expert override; the verification test can still scan both ways. Job Review checks
+   table coverage against the emitted feed. Below the first sample, correction scales from zero;
+   above the last sample, it stays at the last offset. A non-finite per-operation override is ignored
+   with a warning, allowing table compensation (or zero for an empty table).
    Overscan extends each emitted row by ~5 mm with S0.
 8. G-code file lands in the chosen output target (download, Save As,
    or the connected serial).
@@ -4256,6 +4277,17 @@ and lifts the command's CNC-only gate.)*
    evidence.
 3. `MPG:0` covers the grblHAL MPG stream only; WebUI, network, second serial,
    PLC, macro, and physical inputs remain under F-CNC42 and external interlocks.
+
+#### Recovery after an interrupted Jog
+
+- KerfDesk retains ownership of old acknowledgements while the pendant owns control and sends no
+  cancellation into pendant motion. After explicit `MPG:0`, it waits for prior writes and responses,
+  an acknowledged planner-settlement marker, and a later Idle before releasing the Jog owner.
+- Recovery confirms settlement only. It does not resume interrupted Jog phases or restore Frame,
+  work-Z, or trusted-position evidence. MPG reacquisition invalidates the current recovery attempt.
+- Cancel acknowledgement/status timeouts are shown as errors and retain uncertain motion ownership.
+  Reconnect if the controller stops responding; cancellation is not reported as successful without
+  its required confirmation.
 
 ### F-CNC44. Detect unowned GRBL terminal responses - Phase H.12
 

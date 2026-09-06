@@ -1,5 +1,8 @@
 import { nextOperationColor } from '../../core/scene';
-import { projectObjectOperationSettings } from '../../core/scene/object-operation-settings';
+import {
+  objectOperationSettingsForLayer,
+  projectObjectOperationSettings,
+} from '../../core/scene/object-operation-settings';
 
 type RawRecord = Record<string, unknown>;
 
@@ -141,7 +144,7 @@ function overrideOperation(
 ): RawRecord {
   return {
     ...source,
-    ...projectObjectOperationSettings(override),
+    ...objectOperationSettingsForLayer(projectObjectOperationSettings(override)),
     id,
     name: `${artwork} - ${stringValue(source['name'], 'Operation')}`,
     color,

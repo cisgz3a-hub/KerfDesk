@@ -75,7 +75,7 @@ export function CutSettingsImageFields(props: {
         label="Expert override"
         name="allowUncalibratedBidirectionalScan"
         checked={props.layer.allowUncalibratedBidirectionalScan === true}
-        title="Allow bidirectional scanning without a verified scan-offset calibration. This can double or blur edges on profiles that require calibration."
+        title="Allow uncalibrated bidirectional scanning, which can double or blur edges. Profiles requiring verified offsets still use one-way scanning while a saved table is marked pending."
       />
       <ImageCheckboxField
         label="Pass-through"

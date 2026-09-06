@@ -15,6 +15,7 @@ export function dispatchQueuedMotionLine(
   const operation = get().motionOperation;
   if (operation?.operationId !== operationId || operation.cancelRequested === true) return;
   const kind = operation.kind;
+  const mpgInterruptionId = operation.mpgInterruptionId;
   void safeWrite(line, kind)
     .then(() => {
       set((state) => ({
@@ -23,7 +24,8 @@ export function dispatchQueuedMotionLine(
     })
     .catch(() => {
       set((state) =>
-        state.motionOperation?.operationId === operationId
+        state.motionOperation?.operationId === operationId &&
+        state.motionOperation.mpgInterruptionId === mpgInterruptionId
           ? {
               motionOperation: { ...state.motionOperation, cancelRequested: true },
               frameVerification: null,

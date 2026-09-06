@@ -1,7 +1,10 @@
 import { clamp } from '../math';
 import type { Layer, ObjectPowerScale, SceneObject } from '../scene';
 import type { ObjectOperationSettingsOverride } from '../scene/scene-object';
-import { projectObjectOperationSettings } from '../scene/object-operation-settings';
+import {
+  objectOperationSettingsForLayer,
+  projectObjectOperationSettings,
+} from '../scene/object-operation-settings';
 
 const MIN_POWER_SCALE_PERCENT = 0;
 const MAX_POWER_SCALE_PERCENT = 100;
@@ -13,7 +16,9 @@ export function effectiveOperationForObject(
   object: Pick<SceneObject, 'operationOverride'>,
 ): Layer {
   const override = operationOverrideForObject(layer, object);
-  return override === undefined ? layer : { ...layer, ...override };
+  return override === undefined
+    ? layer
+    : { ...layer, ...objectOperationSettingsForLayer(override) };
 }
 
 export function operationOverrideForObject(

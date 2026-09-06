@@ -18,6 +18,7 @@ export function validateObjectOperationOverride(value: unknown, path: string): s
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   return firstError([
     optionalLiteral(value, `${path}.mode`, ['line', 'fill', 'image']),
+    optionalLiteral(value, `${path}.powerMode`, ['constant', 'dynamic', 'auto']),
     optionalPercent(value, `${path}.minPower`),
     optionalPercent(value, `${path}.power`),
     optionalPositiveNumber(value, `${path}.speed`),

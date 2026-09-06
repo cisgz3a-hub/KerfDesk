@@ -12,8 +12,12 @@ import { rasterImportGeometry } from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
 import { loadImageAsRawData, readImageNaturalSize } from '../trace/image-loader';
 import { traceImageWithFallback } from '../trace/use-trace-worker-client';
+import { traceNoticeMessage, type TraceNotice } from '../trace/trace-notices';
 
 export type MultiFileTraceFile = File;
+export type MultiFileTraceExport = BatchTraceSvgFile & {
+  readonly notices?: ReadonlyArray<TraceNotice>;
+};
 
 export type MultiFileTraceDeps = {
   readonly loadImage?: (file: MultiFileTraceFile) => Promise<RawImageData>;
@@ -36,7 +40,7 @@ const DEFAULT_MULTI_FILE_TRACE_OPTIONS: TraceOptions =
 export async function buildMultiFileTraceExports(
   files: ReadonlyArray<MultiFileTraceFile>,
   deps: MultiFileTraceDeps = {},
-): Promise<ReadonlyArray<BatchTraceSvgFile>> {
+): Promise<ReadonlyArray<MultiFileTraceExport>> {
   const loadImage = deps.loadImage ?? loadImageAsRawData;
   const readNatural =
     deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null);
@@ -65,7 +69,16 @@ export async function buildMultiFileTraceExports(
       options,
     });
   }
-  return traceImagesToSvgFiles(jobs, { trace: deps.trace ?? traceWithWorkerFallback });
+  const notices: ReadonlyArray<TraceNotice>[] = [];
+  const exports = await traceImagesToSvgFiles(jobs, {
+    trace: deps.trace ?? traceWithWorkerFallback(notices),
+  });
+  return exports.map((file, index) => {
+    const fileNotices = notices[index];
+    return fileNotices === undefined || fileNotices.length === 0
+      ? file
+      : { ...file, notices: fileNotices };
+  });
 }
 
 export async function runMultiFileTrace(
@@ -79,16 +92,28 @@ export async function runMultiFileTrace(
     if (svgFiles.length === 0) return;
     assertTraceProducedVisiblePaths(svgFiles);
     const write = deps.write ?? missingTraceExportWriter;
-    let written = 0;
-    for (const file of svgFiles) {
-      if (await write(file)) written += 1;
-    }
+    const { written, notices } = await writeTraceExports(svgFiles, write);
     if (written === 0) return;
-    pushToast(`Traced ${written} ${written === 1 ? 'image' : 'images'} to SVG.`, 'success');
+    const summary = `Traced ${written} ${written === 1 ? 'image' : 'images'} to SVG.`;
+    pushToast([summary, ...notices.map(traceNoticeMessage)].join(' '), 'success');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not trace images: ${message}`, 'error');
   }
+}
+
+async function writeTraceExports(
+  files: ReadonlyArray<MultiFileTraceExport>,
+  write: NonNullable<MultiFileTraceDeps['write']>,
+): Promise<{ readonly written: number; readonly notices: ReadonlyArray<TraceNotice> }> {
+  let written = 0;
+  const notices = new Set<TraceNotice>();
+  for (const file of files) {
+    if (!(await write(file))) continue;
+    written += 1;
+    for (const notice of file.notices ?? []) notices.add(notice);
+  }
+  return { written, notices: [...notices] };
 }
 
 export async function writeTraceSvgFileWithPlatform(
@@ -117,10 +142,14 @@ function missingTraceExportWriter(): never {
   throw new Error('Trace export writer is not configured.');
 }
 
-async function traceWithWorkerFallback(
-  image: RawImageData,
-  options: TraceOptions,
-): Promise<ReadonlyArray<ColoredPath>> {
-  const result = await traceImageWithFallback(image, options);
-  return result.paths;
+function traceWithWorkerFallback(
+  notices: ReadonlyArray<TraceNotice>[],
+): NonNullable<MultiFileTraceDeps['trace']> {
+  // The batch core traces in source order. Keep each result's notices beside
+  // its SVG so cancelled saves cannot attach a warning to a different file.
+  return async (image, options) => {
+    const result = await traceImageWithFallback(image, options);
+    notices.push(result.notices ?? []);
+    return result.paths;
+  };
 }

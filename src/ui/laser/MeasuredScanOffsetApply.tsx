@@ -143,11 +143,13 @@ function CalibrationLifecycleStatus(props: {
       <div role="status" style={verificationStyle}>
         Verification pending: the table is saved, but physical alignment is not proven. Generate
         “Verify saved table” from Scan Offset Test, inspect the burned coupon, then explicitly mark
-        it verified. The table remains available; this warning does not disable output.
+        it verified. Output remains available. Profiles requiring verified offsets use one-way
+        scanning while pending, even with Expert override; verification tests can still scan both
+        ways.
         <div style={buttonRowStyle}>
           <button
             type="button"
-            title="Record that the physical verification coupon passed. This is provenance, not an output gate."
+            title="Record that the physical verification coupon passed. Profiles requiring verified offsets can then use bidirectional scanning."
             onClick={props.onMarkVerified}
           >
             Mark verified
@@ -165,7 +167,7 @@ function CalibrationLifecycleStatus(props: {
       <div style={buttonRowStyle}>
         <button
           type="button"
-          title="Record that this table still needs a physical verification coupon. The table remains available."
+          title="Record that this table still needs a physical verification coupon. Profiles requiring verified offsets will use one-way scanning while pending."
           onClick={props.onMarkPending}
         >
           Mark pending
@@ -173,7 +175,7 @@ function CalibrationLifecycleStatus(props: {
         {legacy ? (
           <button
             type="button"
-            title="Record that the physical verification coupon passed. This is provenance, not an output gate."
+            title="Record that the physical verification coupon passed. Profiles requiring verified offsets can then use bidirectional scanning."
             onClick={props.onMarkVerified}
           >
             Mark verified

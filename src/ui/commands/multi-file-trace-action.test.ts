@@ -105,6 +105,28 @@ describe('buildMultiFileTraceExports', () => {
 });
 
 describe('runMultiFileTrace', () => {
+  it('retains actual fallback notices on exported files and reports them after saving', async () => {
+    const data = new Uint8ClampedArray(16 * 16 * 4).fill(255);
+    for (const y of [7, 8]) data.set([0, 0, 0, 255], (y * 16 + 7) * 4);
+    const loadImage = async (): Promise<RawImageData> => ({ width: 16, height: 16, data });
+    const options = TRACE_PRESETS['Sharp'];
+    if (options === undefined) throw new Error('Missing Sharp preset');
+    const pushToast = vi.fn();
+    const write = vi.fn(async () => true);
+    await runMultiFileTrace([namedFile('speck.png')], pushToast, {
+      loadImage,
+      options,
+      write,
+    });
+    expect(write).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: 'speck-trace.svg', notices: ['relaxed-settings'] }),
+    );
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringContaining('Automatic retry used relaxed trace settings'),
+      'success',
+    );
+  });
+
   it('writes one SVG per selected source image and reports success', async () => {
     const pushToast = vi.fn();
     const writtenFiles: string[] = [];

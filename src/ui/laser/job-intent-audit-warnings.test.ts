@@ -1,5 +1,8 @@
 import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
+import { compileJob } from '../../core/job';
+import { offsetForEmittedFeed } from '../../core/job/scan-offset';
+import { grblStrategy } from '../../core/output/grbl-strategy';
 import {
   createLayer,
   createProject,
@@ -49,7 +52,7 @@ const boxPanel: SceneObject = {
   ],
 };
 
-function projectWith(object: SceneObject, mode: 'line' | 'image'): Project {
+function projectWith(object: SceneObject, mode: 'line' | 'image' | 'fill'): Project {
   return {
     ...createProject(),
     scene: {
@@ -61,6 +64,64 @@ function projectWith(object: SceneObject, mode: 'line' | 'image'): Project {
 }
 
 describe('audit Job Review intent disclosures', () => {
+  it.each(['fill', 'image'] as const)(
+    'checks %s table coverage at the feed actually emitted near a fractional boundary',
+    (mode) => {
+      const base = projectWith(
+        mode === 'fill'
+          ? boxPanel
+          : { ...raster, lumaBase64: Buffer.from(new Uint8Array(4)).toString('base64') },
+        mode,
+      );
+      const project = {
+        ...base,
+        device: {
+          ...base.device,
+          scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.2 }],
+        },
+        scene: {
+          ...base.scene,
+          layers: base.scene.layers.map((layer) => ({ ...layer, speed: 1000.75 })),
+        },
+      };
+      const output = grblStrategy.emit(compileJob(project.scene, project.device), project.device);
+      expect(output).toMatch(/\bF1000\b/);
+      expect(output).not.toMatch(/\bF1001\b/);
+      expect(detectJobIntentWarnings(project).join('\n')).not.toContain(
+        'outside the saved scan-offset table',
+      );
+
+      const uncovered = {
+        ...project,
+        device: {
+          ...project.device,
+          scanningOffsets: [
+            { speedMmPerMin: 1000.5, offsetMm: 0.2 },
+            { speedMmPerMin: 2000, offsetMm: 0.4 },
+          ],
+        },
+      };
+      expect(detectJobIntentWarnings(uncovered).join('\n')).toContain(
+        '1000 mm/min is outside the saved scan-offset table (1000.5–2000 mm/min)',
+      );
+    },
+  );
+
+  it('describes below-range correction scaling from zero instead of endpoint clamping', () => {
+    const base = projectWith(raster, 'image');
+    const project = {
+      ...base,
+      device: {
+        ...base.device,
+        scanningOffsets: [{ speedMmPerMin: 3000, offsetMm: 0.2 }],
+      },
+    };
+    expect(offsetForEmittedFeed(project.device.scanningOffsets, 1500)).toBe(0.1);
+    expect(detectJobIntentWarnings(project).join('\n')).toContain(
+      'Below the first sample, correction scales from zero',
+    );
+  });
+
   it('warns when bidirectional scans have no saved offset table', () => {
     expect(detectJobIntentWarnings(projectWith(raster, 'image'))).toContain(
       'Bidirectional scan output at 1500 mm/min has no saved scan-offset table. KerfDesk will emit 0 mm scan correction; calibrate these speeds or select one-way scanning if alignment is not verified.',
@@ -80,7 +141,7 @@ describe('audit Job Review intent disclosures', () => {
       },
     });
     expect(warnings).toContain(
-      'Bidirectional scan output at 1500 mm/min is outside the saved scan-offset table (500–1000 mm/min). KerfDesk clamps to the nearest endpoint offset; add measured rows covering these emitted speeds or select one-way scanning.',
+      'Bidirectional scan output at 1500 mm/min is outside the saved scan-offset table (500–1000 mm/min). Below the first sample, correction scales from zero; above the last sample, it stays at the last offset. Add measured rows covering these emitted speeds or select one-way scanning.',
     );
   });
 
