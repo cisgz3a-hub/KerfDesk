@@ -6,11 +6,13 @@ export type TraceCommitOwner = {
   readonly projectDocumentEpoch: number;
   readonly source: RasterImage;
   readonly dialogRequestToken: string;
+  readonly sourceOrigin?: 'camera-capture';
 };
 
 export type TraceCommitClaim = {
   readonly project: Project;
   readonly source: RasterImage;
+  readonly cameraSource?: RasterImage;
 };
 
 /** Capture the exact live document, source object, and Trace-dialog request at submit. */
@@ -22,6 +24,14 @@ export function captureTraceCommitOwner(
   if (dialog?.requestToken !== dialogRequestToken || dialog.source !== seed) return null;
 
   const state = useStore.getState();
+  if (dialog.sourceOrigin === 'camera-capture') {
+    return {
+      projectDocumentEpoch: state.projectDocumentEpoch,
+      source: seed,
+      dialogRequestToken,
+      sourceOrigin: 'camera-capture',
+    };
+  }
   const source = state.project.scene.objects.find((object) => object.id === seed.id);
   if (!sameTraceSourceContent(source, seed)) return null;
   return { projectDocumentEpoch: state.projectDocumentEpoch, source, dialogRequestToken };
@@ -34,6 +44,10 @@ export function claimTraceCommitOwner(owner: TraceCommitOwner): TraceCommitClaim
 
   const state = useStore.getState();
   if (state.projectDocumentEpoch !== owner.projectDocumentEpoch) return null;
+  if (owner.sourceOrigin === 'camera-capture') {
+    if (dialog.sourceOrigin !== owner.sourceOrigin || dialog.source !== owner.source) return null;
+    return { project: state.project, source: owner.source, cameraSource: owner.source };
+  }
   const source = state.project.scene.objects.find((object) => object.id === owner.source.id);
   if (source !== owner.source) return null;
   return { project: state.project, source: owner.source };

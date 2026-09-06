@@ -52,6 +52,7 @@ export type TextDialogState =
 
 export type TraceImageDialogState = {
   readonly source: RasterImage;
+  readonly sourceOrigin?: 'camera-capture';
   /** Exact owner for one open Trace dialog lifetime. */
   readonly requestToken: string;
   readonly replaceTraceId?: string;
@@ -170,7 +171,7 @@ export type UiState = ArtworkRunOrderUiState &
     readonly imageDialog: TraceImageDialogState | null;
     readonly openImageDialog: (
       source: RasterImage,
-      options?: { readonly replaceTraceId?: string },
+      options?: Pick<TraceImageDialogState, 'replaceTraceId' | 'sourceOrigin'>,
     ) => void;
     readonly closeImageDialog: () => void;
     // ADR-029 Convert to Bitmap dialog. Lives here (not CommandShell-local
@@ -260,10 +261,7 @@ function uiDialogSlice(
     imageDialog: null,
     openImageDialog: (source, options) =>
       set({
-        imageDialog:
-          options?.replaceTraceId === undefined
-            ? { source, requestToken: crypto.randomUUID() }
-            : { source, requestToken: crypto.randomUUID(), replaceTraceId: options.replaceTraceId },
+        imageDialog: { source, ...options, requestToken: crypto.randomUUID() },
       }),
     closeImageDialog: () => set({ imageDialog: null }),
     convertBitmapDialogOpen: false,

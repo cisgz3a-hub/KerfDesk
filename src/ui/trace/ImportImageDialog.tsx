@@ -5,7 +5,7 @@
 // CNC stays vector-only. Both outputs retain source provenance for Re-trace
 // Original. Pure UI pieces live in dialog-parts.tsx.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { IDENTITY_TRANSFORM, type RasterImage, type TracedImage } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
@@ -49,6 +49,13 @@ import {
 } from './trace-commit-ownership';
 import { commitTraceOutput } from './trace-output-commit';
 import { useTracePreview } from './use-trace-preview';
+import { useTraceCommitLifetime } from './use-trace-commit-lifetime';
+import {
+  preparedTraceEntry,
+  type TracePreviewCommitControl,
+  type TracePreviewSettlement,
+} from './use-trace-preview-settlement';
+import { isTraceRequestSuperseded } from './use-trace-worker-client';
 
 export function ImportImageDialog(): JSX.Element | null {
   const dialog = useUiStore((s) => s.imageDialog);
@@ -85,6 +92,7 @@ type TraceCommitContext = {
   readonly close: () => void;
   readonly setBusy: (v: boolean) => void;
   readonly claimOwner: () => TraceCommitClaim | null;
+  readonly settlePreview?: (outcome: TracePreviewSettlement) => void;
 };
 
 function DialogBody(props: {
@@ -110,6 +118,8 @@ function DialogBody(props: {
   const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
   const boundarySelection = useBoundarySelection();
   const [busy, setBusy] = useState(false);
+  const captureLifetime = useTraceCommitLifetime(props.requestToken);
+  const previewControl = useRef<TracePreviewCommitControl>(null);
   // Layer the LightBurn-style trace settings on top of the preset.
   // Image-level edits stay in Adjust Image, so Trace Image keeps one
   // authoritative vector workflow: cutoff, threshold, ignore,
@@ -124,13 +134,10 @@ function DialogBody(props: {
   // re-derived from `TRACE_PRESETS[preset]` each render and would
   // otherwise be ref-unstable too.
   const presetOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
-  const options: TraceOptions = useMemo(
-    () => mergeLightBurnTraceSettings(presetOptions, traceSettings),
-    [presetOptions, traceSettings],
-  );
+  const options = useTraceOptions(presetOptions, traceSettings);
   const supportsTraceFillStyle = isFilledContourTraceOptions(options);
   const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : traceOutput;
-  const preview = useSelectedTracePreview(file, options, boundarySelection, seed);
+  const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
 
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -151,6 +158,8 @@ function DialogBody(props: {
       pushToast,
       setBusy,
       requestToken: props.requestToken,
+      captureLifetime,
+      previewControl: previewControl.current,
     });
   };
 
@@ -185,12 +194,11 @@ function DialogBody(props: {
   );
 }
 
-function preparedTraceEntry(preview: ReturnType<typeof useTracePreview>): {
-  readonly preparedTrace?: PreparedTrace;
-} {
-  return preview.kind === 'ready' && preview.preparedTrace !== undefined
-    ? { preparedTrace: preview.preparedTrace }
-    : {};
+function useTraceOptions(
+  preset: TraceOptions,
+  overrides: LightBurnTraceSettingOverrides,
+): TraceOptions {
+  return useMemo(() => mergeLightBurnTraceSettings(preset, overrides), [preset, overrides]);
 }
 
 function useSelectedTracePreview(
@@ -198,11 +206,16 @@ function useSelectedTracePreview(
   options: TraceOptions,
   selection: ReturnType<typeof useBoundarySelection>,
   seed: RasterImage,
+  control: Ref<TracePreviewCommitControl>,
 ): ReturnType<typeof useTracePreview> {
-  return useTracePreview(file, options, selection.boundary, selection.boundaryMode, {
-    width: seed.pixelWidth,
-    height: seed.pixelHeight,
-  });
+  return useTracePreview(
+    file,
+    options,
+    selection.boundary,
+    selection.boundaryMode,
+    { width: seed.pixelWidth, height: seed.pixelHeight },
+    control,
+  );
 }
 
 function isFilledContourTraceOptions(options: TraceOptions): boolean {
@@ -307,13 +320,17 @@ function submitTraceDialog(deps: {
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
   readonly setBusy: (v: boolean) => void;
   readonly requestToken: string;
+  readonly captureLifetime: () => () => boolean;
+  readonly previewControl: TracePreviewCommitControl | null;
 }): void {
   if (deps.file === null) {
     deps.pushToast('Image still loading — try again in a moment.', 'warning');
     return;
   }
   const owner = captureTraceCommitOwner(deps.seed, deps.requestToken);
-  if (owner === null) return;
+  const isCurrent = deps.captureLifetime();
+  if (owner === null || !isCurrent()) return;
+  const settlePreview = deps.previewControl?.capture();
   const traceArgs = {
     file: deps.file,
     options: deps.options,
@@ -332,7 +349,8 @@ function submitTraceDialog(deps: {
     pushToast: deps.pushToast,
     close: () => closeOwnedTraceDialog(owner.dialogRequestToken),
     setBusy: deps.setBusy,
-    claimOwner: () => claimTraceCommitOwner(owner),
+    claimOwner: () => (isCurrent() ? claimTraceCommitOwner(owner) : null),
+    ...(settlePreview === undefined ? {} : { settlePreview }),
   });
 }
 
@@ -352,12 +370,14 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     // re-traces the region supersampled and patches it into the full trace
     // (ADR-113). Either way geometry returns in source-image coordinates so
     // preview, commit, and overlay registration stay on the same pixels.
-    const { paths, bounds, width, height, notices } = await resolveTraceCommitResult({
+    const result = await resolveTraceCommitResult({
       ...args,
       sourceGrid: { width: args.seed.pixelWidth, height: args.seed.pixelHeight },
     });
     const owner = ctx.claimOwner();
     if (owner === null) return;
+    settleTracePreview(ctx, { kind: 'ready', result });
+    const { paths, bounds, width, height, notices } = result;
     if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,
@@ -420,6 +440,8 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
 
 function reportTraceCommitError(source: string, err: unknown, ctx: TraceCommitContext): void {
   if (ctx.claimOwner() === null) return;
+  if (isTraceRequestSuperseded(err)) return;
+  settleTracePreview(ctx, { kind: 'error', error: err });
   ctx.pushToast(
     `Could not trace ${source}: ${err instanceof Error ? err.message : String(err)}`,
     'error',
@@ -428,6 +450,10 @@ function reportTraceCommitError(source: string, err: unknown, ctx: TraceCommitCo
 
 function releaseTraceCommitBusy(ctx: TraceCommitContext): void {
   if (ctx.claimOwner() !== null) ctx.setBusy(false);
+}
+
+function settleTracePreview(ctx: TraceCommitContext, outcome: TracePreviewSettlement): void {
+  ctx.settlePreview?.(outcome);
 }
 
 /** Compare trace-source content and pixel grids while intentionally allowing a

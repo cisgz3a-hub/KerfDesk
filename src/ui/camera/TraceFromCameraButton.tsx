@@ -11,6 +11,7 @@ import { cameraCaptureBindingForFrame } from './frame-source';
 import { buildCameraTraceImage } from './trace-from-camera';
 import { cameraBindingIssue } from './camera-binding-guard';
 import { cameraSurfaceHeightIssue, resolveCameraSurfaceHeight } from './camera-surface-height';
+import { useCameraTraceLifetime } from './use-camera-trace-lifetime';
 
 export function TraceFromCameraButton(): JSX.Element {
   const alignment = useStore((s) => s.project.device.cameraAlignment);
@@ -22,10 +23,13 @@ export function TraceFromCameraButton(): JSX.Element {
   const activatePlacement = useCameraStore((s) => s.activatePlacement);
   const openImageDialog = useUiStore((s) => s.openImageDialog);
   const pushToast = useToastStore((s) => s.pushToast);
+  const captureLifetime = useCameraTraceLifetime();
 
   const traceFromCamera = async (): Promise<void> => {
     if (sourceState.kind !== 'live') return;
+    const isCurrent = captureLifetime();
     const raw = await captureSourceFrame(sourceState.source);
+    if (!isCurrent()) return;
     if (raw === null) {
       pushToast('Could not capture a camera frame.', 'error');
       return;
@@ -63,7 +67,7 @@ export function TraceFromCameraButton(): JSX.Element {
     // Keep camera placement visible in the Camera panel without rewriting the
     // operator's selected origin mode. The watched Frame verifies exact motion.
     activatePlacement();
-    openImageDialog(built.source);
+    openImageDialog(built.source, { sourceOrigin: 'camera-capture' });
   };
 
   return (
