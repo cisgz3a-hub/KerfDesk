@@ -170,5 +170,158 @@
     "sha256": "CF0E82F580B9658E43AED87B7ADFFF01B65D58E7C17670D0C3AABEA6C714F17C",
     "sourceWorktree": "C:/Users/Asus/LaserForge-2.0/.claude/worktrees/xenodochial-stonebraker-4af61c",
     "sourceHead": "f29214ba2c366b35ce65bb21ea0ed8caed991c49"
+  },
+  {
+    "originalPath": "docs/audits/2026-07-11-competitive-sector-audit.md",
+    "publishedPath": "docs/audits/2026-07-11-competitive-sector-audit.md",
+    "sha256": "BBEE2ED0A4B33054B31BD1964A6CD46D86E86AC2D659E747916126148CDBE305",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "BA61E1C4FFAE670FF25505C6318DF63C1489EDB0F102326361C2B04A390EC9E2",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-12-laser-gap-closure-research.md",
+    "publishedPath": "docs/audits/2026-07-12-laser-gap-closure-research.md",
+    "sha256": "FE9433BB44A6CCF3FD4D6901DF0DBE598604F6D4261432D56AE77F98B2379F70",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "02D7699657149F551574899245B12E3ABA7E2F4BEF667F88B8E99929017A4EEF",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-cam-motion-machine-architecture.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-cam-motion-machine-architecture.md",
+    "sha256": "375AA7E3EEFB0AEAFD59A64DA224719864DDC533BEA3350D95977244AAB574E9",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "0986BA1D5C9FCE88D9A1BDE2E47354E9E21BD57EC5B3473AC6CAAE0295674C88",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-controller-machine-integration-and-fault-verification.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-controller-machine-integration-and-fault-verification.md",
+    "sha256": "8D0D7C9E404831F09E655BCE818671ADB500ECFC3B66A3C15938678BCE1DE861",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "2223B696EC89938FD25631859FF8AD4FA6DCAE316F20E46C2112A48E2CF50446",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-controller-post-and-process-workflows.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-controller-post-and-process-workflows.md",
+    "sha256": "3F11C3729B5A0C7264A29F60A210FAFC3111DDC43A13164281D7AA967F5B0BEB",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "3F4A657FA5C47DF490D0782F1169BC02C8ABF3804FB448E87CEEB01D644F9258",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-coordinate-frames-multi-axis-kinematics-and-volumetric-accuracy.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-coordinate-frames-multi-axis-kinematics-and-volumetric-accuracy.md",
+    "sha256": "E50D6BED7CCF9F616E6CC59DDD0D862B555F6B9347058AAFCDE26EEC58884BDA",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "57363BD1C25892D78E3644E297241634D47BF5D38630D19A6F29D89A7E21785A",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-cutting-mechanics-tooling-and-process-intelligence.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-cutting-mechanics-tooling-and-process-intelligence.md",
+    "sha256": "A656A0326433AEFC9D809359F018647D67604BD64C0A0C40D0C7BEDEE9AFA9B6",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "4746B6B0A5CDBDA650DDB23E22B32F2EA2E7B9B5F197367D1CA988D23441A684",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-cybersecurity-program-integrity-networking-and-remote-operations.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-cybersecurity-program-integrity-networking-and-remote-operations.md",
+    "sha256": "63F91190BA8459F0CFB695659993FBCD98BC4FD9BFC681CF325377344F19D6FE",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "423D88A1E0518EA7665E61D46EB9A73C79DC18C5DF1EE6D2E5D941120CD5F53A",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-gcode-interpreter-restart-and-simulation-architecture.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-gcode-interpreter-restart-and-simulation-architecture.md",
+    "sha256": "0013CD9A4C4D423217A33548A637FC67F5BB42FCDCBAF37290337151BD8CE47D",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "E13CB33536D87323C7E63F213F0F38AEA5344C8B2CDEEBE3189521AD6750B24B",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-motion-control-drive-process-and-metrology.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-motion-control-drive-process-and-metrology.md",
+    "sha256": "569989CD7456C6F90B747431C8EE6919E52890DAF7AE0B6A8DA7A144B16177BB",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "39C3BF617C4A3B9E95BCBCDEA5B5F61E099867036264A20858491E3EEF93E105",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-safety-architecture-operator-modes-and-human-factors.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-safety-architecture-operator-modes-and-human-factors.md",
+    "sha256": "32BA67310337F6A11388DCAD0A3270E18181394AA1086584E6C1D2AEDF2EA8C0",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "E18C011E8409F7F1C67A4F18D9A4C3A558C9AB0935928B5F158D6BE382412B4B",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-setup-probing-tooling-and-calibration-architecture.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-setup-probing-tooling-and-calibration-architecture.md",
+    "sha256": "E41E1430890204B6AA34D92AF6118A509E09B886D0C218418029D770B5022D7D",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "A75421F38437F93EF1EBC30A4FA0E330753B2E7BAD38BFF270AC0375FBE28FDF",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-software-deep-research-foundation.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-software-deep-research-foundation.md",
+    "sha256": "4163C50DACE20A40D9B2100E82B6FE2F98AA136E5BED4D9ECCE351EC115C39C6",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "8108045C84A683484B866D0A63D54DA079FD4B95323C77ED1FFEFECF8CE0633A",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-spindle-auxiliary-toolchanger-and-plc-architecture.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-spindle-auxiliary-toolchanger-and-plc-architecture.md",
+    "sha256": "EC6BCD2542D97DB9246277A56BB109811B8E37F95A0F16C409B41FB5D5EACC78",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "0EC6B6C6B543CBE9486546A78D761F818B6796396CC121C5B15BBEEB4ADB975E",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-turning-threading-mill-turn-and-multi-channel-architecture.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-turning-threading-mill-turn-and-multi-channel-architecture.md",
+    "sha256": "10DBB88CB0B9EE3C599E2643200C15EDA28E469CC60BA176BF2054C185D4B919",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "2767748AFFABF3ED49BFB8254388C0316825B7DC1F8999F9E194BDC6027D7BA3",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-cnc-workholding-fixture-vacuum-and-part-state-architecture.md",
+    "publishedPath": "docs/audits/2026-07-13-cnc-workholding-fixture-vacuum-and-part-state-architecture.md",
+    "sha256": "D4E0D1321098DEC9B2368277ECDDACC15A5A48BEFDFE11C080046A5936D43887",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "793D30C97B76630C1329344479682E72EB0D6E03306209EEF48D2EA992B1C61F",
+    "publicationTransform": "Prepend historical archive notice; normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-11-competitive-scorecard.csv",
+    "publishedPath": "docs/audits/2026-07-11-competitive-scorecard.csv",
+    "sha256": "EFE0D74453F0A52B930E622C7E1CEBB0C75FDA3077C296F4E86021FA0C84A4AF",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/audit-current-main",
+    "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
+    "publishedSha256": "EFE0D74453F0A52B930E622C7E1CEBB0C75FDA3077C296F4E86021FA0C84A4AF",
+    "publicationTransform": "Normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines; preserve all CSV values."
   }
 ]
