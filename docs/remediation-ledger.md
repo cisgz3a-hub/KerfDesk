@@ -1,5 +1,10 @@
 # Audit remediation ledger
 
+Current selected Grok-audit fixes, 2026-09-06: `codex/grok-reviewed-fixes-20260906`, based on main
+`5918ef53fd91f6b33a4cd0766f2a3b7ba6991acc`. Scope, reproduced failures, verification, and limitations:
+[`audits/2026-09-06-grok-reviewed-fixes.md`](audits/2026-09-06-grok-reviewed-fixes.md).
+PR/check records establish publication; this record does not assert a merge, deployment, or hardware result.
+
 Current CNC spindle-review correction owner, 2026-09-06:
 `codex/cnc-review-spindle-facts-20260906`, based on main `5918ef53fd91f6b33a4cd0766f2a3b7ba6991acc`.
 Scope: active CNC/laser controller S-scale facts, offline configured-spindle advisory, and honest

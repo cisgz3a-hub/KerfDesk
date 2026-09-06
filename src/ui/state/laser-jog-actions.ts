@@ -230,7 +230,12 @@ function assertMotionOperationOwner(
   label: string,
 ): void {
   const operation = get().motionOperation;
-  if (operation?.operationId === operationId && operation.cancelRequested !== true) return;
+  if (
+    operation?.operationId === operationId &&
+    operation.cancelRequested !== true &&
+    operation.mpgInterruptionId === undefined
+  )
+    return;
   throw new Error(`${label} was cancelled or replaced before its first command was dispatched.`);
 }
 
@@ -246,7 +251,11 @@ function failOwnedMotionOperation(
   state: LaserState,
   operationId: LaserMotionOperationId,
 ): Partial<Pick<LaserState, 'motionOperation' | 'frameVerification' | 'framedRun'>> {
-  if (state.motionOperation?.operationId !== operationId) return {};
+  if (
+    state.motionOperation?.operationId !== operationId ||
+    state.motionOperation.mpgInterruptionId !== undefined
+  )
+    return {};
   return {
     motionOperation: { ...state.motionOperation, cancelRequested: true },
     frameVerification: null,
@@ -257,7 +266,12 @@ function failOwnedMotionOperation(
 function resetOwnedMotionPhase(set: SetFn, operationId: LaserMotionOperationId): void {
   set((state) => {
     const operation = state.motionOperation;
-    if (operation?.operationId !== operationId || operation.cancelRequested === true) return {};
+    if (
+      operation?.operationId !== operationId ||
+      operation.cancelRequested === true ||
+      operation.mpgInterruptionId !== undefined
+    )
+      return {};
     return {
       motionOperation: {
         ...operation,

@@ -6,16 +6,15 @@ import { startControllerCommand } from './laser-interactive-command';
 import type { LaserMotionOperation, LaserMotionOperationId } from './laser-motion-operation';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { GetFn, SafeWriteFn, SetFn } from './laser-line-shared';
+import {
+  assertCancelContext,
+  createCancelContext,
+  publishCancelFailure,
+  type CancelContext,
+} from './laser-motion-cancel-context';
 
 const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
 const CANCEL_QUEUE_POLL_MS = 10;
-
-type CancelContext = {
-  readonly set: SetFn;
-  readonly get: GetFn;
-  readonly refs: LiveRefs;
-  readonly safeWrite: SafeWriteFn;
-};
 
 export async function runCancelJog(
   set: SetFn,
@@ -23,21 +22,26 @@ export async function runCancelJog(
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
-  const context = { set, get, refs, safeWrite };
-  const operationId = get().motionOperation?.operationId;
+  const context = createCancelContext(set, get, refs, safeWrite);
+  const operationId = context.operationId;
   // Cancel intent itself expires a completed Frame permit, even when no live
   // motion owner exists (for example a key/button release after a zero-length
   // jog). Authorization never survives a realtime cancel attempt.
   set({ frameVerification: null, framedRun: null });
   if (operationId !== undefined) markMotionOperationCancelling(context, operationId);
-  const cancelError = await writeJogCancel(refs, safeWrite);
   try {
-    await waitForCancelledMotionQueue(get, operationId);
-    await armCancelledMotionStatusFence(context, operationId);
-  } catch (settlementError) {
-    throw cancelError ?? settlementError;
+    const cancelError = await writeJogCancel(context);
+    try {
+      await waitForCancelledMotionQueue(context, operationId);
+      await armCancelledMotionStatusFence(context, operationId);
+    } catch (settlementError) {
+      throw cancelError ?? settlementError;
+    }
+    if (cancelError !== undefined) throw cancelError;
+  } catch (error) {
+    publishCancelFailure(context, error);
+    throw error;
   }
-  if (cancelError !== undefined) throw cancelError;
 }
 
 function markMotionOperationCancelling(
@@ -46,7 +50,7 @@ function markMotionOperationCancelling(
 ): void {
   context.set((state) =>
     state.motionOperation?.operationId === operationId
-      ? { motionOperation: cancellingMotionOperation(state.motionOperation) }
+      ? { motionOperation: cancellingMotionOperation(state.motionOperation, context.attemptId) }
       : {},
   );
   // A phase barrier may currently own the singleton fresh-status waiter.
@@ -55,35 +59,36 @@ function markMotionOperationCancelling(
   cancelFreshControllerStatusWait(context.refs, 'Motion settlement was superseded by Cancel.');
 }
 
-async function writeJogCancel(
-  refs: LiveRefs,
-  safeWrite: SafeWriteFn,
-): Promise<unknown | undefined> {
-  const jogCancel = refs.driver.realtime.jogCancel;
+async function writeJogCancel(context: CancelContext): Promise<unknown | undefined> {
+  assertCancelContext(context);
+  const jogCancel = context.refs.driver.realtime.jogCancel;
   if (jogCancel === null) return undefined;
   try {
-    await safeWrite(jogCancel, 'jog');
+    await context.safeWrite(jogCancel, 'jog');
     return undefined;
   } catch (error) {
     return error;
   }
 }
 
-function cancellingMotionOperation(operation: LaserMotionOperation): LaserMotionOperation {
+function cancellingMotionOperation(
+  operation: LaserMotionOperation,
+  attemptId: symbol,
+): LaserMotionOperation {
   const { cancelStatusQueryAfterSequence: staleFence, ...unstamped } = operation;
   void staleFence;
-  return { ...unstamped, cancelRequested: true };
+  return { ...unstamped, cancelRequested: true, cancelAttemptId: attemptId };
 }
 
 async function waitForCancelledMotionQueue(
-  get: GetFn,
+  context: CancelContext,
   operationId: LaserMotionOperationId | undefined,
 ): Promise<void> {
   if (operationId === undefined) return;
   const deadline = Date.now() + CANCEL_QUEUE_TIMEOUT_MS;
   while (Date.now() <= deadline) {
-    const state = get();
-    if (state.motionOperation?.operationId !== operationId) return;
+    assertCancelContext(context);
+    const state = context.get();
     if (motionQueueSettled(state)) return;
     await sleep(CANCEL_QUEUE_POLL_MS);
   }
@@ -104,13 +109,12 @@ async function armCancelledMotionStatusFence(
   context: CancelContext,
   operationId: LaserMotionOperationId | undefined,
 ): Promise<void> {
-  if (operationId === undefined || context.get().motionOperation?.operationId !== operationId) {
-    return;
-  }
+  if (operationId === undefined) return;
+  assertCancelContext(context);
   await waitForCancelledMotionIdleBeforeMarker(context, operationId);
-  if (context.get().motionOperation?.operationId !== operationId) return;
+  assertCancelContext(context);
   await crossCancellationSettlementMarker(context);
-  if (context.get().motionOperation?.operationId !== operationId) return;
+  assertCancelContext(context);
   const statusQuery = cancellationStatusQuery(context.refs);
   if (statusQuery === null) {
     throw new Error(
@@ -132,14 +136,15 @@ async function waitForCancelledMotionIdleBeforeMarker(
   }
   const deadline = Date.now() + CANCEL_QUEUE_TIMEOUT_MS;
   while (context.get().motionOperation?.operationId === operationId) {
-    await waitForCancelledMotionQueue(context.get, operationId);
+    await waitForCancelledMotionQueue(context, operationId);
     const report = await queryCancellationStatus(context, statusQuery, deadline);
+    assertCancelContext(context);
     if (report.state === 'Idle') return;
     if (report.state === 'Jog') {
       // GRBL ignores 0x85 unless it has already entered STATE_JOG. A first
       // cancel written during the command -> Jog transition is therefore not
       // proof. Re-send only after a fresh Jog report, then query again.
-      const retryError = await writeJogCancel(context.refs, context.safeWrite);
+      const retryError = await writeJogCancel(context);
       if (retryError !== undefined) throw retryError;
     }
     if (Date.now() >= deadline) break;
@@ -155,7 +160,9 @@ async function queryCancellationStatus(
   statusQuery: string,
   deadline: number,
 ): Promise<Awaited<ReturnType<typeof waitForFreshControllerStatus>>> {
+  assertCancelContext(context);
   const beforeQuery = context.get();
+  const alreadyWaiting = context.refs.controllerStatusWait != null;
   const confirmation = waitForFreshControllerStatus(context.refs, {
     after: {
       sessionEpoch: beforeQuery.controllerSessionEpoch,
@@ -165,6 +172,7 @@ async function queryCancellationStatus(
     timeoutMs: Math.max(1, deadline - Date.now()),
     timeoutMessage: 'Timed out waiting for controller state after Cancel.',
   });
+  const ownedWait = alreadyWaiting ? null : context.refs.controllerStatusWait;
   try {
     const [, report] = await Promise.all([
       context.safeWrite(statusQuery, undefined, 'poll'),
@@ -172,15 +180,18 @@ async function queryCancellationStatus(
     ]);
     return report;
   } catch (error) {
-    cancelFreshControllerStatusWait(
-      context.refs,
-      'Motion-cancel status observation was cancelled.',
-    );
+    if (ownedWait != null && context.refs.controllerStatusWait === ownedWait) {
+      cancelFreshControllerStatusWait(
+        context.refs,
+        'Motion-cancel status observation was cancelled.',
+      );
+    }
     throw error;
   }
 }
 
 async function crossCancellationSettlementMarker(context: CancelContext): Promise<void> {
+  assertCancelContext(context);
   // A status report has no query identifier, so a delayed response to an old
   // background query cannot itself prove cancellation. The ack-owned marker
   // makes every later status observation causal to the cancelled motion queue.
@@ -208,6 +219,7 @@ async function confirmCancelledMotionIdle(
   operationId: LaserMotionOperationId,
   statusQuery: string,
 ): Promise<void> {
+  assertCancelContext(context);
   const beforeQuery = context.get();
   context.set((state) =>
     state.motionOperation?.operationId === operationId
@@ -219,21 +231,26 @@ async function confirmCancelledMotionIdle(
         }
       : {},
   );
+  const alreadyWaiting = context.refs.controllerStatusWait != null;
   const confirmation = waitForFreshControllerStatus(context.refs, {
     after: {
       sessionEpoch: beforeQuery.controllerSessionEpoch,
       sequence: beforeQuery.statusSequence,
     },
-    accept: (report) => report.state === 'Idle',
+    accept: (report) => report.state === 'Idle' || report.mpgActive === true,
     timeoutMessage: 'Timed out waiting for a post-cancel Idle status report.',
   });
+  const ownedWait = alreadyWaiting ? null : context.refs.controllerStatusWait;
   try {
     await Promise.all([context.safeWrite(statusQuery, undefined, 'poll'), confirmation]);
+    assertCancelContext(context, true);
   } catch (error) {
-    cancelFreshControllerStatusWait(
-      context.refs,
-      'Motion-cancel status confirmation was cancelled.',
-    );
+    if (ownedWait != null && context.refs.controllerStatusWait === ownedWait) {
+      cancelFreshControllerStatusWait(
+        context.refs,
+        'Motion-cancel status confirmation was cancelled.',
+      );
+    }
     throw error;
   }
 }

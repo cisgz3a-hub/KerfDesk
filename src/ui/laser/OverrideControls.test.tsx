@@ -80,49 +80,53 @@ describe('OverrideControls', () => {
     }
   });
 
-  it('fires the exact realtime byte per button', async () => {
-    const original = useLaserStore.getState().sendRealtimeOverride;
-    const send = vi.fn(async (_byte: RealtimeOverrideByte) => undefined);
-    useLaserStore.setState({ sendRealtimeOverride: send } as Partial<
-      ReturnType<typeof useLaserStore.getState>
-    >);
-    const { host, root } = await renderControls();
-    try {
-      const buttons = [...host.querySelectorAll('button')];
-      const feedMinus = buttons.find((b) => b.title.startsWith('Slow the feed'));
-      const spindleReset = buttons.find((b) => b.title.startsWith('Reset the spindle'));
-      // Fine steps: the '1%' substring separates them from the '10%' coarse
-      // buttons that share the same "Slow/Raise the … override" prefix.
-      const feedMinusFine = buttons.find(
-        (b) => b.title.startsWith('Slow the feed') && b.title.includes('by 1%'),
-      );
-      const spindlePlusFine = buttons.find(
-        (b) => b.title.startsWith('Raise the spindle') && b.title.includes('by 1%'),
-      );
-      if (
-        feedMinus === undefined ||
-        spindleReset === undefined ||
-        feedMinusFine === undefined ||
-        spindlePlusFine === undefined
-      ) {
-        throw new Error('override buttons missing');
-      }
-      await act(async () => {
-        feedMinus.click();
-        spindleReset.click();
-        feedMinusFine.click();
-        spindlePlusFine.click();
-      });
-      expect(send).toHaveBeenCalledWith(RT_FEED_OV_MINUS_10);
-      expect(send).toHaveBeenCalledWith(RT_SPINDLE_OV_RESET);
-      expect(send).toHaveBeenCalledWith(RT_FEED_OV_MINUS_1);
-      expect(send).toHaveBeenCalledWith(RT_SPINDLE_OV_PLUS_1);
-    } finally {
-      useLaserStore.setState({ sendRealtimeOverride: original } as Partial<
+  it.each(['cnc', 'laser'] as const)(
+    'fires the exact realtime byte per %s button',
+    async (kind) => {
+      const original = useLaserStore.getState().sendRealtimeOverride;
+      const send = vi.fn(async (_byte: RealtimeOverrideByte) => undefined);
+      useLaserStore.setState({ sendRealtimeOverride: send, activeJobMachineKind: kind } as Partial<
         ReturnType<typeof useLaserStore.getState>
       >);
-      await act(async () => root.unmount());
-      host.remove();
-    }
-  });
+      const { host, root } = await renderControls();
+      try {
+        const buttons = [...host.querySelectorAll('button')];
+        const feedMinus = buttons.find((b) => b.title.startsWith('Slow the feed'));
+        const name = kind === 'cnc' ? 'spindle' : 'laser power';
+        const spindleReset = buttons.find((b) => b.title.startsWith(`Reset the ${name}`));
+        // Fine steps: the '1%' substring separates them from the '10%' coarse
+        // buttons that share the same "Slow/Raise the … override" prefix.
+        const feedMinusFine = buttons.find(
+          (b) => b.title.startsWith('Slow the feed') && b.title.includes('by 1%'),
+        );
+        const spindlePlusFine = buttons.find(
+          (b) => b.title.startsWith(`Raise the ${name}`) && b.title.includes('by 1%'),
+        );
+        if (
+          feedMinus === undefined ||
+          spindleReset === undefined ||
+          feedMinusFine === undefined ||
+          spindlePlusFine === undefined
+        ) {
+          throw new Error('override buttons missing');
+        }
+        await act(async () => {
+          feedMinus.click();
+          spindleReset.click();
+          feedMinusFine.click();
+          spindlePlusFine.click();
+        });
+        expect(send).toHaveBeenCalledWith(RT_FEED_OV_MINUS_10);
+        expect(send).toHaveBeenCalledWith(RT_SPINDLE_OV_RESET);
+        expect(send).toHaveBeenCalledWith(RT_FEED_OV_MINUS_1);
+        expect(send).toHaveBeenCalledWith(RT_SPINDLE_OV_PLUS_1);
+      } finally {
+        await act(async () => root.unmount());
+        useLaserStore.setState({ sendRealtimeOverride: original } as Partial<
+          ReturnType<typeof useLaserStore.getState>
+        >);
+        host.remove();
+      }
+    },
+  );
 });

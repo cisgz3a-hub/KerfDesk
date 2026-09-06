@@ -6,6 +6,7 @@
 
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
+import type { LayerPowerMode } from './layer';
 
 export type Vec2 = { readonly x: number; readonly y: number };
 
@@ -89,6 +90,9 @@ export type Bounds = {
 
 export type ObjectOperationSettingsOverride = {
   readonly mode?: 'line' | 'fill' | 'image';
+  // Absence inherits the operation; explicit Auto uses the device default even
+  // when the operation selects M3/M4. The string survives project JSON.
+  readonly powerMode?: LayerPowerMode | 'auto' | undefined;
   readonly minPower?: number;
   readonly power?: number;
   readonly speed?: number;

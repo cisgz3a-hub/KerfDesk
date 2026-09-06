@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { compileJob } from '../../core/job';
 import { compileCncJob } from '../../core/cnc';
+import { grblPowerModeWordsForJob } from '../../core/output/grbl-power-modes';
 import {
   captureLayerOperationSettings,
   createLayer,
@@ -70,6 +71,50 @@ describe('schema v5 operation override ownership', () => {
     },
   );
 
+  it.each([1, 2, 3, 4, 5])(
+    'preserves legacy artwork power modes and device-default Auto through schema v%s migration',
+    (schemaVersion) => {
+      for (const powerMode of ['constant', 'dynamic', 'auto'] as const) {
+        const project = fixture({ power: 17, powerMode });
+        const scene = {
+          ...project.scene,
+          layers: project.scene.layers.map((layer) => ({
+            ...layer,
+            powerMode: 'constant' as const,
+            subLayers: layer.subLayers.map((sub) => ({
+              ...sub,
+              settings: { ...sub.settings, powerMode: 'constant' as const },
+            })),
+          })),
+        };
+        const loaded = loadRaw({ ...project, scene, schemaVersion });
+        expect(
+          grblPowerModeWordsForJob(compileJob(loaded.scene, loaded.device), loaded.device).cut,
+        ).toEqual([powerMode === 'constant' ? 'M3' : 'M4']);
+        const reopened = reopen(loaded);
+        expect(
+          grblPowerModeWordsForJob(compileJob(reopened.scene, reopened.device), reopened.device),
+        ).toEqual(grblPowerModeWordsForJob(compileJob(loaded.scene, loaded.device), loaded.device));
+      }
+    },
+  );
+
+  it('round-trips independent parent/sub-operation power modes and device defaults', () => {
+    const project = fixture({
+      powerMode: 'constant',
+      byOperation: { shared: { powerMode: 'auto' }, 'shared:finish': { powerMode: 'constant' } },
+    });
+    const loaded = reopen(project);
+    expect(loaded.scene.objects[0]?.operationOverride).toEqual(
+      project.scene.objects[0]?.operationOverride,
+    );
+    expect(
+      compileJob(loaded.scene, loaded.device).groups.map((group) =>
+        group.kind === 'cut' ? group.powerMode : 'unexpected',
+      ),
+    ).toEqual([undefined, 'constant']);
+  });
+
   it.each([
     {
       override: { power: 17, speed: 600 },
@@ -127,6 +172,9 @@ describe('schema v5 operation override ownership', () => {
     { byOperation: { '': { power: 10 } } },
     { byOperation: { shared: { speed: 0 } } },
     { byOperation: { shared: { power: 101 } } },
+    { powerMode: 'turbo' },
+    { byOperation: { shared: { powerMode: 'turbo' } } },
+    { byOperation: { shared: { powerMode: null } } },
     { byOperation: { shared: { byOperation: {} } } },
     { byOperation: { shared: { id: 'other' } } },
     { byOperation: { shared: { color: '#ff0000' } } },

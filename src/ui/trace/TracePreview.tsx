@@ -10,6 +10,7 @@ import { useMemo, useRef, useState } from 'react';
 
 import { normalizeTraceBoundary, type TraceBoundary } from '../../core/trace';
 import type { TracePreviewState } from './use-trace-preview';
+import { traceNoticeMessage } from './trace-notices';
 
 type Props = {
   readonly state: TracePreviewState;
@@ -47,9 +48,22 @@ export function TracePreview(props: Props): JSX.Element {
         isSourceFaded={isSourceFaded}
         shouldShowPoints={shouldShowPoints}
       />
+      {state.kind === 'ready'
+        ? state.notices?.map((notice) => (
+            <p key={notice} role="status" style={noticeStyle}>
+              {traceNoticeMessage(notice)}
+            </p>
+          ))
+        : null}
     </div>
   );
 }
+
+const noticeStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};
 
 function PreviewControls(props: {
   readonly hasSource: boolean;

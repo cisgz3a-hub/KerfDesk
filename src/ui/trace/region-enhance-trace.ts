@@ -39,12 +39,17 @@ export async function traceImageWithBoundaryMode(
     return traceImageRegion(image, options, boundary);
   }
   const full = await traceImageWithFallback(image, options);
+  const notices = new Set(full.notices);
   const paths = await enhanceRegionPaths({
     image,
     region: boundary,
     fullTracePaths: full.paths,
     options,
-    trace: (img, opts) => traceImageWithFallback(img, opts).then((result) => result.paths),
+    trace: async (img, opts) => {
+      const result = await traceImageWithFallback(img, opts);
+      for (const notice of result.notices ?? []) notices.add(notice);
+      return result.paths;
+    },
   });
   return {
     paths,
@@ -53,5 +58,6 @@ export async function traceImageWithBoundaryMode(
     // that same full coordinate space. Preserve the full trace's actual grid.
     width: full.width,
     height: full.height,
+    ...(notices.size === 0 ? {} : { notices: [...notices] }),
   };
 }

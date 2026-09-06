@@ -84,9 +84,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // test). So Centerline opts OUT of upscaleSmallSmoothSources.
   },
   'Edge Detection': {
-    // Contrast edge vectorization -> stroked contour vectors around brightness
-    // transitions. For full-colour art / logos that should engrave as a line
-    // drawing of their edges, not a flat filled silhouette.
+    // Local contrast detects full-colour artwork, then the shared contour
+    // finisher produces closed outlines around the detected ink.
     traceMode: 'edge',
     numberOfColors: 2,
     pathOmit: 0,
@@ -101,8 +100,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     edgeBlurSigma: 1.2,
     edgeLowThresholdRatio: 0.08,
     edgeHighThresholdRatio: 0.2,
-    // Minimum line is CHAIN length now (the old outline backend measured
-    // two-sided contour perimeters, roughly double).
+    // Minimum finished outline length, including its closing edge.
     edgeMinLengthPx: 12,
     edgeJoinGapPx: 5,
     // undefined = AUTO median: applied only when impulse noise is detected,

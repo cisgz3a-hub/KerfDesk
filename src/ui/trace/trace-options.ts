@@ -10,9 +10,11 @@
 import type { TraceOptions } from '../../core/trace';
 
 export type LightBurnTraceSettingOverrides = {
+  readonly detectionMode?: TraceDetectionMode;
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
   readonly ignoreLessThanPixels?: number;
+  readonly despeckleMinPixels?: number;
   readonly smoothness?: number;
   readonly optimize?: number;
   readonly traceTransparency?: boolean;
@@ -21,6 +23,8 @@ export type LightBurnTraceSettingOverrides = {
   readonly edgeDetail?: number;
   readonly edgeMinimumLinePx?: number;
 };
+
+export type TraceDetectionMode = 'preset' | 'manual' | 'sketch';
 
 export const DEFAULT_EDGE_SENSITIVITY = 50;
 export const DEFAULT_EDGE_DETAIL = 68;
@@ -31,6 +35,53 @@ export function mergeLightBurnTraceSettings(
   settings: LightBurnTraceSettingOverrides,
 ): TraceOptions {
   const out: Record<string, unknown> = { ...preset };
+  applyDetectionSettings(out, preset, settings);
+  if (settings.ignoreLessThanPixels !== undefined) {
+    out['ignoreLessThanPixels'] = Math.max(0, Math.round(settings.ignoreLessThanPixels));
+  }
+  if (settings.despeckleMinPixels !== undefined) {
+    out['despeckleMinPixels'] = Math.max(0, Math.round(settings.despeckleMinPixels));
+  }
+  if (settings.smoothness !== undefined) out['smoothness'] = clampMin(settings.smoothness, 0);
+  if (settings.optimize !== undefined) out['optimize'] = clampMin(settings.optimize, 0);
+  if (settings.traceTransparency !== undefined) {
+    out['traceTransparency'] = settings.traceTransparency;
+  }
+  if (preset.traceMode === 'edge') {
+    applyEdgeTraceSettings(out, preset, settings);
+  }
+  return out as TraceOptions;
+}
+
+export function traceDetectionMode(
+  preset: TraceOptions,
+  settings: LightBurnTraceSettingOverrides,
+): TraceDetectionMode {
+  if (settings.detectionMode !== undefined) return settings.detectionMode;
+  if ((settings.sketchTrace ?? preset.sketchTrace) === true) return 'sketch';
+  return settings.cutoffLuma !== undefined || settings.thresholdLuma !== undefined
+    ? 'manual'
+    : 'preset';
+}
+
+function applyDetectionSettings(
+  out: Record<string, unknown>,
+  preset: TraceOptions,
+  settings: LightBurnTraceSettingOverrides,
+): void {
+  // Returning to preset detection restores its complete detection policy while
+  // retaining the operator's manual band for a later deliberate switch back.
+  if (settings.detectionMode === 'preset') return;
+  if (settings.detectionMode === 'sketch') {
+    out['sketchTrace'] = true;
+    return;
+  }
+  if (settings.detectionMode === 'manual') {
+    applyManualDetection(out, preset, settings);
+    return;
+  }
+  // Preserve the existing programmatic override contract. The dialog uses an
+  // explicit mode so automatic settings never masquerade as a manual band.
   const manualThreshold = settings.cutoffLuma !== undefined || settings.thresholdLuma !== undefined;
   if (manualThreshold) {
     delete out['useOtsuThreshold'];
@@ -40,23 +91,21 @@ export function mergeLightBurnTraceSettings(
   if (settings.thresholdLuma !== undefined) {
     out['thresholdLuma'] = clampByte(settings.thresholdLuma);
   }
-  if (settings.ignoreLessThanPixels !== undefined) {
-    const pixels = Math.max(0, Math.round(settings.ignoreLessThanPixels));
-    out['ignoreLessThanPixels'] = pixels;
-    out['despeckleMinPixels'] = pixels;
-  }
-  if (settings.smoothness !== undefined) out['smoothness'] = clampMin(settings.smoothness, 0);
-  if (settings.optimize !== undefined) out['optimize'] = clampMin(settings.optimize, 0);
-  if (settings.traceTransparency !== undefined) {
-    out['traceTransparency'] = settings.traceTransparency;
-  }
   if (settings.sketchTrace !== undefined) {
     out['sketchTrace'] = settings.sketchTrace;
   }
-  if (preset.traceMode === 'edge') {
-    applyEdgeTraceSettings(out, preset, settings);
-  }
-  return out as TraceOptions;
+}
+
+function applyManualDetection(
+  out: Record<string, unknown>,
+  preset: TraceOptions,
+  settings: LightBurnTraceSettingOverrides,
+): void {
+  delete out['useOtsuThreshold'];
+  out['autoSketchTrace'] = false;
+  out['sketchTrace'] = false;
+  out['cutoffLuma'] = clampByte(settings.cutoffLuma ?? preset.cutoffLuma ?? 0);
+  out['thresholdLuma'] = clampByte(settings.thresholdLuma ?? preset.thresholdLuma ?? 128);
 }
 
 export function edgeSensitivityFromOptions(options: TraceOptions): number {
@@ -141,7 +190,7 @@ function copyIfDefined<T extends keyof TraceOptions>(
 // can collapse a near-uniform image to zero paths: Otsu histogram
 // binarization, fixedPalette, or despeckle.
 export function hasAggressivePreprocessing(options: TraceOptions): boolean {
-  // Edge mode never runs the shared preprocessing (Canny reads the raw
+  // Edge mode never runs the shared preprocessing (local contrast reads the raw
   // image), so relaxing these flags cannot change its output — a zero-paths
   // retry would just repeat the identical multi-second pipeline.
   if (options.traceMode === 'edge') return false;

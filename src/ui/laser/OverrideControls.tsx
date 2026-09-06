@@ -27,11 +27,14 @@ import {
   type RealtimeOverrideByte,
 } from '../../core/controllers/grbl';
 import { useLaserStore } from '../state/laser-store';
+import { useStore } from '../state/store';
 
 export function OverrideControls(): JSX.Element {
   const ovCache = useLaserStore((s) => s.ovCache);
   const send = useLaserStore((s) => s.sendRealtimeOverride);
-  const isCncJob = useLaserStore((s) => s.activeJobMachineKind) === 'cnc';
+  const activeJobMachineKind = useLaserStore((s) => s.activeJobMachineKind);
+  const projectMachineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
+  const isCncJob = (activeJobMachineKind ?? projectMachineKind) === 'cnc';
   const fire = (byte: RealtimeOverrideByte): void => {
     void send(byte).catch(() => undefined);
   };
@@ -55,7 +58,7 @@ export function OverrideControls(): JSX.Element {
         </span>
       )}
       <OverrideRow
-        label="Spindle"
+        label={isCncJob ? 'Spindle' : 'Laser power'}
         percent={ovCache?.spindle ?? null}
         onMinus={() => fire(RT_SPINDLE_OV_MINUS_10)}
         onMinusFine={() => fire(RT_SPINDLE_OV_MINUS_1)}
@@ -172,7 +175,7 @@ const rowStyle: React.CSSProperties = {
   gap: 4,
   flexWrap: 'wrap',
 };
-const labelStyle: React.CSSProperties = { width: 52, fontSize: 12 };
+const labelStyle: React.CSSProperties = { width: 72, fontSize: 12 };
 const valueStyle: React.CSSProperties = {
   width: 40,
   fontSize: 12,
@@ -186,10 +189,10 @@ const stepButtonStyle: React.CSSProperties = {
   fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
 };
-// Sits under the Feed row, indented past the label column (52 + 4 gap) so it
+// Sits under the Feed row, indented past the label column (72 + 4 gap) so it
 // reads as an annotation on Feed rather than a new control.
 const captionStyle: React.CSSProperties = {
-  paddingLeft: 56,
+  paddingLeft: 76,
   marginTop: -2,
   fontSize: 11,
   color: 'var(--lf-text-muted)',

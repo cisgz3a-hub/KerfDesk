@@ -187,7 +187,7 @@ describe('runPreEmitPreflight', () => {
     });
   });
 
-  it('refuses only non-executable controlled feeds and scan offsets before compile', () => {
+  it('reports invalid controlled feeds and ignored non-finite scan offsets before compile', () => {
     const project = createProject({
       ...DEFAULT_DEVICE_PROFILE,
       controlledLaserOffTravelFeedMmPerMin: 0,
@@ -207,7 +207,7 @@ describe('runPreEmitPreflight', () => {
         expect.objectContaining({ code: 'speed-out-of-range' }),
         expect.objectContaining({
           code: 'scan-offset-out-of-range',
-          message: expect.stringContaining('must be finite'),
+          message: expect.stringContaining('is not finite and will be ignored'),
         }),
       ]),
     );

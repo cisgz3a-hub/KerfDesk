@@ -26,6 +26,7 @@ import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
 import { frameStatusFailurePatch, jogMpgInterruptionPatch } from './frame-status-failure';
 import { MPG_ACTIVE_COMMAND_MESSAGE, pushLog, streamerCanPauseForMpg } from './laser-store-helpers';
+import { resumeJogSettlementAfterMpg } from './laser-motion-operation';
 
 export function handleStatusLine(
   set: SetFn,
@@ -35,30 +36,21 @@ export function handleStatusLine(
   report: StatusReport,
 ): void {
   const state = get();
-  const operation = state.motionOperation;
   const streamer = state.streamer;
   if (isInvalidatingStatusState(report.state)) {
     handleInvalidatingStatus(set, refs, state, report, streamer);
     return;
   }
-  const mpgOwnsControl = report.mpgActive === true;
-  // Marlin's queued M114 status arrives before that query's own trailing `ok`.
-  // The poller sends M114 only after every earlier ack reaches zero, so its
-  // outstanding ack cannot belong to the Frame line. Realtime-report drivers
-  // have no query ack and retain the strict aggregate terminal fence.
-  const pendingMotionAcks =
-    refs.driver.commands.queuedStatusQuery === null ? state.pendingUntrackedAcks : 0;
-  const motionObservation = observeFrameMotion(
-    operation,
-    report.state,
-    pendingMotionAcks,
-    mpgOwnsControl,
-    state.statusSequence + 1,
+  const { operation, observation: motionObservation } = observeOwnedMotionStatus(
+    state,
+    refs,
+    report,
   );
   const observedOperation = motionObservation.observed;
   const queuedFrameDispatch = nextFrameDispatch(operation, motionObservation);
   const nextOperation = queuedFrameDispatch?.operation ?? observedOperation;
-  const operationPatch = operation === nextOperation ? {} : { motionOperation: nextOperation };
+  const operationPatch =
+    state.motionOperation === nextOperation ? {} : { motionOperation: nextOperation };
   const autofocusRecoveryPatch = recoverUncertainAutofocus(state, report);
   // Release the job lock once GRBL settles to Idle for BOTH a clean finish
   // ('done') and a rejected line ('errored'). Idle means physical motion has
@@ -98,7 +90,7 @@ export function handleStatusLine(
     report,
     controllerCommandOwnsCncStartSettleDwell(refs),
   );
-  const jogMpgInterruption = jogMpgInterruptionPatch(state, mpgOwnsControl);
+  const jogMpgInterruption = jogMpgInterruptionPatch(state, report.mpgActive === true);
   set({
     ...positionPatch,
     statusSequence: nextSequence,
@@ -124,6 +116,37 @@ export function handleStatusLine(
       queuedFrameDispatch.line,
       queuedFrameDispatch.operation.operationId,
     );
+}
+
+function observeOwnedMotionStatus(
+  state: LaserState,
+  refs: HandlerRefs,
+  report: StatusReport,
+): {
+  readonly operation: LaserState['motionOperation'];
+  readonly observation: ReturnType<typeof observeFrameMotion>;
+} {
+  const operation = resumeJogSettlementAfterMpg(
+    state.motionOperation,
+    report.mpgActive === false,
+    `${refs.driver.commands.settleDwell}\n`,
+  );
+  // Marlin's queued M114 status arrives before that query's own trailing `ok`.
+  // The poller sends M114 only after every earlier ack reaches zero, so its
+  // outstanding ack cannot belong to the Frame line. Realtime-report drivers
+  // have no query ack and retain the strict aggregate terminal fence.
+  const pendingMotionAcks =
+    refs.driver.commands.queuedStatusQuery === null ? state.pendingUntrackedAcks : 0;
+  return {
+    operation,
+    observation: observeFrameMotion(
+      operation,
+      report.state,
+      pendingMotionAcks,
+      report.mpgActive === true,
+      state.statusSequence + 1,
+    ),
+  };
 }
 
 function mpgJobInterruptionPatch(

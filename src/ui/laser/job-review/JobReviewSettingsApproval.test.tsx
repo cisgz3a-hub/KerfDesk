@@ -10,6 +10,7 @@ import {
   EMPTY_SCENE,
   type Layer,
 } from '../../../core/scene';
+import { createRectangle } from '../../../core/shapes/primitives';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
 import { JobReviewSettingsApproval } from './JobReviewSettingsApproval';
@@ -164,6 +165,43 @@ async function exerciseApprovalSettingsSequence(
 }
 
 describe('JobReviewSettingsApproval', () => {
+  it('re-arms approval after object power overrides and power scale change', async () => {
+    const object = {
+      ...createRectangle({
+        id: 'artwork',
+        color: '#ff0000',
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+      }),
+      operationIds: ['red'],
+    };
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: { ...state.project.scene, objects: [object] },
+      },
+    }));
+    const onApprove = vi.fn();
+    await render(onApprove);
+    await act(async () => approveButton().click());
+    expect(onApprove).not.toHaveBeenCalled();
+
+    await act(async () =>
+      useStore
+        .getState()
+        .setObjectsOperationOverrideForOperation(['artwork'], 'red', { power: 33 }),
+    );
+    expect(host.textContent).toContain('Changes are synced to the main Artwork / Operations');
+    await act(async () => approveButton().click());
+    expect(onApprove).toHaveBeenCalledTimes(1);
+
+    await act(async () => useStore.getState().setObjectsPowerScale(['artwork'], 50));
+    expect(host.textContent).toContain('Changes are synced to the main Artwork / Operations');
+    await act(async () => approveButton().click());
+    expect(onApprove).toHaveBeenCalledTimes(2);
+    await act(async () => approveButton().click());
+    expect(onApprove).toHaveBeenCalledTimes(2);
+  });
+
   it('approves live-synced main settings and re-arms after another edit', async () => {
     const onApprove = vi.fn();
     await render(onApprove);

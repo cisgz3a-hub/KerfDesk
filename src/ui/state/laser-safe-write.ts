@@ -8,6 +8,7 @@ import {
 } from './laser-transcript';
 import type { LaserState } from './laser-store';
 import type { LaserMotionOperationId } from './laser-motion-operation';
+import { JOG_MPG_INTERRUPTION_MESSAGE } from './frame-status-failure';
 import { reserveUntrackedAcks, type UntrackedAckLedgerRefs } from './laser-untracked-ack-ledger';
 import {
   activeJobCommandBlockMessage,
@@ -153,7 +154,11 @@ function recordWriteFailure(
     // reservation as a quarantine until the real terminal response arrives or
     // a reconnect advances the write epoch.
     ...motionTransportWritePatch(state, action, -1, motionOperationId),
-    lastWriteError: message,
+    lastWriteError:
+      state.motionOperation?.operationId === motionOperationId &&
+      state.motionOperation?.mpgInterruptionId !== undefined
+        ? `${message}. ${JOG_MPG_INTERRUPTION_MESSAGE}`
+        : message,
     log: pushLog(
       state,
       `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,

@@ -32,6 +32,7 @@ import { rawImageHasTransparency } from './raw-image-transparency';
 import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
 import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 import { isTraceRequestSuperseded } from './use-trace-worker-client';
+import type { TraceNotice } from './trace-notices';
 
 export type TracePreviewState =
   | { readonly kind: 'idle' }
@@ -43,6 +44,7 @@ export type TracePreviewState =
       readonly width: number;
       readonly height: number;
       readonly paths: ReadonlyArray<ColoredPath>;
+      readonly notices?: ReadonlyArray<TraceNotice>;
       readonly preparedTrace?: PreparedTrace;
       readonly sourceHasTransparency?: boolean | undefined;
     }
@@ -224,6 +226,7 @@ export function runTrace(args: {
         width,
         height,
         paths,
+        ...(result.notices === undefined ? {} : { notices: result.notices }),
         ...(args.request === undefined ? {} : { preparedTrace: { request: args.request, result } }),
         sourceHasTransparency: args.sourceHasTransparency,
       });
