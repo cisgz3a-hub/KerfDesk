@@ -38,8 +38,12 @@ function applyEdit(
 ): AppState | Partial<AppState> {
   const image = sceneObjectById(state.project.scene.objects, imageId);
   if (image?.kind !== 'raster-image') return state;
+  // Apply supplies the full baked PNG and matching luma. They become the current
+  // embedded revision; the old page descriptor would override both with stale
+  // source/thumbnail/luma. Its assets remain owned by history and shared copies.
+  const { imageAsset: _previousAsset, ...embeddedImage } = image;
   const edited = {
-    ...image,
+    ...embeddedImage,
     dataUrl: fields.dataUrl,
     lumaBase64: fields.lumaBase64,
     ...(fields.pixelWidth === undefined ? {} : { pixelWidth: fields.pixelWidth }),
