@@ -192,10 +192,11 @@ function sameControllerSetup(
 ): boolean {
   return (
     before.controllerSessionEpoch === completed.controllerSessionEpoch &&
-    before.controllerSettings === completed.controllerSettings &&
-    before.controllerSettingsObservation === completed.controllerSettingsObservation &&
-    before.controllerBuildInfo === completed.controllerBuildInfo &&
-    before.controllerBuildInfoObservation === completed.controllerBuildInfoObservation &&
+    // Refreshed settings/build-info objects and observation stamps are review
+    // evidence, not movement. Keep the report-unit interpretation bound even
+    // at zero, where normalized coordinates alone cannot reveal a unit change.
+    (before.controllerSettings?.reportInches === true) ===
+      (completed.controllerSettings?.reportInches === true) &&
     sameAxes(before.wcoCache, completed.wcoCache) &&
     before.workOriginActive === completed.workOriginActive &&
     before.workOriginSource === completed.workOriginSource &&

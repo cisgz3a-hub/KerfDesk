@@ -10912,6 +10912,22 @@ dialog must not interrupt an ordinary Frame: "It should only be at the main butt
 - The Job Review `frame` purpose ("Accept & Frame" copy) has no production caller after this
   change; it is retained for now and may be removed in a follow-up.
 
+### 2026-09-06 amendment: descriptive evidence retention
+
+Equivalent controller settings/build-info object refreshes and same-session observation
+timestamps do not revoke a clean Frame. The semantic `reportInches` interpretation remains
+bound, including at zero position/WCO, together with the existing session, origin, trusted
+position, work-Z, return and terminal-settlement facts. This narrows reference-based expiry;
+the later Start handoff and the warning-only controller policy are unchanged.
+
+The retained artifact signature excludes exactly the device profile's `name`, `vendor`,
+`model`, `profileSource`, `catalogVersion` and `evidence`. Timing calibration, `noGoZones`
+and all other or unknown fields remain included. The exact cached program, metrics and
+timing plan remain owned by the permit; neither cached-plan replacement nor Job Review's
+warning refresh loop changes. The partially adopted historical proposal and its pending
+no-go/timing portions are recorded in
+[the preservation note](docs/audits/2026-09-06-frame-advisory-retention-preservation.md).
+
 ---
 
 ## ADR-238 - Laser trace output defaults to editable vectors; raster scan remains selectable
