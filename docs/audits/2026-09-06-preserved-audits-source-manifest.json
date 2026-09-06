@@ -128,5 +128,26 @@
     "originalPath": "src/__fixtures__/audit/loop-06-stl-facet-boundary.test.ts",
     "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-06-stl-facet-boundary.test.ts.txt",
     "sha256": "A53DE1944341BA63F0088300CA40A1074E55F591014A804DCD9E0D2F5EA8458F"
+  },
+  {
+    "originalPath": "docs/audits/2026-07-26-controller-systems-audit.md",
+    "publishedPath": "docs/audits/2026-07-26-controller-systems-audit.md",
+    "sha256": "FA3BF7CE9DF3BB400058B35AB3F468FD5D1EDD864A2ABC66A167AB81B26F22A2",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/controller-systems-audit-20260726",
+    "sourceHead": "de36b8674a8abf0c9276f5666ae34e14a3791476"
+  },
+  {
+    "originalPath": "docs/audits/2026-07-17-burn-quality-findings-register.md",
+    "publishedPath": "docs/audits/2026-07-17-burn-quality-findings-register.md",
+    "sha256": "FE379119DFE8841FDDC4FC004FAB118153AE6EF5A76873FDDD6188A7CF2FEA62",
+    "sourceWorktree": "C:/Users/Asus/LaserForge-2.0/.claude/worktrees/laser-burn-quality-audit-116661",
+    "sourceHead": "bd76af4b14ecc819a8414740785ce5b0bff6a89f"
+  },
+  {
+    "originalPath": "docs/audits/2026-07-17-laser-burn-quality-audit.md",
+    "publishedPath": "docs/audits/2026-07-17-laser-burn-quality-audit.md",
+    "sha256": "DC791BA3CD66F24BDB1F84F1A1CE7FC7B7D9086E6B23A67E1B67A7E6749EB6D9",
+    "sourceWorktree": "C:/Users/Asus/LaserForge-2.0/.claude/worktrees/laser-burn-quality-audit-116661",
+    "sourceHead": "bd76af4b14ecc819a8414740785ce5b0bff6a89f"
   }
 ]
