@@ -1,5 +1,6 @@
 import type { Project, RasterImage, TracedImage } from '../../core/scene';
 import type { TraceExistingImageOptions } from '../state/scene-mutations';
+import { projectWithCameraTraceSource } from '../state/camera-trace-import';
 import type { TraceOutput } from './dialog-parts';
 import {
   buildRasterTraceOutput,
@@ -9,6 +10,7 @@ import {
 
 export type TraceOutputCommitArgs = {
   readonly seed: Pick<RasterImage, 'id' | 'source'>;
+  readonly cameraSource?: RasterImage;
   readonly traceOutput?: TraceOutput;
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
@@ -40,6 +42,7 @@ export async function commitTraceOutput(
   const deleteSourceAfterTrace = args.deleteSourceAfterTrace === true;
   const traceOptions: TraceExistingImageOptions = {
     deleteSourceAfterTrace,
+    ...(args.cameraSource === undefined ? {} : { cameraSource: args.cameraSource }),
     ...(args.replaceTraceId === undefined ? {} : { replaceTraceId: args.replaceTraceId }),
   };
   const sourceStatus = deleteSourceAfterTrace ? 'source deleted' : 'source kept';
@@ -62,7 +65,11 @@ async function commitRasterTraceOutput(
   traceOptions: TraceExistingImageOptions,
   sourceStatus: string,
 ): Promise<boolean> {
-  const inputs = rasterTraceInputs(liveProject, args.seed.id);
+  const inputProject =
+    args.cameraSource === undefined
+      ? liveProject
+      : projectWithCameraTraceSource(liveProject, args.cameraSource);
+  const inputs = rasterTraceInputs(inputProject, args.seed.id);
   if (inputs === null) {
     ctx.pushToast(
       `The source image or Image operation for ${args.seed.source} changed — re-open Trace to continue.`,
@@ -77,7 +84,12 @@ async function commitRasterTraceOutput(
   );
   if (!ctx.isCurrent()) return false;
   const currentProject = ctx.getCurrentProject();
-  if (currentProject.machine?.kind === 'cnc' || !sameRasterTraceInputs(currentProject, inputs)) {
+  // Camera inputs are an immutable private import, so no live source/operation
+  // can change during the build. The dialog/document lifetime still owns it.
+  if (
+    currentProject.machine?.kind === 'cnc' ||
+    (args.cameraSource === undefined && !sameRasterTraceInputs(currentProject, inputs))
+  ) {
     ctx.pushToast(
       `The machine, source image, or Image operation for ${args.seed.source} changed while the raster scan was being built — re-open Trace to continue.`,
       'error',

@@ -8,6 +8,7 @@ import { useUiStore, type TraceImageDialogState } from '../state/ui-store';
  * the old submission even if the source ID and pixels are retained. */
 export function useTraceCommitLifetime(dialog: TraceImageDialogState): () => () => boolean {
   const unmountEpoch = useRef(0);
+  const openingDocumentEpoch = useRef(useStore.getState().projectDocumentEpoch).current;
   useEffect(
     () => () => {
       unmountEpoch.current += 1;
@@ -17,7 +18,10 @@ export function useTraceCommitLifetime(dialog: TraceImageDialogState): () => () 
 
   return () => {
     const mountedEpoch = unmountEpoch.current;
-    const documentEpoch = useStore.getState().projectDocumentEpoch;
+    const documentEpoch =
+      dialog.sourceOrigin === 'camera-capture'
+        ? openingDocumentEpoch
+        : useStore.getState().projectDocumentEpoch;
     return () =>
       unmountEpoch.current === mountedEpoch &&
       useUiStore.getState().imageDialog === dialog &&

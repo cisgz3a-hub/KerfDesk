@@ -52,6 +52,7 @@ export type TextDialogState =
 
 export type TraceImageDialogState = {
   readonly source: RasterImage;
+  readonly sourceOrigin?: 'camera-capture';
   readonly replaceTraceId?: string;
 };
 
@@ -162,13 +163,12 @@ export type UiState = ArtworkRunOrderUiState &
     readonly closeTextDialog: () => void;
     // Trace-Image dialog. Holds the bitmap to trace, or null when closed.
     // LightBurn's model: Trace is a tool run on a SELECTED, already-imported
-    // image — so the dialog is always seeded with the RasterImage the
-    // operator picked (via the toolbar Trace button), never a blank file
-    // picker. Importing an image as a bitmap is a separate, dialog-less path.
+    // image. Camera captures explicitly opt into a transient import whose
+    // source and output enter the project together only after Trace commits.
     readonly imageDialog: TraceImageDialogState | null;
     readonly openImageDialog: (
       source: RasterImage,
-      options?: { readonly replaceTraceId?: string },
+      options?: Omit<TraceImageDialogState, 'source'>,
     ) => void;
     readonly closeImageDialog: () => void;
     // ADR-029 Convert to Bitmap dialog. Lives here (not CommandShell-local
@@ -250,10 +250,7 @@ function uiDialogSlice(
     imageDialog: null,
     openImageDialog: (source, options) =>
       set({
-        imageDialog:
-          options?.replaceTraceId === undefined
-            ? { source }
-            : { source, replaceTraceId: options.replaceTraceId },
+        imageDialog: { source, ...options },
       }),
     closeImageDialog: () => set({ imageDialog: null }),
     convertBitmapDialogOpen: false,

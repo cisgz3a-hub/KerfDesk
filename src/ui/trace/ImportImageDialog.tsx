@@ -60,6 +60,7 @@ type TraceCommitArgs = {
   readonly file: File;
   readonly options: TraceOptions;
   readonly seed: RasterImage;
+  readonly cameraSource?: RasterImage;
   readonly traceOutput?: TraceOutput;
   readonly traceFillStyle?: TraceFillStyle;
   readonly deleteSourceAfterTrace?: boolean;
@@ -80,7 +81,7 @@ type TraceCommitContext = {
 };
 
 function DialogBody(props: { readonly dialog: TraceImageDialogState }): JSX.Element {
-  const { source: seed, replaceTraceId } = props.dialog;
+  const { source: seed, replaceTraceId, sourceOrigin } = props.dialog;
   const captureLifetime = useTraceCommitLifetime(props.dialog);
   const close = useUiStore((s) => s.closeImageDialog);
   const traceExistingImage = useStore((s) => s.traceExistingImage);
@@ -127,6 +128,7 @@ function DialogBody(props: { readonly dialog: TraceImageDialogState }): JSX.Elem
       file,
       options,
       seed,
+      sourceOrigin,
       traceOutput: effectiveTraceOutput,
       machineKind,
       traceFillStyle,
@@ -283,6 +285,7 @@ function submitTraceDialog(deps: {
   readonly file: File | null;
   readonly options: TraceOptions;
   readonly seed: RasterImage;
+  readonly sourceOrigin: TraceImageDialogState['sourceOrigin'];
   readonly traceOutput: TraceOutput;
   readonly machineKind: 'laser' | 'cnc';
   readonly traceFillStyle: TraceFillStyle;
@@ -306,6 +309,7 @@ function submitTraceDialog(deps: {
     file: deps.file,
     options: deps.options,
     seed: deps.seed,
+    ...(deps.sourceOrigin === 'camera-capture' ? { cameraSource: deps.seed } : {}),
     traceOutput: deps.traceOutput,
     ...submittedFillStyle(deps),
     deleteSourceAfterTrace: deps.deleteSourceAfterTrace,
@@ -372,7 +376,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       ...(operationOverride === undefined ? {} : { operationOverride }),
     };
     const liveProject = ctx.getCurrentProject();
-    const liveSource = liveProject.scene.objects.find((object) => object.id === args.seed.id);
+    const liveSource = resolveCommitSource(args, liveProject);
     // P2-A: refuse to commit if the live source changed (content/grid) or was
     // removed while the modal was open. Vector output may follow a moved source;
     // raster output captures the complete live object and operation references
@@ -407,6 +411,13 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
 
 function closeCurrentTrace(ctx: TraceCommitContext): void {
   if (ctx.isCurrent()) ctx.close();
+}
+
+function resolveCommitSource(
+  args: TraceCommitArgs,
+  project: ReturnType<typeof useStore.getState>['project'],
+): SceneObject | undefined {
+  return args.cameraSource ?? project.scene.objects.find((object) => object.id === args.seed.id);
 }
 
 function reportCurrentTraceError(source: string, ctx: TraceCommitContext, err: unknown): void {

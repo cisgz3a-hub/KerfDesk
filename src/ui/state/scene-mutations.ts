@@ -66,6 +66,8 @@ export type MutationResult = {
 };
 
 export type TraceExistingImageOptions = {
+  /** Explicit transient camera import; ordinary missing scene sources never opt in. */
+  readonly cameraSource?: RasterImage;
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
 };
