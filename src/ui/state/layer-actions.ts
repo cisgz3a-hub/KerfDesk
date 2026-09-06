@@ -15,6 +15,7 @@ import {
 } from '../../core/scene';
 import { recolorLayer } from '../../core/scene/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
+import { profileLayerDefaultSettings } from '../layers/profile-layer-default-settings';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import { cncSettingsForArtworkPaste } from './cnc-settings-clipboard';
@@ -157,10 +158,10 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
       if (normalized === null) return {};
       if (state.project.scene.layers.some((layer) => layer.color === normalized)) return {};
       const defaults = defaultSettingsForColor(state.layerDefaults, normalized);
-      const base = applyLayerDefaultSettings(
-        createLayer({ id: normalized, color: normalized }),
-        defaults,
-      );
+      const base = applyLayerDefaultSettings(createLayer({ id: normalized, color: normalized }), {
+        ...profileLayerDefaultSettings(state.project, defaults.mode ?? 'line'),
+        ...defaults,
+      });
       const machine = state.project.machine;
       const layer =
         machine?.kind === 'cnc' && defaults.cnc === undefined

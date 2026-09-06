@@ -12,6 +12,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
+import { profileLayerDefaultSettings } from '../layers/profile-layer-default-settings';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
@@ -56,7 +57,7 @@ function fillSelectionMutation(
   const scene =
     sharedOperationId !== null &&
     !unselectedObjectUsesOperation(state.project.scene, selectedIds, sharedOperationId)
-      ? ensureOperationIsFill(state.project.scene, sharedOperationId)
+      ? ensureOperationIsFill(state, sharedOperationId)
       : isolateSelectionToNewFillOperation(state, selectedIds);
   if (scene === state.project.scene) return {};
   return {
@@ -79,7 +80,10 @@ function isolateSelectionToNewFillOperation(
   });
   const defaults = defaultSettingsForColor(state.layerDefaults, created.operation.color);
   const withDefaults = {
-    ...applyLayerDefaultSettings(created.operation, defaults),
+    ...applyLayerDefaultSettings(created.operation, {
+      ...profileLayerDefaultSettings(state.project, 'fill'),
+      ...defaults,
+    }),
     mode: 'fill' as const,
   };
   const machine = state.project.machine;
@@ -97,10 +101,18 @@ function isolateSelectionToNewFillOperation(
   return pruneOrphanLayers(addLayer({ ...state.project.scene, objects }, operation));
 }
 
-function ensureOperationIsFill(scene: Scene, operationId: string): Scene {
+function ensureOperationIsFill(state: FillSelectionState, operationId: string): Scene {
+  const scene = state.project.scene;
   const operation = scene.layers.find((candidate) => candidate.id === operationId);
   if (operation === undefined || operation.mode === 'fill') return scene;
-  return updateLayer(scene, operation.id, { mode: 'fill' });
+  return updateLayer(scene, operation.id, {
+    ...profileLayerDefaultSettings(
+      state.project,
+      'fill',
+      defaultSettingsForColor(state.layerDefaults, operation.color),
+    ),
+    mode: 'fill',
+  });
 }
 
 function selectedVectorObjectIds(state: FillSelectionState): ReadonlySet<string> {
