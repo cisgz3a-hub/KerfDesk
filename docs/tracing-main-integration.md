@@ -69,6 +69,13 @@ and aborted without a TTY. The subsequent local gate uses process-scoped
 to report workspace-layout drift without altering the shared runtime. This is
 separate from a fresh lockfile installation and hosted exact-head checks.
 
+That normal gate reached Vitest: 12442 tests passed, two tests exposed an incomplete
+worker-module mock, and 32 suites could not load SVG assets through the external
+dependency junction. The mock now keeps the real supersession helper. All 156 tests
+in the 33 affected files pass with the resolved dependency directory allowed in a
+local test configuration. The original failed gate and the subsequent checks remain
+separate evidence records; the original command is not reported as a green run.
+
 The manager owns publication and exact-head hosted `Chrome UX smoke` and
 `Lint, typecheck, license, test, build` gates. Local commits do not represent a
 push, merge, deployment, packaged-runtime qualification or hardware run.
