@@ -1,0 +1,112 @@
+{
+  "website": "https://kerfdesk.com/",
+  "buildVersion": "0.1.1962",
+  "auditCommit": "ccaa3064d9efe904821307f0603ce842d903b586",
+  "remoteMain": "ccaa3064d9efe904821307f0603ce842d903b586",
+  "workingHead": "9209fcb33f4807ebfc1f7a55780069b6a7b0e23c",
+  "workingBranch": "claude/vcarve-stamp-subcell",
+  "sourceSnapshot": "C:\\Users\\Asus\\.codex\\audits\\kerfdesk-features-20260905-ccaa3064",
+  "createdUtc": "2026-09-05T00:03:41.1617965Z",
+  "inheritedFileHashes": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "46DFE4B6B6485F60DCDC056036C35333DA170783B8921647E3AC996C3FE0EB77"
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "4884B0C7AD5FF2CA8F719C5C622360076E39A1F28B934A8222232DDD384D5F2A"
+    },
+    {
+      "path": "docs/audits/2026-08-09-rayforge-gap-planning-ledger.md",
+      "sha256": "FDE16BEA3CAEA1DF30319D6A5BB91E6E64815CA9D87149F19349F7973007E83C"
+    },
+    {
+      "path": "docs/audits/2026-08-30-ten-loop-repo-audit/coverage-map.md",
+      "sha256": "B089C596FDD121E2C9CF466FE49C4FB36DB0FDF1FD1387A05A83B36B788C2847"
+    },
+    {
+      "path": "docs/audits/2026-08-30-ten-loop-repo-audit/findings-ledger.md",
+      "sha256": "6292F7887968D7EED8C81AF144509EE07AFA49F1D12D43B1317ADE3F937B2643"
+    },
+    {
+      "path": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-01-governance-and-guard-contract.md",
+      "sha256": "B3032131B6AD1E3BC80FA57291EF0DC4EC1B76A7ABA1CDD7732FC7D3EDBAEC3C"
+    },
+    {
+      "path": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-02-geometry-transforms-and-units.md",
+      "sha256": "DB871B2FFBE62EA19EBC5A189A846B80FE22AC2DC90A3A775109FD8E4A24AEDE"
+    },
+    {
+      "path": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-03-laser-compile-and-gcode.md",
+      "sha256": "1762912BEBE195D7BE78893A0C15518496248A18878D234414064CC2188A4798"
+    },
+    {
+      "path": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-04-cnc-physical-motion.md",
+      "sha256": "708B315D9C3994CD0F08748FB08B77C6F68ECA7DA5B26AB17155769125B083C6"
+    },
+    {
+      "path": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-05-controller-transport-and-recovery.md",
+      "sha256": "23CB25BCE4E9A846C779AAA671AD849FDB23347757CC237DF58C5988A1D89C76"
+    },
+    {
+      "path": "docs/audits/2026-08-30-ten-loop-repo-audit/README.md",
+      "sha256": "89D03F5AB2885C214F14D5D0EBA79CAA40203D72D9044C4DF37E5D58ED6E0EB3"
+    },
+    {
+      "path": "docs/audits/2026-09-05-website-features-and-button-audit.md",
+      "sha256": "24ED865F9F72AFAFAF1F24C14109F5C4C1E87535AB1ED8ABD2AF5D17A707673B"
+    },
+    {
+      "path": "src/__fixtures__/audit/loop-06-stl-facet-boundary.test.ts",
+      "sha256": "A53DE1944341BA63F0088300CA40A1074E55F591014A804DCD9E0D2F5EA8458F"
+    },
+    {
+      "path": "src/core/gcode-view/gcode-render-model-builder.test.ts",
+      "sha256": "293E81C361962498F36529EC440D848F02B1C8B3A6C474CDA1F5139FD024283E"
+    },
+    {
+      "path": "src/core/gcode-view/gcode-render-model-builder.ts",
+      "sha256": "C6BAFC5B5DE5235700ABE87E137657EE733DD005225AFB96073D2EDD2810595F"
+    },
+    {
+      "path": "src/core/gcode/index.ts",
+      "sha256": "F55C3FBF1A3EF9AD02211A695A4F57839794C4ECA38F9409B4BD53BEE97CD5DF"
+    },
+    {
+      "path": "src/core/gcode/program-parse-reason.ts",
+      "sha256": "7BD2BD521FECC01D450364174915C3DA96EB5168C7330D0B1D09308F3FE5C3BE"
+    },
+    {
+      "path": "src/io/gcode/gcode-program-line-parser.ts",
+      "sha256": "3B8A47DE7161B73E922509899D05AA32CDE3F6D9D908B68E6B244C2DBF10548C"
+    },
+    {
+      "path": "src/io/gcode/parse-gcode-program.test.ts",
+      "sha256": "EAA0F4D3444678AC2D50E500D0259567A01C1589C6827172A209AC822348955A"
+    },
+    {
+      "path": "src/ui/app/file-actions.test.ts",
+      "sha256": "A677D92C649E51BCCCF83D4D5AA3FA996D7D67CE4E0712CD6FF07A21C3CF2587"
+    },
+    {
+      "path": "src/ui/app/file-actions.ts",
+      "sha256": "F26C11694C33032C1C91CBDB3AE32B6D71CE35D9F13A3474AB0F134C483CB579"
+    },
+    {
+      "path": "src/ui/layers/artwork-run-order-view-model.ts",
+      "sha256": "4407F90EF9BC96139B562DADD03D37C753C85A2B5A13E6865E840101D51B719E"
+    },
+    {
+      "path": "src/ui/layers/CncLayerFields.tsx",
+      "sha256": "2FF34712070D27C6B8EEC2ACC30DEF1F0DB56891610793F53E193056FE7603AB"
+    },
+    {
+      "path": "src/ui/layers/CncVCarveOpenPathNote.test.tsx",
+      "sha256": "CF6C7C712A00E6DB77847D4B007C403A4D886977F20D1638694A6B3B2AE3CC0C"
+    },
+    {
+      "path": "src/ui/layers/CncVCarveOpenPathNote.tsx",
+      "sha256": "6F5ABFEC18371DA5FD3453E4A47974E2F7466367035E0C6EA6997DEEFBE6C8F8"
+    }
+  ]
+}

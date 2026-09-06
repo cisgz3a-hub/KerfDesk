@@ -1,0 +1,132 @@
+[
+  {
+    "originalPath": "docs/audits/2026-08-09-rayforge-gap-planning-ledger.md",
+    "publishedPath": "docs/audits/2026-08-09-rayforge-gap-planning-ledger.md",
+    "sha256": "FDE16BEA3CAEA1DF30319D6A5BB91E6E64815CA9D87149F19349F7973007E83C"
+  },
+  {
+    "originalPath": "docs/audits/2026-08-30-ten-loop-repo-audit/README.md",
+    "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/README.md",
+    "sha256": "89D03F5AB2885C214F14D5D0EBA79CAA40203D72D9044C4DF37E5D58ED6E0EB3"
+  },
+  {
+    "originalPath": "docs/audits/2026-08-30-ten-loop-repo-audit/coverage-map.md",
+    "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/coverage-map.md",
+    "sha256": "B089C596FDD121E2C9CF466FE49C4FB36DB0FDF1FD1387A05A83B36B788C2847"
+  },
+  {
+    "originalPath": "docs/audits/2026-08-30-ten-loop-repo-audit/findings-ledger.md",
+    "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/findings-ledger.md",
+    "sha256": "6292F7887968D7EED8C81AF144509EE07AFA49F1D12D43B1317ADE3F937B2643"
+  },
+  {
+    "originalPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-01-governance-and-guard-contract.md",
+    "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-01-governance-and-guard-contract.md",
+    "sha256": "B3032131B6AD1E3BC80FA57291EF0DC4EC1B76A7ABA1CDD7732FC7D3EDBAEC3C"
+  },
+  {
+    "originalPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-02-geometry-transforms-and-units.md",
+    "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-02-geometry-transforms-and-units.md",
+    "sha256": "DB871B2FFBE62EA19EBC5A189A846B80FE22AC2DC90A3A775109FD8E4A24AEDE"
+  },
+  {
+    "originalPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-03-laser-compile-and-gcode.md",
+    "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-03-laser-compile-and-gcode.md",
+    "sha256": "1762912BEBE195D7BE78893A0C15518496248A18878D234414064CC2188A4798"
+  },
+  {
+    "originalPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-04-cnc-physical-motion.md",
+    "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-04-cnc-physical-motion.md",
+    "sha256": "708B315D9C3994CD0F08748FB08B77C6F68ECA7DA5B26AB17155769125B083C6"
+  },
+  {
+    "originalPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-05-controller-transport-and-recovery.md",
+    "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-05-controller-transport-and-recovery.md",
+    "sha256": "23CB25BCE4E9A846C779AAA671AD849FDB23347757CC237DF58C5988A1D89C76"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/README.md",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/README.md",
+    "sha256": "8EF33F221DDC6AAE02443238D5BF66DF66EB2DAEBB6F84AB98DC7392D9D19DEC"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/audit-feature01-07.test.tsx",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/audit-feature01-07.test.tsx.txt",
+    "sha256": "5F12DEE86BB910DA3989123C349192B31E594831C75D4C46F73D8480E91D2A14"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/audit-feature22-27-vitest.txt",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/audit-feature22-27-vitest.txt",
+    "sha256": "2A2E8E5ADEA955FCF7BA6973C12E1E10F246D4D08337D2E6E9DAA19301CAF1CB"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/audit-feature22-27.test.tsx",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/audit-feature22-27.test.tsx.txt",
+    "sha256": "7EFCA241401115FCBDC8A8610F929BD08952754E26B491F6434BB90FD54EB1F4"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/baseline.json",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/baseline.json",
+    "sha256": "47FB9A9F32402E556E59B2C149046C317A1817D6D04D96E1B1572C0ABD42FAD3"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/features-01-07.md",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/features-01-07.md",
+    "sha256": "1C4451FD5367E84A1893F954F48EA3F3DBD2CE62B2C403548D209AF5B6F257A7"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/features-08-14-audit-test.tsx",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/features-08-14-audit-test.tsx.txt",
+    "sha256": "3217E01B133BB567D3E776041EA7D8DFE9DCE33E9F4E64840E19765A31DE1945"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/features-08-14-test-output.txt",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/features-08-14-test-output.txt",
+    "sha256": "E05DAB6D752CA81B9D008A1F93818531B9C5FB71D372F57E34A0F33553792D47"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/features-08-14.md",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/features-08-14.md",
+    "sha256": "BB687C3B6CBCBDC1F2503FA6EC08A598B1E16B9DD10DDE21ED439C2DBDE73FCE"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/features-15-21-repro-output.txt",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/features-15-21-repro-output.txt",
+    "sha256": "11F24BEC87053CD41AB044CBBE8BFC82777F10F78C661C62FB1F434B064B3DBB"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/features-15-21-repro.test.tsx",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/features-15-21-repro.test.tsx.txt",
+    "sha256": "871BCBC7FB1ADF5A8E02FD8F822F1A60A351FC4E34E04F3A842C4C9F980F7B15"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/features-15-21.md",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/features-15-21.md",
+    "sha256": "60E75A7018FD39D8F8F338A2224B3C88A8B7388601B98AFD5949F26804AFDCA6"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/features-22-27.md",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/features-22-27.md",
+    "sha256": "3EEAC459C28AEC7A87D18F1F88489E5C8B081BC19949419145FE0BEF112C73F3"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/preservation-result.json",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/preservation-result.json",
+    "sha256": "C11A25880E9B9F14F3BAB7AE5A01E532792EC5992CA7092C5D32B3B427708058"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-feature-code-quality/verify-preservation.py",
+    "publishedPath": "docs/audits/2026-09-05-feature-code-quality/verify-preservation.py",
+    "sha256": "186A2C9B1F8A15600570161B909560E849A80A39BA9A39565069FBB4FA3C0D68"
+  },
+  {
+    "originalPath": "docs/audits/2026-09-05-website-features-and-button-audit.md",
+    "publishedPath": "docs/audits/2026-09-05-website-features-and-button-audit.md",
+    "sha256": "24ED865F9F72AFAFAF1F24C14109F5C4C1E87535AB1ED8ABD2AF5D17A707673B"
+  },
+  {
+    "originalPath": "src/__fixtures__/audit/loop-06-stl-facet-boundary.test.ts",
+    "publishedPath": "docs/audits/2026-08-30-ten-loop-repo-audit/loop-06-stl-facet-boundary.test.ts.txt",
+    "sha256": "A53DE1944341BA63F0088300CA40A1074E55F591014A804DCD9E0D2F5EA8458F"
+  }
+]

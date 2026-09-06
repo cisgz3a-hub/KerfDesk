@@ -1,0 +1,343 @@
+// AUDIT ONLY. These tests assert observed defects at ccaa3064, not desired behavior.
+// A passing test confirms its named defect; this is not a product regression suite.
+import { act, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { captureMaterialRecipe } from '../core/material-library';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type RasterImage } from '../core/scene';
+import { createRgbaBuffer } from '../core/image-edit/rgba-buffer';
+import { DEFAULT_DESIGN_LAYER, entityDesignLayer } from '../core/design/layers';
+import type { Sketch } from '../core/design';
+import { CutSettingsDialog } from '../ui/layers/CutSettingsDialog';
+import { WizardCutSettingsStep } from '../ui/material-library/wizard/WizardCutSettingsStep';
+import { readRecipeFromForm } from '../ui/material-library/wizard/wizard-recipe';
+import { useStore } from '../ui/state';
+import { resetStore } from '../ui/state/test-helpers';
+import { useImageEditorStore } from '../ui/image-editor/image-editor-store';
+import { createSession } from '../ui/image-editor/editor-session';
+import { bakeBufferToBitmapFields } from '../ui/image-editor/image-editor-decode';
+import { ImageEditorTopBar } from '../ui/image-editor/ImageEditorTopBar';
+import { computeAdjustPreview, commitAdjustment } from '../ui/image-editor/editor-adjust-session';
+import { compositeSession, setActiveLayerProps } from '../ui/image-editor/editor-session-layers';
+import { AdjustDialogPanel } from '../ui/image-editor/AdjustDialog';
+import { useAdjustDialogStore } from '../ui/image-editor/adjust-dialog-store';
+import { applyCornerOp } from '../ui/design-studio/design-corner-apply';
+import { applyDesignSketch } from '../ui/state/design-apply-mutation';
+import { useDesignStudioStore } from '../ui/design-studio/design-studio-store';
+import { createDesignSession, restoreDesignSession } from '../ui/design-studio/design-session';
+import { DesignTopBar } from '../ui/design-studio/DesignTopBar';
+import { hydratePagedRasterImage, type PagedRasterAssetReader } from '../ui/import/paged-raster-hydration';
+import { createRectangle } from '../core/shapes/primitives';
+import { cropMaskedRasterImage } from '../ui/raster/crop-image';
+
+vi.mock('../ui/image-editor/image-editor-decode', () => ({
+  bakeBufferToBitmapFields: vi.fn(async () => ({
+    dataUrl: 'data:image/png;base64,edited',
+    lumaBase64: 'AAAA',
+  })),
+  decodeRasterToBuffer: vi.fn(),
+}));
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const mounts: { root: Root; host: HTMLDivElement }[] = [];
+const bounds = { minX: 0, minY: 0, maxX: 8, maxY: 8 };
+const noop = (): void => undefined;
+
+async function render(node: ReactNode): Promise<HTMLDivElement> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  mounts.push({ root, host });
+  await act(async () => root.render(node));
+  return host;
+}
+function input(host: HTMLElement, label: string): HTMLInputElement {
+  const found = host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
+  if (found === null) throw new Error(`Missing input: ${label}`);
+  return found;
+}
+function button(host: HTMLElement, label: string): HTMLButtonElement {
+  const found = [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === label);
+  if (found === undefined) throw new Error(`Missing button: ${label}`);
+  return found;
+}
+async function change(field: HTMLInputElement, value: string): Promise<void> {
+  field.value = value;
+  await act(async () => Simulate.change(field));
+}
+function session() {
+  return createSession('audit-image', 'audit.png', createRgbaBuffer(8, 8), bounds);
+}
+function image(): RasterImage {
+  return {
+    kind: 'raster-image', id: 'audit-image', source: 'audit.png',
+    dataUrl: 'data:image/png;base64,source', pixelWidth: 8, pixelHeight: 8,
+    bounds, transform: IDENTITY_TRANSFORM, color: '#000000',
+    dither: 'threshold', linesPerMm: 10,
+  };
+}
+
+beforeEach(() => {
+  resetStore();
+  vi.mocked(bakeBufferToBitmapFields).mockClear();
+  useImageEditorStore.setState({
+    session: null, sessionOwner: null, stash: {}, transform: null,
+    isApplying: false, applyRequest: null, tool: { kind: 'pencil' },
+    brush: { diameterPx: 3, hardness: 1, opacity: 1 },
+    foreground: { r: 0, g: 0, b: 0 }, background: { r: 255, g: 255, b: 255 },
+  });
+  useAdjustDialogStore.setState({ dialog: null });
+  useDesignStudioStore.setState({ session: null, stash: null });
+});
+afterEach(async () => {
+  for (const mounted of mounts.splice(0)) {
+    await act(async () => mounted.root.unmount());
+    mounted.host.remove();
+  }
+  useAdjustDialogStore.setState({ dialog: null });
+});
+
+describe('audit features 08-14: assertions confirm observed defects', () => {
+  it.each(['fill', 'image'] as const)('F08-01: 300 %s density creates native stepMismatch and blocks submit', async (mode) => {
+    const onApply = vi.fn();
+    const layer = { ...createLayer({ id: 'l', color: '#000000' }), mode };
+    const host = await render(<CutSettingsDialog layer={layer} onApply={onApply} onCancel={noop} />);
+    const density = input(host, mode === 'fill' ? 'Cut settings lines per inch' : 'Cut settings DPI');
+    await change(density, '300');
+    const interval = input(host, 'Cut settings line interval');
+    expect(interval.value).toBe('0.0847');
+    expect(interval.validity.stepMismatch).toBe(true);
+    expect(host.querySelector('form')?.checkValidity()).toBe(false);
+    await act(async () => button(host, 'OK').click());
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('F08-02: increasing draft Power does not increase grayscale Min Power max', async () => {
+    const onApply = vi.fn();
+    const layer = { ...createLayer({ id: 'l', color: '#000000' }), mode: 'image' as const,
+      ditherAlgorithm: 'grayscale' as const, power: 20, minPower: 5 };
+    const host = await render(<CutSettingsDialog layer={layer} onApply={onApply} onCancel={noop} />);
+    await change(input(host, 'Cut settings power'), '80');
+    await change(input(host, 'Cut settings minPower'), '50');
+    const minimum = input(host, 'Cut settings minPower');
+    expect(minimum.max).toBe('20');
+    expect(minimum.validity.rangeOverflow).toBe(true);
+    await act(async () => button(host, 'OK').click());
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it.each(['line', 'fill', 'image'] as const)('F09-01: unchanged %s wizard settings reset unseen details', async (mode) => {
+    const recipe = captureMaterialRecipe({ ...createLayer({ id: 'l', color: '#000000' }), mode,
+      tabsEnabled: true, tabSkipInnerShapes: true,
+      fillStyle: 'offset', fillBidirectional: true, fillCrossHatch: true,
+      negativeImage: true, imageBidirectional: true, passThrough: true });
+    const host = await render(<form><WizardCutSettingsStep recipe={recipe} /></form>);
+    const form = host.querySelector('form');
+    if (form === null) throw new Error('Missing form');
+    const result = readRecipeFromForm(form, recipe);
+    if (mode === 'line') {
+      expect(result.tabsEnabled).toBe(false);
+      expect(result.tabSkipInnerShapes).toBe(false);
+    } else if (mode === 'fill') {
+      expect(result.fillStyle).toBe('scanline');
+      expect(result.fillBidirectional).toBe(false);
+      expect(result.fillCrossHatch).toBe(false);
+    } else {
+      expect(result.negativeImage).toBe(false);
+      expect(result.imageBidirectional).toBe(false);
+      expect(result.passThrough).toBe(false);
+    }
+  });
+
+  it('F09-02: unchecking recipe air assist retains true', async () => {
+    const recipe = captureMaterialRecipe({ ...createLayer({ id: 'l', color: '#000000' }), airAssist: true });
+    const host = await render(<form><WizardCutSettingsStep recipe={recipe} /></form>);
+    input(host, 'Recipe uses air assist').checked = false;
+    const form = host.querySelector('form');
+    if (form === null) throw new Error('Missing form');
+    expect(new FormData(form).has('airAssist')).toBe(false);
+    expect(readRecipeFromForm(form, recipe).airAssist).toBe(true);
+  });
+
+  it('F12-01: Undo after Apply changes pixels but leaves Apply disabled and next apply skips bake', async () => {
+    const project = createProject();
+    useStore.setState({ project: { ...project, scene: { ...project.scene, objects: [image()] } } });
+    useImageEditorStore.setState({ session: session() });
+    useImageEditorStore.getState().stroke([{ x: 4, y: 4 }]);
+    expect(useImageEditorStore.getState().session?.doc.data[(4 * 8 + 4) * 4]).toBe(0);
+    useImageEditorStore.getState().apply();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(false);
+    useImageEditorStore.getState().undo();
+    const undone = useImageEditorStore.getState().session;
+    if (undone === null) throw new Error('Missing session');
+    expect(undone.doc.data[(4 * 8 + 4) * 4]).toBe(255);
+    expect(undone.dirtySinceApply).toBe(false);
+    const host = await render(<ImageEditorTopBar session={undone} isApplying={false}
+      isHistoryOpen={false} onToggleHistory={noop} actions={{ undo: noop, redo: noop, revert: noop,
+        apply: noop, applyAndTrace: noop, close: noop }} />);
+    expect(button(host, 'Apply').disabled).toBe(true);
+    const calls = vi.mocked(bakeBufferToBitmapFields).mock.calls.length;
+    useImageEditorStore.getState().apply();
+    await Promise.resolve();
+    expect(vi.mocked(bakeBufferToBitmapFields).mock.calls.length).toBe(calls);
+  });
+
+  it('F11-01: mask crop of a paged-only raster substitutes white and keeps incompatible old asset', async () => {
+    const { dataUrl: _url, ...baseImage } = image();
+    const paged: RasterImage = { ...baseImage, imageMaskId: 'mask', imageAsset: {
+      schemaVersion: 1, repository: 'curvedesk-import-assets-v1',
+      sourceAssetId: 'original-source', lumaAssetId: 'original-luma', sourceMimeType: 'image/png',
+      sourceByteLength: 30_000_000, lumaByteLength: 64, naturalWidth: 8, naturalHeight: 8,
+      sampledWidth: 8, sampledHeight: 8,
+      thumbnail: { mimeType: 'image/bmp', dataUrl: 'data:image/bmp;base64,old', width: 8, height: 8 },
+    } };
+    const mask = createRectangle({ id: 'mask', color: '#000000',
+      spec: { widthMm: 4, heightMm: 8, cornerRadiusMm: 0 } });
+    const cropped = await cropMaskedRasterImage(paged, mask, (raster) => ({
+      dataUrl: 'data:image/png;base64,cropped',
+      lumaBase64: btoa(String.fromCharCode(...raster.luma)),
+    }));
+    expect(cropped.pixelWidth).toBe(4);
+    expect([...atob(cropped.lumaBase64!)].map((c) => c.charCodeAt(0))).toEqual(new Array(32).fill(255));
+    expect(cropped.imageAsset).toBe(paged.imageAsset);
+    expect(cropped.imageAsset?.sampledWidth).not.toBe(cropped.pixelWidth);
+  });
+
+  it('F12-02: store eraser ignores non-white selected background', () => {
+    useImageEditorStore.setState({ session: session(), tool: { kind: 'eraser' },
+      background: { r: 17, g: 34, b: 51 } });
+    useImageEditorStore.getState().stroke([{ x: 4, y: 4 }]);
+    const offset = (4 * 8 + 4) * 4;
+    const pixels = useImageEditorStore.getState().session?.doc.data;
+    expect([...pixels!.slice(offset, offset + 3)]).toEqual([255, 255, 255]);
+  });
+
+  it('F12-03: Apply retains original paged luma and hydration overwrites edited pixels', async () => {
+    const asset: NonNullable<RasterImage['imageAsset']> = {
+      schemaVersion: 1, repository: 'curvedesk-import-assets-v1',
+      sourceAssetId: 'old-source', lumaAssetId: 'old-luma', sourceMimeType: 'image/png',
+      sourceByteLength: 30_000_000, lumaByteLength: 64, naturalWidth: 8, naturalHeight: 8,
+      sampledWidth: 8, sampledHeight: 8,
+      thumbnail: { mimeType: 'image/bmp', dataUrl: 'data:image/bmp;base64,old', width: 8, height: 8 },
+    };
+    const repository: PagedRasterAssetReader = {
+      readManifest: async () => ({ schemaVersion: 1, assetId: 'old-luma', sourceName: 'old',
+        mimeType: 'application/x-curvedesk-luma', byteLength: 64, writtenByteLength: 64,
+        pageBytes: 64, pageCount: 1, createdAtEpochMs: 1, state: 'ready' }),
+      readAssetChunks: async function* () { yield new Uint8Array(64); },
+    };
+    const base = createProject();
+    useStore.setState({ project: { ...base, scene: { ...base.scene, objects: [{ ...image(), imageAsset: asset }] } } });
+    const newLuma = btoa(String.fromCharCode(...new Uint8Array(64).fill(255)));
+    useStore.getState().applyEditedImage('audit-image', {
+      dataUrl: 'data:image/png;base64,new', lumaBase64: newLuma, pixelWidth: 8, pixelHeight: 8,
+    });
+    const edited = useStore.getState().project.scene.objects[0] as RasterImage;
+    expect(edited.imageAsset).toBe(asset);
+    expect(edited.lumaBase64).toBe(newLuma);
+    const hydrated = await hydratePagedRasterImage(edited, repository);
+    expect(hydrated.lumaBase64).toBe(btoa(String.fromCharCode(...new Uint8Array(64))));
+    expect(hydrated.dataUrl).toBe(asset.thumbnail.dataUrl);
+    useStore.getState().applyEditedImage('audit-image', {
+      dataUrl: 'data:image/png;base64,cropped', lumaBase64: btoa(String.fromCharCode(...new Uint8Array(32))),
+      pixelWidth: 4, pixelHeight: 8,
+    });
+    const cropped = useStore.getState().project.scene.objects[0] as RasterImage;
+    await expect(hydratePagedRasterImage(cropped, repository)).rejects.toThrow('expects 32 luma bytes but references 64');
+  });
+
+  it('F12-04: async bake PNG snapshot and emitted luma can read different pixel revisions', async () => {
+    const actual = await vi.importActual<typeof import('../ui/image-editor/image-editor-decode')>(
+      '../ui/image-editor/image-editor-decode');
+    const doc = createRgbaBuffer(1, 1);
+    let pngPixels: number[] = [];
+    let finish: BlobCallback | undefined;
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({
+      putImageData: (pixels: ImageData) => { pngPixels = [...pixels.data]; },
+    }) as unknown as CanvasRenderingContext2D);
+    const toBlob = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+      finish = callback;
+    });
+    try {
+      const pending = actual.bakeBufferToBitmapFields(doc);
+      expect(pngPixels).toEqual([255, 255, 255, 255]);
+      // A subsequent editor stroke mutates the same doc buffer while PNG encoding waits.
+      doc.data.set([0, 0, 0, 255]);
+      if (finish === undefined) throw new Error('PNG encoding did not start');
+      finish(new Blob(['encoded-original-white-pixel'], { type: 'image/png' }));
+      const fields = await pending;
+      expect(fields.lumaBase64).toBe('AA==');
+      expect(pngPixels[0]).toBe(255);
+    } finally {
+      getContext.mockRestore();
+      toBlob.mockRestore();
+    }
+  });
+
+  it('F13-01: Enter on the production Cancel button commits an adjustment', async () => {
+    useImageEditorStore.setState({ session: session() });
+    useAdjustDialogStore.getState().open('brightness-contrast');
+    useAdjustDialogStore.getState().setParams({ brightness: -100 });
+    const host = await render(<AdjustDialogPanel />);
+    const cancel = button(host, 'Cancel');
+    cancel.focus();
+    await act(async () => cancel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(useAdjustDialogStore.getState().dialog).toBeNull();
+    expect(useImageEditorStore.getState().session?.doc.data[0]).toBe(127);
+    expect(useImageEditorStore.getState().session?.history.undoStack).toHaveLength(1);
+  });
+
+  it('F13-02: single-layer adjustment preview ignores layer opacity', () => {
+    const edited = setActiveLayerProps(session(), { opacity: 0.5 });
+    const preview = computeAdjustPreview(edited, 'invert', {});
+    const committed = commitAdjustment(edited, 'invert', {});
+    const output = compositeSession(committed);
+    expect(preview.data[0]).toBe(0);
+    expect(output.data[0]).toBeGreaterThan(100);
+    expect(preview.data[0]).not.toBe(output.data[0]);
+  });
+
+  it('F14-01: chamfering a rectangle drops its assigned carve layer', () => {
+    const custom = { ...DEFAULT_DESIGN_LAYER, id: 'deep', name: 'Deep', depthMm: 7 };
+    const sketch: Sketch = { layers: [DEFAULT_DESIGN_LAYER, custom], entities: [{
+      kind: 'rect', id: 'r', origin: { x: 0, y: 0 }, widthMm: 40, heightMm: 30,
+      cornerRadiusMm: 0, layerId: 'deep',
+    }] };
+    const next = applyCornerOp(sketch, { kind: 'rect', entityId: 'r' }, 'chamfer', 2);
+    const changed = next?.entities[0];
+    if (changed === undefined) throw new Error('Chamfer did not produce geometry');
+    expect(changed.kind).toBe('path');
+    expect(changed.layerId).toBeUndefined();
+    expect(entityDesignLayer(changed, next!.layers!).id).toBe(DEFAULT_DESIGN_LAYER.id);
+  });
+
+  it('F14-02: deleting the last applied entity cannot remove previous project output', async () => {
+    const sketch: Sketch = { entities: [{ kind: 'line', id: 'l', start: { x: 0, y: 0 }, end: { x: 10, y: 0 } }] };
+    const first = applyDesignSketch({ project: createProject(), undoStack: [] }, sketch, ['scene-l']);
+    if (first === null) throw new Error('First apply failed');
+    const empty: Sketch = { entities: [] };
+    const result = applyDesignSketch({ project: first.project, undoStack: [] }, empty, [], first.applyRecord);
+    expect(result).toBeNull();
+    expect(first.project.scene.objects).toHaveLength(1);
+    useDesignStudioStore.setState({ session: { ...createDesignSession(empty),
+      applied: first.applyRecord, dirtySinceApply: true } });
+    const host = await render(<DesignTopBar onFit={noop} />);
+    expect(button(host, 'Apply').disabled).toBe(true);
+    expect(button(host, 'Apply & Close').disabled).toBe(true);
+  });
+
+  it('F14-03: restored never-applied drawing has Apply disabled until a new edit', async () => {
+    const restored = restoreDesignSession({ sketch: { entities: [{
+      kind: 'line', id: 'l', start: { x: 0, y: 0 }, end: { x: 10, y: 0 },
+    }] }, activeLayerId: DEFAULT_DESIGN_LAYER.id, surface3d: false, applied: null });
+    useDesignStudioStore.setState({ session: restored });
+    const host = await render(<DesignTopBar onFit={noop} />);
+    expect(restored.history.present.entities).toHaveLength(1);
+    expect(restored.applied).toBeNull();
+    expect(restored.dirtySinceApply).toBe(false);
+    expect(button(host, 'Apply').disabled).toBe(true);
+  });
+});

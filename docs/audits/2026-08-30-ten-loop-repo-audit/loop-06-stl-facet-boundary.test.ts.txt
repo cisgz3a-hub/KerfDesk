@@ -1,0 +1,69 @@
+import { Blob as NodeBlob } from 'node:buffer';
+import { describe, expect, it } from 'vitest';
+import { parseGcodeProgram } from '../../io/gcode/parse-gcode-program';
+import { parseStl } from '../../io/stl';
+import { parseStlBlob } from '../../io/stl/parse-stl-blob';
+
+const CROSS_FACET = `solid bad
+facet normal 0 0 1
+outer loop
+vertex 0 0 0
+vertex 1 0 0
+vertex 0 1 0
+vertex 9 9 9
+endloop
+endfacet
+facet normal 0 0 1
+outer loop
+vertex 10 0 0
+vertex 10 1 0
+endloop
+endfacet
+endsolid bad
+`;
+
+describe('Loop 6 ASCII STL facet-integrity probe', () => {
+  it('records that both production entry points regroup vertices across malformed facets', async () => {
+    const bytes = new TextEncoder().encode(CROSS_FACET);
+    const buffered = parseStl(bytes.buffer);
+    const streamed = await parseStlBlob(new NodeBlob([bytes]) as unknown as Blob);
+
+    expect(buffered.kind).toBe('ok');
+    expect(streamed.kind).toBe('ok');
+    if (buffered.kind !== 'ok' || streamed.kind !== 'ok') return;
+
+    const result = {
+      bufferedTriangles: buffered.mesh.positions.length / 9,
+      streamedTriangles: streamed.mesh.positions.length / 9,
+      secondBufferedTriangle: [...buffered.mesh.positions.slice(9, 18)],
+      secondStreamedTriangle: [...streamed.mesh.positions.slice(9, 18)],
+    };
+    console.log(`LOOP6_STL_FACET_RESULT ${JSON.stringify(result)}`);
+    expect(result).toEqual({
+      bufferedTriangles: 2,
+      streamedTriangles: 2,
+      secondBufferedTriangle: [9, 9, 9, 10, 0, 0, 10, 1, 0],
+      secondStreamedTriangle: [9, 9, 9, 10, 0, 0, 10, 1, 0],
+    });
+  });
+});
+
+describe('Loop 6 external G-code preview honesty probe', () => {
+  it('records tolerated trailing garbage and last-wins duplicate axes', () => {
+    const result = parseGcodeProgram('G90\nG0 X1 X20 Y3 junk\n');
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+
+    const observation = {
+      notes: result.notes,
+      steps: result.toolpath.steps.map((step) => ({
+        kind: step.kind,
+        to: step.to,
+      })),
+    };
+    console.log(`LOOP6_GCODE_TOLERANCE_RESULT ${JSON.stringify(observation)}`);
+    expect(observation.notes).toEqual([]);
+    expect(observation.steps.at(-1)?.to).toEqual({ x: 20, y: 3 });
+  });
+});

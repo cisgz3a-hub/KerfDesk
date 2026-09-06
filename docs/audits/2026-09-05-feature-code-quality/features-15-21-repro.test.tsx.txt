@@ -1,0 +1,170 @@
+// Audit evidence only: these assertions characterize current defects at ccaa3064.
+// After fixes, replace the bad-behavior assertions with the stated invariants.
+// Camera I/O and camera math are mocked; no browser permission or hardware calls.
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { generateFitCoupon } from '../core/box/fit-coupon';
+import { generateIntervalTestGrid } from '../core/job/interval-test-grid';
+import { generateMaterialTestGrid } from '../core/job/material-test-grid';
+import { compileJob } from '../core/job/compile-job';
+import { grblStrategy } from '../core/output/grbl-strategy';
+import { DEFAULT_DEVICE_PROFILE } from '../core/devices';
+import { createProject } from '../core/scene';
+import { IntervalTestDialog } from '../ui/calibration/IntervalTestDialog';
+import { MaterialTestDialog } from '../ui/calibration/MaterialTestDialog';
+import { BoxFitTestDialog } from '../ui/box/BoxFitTestDialog';
+import { CameraAlignWizard } from '../ui/camera/align-wizard/CameraAlignWizard';
+import { useCameraAlignWizardStore } from '../ui/camera/align-wizard/camera-align-wizard-store';
+import { useCameraStore } from '../ui/state/camera-store';
+import { useStore } from '../ui/state';
+import { RegistrationJigOutlineControls } from '../ui/workspace/RegistrationJigOutlineControls';
+
+const mocked = vi.hoisted(() => ({ capture: vi.fn() }));
+vi.mock('../ui/camera/frame-source', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../ui/camera/frame-source')>()),
+  captureSourceFrame: mocked.capture,
+}));
+vi.mock('../ui/camera/CameraSourceView', () => ({ CameraSourceView: () => null }));
+vi.mock('../core/camera', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../core/camera')>()),
+  detectAlignMarkers: () => ({ kind: 'ok' }),
+  solveMarkerAlignment: () => ({
+    kind: 'ok',
+    homography: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    verificationErrorMm: 0,
+  }),
+}));
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const mounted: Root[] = [];
+async function render(element: JSX.Element): Promise<HTMLDivElement> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  mounted.push(root);
+  await act(async () => root.render(element));
+  return host;
+}
+function input(host: HTMLElement, label: string): HTMLInputElement {
+  const found = host.querySelector(`input[aria-label="${label}"]`);
+  if (!(found instanceof HTMLInputElement)) throw new Error(`Missing ${label}`);
+  return found;
+}
+async function setInput(host: HTMLElement, label: string, value: string): Promise<void> {
+  const element = input(host, label);
+  await act(async () => { element.value = value; Simulate.change(element); });
+}
+async function click(host: HTMLElement, text: string): Promise<void> {
+  const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === text);
+  if (button === undefined) throw new Error(`Missing button ${text}`);
+  await act(async () => button.click());
+}
+afterEach(async () => {
+  for (const root of mounted.splice(0)) await act(async () => root.unmount());
+  useCameraAlignWizardStore.getState().closeWizard();
+  useCameraStore.setState({ sourceState: { kind: 'idle' } });
+  localStorage.clear();
+  vi.restoreAllMocks();
+  document.body.innerHTML = '';
+});
+
+describe('Feature 15-21 audit: observed bad behavior, not acceptance of correctness', () => {
+  it('blank interval speed is browser-valid and generates a zero-speed job that cannot emit', async () => {
+    const generated = vi.fn();
+    const host = await render(<IntervalTestDialog onCancel={() => undefined} onGenerate={generated} maxFeedMmPerMin={3000} />);
+    await setInput(host, 'Speed', '');
+    expect(input(host, 'Speed').checkValidity()).toBe(true);
+    await click(host, 'Generate');
+    expect(generated).toHaveBeenCalledOnce();
+    const options = generated.mock.calls[0]?.[0];
+    expect(options.speed).toBe(0);
+    const grid = generateIntervalTestGrid(options);
+    expect(grid.cells[0]?.effectiveSpeed).toBe(0);
+    expect(() => grblStrategy.emit(compileJob(grid.scene, DEFAULT_DEVICE_PROFILE), DEFAULT_DEVICE_PROFILE)).toThrow(/speed must be finite and > 0/);
+    // Required invariant: incomplete speed must not replace the scene or claim successful generation.
+  });
+
+  it('blank material minimum speed creates a zero-speed row that cannot emit', async () => {
+    const generated = vi.fn();
+    const host = await render(<MaterialTestDialog onCancel={() => undefined} onGenerate={generated} maxFeedMmPerMin={3000} />);
+    await setInput(host, 'Min speed', '');
+    expect(input(host, 'Min speed').checkValidity()).toBe(true);
+    await click(host, 'Generate');
+    const grid = generateMaterialTestGrid(generated.mock.calls[0]?.[0]);
+    expect(grid.cells.some((cell) => cell.effectiveSpeed === 0)).toBe(true);
+    expect(() => grblStrategy.emit(compileJob(grid.scene, DEFAULT_DEVICE_PROFILE), DEFAULT_DEVICE_PROFILE)).toThrow(/speed must be finite and > 0/);
+  });
+
+  it('blank CNC fit-test relief diameter is accepted and generates unrelieved coupons', async () => {
+    const generated = vi.fn();
+    const host = await render(<BoxFitTestDialog machine={{ kind: 'cnc', stockThicknessMm: 3, toolDiameterMm: 3.175 }} onCancel={() => undefined} onGenerate={generated} />);
+    await setInput(host, 'Relief tool diameter', '');
+    expect(input(host, 'Relief tool diameter').checkValidity()).toBe(true);
+    await click(host, 'Generate');
+    expect(generated).toHaveBeenCalledOnce();
+    const specification = { thicknessMm: 3, fingerWidthMm: 9, startClearanceMm: .05, stepClearanceMm: .05, rungCount: 6 };
+    const zero = generateFitCoupon({ ...specification, relief: { kind: 'corner-overcut', toolDiameterMm: 0 } });
+    const plain = generateFitCoupon({ ...specification, relief: { kind: 'none' } });
+    expect(zero.kind).toBe('generated');
+    expect(plain.kind).toBe('generated');
+    if (zero.kind !== 'generated' || plain.kind !== 'generated') throw new Error('Expected current generated behavior');
+    // Clipper normalizes closure/order and rounds nominal coordinates. A zero
+    // radius leaves the original orthogonal comb/slots with no relief arcs.
+    const lengths = (parts: typeof zero.parts) => parts.map((part) => part.rings.outline.points.length);
+    expect(lengths(zero.parts)).toEqual(lengths(plain.parts));
+    for (const part of zero.parts) {
+      const points = part.rings.outline.points;
+      for (let i = 1; i < points.length; i += 1) {
+        const previous = points[i - 1]!;
+        const current = points[i]!;
+        expect(previous.x === current.x || previous.y === current.y).toBe(true);
+      }
+    }
+    const relieved = generateFitCoupon({ ...specification, relief: { kind: 'corner-overcut', toolDiameterMm: 3.175 } });
+    if (relieved.kind !== 'generated') throw new Error('Expected valid positive relief');
+    expect(relieved.parts[1]!.rings.outline.points.length).toBeGreaterThan(zero.parts[1]!.rings.outline.points.length);
+    // Required invariant: CNC relief requires a finite positive diameter before any coupon is generated.
+  });
+
+  it('a delayed alignment commits into a new project even after the wizard is closed', async () => {
+    let finishCapture: (value: { width: number; height: number; data: Uint8ClampedArray }) => void = () => undefined;
+    mocked.capture.mockImplementationOnce(() => new Promise((resolve) => { finishCapture = resolve; }));
+    useStore.setState({ project: createProject(), undoStack: [], redoStack: [] });
+    useCameraStore.setState({ sourceState: { kind: 'live', source: { kind: 'machine-jpeg', frameUrl: 'http://example.invalid/frame', cameraUrl: 'http://example.invalid/camera' } } });
+    useCameraAlignWizardStore.getState().openWizard();
+    useCameraAlignWizardStore.getState().setStep({ kind: 'detect', status: { kind: 'idle' } });
+    function Host(): JSX.Element | null { return useCameraAlignWizardStore((state) => state.open) ? <CameraAlignWizard /> : null; }
+    const host = await render(<Host />);
+    await click(host, 'Detect markers');
+    const close = host.querySelector('button[aria-label="Close Align camera to bed"]');
+    if (!(close instanceof HTMLButtonElement)) throw new Error('Missing wizard Exit');
+    await act(async () => close.click());
+    expect(useCameraAlignWizardStore.getState().open).toBe(false);
+    const replacement = createProject();
+    useStore.setState({ project: { ...replacement, device: { ...replacement.device, name: 'Replacement project device' } } });
+    expect(useStore.getState().project.device.cameraAlignment).toBeUndefined();
+    await act(async () => { finishCapture({ width: 8, height: 8, data: new Uint8ClampedArray(8 * 8 * 4) }); });
+    expect(useStore.getState().project.device.name).toBe('Replacement project device');
+    expect(useStore.getState().project.device.cameraAlignment).toBeDefined();
+    expect(useCameraAlignWizardStore.getState().step.kind).toBe('done');
+    // Required invariant: cancellation/project replacement invalidates the pending mutation and completion state.
+  });
+
+  it('accepts a 100-million-jig request at the UI boundary without allocating it', async () => {
+    const original = useStore.getState().replaceRegistrationJigSet;
+    const request = vi.fn();
+    useStore.setState({ project: createProject(), replaceRegistrationJigSet: request });
+    try {
+      const host = await render(<RegistrationJigOutlineControls />);
+      await setInput(host, 'Jig rows', '10000');
+      await setInput(host, 'Jig columns', '10000');
+      expect(input(host, 'Jig rows').max).toBe('');
+      await click(host, 'Create 100000000 jigs');
+      expect(request).toHaveBeenCalledWith(expect.objectContaining({ rows: 10000, columns: 10000 }));
+      // The real action's lines94-95 execute exactly rows*columns iterations, with no work bound.
+      // Required invariant: reject or move oversized construction into bounded cancellable work.
+    } finally { await act(async () => useStore.setState({ replaceRegistrationJigSet: original })); }
+  });
+});
