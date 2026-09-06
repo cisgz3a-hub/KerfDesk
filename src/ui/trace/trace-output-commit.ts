@@ -2,6 +2,7 @@ import type { Project, RasterImage, TracedImage } from '../../core/scene';
 import type { TraceExistingImageOptions } from '../state/scene-mutations';
 import type { TraceOutput } from './dialog-parts';
 import type { TraceCommitClaim } from './trace-commit-ownership';
+import { traceNoticeMessage, type TraceNotice } from './trace-notices';
 import {
   buildRasterTraceOutput,
   rasterTraceInputs,
@@ -13,6 +14,7 @@ export type TraceOutputCommitArgs = {
   readonly traceOutput?: TraceOutput;
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
+  readonly notices?: ReadonlyArray<TraceNotice>;
 };
 
 export type TraceOutputCommitContext = {
@@ -49,7 +51,7 @@ export async function commitTraceOutput(
   }
   if (ctx.claimOwner() === null) return false;
   ctx.traceExistingImage(args.seed.id, traced, traceOptions);
-  ctx.pushToast(traceSuccessMessage(args.seed.source, traced, sourceStatus, false), 'success');
+  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, false), 'success');
   return true;
 }
 
@@ -87,17 +89,18 @@ async function commitRasterTraceOutput(
     return false;
   }
   ctx.commitRasterizedTrace(args.seed.id, raster, traceOptions);
-  ctx.pushToast(traceSuccessMessage(args.seed.source, traced, sourceStatus, true), 'success');
+  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, true), 'success');
   return true;
 }
 
 function traceSuccessMessage(
-  source: string,
+  args: TraceOutputCommitArgs,
   traced: TracedImage,
   sourceStatus: string,
   raster: boolean,
 ): string {
   const colorCount = traced.paths.length;
   const output = raster ? ' as a raster scan' : '';
-  return `Traced ${source}${output} — ${colorCount} color${colorCount === 1 ? '' : 's'}, ${sourceStatus}`;
+  const summary = `Traced ${args.seed.source}${output} — ${colorCount} color${colorCount === 1 ? '' : 's'}, ${sourceStatus}`;
+  return [summary, ...(args.notices ?? []).map(traceNoticeMessage)].join('. ');
 }

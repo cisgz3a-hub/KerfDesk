@@ -433,7 +433,12 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
 test('imports a generated bitmap and traces it through the production worker workflow', async ({
   page,
   kerfdesk,
-}) => {
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
   await kerfdesk.setOpenFiles([
     { name: 'trace-square.png', kind: 'png-fixture', width: 64, height: 64 },
   ]);
@@ -441,7 +446,28 @@ test('imports a generated bitmap and traces it through the production worker wor
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Trace Image...' })).toBeEnabled();
   await page.getByRole('button', { name: 'Trace Image...' }).click();
-  await expect(page.getByRole('dialog', { name: 'Trace image' })).toBeVisible();
+  const dialog = page.getByRole('dialog', { name: 'Trace image' });
+  await expect(dialog).toBeVisible();
+  const detection = dialog.getByRole('combobox', { name: 'Trace detection' });
+  const threshold = dialog.getByRole('spinbutton', { name: 'Trace Threshold', exact: true });
+  await expect(detection).toHaveValue('preset');
+  await expect(threshold).toHaveCount(0);
+  await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('12');
+  await expect(dialog.getByRole('spinbutton', { name: 'Ignore Less Than' })).toHaveValue('2');
+  await dialog.screenshot({ path: testInfo.outputPath('trace-automatic.png') });
+
+  await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Sharp');
+  await expect(threshold).toHaveCount(0);
+  await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('4');
+  await expect(dialog.getByRole('spinbutton', { name: 'Ignore Less Than' })).toHaveValue('0');
+  await detection.selectOption('manual');
+  await expect(threshold).toHaveValue('128');
+  await threshold.fill('137');
+  await expect(threshold).toHaveValue('137');
+  await dialog.screenshot({ path: testInfo.outputPath('trace-manual.png') });
+  await detection.selectOption('preset');
+  await expect(threshold).toHaveCount(0);
+  await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Line Art');
   await expect(page.getByRole('button', { name: 'Trace', exact: true })).toBeEnabled({
     timeout: 15_000,
   });
@@ -458,6 +484,7 @@ test('imports a generated bitmap and traces it through the production worker wor
       (object) => object['kind'] === 'raster-image' && object['source'] === 'trace-square.png',
     ),
   ).toBe(true);
+  expect(errors).toEqual([]);
 });
 
 test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready state', async ({

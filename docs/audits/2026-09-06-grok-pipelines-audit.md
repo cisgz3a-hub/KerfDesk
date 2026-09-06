@@ -25,7 +25,7 @@ Line references below refer to the current worktree unless explicitly labelled *
 
 **pipelines-CI-01 — Stable source does not prove stable activation.**
 
-Grok is right that a finished YAML file cannot establish that signed stable distribution is live. [WORKFLOW.md:5658](/C:/Users/Asus/.codex/worktrees/grok-ci-time5-20260906/WORKFLOW.md:5658) expressly dates its operational state to 25 July 2026, and step 4 at line 5679 remains future stable activation. It requires the protected environment, exact approved SHA and signing/R2 credentials. That historical text is insufficient to conclude the credentials are still absent today.
+Grok is right that a finished YAML file cannot establish that signed stable distribution is live. [WORKFLOW.md:5690](/C:/Users/Asus/.codex/worktrees/grok-ci-time5-20260906/WORKFLOW.md:5690) expressly dates its operational state to 25 July 2026, and step 4 at line 5711 remains future stable activation. It requires the protected environment, exact approved SHA and signing/R2 credentials. That historical text is insufficient to conclude the credentials are still absent today.
 
 The implementation respects this boundary: [release-desktop-stable.yml:54](/C:/Users/Asus/.codex/worktrees/grok-ci-time5-20260906/.github/workflows/release-desktop-stable.yml:54) compares the tag source to `STABLE_APPROVED_RELEASE_SHA`; line 68 selects `environment: desktop-production`. It also checks annotated-tag identity/main ancestry before packaging and requires real signing credentials plus a valid Authenticode signature. Its introductory comments already separate future signed stable from unsigned Preview.
 

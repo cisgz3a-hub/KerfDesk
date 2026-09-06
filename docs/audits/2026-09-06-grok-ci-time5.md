@@ -1,7 +1,7 @@
 # Grok pipelines-CI and TIME5 audit, 2026-09-06
 
 Grok's supplied baseline is `5918ef53fd91f6b33a4cd0766f2a3b7ba6991acc`. This audit and
-remediation use current main `c07cea275149832909d46f21c4dd7ec74d634f4a` on the isolated
+initial remediation use main `c07cea275149832909d46f21c4dd7ec74d634f4a` on the isolated
 branch `codex/grok-ci-time5-20260906`. The intervening change is the CNC spindle-review
 correction in PR #751; it does not resolve these timing or pipeline findings.
 
@@ -10,9 +10,9 @@ Wave 1 `pipelines-CI-*` findings, not the August merge-state finding with the sa
 Timing identifiers are `KD-TIME5-*`. Rotation and other wave names appear only in handoff
 chatter: no additional findings were supplied for those topics.
 
-This is local implementation evidence. The previous fixes remain separately preserved on
-`codex/grok-reviewed-fixes-20260906`, containing fix commit `5edcd78c4`; this branch does not include that commit.
-No changes in this pack are merged or deployed. Johann owns merging. Frame remains the sole
+This records local implementation evidence for fix commit `8a7794c10`. For integration, the branch
+now also contains the earlier Grok pack from `97f3f1832` / PR #752, preserving its fix commit `5edcd78c4`.
+The user subsequently authorized merging both PRs after verification. Frame remains the sole
 ordinary Start policy gate; no machine operation or controller-setting write was added.
 
 ## Timing findings
@@ -128,14 +128,14 @@ The two substantive pipeline reproductions are independently observable:
 
 ## Verification and limits
 
-Fresh full-repository `pnpm test` on the frozen final source passed **12,348 tests**, with
+Fresh full-repository `pnpm test` on the frozen timing-pack source at `8a7794c10` passed **12,348 tests**, with
 **22 skipped** and **zero failures**, across **1,929 passed files / 14 skipped files**.
 The skipped cases are the existing opt-in perceptual audit/probe fixtures.
 
 The final affected-area run passed **1,044 tests across 162 files**. It covered the job
 planner, G-code clocks, motion planner, output emitters, Job Review, Preview statistics,
 live badge handoff, and timing state. This run includes the final CNC restart-stop correction.
-SHA-256 hashes of all 44 changed source/test/workflow files were unchanged through that run.
+SHA-256 hashes of all 44 timing-pack source/test/workflow files were unchanged through that run.
 The same source hashes remained unchanged through the fresh full run. An earlier aggregate
 run overlapped the CNC restart correction and observed its two failing regression cases;
 `full-tests.log` retains that result. The successful frozen-source rerun is recorded separately
@@ -161,9 +161,9 @@ Detailed local logs and probe results are in
 `C:/Users/Asus/.codex/audits/grok-ci-time5-20260906`. At the preservation checkpoint, the
 original checkout's HEAD, status, and 15 fingerprinted source/instruction files were unchanged.
 The previous fix worktree was clean at `5edcd78c4a0efe07c75de6b344306274f63285d6` before the
-later repository-wide request to publish completed work. That separate pack now has
+later repository-wide request to publish completed work. That earlier pack has
 [PR #752](https://github.com/cisgz3a-hub/KerfDesk/pull/752), preserving the fix commit and
-integrating main at `97f3f183296e332f2b67cb5e003356ccf22c2291`; it is not included in this branch.
+integrating main at `97f3f183296e332f2b67cb5e003356ccf22c2291`. It is now the integration base for PR #755.
 Live `origin/main` was still `c07cea275149832909d46f21c4dd7ec74d634f4a` at the remote check.
 
 Software ETA parity does not qualify controller acceleration, per-axis rapid limits, buffering, overrides, manual
@@ -174,3 +174,19 @@ Preview route playback remains a motion animation and discloses the separate spi
 Hosted PR checks are recorded on the pull request separately from this local verification.
 No deployment, installer, signing, updater, reference-CAM, or hardware run was performed.
 Building or testing the release evidence scripts does not activate the stable desktop release channel.
+
+## Combined integration for main
+
+PR #755 is prepared after PR #752, combining timing fix `8a7794c10` with the earlier pack at
+`97f3f1832`. The only manual merge conflict was the audit ledger; both entries were retained.
+WORKFLOW.md and the production browser test file merged automatically. An independent review
+confirmed that every other application/source blob remained identical to its owning fix pack,
+including power-mode resolution, emitted timing boundaries, and MPG pause/settlement behavior.
+
+The combined checkout passed **82 tests across eight suites** for artwork overrides and
+save/load, settings approval, emitted-seek parity, live timing, MPG recovery and cancellation.
+It also passed **2/2 Chrome flows**: project-open/calibration/Preview/save and actual bitmap
+import/tracing through the production worker. E2E typechecking and formatting of the combined
+test file passed. The full-suite numbers above describe the standalone timing commit; hosted
+checks on the combined PR head provide the aggregate integration result. The user authorized
+merging both PRs after verification; PR and main check records establish the final merge state.

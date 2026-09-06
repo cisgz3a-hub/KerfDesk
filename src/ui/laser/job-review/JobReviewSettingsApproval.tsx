@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { Layer, LayerOperationSettings } from '../../../core/scene';
+import { useMemo, useState } from 'react';
+import { captureLayerOperationSettings, type Scene } from '../../../core/scene';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
 
@@ -8,13 +8,14 @@ import { useStore } from '../../state';
  * `onApprove` runs only for changed values so the caller can refresh the exact prepared job.
  */
 export function JobReviewSettingsApproval(props: { readonly onApprove: () => void }): JSX.Element {
-  const signature = useStore((state) => settingsSignature(state.project.scene.layers));
+  const scene = useStore((state) => state.project.scene);
+  const signature = useMemo(() => settingsSignature(scene), [scene]);
   const [approvedSignature, setApprovedSignature] = useState(signature);
   const [hasApproved, setHasApproved] = useState(false);
   const hasChanges = signature !== approvedSignature;
 
   const handleApprove = (): void => {
-    const currentSignature = settingsSignature(useStore.getState().project.scene.layers);
+    const currentSignature = settingsSignature(useStore.getState().project.scene);
     const shouldRebuild = currentSignature !== approvedSignature;
     setApprovedSignature(currentSignature);
     setHasApproved(true);
@@ -49,27 +50,32 @@ function approvalStatus(hasChanges: boolean, hasApproved: boolean): string {
     : 'Main Artwork / Operations settings match this review.';
 }
 
-function settingsSignature(layers: ReadonlyArray<Layer>): string {
-  return JSON.stringify(
-    layers.map((layer) => ({
+function settingsSignature(scene: Scene): string {
+  return JSON.stringify({
+    layers: scene.layers.map((layer) => ({
       id: layer.id,
-      settings: editableOperationSettings(layer),
+      color: layer.color,
+      output: layer.output,
+      settings: captureLayerOperationSettings(layer),
       cnc: layer.cnc ?? null,
       subLayers: layer.subLayers.map((subLayer) => ({
         id: subLayer.id,
-        settings: editableOperationSettings(subLayer.settings),
+        enabled: subLayer.enabled,
+        settings: captureLayerOperationSettings(subLayer.settings),
       })),
     })),
-  );
-}
-
-function editableOperationSettings(settings: LayerOperationSettings): object {
-  return {
-    power: settings.power,
-    speed: settings.speed,
-    passes: settings.passes,
-    airAssist: settings.airAssist,
-  };
+    objects: scene.objects.map((object) => ({
+      id: object.id,
+      operationIds: object.operationIds,
+      operationOverride: object.operationOverride,
+      powerScale: object.powerScale,
+      color: 'color' in object ? object.color : undefined,
+      paths:
+        'paths' in object
+          ? object.paths.map((path) => ({ color: path.color, operationIds: path.operationIds }))
+          : undefined,
+    })),
+  });
 }
 
 const approvalStyle: React.CSSProperties = {

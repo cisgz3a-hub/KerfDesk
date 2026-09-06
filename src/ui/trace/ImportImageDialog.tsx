@@ -352,7 +352,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     // re-traces the region supersampled and patches it into the full trace
     // (ADR-113). Either way geometry returns in source-image coordinates so
     // preview, commit, and overlay registration stay on the same pixels.
-    const { paths, bounds, width, height } = await resolveTraceCommitResult({
+    const { paths, bounds, width, height, notices } = await resolveTraceCommitResult({
       ...args,
       sourceGrid: { width: args.seed.pixelWidth, height: args.seed.pixelHeight },
     });
@@ -409,7 +409,8 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
             ),
           }
         : traced;
-    if (await commitTraceOutput(args, ctx, commitTraced, liveProject)) ctx.close();
+    const outputArgs = { ...args, ...(notices === undefined ? {} : { notices }) };
+    if (await commitTraceOutput(outputArgs, ctx, commitTraced, liveProject)) ctx.close();
   } catch (err) {
     reportTraceCommitError(args.seed.source, err, ctx);
   } finally {

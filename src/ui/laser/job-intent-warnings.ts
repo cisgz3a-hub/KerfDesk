@@ -1,4 +1,5 @@
 import { resolveGrblDialect, type GrblPowerMode } from '../../core/devices';
+import { effectiveGcodeFeedMmPerMin } from '../../core/gcode/feed-word';
 import {
   analyzeFillHeatRisk,
   compileJob,
@@ -85,7 +86,7 @@ function appendScanOffsetCoverageWarnings(project: Project, job: Job, warnings: 
   const uncovered = feeds.filter((feed) => feed < min || feed > max);
   if (uncovered.length === 0) return;
   warnings.push(
-    `Bidirectional scan output at ${formatFeedList(uncovered)} is outside the saved scan-offset table (${min}–${max} mm/min). KerfDesk clamps to the nearest endpoint offset; add measured rows covering these emitted speeds or select one-way scanning.`,
+    `Bidirectional scan output at ${formatFeedList(uncovered)} is outside the saved scan-offset table (${min}–${max} mm/min). Below the first sample, correction scales from zero; above the last sample, it stays at the last offset. Add measured rows covering these emitted speeds or select one-way scanning.`,
   );
 }
 
@@ -95,7 +96,7 @@ function tableDrivenBidirectionalScanFeed(group: Job['groups'][number]): number 
       group.bidirectionalScanOffsetMm === undefined &&
       group.pixelWidth > 0 &&
       group.pixelHeight > 0
-      ? Math.round(group.speed)
+      ? effectiveGcodeFeedMmPerMin(group.speed)
       : null;
   }
   if (
@@ -105,7 +106,7 @@ function tableDrivenBidirectionalScanFeed(group: Job['groups'][number]): number 
     group.bidirectionalScanOffsetMm === undefined &&
     group.segments.length > 0
   ) {
-    return Math.round(group.speed);
+    return effectiveGcodeFeedMmPerMin(group.speed);
   }
   return null;
 }

@@ -39,6 +39,7 @@ import {
 } from '../../core/trace';
 import { hasAggressivePreprocessing, relaxAggressivePreprocessing } from './trace-options';
 import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
+import type { TraceNotice } from './trace-notices';
 
 export type TraceResult = {
   readonly paths: ColoredPath[];
@@ -49,6 +50,7 @@ export type TraceResult = {
   // original imported raster.
   readonly width: number;
   readonly height: number;
+  readonly notices?: ReadonlyArray<TraceNotice>;
 };
 
 export class TraceRequestSupersededError extends Error {
@@ -315,10 +317,9 @@ export async function traceImageWithFallback(
   const first = await traceImage(image, options);
   if (first.paths.length > 0) return first;
   if (!hasAggressivePreprocessing(options)) return first;
-  // The first pass found nothing AND the preset stacks at least one
-  // aggressive lever (Otsu / fixedPalette / despeckle). Drop those
-  // three and trace again. If the relaxed pass also finds nothing,
-  // we return its result; the input genuinely lacks contrast and the
-  // caller's UI should communicate that.
-  return traceImage(image, relaxAggressivePreprocessing(options));
+  // Keep the same palette/backend and disclose that Otsu, ink despeckle,
+  // and short-path filtering were relaxed. Preview and commit carry this
+  // result together so recovered artwork never masquerades as the first pass.
+  const retried = await traceImage(image, relaxAggressivePreprocessing(options));
+  return { ...retried, notices: ['relaxed-settings'] };
 }

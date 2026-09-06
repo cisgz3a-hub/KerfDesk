@@ -215,7 +215,10 @@ function buildOutputDiagnostics(
               : ('matches-contract' as const),
         reference: diff.desired,
         referenceLabel: 'Active profile output contract',
-        note: 'This controller value is checked against the active profile output contract used by generated jobs.',
+        note:
+          id === 31
+            ? 'Saved reference for the minimum S value used by the controller PWM mapping. Generated job S values scale with $30; they are not clamped to this $31 value.'
+            : 'Compare the live controller value with the saved profile output settings. Profile edits do not write firmware settings.',
       },
     ];
   });

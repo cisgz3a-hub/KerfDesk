@@ -37,6 +37,7 @@ describe('mergeLightBurnTraceSettings', () => {
       cutoffLuma: 12,
       thresholdLuma: 160,
       ignoreLessThanPixels: 7,
+      despeckleMinPixels: 11,
       smoothness: 0.4,
       optimize: 0.6,
       traceTransparency: true,
@@ -46,7 +47,7 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.cutoffLuma).toBe(12);
     expect(merged.thresholdLuma).toBe(160);
     expect(merged.ignoreLessThanPixels).toBe(7);
-    expect(merged.despeckleMinPixels).toBe(7);
+    expect(merged.despeckleMinPixels).toBe(11);
     expect(merged.smoothness).toBe(0.4);
     expect(merged.optimize).toBe(0.6);
     expect(merged.traceTransparency).toBe(true);

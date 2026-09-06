@@ -148,6 +148,7 @@ describe('commit source revalidation (P2-A)', () => {
       bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
       width: 2,
       height: 2,
+      notices: ['relaxed-settings'] as const,
     };
 
     await commit(
@@ -169,6 +170,9 @@ describe('commit source revalidation (P2-A)', () => {
     expect(loadImageAsRawData).not.toHaveBeenCalled();
     expect(traceImageWithFallback).not.toHaveBeenCalled();
     expect(ctx.traceExistingImage).toHaveBeenCalledTimes(1);
+    expect(ctx.pushToast.mock.lastCall?.[0]).toContain(
+      'Automatic retry used relaxed trace settings',
+    );
   });
 
   it('retraces instead of reusing a preview whose options no longer match', async () => {

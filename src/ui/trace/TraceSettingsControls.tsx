@@ -5,8 +5,10 @@ import {
   DEFAULT_EDGE_SENSITIVITY,
   edgeDetailFromOptions,
   edgeSensitivityFromOptions,
+  mergeLightBurnTraceSettings,
   type LightBurnTraceSettingOverrides,
 } from './trace-options';
+import { TraceDetectionControls } from './TraceDetectionControls';
 
 type TraceSettingsControlsProps = {
   readonly preset: TraceOptions;
@@ -77,57 +79,87 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
   const alphaMaskChecking = props.sourceHasTransparency === undefined;
   const alphaMaskUnavailable = props.sourceHasTransparency === false;
   const alphaMaskDisabled = alphaMaskChecking || alphaMaskUnavailable;
+  const alphaMask =
+    !alphaMaskDisabled && traceBooleanValue(props.preset, props.overrides, 'traceTransparency');
   return (
     <fieldset style={fieldsetStyle}>
       <legend style={legendStyle}>Trace settings</legend>
+      <TraceDetectionControls {...props} alphaMask={alphaMask}>
+        <BrightnessBandControls {...props} />
+      </TraceDetectionControls>
+      <TraceAreaControls {...props} />
+      {props.preset.traceMode !== 'centerline' ? <ContourGeometryControls {...props} /> : null}
+      <CheckboxRow
+        label="Trace alpha mask"
+        checked={alphaMask}
+        disabled={alphaMaskDisabled}
+        onChange={(traceTransparency) => set({ traceTransparency })}
+      />
+      {alphaMaskChecking ? <AlphaMaskCheckingNote /> : null}
+      {alphaMaskUnavailable ? <AlphaMaskUnavailableNote /> : null}
+      <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
+    </fieldset>
+  );
+}
+
+function BrightnessBandControls(props: TraceSettingsControlsProps): JSX.Element {
+  const options = mergeLightBurnTraceSettings(props.preset, props.overrides);
+  const cutoffLuma = options.cutoffLuma ?? 0;
+  const thresholdLuma = options.thresholdLuma ?? 128;
+  const set = (patch: LightBurnTraceSettingOverrides): void =>
+    props.onChange({
+      ...props.overrides,
+      detectionMode: 'manual',
+      cutoffLuma,
+      thresholdLuma,
+      ...patch,
+    });
+  return (
+    <>
       <NumberRow
         label="Cutoff"
         min={0}
         max={255}
         step={1}
-        value={traceValue(props.preset, props.overrides, 'cutoffLuma')}
-        onChange={(cutoffLuma) => set({ cutoffLuma })}
+        value={cutoffLuma}
+        onChange={(next) => set({ cutoffLuma: next })}
       />
       <NumberRow
         label="Threshold"
         min={0}
         max={255}
         step={1}
-        value={traceValue(props.preset, props.overrides, 'thresholdLuma')}
-        onChange={(thresholdLuma) => set({ thresholdLuma })}
+        value={thresholdLuma}
+        onChange={(next) => set({ thresholdLuma: next })}
       />
+    </>
+  );
+}
+
+function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
+  const set = (patch: LightBurnTraceSettingOverrides): void =>
+    props.onChange({ ...props.overrides, ...patch });
+  return (
+    <>
       <NumberRow
-        label="Ignore Less Than"
+        label="Remove ink specks"
         min={0}
         max={10000}
         step={1}
-        value={traceValue(props.preset, props.overrides, 'ignoreLessThanPixels')}
-        onChange={(ignoreLessThanPixels) => set({ ignoreLessThanPixels })}
+        value={props.overrides.despeckleMinPixels ?? props.preset.despeckleMinPixels ?? 0}
+        onChange={(despeckleMinPixels) => set({ despeckleMinPixels })}
       />
-      {props.preset.traceMode !== 'centerline' ? <ContourGeometryControls {...props} /> : null}
-      <CheckboxRow
-        label="Trace alpha mask"
-        checked={
-          alphaMaskDisabled
-            ? false
-            : traceBooleanValue(props.preset, props.overrides, 'traceTransparency')
-        }
-        disabled={alphaMaskDisabled}
-        onChange={(traceTransparency) => set({ traceTransparency })}
-      />
-      {alphaMaskChecking ? <AlphaMaskCheckingNote /> : null}
-      {alphaMaskUnavailable ? <AlphaMaskUnavailableNote /> : null}
-      {props.preset.autoSketchTrace === true ? (
-        <AutoSketchTraceNote />
-      ) : (
-        <CheckboxRow
-          label="Force Sketch Trace"
-          checked={traceBooleanValue(props.preset, props.overrides, 'sketchTrace')}
-          onChange={(sketchTrace) => set({ sketchTrace })}
+      {props.preset.traceMode !== 'centerline' ? (
+        <NumberRow
+          label="Ignore Less Than"
+          min={0}
+          max={10000}
+          step={1}
+          value={props.overrides.ignoreLessThanPixels ?? props.preset.ignoreLessThanPixels ?? 0}
+          onChange={(ignoreLessThanPixels) => set({ ignoreLessThanPixels })}
         />
-      )}
-      <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
-    </fieldset>
+      ) : null}
+    </>
   );
 }
 
@@ -159,12 +191,9 @@ function ContourGeometryControls(props: TraceSettingsControlsProps): JSX.Element
 
 type NumericTraceSettingKey = Extract<
   keyof LightBurnTraceSettingOverrides,
-  'cutoffLuma' | 'thresholdLuma' | 'ignoreLessThanPixels' | 'smoothness' | 'optimize'
+  'smoothness' | 'optimize'
 >;
-type BooleanTraceSettingKey = Extract<
-  keyof LightBurnTraceSettingOverrides,
-  'traceTransparency' | 'sketchTrace'
->;
+type BooleanTraceSettingKey = Extract<keyof LightBurnTraceSettingOverrides, 'traceTransparency'>;
 
 function traceValue(
   preset: TraceOptions,
@@ -173,13 +202,6 @@ function traceValue(
 ): number {
   const override = overrides[key];
   if (override !== undefined) return override;
-  if (key === 'ignoreLessThanPixels') {
-    return (
-      preset.ignoreLessThanPixels ??
-      preset.despeckleMinPixels ??
-      DEFAULT_LIGHTBURN_TRACE_SETTINGS.ignoreLessThanPixels
-    );
-  }
   const presetValue = preset[key];
   return presetValue ?? DEFAULT_LIGHTBURN_TRACE_SETTINGS[key];
 }
@@ -213,19 +235,11 @@ function ResetTraceSettingsButton(props: {
   );
 }
 
-function AutoSketchTraceNote(): JSX.Element {
-  return (
-    <p style={autoSketchNoteStyle}>
-      Line Art automatically preserves pale logo details. Use Centerline for one-stroke drawings.
-    </p>
-  );
-}
-
 function EdgeTraceModeNote(): JSX.Element {
   return (
     <p style={edgeTraceNoteStyle}>
-      Traces brightness edges as single vector lines — best for full-colour art or logos that should
-      engrave as a line drawing of their edges.
+      Traces local contrast as closed outlines around the artwork. Use Centerline for a single path
+      down the middle of a stroke.
     </p>
   );
 }
@@ -300,7 +314,9 @@ function traceNumberTitle(label: string): string {
     case 'Threshold':
       return 'Brightness split used to separate artwork from background.';
     case 'Ignore Less Than':
-      return 'Discard traced specks smaller than this pixel area.';
+      return 'Discard closed contours and holes smaller than this source-image pixel area. Zero keeps all areas.';
+    case 'Remove ink specks':
+      return 'Remove connected ink regions smaller than this source-image pixel area; holes are preserved. Zero disables this filter.';
     case 'Smoothness':
       return 'Smooth traced edges to reduce jagged vector paths.';
     case 'Optimize':
@@ -310,7 +326,7 @@ function traceNumberTitle(label: string): string {
     case 'Detail':
       return 'Higher values preserve more fine edge detail; lower values smooth noise.';
     case 'Minimum line':
-      return 'Discard edge paths shorter than this many source-image pixels.';
+      return 'Discard closed edge outlines whose perimeter is shorter than this many source-image pixels.';
     default:
       return `Trace ${label.toLowerCase()} setting.`;
   }
@@ -320,8 +336,6 @@ function traceCheckboxTitle(label: string): string {
   switch (label) {
     case 'Trace alpha mask':
       return 'Only changes images with transparent pixels; opaque images trace the same.';
-    case 'Force Sketch Trace':
-      return 'Force local-contrast tracing. Line Art can also auto-use this for pale logo details.';
     default:
       return `Toggle ${label.toLowerCase()} for tracing.`;
   }
@@ -364,12 +378,6 @@ const checkboxRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
-  fontSize: 12,
-  color: 'var(--lf-text-muted)',
-};
-const autoSketchNoteStyle: React.CSSProperties = {
-  gridColumn: '1 / -1',
-  margin: 0,
   fontSize: 12,
   color: 'var(--lf-text-muted)',
 };

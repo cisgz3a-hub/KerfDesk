@@ -112,7 +112,7 @@ function ExpertOverrideField(props: { readonly enabled: boolean }): JSX.Element 
         type="checkbox"
         className="lf-checkbox"
         defaultChecked={props.enabled}
-        title="Allow bidirectional scanning without a verified scan-offset calibration. This can double or blur edges on profiles that require calibration."
+        title="Allow uncalibrated bidirectional scanning, which can double or blur edges. Profiles requiring verified offsets still use one-way scanning while a saved table is marked pending."
       />
     </Field>
   );

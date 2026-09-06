@@ -36,6 +36,16 @@ type LaserMotionOperationCommon = {
    * own late transport/status evidence, but it can never dispatch another leg
    * or mint a Start permit. */
   readonly cancelRequested?: boolean;
+  /** Identifies the current asynchronous Cancel attempt. A later attempt or
+   * MPG recovery must not inherit its pending continuations. */
+  readonly cancelAttemptId?: symbol;
+  /** The pendant interrupted the host's Jog lifecycle. Recovery resumes only
+   * planner settlement after explicit MPG release, never the original move. */
+  readonly interruptedByMpg?: boolean;
+  /** Permanent invalidation of the original action's motion continuations.
+   * Each takeover replaces this token, while the ack owner survives only to
+   * drain old motion. Stale failure cleanup cannot cancel a later recovery. */
+  readonly mpgInterruptionId?: symbol;
   /** Status sequence captured after cancel transport, the old motion queue,
    * and an ack-owned planner-settlement marker all complete, immediately
    * before a new status query. Only a later Idle may release the owner. */
@@ -79,6 +89,35 @@ export function markMotionOperationDispatched(
     return operation;
   }
   return { ...operation, dispatchComplete: true };
+}
+
+export function resumeJogSettlementAfterMpg(
+  operation: LaserMotionOperation | null,
+  mpgReleased: boolean,
+  settlementLine: string,
+): LaserMotionOperation | null {
+  if (!mpgReleased || operation?.kind !== 'jog' || operation.interruptedByMpg !== true) {
+    return operation;
+  }
+  // Retain the old transport/ack owner until its writes drain. The next Idle
+  // then dispatches only a new planner marker; its exact ack and a later Idle
+  // remain necessary even if a pre-takeover marker had already acknowledged.
+  return {
+    ...startMotionOperation(
+      'jog',
+      [settlementLine],
+      undefined,
+      0,
+      operation.pendingMotionTransportWrites ?? 0,
+      operation.operationId,
+      settlementLine,
+    ),
+    dispatchComplete: true,
+    sawControllerBusy: true,
+    ...(operation.mpgInterruptionId === undefined
+      ? {}
+      : { mpgInterruptionId: operation.mpgInterruptionId }),
+  };
 }
 
 export function observeMotionStatus(
@@ -221,9 +260,13 @@ export function takeNextMotionLine(
       ? line === operation.settlementLine
       : false;
   return {
-    operation: dispatchesSettlement
-      ? { ...nextOperation, awaitingSettlementAck: true }
-      : nextOperation,
+    operation: {
+      ...nextOperation,
+      ...(operation.mpgInterruptionId === undefined
+        ? {}
+        : { mpgInterruptionId: operation.mpgInterruptionId }),
+      ...(dispatchesSettlement ? { awaitingSettlementAck: true } : {}),
+    },
     line,
   };
 }

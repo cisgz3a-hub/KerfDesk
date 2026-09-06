@@ -119,7 +119,9 @@ async function probeControllerStatus(
   context: SettlementContext,
   probe: ControllerStatusProbe,
 ): Promise<StatusReport> {
+  assertOwnedMotion(context.get, context.operationId, context.label);
   const beforeQuery = context.get();
+  const alreadyWaiting = context.refs.controllerStatusWait != null;
   const confirmation = waitForFreshControllerStatus(context.refs, {
     after: {
       sessionEpoch: beforeQuery.controllerSessionEpoch,
@@ -129,17 +131,21 @@ async function probeControllerStatus(
     ...(probe.timeoutMs === undefined ? {} : { timeoutMs: probe.timeoutMs }),
     timeoutMessage: probe.timeoutMessage,
   });
+  const ownedWait = alreadyWaiting ? null : context.refs.controllerStatusWait;
   try {
     const [, report] = await Promise.all([
       context.safeWrite(probe.statusQuery, undefined, 'poll'),
       confirmation,
     ]);
+    assertOwnedMotion(context.get, context.operationId, context.label);
     return report;
   } catch (error) {
-    cancelFreshControllerStatusWait(
-      context.refs,
-      `${context.label} status confirmation was cancelled.`,
-    );
+    if (ownedWait != null && context.refs.controllerStatusWait === ownedWait) {
+      cancelFreshControllerStatusWait(
+        context.refs,
+        `${context.label} status confirmation was cancelled.`,
+      );
+    }
     throw error;
   }
 }
@@ -159,7 +165,12 @@ function assertOwnedMotion(
   label: string,
 ): void {
   const operation = get().motionOperation;
-  if (operation?.operationId === operationId && operation.cancelRequested !== true) return;
+  if (
+    operation?.operationId === operationId &&
+    operation.cancelRequested !== true &&
+    operation.mpgInterruptionId === undefined
+  )
+    return;
   throw new Error(`${label} was cancelled or replaced before it physically settled.`);
 }
 

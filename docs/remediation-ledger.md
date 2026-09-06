@@ -5,8 +5,13 @@ Current Grok pipelines/TIME5 audit owner, 2026-09-06:
 Scope: calibrated job clocks, emitted seek/dwell timing, CNC timing categories, duration display,
 and dependency/release evidence integrity. Source proofs, all 20 adjudications, and validation:
 [`audits/2026-09-06-grok-ci-time5.md`](audits/2026-09-06-grok-ci-time5.md).
-This local pack is separate from `codex/grok-reviewed-fixes-20260906`; neither a local commit nor
-the evidence scripts establish publication. Johann owns merging. No Start-policy or hardware change.
+PR #755 follows the earlier Grok pack in PR #752. PR/check/merge records establish publication;
+the evidence scripts do not. No Start-policy or hardware change.
+
+Current selected Grok-audit fixes, 2026-09-06: `codex/grok-reviewed-fixes-20260906`, based on main
+`5918ef53fd91f6b33a4cd0766f2a3b7ba6991acc`. Scope, reproduced failures, verification, and limitations:
+[`audits/2026-09-06-grok-reviewed-fixes.md`](audits/2026-09-06-grok-reviewed-fixes.md).
+PR/check records establish publication; this record does not assert a merge, deployment, or hardware result.
 
 Current CNC spindle-review correction owner, 2026-09-06:
 `codex/cnc-review-spindle-facts-20260906`, based on main `5918ef53fd91f6b33a4cd0766f2a3b7ba6991acc`.

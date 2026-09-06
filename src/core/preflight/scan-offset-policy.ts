@@ -7,7 +7,7 @@ import type { PreflightIssue } from './preflight';
 import { operationOverrideForObject } from '../effective-output';
 
 type ScanOffsetIssueOptions = {
-  /** Pre-compile callers use this to reject only values no emitter can encode. */
+  /** Pre-compile callers report invalid overrides that normalization will ignore. */
   readonly nonFiniteOnly?: boolean;
 };
 
@@ -50,7 +50,7 @@ function scanOffsetIssue(
   if (!Number.isFinite(offset)) {
     return {
       code: 'scan-offset-out-of-range',
-      message: `${owner} bidirectional scan offset ${String(offset)} mm must be finite.`,
+      message: `${owner} bidirectional scan offset ${String(offset)} mm is not finite and will be ignored. Output inheriting this invalid value uses the device table for bidirectional compensation, or 0 mm when no table is saved.`,
     };
   }
   if (options.nonFiniteOnly === true || isScanOffsetMagnitudeForProfile(offset, project.device)) {
@@ -59,7 +59,7 @@ function scanOffsetIssue(
   const limit = scanOffsetMagnitudeLimitMm(project.device);
   // Distinct advisory code (rule 7): a finite over-cap magnitude is a
   // heuristic finding — it must warn (Job Review, post-save toast), never
-  // block. Only the non-finite case above is a hard validity failure.
+  // block. Non-finite overrides above are also advisory and normalize to absent.
   return {
     code: 'scan-offset-above-cap',
     message: `${owner} bidirectional scan offset ${String(offset)} mm exceeds the device limit of ±${limit} mm.`,

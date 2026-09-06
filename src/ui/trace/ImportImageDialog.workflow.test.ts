@@ -194,9 +194,10 @@ describe('Trace Image workflow controls', () => {
       const text = host.textContent ?? '';
       for (const label of [
         'Trace settings',
-        'Cutoff',
-        'Threshold',
+        'Detection',
+        'Automatic (preserve pale details)',
         'Ignore Less Than',
+        'Remove ink specks',
         'Smoothness',
         'Optimize',
         'Trace alpha mask',
@@ -216,6 +217,7 @@ describe('Trace Image workflow controls', () => {
       ]) {
         expect(text).not.toContain(label);
       }
+      expect(host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
     });
   });
 
@@ -275,8 +277,10 @@ describe('Trace Image workflow controls', () => {
     await withTraceDialog(async (host) => {
       await changePreset(presetSelect(host), 'Centerline');
       const text = host.textContent ?? '';
-      expect(text).toContain('Threshold');
-      expect(text).toContain('Ignore Less Than');
+      expect(text).toContain('Automatic threshold (Otsu)');
+      expect(text).toContain('Remove ink specks');
+      expect(host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
+      expect(text).not.toContain('Ignore Less Than');
       expect(text).not.toContain('Smoothness');
       expect(text).not.toContain('Optimize');
     });
