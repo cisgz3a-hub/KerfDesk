@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CameraAlignment, CameraCalibration } from '../../core/camera';
 import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
+import { LASER_MACHINE_CONFIG } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -54,6 +55,25 @@ describe('machine profile store actions', () => {
       name: 'Homing laser',
       homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
     });
+
+    expect(useStore.getState().jobPlacement).toEqual({
+      startFrom: 'absolute',
+      anchor: 'center',
+    });
+  });
+
+  it('restores Absolute Coordinates when a homing-capable machine setup is saved', () => {
+    useStore.setState({
+      jobPlacement: { startFrom: 'current-position', anchor: 'center' },
+    });
+
+    useStore.getState().replaceMachineSetup(
+      {
+        ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+        homing: { ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.homing, enabled: true },
+      },
+      LASER_MACHINE_CONFIG,
+    );
 
     expect(useStore.getState().jobPlacement).toEqual({
       startFrom: 'absolute',
