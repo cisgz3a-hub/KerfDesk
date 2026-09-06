@@ -34,7 +34,7 @@ export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
   const passLimit = offsetPassLimit(source, spacing);
   for (let pass = 0; current.contours.length > 0 && pass < passLimit; pass += 1) {
     out.push(...current.contours);
-    current = offsetBy(current.contours, -spacing);
+    current = offsetBy(source, -(spacing / 2 + (pass + 1) * spacing));
   }
   // A failure can happen on the lookahead after the final emitted contour, so
   // it takes precedence over the budget check. A still-populated lookahead
