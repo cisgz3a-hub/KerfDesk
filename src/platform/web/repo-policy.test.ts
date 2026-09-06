@@ -9,31 +9,28 @@ function repoFile(path: string): string {
 
 describe('repository policy enforcement contract', () => {
   it('does not document a nonexistent per-file test-coverage lint rule', () => {
-    const manual = repoFile('CLAUDE.md');
-
-    expect(manual).not.toContain('require-test-coverage');
-    expect(manual).toContain('CI does not enforce a direct sibling-test rule');
+    for (const path of ['AGENTS.md', 'CLAUDE.md']) {
+      expect(repoFile(path)).not.toContain('require-test-coverage');
+    }
   });
 
-  it('keeps the written file-size rule aligned with ESLint line counting', () => {
-    const manual = repoFile('CLAUDE.md');
+  it('enforces counted code lines separately from the raw-line backstop', () => {
     const eslintConfig = repoFile('eslint.config.mjs');
+    const rawLineGate = repoFile('scripts/check-file-size-policy.mjs');
 
-    expect(manual).toContain('excluding blank and comment lines');
-    expect(manual).toContain('600 raw physical lines');
+    expect(eslintConfig).toContain('const FILE_LINE_LIMIT = 400');
+    expect(eslintConfig).toContain("'max-lines': ['error', { max: FILE_LINE_LIMIT");
     expect(eslintConfig).toContain('skipBlankLines: true');
     expect(eslintConfig).toContain('skipComments: true');
+    expect(rawLineGate).toContain('const MAX_RAW_LINES = 600');
+    expect(rawLineGate).toContain('const TEST_MAX_RAW_LINES = 900');
   });
 
-  // H14 (AUDIT-2026-06-10): CLAUDE.md documented `import/no-cycle: error`
-  // years of commits before the rule existed, and the test script's
-  // --passWithNoTests was the opposite of the documented gate. Pin both so
-  // the manual and the config cannot drift apart again silently.
-  it('actually enforces the documented no-circular-imports rule', () => {
-    const manual = repoFile('CLAUDE.md');
+  // H14 (AUDIT-2026-06-10): the documented circular-import and test-discovery
+  // gates were not configured. Pin enforcement independently of agent guidance.
+  it('enforces the no-circular-imports rule', () => {
     const eslintConfig = repoFile('eslint.config.mjs');
 
-    expect(manual).toContain('import/no-cycle');
     expect(eslintConfig).toContain("'import/no-cycle': 'error'");
   });
 
@@ -115,7 +112,6 @@ describe('repository policy enforcement contract', () => {
     expect(packageJson.scripts?.['release:check']).toContain('pnpm check:index-exports');
     expect(gate).toContain('scripts/index-export-baseline.json');
     expect(gate).toContain('process.exit(1)');
-    expect(repoFile('CLAUDE.md')).toContain('CI-ratcheted');
   });
 
   it('runs Chrome E2E in a dedicated workflow outside release and deploy gates', () => {
