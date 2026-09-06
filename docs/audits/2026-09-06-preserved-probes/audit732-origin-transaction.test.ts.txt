@@ -1,0 +1,185 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+  consumeControllerCommandResponse,
+  type ControllerLifecycleRefs,
+} from './laser-interactive-command';
+import { runOriginTransaction } from './laser-origin-transaction';
+import { useLaserStore, type LaserState } from './laser-store';
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+
+function harness() {
+  let state: LaserState = {
+    ...useLaserStore.getInitialState(),
+    connection: { kind: 'connected' },
+    controllerSessionEpoch: 1,
+    workOriginVersion: 1,
+    log: [],
+  };
+  const refs: ControllerLifecycleRefs = {
+    controllerCommand: null,
+    controllerIdleWait: null,
+    writeEpoch: 1,
+  };
+  const set = (
+    patch: Partial<LaserState> | ((current: LaserState) => Partial<LaserState> | LaserState),
+  ) => {
+    state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) };
+  };
+  const write = vi.fn(async () => {
+    queueMicrotask(() => consumeControllerCommandResponse(refs, { kind: 'ok' }, 'ok'));
+  });
+  return { get: () => state, set, refs, write };
+}
+
+const originPatch: Partial<LaserState> = {
+  workOriginActive: true,
+  workOriginSource: 'g92',
+  positionEvidenceSuppressed: false,
+  wcoCache: { x: 12, y: 34, z: 0 },
+};
+
+describe('origin transaction completion ownership', () => {
+  for (const boundary of [
+    'session',
+    'write epoch',
+    'connection',
+    'replacement operation',
+  ] as const) {
+    for (const completion of ['success', 'failure'] as const) {
+      it(`preserves the new owner after ${boundary} changes during post-ACK ${completion}`, async () => {
+        const h = harness();
+        const entered = deferred<undefined>();
+        const patch = deferred<Partial<LaserState>>();
+        const pending = runOriginTransaction(
+          h.set,
+          h.get,
+          h.refs,
+          h.write,
+          'Set work origin',
+          async (write) => write('G54 G92 X0 Y0\n'),
+          () => {
+            entered.resolve(undefined);
+            return patch.promise;
+          },
+          { changesXyOrigin: true, reestablishesPositionEvidence: true },
+        ).catch((error: unknown) => error);
+        await entered.promise;
+        expect(h.refs.controllerCommand).toBeNull();
+        if (boundary === 'session') h.set({ controllerSessionEpoch: 2 });
+        if (boundary === 'write epoch') h.refs.writeEpoch = 2;
+        if (boundary === 'connection') h.set({ connection: { kind: 'disconnected' } });
+        if (boundary === 'replacement operation')
+          h.set({
+            controllerOperation: {
+              kind: 'interactive-command',
+              phase: 'command',
+              label: 'New owner',
+            },
+          });
+        h.set({
+          lastWriteError: 'New owner error',
+          log: ['New owner log'],
+          positionEvidenceSuppressed: true,
+        });
+        const newer = h.get();
+        if (completion === 'success') patch.resolve(originPatch);
+        else patch.reject(new Error('Old WCO failure'));
+        expect(await pending).toBeInstanceOf(Error);
+        expect(h.get()).toEqual(newer);
+      });
+    }
+  }
+
+  it('commits normal same-owner success only after the post-ACK patch resolves', async () => {
+    const h = harness();
+    const entered = deferred<undefined>();
+    const patch = deferred<Partial<LaserState>>();
+    const pending = runOriginTransaction(
+      h.set,
+      h.get,
+      h.refs,
+      h.write,
+      'Set work origin',
+      async (write) => write('G54 G92 X0 Y0\n'),
+      () => {
+        entered.resolve(undefined);
+        return patch.promise;
+      },
+      { changesXyOrigin: true },
+    );
+    await entered.promise;
+    expect(h.get().workOriginActive).toBe(false);
+    expect(h.get().controllerOperation).not.toBeNull();
+    patch.resolve(originPatch);
+    await pending;
+    expect(h.get()).toMatchObject({
+      ...originPatch,
+      workOriginVersion: 2,
+      controllerOperation: null,
+      lastWriteError: null,
+    });
+    expect(h.get().log).toEqual(['[lf2] Set work origin acknowledged by the controller.']);
+  });
+
+  it('keeps same-owner failures visible and invalidates their uncertain origin', async () => {
+    const h = harness();
+    await expect(
+      runOriginTransaction(
+        h.set,
+        h.get,
+        h.refs,
+        h.write,
+        'Set work origin',
+        async (write) => write('G54 G92 X0 Y0\n'),
+        async () => {
+          throw new Error('WCO failure');
+        },
+        { changesXyOrigin: true },
+      ),
+    ).rejects.toThrow('WCO failure');
+    expect(h.get()).toMatchObject({
+      workOriginSource: 'unknown',
+      positionEvidenceSuppressed: true,
+      workOriginVersion: 2,
+      controllerOperation: null,
+      lastWriteError: 'WCO failure',
+    });
+  });
+
+  it('does not write a second origin command or evaluate its patch after losing the first command owner', async () => {
+    const h = harness();
+    const patch = vi.fn(() => originPatch);
+    const write = vi.fn(async () => {
+      consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok');
+      h.refs.writeEpoch = 2;
+      h.set({ controllerOperation: null, lastWriteError: 'Reset' });
+    });
+    await expect(
+      runOriginTransaction(
+        h.set,
+        h.get,
+        h.refs,
+        write,
+        'Reset work origin',
+        async (send) => {
+          await send('G54 G92.1\n');
+          await send('G10 L20 P1 X0 Y0\n');
+        },
+        patch,
+      ),
+    ).rejects.toThrow(/cancelled by a controller session change/i);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(patch).not.toHaveBeenCalled();
+    expect(h.get().lastWriteError).toBe('Reset');
+    expect(h.get().log).toEqual([]);
+  });
+});

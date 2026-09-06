@@ -1,0 +1,112 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createProject } from '../../core/scene';
+import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
+import { useStore } from './store';
+
+function makeConnection() {
+  const handlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of handlers) handler(line);
+  };
+  const writes: string[] = [];
+  const connection: SerialConnection = {
+    write: async (line) => {
+      writes.push(line);
+      respondToTestGrblHandshake(line, emit);
+      if (line === '\x18') queueMicrotask(() => emit('Grbl 1.1f'));
+    },
+    onLine: (handler) => {
+      handlers.add(handler);
+      return () => handlers.delete(handler);
+    },
+    onClose: () => () => undefined,
+    close: async () => undefined,
+  };
+  const adapter: PlatformAdapter = {
+    id: 'mock',
+    pickFilesForOpen: async () => [],
+    pickFileForSave: async () => null,
+    serial: {
+      isSupported: () => true,
+      requestPort: async () => ({ open: async () => connection }),
+    },
+  };
+  return { adapter, emit, writes };
+}
+
+async function flush(): Promise<void> {
+  for (let i = 0; i < 40; i += 1) await Promise.resolve();
+}
+
+beforeEach(() => {
+  useStore.setState({ project: createProject() });
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+});
+
+afterEach(async () => {
+  vi.useRealTimers();
+  await useLaserStore.getState().disconnect();
+  useLaserStore.setState(useLaserStore.getInitialState());
+  vi.restoreAllMocks();
+});
+
+describe('Set Origin waiting for WCO retains its controller owner', () => {
+  for (const boundary of ['reset', 'disconnect', 'replacement operation'] as const) {
+    it(`cancels the WCO wait after ${boundary} without restoring the old origin or logging success`, async () => {
+      const connection = makeConnection();
+      await useLaserStore.getState().connect(connection.adapter);
+      connection.emit('Grbl 1.1f');
+      connection.emit('<Idle|MPos:12,34,0|FS:0,0>');
+      await flush();
+      connection.emit('ok');
+      connection.emit('<Idle|MPos:12,34,0|FS:0,0>');
+      await settleTestGrblHandshake();
+      vi.useFakeTimers();
+      const pending = useLaserStore
+        .getState()
+        .setOriginHere()
+        .catch((error: unknown) => error);
+      await flush();
+      connection.emit('<Idle|MPos:12,34,0|FS:0,0>');
+      await flush();
+      expect(connection.writes).toContain('G54 G92 X0 Y0\n');
+      connection.emit('ok');
+      await flush();
+      expect(useLaserStore.getState().controllerOperation).toMatchObject({
+        label: 'Set work origin',
+      });
+      expect(useLaserStore.getState().wcoCache).toBeNull();
+      if (boundary === 'reset') connection.emit('Grbl 1.1f');
+      if (boundary === 'disconnect') await useLaserStore.getState().disconnect();
+      if (boundary === 'replacement operation')
+        useLaserStore.setState({
+          controllerOperation: {
+            kind: 'interactive-command',
+            phase: 'command',
+            label: 'Replacement',
+          },
+        });
+      await flush();
+      useLaserStore.setState({
+        lastWriteError: 'New owner error',
+        positionEvidenceSuppressed: true,
+      });
+      const newer = useLaserStore.getState();
+      await vi.advanceTimersByTimeAsync(100);
+      const result = await pending;
+      expect(result).toBeInstanceOf(Error);
+      expect(useLaserStore.getState()).toMatchObject({
+        workOriginActive: newer.workOriginActive,
+        workOriginSource: newer.workOriginSource,
+        workOriginVersion: newer.workOriginVersion,
+        positionEvidenceSuppressed: true,
+        lastWriteError: 'New owner error',
+        controllerOperation: newer.controllerOperation,
+      });
+      expect(useLaserStore.getState().log.join('\n')).not.toContain('Set work origin acknowledged');
+      expect(useLaserStore.getState().log.join('\n')).not.toContain('Origin set, but');
+    });
+  }
+});

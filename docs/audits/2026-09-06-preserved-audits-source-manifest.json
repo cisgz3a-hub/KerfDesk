@@ -149,5 +149,19 @@
     "sha256": "DC791BA3CD66F24BDB1F84F1A1CE7FC7B7D9086E6B23A67E1B67A7E6749EB6D9",
     "sourceWorktree": "C:/Users/Asus/LaserForge-2.0/.claude/worktrees/laser-burn-quality-audit-116661",
     "sourceHead": "bd76af4b14ecc819a8414740785ce5b0bff6a89f"
+  },
+  {
+    "originalPath": "src/ui/state/audit732-origin-transaction.test.ts",
+    "publishedPath": "docs/audits/2026-09-06-preserved-probes/audit732-origin-transaction.test.ts.txt",
+    "sha256": "8130AA6CA8AFFE0A4D9C588F1096E22446E958EA1D57D4196A8331A17268AA47",
+    "sourceWorktree": "C:/Users/Asus/.codex/worktrees/next200-origin-pr732-review",
+    "sourceHead": "c7c9c216092440580c5186d36f3fa55df4acc8db"
+  },
+  {
+    "originalPath": "src/ui/state/audit732-store-origin-ownership.test.ts",
+    "publishedPath": "docs/audits/2026-09-06-preserved-probes/audit732-store-origin-ownership.test.ts.txt",
+    "sha256": "3FF4114477DF562F0DAB10095E83F2FE47B43EEDA7557F20A7BEC26CAE4F0F36",
+    "sourceWorktree": "C:/Users/Asus/.codex/worktrees/next200-origin-pr732-review",
+    "sourceHead": "c7c9c216092440580c5186d36f3fa55df4acc8db"
   }
 ]
