@@ -9,6 +9,11 @@
 // preview shows what burns, not what is merely visible.
 
 import type { DeviceProfile } from '../../core/devices';
+import { layerWithObjectOverride } from '../../core/job/compile-job-object-policy';
+import {
+  effectiveObjectMinPowerPercent,
+  effectiveObjectPowerPercent,
+} from '../../core/job/object-power-scale';
 import {
   outputOperationLayers,
   sceneObjectUsesOperation,
@@ -50,6 +55,13 @@ type PendingPreviewBuild = {
   readonly cancel: () => void;
 };
 
+type RasterPreviewRequest = {
+  readonly obj: RasterImage;
+  readonly layer: Layer;
+  readonly maskObject: SceneObject | null;
+  readonly key: string;
+};
+
 // In-flight builds are keyed by scene-object id like the canvas cache: a moved
 // raster is a new object running the same build, and cancelling it would abort
 // and restart its paged-asset hydration on every frame of the drag.
@@ -61,48 +73,44 @@ export function drawRasterPreview(
   view: ViewTransform,
   options: DrawRasterPreviewOptions = {},
 ): void {
-  const liveRasterIds = livePreviewRasterIds(project);
+  const requests = rasterPreviewRequests(project);
+  const liveRasterIds = new Set(requests.map(({ obj }) => obj.id));
   retainPreviewCanvases(liveRasterIds);
-  pruneRasterPreviewBuilds(liveRasterIds);
-  for (const layer of project.scene.layers) {
-    for (const operationLayer of outputOperationLayers(layer)) {
-      if (operationLayer.mode !== 'image') continue;
-      for (const obj of project.scene.objects) {
-        if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, operationLayer)) continue;
-        if (obj.role === 'trace-source') continue;
-        drawOnePreview(
-          ctx,
-          obj,
-          operationLayer,
-          project.device,
-          view,
-          imageMaskObjectFor(project, obj),
-          options,
-        );
-      }
-    }
+  pruneRasterPreviewBuilds(requests);
+  for (const request of requests) {
+    drawOnePreview(ctx, request, project.device, view, options);
   }
 }
 
-/** Aborts scheduled builds for rasters that are no longer previewed. */
-function pruneRasterPreviewBuilds(liveRasterIds: ReadonlySet<string>): void {
+/** Retain every currently bound settings key, but cancel superseded settings
+ * or pixels before an older hydration can replace a current cache record. */
+function pruneRasterPreviewBuilds(requests: ReadonlyArray<RasterPreviewRequest>): void {
+  const active = new Map<string, Map<string, RasterImage>>();
+  for (const { obj, key } of requests) {
+    const keys = active.get(obj.id) ?? new Map<string, RasterImage>();
+    keys.set(key, obj);
+    active.set(obj.id, keys);
+  }
   for (const [id, builds] of pendingPreviewBuilds) {
-    if (liveRasterIds.has(id)) continue;
-    for (const pending of builds.values()) pending.cancel();
-    pendingPreviewBuilds.delete(id);
+    for (const [key, pending] of builds) {
+      const obj = active.get(id)?.get(key);
+      if (obj !== undefined && sameRasterContent(pending.content, obj)) continue;
+      pending.cancel();
+      builds.delete(key);
+    }
+    if (builds.size === 0) pendingPreviewBuilds.delete(id);
   }
 }
 
 function drawOnePreview(
   ctx: CanvasRenderingContext2D,
-  obj: RasterImage,
-  layer: Layer,
+  request: RasterPreviewRequest,
   device: DeviceProfile,
   view: ViewTransform,
-  maskObject: SceneObject | null,
   options: DrawRasterPreviewOptions,
 ): void {
-  const canvas = previewCanvasFor(obj, layer, device, maskObject, options);
+  const { obj } = request;
+  const canvas = previewCanvasFor(request, device, options);
   if (canvas === null) return;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
@@ -111,15 +119,13 @@ function drawOnePreview(
 }
 
 function previewCanvasFor(
-  obj: RasterImage,
-  layer: Layer,
+  request: RasterPreviewRequest,
   device: DeviceProfile,
-  maskObject: SceneObject | null,
   options: DrawRasterPreviewOptions,
 ): HTMLCanvasElement | null {
+  const { obj, layer, maskObject, key } = request;
   const { pixelWidth, pixelHeight } = obj;
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
-  const key = previewSettingsKey(obj, layer, device, maskObject);
   const cached = lookupPreviewCanvas(obj, key);
   if (cached.kind === 'hit') return cached.canvas;
   schedulePreviewCanvasBuild(key, obj, layer, device, maskObject, options);
@@ -150,20 +156,25 @@ function schedulePreviewCanvasBuild(
 ): void {
   if (isBuildInFlight(obj, key)) return;
   const scheduleBuild = options.scheduleBuild ?? scheduleRasterPreviewBuild;
+  let cancelled = false;
   if (obj.imageAsset === undefined) {
     let ownBuild: PendingPreviewBuild | undefined;
     let completedSynchronously = false;
     const cancel = scheduleBuild(() => {
+      if (cancelled) return;
       clearPendingBuild(obj, key, ownBuild);
       const canvas = buildPreviewCanvas(obj, layer, device, maskObject);
       storePreviewCanvas(obj, key, canvas);
       if (canvas !== null) options.onRasterPreviewReady?.();
       completedSynchronously = true;
     });
-    if (!completedSynchronously) ownBuild = setPendingBuild(obj, key, cancel);
+    if (!completedSynchronously)
+      ownBuild = setPendingBuild(obj, key, () => {
+        cancelled = true;
+        cancel();
+      });
     return;
   }
-  let cancelled = false;
   // Assigned once the scheduler hands back its cancel handle. The promise chain
   // below only settles in a later microtask, so the entry is always registered
   // by the time the chain reads it.
@@ -270,17 +281,29 @@ function adjustmentKey(obj: RasterImage): string {
   return `${obj.brightness ?? 0}:${obj.contrast ?? 0}:${obj.gamma ?? 1}`;
 }
 
-function livePreviewRasterIds(project: Project): Set<string> {
-  const imageOperations = project.scene.layers
-    .flatMap((layer) => outputOperationLayers(layer))
-    .filter((layer) => layer.mode === 'image');
-  const live = new Set<string>();
-  for (const obj of project.scene.objects) {
-    if (obj.kind !== 'raster-image') continue;
-    if (obj.role === 'trace-source') continue;
-    if (imageOperations.some((operation) => sceneObjectUsesOperation(obj, operation))) {
-      live.add(obj.id);
+function rasterPreviewRequests(project: Project): RasterPreviewRequest[] {
+  const requests: RasterPreviewRequest[] = [];
+  for (const operation of project.scene.layers.flatMap(outputOperationLayers)) {
+    for (const obj of project.scene.objects) {
+      if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
+      if (!sceneObjectUsesOperation(obj, operation)) continue;
+      const effective = layerWithObjectOverride(operation, obj);
+      if (effective.mode !== 'image') continue;
+      // Match the compiler's rounded power schedule before normalising it for
+      // display, including zero object power and min/max power overrides.
+      const layer = {
+        ...effective,
+        power: effectiveObjectPowerPercent(effective, obj),
+        minPower: effectiveObjectMinPowerPercent(effective, obj),
+      };
+      const maskObject = imageMaskObjectFor(project, obj);
+      requests.push({
+        obj,
+        layer,
+        maskObject,
+        key: previewSettingsKey(obj, layer, project.device, maskObject),
+      });
     }
   }
-  return live;
+  return requests;
 }
