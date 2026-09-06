@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type * as OffsetRegionModule from '../../core/job/offset-fill-region';
 
 import {
   createLayer,
@@ -16,9 +17,9 @@ import {
 // loss got shipped in the first place.
 const offsetCheckedMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../core/geometry/kerf-offset', () => ({
-  offsetClosedPolylinesForKerf: () => [],
-  offsetClosedPolylinesForKerfChecked: offsetCheckedMock,
+vi.mock('../../core/job/offset-fill-region', async (importOriginal) => ({
+  ...(await importOriginal<typeof OffsetRegionModule>()),
+  offsetPreparedFillRegionChecked: offsetCheckedMock,
 }));
 
 const { detectJobIntentWarnings } = await import('./job-intent-warnings');

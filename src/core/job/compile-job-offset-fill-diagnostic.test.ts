@@ -2,15 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { createLayer, IDENTITY_TRANSFORM, type Scene, type SceneObject } from '../scene';
+import type * as OffsetRegionModule from './offset-fill-region';
 
 // Fail the offset engine the way clipper2 does on pathological geometry. The
 // checked variant surfaces it as a Result, which is what lets compileJob report
 // the loss instead of emitting a job that is quietly missing a fill.
 const offsetCheckedMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../geometry/kerf-offset', () => ({
-  offsetClosedPolylinesForKerf: () => [],
-  offsetClosedPolylinesForKerfChecked: offsetCheckedMock,
+vi.mock('./offset-fill-region', async (importOriginal) => ({
+  ...(await importOriginal<typeof OffsetRegionModule>()),
+  offsetPreparedFillRegionChecked: offsetCheckedMock,
 }));
 
 const { compileJob } = await import('./compile-job');

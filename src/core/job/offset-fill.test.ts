@@ -1,26 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type * as KerfOffsetModule from '../geometry/kerf-offset';
+import type * as OffsetRegionModule from './offset-fill-region';
 import type { Polyline } from '../scene';
 
-// clipper2-ts fails internally on pathological geometry. kerf-offset catches it
+// clipper2-ts fails internally on pathological geometry. offset-fill-region catches it
 // at the boundary (R6); the checked variant returns that failure as a Result so
 // offset-fill can tell "the fill closed in on itself" apart from "the offset
 // engine failed". Driving the Result directly is the only deterministic way to
 // exercise both outcomes.
-type CheckedOffset = typeof KerfOffsetModule.offsetClosedPolylinesForKerfChecked;
+type CheckedOffset = typeof OffsetRegionModule.offsetPreparedFillRegionChecked;
 
 const offsetHarness = vi.hoisted(() => ({
   actual: undefined as CheckedOffset | undefined,
   checked: vi.fn<CheckedOffset>(),
 }));
 
-vi.mock('../geometry/kerf-offset', async (importOriginal) => {
-  const actual = await importOriginal<typeof KerfOffsetModule>();
-  offsetHarness.actual = actual.offsetClosedPolylinesForKerfChecked;
+vi.mock('./offset-fill-region', async (importOriginal) => {
+  const actual = await importOriginal<typeof OffsetRegionModule>();
+  offsetHarness.actual = actual.offsetPreparedFillRegionChecked;
   return {
     ...actual,
-    offsetClosedPolylinesForKerfChecked: offsetHarness.checked,
+    offsetPreparedFillRegionChecked: offsetHarness.checked,
   };
 });
 

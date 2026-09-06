@@ -1,5 +1,5 @@
-import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
 import { isClosedEnough, type Polyline } from '../scene';
+import { offsetPreparedFillRegionChecked, prepareOffsetFillRegion } from './offset-fill-region';
 import type { OffsetFillTermination } from './offset-fill-termination';
 
 const MIN_OFFSET_FILL_SPACING_MM = 0.05;
@@ -26,7 +26,11 @@ type OffsetPass = {
 /** Generate successive inward contours without hiding failure or budget exhaustion. */
 export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
   const spacing = Math.max(MIN_OFFSET_FILL_SPACING_MM, input.spacingMm);
-  const source = input.polylines.filter(isUsableClosedContour);
+  // A crossing contour can have zero signed area and still enclose valid
+  // even-odd ink. Test area only after resolving the complete filled region.
+  const prepared = prepareOffsetFillRegion(input.polylines.filter(isClosedEnough));
+  if (prepared.kind === 'error') return { contours: [], termination: { kind: 'offset-failed' } };
+  const source = prepared.value.filter(isUsableClosedContour);
   if (source.length === 0) return { contours: [], termination: { kind: 'complete' } };
 
   let current = offsetBy(source, -spacing / 2);
@@ -48,11 +52,8 @@ export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
 }
 
 function offsetBy(polylines: ReadonlyArray<Polyline>, offsetMm: number): OffsetPass {
-  // The checked variant keeps the clipper2 failure that kerf-offset already
-  // detects, instead of flattening it to an empty list. Without it a failed
-  // offset is indistinguishable from a fill that legitimately ran out of
-  // interior, and the pass silently disappears from the job.
-  const offset = offsetClosedPolylinesForKerfChecked(polylines, offsetMm);
+  // Keep both the prepared winding and factual engine failure on every pass.
+  const offset = offsetPreparedFillRegionChecked(polylines, offsetMm);
   if (offset.kind === 'error') return { contours: [], isFailed: true };
   return { contours: offset.value.filter(isUsableClosedContour), isFailed: false };
 }
