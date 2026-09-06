@@ -3,9 +3,9 @@
 // values) and has no material picked hasn't been tuned for the operator's stock
 // and bit — the exact "cut-wrecking defaults" ADR-111 was written about.
 //
-// The only other guard, detectCncMachineLimitWarnings, is connection-dependent
-// (it returns [] when the controller's limits are unknown), so an OFFLINE
-// beginner gets zero guidance. This one fires without a connection. Advisory,
+// Live axis-rate comparisons need controller settings; the separate configured
+// spindle-ceiling advisory cannot explain generic feed/plunge defaults. This
+// detector provides that guidance without a connection. Advisory,
 // not a gate — the defaults are legitimate once the operator confirms them.
 
 import { DEFAULT_CNC_LAYER_SETTINGS, type Project } from '../../core/scene';

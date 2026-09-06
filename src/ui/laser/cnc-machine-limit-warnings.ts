@@ -1,13 +1,6 @@
-// detectCncMachineLimitWarnings — CNC advisories that only a CONNECTED
-// controller can raise, comparing the job against the machine's live-reported
-// `$$` limits: stock overhanging the reported travel ($130/$131), a layer feed
-// above the SLOWER reported axis rate ($110/$111), a layer plunge above the
-// reported Z max rate ($112), and a layer spindle RPM above the reported $30
-// max. Advisory, never a gate — an operator who knows their real work area or
-// accepts firmware clamping may still proceed. Pure: the detected snapshot is
-// passed in (the laser store owns it), distinct from detectCncStockWarnings
-// (toolpaths vs the stock footprint) so each file keeps a single
-// responsibility.
+// CNC machine-limit advisories: compare configured spindle values even offline;
+// compare travel, feed, plunge and controller S scale only with a live snapshot.
+// Pure review information, never a gate or a measurement of physical motion/RPM.
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import {
@@ -23,7 +16,8 @@ export function detectCncMachineLimitWarnings(
   limits: ControllerSettingsSnapshot | null,
 ): ReadonlyArray<string> {
   const machine = project.machine;
-  if (limits === null || machine === undefined || machine.kind !== 'cnc') return [];
+  if (machine === undefined || machine.kind !== 'cnc') return [];
+  if (limits === null) return spindleVsConfiguredCeiling(project);
   return [
     ...stockVsBed(machine.stock, limits),
     ...feedVsMax(project, limits),
@@ -78,9 +72,8 @@ function plungeVsZMax(project: Project, limits: ControllerSettingsSnapshot): Rea
 }
 
 // The app's OWN configured ceiling, distinct from the controller's reported $30
-// above. capSpindle clamps the layer to this at compile time, so the job still
-// runs - it just runs slower than the layer asks, with feeds that assume the
-// higher RPM. Preflight used to refuse this outright; it is an advisory now.
+// above. capSpindle limits the compiled setting, not measured physical RPM.
+// Preflight used to refuse this outright; it is an advisory now.
 function spindleVsConfiguredCeiling(project: Project): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
@@ -89,8 +82,8 @@ function spindleVsConfiguredCeiling(project: Project): ReadonlyArray<string> {
   if (topRpm === null || topRpm <= ceiling) return [];
   return [
     `A layer requests spindle ${topRpm} RPM but the machine's Spindle maximum is ` +
-      `${ceiling} RPM — the job will run at ${ceiling}, while that layer's feeds ` +
-      'assume the higher speed.',
+      `${ceiling} RPM — the compiled spindle setting is limited to ${ceiling} RPM; ` +
+      'actual spindle RPM is not measured. Verify the controller-to-spindle scale.',
   ];
 }
 
@@ -99,9 +92,9 @@ function spindleVsMax(project: Project, limits: ControllerSettingsSnapshot): Rea
   const topRpm = maxOutputLayerValue(project, (cnc) => cnc.spindleRpm);
   if (topRpm === null || topRpm <= limits.maxPowerS) return [];
   return [
-    `A layer's spindle ${topRpm} RPM is above the machine's reported max ($30) ` +
-      `${limits.maxPowerS} RPM — the controller caps the S output, so the spindle ` +
-      'spins slower than the feeds assume.',
+    `A layer requests spindle ${topRpm} RPM, above the machine's reported max ($30) ` +
+      `${limits.maxPowerS} RPM. On GRBL, S commands above $30 use maximum PWM output; ` +
+      'actual spindle RPM is not measured. Verify the controller-to-spindle scale.',
   ];
 }
 
