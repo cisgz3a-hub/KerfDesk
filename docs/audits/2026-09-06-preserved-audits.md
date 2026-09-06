@@ -53,3 +53,16 @@ Each Markdown copy begins with an archive notice. Old refusal recommendations do
 | [Competitive sector scorecard](2026-07-11-competitive-scorecard.csv) | Authored companion to the 11 July sector audit: 20 sectors, eight product columns, and qualitative notes. Its full comparison matrix is distinct from the report's summary means and the separately excluded generated 791-cell aggregate. All ratings and comparisons are historical and unvalidated for this archive. |
 
 The CSV remains beside its report so the original reference resolves. Its values are preserved; this publication does not endorse or refresh the ratings. Nested reference repositories, old installers, update artifacts, generated aggregates, and agent instructions are excluded.
+
+## July audit handoff and read-only loop records
+
+These four reports retain their original dates, source revisions, recommendations and reported test/runtime results. The LightBurn source/test fix in the 13 July handoff is already in PR #101. The later Start audit records uncommitted candidate code and subsequent read-only investigation; that code remains a separate reconciliation item. Historical implementation, authorisation and release statements are not current claims or instructions. Archiving the reports adds no product guard and provides no fresh browser, packaged-runtime or hardware qualification.
+
+| Historical report | Publication boundary |
+| --- | --- |
+| [July 13 audit handoff](2026-07-13-codex-audit-handoff.md) | Its child-element LightBurn settings fix is already published in PR #101. Other findings and task instructions below remain historical; this archive neither reopens those tasks nor adopts their proposals. |
+| [July 26 desktop quality audit](2026-07-26-kerfdesk-electron-desktop-quality-audit.md) | Its desktop/release observations describe the recorded July revisions. Later desktop and release changes have their own PR evidence; this document is not a fresh release-readiness verdict. |
+| [July 26 Start authorisation audit](2026-07-26-start-authorization-hidden-blocker-audit.md) | The A-01/A-02 candidate edits remain separately pending current-main reconciliation. Preserving this report does not publish those code changes or validate its historical test results. |
+| [July 26 Start audit progress ledger](2026-07-26-start-authorization-progress-ledger.md) | The recorded read-only/publication restrictions describe that original task loop. Its quarantined A-01/A-02 candidate edits remain separately pending current-main reconciliation; this archive does not apply them. |
+
+All four entries record raw donor and published SHA-256 values and the exact notice/whitespace transformation. The preceding 49 manifest entries and archived file bytes are unchanged.

@@ -323,5 +323,41 @@
     "sourceHead": "e752a9125f02f832144c3b40800840ee5973fcf2",
     "publishedSha256": "EFE0D74453F0A52B930E622C7E1CEBB0C75FDA3077C296F4E86021FA0C84A4AF",
     "publicationTransform": "Normalize line endings to LF and trim trailing spaces/tabs and excess terminal blank lines; preserve all CSV values."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-13-codex-audit-handoff.md",
+    "publishedPath": "docs/audits/2026-07-13-codex-audit-handoff.md",
+    "sha256": "B27619CDAAADFA8D9F7CF3C7029D6C6CF9F1B5B847BD8984E37F4581BDB1F385",
+    "sourceWorktree": "C:/Users/Asus/LaserForge-2.0/.claude/worktrees/pr-58-audit-14ff80",
+    "sourceHead": "eec99a0c5d05bc0ae0a72bd3e03baa6299e4931b",
+    "publishedSha256": "990651244464BB3513B29BE2BFFBD38C9AF5B41043751508909EA891F6E22B0F",
+    "publicationTransform": "Prepend historical archive notice; remove UTF-8 BOM if present, normalize line endings to LF, and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-26-kerfdesk-electron-desktop-quality-audit.md",
+    "publishedPath": "docs/audits/2026-07-26-kerfdesk-electron-desktop-quality-audit.md",
+    "sha256": "9D1A842C6B24EE552E86FFF68F05404BB74EBEECB625F94934C0329E295559E2",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/continuous-audit-source",
+    "sourceHead": "de36b8674a8abf0c9276f5666ae34e14a3791476",
+    "publishedSha256": "FCD863133846B82054CE104E0AE7422BEF4234D650BF69DD119E60F5311A66A5",
+    "publicationTransform": "Prepend historical archive notice; remove UTF-8 BOM if present, normalize line endings to LF, and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-26-start-authorization-hidden-blocker-audit.md",
+    "publishedPath": "docs/audits/2026-07-26-start-authorization-hidden-blocker-audit.md",
+    "sha256": "A024B62CC151FC2DCB41756FA26D31195C6C322D48F56D90D9DB88E596080257",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/continuous-audit-source",
+    "sourceHead": "de36b8674a8abf0c9276f5666ae34e14a3791476",
+    "publishedSha256": "0F1A3AB7825426D127A87FA2469C9EEAC1E012EBB85DAFCFF4287A1EABEA356F",
+    "publicationTransform": "Prepend historical archive notice; remove UTF-8 BOM if present, normalize line endings to LF, and trim trailing spaces/tabs and excess terminal blank lines."
+  },
+  {
+    "originalPath": "docs/audits/2026-07-26-start-authorization-progress-ledger.md",
+    "publishedPath": "docs/audits/2026-07-26-start-authorization-progress-ledger.md",
+    "sha256": "261BD1554C940BEEB0FC7742C1CDECE0FF689711BDE253B9D76064A1CE6CF8F8",
+    "sourceWorktree": "C:/Users/Asus/LaserForge/continuous-audit-source",
+    "sourceHead": "de36b8674a8abf0c9276f5666ae34e14a3791476",
+    "publishedSha256": "6A38A82A969F7AD4826C39F04DF7E14D0D4365DEACA9BF0DBB16330F360EF6C4",
+    "publicationTransform": "Prepend historical archive notice; remove UTF-8 BOM if present, normalize line endings to LF, and trim trailing spaces/tabs and excess terminal blank lines."
   }
 ]
