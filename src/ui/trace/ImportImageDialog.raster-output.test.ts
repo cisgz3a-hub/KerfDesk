@@ -102,6 +102,7 @@ function context(getCurrentProject: () => Project) {
     close: vi.fn(),
     setBusy: vi.fn(),
     getCurrentProject,
+    isCurrent: () => true,
   };
 }
 

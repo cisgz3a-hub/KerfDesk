@@ -63,6 +63,7 @@ function ctxWith(getCurrentObject: (id: string) => SceneObject | undefined) {
     close: vi.fn(),
     setBusy: vi.fn(),
     getCurrentProject: () => projectWith(getCurrentObject('src-1')),
+    isCurrent: () => true,
   };
 }
 

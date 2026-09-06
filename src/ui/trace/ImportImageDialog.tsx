@@ -20,7 +20,7 @@ import {
 } from '../../core/trace';
 import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
-import { useUiStore } from '../state/ui-store';
+import { useUiStore, type TraceImageDialogState } from '../state/ui-store';
 import { Dialog } from '../kit';
 import {
   CNC_TRACE_PRESET_NAME,
@@ -47,15 +47,13 @@ import { fairTracedPathsForCnc } from './cnc-trace-fairing';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import { commitTraceOutput } from './trace-output-commit';
 import { useTracePreview } from './use-trace-preview';
+import { useTraceCommitLifetime } from './use-trace-commit-lifetime';
 
 export function ImportImageDialog(): JSX.Element | null {
   const dialog = useUiStore((s) => s.imageDialog);
-  if (dialog === null) return null;
-  return dialog.replaceTraceId === undefined ? (
-    <DialogBody seed={dialog.source} />
-  ) : (
-    <DialogBody seed={dialog.source} replaceTraceId={dialog.replaceTraceId} />
-  );
+  const session = useMemo(() => ({ dialog, key: crypto.randomUUID() }), [dialog]);
+  if (session.dialog === null) return null;
+  return <DialogBody key={session.key} dialog={session.dialog} />;
 }
 
 type TraceCommitArgs = {
@@ -78,13 +76,12 @@ type TraceCommitContext = {
   readonly close: () => void;
   readonly setBusy: (v: boolean) => void;
   readonly getCurrentProject: () => ReturnType<typeof useStore.getState>['project'];
+  readonly isCurrent: () => boolean;
 };
 
-function DialogBody(props: {
-  readonly seed: RasterImage;
-  readonly replaceTraceId?: string;
-}): JSX.Element {
-  const { seed } = props;
+function DialogBody(props: { readonly dialog: TraceImageDialogState }): JSX.Element {
+  const { source: seed, replaceTraceId } = props.dialog;
+  const captureLifetime = useTraceCommitLifetime(props.dialog);
   const close = useUiStore((s) => s.closeImageDialog);
   const traceExistingImage = useStore((s) => s.traceExistingImage);
   const commitRasterizedTrace = useStore((s) => s.commitRasterizedTrace);
@@ -137,12 +134,13 @@ function DialogBody(props: {
       boundary: boundarySelection.boundary,
       boundaryMode: boundarySelection.boundaryMode,
       preview,
-      replaceTraceId: props.replaceTraceId,
+      replaceTraceId,
       traceExistingImage,
       commitRasterizedTrace,
       pushToast,
       close,
       setBusy,
+      isCurrent: captureLifetime(),
     });
   };
 
@@ -298,6 +296,7 @@ function submitTraceDialog(deps: {
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
   readonly close: () => void;
   readonly setBusy: (v: boolean) => void;
+  readonly isCurrent: () => boolean;
 }): void {
   if (deps.file === null) {
     deps.pushToast('Image still loading — try again in a moment.', 'warning');
@@ -322,11 +321,13 @@ function submitTraceDialog(deps: {
     close: deps.close,
     setBusy: deps.setBusy,
     getCurrentProject: () => useStore.getState().project,
+    isCurrent: deps.isCurrent,
   });
 }
 
 // Exported for testing the source-revalidation guard (P2-A).
 export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Promise<void> {
+  if (!ctx.isCurrent()) return;
   ctx.setBusy(true);
   try {
     // Direct tracedata path: ColoredPath[] directly, skipping the
@@ -344,6 +345,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       ...args,
       sourceGrid: { width: args.seed.pixelWidth, height: args.seed.pixelHeight },
     });
+    if (!ctx.isCurrent()) return;
     if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,
@@ -395,15 +397,24 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
             ),
           }
         : traced;
-    if (await commitTraceOutput(args, ctx, commitTraced, liveProject)) ctx.close();
+    if (await commitTraceOutput(args, ctx, commitTraced, liveProject)) closeCurrentTrace(ctx);
   } catch (err) {
-    ctx.pushToast(
-      `Could not trace ${args.seed.source}: ${err instanceof Error ? err.message : String(err)}`,
-      'error',
-    );
+    reportCurrentTraceError(args.seed.source, ctx, err);
   } finally {
-    ctx.setBusy(false);
+    if (ctx.isCurrent()) ctx.setBusy(false);
   }
+}
+
+function closeCurrentTrace(ctx: TraceCommitContext): void {
+  if (ctx.isCurrent()) ctx.close();
+}
+
+function reportCurrentTraceError(source: string, ctx: TraceCommitContext, err: unknown): void {
+  if (!ctx.isCurrent()) return;
+  ctx.pushToast(
+    `Could not trace ${source}: ${err instanceof Error ? err.message : String(err)}`,
+    'error',
+  );
 }
 
 /** Compare trace-source content and pixel grids while intentionally allowing a

@@ -136,6 +136,7 @@ function ctxWith(machine: MachineConfig, source = seedRaster()): TestCommitConte
     close: vi.fn<CommitContext['close']>(),
     setBusy: vi.fn<CommitContext['setBusy']>(),
     getCurrentProject: () => project,
+    isCurrent: () => true,
   };
 }
 

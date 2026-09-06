@@ -27,6 +27,7 @@ export type TraceOutputCommitContext = {
   ) => void;
   readonly pushToast: (message: string, variant: 'success' | 'error') => void;
   readonly getCurrentProject: () => Project;
+  readonly isCurrent: () => boolean;
 };
 
 export async function commitTraceOutput(
@@ -35,6 +36,7 @@ export async function commitTraceOutput(
   traced: TracedImage,
   liveProject: Project,
 ): Promise<boolean> {
+  if (!ctx.isCurrent()) return false;
   const deleteSourceAfterTrace = args.deleteSourceAfterTrace === true;
   const traceOptions: TraceExistingImageOptions = {
     deleteSourceAfterTrace,
@@ -47,6 +49,7 @@ export async function commitTraceOutput(
     return commitRasterTraceOutput(args, ctx, traced, liveProject, traceOptions, sourceStatus);
   }
   ctx.traceExistingImage(args.seed.id, traced, traceOptions);
+  if (!ctx.isCurrent()) return false;
   ctx.pushToast(traceSuccessMessage(args.seed.source, traced, sourceStatus, false), 'success');
   return true;
 }
@@ -72,6 +75,7 @@ async function commitRasterTraceOutput(
     traced,
     inputs.operations.map(({ operation }) => operation),
   );
+  if (!ctx.isCurrent()) return false;
   const currentProject = ctx.getCurrentProject();
   if (currentProject.machine?.kind === 'cnc' || !sameRasterTraceInputs(currentProject, inputs)) {
     ctx.pushToast(
@@ -81,6 +85,7 @@ async function commitRasterTraceOutput(
     return false;
   }
   ctx.commitRasterizedTrace(args.seed.id, raster, traceOptions);
+  if (!ctx.isCurrent()) return false;
   ctx.pushToast(traceSuccessMessage(args.seed.source, traced, sourceStatus, true), 'success');
   return true;
 }
