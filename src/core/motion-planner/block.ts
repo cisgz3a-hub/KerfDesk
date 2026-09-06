@@ -22,6 +22,9 @@ export type Block = {
   readonly targetVelocity: number; // mm/sec
   /** Legacy narrow tag for a continuous S0/burn chain without motion metadata. */
   readonly feedMatchedLaserMotion?: boolean;
+  /** A non-motion command drains the planner after this move, such as M5 or
+   * a coolant/power-mode transition before the following motion. */
+  readonly stopAfter?: boolean;
   // Unit direction vector. Travels with zero length are filtered out
   // before block creation so this is always defined for real blocks.
   readonly direction: BlockDirection;

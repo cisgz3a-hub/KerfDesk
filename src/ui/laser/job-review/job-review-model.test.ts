@@ -339,6 +339,7 @@ describe('buildJobReviewModel', () => {
     const model = await buildModelFromCurrentStores();
 
     expect(model.machineKind).toBe('cnc');
+    expect(model.stats[0]?.detail).toMatch(/^Cut \+ plunge .* · travel .* · spindle dwell 3s$/);
     expect(model.stats[2]?.label).toBe('Cutters');
     expect(model.stats[2]?.value).toBe('1 bit');
     expect(model.stats[2]?.detail).toBe('0 tool changes');

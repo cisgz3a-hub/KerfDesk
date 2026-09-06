@@ -20,16 +20,24 @@ export function generateReleaseEvidence(options) {
       sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
     };
   });
-  const rootPackage = JSON.parse(fs.readFileSync(path.resolve(options.packageFile), 'utf8'));
+  const packageFile = path.resolve(options.packageFile);
+  const packageDir = path.dirname(packageFile);
+  const rootPackage = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
   const dependencyTree = JSON.parse(fs.readFileSync(path.resolve(options.dependencyJson), 'utf8'));
-  const components = flattenDependencies(dependencyTree).map(({ name, version }) => ({
+  const components = flattenDependencies(
+    dependencyTree,
+    rootPackage,
+    packageDir,
+    options.version,
+  ).map(({ name, version, license }) => ({
     SPDXID: `SPDXRef-Package-${sanitizeId(name)}-${sanitizeId(version)}`,
     name,
     versionInfo: version,
     downloadLocation: 'NOASSERTION',
     filesAnalyzed: false,
     licenseConcluded: 'NOASSERTION',
-    licenseDeclared: 'NOASSERTION',
+    // Report the package's declaration, not a legal conclusion from a scan.
+    licenseDeclared: license,
   }));
   const sbom = {
     spdxVersion: 'SPDX-2.3',
@@ -78,17 +86,47 @@ export function generateReleaseEvidence(options) {
   return { artifacts, sbom, provenance };
 }
 
-function flattenDependencies(tree) {
+function flattenDependencies(tree, rootPackage, packageDir, releaseVersion) {
   const roots = Array.isArray(tree) ? tree : [tree];
   const byIdentity = new Map();
-  const visit = (node) => {
-    if (node === null || typeof node !== 'object') return;
-    if (typeof node.name === 'string' && typeof node.version === 'string') {
-      byIdentity.set(`${node.name}@${node.version}`, { name: node.name, version: node.version });
+  const visit = (node, edgeName, root = false) => {
+    if (node === null || typeof node !== 'object')
+      throw new Error('Invalid dependency inventory node.');
+    const manifest =
+      typeof node.path === 'string'
+        ? JSON.parse(fs.readFileSync(path.join(node.path, 'package.json'), 'utf8'))
+        : root
+          ? rootPackage
+          : node;
+    const name = manifest.name ?? node.name ?? node.from ?? edgeName;
+    const version = root ? releaseVersion : (manifest.version ?? node.version);
+    if (typeof name !== 'string' || typeof version !== 'string') {
+      throw new Error('Dependency inventory entry is missing its name or version.');
     }
-    for (const child of Object.values(node.dependencies ?? {})) visit(child);
+    const declared = manifest.license;
+    const license = typeof declared === 'string' ? declared : declared?.type;
+    const entry = {
+      name,
+      version,
+      license: typeof license === 'string' && license.length > 0 ? license : 'NOASSERTION',
+    };
+    const key = `${name}@${version}`;
+    const previous = byIdentity.get(key);
+    if (previous && previous.license !== entry.license) {
+      throw new Error(`Dependency variants disagree on the declared license for ${key}.`);
+    }
+    byIdentity.set(key, entry);
+    for (const children of [node.dependencies, node.optionalDependencies]) {
+      for (const [childName, child] of Object.entries(children ?? {})) visit(child, childName);
+    }
   };
-  for (const root of roots) visit(root);
+  for (const root of roots) visit(root, rootPackage.name, true);
+  // Electron is a devDependency for bundling, but its binary is the installed
+  // desktop runtime. Do not confuse its build-time downloader tree with that host.
+  if (rootPackage.devDependencies?.electron !== undefined) {
+    visit({ path: path.join(packageDir, 'node_modules', 'electron') }, 'electron');
+  }
+  if (byIdentity.size === 0) throw new Error('Dependency inventory contains no packages.');
   return [...byIdentity.values()].sort(
     (a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version),
   );

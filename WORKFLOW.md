@@ -1198,6 +1198,14 @@ pause/`M400` boundaries and actual spindle or coolant state changes. Redundant `
 `M9` re-arms do not invent another stop, and laser power carried by a planned motion stays on that
 motion span.
 
+Saved cut and travel time scales apply to both the pre-run estimate and the live countdown's
+motion baseline. CNC plunge time belongs to cut time, while retract time belongs to rapid travel;
+programmed spindle-start and restart dwells are added separately, without either scale. Job Review
+and Preview disclose that dwell contribution. Preview route playback animates motion only.
+Acceleration and junction-deviation fields tune the local estimate and do not write firmware
+settings. Durations round once to whole seconds before splitting into hours, minutes, and seconds,
+and retain seconds for jobs longer than an hour.
+
 While the job runs, only fresh, trustworthy, same-session controller positions that reconcile to the
 active route may calibrate the modeled motion pace. Acknowledged-line counts may bound that
 reconciliation, but they cannot calibrate time by themselves. Arc and helix progress maps by exact

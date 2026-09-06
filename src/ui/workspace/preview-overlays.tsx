@@ -4,7 +4,7 @@
 // verification surface — a silently-empty preview or an unexplained red
 // outline is a trust leak.
 
-import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
+import { formatDuration, summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 // Deep type import: core/sim's public barrel is hard-capped at 20 exports by
 // its index contract, so this display-resolution type remains on a leaf path.
@@ -129,23 +129,23 @@ export function PreviewStatsPanel(props: {
         <strong>{formatEstimate(props.estimate)}</strong>
         {props.estimate.kind === 'estimated' ? (
           <>
-            <span>Cut time</span>
-            <strong>{formatSeconds(props.estimate.breakdown.cutSeconds)}</strong>
+            <span>{stats.plungeMm > 0 ? 'Cut + plunge time' : 'Cut time'}</span>
+            <strong>{formatDuration(props.estimate.breakdown.cutSeconds)}</strong>
             <span>Travel time</span>
-            <strong>{formatSeconds(props.estimate.breakdown.travelSeconds)}</strong>
+            <strong>{formatDuration(props.estimate.breakdown.travelSeconds)}</strong>
+            {(props.estimate.breakdown.dwellSeconds ?? 0) > 0 ? (
+              <>
+                <span title="Included in total time. Route playback shows motion only.">
+                  Spindle dwell
+                </span>
+                <strong>{formatDuration(props.estimate.breakdown.dwellSeconds ?? 0)}</strong>
+              </>
+            ) : null}
           </>
         ) : null}
       </div>
     </div>
   );
-}
-
-function formatSeconds(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return '0s';
-  const rounded = Math.round(seconds);
-  if (rounded < 60) return `${rounded}s`;
-  const minutes = Math.floor(rounded / 60);
-  return `${minutes}m ${rounded % 60}s`;
 }
 
 export function PreviewControlsPanel(props: {

@@ -1,5 +1,13 @@
 # Audit remediation ledger
 
+Current Grok pipelines/TIME5 audit owner, 2026-09-06:
+`codex/grok-ci-time5-20260906`, based on main `c07cea275149832909d46f21c4dd7ec74d634f4a`.
+Scope: calibrated job clocks, emitted seek/dwell timing, CNC timing categories, duration display,
+and dependency/release evidence integrity. Source proofs, all 20 adjudications, and validation:
+[`audits/2026-09-06-grok-ci-time5.md`](audits/2026-09-06-grok-ci-time5.md).
+This local pack is separate from `codex/grok-reviewed-fixes-20260906`; neither a local commit nor
+the evidence scripts establish publication. Johann owns merging. No Start-policy or hardware change.
+
 Current CNC spindle-review correction owner, 2026-09-06:
 `codex/cnc-review-spindle-facts-20260906`, based on main `5918ef53fd91f6b33a4cd0766f2a3b7ba6991acc`.
 Scope: active CNC/laser controller S-scale facts, offline configured-spindle advisory, and honest

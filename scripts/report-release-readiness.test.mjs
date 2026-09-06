@@ -20,12 +20,20 @@ test('keeps all readiness lanes separate and explicitly nonblocking', () => {
   assert.deepEqual(Object.fromEntries(report.lanes.map((lane) => [lane.id, lane.state])), {
     ci: 'passed',
     browser: 'failed',
-    deploy: 'not-run',
+    deploy: 'skipped',
     'packaged-runtime': 'not-run',
     'perceptual-reference-cam': 'not-run',
     hardware: 'not-run',
   });
   assert.match(readinessMarkdown(report), /Commit: `9209fcb/);
+  assert.match(readinessMarkdown(report), /not an aggregate verdict/);
+  assert.equal(report.policy.scope, 'reported-lanes-only');
+});
+
+test('preserves observed cancellation and skip outcomes separately from absent evidence', () => {
+  assert.equal(normalizeReadinessState('cancelled'), 'cancelled');
+  assert.equal(normalizeReadinessState('skipped'), 'skipped');
+  assert.equal(normalizeReadinessState(undefined), 'not-run');
 });
 
 test('rejects unknown states instead of guessing', () => {

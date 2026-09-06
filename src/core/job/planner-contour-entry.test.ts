@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
+import { buildGcodeRenderModel } from '../gcode-view';
+import { buildProgramTime } from '../gcode-time/program-time';
+import { grblStrategy } from '../output/grbl-strategy';
 import { estimateJobDuration } from './estimate-duration';
 import type { CutGroup } from './job';
 
@@ -28,15 +31,20 @@ const baseGroup: CutGroup = {
 describe('planner timing with ADR-239 contour entries', () => {
   it('times the tangential entry as laser-off feed travel', () => {
     const device = NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE;
-    const withEntry = estimateJobDuration({ groups: [{ ...baseGroup, entryRunwayMm: 5 }] }, device);
-    const withoutEntry = estimateJobDuration({ groups: [baseGroup] }, device);
+    const job = { groups: [{ ...baseGroup, entryRunwayMm: 5 }] };
+    const withEntry = estimateJobDuration(job, device);
+    const parsed = buildGcodeRenderModel(grblStrategy.emit(job, device));
+    if (parsed.kind !== 'ok') throw new Error(parsed.reason);
+    const emitted = buildProgramTime(parsed.model, {
+      accelMmPerSec2: device.accelMmPerSec2,
+      junctionDeviationMm: device.junctionDeviationMm,
+      maxFeedMmPerMin: device.maxFeed,
+    });
 
-    // The 5 mm laser-off ramp is timed as feed travel. Total time is NOT
-    // asserted greater: the collinear entry lets the burn start at speed
-    // instead of stopping at the seek junction, which can shorten the job —
-    // the exact physics the entry exists for.
-    expect((withEntry.breakdown.feedTravelSeconds ?? 0) * 1000).toBeGreaterThan(
-      (withoutEntry.breakdown.feedTravelSeconds ?? 0) * 1000 + 100,
-    );
+    // Both the F800 seek and F1500 entry now belong to feed travel. Adding an
+    // entry can shorten that total by replacing part of the slower seek.
+    expect(withEntry.breakdown.feedTravelSeconds).toBeGreaterThan(0);
+    expect(withEntry.breakdown.rapidTravelSeconds).toBe(0);
+    expect(withEntry.totalSeconds).toBeCloseTo(emitted.totalSeconds, 6);
   });
 });

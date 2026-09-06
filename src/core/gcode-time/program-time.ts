@@ -1,15 +1,17 @@
 // buildProgramTime — planner-true seconds for a parsed program (ADR-255
 // stage 8b).
 //
-// Runs the SAME lookahead + trapezoidal kinematics the job duration
-// estimator uses (core/motion-planner), so the Inspector's clock and the
-// Job Review estimate cannot drift apart by construction.
+// Runs the same lookahead + trapezoidal kinematics the job duration
+// estimator uses (core/motion-planner). Callers may calibrate the resulting
+// motion times without changing the planned velocities or deterministic dwells.
 //
 // Beyond an honest ETA this yields the planner lens: which moves never
 // sustained their programmed feed because acceleration or cornering got in
 // the way first — "why is my job slow", answered from the program itself.
 
 import type { GcodeRenderModel } from '../gcode-view';
+import { isEstimateTimeScale } from '../devices';
+import type { MachineKind } from '../scene/machine';
 import { blockTime, planVelocities, type Block } from '../motion-planner';
 import { sanitizeLimits, type MotionLimits } from './motion-limits';
 import { segmentBlocks } from './segment-blocks';
@@ -22,6 +24,8 @@ import { segmentBlocks } from './segment-blocks';
 export type ProgramTimeModel = {
   /** Seconds for each segment. */
   readonly segSeconds: Float32Array;
+  /** Calibration applied to time only; segment kinematics remain unscaled. */
+  readonly segTimeScale: Float32Array;
   readonly segDistanceMm: Float32Array;
   readonly segTargetVelocityMmPerSec: Float32Array;
   readonly segEntryVelocityMmPerSec: Float32Array;
@@ -39,13 +43,26 @@ export type ProgramTimeModel = {
   readonly accelMmPerSec2: number;
 };
 
+export type ProgramTimeCalibration = {
+  readonly cutTimeScale: number;
+  readonly travelTimeScale: number;
+};
+
+const DEFAULT_TIME_CALIBRATION: ProgramTimeCalibration = {
+  cutTimeScale: 1,
+  travelTimeScale: 1,
+};
+
 export function buildProgramTime(
   model: GcodeRenderModel,
   rawLimits: MotionLimits,
+  calibration: ProgramTimeCalibration = DEFAULT_TIME_CALIBRATION,
+  machineKind?: MachineKind,
 ): ProgramTimeModel {
   const limits = sanitizeLimits(rawLimits);
   const blocks = segmentBlocks(model, limits);
   const segSeconds = new Float32Array(blocks.length);
+  const segTimeScale = new Float32Array(blocks.length);
   const segDistanceMm = new Float32Array(blocks.length);
   const segTargetVelocityMmPerSec = new Float32Array(blocks.length);
   const segEntryVelocityMmPerSec = new Float32Array(blocks.length);
@@ -61,8 +78,11 @@ export function buildProgramTime(
       const block = spanBlocks[localIndex];
       const entry = plan[localIndex];
       if (block === undefined || entry === undefined) continue;
-      const seconds = blockTime(block, entry.entryV, entry.exitV, limits.accelMmPerSec2);
+      const timeScale = motionTimeScale(block, model.segPower[index], calibration, machineKind);
+      const seconds =
+        blockTime(block, entry.entryV, entry.exitV, limits.accelMmPerSec2) * timeScale;
       segSeconds[index] = seconds;
+      segTimeScale[index] = timeScale;
       segDistanceMm[index] = block.distance;
       segTargetVelocityMmPerSec[index] = block.targetVelocity;
       segEntryVelocityMmPerSec[index] = entry.entryV;
@@ -77,6 +97,7 @@ export function buildProgramTime(
   const dwellSeconds = totalDwellSeconds(model);
   return {
     segSeconds,
+    segTimeScale,
     segDistanceMm,
     segTargetVelocityMmPerSec,
     segEntryVelocityMmPerSec,
@@ -88,6 +109,21 @@ export function buildProgramTime(
     totalSeconds: elapsed + dwellSeconds,
     accelMmPerSec2: limits.accelMmPerSec2,
   };
+}
+
+function motionTimeScale(
+  block: Block,
+  power: number | undefined,
+  calibration: ProgramTimeCalibration,
+  machineKind: MachineKind | undefined,
+): number {
+  // Render kinds describe geometry: an XY G1 is "cut" even when its laser S
+  // word is zero. Keep those runways/seeks on the travel clock, while CNC
+  // plunge remains cutting and every G0 (including downward Z) remains travel.
+  const laserOff = machineKind === 'laser' && power === 0;
+  const isTravel = block.motion === 'rapid' || block.kind === 'travel' || laserOff;
+  const value = isTravel ? calibration.travelTimeScale : calibration.cutTimeScale;
+  return isEstimateTimeScale(value) ? value : 1;
 }
 
 type MotionSpan = { readonly startIndex: number; readonly endIndex: number };

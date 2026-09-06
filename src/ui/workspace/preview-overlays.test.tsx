@@ -76,6 +76,21 @@ describe('PreviewStatsPanel', () => {
     expect(host.textContent).toContain('ETA skipped');
   });
 
+  it('discloses spindle dwell separately from the animated motion time', async () => {
+    const host = await renderPanel({
+      ...estimate,
+      label: '50s',
+      totalSeconds: 50,
+      breakdown: { ...estimate.breakdown, dwellSeconds: 3 },
+    });
+
+    expect(host.textContent).toContain('50s');
+    expect(host.textContent).toContain('Spindle dwell3s');
+    expect(
+      host.querySelector('[title="Included in total time. Route playback shows motion only."]'),
+    ).not.toBeNull();
+  });
+
   it('labels whether route preview is for the whole project or selected output', async () => {
     const host = await renderPanel(estimate, 'Selected output');
 

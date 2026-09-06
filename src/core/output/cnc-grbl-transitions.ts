@@ -10,12 +10,10 @@ import type { CncCoolantMode, Vec2 } from '../scene';
 import { appendCoolantStart, appendCoolantStop } from './cnc-grbl-coolant';
 import { appendRetract, fmt, type Head } from './cnc-grbl-emit-head';
 import { TOOL_CHANGE_LOAD_PREFIX } from './tool-change-labels';
+import { cncSpindleTransition, type CncSpindleState } from '../cnc/spindle-transition';
 
 /** Per-job emit context threaded through group transitions. */
-export type EmitState = {
-  isMultiTool: boolean;
-  currentRpm: number;
-  currentToolKey: string;
+export type EmitState = CncSpindleState & {
   maxSafeZ: number;
   readonly finish: Vec2 | undefined;
   // Coolant is machine-wide for the job, but the tool-change hold has to close
@@ -46,13 +44,14 @@ export function appendGroupTransition(
   state: EmitState,
 ): void {
   state.maxSafeZ = Math.max(state.maxSafeZ, group.safeZMm);
-  if (state.isMultiTool && (group.toolId ?? '') !== state.currentToolKey) {
+  const transition = cncSpindleTransition(group, state);
+  if (transition === 'tool-change') {
     appendToolChange(lines, head, group, state);
     state.currentToolKey = group.toolId ?? '';
     state.currentRpm = group.spindleRpm;
     return;
   }
-  if (group.spindleRpm !== state.currentRpm) {
+  if (transition === 'rpm-change') {
     appendSpindleStart(lines, head, group.safeZMm, group.spindleRpm, group.spindleSpinupSec);
     state.currentRpm = group.spindleRpm;
   }

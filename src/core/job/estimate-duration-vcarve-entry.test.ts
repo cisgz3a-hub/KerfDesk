@@ -223,8 +223,9 @@ function expectedCutSeconds(
   }, 0);
   const entryTravelMm = safeZMm + Math.abs(points[0]?.z ?? 0);
   const plungeSeconds = (entryTravelMm / plungeFeedMmPerMin) * SECONDS_PER_MINUTE;
-  const retractSeconds = (entryTravelMm / DEFAULT_DEVICE_PROFILE.maxFeed) * SECONDS_PER_MINUTE;
-  return motionSeconds + plungeSeconds + retractSeconds;
+  // G0 retract now belongs to rapid travel; Cut retains the feed-motion
+  // profile and the analytic entry plunge only.
+  return motionSeconds + plungeSeconds;
 }
 
 function representedPoint(point: PathPoint): PathPoint {

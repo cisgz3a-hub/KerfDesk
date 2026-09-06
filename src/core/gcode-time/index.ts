@@ -1,8 +1,12 @@
 // Planner-true time for a parsed G-code program (ADR-255 stage 8b).
-// Plans over core/motion-planner — the same kinematics as the job duration
-// estimator — so the Inspector's clock cannot drift from Job Review's.
+// Plans over core/motion-planner with caller-selected machine assumptions
+// and optional motion-time calibration.
 
-export { buildProgramTime, type ProgramTimeModel } from './program-time';
+export {
+  buildProgramTime,
+  type ProgramTimeCalibration,
+  type ProgramTimeModel,
+} from './program-time';
 export {
   buildGcodeTimingPlan,
   plannedProgressAtRoute,

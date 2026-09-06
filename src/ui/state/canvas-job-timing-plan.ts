@@ -1,6 +1,11 @@
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
-import { buildGcodeTimingPlan, type GcodeTimingPlanResult } from '../../core/gcode-time';
+import {
+  buildGcodeTimingPlan,
+  type GcodeTimingPlanResult,
+  type ProgramTimeCalibration,
+} from '../../core/gcode-time';
 import type { MotionPoint } from '../../core/job/motion-manifest';
+import type { MachineKind } from '../../core/scene/machine';
 import { fingerprintGcode, fingerprintsEqual, type GcodeFingerprint } from '../../core/recovery';
 
 const MAX_LIVE_COUNTDOWN_LINES = 25_000;
@@ -32,6 +37,7 @@ export function canvasJobTimingPlan(
   device: DeviceProfile,
   initialPosition: MotionPoint | null,
   context: CanvasJobTimingContext,
+  machineKind: MachineKind = 'laser',
 ): CanvasJobTimingPlanResult {
   const evidence: CanvasJobTimingEvidence = {
     fingerprint: fingerprintGcode(gcode),
@@ -67,7 +73,11 @@ export function canvasJobTimingPlan(
       maxFeedMmPerMin: device.maxFeed,
     },
     initialPosition,
-    { maxSegments: MAX_LIVE_COUNTDOWN_SEGMENTS },
+    {
+      maxSegments: MAX_LIVE_COUNTDOWN_SEGMENTS,
+      machineKind,
+      timeCalibration: profileTimeCalibration(device),
+    },
   );
   if (
     result.kind === 'ok' &&
@@ -83,6 +93,13 @@ export function canvasJobTimingPlan(
     };
   }
   return { ...result, evidence };
+}
+
+function profileTimeCalibration(device: DeviceProfile): ProgramTimeCalibration {
+  return {
+    cutTimeScale: device.estimateCutTimeScale ?? 1,
+    travelTimeScale: device.estimateTravelTimeScale ?? 1,
+  };
 }
 
 export function validatedCanvasJobTimingPlan(

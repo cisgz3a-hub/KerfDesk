@@ -38,7 +38,12 @@ test('creates arrays, nests them, previews them, and saves one undoable project'
 test('calibrates machine timing and exposes cut and travel estimates in Preview', async ({
   page,
   kerfdesk,
-}) => {
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   await page
     .getByRole('button', { name: 'Go to step 5: Options & calibration', exact: true })
@@ -54,6 +59,7 @@ test('calibrates machine timing and exposes cut and travel estimates in Preview'
   await expect(panel).toBeVisible();
   await expect(panel).toContainText('Cut time');
   await expect(panel).toContainText('Travel time');
+  await panel.screenshot({ path: testInfo.outputPath('calibrated-preview-timing.png') });
 
   await page.getByRole('button', { name: 'Save As...' }).click();
   const saved = await savedProject(kerfdesk);
@@ -61,6 +67,8 @@ test('calibrates machine timing and exposes cut and travel estimates in Preview'
     estimateCutTimeScale: 1.18,
     estimateTravelTimeScale: 1.07,
   });
+  expect((await kerfdesk.events()).filter((event) => event.kind.startsWith('serial'))).toEqual([]);
+  expect(errors).toEqual([]);
 });
 
 test('outline-nests complementary vector parts that rectangular bounds cannot fit', async ({

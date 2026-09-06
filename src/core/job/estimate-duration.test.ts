@@ -479,9 +479,20 @@ describe('formatDuration', () => {
     expect(formatDuration(3599)).toBe('59m 59s');
   });
 
-  it('shows hours-and-minutes once over an hour', () => {
-    expect(formatDuration(3600)).toBe('1h 0m');
-    expect(formatDuration(4332)).toBe('1h 12m');
+  it('keeps seconds once over an hour', () => {
+    expect(formatDuration(3600)).toBe('1h 0m 0s');
+    expect(formatDuration(4332)).toBe('1h 12m 12s');
+  });
+
+  it.each([
+    [59.49, '59s'],
+    [59.5, '1m 0s'],
+    [119.6, '2m 0s'],
+    [3599.5, '1h 0m 0s'],
+    [3659.6, '1h 1m 0s'],
+    [7199.6, '2h 0m 0s'],
+  ])('carries rounded seconds into minutes and hours: %s', (seconds, expected) => {
+    expect(formatDuration(seconds)).toBe(expected);
   });
 
   it('handles non-finite and negative inputs as 0s', () => {

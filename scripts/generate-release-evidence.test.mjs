@@ -68,3 +68,84 @@ test('fails closed when a declared published artifact is absent', () => {
     /Published artifact does not exist/u,
   );
 });
+
+test('reads pnpm keyed dependency nodes and installed license facts, including nested and optional packages', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-pnpm-sbom-'));
+  const writePackage = (dir, manifest) => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(manifest));
+    return dir;
+  };
+  writePackage(root, {
+    name: 'laserforge',
+    version: '0.1.0',
+    license: 'MIT',
+    devDependencies: { electron: '^40.0.0' },
+  });
+  const react = writePackage(path.join(root, 'react'), {
+    name: 'react',
+    version: '18.3.1',
+    license: 'MIT',
+  });
+  const nested = writePackage(path.join(root, 'nested'), {
+    name: 'nested',
+    version: '1.0.0',
+    license: { type: 'ISC' },
+  });
+  const optional = writePackage(path.join(root, 'optional'), {
+    name: 'optional',
+    version: '2.0.0',
+  });
+  writePackage(path.join(root, 'node_modules', 'electron'), {
+    name: 'electron',
+    version: '40.0.0',
+    license: 'MIT',
+  });
+  const dependencyFile = path.join(root, 'runtime-dependencies.json');
+  fs.writeFileSync(
+    dependencyFile,
+    JSON.stringify([
+      {
+        name: 'laserforge',
+        version: '0.1.0',
+        path: root,
+        dependencies: {
+          'react-alias': {
+            from: 'react',
+            version: '18.3.1',
+            path: react,
+            dependencies: { nested: { from: 'nested', version: '1.0.0', path: nested } },
+          },
+        },
+        optionalDependencies: { optional: { from: 'optional', version: '2.0.0', path: optional } },
+      },
+    ]),
+  );
+  const releaseDir = path.join(root, 'release');
+  fs.mkdirSync(releaseDir);
+  fs.writeFileSync(path.join(releaseDir, 'installer.exe'), 'fixture');
+  const result = generateReleaseEvidence({
+    releaseDir,
+    version: '1.2.3',
+    sourceSha: 'a'.repeat(40),
+    dependencyJson: dependencyFile,
+    packageFile: path.join(root, 'package.json'),
+    artifactNames: ['installer.exe'],
+    generatedAt: '2026-09-06T00:00:00.000Z',
+  });
+  assert.deepEqual(
+    result.sbom.packages.map(({ name, versionInfo, licenseDeclared }) => ({
+      name,
+      versionInfo,
+      licenseDeclared,
+    })),
+    [
+      { name: 'electron', versionInfo: '40.0.0', licenseDeclared: 'MIT' },
+      { name: 'laserforge', versionInfo: '1.2.3', licenseDeclared: 'MIT' },
+      { name: 'nested', versionInfo: '1.0.0', licenseDeclared: 'ISC' },
+      { name: 'optional', versionInfo: '2.0.0', licenseDeclared: 'NOASSERTION' },
+      { name: 'react', versionInfo: '18.3.1', licenseDeclared: 'MIT' },
+    ],
+  );
+  assert.ok(result.sbom.packages.every((entry) => entry.licenseConcluded === 'NOASSERTION'));
+});

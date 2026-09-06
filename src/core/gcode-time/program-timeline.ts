@@ -6,8 +6,13 @@ import {
   type GcodeRenderModel,
   type ProgramEvent,
 } from '../gcode-view';
-import { buildProgramTime, type ProgramTimeModel } from './program-time';
+import {
+  buildProgramTime,
+  type ProgramTimeCalibration,
+  type ProgramTimeModel,
+} from './program-time';
 import type { MotionLimits } from './motion-limits';
+import type { MachineKind } from '../scene/machine';
 
 /** An emitted M0/M1 boundary mapped to both raw and controller-sendable lines. */
 export type ProgramPauseBarrier = {
@@ -31,6 +36,7 @@ export type ProgramTimeline = {
   readonly plannedMotionStartSeconds: Float64Array;
   readonly plannedMotionEndSeconds: Float64Array;
   readonly segmentDistanceMm: Float32Array;
+  readonly segmentTimeScale: Float32Array;
   readonly segmentTargetVelocityMmPerSec: Float32Array;
   readonly segmentEntryVelocityMmPerSec: Float32Array;
   readonly segmentExitVelocityMmPerSec: Float32Array;
@@ -57,6 +63,9 @@ export type ProgramTimelineResult =
 export type ProgramTimelineOptions = {
   readonly initialPositionMm?: { readonly x: number; readonly y: number; readonly z: number };
   readonly maxSegments?: number;
+  readonly timeCalibration?: ProgramTimeCalibration;
+  /** Known job kind distinguishes laser-off S0 feeds from CNC process feeds. */
+  readonly machineKind?: MachineKind;
 };
 
 type LineTiming = Pick<
@@ -88,7 +97,7 @@ export function buildProgramTimeline(
   }
   const unavailableReason = timingUnavailableReason(parsed.model);
   if (unavailableReason !== null) return { kind: 'unavailable', reason: unavailableReason };
-  const time = buildProgramTime(parsed.model, limits);
+  const time = buildProgramTime(parsed.model, limits, options.timeCalibration, options.machineKind);
   const lineTiming = buildLineTiming(gcode, parsed.model, time);
   const segmentTiming = buildSegmentTiming(parsed.model, time, lineTiming);
   const motionSeconds = last(lineTiming.rawLineMotionEndSeconds);
@@ -101,6 +110,7 @@ export function buildProgramTimeline(
       dwellSeconds,
       totalRouteMm: parsed.model.totalRouteMm,
       segmentDistanceMm: time.segDistanceMm,
+      segmentTimeScale: time.segTimeScale,
       segmentTargetVelocityMmPerSec: time.segTargetVelocityMmPerSec,
       segmentEntryVelocityMmPerSec: time.segEntryVelocityMmPerSec,
       segmentExitVelocityMmPerSec: time.segExitVelocityMmPerSec,

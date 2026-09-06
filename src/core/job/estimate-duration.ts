@@ -29,9 +29,7 @@ import {
   formatCncCoordinateMm,
   representedCncCoordinateMm,
 } from '../cnc/coordinate-representation';
-import { cncPassCanEmit } from '../cnc/output-representation';
 import {
-  cncPassEntryDepthMm,
   type CncGroup,
   type CncPath3dPass,
   type CutGroup,
@@ -40,6 +38,8 @@ import {
   type Job,
 } from './job';
 import { estimateWithPlanner, type PlannerEndMotionOptions } from './planner';
+import { cncDurationOverhead } from './cnc-duration-overhead';
+import { cncSpindleTransition } from '../cnc/spindle-transition';
 
 export type JobDurationBreakdown = {
   readonly cutSeconds: number;
@@ -49,6 +49,8 @@ export type JobDurationBreakdown = {
   // laser-off G1 motion while Job Review retains the aggregate travel total.
   readonly rapidTravelSeconds?: number;
   readonly feedTravelSeconds?: number;
+  /** Fixed emitted G4 timing; cut/travel calibration never scales this. */
+  readonly dwellSeconds?: number;
 };
 
 export type JobDurationEstimate = {
@@ -64,21 +66,22 @@ export function estimateJobDuration(
   options: JobDurationEstimateOptions = {},
 ): JobDurationEstimate {
   const plannerJob = jobWithCncAsCutGroups(job);
-  const estimate = estimateWithPlanner(plannerJob, device, options);
-  const plungeSeconds = cncPlungeSeconds(job, device);
+  const estimate = estimateWithPlanner(plannerJob, plannerMotionDevice(job, device), options);
+  const { plungeSeconds, retractSeconds, dwellSeconds } = cncDurationOverhead(job, device);
   const cutSeconds =
     (estimate.breakdown.cutSeconds + plungeSeconds) * timingScale(device.estimateCutTimeScale);
   const travelScale = timingScale(device.estimateTravelTimeScale);
-  const rapidTravelSeconds = estimate.breakdown.rapidTravelSeconds * travelScale;
+  const rapidTravelSeconds = (estimate.breakdown.rapidTravelSeconds + retractSeconds) * travelScale;
   const feedTravelSeconds = estimate.breakdown.feedTravelSeconds * travelScale;
   const travelSeconds = rapidTravelSeconds + feedTravelSeconds;
   return {
-    totalSeconds: cutSeconds + travelSeconds,
+    totalSeconds: cutSeconds + travelSeconds + dwellSeconds,
     breakdown: {
       cutSeconds,
       travelSeconds,
       rapidTravelSeconds,
       feedTravelSeconds,
+      dwellSeconds,
     },
   };
 }
@@ -87,12 +90,22 @@ function timingScale(value: number | undefined): number {
   return isEstimateTimeScale(value) ? value : 1;
 }
 
+function plannerMotionDevice(job: Job, device: DeviceProfile): DeviceProfile {
+  if (!job.groups.some((group) => group.kind === 'cnc')) return device;
+  // The CNC emitter always uses G0 for XY seeks and parking. A retained laser
+  // profile preference must not turn its travel into a controlled laser G1.
+  const { controlledLaserOffTravelFeedMmPerMin: laserSeek, ...cncDevice } = device;
+  void laserSeek;
+  return cncDevice;
+}
+
 // Ordinary CNC paths retain the legacy XY planner plus analytic entry/retract
 // terms. Z-rate-capped V-carve paths additionally carry each emitted XYZ edge
 // into the planner so their 3D length, junction angle, and capped feed agree
 // with the generated program.
 function jobWithCncAsCutGroups(job: Job): Job {
   let changed = false;
+  let previousCncGroup: CncGroup | undefined;
   const groups: Group[] = [];
   for (const group of job.groups) {
     if (group.kind !== 'cnc') {
@@ -100,9 +113,32 @@ function jobWithCncAsCutGroups(job: Job): Job {
       continue;
     }
     changed = true;
-    groups.push(...cncAsCutGroups(group));
+    const projection = cncAsCutGroups(group);
+    groups.push(...withCncSpindleStop(projection, previousCncGroup, group));
+    previousCncGroup = group;
   }
   return changed ? { groups } : job;
+}
+
+function withCncSpindleStop(
+  projection: ReadonlyArray<CutGroup>,
+  previous: CncGroup | undefined,
+  group: CncGroup,
+): ReadonlyArray<CutGroup> {
+  if (previous === undefined) return projection;
+  const transition = cncSpindleTransition(group, {
+    // Distinct adjacent tool keys necessarily imply a multi-tool program.
+    isMultiTool: true,
+    currentToolKey: previous.toolId ?? '',
+    currentRpm: previous.spindleRpm,
+  });
+  if (transition === 'none') return projection;
+  const changedS =
+    Math.max(0, Math.round(previous.spindleRpm)) !== Math.max(0, Math.round(group.spindleRpm));
+  if (transition !== 'tool-change' && !(group.spindleSpinupSec > 0) && !changedS) return projection;
+  return projection.map(
+    (cut, index): CutGroup => (index === 0 ? { ...cut, plannerStopBefore: true } : cut),
+  );
 }
 
 function cncAsCutGroups(group: CncGroup): ReadonlyArray<CutGroup> {
@@ -230,6 +266,7 @@ function cncAsCutGroup(
     segments: passes.map((pass, index) => ({
       polyline: cncPassRepresentedXyPoints(pass),
       closed: pass.closed,
+      plannerCoordinatesRepresented: true,
       ...(index === 0 && motion !== undefined ? { plannerMotion: motion } : {}),
     })),
   };
@@ -252,34 +289,15 @@ function plannerMotion(
   };
 }
 
-const SECONDS_PER_MINUTE = 60;
-
-function cncPlungeSeconds(job: Job, device: DeviceProfile): number {
-  let seconds = 0;
-  for (const group of job.groups) {
-    if (group.kind !== 'cnc') continue;
-    const plungeFeed = emittedCncFeedMmPerMin(group.plungeMmPerMin);
-    const retractFeed = Math.max(1, device.maxFeed);
-    const safeZMm = representedCncCoordinateMm(Math.max(0, group.safeZMm));
-    for (const pass of group.passes) {
-      if (!cncPassCanEmit(pass)) continue;
-      const travelZMm = safeZMm + Math.abs(cncPassEntryDepthMm(pass));
-      seconds += (travelZMm / plungeFeed) * SECONDS_PER_MINUTE;
-      seconds += (travelZMm / retractFeed) * SECONDS_PER_MINUTE;
-    }
-  }
-  return seconds;
-}
-
-// Human-readable formatter — "4m 23s" / "47s" / "1h 12m". Co-located with
+// Human-readable formatter — "4m 23s" / "47s" / "1h 12m 12s". Co-located with
 // the estimate so callers don't reinvent the math; reused by JobControls
 // and any future status display.
 export function formatDuration(totalSeconds: number): string {
-  const safe = Number.isFinite(totalSeconds) && totalSeconds > 0 ? totalSeconds : 0;
+  const safe = Number.isFinite(totalSeconds) && totalSeconds > 0 ? Math.round(totalSeconds) : 0;
   const hours = Math.floor(safe / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
-  const seconds = Math.round(safe % 60);
-  if (hours > 0) return `${hours}h ${minutes}m`;
+  const seconds = safe % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
   if (minutes > 0) return `${minutes}m ${seconds}s`;
   return `${seconds}s`;
 }

@@ -66,12 +66,18 @@ export async function streamResumeFromRawLine(
       resumeGcode,
       initialPosition ?? undefined,
     );
-    const jobTimingPlan = canvasJobTimingPlan(resumeGcode, project.device, initialPosition, {
-      controllerSessionEpoch: laser.controllerSessionEpoch,
-      positionEpoch: laser.trustedPositionEpoch,
-      activeControllerKind: laser.activeControllerKind,
-      detectedControllerKind: laser.detectedControllerKind,
-    });
+    const jobTimingPlan = canvasJobTimingPlan(
+      resumeGcode,
+      project.device,
+      initialPosition,
+      {
+        controllerSessionEpoch: laser.controllerSessionEpoch,
+        positionEpoch: laser.trustedPositionEpoch,
+        activeControllerKind: laser.activeControllerKind,
+        detectedControllerKind: laser.detectedControllerKind,
+      },
+      canvasPlan.machineKind,
+    );
     await laser.startJob(resumeGcode, {
       streamingMode: streamingModeForController(
         project.device.controllerKind,

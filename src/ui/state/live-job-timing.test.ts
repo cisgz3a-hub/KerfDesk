@@ -26,6 +26,39 @@ function plan(gcode: string): GcodeTimingPlanResult {
 }
 
 describe('live job timing', () => {
+  it('retains calibrated motion through partial-route pacing and pause without scaling dwell', () => {
+    const built = buildGcodeTimingPlan(
+      'G21 G90\nM4 S100\nG1 X1000 F3000\nG4 P7',
+      { ...LIMITS, accelMmPerSec2: 50 },
+      { x: 0, y: 0, z: 0 },
+      { timeCalibration: { cutTimeScale: 2, travelTimeScale: 3 } },
+    );
+    if (built.kind !== 'ok') throw new Error('Expected calibrated timing.');
+    // Physical trapezoid: 1 s acceleration, 19 s cruise, 1 s deceleration.
+    // Cut calibration doubles those 21 s; the emitted dwell remains 7 s.
+    const started = startLiveJobTiming(built, 0);
+    expect(describeLiveJobTiming(started, 0)).toEqual({
+      kind: 'estimating',
+      remainingSeconds: 49,
+    });
+    let timing = observeTrustedLiveJobProgress(started, 0, 0);
+    // First 50 mm: 25 mm accelerating + 25 mm cruising takes 1.5 raw seconds,
+    // or 3 calibrated seconds. An on-model observation must keep pace at 1.
+    timing = observeTrustedLiveJobProgress(timing, 50, 3000);
+    if (timing.kind !== 'running') throw new Error('Expected running timing.');
+    expect(timing.motionPace).toBeCloseTo(1, 8);
+    expect(timing.remainingSecondsAtUpdate).toBeCloseTo(46, 8);
+    const paused = pauseLiveJobTiming(timing, 5000);
+    expect(describeLiveJobTiming(paused, 60_000)).toEqual({
+      kind: 'paused',
+      remainingSeconds: 44,
+    });
+    expect(describeLiveJobTiming(runLiveJobTiming(paused, 60_000), 61_000)).toEqual({
+      kind: 'running',
+      remainingSeconds: 43,
+    });
+  });
+
   it('freezes active time across pause and resumes from a fresh pacing anchor', () => {
     const started = startLiveJobTiming(plan('G1 X1000 F600'), 0);
     const running = observeTrustedLiveJobProgress(runLiveJobTiming(started, 0), 100, 10_000);

@@ -37,6 +37,29 @@ function controllerContext(
 }
 
 describe('canvas job timing plan', () => {
+  it('uses the actual job kind to calibrate S0 feed motion on the same controller family', () => {
+    const gcode = 'G21 G90\nM3 S0\nG1 X100 F600';
+    const device = {
+      ...DEFAULT_DEVICE_PROFILE,
+      estimateCutTimeScale: 2,
+      estimateTravelTimeScale: 3,
+    };
+    const baseline = canvasJobTimingPlan(
+      gcode,
+      DEFAULT_DEVICE_PROFILE,
+      ORIGIN,
+      controllerContext(),
+    );
+    const laser = canvasJobTimingPlan(gcode, device, ORIGIN, controllerContext(), 'laser');
+    const cnc = canvasJobTimingPlan(gcode, device, ORIGIN, controllerContext(), 'cnc');
+    if (baseline.kind !== 'ok' || laser.kind !== 'ok' || cnc.kind !== 'ok') {
+      throw new Error('Expected calibrated timing plans.');
+    }
+    expect(laser.plan.totalSeconds).toBeCloseTo(baseline.plan.totalSeconds * 3, 5);
+    expect(cnc.plan.totalSeconds).toBeCloseTo(baseline.plan.totalSeconds * 2, 5);
+    expect(laser.plan.totalRouteMm).toBe(cnc.plan.totalRouteMm);
+  });
+
   it('requires a trustworthy finite controller start position', () => {
     const missing = canvasJobTimingPlan(
       ABSOLUTE_MOVE,
