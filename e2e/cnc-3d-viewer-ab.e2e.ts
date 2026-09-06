@@ -15,6 +15,7 @@ import {
   injectCut3DLateError,
   openReadyCut3D,
 } from './fixtures/cut3d-offscreen-browser';
+import { waitForGcodeCanvasReady } from './fixtures/wait-for-gcode-canvas-ready';
 
 const POST_COMPLETION_WINDOW_MS = 750;
 
@@ -108,6 +109,14 @@ test('mixed-operation Preview and Cut 3D complete without a delayed UI stall', a
   await injectCut3DLateError(cut3D);
   await cancelThenRemountCut3D(page, cut3D.canvas);
   await assertUnsupportedCut3D(page, workerUrls);
+  const unsupportedDialog = page.getByRole('dialog', { name: 'Cut 3D preview' });
+  await unsupportedDialog.getByRole('button', { name: 'Close' }).click();
+  await expect(unsupportedDialog).toHaveCount(0);
+
+  // Closing and remounting Cut 3D must leave this project's G-code view available.
+  await page.getByRole('button', { name: 'G-code 3D', exact: true }).click();
+  await waitForGcodeCanvasReady(page, 60_000);
+  expect(workerUrls.some((url) => url.includes('output-preparation-worker'))).toBe(true);
 });
 
 async function mountRetiredPaneForTest(page: Page): Promise<void> {
