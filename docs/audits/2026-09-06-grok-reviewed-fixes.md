@@ -55,5 +55,17 @@ policy guard under PROJECT non-negotiable 21 and ADRs 228/230/232/237. No hardwa
   All `release:check` components passed as staged commands. These are local source/build checks,
   not a packaged-runtime or publication result.
 - The original checkout's HEAD, status and all 15 recorded file fingerprints remain unchanged.
-- Hosted CI, deployment, packaged runtime, independent reference-CAM qualification, material tests,
-  and hardware qualification have not been run for this branch.
+- At this local verification checkpoint, hosted CI, deployment, packaged runtime, independent
+  reference-CAM qualification, material tests, and hardware qualification had not been run.
+
+## PR publication follow-up
+
+The later user request to commit unfinished work and create PRs authorizes publishing this pack.
+Current main `c07cea275149832909d46f21c4dd7ec74d634f4a` was integrated without rewriting fix commit
+`5edcd78c4a0efe07c75de6b344306274f63285d6`. The only merge conflict was the audit ledger; both
+entries were retained. None of the previously verified Grok source/test files changed.
+
+After integration, five suites covering the incoming CNC controller review and existing Grok
+approval/warning behavior passed **47/47 tests**. The full-suite result above belongs to the
+original fix commit; exact published-head CI results are recorded on the PR. Merging, deployment,
+packaged-runtime qualification, and hardware operation are separate from this publication request.

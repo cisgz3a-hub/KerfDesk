@@ -64,7 +64,11 @@ function useControllerReviewArgs(machineKind: MachineKind): ControllerReviewArgs
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const activeWcs = useLaserStore((s) => s.activeWcs);
   const overrides = useLaserStore((s) => s.ovCache);
-  const profileMaxPowerS = useStore((s) => s.project.device.maxPowerS);
+  const profileMaxPowerS = useStore((s) =>
+    s.project.machine?.kind === 'cnc'
+      ? s.project.machine.params.spindleMaxRpm
+      : s.project.device.maxPowerS,
+  );
   const profileBedWidth = useStore((s) => s.project.device.bedWidth);
   const profileBedHeight = useStore((s) => s.project.device.bedHeight);
   return {

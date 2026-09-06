@@ -1009,6 +1009,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    not editable in review; the sticky footer echoes the resolved origin beside Cancel and **Start
    job**. Scan output also names effective direction/reason, exact pass-weighted runway coverage,
    requested runway values, and any controlled laser-off seek warning.
+   Controller **S max $30** compares the live setting with the active CNC machine's spindle
+   maximum, or the laser profile's S maximum in laser mode. A CNC operation above its configured
+   spindle maximum still contributes a warning when controller settings are unavailable. These
+   facts describe requested/compiled settings and controller scaling, not measured spindle RPM.
 7. Editing a value in Job Review commits through the normal store actions and re-runs preparation.
    The stat tiles dim behind **Recomputing…** while synchronized evidence refreshes. **Approve
    settings** remains informational and never adds a Start gate. If the edit changes the exact

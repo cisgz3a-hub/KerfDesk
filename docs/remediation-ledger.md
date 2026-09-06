@@ -3,7 +3,14 @@
 Current selected Grok-audit fixes, 2026-09-06: `codex/grok-reviewed-fixes-20260906`, based on main
 `5918ef53fd91f6b33a4cd0766f2a3b7ba6991acc`. Scope, reproduced failures, verification, and limitations:
 [`audits/2026-09-06-grok-reviewed-fixes.md`](audits/2026-09-06-grok-reviewed-fixes.md).
-Implementation is local; this record does not assert a merge, deployment, or hardware result.
+PR/check records establish publication; this record does not assert a merge, deployment, or hardware result.
+
+Current CNC spindle-review correction owner, 2026-09-06:
+`codex/cnc-review-spindle-facts-20260906`, based on main `5918ef53fd91f6b33a4cd0766f2a3b7ba6991acc`.
+Scope: active CNC/laser controller S-scale facts, offline configured-spindle advisory, and honest
+RPM wording. No motion, controller writes, or Start-policy changes. Evidence and limits:
+[`audits/2026-09-06-cnc-spindle-review-corrections.md`](audits/2026-09-06-cnc-spindle-review-corrections.md).
+PR/check/merge records, not this source note, establish publication.
 
 Earlier CNC/laser change-audit integration owner, 2026-09-05:
 `codex/cnc-laser-audit-fixes-20260905`, based on main `c7681e3af152ed4c1162ef20ae45793552fd1503`.
