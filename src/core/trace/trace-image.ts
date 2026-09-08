@@ -29,6 +29,7 @@ import { fillPinholes } from './fill-pinholes';
 import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
+import { prepareAutomaticDetailMask } from './automatic-detail-mask';
 import { shouldTraceAlphaMask } from './trace-alpha';
 
 // Internal type for the imagetracer module surface we use. Keeps
@@ -136,6 +137,14 @@ export function prepareTraceForContour(
   const adjusted = applyImageAdjustments(image, options);
   if (shouldUseSketchTrace(image, options)) {
     const radiusPx = SKETCH_RADIUS_PX * effectivePixelScale(options);
+    if (options.sketchTrace !== true) {
+      const recovered = prepareAutomaticDetailMask(
+        adjusted,
+        sketchCrackField(adjusted, radiusPx),
+        options,
+      );
+      return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options) };
+    }
     const prepared = sketchTraceToMonochrome(
       adjusted,
       // The local-contrast window is denominated in SOURCE pixels; on a

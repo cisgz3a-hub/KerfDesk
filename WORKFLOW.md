@@ -1879,7 +1879,10 @@ ADR-279.*
    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
    use source-image pixels and preserve their separate preset values. **Smoothness** and **Optimize**
    stay visible and editable for filled outlines and Edge Detection, including values carried from
-   another preset; Reset restores the selected preset's defaults. Changes are debounced; the
+   another preset; Reset restores the selected preset's defaults. Automatic Line Art detail
+   recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
+   Explicit Sketch uses local contrast alone, including removal of dark shadow backgrounds.
+   Changes are debounced; the
    newest request supersedes and cancels any older trace still running.
 3. The preview displays only the newest completed result. A late response from
    a retired worker is ignored and cannot replace the current preview.
