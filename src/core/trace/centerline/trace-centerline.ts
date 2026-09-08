@@ -7,7 +7,12 @@
 
 import type { ColoredPath } from '../../scene';
 import { withCanonicalTraceCurves } from '../trace-curves';
-import { preprocessForTrace, type RawImageData, type TraceOptions } from '../trace-image';
+import {
+  effectivePixelScale,
+  preprocessForTrace,
+  type RawImageData,
+  type TraceOptions,
+} from '../trace-image';
 import { squaredDistanceFieldSteps, type InkMask } from './distance-field';
 import { thinToMedialAxisSteps } from './medial-thinning';
 import { buildStrokeGraph } from './stroke-graph';
@@ -45,7 +50,9 @@ export function* traceCenterlineStrokePathsSteps(
   if (cooperate) yield;
   const pruned = yield* pruneSpursSteps(condensed, distSq, mask.width, DEFAULT_SPUR_OPTIONS);
   const polylines = yield* assembleStrokePathsSteps(pruned, distSq, mask, {
-    joinGapPx: options.centerlineJoinGapPx ?? DEFAULT_JOIN_GAP_PX,
+    // Separate-end bridging follows the source grid across upscale/Enhance.
+    // Default Centerline ring closure keeps its independent touch policy.
+    joinGapPx: (options.centerlineJoinGapPx ?? DEFAULT_JOIN_GAP_PX) * effectivePixelScale(options),
     // lineTolerance keeps its documented contract (higher = fewer vertices);
     // the preset default of 1 leaves the tuned epsilon unchanged.
     simplifyTolerance: options.lineTolerance,

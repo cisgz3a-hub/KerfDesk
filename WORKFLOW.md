@@ -1891,6 +1891,9 @@ ADR-279.*
    a retired worker is ignored and cannot replace the current preview.
    A zero-paths retry with relaxed settings is disclosed in the preview and retained in successful
    commit/export feedback. Edge Detection creates closed outlines; Centerline follows stroke centres.
+   Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
+   converted once on enlarged working rasters, including Enhance regions. Zero disables that
+   gap bridge; true-junction repairs and ring closure keep their existing separate policies.
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.

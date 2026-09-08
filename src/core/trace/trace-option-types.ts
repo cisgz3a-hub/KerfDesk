@@ -119,6 +119,9 @@ export type TraceOptions = {
   readonly edgeMinLengthPx?: number;
   readonly edgeJoinGapPx?: number;
   readonly edgeMedianFilter?: boolean;
+  // Source-grid distance for bridging separate Centerline ends. The working
+  // raster uses the validated pixelScale once. Zero disables gap bridging;
+  // true-junction repair and ring closure retain their separate policies.
   readonly centerlineJoinGapPx?: number;
   // Phase E.3 — image-level adjustments matching LF1's
   // ImageProcessing.ts math (see raster-prep.ts). All four run BEFORE the
