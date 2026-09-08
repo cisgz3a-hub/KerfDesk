@@ -11,6 +11,7 @@
 // force), and never when it is an endpoint (1 neighbour) or isolated dot.
 
 import type { InkMask } from './distance-field';
+import { runTraceSteps, type TraceSteps } from '../trace-steps';
 
 // Ring positions around a pixel, clockwise from top-left.
 const RING_OFFSETS: ReadonlyArray<readonly [number, number]> = [
@@ -42,26 +43,37 @@ const NEIGHBOR_COUNT_LUT = buildNeighborCountLut();
  *  the endpoint rule and survive (minus at most a pixel, which tip extension
  *  recovers). */
 export function thinToMedialAxis(mask: InkMask, distSq: Float64Array): Uint8Array {
+  return runTraceSteps(thinToMedialAxisSteps(mask, distSq));
+}
+
+export function* thinToMedialAxisSteps(
+  mask: InkMask,
+  distSq: Float64Array,
+): TraceSteps<Uint8Array> {
   const { width, height, ink } = mask;
   const skeleton = new Uint8Array(ink);
   const anchors = maximalDiscAnchors(mask, distSq);
-  thinPass(skeleton, width, height, distSq, anchors);
-  thinPass(skeleton, width, height, distSq, null);
+  yield* thinPassSteps(skeleton, width, height, distSq, anchors);
+  yield* thinPassSteps(skeleton, width, height, distSq, null);
   return skeleton;
 }
 
-function thinPass(
+function* thinPassSteps(
   skeleton: Uint8Array,
   width: number,
   height: number,
   distSq: Float64Array,
   anchors: Uint8Array | null,
-): void {
+): TraceSteps<void> {
+  const cooperate = yield;
   const heap: number[] = [];
   for (let i = 0; i < skeleton.length; i += 1) {
+    if ((i & 127) === 0 && cooperate) yield;
     if ((skeleton[i] ?? 0) === 1) heapPush(heap, packEntry(skeleton, width, height, i), distSq);
   }
+  let work = 0;
   while (heap.length > 0) {
+    if ((work++ & 127) === 0 && cooperate) yield;
     const index = unpackIndex(heapPop(heap, distSq));
     if (!isErodable(skeleton, width, height, index, anchors)) continue;
     skeleton[index] = 0;

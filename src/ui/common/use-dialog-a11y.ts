@@ -24,6 +24,7 @@
 //   focus target.
 
 import { useEffect, useRef, type RefObject } from 'react';
+import { recoverDialogFocus, restoreDialogFocus } from './recover-dialog-focus';
 
 const FOCUSABLE_SELECTOR = [
   'button:not([disabled])',
@@ -75,6 +76,9 @@ export function useDialogA11y(
         ? node
         : (node.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? node);
     initial.focus();
+    const releaseFocusRecovery = recoverDialogFocus(node, FOCUSABLE_SELECTOR, () =>
+      isTopmostModal(node),
+    );
 
     const onKeyDown = (e: KeyboardEvent): void => {
       if (!isTopmostModal(node)) return;
@@ -90,13 +94,11 @@ export function useDialogA11y(
     node.addEventListener('keydown', onKeyDown);
     return (): void => {
       node.removeEventListener('keydown', onKeyDown);
+      releaseFocusRecovery();
       // Return focus to whatever opened us — typically a toolbar button.
       // Guard against the element having been removed from the DOM in
       // the meantime (e.g., a layout swap during dialog lifetime).
-      const target = previouslyFocused.current;
-      if (target !== null && document.contains(target)) {
-        target.focus();
-      }
+      restoreDialogFocus(node, previouslyFocused.current);
     };
     // Mount-only: focus setup, listener, and previously-focused capture must run
     // once for the dialog's lifetime. onClose is read via onCloseRef so its

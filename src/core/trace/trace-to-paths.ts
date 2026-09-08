@@ -26,11 +26,12 @@ import {
   preprocessForTrace,
 } from './trace-image';
 import { downscaleTracedPaths, scaleTracedPathsUniform, upscaleBy } from './auto-upscale';
-import { traceCenterlineStrokePaths } from './centerline';
-import { isBinaryContourPreset, traceImageToContourColoredPaths } from './contour-trace';
-import { traceImageToEdgePaths } from './edge-trace';
+import { traceCenterlineStrokePathsSteps } from './centerline/trace-centerline';
+import { isBinaryContourPreset, traceImageToContourColoredPathsSteps } from './contour-trace';
+import { traceImageToEdgePathsSteps } from './edge-trace';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
+import { runTraceSteps, type TraceStepRunner } from './trace-steps';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -136,6 +137,7 @@ async function loadTracer(): Promise<ImageTracerModule> {
 export async function traceImageToColoredPaths(
   image: RawImageData,
   options: TraceOptions,
+  run: TraceStepRunner = runTraceSteps,
 ): Promise<ColoredPath[]> {
   // Sparse small/thin sources trace poorly at native resolution, so their
   // scale plan supersamples them. Dense color pictures instead stay native or
@@ -155,30 +157,36 @@ export async function traceImageToColoredPaths(
       upscaleSmallSmoothSources: false,
       pixelScale: 1,
     };
-    const traced = withCanonicalTraceCurves(await dispatchTrace(workingImage, workingOptions));
+    const traced = withCanonicalTraceCurves(await dispatchTrace(workingImage, workingOptions, run));
     return scaleTracedPathsUniform(traced, scalePlan.coordinateScale);
   }
   const factor = scalePlan.kind === 'upscale' ? scalePlan.factor : 1;
   if (factor > 1) {
     const scaledOptions: TraceOptions = { ...options, pixelScale: factor };
     const upscaled = withCanonicalTraceCurves(
-      await dispatchTrace(upscaleBy(image, factor), scaledOptions),
+      await dispatchTrace(upscaleBy(image, factor), scaledOptions, run),
     );
     return downscaleTracedPaths(upscaled, factor);
   }
-  return withCanonicalTraceCurves(await dispatchTrace(image, options));
+  return withCanonicalTraceCurves(await dispatchTrace(image, options, run));
 }
 
 // The backend selection shared by both the direct and the upscaled paths.
 // Extracted so the public wrapper stays a thin guard and complexity stays
 // under the lint cap.
-async function dispatchTrace(image: RawImageData, options: TraceOptions): Promise<ColoredPath[]> {
-  if (options.traceMode === 'centerline') return traceCenterlineStrokePaths(image, options);
-  if (options.traceMode === 'edge') return traceImageToEdgePaths(image, options);
+async function dispatchTrace(
+  image: RawImageData,
+  options: TraceOptions,
+  run: TraceStepRunner,
+): Promise<ColoredPath[]> {
+  if (options.traceMode === 'centerline')
+    return run(traceCenterlineStrokePathsSteps(image, options));
+  if (options.traceMode === 'edge') return run(traceImageToEdgePathsSteps(image, options));
   // The binary filled-contours lane (Line Art / Smooth / Sharp) is traced by
   // the in-house contour backend (ADR-123). imagetracerjs remains only for
   // the multi-colour, no-fixed-palette path below.
-  if (isBinaryContourPreset(options)) return traceImageToContourColoredPaths(image, options);
+  if (isBinaryContourPreset(options))
+    return run(traceImageToContourColoredPathsSteps(image, options));
   const tracer = await loadTracer();
   const prepared = preprocessForTrace(image, options);
   const td = tracer.imagedataToTracedata(prepared, buildImageTracerOptions(options));

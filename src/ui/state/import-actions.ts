@@ -28,6 +28,7 @@ import {
   type LayerDefaultsState,
 } from './layer-default-actions';
 import { sourceColorForOperation } from './operation-source-color';
+import { applyCameraTraceImport } from './camera-trace-import';
 
 // Narrow `set`: every action here dispatches a pure mutation helper
 // returning a MutationResult. AppState's full Setter is assignable to
@@ -66,14 +67,26 @@ export function imageImportActions(
       fitAllObjects(get);
     },
     traceExistingImage: (sourceId, traced, options) => {
-      set((s) => withFreshCncLayers(s, applyTraceToExisting(s, sourceId, traced, options)));
+      set((s) =>
+        withFreshCncLayers(
+          s,
+          options?.cameraSource === undefined
+            ? applyTraceToExisting(s, sourceId, traced, options)
+            : applyCameraTraceImport(s, options.cameraSource, traced, options),
+        ),
+      );
       fitAllObjects(get);
     },
     // Rasterized traces retain the source's placement and Image operation, so
     // committing them is an in-place swap and must not move the viewport.
     commitRasterizedTrace: (sourceId, raster, options) => {
       set((s) =>
-        withFreshCncLayers(s, applyRasterizedTraceToExisting(s, sourceId, raster, options)),
+        withFreshCncLayers(
+          s,
+          options?.cameraSource === undefined
+            ? applyRasterizedTraceToExisting(s, sourceId, raster, options)
+            : applyCameraTraceImport(s, options.cameraSource, raster, options),
+        ),
       );
     },
     // No fitAllObjects: Convert replaces the vector(s) in place (same combined

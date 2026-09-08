@@ -1,9 +1,6 @@
-// Pins the supersede lifecycle of the shared trace worker: a newer request
-// rejects the pending caller (TraceRequestSupersededError) but KEEPS the
-// worker alive — the stale job's late response is dropped by request id.
-// Terminating on supersede paid a cold worker spawn (plus the full unbundled
-// module-graph reload in Vite dev) on nearly every 50-500ms preview trace
-// while the user tuned sliders/presets.
+// Superseding unfinished work retires its synchronous worker; a healthy
+// completed worker stays reusable. Request and timer ownership must survive
+// late events from the retired instance.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RawImageData } from '../../core/trace';
@@ -36,18 +33,16 @@ const ZERO_BOUNDS = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 // Mirrors TRACE_WORKER_TIMEOUT_MS in use-trace-worker-client.ts.
 const WATCHDOG_BUDGET_MS = 30_000;
 
-// How long one preview trace of a large image occupies the shared worker.
-// Two back-to-back traces overrun a single 30s budget — which is the whole
-// point: the newest request must not be charged for the superseded one's
-// compute, because the worker cannot cancel an in-flight synchronous trace.
+// Controlled compute duration. The replacement must finish after one interval
+// instead of waiting for the superseded worker's interval first.
 const WORKER_TRACE_MS = 20_000;
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('traceImage supersede lifecycle (shared worker kept alive)', () => {
-  it('rejects the superseded request but reuses the live worker for the newest one', async () => {
+describe('traceImage supersede lifecycle (unfinished owner retired)', () => {
+  it('rejects the superseded request and gives the newest one a fresh worker', async () => {
     vi.resetModules();
     vi.useFakeTimers();
     const workers: RespondingWorker[] = [];
@@ -90,24 +85,23 @@ describe('traceImage supersede lifecycle (shared worker kept alive)', () => {
       const firstError = await first;
       expect(firstError).toBeInstanceOf(Error);
       expect(client.isTraceRequestSuperseded(firstError)).toBe(true);
-      // The stale job's response (401px grid) arrived first and must be
-      // dropped by request id — the newest caller sees only its own result.
+      // The old callback is attempted first; the newest caller must still see
+      // only its own worker's grid.
       await expect(second).resolves.toEqual({
         paths: [],
         bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
         width: 402,
         height: 400,
       });
-      // ONE worker total: superseding must not terminate-and-respawn. The
-      // cold spawn + worker module-graph reload was the P1 preview cost.
-      expect(workers).toHaveLength(1);
-      expect(workers[0]?.terminated).toBe(false);
-      expect(workers[0]?.requests).toHaveLength(2);
+      expect(workers).toHaveLength(2);
+      expect(workers[0]?.terminated).toBe(true);
+      expect(workers[1]?.terminated).toBe(false);
+      expect(workers.map((worker) => worker.requests.length)).toEqual([1, 1]);
 
       // The superseded request's 30s timer was cleared on rejection and the
       // completed request's on resolve — neither may later kill the worker.
       await vi.advanceTimersByTimeAsync(30_000);
-      expect(workers[0]?.terminated).toBe(false);
+      expect(workers[1]?.terminated).toBe(false);
     } finally {
       vi.useRealTimers();
     }
@@ -157,17 +151,13 @@ describe('traceImage supersede lifecycle (shared worker kept alive)', () => {
       width: 2,
       height: 2,
     });
-    expect(workers).toHaveLength(1);
+    expect(workers).toHaveLength(2);
   });
 });
 
-// The hung-worker watchdog must bound the worker's COMPUTE time for a request,
-// never the time that request spent queued behind an already-superseded trace.
-// Superseding no longer terminates the worker, so a superseded trace still runs
-// to completion inside it; arming the budget at postMessage time charged that
-// backlog to the newest request and killed a perfectly healthy worker.
+// The current request retains its compute budget without waiting for old work.
 describe('traceImage watchdog measures compute time, not queue time', () => {
-  it('does not time out the newest request while the worker drains a superseded trace', async () => {
+  it('completes the newest request in one compute interval while retiring stale work', async () => {
     vi.resetModules();
     vi.useFakeTimers();
     const workers: SerialTraceWorker[] = [];
@@ -237,16 +227,17 @@ describe('traceImage watchdog measures compute time, not queue time', () => {
         }),
       );
 
-      // Past the 30s budget, but only 2 x 20s of actual worker compute.
-      await vi.advanceTimersByTimeAsync(WORKER_TRACE_MS * 2 + 1);
+      // The replacement starts immediately, so one interval suffices.
+      await vi.advanceTimersByTimeAsync(WORKER_TRACE_MS + 1);
 
       expect(client.isTraceRequestSuperseded(await superseded)).toBe(true);
       expect(await newest).toEqual({
         kind: 'ok',
         result: { paths: [], bounds: ZERO_BOUNDS, width: 402, height: 400 },
       });
-      expect(workers).toHaveLength(1);
-      expect(workers[0]?.terminated).toBe(false);
+      expect(workers).toHaveLength(2);
+      expect(workers[0]?.terminated).toBe(true);
+      expect(workers[1]?.terminated).toBe(false);
     } finally {
       vi.useRealTimers();
     }

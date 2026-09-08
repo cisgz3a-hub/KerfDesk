@@ -4,6 +4,7 @@
 // afterwards any two loose open ends closer than the join gap are bridged.
 
 import type { Vec2 } from '../../scene';
+import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import { pointAtArcDistance } from './polyline-window';
 import type { StrokeGraph } from './stroke-graph';
 
@@ -21,10 +22,17 @@ const POINT_MATCH_EPS = 1e-6;
 type ChainEnd = { readonly chain: Chain; readonly atStart: boolean };
 
 export function pairThroughJunctions(chains: Chain[], graph: StrokeGraph): void {
+  runTraceSteps(pairThroughJunctionsSteps(chains, graph));
+}
+
+export function* pairThroughJunctionsSteps(chains: Chain[], graph: StrokeGraph): TraceSteps<void> {
+  const cooperate = yield;
   for (const node of graph.nodes) {
+    if (cooperate) yield;
     if (node.kind !== 'junction') continue;
     let ends = endsAtPoint(chains, node.pos);
     while (ends.length >= 2) {
+      if (cooperate) yield;
       const pair = straightestPair(ends);
       if (pair === null) break;
       mergeEnds(pair[0], pair[1]);
@@ -40,9 +48,17 @@ export function pairThroughJunctions(chains: Chain[], graph: StrokeGraph): void 
  *  always the same drawn line interrupted by detection dropout, while a
  *  perpendicular weld almost never is. */
 export function bridgeNearbyEnds(chains: Chain[], joinGapPx: number, alignedFactor = 1): void {
+  runTraceSteps(bridgeNearbyEndsSteps(chains, joinGapPx, alignedFactor));
+}
+
+export function* bridgeNearbyEndsSteps(
+  chains: Chain[],
+  joinGapPx: number,
+  alignedFactor = 1,
+): TraceSteps<void> {
   if (joinGapPx <= 0) return;
   for (;;) {
-    const pair = nearestBridgeableEnds(chains, joinGapPx, alignedFactor);
+    const pair = yield* nearestBridgeableEndsSteps(chains, joinGapPx, alignedFactor);
     if (pair === null) return;
     mergeEnds(pair[0], pair[1]);
   }
@@ -123,15 +139,17 @@ const MIN_BRIDGE_FORWARDNESS_SUM = -0.25;
 const CORNER_BRIDGE_FACTOR = 2;
 const MIN_CORNER_FORWARDNESS = 0.25;
 
-function nearestBridgeableEnds(
+function* nearestBridgeableEndsSteps(
   chains: ReadonlyArray<Chain>,
   joinGapPx: number,
   alignedFactor: number,
-): readonly [ChainEnd, ChainEnd] | null {
+): TraceSteps<readonly [ChainEnd, ChainEnd] | null> {
+  const cooperate = yield;
   const ends = collectOpenEnds(chains);
   let best: readonly [ChainEnd, ChainEnd] | null = null;
   let bestDist = joinGapPx * Math.max(1, alignedFactor);
   for (let i = 0; i < ends.length; i += 1) {
+    if (cooperate) yield;
     for (let j = i + 1; j < ends.length; j += 1) {
       const a = ends[i];
       const b = ends[j];

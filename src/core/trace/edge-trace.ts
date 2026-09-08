@@ -21,7 +21,7 @@
 import { clamp } from '../math';
 import type { ColoredPath, Polyline } from '../scene';
 import {
-  contourPolylinesFromMask,
+  contourPolylinesFromMaskSteps,
   flattenStrengthFromSmoothness,
   optimizationToleranceScaleFromOptimize,
 } from './contour-trace';
@@ -29,6 +29,7 @@ import { localContrastCrackField, localContrastInkBitmap } from './local-contras
 import { impulseNoiseRatio, IMPULSE_NOISE_MIN_RATIO, medianFilter } from './preprocess';
 import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
 import { withCanonicalTraceCurves } from './trace-curves';
+import { runTraceSteps, type TraceSteps } from './trace-steps';
 
 const EDGE_COLOR = '#000000';
 const DEFAULT_EDGE_MIN_LENGTH_PX = 3;
@@ -60,7 +61,16 @@ const RADIUS_MIN_PX = 4;
 const RADIUS_MAX_PX = 32;
 
 export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions): ColoredPath[] {
+  return runTraceSteps(traceImageToEdgePathsSteps(image, options));
+}
+
+export function* traceImageToEdgePathsSteps(
+  image: RawImageData,
+  options: TraceOptions,
+): TraceSteps<ColoredPath[]> {
+  const cooperate = yield;
   const source = medianForEdges(image, options.edgeMedianFilter);
+  if (cooperate) yield;
   // Pixel-denominated knobs keep SOURCE-pixel semantics on a supersampled
   // trace (same discipline as the filled-contour lane): the local-mean
   // radius and simplify ε scale by pixelScale, areas by its square. delta is
@@ -71,12 +81,14 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
     delta: maskDelta(options),
   };
   const bitmap = localContrastInkBitmap(source, maskOptions);
+  if (cooperate) yield;
   // The same measured-boundary stack as the filled lane: the mask's iso-line
   // field gives sub-pixel vertex positions, which in turn lets the wobble
   // stages stand down and the fairing-by-fitting tail engage per loop.
   const crackField = localContrastCrackField(source, maskOptions);
+  if (cooperate) yield;
   const toleranceScale = optimizationToleranceScaleFromOptimize(options.optimize);
-  const finished = contourPolylinesFromMask(
+  const finished = yield* contourPolylinesFromMaskSteps(
     { width: bitmap.width, height: bitmap.height, ink: bitmap.data },
     {
       // A tiny area floor prevents degenerate loops; the operator's Minimum

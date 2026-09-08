@@ -26,7 +26,9 @@ type OffsetPass = {
 /** Generate successive inward contours without hiding failure or budget exhaustion. */
 export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
   const spacing = Math.max(MIN_OFFSET_FILL_SPACING_MM, input.spacingMm);
-  const source = input.polylines.filter(isUsableClosedContour);
+  // A self-intersecting outline can have zero signed area while enclosing ink.
+  // The shared kerf engine resolves even-odd regions before area filtering.
+  const source = input.polylines.filter(isClosedEnough);
   if (source.length === 0) return { contours: [], termination: { kind: 'complete' } };
 
   let current = offsetBy(source, -spacing / 2);

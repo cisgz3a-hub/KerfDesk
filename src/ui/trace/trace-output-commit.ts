@@ -1,5 +1,6 @@
 import type { Project, RasterImage, TracedImage } from '../../core/scene';
 import type { TraceExistingImageOptions } from '../state/scene-mutations';
+import { projectWithCameraTraceSource } from '../state/camera-trace-import';
 import type { TraceOutput } from './dialog-parts';
 import type { TraceCommitClaim } from './trace-commit-ownership';
 import { traceNoticeMessage, type TraceNotice } from './trace-notices';
@@ -38,16 +39,23 @@ export async function commitTraceOutput(
   traced: TracedImage,
   liveProject: Project,
 ): Promise<boolean> {
+  const owner = ctx.claimOwner();
+  if (owner === null) return false;
   const deleteSourceAfterTrace = args.deleteSourceAfterTrace === true;
   const traceOptions: TraceExistingImageOptions = {
     deleteSourceAfterTrace,
+    ...(owner.cameraSource === undefined ? {} : { cameraSource: owner.cameraSource }),
     ...(args.replaceTraceId === undefined ? {} : { replaceTraceId: args.replaceTraceId }),
   };
   const sourceStatus = deleteSourceAfterTrace ? 'source deleted' : 'source kept';
   const rasterOutput =
     (args.traceOutput ?? 'vector') === 'raster' && liveProject.machine?.kind !== 'cnc';
   if (rasterOutput) {
-    return commitRasterTraceOutput(args, ctx, traced, liveProject, traceOptions, sourceStatus);
+    const outputProject =
+      owner.cameraSource === undefined
+        ? liveProject
+        : projectWithCameraTraceSource(liveProject, owner.cameraSource);
+    return commitRasterTraceOutput(args, ctx, traced, outputProject, traceOptions, sourceStatus);
   }
   if (ctx.claimOwner() === null) return false;
   ctx.traceExistingImage(args.seed.id, traced, traceOptions);
@@ -81,7 +89,10 @@ async function commitRasterTraceOutput(
   const currentOwner = ctx.claimOwner();
   if (currentOwner === null) return false;
   const currentProject = currentOwner.project;
-  if (currentProject.machine?.kind === 'cnc' || !sameRasterTraceInputs(currentProject, inputs)) {
+  if (
+    currentProject.machine?.kind === 'cnc' ||
+    (traceOptions.cameraSource === undefined && !sameRasterTraceInputs(currentProject, inputs))
+  ) {
     ctx.pushToast(
       `The machine, source image, or Image operation for ${args.seed.source} changed while the raster scan was being built — re-open Trace to continue.`,
       'error',
