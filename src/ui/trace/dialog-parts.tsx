@@ -191,9 +191,7 @@ export function DialogActions(props: {
 }): JSX.Element {
   return (
     <KitDialogActions>
-      <Button onClick={props.onCancel} disabled={props.busy}>
-        Cancel
-      </Button>
+      <Button onClick={props.onCancel}>Cancel</Button>
       <Button type="submit" variant="primary" disabled={!props.canSubmit}>
         {props.busy ? 'Tracing…' : 'Trace'}
       </Button>
