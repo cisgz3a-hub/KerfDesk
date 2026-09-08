@@ -1895,6 +1895,10 @@ ADR-279.*
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
    converted once on enlarged working rasters, including Enhance regions. Zero disables that
    gap bridge; true-junction repairs and ring closure keep their existing separate policies.
+   Filled-outline and Edge finishing check the continuous contour boundaries together.
+   When final smoothing creates a crossing or changes a counter's nesting, only the affected
+   contours are refined closer to their earlier boundaries. Valid positive gaps retain their
+   geometry, including gaps smaller than one source pixel.
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.

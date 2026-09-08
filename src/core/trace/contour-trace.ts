@@ -10,7 +10,6 @@
 
 import type { ColoredPath, Polyline } from '../scene';
 import {
-  closeRingEndpoints,
   inkMaskFromPrepared,
   refineChainForOutput,
   simplifyChain,
@@ -31,6 +30,13 @@ import { fitCubicsThroughPoints, sampleCubics } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import { withCanonicalTraceCurves } from './trace-curves';
+import {
+  closeContour,
+  contourRefinement,
+  preserveContourTopologySteps,
+  type ContourRefinement,
+  type FinishedContour,
+} from './contour-topology';
 import {
   effectivePixelScale,
   prepareTraceForContour,
@@ -194,16 +200,16 @@ export function* contourPolylinesFromMaskSteps(
     pixelScale,
     crackField: options.crackField,
   };
-  const polylines: Polyline[] = [];
+  const contours: FinishedContour[] = [];
   for (const loop of traceBoundaryLoops(mask)) {
     if (cooperate) yield;
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.
     if (Math.abs(loop.area) < options.minAreaPx) continue;
     const finished = yield* finishLoopSteps(loop.points, finish);
-    if (finished !== null) polylines.push(finished);
+    if (finished !== null) contours.push(finished);
   }
-  return polylines;
+  return yield* preserveContourTopologySteps(contours);
 }
 
 type LoopFinish = {
@@ -219,7 +225,7 @@ type LoopFinish = {
 function* finishLoopSteps(
   staircase: ReadonlyArray<Polyline['points'][number]>,
   finish: LoopFinish,
-): TraceSteps<Polyline | null> {
+): TraceSteps<FinishedContour | null> {
   const { distSq, width } = finish;
   if (staircase.length < MIN_LOOP_POINTS) return null;
   // Mid-crack first (lattice steps become ≤45° bends; sub-pixel interpolated
@@ -268,10 +274,11 @@ function* finishLoopSteps(
   // into fair curves with no chord joints and no per-vertex facets
   // (research brief #2). Tiny glyphs and beyond-range art loops keep the
   // approved legacy tail until the fit path earns them.
-  if (subPixelInformed && dense.length >= sharpenMin) {
-    return finishMeasuredLoop(arcSmoothed, sharpened, inSharpenRange, finish);
-  }
-  return finishLegacyLoop(arcSmoothed, sharpened.corners, flattenStrengthEff, finish);
+  const refined =
+    subPixelInformed && dense.length >= sharpenMin
+      ? finishMeasuredLoop(arcSmoothed, sharpened, inSharpenRange, finish)
+      : finishLegacyLoop(arcSmoothed, sharpened.corners, flattenStrengthEff, finish);
+  return refined === null ? null : { ...refined, source: closeContour(crack.points) };
 }
 
 // Measured loops end in the fairing-by-fitting tail: least-squares cubics
@@ -285,7 +292,7 @@ function finishMeasuredLoop(
   sharpened: { readonly corners: ReadonlySet<Polyline['points'][number]> },
   inSharpenRange: boolean,
   finish: LoopFinish,
-): Polyline | null {
+): ContourRefinement | null {
   if (inSharpenRange) {
     return fitLoopTail(arcSmoothed, sharpened.corners, finish, FIT_TOLERANCE_PX);
   }
@@ -301,7 +308,7 @@ function finishLegacyLoop(
   corners: ReadonlySet<Polyline['points'][number]>,
   flattenStrength: number,
   finish: LoopFinish,
-): Polyline | null {
+): ContourRefinement | null {
   const simplified = simplifyChain(arcSmoothed, true, finish.epsilonPx);
   if (simplified.length < MIN_LOOP_POINTS) return null;
   // Rough source edges leave long-wavelength waviness that survives both
@@ -318,13 +325,9 @@ function finishLegacyLoop(
   // Closed rings must RETURN to their start point (ADR-100 third amendment):
   // renderers and emitters draw points as given and never synthesise the
   // closing edge, so a ring left "open" engraves with a seam gap.
-  const closed = closeRingEndpoints([
-    {
-      points: refineChainForOutput(straightened, true, corners, finish.epsilonPx),
-      closed: true,
-    },
-  ]);
-  return closed[0] ?? null;
+  return contourRefinement(straightened, (amount) =>
+    refineChainForOutput(straightened, true, corners, finish.epsilonPx * amount),
+  );
 }
 
 // The measured-loop output tail: G1 cubic fit segmented at the sharpener's
@@ -334,17 +337,19 @@ function fitLoopTail(
   corners: ReadonlySet<Polyline['points'][number]>,
   finish: LoopFinish,
   tolerancePx: number,
-): Polyline | null {
-  const cubics = fitCubicsThroughPoints(
-    chain,
-    true,
-    corners,
-    tolerancePx * finish.pixelScale * finish.fitToleranceScale,
-  );
-  const sampled = sampleCubics(cubics, true);
-  if (sampled.length < MIN_LOOP_POINTS) return null;
-  const closed = closeRingEndpoints([{ points: sampled, closed: true }]);
-  return closed[0] ?? null;
+): ContourRefinement | null {
+  const refine = (amount: number): Polyline['points'] =>
+    sampleCubics(
+      fitCubicsThroughPoints(
+        chain,
+        true,
+        corners,
+        tolerancePx * finish.pixelScale * finish.fitToleranceScale * amount,
+      ),
+      true,
+    );
+  const candidate = contourRefinement(chain, refine);
+  return candidate.polyline.points.length < MIN_LOOP_POINTS ? null : candidate;
 }
 
 // Windowed hard-turn corner detection for loops the sharpener never saw
