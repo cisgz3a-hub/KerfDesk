@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "status": "unapplied-historical-proposal",
+  "date": "2026-09-06",
+  "donor": {
+    "worktree": "C:/Users/Asus/LaserForge/faster-ci",
+    "branch": "codex/faster-ci",
+    "head": "36aff28b0fac03e03679b443cf046a6aafed938a"
+  },
+  "reviewedMain": "00abb56e151332a85d9f9673ed6a5e0fae3faaef",
+  "patch": {
+    "file": "2026-09-06-ci-scheduling-and-artifact-reuse.patch.txt",
+    "sha256": "18d815ce4edb20dacd07cc0e95081fe75e6a5de4fb340c5eef386a413c1bc16e",
+    "bytes": 22353,
+    "paths": 7,
+    "hunks": 13,
+    "warning": "Historical diff against donor HEAD only. Not an approved patch for current workflows."
+  },
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "workingSha256": "b81f2935e161664edc8462c1c4d3a1ecfe9fbec0a17d199a81e269cd2cc68687",
+      "donorHeadFileSha256": "9d988553834dbd6abfe23dcf60a550057481d0ffaf94e813cbf19d91a62ceb44",
+      "reviewedMainBlob": "8608c5e469bc82aeeb23566929418307b4886ca7",
+      "hunks": [
+        {
+          "header": "@@ -3,7 +3,13 @@ name: CI",
+          "id": "CI-1",
+          "disposition": "unapplied-coverage-proposal-not-part-of-qualified-scheduling-port",
+          "original": "Skip Markdown/docs-only push and pull-request CI runs.",
+          "current": "Main still triggers both events without path exclusions. ADR numbering and source/document policy tests remain release obligations; required skipped workflows can remain pending.",
+          "publication": "Preserve only as historical text. Keep current CI triggers in any first scheduling port.",
+          "refs": [435, 700, 705]
+        },
+        {
+          "header": "@@ -14,33 +20,142 @@ permissions:",
+          "id": "CI-2",
+          "disposition": "surviving-scheduling-and-artifact-intent-needs-complete-current-main-port",
+          "original": "Replace the serial job with static/policy, four Vitest shards, web build/upload, Electron build and an always-running aggregate with the established named check.",
+          "segments": [
+            {
+              "area": "quality commands",
+              "result": "Preserve static/policy splitting as intent. Add current ADR/action-pin/release-integrity gates and truthful readiness reporting; remove the old blocking audit:deps command under PR403."
+            },
+            {
+              "area": "four Vitest shards",
+              "result": "Survives as a proposal. Preserve the current worker policy, prove actual full-suite executed-file union and all shard outcomes; no speed claim follows from equal file counts."
+            },
+            {
+              "area": "web build",
+              "result": "Full-history build is a useful preserved intent. Do not replace the complete build:web command before separately proving its nested typecheck/notice/build parity."
+            },
+            {
+              "area": "web artifact upload",
+              "result": "Survives as a separate proposal. SHA naming, seven-day retention and overwrite are not enough to prove run-attempt/content identity; reviewed pins and explicit provenance are needed."
+            },
+            {
+              "area": "Electron build",
+              "result": "Separate execution of the unchanged build:electron-main command is a viable paper lane."
+            },
+            {
+              "area": "aggregate",
+              "result": "Preserve exact check name and require every lane/shard success, including failed/cancelled/skipped paths. Add current SHA-correlated readiness without falsely reporting a serial release:check execution."
+            }
+          ],
+          "current": "Current serial release:check contains 14 top-level commands, including 12 Node release-integrity scripts outside Vitest. Its three-workflow snapshots pass current action pins; the old snapshots produce 22 pin errors. Unconditional main cancellation and mutable tags are also stale inherited donor context, not separate authored intentions.",
+          "publication": "Keep this hunk as an unapplied attachment until the full mapped lane contract, actual shards and aggregate behavior are validated.",
+          "refs": [324, 403, 435, 699, 700, 705]
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "workingSha256": "86a2a141f423d7eaee475f51d10641fbb7dad9693fceaed055f8f5e1bd041507",
+      "donorHeadFileSha256": "a621a1371d9e6e168a2ef5347e3e4f2b23308e88308ebaea64f83feb865e02e3",
+      "reviewedMainBlob": "6154f7d6782664c90b090f35c64630e174986fef",
+      "hunks": [
+        {
+          "header": "@@ -1,14 +1,8 @@",
+          "id": "DEPLOY-1",
+          "disposition": "surviving-rationale-unapplied",
+          "original": "Describe normal deployment as consuming a verified CI bundle rather than repeating the full release gate; retain manual rebuilds.",
+          "current": "Current eligible deployments still run the complete release gate. No successful exact-artifact reuse implementation is established.",
+          "publication": "Restate as an intended efficiency objective, not current shipped behavior or an immutable-artifact guarantee.",
+          "refs": [705]
+        },
+        {
+          "header": "@@ -16,74 +10,71 @@ on:",
+          "id": "DEPLOY-2",
+          "disposition": "surviving-reuse-intent-with-superseded-baseline-and-unproven-content-contract",
+          "original": "Download by successful workflow run id and SHA name, install/release-check only for manual dispatch, require index.html, then publish through Wrangler.",
+          "segments": [
+            {
+              "area": "permissions and identity",
+              "result": "Any Actions-read addition is a separately reviewed narrow need. Preserve current repository checks, exact eligible SHA and existing provider credential scopes."
+            },
+            {
+              "area": "normal artifact download",
+              "result": "Run-id/SHA selection is useful intent but does not prove attempt identity or rejecting digest verification. The historical overwrite scheme and existence-only bundle check require redesign/test evidence."
+            },
+            {
+              "area": "manual gate",
+              "result": "Retain full release:check and current-main checkout. Do not substitute the old selected-ref expression for current main."
+            },
+            {
+              "area": "setup and report execution",
+              "result": "Normal reuse still needs a verified means to execute repo/readiness tooling. Report upstream successful CI separately from the local manual release outcome; do not report skipped local verification as a new pass."
+            },
+            {
+              "area": "publication lane",
+              "result": "Preserve PR705 current-control resolver, provider-free stale no-ops, both freshness checks, deploy-production-main/queue:max, reviewed pins and Pages-only credential names. The old replaceable queue and credential names remain historical data only."
+            }
+          ],
+          "current": "PR705 current-main control and pre-publication checks occur before provider use; queued obsolete candidates cannot replace eligible production work. Current readiness binds checkout, report and artifact names to one deployment SHA.",
+          "publication": "Keep historical hunk unapplied. A future artifact proposal must satisfy all current identity, content, failure, rerun, manual and readiness tests before active workflow publication.",
+          "refs": [699, 700, 705]
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/e2e.yml",
+      "workingSha256": "d7e6a76b8ba03859594fb50640e96e4875008b7a78e5be1c020aa614c85d1c81",
+      "donorHeadFileSha256": "aa01459822efeb362df92191c32d71bf33224dfddf5b3fda0da8c59eec920543",
+      "reviewedMainBlob": "aa44af425f42bae5aeda996e1d7b5a3a33c8dd9f",
+      "hunks": [
+        {
+          "header": "@@ -9,7 +9,13 @@ name: Browser smoke",
+          "id": "E2E-1",
+          "disposition": "unapplied-coverage-reduction-excluded-from-first-port",
+          "original": "Skip Markdown/docs-only push and pull-request browser runs.",
+          "current": "Browser smoke still runs on main pushes, PRs and manual dispatch, with typecheck/discovery/cold/dev/production-bundle and independent readiness evidence.",
+          "publication": "Preserve the alternative only in the historical attachment; retain current triggers and browser/deploy separation.",
+          "refs": [107, 267, 699, 705]
+        }
+      ]
+    },
+    {
+      "path": "DECISIONS.md",
+      "workingSha256": "b6a04d5e6016be5cf3bed5a767339ad4bc375c7b025a3646d0053f1989707b7f",
+      "donorHeadFileSha256": "e5c95b976834509742d177a3445b169932dfe3fa6ca4bdcc76a2b8d325f7de3e",
+      "reviewedMainBlob": "bc6d38206a30adc1bcdfc3f811d5771479162c66",
+      "hunks": [
+        {
+          "header": "@@ -199,6 +199,7 @@",
+          "id": "ADR-1",
+          "disposition": "superseded-identifier-and-unqualified-acceptance",
+          "original": "Add an Accepted ADR235 index entry for parallel CI/artifact reuse.",
+          "current": "Current ADR235 is laser Raster/Image trace output. This CI implementation has no published acceptance established by the current review.",
+          "publication": "Do not edit the ADR index. Preserve the old text in the explicitly unapplied attachment and use an unnumbered dated proposal.",
+          "refs": []
+        },
+        {
+          "header": "@@ -10149,3 +10150,51 @@ transitions untouched, especially on alternating reverse rows.",
+          "id": "ADR-2",
+          "disposition": "surviving-design-rationale-with-retired-and-unverified-claims",
+          "original": "Add the full Accepted ADR body: four shards, reduced coverage triggers, exact artifact reuse, digest rejection and expected 5–7-minute CI.",
+          "current": "Historical timings are not a current baseline, three current gates/readiness are omitted, and download digest mismatch is documented as a warning rather than mandatory rejection.",
+          "publication": "Rewrite the review-facing proposal around pending validation and all modern contracts. Preserve the exact old body as archived diff data only.",
+          "refs": [403, 435, 699, 700, 705]
+        }
+      ]
+    },
+    {
+      "path": "PROJECT.md",
+      "workingSha256": "3fc33d3c62165ccedd7ac7216a167810c718c54fb5dbb2b9170351245b8ab760",
+      "donorHeadFileSha256": "6d5e111ebebcd13b2064d6189d360f67a178f0089b6841f8f08dea9987678544",
+      "reviewedMainBlob": "df24f8d76f92bfad1a5453994ec061672a9d5fe1",
+      "hunks": [
+        {
+          "header": "@@ -1,6 +1,6 @@",
+          "id": "PROJECT-1",
+          "disposition": "superseded-status-plus-unapplied-shipping-claim",
+          "original": "Mark ADR235 parallel CI shipped and add the ADR234 fill-status mention in the old v3.9 status line.",
+          "current": "Current product status has evolved through ADR317. ADR234 is already part of published history; parallel CI is still not the current workflow.",
+          "publication": "Preserve the historical line in the attachment; do not overwrite current product status or ADR tail.",
+          "refs": [299]
+        },
+        {
+          "header": "@@ -329,7 +329,7 @@ phase; tracked here so they don't get lost.",
+          "id": "PROJECT-2",
+          "disposition": "unapplied-shipped-ci-description",
+          "original": "Describe parallel required lanes, dependency policy and normal artifact deployment as active CI.",
+          "current": "Main remains serial and ADR254 removed the blocking dependency audit. The description is not current implementation evidence.",
+          "publication": "Restate intended lanes only in a dated proposal; update PROJECT only if a later qualified implementation is adopted.",
+          "refs": [403, 705]
+        }
+      ]
+    },
+    {
+      "path": "src/platform/web/deploy-workflow-gate.test.ts",
+      "workingSha256": "9b77a28003fe94e686f0b77765db2ba1328f033d74c53a1fa5d5e94c9fdc5598",
+      "donorHeadFileSha256": "17d49d15b75440fc462127a850d6651c2e81f5f93d247c824947e4603bf63855",
+      "reviewedMainBlob": "f9c10785fd5d24819aea41a7f245fce59e4e8d30",
+      "hunks": [
+        {
+          "header": "@@ -66,8 +66,9 @@ describe('Cloudflare production deploy gate', () => {",
+          "id": "DEPLOYTEST-1",
+          "disposition": "dependent-test-contract-intent",
+          "original": "Rename the production proof test and read CI workflow text for artifact assertions.",
+          "current": "Current PR705 tests already cover resolver ownership, stale candidates, serialization, pre-publication freshness and SHA/report correlation.",
+          "publication": "Retain test intent as proposed coverage work. Do not replace the maintained current tests with the old suite.",
+          "refs": [403, 705]
+        },
+        {
+          "header": "@@ -79,9 +80,25 @@ describe('Cloudflare production deploy gate', () => {",
+          "id": "DEPLOYTEST-2",
+          "disposition": "insufficient-artifact-and-complete-gate-proof",
+          "original": "Replace normal release:check ordering with mutable action-tag/name/run-id/overwrite/index.html substring assertions and manual-only gate checks.",
+          "current": "These assertions neither prove complete distributed gate coverage nor actual content/freshness/attempt identity; mutable tags also conflict with the current allowlist.",
+          "publication": "Archive unchanged as test-design history. A future port needs parsed workflow/command-set checks plus failure, rerun, content and resolver behavior evidence.",
+          "refs": [700, 705]
+        }
+      ]
+    },
+    {
+      "path": "src/platform/web/repo-policy.test.ts",
+      "workingSha256": "0fca69f1a747a720e9d769641d162d194b97e369e0988918b6936089561629b1",
+      "donorHeadFileSha256": "bfcc0c1e4b28b908fb60de6d1f079dc5786a8d7cc6a37b7154ad4a0a57755c78",
+      "reviewedMainBlob": "88592924fb0a6da0cc22bb5de2537a1bff938963",
+      "hunks": [
+        {
+          "header": "@@ -77,7 +77,7 @@ describe('repository policy enforcement contract', () => {",
+          "id": "POLICYTEST-1",
+          "disposition": "dependent-test-description-intent",
+          "original": "Rename the file-size policy test to describe both serial and parallel gates.",
+          "current": "Current CI/deploy still run serial release:check.",
+          "publication": "Keep as historical dependent text; it is not an independently publishable runtime or correctness fix.",
+          "refs": [705]
+        },
+        {
+          "header": "@@ -92,8 +92,9 @@ describe('repository policy enforcement contract', () => {",
+          "id": "POLICYTEST-2",
+          "disposition": "insufficient-complete-gate-proof",
+          "original": "Replace the CI release:check assertion with a file-size substring and require manual-only deploy gating.",
+          "current": "A file-size substring cannot prove preservation of all 14 current gate commands, the 12 release-integrity scripts, readiness, or branch/identity behavior.",
+          "publication": "Preserve as unapplied test history. Require a complete current command-set/DAG proof before changing the maintained contract.",
+          "refs": [435, 699, 700, 705]
+        }
+      ]
+    }
+  ],
+  "hashNotes": "Working-file hashes cover raw donor bytes. The historical Git diff may normalize line endings; raw donor files remain preserved in the original worktree and external evidence.",
+  "excludedInstructionCopies": ["AGENTS.md", "CLAUDE.md"],
+  "validationState": {
+    "activeWorkflowImplementation": "not applied",
+    "shardExecution": "not run",
+    "hostedCandidateExecution": "not run",
+    "providerExecution": "not run",
+    "performanceClaim": "not adopted"
+  }
+}
