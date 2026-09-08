@@ -1877,7 +1877,10 @@ ADR-279.*
    or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
    alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
-   use source-image pixels and preserve their separate preset values. **Smoothness** and **Optimize**
+   use pixels of the decoded image grid supplied to the tracing core and preserve their separate
+   preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
+   converted using the actual width and height ratios, without rounding the internal values.
+   The preceding UI decode cap still defines that source grid. **Smoothness** and **Optimize**
    stay visible and editable for filled outlines and Edge Detection, including values carried from
    another preset; Reset restores the selected preset's defaults. Automatic Line Art detail
    recovery retains the preset's brightness-selected solid ink and adds locally darker detail.

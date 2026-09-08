@@ -84,6 +84,8 @@ export type TraceOptions = {
   // thresholding. Any ink region (4-connected, luma<128) with fewer
   // than N pixels gets flipped to white. 0 or undefined disables.
   // Topology-preserving: holes inside letters (O, B, etc.) survive.
+  // Area is in the source grid supplied to the tracing core (after UI
+  // decode). The downscale wrapper converts it to fractional working area.
   readonly despeckleMinPixels?: number;
   // fillPinholeCracks: fill hairline white slivers ENCLOSED inside solid ink
   // after despeckle — thresholding artifacts that would otherwise trace as
@@ -103,6 +105,8 @@ export type TraceOptions = {
   // simplify epsilon) keep their SOURCE-pixel semantics on a supersampled
   // trace. Callers never set this directly.
   readonly pixelScale?: number;
+  // Source-grid contour/hole area. Converted independently of despeckle;
+  // internal working thresholds may be fractional after downsampling.
   readonly ignoreLessThanPixels?: number;
   readonly smoothness?: number;
   readonly optimize?: number;
