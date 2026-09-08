@@ -1,7 +1,7 @@
 # Tracing integration onto pinned main
 
 Base: `00abb56e151332a85d9f9673ed6a5e0fae3faaef`.
-Scope: TR-013, TR-014, TR-012, TR-017, TR-018, TR-019, TR-016 and TR-020.
+Scope: TR-013, TR-014, TR-012, TR-017, TR-018, TR-019, TR-016, TR-020 and TR-015.
 The earlier audit branch is evidence; its divergent history is not part of this integration.
 
 ## Behavior and semantic integration
@@ -16,6 +16,7 @@ The earlier audit branch is evidence; its divergent history is not part of this 
 | TR-019 | Current compiled raster rendering already respects effective settings, masks, power and transforms. Obsolete settings could retain pending work; object power scale was missing from its key. | Prune pending builds against all active effective keys and source content; retain concurrent operations; include power scale. |
 | TR-016 | Early terminal empty/error commits could leave the preview tracing indefinitely. Prepared ready results were already reused. | Settle the owned preview from the commit result/error without another trace request, preserving retry notices. |
 | TR-020 | Expensive inline work blocked the UI, and obsolete native worker jobs delayed the latest preview until the watchdog. | Pure resumable computation with a synchronous core runner, cooperative UI execution, exact worker ownership and bounded recovery. |
+| TR-015 | Removing Clear Boundary or disabling a mouse-focused Trace button left focus on the document body, where Escape could not reach the dialog. Cancel was disabled during tracing. | Recover focus within the active dialog when its focused control disappears or becomes unavailable; keep Cancel enabled and preserve deliberate focus moves and stacked-dialog ownership. |
 
 The newer detection policy, separate despeckle control, Edge outline/perimeter help,
 retry notices, raster machine-row display and V-carve timeout remain intact.
@@ -59,8 +60,22 @@ Four fixed native pairs and six additional controls cover nonempty/empty output,
 ordinary and transient-camera vector/raster commits, terminal error recovery,
 prepared-result reuse, newer settings and document replacement. Reply delivery is
 held across the real 300 ms debounce; the error is deliberate one-response injection.
-The document-replacement control uses public stores because Cancel is disabled while
-busy. This does not establish TR-015's unresolved mouse-focus/Escape behaviour.
+The earlier document-replacement control used public stores because Cancel was disabled
+while busy. The subsequent TR-015 correction has its own focus and cancellation evidence.
+
+TR-015 adds 12 component regressions and passes 178 related cases across 18 files,
+giving 190 distinct passing cases across 20 files. Eight valid native baseline
+failures establish lost focus or unavailable Cancel. The fixed native run passes
+20 Trace controls and three shared-modal controls, covering crop and Enhance,
+ordinary and transient-camera vector/raster output, keyboard wrapping, Escape,
+Cancel, prepared-result reuse, stacked dialogs and opener restoration.
+Twelve cancellation controls hold a successful native worker reply until after
+the dialog closes, then verify that project, scene, history, selection and dirty
+state remain unchanged after release. Four prepared positive controls add exactly
+one undo step without another trace request. These are isolated production-component
+fixtures with controlled reply delivery, not full-App performance, device-camera,
+packaged-runtime or hardware qualification. Failed and incomplete harness attempts
+remain recorded separately; they are not counted as passing controls.
 
 The manager's output review covers twelve fill records with eleven distinct labels
 and four text cases using three fonts. All 24 compiler cases agree with their
@@ -99,6 +114,8 @@ follow-up's 149 passing cases in 12 files are overlapping evidence groups, not
 additional totals. Final typecheck, scoped lint/format and the remaining local
 release steps passed; the follow-up did not repeat the full release command.
 
-The manager owns publication and exact-head hosted `Chrome UX smoke` and
-`Lint, typecheck, license, test, build` gates. Local commits do not represent a
-push, merge, deployment, packaged-runtime qualification or hardware run.
+PR #776 carries this integration. The maintainer authorised publication and merge
+after the TR-015 handoff. Exact-head hosted `Chrome UX smoke` and
+`Lint, typecheck, license, test, build` remain required before merge; post-merge
+CI and automatic Pages publication are verified separately. Local commits do not
+represent hosted checks, deployment, packaged-runtime qualification or hardware runs.
