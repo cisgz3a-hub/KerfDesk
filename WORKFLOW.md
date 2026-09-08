@@ -1890,7 +1890,8 @@ ADR-279.*
 3. The preview displays only the newest completed result. A late response from
    a retired worker is ignored and cannot replace the current preview.
    A zero-paths retry with relaxed settings is disclosed in the preview and retained in successful
-   commit/export feedback. Edge Detection creates closed outlines; Centerline follows stroke centres.
+   commit/export feedback. Edge Detection creates closed outlines around dark artwork and locally
+   darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
    converted once on enlarged working rasters, including Enhance regions. Zero disables that
    gap bridge; true-junction repairs and ring closure keep their existing separate policies.
