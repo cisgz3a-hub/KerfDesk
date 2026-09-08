@@ -44,6 +44,9 @@ export function useTracePreviewSettlement(
         const captured = latest.current,
           token = captured.token.current,
           epoch = ++submission.current;
+        // Submit now owns this request, including any pending decode/debounce.
+        // A newer request advances the token and remains free to supersede it.
+        settled.current = token;
         let completed = false;
         return (outcome) => {
           if (

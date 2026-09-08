@@ -131,13 +131,18 @@ it('can retry an error in the same request and settle a completed empty result',
   expect(state!).toMatchObject({ kind: 'ready', paths: [] });
 });
 
-it('does not publish an expected supersession as an error', async () => {
-  await render(base());
+it('does not publish supersession or revive the preview replaced by Submit', async () => {
+  const p = base();
+  await render(p);
   await act(async () =>
     control.current!.capture()({ kind: 'error', error: new TraceRequestSupersededError() }),
   );
   expect(state!.kind).toBe('tracing');
   await act(async () => traces[0]!.resolve(full));
+  expect(state!.kind).toBe('tracing');
+  await render({ ...p, options: { ...p.options, thresholdLuma: 129 } });
+  await act(async () => vi.advanceTimersByTime(300));
+  await act(async () => traces[1]!.resolve(full));
   expect(state!.kind).toBe('ready');
 });
 
