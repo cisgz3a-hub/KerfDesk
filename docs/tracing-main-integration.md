@@ -37,7 +37,8 @@ are not covered by a general sub-100-ms promise.
 
 TR-001's explicit numeric-history and separated despeckle witnesses pass.
 TR-002 still carries hidden Smoothness/Optimize into Edge geometry.
-TR-006 describes closed outlines but omits the demonstrated 64/112 dark split limit.
+TR-006's tooltip describes closed outlines but omits the demonstrated 64/112 dark split
+limit; the full-dialog footer still promises single lines along full-colour edges.
 Those queued control findings are dispositions, not additional fixes.
 
 The historical imageMaskId-only probe does not establish a current source-byte flaw:
@@ -47,12 +48,26 @@ retires the commit owner. A baked crop changes source bytes. Ordinary background
 editing is suppressed by the existing modal shell; the probe is separate from
 Trace Transparency and boundary-crop mask-intent findings.
 
-A retained schedule observation needs separate review: submitting while a detection
-change still has a pending preview debounce can be superseded by that preview.
-The observed dialog became ready without committing output. The accepted terminal
-witness is qualified with the current request dispatched and its native reply held;
-the pending-debounce schedule is not claimed fixed or classified against an untouched
-baseline by this integration.
+Submitting while a detection change still had a pending preview debounce could lose
+the explicit Trace action. Eight paired observations on pinned main and the first
+integration established that the lost output predated the port, while the port changed
+the generic supersession error into silent cancellation. Submit now claims its current
+preview token synchronously. The pending decode or debounce for that token cannot
+replace the submitted request; a genuinely newer request still wins.
+
+Four fixed native pairs and six additional controls cover nonempty/empty output,
+ordinary and transient-camera vector/raster commits, terminal error recovery,
+prepared-result reuse, newer settings and document replacement. Reply delivery is
+held across the real 300 ms debounce; the error is deliberate one-response injection.
+The document-replacement control uses public stores because Cancel is disabled while
+busy. This does not establish TR-015's unresolved mouse-focus/Escape behaviour.
+
+The manager's output review covers twelve fill records with eleven distinct labels
+and four text cases using three fonts. All 24 compiler cases agree with their
+qualified preview/emission bounds; four unchanged Scanline/Island controls retain
+0.02335–0.03030 mm of cumulative excursion beyond unrounded source regions, with
+less than 0.0005 mm of emission deviation from the rounded-region preview. They are
+not zero-excursion proofs. TR-007's narrow-notch crossing witnesses remain queued.
 
 ## Reproduction and publication
 
@@ -75,6 +90,14 @@ dependency junction. The mock now keeps the real supersession helper. All 156 te
 in the 33 affected files pass with the resolved dependency directory allowed in a
 local test configuration. The original failed gate and the subsequent checks remain
 separate evidence records; the original command is not reported as a green run.
+
+For the original integration, independent reconciliation yields 12583 passing and
+22 skipped test identities
+across 1950 passing and 14 skipped files after replacing the affected file results.
+The original integration's 703 distinct focused/recovered cases and the debounce
+follow-up's 149 passing cases in 12 files are overlapping evidence groups, not
+additional totals. Final typecheck, scoped lint/format and the remaining local
+release steps passed; the follow-up did not repeat the full release command.
 
 The manager owns publication and exact-head hosted `Chrome UX smoke` and
 `Lint, typecheck, license, test, build` gates. Local commits do not represent a
