@@ -29,6 +29,7 @@ import { fillPinholes } from './fill-pinholes';
 import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
+import { shouldTraceAlphaMask } from './trace-alpha';
 
 // Internal type for the imagetracer module surface we use. Keeps
 // the `as` cast contained to one place.
@@ -122,8 +123,8 @@ export function prepareTraceForContour(
   // buffer or non-integer dims would read past the array or size a wrong-shape
   // output. Return the input unchanged rather than corrupting it.
   if (!isValidRawImageData(image)) return { prepared: image, crackField: null };
-  // Trace Transparency keys the mask off alpha. If an image is fully opaque,
-  // tracing alpha would turn the whole page black, so fall back to luma trace.
+  // A fully opaque original uses luma, while an opaque derived region keeps
+  // the full source's alpha interpretation.
   if (shouldTraceAlphaMask(image, options)) {
     const prepared = alphaToMonochrome(
       image,
@@ -310,10 +311,6 @@ function shouldDespeckle(options: TraceOptions): boolean {
   );
 }
 
-function shouldTraceAlphaMask(image: RawImageData, options: TraceOptions): boolean {
-  return options.traceTransparency === true && imageHasTransparency(image);
-}
-
 const SKETCH_RADIUS_PX = 8;
 const SKETCH_CONTRAST_BIAS = 8;
 
@@ -381,13 +378,6 @@ function localMean(
     (integral[y1 * stride + x0] ?? 0) +
     (integral[y0 * stride + x0] ?? 0);
   return sum / Math.max(1, (x1 - x0) * (y1 - y0));
-}
-
-function imageHasTransparency(image: RawImageData): boolean {
-  for (let i = 3; i < image.data.length; i += 4) {
-    if ((image.data[i] ?? 255) < 255) return true;
-  }
-  return false;
 }
 
 function alphaToMonochrome(image: RawImageData, cutoff: number, threshold: number): RawImageData {

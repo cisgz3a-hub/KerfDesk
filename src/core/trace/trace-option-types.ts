@@ -50,6 +50,10 @@ export type TraceOptions = {
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
   readonly traceTransparency?: boolean;
+  // INTERNAL full-source verdict, resolved before cropping or resampling and
+  // carried only with that execution's derived options. traceTransparency
+  // remains the requested setting; an originally opaque source still uses luma.
+  readonly sourceHasTransparency?: boolean;
   readonly sketchTrace?: boolean;
   readonly autoSketchTrace?: boolean;
   // Phase E.2 quality polish — three pure-core preprocessing

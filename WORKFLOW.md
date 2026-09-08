@@ -1903,6 +1903,12 @@ ADR-279.*
   match the ready preview. Otherwise commit decodes and traces the current
   source normally. Existing source-revalidation checks still apply.
 
+**Edge — an opaque region of a transparent image**:
+- **Trace alpha mask** keeps using the full source's transparency when a Crop or Enhance region
+  contains only opaque pixels. White foreground remains ink, and RGB detail inside uniform alpha
+  does not become a hole. Clear Boundary restores the full-image trace. Cutoff/Threshold keep
+  their alpha-band meaning; an originally opaque image still uses the brightness fallback.
+
 ---
 
 ## Phase F flows

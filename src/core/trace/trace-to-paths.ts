@@ -32,6 +32,7 @@ import { traceImageToEdgePathsSteps } from './edge-trace';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
 import { runTraceSteps, type TraceStepRunner } from './trace-steps';
+import { resolveTraceSourceOptions } from './trace-alpha';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -136,9 +137,10 @@ async function loadTracer(): Promise<ImageTracerModule> {
 // between, so curve fidelity survives.
 export async function traceImageToColoredPaths(
   image: RawImageData,
-  options: TraceOptions,
+  requestedOptions: TraceOptions,
   run: TraceStepRunner = runTraceSteps,
 ): Promise<ColoredPath[]> {
+  const options = resolveTraceSourceOptions(image, requestedOptions);
   // Sparse small/thin sources trace poorly at native resolution, so their
   // scale plan supersamples them. Dense color pictures instead stay native or
   // trace on a bounded working grid so photo texture cannot multiply the
