@@ -66,6 +66,7 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
         }
         onChange={(edgeMinimumLinePx) => set({ edgeMinimumLinePx })}
       />
+      <ContourGeometryControls {...props} />
       <EdgeTraceModeNote />
       <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
     </fieldset>
