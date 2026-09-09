@@ -4420,6 +4420,8 @@ and lifts the command's CNC-only gate.)*
    the metadata is recorded, not authenticated. **Recorded source polarity** describes the source
    declaration; the editable mapping below controls the current materialization and may differ. A
    legacy-mesh relief has no canonical provenance object, so CurveDesk does not fabricate this group.
+   The success toast always explains that the relief is stored in either machine mode and that
+   output geometry is generated only in CNC mode, including when the mode changes during import.
 4. For a selected canonical heightfield only, the CNC Relief properties panel shows a read-only
    **Field geometry** block. If the stored field is `width` by `height`, its declared physical
    dimensions are `physicalWidthMm` by `physicalHeightMm`, its object transform has scales
@@ -4546,9 +4548,9 @@ and lifts the command's CNC-only gate.)*
 
 #### Edge - laser mode and large sources
 1. The file command remains available in laser mode because importing and
-   persisting geometry is machine-agnostic. The relief is stored and the toast
-   explains that it becomes output geometry in CNC mode; no new mode guard is
-   added.
+   persisting geometry is machine-agnostic. In either mode, the success toast explains that
+   reliefs are stored in either machine mode and output geometry is generated only in CNC mode.
+   A same-document mode change during import does not make this disclosure stale.
 2. When other laser artwork makes the job emittable, Job Review warns that relief
    geometry will be skipped while remaining stored. The warning never refuses
    Frame, Start, preview, save, or output.

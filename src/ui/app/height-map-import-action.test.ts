@@ -55,7 +55,6 @@ describe('importHeightMapFiles', () => {
     const importObject = vi.fn();
     const pushToast = vi.fn();
     const pending = importHeightMapFiles([new File(['png'], 'late-depth.png')], {
-      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
       getProjectDocumentEpoch: () => epoch,
       importObject,
       pushToast,
@@ -76,7 +75,6 @@ describe('importHeightMapFiles', () => {
     const pushToast = vi.fn();
 
     await importHeightMapFiles([new File(['png'], 'depth.png', { type: 'image/png' })], {
-      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
       getProjectDocumentEpoch,
       importObject,
       pushToast,
@@ -139,7 +137,6 @@ describe('importHeightMapFiles', () => {
           });
           const imported: SceneObject[] = [];
           await importHeightMapFiles([new File(['png'], 'depth.png')], {
-            project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
             getProjectDocumentEpoch,
             importObject: (object) => imported.push(object),
             pushToast: vi.fn(),
@@ -155,13 +152,12 @@ describe('importHeightMapFiles', () => {
     );
   });
 
-  it('does not block storage in laser mode and discloses that output begins in CNC mode', async () => {
+  it('stores reliefs and discloses that output geometry is generated only in CNC mode', async () => {
     vi.mocked(prepareReliefHeightfieldPngOffThread).mockResolvedValue(PREPARED);
     const importObject = vi.fn();
     const pushToast = vi.fn();
 
     await importHeightMapFiles([new File(['png'], 'depth.png', { type: 'image/png' })], {
-      project: createProject(),
       getProjectDocumentEpoch,
       importObject,
       pushToast,
@@ -169,7 +165,7 @@ describe('importHeightMapFiles', () => {
 
     expect(importObject).toHaveBeenCalledOnce();
     expect(pushToast).toHaveBeenCalledWith(
-      expect.stringMatching(/becomes output geometry in CNC/i),
+      expect.stringMatching(/output geometry is generated only in CNC mode/i),
       'success',
     );
   });
@@ -193,7 +189,6 @@ describe('importHeightMapFiles', () => {
     };
 
     await importHeightMapFiles([new File(['png'], 'tall-depth.png')], {
-      project: state.project,
       getProjectDocumentEpoch,
       importObject: (object, batchIndex) => {
         const result = applyFreshImport(state, object, batchIndex ?? 0);
@@ -225,7 +220,6 @@ describe('importHeightMapFiles', () => {
     const png = makePng({ width: 2, height: 1, colorType: 0, rows: [[0, 255]] });
 
     await importHeightMapFiles([streamingFile(png, 'fallback.png')], {
-      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
       getProjectDocumentEpoch,
       importObject,
       pushToast,
@@ -266,7 +260,6 @@ describe('importHeightMapFiles', () => {
     });
 
     await importHeightMapFiles([streamingFile(png, 'fallback-u16.png')], {
-      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
       getProjectDocumentEpoch,
       importObject,
       pushToast,
@@ -308,7 +301,6 @@ describe('importHeightMapFiles', () => {
     });
 
     await importHeightMapFiles([streamingFile(png, 'fallback-alpha.png')], {
-      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
       getProjectDocumentEpoch,
       importObject,
       pushToast,
@@ -343,7 +335,6 @@ describe('importHeightMapFiles', () => {
     const pushToast = vi.fn();
 
     await importHeightMapFiles([new File(['png'], 'cancelled.png')], {
-      project: createProject(),
       getProjectDocumentEpoch,
       importObject,
       pushToast,
@@ -361,7 +352,6 @@ describe('importHeightMapFiles', () => {
     const pushToast = vi.fn();
 
     await importHeightMapFiles([new File(['png'], 'failed.png')], {
-      project: createProject(),
       getProjectDocumentEpoch,
       importObject,
       pushToast,
@@ -396,7 +386,6 @@ describe('handleImportHeightMaps', () => {
 
     await expect(
       handleImportHeightMaps(platform, {
-        project: createProject(),
         getProjectDocumentEpoch,
         importObject: vi.fn(),
         pushToast,

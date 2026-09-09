@@ -16295,6 +16295,16 @@ second unaudited decoder.
   https://www.w3.org/TR/png-3/
 - ADR-289, relief XY scale and sampled physical-cutter qualification boundary.
 
+### 2026-09-06 clarification: mode-independent height-map success disclosure
+
+The success toast always states that the imported relief is stored in either machine mode and
+that output geometry is generated only in CNC mode. It does not depend on a project/machine
+snapshot captured before a picker or decode completes: changing mode within the same document
+must not omit that explanation or make it depend on an outdated mode. The canonical heightfield
+pipeline and exact-document ownership checks remain unchanged, including suppression of a completion
+after New/Open replaces its document. This clarification changes success copy and its context
+dependency only; it changes no import availability, geometry, Frame/Start behavior, or hardware qualification.
+
 ## ADR-291 - Photo-to-relief converges on one editable U16 heightfield pipeline (2026-08-09)
 
 **Date:** 2026-08-09

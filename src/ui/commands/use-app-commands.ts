@@ -263,7 +263,6 @@ function fileCommandContext(
     importHeightMap: () => {
       const current = useStore.getState();
       void handleImportHeightMaps(platform, {
-        project: current.project,
         getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
         importObject: current.importSvgObject,
         pushToast,
