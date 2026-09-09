@@ -62,7 +62,9 @@ export class SegmentGrid {
     for (let cy = minCy; cy <= maxCy; cy += 1) {
       for (let cx = minCx; cx <= maxCx; cx += 1) {
         const bucket = this.cells.get(this.key(cx, cy));
-        if (bucket !== undefined) out.push(...bucket);
+        if (bucket !== undefined) {
+          for (const segment of bucket) out.push(segment);
+        }
       }
     }
     return out;

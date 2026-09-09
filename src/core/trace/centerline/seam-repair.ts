@@ -12,9 +12,7 @@
 import type { Vec2 } from '../../scene';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import { projectOntoSegment, radiusAtPosition, trimArc } from './polyline-window';
-import { SegmentGrid } from './spatial-grid';
-
-type WeldChain = { points: Vec2[]; closed: boolean; alive: boolean };
+import { WeldFootFinder, type WeldChain } from './weld-foot-finder';
 
 const MATCH_EPS = 1e-6;
 // Loops that closed during pruning get FULLY smoothed (no pinned ends), so
@@ -49,7 +47,7 @@ export function repairJunctionSeams(
 ): Vec2[] {
   let pts = [...points];
   if (junctions.length === 0 || pts.length < 4) return pts;
-  for (const junction of junctions) {
+  for (const junction of nearbyJunctions(points, junctions)) {
     const idx = indexOfPoint(pts, junction);
     if (idx < 0) continue;
     if (!closed && (idx === 0 || idx === pts.length - 1)) continue; // branch arm end
@@ -57,6 +55,34 @@ export function repairJunctionSeams(
     pts = closed ? stitchClosed(pts, idx, radius) : stitchOpen(pts, idx, radius);
   }
   return pts;
+}
+
+function nearbyJunctions(
+  points: ReadonlyArray<Vec2>,
+  junctions: ReadonlyArray<Vec2>,
+): ReadonlyArray<Vec2> {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const point of points) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+  if (![minX, minY, maxX, maxY].every(Number.isFinite)) return junctions;
+  // Stitching only removes vertices or projects onto an existing chord, so
+  // later seats remain within the original bounds (plus floating roundoff).
+  const magnitude = Math.max(1, Math.abs(minX), Math.abs(minY), Math.abs(maxX), Math.abs(maxY));
+  const padding = MATCH_REACH_PX + 32 * Number.EPSILON * magnitude;
+  return junctions.filter(
+    (point) =>
+      point.x >= minX - padding &&
+      point.x <= maxX + padding &&
+      point.y >= minY - padding &&
+      point.y <= maxY + padding,
+  );
 }
 
 /** Snap every open-chain endpoint that sits ON a junction onto the nearest
@@ -83,11 +109,7 @@ export function* weldBranchEndsSteps(
   openEndWeldReachPx = 0,
 ): TraceSteps<void> {
   const cooperate = yield;
-  // A shared segment grid replaces the per-end full scan of every chain's
-  // every segment. Weld reach is tiny (≤ maxReach), so cells that size span
-  // the query. Welds move endpoints, mutating adjacent segments, so the grid
-  // is marked stale on each successful weld and rebuilt lazily before the
-  // next query — most ends do not weld, so the grid usually stays valid.
+  // One shared segment grid is updated only beside each moved endpoint.
   const maxReach = Math.max(WELD_REACH_PX, openEndWeldReachPx);
   const foots = new WeldFootFinder(polylines, maxReach);
   for (const chain of polylines) {
@@ -117,7 +139,7 @@ function weldChainEnd(
   if (!atJunction && !endApproaches(chain.points, which, foot)) return;
   if (which === 'start') chain.points[0] = foot;
   else chain.points[chain.points.length - 1] = foot;
-  foots.markDirty();
+  foots.endpointChanged(chain, which);
 }
 
 function nearerFoot(end: Vec2, a: Vec2 | null, b: Vec2 | null): Vec2 | null {
@@ -283,73 +305,4 @@ function stitchClosed(pts: ReadonlyArray<Vec2>, idx: number, radius: number): Ve
   const shift = (idx - mid + pts.length) % pts.length;
   const rotated = [...pts.slice(shift), ...pts.slice(0, shift)];
   return stitchOpen(rotated, mid, radius);
-}
-
-// Grid-accelerated nearest-foot search over OTHER chains' segments. Replaces
-// the O(ends × all segments) full scan: only segments in cells near the query
-// end are tested. Selection is IDENTICAL to the scan — candidates are ordered
-// by (chain index, segment index) and the first foot achieving the strict
-// minimum wins, exactly as the array-order scan did.
-class WeldFootFinder {
-  private readonly polylines: ReadonlyArray<WeldChain>;
-  private readonly cellSize: number;
-  private grid: SegmentGrid;
-  private dirty = false;
-
-  constructor(polylines: ReadonlyArray<WeldChain>, maxReach: number) {
-    this.polylines = polylines;
-    this.cellSize = maxReach;
-    this.grid = this.build();
-  }
-
-  markDirty(): void {
-    this.dirty = true;
-  }
-
-  nearestFootOnOthers(end: Vec2, own: WeldChain, reachPx: number): Vec2 | null {
-    if (this.dirty) {
-      this.grid = this.build();
-      this.dirty = false;
-    }
-    const ownIndex = this.polylines.indexOf(own);
-    // Dedup segments that span multiple cells, then order by (chain, segment)
-    // so tie-breaking matches the original array-order scan exactly.
-    const seen = new Set<string>();
-    const candidates: Array<{ ci: number; si: number; a: Vec2; b: Vec2 }> = [];
-    for (const seg of this.grid.query(end, reachPx)) {
-      if (seg.ownerId === ownIndex) continue;
-      const key = `${seg.ownerId}:${seg.segIndex}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      candidates.push({ ci: seg.ownerId, si: seg.segIndex, a: seg.a, b: seg.b });
-    }
-    candidates.sort((x, y) => (x.ci !== y.ci ? x.ci - y.ci : x.si - y.si));
-    let best: Vec2 | null = null;
-    let bestDist = reachPx;
-    for (const c of candidates) {
-      const foot = projectOntoSegment(end, c.a, c.b);
-      const d = Math.hypot(foot.x - end.x, foot.y - end.y);
-      if (d < bestDist) {
-        bestDist = d;
-        best = foot;
-      }
-    }
-    return best;
-  }
-
-  private build(): SegmentGrid {
-    const grid = new SegmentGrid(this.cellSize);
-    for (let ci = 0; ci < this.polylines.length; ci += 1) {
-      const other = this.polylines[ci];
-      if (other === undefined || !other.alive || other.points.length < 2) continue;
-      const count = other.points.length + (other.closed ? 0 : -1);
-      for (let i = 0; i < count; i += 1) {
-        const a = other.points[i];
-        const b = other.points[(i + 1) % other.points.length];
-        if (a === undefined || b === undefined) continue;
-        grid.insert({ ownerId: ci, segIndex: i, a, b });
-      }
-    }
-    return grid;
-  }
 }

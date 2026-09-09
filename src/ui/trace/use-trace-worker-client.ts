@@ -79,9 +79,9 @@ let nextRequestId = 0;
 let latestTraceEpoch = 0;
 const pendingByRequestId = new Map<number, Pending>();
 const MAX_INLINE_TRACE_PIXELS = 160_000;
-// Bound a worker request: a hung-but-alive worker (a pathological tracer loop)
-// would otherwise leave the preview/commit UI pending forever. 30s is far past
-// any legitimate trace of a budget-capped image (P2-A).
+// Bound a worker request so excessive computation cannot leave preview/commit
+// pending forever. This is an execution deadline, not a complexity guarantee:
+// valid artwork can still expose a slow algorithm despite a capped pixel grid.
 const TRACE_WORKER_TIMEOUT_MS = 30_000;
 
 class TraceWorkerRuntimeError extends Error {}
