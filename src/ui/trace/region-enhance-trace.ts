@@ -22,6 +22,7 @@ import {
 } from '../../core/trace';
 import { traceImageRegion } from './trace-region';
 import { traceImageWithFallback, type TraceResult } from './use-trace-worker-client';
+import { resolveTraceSourceOptions } from '../../core/trace/trace-alpha';
 
 export type BoundaryMode = 'crop' | 'enhance';
 
@@ -31,10 +32,11 @@ export type BoundaryMode = 'crop' | 'enhance';
  *  region and patched — the region-enhance re-trace of ADR-113. */
 export async function traceImageWithBoundaryMode(
   image: RawImageData,
-  options: TraceOptions,
+  requestedOptions: TraceOptions,
   boundary: TraceBoundary | null | undefined,
   mode: BoundaryMode,
 ): Promise<TraceResult> {
+  const options = resolveTraceSourceOptions(image, requestedOptions);
   if (mode === 'crop' || boundary === null || boundary === undefined) {
     return traceImageRegion(image, options, boundary);
   }

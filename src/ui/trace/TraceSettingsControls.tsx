@@ -66,6 +66,7 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
         }
         onChange={(edgeMinimumLinePx) => set({ edgeMinimumLinePx })}
       />
+      <ContourGeometryControls {...props} />
       <EdgeTraceModeNote />
       <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
     </fieldset>
@@ -238,8 +239,8 @@ function ResetTraceSettingsButton(props: {
 function EdgeTraceModeNote(): JSX.Element {
   return (
     <p style={edgeTraceNoteStyle}>
-      Traces local contrast as closed outlines around the artwork. Use Centerline for a single path
-      down the middle of a stroke.
+      Closed outlines around dark artwork and locally darker detail. Adjacent dark tones may merge
+      into one outline. Use Centerline for a single path down the middle of a stroke.
     </p>
   );
 }

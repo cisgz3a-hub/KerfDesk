@@ -36,7 +36,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     fixedPalette: ['#ffffff', '#000000'],
     cutoffLuma: 0,
     thresholdLuma: 128,
-    autoSketchTrace: true,
+    autoSketchTrace: true, // Add local detail without removing brightness-selected solid ink.
     ignoreLessThanPixels: 2,
     smoothness: 1,
     optimize: 0.2,
