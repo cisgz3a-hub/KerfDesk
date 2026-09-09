@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Vec2 } from '../../scene';
 import { pruneSpurs, pruneSpursSteps } from './spur-pruning';
 import type { StrokeChain, StrokeGraph, StrokeNode } from './stroke-graph';
@@ -26,6 +26,89 @@ function starComponents(count: number, shortArms: boolean): StrokeGraph {
 }
 
 describe('live spur-pruning connectivity', () => {
+  it('does not remeasure unchanged real branches when unrelated spurs are removed', () => {
+    const real = starComponents(60, false);
+    const spurs = starComponents(60, true);
+    const offset = real.nodes.length;
+    const graph: StrokeGraph = {
+      nodes: [...real.nodes, ...spurs.nodes.map((node) => ({ ...node, id: node.id + offset }))],
+      chains: [
+        ...real.chains,
+        ...spurs.chains.map((chain) => ({ ...chain, a: chain.a + offset, b: chain.b + offset })),
+      ],
+    };
+    const hypot = vi.spyOn(Math, 'hypot');
+    try {
+      const result = pruneSpurs(graph, new Float64Array(32 * 32).fill(4), 32);
+      expect(result.chains.map((chain) => chain.points)).toEqual([
+        ...real.chains.map((chain) => chain.points),
+        ...spurs.chains.filter((_, index) => index % 3 === 2).map((chain) => chain.points),
+      ]);
+      expect(hypot.mock.calls.length).toBeLessThan(graph.chains.length * 3);
+    } finally {
+      hypot.mockRestore();
+    }
+  });
+
+  it('revisits an earlier chain before later candidates when a removal makes it a leaf', () => {
+    const positions = [
+      { x: 0.5, y: 0.5 },
+      { x: 1.5, y: 0.5 },
+      { x: 2.5, y: 0.5 },
+      { x: 3.5, y: 0.5 },
+    ] as const;
+    const graph: StrokeGraph = {
+      nodes: positions.map((pos, id) => ({ id, pos, kind: 'junction', pixels: [] })),
+      chains: (
+        [
+          [1, 2],
+          [0, 1],
+          [2, 3],
+        ] as const
+      ).map(([a, b]) => ({
+        a,
+        b,
+        closed: false,
+        points: [positions[a], positions[b]],
+      })),
+    };
+    const result = pruneSpurs(graph, new Float64Array(8).fill(1), 8);
+    expect(result.chains).toHaveLength(1);
+    expect(result.chains[0]?.points).toEqual([positions[2], positions[3]]);
+  });
+
+  it('rechecks a retained leaf after merging it onto a wider junction', () => {
+    const positions = [
+      { x: 0.5, y: 10.5 },
+      { x: 5.5, y: 10.5 },
+      { x: 8.5, y: 10.5 },
+      { x: 20.5, y: 10.5 },
+      { x: 8.5, y: 25.5 },
+    ] as const;
+    const graph: StrokeGraph = {
+      nodes: positions.map((pos, id) => ({ id, pos, kind: 'junction', pixels: [] })),
+      chains: (
+        [
+          [0, 1],
+          [1, 2],
+          [2, 3],
+          [2, 4],
+        ] as const
+      ).map(([a, b]) => ({
+        a,
+        b,
+        closed: false,
+        points: [positions[a], positions[b]],
+      })),
+    };
+    const distances = new Float64Array(32 * 32).fill(4);
+    distances[10 * 32] = distances[10 * 32 + 5] = 1;
+    distances[10 * 32 + 8] = 16;
+    const result = pruneSpurs(graph, distances, 32);
+    expect(result.chains).toHaveLength(1);
+    expect(result.chains[0]?.points).toEqual([positions[3], positions[2], positions[4]]);
+  });
+
   it('keeps thousands of real branches within a linear cooperative work budget', () => {
     const graph = starComponents(1000, false);
     const steps = pruneSpursSteps(graph, new Float64Array(32 * 32).fill(4), 32);

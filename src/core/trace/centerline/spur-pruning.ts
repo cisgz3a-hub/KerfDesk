@@ -11,6 +11,7 @@
 import type { Vec2 } from '../../scene';
 import type { StrokeGraph, StrokeNode } from './stroke-graph';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
+import { PruningWorklist, type MutablePruneChain as MutableChain } from './pruning-worklist';
 
 export type SpurPruneOptions = {
   /** Multiplier on the junction's local stroke radius. */
@@ -43,18 +44,11 @@ export const DEFAULT_SPUR_OPTIONS: SpurPruneOptions = {
 // spokes while corner spurs (protrusion ≲ 6 px) still prune.
 const MAX_SPUR_BUDGET_PX = 12;
 
-type MutableChain = {
-  a: number;
-  b: number;
-  points: Vec2[];
-  closed: boolean;
-  alive: boolean;
-};
-
 type OpenComponent = { size: number };
 type PruneState = {
   readonly degree: Map<number, number>;
   readonly component: Map<MutableChain, OpenComponent>;
+  readonly worklist: PruningWorklist;
 };
 
 export function pruneSpurs(
@@ -85,12 +79,13 @@ export function* pruneSpursSteps(
   const state: PruneState = {
     degree: liveDegrees(chains),
     component: yield* liveComponentsSteps(chains),
+    worklist: new PruningWorklist(chains),
   };
 
   let changed = true;
   while (changed) {
     if (cooperate) yield;
-    changed = yield* pruneOneSpurSteps(chains, state, nodeKind, distSq, width, options);
+    changed = yield* pruneOneSpurSteps(state, nodeKind, distSq, width, options);
     if (!changed && (yield* dissolvePassthroughJunctionsSteps(chains, state, nodeKind))) {
       changed = true;
     }
@@ -145,7 +140,6 @@ function survivingGraph(graph: StrokeGraph, chains: ReadonlyArray<MutableChain>)
 // Keep the original first-candidate ordering, with live counts after every
 // removal. A stale component size would let all leaves of a small mark die.
 function* pruneOneSpurSteps(
-  chains: MutableChain[],
   state: PruneState,
   nodeKind: Map<number, StrokeNode['kind']>,
   distSq: Float64Array,
@@ -153,8 +147,8 @@ function* pruneOneSpurSteps(
   options: SpurPruneOptions,
 ): TraceSteps<boolean> {
   const cooperate = yield;
-  const { degree, component } = state;
-  for (const chain of chains) {
+  const { degree, component, worklist } = state;
+  for (let chain = worklist.take(); chain !== undefined; chain = worklist.take()) {
     if (cooperate) yield;
     if (!chain.alive || chain.closed) continue;
     if (!isPrunableLeaf(chain, degree, nodeKind)) continue;
@@ -162,8 +156,11 @@ function* pruneOneSpurSteps(
     if (group === undefined || group.size <= 1) continue; // last chain guard
     if (!isArtifactSpur(chain, degree, distSq, width, options)) continue;
     chain.alive = false;
+    worklist.detach(chain);
     adjustDegree(degree, chain, -1);
     group.size -= 1;
+    worklist.changedAt(chain.a);
+    worklist.changedAt(chain.b);
     return true;
   }
   return false;
@@ -305,18 +302,21 @@ function* dissolvePassthroughJunctionsSteps(
   for (const [nodeId, d] of degree) {
     if (cooperate) yield;
     if (d !== 2 || nodeKind.get(nodeId) !== 'junction') continue;
-    const incident = chains.filter(
-      (c) => c.alive && !c.closed && (c.a === nodeId || c.b === nodeId),
-    );
+    const incident = state.worklist.at(nodeId);
     const first = incident[0];
     const second = incident[1];
     if (first === undefined || second === undefined || first === second) continue;
+    const affected = [first.a, first.b, second.a, second.b];
+    state.worklist.detach(first);
+    state.worklist.detach(second);
     adjustDegree(state.degree, first, -1);
     adjustDegree(state.degree, second, -1);
     mergeThroughNode(first, second, nodeId);
+    state.worklist.attach(first);
     adjustDegree(state.degree, first, 1);
     const group = state.component.get(first);
     if (group !== undefined) group.size -= first.closed ? 2 : 1;
+    for (const node of affected) state.worklist.changedAt(node);
     return true; // degrees changed — caller loops again
   }
   return false;
