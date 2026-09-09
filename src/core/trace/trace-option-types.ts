@@ -77,8 +77,9 @@ export type TraceOptions = {
   //     policy Edge Detection already uses.
   readonly medianFilter?: boolean | 'auto';
   // despeckleMinPixels: connected-component despeckle applied AFTER
-  // thresholding. Any ink region (4-connected, luma<128) with fewer
-  // than N pixels gets flipped to white. 0 or undefined disables.
+  // thresholding. Any ink region (luma<128) with fewer than N source pixels
+  // gets flipped to white. Centerline uses eight-connected ink; other modes
+  // retain four-connectivity. 0 or undefined disables.
   // Topology-preserving: holes inside letters (O, B, etc.) survive.
   readonly despeckleMinPixels?: number;
   // fillPinholeCracks: fill hairline white slivers ENCLOSED inside solid ink
@@ -96,8 +97,8 @@ export type TraceOptions = {
   readonly supersampleContour?: boolean;
   // pixelScale: INTERNAL — set by the upscale wrapper so pixel-denominated
   // cleanup caps (despeckle area, pinhole radius/area, contour min-area,
-  // simplify epsilon) keep their SOURCE-pixel semantics on a supersampled
-  // trace. Callers never set this directly.
+  // simplify epsilon, centerline join distance) keep their SOURCE-pixel
+  // semantics on a supersampled trace. Callers never set this directly.
   readonly pixelScale?: number;
   readonly ignoreLessThanPixels?: number;
   readonly smoothness?: number;
@@ -111,6 +112,9 @@ export type TraceOptions = {
   readonly edgeMinLengthPx?: number;
   readonly edgeJoinGapPx?: number;
   readonly edgeMedianFilter?: boolean;
+  // Centerline endpoint-join allowance in source-image pixels. Candidates
+  // must be strictly closer than this distance and pass the tangent checks.
+  // Zero disables gap bridging.
   readonly centerlineJoinGapPx?: number;
   // Phase E.3 — image-level adjustments matching LF1's
   // ImageProcessing.ts math (see raster-prep.ts). All four run BEFORE the

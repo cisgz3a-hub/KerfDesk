@@ -84,11 +84,49 @@ export function* pruneSpursSteps(
     if (!changed && (yield* dissolvePassthroughJunctionsSteps(chains, nodeKind))) changed = true;
   }
 
+  return survivingGraph(graph, chains);
+}
+
+// Pruning changes node roles as well as edges. A former junction with one
+// surviving arm is now a stroke tip; retaining its historical role suppresses
+// cap extension. Remove unused nodes and keep ids aligned with array indices.
+function survivingDegrees(chains: ReadonlyArray<MutableChain>): Map<number, number> {
+  const degree = liveDegrees(chains);
+  // A dissolved ring may still share its anchor with an open branch. Its
+  // two incidences remain part of that junction even though the closed ring
+  // no longer participates in spur removal or passthrough pairing.
+  for (const chain of chains) {
+    if (!chain.alive || !chain.closed) continue;
+    if (chain.a >= 0) degree.set(chain.a, (degree.get(chain.a) ?? 0) + 1);
+    if (chain.b >= 0) degree.set(chain.b, (degree.get(chain.b) ?? 0) + 1);
+  }
+  return degree;
+}
+
+function survivingGraph(graph: StrokeGraph, chains: ReadonlyArray<MutableChain>): StrokeGraph {
+  const degree = survivingDegrees(chains);
+  const remap = new Map<number, number>();
+  const nodes: StrokeNode[] = [];
+  for (const node of graph.nodes) {
+    const incident = degree.get(node.id) ?? 0;
+    if (incident === 0) continue;
+    const id = nodes.length;
+    remap.set(node.id, id);
+    nodes.push({ ...node, id, kind: incident === 1 ? 'endpoint' : 'junction' });
+  }
   return {
-    nodes: graph.nodes,
+    nodes,
+    seamJunctions:
+      graph.seamJunctions ??
+      graph.nodes.filter((node) => node.kind === 'junction').map((node) => node.pos),
     chains: chains
-      .filter((c) => c.alive)
-      .map((c) => ({ a: c.a, b: c.b, points: c.points, closed: c.closed })),
+      .filter((chain) => chain.alive)
+      .map((chain) => ({
+        a: remap.get(chain.a) ?? chain.a,
+        b: remap.get(chain.b) ?? chain.b,
+        points: chain.points,
+        closed: chain.closed,
+      })),
   };
 }
 
@@ -297,8 +335,7 @@ function mergeThroughNode(first: MutableChain, second: MutableChain, nodeId: num
   if (first.a === first.b && first.points.length >= 4) {
     first.closed = true;
     first.points.pop(); // closed polylines don't repeat the start point
-    first.a = -1;
-    first.b = -1;
+    // Keep the anchor id: another surviving chain may branch from this ring.
   }
   second.alive = false;
 }

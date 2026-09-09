@@ -4319,6 +4319,31 @@ push past potrace's blunted corners — i.e. where we exceed the reference,
 not miss it. This is the measured "1:1 match against a reference": the
 two vectorizations are indistinguishable except where ours is better.
 
+**Amendment (2026-09-09) - Centerline connectivity and distance units.**
+A separate mathematical audit reproduced seven failures beyond the existing
+fixtures: erased holes, merged independent intersections, shortened flat caps,
+deleted diagonal strokes, separated branch attachments, scale-dependent gap
+allowances and dropped gap endpoints. The squared distance transform and
+simple-point thinning remain unchanged.
+
+Centerline now removes pinched spurs before fitting junction groups. Only graph
+bridges may contract; every outgoing arm must support one common crossing,
+each node's displacement is bounded, and moved segments must stay in ink.
+Closed-loop anchors survive node remapping and cannot contract. Pruning updates
+live node roles, including the two incidences of an attached closed loop, while
+historical junction locations remain separate seam-repair landmarks.
+
+Existing endpoint-on-segment contacts become shared anchors through sharpening,
+smoothing, fairing and simplification; output interpolation retains those
+anchors without treating smooth attachments as corners. Centerline despeckling
+uses eight-connected ink, and the join allowance scales from source pixels to
+working pixels exactly once. Gap concatenation retains both distinct endpoints,
+and parallel or receding tips cannot join without positive forward progress.
+Focused regressions include rotated and enlarged controls, deliberate gaps,
+closed loops, thick crossings, short flat caps and independent nearby branches.
+These are software geometry guarantees on the tested fixtures, not a claim of
+universal raster reconstruction or machine qualification.
+
 ---
 
 ## ADR-024 — Windows desktop distribution + auto-update mechanism

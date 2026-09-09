@@ -249,9 +249,15 @@ export function otsuThreshold(image: RawImageData): number {
 // tiny holes" — preserving hole topology is critical for letters
 // like O / B / R / etc.
 //
+// Contours use four-connected ink; Centerline opts into eight-connectivity
+// so a diagonal stroke is one component rather than a row of isolated specks.
 // BFS using a single Uint8 visited mask + an index queue. O(N) total
 // work for N pixels regardless of region count.
-export function despeckle(image: RawImageData, minPixels: number): RawImageData {
+export function despeckle(
+  image: RawImageData,
+  minPixels: number,
+  connectivity: 4 | 8 = 4,
+): RawImageData {
   if (minPixels <= 1) return image;
   const { width: w, height: h } = image;
   const out = new Uint8ClampedArray(image.data);
@@ -260,7 +266,7 @@ export function despeckle(image: RawImageData, minPixels: number): RawImageData 
     if (visited[startIdx] !== 0) continue;
     visited[startIdx] = 1;
     if (lumaAt(out, startIdx * 4) >= 128) continue; // background pixel — skip
-    const region = bfsInkRegion(out, visited, w, h, startIdx);
+    const region = bfsInkRegion(out, visited, w, h, startIdx, connectivity);
     if (region.length < minPixels) {
       eraseRegion(out, region);
     }
@@ -269,15 +275,15 @@ export function despeckle(image: RawImageData, minPixels: number): RawImageData 
 }
 
 // BFS the connected ink region (luma < 128) starting at `startIdx`.
-// Marks every visited cell in `visited`. 4-connected so diagonal-only
-// touches stay separate regions — matches what the eye reads as
-// "this dot is detached".
+// Marks every visited cell in `visited`. Diagonal neighbours participate only
+// for callers whose stroke topology uses eight-connected ink.
 function bfsInkRegion(
   out: Uint8ClampedArray,
   visited: Uint8Array,
   w: number,
   h: number,
   startIdx: number,
+  connectivity: 4 | 8,
 ): number[] {
   const region: number[] = [startIdx];
   const queue: number[] = [startIdx];
@@ -289,6 +295,12 @@ function bfsInkRegion(
     visitNeighbour(out, visited, w, h, cx + 1, cy, region, queue);
     visitNeighbour(out, visited, w, h, cx, cy - 1, region, queue);
     visitNeighbour(out, visited, w, h, cx, cy + 1, region, queue);
+    if (connectivity === 8) {
+      visitNeighbour(out, visited, w, h, cx - 1, cy - 1, region, queue);
+      visitNeighbour(out, visited, w, h, cx + 1, cy - 1, region, queue);
+      visitNeighbour(out, visited, w, h, cx - 1, cy + 1, region, queue);
+      visitNeighbour(out, visited, w, h, cx + 1, cy + 1, region, queue);
+    }
   }
   return region;
 }

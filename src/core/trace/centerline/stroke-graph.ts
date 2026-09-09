@@ -19,7 +19,8 @@ export type StrokeNode = {
 };
 
 export type StrokeChain = {
-  /** Node ids at each end; -1 for closed loops. */
+  /** Node ids at each end; -1 for standalone closed loops. A loop closed
+   *  at a graph node retains that same id at both ends for attachments. */
   readonly a: number;
   readonly b: number;
   readonly points: ReadonlyArray<Vec2>;
@@ -29,6 +30,9 @@ export type StrokeChain = {
 export type StrokeGraph = {
   readonly nodes: ReadonlyArray<StrokeNode>;
   readonly chains: ReadonlyArray<StrokeChain>;
+  /** Former junction positions retained for geometric seam repair after
+   *  pruning. These are not live attachments and must not suppress tips. */
+  readonly seamJunctions?: ReadonlyArray<Vec2>;
 };
 
 const RING: ReadonlyArray<readonly [number, number]> = [

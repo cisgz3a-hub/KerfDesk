@@ -171,7 +171,11 @@ function cleanBinaryMask(image: RawImageData, options: TraceOptions): RawImageDa
   // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
   const scale = effectivePixelScale(options);
   const despeckled = shouldDespeckle(options)
-    ? despeckle(image, (options.despeckleMinPixels ?? 0) * scale * scale)
+    ? despeckle(
+        image,
+        (options.despeckleMinPixels ?? 0) * scale * scale,
+        options.traceMode === 'centerline' ? 8 : 4,
+      )
     : image;
   return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale) : despeckled;
 }
