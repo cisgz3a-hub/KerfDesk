@@ -31,6 +31,12 @@ importing an image or committing a trace.
   existing supersession queue and a global four-result cache bound.
   Full worker responses also retain their existing placement-offset carrier,
   which the client previously discarded.
+- The full worker previously calculated its duration after retaining the
+  complete route. In the committed production trial, stage diagnostics
+  completed construction, scene mapping and serialization, then stalled
+  inside that duration calculation. Calculate the same prepared-output
+  estimate before constructing the route, avoiding that overlap in live
+  memory. The ordinary estimate, source and path mathematics are unchanged.
 - Full Preview must still receive its complete route. The ordinary 4096 x
   4096 raster rendered directly on the baseline but exhausted a single worker
   clone after background routing. Larger full responses therefore transfer
@@ -92,7 +98,7 @@ worker returned P95 intervals of **8.5 ms for hover, 16.6 ms for zoom and
 their maximum intervals were 16.8, 33.4 and 25.1 ms respectively. The trace
 commit phase still included a 283 ms task. This profile qualifies the frozen
 canvas/autosave sources; its recorded bundle/source hashes precede the final
-large-Preview transfer ownership change. It does not establish a worst-case
+large-Preview memory changes. It does not establish a worst-case
 bound for the first required autosave, including work between measured phases.
 
 An isolated native Canvas2D comparison of the actual original and modified
@@ -135,6 +141,10 @@ requires actual ETA, non-null idle markers and completed chunked full Preview,
 then checks zero hover redraws in both Design and Preview and verifies saved
 source dimensions and pixels. This case passes in native Chrome. The hover
 regression failed on the baseline with twelve redraws.
+Hover points are hit-tested against the actual canvas: on a compact viewport,
+the Preview controls cover part of its rectangle. Both 1280 x 720 and
+1920 x 1080 viewports must still deliver all twelve native canvas pointer
+events and zero artwork redraws, rather than silently hovering a control.
 
 Raw profiles, scripts, screenshots, source hashes, native pixel comparisons
 and reports are retained outside the repository at

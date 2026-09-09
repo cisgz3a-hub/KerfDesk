@@ -15,6 +15,21 @@ export async function checkWorkspaceHover(page: Page): Promise<{
   await expect(canvas).toBeVisible();
   const bounds = await canvas.boundingBox();
   if (bounds === null) throw Error('Workspace canvas has no visible bounds');
+  const points = await canvas.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const candidates = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75].flatMap((fy) =>
+      [0.15, 0.25, 0.35, 0.45, 0.55, 0.75].map((fx) => ({
+        x: rect.x + rect.width * fx,
+        y: rect.y + rect.height * fy,
+      })),
+    );
+    // Compact viewports place Preview controls over the canvas. Moving over
+    // those controls cannot exercise the artwork's pointer/redraw behavior.
+    return candidates
+      .filter(({ x, y }) => document.elementFromPoint(x, y) === element)
+      .slice(0, 12);
+  });
+  expect(points).toHaveLength(12);
   await page.mouse.move(bounds.x + 30, bounds.y + 30);
   await page.evaluate(
     () =>
@@ -41,11 +56,8 @@ export async function checkWorkspaceHover(page: Page): Promise<{
     target.__workspaceHover = observe;
   });
   try {
-    for (let index = 0; index < 12; index++) {
-      await page.mouse.move(
-        bounds.x + bounds.width * (0.2 + (index % 6) * 0.1),
-        bounds.y + bounds.height * (index < 6 ? 0.35 : 0.65),
-      );
+    for (const point of points) {
+      await page.mouse.move(point.x, point.y);
       await page.evaluate(
         () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
       );

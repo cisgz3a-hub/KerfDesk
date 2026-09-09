@@ -57,6 +57,9 @@ export function largeJobPreparationFromPrepared(
   prepared: PreparedOutput,
   options: LargeJobPreparationOptions,
 ): LargeJobPreparation {
+  // Finish the planner's temporary allocations before retaining a complete
+  // multi-million-step preview route. Both use this exact prepared output.
+  const estimate = estimateLiveJobFromPrepared(prepared, options.jobOrigin, { unbounded: true });
   const toolpath = buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
     executablePlan: true,
   });
@@ -66,6 +69,6 @@ export function largeJobPreparationFromPrepared(
   return {
     toolpath: serializedToolpath,
     jobOriginOffset,
-    estimate: estimateLiveJobFromPrepared(prepared, options.jobOrigin, { unbounded: true }),
+    estimate,
   };
 }
