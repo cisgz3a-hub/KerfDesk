@@ -84,6 +84,29 @@ afterEach(async () => {
 });
 
 describe('serial connection epoch guards', () => {
+  it.each([
+    [
+      'a matching synthetic banner',
+      "Grbl 3.7 [FluidNC v4.0.3 (synthetic) '$' for help]",
+      'fluidnc',
+    ],
+    ['an unrecognized synthetic sign-on', 'OEM laboratory controller ready', null],
+    ['a stock-looking synthetic GRBL banner', 'Grbl 1.1h', 'grbl-v1.1'],
+    ['another recognized-family synthetic banner', 'GrblHAL 1.1f', 'grblhal'],
+  ] as const)(
+    'keeps the configured FluidNC driver for %s',
+    async (_label, banner, detectedControllerKind) => {
+      const connection = makeConnection();
+
+      await useLaserStore.getState().connect(adapterFor(connection), { controllerKind: 'fluidnc' });
+      connection.emitLine(banner);
+      await Promise.resolve();
+
+      expect(useLaserStore.getState().activeControllerKind).toBe('fluidnc');
+      expect(useLaserStore.getState().detectedControllerKind).toBe(detectedControllerKind);
+    },
+  );
+
   it('does not restart Marlin polling after Forget cancels the startup handshake', async () => {
     vi.useFakeTimers();
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
