@@ -65,7 +65,7 @@ export type ToolMode =
   | { readonly kind: 'select' }
   | { readonly kind: 'node' }
   | { readonly kind: 'measure' }
-  | { readonly kind: 'cnc-tabs'; readonly layerColor: string }
+  | { readonly kind: 'cnc-tabs'; readonly layerColor: string; readonly operationId?: string }
   // Camera/positioning aid (ADR-116 follow-up): the next canvas click jogs
   // the laser head to that bed point (absolute, beam off). Esc returns to
   // select like every other mode.

@@ -14,6 +14,7 @@ import type { AppState } from './store';
 import { projectAfterDeviceProfileChange } from './cnc-machine-setup-scene';
 import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
 import { machineSetupActions } from './machine-setup-actions';
+import { synchronizeCncTabCount } from './cnc-tab-count-sync';
 import {
   nextProbeSetupState,
   projectsShareProbeSetupIdentity,
@@ -44,7 +45,11 @@ export function sceneActions(
       set((s) => {
         const project = {
           ...s.project,
-          scene: updateLayer(s.project.scene, layerId, patch),
+          scene: synchronizeCncTabCount(
+            s.project.scene,
+            updateLayer(s.project.scene, layerId, patch),
+            layerId,
+          ),
         };
         return {
           project,

@@ -35,7 +35,10 @@ export function CncTabPositionControls(props: {
     layer,
     settings,
   );
-  const editing = toolMode.kind === 'cnc-tabs' && toolMode.layerColor === tabPathColor;
+  const editing =
+    toolMode.kind === 'cnc-tabs' &&
+    toolMode.layerColor === tabPathColor &&
+    (toolMode.operationId === undefined || toolMode.operationId === layer.id);
   return (
     <Row label="Tab positions">
       <button
@@ -49,7 +52,7 @@ export function CncTabPositionControls(props: {
         }
         onClick={() => {
           seedAnchors(tabPathColor, settings.tabsPerShape);
-          setToolMode({ kind: 'cnc-tabs', layerColor: tabPathColor });
+          setToolMode({ kind: 'cnc-tabs', layerColor: tabPathColor, operationId: layer.id });
           fitToSelection();
         }}
       >

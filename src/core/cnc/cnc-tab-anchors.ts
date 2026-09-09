@@ -71,6 +71,44 @@ export function cncTabAnchorPosition(object: SceneObject, anchor: CncTabAnchor):
   return local === null ? null : applyTransform(local, object.transform);
 }
 
+/** Replace saved positions only on the caller's eligible paths. Unanchored
+ * contours remain automatic; opening the editor still uses keep-existing seeding. */
+export function redistributeCncTabAnchors(
+  object: SceneObject,
+  pathIndexes: ReadonlySet<number>,
+  count: number,
+): ReadonlyArray<CncTabAnchor> {
+  const original = object.cncTabAnchors ?? [];
+  if (!('paths' in object) || !Number.isFinite(count) || count < 1) return original;
+  const perContour = Math.floor(count);
+  const replaced = new Set<CncTabAnchor>();
+  const seeded: CncTabAnchor[] = [];
+  object.paths.forEach((path, pathIndex) => {
+    if (!pathIndexes.has(pathIndex)) return;
+    const existing = original.filter(
+      (anchor) => anchor.pathIndex === pathIndex && anchor.layerColor === path.color,
+    );
+    if (existing.length === 0) return;
+    resolvedPolylines(path).forEach((polyline, polylineIndex) => {
+      if (!polyline.closed || normalizedClosedPoints(polyline).length < 3) return;
+      const anchors = existing.filter((anchor) => anchor.polylineIndex === polylineIndex);
+      if (anchors.length === 0) return;
+      anchors.forEach((anchor) => replaced.add(anchor));
+      for (let index = 0; index < perContour; index += 1) {
+        seeded.push({
+          layerColor: path.color,
+          pathIndex,
+          polylineIndex,
+          pathT: (index + 0.5) / perContour,
+        });
+      }
+    });
+  });
+  if (replaced.size === 0) return original;
+  const next = [...original.filter((anchor) => !replaced.has(anchor)), ...seeded];
+  return JSON.stringify(next) === JSON.stringify(original) ? original : next;
+}
+
 export function projectCncTabAnchor(
   object: SceneObject,
   layerColor: string,
