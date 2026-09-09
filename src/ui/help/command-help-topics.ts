@@ -293,7 +293,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'arrange.array': {
     family: 'arrange',
-    tooltip: 'Create a bounded grid or circular array from the selected artwork.',
+    tooltip: 'Create a grid, point-rotation, or circular array from selected artwork.',
   },
   'arrange.quick-nest': {
     family: 'arrange',
