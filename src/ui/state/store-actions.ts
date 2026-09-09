@@ -1,4 +1,6 @@
 import { deviceProfileWithInteractivePatch } from '../../core/devices/device-profile-patch';
+import { profileLayerDefaultSettings } from '../layers/profile-layer-default-settings';
+import { defaultSettingsForColor } from './layer-default-actions';
 import {
   moveLayer as moveSceneLayer,
   sceneObjectHasVisibleLayer,
@@ -42,9 +44,18 @@ export function sceneActions(
   return {
     setLayerParam: (layerId, patch) =>
       set((s) => {
+        const current = s.project.scene.layers.find((layer) => layer.id === layerId);
+        const modeDefaults =
+          current !== undefined && patch.mode !== undefined && patch.mode !== current.mode
+            ? profileLayerDefaultSettings(
+                s.project,
+                patch.mode,
+                defaultSettingsForColor(s.layerDefaults, current.color),
+              )
+            : {};
         const project = {
           ...s.project,
-          scene: updateLayer(s.project.scene, layerId, patch),
+          scene: updateLayer(s.project.scene, layerId, { ...modeDefaults, ...patch }),
         };
         return {
           project,

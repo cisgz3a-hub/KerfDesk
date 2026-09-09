@@ -19458,3 +19458,13 @@ from its hole and change existing toolpaths merely while adding a new operation.
   qualification is claimed. The exact-job Frame policy and Job Review advisory policy are unchanged.
 
 ---
+
+## Pending proposal - 4040 laser layer defaults (2026-09-06)
+
+**Status: proposal only; adoption not approved. No ADR number is allocated or reserved.**
+
+The [dated proposal note](docs/proposals/2026-09-06-4040-layer-defaults.md) records the recovered
+800 mm/min, Line 90%, Fill 80%, one-way laser defaults, the current-scope draft implementation,
+all eight donor-file dispositions, and the unapplied Image-preset direction hunk. The numeric
+rationale and mode-change/preset choices remain unresolved. This entry records a reviewable
+proposal, not an accepted machine/material setting or physical-quality finding.
