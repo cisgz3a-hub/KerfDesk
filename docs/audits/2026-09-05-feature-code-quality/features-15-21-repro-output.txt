@@ -1,0 +1,174 @@
+Command: pnpm exec vitest run src/__fixtures__/audit-feature15-21.test.tsx
+Working directory: C:\Users\Asus\.codex\audits\kerfdesk-features-20260905-ccaa3064
+Source revision: ccaa3064d9efe904821307f0603ce842d903b586
+Audit evidence only. These assertions characterize current defects; passing is not a correctness endorsement.
+
+Final run (exit code 0):
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+
+ RUN  v3.2.6 C:/Users/Asus/.codex/audits/kerfdesk-features-20260905-ccaa3064
+
+
+ ✓ src/__fixtures__/audit-feature15-21.test.tsx (5 tests) 204ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  08:14:33
+   Duration  13.34s (transform 6.57s, setup 25ms, collect 11.93s, tests 204ms, environment 733ms, prepare 129ms)
+
+
+
+Initial run (exit code 1), retained to show the evidence correction:
+stderr | src/__fixtures__/audit-feature15-21.test.tsx > Feature 15-21 audit: observed bad behavior, not acceptance of correctness > accepts a 100-million-jig request at the UI boundary without allocating it
+Warning: An update to RegistrationJigOutlineControls inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RegistrationJigOutlineControls (C:\Users\Asus\.codex\audits\kerfdesk-features-20260905-ccaa3064\src\ui\workspace\RegistrationJigOutlineControls.tsx:21:51)
+
+ ❯ src/__fixtures__/audit-feature15-21.test.tsx (5 tests | 1 failed) 227ms
+   ✓ Feature 15-21 audit: observed bad behavior, not acceptance of correctness > blank interval speed is browser-valid and generates a zero-speed job that cannot emit 103ms
+   ✓ Feature 15-21 audit: observed bad behavior, not acceptance of correctness > blank material minimum speed creates a zero-speed row that cannot emit 63ms
+   × Feature 15-21 audit: observed bad behavior, not acceptance of correctness > blank CNC fit-test relief diameter is accepted and generates unrelieved coupons 26ms
+     → expected [ Array(2) ] to deeply equal [ Array(2) ]
+   ✓ Feature 15-21 audit: observed bad behavior, not acceptance of correctness > a delayed alignment commits into a new project even after the wizard is closed 12ms
+   ✓ Feature 15-21 audit: observed bad behavior, not acceptance of correctness > accepts a 100-million-jig request at the UI boundary without allocating it 20ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__fixtures__/audit-feature15-21.test.tsx > Feature 15-21 audit: observed bad behavior, not acceptance of correctness > blank CNC fit-test relief diameter is accepted and generates unrelieved coupons
+AssertionError: expected [ Array(2) ] to deeply equal [ Array(2) ]
+
+- Expected
++ Received
+
+  [
+    [
+      "0.000000,0.000000",
+      "0.000000,10.000000",
+-     "0.000000,10.000000",
+-     "103.425000,10.000000",
+-     "103.425000,13.000000",
++     "103.430000,10.000000",
++     "103.430000,13.000000",
+      "121.500000,0.000000",
+      "121.500000,10.000000",
+-     "13.487500,10.000000",
+-     "13.487500,13.000000",
+-     "22.525000,10.000000",
+-     "22.525000,13.000000",
+-     "31.475000,10.000000",
+-     "31.475000,13.000000",
+-     "4.512500,10.000000",
+-     "4.512500,13.000000",
+-     "40.537500,10.000000",
+-     "40.537500,13.000000",
+-     "49.462500,10.000000",
+-     "49.462500,13.000000",
++     "121.500000,10.000000",
++     "13.490000,10.000000",
++     "13.490000,13.000000",
++     "22.530000,10.000000",
++     "22.530000,13.000000",
++     "31.480000,10.000000",
++     "31.480000,13.000000",
++     "4.510000,10.000000",
++     "4.510000,13.000000",
++     "40.540000,10.000000",
++     "40.540000,13.000000",
++     "49.460000,10.000000",
++     "49.460000,13.000000",
+      "58.550000,10.000000",
+      "58.550000,13.000000",
+      "67.450000,10.000000",
+      "67.450000,13.000000",
+-     "76.562500,10.000000",
+-     "76.562500,13.000000",
+-     "85.437500,10.000000",
+-     "85.437500,13.000000",
+-     "94.575000,10.000000",
+-     "94.575000,13.000000",
++     "76.560000,10.000000",
++     "76.560000,13.000000",
++     "85.440000,10.000000",
++     "85.440000,13.000000",
++     "94.580000,10.000000",
++     "94.580000,13.000000",
+    ],
+    [
+      "0.000000,19.000000",
+-     "0.000000,32.000000",
+      "0.000000,32.000000",
+-     "103.575000,29.000000",
+-     "103.575000,32.000000",
++     "103.580000,29.000000",
++     "103.580000,32.000000",
+      "121.500000,19.000000",
++     "121.500000,32.000000",
+      "121.500000,32.000000",
+-     "13.512500,29.000000",
+-     "13.512500,32.000000",
+-     "22.475000,29.000000",
+-     "22.475000,32.000000",
+-     "31.525000,29.000000",
+-     "31.525000,32.000000",
+-     "4.487500,29.000000",
+-     "4.487500,32.000000",
+-     "40.462500,29.000000",
+-     "40.462500,32.000000",
+-     "49.537500,29.000000",
+-     "49.537500,32.000000",
++     "13.510000,29.000000",
++     "13.510000,32.000000",
++     "22.480000,29.000000",
++     "22.480000,32.000000",
++     "31.530000,29.000000",
++     "31.530000,32.000000",
++     "4.490000,29.000000",
++     "4.490000,32.000000",
++     "40.460000,29.000000",
++     "40.460000,32.000000",
++     "49.540000,29.000000",
++     "49.540000,32.000000",
+      "58.450000,29.000000",
+      "58.450000,32.000000",
+      "67.550000,29.000000",
+      "67.550000,32.000000",
+-     "76.437500,29.000000",
+-     "76.437500,32.000000",
+-     "85.562500,29.000000",
+-     "85.562500,32.000000",
+-     "94.425000,29.000000",
+-     "94.425000,32.000000",
++     "76.440000,29.000000",
++     "76.440000,32.000000",
++     "85.560000,29.000000",
++     "85.560000,32.000000",
++     "94.430000,29.000000",
++     "94.430000,32.000000",
+    ],
+  ]
+
+ ❯ src/__fixtures__/audit-feature15-21.test.tsx:115:34
+    113|     // Clipper may normalize winding/order, so compare the geometric v…
+    114|     const vertices = (parts: typeof zero.parts) => parts.map((part) =>…
+    115|     expect(vertices(zero.parts)).toEqual(vertices(plain.parts));
+       |                                  ^
+    116|     // Required invariant: CNC relief requires a finite positive diame…
+    117|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  08:13:44
+   Duration  13.44s (transform 6.43s, setup 38ms, collect 11.74s, tests 227ms, environment 932ms, prepare 138ms)

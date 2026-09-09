@@ -1,0 +1,28 @@
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+
+ RUN  v3.2.6 C:/Users/Asus/.codex/audits/kerfdesk-features-20260905-ccaa3064
+
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F08-01: 300 fill density creates native stepMismatch and blocks submit 93ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F08-01: 300 image density creates native stepMismatch and blocks submit 21ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F08-02: increasing draft Power does not increase grayscale Min Power max 15ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F09-01: unchanged line wizard settings reset unseen details 10ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F09-01: unchanged fill wizard settings reset unseen details 4ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F09-01: unchanged image wizard settings reset unseen details 4ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F09-02: unchecking recipe air assist retains true 3ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F12-01: Undo after Apply changes pixels but leaves Apply disabled and next apply skips bake 8ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F11-01: mask crop of a paged-only raster substitutes white and keeps incompatible old asset 3ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F12-02: store eraser ignores non-white selected background 1ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F12-03: Apply retains original paged luma and hydration overwrites edited pixels 2ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F12-04: async bake PNG snapshot and emitted luma can read different pixel revisions 33ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F13-01: Enter on the production Cancel button commits an adjustment 9ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F13-02: single-layer adjustment preview ignores layer opacity 1ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F14-01: chamfering a rectangle drops its assigned carve layer 1ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F14-02: deleting the last applied entity cannot remove previous project output 9ms
+ ✓ src/__fixtures__/audit-feature08-14.test.tsx > audit features 08-14: assertions confirm observed defects > F14-03: restored never-applied drawing has Apply disabled until a new edit 5ms
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  08:20:09
+   Duration  10.09s (transform 4.77s, setup 23ms, collect 8.68s, tests 224ms, environment 724ms, prepare 123ms)

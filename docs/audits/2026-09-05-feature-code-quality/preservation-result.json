@@ -1,0 +1,12 @@
+{
+  "checkedUtc": "2026-09-05T02:59:56.450415+00:00",
+  "inheritedFilesChecked": 25,
+  "inheritedFilesChanged": [],
+  "archiveFilesChecked": 4602,
+  "archivedSourceFilesChanged": [],
+  "workingHead": "9209fcb33f4807ebfc1f7a55780069b6a7b0e23c",
+  "workingBranch": "claude/vcarve-stamp-subcell",
+  "currentRemoteMain": "7296bde144def7692b308e0971f4861656002cf4",
+  "workingStatus": "M AGENTS.md\n M CLAUDE.md\n M src/core/gcode-view/gcode-render-model-builder.test.ts\n M src/core/gcode-view/gcode-render-model-builder.ts\n M src/core/gcode/index.ts\n M src/io/gcode/gcode-program-line-parser.ts\n M src/io/gcode/parse-gcode-program.test.ts\n M src/ui/app/file-actions.test.ts\n M src/ui/app/file-actions.ts\n M src/ui/layers/CncLayerFields.tsx\n M src/ui/layers/artwork-run-order-view-model.ts\n?? docs/audits/2026-08-09-rayforge-gap-planning-ledger.md\n?? docs/audits/2026-08-30-ten-loop-repo-audit/\n?? docs/audits/2026-09-05-feature-code-quality/\n?? docs/audits/2026-09-05-website-features-and-button-audit.md\n?? src/__fixtures__/audit/\n?? src/core/gcode/program-parse-reason.ts\n?? src/ui/layers/CncVCarveOpenPathNote.test.tsx\n?? src/ui/layers/CncVCarveOpenPathNote.tsx",
+  "note": "New audit-only fixtures and node_modules in the extracted snapshot are not original archive members. Only report files were added to the working checkout."
+}

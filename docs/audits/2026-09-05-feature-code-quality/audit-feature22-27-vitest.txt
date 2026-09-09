@@ -1,0 +1,23 @@
+Audit-only reproduction run; output transcribed from tool result with normalized checkmarks.
+Snapshot: C:\Users\Asus\.codex\audits\kerfdesk-features-20260905-ccaa3064
+Snapshot revision: ccaa3064d9efe904821307f0603ce842d903b586
+Command: pnpm exec vitest run src/__fixtures__/audit-feature22-27.test.tsx --reporter=verbose
+Exit code: 0
+
+The build metadata hook printed "fatal: not a git repository (or any of the parent directories): .git" three times before Vitest because this is an extracted snapshot without .git. Vitest then ran normally.
+
+RUN v3.2.6 C:/Users/Asus/.codex/audits/kerfdesk-features-20260905-ccaa3064
+
+PASS src/__fixtures__/audit-feature22-27.test.tsx > feature 22-27 audit reproductions > reproduces stale G92 success after the acknowledged operation loses its physical port 49ms
+PASS src/__fixtures__/audit-feature22-27.test.tsx > feature 22-27 audit reproductions > reproduces canvas machine-coordinate target being emitted as work-coordinate absolute jog 19ms
+PASS src/__fixtures__/audit-feature22-27.test.tsx > feature 22-27 audit reproductions > reproduces stale G92 owner overwriting the replacement controller work offset 24ms
+PASS src/__fixtures__/audit-feature22-27.test.tsx > feature 22-27 audit reproductions > reproduces lost Show traversal moves change before asynchronous scene creation 317ms
+PASS src/__fixtures__/audit-feature22-27.test.tsx > feature 22-27 audit reproductions > reproduces missed variable advancement when terminal completion precedes recovery activation 5ms
+PASS src/__fixtures__/audit-feature22-27.test.tsx > feature 22-27 audit reproductions > reproduces Delete editing underlying artwork while the full-page CNC dialog is open 32ms
+
+Test Files 1 passed (1)
+Tests 6 passed (6)
+Start at 08:20:30
+Duration 13.70s (transform 6.45s, setup 22ms, collect 12.06s, tests 449ms, environment 723ms, prepare 115ms)
+
+These tests assert the observed defective behavior. Passing them demonstrates reproduction, not acceptance of correct application behavior. All machine-facing interactions are simulated; no hardware or provider was operated.
