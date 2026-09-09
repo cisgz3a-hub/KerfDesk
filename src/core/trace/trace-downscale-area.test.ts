@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { denseFixture, rect } from '../../__fixtures__/dense-trace-area';
 import { components } from '../../__fixtures__/auto-detail-trace';
 import { resampleBuffer } from '../image-resample';
-import type { ColoredPath } from '../scene';
-import { scaleTracedPathsUniform } from './auto-upscale';
+import { polylineToCurveSubpath, type ColoredPath } from '../scene';
 import { enhanceRegionPaths } from './region-enhance';
 import { TRACE_PRESETS } from './trace-presets';
 import { prepareTraceForContour, type TraceOptions } from './trace-image';
@@ -41,7 +40,7 @@ describe('source-grid area controls during dense downsampling', () => {
           ignoreLessThanPixels: 20 * areaRatio,
         });
         expect(await traceImageToColoredPaths(image, options)).toEqual(
-          scaleTracedPathsUniform(reference, plan.coordinateScale),
+          restoreSourceGrid(reference, image.width / plan.width, image.height / plan.height),
         );
       }
     },
@@ -124,7 +123,7 @@ describe('source-grid area controls during dense downsampling', () => {
     });
     const before = image.data.slice();
     expect(await traceImageToColoredPaths(image, options)).toEqual(
-      scaleTracedPathsUniform(reference, plan.coordinateScale),
+      restoreSourceGrid(reference, image.width / plan.width, image.height / plan.height),
     );
     expect(image.data.length).toBe(before.length);
     expect(image.data.every((value, index) => value === before[index])).toBe(true);
@@ -149,7 +148,7 @@ describe('source-grid area controls during dense downsampling', () => {
       { ...options, ...nativeFlags },
     );
     expect(await traceImageToColoredPaths(image, options)).toEqual(
-      scaleTracedPathsUniform(reference, plan.coordinateScale),
+      restoreSourceGrid(reference, image.width / plan.width, image.height / plan.height),
     );
   }, 30000);
 
@@ -179,3 +178,13 @@ describe('source-grid area controls during dense downsampling', () => {
     expect(targets(enhanced)).toHaveLength(12);
   }, 30000);
 });
+
+function restoreSourceGrid(paths: ColoredPath[], scaleX: number, scaleY: number): ColoredPath[] {
+  return paths.map((path) => {
+    const polylines = path.polylines.map((line) => ({
+      closed: line.closed,
+      points: line.points.map((point) => ({ x: point.x * scaleX, y: point.y * scaleY })),
+    }));
+    return { color: path.color, polylines, curves: polylines.map(polylineToCurveSubpath) };
+  });
+}

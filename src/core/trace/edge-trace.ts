@@ -16,17 +16,15 @@
 //
 // The Canny-era option fields stay as the public knobs so the dialog,
 // presets, and merge logic are untouched; the engine derives its two mask
-// parameters from them (see the derivation constants below).
+// parameters from them (see edge-input.ts).
 
-import { clamp } from '../math';
 import type { ColoredPath, Polyline } from '../scene';
 import {
   contourPolylinesFromMaskSteps,
   flattenStrengthFromSmoothness,
   optimizationToleranceScaleFromOptimize,
 } from './contour-trace';
-import { localContrastCrackField, localContrastInkBitmap } from './local-contrast-mask';
-import { impulseNoiseRatio, IMPULSE_NOISE_MIN_RATIO, medianFilter } from './preprocess';
+import { edgeTraceInputMatches, prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
 import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { runTraceSteps, type TraceSteps } from './trace-steps';
@@ -37,29 +35,6 @@ const MIN_EDGE_AREA_PX = 2;
 // Same base simplification epsilon as the contour lane (see contour-trace).
 const EDGE_SIMPLIFY_EPSILON_PX = 0.45;
 
-// Slider → mask-parameter derivations. The dialog's Edge sliders land in
-// TraceOptions as Canny-era fields (src/ui/trace/trace-options.ts):
-// Sensitivity → edgeLow/HighThresholdRatio, Detail → edgeBlurSigma,
-// Minimum line → edgeMinLengthPx.
-//
-// delta (how much darker than the neighbourhood counts as ink) derives from
-// the LOW threshold ratio: the app default (sensitivity 50 → low 0.074)
-// must land on the prototype-approved delta 6, hence the 6/0.074 scale.
-// Higher sensitivity → lower ratio → smaller delta → fainter ink caught,
-// preserving the slider's direction.
-const DELTA_PER_LOW_THRESHOLD_RATIO = 6 / 0.074;
-const DEFAULT_LOW_THRESHOLD_RATIO = 0.074;
-const DELTA_MIN = 2;
-const DELTA_MAX = 12;
-// radius (the neighbourhood the local mean is taken over) derives from the
-// blur sigma: the app default (detail 68 → sigma 1.2) must land on the
-// prototype-approved radius 12, hence the ×10 scale. More Detail → smaller
-// sigma → smaller neighbourhood → finer local adaptation.
-const RADIUS_PER_BLUR_SIGMA = 10;
-const DEFAULT_BLUR_SIGMA = 1.2;
-const RADIUS_MIN_PX = 4;
-const RADIUS_MAX_PX = 32;
-
 export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions): ColoredPath[] {
   return runTraceSteps(traceImageToEdgePathsSteps(image, options));
 }
@@ -67,25 +42,22 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
 export function* traceImageToEdgePathsSteps(
   image: RawImageData,
   options: TraceOptions,
+  preparedInput?: EdgeTraceInput,
 ): TraceSteps<ColoredPath[]> {
   const cooperate = yield;
-  const source = medianForEdges(image, options.edgeMedianFilter);
-  if (cooperate) yield;
+  const input =
+    preparedInput !== undefined && edgeTraceInputMatches(preparedInput, image, options)
+      ? preparedInput
+      : prepareEdgeTraceInput(image, options);
+  const { bitmap, crackField } = input;
   // Pixel-denominated knobs keep SOURCE-pixel semantics on a supersampled
   // trace (same discipline as the filled-contour lane): the local-mean
   // radius and simplify ε scale by pixelScale, areas by its square. delta is
   // a luma contrast, scale-free.
   const scale = effectivePixelScale(options);
-  const maskOptions = {
-    radiusPx: maskRadiusPx(options) * scale,
-    delta: maskDelta(options),
-  };
-  const bitmap = localContrastInkBitmap(source, maskOptions);
-  if (cooperate) yield;
   // The same measured-boundary stack as the filled lane: the mask's iso-line
   // field gives sub-pixel vertex positions, which in turn lets the wobble
   // stages stand down and the fairing-by-fitting tail engage per loop.
-  const crackField = localContrastCrackField(source, maskOptions);
   if (cooperate) yield;
   const toleranceScale = optimizationToleranceScaleFromOptimize(options.optimize);
   const finished = yield* contourPolylinesFromMaskSteps(
@@ -132,30 +104,4 @@ function polylineLength(polyline: Polyline): number {
     length += Math.hypot(first.x - last.x, first.y - last.y);
   }
   return length;
-}
-
-function maskDelta(options: TraceOptions): number {
-  const low = options.edgeLowThresholdRatio ?? DEFAULT_LOW_THRESHOLD_RATIO;
-  return clamp(Math.round(low * DELTA_PER_LOW_THRESHOLD_RATIO), DELTA_MIN, DELTA_MAX);
-}
-
-function maskRadiusPx(options: TraceOptions): number {
-  const sigma = options.edgeBlurSigma ?? DEFAULT_BLUR_SIGMA;
-  return clamp(Math.round(sigma * RADIUS_PER_BLUR_SIGMA), RADIUS_MIN_PX, RADIUS_MAX_PX);
-}
-
-// Median pre-filtering: a 3×3 median protects noisy photos but DESTROYS
-// clean small features — 4-6 px letters trace as melted blobs (the
-// LANGEBAAN defect). Default (undefined) is therefore AUTO: apply the
-// median only when the image actually contains impulse noise (see
-// hasImpulseNoise in preprocess.ts, which owns the shared detector and its
-// constants). An explicit true/false still forces the choice.
-//
-// The auto branch reuses the median it already computed rather than calling
-// hasImpulseNoise (which would filter a second time).
-function medianForEdges(image: RawImageData, edgeMedianFilter: boolean | undefined): RawImageData {
-  if (edgeMedianFilter === false) return image;
-  const filtered = medianFilter(image);
-  if (edgeMedianFilter === true) return filtered;
-  return impulseNoiseRatio(image, filtered) >= IMPULSE_NOISE_MIN_RATIO ? filtered : image;
 }

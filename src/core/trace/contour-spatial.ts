@@ -1,28 +1,9 @@
-import type { Vec2 } from '../scene';
+import { ContourBoxIndex } from './contour-box-index';
+import { boxesOverlap, contourBox, finiteContourBox, type ContourBox } from './contour-bounds';
 import type { TraceSteps } from './trace-steps';
 
-export type ContourBox = {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-};
+export { contourBox, type ContourBox } from './contour-bounds';
 const CHECKPOINT_PAIRS = 256;
-
-/** Bounds for a nonempty contour or segment. */
-export function contourBox(points: ReadonlyArray<Vec2>): ContourBox {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
-}
 
 /** Visit every overlapping pair, with inclusive bounds so contacts are retained. */
 export function* visitContourBoxPairsSteps<T extends ContourBox>(
@@ -40,6 +21,39 @@ export function* visitContourBoxPairsSteps<T extends ContourBox>(
   const low = horizontal ? 'minX' : 'minY';
   const high = horizontal ? 'maxX' : 'maxY';
   const sorted = [...boxes].sort((a, b) => a[low] - b[low]);
+  if (!boxes.every(finiteContourBox)) {
+    yield* visitSweepPairsSteps(sorted, low, high, visit);
+    return;
+  }
+  const entries = sorted.map((box, order) => ({
+    minX: box.minX,
+    minY: box.minY,
+    maxX: box.maxX,
+    maxY: box.maxY,
+    order,
+    box,
+  }));
+  const index = yield* ContourBoxIndex.createSteps(entries);
+  let pairs = 0;
+  for (const a of entries) {
+    if (cooperate) yield;
+    const candidates = index.query(a).filter((b) => b.order > a.order);
+    candidates.sort((a, b) => a.order - b.order);
+    for (const b of candidates) {
+      pairs += 1;
+      if (cooperate && pairs % CHECKPOINT_PAIRS === 0) yield;
+      visit(a.box, b.box);
+    }
+  }
+}
+
+function* visitSweepPairsSteps<T extends ContourBox>(
+  sorted: ReadonlyArray<T>,
+  low: 'minX' | 'minY',
+  high: 'maxX' | 'maxY',
+  visit: (a: T, b: T) => void,
+): TraceSteps<void> {
+  const cooperate = yield;
   let pairs = 0;
   for (let i = 0; i < sorted.length; i += 1) {
     if (cooperate) yield;
@@ -53,8 +67,4 @@ export function* visitContourBoxPairsSteps<T extends ContourBox>(
       if (boxesOverlap(a, b)) visit(a, b);
     }
   }
-}
-
-function boxesOverlap(a: ContourBox, b: ContourBox): boolean {
-  return a.maxX >= b.minX && b.maxX >= a.minX && a.maxY >= b.minY && b.maxY >= a.minY;
 }

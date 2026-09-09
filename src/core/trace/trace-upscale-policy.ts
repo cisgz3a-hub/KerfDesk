@@ -9,6 +9,7 @@ import { contourDetailProfile, type ContourDetailProfile } from './contour-detai
 import { isBinaryContourPreset } from './contour-trace';
 import type { RawImageData, TraceOptions } from './trace-image';
 import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
+import type { EdgeTraceInput } from './edge-input';
 
 const DENSE_COLOR_TRANSITION_DENSITY = 0.025;
 const DENSE_COLOR_DOWNSCALE_TRIGGER_PIXELS = 1_500_000;
@@ -42,12 +43,16 @@ export function traceUpscaleFactor(image: RawImageData, options: TraceOptions): 
  * ordinary sizes and use a bounded working grid above 1.5 MP; their vectors
  * are restored to source coordinates after tracing.
  */
-export function traceScalePlan(image: RawImageData, options: TraceOptions): TraceScalePlan {
+export function traceScalePlan(
+  image: RawImageData,
+  options: TraceOptions,
+  edgeInput?: EdgeTraceInput,
+): TraceScalePlan {
   const thinStroke = options.autoUpscaleSmallSources === true && shouldAutoUpscale(image);
   const smallSmooth = options.upscaleSmallSmoothSources === true && shouldUpscaleSmallSource(image);
   const thinFactor = thinStroke ? THIN_STROKE_UPSCALE_FACTOR : 1;
   const smallFactor = smallSmooth ? computeUpscaleFactor(image) : 1;
-  const profile = contourQualityProfile(image, options);
+  const profile = contourQualityProfile(image, options, edgeInput);
   const denseColor = isDenseColorProfile(image, options, profile);
   if (denseColor) {
     const downscale = denseColorDownscalePlan(image);
@@ -65,10 +70,11 @@ export function traceScalePlan(image: RawImageData, options: TraceOptions): Trac
 function contourQualityProfile(
   image: RawImageData,
   options: TraceOptions,
+  edgeInput?: EdgeTraceInput,
 ): ContourDetailProfile | null {
   if (options.supersampleContour !== true) return null;
   if (!isBinaryContourPreset(options) && options.traceMode !== 'edge') return null;
-  return contourDetailProfile(image, options);
+  return contourDetailProfile(image, options, edgeInput);
 }
 
 function shouldUseContourQualityScale(

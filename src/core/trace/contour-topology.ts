@@ -2,7 +2,8 @@ import type { Polyline, Vec2 } from '../scene';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { closeRingEndpoints } from './centerline/loop-closure';
 import { intersectingContourLoopsSteps } from './contour-intersections';
-import { insideContour } from './contour-orientation';
+import { ContourMembership } from './contour-membership';
+import { ContourContactCache } from './contour-contact-cache';
 import { contourBox, visitContourBoxPairsSteps } from './contour-spatial';
 import type { TraceSteps } from './trace-steps';
 
@@ -40,9 +41,11 @@ export function* preserveContourTopologySteps(
   const cooperate = yield;
   const current = contours.map((contour) => contour.polyline);
   const attempts = contours.map(() => 0);
+  const membership = new ContourMembership();
+  const contacts = new ContourContactCache();
   for (;;) {
-    const conflicts = yield* intersectingContourLoopsSteps(current);
-    yield* addNestingConflictsSteps(contours, current, conflicts);
+    const conflicts = yield* intersectingContourLoopsSteps(current, contacts);
+    yield* addNestingConflictsSteps(contours, current, conflicts, membership);
     let changed = false;
     for (const index of conflicts) {
       if (cooperate) yield;
@@ -70,6 +73,7 @@ function* addNestingConflictsSteps(
   contours: ReadonlyArray<FinishedContour>,
   current: ReadonlyArray<Polyline>,
   conflicts: Set<number>,
+  membership: ContourMembership,
 ): TraceSteps<void> {
   const cooperate = yield;
   const boxes = contours.map((contour, index) => {
@@ -87,28 +91,34 @@ function* addNestingConflictsSteps(
     };
   });
   if (cooperate) yield;
-  yield* visitContourBoxPairsSteps(boxes, (a, b) => {
+  const pairs: [(typeof boxes)[number], (typeof boxes)[number]][] = [];
+  yield* visitContourBoxPairsSteps(boxes, (a, b) => pairs.push([a, b]));
+  for (const [a, b] of pairs) {
+    if (cooperate) yield;
     if (
-      membershipChanged(a.source, b.source, a.candidate, b.candidate) ||
-      membershipChanged(b.source, a.source, b.candidate, a.candidate)
+      (yield* membershipChangedSteps(a.source, b.source, a.candidate, b.candidate, membership)) ||
+      (yield* membershipChangedSteps(b.source, a.source, b.candidate, a.candidate, membership))
     ) {
       conflicts.add(a.index);
       conflicts.add(b.index);
     }
-  });
+  }
 }
 
-function membershipChanged(
+function* membershipChangedSteps(
   a: Polyline,
   b: Polyline,
   currentA: Polyline,
   currentB: Polyline,
-): boolean {
+  membership: ContourMembership,
+): TraceSteps<boolean> {
+  yield;
   const sourcePoint = a.points[0];
   const currentPoint = currentA.points[0];
   return (
     sourcePoint !== undefined &&
     currentPoint !== undefined &&
-    insideContour(sourcePoint, b.points) !== insideContour(currentPoint, currentB.points)
+    (yield* membership.containsSteps(sourcePoint, b.points)) !==
+      (yield* membership.containsSteps(currentPoint, currentB.points))
   );
 }

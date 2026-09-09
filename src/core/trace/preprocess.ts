@@ -32,6 +32,7 @@
 // Pure-core compliant: no clock, no random, no I/O.
 
 import type { RawImageData } from './trace-image';
+import { medianSourceOverPaper, repairIsolatedMedianChanges } from './auto-median';
 
 // ITU-R BT.601 luma weights. Matches thresholdToMonochrome in
 // trace-image.ts so the threshold cutoff is consistent regardless
@@ -147,28 +148,31 @@ function swapSort(buf: Uint8Array, i: number, j: number): void {
   }
 }
 
-// AUTO median gate: measures salt-and-pepper (impulse) noise as the fraction
-// of pixels the 3×3 median would move by more than IMPULSE_NOISE_LUMA_DELTA
-// luma, and returns whether that fraction clears IMPULSE_NOISE_MIN_RATIO.
-// WHY: a median destroys clean small glyphs — 4-6 px letters trace as melted
-// blobs — so it must only run when the image genuinely carries impulse noise
-// that the median repairs. Both the Edge Detection tracer and the Smooth
-// trace preset gate on this instead of forcing the median unconditionally.
-//
-// Moved here from edge-trace.ts so the two callers share one detector and one
-// set of constants (values unchanged from the original edge implementation).
+// AUTO cleanup measures isolated high-contrast impulses. A full-frame median
+// also erases coherent one-pixel strokes, so automatic repair applies only to
+// isolated changed pixels, preserving connected features even in noisy art.
 const IMPULSE_NOISE_LUMA_DELTA = 40;
 export const IMPULSE_NOISE_MIN_RATIO = 0.004;
 
 export function hasImpulseNoise(image: RawImageData): boolean {
-  const filtered = medianFilter(image);
-  return impulseNoiseRatio(image, filtered) >= IMPULSE_NOISE_MIN_RATIO;
+  return autoMedianFilter(image) !== image;
+}
+
+/** Selective automatic cleanup; computes the median only once. An explicit
+ * medianFilter:true keeps using the full median's historical behaviour. */
+export function autoMedianFilter(image: RawImageData): RawImageData {
+  const filtered = medianFilter(medianSourceOverPaper(image));
+  return repairIsolatedMedianChanges(
+    image,
+    filtered,
+    IMPULSE_NOISE_LUMA_DELTA,
+    IMPULSE_NOISE_MIN_RATIO,
+  );
 }
 
 // Fraction of pixels whose luma the median changed by more than the impulse
-// delta. Takes the pre-computed median-filtered image so callers that also
-// need the filtered result (Edge Detection, the 'auto' trace path) do not
-// compute the median twice.
+// delta, without distinguishing connected detail from isolated noise. Retained
+// as a raw diagnostic metric; automatic cleanup uses the structural check above.
 //
 // Uses UN-rounded luma (not the module's rounded lumaAt) on purpose: the
 // original edge-trace impulse detector compared un-rounded luma, and the

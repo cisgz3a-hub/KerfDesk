@@ -4,6 +4,7 @@ import {
   type RawImageData,
   type TraceOptions,
 } from './trace-image';
+import { edgeTraceInputMatches, prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
 
 const INK_LUMA_CUTOFF = 128;
 const MAX_THIN_RUN_PX = 3;
@@ -40,15 +41,25 @@ export function hasSupersampleWorthyContourDetail(
 export function contourDetailProfile(
   image: RawImageData,
   options: TraceOptions,
+  edgeInput?: EdgeTraceInput,
 ): ContourDetailProfile {
   if (!isValidRawImageData(image)) return { hasThinDetail: false, transitionDensity: 0 };
-
+  if (options.traceMode === 'edge') {
+    const input =
+      edgeInput !== undefined && edgeTraceInputMatches(edgeInput, image, options)
+        ? edgeInput
+        : prepareEdgeTraceInput(image, options);
+    return profileInk(input.bitmap.data, input.bitmap.width, input.bitmap.height);
+  }
   const prepared = prepareTraceForContour(image, { ...options, pixelScale: 1 }).prepared;
-  const ink = inkMask(prepared);
-  const thin = thinRunMask(ink, prepared.width, prepared.height);
+  return profileInk(inkMask(prepared), prepared.width, prepared.height);
+}
+
+function profileInk(ink: Uint8Array, width: number, height: number): ContourDetailProfile {
+  const thin = thinRunMask(ink, width, height);
   return {
-    hasThinDetail: hasCoherentThinCluster(thin, prepared.width, prepared.height),
-    transitionDensity: maskTransitionDensity(ink, prepared.width, prepared.height),
+    hasThinDetail: hasCoherentThinCluster(thin, width, height),
+    transitionDensity: maskTransitionDensity(ink, width, height),
   };
 }
 

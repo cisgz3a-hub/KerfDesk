@@ -73,12 +73,10 @@ export type TraceOptions = {
   // blur would.
   //   - true  → force the median on every pixel.
   //   - false / undefined → never apply it.
-  //   - 'auto' → apply ONLY when the image carries measurable impulse
-  //     noise (hasImpulseNoise, preprocess.ts). WHY: the median melts
-  //     clean small glyphs — 4-6 px letters trace as blobs — so on crisp
-  //     line art it does pure harm. 'auto' keeps the noise protection for
-  //     scanned/JPEG sources while leaving clean logos untouched, the same
-  //     policy Edge Detection already uses.
+  //   - 'auto' → repair isolated high-contrast impulses when their density
+  //     warrants cleanup. Connected thin features and unaffected pixels stay
+  //     intact even when the same image also contains noise. Shares the
+  //     selective automatic policy used by Edge Detection.
   readonly medianFilter?: boolean | 'auto';
   // despeckleMinPixels: connected-component despeckle applied AFTER
   // thresholding. Any ink region (luma<128) with fewer than N source pixels
@@ -115,10 +113,15 @@ export type TraceOptions = {
   // operator knobs: Sensitivity, Detail, and Minimum line.
   readonly edgeBlurSigma?: number;
   readonly edgeLowThresholdRatio?: number;
+  // Retained for the Sensitivity control's preset round-trip; the local mask
+  // derives its contrast delta from edgeLowThresholdRatio.
   readonly edgeHighThresholdRatio?: number;
   // Minimum finished edge-path length in source-image pixels.
   readonly edgeMinLengthPx?: number;
+  // Canny-era compatibility value; closed-mask contours do not bridge gaps.
   readonly edgeJoinGapPx?: number;
+  // undefined = selective AUTO cleanup in source pixels before enlargement;
+  // true = the explicit full 3x3 median on the working raster; false = off.
   readonly edgeMedianFilter?: boolean;
   // Centerline endpoint-join allowance in source-image pixels. Candidates
   // must be strictly closer than this distance and pass the tangent checks.
