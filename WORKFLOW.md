@@ -2104,9 +2104,9 @@ streaming controls. Two buttons:
   acknowledgement (not merely USB write completion); the status
   bar's `Origin:` row flips from "machine 0,0" (muted) to
   "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
-  next WCO-bearing status frame arrives. Frame and Start switch to
-  user-origin placement only after that `ok`; they do not wait for the
-  later WCO-bearing status frame.
+  next WCO-bearing status frame arrives. Set Origin switches placement
+  to user origin after that `ok` and its bounded work-offset wait finish.
+  A cancelled action leaves placement unchanged.
 - **Reset origin** — sends `G92.1`. Clears the offset, status returns
   to "machine 0,0". Disabled when no custom origin is active.
 
@@ -2122,6 +2122,9 @@ controller command arbiter until `ok`/`error`/`ALARM`, so Start,
 Console, settings, and other motion cannot steal its response. The two
 commands in a persistent-origin update are acknowledged one at a time;
 local origin truth changes atomically only after both succeed.
+That ownership continues through Set Origin's post-ACK work-offset wait.
+Reset, disconnect, or a replacement controller operation ends the old wait;
+its late success/failure cannot change the new owner's origin state or diagnostics.
 
 The readout and Reset action treat any nonzero WCO axis as meaningful,
 but job placement is axis-specific: only a nonzero X or Y offset proves
@@ -2140,11 +2143,13 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    || streaming`; `disabled` set by `LaserWindow` when connection
    isn't `connected`). User must connect first.
 3. **Rejected / interrupted update.** If a command is rejected, times
-   out, disconnects, or a multi-command persistent update fails after
-   its first `ok`, the cached WCO, compatibility Frame proof, and any exact
-   candidate/permit are cleared and the origin source becomes `unknown`.
+   out, or a multi-command persistent update fails after its first `ok`
+   while the transaction still owns the controller, the cached WCO,
+   compatibility Frame proof, and any exact candidate/permit are cleared
+   and the origin source becomes `unknown`.
    Custom placement remains unresolved until the operator re-establishes or
-   resets it.
+   resets it. Reset/disconnect or replacement operation state remains intact
+   when an older transaction completes or fails later.
 4. **Alarm clears origin mid-session.** Operator sets origin, then a
    limit switch triggers (or `\x18` is sent). GRBL clears G92
    internally; the alarm branch in `laser-line-handler.ts` clears
