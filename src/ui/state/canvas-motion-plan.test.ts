@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE, toSceneCoords, type Origin } from '../../core/devices';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  toSceneCoords,
+  type DeviceProfile,
+  type Origin,
+} from '../../core/devices';
 import type { CncGroup, Job } from '../../core/job';
 import { emitCncJobWithPassSpans } from '../../core/output';
 import {
@@ -60,6 +65,58 @@ describe('canvasPlanRetentionKey', () => {
     canvasPlanRetentionKey(project, DEFAULT_OUTPUT_SCOPE, placement, null);
     expect(sceneReads).toBe(2);
   });
+
+  it.each<[string, Partial<DeviceProfile>]>([
+    ['cut timing', { estimateCutTimeScale: 2 }],
+    ['travel timing', { estimateTravelTimeScale: 3 }],
+    [
+      'no-go zones',
+      {
+        noGoZones: [
+          { id: 'clamp', name: 'Clamp', enabled: true, x: 4, y: 4, width: 10, height: 10 },
+        ],
+      },
+    ],
+    ['power output', { maxPowerS: 2000 }],
+    ['transport buffer', { rxBufferBytes: 64 }],
+    ['bed envelope', { bedWidth: 500 }],
+    ['origin transform', { origin: 'rear-right' }],
+  ])('keeps %s in retained artifact identity', (_label, patch) => {
+    const project = createProject();
+    const placement = { startFrom: 'absolute' as const, anchor: 'front-left' as const };
+    const changed = { ...project, device: { ...project.device, ...patch } };
+    expect(canvasPlanRetentionKey(changed, DEFAULT_OUTPUT_SCOPE, placement)).not.toBe(
+      canvasPlanRetentionKey(project, DEFAULT_OUTPUT_SCOPE, placement),
+    );
+  });
+
+  it('retains future device fields by default', () => {
+    const project = createProject();
+    const placement = { startFrom: 'absolute' as const, anchor: 'front-left' as const };
+    const changed = {
+      ...project,
+      device: { ...project.device, futureCoordinateConvention: { version: 1 } },
+    };
+    expect(canvasPlanRetentionKey(changed, DEFAULT_OUTPUT_SCOPE, placement)).not.toBe(
+      canvasPlanRetentionKey(project, DEFAULT_OUTPUT_SCOPE, placement),
+    );
+  });
+
+  it.each<Partial<DeviceProfile>>([{ maxPowerS: 2000 }])(
+    'invalidates when a profile edit actually changes emitted output: %j',
+    (patch) => {
+      const baseline = prepared();
+      const changed = {
+        ...baseline,
+        project: { ...baseline.project, device: { ...baseline.project.device, ...patch } },
+      };
+      const placement = { startFrom: 'absolute' as const, anchor: 'front-left' as const };
+      expect(emitPreparedGcode(changed).gcode).not.toBe(emitPreparedGcode(baseline).gcode);
+      expect(canvasPlanRetentionKey(changed.project, DEFAULT_OUTPUT_SCOPE, placement)).not.toBe(
+        canvasPlanRetentionKey(baseline.project, DEFAULT_OUTPUT_SCOPE, placement),
+      );
+    },
+  );
 });
 
 function prepared(

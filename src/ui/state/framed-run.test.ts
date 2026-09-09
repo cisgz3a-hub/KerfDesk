@@ -120,25 +120,110 @@ describe('FramedRun completion evidence', () => {
     expect(framedRunCompletionIssue(candidateFor(source), changedReportWco)).toBeNull();
   });
 
-  it('refuses controller, origin, or work-Z evidence drift during Frame', () => {
+  it.each<Partial<FramedRunControllerSource>>([
+    { controllerSessionEpoch: 8 },
+    { wcoCache: { x: 3, y: 4, z: 0 } },
+    { workOriginActive: false },
+    { workOriginSource: 'g54-persistent' },
+    { trustedPositionEpoch: 1 },
+    { workZReferenceEpoch: 4 },
+    { workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 4 } },
+  ])('refuses factual controller, origin, or work-Z drift: %j', (change) => {
     const source = controllerSource();
-    expect(
-      framedRunCompletionIssue(candidateFor(source), {
-        ...source,
-        wcoCache: { x: 3, y: 4, z: 0 },
-      }),
-    ).toBe(FRAME_CONTROLLER_CHANGED_MESSAGE);
+    expect(framedRunCompletionIssue(candidateFor(source), { ...source, ...change })).toBe(
+      FRAME_CONTROLLER_CHANGED_MESSAGE,
+    );
   });
 
-  it('refuses build-info evidence drift during Frame', () => {
-    const source = controllerSource();
-    expect(
-      framedRunCompletionIssue(candidateFor(source), {
+  it.each(['settings', 'settings-observation', 'build-info', 'build-observation', 'all'])(
+    'retains the exact candidate across an equivalent %s refresh',
+    (refresh) => {
+      const source = {
+        ...controllerSource(),
+        controllerSettings: { maxPowerS: 1000, laserModeEnabled: true, reportInches: false },
+        controllerSettingsObservation: { sessionEpoch: 7, observedAt: 100 },
+      };
+      const refreshed = {
         ...source,
-        controllerBuildInfoObservation: { sessionEpoch: 7, observedAt: 102 },
-      }),
-    ).toBe(FRAME_CONTROLLER_CHANGED_MESSAGE);
-  });
+        ...((refresh === 'settings' || refresh === 'all') && {
+          controllerSettings: { ...source.controllerSettings },
+        }),
+        ...((refresh === 'settings-observation' || refresh === 'all') && {
+          controllerSettingsObservation: { sessionEpoch: 7, observedAt: 102 },
+        }),
+        ...((refresh === 'build-info' || refresh === 'all') && {
+          controllerBuildInfo: {
+            ...controllerBuildInfo,
+            optionCodes: [...controllerBuildInfo.optionCodes],
+          },
+        }),
+        ...((refresh === 'build-observation' || refresh === 'all') && {
+          controllerBuildInfoObservation: { sessionEpoch: 7, observedAt: 102 },
+        }),
+      };
+      expect(framedRunCompletionIssue(candidateFor(source), refreshed)).toBeNull();
+    },
+  );
+
+  it.each([null, {}, { reportInches: false }])(
+    'uses the same millimetre interpretation for equivalent report-unit evidence: %j',
+    (settings) => {
+      const source = controllerSource();
+      expect(
+        framedRunCompletionIssue(candidateFor(source), {
+          ...source,
+          controllerSettings: settings,
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it.each([false, true])(
+    'retains equivalent fresh objects with reportInches=%s',
+    (reportInches) => {
+      const source = { ...controllerSource(), controllerSettings: { reportInches } };
+      expect(
+        framedRunCompletionIssue(candidateFor(source), {
+          ...source,
+          controllerSettings: { reportInches },
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it.each([0, 10])(
+    'preserves a report-unit change dependency at position/WCO basis %s',
+    (position) => {
+      const source = {
+        ...controllerSource(),
+        controllerSettings: { reportInches: false },
+        statusReport: {
+          ...statusReport,
+          mPos: { x: position, y: position, z: 0 },
+          wco: { x: 0, y: 0, z: 0 },
+        },
+        wcoCache: { x: 0, y: 0, z: 0 },
+      };
+      const inches = { ...source, controllerSettings: { reportInches: true } };
+      // Zero is numerically identical in both units. At nonzero positions even
+      // an equivalent millimetre location does not erase this interpretation change.
+      expect(framedRunCompletionIssue(candidateFor(source), inches)).toBe(
+        FRAME_CONTROLLER_CHANGED_MESSAGE,
+      );
+      expect(
+        framedRunCompletionIssue(candidateFor(source), {
+          ...inches,
+          statusReport: {
+            ...inches.statusReport,
+            mPos: { x: position / 25.4, y: position / 25.4, z: 0 },
+          },
+        }),
+      ).toBe(FRAME_CONTROLLER_CHANGED_MESSAGE);
+      expect(framedRunCompletionIssue(candidateFor(inches), source)).toBe(
+        FRAME_CONTROLLER_CHANGED_MESSAGE,
+      );
+    },
+  );
 
   it('refuses a final position that did not return to the pre-Frame XYZ', () => {
     const source = controllerSource();
