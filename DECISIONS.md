@@ -10664,6 +10664,22 @@ operator-authored machining values.
   condition, spindle variant, and machine rigidity. Public research and green tests do not make it a
   hardware-qualified cutting recipe.
 
+### 2026-09-06 source note: optional 500 W machine preset
+
+The optional CNC machine selector includes **Neotronics 4040 Max (500 W spindle)** with a provisional
+400 × 400 mm work area and a 12,000 RPM spindle maximum. The
+[4040 Max product page](https://neotronics.co.za/index.php?product_id=1018&route=product%2Fproduct)
+lists a 400 × 400 × 75 mm work area but mixes spindle variants. The separately identified
+[CNC500W bundle](https://neotronics.co.za/index.php?product_id=297&route=product%2Fproduct) lists
+3,000–12,000 RPM operating speed. Sources were checked on 2026-09-06; these published ratings are
+an explicit 500 W assumption that the operator must confirm against the fitted machine.
+
+**Load into draft** retains its existing boundary: it copies bed dimensions and spindle maximum
+into the unsaved Machine Setup draft. It does not select a device profile or machine family, change
+the ADR-256 operation starter, or rewrite saved/manual operation settings on selection. This
+catalogue addition supplies no cutting recipe, controller observation, measured travel, or hardware
+qualification, and changes no Frame or Start policy.
+
 ---
 
 ## ADR-234 - Bounded feed-matched fill entries for the 4040-safe profile

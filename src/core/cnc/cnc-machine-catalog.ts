@@ -42,6 +42,16 @@ export const CNC_MACHINE_CATALOG: ReadonlyArray<CncMachinePreset> = [
     note: CONFIRM,
   },
   {
+    id: 'neotronics-4040-max',
+    name: 'Neotronics 4040 Max (500 W spindle)',
+    // Provisional 400 × 400 mm envelope and the explicit CNC500W bundle's
+    // 12,000 RPM rating. Vendor sources checked 2026-09-06: ADR-233 source note.
+    bedWidthMm: 400,
+    bedHeightMm: 400,
+    spindleMaxRpm: 12000,
+    note: `${CONFIRM} This preset assumes the 500 W spindle (12,000 RPM); confirm against the fitted machine.`,
+  },
+  {
     id: 'shapeoko-3',
     name: 'Shapeoko 3 (Standard)',
     bedWidthMm: 425,
