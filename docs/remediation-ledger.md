@@ -1009,18 +1009,19 @@ and missing-glyph cases below.
   reachable** at current main `59bc989e829aff5a9edce957857135b09bbefaa8`. Earlier row text that says
   those branches await integration is historical. The complete open-PR inventory was empty at
   this checkpoint; this unfinished slice has no PR yet.
-- **NATIVE-SMOKE-01, confirmed harness defect, pending separate slice:** scheduled Windows run
-  `33615466935` built and packaged successfully but its smoke failed only `ok`/window visibility.
-  The launcher requests `windowsHide: true`. An isolated Electron 42.5.1 fixture using the exact
-  production readiness policy reproduced invisible windows in 3/3 hidden launches and visible
-  windows in 3/3 ordinary launches, all with isolated userData/sessionData and renderer readiness.
-  Do not weaken visibility validation or alter production readiness to compensate. This fixture is
-  not a repaired packaged-product pass, and no workflow rerun or manual deployment has occurred.
+- **NATIVE-SMOKE-01, resolved through [PR #749](https://github.com/cisgz3a-hub/KerfDesk/pull/749):**
+  the launcher keeps `windowsHide: false`, so the isolated run still requires the production window to
+  become visible rather than weakening its validation. The exact PR head passed Chrome UX smoke and
+  CI; this record does not claim another packaged-runtime pass, an installer qualification, or a
+  deployment.
 
-- **NATIVE-SMOKE-02, confirmed diagnostic-loss defect, pending same harness slice:** validation
-  precedes result/stdout/stderr preservation, and the `finally` removes the temporary evidence.
-  Failed run artifact `9840872041` consequently contains only the readiness report. Preserve failure
-  evidence before cleanup in the narrowly scoped repair; no private execution archive is involved.
+- **NATIVE-SMOKE-02, implemented in the native-evidence follow-up (PR/hosted verification pending):**
+  every invocation publishes a separate evidence directory before launch, captures the raw result and
+  both stream logs before validation, preserves the terminal manifest on failures, and removes only a
+  confirmed closed disposable profile. Timeout, process/stream failure, late events, unreadable result,
+  evidence-write failure, and unsafe cleanup paths retain a non-passing record. The focused Node
+  matrix is software evidence only; it does not establish a packaged Electron run, real OS behavior,
+  controller/hardware behavior, or manual deployment.
 
 ### 2026-09-05 first 100 pull requests: remediation
 

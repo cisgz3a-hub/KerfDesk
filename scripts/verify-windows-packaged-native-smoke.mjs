@@ -1,8 +1,7 @@
 import { spawn } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { nativeSmokeLaunchOptions, runIsolatedNativeSmoke } from './native-smoke-runner.mjs';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
@@ -32,64 +31,26 @@ export function validateNativeSmokeResult(result, expectedUserData) {
 async function runCli() {
   if (process.platform !== 'win32') throw new Error('Windows packaged smoke requires Windows');
   const args = parseArgs(process.argv.slice(2));
-  const executable = resolve(args.executable);
-  const root = await mkdtemp(resolve(tmpdir(), 'kerfdesk-native-smoke-'));
-  const userData = resolve(root, 'user-data');
-  const resultPath = resolve(root, 'native-smoke-result.json');
-  const output = resolve(args.output ?? 'artifacts/native-smoke');
-  await mkdir(userData, { recursive: true });
-  try {
-    const processResult = await launch(executable, userData, resultPath, args.timeoutMs);
-    await mkdir(output, { recursive: true });
-    await writeFile(resolve(output, 'native-smoke-stdout.txt'), processResult.stdout, 'utf8');
-    await writeFile(resolve(output, 'native-smoke-stderr.txt'), processResult.stderr, 'utf8');
-    const rawResult = await readFile(resultPath, 'utf8');
-    await copyFile(resultPath, resolve(output, 'native-smoke-result.json'));
-    const parsed = JSON.parse(rawResult);
-    validateNativeSmokeResult(parsed, userData);
-    if (processResult.code !== 0) throw new Error(`packaged app exited ${processResult.code}`);
-    process.stdout.write('NATIVE_SMOKE_EXIT=0\nNATIVE_SMOKE_OK=true\n');
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-}
-
-async function launch(executable, userData, resultPath, timeoutMs) {
-  const child = spawn(
-    executable,
-    [
-      `--kerfdesk-native-smoke-user-data=${userData}`,
-      `--kerfdesk-native-smoke-result=${resultPath}`,
-    ],
-    nativeSmokeLaunchOptions(executable),
-  );
-  let stdout = '';
-  let stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', (chunk) => (stdout += chunk));
-  child.stderr.on('data', (chunk) => (stderr += chunk));
-  const code = await new Promise((resolveExit, reject) => {
-    const timeout = setTimeout(() => {
-      child.kill();
-      reject(new Error(`packaged app exceeded ${timeoutMs} ms`));
-    }, timeoutMs);
-    child.once('error', (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-    child.once('exit', (exitCode) => {
-      clearTimeout(timeout);
-      resolveExit(exitCode ?? 1);
-    });
+  await runNativeSmoke(args, spawn, {
+    reportEvidence: (path) => process.stdout.write(`NATIVE_SMOKE_EVIDENCE=${path}\n`),
   });
-  return { code, stdout, stderr };
+  process.stdout.write('NATIVE_SMOKE_EXIT=0\nNATIVE_SMOKE_OK=true\n');
 }
 
-export function nativeSmokeLaunchOptions(executable) {
-  // This smoke proves the packaged BrowserWindow becomes visible. STARTF_USESHOWWINDOW/SW_HIDE
-  // can override Electron's window.show() on Windows and would invalidate that observation.
-  return { cwd: dirname(executable), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: false };
+export { nativeSmokeLaunchOptions };
+
+export async function runNativeSmoke(args, spawnProcess = spawn, dependencies = {}) {
+  const result = await runIsolatedNativeSmoke(args, validateNativeSmokeResult, {
+    ...dependencies,
+    spawnProcess,
+  });
+  if (result.manifest.outcome !== 'success') {
+    throw Object.assign(
+      new Error(`${result.manifest.failure.message}; evidence=${result.evidenceDirectory}`),
+      result,
+    );
+  }
+  return result;
 }
 
 function parseArgs(args) {

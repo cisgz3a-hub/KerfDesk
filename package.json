@@ -22,7 +22,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:release-integrity": "node --test scripts/check-adr-numbers.test.mjs scripts/third-party-closure.test.mjs scripts/generate-release-evidence.test.mjs scripts/report-dependency-audit.test.mjs scripts/verify-github-actions-pinning.test.mjs scripts/verify-packaged-preview-metadata.test.mjs scripts/verify-windows-package-identity.test.mjs scripts/report-release-readiness.test.mjs scripts/report-coverage-trend.test.mjs scripts/resolve-web-deploy-identity.test.mjs scripts/run-vitest-coverage.test.mjs scripts/verify-windows-packaged-native-smoke.test.mjs",
+    "test:release-integrity": "node --test scripts/check-adr-numbers.test.mjs scripts/third-party-closure.test.mjs scripts/generate-release-evidence.test.mjs scripts/report-dependency-audit.test.mjs scripts/verify-github-actions-pinning.test.mjs scripts/verify-packaged-preview-metadata.test.mjs scripts/verify-windows-package-identity.test.mjs scripts/report-release-readiness.test.mjs scripts/report-coverage-trend.test.mjs scripts/resolve-web-deploy-identity.test.mjs scripts/run-vitest-coverage.test.mjs scripts/verify-windows-packaged-native-smoke.test.mjs scripts/native-smoke-process.test.mjs scripts/native-smoke-runner.test.mjs scripts/native-smoke-evidence.test.mjs scripts/native-smoke-shutdown.test.mjs",
     "test:watch": "vitest",
     "test:coverage": "node scripts/run-vitest-coverage.mjs",
     "report:coverage": "node scripts/report-coverage-trend.mjs",
