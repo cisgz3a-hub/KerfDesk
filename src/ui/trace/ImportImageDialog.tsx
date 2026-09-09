@@ -38,7 +38,7 @@ import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
 import { useBoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
-import { fairTracedPathsForCnc } from './cnc-trace-fairing';
+import { fairTracedImageForCnc } from './fair-traced-image-for-cnc';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import {
   captureTraceCommitOwner,
@@ -421,13 +421,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     // fairing before this point would use stale physical units.
     const commitTraced =
       liveProject.machine?.kind === 'cnc'
-        ? {
-            ...traced,
-            paths: fairTracedPathsForCnc(
-              paths,
-              positionTraceOverRasterSource(liveSource, traced).transform,
-            ),
-          }
+        ? fairTracedImageForCnc(traced, positionTraceOverRasterSource(liveSource, traced).transform)
         : traced;
     const outputArgs = { ...args, ...(notices === undefined ? {} : { notices }) };
     if (await commitTraceOutput(outputArgs, ctx, commitTraced, liveProject)) ctx.close();

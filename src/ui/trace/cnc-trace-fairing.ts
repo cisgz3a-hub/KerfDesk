@@ -12,8 +12,9 @@ import {
   type ColoredPath,
   type Polyline,
   type Transform,
+  type Vec2,
 } from '../../core/scene';
-import { weldOpenPolylines } from '../../core/toolpath';
+import { preparePolylineContacts, weldOpenPolylines } from '../../core/toolpath';
 
 // Target G1 chord away from drawn corners. Audit band 0.3-0.5 mm; 0.4 mm
 // keeps the impulse rate below ~12 Hz at the F300 default while the chord
@@ -41,20 +42,33 @@ export function fairTracedPathsForCnc(
   placement: Transform,
 ): ColoredPath[] {
   const metric = physicalMetricForPlacement(placement);
+  const sourcePolylines = paths.flatMap((path) => path.polylines);
+  const contacts =
+    metric === null
+      ? { polylines: sourcePolylines, pinnedPoints: new Set<Vec2>() }
+      : preparePolylineContacts(sourcePolylines);
+  let offset = 0;
   return paths.map((path) => {
+    const prepared = contacts.polylines.slice(offset, offset + path.polylines.length);
+    offset += path.polylines.length;
+    const pinnedPoints = new Set<Vec2>();
     const metricPolylines =
-      metric === null ? [...path.polylines] : mapPolylinesToMetric(path.polylines, metric);
+      metric === null
+        ? prepared
+        : mapPolylinesToMetric(prepared, metric, contacts.pinnedPoints, pinnedPoints);
     // Weld first, then fair: joining fragments turns pecks into one cut, and
     // the fairing pass then smooths the stitch joints like any other vertex.
     const welded = weldOpenPolylines(metricPolylines, {
       mmPerPx: metric?.referenceMmPerUnit ?? 0,
       maxGapMm: CNC_TRACE_WELD_GAP_MM,
+      retainedPoints: pinnedPoints,
     });
     const faired = fairToolpathPolylines(welded, {
       mmPerPx: metric?.referenceMmPerUnit ?? 0,
       minSegmentMm: CNC_TRACE_MIN_SEGMENT_MM,
       maxDeviationMm: CNC_TRACE_MAX_DEVIATION_MM,
       cornerAngleDeg: CNC_TRACE_CORNER_ANGLE_DEG,
+      pinnedPoints,
     });
     const polylines = metric === null ? faired : mapPolylinesFromMetric(faired, metric);
     return { ...path, polylines, curves: polylines.map(polylineToCurveSubpath) };
@@ -98,13 +112,16 @@ function physicalMetricForPlacement(placement: Transform): PhysicalMetric | null
 function mapPolylinesToMetric(
   polylines: ReadonlyArray<Polyline>,
   metric: PhysicalMetric,
+  sourcePins: ReadonlySet<Vec2>,
+  mappedPins: Set<Vec2>,
 ): Polyline[] {
   return polylines.map((polyline) => ({
     ...polyline,
-    points: polyline.points.map((point) => ({
-      x: point.x * metric.xFactor,
-      y: point.y * metric.yFactor,
-    })),
+    points: polyline.points.map((point) => {
+      const mapped = { x: point.x * metric.xFactor, y: point.y * metric.yFactor };
+      if (sourcePins.has(point)) mappedPins.add(mapped);
+      return mapped;
+    }),
   }));
 }
 

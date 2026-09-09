@@ -103,7 +103,13 @@ function readyTracePreview(
 ): TracePreviewState {
   return {
     kind: 'ready',
-    svg: coloredPathsToSvg(result.paths, result.width, result.height),
+    svg: coloredPathsToSvg(
+      result.paths,
+      result.width,
+      result.height,
+      undefined,
+      request.options.traceMode,
+    ),
     paths: result.paths,
     width: result.width,
     height: result.height,

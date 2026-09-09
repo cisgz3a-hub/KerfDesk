@@ -1877,15 +1877,47 @@ ADR-279.*
    or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
    alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
-   use source-image pixels and preserve their separate preset values. Changes are debounced; the
+   use pixels of the decoded image grid supplied to the tracing core and preserve their separate
+   preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
+   converted using the actual width and height ratios, without rounding the internal values.
+   The preceding UI decode cap still defines that source grid. **Smoothness** and **Optimize**
+   stay visible and editable for filled outlines and Edge Detection, including values carried from
+   another preset; Reset restores the selected preset's defaults. Automatic Line Art detail
+   recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
+   Explicit Sketch uses local contrast alone, including removal of dark shadow backgrounds.
+   Changes are debounced; the
    newest request supersedes and cancels any older trace still running.
 3. The preview displays only the newest completed result. A late response from
    a retired worker is ignored and cannot replace the current preview.
    A zero-paths retry with relaxed settings is disclosed in the preview and retained in successful
-   commit/export feedback. Edge Detection creates closed outlines; Centerline follows stroke centres.
+   commit/export feedback. Centerline previews and explicit Centerline SVG exports draw both
+   closed and open paths as strokes. Filled presets retain their contour fills and holes.
+   Submitted results use their captured request's paint intent; a newer preset request still
+   supersedes an older result.
+   Edge Detection creates closed outlines around dark artwork and locally
+   darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+   Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
+   converted once on enlarged working rasters, including Enhance regions. Zero disables that
+   gap bridge; true-junction repairs and ring closure keep their existing separate policies.
+   Centerline removes corner spurs before condensing junctions, then carries shared junction
+   anchors through smoothing and simplification so finished branches remain attached to their
+   receiving strokes, including closed rings. Joined gaps retain both actual endpoints.
+   Filled-outline and Edge finishing check the continuous contour boundaries together.
+   When final smoothing creates a crossing or changes a counter's nesting, only the affected
+   contours are refined closer to their earlier boundaries. Valid positive gaps retain their
+   geometry, including gaps smaller than one source pixel.
+   A tiny closed contour that passes its area threshold remains present when
+   Optimize would collapse its finishing geometry. That contour uses its measured
+   boundary and participates in the same topology check as the other contours.
+   Straightening retains deep notches and narrow turns where the outline doubles
+   back along an otherwise straight edge. Increasing Smoothness still removes
+   edge waviness without increasing how far such a turn may be shortened.
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.
+   In a CNC project, smoothing retains established stroke junctions at the
+   source image's current physical size. Selection bounds follow the conditioned
+   geometry while the trace remains registered over its full source image.
 
 **Error — worker stalls or crashes**:
 - A worker request has a bounded execution timeout. The failed worker is
@@ -1900,6 +1932,12 @@ ADR-279.*
 - Reuse is allowed only when file identity, options, boundary, and boundary mode
   match the ready preview. Otherwise commit decodes and traces the current
   source normally. Existing source-revalidation checks still apply.
+
+**Edge — an opaque region of a transparent image**:
+- **Trace alpha mask** keeps using the full source's transparency when a Crop or Enhance region
+  contains only opaque pixels. White foreground remains ink, and RGB detail inside uniform alpha
+  does not become a hole. Clear Boundary restores the full-image trace. Cutoff/Threshold keep
+  their alpha-band meaning; an originally opaque image still uses the brightness fallback.
 
 ---
 

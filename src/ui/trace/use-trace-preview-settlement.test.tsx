@@ -119,6 +119,62 @@ it('shares the exact terminal result and ignores a late preview success or failu
   expect(traceImageWithBoundaryMode).toHaveBeenCalledTimes(1);
 });
 
+for (const preset of ['Centerline', 'Sharp'] as const)
+  it(`settles captured ${preset} paint intent and rejects it after a preset successor`, async () => {
+    const closed: TraceResult = {
+      ...full,
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 1, y: 0 },
+                { x: 3, y: 0 },
+                { x: 3, y: 1 },
+                { x: 1, y: 1 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const p = { ...base(), options: TRACE_PRESETS[preset]! };
+    await render(p);
+    const settle = control.current!.capture();
+    await act(async () => settle({ kind: 'ready', result: closed }));
+    if (state!.kind !== 'ready') throw Error('Settlement did not become ready');
+    expect(state.svg).toContain(
+      preset === 'Centerline'
+        ? 'fill="none" stroke="#000000"'
+        : 'fill-rule="evenodd" stroke="none"',
+    );
+    expect(state.paths).toBe(closed.paths);
+    expect(state.preparedTrace?.request.options).toBe(p.options);
+    expect(state.preparedTrace?.result).toBe(closed);
+    const oldSettlement = control.current!.capture();
+    const next = {
+      ...p,
+      options: TRACE_PRESETS[preset === 'Centerline' ? 'Sharp' : 'Centerline']!,
+    };
+    await render(next);
+    const pending = state!;
+    await act(async () => oldSettlement({ kind: 'ready', result: closed }));
+    expect(state!).toBe(pending);
+    await act(async () => vi.advanceTimersByTime(300));
+    await act(async () => traces.at(-1)!.resolve(closed));
+    if (state!.kind !== 'ready') throw Error('Successor did not become ready');
+    expect(state.svg).toContain(
+      preset === 'Centerline'
+        ? 'fill-rule="evenodd" stroke="none"'
+        : 'fill="none" stroke="#000000"',
+    );
+    expect(state.preparedTrace?.request.options).toBe(next.options);
+    await act(async () => traces[0]!.resolve(closed));
+    expect(state.preparedTrace?.request.options).toBe(next.options);
+  });
+
 it('can retry an error in the same request and settle a completed empty result', async () => {
   await render(base());
   await act(async () =>
