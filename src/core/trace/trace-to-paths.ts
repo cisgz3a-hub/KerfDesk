@@ -26,10 +26,11 @@ import {
   effectivePixelScale,
   preprocessForTrace,
 } from './trace-image';
-import { downscaleTracedPaths, scaleTracedPathsUniform, upscaleBy } from './auto-upscale';
+import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
 import { traceCenterlineStrokePathsSteps } from './centerline/trace-centerline';
 import { isBinaryContourPreset, traceImageToContourColoredPathsSteps } from './contour-trace';
 import { traceImageToEdgePathsSteps } from './edge-trace';
+import { prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
 import { runTraceSteps, type TraceStepRunner } from './trace-steps';
@@ -150,7 +151,9 @@ export async function traceImageToColoredPaths(
   // pixelScale rides along on the upscale route so cleanup caps (despeckle,
   // pinhole fill, min-area, simplify ε, sharpener regime bounds) keep their
   // SOURCE-pixel semantics on the supersampled raster.
-  const scalePlan = traceScalePlan(image, options);
+  const edgeInput =
+    options.traceMode === 'edge' ? prepareEdgeTraceInput(image, options) : undefined;
+  const scalePlan = traceScalePlan(image, options, edgeInput);
   if (scalePlan.kind === 'downscale') {
     const workingImage = resampleBuffer(image, scalePlan.width, scalePlan.height);
     // Convert the two source-area controls once, using both actual raster
@@ -174,18 +177,44 @@ export async function traceImageToColoredPaths(
       upscaleSmallSmoothSources: false,
       pixelScale: 1,
     };
-    const traced = withCanonicalTraceCurves(await dispatchTrace(workingImage, workingOptions, run));
-    return scaleTracedPathsUniform(traced, scalePlan.coordinateScale);
+    const traced = await dispatchTrace(workingImage, workingOptions, run);
+    // Only binary contours take this route. Their canonical curves are line
+    // segments over the finished polylines; rebuild them on the restored grid.
+    // The resampler covers each axis independently, and rounded working height
+    // need not have the same ratio as width.
+    const scaleX = image.width / workingImage.width;
+    const scaleY = image.height / workingImage.height;
+    return withCanonicalTraceCurves(
+      traced.map((path) => ({
+        color: path.color,
+        polylines: path.polylines.map((polyline) => ({
+          closed: polyline.closed,
+          points: polyline.points.map((point) => ({ x: point.x * scaleX, y: point.y * scaleY })),
+        })),
+      })),
+    );
   }
   const factor = scalePlan.kind === 'upscale' ? scalePlan.factor : 1;
   if (factor > 1) {
-    const scaledOptions: TraceOptions = { ...options, pixelScale: factor };
+    // AUTO repairs source-grid impulses once. An explicit forced median keeps
+    // its existing working-grid order, after enlargement. Both paths measure
+    // a fresh local mask and threshold field at the enlarged resolution.
+    const reuseCleanedEdge = edgeInput !== undefined && options.edgeMedianFilter !== true;
+    const scaledOptions: TraceOptions = {
+      ...options,
+      pixelScale: factor,
+      ...(reuseCleanedEdge ? { edgeMedianFilter: false } : {}),
+    };
     const upscaled = withCanonicalTraceCurves(
-      await dispatchTrace(upscaleBy(image, factor), scaledOptions, run),
+      await dispatchTrace(
+        upscaleBy(reuseCleanedEdge ? edgeInput.source : image, factor),
+        scaledOptions,
+        run,
+      ),
     );
     return downscaleTracedPaths(upscaled, factor);
   }
-  return withCanonicalTraceCurves(await dispatchTrace(image, options, run));
+  return withCanonicalTraceCurves(await dispatchTrace(image, options, run, edgeInput));
 }
 
 // The backend selection shared by both the direct and the upscaled paths.
@@ -195,10 +224,12 @@ async function dispatchTrace(
   image: RawImageData,
   options: TraceOptions,
   run: TraceStepRunner,
+  edgeInput?: EdgeTraceInput,
 ): Promise<ColoredPath[]> {
   if (options.traceMode === 'centerline')
     return run(traceCenterlineStrokePathsSteps(image, options));
-  if (options.traceMode === 'edge') return run(traceImageToEdgePathsSteps(image, options));
+  if (options.traceMode === 'edge')
+    return run(traceImageToEdgePathsSteps(image, options, edgeInput));
   // The binary filled-contours lane (Line Art / Smooth / Sharp) is traced by
   // the in-house contour backend (ADR-123). imagetracerjs remains only for
   // the multi-colour, no-fixed-palette path below.

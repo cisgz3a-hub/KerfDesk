@@ -95,103 +95,122 @@ test.afterEach(async ({ page }, testInfo) => {
   });
 });
 
-test('default Centerline traces the actual dragon in a real worker and commits its preview', async ({
-  page,
-  kerfdesk,
-}, testInfo) => {
-  await importDragon(page);
-  await page.getByRole('button', { name: 'Trace Image...', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Trace image' });
-  await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Centerline');
-  await expect(dialog.getByRole('combobox', { name: 'Trace detection' })).toHaveValue('preset');
-  await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('12');
-  await page.waitForFunction(
-    () =>
-      window.__centerlineWorkerProbe.requests.some(
-        (r) => r.options.traceMode === 'centerline' && r.startedAt !== null,
-      ),
-    undefined,
-    { timeout: COMPUTE_BUDGET_MS },
-  );
-  const remaining = await page.evaluate((budget) => {
-    const request = window.__centerlineWorkerProbe.requests
-      .filter((r) => r.options.traceMode === 'centerline')
+for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Detection']) {
+  test(`default ${presetName} traces the actual dragon in a real worker and commits its preview`, async ({
+    page,
+    kerfdesk,
+  }, testInfo) => {
+    await importDragon(page);
+    await page.getByRole('button', { name: 'Trace Image...', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Trace image' });
+    const preset = TRACE_PRESETS[presetName];
+    if (preset === undefined) throw Error(`Missing ${presetName} preset`);
+    await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption(presetName);
+    if (preset.traceMode !== 'edge') {
+      await expect(dialog.getByRole('combobox', { name: 'Trace detection' })).toHaveValue('preset');
+      await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue(
+        String(preset.despeckleMinPixels),
+      );
+    }
+    await page.waitForFunction(
+      (options) =>
+        window.__centerlineWorkerProbe.requests.some(
+          (r) => JSON.stringify(r.options) === JSON.stringify(options) && r.startedAt !== null,
+        ),
+      preset,
+      { timeout: COMPUTE_BUDGET_MS },
+    );
+    const remaining = await page.evaluate(
+      ({ budget, options }) => {
+        const request = window.__centerlineWorkerProbe.requests
+          .filter((r) => JSON.stringify(r.options) === JSON.stringify(options))
+          .at(-1);
+        if (request?.startedAt === null || request?.startedAt === undefined)
+          throw Error('No preset worker acknowledgement');
+        return Math.max(1, budget - (performance.now() - request.startedAt));
+      },
+      { budget: COMPUTE_BUDGET_MS, options: preset },
+    );
+    const preview = dialog.locator('[aria-label="Trace preview (1254x1254 px)"]');
+    await expect(preview.locator('svg path').first()).toBeVisible({ timeout: remaining });
+    await expect(dialog.getByText(/Preview failed:/)).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Show Points', exact: true })).toBeVisible();
+    const request = (await observations(page))
+      .filter((r) => JSON.stringify(r.options) === JSON.stringify(preset))
       .at(-1);
-    if (request?.startedAt === null || request?.startedAt === undefined)
-      throw Error('No Centerline worker acknowledgement');
-    return Math.max(1, budget - (performance.now() - request.startedAt));
-  }, COMPUTE_BUDGET_MS);
-  const preview = dialog.locator('[aria-label="Trace preview (1254x1254 px)"]');
-  await expect(preview.locator('svg path').first()).toBeVisible({ timeout: remaining });
-  await expect(dialog.getByText(/Preview failed:/)).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Show Points', exact: true })).toBeVisible();
-  const request = (await observations(page))
-    .filter((r) => r.options.traceMode === 'centerline')
-    .at(-1);
-  if (request === undefined || request.startedAt === null || request.settledAt === null)
-    throw Error('Missing completed real-worker trace');
-  expect(request.options).toEqual(TRACE_PRESETS.Centerline);
-  expect(request.width * request.height).toBeGreaterThan(160_000);
-  expect(request.outcome).toBe('ok');
-  expect(request.polylines).toBeGreaterThan(0);
-  expect(request.closedPolylines).toBeGreaterThan(0);
-  expect(request.vertices).toBeGreaterThan(1);
-  expect(request.settledAt - request.startedAt).toBeLessThan(COMPUTE_BUDGET_MS);
-  expect(request.ticksAtEnd - request.ticksAtStart).toBeGreaterThan(0);
-  expect(nativeWorkers.get(page)?.length).toBeGreaterThan(0);
-  const svgPaths = await preview.locator('svg path').evaluateAll((paths) =>
-    paths.map((path) => ({
-      fill: path.getAttribute('fill'),
-      stroke: path.getAttribute('stroke'),
-      d: path.getAttribute('d') ?? '',
-    })),
-  );
-  expect(
-    svgPaths.every(
-      (path) => path.fill === 'none' && path.stroke !== null && path.stroke !== 'none',
-    ),
-  ).toBe(true);
-  expect(svgPaths.reduce((sum, path) => sum + (path.d.match(/\bZ\b/gi)?.length ?? 0), 0)).toBe(
-    request.closedPolylines,
-  );
-  await dialog.screenshot({ path: testInfo.outputPath('dragon-centerline-preview.png') });
-  const beforeCommit = (await observations(page)).length;
-  await dialog.getByRole('button', { name: 'Trace', exact: true }).click();
-  await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-  expect((await observations(page)).length).toBe(beforeCommit); // Commits the prepared preview, without tracing again.
-  const project = await saveProject(page, kerfdesk);
-  const traced = project.scene.objects.find(
-    (object) => object.kind === 'traced-image' && object.source === FIXTURE_NAME,
-  );
-  if (traced?.kind !== 'traced-image')
-    throw Error('The actual scene did not receive the dragon trace');
-  expect(traced.traceMode).toBe('centerline');
-  expect([traced.tracePixelWidth, traced.tracePixelHeight]).toEqual([1254, 1254]);
-  if (request.geometryJson === null) throw Error('Missing worker output geometry');
-  expect(traced.paths).toEqual(JSON.parse(request.geometryJson));
-  const polylines = traced.paths.flatMap((path) => path.polylines);
-  expect(polylines.length).toBe(request.polylines);
-  expect(polylines.reduce((sum, line) => sum + line.points.length, 0)).toBe(request.vertices);
-  expect(
-    polylines.every(
-      (line) =>
-        line.points.length >= 2 &&
-        line.points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)),
-    ),
-  ).toBe(true);
-  await testInfo.attach('dragon-committed-scene.json', {
-    body: JSON.stringify({
-      id: traced.id,
-      traceMode: traced.traceMode,
-      bounds: traced.bounds,
-      grid: [traced.tracePixelWidth, traced.tracePixelHeight],
-      polylines: polylines.length,
-      vertices: request.vertices,
-    }),
-    contentType: 'application/json',
+    if (request === undefined || request.startedAt === null || request.settledAt === null)
+      throw Error('Missing completed real-worker trace');
+    expect(request.options).toEqual(preset);
+    expect(request.width * request.height).toBeGreaterThan(160_000);
+    expect(request.outcome).toBe('ok');
+    expect(request.polylines).toBeGreaterThan(0);
+    expect(request.closedPolylines).toBeGreaterThan(0);
+    expect(request.vertices).toBeGreaterThan(1);
+    expect(request.settledAt - request.startedAt).toBeLessThan(COMPUTE_BUDGET_MS);
+    expect(request.ticksAtEnd - request.ticksAtStart).toBeGreaterThan(0);
+    expect(nativeWorkers.get(page)?.length).toBeGreaterThan(0);
+    const svgPaths = await preview.locator('svg path').evaluateAll((paths) =>
+      paths.map((path) => ({
+        fill: path.getAttribute('fill'),
+        stroke: path.getAttribute('stroke'),
+        d: path.getAttribute('d') ?? '',
+      })),
+    );
+    if (preset.traceMode === 'centerline') {
+      expect(
+        svgPaths.every(
+          (path) => path.fill === 'none' && path.stroke !== null && path.stroke !== 'none',
+        ),
+      ).toBe(true);
+    } else {
+      expect(request.closedPolylines).toBe(request.polylines);
+      expect(svgPaths.every((path) => path.fill === '#000000' && path.stroke === 'none')).toBe(
+        true,
+      );
+      await expect(preview.locator('svg path').first()).toHaveAttribute('fill-rule', 'evenodd');
+    }
+    expect(svgPaths.reduce((sum, path) => sum + (path.d.match(/\bZ\b/gi)?.length ?? 0), 0)).toBe(
+      request.closedPolylines,
+    );
+    await dialog.screenshot({ path: testInfo.outputPath('dragon-preset-preview.png') });
+    const beforeCommit = (await observations(page)).length;
+    await dialog.getByRole('button', { name: 'Trace', exact: true }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+    expect((await observations(page)).length).toBe(beforeCommit); // Commits the prepared preview, without tracing again.
+    const project = await saveProject(page, kerfdesk);
+    const traced = project.scene.objects.find(
+      (object) => object.kind === 'traced-image' && object.source === FIXTURE_NAME,
+    );
+    if (traced?.kind !== 'traced-image')
+      throw Error('The actual scene did not receive the dragon trace');
+    expect(traced.traceMode).toBe(preset.traceMode ?? 'filled-contours');
+    expect([traced.tracePixelWidth, traced.tracePixelHeight]).toEqual([1254, 1254]);
+    if (request.geometryJson === null) throw Error('Missing worker output geometry');
+    expect(traced.paths).toEqual(JSON.parse(request.geometryJson));
+    const polylines = traced.paths.flatMap((path) => path.polylines);
+    expect(polylines.length).toBe(request.polylines);
+    expect(polylines.reduce((sum, line) => sum + line.points.length, 0)).toBe(request.vertices);
+    expect(
+      polylines.every(
+        (line) =>
+          line.points.length >= 2 &&
+          line.points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)),
+      ),
+    ).toBe(true);
+    await testInfo.attach('dragon-committed-scene.json', {
+      body: JSON.stringify({
+        id: traced.id,
+        traceMode: traced.traceMode,
+        bounds: traced.bounds,
+        grid: [traced.tracePixelWidth, traced.tracePixelHeight],
+        polylines: polylines.length,
+        vertices: request.vertices,
+      }),
+      contentType: 'application/json',
+    });
+    await page.screenshot({ path: testInfo.outputPath('dragon-preset-committed.png') });
   });
-  await page.screenshot({ path: testInfo.outputPath('dragon-centerline-committed.png') });
-});
+}
 
 test('superseding an active dragon trace terminates its real worker and completes the replacement', async ({
   page,

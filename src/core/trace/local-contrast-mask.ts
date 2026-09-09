@@ -48,13 +48,45 @@ export function localContrastInkBitmap(
   image: RawImageData,
   options: LocalContrastMaskOptions,
 ): TraceBitmap {
-  const { width, height } = image;
+  const { luma, mean } = localContrastPlanes(image, options);
+  return inkBitmapFromPlanes(image, luma, mean, options.delta);
+}
+
+/** Build the bitmap and its measured iso-line from one luma/mean calculation.
+ * Both outputs must describe the same prepared image and detector settings. */
+export function localContrastTraceData(
+  image: RawImageData,
+  options: LocalContrastMaskOptions,
+): { readonly bitmap: TraceBitmap; readonly crackField: CrackSubPixelField } {
+  const { luma, mean } = localContrastPlanes(image, options);
+  return {
+    bitmap: inkBitmapFromPlanes(image, luma, mean, options.delta),
+    crackField: crackFieldFromPlanes(image, luma, mean, options.delta),
+  };
+}
+
+function localContrastPlanes(
+  image: RawImageData,
+  options: LocalContrastMaskOptions,
+): { readonly luma: Float32Array; readonly mean: Float32Array } {
   const luma = lumaPlane(image);
-  const mean = boxBlur(luma, width, height, Math.max(1, Math.round(options.radiusPx)));
+  return {
+    luma,
+    mean: boxBlur(luma, image.width, image.height, Math.max(1, Math.round(options.radiusPx))),
+  };
+}
+
+function inkBitmapFromPlanes(
+  image: RawImageData,
+  luma: Float32Array,
+  mean: Float32Array,
+  delta: number,
+): TraceBitmap {
+  const { width, height } = image;
   const ink = new Uint8Array(width * height);
   for (let i = 0; i < ink.length; i += 1) {
     const l = luma[i] as number;
-    if (l < (mean[i] as number) - options.delta || l < GLOBAL_INK_LUMA) ink[i] = 1;
+    if (l < (mean[i] as number) - delta || l < GLOBAL_INK_LUMA) ink[i] = 1;
   }
   return { width, height, data: ink };
 }
@@ -69,9 +101,17 @@ export function localContrastCrackField(
   image: RawImageData,
   options: LocalContrastMaskOptions,
 ): CrackSubPixelField {
+  const { luma, mean } = localContrastPlanes(image, options);
+  return crackFieldFromPlanes(image, luma, mean, options.delta);
+}
+
+function crackFieldFromPlanes(
+  image: RawImageData,
+  luma: Float32Array,
+  mean: Float32Array,
+  delta: number,
+): CrackSubPixelField {
   const { width, height } = image;
-  const luma = lumaPlane(image);
-  const mean = boxBlur(luma, width, height, Math.max(1, Math.round(options.radiusPx)));
   return {
     lumaAt: (x: number, y: number): number => {
       if (x < 0 || y < 0 || x >= width || y >= height) return OPAQUE_PAPER_LUMA;
@@ -80,10 +120,7 @@ export function localContrastCrackField(
     thresholdAt: (x: number, y: number): number => {
       const cx = Math.min(width - 1, Math.max(0, x));
       const cy = Math.min(height - 1, Math.max(0, y));
-      return Math.max(
-        (mean[cy * width + cx] ?? OPAQUE_PAPER_LUMA) - options.delta,
-        GLOBAL_INK_LUMA,
-      );
+      return Math.max((mean[cy * width + cx] ?? OPAQUE_PAPER_LUMA) - delta, GLOBAL_INK_LUMA);
     },
   };
 }

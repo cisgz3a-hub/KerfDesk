@@ -26,7 +26,7 @@ import { finiteOr } from '../util';
 import type { CrackSubPixelField } from './contour-boundary';
 import type { TraceOptions } from './trace-option-types';
 import { fillPinholes } from './fill-pinholes';
-import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
+import { autoMedianFilter, despeckle, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { prepareAutomaticDetailMask } from './automatic-detail-mask';
@@ -158,10 +158,7 @@ export function prepareTraceForContour(
       crackField: sketchCrackField(adjusted, radiusPx),
     };
   }
-  let prepared = adjusted;
-  if (shouldApplyMedian(prepared, options.medianFilter)) {
-    prepared = medianFilter(prepared);
-  }
+  const prepared = applyMedian(adjusted, options.medianFilter);
   const thresholded = applyThresholdWithIso(prepared, options);
   return {
     prepared: cleanBinaryMask(thresholded.prepared, options),
@@ -271,15 +268,14 @@ function sketchCrackField(adjusted: RawImageData, radiusPx = SKETCH_RADIUS_PX): 
   };
 }
 
-// Median gate. true forces it, false/undefined skips it, and 'auto' defers
-// to the impulse-noise detector so clean line art keeps its small features
-// while noisy scans still get de-speckled (see medianFilter's doc comment).
-function shouldApplyMedian(
+// Forced median and selective automatic cleanup have different contracts. The
+// automatic path computes and applies its result once, preserving connected ink.
+function applyMedian(
   image: RawImageData,
   medianFilterOption: boolean | 'auto' | undefined,
-): boolean {
-  if (medianFilterOption === 'auto') return hasImpulseNoise(image);
-  return medianFilterOption === true;
+): RawImageData {
+  if (medianFilterOption === 'auto') return autoMedianFilter(image);
+  return medianFilterOption === true ? medianFilter(image) : image;
 }
 
 // Brightness → contrast → gamma → invert. Each is a no-op at its

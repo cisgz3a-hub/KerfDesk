@@ -133,14 +133,22 @@ function crackCrossing(
   const inkLuma = field.lumaAt(inkX, inkY);
   const bgLuma = field.lumaAt(bgX, bgY);
   if (bgLuma >= SATURATED_BG_LUMA && inkLuma <= SATURATED_INK_LUMA) return MID_CRACK_T;
-  // The iso value across the crack: mean of the two positions' thresholds
-  // (they differ only in sketch mode, where the cut tracks the local mean).
-  const threshold = (field.thresholdAt(inkX, inkY) + field.thresholdAt(bgX, bgY)) / 2;
+  // The iso-line is the zero of luma minus the threshold at that position.
+  // Interpolate those residuals: averaging the thresholds first changes the
+  // crossing whenever a local threshold varies across the crack.
+  const inkThreshold = field.thresholdAt(inkX, inkY);
+  const bgThreshold = field.thresholdAt(bgX, bgY);
+  const inkResidual = inkLuma - inkThreshold;
+  const bgResidual = bgLuma - bgThreshold;
   // Only a proper straddle interpolates. Cleanup stages (despeckle, pinhole
   // fill) flip mask pixels without touching the luma, so cracks they create
   // have no crossing — those stay at the plain midpoint.
-  if (!(bgLuma > threshold && inkLuma <= threshold)) return MID_CRACK_T;
-  const t = (bgLuma - threshold) / (bgLuma - inkLuma);
+  if (!(bgResidual > 0 && inkResidual <= 0)) return MID_CRACK_T;
+  // Keep the established constant-threshold arithmetic exactly unchanged.
+  const t =
+    inkThreshold === bgThreshold
+      ? bgResidual / (bgLuma - inkLuma)
+      : bgResidual / (bgResidual - inkResidual);
   return Math.min(SUBPIXEL_T_MAX, Math.max(SUBPIXEL_T_MIN, t));
 }
 

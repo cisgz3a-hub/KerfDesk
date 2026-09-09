@@ -30,6 +30,7 @@ import { fitCubicsThroughPoints, sampleCubics } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import { withCanonicalTraceCurves } from './trace-curves';
+import { contourFeatureAnchors } from './contour-feature-anchors';
 import {
   closeContour,
   contourRefinement,
@@ -192,6 +193,7 @@ export function* contourPolylinesFromMaskSteps(
       ? Math.max(1, options.pixelScale)
       : 1;
   const finish: LoopFinish = {
+    mask,
     distSq: yield* squaredDistanceFieldSteps(mask),
     width: mask.width,
     epsilonPx: options.epsilonPx,
@@ -213,6 +215,7 @@ export function* contourPolylinesFromMaskSteps(
 }
 
 type LoopFinish = {
+  readonly mask: InkMask;
   readonly distSq: Float64Array;
   readonly width: number;
   readonly epsilonPx: number;
@@ -221,6 +224,17 @@ type LoopFinish = {
   readonly pixelScale: number;
   readonly crackField: CrackSubPixelField | undefined;
 };
+
+function featureAnchorsForLoop(
+  staircase: ReadonlyArray<Polyline['points'][number]>,
+  dense: ReadonlyArray<Polyline['points'][number]>,
+  finish: LoopFinish,
+  subPixelInformed: boolean,
+): ReadonlySet<Polyline['points'][number]> {
+  return finish.flattenStrength === 0 && !subPixelInformed
+    ? contourFeatureAnchors(staircase, dense, finish.mask)
+    : NO_CORNERS;
+}
 
 function* finishLoopSteps(
   staircase: ReadonlyArray<Polyline['points'][number]>,
@@ -242,6 +256,11 @@ function* finishLoopSteps(
   // verdicts, 2026-07-11) and evening it fights drawn texture. Binary
   // sources (saturated steps, fraction ~0) keep the full 1x behaviour.
   const subPixelInformed = crack.interpolatedFraction >= SUBPIXEL_INFORMED_FRACTION;
+  // When quantization smoothing is off, a terminal pixel is deliberate
+  // detail. Keep its cap through the bend rebuild and simplification. The
+  // pins are existing pre-smoothed points, so the spline can still round
+  // them; they are not drawn corners. Measured AA loops keep their own tail.
+  const featureAnchors = featureAnchorsForLoop(staircase, dense, finish, subPixelInformed);
   // The chain-length regime bounds were tuned at 1x; a supersampled chain is
   // pixelScale× denser, so the bounds scale with it — a LANGEBAAN-size glyph
   // must stay in the same (sparse-detection) regime it was tuned for.
@@ -254,9 +273,13 @@ function* finishLoopSteps(
   const flattenStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
   const arcStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
   const sharpened = inSharpenRange
-    ? yield* sharpenChainBendsSteps(dense, true, distSq, width)
+    ? yield* sharpenChainBendsSteps(dense, true, distSq, width, featureAnchors)
     : { points: dense, corners: NO_CORNERS };
-  const evened = smoothChainCurvature(sharpened.points, true, sharpened.corners);
+  const fixedPoints =
+    featureAnchors.size === 0
+      ? sharpened.corners
+      : new Set([...sharpened.corners, ...featureAnchors]);
+  const evened = smoothChainCurvature(sharpened.points, true, fixedPoints);
   // Mid-wavelength curvature noise (the "small wobble in the O") is evened
   // on the DENSE chain, where a local moving circle fit has rich statistics
   // and cannot average away drawn structure the way long-span fits do
@@ -277,7 +300,13 @@ function* finishLoopSteps(
   const refined =
     subPixelInformed && dense.length >= sharpenMin
       ? finishMeasuredLoop(arcSmoothed, sharpened, inSharpenRange, finish)
-      : finishLegacyLoop(arcSmoothed, sharpened.corners, flattenStrengthEff, finish);
+      : finishLegacyLoop(
+          arcSmoothed,
+          sharpened.corners,
+          flattenStrengthEff,
+          finish,
+          featureAnchors,
+        );
   // The area policy has already admitted this boundary. A tolerance larger
   // than the loop can collapse the finishing tail to two anchors; Optimize
   // must not become another area-removal control. Retain the measured crack
@@ -314,8 +343,9 @@ function finishLegacyLoop(
   corners: ReadonlySet<Polyline['points'][number]>,
   flattenStrength: number,
   finish: LoopFinish,
+  featureAnchors: ReadonlySet<Polyline['points'][number]>,
 ): ContourRefinement | null {
-  const simplified = simplifyChain(arcSmoothed, true, finish.epsilonPx);
+  const simplified = simplifyChain(arcSmoothed, true, finish.epsilonPx, featureAnchors);
   if (simplified.length < MIN_LOOP_POINTS) return null;
   // Rough source edges leave long-wavelength waviness that survives both
   // evening and simplification (nominally straight stems trace wobbly);

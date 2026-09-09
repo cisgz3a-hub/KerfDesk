@@ -7,14 +7,15 @@ const EXPONENT_BIAS_WITH_FRACTION = 1075;
 const SUBNORMAL_EXPONENT = -1074;
 const SIGN_BIT = 63n;
 type Dyadic = { readonly integer: bigint; readonly exponent: number };
+type PreparedPoint = { readonly x: number; readonly y: number; readonly values: [Dyadic, Dyadic] };
+const BINARY64_VIEW = new DataView(new ArrayBuffer(8));
 
 // A finite binary64 value is an integer times a power of two. Aligning those
 // powers makes the determinant exact even for almost-collinear trace edges;
 // no epsilon may turn a positive paper gap into a contact.
 function dyadic(value: number): Dyadic {
-  const view = new DataView(new ArrayBuffer(8));
-  view.setFloat64(0, value);
-  const bits = view.getBigUint64(0);
+  BINARY64_VIEW.setFloat64(0, value);
+  const bits = BINARY64_VIEW.getBigUint64(0);
   const exponent = Number((bits >> FRACTION_BITS) & EXPONENT_MASK);
   const fraction = bits & FRACTION_MASK;
   const sign = bits >> SIGN_BIT === 0n ? 1n : -1n;
@@ -26,7 +27,32 @@ function dyadic(value: number): Dyadic {
 
 /** Exact orientation sign for finite trace coordinates. */
 export function contourOrientation(a: Vec2, b: Vec2, c: Vec2): number {
-  const values = [a.x, a.y, b.x, b.y, c.x, c.y].map(dyadic);
+  return exactOrientation([a.x, a.y, b.x, b.y, c.x, c.y].map(dyadic));
+}
+
+/** Cache only binary64 decompositions, never an approximate determinant. */
+export class ContourOrientation {
+  private readonly points = new WeakMap<Vec2, PreparedPoint>();
+
+  sign(a: Vec2, b: Vec2, c: Vec2): number {
+    return exactOrientation([
+      ...this.coordinates(a),
+      ...this.coordinates(b),
+      ...this.coordinates(c),
+    ]);
+  }
+
+  private coordinates(point: Vec2): [Dyadic, Dyadic] {
+    const { x, y } = point;
+    const previous = this.points.get(point);
+    if (previous !== undefined && previous.x === x && previous.y === y) return previous.values;
+    const values: [Dyadic, Dyadic] = [dyadic(x), dyadic(y)];
+    this.points.set(point, { x, y, values });
+    return values;
+  }
+}
+
+function exactOrientation(values: ReadonlyArray<Dyadic>): number {
   const exponent = Math.min(...values.map((value) => value.exponent));
   const integers = values.map((value) => value.integer << BigInt(value.exponent - exponent));
   // The fixed six-coordinate list establishes all six entries.

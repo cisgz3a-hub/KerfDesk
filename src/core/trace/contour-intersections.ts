@@ -1,5 +1,6 @@
 import type { Polyline, Vec2 } from '../scene';
-import { contourOrientation } from './contour-orientation';
+import { ContourContactCache } from './contour-contact-cache';
+import { ContourOrientation } from './contour-orientation';
 import { contourBox, visitContourBoxPairsSteps, type ContourBox } from './contour-spatial';
 import type { TraceSteps } from './trace-steps';
 
@@ -15,8 +16,16 @@ const EDGE_CHECKPOINT_INTERVAL = 256;
 /** Loop owners of all nonadjacent crossings, contacts and collinear overlaps. */
 export function* intersectingContourLoopsSteps(
   polylines: ReadonlyArray<Polyline>,
+  cache = new ContourContactCache(),
 ): TraceSteps<Set<number>> {
+  yield;
+  const cached = yield* cache.findSteps(polylines);
+  return cached ?? (yield* uncachedIntersectionsSteps(polylines));
+}
+
+function* uncachedIntersectionsSteps(polylines: ReadonlyArray<Polyline>): TraceSteps<Set<number>> {
   const cooperate = yield;
+  const orientation = new ContourOrientation();
   const edges: ContourEdge[] = [];
   for (const [loop, polyline] of polylines.entries()) {
     if (cooperate) yield;
@@ -35,7 +44,7 @@ export function* intersectingContourLoopsSteps(
   const conflicts = new Set<number>();
   yield* visitContourBoxPairsSteps(edges, (a, b) => {
     if (adjacent(a, b)) return;
-    if (!segmentsMeet(a, b)) return;
+    if (!segmentsMeet(a, b, orientation)) return;
     conflicts.add(a.loop);
     conflicts.add(b.loop);
   });
@@ -49,10 +58,10 @@ function adjacent(a: ContourEdge, b: ContourEdge): boolean {
 
 // Bounding boxes already overlap. The orientation products therefore include
 // endpoint contact and collinear overlap without a distance tolerance.
-function segmentsMeet(a: ContourEdge, b: ContourEdge): boolean {
+function segmentsMeet(a: ContourEdge, b: ContourEdge, orientation: ContourOrientation): boolean {
   return (
-    contourOrientation(a.a, a.b, b.a) * contourOrientation(a.a, a.b, b.b) <= 0 &&
-    contourOrientation(b.a, b.b, a.a) * contourOrientation(b.a, b.b, a.b) <= 0
+    orientation.sign(a.a, a.b, b.a) * orientation.sign(a.a, a.b, b.b) <= 0 &&
+    orientation.sign(b.a, b.b, a.a) * orientation.sign(b.a, b.b, a.b) <= 0
   );
 }
 
