@@ -1895,6 +1895,9 @@ ADR-279.*
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
    converted once on enlarged working rasters, including Enhance regions. Zero disables that
    gap bridge; true-junction repairs and ring closure keep their existing separate policies.
+   Centerline removes corner spurs before condensing junctions, then carries shared junction
+   anchors through smoothing and simplification so finished branches remain attached to their
+   receiving strokes, including closed rings. Joined gaps retain both actual endpoints.
    Filled-outline and Edge finishing check the continuous contour boundaries together.
    When final smoothing creates a crossing or changes a counter's nesting, only the affected
    contours are refined closer to their earlier boundaries. Valid positive gaps retain their

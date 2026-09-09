@@ -129,7 +129,7 @@ describe('Centerline source-distance gap bridging', () => {
           ],
           scale,
         ),
-        expected = [...a.points, b.points[1]!];
+        expected = [...a.points, ...b.points];
       bridgeNearbyEnds([a, b, c], workingGap);
       expect(a.points).toEqual(expected);
       expect(b.alive).toBe(false);
