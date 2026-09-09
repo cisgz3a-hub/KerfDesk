@@ -1911,6 +1911,9 @@ ADR-279.*
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.
+   In a CNC project, smoothing retains established stroke junctions at the
+   source image's current physical size. Selection bounds follow the conditioned
+   geometry while the trace remains registered over its full source image.
 
 **Error — worker stalls or crashes**:
 - A worker request has a bounded execution timeout. The failed worker is
