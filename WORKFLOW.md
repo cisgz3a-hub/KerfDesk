@@ -1905,6 +1905,9 @@ ADR-279.*
    A tiny closed contour that passes its area threshold remains present when
    Optimize would collapse its finishing geometry. That contour uses its measured
    boundary and participates in the same topology check as the other contours.
+   Straightening retains deep notches and narrow turns where the outline doubles
+   back along an otherwise straight edge. Increasing Smoothness still removes
+   edge waviness without increasing how far such a turn may be shortened.
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.
