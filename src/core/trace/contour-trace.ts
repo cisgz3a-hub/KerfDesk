@@ -278,7 +278,13 @@ function* finishLoopSteps(
     subPixelInformed && dense.length >= sharpenMin
       ? finishMeasuredLoop(arcSmoothed, sharpened, inSharpenRange, finish)
       : finishLegacyLoop(arcSmoothed, sharpened.corners, flattenStrengthEff, finish);
-  return refined === null ? null : { ...refined, source: closeContour(crack.points) };
+  // The area policy has already admitted this boundary. A tolerance larger
+  // than the loop can collapse the finishing tail to two anchors; Optimize
+  // must not become another area-removal control. Retain the measured crack
+  // boundary in that case (one bounded fallback, no new fitting search), and
+  // include it in the same topology repair as every other admitted contour.
+  const retained = refined ?? contourRefinement(crack.points, () => crack.points);
+  return { ...retained, source: closeContour(crack.points) };
 }
 
 // Measured loops end in the fairing-by-fitting tail: least-squares cubics

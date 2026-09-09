@@ -1902,6 +1902,9 @@ ADR-279.*
    When final smoothing creates a crossing or changes a counter's nesting, only the affected
    contours are refined closer to their earlier boundaries. Valid positive gaps retain their
    geometry, including gaps smaller than one source pixel.
+   A tiny closed contour that passes its area threshold remains present when
+   Optimize would collapse its finishing geometry. That contour uses its measured
+   boundary and participates in the same topology check as the other contours.
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.
