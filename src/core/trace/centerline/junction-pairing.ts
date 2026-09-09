@@ -5,6 +5,7 @@
 
 import type { Vec2 } from '../../scene';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
+import { EndpointGrid } from './endpoint-grid';
 import { pointAtArcDistance } from './polyline-window';
 import type { StrokeGraph } from './stroke-graph';
 
@@ -151,12 +152,14 @@ function* nearestBridgeableEndsSteps(
   const ends = collectOpenEnds(chains);
   let best: readonly [ChainEnd, ChainEnd] | null = null;
   let bestDist = joinGapPx * Math.max(1, alignedFactor);
+  const grid = EndpointGrid.create(ends.map(endPoint), bestDist);
   for (let i = 0; i < ends.length; i += 1) {
     if (cooperate) yield;
-    for (let j = i + 1; j < ends.length; j += 1) {
-      const a = ends[i];
+    const a = ends[i];
+    if (a === undefined) continue;
+    for (const j of laterEndIndices(ends, i, grid)) {
       const b = ends[j];
-      if (a === undefined || b === undefined) continue;
+      if (b === undefined) continue;
       const d = endGap(a, b);
       if (d === null || d >= bestDist) continue;
       const forward = bridgeForwardness(a, b);
@@ -167,6 +170,18 @@ function* nearestBridgeableEndsSteps(
     }
   }
   return best;
+}
+
+function laterEndIndices(
+  ends: ReadonlyArray<ChainEnd>,
+  index: number,
+  grid: EndpointGrid | null,
+): number[] {
+  const end = ends[index];
+  const point = end === undefined ? undefined : endPoint(end);
+  if (grid !== null && point !== undefined)
+    return grid.nearbyIndices(point).filter((i) => i > index);
+  return Array.from({ length: ends.length - index - 1 }, (_, i) => index + i + 1);
 }
 
 function passesBridgeTier(

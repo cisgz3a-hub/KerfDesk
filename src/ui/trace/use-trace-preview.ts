@@ -285,7 +285,7 @@ export function runTrace(args: {
       );
       const { paths, width, height } = result;
       if (!args.isCurrent()) return;
-      const svg = coloredPathsToSvg(paths, width, height);
+      const svg = coloredPathsToSvg(paths, width, height, undefined, args.options.traceMode);
       args.setState({
         kind: 'ready',
         svg,

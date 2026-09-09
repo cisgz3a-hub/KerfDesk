@@ -56,6 +56,41 @@ function rawImage(width: number, height: number): RawImageData {
 }
 
 describe('traceImagesToSvgFiles', () => {
+  it('carries explicit Centerline intent into both SVG paint and visible path counts', async () => {
+    const zeroAreaStroke: ColoredPath = {
+      color: '#000000',
+      polylines: [
+        {
+          closed: true,
+          points: [
+            { x: 1, y: 1 },
+            { x: 3, y: 3 },
+          ],
+        },
+      ],
+    };
+    const trace = vi.fn(async () => [zeroAreaStroke]);
+    const options: TraceOptions = { ...DEFAULT_TRACE_OPTIONS, traceMode: 'centerline' };
+    const files = await traceImagesToSvgFiles(
+      [
+        {
+          sourceName: 'ring.png',
+          image: rawImage(8, 8),
+          options,
+          physicalSizeMm: { widthMm: 16, heightMm: 8 },
+        },
+        { sourceName: 'ring.jpg', image: rawImage(8, 8) },
+      ],
+      { trace },
+    );
+    expect(files.map((f) => f.filename)).toEqual(['ring-trace.svg', 'ring-2-trace.svg']);
+    expect(files.map((f) => f.pathCount)).toEqual([1, 0]);
+    expect(files[0]?.svg).toContain('d="M1 1 L3 3 Z" fill="none" stroke="#000000"');
+    expect(files[0]?.svg).toContain('width="16mm" height="8mm"');
+    expect(files[1]?.svg).not.toContain('<path ');
+    expect(trace).toHaveBeenNthCalledWith(1, rawImage(8, 8), options);
+  });
+
   it('traces each image to a standalone SVG file without requiring scene mutation', async () => {
     const trace = vi.fn(async () => [SQUARE_PATH]);
 

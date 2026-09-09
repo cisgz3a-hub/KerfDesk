@@ -19,6 +19,7 @@
 // Pure-core compliant: no clock, no random, no I/O, no DOM.
 
 import type { ColoredPath } from '../scene';
+import type { TraceOptions } from './trace-option-types';
 
 // Decimal-rounding precision. 2 dp = 0.01px on a 400px preview ≈
 // 0.0025% of width — well below display resolution. Higher precision
@@ -36,14 +37,18 @@ export function coloredPathsToSvg(
   width: number,
   height: number,
   physicalSize?: SvgPhysicalSize,
+  traceMode?: TraceOptions['traceMode'],
 ): string {
   const header = svgOpen(width, height, physicalSize);
-  const body = paths.map(coloredPathToSvgPath).join('');
+  const body = paths.map((path) => coloredPathToSvgPath(path, traceMode)).join('');
   return `${header}${body}</svg>`;
 }
 
-export function countVisibleColoredPaths(paths: ReadonlyArray<ColoredPath>): number {
-  return paths.filter(isVisibleColoredPath).length;
+export function countVisibleColoredPaths(
+  paths: ReadonlyArray<ColoredPath>,
+  traceMode?: TraceOptions['traceMode'],
+): number {
+  return paths.filter((path) => isVisibleColoredPath(path, traceMode)).length;
 }
 
 function svgOpen(width: number, height: number, physicalSize?: SvgPhysicalSize): string {
@@ -59,13 +64,19 @@ function svgOpen(width: number, height: number, physicalSize?: SvgPhysicalSize):
   );
 }
 
-function coloredPathToSvgPath(path: ColoredPath): string {
+function coloredPathToSvgPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): string {
   if (!isVisibleColor(path.color)) return '';
-  const closed = path.polylines.filter((pl) => pl.closed && isVisibleClosedPolyline(pl));
-  const open = path.polylines.filter((pl) => !pl.closed && isVisibleOpenPolyline(pl));
-  const filled = closedPolylinesToSvgPath(path.color, closed);
-  const stroked = openPolylinesToSvgPath(path.color, open);
-  return `${filled}${stroked}`;
+  const closedVisible =
+    traceMode === 'centerline' ? isVisibleStrokedPolyline : isVisibleClosedPolyline;
+  const closed = path.polylines.filter((pl) => pl.closed && closedVisible(pl));
+  const open = path.polylines.filter((pl) => !pl.closed && isVisibleStrokedPolyline(pl));
+  // A closed Centerline is still a line operation; closure does not imply fill.
+  const closedSvg =
+    traceMode === 'centerline'
+      ? strokedPolylinesToSvgPath(path.color, closed)
+      : closedPolylinesToSvgPath(path.color, closed);
+  const openSvg = strokedPolylinesToSvgPath(path.color, open);
+  return `${closedSvg}${openSvg}`;
 }
 
 function closedPolylinesToSvgPath(
@@ -81,7 +92,7 @@ function closedPolylinesToSvgPath(
   return `<path d="${d}" fill="${color}" fill-rule="evenodd" stroke="none"/>`;
 }
 
-function openPolylinesToSvgPath(
+function strokedPolylinesToSvgPath(
   color: string,
   polylines: ReadonlyArray<ColoredPath['polylines'][number]>,
 ): string {
@@ -108,10 +119,12 @@ function polylineToSubPath(polyline: ColoredPath['polylines'][number]): string {
   return d;
 }
 
-function isVisibleColoredPath(path: ColoredPath): boolean {
+function isVisibleColoredPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): boolean {
   if (!isVisibleColor(path.color)) return false;
   return path.polylines.some((polyline) =>
-    polyline.closed ? isVisibleClosedPolyline(polyline) : isVisibleOpenPolyline(polyline),
+    polyline.closed && traceMode !== 'centerline'
+      ? isVisibleClosedPolyline(polyline)
+      : isVisibleStrokedPolyline(polyline),
   );
 }
 
@@ -129,10 +142,10 @@ function isVisibleClosedPolyline(polyline: ColoredPath['polylines'][number]): bo
   return Math.abs(signedArea(points)) > VISIBLE_GEOMETRY_EPSILON;
 }
 
-function isVisibleOpenPolyline(polyline: ColoredPath['polylines'][number]): boolean {
+function isVisibleStrokedPolyline(polyline: ColoredPath['polylines'][number]): boolean {
   const points = finitePoints(polyline);
   if (points.length < 2) return false;
-  return pathLength(points) > VISIBLE_GEOMETRY_EPSILON;
+  return pathLength(points, polyline.closed) > VISIBLE_GEOMETRY_EPSILON;
 }
 
 function finitePoints(
@@ -156,11 +169,13 @@ function signedArea(
 
 function pathLength(
   points: ReadonlyArray<ColoredPath['polylines'][number]['points'][number]>,
+  closed: boolean,
 ): number {
   let length = 0;
-  for (let i = 1; i < points.length; i += 1) {
-    const prev = points[i - 1];
-    const point = points[i];
+  const segments = closed ? points.length : points.length - 1;
+  for (let i = 0; i < segments; i += 1) {
+    const prev = points[i];
+    const point = points[(i + 1) % points.length];
     if (prev === undefined || point === undefined) continue;
     length += Math.hypot(point.x - prev.x, point.y - prev.y);
   }

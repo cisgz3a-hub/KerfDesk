@@ -43,8 +43,14 @@ export async function traceImagesToSvgFiles(
     const stem = uniqueStem(safeSourceStem(job.sourceName), seenNames);
     files.push({
       filename: `${stem}-trace.svg`,
-      svg: coloredPathsToSvg(paths, job.image.width, job.image.height, job.physicalSizeMm),
-      pathCount: countVisibleColoredPaths(paths),
+      svg: coloredPathsToSvg(
+        paths,
+        job.image.width,
+        job.image.height,
+        job.physicalSizeMm,
+        options.traceMode,
+      ),
+      pathCount: countVisibleColoredPaths(paths, options.traceMode),
     });
   }
   return files;

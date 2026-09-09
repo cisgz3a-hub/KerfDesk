@@ -51,6 +51,12 @@ type MutableChain = {
   alive: boolean;
 };
 
+type OpenComponent = { size: number };
+type PruneState = {
+  readonly degree: Map<number, number>;
+  readonly component: Map<MutableChain, OpenComponent>;
+};
+
 export function pruneSpurs(
   graph: StrokeGraph,
   distSq: Float64Array,
@@ -76,12 +82,18 @@ export function* pruneSpursSteps(
   }));
   const nodeKind = new Map<number, StrokeNode['kind']>();
   for (const node of graph.nodes) nodeKind.set(node.id, node.kind);
+  const state: PruneState = {
+    degree: liveDegrees(chains),
+    component: yield* liveComponentsSteps(chains),
+  };
 
   let changed = true;
   while (changed) {
     if (cooperate) yield;
-    changed = yield* pruneOneSpurSteps(chains, nodeKind, distSq, width, options);
-    if (!changed && (yield* dissolvePassthroughJunctionsSteps(chains, nodeKind))) changed = true;
+    changed = yield* pruneOneSpurSteps(chains, state, nodeKind, distSq, width, options);
+    if (!changed && (yield* dissolvePassthroughJunctionsSteps(chains, state, nodeKind))) {
+      changed = true;
+    }
   }
 
   return survivingGraph(graph, chains);
@@ -130,27 +142,28 @@ function survivingGraph(graph: StrokeGraph, chains: ReadonlyArray<MutableChain>)
   };
 }
 
-// One prune per sweep: degree and component counts go stale the moment a
-// chain dies, and pruning further against the snapshot lets every leaf of a
-// small mark die in a single pass — a 3-px "+" or a dot vanishes entirely,
-// the exact last-chain violation the component guard exists to prevent.
+// Keep the original first-candidate ordering, with live counts after every
+// removal. A stale component size would let all leaves of a small mark die.
 function* pruneOneSpurSteps(
   chains: MutableChain[],
+  state: PruneState,
   nodeKind: Map<number, StrokeNode['kind']>,
   distSq: Float64Array,
   width: number,
   options: SpurPruneOptions,
 ): TraceSteps<boolean> {
   const cooperate = yield;
-  const degree = liveDegrees(chains);
-  const componentSize = yield* liveComponentChainCountsSteps(chains);
+  const { degree, component } = state;
   for (const chain of chains) {
     if (cooperate) yield;
     if (!chain.alive || chain.closed) continue;
     if (!isPrunableLeaf(chain, degree, nodeKind)) continue;
-    if ((componentSize.get(yield* componentKeySteps(chain, chains)) ?? 1) <= 1) continue; // last chain guard
+    const group = component.get(chain);
+    if (group === undefined || group.size <= 1) continue; // last chain guard
     if (!isArtifactSpur(chain, degree, distSq, width, options)) continue;
     chain.alive = false;
+    adjustDegree(degree, chain, -1);
+    group.size -= 1;
     return true;
   }
   return false;
@@ -166,11 +179,13 @@ function liveDegrees(chains: ReadonlyArray<MutableChain>): Map<number, number> {
   return degree;
 }
 
-// Union-find over node ids; every open chain links its two ends. Closed
-// chains are their own components and never pruned.
-function* liveComponentChainCountsSteps(
+// These operations cannot split the remaining open edges of a component:
+// removing a leaf deletes only its tip, and degree-two dissolution replaces
+// a corridor with one edge. A newly closed loop removes its two open edges.
+// Therefore component identity is fixed, while its live size changes.
+function* liveComponentsSteps(
   chains: ReadonlyArray<MutableChain>,
-): TraceSteps<Map<string, number>> {
+): TraceSteps<Map<MutableChain, OpenComponent>> {
   const cooperate = yield;
   const parent = new Map<number, number>();
   const find = (n: number): number => {
@@ -182,46 +197,29 @@ function* liveComponentChainCountsSteps(
   let work = 0;
   for (const chain of chains) {
     if ((work++ & 63) === 0 && cooperate) yield;
-    if (!chain.alive || chain.closed) continue;
+    if (chain.closed) continue;
     const ra = find(chain.a);
     const rb = find(chain.b);
     if (ra !== rb) parent.set(ra, rb);
   }
-  const counts = new Map<string, number>();
+  const components = new Map<number, OpenComponent>();
+  const byChain = new Map<MutableChain, OpenComponent>();
   for (const chain of chains) {
     if ((work++ & 63) === 0 && cooperate) yield;
-    if (!chain.alive || chain.closed) continue;
-    const key = `n${find(chain.a)}`;
-    incrementComponentCount(counts, key);
+    if (chain.closed) continue;
+    const key = find(chain.a);
+    const group = components.get(key) ?? { size: 0 };
+    group.size += 1;
+    components.set(key, group);
+    byChain.set(chain, group);
   }
-  return counts;
+  return byChain;
 }
 
-function incrementComponentCount(counts: Map<string, number>, key: string): void {
-  counts.set(key, (counts.get(key) ?? 0) + 1);
-}
-
-function* componentKeySteps(
-  chain: MutableChain,
-  chains: ReadonlyArray<MutableChain>,
-): TraceSteps<string> {
-  const cooperate = yield;
-  // Recompute the representative the same way liveComponentChainCounts does.
-  const parent = new Map<number, number>();
-  const find = (n: number): number => {
-    let root = n;
-    while ((parent.get(root) ?? root) !== root) root = parent.get(root) ?? root;
-    return root;
-  };
-  let work = 0;
-  for (const c of chains) {
-    if ((work++ & 63) === 0 && cooperate) yield;
-    if (!c.alive || c.closed) continue;
-    const ra = find(c.a);
-    const rb = find(c.b);
-    if (ra !== rb) parent.set(ra, rb);
-  }
-  return `n${find(chain.a)}`;
+function adjustDegree(degree: Map<number, number>, chain: MutableChain, change: number): void {
+  if (chain.closed) return;
+  degree.set(chain.a, (degree.get(chain.a) ?? 0) + change);
+  degree.set(chain.b, (degree.get(chain.b) ?? 0) + change);
 }
 
 // The pinched-tip discriminator. A leaf's arc length includes its run INSIDE
@@ -297,9 +295,12 @@ export function arcLength(points: ReadonlyArray<Vec2>): number {
 // Merge the two surviving chains of any degree-2 node into one through-chain.
 function* dissolvePassthroughJunctionsSteps(
   chains: MutableChain[],
+  state: PruneState,
   nodeKind: Map<number, StrokeNode['kind']>,
 ): TraceSteps<boolean> {
   const cooperate = yield;
+  // Recreate insertion order from the current chains, as before. A cached
+  // map's historic order can choose a different first node after merges.
   const degree = liveDegrees(chains);
   for (const [nodeId, d] of degree) {
     if (cooperate) yield;
@@ -310,7 +311,12 @@ function* dissolvePassthroughJunctionsSteps(
     const first = incident[0];
     const second = incident[1];
     if (first === undefined || second === undefined || first === second) continue;
+    adjustDegree(state.degree, first, -1);
+    adjustDegree(state.degree, second, -1);
     mergeThroughNode(first, second, nodeId);
+    adjustDegree(state.degree, first, 1);
+    const group = state.component.get(first);
+    if (group !== undefined) group.size -= first.closed ? 2 : 1;
     return true; // degrees changed — caller loops again
   }
   return false;
