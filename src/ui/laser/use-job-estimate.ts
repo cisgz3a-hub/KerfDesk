@@ -23,10 +23,11 @@ import {
 } from '../job-placement';
 import {
   isPreparationSuperseded,
-  prepareLargeJobOffThread,
+  prepareJobEstimateOffThread,
 } from '../workspace/preparation-worker-client';
 import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 import { PRINT_CUT_REGISTRATION_INVALID_MESSAGE } from '../../io/gcode/prepare-output-snapshot';
+import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -147,25 +148,32 @@ function useSettledEstimate({
   // paged-asset, or Print-and-Cut materialization and therefore begin paused
   // (or with the already-known registration failure) until the background
   // preparation settles.
-  const [settled, setSettled] = useState<Settled>(() => ({
-    project: initiallyAsync ? null : project,
-    outputScopeKey,
-    registrationKey,
-    placementKey,
-    estimate: initialEstimate(project, outputScope, jobOrigin, initialRegistration, initiallyAsync),
-  }));
+  const [settled, setSettled] = useState<Settled>(() => {
+    // A saved plain raster can need background work on mount too. Leaving it
+    // marked as settled would suppress the worker follow-up until another edit.
+    // Classify inside this initializer so hover renders do not repeat the scan.
+    const deferInitial = initiallyAsync || costlyCanvasPreparation(project, outputScope);
+    return {
+      project: deferInitial ? null : project,
+      outputScopeKey,
+      registrationKey,
+      placementKey,
+      estimate: initialEstimate(project, outputScope, jobOrigin, initialRegistration, deferInitial),
+    };
+  });
   // The ADR-244 worker follow-up must survive the settle-triggered effect
   // cleanup (settling changes the deps and re-runs the effect), so it is
   // cancelled by GENERATION — a newer recompute or unmount — not by the
   // effect's own cancelled flag.
   const workerGeneration = useRef(0);
   const mounted = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // StrictMode replays effect setup after cleanup on the mounted instance.
+    mounted.current = true;
+    return () => {
       mounted.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
   useEffect(() => {
     if (
       settled.project === project &&
@@ -272,7 +280,7 @@ function followUpWithWorkerEstimate(
 ): void {
   if (value.kind !== 'too-large') return;
   const registration = currentPrintCutOutputRegistration(args.project);
-  const offThread = prepareLargeJobOffThread(args.project, {
+  const offThread = prepareJobEstimateOffThread(args.project, {
     outputScope: args.outputScope,
     ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
     ...(usesSnapshot

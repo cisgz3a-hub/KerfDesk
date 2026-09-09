@@ -8,9 +8,12 @@ import { serializeExecutablePlanPreviewRoute } from './executable-plan-preview-r
 import type { PreviewToolpath } from './preview-status';
 import { registerPreviewJobOriginOffset } from './preview-scene-frame';
 
-export type LargeJobPreparation = {
-  readonly toolpath: PreviewToolpath;
+export type LargeJobEstimate = {
   readonly estimate: LiveJobEstimate;
+};
+
+export type LargeJobPreparation = LargeJobEstimate & {
+  readonly toolpath: PreviewToolpath;
   /** Clone-safe carrier restored into the process-local preview association. */
   readonly jobOriginOffset?: Vec2;
 };

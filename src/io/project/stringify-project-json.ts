@@ -5,6 +5,8 @@ class JsonTextWriter {
   private readonly indents = [''];
   private current = '';
 
+  constructor(readonly compact: boolean) {}
+
   append(text: string): void {
     if (this.current.length + text.length < CHUNK_CHARACTERS) {
       this.current += text;
@@ -16,6 +18,7 @@ class JsonTextWriter {
   }
 
   line(depth: number): void {
+    if (this.compact) return;
     while (this.indents.length <= depth) {
       this.indents.push(`${this.indents.at(-1) ?? ''}  `);
     }
@@ -34,8 +37,11 @@ class JsonTextWriter {
   }
 }
 
-export function stringifyProjectJson(project: unknown): string {
-  const writer = new JsonTextWriter();
+export function stringifyProjectJson(
+  project: unknown,
+  options: { readonly compact?: boolean } = {},
+): string {
+  const writer = new JsonTextWriter(options.compact === true);
   writePreparedValue(writer, prepareValue(project, ''), 0, new Set());
   return writer.finish();
 }
@@ -88,7 +94,7 @@ function writeFloatArray(
   }
   if (allFinite(values)) {
     writer.line(depth + 1);
-    writer.append(values.join(`,\n${'  '.repeat(depth + 1)}`));
+    writer.append(values.join(writer.compact ? ',' : `,\n${'  '.repeat(depth + 1)}`));
     writer.line(depth);
     writer.append(']');
     return;
@@ -136,7 +142,7 @@ function writeObject(
     if (isOmitted(child)) continue;
     if (written > 0) writer.append(',');
     writer.line(depth + 1);
-    writer.append(`${JSON.stringify(key)}: `);
+    writer.append(`${JSON.stringify(key)}:${writer.compact ? '' : ' '}`);
     writePreparedValue(writer, child, depth + 1, ancestors);
     written += 1;
   }

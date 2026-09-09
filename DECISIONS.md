@@ -16126,6 +16126,48 @@ the final Inspector transition still delayed input and paint.
 - NOT verified: controller execution, air-cut, material cut, physical containment, spindle load,
   cut quality, perceptual GPU fidelity, or fixed responsiveness on other CPUs.
 
+### Amendment - Dense artwork and embedded raster responsiveness (2026-09-09)
+
+Ordinary Design mode can contain hundreds of thousands of traced points or multi-megapixel embedded
+rasters. Native Chrome profiling found redundant canvas redraws on unchanged snap guides, repeated
+closure of a growing filled path, foreground raster preparation for idle markers and ETA, and
+repeated autosave serialization of an unchanged document.
+
+- Preserve snap-guide state identity when its ordered geometry is unchanged. Cursor updates alone
+  must not repaint the artwork. Filled closed contours use Canvas's implicit fill closure; stored
+  closure, stroke behavior, display sampling and even-odd/nonzero fill rules are unchanged. This
+  follows the [HTML fill steps](https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-fill).
+- Keep the core raster work advisory separate from UI scheduling. At 250,000 aggregate source pixels
+  plus effective output pixel-passes, use the existing background preparation route. Count only
+  output-bound raster sources, once per object, and include effective operations, transforms,
+  pass-through and passes in output work. Hidden output still counts; disabled output, trace-source
+  rasters and excluded selections do not. Do not decode pixels to classify work. The threshold changes
+  execution context only; it does not restrict images or alter source resolution, output or guards.
+- The initial ETA for an already-loaded costly project must enter the same worker path as an edit.
+  Effect setup/cleanup must retain correct ownership under development StrictMode replay and unmount.
+  Estimate-only requests return the exact duration without allocating or cloning unused preview
+  geometry. Full Preview may satisfy ETA; ETA alone cannot satisfy Preview. Preserve supersession,
+  quiet-window dispatch and a global four-result bound across both result capabilities.
+  Large full Preview responses cross the worker boundary as ordered, acknowledged chunks of at most
+  2,048 steps for both legacy and verified executable-plan routes. Retain every step and header,
+  including placement offsets. Publish only a complete validated route, and discard partial assembly
+  on cancellation or failure. This bounds the many small raster records per message; a single large
+  polyline is not subject to a universal byte-size promise.
+  Only the worker's newly constructed response may consume acknowledged step-array slots, releasing
+  its original route as the receiver accumulates the copy. Never mutate nested points, metadata,
+  prepared output or a shared in-process preview; keep the ordinary sender non-consuming.
+- Memoize the autosave wrapper within its mounted loop using immutable Project identity, document
+  epoch and persisted job setup/ordered selection. Successful unchanged saves can then be skipped;
+  edits, document replacement and cleared recovery slots remain eligible. Validate raster base64
+  without allocating a second cleaned copy while preserving the accepted alphabet, whitespace,
+  padding and unused-bit rules.
+  Recovery JSON may omit indentation while retaining every value, typed relief array and validation;
+  manual file formatting and durable ownership/atomicity remain unchanged.
+
+These changes do not change compiled motion, Frame or Start. Verification includes real-pointer
+red/green tests, native canvas pixel parity, worker/direct output parity, autosave lifecycle tests and
+before/after browser profiles. Hardware qualification is outside this display and scheduling change.
+
 ## ADR-289 - Relief XY scale is resolved before physical cutter geometry (2026-08-05)
 
 **Date:** 2026-08-05
