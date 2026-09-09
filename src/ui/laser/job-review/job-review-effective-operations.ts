@@ -13,7 +13,8 @@ export type JobReviewEffectiveOperation = {
   readonly cncActualMaxDepthMm?: number;
 };
 
-/** Summarize the groups that actually reached the exact prepared Job. */
+/** Summarize selected values from the exact prepared Job. Matching displayed
+ * summaries within one operation are combined; they do not establish complete group identity. */
 export function buildEffectiveOperationReview(
   job: Job,
   scene?: {
