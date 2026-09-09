@@ -16,6 +16,7 @@ function record(kind, detail = {}) {
 function installSerial() {
   let readController = null;
   let currentStatus = '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>';
+  const commandStatuses = new Map();
   const settings = new Map([
     [30, '1000'],
     [31, '0'],
@@ -40,6 +41,11 @@ function installSerial() {
       write(chunk) {
         const text = decoder.decode(chunk);
         record('serial-write', { text, bytes: Array.from(chunk) });
+        const commandStatus = commandStatuses.get(text);
+        if (commandStatus !== undefined) {
+          commandStatuses.delete(text);
+          emitLine(commandStatus);
+        }
         respondToSerialWrite(text, emitLine, () => currentStatus, settings);
       },
     });
@@ -76,6 +82,9 @@ function installSerial() {
   });
   return {
     emitLine,
+    setStatusAfterCommand(command, status) {
+      commandStatuses.set(command, status);
+    },
     setSetting(id, value) {
       settings.set(id, value);
       record('serial-setting-fixture', { id, value });
@@ -228,6 +237,7 @@ window.__KERFDESK_E2E__ = {
   events: state.events,
   savedFiles: state.savedFiles,
   emitSerialLine: serial.emitLine,
+  setSerialStatusAfterCommand: serial.setStatusAfterCommand,
   setSerialSetting: serial.setSetting,
   acknowledgeSerial: serial.acknowledge,
   disconnectSerial: serial.disconnect,

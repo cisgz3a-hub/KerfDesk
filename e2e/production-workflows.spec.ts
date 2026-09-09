@@ -522,29 +522,48 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  const pauseBytesBefore = serialWriteBytes(await kerfdesk.events()).length;
   await page.getByRole('button', { name: 'Pause' }).click();
-  await expect.poll(async () => serialWriteBytes(await kerfdesk.events())).toContain(0x84);
+  await expectRealtimeCommandThenStatusQuery(kerfdesk, pauseBytesBefore, 0x84);
   await kerfdesk.emitSerialLine(
     '<Door:0|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
   );
   await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
+  const resumeBytesBefore = serialWriteBytes(await kerfdesk.events()).length;
   await page.getByRole('button', { name: 'Resume' }).click();
+  await expectRealtimeCommandThenStatusQuery(kerfdesk, resumeBytesBefore, 0x7e);
   await kerfdesk.emitSerialLine('<Run|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:1500,0>');
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
-  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('~');
 
+  await kerfdesk.setAutoAcknowledge(true);
+  const abortWritesBefore = serialWrites(await kerfdesk.events()).length;
   await page.getByRole('button', { name: 'ABORT JOB', exact: true }).click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('\u0018');
   await expect(page.getByRole('button', { name: 'Set up & Frame', exact: true })).toBeVisible();
+  await expect
+    .poll(async () => serialWrites(await kerfdesk.events()).slice(abortWritesBefore))
+    .toContain('M9\n');
 
   await kerfdesk.emitSerialLine('ALARM:3');
+  // ALARM:3 is diagnostic text; update the fixture's polled state after Abort too.
+  await kerfdesk.emitSerialLine('<Alarm|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('alert')).toContainText('Alarm 3');
-  await kerfdesk.setAutoAcknowledge(true);
+  await kerfdesk.setAutoAcknowledge(false);
+  await kerfdesk.setSerialStatusAfterCommand(
+    '$H\n',
+    '<Home|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>',
+  );
+  const homeWritesBeforeRecovery = exactSerialWriteCount(await kerfdesk.events(), '$H\n');
   const settleWritesBeforeRecovery = exactSerialWriteCount(await kerfdesk.events(), 'G4 P0.01\n');
   await page.getByRole('button', { name: 'Home ($H)' }).click();
   await expect
+    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), '$H\n'))
+    .toBeGreaterThan(homeWritesBeforeRecovery);
+  await kerfdesk.acknowledgeSerial(1);
+  await expect
     .poll(async () => exactSerialWriteCount(await kerfdesk.events(), 'G4 P0.01\n'))
     .toBeGreaterThan(settleWritesBeforeRecovery);
+  await kerfdesk.acknowledgeSerial(1);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('alert')).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Set up & Frame', exact: true })).toBeEnabled();
@@ -663,6 +682,32 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await expect(
     recovery.getByTitle('Permanently discard only this isolated recovery capsule.'),
   ).toBeVisible();
+
+  // Make the live canvas differ from the archived run before opening its review.
+  await selectAll(page);
+  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('10');
+  await fillAndCommit(page, 'Selection X position', '47');
+  await page.getByRole('button', { name: 'Save As...' }).click();
+  const currentProject = await savedProject(kerfdesk);
+  const savedBeforeReview = fileSavedCount(await kerfdesk.events());
+  const writesBeforeReview = serialWriteBytes(await kerfdesk.events());
+
+  await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
+  const review = page.getByRole('dialog', { name: 'Review interrupted laser job' });
+  await expect(review).toContainText('Exact job artifact saved');
+  await expect(review).toContainText(
+    'Reviewing or closing this saved job does not change the current canvas',
+  );
+  await review.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(review).not.toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
+
+  await page.getByRole('button', { name: 'Save As...' }).click();
+  await expect
+    .poll(async () => fileSavedCount(await kerfdesk.events()))
+    .toBeGreaterThan(savedBeforeReview);
+  expect(await savedProject(kerfdesk)).toEqual(currentProject);
+  expect(serialWriteBytes(await kerfdesk.events())).toEqual(writesBeforeReview);
 });
 
 test('uses jog speed for XY buttons and return to work zero without hijacking canvas arrows', async ({
@@ -795,6 +840,21 @@ function serialWriteBytes(events: readonly Readonly<Record<string, unknown>>[]):
     if (!Array.isArray(bytes)) return [];
     return bytes.filter((value): value is number => typeof value === 'number');
   });
+}
+
+async function expectRealtimeCommandThenStatusQuery(
+  kerfdesk: KerfDeskFixture,
+  baselineBytes: number,
+  command: number,
+): Promise<void> {
+  await expect
+    .poll(async () => {
+      const bytes = serialWriteBytes(await kerfdesk.events()).slice(baselineBytes);
+      const commandIndex = bytes.indexOf(command);
+      // Polling can interleave writes; the command and query need not be adjacent.
+      return commandIndex >= 0 && bytes.slice(commandIndex + 1).includes(0x3f);
+    })
+    .toBe(true);
 }
 
 function serialWriteLineCount(events: readonly Readonly<Record<string, unknown>>[]): number {
