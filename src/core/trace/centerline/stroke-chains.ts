@@ -11,11 +11,16 @@
 
 import type { Polyline, Vec2 } from '../../scene';
 import { fairChainAlongArc } from './arc-fairing';
+import {
+  applyChainLoopClosure,
+  attachmentSpans,
+  retainChainAttachmentsSteps,
+} from './chain-attachments';
 import { smoothChainCurvature } from './chain-smoothing';
 import { refineChainForOutput } from './curve-refine';
 import type { InkMask } from './distance-field';
 import { bridgeNearbyEndsSteps, pairThroughJunctionsSteps, type Chain } from './junction-pairing';
-import { decideLoopClosure, LOOP_TOUCH_GAP_PX, type LoopClosureOptions } from './loop-closure';
+import { LOOP_TOUCH_GAP_PX, type LoopClosureOptions } from './loop-closure';
 import { pointAtArcDistance, radiusAtPosition } from './polyline-window';
 import { repairJunctionSeams, weldBranchEndsSteps } from './seam-repair';
 import { sharpenChainBendsSteps } from './sharpen-bends';
@@ -81,16 +86,23 @@ export function* assembleStrokePathsSteps(
   for (const chain of chains) {
     if (cooperate) yield;
     if (!chain.alive) continue;
-    chain.points = repairJunctionSeams(chain.points, chain.closed, junctions, distSq, mask.width);
+    chain.points = repairJunctionSeams(
+      chain.points,
+      chain.closed,
+      seamLandmarks(graph, junctions),
+      distSq,
+      mask.width,
+    );
   }
   yield* weldBranchEndsSteps(chains, junctions, Math.max(0, options.weldOpenEndsPx ?? 0));
+  const attachments = yield* retainChainAttachmentsSteps(chains);
   // Welds move endpoints; a ring whose ends both landed on the same target
   // may only NOW be closable.
   for (const chain of chains) {
-    if (chain.alive && !chain.closed) applyLoopClosure(chain, closure);
+    if (chain.alive && !chain.closed) applyChainLoopClosure(chain, closure, attachments.get(chain));
   }
   const simplifyEpsilonPx = SIMPLIFY_EPSILON_PX * Math.max(0.1, options.simplifyTolerance ?? 1);
-  return yield* finalizeChainsSteps(chains, distSq, mask, simplifyEpsilonPx);
+  return yield* finalizeChainsSteps(chains, distSq, mask, simplifyEpsilonPx, attachments);
 }
 
 // Raw graph chains → snapped (edge mode) and staircase-smoothed chains.
@@ -124,11 +136,8 @@ function closureOptionsFor(joinGapPx: number, alignedFactor: number): LoopClosur
   };
 }
 
-function applyLoopClosure(chain: Chain, closure: LoopClosureOptions): void {
-  const decision = decideLoopClosure(chain.points, closure);
-  if (decision.kind === 'open') return;
-  if (decision.dropLastPoint) chain.points.pop();
-  chain.closed = true;
+function seamLandmarks(graph: StrokeGraph, live: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+  return graph.seamJunctions ?? live;
 }
 
 function closeOrExtend(
@@ -142,7 +151,7 @@ function closeOrExtend(
   // Close cycles FIRST — a ring's two ends meet at a junction, and extending
   // them would walk 3 radii through the band in each direction (the "tail on
   // every ring" defect).
-  applyLoopClosure(chain, closure);
+  applyChainLoopClosure(chain, closure);
   if (chain.closed) return;
   if (isTrueTip(chain, 'start', junctions, distSq, mask.width)) {
     extendTip(chain, 'start', distSq, mask);
@@ -157,6 +166,7 @@ function* finalizeChainsSteps(
   distSq: Float64Array,
   mask: InkMask,
   simplifyEpsilonPx: number,
+  attachments: ReadonlyMap<Chain, ReadonlySet<Vec2>>,
 ): TraceSteps<Polyline[]> {
   const cooperate = yield;
   const result: Polyline[] = [];
@@ -167,17 +177,26 @@ function* finalizeChainsSteps(
     // Thinning chamfers drawn corners and round nibs round them; rebuild the
     // vertices before simplification eats the dense points the tangent
     // estimates need.
-    const sharpened = yield* sharpenChainBendsSteps(chain.points, chain.closed, distSq, mask.width);
+    const attached = attachments.get(chain);
+    const sharpened = yield* sharpenChainBendsSteps(
+      chain.points,
+      chain.closed,
+      distSq,
+      mask.width,
+      attached,
+    );
+    const pinned =
+      attached === undefined ? sharpened.corners : new Set([...sharpened.corners, ...attached]);
     // Even out the residual pixel-scale curvature noise on the DENSE chain
     // (corners pinned) before Douglas-Peucker samples it — otherwise every
     // sampled vertex inherits a slightly-wrong tangent and the curve facets
     // (the angular-bowl defect). Corners stay exact objects for output pinning.
-    const evened = smoothChainCurvature(sharpened.points, chain.closed, sharpened.corners);
+    const evened = smoothChainCurvature(sharpened.points, chain.closed, pinned);
     // The Taubin passes are blind to the multi-pixel lattice beat that reads
     // as wobble on smooth turns; the bounded arc-length quadratic fit removes
     // it before Douglas-Peucker can anchor vertices on its extremes.
-    const faired = fairChainAlongArc(evened, chain.closed, sharpened.corners);
-    const simplified = simplifyChain(faired, chain.closed, simplifyEpsilonPx);
+    const faired = fairChainAlongArc(evened, chain.closed, pinned);
+    const simplified = simplifyChain(faired, chain.closed, simplifyEpsilonPx, attached);
     if (simplified.length < 2) continue;
     if (!chain.closed && arcLength(simplified) < MIN_CHAIN_LENGTH_PX) continue;
     result.push({
@@ -397,8 +416,16 @@ export function simplifyChain(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
   epsilonPx: number,
+  anchors?: ReadonlySet<Vec2>,
 ): Vec2[] {
   if (points.length <= 2) return [...points];
+  if (anchors !== undefined && anchors.size > 0) {
+    const spans = attachmentSpans(points, closed, anchors, farthestIndexFrom(points, 0));
+    return spans.flatMap((span, index) => {
+      const simplified = douglasPeucker(span, epsilonPx);
+      return closed || index < spans.length - 1 ? simplified.slice(0, -1) : simplified;
+    });
+  }
   if (!closed) return douglasPeucker(points, epsilonPx);
   // Closed: anchor at 0 and the farthest point, simplify both halves.
   const anchor = farthestIndexFrom(points, 0);

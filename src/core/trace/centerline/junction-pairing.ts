@@ -117,20 +117,23 @@ function angleBetween(a: Vec2, b: Vec2): number {
 }
 
 function mergeEnds(a: ChainEnd, b: ChainEnd): void {
-  // Orient chain A to END at the junction and chain B to START at it.
+  // Orient chain A to END at the join and chain B to START at it.
   if (a.atStart) a.chain.points.reverse();
   if (!b.atStart) b.chain.points.reverse();
-  a.chain.points.push(...b.chain.points.slice(1));
+  const last = a.chain.points.at(-1);
+  const first = b.chain.points[0];
+  // A junction shares one point; a gap bridge must retain BOTH endpoints.
+  const duplicate = last !== undefined && first !== undefined && samePoint(last, first);
+  a.chain.points.push(...b.chain.points.slice(duplicate ? 1 : 0));
   b.chain.alive = false;
   b.chain.points = [];
 }
 
 const MIN_BRIDGE_ALIGNMENT = Math.cos((35 * Math.PI) / 180);
-// Within the join gap the bridge is lenient, but ends whose tangents clearly
-// RECEDE from each other (summed forwardness below this) are two separate
-// stroke tips that merely end near each other — welding them draws a
-// doubled-back hairpin (adjacent glyph terminals in small traced text).
-const MIN_BRIDGE_FORWARDNESS_SUM = -0.25;
+// A bridge needs positive forward progress across the gap. Receding tips and
+// side-by-side parallel terminals can be close without continuing one another;
+// a sideways bridge would turn two strokes into a doubled-back hairpin.
+const MIN_BRIDGE_FORWARDNESS_SUM = 0.25;
 // Corner tier: two edges meeting at a drawn corner approach the gap at up to
 // ~90° to each other, so neither passes the collinear-ALIGNED test — but both
 // still travel TOWARD each other. Canny drops pixels at exactly these

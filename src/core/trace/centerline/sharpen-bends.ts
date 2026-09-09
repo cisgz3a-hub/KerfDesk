@@ -64,8 +64,9 @@ export function sharpenChainBends(
   closed: boolean,
   distSq: Float64Array,
   width: number,
+  anchors?: ReadonlySet<Vec2>,
 ): SharpenedChain {
-  return runTraceSteps(sharpenChainBendsSteps(points, closed, distSq, width));
+  return runTraceSteps(sharpenChainBendsSteps(points, closed, distSq, width, anchors));
 }
 
 export function* sharpenChainBendsSteps(
@@ -73,6 +74,7 @@ export function* sharpenChainBendsSteps(
   closed: boolean,
   distSq: Float64Array,
   width: number,
+  anchors?: ReadonlySet<Vec2>,
 ): TraceSteps<SharpenedChain> {
   const cooperate = yield;
   let pts = [...points];
@@ -103,7 +105,7 @@ export function* sharpenChainBendsSteps(
           (closedMaxArm ??= arcLengthOf(pts) / CLOSED_ARM_LENGTH_DIVISOR),
         )
       : trySharpenOpen(pts, i, distSq, width);
-    if (bent === null || tooCloseToExistingCorner(bent.corner, corners)) {
+    if (!acceptableBend(bent, corners, anchors)) {
       i += 1;
       continue;
     }
@@ -120,6 +122,24 @@ export function* sharpenChainBendsSteps(
     i = closed ? 1 : bent.resumeAt;
   }
   return { points: pts, corners };
+}
+
+function dropsAnchor(points: ReadonlyArray<Vec2>, anchors: ReadonlySet<Vec2> | undefined): boolean {
+  if (anchors === undefined || anchors.size === 0) return false;
+  const retained = new Set(points);
+  return [...anchors].some((anchor) => !retained.has(anchor));
+}
+
+function acceptableBend(
+  bent: BendResult | null,
+  corners: ReadonlySet<Vec2>,
+  anchors: ReadonlySet<Vec2> | undefined,
+): bent is BendResult {
+  return (
+    bent !== null &&
+    !tooCloseToExistingCorner(bent.corner, corners) &&
+    !dropsAnchor(bent.points, anchors)
+  );
 }
 
 type BendResult = {

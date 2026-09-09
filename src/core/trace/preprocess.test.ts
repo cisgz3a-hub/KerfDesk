@@ -258,6 +258,23 @@ describe('despeckle', () => {
     expect(lumaOf(out, 1, 1)).toBe(255);
   });
 
+  it('can retain diagonal strokes while removing smaller eight-connected components', () => {
+    const img = gridImage([
+      [0, 255, 255, 255, 255, 255],
+      [255, 0, 255, 255, 255, 255],
+      [255, 255, 0, 255, 255, 255],
+      [255, 255, 255, 255, 255, 255],
+      [255, 255, 255, 255, 0, 255],
+      [255, 255, 255, 255, 255, 0],
+    ]);
+    const before = new Uint8ClampedArray(img.data);
+    const out = despeckle(img, 3, 8);
+    for (let i = 0; i < 3; i += 1) expect(lumaOf(out, i, i)).toBe(0);
+    expect(lumaOf(out, 4, 4)).toBe(255);
+    expect(lumaOf(out, 5, 5)).toBe(255);
+    expect(img.data).toEqual(before);
+  });
+
   it('preserves holes inside letter-like shapes (topology preserving)', () => {
     // 5×5 ink ring with a white hole in the middle — like the
     // interior of a letter O. The hole is a 1-pixel BACKGROUND

@@ -7,7 +7,12 @@
 
 import type { ColoredPath } from '../../scene';
 import { withCanonicalTraceCurves } from '../trace-curves';
-import { preprocessForTrace, type RawImageData, type TraceOptions } from '../trace-image';
+import {
+  effectivePixelScale,
+  preprocessForTrace,
+  type RawImageData,
+  type TraceOptions,
+} from '../trace-image';
 import { squaredDistanceFieldSteps, type InkMask } from './distance-field';
 import { thinToMedialAxisSteps } from './medial-thinning';
 import { buildStrokeGraph } from './stroke-graph';
@@ -33,7 +38,7 @@ export function* traceCenterlineStrokePathsSteps(
   options: TraceOptions,
 ): TraceSteps<ColoredPath[]> {
   const cooperate = yield;
-  const prepared = preprocessForTrace(image, options);
+  const prepared = preprocessForTrace(image, { ...options, traceMode: 'centerline' });
   if (cooperate) yield;
   const mask = inkMaskFromPrepared(prepared);
   if (!hasInk(mask)) return [];
@@ -41,11 +46,17 @@ export function* traceCenterlineStrokePathsSteps(
   const skeleton = yield* thinToMedialAxisSteps(mask, distSq);
   const graph = buildStrokeGraph(skeleton, mask.width, mask.height);
   if (cooperate) yield;
-  const condensed = condenseJunctions(graph, distSq, mask.width);
+  // Remove short corner spurs before measuring crossing arms. A replicated
+  // diagonal can otherwise present many tiny corridors instead of its drawn
+  // through-stroke. Condensation only contracts bridges between junctions;
+  // it creates no new leaves or degree-two nodes requiring a second prune.
+  const pruned = yield* pruneSpursSteps(graph, distSq, mask.width, DEFAULT_SPUR_OPTIONS);
+  const condensed = condenseJunctions(pruned, distSq, mask.width);
   if (cooperate) yield;
-  const pruned = yield* pruneSpursSteps(condensed, distSq, mask.width, DEFAULT_SPUR_OPTIONS);
-  const polylines = yield* assembleStrokePathsSteps(pruned, distSq, mask, {
-    joinGapPx: options.centerlineJoinGapPx ?? DEFAULT_JOIN_GAP_PX,
+  const polylines = yield* assembleStrokePathsSteps(condensed, distSq, mask, {
+    // Assembly measures the working grid; the option is a source-pixel
+    // distance, so automatic enlargement must enlarge its allowance too.
+    joinGapPx: (options.centerlineJoinGapPx ?? DEFAULT_JOIN_GAP_PX) * effectivePixelScale(options),
     // lineTolerance keeps its documented contract (higher = fewer vertices);
     // the preset default of 1 leaves the tuned epsilon unchanged.
     simplifyTolerance: options.lineTolerance,
