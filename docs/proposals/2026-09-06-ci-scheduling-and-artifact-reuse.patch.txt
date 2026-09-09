@@ -1,0 +1,468 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index eab8f52dc..4d411ef5d 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -3,7 +3,13 @@ name: CI
+ on:
+   push:
+     branches: [main]
++    paths-ignore:
++      - '**/*.md'
++      - 'docs/**'
+   pull_request:
++    paths-ignore:
++      - '**/*.md'
++      - 'docs/**'
+ 
+ # Cancel in-progress runs on the same PR / branch when a new commit lands.
+ concurrency:
+@@ -14,33 +20,142 @@ permissions:
+   contents: read
+ 
+ jobs:
+-  ci:
+-    name: Lint, typecheck, license, test, build
++  quality:
++    name: Static and policy checks
++    runs-on: ubuntu-latest
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v7
++
++      - name: Set up pnpm
++        # package.json's packageManager field is the single pnpm version source.
++        uses: pnpm/action-setup@v6
++
++      - name: Set up Node.js
++        uses: actions/setup-node@v6
++        with:
++          node-version: 22
++          cache: pnpm
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      - name: Run static and policy checks
++        run: |
++          pnpm typecheck
++          pnpm lint
++          pnpm lint:electron
++          pnpm format:check
++          pnpm license-check
++          pnpm audit:deps
++          pnpm check:file-size
++          pnpm check:soft-size
++          pnpm check:index-exports
++
++  unit_tests:
++    name: Unit tests (${{ matrix.shard }})
++    runs-on: ubuntu-latest
++    strategy:
++      fail-fast: true
++      matrix:
++        shard: ['1/4', '2/4', '3/4', '4/4']
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v7
++
++      - name: Set up pnpm
++        uses: pnpm/action-setup@v6
++
++      - name: Set up Node.js
++        uses: actions/setup-node@v6
++        with:
++          node-version: 22
++          cache: pnpm
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      - name: Run unit-test shard
++        run: pnpm exec vitest run --shard=${{ matrix.shard }}
++
++  web_build:
++    name: Web build artifact
++    runs-on: ubuntu-latest
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v7
++        with:
++          # The version badge uses the real revision count, not a shallow-clone count.
++          fetch-depth: 0
++
++      - name: Set up pnpm
++        uses: pnpm/action-setup@v6
++
++      - name: Set up Node.js
++        uses: actions/setup-node@v6
++        with:
++          node-version: 22
++          cache: pnpm
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      - name: Build web bundle
++        # TypeScript is a separate required lane; avoid compiling it twice here.
++        run: pnpm generate:notices && pnpm exec vite build
++
++      - name: Upload exact-revision web bundle
++        uses: actions/upload-artifact@v7
++        with:
++          name: kerfdesk-web-${{ github.sha }}
++          path: dist/web
++          if-no-files-found: error
++          retention-days: 7
++          # A GitHub "re-run jobs" attempt reuses the run id and artifact name.
++          overwrite: true
++
++  electron_build:
++    name: Electron main build
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v7
+ 
+       - name: Set up pnpm
+-        # No `with.version` — pnpm/action-setup@v6 rejects when both
+-        # the action input AND package.json's `packageManager` field
+-        # are set. We pin via packageManager: "pnpm@11.3.0" in
+-        # package.json (npm-standard, more specific). The action
+-        # reads it automatically.
+         uses: pnpm/action-setup@v6
+ 
+       - name: Set up Node.js
+         uses: actions/setup-node@v6
+         with:
+-          # Node 22 LTS — required by pnpm 11.3.0 (which uses node:sqlite,
+-          # added in Node 22.5). Bumped from 20 after pnpm/action-setup@v4
+-          # surfaced the version conflict. Node 20 goes EOL Apr 2026; 22
+-          # is the current LTS through Apr 2027.
+           node-version: 22
+           cache: pnpm
+ 
+       - name: Install dependencies
+         run: pnpm install --frozen-lockfile
+ 
+-      - name: Release verification gate
+-        run: pnpm release:check
++      - name: Build Electron main process
++        run: pnpm build:electron-main
++
++  ci:
++    name: Lint, typecheck, license, test, build
++    if: ${{ always() }}
++    needs: [quality, unit_tests, web_build, electron_build]
++    runs-on: ubuntu-latest
++    steps:
++      - name: Require every CI lane to pass
++        env:
++          QUALITY_RESULT: ${{ needs.quality.result }}
++          UNIT_TESTS_RESULT: ${{ needs.unit_tests.result }}
++          WEB_BUILD_RESULT: ${{ needs.web_build.result }}
++          ELECTRON_BUILD_RESULT: ${{ needs.electron_build.result }}
++        run: |
++          for result in \
++            "${QUALITY_RESULT}" \
++            "${UNIT_TESTS_RESULT}" \
++            "${WEB_BUILD_RESULT}" \
++            "${ELECTRON_BUILD_RESULT}"; do
++            if [ "${result}" != "success" ]; then
++              echo "Required CI lane ended with: ${result}"
++              exit 1
++            fi
++          done
+diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
+index 7cae407a8..2896175b4 100644
+--- a/.github/workflows/deploy.yml
++++ b/.github/workflows/deploy.yml
+@@ -1,14 +1,8 @@
+ name: Deploy to Cloudflare Pages
+ 
+-# Runs AFTER the CI workflow succeeds on main (R-H5 audit fix —
+-# previously deploy ran in parallel with CI, so a commit that broke
+-# tests / lint but built cleanly would publish). Manual trigger from
+-# the Actions tab still works for re-deploys without a new commit
+-# (e.g. after editing _headers).
+-#
+-# Cloudflare Pages serves a "Preview" environment per branch by default;
+-# the Pages project production branch is main, matching the GitHub
+-# default branch. See note in package.json's deploy:web script.
++# A successful main CI run already built and verified the exact web revision.
++# Normal deploys consume that immutable workflow artifact instead of repeating
++# the full release gate. Manual deploys still rebuild and re-prove main.
+ on:
+   workflow_run:
+     workflows: [CI]
+@@ -16,74 +10,71 @@ on:
+     branches: [main]
+   workflow_dispatch:
+ 
+-# Cancel a queued deploy if a newer commit lands while one is running.
+-# Cloudflare Pages handles a fast cancel gracefully (the in-flight one
+-# completes; the new one queues right after).
++# Keep the in-flight deploy, but replace an older queued deploy with the newest.
+ concurrency:
+   group: deploy-${{ github.ref }}
+   cancel-in-progress: false
+ 
+-# Required for actions/checkout — read access is enough; the deploy
+-# itself authenticates via CLOUDFLARE_API_TOKEN, not GITHUB_TOKEN.
+ permissions:
++  actions: read
+   contents: read
+ 
+ jobs:
+   deploy:
+-    name: Build + deploy web bundle
++    name: Deploy verified web bundle
+     runs-on: ubuntu-latest
+-    # workflow_run fires for EVERY CI completion (success + failure).
+-    # Manual dispatches are production deploys, so the selected ref must
+-    # be main and the job still re-runs the shared release gate below.
++    # workflow_run fires for every CI conclusion. Manual deploys must target main.
+     if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v7
+         with:
+-          # M33 (AUDIT-2026-06-10): for workflow_run events GITHUB_SHA is the
+-          # default branch's CURRENT tip, not the commit whose CI succeeded —
+-          # a push race (or a re-run of an old green CI) would deploy a
+-          # different commit than the one validated. Pin the checkout to the
+-          # triggering run's head SHA; manual dispatches deploy the selected
+-          # ref (gated to main above) and re-prove everything below anyway.
++          # Pin workflow_run deploys to the exact successful CI revision. Full
++          # history preserves the correct version badge for manual rebuilds.
+           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+-          # Fetch full history so the version badge's `git rev-list --count
+-          # HEAD` (the auto build number, see vite.config.ts appVersion) is the
+-          # real total, not the shallow-clone 1. `git rev-parse --short HEAD`
+-          # for the SHA works at any depth.
+           fetch-depth: 0
+ 
+       - name: Set up pnpm
+-        # See ci.yml for why no `with.version` — package.json's
+-        # packageManager field is the single source of truth.
+         uses: pnpm/action-setup@v6
+ 
+       - name: Set up Node.js
+         uses: actions/setup-node@v6
+         with:
+-          # Node 22 LTS — see ci.yml comment. pnpm 11.3.0 needs ≥22.13.
+           node-version: 22
+           cache: pnpm
+ 
+-      - name: Install dependencies
++      - name: Install dependencies for manual rebuild
++        if: github.event_name == 'workflow_dispatch'
+         run: pnpm install --frozen-lockfile
+ 
+       - name: Verify canonical deployment repository
+         run: pnpm guard:repo
+ 
+-      - name: Release verification gate
++      - name: Download exact successful CI bundle
++        if: github.event_name == 'workflow_run'
++        uses: actions/download-artifact@v8
++        with:
++          name: kerfdesk-web-${{ github.event.workflow_run.head_sha }}
++          path: dist/web
++          github-token: ${{ github.token }}
++          repository: ${{ github.repository }}
++          run-id: ${{ github.event.workflow_run.id }}
++
++      - name: Release verification gate for manual deploy
++        if: github.event_name == 'workflow_dispatch'
+         run: pnpm release:check
+ 
++      - name: Verify deployable bundle
++        shell: bash
++        run: test -f dist/web/index.html
++
+       - name: Publish to Cloudflare Pages
+-        # cloudflare/wrangler-action is the official Cloudflare action.
+-        # v4 installs Wrangler CLI v4 by default (matches this repo's
+-        # wrangler ^4.100.0); the apiToken/accountId/command inputs are
+-        # unchanged from v3. The `command` is the standard `wrangler pages
+-        # deploy` invocation; the action handles auth via the env vars.
+         uses: cloudflare/wrangler-action@v4
+         with:
+           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+-          # The 'laserforge' Pages project serves the canonical release URL
+-          # https://kerfdesk.com (Pages default fallback: laserforge-2fj.pages.dev).
++          wranglerVersion: 4.100.0
++          packageManager: pnpm
++          # The laserforge Pages API project serves https://kerfdesk.com
++          # (fallback: https://laserforge-2fj.pages.dev).
+           command: pages deploy dist/web --project-name=laserforge --branch=main
+diff --git a/.github/workflows/e2e.yml b/.github/workflows/e2e.yml
+index 668361024..f9386df3a 100644
+--- a/.github/workflows/e2e.yml
++++ b/.github/workflows/e2e.yml
+@@ -9,7 +9,13 @@ name: Browser smoke
+ on:
+   push:
+     branches: [main]
++    paths-ignore:
++      - '**/*.md'
++      - 'docs/**'
+   pull_request:
++    paths-ignore:
++      - '**/*.md'
++      - 'docs/**'
+   workflow_dispatch:
+ 
+ concurrency:
+diff --git a/DECISIONS.md b/DECISIONS.md
+index db28d4804..9e67fcc1f 100644
+--- a/DECISIONS.md
++++ b/DECISIONS.md
+@@ -199,6 +199,7 @@
+ | ADR-232 | 2026-07-19 | Accepted (governing) | Physical Frame completion is the spatial source of truth |
+ | ADR-233 | 2026-07-19 | Accepted | Revisioned machine-aware CNC starters initialize new operations without rewriting jobs |
+ | ADR-234 | 2026-07-19 | Accepted, hardware verification pending | Bounded feed-matched fill entries for the 4040-safe profile |
++| ADR-235 | 2026-07-19 | Accepted | Parallel full-suite CI and exact-revision deploy artifacts |
+ 
+ ---
+ 
+@@ -10149,3 +10150,51 @@ transitions untouched, especially on alternating reverse rows.
+ - A property test covers arbitrary split gaps and proves monotonic non-overlapping entry geometry.
+ - Generic/Falcon emitter tests remain byte-identical, while planner, preview, and motion-bounds
+   tests assert parity with the emitted 4040 runway geometry.
++
++---
++
++## ADR-235 - Parallel full-suite CI and exact-revision deploy artifacts
++
++**Date:** 2026-07-19
++**Status:** Accepted (maintainer request to make GitHub CI and deployment faster)
++
++### Context
++
++Core CI ran `release:check` as one serial job. A measured main run spent about 18 of its 21 minutes
++in 1,056 Vitest files because the two-vCPU runner intentionally uses one Vitest worker to prevent
++orchestrator starvation. After that run passed, the Cloudflare workflow checked out the same SHA
++and repeated the full gate for another 21 minutes even though the Pages upload took seconds.
++Dependency caching was already active and installation took about ten seconds, so caching could not
++materially reduce the critical path.
++
++### Decision
++
++1. Keep `release:check` as the serial local, manual-deploy, and desktop-release authority. Core
++   GitHub CI preserves the same checks collectively, but divides them into parallel static/policy,
++   web-build, Electron-build, and unit-test lanes.
++2. Run Vitest as four file shards on four GitHub runners. Each runner retains the existing CI limit
++   of one Vitest worker, so sharding reduces wall time without reintroducing the worker-RPC
++   starvation that the limit prevents. An aggregate job with the established CI check name fails
++   unless every lane and every shard succeeds.
++3. Build the web bundle from full Git history so its revision count and SHA remain correct, then
++   upload `dist/web` as a seven-day artifact named for that exact workflow SHA. Documentation-only
++   changes skip core CI and browser smoke; source, configuration, and workflow changes retain the
++   complete gates.
++4. A normal main deployment may run only after that exact CI workflow succeeds. It checks out the
++   triggering SHA and downloads the web artifact from the triggering workflow run with read-only
++   Actions permission. Missing artifacts, digest mismatch, or a missing `index.html` fail before
++   Cloudflare publication. The deploy never substitutes a bundle from another SHA or run.
++5. A manually dispatched deploy has no originating CI artifact, so it retains the full
++   `release:check` rebuild before publication. ADR-158 remains unchanged: browser smoke is visible
++   and independent, not an additional production-deploy dependency.
++
++### Consequences
++
++- Code changes still exercise every unit, property, snapshot, type, lint, license, dependency,
++  build, and policy check; the optimization changes scheduling rather than coverage.
++- The expected core-CI critical path falls from about 21 minutes to roughly 5-7 minutes, and normal
++  commit-to-production time no longer includes a second 21-minute verification pass.
++- Four test runners and separate build/quality runners use more concurrent capacity and modestly
++  more setup minutes. Cancellation still retires obsolete branch runs when a newer commit lands.
++- The CI-produced web bundle becomes the deployment input, removing the previous build-after-check
++  time-of-check/time-of-use gap while retaining an exact-SHA checkout for repository provenance.
+diff --git a/PROJECT.md b/PROJECT.md
+index 9f41f0868..bcfe47aa5 100644
+--- a/PROJECT.md
++++ b/PROJECT.md
+@@ -1,6 +1,6 @@
+ # PROJECT.md — LaserForge 2.0
+ 
+-> **Status:** v3.9 — revisioned machine-aware CNC starters (ADR-233), the actual completed Frame as the spatial source of truth with calculated bounds/settings kept advisory (ADR-232), a public-spec 4040 hybrid profile (ADR-231), exact-artifact pre-Frame Job Review and a completion-issued Start permit (ADR-230), and the read-only Super console (ADR-229). A completed Frame for the exact current job remains the sole Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 233. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
++> **Status:** v3.9 — parallel full-suite CI and exact-revision deploy artifacts (ADR-235), bounded feed-matched fill entries for the 4040-safe profile (ADR-234), revisioned machine-aware CNC starters (ADR-233), the actual completed Frame as the spatial source of truth with calculated bounds/settings kept advisory (ADR-232), a public-spec 4040 hybrid profile (ADR-231), exact-artifact pre-Frame Job Review and a completion-issued Start permit (ADR-230), and the read-only Super console (ADR-229). A completed Frame for the exact current job remains the sole Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 235. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+ >
+ > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
+ 
+@@ -329,7 +329,7 @@ phase; tracked here so they don't get lost.
+   - `eslint max-lines`, `max-lines-per-function`, `complexity` (file-size enforcement).
+   - `license-checker` in CI (license-compliance enforcement).
+   - Prettier.
+-- **CI:** GitHub Actions on `ubuntu-latest`. The release/deploy gate runs lint, typecheck, license-check, unit, property, snapshot, web build, and Electron main-process compile. Playwright runs in a separate pull-request/manual browser-smoke workflow so browser provisioning cannot time out a production deploy (ADR-158). The Windows desktop `.exe` (`build:desktop`, electron-builder) and hardware verification remain release-manual (S02-001/003).
++- **CI:** GitHub Actions on `ubuntu-latest`. Core CI runs lint, typecheck, license and dependency policy, four full-suite Vitest shards, web build, and Electron main-process compile as parallel required lanes. A successful main run publishes the exact-revision web bundle artifact consumed by deployment; manual deploys re-run the serial `release:check` gate (ADR-235). Playwright runs in a separate pull-request/manual browser-smoke workflow so browser provisioning cannot time out a production deploy (ADR-158). The Windows desktop `.exe` (`build:desktop`, electron-builder) and hardware verification remain release-manual (S02-001/003).
+ - **Repo:** Single Git repo, MIT license, public (ADR-120 supersedes ADR-018's private posture).
+ 
+ ---
+diff --git a/src/platform/web/deploy-workflow-gate.test.ts b/src/platform/web/deploy-workflow-gate.test.ts
+index 0ad43dc65..8a0146d94 100644
+--- a/src/platform/web/deploy-workflow-gate.test.ts
++++ b/src/platform/web/deploy-workflow-gate.test.ts
+@@ -66,8 +66,9 @@ describe('Cloudflare production deploy gate', () => {
+     expect(workflow).toContain('github.event.workflow_run.head_sha');
+   });
+ 
+-  it('runs repo identity proof and CI gates before Wrangler publishes', () => {
++  it('publishes only an exact successful CI artifact or a manually re-proved bundle', () => {
+     const workflow = repoFile('.github/workflows/deploy.yml');
++    const ciWorkflow = repoFile('.github/workflows/ci.yml');
+     const packageJson = JSON.parse(repoFile('package.json')) as {
+       scripts: Record<string, string>;
+     };
+@@ -79,9 +80,25 @@ describe('Cloudflare production deploy gate', () => {
+     expect(publishIndex).toBeGreaterThanOrEqual(0);
+ 
+     const repoGuardIndex = commandIndex(workflow, 'pnpm guard:repo');
+-    expect(commandIndex(workflow, 'pnpm release:check')).toBeLessThan(publishIndex);
++    const artifactDownloadIndex = workflow.indexOf('uses: actions/download-artifact@v8');
++    const manualReleaseIndex = commandIndex(workflow, 'pnpm release:check');
++    const bundleProofIndex = commandIndex(workflow, 'test -f dist/web/index.html');
++
++    expect(artifactDownloadIndex).toBeGreaterThanOrEqual(0);
++    expect(repoGuardIndex).toBeLessThan(artifactDownloadIndex);
++    expect(artifactDownloadIndex).toBeLessThan(bundleProofIndex);
++    expect(manualReleaseIndex).toBeLessThan(bundleProofIndex);
++    expect(bundleProofIndex).toBeLessThan(publishIndex);
+     expect(repoGuardIndex).toBeLessThan(publishIndex);
+     expect(releaseCheck).not.toContain('pnpm guard:repo');
++    expect(ciWorkflow).toContain('uses: actions/upload-artifact@v7');
++    expect(ciWorkflow).toContain('name: kerfdesk-web-${{ github.sha }}');
++    expect(ciWorkflow).toContain('path: dist/web');
++    expect(ciWorkflow).toContain('overwrite: true');
++    expect(workflow).toContain('actions: read');
++    expect(workflow).toContain('name: kerfdesk-web-${{ github.event.workflow_run.head_sha }}');
++    expect(workflow).toContain('run-id: ${{ github.event.workflow_run.id }}');
++    expect(workflow).toContain('github-token: ${{ github.token }}');
+ 
+     const requiredBeforePublish = [
+       'pnpm typecheck',
+diff --git a/src/platform/web/repo-policy.test.ts b/src/platform/web/repo-policy.test.ts
+index 3bec3e00a..74ea095ab 100644
+--- a/src/platform/web/repo-policy.test.ts
++++ b/src/platform/web/repo-policy.test.ts
+@@ -77,7 +77,7 @@ describe('repository policy enforcement contract', () => {
+     );
+   });
+ 
+-  it('uses one cross-platform file-size backstop in CI and deploy workflows', () => {
++  it('uses one cross-platform file-size backstop in serial and parallel CI gates', () => {
+     const packageJson = JSON.parse(repoFile('package.json')) as {
+       readonly scripts?: {
+         readonly ['check:file-size']?: string;
+@@ -92,8 +92,9 @@ describe('repository policy enforcement contract', () => {
+       'node scripts/check-file-size-policy.mjs',
+     );
+     expect(releaseCheck).toContain('pnpm check:file-size');
+-    expect(ciWorkflow).toContain('run: pnpm release:check');
++    expect(ciWorkflow).toContain('pnpm check:file-size');
+     expect(deployWorkflow).toContain('run: pnpm release:check');
++    expect(deployWorkflow).toContain("if: github.event_name == 'workflow_dispatch'");
+   });
+ 
+   it('exposes the local RTSP camera bridge for browser development', () => {
