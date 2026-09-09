@@ -1,5 +1,7 @@
-import { classifyResponse, describeAlarm, describeError } from '../../core/controllers/grbl';
+import { classifyResponse } from '../../core/controllers/grbl';
+import { presentAlarm, presentError } from '../../core/controllers/grbl/response-presentation';
 import type { ControllerEvent } from '../../core/controllers';
+import type { ControllerKind } from '../../core/devices';
 
 export const TRANSCRIPT_MAX = 500;
 
@@ -57,6 +59,7 @@ export function inboundTranscriptEntry(
   // Callers on the live line path pass the active driver's classification;
   // the GRBL classifier is only the fallback for display-time/test use.
   response: ControllerEvent = classifyResponse(raw),
+  controllerKind: ControllerKind = 'grbl-v1.1',
 ): SerialTranscriptEntry {
   return {
     id,
@@ -65,7 +68,7 @@ export function inboundTranscriptEntry(
     raw,
     kind: inboundKind(response),
     source: 'controller',
-    ...decoded(response),
+    ...decoded(response, controllerKind),
   };
 }
 
@@ -119,21 +122,24 @@ function outboundKind(raw: string): TranscriptKind {
   return 'gcode';
 }
 
-function decoded(response: ControllerEvent): { readonly decoded: string } | Record<string, never> {
+function decoded(
+  response: ControllerEvent,
+  controllerKind: ControllerKind,
+): { readonly decoded: string } | Record<string, never> {
   if (response.kind === 'error') {
     if (response.code === null) {
       return { decoded: `Unrecognized controller error: ${response.raw ?? 'error'}` };
     }
-    const desc = describeError(response.code);
+    const desc = presentError(controllerKind, response.code);
     return desc === null
       ? { decoded: `Error ${response.code}` }
-      : { decoded: `${desc.title}: ${desc.detail}` };
+      : { decoded: desc.detail === undefined ? desc.title : `${desc.title}: ${desc.detail}` };
   }
   if (response.kind === 'alarm') {
-    const desc = describeAlarm(response.code);
+    const desc = presentAlarm(controllerKind, response.code);
     return desc === null
       ? { decoded: `Alarm ${response.code}` }
-      : { decoded: `${desc.title}: ${desc.detail}` };
+      : { decoded: desc.detail === undefined ? desc.title : `${desc.title}: ${desc.detail}` };
   }
   return {};
 }
